@@ -11,4 +11,4 @@ on each roomba:
   - USB wifi card
   - microphone
   - speaker
-- MAYBE a master relay which can be turned off programatically to save the roomba from discharging
+- MAYBE a master relay which can be turned off programatically to save the roomba from discharging. based on battery voltage plus urgent battery #?

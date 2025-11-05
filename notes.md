@@ -10,6 +10,8 @@ this event will be sent all of the module data at once, in JSON
 
 split each JSON element to the UI element functions
 
+one single system for loading and saving user settings
+
 
 ## esp-server comms
 
@@ -19,6 +21,6 @@ rover's name
 enable / disable for each motor
 camera IP address
 battery info (for different battery behaviors):
-    full number
-    warn number
-    urgent number
+- full number
+- warn number
+- urgent number
