@@ -3,7 +3,7 @@ create_2_Open_Interface_Spec.txt
 
 
 
-
-.node_modules
+logs
+node_modules/
 .pio
-.vscode
+.vscode/
