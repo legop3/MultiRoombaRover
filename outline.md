@@ -1,111 +1,44 @@
-# notes and ideas
-
-the multi-roombarover. 
-control multiple roombas through a web UI. On each roomba is an esp32 and an IP camera.
-telepresence style. low latency, even sometimes over consistency.
-
-# STARTING OUT
-
-command the roomba directly from the web UI
-
-web UI (socket.io) -> server
-server (rover link websocket) -> esp32 on the roomba 
-
-- esp32 websocket firmware
-  - the esp32 will connect to the roomba's OI
-  - the esp32 will connect to wifi
-  - the esp32 will connect to the websocket server
-  - the esp32 will listen for drive and mode commands from the server
-  - the esp32 will tell the roomba to start a stream of all sensors
-  - the esp32 will pulse the roombas BRC pin for 1 second every minute to keep it awake
-  - on each loop in the firmware
-    - run commands on the roomba from what websocket is telling the rover to do (this NEEDS to be unblockable, high priority, and very low latency from web UI keypress to roomba moving)
-    - decode ONE full set of sensors from the stream and sends it to the server over websockets
-- simple server for testing
-  - rover link websocket server
-  - express web server
-    - with socket.io for communicating with web clients
-  - the web client socket.io server and the rover link websocket server are COMPLETELY SEPERATE, even put the rover websocket server on a different port just to make sure
-  - follow the module structure outlined below
-- simple web client for testing
-  - plain html for now. minimal css.
-  - buttons in web client to start out with
-    - start OI
-    - safe mode
-    - full mode
-    - seek dock
-    - start sensor stream
-    - stop sensor stream
-
 ## esp32 firmware
+- platform.io
+- pull the roomba's BRC pin low (ground it) for 1 second every minute to keep it awake (pin 5)
+- connect to wifi
+  - disable wifi power saving
+  - reconnect if needed
+- connect to server
+  - reconnect if needed
+- hooked up to the roomba's UART on pins 16 and 17
+- send raw roomba sensor data to the server, requesting ALL of the sensors from the roomba. data will be decoded on the server.
+- listen to commands from the server for wheel motor speeds, aux. motor speeds, OI mode, seek dock, and song commands
+- input from user to roomba MUST be prioritized. sensor data needs to be accurate, and constant, but is allowed to have blips where it slows down or whatever
 
-defined in platformio.ini:
-rover's name
-server's IP address
-wifi connection info
-enable / disable for each motor
-- main brush
-- side brush
-- vacuum
-camera IP address
-battery info (for different battery behaviors):
-- full number (2068)
-- warn number (1700)
-- urgent number (1650)
+## esp32 -> server communication
+- needs to be something stateless, that doesn't care if the wifi hiccups on the esp32 side, because it can and will
+  - communication to and from the server needs to be "stream style"
+- needs to be light and fast
+- connection inconsistencies CANNOT create queued up events in either direction
+- the server needs to know and track which roombas are connected at any given time
 
+## nodejs server
+- KISS
+- decode the sensor data from each roomba
+- can support multiple roombas connected from the ground up
+- keep it simple, worry about getting the esp32 firmware right.
+  - but the server DOES have to exist for testing
+- IS the web server, hosts an entire static folder for the web UI
 
-esp32-s3 firmware, platformio
-UART hooked up to the roomba's OI port
-one more GPIO on the roomba's BRC pin
-- pulsing low for one second every minute to keep the roomba awake
+## server -> web UI communication
+- socket.io
+- don't do anything fancy with the socket.io setup
+  - it works fine out of the box, we will optimize it later
 
+## the web UI
+- KISS
+- plain old html. no styling even. just bare minimum for testing
+- what it needs to do:
+  - allow user to select the roomba from a list
+  - make the selected roomba drive with WASD
+  - have buttons to set the OI mode, and tell the roomba to dock
+  - show a plain list of the sensor data from the selected roomba
 
-
-## esp-server comms
-
-the ESP will report to the server when it connects:
-
-rover's name
-enable / disable for each motor
-- main brush
-- side brush
-- vacuum
-camera IP address
-battery info (for different battery behaviors):
-- full number (2068)
-- warn number (1700)
-- urgent number (1650)
-
-
-the ESP will poll the roomba for ALL sensors, decode them, and send them to the server, which will forward it to clients over socket.io
-
-## server
-
-nodejs server, ES6 imports and exports
-
-one entrypoint file, the only thing in this file should be a bunch of imports for our "modules", imported in the right order
-modules should NOT be intertwined within the entrypoint file
-all of the modules will import what they need from the other modules
-all of the modules will export what they need other modules to know
-
-create global express, websocket, and socket.io instances for all of the modules to share. modules will add their own listeners / senders
-
-## frontend
-
-javascript is ES6, same module style as the server.
-
-UI is made in HTML with CDN tailwind. NO BUNDLERS.
-
-each frontend module will have a JSON state update over socket.io
-each module will export a function to update it's state
-
-use these functions to update all modules on connect, from a UI init state event.
-this event will be sent all of the module data at once, in JSON
-
-split each JSON element to the UI element functions
-
-one single system for loading and saving user settings to cookies / browser storage
-
-the UI:
-- WASD rover movement controls
-- buttons to enable OI, enter safe mode, full mode, and seek dock
+## closing notes
+- keep the user input path (web UI -> server -> roomba) as light and responsive as possible. responsiveness is key for this.
