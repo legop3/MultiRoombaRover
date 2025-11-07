@@ -2,6 +2,40 @@
 
 the multi-roombarover. 
 control multiple roombas through a web UI. On each roomba is an esp32 and an IP camera.
+telepresence style. low latency, even sometimes over consistency.
+
+# STARTING OUT
+
+command the roomba directly from the web UI
+
+web UI (socket.io) -> server
+server (rover link websocket) -> esp32 on the roomba 
+
+- esp32 websocket firmware
+  - the esp32 will connect to the roomba's OI
+  - the esp32 will connect to wifi
+  - the esp32 will connect to the websocket server
+  - the esp32 will listen for drive and mode commands from the server
+  - the esp32 will tell the roomba to start a stream of all sensors
+  - the esp32 will pulse the roombas BRC pin for 1 second every minute to keep it awake
+  - on each loop in the firmware
+    - run commands on the roomba from what websocket is telling the rover to do (this NEEDS to be unblockable, high priority, and very low latency from web UI keypress to roomba moving)
+    - decode ONE full set of sensors from the stream and sends it to the server over websockets
+- simple server for testing
+  - rover link websocket server
+  - express web server
+    - with socket.io for communicating with web clients
+  - the web client socket.io server and the rover link websocket server are COMPLETELY SEPERATE, even put the rover websocket server on a different port just to make sure
+  - follow the module structure outlined below
+- simple web client for testing
+  - plain html for now. minimal css.
+  - buttons in web client to start out with
+    - start OI
+    - safe mode
+    - full mode
+    - seek dock
+    - start sensor stream
+    - stop sensor stream
 
 ## esp32 firmware
 
