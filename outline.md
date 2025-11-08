@@ -64,3 +64,4 @@
 - responsiveness is the name of the game. The future of this program is teleoperation over the internet, with a camera on each roomba. keyboard inputs from the user must be near instant.
 - on the esp32 firmware side of things, sensor data is second priority to having a responsive control system
   - but sensor data DOES have to exist.
+- the future of this project will involve assigning one roomba to a user, make the server able to do that from the ground up.
