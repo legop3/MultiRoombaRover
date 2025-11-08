@@ -12,6 +12,8 @@
   - enable OI
   - safe mode
   - full mode
+  - play song
+  - load song
 
 ## esp32 -> server communication
 - one UDP stream to the esp32 for controlling the roomba
