@@ -12,3 +12,7 @@ on each roomba:
   - microphone
   - speaker
 - MAYBE a master relay which can be turned off programatically to save the roomba from discharging. based on battery voltage plus urgent battery #?
+
+UDP:
+one control stream out to the esp32
+one raw data sensor stream in form the esp32

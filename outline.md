@@ -1,22 +1,32 @@
 ## esp32 firmware
-- platform.io
-- pull the roomba's BRC pin low (ground it) for 1 second every minute to keep it awake (pin 5)
-- connect to wifi
-  - disable wifi power saving
-  - reconnect if needed
-- connect to server
-  - reconnect if needed
 - hooked up to the roomba's UART on pins 16 and 17
-- send raw roomba sensor data to the server, requesting ALL of the sensors from the roomba. data will be decoded on the server.
-- listen to commands from the server for wheel motor speeds, aux. motor speeds, OI mode, seek dock, and song commands
-- input from user to roomba MUST be prioritized. sensor data needs to be accurate, and constant, but is allowed to have blips where it slows down or whatever
+- pin 5 is connected to the roomba's BRC pin
+  - pulse the BRC pin low for 1 second every minute to keep the roomba awake
+- connect to wifi
+- connect to the server
+- get a full frame of sensor group 100 from the roomba every 500ms
+  - send it to the server over the sensor UDP stream
+- listen to the server's control UDP stream (per roomba) and do the following accordingly:
+  - set wheel speeds
+  - seek dock
+  - enable OI
+  - safe mode
+  - full mode
 
 ## esp32 -> server communication
-- needs to be something stateless, that doesn't care if the wifi hiccups on the esp32 side, because it can and will
-  - communication to and from the server needs to be "stream style"
-- needs to be light and fast
-- connection inconsistencies CANNOT create queued up events in either direction
-- the server needs to know and track which roombas are connected at any given time
+- one UDP stream to the esp32 for controlling the roomba
+  - might look like this:
+    - left wheel speed
+    - right wheel speed
+    - OI mode
+    - seek dock?
+  - blasts out at a constant rate from the server for each roomba
+  - the esp32 will listen, and follow the latest command that it sees
+- one UDP stream from the esp32 to the server for sending sensor data frames and other telemetry
+  - one full frame of sensor data per datagram
+  - send raw sensor data, the server will decode it
+  - add other telemetry from the esp32, like signal strength, etc. 
+  - maybe use this stream as a sign that the esp32 is still running healthily?
 
 ## nodejs server
 - KISS
@@ -40,5 +50,15 @@
   - have buttons to set the OI mode, and tell the roomba to dock
   - show a plain list of the sensor data from the selected roomba
 
+### general javascript programming guidelines (applies to the web UI too)
+- everything ES6
+  - one entrypoint file in the web UI
+- everything modular
+- everything easy to read, understand, and work on
+- comment where you think is best to describe whats going on
+
 ## closing notes
 - keep the user input path (web UI -> server -> roomba) as light and responsive as possible. responsiveness is key for this.
+- responsiveness is the name of the game. The future of this program is teleoperation over the internet, with a camera on each roomba. keyboard inputs from the user must be near instant.
+- on the esp32 firmware side of things, sensor data is second priority to having a responsive control system
+  - but sensor data DOES have to exist.
