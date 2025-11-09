@@ -7,3 +7,5 @@ logs
 node_modules/
 .pio
 .vscode/
+include/config.h
+server/robots.json

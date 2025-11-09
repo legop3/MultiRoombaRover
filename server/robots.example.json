@@ -1,0 +1,7 @@
+[
+  {
+    "id": "roomba-alpha",
+    "controlPort": 50010,
+    "maxWheelSpeed": 350
+  }
+]

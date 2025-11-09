@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>MultiRoombaRover</title>
+  </head>
+  <body>
+    <main>
+      <h1>MultiRoombaRover</h1>
+      <section>
+        <label for="robotSelect">Select Roomba:</label>
+        <select id="robotSelect"></select>
+      </section>
+      <section id="driveHints">
+        <p>Use WASD for drive control. Release keys to stop.</p>
+        <div>
+          <button id="safeModeBtn">Safe Mode</button>
+          <button id="fullModeBtn">Full Mode</button>
+          <button id="enableOiBtn">Enable OI</button>
+          <button id="seekDockBtn">Seek Dock</button>
+        </div>
+      </section>
+      <section>
+        <label for="songSlot">Song Slot:</label>
+        <input type="number" id="songSlot" value="0" min="0" max="15" />
+        <button id="playSongBtn">Play Song</button>
+      </section>
+      <section>
+        <h2>Telemetry</h2>
+        <pre id="telemetrySummary"></pre>
+        <pre id="sensorList"></pre>
+      </section>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
