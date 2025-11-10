@@ -9,6 +9,10 @@ paths:
     source: rpiCamera
     rpiCameraWidth: 1280
     rpiCameraHeight: 720
-    # rpiCameraFrameRate: 30
+    rpiCameraFPS: 30
+    rpiCameraBitrate: 2500000
+    rpiCameraIDRPeriod: 30
+    rpiCameraExposure: sports
+    rpiCameraAWB: auto
     rpiCameraHFlip: false
     rpiCameraVFlip: false
