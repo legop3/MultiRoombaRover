@@ -11,6 +11,6 @@ paths:
     source: rpiCamera
     rpiCameraWidth: 1280
     rpiCameraHeight: 720
-    rpiCameraFrameRate: 30
+    # rpiCameraFrameRate: 30
     rpiCameraHFlip: false
     rpiCameraVFlip: false
