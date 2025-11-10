@@ -1,11 +1,9 @@
 logLevel: info
 webrtc: yes
-webrtcLocalTCPAddress: 0.0.0.0
-webrtcLocalUDPAddress: 0.0.0.0
-# webrtcDisableDefaultICEServers: true
-# webrtcICEServers:
-#   - urls:
-#       - stun:stun.l.google.com:19302
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8189
+webrtcAdditionalHosts: [ "localhost" ]
+
 paths:
   rovercam:
     source: rpiCamera
