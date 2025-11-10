@@ -32,7 +32,7 @@ What the script does:
 - creates the `roverd` (and optionally `mediamtx`) service users if missing and installs `/usr/local/bin/roverd`
 - copies `pi/roverd/roverd.sample.yaml` to `/etc/roverd.yaml` if the file is absent (existing configs are left untouched)
 - installs/enables the `roverd.service` systemd unit, restarting it automatically when a config already exists
-- when `--mediamtx` is passed, installs the sample mediaMTX config + unit, enables the service, and restarts it
+- when `--mediamtx` is passed, downloads the requested mediaMTX release for the Pi’s architecture, installs it to `/usr/local/bin/mediamtx`, drops the sample config + unit, enables the service, and restarts it
 
 Flags:
 
@@ -40,7 +40,8 @@ Flags:
 |------|---------|
 | `-b PATH` | use a different roverd binary (defaults to `dist/roverd`) |
 | `-c PATH` | seed `/etc/roverd.yaml` from another template |
-| `--mediamtx` | install the provided mediaMTX config + unit alongside roverd |
+| `--mediamtx` | download/install mediaMTX plus the provided config + unit |
+| `--mediamtx-version X.Y.Z` | override the mediaMTX release tag (default `1.8.6`) |
 
 If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and the WHEP URL that the central server should expose.
 
@@ -62,6 +63,7 @@ If the script installs the sample config, it will remind you to edit `/etc/rover
    ```
 
 `roverd` requires access to `/dev/ttyAMA0` and `/sys/class/gpio`; keeping it under its own user ensures the rest of the system stays isolated.  
+**BRC note:** writing to `/sys/class/gpio/export` typically requires root on Raspberry Pi OS. Until the pulser moves to `libgpiod`, either run the service as root or set `brc.gpioPin: -1` (rover may eventually sleep).  
 If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` service account can invoke `systemctl <action> <media.service>` (either run the unit as root or grant sudo privileges for that command).
 
 ## Configuring mediaMTX

@@ -34,7 +34,7 @@ npm install
 npm run start
 ```
 
-Deploy a rover by copying the repo + `dist/roverd` to the Pi and running the helper:
+Deploy a rover by copying the repo + `dist/roverd` to the Pi and running the helper (it will also fetch mediaMTX when `--mediamtx` is set):
 
 ```bash
 cd ~/MultiRoombaRover
@@ -43,3 +43,4 @@ sudo ./pi/install_roverd.sh --mediamtx
 
 Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, enable the sensor stream from the UI, and drive with WASD.
 Use the “Restart Camera” button if you enable media management so roverd can bounce the mediamtx service remotely.
+Heads-up: the BRC pulser currently hits `/sys/class/gpio/export`, so the service needs root privileges on Raspberry Pi OS. Until it’s switched to `libgpiod`, set `brc.gpioPin: -1` if you prefer to run unprivileged (the Create will then nap unless something else keeps it awake).
