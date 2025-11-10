@@ -34,5 +34,12 @@ npm install
 npm run start
 ```
 
+Deploy a rover by copying the repo + `dist/roverd` to the Pi and running the helper:
+
+```bash
+cd ~/MultiRoombaRover
+sudo ./pi/install_roverd.sh --mediamtx
+```
+
 Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, enable the sensor stream from the UI, and drive with WASD.
 Use the “Restart Camera” button if you enable media management so roverd can bounce the mediamtx service remotely.

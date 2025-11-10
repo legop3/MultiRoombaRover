@@ -18,7 +18,33 @@ make pi-build
 
 The binary is placed in `dist/roverd` (relative to the repo root).
 
-## Installing `roverd`
+## Automated installation (recommended)
+
+Once the binary (and repo) are on the Pi, run the helper script from the repo root:
+
+```bash
+cd ~/MultiRoombaRover
+sudo ./pi/install_roverd.sh --mediamtx
+```
+
+What the script does:
+
+- creates the `roverd` (and optionally `mediamtx`) service users if missing and installs `/usr/local/bin/roverd`
+- copies `pi/roverd/roverd.sample.yaml` to `/etc/roverd.yaml` if the file is absent (existing configs are left untouched)
+- installs/enables the `roverd.service` systemd unit, restarting it automatically when a config already exists
+- when `--mediamtx` is passed, installs the sample mediaMTX config + unit, enables the service, and restarts it
+
+Flags:
+
+| Flag | Purpose |
+|------|---------|
+| `-b PATH` | use a different roverd binary (defaults to `dist/roverd`) |
+| `-c PATH` | seed `/etc/roverd.yaml` from another template |
+| `--mediamtx` | install the provided mediaMTX config + unit alongside roverd |
+
+If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and the WHEP URL that the central server should expose.
+
+## Manual installation
 
 1. Copy the binary and config:
    ```bash
