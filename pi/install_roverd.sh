@@ -7,7 +7,7 @@ set -euo pipefail
 BINARY_SRC="dist/roverd"
 CONFIG_SRC="pi/roverd/roverd.sample.yaml"
 INSTALL_MEDIAMTX=0
-MEDIAMTX_VERSION="1.8.6"
+MEDIAMTX_VERSION="1.15.3"
 
 usage() {
 	cat <<'USAGE'
@@ -18,7 +18,7 @@ Options:
   -c, --config <path>   Source config to install if /etc/roverd.yaml is missing
                         (default: pi/roverd/roverd.sample.yaml)
       --mediamtx        Install/download mediaMTX (binary, config, systemd unit)
-      --mediamtx-version <v>  Override mediaMTX release tag (default: 1.8.6)
+      --mediamtx-version <v>  Override mediaMTX release tag (default: 1.15.3)
   -h, --help            Show this help text
 
 The script must run from the repository root and as root (sudo). It will:

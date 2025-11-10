@@ -41,7 +41,7 @@ Flags:
 | `-b PATH` | use a different roverd binary (defaults to `dist/roverd`) |
 | `-c PATH` | seed `/etc/roverd.yaml` from another template |
 | `--mediamtx` | download/install mediaMTX plus the provided config + unit |
-| `--mediamtx-version X.Y.Z` | override the mediaMTX release tag (default `1.8.6`) |
+| `--mediamtx-version X.Y.Z` | override the mediaMTX release tag (default `1.15.3`) |
 
 If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and the WHEP URL that the central server should expose.
 
