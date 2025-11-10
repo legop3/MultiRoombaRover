@@ -6,7 +6,7 @@ set -euo pipefail
 
 BINARY_SRC="dist/roverd"
 CONFIG_SRC="pi/roverd/roverd.sample.yaml"
-INSTALL_MEDIAMTX=1
+INSTALL_MEDIAMTX=0
 MEDIAMTX_VERSION="1.8.6"
 
 usage() {
@@ -115,13 +115,13 @@ install_mediamtx_binary() {
 	if ! command -v curl >/dev/null 2>&1; then
 		echo "curl is required to download mediaMTX" >&2
 		exit 1
-	}
+	fi
 	local asset
 	asset="$(detect_mediamtx_asset)"
 	if [[ -z "$asset" ]]; then
 		echo "Unsupported architecture $(uname -m) for mediaMTX download" >&2
 		exit 1
-	}
+	fi
 	local url="https://github.com/bluenviron/mediamtx/releases/download/v${MEDIAMTX_VERSION}/${asset}"
 	local tmpdir
 	tmpdir="$(mktemp -d)"
@@ -130,7 +130,7 @@ install_mediamtx_binary() {
 		echo "Failed to download mediaMTX from ${url}" >&2
 		rm -rf "$tmpdir"
 		exit 1
-	}
+	fi
 	tar -xzf "${tmpdir}/${asset}" -C "$tmpdir" mediamtx
 	install -o mediamtx -g mediamtx -m 0755 "${tmpdir}/mediamtx" /usr/local/bin/mediamtx
 	log "Installed /usr/local/bin/mediamtx"
