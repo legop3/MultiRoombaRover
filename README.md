@@ -12,3 +12,27 @@ pi provisioning:
 - enable serial port
 - disable wifi powersave
 - disable bluetooth
+
+## Repo layout
+
+- `pi/roverd`: tiny Go daemon that bridges the Create 2 serial port, BRC pin, and the control server via WebSockets.
+- `server`: Node.js process that terminates rover sockets, relays commands to/from the Socket.IO UI, and serves `public/`.
+- `pi/systemd` / `pi/mediamtx`: ready-to-drop systemd units and a minimal mediaMTX config for WebRTC publishing (roverd can optionally supervise the mediamtx service).
+- `docs/pi-deployment.md`: per-rover build + install instructions (cross-compiling on Fedora 43, deploying roverd + mediaMTX).
+
+## Quick start
+
+```bash
+# build the Pi agent (armv7)
+cd pi/roverd
+mkdir -p ../../dist
+make pi-build
+
+# start the server + UI
+cd ../../server
+npm install
+npm run start
+```
+
+Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, enable the sensor stream from the UI, and drive with WASD.
+Use the “Restart Camera” button if you enable media management so roverd can bounce the mediamtx service remotely.

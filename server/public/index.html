@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Multi Roomba Rover</title>
+    <style>
+      body { font-family: sans-serif; margin: 16px; }
+      #layout { display: flex; gap: 16px; }
+      #roverList { width: 240px; }
+      #sensorOutput { font-family: monospace; height: 320px; overflow: auto; border: 1px solid #999; padding: 8px; }
+      button { margin: 4px; }
+      .row { margin-bottom: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Multi Roomba Rover</h1>
+    <div id="status">Connecting…</div>
+    <div id="layout">
+      <div id="roverList">
+        <label for="roverSelect">Rovers</label>
+        <select id="roverSelect" size="10" style="width: 100%"></select>
+        <div class="row">
+          <button data-mode="start">Start OI</button>
+          <button data-mode="safe">Safe</button>
+          <button data-mode="full">Full</button>
+          <button data-mode="passive">Passive</button>
+          <button data-mode="dock">Dock</button>
+        </div>
+        <div class="row">
+          <button id="sensorToggle">Enable Sensor Stream</button>
+        </div>
+        <div class="row">
+          <button id="motorsStop">Stop Motors</button>
+          <button id="mediaRestart">Restart Camera</button>
+        </div>
+      </div>
+      <div style="flex: 1">
+        <h3>Sensor Frames</h3>
+        <pre id="sensorOutput"></pre>
+        <p>Use WASD keys to drive the selected rover. Shift increases speed.</p>
+      </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

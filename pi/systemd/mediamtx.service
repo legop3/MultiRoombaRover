@@ -1,0 +1,15 @@
+[Unit]
+Description=mediaMTX WebRTC publisher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mediamtx /etc/mediamtx/mediamtx.yml
+Restart=on-failure
+RestartSec=5
+User=mediamtx
+Group=mediamtx
+
+[Install]
+WantedBy=multi-user.target
