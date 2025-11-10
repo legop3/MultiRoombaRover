@@ -173,8 +173,8 @@ if [[ $INSTALL_MEDIAMTX -eq 1 ]]; then
 		exit 1
 	fi
 
-	ensure_user mediamtx ""
-	install_mediamtx_binary
+ensure_user mediamtx "video"
+install_mediamtx_binary
 	install -d -o mediamtx -g mediamtx /etc/mediamtx
 	install -o mediamtx -g mediamtx -m 0644 pi/mediamtx/mediamtx.yml /etc/mediamtx/mediamtx.yml
 	install -m 0644 pi/systemd/mediamtx.service /etc/systemd/system/mediamtx.service
