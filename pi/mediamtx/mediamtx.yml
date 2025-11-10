@@ -12,6 +12,6 @@ paths:
     rpiCameraFPS: 30
     rpiCameraBitrate: 2500000
     rpiCameraIDRPeriod: 30
-    rpiCameraExposure: normal
+    rpiCameraExposure: long
     rpiCameraHFlip: false
     rpiCameraVFlip: false
