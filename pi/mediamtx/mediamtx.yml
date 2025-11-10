@@ -10,7 +10,7 @@ paths:
     rpiCameraWidth: 1280
     rpiCameraHeight: 720
     rpiCameraFPS: 30
-    rpiCameraBitrate: 2500000
+    rpiCameraBitrate: 1500000
     rpiCameraIDRPeriod: 30
     rpiCameraExposure: long
     rpiCameraHFlip: false
