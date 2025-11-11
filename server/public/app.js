@@ -81,7 +81,7 @@ document.querySelectorAll('[data-mode]').forEach((btn) => {
 });
 
 const keys = new Set();
-const driveInterval = 120;
+const driveInterval = 50;
 
 window.addEventListener('keydown', (event) => {
   keys.add(event.key.toLowerCase());
