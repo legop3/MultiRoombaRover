@@ -99,10 +99,10 @@ func (a *AutoChargeController) emitEvent(event string, data map[string]any) {
 	}
 	select {
 	case a.events <- RoverEvent{
-		Type:   "event",
-		Event:  event,
-		Ts:     time.Now().UnixMilli(),
-		Data:   data,
+		Type:  "event",
+		Event: event,
+		Ts:    time.Now().UnixMilli(),
+		Data:  data,
 	}:
 	default:
 	}

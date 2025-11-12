@@ -18,6 +18,18 @@ make pi-build
 
 The binary is placed in `dist/roverd` (relative to the repo root).
 
+### Dummy rover build (for local testing)
+
+If you need extra “virtual” rovers on your laptop/CI box, build the dummy binary:
+
+```bash
+cd pi/roverd
+mkdir -p ../../dist
+make dummy
+```
+
+Run the resulting `dist/roverd-dummy` on any machine; it will connect to the server, stream fake Group 100 sensor data, and log drive commands so you can test multi-rover features without additional hardware.
+
 ## Automated installation (recommended)
 
 Once the binary (and repo) are on the Pi, run the helper script from the repo root:

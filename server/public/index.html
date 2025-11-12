@@ -22,18 +22,21 @@
         <label for="roverSelect">Rovers</label>
         <select id="roverSelect" size="10" style="width: 100%"></select>
         <div class="row">
-          <button data-mode="start">Start OI</button>
-          <button data-mode="safe">Safe</button>
-          <button data-mode="full">Full</button>
-          <button data-mode="passive">Passive</button>
-          <button data-mode="dock">Dock</button>
+          <button id="requestControl">Request Control</button>
+          <button id="lockToggle">Lock/Unlock</button>
+        </div>
+        <div class="row">
+          <button data-oi="start">Start OI</button>
+          <button data-oi="safe">Safe</button>
+          <button data-oi="full">Full</button>
+          <button data-oi="passive">Passive</button>
+          <button data-oi="dock">Dock</button>
         </div>
         <div class="row">
           <button id="sensorToggle">Enable Sensor Stream</button>
         </div>
         <div class="row">
           <button id="motorsStop">Stop Motors</button>
-          <button id="mediaRestart">Restart Camera</button>
         </div>
       </div>
       <div style="flex: 1">
@@ -44,6 +47,13 @@
       </div>
     </div>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js" type="module"></script>
+    <script src="loader.js"></script>
+    <script src="src/globals/socket.js"></script>
+    <script src="src/helpers/formatters.js"></script>
+    <script src="src/services/state.js"></script>
+    <script src="src/services/alertFeed.js"></script>
+    <script src="src/services/roverUI.js"></script>
+    <script src="src/services/driveControls.js"></script>
+    <script src="src/main.js"></script>
   </body>
 </html>

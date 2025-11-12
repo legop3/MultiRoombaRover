@@ -1,3 +1,5 @@
+//go:build !dummy
+
 package roverd
 
 import (

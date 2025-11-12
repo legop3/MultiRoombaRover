@@ -34,6 +34,17 @@ npm install
 npm run start
 ```
 
+Need a fake rover or multi-rover testing without hardware? Use the dummy build:
+
+```bash
+cd pi/roverd
+mkdir -p ../../dist
+make dummy
+./../../dist/roverd-dummy -config ./roverd.sample.yaml
+```
+
+The dummy binary connects to the Node server, emits simulated sensor frames, and logs every command it receives, so you can spin up as many virtual rovers as you’d like on your dev machine.
+
 Deploy a rover by copying the repo + `dist/roverd` to the Pi and running the helper (it will also fetch mediaMTX when `--mediamtx` is set):
 
 ```bash

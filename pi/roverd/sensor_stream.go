@@ -1,3 +1,5 @@
+//go:build !dummy
+
 package roverd
 
 import (
@@ -15,10 +17,10 @@ const (
 )
 
 type SensorStreamer struct {
-	r       io.Reader
-	rawOut  chan<- []byte
-	parsed  chan<- SensorSample
-	logger  *log.Logger
+	r      io.Reader
+	rawOut chan<- []byte
+	parsed chan<- SensorSample
+	logger *log.Logger
 }
 
 func NewSensorStreamer(r io.Reader, rawOut chan<- []byte, parsed chan<- SensorSample, logger *log.Logger) *SensorStreamer {
