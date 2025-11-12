@@ -44,7 +44,10 @@ func main() {
 	}
 
 	sensorFrames := make(chan []byte, 8)
-	streamer := roverd.NewSensorStreamer(serialPort, sensorFrames, logger)
+	sensorSamples := make(chan roverd.SensorSample, 8)
+	eventStream := make(chan roverd.RoverEvent, 16)
+
+	streamer := roverd.NewSensorStreamer(serialPort, sensorFrames, sensorSamples, logger)
 	go streamer.Run(ctx)
 
 	adapter := roverd.NewSerialAdapter(serialPort, logger)
@@ -54,7 +57,10 @@ func main() {
 		mediaSupervisor.Start(ctx)
 	}
 
-	client := roverd.NewWSClient(cfg, adapter, sensorFrames, mediaSupervisor, logger)
+	autoCharge := roverd.NewAutoChargeController(adapter, eventStream, logger)
+	go autoCharge.Run(ctx, sensorSamples)
+
+	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, logger)
 
 	retryDelay := time.Second
 	for ctx.Err() == nil {

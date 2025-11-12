@@ -15,15 +15,17 @@ type WSClient struct {
 	cfg          *Config
 	adapter      *SerialAdapter
 	sensorFrames <-chan []byte
+	events       <-chan RoverEvent
 	media        *MediaSupervisor
 	log          *log.Logger
 }
 
-func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, media *MediaSupervisor, logger *log.Logger) *WSClient {
+func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events <-chan RoverEvent, media *MediaSupervisor, logger *log.Logger) *WSClient {
 	return &WSClient{
 		cfg:          cfg,
 		adapter:      adapter,
 		sensorFrames: frames,
+		events:       events,
 		media:        media,
 		log:          logger,
 	}
@@ -45,6 +47,7 @@ func (c *WSClient) Run(ctx context.Context) error {
 		errCh <- c.readLoop(ctx, conn)
 	}()
 	go c.forwardSensors(ctx, conn)
+	go c.forwardEvents(ctx, conn)
 
 	select {
 	case <-ctx.Done():
@@ -112,7 +115,7 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		return c.adapter.MotorPWM(main, side, vac)
 	case msg.SensorStream != nil:
 		if msg.SensorStream.Enable {
-			if err := c.adapter.StartSensorStream(streamGroupDefault); err != nil {
+			if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
 				return err
 			}
 			return c.adapter.PauseSensorStream(false)
@@ -147,6 +150,26 @@ func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
 			}
 			if err := writeJSON(ctx, conn, msg); err != nil {
 				c.log.Printf("sensor send failed: %v", err)
+				return
+			}
+		}
+	}
+}
+
+func (c *WSClient) forwardEvents(ctx context.Context, conn *websocket.Conn) {
+	if c.events == nil {
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case evt := <-c.events:
+			if evt.Type == "" {
+				evt.Type = "event"
+			}
+			if err := writeJSON(ctx, conn, evt); err != nil {
+				c.log.Printf("event send failed: %v", err)
 				return
 			}
 		}

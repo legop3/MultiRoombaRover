@@ -73,6 +73,17 @@ function handleRoverConnection(ws) {
           io.emit('commandAck', { roverId: pending.roverId, id: msg.id, status: msg.status, error: msg.error });
         }
         break;
+      case 'event':
+        if (!roverId) {
+          return;
+        }
+        io.emit('roverEvent', {
+          roverId,
+          event: msg.event,
+          ts: msg.ts || Date.now(),
+          data: msg.data || {},
+        });
+        break;
       default:
         break;
     }

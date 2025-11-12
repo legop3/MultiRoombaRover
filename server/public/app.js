@@ -4,6 +4,7 @@ const roverSelect = document.getElementById('roverSelect');
 const sensorToggleBtn = document.getElementById('sensorToggle');
 const motorsStopBtn = document.getElementById('motorsStop');
 const sensorOutput = document.getElementById('sensorOutput');
+const alertsEl = document.getElementById('alerts');
 const mediaRestartBtn = document.getElementById('mediaRestart');
 let selectedRover = null;
 let sensorEnabled = false;
@@ -51,6 +52,24 @@ socket.on('commandAck', ({ roverId, status, error }) => {
   } else {
     statusEl.textContent = `Command failed: ${error}`;
   }
+});
+
+socket.on('roverEvent', ({ roverId, event, ts, data }) => {
+  if (!alertsEl) return;
+  const div = document.createElement('div');
+  div.className = 'alert';
+  const when = ts ? new Date(ts).toLocaleTimeString() : new Date().toLocaleTimeString();
+  const details = data && data.error ? ` (${data.error})` : '';
+  div.textContent = `[${when}] ${roverId}: ${event}${details}`;
+  alertsEl.prepend(div);
+  while (alertsEl.children.length > 5) {
+    alertsEl.removeChild(alertsEl.lastChild);
+  }
+  setTimeout(() => {
+    if (div.parentElement === alertsEl) {
+      alertsEl.removeChild(div);
+    }
+  }, 15000);
 });
 
 roverSelect.addEventListener('change', (e) => {

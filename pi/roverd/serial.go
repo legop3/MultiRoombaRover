@@ -2,6 +2,7 @@ package roverd
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -68,8 +69,12 @@ func (s *SerialAdapter) MotorPWM(main, side, vacuum int) error {
 	return s.write(payload)
 }
 
-func (s *SerialAdapter) StartSensorStream(group byte) error {
-	payload := []byte{148, 1, group}
+func (s *SerialAdapter) StartSensorStream(packets []byte) error {
+	if len(packets) == 0 {
+		return errors.New("sensor stream requires packets")
+	}
+	payload := []byte{148, byte(len(packets))}
+	payload = append(payload, packets...)
 	return s.write(payload)
 }
 
@@ -83,4 +88,8 @@ func (s *SerialAdapter) PauseSensorStream(pause bool) error {
 
 func (s *SerialAdapter) SendRaw(raw []byte) error {
 	return s.write(raw)
+}
+
+func (s *SerialAdapter) SeekDock() error {
+	return s.write([]byte{143})
 }

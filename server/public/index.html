@@ -10,6 +10,8 @@
       #sensorOutput { font-family: monospace; height: 320px; overflow: auto; border: 1px solid #999; padding: 8px; }
       button { margin: 4px; }
       .row { margin-bottom: 8px; }
+      #alerts { margin-top: 12px; max-width: 600px; }
+      .alert { background: #fff1d2; border: 1px solid #f0b651; padding: 6px 8px; margin-bottom: 6px; font-size: 0.9rem; }
     </style>
   </head>
   <body>
@@ -38,6 +40,7 @@
         <h3>Sensor Frames</h3>
         <pre id="sensorOutput"></pre>
         <p>Use WASD keys to drive the selected rover. Shift increases speed.</p>
+        <div id="alerts"></div>
       </div>
     </div>
     <script src="/socket.io/socket.io.js"></script>

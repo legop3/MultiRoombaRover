@@ -10,19 +10,19 @@ import (
 )
 
 const (
-	sensorHeader       = 19
-	sensorReadTimeout  = 150 * time.Millisecond
-	streamGroupDefault = 100
+	sensorHeader      = 19
+	sensorReadTimeout = 150 * time.Millisecond
 )
 
 type SensorStreamer struct {
-	r      io.Reader
-	out    chan<- []byte
-	logger *log.Logger
+	r       io.Reader
+	rawOut  chan<- []byte
+	parsed  chan<- SensorSample
+	logger  *log.Logger
 }
 
-func NewSensorStreamer(r io.Reader, out chan<- []byte, logger *log.Logger) *SensorStreamer {
-	return &SensorStreamer{r: r, out: out, logger: logger}
+func NewSensorStreamer(r io.Reader, rawOut chan<- []byte, parsed chan<- SensorSample, logger *log.Logger) *SensorStreamer {
+	return &SensorStreamer{r: r, rawOut: rawOut, parsed: parsed, logger: logger}
 }
 
 func (s *SensorStreamer) Run(ctx context.Context) {
@@ -34,14 +34,14 @@ func (s *SensorStreamer) Run(ctx context.Context) {
 		default:
 		}
 
-		b, err := reader.ReadByte()
+		header, err := reader.ReadByte()
 		if err != nil {
 			if ctx.Err() != nil {
 				return
 			}
 			continue
 		}
-		if b != sensorHeader {
+		if header != sensorHeader {
 			continue
 		}
 		nBytes, err := reader.ReadByte()
@@ -61,8 +61,17 @@ func (s *SensorStreamer) Run(ctx context.Context) {
 		}
 
 		select {
-		case s.out <- frame:
+		case s.rawOut <- frame:
 		default:
+		}
+
+		if s.parsed != nil {
+			if sample, ok := decodeSensorSample(frame); ok {
+				select {
+				case s.parsed <- sample:
+				default:
+				}
+			}
 		}
 	}
 }
@@ -73,4 +82,45 @@ func validateChecksum(buf []byte) bool {
 		sum += int(b)
 	}
 	return byte(sum&0xFF) == 0
+}
+
+func decodeSensorSample(frame []byte) (SensorSample, bool) {
+	if len(frame) < 3 {
+		return SensorSample{}, false
+	}
+	nBytes := int(frame[1])
+	if nBytes+3 != len(frame) {
+		return SensorSample{}, false
+	}
+	payload := frame[2 : 2+nBytes]
+	if len(payload) != expectedPayloadLength {
+		return SensorSample{}, false
+	}
+
+	idx := 0
+	var sample SensorSample
+	var seen byte
+	for idx < len(payload) {
+		id := payload[idx]
+		idx++
+		size, ok := packetSizes[id]
+		if !ok {
+			return SensorSample{}, false
+		}
+		if idx+size > len(payload) {
+			return SensorSample{}, false
+		}
+		segment := payload[idx : idx+size]
+		switch id {
+		case 21:
+			sample.ChargingState = segment[0]
+			seen |= 1
+		case 34:
+			sample.ChargeSources = segment[0]
+			seen |= 2
+		}
+		idx += size
+	}
+	sample.Timestamp = time.Now().UnixMilli()
+	return sample, seen&3 == 3
 }
