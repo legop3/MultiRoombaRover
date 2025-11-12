@@ -40,9 +40,9 @@ socket.on('rovers', (list) => {
   }
 });
 
-socket.on('sensorFrame', ({ roverId, frame }) => {
+socket.on('sensorFrame', ({ roverId, frame, sensors }) => {
   if (roverId !== selectedRover) return;
-  sensorOutput.textContent = formatSensorFrame(frame.data);
+  sensorOutput.textContent = renderSensors(sensors, frame?.data);
 });
 
 socket.on('commandAck', ({ roverId, status, error }) => {
@@ -171,4 +171,23 @@ function formatSensorFrame(base64) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function renderSensors(sensors = {}, rawBase64) {
+  const lines = [];
+  if (sensors && Object.keys(sensors).length) {
+    for (const [key, value] of Object.entries(sensors)) {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        lines.push(`${key}: ${JSON.stringify(value)}`);
+      } else {
+        lines.push(`${key}: ${value}`);
+      }
+    }
+  } else {
+    lines.push('No decoded sensor data yet.');
+  }
+  if (rawBase64) {
+    lines.push('', 'raw:', formatSensorFrame(rawBase64));
+  }
+  return lines.join('\n');
 }

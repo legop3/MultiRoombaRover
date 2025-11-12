@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const { Server: SocketIOServer } = require('socket.io');
 const { WebSocketServer } = require('ws');
 const { v4: uuidv4 } = require('uuid');
+const { parseSensorFrame } = require('./sensorDecoder');
 
 const PORT = process.env.PORT || 8080;
 
@@ -62,9 +63,11 @@ function handleRoverConnection(ws) {
         if (!roverId || !rovers.has(roverId)) {
           return;
         }
-        rovers.get(roverId).lastSensor = msg;
-        rovers.get(roverId).lastSeen = Date.now();
-        io.emit('sensorFrame', { roverId, frame: msg });
+        const rover = rovers.get(roverId);
+        const decoded = parseSensorFrame(msg.data);
+        rover.lastSensor = { raw: msg, decoded };
+        rover.lastSeen = Date.now();
+        io.emit('sensorFrame', { roverId, frame: msg, sensors: decoded });
         break;
       case 'ack':
         if (msg.id && pendingCommands.has(msg.id)) {

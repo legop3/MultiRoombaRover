@@ -9,13 +9,17 @@ this service would import the roomba list from whatever other service contains i
 - modular code structure
   - one folder for each of these categories
     - globals
+      - GLOBALS ARE: "static" parts of the server that don't contain any interactive logic.
       - where the express, websocket, and socket.io instances will be
       - other global things
     - services
+      - SERVICES ARE: parts of the program that are part of the interaction pipeline.
       - contains things like the roomba manager
       - will also in the future contain other things like a discord bot, home assistant integration, etc
       - anything with a large amount of controlling logic should be in here
     - helpers
+      - HELPERS ARE: parts of the program that other modules only pull helper funcions or classes from.
+        - if a function or class is dedicated to a service, it should NOT be in a helper.
       - contains passive helpers
       - things like the logger system
       - no "service" logic in here, only things that are passively pulled out and used inside other modules
@@ -41,3 +45,7 @@ I want there to be a ground up system where I can set the entire service to four
 only admins can change modes.
 
 do NOT implement any authentication stuff yet, just add a stub service with places set up to put the auth. logic
+
+# web client code structure:
+- the same as the server's code structure
+  - all ES6
