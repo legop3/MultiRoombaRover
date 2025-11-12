@@ -62,9 +62,9 @@ If the script installs the sample config, it will remind you to edit `/etc/rover
    sudo systemctl enable --now roverd.service
    ```
 
-`roverd` requires access to `/dev/ttyAMA0` and `/sys/class/gpio`; keeping it under its own user ensures the rest of the system stays isolated.  
-`mediamtx` needs read access to the camera devices (`/dev/media*`, `/dev/video*`), so the install script adds its service account to the `video` group; if you created the user manually, make sure it belongs to `video`.
-**BRC note:** writing to `/sys/class/gpio/export` typically requires root on Raspberry Pi OS. Until the pulser moves to `libgpiod`, either run the service as root or set `brc.gpioPin: -1` (rover may eventually sleep).  
+`roverd` requires access to `/dev/ttyAMA0` and `/dev/gpiochip*`; keeping it under its own user ensures the rest of the system stays isolated—just make sure the account belongs to the `dialout` and `gpio` groups so it can reach the UART and libgpiod.  
+`mediamtx` needs read access to the camera devices (`/dev/media*`, `/dev/video*`), so the install script adds its service account to the `video` group; if you created the user manually, make sure it belongs to `video`.  
+**BRC note:** configure `brc.gpioPin` (and `brc.gpioChip` if you’re not using `gpiochip0`) and ensure the `roverd` user has permission to toggle that line—no root privileges are required anymore.  
 If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` service account can invoke `systemctl <action> <media.service>` (either run the unit as root or grant sudo privileges for that command).
 
 ## Configuring mediaMTX

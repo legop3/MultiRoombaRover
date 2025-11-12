@@ -37,6 +37,7 @@ func (d Duration) MarshalYAML() (interface{}, error) {
 
 type BRCConfig struct {
 	GPIOPin    int      `yaml:"gpioPin"`
+	GPIOChip   string   `yaml:"gpioChip"`
 	PulseEvery Duration `yaml:"pulseEvery"`
 	PulseWidth Duration `yaml:"pulseWidth"`
 }
@@ -78,7 +79,8 @@ func LoadConfig(path string) (*Config, error) {
 	cfg := Config{
 		MaxWheelMMs: 500,
 		BRC: BRCConfig{
-			GPIOPin: -1,
+			GPIOPin:  -1,
+			GPIOChip: "gpiochip0",
 			PulseEvery: Duration{
 				Duration: time.Minute,
 			},
@@ -107,6 +109,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if cfg.MaxWheelMMs <= 0 || cfg.MaxWheelMMs > 500 {
 		return nil, fmt.Errorf("maxWheelSpeed must be 1-500, got %d", cfg.MaxWheelMMs)
+	}
+	if cfg.BRC.GPIOChip == "" {
+		cfg.BRC.GPIOChip = "gpiochip0"
 	}
 	if cfg.Media.Manage && cfg.Media.Service == "" {
 		return nil, errors.New("media.manage requires media.service")

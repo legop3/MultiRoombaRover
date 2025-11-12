@@ -43,4 +43,4 @@ sudo ./pi/install_roverd.sh --mediamtx
 
 Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, enable the sensor stream from the UI, and drive with WASD.
 Use the “Restart Camera” button if you enable media management so roverd can bounce the mediamtx service remotely.
-Heads-up: the BRC pulser currently hits `/sys/class/gpio/export`, so the service needs root privileges on Raspberry Pi OS. Until it’s switched to `libgpiod`, set `brc.gpioPin: -1` if you prefer to run unprivileged (the Create will then nap unless something else keeps it awake).
+Heads-up: the BRC pulser now uses libgpiod; make sure the `roverd` service account is in the `gpio` group (or otherwise allowed to access `/dev/gpiochip*`) and set `brc.gpioChip` if your hardware exposes a different chip name.
