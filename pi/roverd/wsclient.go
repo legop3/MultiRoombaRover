@@ -41,6 +41,9 @@ func (c *WSClient) Run(ctx context.Context) error {
 	if err := c.sendHello(ctx, conn); err != nil {
 		return err
 	}
+	if err := c.ensureSensorStream(); err != nil {
+		c.log.Printf("sensor stream init failed: %v", err)
+	}
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -126,7 +129,13 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		if err != nil {
 			return fmt.Errorf("raw decode: %w", err)
 		}
-		return c.adapter.SendRaw(buf)
+		if err := c.adapter.SendRaw(buf); err != nil {
+			return err
+		}
+		if len(buf) > 0 && isModeOpcode(buf[0]) {
+			return c.ensureSensorStream()
+		}
+		return nil
 	case msg.Media != nil:
 		if c.media == nil {
 			return fmt.Errorf("media supervisor disabled")
@@ -192,4 +201,20 @@ func clamp(value, min, max int) int {
 		return max
 	}
 	return value
+}
+
+func (c *WSClient) ensureSensorStream() error {
+	if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
+		return err
+	}
+	return c.adapter.PauseSensorStream(false)
+}
+
+func isModeOpcode(op byte) bool {
+	switch op {
+	case 128, 131, 132:
+		return true
+	default:
+		return false
+	}
 }

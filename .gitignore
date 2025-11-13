@@ -10,3 +10,4 @@ node_modules/
 config.h
 robots.json
 roverd-dummy
+server/config.yaml

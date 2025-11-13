@@ -8,8 +8,15 @@ registerModule('services/roverUI', (require, exports) => {
   const sensorOutput = document.getElementById('sensorOutput');
   const requestBtn = document.getElementById('requestControl');
   const lockBtn = document.getElementById('lockToggle');
+  const activeDriverEl = document.getElementById('activeDriver');
 
   let roster = [];
+
+  state.onRoleChange((role) => {
+    const isAdmin = role === 'admin' || role === 'lockdown';
+    if (requestBtn) requestBtn.disabled = !isAdmin;
+    if (lockBtn) lockBtn.disabled = !isAdmin;
+  });
 
   socket.on('rovers', (list) => {
     roster = list;
@@ -46,6 +53,13 @@ registerModule('services/roverUI', (require, exports) => {
     }
     lines.push('', 'raw:', formatHex(frame?.data));
     sensorOutput.textContent = lines.join('\n');
+  });
+
+  socket.on('activeDriver', ({ roverId, socketId }) => {
+    if (roverId !== state.getSelected()) return;
+    if (activeDriverEl) {
+      activeDriverEl.textContent = `Active driver: ${socketId || 'none'}`;
+    }
   });
 
   requestBtn?.addEventListener('click', () => {

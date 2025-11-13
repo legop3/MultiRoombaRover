@@ -9,6 +9,7 @@ require('./src/helpers/sensorDecoder');
 require('./src/services/alertService');
 require('./src/services/authService');
 require('./src/services/modeManager');
+require('./src/services/lockdownGuard');
 require('./src/services/roverManager');
 require('./src/services/commandService');
 require('./src/services/roverConnectionService');

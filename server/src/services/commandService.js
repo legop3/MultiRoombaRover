@@ -1,7 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const io = require('../globals/io');
 const roverManager = require('./roverManager');
-const { isAdmin } = require('./authService');
 
 const pendingCommands = new Map(); // id -> { roverId }
 
@@ -40,8 +39,8 @@ io.on('connection', (socket) => {
       if (!roverId) {
         throw new Error('roverId required');
       }
-      if (!roverManager.isDriver(roverId, socket) && !isAdmin(socket)) {
-        throw new Error('Not controlling this rover');
+      if (!roverManager.canDrive(roverId, socket)) {
+        throw new Error('Not your turn or no control');
       }
       const payload = data ? { ...data } : {};
       const id = issueCommand(roverId, { type, ...payload });

@@ -3,10 +3,12 @@ const logger = require('../globals/logger');
 const { sendAlert, COLORS } = require('./alertService');
 const { parseSensorFrame } = require('../helpers/sensorDecoder');
 const { MODES, getMode } = require('./modeManager');
-const { isAdmin } = require('./authService');
+const { isAdmin, roleEvents } = require('./roleService');
 
 const rovers = new Map(); // roverId -> record
 const socketToRovers = new Map(); // socketId -> Set(roverId)
+const spectatorSockets = new Set();
+const turnService = require('./turnService');
 
 function ensureRecord(id) {
   if (!rovers.has(id)) {
@@ -31,6 +33,10 @@ function upsertRover(meta, ws) {
   record.ws = ws;
   record.lastSeen = Date.now();
   rovers.set(id, record);
+  spectatorSockets.forEach((socketId) => {
+    const sock = io.sockets.sockets.get(socketId);
+    sock?.join(record.room);
+  });
   broadcastRoster();
   return record;
 }
@@ -39,6 +45,11 @@ function removeRover(id) {
   const record = rovers.get(id);
   if (!record) return;
   rovers.delete(id);
+  turnService.cleanupRover(id);
+  spectatorSockets.forEach((socketId) => {
+    const sock = io.sockets.sockets.get(socketId);
+    sock?.leave(record.room);
+  });
   broadcastRoster();
 }
 
@@ -89,20 +100,28 @@ function handleSensorFrame(roverId, frame) {
 
 function removeSocket(socket) {
   const joined = socketToRovers.get(socket.id);
-  if (!joined) return;
+  if (!joined) {
+    disableSpectator(socket);
+    return;
+  }
   for (const roverId of joined) {
     const record = rovers.get(roverId);
     if (record) {
       record.drivers.delete(socket.id);
     }
+    turnService.driverRemoved(roverId, socket.id);
   }
   socketToRovers.delete(socket.id);
+  disableSpectator(socket);
 }
 
 function requestControl(roverId, socket) {
   const record = rovers.get(roverId);
   if (!record) {
     throw new Error('Unknown rover');
+  }
+  if (!isAdmin(socket)) {
+    throw new Error('Only admins can request control');
   }
   if (record.locked && !isAdmin(socket)) {
     throw new Error('Rover locked');
@@ -114,13 +133,13 @@ function requestControl(roverId, socket) {
   if (mode === MODES.LOCKDOWN && !isAdmin(socket)) {
     throw new Error('Server in lockdown');
   }
-  // TODO: future turns logic
   record.drivers.add(socket.id);
   if (!socketToRovers.has(socket.id)) {
     socketToRovers.set(socket.id, new Set());
   }
   socketToRovers.get(socket.id).add(roverId);
   socket.join(record.room);
+  turnService.driverAdded(roverId, socket.id);
   sendAlert({
     color: COLORS.success,
     title: 'Control Granted',
@@ -141,12 +160,17 @@ function releaseControl(roverId, socket) {
     }
   }
   socket.leave(record.room);
+  turnService.driverRemoved(roverId, socket.id);
 }
 
 function isDriver(roverId, socket) {
   const record = rovers.get(roverId);
   if (!record) return false;
   return record.drivers.has(socket.id);
+}
+
+function canDrive(roverId, socket) {
+  return turnService.canDrive(roverId, socket) || isAdmin(socket);
 }
 
 module.exports = {
@@ -160,10 +184,26 @@ module.exports = {
   releaseControl,
   removeSocket,
   isDriver,
+  canDrive,
+  enableSpectator,
+  disableSpectator,
   rovers,
 };
 
+roleEvents.on('change', ({ socket, role }) => {
+  if (role === 'spectator') {
+    enableSpectator(socket);
+  } else {
+    disableSpectator(socket);
+  }
+});
+
 io.on('connection', (socket) => {
+  socket.emit('rovers', getRoster());
+  if (socket.data?.role === 'spectator') {
+    enableSpectator(socket);
+  }
+
   socket.on('requestControl', ({ roverId } = {}) => {
     try {
       const targetId = roverId || Array.from(rovers.keys())[0];
@@ -192,6 +232,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('subscribeAll', () => {
+    if (socket.data?.role !== 'spectator') {
+      return;
+    }
     for (const record of rovers.values()) {
       socket.join(record.room);
     }
@@ -201,3 +244,19 @@ io.on('connection', (socket) => {
     removeSocket(socket);
   });
 });
+
+function enableSpectator(socket) {
+  if (!socket?.id || spectatorSockets.has(socket.id)) return;
+  spectatorSockets.add(socket.id);
+  for (const record of rovers.values()) {
+    socket.join(record.room);
+  }
+}
+
+function disableSpectator(socket) {
+  if (!socket?.id || !spectatorSockets.has(socket.id)) return;
+  spectatorSockets.delete(socket.id);
+  for (const record of rovers.values()) {
+    socket.leave(record.room);
+  }
+}

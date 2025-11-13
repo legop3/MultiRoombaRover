@@ -1,6 +1,7 @@
+const EventEmitter = require('events');
 const io = require('../globals/io');
 const { sendAlert, COLORS } = require('./alertService');
-const { isAdmin, isLockdownAdmin } = require('./authService');
+const { isAdmin, isLockdownAdmin } = require('./roleService');
 
 const MODES = {
   OPEN: 'open',
@@ -10,6 +11,7 @@ const MODES = {
 };
 
 let currentMode = MODES.OPEN;
+const modeEvents = new EventEmitter();
 
 function canChangeMode(socket, nextMode) {
   if (nextMode === MODES.LOCKDOWN) {
@@ -34,6 +36,7 @@ function setMode(nextMode, socket) {
     title: 'Mode Changed',
     message: `Server mode set to ${nextMode}`,
   });
+  modeEvents.emit('change', currentMode);
   return currentMode;
 }
 
@@ -45,6 +48,7 @@ module.exports = {
   MODES,
   getMode,
   setMode,
+  modeEvents,
 };
 
 io.on('connection', (socket) => {

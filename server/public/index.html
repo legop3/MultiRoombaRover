@@ -12,11 +12,21 @@
       .row { margin-bottom: 8px; }
       #alerts { margin-top: 12px; max-width: 600px; }
       .alert { background: #fff1d2; border: 1px solid #f0b651; padding: 6px 8px; margin-bottom: 6px; font-size: 0.9rem; }
+      #authPanel { margin: 12px 0; display: flex; gap: 8px; align-items: center; }
+      #authPanel input { padding: 4px; }
+      #activeDriver { margin-bottom: 8px; font-weight: bold; }
     </style>
   </head>
   <body>
     <h1>Multi Roomba Rover</h1>
     <div id="status">Connecting…</div>
+    <div id="authPanel">
+      <input id="username" placeholder="Username" />
+      <input id="password" type="password" placeholder="Password" />
+      <button id="loginBtn">Admin Login</button>
+      <button id="spectatorBtn">Spectate</button>
+      <span id="roleStatus">Role: user</span>
+    </div>
     <div id="layout">
       <div id="roverList">
         <label for="roverSelect">Rovers</label>
@@ -41,6 +51,7 @@
       </div>
       <div style="flex: 1">
         <h3>Sensor Frames</h3>
+        <div id="activeDriver">Active driver: --</div>
         <pre id="sensorOutput"></pre>
         <p>Use WASD keys to drive the selected rover. Shift increases speed.</p>
         <div id="alerts"></div>
@@ -52,6 +63,7 @@
     <script src="src/helpers/formatters.js"></script>
     <script src="src/services/state.js"></script>
     <script src="src/services/alertFeed.js"></script>
+    <script src="src/services/authControls.js"></script>
     <script src="src/services/roverUI.js"></script>
     <script src="src/services/driveControls.js"></script>
     <script src="src/main.js"></script>
