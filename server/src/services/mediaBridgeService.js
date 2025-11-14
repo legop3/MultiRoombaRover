@@ -85,13 +85,17 @@ function normalizeSource(raw) {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  if (/^wheps?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
   try {
-    const parsed = new URL(trimmed);
+    const parsed = new URL(/^[a-z]+:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`);
     const protocol = parsed.protocol === 'https:' ? 'wheps' : 'whep';
-    return `${protocol}://${parsed.host}${parsed.pathname}${parsed.search || ''}`;
+    let path = parsed.pathname || '/';
+    if (!path.endsWith('/whep')) {
+      if (!path.endsWith('/')) {
+        path += '/';
+      }
+      path += 'whep';
+    }
+    return `${protocol}://${parsed.host}${path}`;
   } catch (err) {
     logger.warn('invalid WHEP URL: %s (%s)', raw, err.message);
     return null;
