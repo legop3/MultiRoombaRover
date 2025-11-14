@@ -5,7 +5,7 @@ Each rover runs mediaMTX locally to capture the Pi camera, and the control serve
 ## Pi (publisher)
 
 - mediaMTX samples the Pi camera (`paths.rovercam.source: rpiCamera`) and exposes the HTTP API on `http://127.0.0.1:9997`.
-- `/etc/roverd.yaml` contains `media.whepUrl`, pointing at the Pi’s own WHEP endpoint (e.g. `http://roomba-alpha.local:8889/whep/rovercam`). This is what the central server will pull.
+- `roverd` automatically detects the Pi’s own WHEP endpoint (e.g. `http://roomba-alpha.local:8889/whep/rovercam`) and reports a `bridgeWhepUrl` (converted to `whep://.../whep`) to the server. No manual per-rover video URL configuration is required.
 - The `media.manage` flag keeps the local service alive via `systemctl` and hits the API for health checks (`media.healthUrl`, defaults to `http://127.0.0.1:9997/v3/paths/list`).
 
 ## Control server (viewer)

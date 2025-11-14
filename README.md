@@ -56,7 +56,7 @@ cd ~/MultiRoombaRover
 sudo ./pi/install_roverd.sh --mediamtx
 ```
 
-Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set (or leave blank to auto-derive) `media.whepUrl` for the Pi’s mediaMTX instance (defaults to `http://<pi-ip>:8889/whep/rovercam`), enable the sensor stream from the UI, and drive with WASD.
+Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, enable the sensor stream from the UI, and drive with WASD. `roverd` automatically advertises its local mediaMTX WHEP endpoint (derived from the Pi’s DHCP address), so no video URL configuration is required unless you want to override the defaults.
 Use the “Restart Camera” button if you enable media management so roverd can bounce the mediamtx service remotely.
 Heads-up: the BRC pulser now uses libgpiod; make sure the `roverd` service account is in the `gpio` group (or otherwise allowed to access `/dev/gpiochip*`) and set `brc.gpioChip` if your hardware exposes a different chip name.
 

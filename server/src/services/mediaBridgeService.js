@@ -36,8 +36,12 @@ async function syncRover(record) {
     await removePath(record?.id);
     return;
   }
-  const source = normalizeSource(record.meta.media.whepUrl);
+  const source = record.meta.media.bridgeWhepUrl;
   if (!source) {
+    logger.warn(
+      'rover %s missing bridgeWhepUrl; video bridge disabled for this rover',
+      record.id
+    );
     await removePath(record.id);
     return;
   }
@@ -78,27 +82,6 @@ async function removePath(roverId) {
     if (err.status !== 404) {
       throw err;
     }
-  }
-}
-
-function normalizeSource(raw) {
-  if (!raw) return null;
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  try {
-    const parsed = new URL(/^[a-z]+:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`);
-    const protocol = parsed.protocol === 'https:' ? 'wheps' : 'whep';
-    let path = parsed.pathname || '/';
-    if (!path.endsWith('/whep')) {
-      if (!path.endsWith('/')) {
-        path += '/';
-      }
-      path += 'whep';
-    }
-    return `${protocol}://${parsed.host}${path}`;
-  } catch (err) {
-    logger.warn('invalid WHEP URL: %s (%s)', raw, err.message);
-    return null;
   }
 }
 

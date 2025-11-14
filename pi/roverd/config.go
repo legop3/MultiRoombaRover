@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -59,6 +60,7 @@ type MediaConfig struct {
 	WhepPort       int      `yaml:"whepPort" json:"-"`
 	WhepPath       string   `yaml:"whepPath" json:"-"`
 	LegacyPublish  string   `yaml:"publishUrl,omitempty" json:"-"`
+	BridgeWhepURL  string   `yaml:"-" json:"bridgeWhepUrl,omitempty"`
 	Manage         bool     `yaml:"manage"`
 	Service        string   `yaml:"service"`
 	HealthURL      string   `yaml:"healthUrl"`
@@ -141,7 +143,38 @@ func LoadConfig(path string) (*Config, error) {
 		scheme := "http"
 		cfg.Media.WhepURL = fmt.Sprintf("%s://%s:%d%s", scheme, ip, effectivePort(cfg.Media.WhepPort), path)
 	}
+	if bridge, err := buildBridgeURL(cfg.Media.WhepURL); err == nil {
+		cfg.Media.BridgeWhepURL = bridge
+	}
 	return &cfg, nil
+}
+
+func buildBridgeURL(src string) (string, error) {
+	if src == "" {
+		return "", errors.New("empty whep url")
+	}
+	parsed, err := url.Parse(src)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Host == "" {
+		return "", errors.New("missing host")
+	}
+	proto := "whep"
+	if parsed.Scheme == "https" {
+		proto = "wheps"
+	}
+	path := parsed.Path
+	if path == "" || path == "/" {
+		path = "/"
+	}
+	if !strings.HasSuffix(path, "/whep") {
+		if !strings.HasSuffix(path, "/") {
+			path += "/"
+		}
+		path += "whep"
+	}
+	return fmt.Sprintf("%s://%s%s", proto, parsed.Host, path), nil
 }
 
 func ensureLeadingSlash(path string) string {

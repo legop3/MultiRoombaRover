@@ -14,7 +14,6 @@ battery:
   urgent: 1650
 maxWheelSpeed: 350
 media:
-  whepUrl: http://dummy1.local:8889/whep/rovercam
   manage: false
   service: mediamtx.service
   healthUrl: http://127.0.0.1:9997/v3/paths/list
