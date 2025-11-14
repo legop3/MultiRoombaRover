@@ -92,9 +92,9 @@ If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` se
    sudo systemctl enable --now mediamtx.service
    ```
 
-The sample config uses the Raspberry Pi camera module as the source, enables the local mediaMTX HTTP API so `roverd` can health-check the service, and includes a placeholder WHIP target pointing at the control server (`whipPublishURL: http://192.168.0.86:8889/whip/ROVER_ID`). Replace `ROVER_ID` with the value of `name` from `/etc/roverd.yaml` so every rover pushes to a unique publish path.  
+The sample config uses the Raspberry Pi camera module as the source, enables the local mediaMTX HTTP API so `roverd` can health-check the service, and serves WebRTC playback at `http://<pi-ip>:8889/whep/rovercam`. Keep that URL reachable from the control server—`roverd` advertises it automatically and the central media bridge pulls each rover’s feed over WHEP.  
 Expose the mediaMTX HTTP API locally (default `http://127.0.0.1:9997`) and set `media.healthUrl` so `roverd` can monitor the pipeline; `media.service` should match the systemd unit name (default `mediamtx.service`).  
-Once the WHIP URL points at the server, the Pi continuously publishes to `192.168.0.86`; the server-side mediaMTX fans the stream out to every driver/spectator via WHEP—no Pi ever serves viewers directly.
+With that in place, the Pi only talks to the server over the trusted LAN while the server-side mediaMTX distributes video to every driver and spectator.
 
 ## Server + UI
 

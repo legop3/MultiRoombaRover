@@ -56,7 +56,7 @@ cd ~/MultiRoombaRover
 sudo ./pi/install_roverd.sh --mediamtx
 ```
 
-Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set `name` to the rover’s ID, and edit `/etc/mediamtx/mediamtx.yml` so `whipPublishURL` is `http://192.168.0.86:8889/whip/<name>`. The Pi continuously pushes WebRTC media to the control server; drivers/spectators always watch through the server-side mediaMTX, so no browser ever talks to the Pi directly.
+Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set `name` to the rover’s ID, and make sure the Pi’s mediaMTX is reachable at `http://<pi-ip>:8889/whep/rovercam` (the default). Each rover advertises that WHEP URL in its `hello` frame, and the server’s media bridge automatically creates a matching pull path so mediaMTX on 192.168.0.86 fans the stream out to drivers/spectators—browsers never talk to the Pi directly.
 Use the “Restart Camera” button if you enable media management so roverd can bounce the mediamtx service remotely.
 Heads-up: the BRC pulser now uses libgpiod; make sure the `roverd` service account is in the `gpio` group (or otherwise allowed to access `/dev/gpiochip*`) and set `brc.gpioChip` if your hardware exposes a different chip name.
 

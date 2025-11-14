@@ -18,5 +18,3 @@ paths:
     rpiCameraExposure: long
     rpiCameraHFlip: false
     rpiCameraVFlip: false
-    # Replace ROVER_ID with the rover's configured name before deploy.
-    whipPublishURL: http://192.168.0.86:8889/whip/Freaky
