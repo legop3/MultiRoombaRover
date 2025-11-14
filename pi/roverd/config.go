@@ -164,17 +164,15 @@ func buildBridgeURL(src string) (string, error) {
 	if parsed.Scheme == "https" {
 		proto = "wheps"
 	}
-	path := parsed.Path
-	if path == "" || path == "/" {
-		path = "/"
+	path := strings.Trim(parsed.Path, "/")
+	if strings.HasPrefix(path, "whep/") {
+		path = strings.TrimPrefix(path, "whep/")
 	}
-	if !strings.HasSuffix(path, "/whep") {
-		if !strings.HasSuffix(path, "/") {
-			path += "/"
-		}
-		path += "whep"
+	path = strings.Trim(path, "/")
+	if path == "" {
+		path = "rovercam"
 	}
-	return fmt.Sprintf("%s://%s%s", proto, parsed.Host, path), nil
+	return fmt.Sprintf("%s://%s/%s/whep", proto, parsed.Host, path), nil
 }
 
 func ensureLeadingSlash(path string) string {
