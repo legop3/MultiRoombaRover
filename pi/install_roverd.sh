@@ -98,7 +98,7 @@ else
 	fi
 fi
 
-ensure_user roverd "dialout,gpio,video"
+ensure_user roverd "dialout,gpio,video,render"
 install -o roverd -g roverd -m 0755 "$BINARY_SRC" /usr/local/bin/roverd
 log "Installed roverd binary"
 
