@@ -62,13 +62,6 @@ if [[ ! -f "$CONFIG_SRC" ]]; then
 	exit 1
 fi
 
-if ! command -v libcamera-vid >/dev/null 2>&1; then
-	log "WARNING: libcamera-vid not found in PATH; install libcamera-utils for video publishing"
-fi
-if ! command -v ffmpeg >/dev/null 2>&1; then
-	log "WARNING: ffmpeg not found in PATH; install ffmpeg for WHIP publishing"
-fi
-
 ensure_user() {
 	local user="$1"
 	local groups="${2:-}"
@@ -86,6 +79,13 @@ ensure_user() {
 log() {
 	echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
 }
+
+if ! command -v libcamera-vid >/dev/null 2>&1; then
+	log "WARNING: libcamera-vid not found in PATH; install libcamera-utils for video publishing"
+fi
+if ! command -v ffmpeg >/dev/null 2>&1; then
+	log "WARNING: ffmpeg not found in PATH; install ffmpeg for WHIP publishing"
+fi
 
 ensure_user roverd "dialout,gpio,video"
 install -o roverd -g roverd -m 0755 "$BINARY_SRC" /usr/local/bin/roverd
