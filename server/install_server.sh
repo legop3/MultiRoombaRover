@@ -72,8 +72,12 @@ webrtc: yes
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: :8189
 
-authMethods: [read]
-authWebhookURL: http://127.0.0.1:8080/mediamtx/auth
+authMethod: http
+authHTTPAddress: http://127.0.0.1:8080/mediamtx/auth
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
 
 paths:
   all:
