@@ -94,7 +94,7 @@ func LoadConfig(path string) (*Config, error) {
 		},
 		Media: MediaConfig{
 			WhepPort:       8889,
-			WhepPath:       "/whep/rovercam",
+			WhepPath:       "/rovercam/whep",
 			HealthInterval: Duration{Duration: 30 * time.Second},
 		},
 	}
@@ -135,7 +135,7 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		path := cfg.Media.WhepPath
 		if path == "" {
-			path = "/whep/rovercam"
+			path = "/rovercam/whep"
 		}
 		path = ensureLeadingSlash(path)
 		scheme := "http"

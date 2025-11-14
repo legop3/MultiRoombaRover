@@ -55,7 +55,7 @@ Flags:
 | `--mediamtx` | download/install mediaMTX plus the provided config + unit |
 | `--mediamtx-version X.Y.Z` | override the mediaMTX release tag (default `1.15.3`) |
 
-If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.whepUrl`. When left blank, roverd automatically uses the Pi’s primary IPv4 plus `:8889/whep/rovercam`.
+If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.whepUrl`. When left blank, roverd automatically uses the Pi’s primary IPv4 plus `:8889/rovercam/whep`.
 
 ## Manual installation
 
@@ -65,7 +65,7 @@ If the script installs the sample config, it will remind you to edit `/etc/rover
    sudo install -o roverd -g roverd -m 0755 dist/roverd /usr/local/bin/roverd
    sudo install -o roverd -g roverd -m 0640 pi/roverd/roverd.sample.yaml /etc/roverd.yaml
    ```
-   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and (if needed) the media `whepUrl` override. Otherwise, roverd fills in `http://<pi-ip>:8889/whep/rovercam` based on the DHCP-assigned address.
+   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and (if needed) the media `whepUrl` override. Otherwise, roverd fills in `http://<pi-ip>:8889/rovercam/whep` based on the DHCP-assigned address.
 
 2. Install the systemd unit:
    ```bash
@@ -92,7 +92,7 @@ If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` se
    sudo systemctl enable --now mediamtx.service
    ```
 
-The sample config uses the Raspberry Pi camera module as the source, enables the local mediaMTX HTTP API so `roverd` can health-check the service, and serves WebRTC playback at `http://<pi-ip>:8889/whep/rovercam`. Keep that URL reachable from the control server—`roverd` advertises it automatically and the central media bridge pulls each rover’s feed over WHEP.  
+The sample config uses the Raspberry Pi camera module as the source, enables the local mediaMTX HTTP API so `roverd` can health-check the service, and serves WebRTC playback at `http://<pi-ip>:8889/rovercam/whep`. Keep that URL reachable from the control server—`roverd` advertises it automatically and the central media bridge pulls each rover’s feed over WHEP.  
 Expose the mediaMTX HTTP API locally (default `http://127.0.0.1:9997`) and set `media.healthUrl` so `roverd` can monitor the pipeline; `media.service` should match the systemd unit name (default `mediamtx.service`).  
 With that in place, the Pi only talks to the server over the trusted LAN while the server-side mediaMTX distributes video to every driver and spectator.
 

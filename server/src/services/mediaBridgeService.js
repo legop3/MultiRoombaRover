@@ -93,21 +93,48 @@ function normalizeSource(raw) {
   if (!raw) return null;
   const trimmed = String(raw).trim();
   if (!trimmed) return null;
-  if (/^wheps?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
   try {
     const parsed = new URL(trimmed);
-    const protocol = parsed.protocol === 'https:' ? 'wheps' : 'whep';
-    let pathname = parsed.pathname || '/';
-    if (!pathname.startsWith('/')) {
-      pathname = `/${pathname}`;
+    let protocol = parsed.protocol;
+    if (!protocol || protocol === 'http:') {
+      protocol = 'whep:';
+    } else if (protocol === 'https:') {
+      protocol = 'wheps:';
+    } else if (protocol !== 'whep:' && protocol !== 'wheps:') {
+      throw new Error('unsupported protocol');
     }
-    return `${protocol}://${parsed.host}${pathname}${parsed.search || ''}`;
+    const host = parsed.host;
+    if (!host) {
+      throw new Error('missing host');
+    }
+    let pathname = parsed.pathname || '/';
+    pathname = normalizeWhepPath(pathname);
+    return `${protocol.slice(0, -1)}://${host}${pathname}${parsed.search || ''}`;
   } catch (err) {
     logger.warn('invalid WHEP URL provided by rover (%s): %s', raw, err.message);
     return null;
   }
+}
+
+function normalizeWhepPath(pathname) {
+  let result = pathname || '/';
+  if (!result.startsWith('/')) {
+    result = `/${result}`;
+  }
+  result = result.replace(/\/+/g, '/');
+  result = result.replace(/\/+$/, '');
+  if (result.startsWith('/whep/')) {
+    result = `/${result.slice(6)}`;
+  } else if (result === '/whep') {
+    result = '/rovercam';
+  }
+  if (!result || result === '/') {
+    result = '/rovercam';
+  }
+  if (!result.endsWith('/whep')) {
+    result = `${result}/whep`;
+  }
+  return result;
 }
 
 async function callApi(method, path, body) {
