@@ -56,7 +56,7 @@ cd ~/MultiRoombaRover
 sudo ./pi/install_roverd.sh --mediamtx
 ```
 
-Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, enable the sensor stream from the UI, and drive with WASD.
+Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set (or leave blank to auto-derive) `media.whepUrl` for the Pi’s mediaMTX instance (defaults to `http://<pi-ip>:8889/whep/rovercam`), enable the sensor stream from the UI, and drive with WASD.
 Use the “Restart Camera” button if you enable media management so roverd can bounce the mediamtx service remotely.
 Heads-up: the BRC pulser now uses libgpiod; make sure the `roverd` service account is in the `gpio` group (or otherwise allowed to access `/dev/gpiochip*`) and set `brc.gpioChip` if your hardware exposes a different chip name.
 
@@ -73,7 +73,7 @@ The script must be executed via `sudo` from the user that owns the repo. It will
 
 - install Node.js/npm plus curl/tar
 - run `npm install --production`
-- copy `config.example.yaml` to `config.yaml` if needed (edit the file afterwards for admins/media URLs)
+- copy `config.example.yaml` to `config.yaml` if needed (edit the file afterwards for admins/media URLs + `media.mediamtxApiUrl`)
 - download mediaMTX v1.15.3 and drop it into `/usr/local/bin`
 - write `/etc/mediamtx/mediamtx.yml` that points to the Node server’s `/mediamtx/auth` webhook
 - create + enable `mediamtx.service` and `multirover.service`, both running as your repo user and pointing at the clone directly
@@ -87,4 +87,4 @@ authHTTPExclude:
 
 Then restart `mediamtx.service` so WHIP pushes from the Pis stop getting rejected.
 
-Once finished, update `server/config.yaml` with your admin passwords and restart `multirover.service` if you change it. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.
+Once finished, update `server/config.yaml` with your admin passwords, `media.whepBaseUrl` (public playback URL), and the new `media.mediamtxApiUrl` (usually `http://127.0.0.1:9997`). The Node server uses that API to create per-rover pull paths so the central mediaMTX automatically connects to each Pi’s WHEP feed as rovers come and go. Restart `multirover.service` whenever you edit the config. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.

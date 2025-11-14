@@ -55,7 +55,7 @@ Flags:
 | `--mediamtx` | download/install mediaMTX plus the provided config + unit |
 | `--mediamtx-version X.Y.Z` | override the mediaMTX release tag (default `1.15.3`) |
 
-If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and the `media.publishUrl` that points at your central mediaMTX WHIP endpoint (for example `https://control-server.local/whip/roomba-alpha`).
+If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.whepUrl`. When left blank, roverd automatically uses the Pi’s primary IPv4 plus `:8889/whep/rovercam`.
 
 ## Manual installation
 
@@ -65,7 +65,7 @@ If the script installs the sample config, it will remind you to edit `/etc/rover
    sudo install -o roverd -g roverd -m 0755 dist/roverd /usr/local/bin/roverd
    sudo install -o roverd -g roverd -m 0640 pi/roverd/roverd.sample.yaml /etc/roverd.yaml
    ```
-   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and the media `publishUrl` that points at the central media server’s WHIP endpoint for that rover.
+   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and (if needed) the media `whepUrl` override. Otherwise, roverd fills in `http://<pi-ip>:8889/whep/rovercam` based on the DHCP-assigned address.
 
 2. Install the systemd unit:
    ```bash

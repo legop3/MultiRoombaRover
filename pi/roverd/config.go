@@ -3,7 +3,9 @@ package roverd
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -53,7 +55,10 @@ type BatteryConfig struct {
 }
 
 type MediaConfig struct {
-	PublishURL     string   `yaml:"publishUrl"`
+	WhepURL        string   `yaml:"whepUrl" json:"whepUrl,omitempty"`
+	WhepPort       int      `yaml:"whepPort" json:"-"`
+	WhepPath       string   `yaml:"whepPath" json:"-"`
+	LegacyPublish  string   `yaml:"publishUrl,omitempty" json:"-"`
 	Manage         bool     `yaml:"manage"`
 	Service        string   `yaml:"service"`
 	HealthURL      string   `yaml:"healthUrl"`
@@ -88,6 +93,8 @@ func LoadConfig(path string) (*Config, error) {
 			},
 		},
 		Media: MediaConfig{
+			WhepPort:       8889,
+			WhepPath:       "/whep/rovercam",
 			HealthInterval: Duration{Duration: 30 * time.Second},
 		},
 	}
@@ -118,5 +125,69 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.Media.Manage && cfg.Media.HealthInterval.Duration <= 0 {
 		cfg.Media.HealthInterval = Duration{Duration: 30 * time.Second}
 	}
+	if cfg.Media.WhepURL == "" {
+		cfg.Media.WhepURL = cfg.Media.LegacyPublish
+	}
+	if cfg.Media.WhepURL == "" {
+		ip, err := detectPrimaryIPv4()
+		if err != nil {
+			return nil, fmt.Errorf("derive whepUrl: %w", err)
+		}
+		path := cfg.Media.WhepPath
+		if path == "" {
+			path = "/whep/rovercam"
+		}
+		path = ensureLeadingSlash(path)
+		scheme := "http"
+		cfg.Media.WhepURL = fmt.Sprintf("%s://%s:%d%s", scheme, ip, effectivePort(cfg.Media.WhepPort), path)
+	}
 	return &cfg, nil
+}
+
+func ensureLeadingSlash(path string) string {
+	if !strings.HasPrefix(path, "/") {
+		return "/" + path
+	}
+	return path
+}
+
+func effectivePort(port int) int {
+	if port <= 0 {
+		return 8889
+	}
+	return port
+}
+
+func detectPrimaryIPv4() (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			ip = ip.To4()
+			if ip == nil {
+				continue
+			}
+			return ip.String(), nil
+		}
+	}
+	return "", errors.New("no non-loopback IPv4 address found")
 }

@@ -1,17 +1,18 @@
 # mediaMTX Integration
 
-Each rover runs mediaMTX locally to capture the Pi camera and publish it upstream, while the control server hosts a central mediaMTX instance that fans video out to drivers and spectators.
+Each rover runs mediaMTX locally to capture the Pi camera, and the control server hosts a central mediaMTX instance that fans video out to drivers and spectators. When a rover connects, the Node server asks the central mediaMTX to _pull_ the rover’s local WHEP stream and expose it under the rover’s name.
 
 ## Pi (publisher)
 
 - mediaMTX samples the Pi camera (`paths.rovercam.source: rpiCamera`) and exposes the HTTP API on `http://127.0.0.1:9997`.
-- `/etc/roverd.yaml` contains `media.publishUrl`, pointing at the control server’s WHIP endpoint for that rover (e.g. `https://control.example.com/whip/roomba-alpha`). No auth is required when the Pi network is trusted.
+- `/etc/roverd.yaml` contains `media.whepUrl`, pointing at the Pi’s own WHEP endpoint (e.g. `http://roomba-alpha.local:8889/whep/rovercam`). This is what the central server will pull.
 - The `media.manage` flag keeps the local service alive via `systemctl` and hits the API for health checks (`media.healthUrl`, defaults to `http://127.0.0.1:9997/v3/paths/list`).
 
 ## Control server (viewer)
 
-- The central mediaMTX instance accepts WHIP ingest at `/whip/<roverId>` and serves WHEP playback at `/whep/<roverId>`.
-- The Node server issues viewer sessions (one per socket) via `video:request`, and mediaMTX calls back into `GET /mediamtx/auth?session=<id>&roverId=<name>` before letting a client access `/whep/<roverId>?session=<id>`. Lockdown mode simply stops minting sessions for non-lockdown admins.
+- The central mediaMTX instance serves WHEP playback at `/whep/<roverId>` and exposes its control API on `http://127.0.0.1:9997`.
+- When a rover connects, the Node server calls `POST /v3/config/paths/replace/<roverId>` and sets `source: whep://<pi-ip>:8889/rovercam/whep`. When the rover disconnects, the path is removed.
+- Viewers still use `video:request` to obtain a session token. mediaMTX calls back into `/mediamtx/auth` before letting a client access `/whep/<roverId>?session=...`, and the Node server enforces lockdown/role rules there.
 
 ## Driver / spectator UIs
 
