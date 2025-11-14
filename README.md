@@ -88,3 +88,8 @@ authHTTPExclude:
 Then restart `mediamtx.service` so WHIP pushes from the Pis stop getting rejected.
 
 Once finished, update `server/config.yaml` with your admin passwords, `media.whepBaseUrl` (public playback URL), and the new `media.mediamtxApiUrl` (usually `http://127.0.0.1:9997`). The Node server uses that API to create per-rover pull paths so the central mediaMTX automatically connects to each Pi’s WHEP feed as rovers come and go. Restart `multirover.service` whenever you edit the config. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.
+
+### Video handshake + diagnostics
+
+- Every `video:request` returns `{ url, token }`. The browser posts the SDP offer to `url` and includes `Authorization: Basic base64(token:token)`. mediaMTX forwards the `token` to `/mediamtx/auth`, which checks the socket’s permissions and either returns 200 or 401—no query parameters are involved anymore.
+- To see what mediaMTX is pulling, run `npm run check:media` (or `node scripts/checkMedia.js`). It hits `/v3/paths/list` and prints each rover’s `ready` state and byte counters so you can instantly spot bridge issues.

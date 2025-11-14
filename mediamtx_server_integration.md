@@ -12,7 +12,7 @@ Each rover runs mediaMTX locally to capture the Pi camera, and the control serve
 
 - The central mediaMTX instance serves WHEP playback at `/whep/<roverId>` and exposes its control API on `http://127.0.0.1:9997`.
 - When a rover connects, the Node server calls `POST /v3/config/paths/replace/<roverId>` and sets `source: whep://<pi-ip>:8889/rovercam/whep`. When the rover disconnects, the path is removed.
-- Viewers still use `video:request` to obtain a session token. mediaMTX calls back into `/mediamtx/auth` before letting a client access `/whep/<roverId>?session=...`, and the Node server enforces lockdown/role rules there.
+- Viewers still use `video:request` to obtain a session token. They POST their SDP offer to `/whep/<roverId>` with `Authorization: Basic base64(token:token)`. mediaMTX forwards the `token` to `/mediamtx/auth` (in the `user` field) before allowing the stream to start, and the Node server enforces lockdown/role rules there.
 
 ## Driver / spectator UIs
 

@@ -23,8 +23,7 @@ function canView(socket) {
 app.post('/mediamtx/auth', (req, res) => {
   const body = req.body || {};
   const path = (body.path || '').replace(/^\//, '');
-  const params = new URLSearchParams(body.query || '');
-  const sessionId = params.get('session');
+  const sessionId = body.user;
   const roverId = path;
 
   if (!sessionId || !roverId) {

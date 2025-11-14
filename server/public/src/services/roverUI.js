@@ -152,10 +152,11 @@ registerModule('services/roverUI', (require, exports) => {
         videoPlayer.stopStream('driver');
         return;
       }
-      const { url } = resp;
+      const { url, token } = resp;
       videoPlayer
         .startStream('driver', {
           url,
+          token,
           mount: videoContainer,
           videoEl: driverVideo,
           onStatus: (state, detail) => {

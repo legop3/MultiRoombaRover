@@ -70,8 +70,7 @@ registerModule('services/videoPlayer', (require, exports) => {
       };
       this.attachAutoPlayLoop();
 
-      const credential = token || extractSessionToken(url);
-      if (!credential) {
+      if (!token) {
         throw new Error('Missing video session token');
       }
       const offer = await this.pc.createOffer();
@@ -80,7 +79,7 @@ registerModule('services/videoPlayer', (require, exports) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/sdp',
-          Authorization: `Basic ${btoa(`${credential}:${credential}`)}`,
+          Authorization: `Basic ${btoa(`${token}:${token}`)}`,
         },
         body: offer.sdp,
       });
@@ -117,15 +116,6 @@ registerModule('services/videoPlayer', (require, exports) => {
         this.video.parentElement.removeChild(this.video);
       }
       this.status('stopped');
-    }
-  }
-
-  function extractSessionToken(url) {
-    try {
-      const parsed = new URL(url, window.location.origin);
-      return parsed.searchParams.get('session');
-    } catch (err) {
-      return null;
     }
   }
 

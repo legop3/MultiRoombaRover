@@ -37,8 +37,8 @@ io.on('connection', (socket) => {
         throw new Error('Not authorized for video');
       }
       const sessionId = videoSessions.createSession(socket, roverId);
-      const url = `${mediaConfig.whepBaseUrl.replace(/\/$/, '')}/${roverId}?session=${sessionId}`;
-      cb({ url });
+      const url = `${mediaConfig.whepBaseUrl.replace(/\/$/, '')}/${roverId}`;
+      cb({ url, token: sessionId });
     } catch (err) {
       logger.warn('video request failed: %s', err.message);
       cb({ error: err.message });

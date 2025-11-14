@@ -82,6 +82,7 @@ registerModule('spectator/main', (require, exports) => {
       videoPlayer
         .startStream(playerId, {
           url: resp.url,
+          token: resp.token,
           mount: wrap,
           onStatus: (state, detail) => {
             if (state === 'playing') {
