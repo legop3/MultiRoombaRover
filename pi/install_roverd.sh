@@ -80,11 +80,22 @@ log() {
 	echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
 }
 
-if ! command -v rpicam-vid >/dev/null 2>&1 && ! command -v libcamera-vid >/dev/null 2>&1; then
-	log "WARNING: neither rpicam-vid nor libcamera-vid found in PATH; install the Raspberry Pi libcamera apps (sudo apt install libcamera-apps)."
-fi
-if ! command -v ffmpeg >/dev/null 2>&1; then
-	log "WARNING: ffmpeg not found in PATH; install ffmpeg for WHIP publishing"
+if ! command -v gst-launch-1.0 >/dev/null 2>&1; then
+	log "WARNING: gst-launch-1.0 not found; install GStreamer (sudo apt install gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libcamera)."
+else
+	if command -v gst-inspect-1.0 >/dev/null 2>&1; then
+		if ! gst-inspect-1.0 whipclientsink >/dev/null 2>&1; then
+			log "WARNING: whipclientsink element missing; install gstreamer1.0-plugins-bad (1.22+)."
+		fi
+		if ! gst-inspect-1.0 libcamerasrc >/dev/null 2>&1; then
+			log "WARNING: libcamerasrc plugin missing; install gstreamer1.0-libcamera."
+		fi
+		if ! gst-inspect-1.0 x264enc >/dev/null 2>&1; then
+			log "WARNING: x264enc element missing; install gstreamer1.0-plugins-ugly."
+		fi
+	else
+		log "WARNING: gst-inspect-1.0 not found; unable to verify GStreamer plugins."
+	fi
 fi
 
 ensure_user roverd "dialout,gpio,video"

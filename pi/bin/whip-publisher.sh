@@ -18,49 +18,31 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-720}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 
-FFMPEG_BIN="${FFMPEG_BIN:-/usr/bin/ffmpeg}"
+GST_BIN="${GST_BIN:-/usr/bin/gst-launch-1.0}"
 
-if [[ -n "${LIBCAMERA_BIN:-}" ]]; then
-	LIBCAMERA_BIN_PATH="$LIBCAMERA_BIN"
-elif command -v rpicam-vid >/dev/null 2>&1; then
-	LIBCAMERA_BIN_PATH="$(command -v rpicam-vid)"
-elif command -v libcamera-vid >/dev/null 2>&1; then
-	LIBCAMERA_BIN_PATH="$(command -v libcamera-vid)"
-else
-	echo "Neither rpicam-vid nor libcamera-vid found; install the libcamera apps." >&2
-	exit 1
-fi
-
-if [[ ! -x "$LIBCAMERA_BIN_PATH" ]]; then
-	echo "Video capture binary not executable at ${LIBCAMERA_BIN_PATH}" >&2
-	exit 1
-fi
-if [[ ! -x "$FFMPEG_BIN" ]]; then
-	echo "ffmpeg not found at ${FFMPEG_BIN}" >&2
-	exit 1
+if [[ ! -x "$GST_BIN" ]]; then
+	if command -v gst-launch-1.0 >/dev/null 2>&1; then
+		GST_BIN="$(command -v gst-launch-1.0)"
+	else
+		echo "gst-launch-1.0 not found; install gstreamer1.0-tools and plugins." >&2
+		exit 1
+	fi
 fi
 
 run_pipeline() {
-	"${LIBCAMERA_BIN_PATH}" \
-		--inline \
-		--timeout 0 \
-		--width "${VIDEO_WIDTH}" \
-		--height "${VIDEO_HEIGHT}" \
-		--framerate "${VIDEO_FPS}" \
-		--bitrate "${VIDEO_BITRATE}" \
-		--codec h264 \
-		--denoise cdn_off \
-		--nopreview \
-		--output - |
-	"${FFMPEG_BIN}" \
-		-hide_banner \
-		-loglevel warning \
-		-f h264 \
-		-i pipe:0 \
-		-c:v copy \
-		-an \
-		-f whip \
-		"${WHIP_URL}"
+	local bitrate_kbps=$((VIDEO_BITRATE / 1000))
+	if [[ "$bitrate_kbps" -le 0 ]]; then
+		bitrate_kbps=3000
+	fi
+	"${GST_BIN}" -e \
+		libcamerasrc \
+		! "video/x-raw,width=${VIDEO_WIDTH},height=${VIDEO_HEIGHT},framerate=${VIDEO_FPS}/1" \
+		! queue \
+		! videoconvert \
+		! x264enc speed-preset=ultrafast tune=zerolatency bitrate="${bitrate_kbps}" key-int-max="${VIDEO_FPS}" byte-stream=true \
+		! "video/x-h264,profile=baseline" \
+		! h264parse config-interval=1 \
+		! whipclientsink signaller::whip-endpoint="${WHIP_URL}"
 }
 
 while true; do

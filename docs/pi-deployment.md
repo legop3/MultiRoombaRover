@@ -32,6 +32,16 @@ Run the resulting `dist/roverd-dummy` on any machine; it will connect to the ser
 
 ## Automated installation (recommended)
 
+Make sure the Pi has GStreamer 1.22+ plus the libcamera + bad plugin sets (Bookworm ships them):
+
+```bash
+sudo apt update
+sudo apt install libcamera-apps \
+  gstreamer1.0-tools gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+  gstreamer1.0-libcamera
+```
+
 Once the binary (and repo) are on the Pi, run the helper script from the repo root:
 
 ```bash
@@ -79,8 +89,16 @@ If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` se
 
 ## WHIP publisher details
 
-The `whip-publisher.service` unit runs `/usr/local/bin/whip-publisher`, a small shell wrapper that pipes `libcamera-vid` into FFmpeg and POSTs the result to `media.publishUrl`. roverd writes `/var/lib/roverd/whip.env` on startup (and whenever you restart the service) so the publisher inherits the correct `WHIP_URL`, resolution, FPS, and bitrate. Tweak those knobs under `media.videoWidth`, `media.videoHeight`, `media.videoFps`, and `media.videoBitrate` in `/etc/roverd.yaml` if you need different camera settings.  
-Use `sudo systemctl status whip-publisher` to watch the pipeline logs; the unit auto-restarts whenever the network drops or FFmpeg exits.
+The `whip-publisher.service` unit runs `/usr/local/bin/whip-publisher`, a small shell wrapper that launches:
+
+```bash
+gst-launch-1.0 libcamerasrc ! video/x-raw,width=WIDTH,height=HEIGHT,framerate=FPS/1 \
+  ! videoconvert ! x264enc tune=zerolatency bitrate=BITRATE_KB key-int-max=FPS \
+  ! h264parse config-interval=1 ! whipclientsink signaller::whip-endpoint=$WHIP_URL
+```
+
+roverd writes `/var/lib/roverd/whip.env` on startup (and whenever you restart the service) so the publisher inherits the correct `WHIP_URL`, resolution, FPS, and bitrate. Tweak those knobs under `media.videoWidth`, `media.videoHeight`, `media.videoFps`, and `media.videoBitrate` in `/etc/roverd.yaml` if you need different camera settings.  
+Use `sudo systemctl status whip-publisher` to watch the pipeline logs; the unit auto-restarts whenever the network drops or GStreamer exits.
 
 ## Server + UI
 
