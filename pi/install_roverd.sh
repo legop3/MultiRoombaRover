@@ -6,6 +6,10 @@ set -euo pipefail
 
 BINARY_SRC="dist/roverd"
 CONFIG_SRC="pi/roverd/roverd.sample.yaml"
+FFMPEG_WHIP_VERSION="0.0.0"
+FFMPEG_WHIP_BASE_URL="https://github.com/steel-dev/ffmpeg-whip/releases/download/v${FFMPEG_WHIP_VERSION}"
+FFMPEG_WHIP_DIR="/usr/local/lib/ffmpeg-whip"
+FFMPEG_WHIP_BIN="/usr/local/bin/ffmpeg-whip"
 
 usage() {
 	cat <<'USAGE'
@@ -62,6 +66,11 @@ if [[ ! -f "$CONFIG_SRC" ]]; then
 	exit 1
 fi
 
+if ! command -v curl >/dev/null 2>&1; then
+	echo "curl is required by this installer" >&2
+	exit 1
+fi
+
 ensure_user() {
 	local user="$1"
 	local groups="${2:-}"
@@ -80,23 +89,43 @@ log() {
 	echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
 }
 
-if ! command -v gst-launch-1.0 >/dev/null 2>&1; then
-	log "WARNING: gst-launch-1.0 not found; install GStreamer (sudo apt install gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libcamera)."
-else
-	if command -v gst-inspect-1.0 >/dev/null 2>&1; then
-		if ! gst-inspect-1.0 whipclientsink >/dev/null 2>&1; then
-			log "WARNING: whipclientsink element missing; install gstreamer1.0-plugins-bad (1.22+)."
-		fi
-		if ! gst-inspect-1.0 libcamerasrc >/dev/null 2>&1; then
-			log "WARNING: libcamerasrc plugin missing; install gstreamer1.0-libcamera."
-		fi
-		if ! gst-inspect-1.0 x264enc >/dev/null 2>&1; then
-			log "WARNING: x264enc element missing; install gstreamer1.0-plugins-ugly."
-		fi
-	else
-		log "WARNING: gst-inspect-1.0 not found; unable to verify GStreamer plugins."
-	fi
+if ! command -v rpicam-vid >/dev/null 2>&1 && ! command -v libcamera-vid >/dev/null 2>&1; then
+	log "WARNING: neither rpicam-vid nor libcamera-vid found in PATH; install libcamera-apps."
 fi
+
+install_ffmpeg_whip() {
+	local arch asset tmp
+	arch="$(uname -m)"
+	case "$arch" in
+		aarch64)
+			asset="ffmpeg-whip-linux-arm64.tar.gz"
+			;;
+		x86_64|amd64)
+			asset="ffmpeg-whip-linux-amd64.tar.gz"
+			;;
+		*)
+			log "WARNING: ffmpeg-whip binary not available for architecture ${arch}; ensure a WHIP-capable ffmpeg is installed manually."
+			return
+	esac
+	tmp="$(mktemp -d)"
+	log "Downloading ffmpeg-whip ${FFMPEG_WHIP_VERSION} (${asset})"
+	if ! curl -fsSL "${FFMPEG_WHIP_BASE_URL}/${asset}" -o "${tmp}/${asset}"; then
+		rm -rf "$tmp"
+		echo "Failed to download ffmpeg-whip from ${FFMPEG_WHIP_BASE_URL}/${asset}" >&2
+		exit 1
+	fi
+	rm -rf "${FFMPEG_WHIP_DIR}"
+	install -d "${FFMPEG_WHIP_DIR}"
+	tar -xzf "${tmp}/${asset}" -C "${FFMPEG_WHIP_DIR}" --strip-components=1
+	rm -rf "$tmp"
+	cat > "${FFMPEG_WHIP_BIN}" <<'EOF'
+#!/usr/bin/env bash
+export LD_LIBRARY_PATH=/usr/local/lib/ffmpeg-whip/lib:${LD_LIBRARY_PATH}
+exec /usr/local/lib/ffmpeg-whip/bin/ffmpeg "$@"
+EOF
+	chmod 0755 "${FFMPEG_WHIP_BIN}"
+	log "Installed ${FFMPEG_WHIP_BIN}"
+}
 
 ensure_user roverd "dialout,gpio,video,render"
 install -o roverd -g roverd -m 0755 "$BINARY_SRC" /usr/local/bin/roverd
@@ -114,6 +143,8 @@ fi
 
 install -m 0644 pi/systemd/roverd.service /etc/systemd/system/roverd.service
 log "Installed roverd systemd unit"
+
+install_ffmpeg_whip
 
 # Install WHIP publisher assets
 install -D -o root -g root -m 0755 pi/bin/whip-publisher.sh /usr/local/bin/whip-publisher

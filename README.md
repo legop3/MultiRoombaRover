@@ -56,7 +56,7 @@ cd ~/MultiRoombaRover
 sudo ./pi/install_roverd.sh
 ```
 
-Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set `name` to the rover’s ID, and (optionally) override `media.publishUrl` if your control server isn’t `192.168.0.86`. The new WHIP publisher service (`whip-publisher.service`) uses GStreamer (`gst-launch-1.0 libcamerasrc ! ... ! whipclientsink`) to encode the Pi camera to H264 and publish straight into the server’s mediaMTX instance at `http://<server>:8889/whip/<name>`. Install `libcamera-apps` plus `gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libcamera` on each Pi so the pipeline is available. Use the “Restart Camera” button if you enable media management so roverd can bounce the publisher service remotely.
+Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set `name` to the rover’s ID, and (optionally) override `media.publishUrl` if your control server isn’t `192.168.0.86`. The WHIP publisher service (`whip-publisher.service`) captures the Pi camera with `rpicam-vid`/`libcamera-vid`, pipes the raw H264 into the bundled `ffmpeg-whip`, and publishes straight into the server’s mediaMTX instance at `http://<server>:8889/whip/<name>`. Install `libcamera-apps` on each Pi; the installer will download the patched ffmpeg build automatically. Use the “Restart Camera” button if you enable media management so roverd can bounce the publisher service remotely.
 Heads-up: the BRC pulser now uses libgpiod; make sure the `roverd` service account is in the `gpio` group (or otherwise allowed to access `/dev/gpiochip*`) and set `brc.gpioChip` if your hardware exposes a different chip name.
 
 ## Fedora server deployment

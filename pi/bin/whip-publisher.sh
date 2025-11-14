@@ -18,31 +18,51 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-720}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 
-GST_BIN="${GST_BIN:-/usr/bin/gst-launch-1.0}"
+if [[ -n "${LIBCAMERA_BIN:-}" ]]; then
+	LIBCAMERA_BIN_PATH="$LIBCAMERA_BIN"
+elif command -v rpicam-vid >/dev/null 2>&1; then
+	LIBCAMERA_BIN_PATH="$(command -v rpicam-vid)"
+elif command -v libcamera-vid >/dev/null 2>&1; then
+	LIBCAMERA_BIN_PATH="$(command -v libcamera-vid)"
+else
+	echo "Neither rpicam-vid nor libcamera-vid found; install libcamera-apps." >&2
+	exit 1
+fi
 
-if [[ ! -x "$GST_BIN" ]]; then
-	if command -v gst-launch-1.0 >/dev/null 2>&1; then
-		GST_BIN="$(command -v gst-launch-1.0)"
-	else
-		echo "gst-launch-1.0 not found; install gstreamer1.0-tools and plugins." >&2
-		exit 1
-	fi
+if [[ -n "${FFMPEG_BIN:-}" ]]; then
+	FFMPEG_BIN_PATH="$FFMPEG_BIN"
+elif command -v ffmpeg-whip >/dev/null 2>&1; then
+	FFMPEG_BIN_PATH="$(command -v ffmpeg-whip)"
+elif command -v ffmpeg >/dev/null 2>&1; then
+	FFMPEG_BIN_PATH="$(command -v ffmpeg)"
+else
+	echo "ffmpeg not found; install it or run the installer to fetch ffmpeg-whip." >&2
+	exit 1
 fi
 
 run_pipeline() {
-	local bitrate_kbps=$((VIDEO_BITRATE / 1000))
-	if [[ "$bitrate_kbps" -le 0 ]]; then
-		bitrate_kbps=3000
-	fi
-	"${GST_BIN}" -e \
-		libcamerasrc \
-		! "video/x-raw,width=${VIDEO_WIDTH},height=${VIDEO_HEIGHT},framerate=${VIDEO_FPS}/1" \
-		! queue \
-		! videoconvert \
-		! x264enc speed-preset=ultrafast tune=zerolatency bitrate="${bitrate_kbps}" key-int-max="${VIDEO_FPS}" byte-stream=true \
-		! "video/x-h264,profile=baseline" \
-		! h264parse config-interval=1 \
-		! whipclientsink signaller::whip-endpoint="${WHIP_URL}"
+	"${LIBCAMERA_BIN_PATH}" \
+		--inline \
+		--timeout 0 \
+		--width "${VIDEO_WIDTH}" \
+		--height "${VIDEO_HEIGHT}" \
+		--framerate "${VIDEO_FPS}" \
+		--bitrate "${VIDEO_BITRATE}" \
+		--codec h264 \
+		--profile baseline \
+		--denoise cdn_off \
+		--nopreview \
+		--output - \
+		| "${FFMPEG_BIN_PATH}" \
+			-hide_banner \
+			-loglevel warning \
+			-fflags nobuffer \
+			-f h264 \
+			-i pipe:0 \
+			-c:v copy \
+			-an \
+			-f whip \
+			"${WHIP_URL}"
 }
 
 while true; do
