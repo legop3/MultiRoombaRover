@@ -1,6 +1,7 @@
 registerModule('services/roverUI', (require, exports) => {
   const { socket } = require('globals/socket');
   const { formatHex } = require('helpers/formatters');
+  const videoPlayer = require('services/videoPlayer');
   const state = require('services/state');
 
   const statusEl = document.getElementById('status');
@@ -13,11 +14,14 @@ registerModule('services/roverUI', (require, exports) => {
   const modeSelect = document.getElementById('modeSelect');
   const activeDriverEl = document.getElementById('activeDriver');
   const currentRoverEl = document.getElementById('currentRover');
-  const videoBtn = document.getElementById('videoRequest');
-  const videoLinkEl = document.getElementById('videoLink');
+  const videoContainer = document.getElementById('videoContainer');
+  const driverVideo = document.getElementById('driverVideo');
+  const videoStatus = document.getElementById('videoStatus');
+  const videoReconnect = document.getElementById('videoReconnect');
 
   let roster = [];
   let lastSelection = null;
+  let currentVideoRover = null;
 
   state.onRoleChange((role) => {
     const isAdmin = role === 'admin' || role === 'lockdown';
@@ -47,7 +51,7 @@ registerModule('services/roverUI', (require, exports) => {
     } else if (!list.length) {
       state.setSelected(null);
     }
-    renderSelection();
+    renderSelection(true);
   });
 
   roverSelect.addEventListener('change', () => {
@@ -64,6 +68,7 @@ registerModule('services/roverUI', (require, exports) => {
     state.setSelected(roverId);
     renderSelection(true);
     statusEl.textContent = `Driving ${roverId}`;
+    maybeConnectVideo(true);
   });
 
   socket.on('sensorFrame', ({ roverId, frame, sensors }) => {
@@ -102,20 +107,7 @@ registerModule('services/roverUI', (require, exports) => {
     }
   });
 
-  videoBtn?.addEventListener('click', () => {
-    const roverId = state.getSelected();
-    if (!roverId) {
-      if (videoLinkEl) videoLinkEl.textContent = 'Select a rover first';
-      return;
-    }
-    socket.emit('video:request', { roverId }, (resp = {}) => {
-      if (resp.error) {
-        videoLinkEl.textContent = `Video error: ${resp.error}`;
-        return;
-      }
-      videoLinkEl.innerHTML = `Video URL: <a href=\"${resp.url}\" target=\"_blank\">${resp.url}</a>`;
-    });
-  });
+  videoReconnect?.addEventListener('click', () => maybeConnectVideo(true));
 
   socket.on('connect', () => {
     statusEl.textContent = 'Connected';
@@ -137,9 +129,56 @@ registerModule('services/roverUI', (require, exports) => {
     if (sensorOutput && (clearOutput || roverId !== lastSelection)) {
       sensorOutput.textContent = roverId ? 'Waiting for sensor data...' : '';
     }
-    if (clearOutput && videoLinkEl) {
-      videoLinkEl.textContent = '';
-    }
     lastSelection = roverId;
+    maybeConnectVideo(clearOutput);
+  }
+
+  function maybeConnectVideo(force = false) {
+    const roverId = state.getSelected();
+    if (!roverId) {
+      currentVideoRover = null;
+      videoPlayer.stopStream('driver');
+      setVideoStatus('No rover selected');
+      return;
+    }
+    if (!force && roverId === currentVideoRover) {
+      return;
+    }
+    currentVideoRover = roverId;
+    setVideoStatus('Connecting video…');
+    socket.emit('video:request', { roverId }, (resp = {}) => {
+      if (resp.error) {
+        setVideoStatus(`Video error: ${resp.error}`);
+        videoPlayer.stopStream('driver');
+        return;
+      }
+      const { url } = resp;
+      videoPlayer
+        .startStream('driver', {
+          url,
+          mount: videoContainer,
+          videoEl: driverVideo,
+          onStatus: (state, detail) => {
+            if (state === 'playing') {
+              setVideoStatus('Video live');
+            } else if (state === 'connecting') {
+              setVideoStatus('Connecting video…');
+            } else if (state === 'error') {
+              setVideoStatus(`Video error: ${detail}`);
+            } else if (state === 'stopped') {
+              setVideoStatus('Video stopped');
+            }
+          },
+        })
+        .catch((err) => {
+          setVideoStatus(`Video error: ${err.message}`);
+        });
+    });
+  }
+
+  function setVideoStatus(message) {
+    if (videoStatus) {
+      videoStatus.textContent = message;
+    }
   }
 });

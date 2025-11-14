@@ -15,6 +15,10 @@
       #authPanel { margin: 12px 0; display: flex; gap: 8px; align-items: center; }
       #authPanel input { padding: 4px; }
       #activeDriver { margin-bottom: 8px; font-weight: bold; }
+      #videoPanel { margin-bottom: 12px; }
+      #videoContainer { width: 100%; background: #000; min-height: 200px; display: flex; align-items: center; justify-content: center; }
+      #videoContainer video { width: 100%; max-height: 320px; background: #000; }
+      #videoStatus { margin-top: 6px; font-size: 0.9rem; color: #444; }
     </style>
   </head>
   <body>
@@ -61,8 +65,13 @@
         <h3>Sensor Frames</h3>
         <div id="currentRover">Active rover: --</div>
         <div id="activeDriver">Driver: --</div>
-        <button id="videoRequest">Get Video URL</button>
-        <div id="videoLink"></div>
+        <div id="videoPanel">
+          <div id="videoContainer">
+            <video id="driverVideo" muted playsinline></video>
+          </div>
+          <div id="videoStatus">No rover selected</div>
+          <button id="videoReconnect">Reconnect Video</button>
+        </div>
         <pre id="sensorOutput"></pre>
         <p>Use WASD keys to drive the selected rover. Shift increases speed.</p>
         <div id="alerts"></div>
@@ -75,6 +84,7 @@
     <script src="src/services/state.js"></script>
     <script src="src/services/alertFeed.js"></script>
     <script src="src/services/authControls.js"></script>
+    <script src="src/services/videoPlayer.js"></script>
     <script src="src/services/roverUI.js"></script>
     <script src="src/services/driveControls.js"></script>
     <script src="src/main.js"></script>

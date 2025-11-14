@@ -11,6 +11,9 @@
       .rover-card h3 { margin: 0 0 8px 0; }
       .sensor { font-family: monospace; white-space: pre-wrap; word-break: break-word; }
       .meta { font-size: 0.9rem; color: #555; margin-bottom: 8px; }
+      .video-wrap { background: #000; min-height: 160px; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; }
+      .video-wrap video { width: 100%; max-height: 200px; background: #000; }
+      .video-status { font-size: 0.85rem; color: #444; margin-bottom: 4px; }
     </style>
   </head>
   <body>
@@ -24,6 +27,7 @@
     </script>
     <script src="../loader.js"></script>
     <script src="../src/globals/socket.js"></script>
+    <script src="../src/services/videoPlayer.js"></script>
     <script src="spectator.js"></script>
   </body>
 </html>
