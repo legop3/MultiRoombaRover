@@ -23,7 +23,7 @@ managerEvents.on('rover', (evt) => {
     });
   }
 });
-
+// guh
 // Initialize existing rovers (in case service loads after they connect)
 for (const record of rovers.values()) {
   syncRover(record).catch((err) => {
