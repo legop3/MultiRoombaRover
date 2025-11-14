@@ -6,8 +6,7 @@ set -euo pipefail
 
 BINARY_SRC="dist/roverd"
 CONFIG_SRC="pi/roverd/roverd.sample.yaml"
-FFMPEG_WHIP_VERSION="0.0.0"
-FFMPEG_WHIP_BASE_URL="https://github.com/steel-dev/ffmpeg-whip/releases/download/v${FFMPEG_WHIP_VERSION}"
+FFMPEG_SRC_REF="master"
 FFMPEG_WHIP_DIR="/usr/local/lib/ffmpeg-whip"
 FFMPEG_WHIP_BIN="/usr/local/bin/ffmpeg-whip"
 
@@ -66,11 +65,6 @@ if [[ ! -f "$CONFIG_SRC" ]]; then
 	exit 1
 fi
 
-if ! command -v curl >/dev/null 2>&1; then
-	echo "curl is required by this installer" >&2
-	exit 1
-fi
-
 ensure_user() {
 	local user="$1"
 	local groups="${2:-}"
@@ -93,30 +87,44 @@ if ! command -v rpicam-vid >/dev/null 2>&1 && ! command -v libcamera-vid >/dev/n
 	log "WARNING: neither rpicam-vid nor libcamera-vid found in PATH; install libcamera-apps."
 fi
 
+ensure_ffmpeg_build_deps() {
+	log "Installing FFmpeg build dependencies (this may take a while)..."
+	apt-get update
+	apt-get install -y --no-install-recommends \
+		git curl ca-certificates build-essential pkg-config yasm nasm \
+		libssl-dev libx264-dev libopus-dev \
+		libx11-dev libxext-dev libxcb1-dev libxcb-shm0-dev libxcb-xfixes0-dev libxcb-shape0-dev
+}
+
 install_ffmpeg_whip() {
-	local arch asset tmp
-	arch="$(uname -m)"
-	case "$arch" in
-		aarch64)
-			asset="ffmpeg-whip-linux-arm64.tar.gz"
-			;;
-		x86_64|amd64)
-			asset="ffmpeg-whip-linux-amd64.tar.gz"
-			;;
-		*)
-			log "WARNING: ffmpeg-whip binary not available for architecture ${arch}; ensure a WHIP-capable ffmpeg is installed manually."
-			return
-	esac
+	if [[ -x "$FFMPEG_WHIP_BIN" && -f "$FFMPEG_WHIP_DIR/bin/ffmpeg" && -d "$FFMPEG_WHIP_DIR/lib" ]]; then
+		log "ffmpeg-whip already present; skipping build"
+		return
+	}
+	ensure_ffmpeg_build_deps
+	log "Building ffmpeg with WHIP muxer (this can take several minutes)..."
+	rm -rf "$FFMPEG_WHIP_DIR"
+	mkdir -p "$FFMPEG_WHIP_DIR"
 	tmp="$(mktemp -d)"
-	log "Downloading ffmpeg-whip ${FFMPEG_WHIP_VERSION} (${asset})"
-	if ! curl -fsSL "${FFMPEG_WHIP_BASE_URL}/${asset}" -o "${tmp}/${asset}"; then
-		rm -rf "$tmp"
-		echo "Failed to download ffmpeg-whip from ${FFMPEG_WHIP_BASE_URL}/${asset}" >&2
-		exit 1
-	fi
-	rm -rf "${FFMPEG_WHIP_DIR}"
-	mkdir -p "${FFMPEG_WHIP_DIR}"
-	tar -xzf "${tmp}/${asset}" -C "${FFMPEG_WHIP_DIR}"
+	git clone --depth 1 --branch "$FFMPEG_SRC_REF" https://git.ffmpeg.org/ffmpeg.git "$tmp/ffmpeg"
+	pushd "$tmp/ffmpeg" >/dev/null
+	./configure \
+		--prefix="$FFMPEG_WHIP_DIR" \
+		--disable-debug --disable-doc --disable-ffplay --disable-ffprobe \
+		--enable-shared --disable-static \
+		--enable-openssl \
+		--enable-protocol=http,https,tcp,udp,dtls,file,pipe \
+		--enable-muxer=whip \
+		--enable-gpl --enable-version3 \
+		--enable-libx264 --enable-libopus \
+		--enable-encoder=libx264,libopus \
+		--enable-parser=h264 \
+		--enable-bsf=h264_mp4toannexb \
+		--enable-filter=scale,fps,format,aresample \
+		--enable-indev=x11grab,xcbgrab
+	make -j"$(nproc)"
+	make install
+	popd >/dev/null
 	rm -rf "$tmp"
 	cat > "${FFMPEG_WHIP_BIN}" <<'EOF'
 #!/usr/bin/env bash
@@ -124,7 +132,7 @@ export LD_LIBRARY_PATH=/usr/local/lib/ffmpeg-whip/lib:${LD_LIBRARY_PATH}
 exec /usr/local/lib/ffmpeg-whip/bin/ffmpeg "$@"
 EOF
 	chmod 0755 "${FFMPEG_WHIP_BIN}"
-	log "Installed ${FFMPEG_WHIP_BIN}"
+	log "Installed ffmpeg-whip ($(${FFMPEG_WHIP_BIN} -version | head -n1))"
 }
 
 ensure_user roverd "dialout,gpio,video,render"

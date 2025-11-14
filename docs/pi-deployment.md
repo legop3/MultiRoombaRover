@@ -95,7 +95,7 @@ rpicam-vid (or libcamera-vid) --inline --timeout 0 --width=WIDTH --height=HEIGHT
       -f h264 -i pipe:0 -c:v copy -an -f whip $WHIP_URL
 ```
 
-The installer downloads `ffmpeg-whip` (a WHIP-enabled FFmpeg build) and drops it at `/usr/local/bin/ffmpeg-whip`, along with its private libraries under `/usr/local/lib/ffmpeg-whip`. roverd writes `/var/lib/roverd/whip.env` on startup (and whenever you restart the service) so the publisher inherits the correct `WHIP_URL`, resolution, FPS, and bitrate. Tweak those knobs under `media.videoWidth`, `media.videoHeight`, `media.videoFps`, and `media.videoBitrate` in `/etc/roverd.yaml` if you need different camera settings.  
+The installer builds `ffmpeg-whip` (a WHIP-enabled FFmpeg) from source, installs it under `/usr/local/lib/ffmpeg-whip`, and drops a wrapper at `/usr/local/bin/ffmpeg-whip`. roverd writes `/var/lib/roverd/whip.env` on startup (and whenever you restart the service) so the publisher inherits the correct `WHIP_URL`, resolution, FPS, and bitrate. Tweak those knobs under `media.videoWidth`, `media.videoHeight`, `media.videoFps`, and `media.videoBitrate` in `/etc/roverd.yaml` if you need different camera settings. Building FFmpeg on a Pi Zero 2 W can take 15–30 minutes—let the installer finish before rebooting.  
 Use `sudo systemctl status whip-publisher` to watch the pipeline logs; the unit auto-restarts whenever the network drops or FFmpeg exits.
 
 ## Server + UI
