@@ -84,7 +84,7 @@ paths:
   all:
     source: publisher
 CFG
-fi
+# fi
 chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
 
 echo "[4/6] Writing systemd units..."
