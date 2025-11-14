@@ -7,3 +7,5 @@ admins:
     password_hash: "$2b$10$n0L0oe1ZQy7IgM.FvVAzb.aXz43uaZWFiT0wr.05uNoVIDLawmrCG" # password: lockdownpass
     discord_id: "0987654321"
     lockdown: true
+media:
+  whepBaseUrl: "http://control-server.local:8889/whep"

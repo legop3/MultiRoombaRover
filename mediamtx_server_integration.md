@@ -11,7 +11,7 @@ Each rover runs mediaMTX locally to capture the Pi camera and publish it upstrea
 ## Control server (viewer)
 
 - The central mediaMTX instance accepts WHIP ingest at `/whip/<roverId>` and serves WHEP playback at `/whep/<roverId>`.
-- The Node server issues viewer sessions (one per socket) and mediamtx calls back into the Node server to authorize new WHEP connections. Lockdown mode simply stops minting sessions for non-lockdown admins.
+- The Node server issues viewer sessions (one per socket) via `video:request`, and mediaMTX calls back into `GET /mediamtx/auth?session=<id>&roverId=<name>` before letting a client access `/whep/<roverId>?session=<id>`. Lockdown mode simply stops minting sessions for non-lockdown admins.
 
 ## Driver / spectator UIs
 

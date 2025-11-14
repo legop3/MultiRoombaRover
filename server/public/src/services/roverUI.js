@@ -13,6 +13,8 @@ registerModule('services/roverUI', (require, exports) => {
   const modeSelect = document.getElementById('modeSelect');
   const activeDriverEl = document.getElementById('activeDriver');
   const currentRoverEl = document.getElementById('currentRover');
+  const videoBtn = document.getElementById('videoRequest');
+  const videoLinkEl = document.getElementById('videoLink');
 
   let roster = [];
   let lastSelection = null;
@@ -100,6 +102,21 @@ registerModule('services/roverUI', (require, exports) => {
     }
   });
 
+  videoBtn?.addEventListener('click', () => {
+    const roverId = state.getSelected();
+    if (!roverId) {
+      if (videoLinkEl) videoLinkEl.textContent = 'Select a rover first';
+      return;
+    }
+    socket.emit('video:request', { roverId }, (resp = {}) => {
+      if (resp.error) {
+        videoLinkEl.textContent = `Video error: ${resp.error}`;
+        return;
+      }
+      videoLinkEl.innerHTML = `Video URL: <a href=\"${resp.url}\" target=\"_blank\">${resp.url}</a>`;
+    });
+  });
+
   socket.on('connect', () => {
     statusEl.textContent = 'Connected';
   });
@@ -119,6 +136,9 @@ registerModule('services/roverUI', (require, exports) => {
     }
     if (sensorOutput && (clearOutput || roverId !== lastSelection)) {
       sensorOutput.textContent = roverId ? 'Waiting for sensor data...' : '';
+    }
+    if (clearOutput && videoLinkEl) {
+      videoLinkEl.textContent = '';
     }
     lastSelection = roverId;
   }

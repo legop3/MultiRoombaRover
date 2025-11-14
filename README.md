@@ -59,3 +59,23 @@ sudo ./pi/install_roverd.sh --mediamtx
 Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, enable the sensor stream from the UI, and drive with WASD.
 Use the “Restart Camera” button if you enable media management so roverd can bounce the mediamtx service remotely.
 Heads-up: the BRC pulser now uses libgpiod; make sure the `roverd` service account is in the `gpio` group (or otherwise allowed to access `/dev/gpiochip*`) and set `brc.gpioChip` if your hardware exposes a different chip name.
+
+## Fedora server deployment
+
+Run the installer from inside the `server/` directory after cloning the repo onto your Fedora 43 Server box:
+
+```bash
+cd ~/MultiRoombaRover/server
+sudo ./install_server.sh
+```
+
+The script must be executed via `sudo` from the user that owns the repo. It will:
+
+- install Node.js/npm plus curl/tar
+- run `npm install --production`
+- copy `config.example.yaml` to `config.yaml` if needed (edit the file afterwards for admins/media URLs)
+- download mediaMTX v1.15.3 and drop it into `/usr/local/bin`
+- write `/etc/mediamtx/mediamtx.yml` that points to the Node server’s `/mediamtx/auth` webhook
+- create + enable `mediamtx.service` and `multirover.service`, both running as your repo user and pointing at the clone directly
+
+Once finished, update `server/config.yaml` with your admin passwords and restart `multirover.service` if you change it. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.
