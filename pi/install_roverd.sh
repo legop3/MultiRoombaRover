@@ -115,8 +115,8 @@ install_ffmpeg_whip() {
 		exit 1
 	fi
 	rm -rf "${FFMPEG_WHIP_DIR}"
-	install -d "${FFMPEG_WHIP_DIR}"
-	tar -xzf "${tmp}/${asset}" -C "${FFMPEG_WHIP_DIR}" --strip-components=1
+	mkdir -p "${FFMPEG_WHIP_DIR}"
+	tar -xzf "${tmp}/${asset}" -C "${FFMPEG_WHIP_DIR}"
 	rm -rf "$tmp"
 	cat > "${FFMPEG_WHIP_BIN}" <<'EOF'
 #!/usr/bin/env bash
