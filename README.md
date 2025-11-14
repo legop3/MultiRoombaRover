@@ -78,4 +78,13 @@ The script must be executed via `sudo` from the user that owns the repo. It will
 - write `/etc/mediamtx/mediamtx.yml` that points to the Node server’s `/mediamtx/auth` webhook
 - create + enable `mediamtx.service` and `multirover.service`, both running as your repo user and pointing at the clone directly
 
+Publishing rovers lives on a trusted network, so the generated config skips HTTP auth for the `publish` action (only playback hits the Node webhook). If you already ran an older installer, edit `/etc/mediamtx/mediamtx.yml` and add:
+
+```yaml
+authHTTPExclude:
+  - action: publish
+```
+
+Then restart `mediamtx.service` so WHIP pushes from the Pis stop getting rejected.
+
 Once finished, update `server/config.yaml` with your admin passwords and restart `multirover.service` if you change it. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.

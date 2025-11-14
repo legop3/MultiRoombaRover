@@ -75,6 +75,7 @@ webrtcLocalTCPAddress: :8189
 authMethod: http
 authHTTPAddress: http://127.0.0.1:8080/mediamtx/auth
 authHTTPExclude:
+  - action: publish
   - action: api
   - action: metrics
   - action: pprof
