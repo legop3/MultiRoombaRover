@@ -8,6 +8,8 @@
    - video streams must be able to be locked
      - to do this, always require JWT auth for all rover streams
      - just decide who to give access tokens too
+       - decide based on server access control mode
+       - admins should see video when logged in & server in admin mode
 3. User web player
    - simple
    - must be able to create and manage multiple players on one page
@@ -21,6 +23,7 @@
 - absolute LOWEST LATENCY possible from glass to glass
   - probably want to use webRTC out of the pi
 - MUST use mediaMTX on the server for fan-out and forwarding
+- NO AUTH BETWEEN THE PIS AND SERVER, THEY ARE TALKING LOCALLY ON A SECURE NETWORK
 
 # notes from past attempts:
 - ffmpeg packaged for the pi doesn't have whip support built in
