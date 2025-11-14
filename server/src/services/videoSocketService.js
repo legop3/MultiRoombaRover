@@ -33,6 +33,9 @@ io.on('connection', (socket) => {
       if (!roverId) {
         throw new Error('roverId required');
       }
+      if (!roverManager.rovers.has(roverId)) {
+        throw new Error('Rover offline');
+      }
       if (!canView(socket, roverId)) {
         throw new Error('Not authorized for video');
       }

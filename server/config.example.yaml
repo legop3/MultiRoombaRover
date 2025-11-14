@@ -8,5 +8,5 @@ admins:
     discord_id: "0987654321"
     lockdown: true
 media:
-  whepBaseUrl: "http://control-server.local:8889/whep"
+  whepBaseUrl: "http://192.168.0.86:8889/whep"
   mediamtxApiUrl: "http://127.0.0.1:9997"
