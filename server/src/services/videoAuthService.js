@@ -20,16 +20,21 @@ function canView(socket) {
   return true;
 }
 
-app.get('/mediamtx/auth', (req, res) => {
-  const { session: sessionId, roverId } = req.query;
+app.post('/mediamtx/auth', (req, res) => {
+  const body = req.body || {};
+  const path = (body.path || '').replace(/^\//, '');
+  const params = new URLSearchParams(body.query || '');
+  const sessionId = params.get('session');
+  const roverId = path;
+
   if (!sessionId || !roverId) {
-    logger.warn('auth missing session or rover');
+    logger.warn('auth missing session or rover (session=%s path=%s)', sessionId, path);
     return res.status(401).end();
   }
 
   const info = videoSessions.getSession(sessionId);
   if (!info || info.roverId !== roverId) {
-    logger.warn('invalid session %s', sessionId);
+    logger.warn('invalid session %s for rover %s', sessionId, roverId);
     return res.status(401).end();
   }
   const socket = io.sockets.sockets.get(info.socketId);
@@ -40,7 +45,6 @@ app.get('/mediamtx/auth', (req, res) => {
   if (!canView(socket)) {
     return res.status(401).end();
   }
-  // optionally ensure non-admin drivers only view their rover
   const role = getRole(socket);
   if (role !== 'spectator' && !isAdmin(socket)) {
     if (!roverManager.isDriver(roverId, socket)) {
