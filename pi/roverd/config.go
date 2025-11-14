@@ -3,9 +3,8 @@ package roverd
 import (
 	"errors"
 	"fmt"
-	"net"
+	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -55,14 +54,16 @@ type BatteryConfig struct {
 }
 
 type MediaConfig struct {
-	WhepURL        string   `yaml:"whepUrl" json:"whepUrl,omitempty"`
-	WhepPort       int      `yaml:"whepPort" json:"-"`
-	WhepPath       string   `yaml:"whepPath" json:"-"`
-	LegacyPublish  string   `yaml:"publishUrl,omitempty" json:"-"`
+	PublishURL     string   `yaml:"publishUrl" json:"publishUrl,omitempty"`
+	PublishPort    int      `yaml:"publishPort" json:"-"`
 	Manage         bool     `yaml:"manage"`
 	Service        string   `yaml:"service"`
 	HealthURL      string   `yaml:"healthUrl"`
 	HealthInterval Duration `yaml:"healthInterval"`
+	VideoWidth     int      `yaml:"videoWidth" json:"-"`
+	VideoHeight    int      `yaml:"videoHeight" json:"-"`
+	VideoFPS       int      `yaml:"videoFps" json:"-"`
+	VideoBitrate   int      `yaml:"videoBitrate" json:"-"`
 }
 
 type Config struct {
@@ -93,9 +94,12 @@ func LoadConfig(path string) (*Config, error) {
 			},
 		},
 		Media: MediaConfig{
-			WhepPort:       8889,
-			WhepPath:       "/rovercam/whep",
+			PublishPort:    8889,
 			HealthInterval: Duration{Duration: 30 * time.Second},
+			VideoWidth:     1280,
+			VideoHeight:    720,
+			VideoFPS:       30,
+			VideoBitrate:   3000000,
 		},
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -125,69 +129,49 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.Media.Manage && cfg.Media.HealthInterval.Duration <= 0 {
 		cfg.Media.HealthInterval = Duration{Duration: 30 * time.Second}
 	}
-	if cfg.Media.WhepURL == "" {
-		cfg.Media.WhepURL = cfg.Media.LegacyPublish
+	if cfg.Media.VideoWidth <= 0 {
+		cfg.Media.VideoWidth = 1280
 	}
-	if cfg.Media.WhepURL == "" {
-		ip, err := detectPrimaryIPv4()
+	if cfg.Media.VideoHeight <= 0 {
+		cfg.Media.VideoHeight = 720
+	}
+	if cfg.Media.VideoFPS <= 0 {
+		cfg.Media.VideoFPS = 30
+	}
+	if cfg.Media.VideoBitrate <= 0 {
+		cfg.Media.VideoBitrate = 3000000
+	}
+	if cfg.Media.PublishPort <= 0 {
+		cfg.Media.PublishPort = 8889
+	}
+	if cfg.Media.PublishURL == "" {
+		derived, err := derivePublishURL(cfg.ServerURL, cfg.Name, cfg.Media.PublishPort)
 		if err != nil {
-			return nil, fmt.Errorf("derive whepUrl: %w", err)
+			return nil, fmt.Errorf("derive publishUrl: %w", err)
 		}
-		path := cfg.Media.WhepPath
-		if path == "" {
-			path = "/rovercam/whep"
-		}
-		path = ensureLeadingSlash(path)
-		scheme := "http"
-		cfg.Media.WhepURL = fmt.Sprintf("%s://%s:%d%s", scheme, ip, effectivePort(cfg.Media.WhepPort), path)
+		cfg.Media.PublishURL = derived
 	}
 	return &cfg, nil
 }
 
-func ensureLeadingSlash(path string) string {
-	if !strings.HasPrefix(path, "/") {
-		return "/" + path
+func derivePublishURL(serverURL, roverName string, port int) (string, error) {
+	if roverName == "" {
+		return "", errors.New("missing rover name for publishUrl")
 	}
-	return path
-}
-
-func effectivePort(port int) int {
-	if port <= 0 {
-		return 8889
-	}
-	return port
-}
-
-func detectPrimaryIPv4() (string, error) {
-	ifaces, err := net.Interfaces()
+	parsed, err := url.Parse(serverURL)
 	if err != nil {
 		return "", err
 	}
-	for _, iface := range ifaces {
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		addrs, err := iface.Addrs()
-		if err != nil {
-			continue
-		}
-		for _, addr := range addrs {
-			var ip net.IP
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-			if ip == nil || ip.IsLoopback() {
-				continue
-			}
-			ip = ip.To4()
-			if ip == nil {
-				continue
-			}
-			return ip.String(), nil
-		}
+	host := parsed.Hostname()
+	if host == "" {
+		return "", errors.New("serverUrl missing host")
 	}
-	return "", errors.New("no non-loopback IPv4 address found")
+	scheme := "http"
+	if parsed.Scheme == "wss" || parsed.Scheme == "https" {
+		scheme = "https"
+	}
+	if port <= 0 {
+		port = 8889
+	}
+	return fmt.Sprintf("%s://%s:%d/whip/%s", scheme, host, port, url.PathEscape(roverName)), nil
 }

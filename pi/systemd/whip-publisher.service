@@ -1,0 +1,17 @@
+[Unit]
+Description=Rover WHIP Publisher
+After=network-online.target roverd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=roverd
+Group=roverd
+WorkingDirectory=/var/lib/roverd
+EnvironmentFile=/var/lib/roverd/whip.env
+ExecStart=/usr/local/bin/whip-publisher
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

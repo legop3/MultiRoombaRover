@@ -9,4 +9,3 @@ admins:
     lockdown: true
 media:
   whepBaseUrl: "http://192.168.0.86:8889/whep"
-  mediamtxApiUrl: "http://127.0.0.1:9997"

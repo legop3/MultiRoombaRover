@@ -19,26 +19,36 @@ type MediaSupervisor struct {
 }
 
 func NewMediaSupervisor(cfg MediaConfig, logger *log.Logger) *MediaSupervisor {
+	if err := UpdatePublisherEnv(cfg); err != nil {
+		logger.Printf("media supervisor: update env failed: %v", err)
+	}
 	if !cfg.Manage || cfg.Service == "" {
 		return nil
-	}
-	if cfg.HealthURL == "" {
-		cfg.HealthURL = "http://127.0.0.1:9997/v3/paths/list"
 	}
 	interval := cfg.HealthInterval.Duration
 	if interval <= 0 {
 		interval = 30 * time.Second
 	}
+	var client *http.Client
+	if cfg.HealthURL != "" {
+		client = &http.Client{Timeout: 5 * time.Second}
+	}
 	return &MediaSupervisor{
 		cfg:           cfg,
 		logger:        logger,
-		client:        &http.Client{Timeout: 5 * time.Second},
+		client:        client,
 		checkInterval: interval,
 	}
 }
 
 func (m *MediaSupervisor) Start(ctx context.Context) {
-	if m == nil || m.cfg.HealthURL == "" {
+	if m == nil {
+		return
+	}
+	if err := UpdatePublisherEnv(m.cfg); err != nil {
+		m.logger.Printf("media supervisor: update env failed: %v", err)
+	}
+	if m.cfg.HealthURL == "" || m.client == nil {
 		return
 	}
 	go func() {
@@ -66,6 +76,9 @@ func (m *MediaSupervisor) HandleAction(ctx context.Context, action string) error
 	if m == nil {
 		return errors.New("media supervisor disabled")
 	}
+	if err := UpdatePublisherEnv(m.cfg); err != nil {
+		return err
+	}
 	switch action {
 	case "start", "stop", "restart", "reload", "status":
 		return m.runSystemctl(ctx, action)
@@ -89,6 +102,9 @@ func (m *MediaSupervisor) checkAndRepair() error {
 }
 
 func (m *MediaSupervisor) checkHealth(ctx context.Context) bool {
+	if m.client == nil || m.cfg.HealthURL == "" {
+		return true
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.cfg.HealthURL, nil)
 	if err != nil {
 		m.logger.Printf("media supervisor: health request: %v", err)

@@ -15,7 +15,13 @@ battery:
   urgent: 1650
 maxWheelSpeed: 350
 media:
-  manage: false
-  service: mediamtx.service
-  healthUrl: http://127.0.0.1:9997/v3/paths/list
+  publishUrl: http://192.168.0.86:8889/whip/roomba-alpha
+  publishPort: 8889
+  videoWidth: 1280
+  videoHeight: 720
+  videoFps: 30
+  videoBitrate: 3000000
+  manage: true
+  service: whip-publisher.service
+  healthUrl: ""
   healthInterval: 30s

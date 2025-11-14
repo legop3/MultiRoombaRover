@@ -36,15 +36,15 @@ Once the binary (and repo) are on the Pi, run the helper script from the repo ro
 
 ```bash
 cd ~/MultiRoombaRover
-sudo ./pi/install_roverd.sh --mediamtx
+sudo ./pi/install_roverd.sh
 ```
 
 What the script does:
 
-- creates the `roverd` (and optionally `mediamtx`) service users if missing and installs `/usr/local/bin/roverd`
+- creates the `roverd` service account (dialout/gpio/video groups) if missing and installs `/usr/local/bin/roverd`
 - copies `pi/roverd/roverd.sample.yaml` to `/etc/roverd.yaml` if the file is absent (existing configs are left untouched)
 - installs/enables the `roverd.service` systemd unit, restarting it automatically when a config already exists
-- when `--mediamtx` is passed, downloads the requested mediaMTX release for the Pi’s architecture, installs it to `/usr/local/bin/mediamtx`, drops the sample config + unit, enables the service, and restarts it
+- installs `/usr/local/bin/whip-publisher`, drops `whip-publisher.service`, and enables it so video is published automatically on boot
 
 Flags:
 
@@ -52,10 +52,8 @@ Flags:
 |------|---------|
 | `-b PATH` | use a different roverd binary (defaults to `dist/roverd`) |
 | `-c PATH` | seed `/etc/roverd.yaml` from another template |
-| `--mediamtx` | download/install mediaMTX plus the provided config + unit |
-| `--mediamtx-version X.Y.Z` | override the mediaMTX release tag (default `1.15.3`) |
 
-If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.whepUrl`. When left blank, roverd automatically uses the Pi’s primary IPv4 plus `:8889/rovercam/whep`.
+If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.publishUrl`. When left blank, roverd automatically publishes to `http://<server-host>:8889/whip/<name>` (host + scheme are derived from `serverUrl`).
 
 ## Manual installation
 
@@ -75,26 +73,14 @@ If the script installs the sample config, it will remind you to edit `/etc/rover
    ```
 
 `roverd` requires access to `/dev/ttyAMA0` and `/dev/gpiochip*`; keeping it under its own user ensures the rest of the system stays isolated—just make sure the account belongs to the `dialout` and `gpio` groups so it can reach the UART and libgpiod.  
-`mediamtx` needs read access to the camera devices (`/dev/media*`, `/dev/video*`), so the install script adds its service account to the `video` group; if you created the user manually, make sure it belongs to `video`.  
+The WHIP publisher needs read access to the camera devices (`/dev/media*`, `/dev/video*`), so the install script adds the `roverd` service account to the `video` group; if you created the user manually, make sure it belongs to `video`.  
 **BRC note:** configure `brc.gpioPin` (and `brc.gpioChip` if you’re not using `gpiochip0`) and ensure the `roverd` user has permission to toggle that line—no root privileges are required anymore.  
-If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` service account can invoke `systemctl <action> <media.service>` (either run the unit as root or grant sudo privileges for that command).
+If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` service account can invoke `systemctl <action> <media.service>` (the installer wires `whip-publisher.service` to run as `roverd`, so no sudo tweaks are required unless you rename it).
 
-## Configuring mediaMTX
+## WHIP publisher details
 
-1. Download the latest mediaMTX release for ARMv7 and place the binary at `/usr/local/bin/mediamtx`.
-2. Copy the provided config:
-   ```bash
-   sudo useradd -r -s /usr/sbin/nologin mediamtx || true
-   sudo install -d -o mediamtx -g mediamtx /etc/mediamtx
-   sudo install -o mediamtx -g mediamtx -m 0644 pi/mediamtx/mediamtx.yml /etc/mediamtx/mediamtx.yml
-   sudo install -m 0644 pi/systemd/mediamtx.service /etc/systemd/system/mediamtx.service
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now mediamtx.service
-   ```
-
-The sample config uses the Raspberry Pi camera module as the source, enables the local mediaMTX HTTP API so `roverd` can health-check the service, and serves WebRTC playback at `http://<pi-ip>:8889/rovercam/whep`. Keep that URL reachable from the control server—`roverd` advertises it automatically and the central media bridge pulls each rover’s feed over WHEP.  
-Expose the mediaMTX HTTP API locally (default `http://127.0.0.1:9997`) and set `media.healthUrl` so `roverd` can monitor the pipeline; `media.service` should match the systemd unit name (default `mediamtx.service`).  
-With that in place, the Pi only talks to the server over the trusted LAN while the server-side mediaMTX distributes video to every driver and spectator.
+The `whip-publisher.service` unit runs `/usr/local/bin/whip-publisher`, a small shell wrapper that pipes `libcamera-vid` into FFmpeg and POSTs the result to `media.publishUrl`. roverd writes `/var/lib/roverd/whip.env` on startup (and whenever you restart the service) so the publisher inherits the correct `WHIP_URL`, resolution, FPS, and bitrate. Tweak those knobs under `media.videoWidth`, `media.videoHeight`, `media.videoFps`, and `media.videoBitrate` in `/etc/roverd.yaml` if you need different camera settings.  
+Use `sudo systemctl status whip-publisher` to watch the pipeline logs; the unit auto-restarts whenever the network drops or FFmpeg exits.
 
 ## Server + UI
 

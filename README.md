@@ -17,7 +17,7 @@ pi provisioning:
 
 - `pi/roverd`: tiny Go daemon that bridges the Create 2 serial port, BRC pin, and the control server via WebSockets.
 - `server`: Node.js process that terminates rover sockets, relays commands to/from the Socket.IO UI, and serves `public/`.
-- `pi/systemd` / `pi/mediamtx`: ready-to-drop systemd units and a minimal mediaMTX config for WebRTC publishing (roverd can optionally supervise the mediamtx service).
+- `pi/bin` / `pi/systemd`: helper scripts + systemd units for the rover (roverd itself plus the WHIP publisher that streams video to the server).
 - `docs/pi-deployment.md`: per-rover build + install instructions (cross-compiling on Fedora 43, deploying roverd + mediaMTX).
 
 ## Quick start
@@ -49,15 +49,14 @@ The dummy binary connects to the Node server, emits simulated sensor frames, and
 
 Before running the Node server, copy `server/config.example.yaml` to `server/config.yaml` and customize the admin records (password hashes, Discord IDs, lockdown permission). Those credentials are used by the driver UI’s login panel—only admins can toggle locks/modes, and lockdown admins retain access when the system enters lockdown mode. The spectator page (future) can set `role:set` to `spectator`, and the server enforces all permissions server-side so client tweaks can’t grant extra control.
 
-Deploy a rover by copying the repo + `dist/roverd` to the Pi and running the helper (it will also fetch mediaMTX when `--mediamtx` is set):
+Deploy a rover by copying the repo + `dist/roverd` to the Pi and running the helper (it installs roverd plus the WHIP publisher service):
 
 ```bash
 cd ~/MultiRoombaRover
-sudo ./pi/install_roverd.sh --mediamtx
+sudo ./pi/install_roverd.sh
 ```
 
-Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set `name` to the rover’s ID, and make sure the Pi’s mediaMTX is reachable at `http://<pi-ip>:8889/rovercam/whep` (the default). Each rover advertises that WHEP URL in its `hello` frame, and the server’s media bridge automatically creates a matching pull path so mediaMTX on 192.168.0.86 fans the stream out to drivers/spectators—browsers never talk to the Pi directly.
-Use the “Restart Camera” button if you enable media management so roverd can bounce the mediamtx service remotely.
+Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set `name` to the rover’s ID, and (optionally) override `media.publishUrl` if your control server isn’t `192.168.0.86`. The new WHIP publisher service (`whip-publisher.service`) continuously captures the Pi camera with `libcamera-vid`, pipes it through FFmpeg, and publishes straight into the server’s mediaMTX instance at `http://<server>:8889/whip/<name>`. Use the “Restart Camera” button if you enable media management so roverd can bounce the publisher service remotely.
 Heads-up: the BRC pulser now uses libgpiod; make sure the `roverd` service account is in the `gpio` group (or otherwise allowed to access `/dev/gpiochip*`) and set `brc.gpioChip` if your hardware exposes a different chip name.
 
 ## Fedora server deployment
@@ -73,7 +72,7 @@ The script must be executed via `sudo` from the user that owns the repo. It will
 
 - install Node.js/npm plus curl/tar
 - run `npm install --production`
-- copy `config.example.yaml` to `config.yaml` if needed (edit the file afterwards for admins/media URLs + `media.mediamtxApiUrl`)
+- copy `config.example.yaml` to `config.yaml` if needed (edit the file afterwards for admins + `media.whepBaseUrl`)
 - download mediaMTX v1.15.3 and drop it into `/usr/local/bin`
 - write `/etc/mediamtx/mediamtx.yml` that points to the Node server’s `/mediamtx/auth` webhook
 - create + enable `mediamtx.service` and `multirover.service`, both running as your repo user and pointing at the clone directly
@@ -87,7 +86,7 @@ authHTTPExclude:
 
 Then restart `mediamtx.service` so WHIP pushes from the Pis stop getting rejected.
 
-Once finished, update `server/config.yaml` with your admin passwords, `media.whepBaseUrl` (`http://192.168.0.86:8889/whep`), and `media.mediamtxApiUrl` (usually `http://127.0.0.1:9997`). The Node server hits that API for health checks and token hooks while mediaMTX fans WHIP publishers back out as WHEP viewers. Restart `multirover.service` whenever you edit the config. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.
+Once finished, update `server/config.yaml` with your admin passwords and `media.whepBaseUrl` (`http://192.168.0.86:8889/whep`). Restart `multirover.service` whenever you edit the config. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.
 
 ### Video handshake + diagnostics
 

@@ -21,6 +21,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
+	if err := roverd.UpdatePublisherEnv(cfg.Media); err != nil {
+		log.Fatalf("prepare media env: %v", err)
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
