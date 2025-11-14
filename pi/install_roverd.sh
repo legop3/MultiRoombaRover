@@ -80,8 +80,8 @@ log() {
 	echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
 }
 
-if ! command -v libcamera-vid >/dev/null 2>&1; then
-	log "WARNING: libcamera-vid not found in PATH; install libcamera-utils for video publishing"
+if ! command -v rpicam-vid >/dev/null 2>&1 && ! command -v libcamera-vid >/dev/null 2>&1; then
+	log "WARNING: neither rpicam-vid nor libcamera-vid found in PATH; install the Raspberry Pi libcamera apps (sudo apt install libcamera-apps)."
 fi
 if ! command -v ffmpeg >/dev/null 2>&1; then
 	log "WARNING: ffmpeg not found in PATH; install ffmpeg for WHIP publishing"

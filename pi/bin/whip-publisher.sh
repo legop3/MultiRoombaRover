@@ -18,11 +18,21 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-720}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 
-LIBCAMERA_BIN="${LIBCAMERA_BIN:-/usr/bin/libcamera-vid}"
 FFMPEG_BIN="${FFMPEG_BIN:-/usr/bin/ffmpeg}"
 
-if [[ ! -x "$LIBCAMERA_BIN" ]]; then
-	echo "libcamera-vid not found at ${LIBCAMERA_BIN}" >&2
+if [[ -n "${LIBCAMERA_BIN:-}" ]]; then
+	LIBCAMERA_BIN_PATH="$LIBCAMERA_BIN"
+elif command -v rpicam-vid >/dev/null 2>&1; then
+	LIBCAMERA_BIN_PATH="$(command -v rpicam-vid)"
+elif command -v libcamera-vid >/dev/null 2>&1; then
+	LIBCAMERA_BIN_PATH="$(command -v libcamera-vid)"
+else
+	echo "Neither rpicam-vid nor libcamera-vid found; install the libcamera apps." >&2
+	exit 1
+fi
+
+if [[ ! -x "$LIBCAMERA_BIN_PATH" ]]; then
+	echo "Video capture binary not executable at ${LIBCAMERA_BIN_PATH}" >&2
 	exit 1
 fi
 if [[ ! -x "$FFMPEG_BIN" ]]; then
@@ -31,7 +41,7 @@ if [[ ! -x "$FFMPEG_BIN" ]]; then
 fi
 
 run_pipeline() {
-	"${LIBCAMERA_BIN}" \
+	"${LIBCAMERA_BIN_PATH}" \
 		--inline \
 		--timeout 0 \
 		--width "${VIDEO_WIDTH}" \
