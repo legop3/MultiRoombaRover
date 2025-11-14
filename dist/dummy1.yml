@@ -14,9 +14,8 @@ battery:
   urgent: 1650
 maxWheelSpeed: 350
 media:
-  whepUrl: https://mediaserver.local/whep/roomba-alpha
-  streamKey: roomba-alpha
+  publishUrl: https://control-server.local/whip/roomba-alpha
   manage: false
   service: mediamtx.service
-  healthUrl: http://127.0.0.1:9997/v3/paths/list/rovercam
+  healthUrl: http://127.0.0.1:9997/v3/paths/list
   healthInterval: 30s

@@ -13,4 +13,5 @@ require('./src/services/lockdownGuard');
 require('./src/services/roverManager');
 require('./src/services/commandService');
 require('./src/services/roverConnectionService');
+require('./src/services/assignmentService');
 require('./src/services/httpServer');

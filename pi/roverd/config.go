@@ -53,8 +53,7 @@ type BatteryConfig struct {
 }
 
 type MediaConfig struct {
-	WhepURL        string   `yaml:"whepUrl"`
-	StreamKey      string   `yaml:"streamKey"`
+	PublishURL     string   `yaml:"publishUrl"`
 	Manage         bool     `yaml:"manage"`
 	Service        string   `yaml:"service"`
 	HealthURL      string   `yaml:"healthUrl"`

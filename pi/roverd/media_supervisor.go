@@ -22,6 +22,9 @@ func NewMediaSupervisor(cfg MediaConfig, logger *log.Logger) *MediaSupervisor {
 	if !cfg.Manage || cfg.Service == "" {
 		return nil
 	}
+	if cfg.HealthURL == "" {
+		cfg.HealthURL = "http://127.0.0.1:9997/v3/paths/list"
+	}
 	interval := cfg.HealthInterval.Duration
 	if interval <= 0 {
 		interval = 30 * time.Second

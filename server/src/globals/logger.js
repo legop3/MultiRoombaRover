@@ -1,9 +1,20 @@
-function stamp(level, args) {
-  return [new Date().toISOString(), `[${level}]`, ...args];
+function stamp(level, label, args) {
+  const fields = [new Date().toISOString(), `[${level}]`];
+  if (label) {
+    fields.push(`[${label}]`);
+  }
+  return [...fields, ...args];
+}
+
+function baseLogger(label) {
+  return {
+    info: (...args) => console.log(...stamp('INFO', label, args)),
+    warn: (...args) => console.warn(...stamp('WARN', label, args)),
+    error: (...args) => console.error(...stamp('ERROR', label, args)),
+  };
 }
 
 module.exports = {
-  info: (...args) => console.log(...stamp('INFO', args)),
-  warn: (...args) => console.warn(...stamp('WARN', args)),
-  error: (...args) => console.error(...stamp('ERROR', args)),
+  ...baseLogger(),
+  child: (label) => baseLogger(label),
 };

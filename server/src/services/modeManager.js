@@ -37,6 +37,7 @@ function setMode(nextMode, socket) {
     message: `Server mode set to ${nextMode}`,
   });
   modeEvents.emit('change', currentMode);
+  io.emit('mode', { mode: currentMode });
   return currentMode;
 }
 
@@ -52,6 +53,7 @@ module.exports = {
 };
 
 io.on('connection', (socket) => {
+  socket.emit('mode', { mode: currentMode });
   socket.on('setMode', ({ mode }) => {
     try {
       setMode(mode, socket);

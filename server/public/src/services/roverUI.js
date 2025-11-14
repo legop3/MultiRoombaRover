@@ -6,16 +6,28 @@ registerModule('services/roverUI', (require, exports) => {
   const statusEl = document.getElementById('status');
   const roverSelect = document.getElementById('roverSelect');
   const sensorOutput = document.getElementById('sensorOutput');
-  const requestBtn = document.getElementById('requestControl');
   const lockBtn = document.getElementById('lockToggle');
+  const forceCheckbox = document.getElementById('forceControl');
+  const adminControls = document.getElementById('adminControls');
+  const modeControls = document.getElementById('modeControls');
+  const modeSelect = document.getElementById('modeSelect');
   const activeDriverEl = document.getElementById('activeDriver');
+  const currentRoverEl = document.getElementById('currentRover');
 
   let roster = [];
+  let lastSelection = null;
 
   state.onRoleChange((role) => {
     const isAdmin = role === 'admin' || role === 'lockdown';
-    if (requestBtn) requestBtn.disabled = !isAdmin;
     if (lockBtn) lockBtn.disabled = !isAdmin;
+    if (roverSelect) roverSelect.disabled = !isAdmin;
+    if (adminControls) {
+      adminControls.style.display = isAdmin ? 'flex' : 'none';
+    }
+    if (modeControls) {
+      modeControls.style.display = isAdmin ? 'block' : 'none';
+      if (modeSelect) modeSelect.disabled = !isAdmin;
+    }
   });
 
   socket.on('rovers', (list) => {
@@ -27,19 +39,28 @@ registerModule('services/roverUI', (require, exports) => {
       option.textContent = `${rover.name}${rover.locked ? ' (locked)' : ''}`;
       roverSelect.appendChild(option);
     });
-    if (!state.getSelected() && list.length) {
+    const selected = state.getSelected();
+    if ((!selected || !list.find((r) => r.id === selected)) && list.length) {
       state.setSelected(list[0].id);
-      roverSelect.value = list[0].id;
+    } else if (!list.length) {
+      state.setSelected(null);
     }
+    renderSelection();
   });
 
   roverSelect.addEventListener('change', () => {
-    state.setSelected(roverSelect.value);
+    const roverId = roverSelect.value;
+    const role = state.getRole();
+    state.setSelected(roverId);
+    renderSelection(true);
+    if (role === 'admin' || role === 'lockdown') {
+      socket.emit('requestControl', { roverId, force: !!forceCheckbox?.checked });
+    }
   });
 
   socket.on('controlGranted', ({ roverId }) => {
     state.setSelected(roverId);
-    roverSelect.value = roverId;
+    renderSelection(true);
     statusEl.textContent = `Driving ${roverId}`;
   });
 
@@ -62,15 +83,21 @@ registerModule('services/roverUI', (require, exports) => {
     }
   });
 
-  requestBtn?.addEventListener('click', () => {
-    socket.emit('requestControl', { roverId: state.getSelected() });
-  });
-
   lockBtn?.addEventListener('click', () => {
     const roverId = state.getSelected();
     const rover = roster.find((r) => r.id === roverId);
     if (!rover) return;
     socket.emit('lockRover', { roverId, locked: !rover.locked });
+  });
+
+  modeSelect?.addEventListener('change', () => {
+    socket.emit('setMode', { mode: modeSelect.value });
+  });
+
+  socket.on('mode', ({ mode }) => {
+    if (modeSelect) {
+      modeSelect.value = mode;
+    }
   });
 
   socket.on('connect', () => {
@@ -79,4 +106,20 @@ registerModule('services/roverUI', (require, exports) => {
   socket.on('disconnect', () => {
     statusEl.textContent = 'Disconnected';
   });
+
+  function renderSelection(clearOutput) {
+    const roverId = state.getSelected();
+    if (roverSelect && roverId) {
+      roverSelect.value = roverId;
+    } else if (roverSelect && !roverId) {
+      roverSelect.value = '';
+    }
+    if (currentRoverEl) {
+      currentRoverEl.textContent = `Active rover: ${roverId || '--'}`;
+    }
+    if (sensorOutput && (clearOutput || roverId !== lastSelection)) {
+      sensorOutput.textContent = roverId ? 'Waiting for sensor data...' : '';
+    }
+    lastSelection = roverId;
+  }
 });

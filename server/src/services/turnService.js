@@ -6,12 +6,12 @@ const driverQueues = new Map(); // roverId -> { queue: [], current: socketId, ti
 const activeDrivers = new Map();
 const TURN_DURATION_MS = 60 * 1000;
 
-function driverAdded(roverId, socketId) {
+function driverAdded(roverId, socketId, force) {
   const queue = ensureQueue(roverId);
   if (!queue.queue.includes(socketId)) {
     queue.queue.push(socketId);
   }
-  if (!queue.current) {
+  if (!queue.current || force) {
     queue.current = socketId;
   }
   syncState(roverId);

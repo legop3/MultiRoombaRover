@@ -1,5 +1,6 @@
+const EventEmitter = require('events');
 const io = require('../globals/io');
-const logger = require('../globals/logger');
+const logger = require('../globals/logger').child('roverManager');
 const { sendAlert, COLORS } = require('./alertService');
 const { parseSensorFrame } = require('../helpers/sensorDecoder');
 const { MODES, getMode } = require('./modeManager');
@@ -9,6 +10,7 @@ const rovers = new Map(); // roverId -> record
 const socketToRovers = new Map(); // socketId -> Set(roverId)
 const spectatorSockets = new Set();
 const turnService = require('./turnService');
+const managerEvents = new EventEmitter();
 
 function ensureRecord(id) {
   if (!rovers.has(id)) {
@@ -37,6 +39,7 @@ function upsertRover(meta, ws) {
     const sock = io.sockets.sockets.get(socketId);
     sock?.join(record.room);
   });
+  managerEvents.emit('rover', { roverId: id, action: 'upsert', record });
   broadcastRoster();
   return record;
 }
@@ -51,6 +54,7 @@ function removeRover(id) {
     sock?.leave(record.room);
   });
   broadcastRoster();
+  managerEvents.emit('rover', { roverId: id, action: 'removed' });
 }
 
 function lockRover(id, locked, actorSocket) {
@@ -66,6 +70,7 @@ function lockRover(id, locked, actorSocket) {
     sendAlert({ color: COLORS.success, title: 'Rover Unlocked', message: `${id} unlocked.` });
   }
   broadcastRoster();
+  managerEvents.emit('lock', { roverId: id, locked: record.locked });
   return record.locked;
 }
 
@@ -115,22 +120,23 @@ function removeSocket(socket) {
   disableSpectator(socket);
 }
 
-function requestControl(roverId, socket) {
+function requestControl(roverId, socket, options = {}) {
+  const { force = false, allowUser = false } = options;
   const record = rovers.get(roverId);
   if (!record) {
     throw new Error('Unknown rover');
   }
-  if (!isAdmin(socket)) {
+  if (!allowUser && !isAdmin(socket)) {
     throw new Error('Only admins can request control');
   }
-  if (record.locked && !isAdmin(socket)) {
+  if (record.locked && !isAdmin(socket) && !allowUser) {
     throw new Error('Rover locked');
   }
   const mode = getMode();
-  if (mode === MODES.ADMIN && !isAdmin(socket)) {
+  if (!allowUser && mode === MODES.ADMIN && !isAdmin(socket)) {
     throw new Error('Admins only');
   }
-  if (mode === MODES.LOCKDOWN && !isAdmin(socket)) {
+  if (!allowUser && mode === MODES.LOCKDOWN && !isAdmin(socket)) {
     throw new Error('Server in lockdown');
   }
   record.drivers.add(socket.id);
@@ -139,7 +145,8 @@ function requestControl(roverId, socket) {
   }
   socketToRovers.get(socket.id).add(roverId);
   socket.join(record.room);
-  turnService.driverAdded(roverId, socket.id);
+  turnService.driverAdded(roverId, socket.id, force && isAdmin(socket));
+  socket.emit('controlGranted', { roverId });
   sendAlert({
     color: COLORS.success,
     title: 'Control Granted',
@@ -188,6 +195,7 @@ module.exports = {
   enableSpectator,
   disableSpectator,
   rovers,
+  managerEvents,
 };
 
 roleEvents.on('change', ({ socket, role }) => {
@@ -204,13 +212,13 @@ io.on('connection', (socket) => {
     enableSpectator(socket);
   }
 
-  socket.on('requestControl', ({ roverId } = {}) => {
+  socket.on('requestControl', ({ roverId, force } = {}) => {
     try {
       const targetId = roverId || Array.from(rovers.keys())[0];
       if (!targetId) {
         throw new Error('No rovers available');
       }
-      requestControl(targetId, socket);
+      requestControl(targetId, socket, { force: Boolean(force) });
       socket.emit('controlGranted', { roverId: targetId });
     } catch (err) {
       sendAlert({ color: COLORS.warn, title: 'Control denied', message: err.message });

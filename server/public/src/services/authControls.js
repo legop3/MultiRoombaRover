@@ -6,7 +6,6 @@ registerModule('services/authControls', (require, exports) => {
   const passwordInput = document.getElementById('password');
   const loginBtn = document.getElementById('loginBtn');
   const roleStatus = document.getElementById('roleStatus');
-  const spectatorBtn = document.getElementById('spectatorBtn');
 
   function updateRole(role) {
     if (roleStatus) {
@@ -33,9 +32,4 @@ registerModule('services/authControls', (require, exports) => {
   });
   // initialize from default role
   updateRole(state.getRole());
-
-  spectatorBtn?.addEventListener('click', () => {
-    socket.emit('role:set', { role: 'spectator' });
-    updateRole('spectator');
-  });
 });

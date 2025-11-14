@@ -55,7 +55,7 @@ Flags:
 | `--mediamtx` | download/install mediaMTX plus the provided config + unit |
 | `--mediamtx-version X.Y.Z` | override the mediaMTX release tag (default `1.15.3`) |
 
-If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and the WHEP URL that the central server should expose.
+If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and the `media.publishUrl` that points at your central mediaMTX WHIP endpoint (for example `https://control-server.local/whip/roomba-alpha`).
 
 ## Manual installation
 
@@ -65,7 +65,7 @@ If the script installs the sample config, it will remind you to edit `/etc/rover
    sudo install -o roverd -g roverd -m 0755 dist/roverd /usr/local/bin/roverd
    sudo install -o roverd -g roverd -m 0640 pi/roverd/roverd.sample.yaml /etc/roverd.yaml
    ```
-   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and the media WHEP URL that points at the central distribution server.
+   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and the media `publishUrl` that points at the central media server’s WHIP endpoint for that rover.
 
 2. Install the systemd unit:
    ```bash
@@ -92,8 +92,9 @@ If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` se
    sudo systemctl enable --now mediamtx.service
    ```
 
-The sample config uses the Raspberry Pi camera module as the source and exposes a WHEP endpoint at `http://<pi-host>:8889/whep/rovercam`. Point `media.whepUrl` in `roverd.yaml` at this URL so the central server can list it.  
-Expose the mediaMTX HTTP API locally (default `http://127.0.0.1:9997`) and set `media.healthUrl` so `roverd` can monitor the pipeline; `media.service` should match the systemd unit name (default `mediamtx.service`).
+The sample config uses the Raspberry Pi camera module as the source and enables the local mediaMTX HTTP API so `roverd` can health-check the service. Edit `/etc/mediamtx/mediamtx.yml` to point its WHIP client at your central media server (see `mediamtx_server_integration.md` for details).  
+Expose the mediaMTX HTTP API locally (default `http://127.0.0.1:9997`) and set `media.healthUrl` so `roverd` can monitor the pipeline; `media.service` should match the systemd unit name (default `mediamtx.service`).  
+Finally, edit `/etc/mediamtx/mediamtx.yml` so the Pi publishes the camera feed to your central control server via WHIP (for example by pointing it at `https://control.example.com/whip/<roverName>`). The Pi never serves viewers directly—drivers and spectators always watch through the control server.
 
 ## Server + UI
 

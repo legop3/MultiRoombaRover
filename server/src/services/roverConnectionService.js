@@ -1,5 +1,5 @@
 const roverWSS = require('../globals/ws');
-const logger = require('../globals/logger');
+const logger = require('../globals/logger').child('roverConnection');
 const roverManager = require('./roverManager');
 const { sendAlert, COLORS } = require('./alertService');
 const { handleAck } = require('./commandService');

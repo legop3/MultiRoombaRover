@@ -24,16 +24,24 @@
       <input id="username" placeholder="Username" />
       <input id="password" type="password" placeholder="Password" />
       <button id="loginBtn">Admin Login</button>
-      <button id="spectatorBtn">Spectate</button>
       <span id="roleStatus">Role: user</span>
     </div>
     <div id="layout">
       <div id="roverList">
         <label for="roverSelect">Rovers</label>
         <select id="roverSelect" size="10" style="width: 100%"></select>
-        <div class="row">
-          <button id="requestControl">Request Control</button>
+        <div class="row" id="adminControls">
+          <label><input type="checkbox" id="forceControl" /> Force control</label>
           <button id="lockToggle">Lock/Unlock</button>
+        </div>
+        <div class="row" id="modeControls" style="display:none">
+          <label for="modeSelect">Server mode</label>
+          <select id="modeSelect">
+            <option value="open">Open</option>
+            <option value="turns">Turns</option>
+            <option value="admin">Admin</option>
+            <option value="lockdown">Lockdown</option>
+          </select>
         </div>
         <div class="row">
           <button data-oi="start">Start OI</button>
@@ -51,7 +59,8 @@
       </div>
       <div style="flex: 1">
         <h3>Sensor Frames</h3>
-        <div id="activeDriver">Active driver: --</div>
+        <div id="currentRover">Active rover: --</div>
+        <div id="activeDriver">Driver: --</div>
         <pre id="sensorOutput"></pre>
         <p>Use WASD keys to drive the selected rover. Shift increases speed.</p>
         <div id="alerts"></div>
@@ -67,5 +76,6 @@
     <script src="src/services/roverUI.js"></script>
     <script src="src/services/driveControls.js"></script>
     <script src="src/main.js"></script>
+    <p><a href="/spectate/">Open spectator view</a></p>
   </body>
 </html>

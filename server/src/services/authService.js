@@ -1,8 +1,9 @@
 const bcrypt = require('bcrypt');
 const io = require('../globals/io');
+const logger = require('../globals/logger').child('authService');
 const { loadConfig } = require('../helpers/configLoader');
 const { clearLockdownTimer } = require('./lockdownGuard');
-const { setRole, roleEvents } = require('./roleService');
+const { setRole } = require('./roleService');
 
 const config = loadConfig();
 const admins = config.admins || [];
@@ -32,8 +33,10 @@ function isLockdownAdmin(socket) {
 }
 
 io.on('connection', (socket) => {
-  setRole(socket, 'user');
-  socket.emit('auth:role', { role: 'user' });
+  const requestedRole = socket.handshake?.query?.role;
+  const initialRole = requestedRole === 'spectator' ? 'spectator' : 'user';
+  setRole(socket, initialRole);
+  socket.emit('auth:role', { role: initialRole });
   socket.on('auth:login', async ({ username, password }, cb = () => {}) => {
     try {
       const admin = await authenticate(username, password);

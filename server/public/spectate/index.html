@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Rover Spectator</title>
+    <style>
+      body { font-family: sans-serif; margin: 16px; }
+      #status { margin-bottom: 12px; }
+      #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+      .rover-card { border: 1px solid #ccc; padding: 12px; border-radius: 6px; background: #fdfdfd; }
+      .rover-card h3 { margin: 0 0 8px 0; }
+      .sensor { font-family: monospace; white-space: pre-wrap; word-break: break-word; }
+      .meta { font-size: 0.9rem; color: #555; margin-bottom: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Rover Spectator</h1>
+    <div id="status">Connecting…</div>
+    <div id="grid"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      window.__desiredRole = 'spectator';
+    </script>
+    <script src="../loader.js"></script>
+    <script src="../src/globals/socket.js"></script>
+    <script src="spectator.js"></script>
+  </body>
+</html>
