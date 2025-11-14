@@ -21,3 +21,7 @@
 - absolute LOWEST LATENCY possible from glass to glass
   - probably want to use webRTC out of the pi
 - MUST use mediaMTX on the server for fan-out and forwarding
+
+# notes from past attempts:
+- ffmpeg packaged for the pi doesn't have whip support built in
+- it is a huge pain to get all the right gstreamer modules on the pi
