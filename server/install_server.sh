@@ -63,8 +63,8 @@ tar -xzf "$tmpdir/mediamtx.tgz" -C "$tmpdir" mediamtx
 install -m 0755 "$tmpdir/mediamtx" "$MEDIAMTX_BIN"
 
 mkdir -p "$MEDIAMTX_CONF_DIR"
-if [[ ! -f "$MEDIAMTX_CONFIG" ]]; then
-  cat > "$MEDIAMTX_CONFIG" <<'CFG'
+# if [[ ! -f "$MEDIAMTX_CONFIG" ]]; then
+cat > "$MEDIAMTX_CONFIG" <<'CFG'
 logLevel: info
 api: yes
 apiAddress: 0.0.0.0:9997
