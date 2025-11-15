@@ -1,5 +1,13 @@
 import { useDriveControls } from '../hooks/useDriveControls.js';
 
+const oiButtons = [
+  { key: 'start', label: 'Start OI' },
+  { key: 'safe', label: 'Safe' },
+  { key: 'full', label: 'Full' },
+  { key: 'passive', label: 'Passive' },
+  { key: 'dock', label: 'Dock' },
+];
+
 function SpeedMeter({ left, right }) {
   return (
     <div className="grid grid-cols-2 gap-4 rounded-2xl border border-slate-800/60 bg-slate-950/40 p-4 text-sm">
@@ -16,7 +24,7 @@ function SpeedMeter({ left, right }) {
 }
 
 export default function DrivePanel() {
-  const { roverId, speeds, sensorEnabled, toggleSensorStream, stopMotors } = useDriveControls();
+  const { roverId, speeds, stopMotors, sendOiCommand } = useDriveControls();
 
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
@@ -30,7 +38,6 @@ export default function DrivePanel() {
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
           <span>W/A/S/D: move</span>
           <span>Shift: boost</span>
-          <span>Space: browser handles scroll</span>
         </div>
       </header>
 
@@ -45,18 +52,27 @@ export default function DrivePanel() {
         >
           Stop Motors
         </button>
-        <button
-          type="button"
-          onClick={toggleSensorStream}
-          className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 disabled:opacity-50"
-          disabled={!roverId}
-        >
-          {sensorEnabled ? 'Disable Sensor Stream' : 'Enable Sensor Stream'}
-        </button>
+      </div>
+
+      <div className="mt-6 space-y-2">
+        <p className="text-xs uppercase tracking-[0.3em] text-slate-500">OI Modes</p>
+        <div className="flex flex-wrap gap-2">
+          {oiButtons.map((btn) => (
+            <button
+              key={btn.key}
+              type="button"
+              onClick={() => sendOiCommand(btn.key)}
+              disabled={!roverId}
+              className="rounded-lg border border-slate-700 px-3 py-1 text-sm font-semibold text-slate-200 disabled:opacity-50"
+            >
+              {btn.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <p className="mt-4 text-xs text-slate-500">
-        Keep this tab focused to drive. Keyboard input is ignored while typing in form fields.
+        Sensor streaming starts automatically after each OI change. Keep this tab focused while driving.
       </p>
     </section>
   );

@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 
+const OI_COMMANDS = {
+  start: [128],
+  safe: [131],
+  full: [132],
+  passive: [128],
+  dock: [143],
+};
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -55,6 +63,12 @@ function shouldIgnoreEvent(event) {
   );
 }
 
+function bytesToBase64(bytes) {
+  const binary = String.fromCharCode(...bytes);
+  if (typeof btoa === 'function') return btoa(binary);
+  return Buffer.from(bytes).toString('base64');
+}
+
 export function useDriveControls() {
   const socket = useSocket();
   const { session } = useSession();
@@ -62,7 +76,6 @@ export function useDriveControls() {
   const keysRef = useRef(new Set());
   const lastSpeedsRef = useRef({ left: 0, right: 0 });
   const [currentSpeeds, setCurrentSpeeds] = useState(lastSpeedsRef.current);
-  const [sensorEnabled, setSensorEnabled] = useState(false);
 
   const emitCommand = useCallback(
     (payload, cb) => {
@@ -71,6 +84,14 @@ export function useDriveControls() {
     },
     [socket, roverId],
   );
+
+  const enableSensorStream = useCallback(() => {
+    if (!roverId) return;
+    emitCommand({
+      type: 'sensorStream',
+      data: { sensorStream: { enable: true } },
+    });
+  }, [emitCommand, roverId]);
 
   const sendDriveUpdate = useCallback(() => {
     if (!roverId) return;
@@ -96,24 +117,25 @@ export function useDriveControls() {
     });
   }, [emitCommand, roverId]);
 
-  const toggleSensorStream = useCallback(() => {
-    if (!roverId) return;
-    setSensorEnabled((prev) => {
-      const next = !prev;
+  const sendOiCommand = useCallback(
+    (key) => {
+      if (!roverId) return;
+      const bytes = OI_COMMANDS[key];
+      if (!bytes) return;
       emitCommand({
-        type: 'sensorStream',
-        data: { sensorStream: { enable: next } },
+        type: 'raw',
+        data: { raw: bytesToBase64(bytes) },
       });
-      return next;
-    });
-  }, [emitCommand, roverId]);
+      enableSensorStream();
+    },
+    [emitCommand, enableSensorStream, roverId],
+  );
 
   useEffect(() => {
     if (!roverId) {
       keysRef.current.clear();
       lastSpeedsRef.current = { left: 0, right: 0 };
       setCurrentSpeeds(lastSpeedsRef.current);
-      setSensorEnabled(false);
       return undefined;
     }
 
@@ -136,17 +158,18 @@ export function useDriveControls() {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
+    enableSensorStream();
+
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [roverId, sendDriveUpdate]);
+  }, [roverId, sendDriveUpdate, enableSensorStream]);
 
   return {
     roverId,
     speeds: currentSpeeds,
-    sensorEnabled,
-    toggleSensorStream,
     stopMotors,
+    sendOiCommand,
   };
 }
