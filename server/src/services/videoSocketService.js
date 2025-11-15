@@ -14,14 +14,9 @@ function buildWhepUrl(roverId) {
   if (!base) {
     return '';
   }
+  const cleanBase = base.replace(/\/$/, '');
   const encodedId = encodeURIComponent(roverId);
-  if (base.includes('{roverId}')) {
-    return base.replace(/\{roverId\}/g, encodedId);
-  }
-  if (base.includes('{id}')) {
-    return base.replace(/\{id\}/g, encodedId);
-  }
-  return `${base.replace(/\/$/, '')}/${encodedId}`;
+  return `${cleanBase}/${encodedId}/whep`;
 }
 
 function canView(socket, roverId) {
