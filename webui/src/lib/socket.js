@@ -4,7 +4,9 @@ const configuredUrl = import.meta.env.VITE_ROVERD_URL?.trim();
 const serverUrl = configuredUrl && configuredUrl.length > 0 ? configuredUrl : undefined;
 
 export const socket = io(serverUrl, {
-  transports: ['websocket'],
+  transports: ['websocket', 'polling'],
+  timeout: 15000,
+  reconnectionAttempts: 5,
   query: { role: 'user' },
 });
 
