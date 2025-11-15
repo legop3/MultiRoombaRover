@@ -66,7 +66,7 @@ function RoverSpectatorCard({ rover, frame, videoInfo }) {
           {frame?.receivedAt ? `Updated ${new Date(frame.receivedAt).toLocaleTimeString()}` : 'Waiting for telemetry…'}
         </p>
       </header>
-      <VideoTile sessionInfo={videoInfo} label={rover.name} />
+      <VideoTile sessionInfo={videoInfo} label={rover.name} forceMute />
       <section className="rounded-2xl border border-slate-800/80 bg-slate-950/50 p-4">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Telemetry</p>
         {sensorList.length === 0 ? (
