@@ -68,6 +68,8 @@ if [[ ! -f "$MEDIAMTX_TEMPLATE" ]]; then
   echo "mediaMTX template missing at $MEDIAMTX_TEMPLATE" >&2
   exit 1
 fi
+echo "      Installing mediaMTX config -> $MEDIAMTX_CONFIG"
+rm -f "$MEDIAMTX_CONFIG"
 install -m 0644 "$MEDIAMTX_TEMPLATE" "$MEDIAMTX_CONFIG"
 chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
 

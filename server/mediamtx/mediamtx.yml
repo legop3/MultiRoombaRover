@@ -1,3 +1,4 @@
+# Managed by install_server.sh; edit server/mediamtx/mediamtx.yml and rerun the installer.
 logLevel: info
 
 api: yes
@@ -14,6 +15,8 @@ hls: no
 webrtc: yes
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: :8189
+webrtcAdditionalHosts: []
+webrtcICEServers2: []
 
 srt: yes
 srtAddress: :9000
@@ -29,3 +32,7 @@ authHTTPExclude:
 paths:
   "~^rover-(?P<id>[a-z0-9_-]+)$":
     source: publisher
+    sourceOnDemand: no
+    sourceProtocol: srt
+    readBufferCount: 512
+    overridePublisher: yes
