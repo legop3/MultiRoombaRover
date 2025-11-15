@@ -212,43 +212,72 @@ io.on('connection', (socket) => {
     enableSpectator(socket);
   }
 
-  socket.on('requestControl', ({ roverId, force } = {}) => {
+  function handleRequestControl({ roverId, force } = {}, cb = () => {}) {
     try {
       const targetId = roverId || Array.from(rovers.keys())[0];
       if (!targetId) {
         throw new Error('No rovers available');
       }
+      logger.info('Request control', socket.id, targetId, { force });
       requestControl(targetId, socket, { force: Boolean(force) });
       socket.emit('controlGranted', { roverId: targetId });
+      cb({ success: true, roverId: targetId });
     } catch (err) {
+      logger.warn('Request control failed', socket.id, err.message);
       sendAlert({ color: COLORS.warn, title: 'Control denied', message: err.message });
+      cb({ error: err.message });
     }
-  });
+  }
 
-  socket.on('releaseControl', ({ roverId }) => {
-    if (!roverId) return;
-    releaseControl(roverId, socket);
-  });
-
-  socket.on('lockRover', ({ roverId, locked }) => {
-    if (!isAdmin(socket)) return;
-    try {
-      lockRover(roverId, locked);
-    } catch (err) {
-      sendAlert({ color: COLORS.error, title: 'Lock failed', message: err.message });
-    }
-  });
-
-  socket.on('subscribeAll', () => {
-    if (socket.data?.role !== 'spectator') {
+  function handleReleaseControl({ roverId } = {}, cb = () => {}) {
+    if (!roverId) {
+      cb({ error: 'roverId required' });
       return;
     }
+    logger.info('Release control', socket.id, roverId);
+    releaseControl(roverId, socket);
+    cb({ success: true, roverId });
+  }
+
+  function handleLockToggle({ roverId, locked } = {}, cb = () => {}) {
+    if (!isAdmin(socket)) {
+      cb({ error: 'Not authorized' });
+      return;
+    }
+    try {
+      lockRover(roverId, locked);
+      logger.info('Lock state changed', roverId, locked);
+      cb({ success: true });
+    } catch (err) {
+      logger.warn('Lock change failed', roverId, err.message);
+      sendAlert({ color: COLORS.error, title: 'Lock failed', message: err.message });
+      cb({ error: err.message });
+    }
+  }
+
+  function handleSubscribeAll(_, cb = () => {}) {
+    if (socket.data?.role !== 'spectator') {
+      cb({ error: 'Spectator role required' });
+      return;
+    }
+    logger.info('Spectator subscribing to all rovers', socket.id);
     for (const record of rovers.values()) {
       socket.join(record.room);
     }
-  });
+    cb({ success: true });
+  }
+
+  socket.on('requestControl', handleRequestControl);
+  socket.on('session:requestControl', handleRequestControl);
+  socket.on('releaseControl', handleReleaseControl);
+  socket.on('session:releaseControl', handleReleaseControl);
+  socket.on('lockRover', handleLockToggle);
+  socket.on('session:lockRover', handleLockToggle);
+  socket.on('subscribeAll', handleSubscribeAll);
+  socket.on('session:subscribeAll', handleSubscribeAll);
 
   socket.on('disconnect', () => {
+    logger.info('Socket disconnected', socket.id);
     removeSocket(socket);
   });
 });

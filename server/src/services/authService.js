@@ -36,6 +36,7 @@ io.on('connection', (socket) => {
   const requestedRole = socket.handshake?.query?.role;
   const initialRole = requestedRole === 'spectator' ? 'spectator' : 'user';
   setRole(socket, initialRole);
+  logger.info('Socket connected with role', socket.id, initialRole);
   socket.emit('auth:role', { role: initialRole });
   socket.on('auth:login', async ({ username, password }, cb = () => {}) => {
     try {
@@ -45,18 +46,27 @@ io.on('connection', (socket) => {
       setRole(socket, role);
       socket.emit('auth:role', { role });
       clearLockdownTimer(socket);
+      logger.info('Login success', socket.id, role);
       cb({ success: true, role: socket.data.role });
     } catch (err) {
+      logger.warn('Login failed', socket.id, err.message);
       cb({ success: false, error: err.message });
     }
   });
 
-  socket.on('role:set', ({ role }) => {
+  function handleRoleChange({ role } = {}, cb = () => {}) {
     if (role === 'spectator' || role === 'user') {
       setRole(socket, role);
       socket.emit('auth:role', { role });
+      logger.info('Role changed via client request', socket.id, role);
+      cb({ success: true, role });
+    } else {
+      cb({ error: 'Invalid role' });
     }
-  });
+  }
+
+  socket.on('role:set', handleRoleChange);
+  socket.on('session:setRole', handleRoleChange);
 });
 
 module.exports = {
