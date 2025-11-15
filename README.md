@@ -17,7 +17,7 @@ pi provisioning:
 
 - `pi/roverd`: tiny Go daemon that bridges the Create 2 serial port, BRC pin, and the control server via WebSockets.
 - `server`: Node.js process that terminates rover sockets, relays commands to/from the Socket.IO UI, and serves `public/`.
-- `pi/bin` / `pi/systemd`: helper scripts + systemd units for the rover (roverd itself plus the WHIP publisher that streams video to the server).
+- `pi/bin` / `pi/systemd`: helper scripts + systemd units for the rover (roverd itself plus the SRT video publisher that streams camera feeds to the server).
 - `docs/pi-deployment.md`: per-rover build + install instructions (cross-compiling on Fedora 43, deploying roverd + mediaMTX).
 
 ## Quick start
@@ -49,14 +49,14 @@ The dummy binary connects to the Node server, emits simulated sensor frames, and
 
 Before running the Node server, copy `server/config.example.yaml` to `server/config.yaml` and customize the admin records (password hashes, Discord IDs, lockdown permission). Those credentials are used by the driver UI’s login panel—only admins can toggle locks/modes, and lockdown admins retain access when the system enters lockdown mode. The spectator page (future) can set `role:set` to `spectator`, and the server enforces all permissions server-side so client tweaks can’t grant extra control.
 
-Deploy a rover by copying the repo + `dist/roverd` to the Pi and running the helper (it installs roverd plus the WHIP publisher service):
+Deploy a rover by copying the repo + `dist/roverd` to the Pi and running the helper (it installs roverd plus the SRT video publisher service):
 
 ```bash
 cd ~/MultiRoombaRover
 sudo ./pi/install_roverd.sh
 ```
 
-Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set `name` to the rover’s ID, and (optionally) override `media.publishUrl` if your control server isn’t `192.168.0.86`. The WHIP publisher service (`whip-publisher.service`) captures the Pi camera with `rpicam-vid`/`libcamera-vid`, pipes the raw H264 into the repo-built `ffmpeg-whip`, and publishes straight into the server’s mediaMTX instance at `http://<server>:8889/whip/<name>`. Install `libcamera-apps` on each Pi; the installer will build the WHIP-enabled ffmpeg binary (takes several minutes on a Pi Zero 2 W). Use the “Restart Camera” button if you enable media management so roverd can bounce the publisher service remotely.
+Then point each rover's `/etc/roverd.yaml` at `ws://<server>:8080/rover`, set `name` to the rover’s ID, and (optionally) override `media.publishUrl` if your control server isn’t `192.168.0.86`. The video publisher service (`video-publisher.service`) captures the Pi camera with `rpicam-vid`/`libcamera-vid`, pipes the raw H264 into the stock FFmpeg binary, and publishes via SRT to the server’s mediaMTX instance at `srt://<server>:9000?streamid=#!::r=<name>,m=publish`. The installer now just pulls `libcamera-apps` + `ffmpeg` from apt (no custom build). Use the “Restart Camera” button if you enable media management so roverd can bounce the publisher service remotely.
 Heads-up: the BRC pulser now uses libgpiod; make sure the `roverd` service account is in the `gpio` group (or otherwise allowed to access `/dev/gpiochip*`) and set `brc.gpioChip` if your hardware exposes a different chip name.
 
 ## Fedora server deployment
@@ -90,5 +90,5 @@ Once finished, update `server/config.yaml` with your admin passwords and `media.
 
 ### Video handshake + diagnostics
 
-- Every `video:request` returns `{ url, token }`. The browser posts the SDP offer to `url` and includes `Authorization: Basic base64(token:token)`. mediaMTX forwards the `token` to `/mediamtx/auth`, which checks the socket’s permissions and either returns 200 or 401—no query parameters are involved anymore.
+- Every `video:request` returns `{ url, token }`. The browser posts the SDP offer to `url` and includes `Authorization: Bearer <token>`. mediaMTX forwards the token to `/mediamtx/auth`, which checks the socket’s permissions and either returns 200 or 401—no query parameters are involved anymore.
 - To see what mediaMTX is ingesting from the Pis, run `npm run check:media` (or `node scripts/checkMedia.js`). It hits `/v3/paths/list` and prints each rover’s `ready` state and byte counters so you can instantly spot publish issues.

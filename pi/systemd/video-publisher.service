@@ -1,5 +1,5 @@
 [Unit]
-Description=Rover WHIP Publisher
+Description=Rover Video Publisher (libcamera -> SRT)
 After=network-online.target roverd.service
 Wants=network-online.target
 
@@ -8,8 +8,8 @@ Type=simple
 User=roverd
 Group=roverd
 WorkingDirectory=/var/lib/roverd
-EnvironmentFile=/var/lib/roverd/whip.env
-ExecStart=/usr/local/bin/whip-publisher
+EnvironmentFile=/var/lib/roverd/video.env
+ExecStart=/usr/local/bin/video-publisher
 Restart=always
 RestartSec=2
 

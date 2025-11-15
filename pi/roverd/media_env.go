@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-const publisherEnvPath = "/var/lib/roverd/whip.env"
+const publisherEnvPath = "/var/lib/roverd/video.env"
 
 func UpdatePublisherEnv(cfg MediaConfig) error {
 	if cfg.PublishURL == "" {
@@ -20,7 +20,7 @@ func UpdatePublisherEnv(cfg MediaConfig) error {
 		return err
 	}
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "WHIP_URL=%s\n", cfg.PublishURL)
+	fmt.Fprintf(&buf, "PUBLISH_URL=%s\n", cfg.PublishURL)
 	fmt.Fprintf(&buf, "VIDEO_WIDTH=%d\n", cfg.VideoWidth)
 	fmt.Fprintf(&buf, "VIDEO_HEIGHT=%d\n", cfg.VideoHeight)
 	fmt.Fprintf(&buf, "VIDEO_FPS=%d\n", cfg.VideoFPS)

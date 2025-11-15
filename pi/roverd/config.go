@@ -94,7 +94,7 @@ func LoadConfig(path string) (*Config, error) {
 			},
 		},
 		Media: MediaConfig{
-			PublishPort:    8889,
+			PublishPort:    9000,
 			HealthInterval: Duration{Duration: 30 * time.Second},
 			VideoWidth:     1280,
 			VideoHeight:    720,
@@ -142,7 +142,7 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.Media.VideoBitrate = 3000000
 	}
 	if cfg.Media.PublishPort <= 0 {
-		cfg.Media.PublishPort = 8889
+		cfg.Media.PublishPort = 9000
 	}
 	if cfg.Media.PublishURL == "" {
 		derived, err := derivePublishURL(cfg.ServerURL, cfg.Name, cfg.Media.PublishPort)
@@ -166,12 +166,9 @@ func derivePublishURL(serverURL, roverName string, port int) (string, error) {
 	if host == "" {
 		return "", errors.New("serverUrl missing host")
 	}
-	scheme := "http"
-	if parsed.Scheme == "wss" || parsed.Scheme == "https" {
-		scheme = "https"
-	}
 	if port <= 0 {
-		port = 8889
+		port = 9000
 	}
-	return fmt.Sprintf("%s://%s:%d/whip/%s", scheme, host, port, url.PathEscape(roverName)), nil
+	streamName := url.PathEscape(roverName)
+	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=publish&latency=20&mode=caller&transtype=live&pkt_size=1316", host, port, streamName), nil
 }

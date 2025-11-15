@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE="${WHIP_ENV_FILE:-/var/lib/roverd/whip.env}"
+ENV_FILE="${VIDEO_ENV_FILE:-/var/lib/roverd/video.env}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
 	echo "Environment file ${ENV_FILE} missing; cannot publish" >&2
@@ -11,7 +11,7 @@ fi
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 
-: "${WHIP_URL:?WHIP_URL not set in ${ENV_FILE}}"
+: "${PUBLISH_URL:?PUBLISH_URL not set in ${ENV_FILE}}"
 
 VIDEO_WIDTH="${VIDEO_WIDTH:-1280}"
 VIDEO_HEIGHT="${VIDEO_HEIGHT:-720}"
@@ -31,12 +31,10 @@ fi
 
 if [[ -n "${FFMPEG_BIN:-}" ]]; then
 	FFMPEG_BIN_PATH="$FFMPEG_BIN"
-elif command -v ffmpeg-whip >/dev/null 2>&1; then
-	FFMPEG_BIN_PATH="$(command -v ffmpeg-whip)"
 elif command -v ffmpeg >/dev/null 2>&1; then
 	FFMPEG_BIN_PATH="$(command -v ffmpeg)"
 else
-	echo "ffmpeg not found; install it or run the installer to fetch ffmpeg-whip." >&2
+	echo "ffmpeg not found; install it via apt install ffmpeg." >&2
 	exit 1
 fi
 
@@ -57,18 +55,20 @@ run_pipeline() {
 			-hide_banner \
 			-loglevel warning \
 			-fflags nobuffer \
+			-use_wallclock_as_timestamps 1 \
 			-f h264 \
 			-i pipe:0 \
 			-c:v copy \
 			-an \
-			-f whip \
-			"${WHIP_URL}"
+			-flush_packets 1 \
+			-f mpegts \
+			"${PUBLISH_URL}"
 }
 
 while true; do
 	if run_pipeline; then
 		exit 0
 	fi
-	echo "WHIP publisher exited, restarting in 2s..." >&2
+	echo "Video publisher exited, restarting in 2s..." >&2
 	sleep 2
 done

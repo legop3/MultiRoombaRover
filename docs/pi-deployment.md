@@ -51,7 +51,7 @@ What the script does:
 - creates the `roverd` service account (dialout/gpio/video groups) if missing and installs `/usr/local/bin/roverd`
 - copies `pi/roverd/roverd.sample.yaml` to `/etc/roverd.yaml` if the file is absent (existing configs are left untouched)
 - installs/enables the `roverd.service` systemd unit, restarting it automatically when a config already exists
-- installs `/usr/local/bin/whip-publisher`, drops `whip-publisher.service`, and enables it so video is published automatically on boot
+- installs `/usr/local/bin/video-publisher`, drops `video-publisher.service`, and enables it so video is published automatically on boot
 
 Flags:
 
@@ -60,7 +60,7 @@ Flags:
 | `-b PATH` | use a different roverd binary (defaults to `dist/roverd`) |
 | `-c PATH` | seed `/etc/roverd.yaml` from another template |
 
-If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.publishUrl`. When left blank, roverd automatically publishes to `http://<server-host>:8889/whip/<name>` (host + scheme are derived from `serverUrl`).
+If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.publishUrl`. When left blank, roverd automatically publishes to `srt://<server-host>:9000?streamid=#!::r=<name>,m=publish…` (the host comes from `serverUrl`).
 
 ## Manual installation
 
@@ -82,21 +82,21 @@ If the script installs the sample config, it will remind you to edit `/etc/rover
 `roverd` requires access to `/dev/ttyAMA0` and `/dev/gpiochip*`; keeping it under its own user ensures the rest of the system stays isolated—just make sure the account belongs to the `dialout` and `gpio` groups so it can reach the UART and libgpiod.  
 The WHIP publisher needs read access to the camera devices (`/dev/media*`, `/dev/video*`), so the install script adds the `roverd` service account to the `video` group; if you created the user manually, make sure it belongs to `video`.  
 **BRC note:** configure `brc.gpioPin` (and `brc.gpioChip` if you’re not using `gpiochip0`) and ensure the `roverd` user has permission to toggle that line—no root privileges are required anymore.  
-If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` service account can invoke `systemctl <action> <media.service>` (the installer wires `whip-publisher.service` to run as `roverd`, so no sudo tweaks are required unless you rename it).
+If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` service account can invoke `systemctl <action> <media.service>` (the installer wires `video-publisher.service` to run as `roverd`, so no sudo tweaks are required unless you rename it).
 
-## WHIP publisher details
+## Video publisher details
 
-The `whip-publisher.service` unit runs `/usr/local/bin/whip-publisher`, a small shell wrapper that launches:
+The `video-publisher.service` unit runs `/usr/local/bin/video-publisher`, piping `rpicam-vid`/`libcamera-vid` straight into the stock FFmpeg package:
 
 ```bash
 rpicam-vid (or libcamera-vid) --inline --timeout 0 --width=WIDTH --height=HEIGHT \
   --framerate=FPS --bitrate=BITRATE --codec h264 --profile baseline --output - \
-  | ffmpeg-whip -hide_banner -loglevel warning -fflags nobuffer \
-      -f h264 -i pipe:0 -c:v copy -an -f whip $WHIP_URL
+  | ffmpeg -hide_banner -loglevel warning -fflags nobuffer \
+      -f h264 -i pipe:0 -c:v copy -an -flush_packets 1 -f mpegts $PUBLISH_URL
 ```
 
-The installer builds `ffmpeg-whip` (a WHIP-enabled FFmpeg) from source, installs it under `/usr/local/lib/ffmpeg-whip`, and drops a wrapper at `/usr/local/bin/ffmpeg-whip`. roverd writes `/var/lib/roverd/whip.env` on startup (and whenever you restart the service) so the publisher inherits the correct `WHIP_URL`, resolution, FPS, and bitrate. Tweak those knobs under `media.videoWidth`, `media.videoHeight`, `media.videoFps`, and `media.videoBitrate` in `/etc/roverd.yaml` if you need different camera settings. Building FFmpeg on a Pi Zero 2 W can take 15–30 minutes—let the installer finish before rebooting.  
-Use `sudo systemctl status whip-publisher` to watch the pipeline logs; the unit auto-restarts whenever the network drops or FFmpeg exits.
+`/var/lib/roverd/video.env` carries all tunables (`PUBLISH_URL`, resolution, FPS, bitrate). `roverd` rewrites the file whenever you restart it or hit the “Restart Camera” button so the publisher always inherits the correct rover ID + bitrate knobs. Because we now use the distro FFmpeg build with SRT enabled, the installer is much faster—no custom compile steps.  
+Use `sudo systemctl status video-publisher` to watch logs; the unit auto-restarts whenever the connection drops or FFmpeg exits with an error.
 
 ## Server + UI
 
