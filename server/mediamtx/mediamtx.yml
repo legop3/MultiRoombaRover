@@ -30,6 +30,6 @@ authHTTPExclude:
   - action: pprof
 
 paths:
-  "~^rover-(?P<id>[a-z0-9_-]+)$":
+  all:
     source: publisher
     sourceOnDemand: no
