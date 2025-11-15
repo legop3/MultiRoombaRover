@@ -88,7 +88,7 @@ install_video_deps() {
 	if command -v ffmpeg >/dev/null 2>&1 && (command -v rpicam-vid >/dev/null 2>&1 || command -v libcamera-vid >/dev/null 2>&1); then
 		log "Video dependencies already installed; skipping apt install"
 		return
-	}
+	fi
 	log "Installing video dependencies (libcamera-apps, ffmpeg)..."
 	apt-get update
 	apt-get install -y --no-install-recommends libcamera-apps ffmpeg
