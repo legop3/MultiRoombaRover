@@ -118,6 +118,8 @@ echo "[5/6] Enabling services..."
 systemctl daemon-reload
 systemctl enable --now mediamtx.service
 systemctl enable --now multirover.service
+systemctl restart mediamtx.service
+systemctl restart multirover.service
 
 echo "[6/6] Done."
 echo
