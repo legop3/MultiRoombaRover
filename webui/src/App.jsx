@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSession } from './context/SessionContext.jsx';
 import TelemetryPanel from './components/TelemetryPanel.jsx';
 import VideoTile from './components/VideoTile.jsx';
+import DrivePanel from './components/DrivePanel.jsx';
 import { useVideoRequests } from './hooks/useVideoRequests.js';
 
 function StatusBadge({ connected, role, mode }) {
@@ -263,6 +264,7 @@ function App() {
         <section className="grid gap-6 lg:grid-cols-2">
           <RosterPanel />
           <AssignmentCard />
+          <DrivePanel />
           <TelemetryPanel />
           <AuthPanel />
           <SessionInspector />
