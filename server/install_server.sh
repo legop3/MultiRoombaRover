@@ -23,6 +23,7 @@ TARGET_USER="$SUDO_USER"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 SERVER_DIR="$SCRIPT_DIR"
 CONFIG_PATH="$SERVER_DIR/config.yaml"
+MEDIAMTX_TEMPLATE="$SERVER_DIR/mediamtx/mediamtx.yml"
 
 echo "[1/6] Installing dependencies..."
 dnf install -y nodejs npm curl tar >/dev/null
@@ -63,28 +64,11 @@ tar -xzf "$tmpdir/mediamtx.tgz" -C "$tmpdir" mediamtx
 install -m 0755 "$tmpdir/mediamtx" "$MEDIAMTX_BIN"
 
 mkdir -p "$MEDIAMTX_CONF_DIR"
-# if [[ ! -f "$MEDIAMTX_CONFIG" ]]; then
-cat > "$MEDIAMTX_CONFIG" <<'CFG'
-logLevel: info
-api: yes
-apiAddress: 0.0.0.0:9997
-webrtc: yes
-webrtcLocalUDPAddress: :8189
-webrtcLocalTCPAddress: :8189
-
-authMethod: http
-authHTTPAddress: http://127.0.0.1:8080/mediamtx/auth
-authHTTPExclude:
-  - action: publish
-  - action: api
-  - action: metrics
-  - action: pprof
-
-paths:
-  all:
-    source: publisher
-CFG
-# fi
+if [[ ! -f "$MEDIAMTX_TEMPLATE" ]]; then
+  echo "mediaMTX template missing at $MEDIAMTX_TEMPLATE" >&2
+  exit 1
+fi
+install -m 0644 "$MEDIAMTX_TEMPLATE" "$MEDIAMTX_CONFIG"
 chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
 
 echo "[4/6] Writing systemd units..."

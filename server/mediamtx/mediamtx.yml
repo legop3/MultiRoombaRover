@@ -1,0 +1,31 @@
+logLevel: info
+
+api: yes
+apiAddress: 0.0.0.0:9997
+metrics: yes
+metricsAddress: 0.0.0.0:9998
+pprof: no
+pprofAddress: 127.0.0.1:9999
+
+rtsp: no
+rtmp: no
+hls: no
+
+webrtc: yes
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8189
+
+srt: yes
+srtAddress: :9000
+
+authMethod: http
+authHTTPAddress: http://127.0.0.1:8080/mediamtx/auth
+authHTTPExclude:
+  - action: publish
+  - action: api
+  - action: metrics
+  - action: pprof
+
+paths:
+  "~^rover-(?P<id>[a-z0-9_-]+)$":
+    source: publisher

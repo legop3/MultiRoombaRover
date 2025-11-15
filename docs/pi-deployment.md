@@ -62,6 +62,7 @@ Flags:
 
 If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.publishUrl`. When left blank, roverd automatically publishes to `srt://<server-host>:9000?streamid=#!::r=<name>,m=publish…` (the host comes from `serverUrl`).
 
+Re-run `pi/install_roverd.sh` any time you pull updates—the script overwrites the roverd + video-publisher binaries and drops the latest systemd units so the only configuration you ever touch manually is `/etc/roverd.yaml`. `roverd` rewrites `/var/lib/roverd/video.env` on startup, so no other files need editing.
 ## Manual installation
 
 1. Copy the binary and config:
@@ -70,7 +71,7 @@ If the script installs the sample config, it will remind you to edit `/etc/rover
    sudo install -o roverd -g roverd -m 0755 dist/roverd /usr/local/bin/roverd
    sudo install -o roverd -g roverd -m 0640 pi/roverd/roverd.sample.yaml /etc/roverd.yaml
    ```
-   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and (if needed) the media `whepUrl` override. Otherwise, roverd fills in `http://<pi-ip>:8889/rovercam/whep` based on the DHCP-assigned address.
+   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and (if needed) the media `publishUrl` override. Otherwise, roverd derives `srt://<server-host>:9000?streamid=#!::r=<name>,m=publish&latency=20&mode=caller&transtype=live&pkt_size=1316` based on the `serverUrl`.
 
 2. Install the systemd unit:
    ```bash
@@ -80,7 +81,7 @@ If the script installs the sample config, it will remind you to edit `/etc/rover
    ```
 
 `roverd` requires access to `/dev/ttyAMA0` and `/dev/gpiochip*`; keeping it under its own user ensures the rest of the system stays isolated—just make sure the account belongs to the `dialout` and `gpio` groups so it can reach the UART and libgpiod.  
-The WHIP publisher needs read access to the camera devices (`/dev/media*`, `/dev/video*`), so the install script adds the `roverd` service account to the `video` group; if you created the user manually, make sure it belongs to `video`.  
+The video publisher needs read access to the camera devices (`/dev/media*`, `/dev/video*`), so the install script adds the `roverd` service account to the `video` group; if you created the user manually, make sure it belongs to `video`.  
 **BRC note:** configure `brc.gpioPin` (and `brc.gpioChip` if you’re not using `gpiochip0`) and ensure the `roverd` user has permission to toggle that line—no root privileges are required anymore.  
 If you set `media.manage: true` in `/etc/roverd.yaml`, make sure the `roverd` service account can invoke `systemctl <action> <media.service>` (the installer wires `video-publisher.service` to run as `roverd`, so no sudo tweaks are required unless you rename it).
 

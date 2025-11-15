@@ -74,17 +74,10 @@ The script must be executed via `sudo` from the user that owns the repo. It will
 - run `npm install --production`
 - copy `config.example.yaml` to `config.yaml` if needed (edit the file afterwards for admins + `media.whepBaseUrl`)
 - download mediaMTX v1.15.3 and drop it into `/usr/local/bin`
-- write `/etc/mediamtx/mediamtx.yml` that points to the Node server’s `/mediamtx/auth` webhook
+- write `/etc/mediamtx/mediamtx.yml` from `server/mediamtx/mediamtx.yml` (SRT ingest on :9000, wildcard `rover-*` paths, auth webhook at `/mediamtx/auth`)
 - create + enable `mediamtx.service` and `multirover.service`, both running as your repo user and pointing at the clone directly
 
-Publishing rovers lives on a trusted network, so the generated config skips HTTP auth for the `publish` action (only playback hits the Node webhook). If you already ran an older installer, edit `/etc/mediamtx/mediamtx.yml` and add:
-
-```yaml
-authHTTPExclude:
-  - action: publish
-```
-
-Then restart `mediamtx.service` so WHIP pushes from the Pis stop getting rejected.
+Publishing rovers lives on a trusted network, so the shipped config (tracked at `server/mediamtx/mediamtx.yml`) skips HTTP auth for SRT ingest and whitelists any path that matches `rover-*`. The installer overwrites `/etc/mediamtx/mediamtx.yml` every time you run it—if you need to tweak ports or add TURN servers, edit the template in the repo and rerun `install_server.sh` so every box stays in sync automatically.
 
 Once finished, update `server/config.yaml` with your admin passwords and `media.whepBaseUrl` (`http://192.168.0.86:8889/whep`). Restart `multirover.service` whenever you edit the config. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.
 
