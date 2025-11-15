@@ -3,6 +3,8 @@ import { useSession } from './context/SessionContext.jsx';
 import TelemetryPanel from './components/TelemetryPanel.jsx';
 import VideoTile from './components/VideoTile.jsx';
 import DrivePanel from './components/DrivePanel.jsx';
+import AlertFeed from './components/AlertFeed.jsx';
+import AdminPanel from './components/AdminPanel.jsx';
 import { useVideoRequests } from './hooks/useVideoRequests.js';
 
 function StatusBadge({ connected, role, mode }) {
@@ -268,6 +270,8 @@ function App() {
           <TelemetryPanel />
           <AuthPanel />
           <SessionInspector />
+          <AdminPanel />
+          <AlertFeed />
         </section>
         <LogPanel />
       </main>

@@ -33,6 +33,7 @@ export function SessionProvider({ children }) {
   const emitWithAck = useAckEmitter(socket);
   const [session, setSession] = useState(null);
   const [logs, setLogs] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [connected, setConnected] = useState(socket.connected);
 
   useEffect(() => {
@@ -59,10 +60,14 @@ export function SessionProvider({ children }) {
     socket.on('session:sync', handleSession);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
+    socket.on('alert:new', (payload = {}) => {
+      setAlerts((prev) => [...prev.slice(-49), payload]);
+    });
     return () => {
       socket.off('session:sync', handleSession);
       socket.off('log:init', handleLogInit);
       socket.off('log:entry', handleLogEntry);
+      socket.off('alert:new');
     };
   }, [socket]);
 
@@ -74,6 +79,8 @@ export function SessionProvider({ children }) {
         emitWithAck('session:requestControl', { roverId, ...options }),
       releaseControl: (roverId) => emitWithAck('session:releaseControl', { roverId }),
       subscribeAll: () => emitWithAck('session:subscribeAll'),
+      lockRover: (roverId, locked) => emitWithAck('session:lockRover', { roverId, locked }),
+      setMode: (mode) => emitWithAck('setMode', { mode }),
     }),
     [emitWithAck],
   );
@@ -83,9 +90,10 @@ export function SessionProvider({ children }) {
       connected,
       session,
       logs,
+      alerts,
       ...actions,
     }),
-    [actions, connected, logs, session],
+    [actions, alerts, connected, logs, session],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
