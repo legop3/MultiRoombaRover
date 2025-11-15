@@ -14,7 +14,14 @@ function buildWhepUrl(roverId) {
   if (!base) {
     return '';
   }
-  const cleanBase = base.replace(/\/$/, '');
+  let origin;
+  try {
+    const parsed = new URL(base);
+    origin = parsed.origin;
+  } catch (err) {
+    origin = base.replace(/\/.*$/, '');
+  }
+  const cleanBase = origin.replace(/\/$/, '');
   const encodedId = encodeURIComponent(roverId);
   return `${cleanBase}/${encodedId}/whep`;
 }
