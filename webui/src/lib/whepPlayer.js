@@ -1,3 +1,13 @@
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'turn:your.turn.server:3478', username: 'user', credential: 'pass' },
+  ],
+  bundlePolicy: 'max-bundle',
+  rtcpMuxPolicy: 'require',
+};
+
+
 function buildAuthHeader(token) {
   if (!token) return {};
   const credential = `${token}:${token}`;
@@ -22,19 +32,33 @@ export class WhepPlayer {
     }
   }
 
+  configureVideoElement() {
+    if (!this.video) return;
+    this.video.playsInline = true;
+    this.video.autoplay = true;
+    this.video.disableRemotePlayback = true;
+    if ('latencyHint' in HTMLMediaElement.prototype) {
+      this.video.latencyHint = 'interactive';
+    }
+  }
+
   async start() {
     if (!this.url || !this.video) {
       throw new Error('Video target missing');
     }
     this.stop();
     this.notify('connecting');
+    this.configureVideoElement();
     this.abortController = new AbortController();
-    const pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection(RTC_CONFIG);
     this.pc = pc;
     const stream = new MediaStream();
     pc.ontrack = (event) => {
       event.streams[0]?.getTracks().forEach((track) => stream.addTrack(track));
       this.video.srcObject = stream;
+      if (track.kind === 'video' && 'playoutDelayHint' in event.receiver) {
+        event.receiver.playoutDelayHint = 0;
+      }
     };
     pc.addTransceiver('video', { direction: 'recvonly' });
     pc.addTransceiver('audio', { direction: 'recvonly' });
@@ -51,7 +75,10 @@ export class WhepPlayer {
     };
 
     try {
-      const offer = await pc.createOffer();
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
       await pc.setLocalDescription(offer);
 
       const response = await fetch(this.url, {
@@ -68,6 +95,12 @@ export class WhepPlayer {
       }
       const answerSdp = await response.text();
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      pc.getReceivers().forEach((receiver) => {
+        if ('playoutDelayHint' in receiver) {
+          receiver.playoutDelayHint = 0;
+        }
+      });
+      await this.video.play().catch(() => {});
       this.notify('playing');
     } catch (err) {
       this.notify('error', err.message);
