@@ -1,12 +1,13 @@
-import { io } from "socket.io-client";
+import { io } from 'socket.io-client';
 
-console.log('socket.io client loaded')
+const configuredUrl = import.meta.env.VITE_ROVERD_URL?.trim();
+const serverUrl = configuredUrl && configuredUrl.length > 0 ? configuredUrl : undefined;
 
-const serverUrl = import.meta.env.VITE_ROVERD_URL ?? "http://localhost:8080";
-export const socket = io({
-// export const socket = io(serverUrl, {
-  transports: ["websocket"], // skip polling if your backend supports it
-  query: {
-    role: "user"
-  }
+export const socket = io(serverUrl, {
+  transports: ['websocket'],
+  query: { role: 'user' },
+});
+
+socket.on('connect_error', (error) => {
+  console.error('Socket connection error:', error.message);
 });
