@@ -9,17 +9,22 @@ registerModule('services/driveControls', (require, exports) => {
   let sensorEnabled = false;
   let lastDrive = { left: 0, right: 0 };
   const keys = new Set();
-  const driveInterval = 120;
 
   window.addEventListener('keydown', (event) => {
-    keys.add(event.key.toLowerCase());
+    const key = event.key.toLowerCase();
+    if (keys.has(key)) return;
+    keys.add(key);
+    maybeSendDriveUpdate();
   });
 
   window.addEventListener('keyup', (event) => {
-    keys.delete(event.key.toLowerCase());
+    const key = event.key.toLowerCase();
+    if (!keys.has(key)) return;
+    keys.delete(key);
+    maybeSendDriveUpdate();
   });
 
-  setInterval(() => {
+  function maybeSendDriveUpdate() {
     const roverId = state.getSelected();
     if (!roverId) return;
     const speeds = computeDrive();
@@ -30,7 +35,7 @@ registerModule('services/driveControls', (require, exports) => {
       type: 'drive',
       data: { driveDirect: speeds },
     });
-  }, driveInterval);
+  }
 
   function computeDrive() {
     const forward = keys.has('w');
