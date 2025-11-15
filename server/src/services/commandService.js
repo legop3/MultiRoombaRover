@@ -37,7 +37,8 @@ module.exports = {
 };
 
 io.on('connection', (socket) => {
-  function handleCommand({ roverId, type, data } = {}, cb = () => {}) {
+  function handleCommand({ roverId, type, data } = {}, cb) {
+    const reply = typeof cb === 'function' ? cb : () => {};
     try {
       if (!roverId) {
         throw new Error('roverId required');
@@ -48,10 +49,10 @@ io.on('connection', (socket) => {
       const payload = data ? { ...data } : {};
       const id = issueCommand(roverId, { type, ...payload });
       logger.info('Queued command', socket.id, roverId, type);
-      cb({ id });
+      reply({ id });
     } catch (err) {
       logger.warn('Command rejected', socket.id, err.message);
-      cb({ error: err.message });
+      reply({ error: err.message });
     }
   }
 
