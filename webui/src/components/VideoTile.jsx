@@ -106,7 +106,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false }) {
 
   return (
     <div className="space-y-2">
-      <div className="aspect-video w-full overflow-hidden rounded-2xl border border-slate-800 bg-black">
+      <div className="w-full overflow-hidden rounded-2xl border border-slate-800 bg-black">
         <video
           ref={videoRef}
           muted={forceMute || muted}
