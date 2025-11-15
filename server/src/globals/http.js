@@ -8,6 +8,9 @@ const app = express();
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.static(config.staticDir));
+app.get('/spectate', (req, res) => {
+  res.sendFile(path.join(config.staticDir, 'index.html'));
+});
 
 const httpServer = http.createServer(app);
 

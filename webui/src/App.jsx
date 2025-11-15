@@ -52,6 +52,7 @@ function LogPanel() {
 function RosterPanel() {
   const { session, requestControl } = useSession();
   const roster = session?.roster ?? [];
+  const isAdmin = session?.role === 'admin' || session?.role === 'lockdown';
   const [pending, setPending] = useState({});
 
   async function handleRequest(roverId) {
@@ -79,14 +80,18 @@ function RosterPanel() {
               <p className="text-white">{rover.name}</p>
               <p className="text-xs text-slate-400">Locked: {rover.locked ? 'yes' : 'no'}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => handleRequest(rover.id)}
-              disabled={pending[rover.id]}
-              className="rounded-full bg-blue-600 px-4 py-1 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {pending[rover.id] ? 'Requesting…' : 'Request control'}
-            </button>
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={() => handleRequest(rover.id)}
+                disabled={pending[rover.id]}
+                className="rounded-full bg-blue-600 px-4 py-1 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {pending[rover.id] ? 'Requesting…' : 'Request control'}
+              </button>
+            ) : (
+              <span className="text-xs text-slate-500">Auto-assigned</span>
+            )}
           </div>
         ))}
       </div>
