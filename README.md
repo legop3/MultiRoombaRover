@@ -74,7 +74,7 @@ The script must be executed via `sudo` from the user that owns the repo. It will
 - run `npm install --production`
 - copy `config.example.yaml` to `config.yaml` if needed (edit the file afterwards for admins + `media.whepBaseUrl`)
 - download mediaMTX v1.15.3 and drop it into `/usr/local/bin`
-- write `/etc/mediamtx/mediamtx.yml` from `server/mediamtx/mediamtx.yml` (SRT ingest on :9000, wildcard `rover-*` paths, auth webhook at `/mediamtx/auth`)
+- write `/etc/mediamtx/mediamtx.yml` from `server/mediamtx/mediamtx.yml` (SRT ingest on :9000, open ingest, viewer auth webhook at `/mediamtx/auth`)
 - create + enable `mediamtx.service` and `multirover.service`, both running as your repo user and pointing at the clone directly
 
 Publishing rovers lives on a trusted network, so the shipped config (tracked at `server/mediamtx/mediamtx.yml`) skips HTTP auth for SRT ingest and whitelists any path that matches `rover-*`. The installer overwrites `/etc/mediamtx/mediamtx.yml` every time you run it—if you need to tweak ports or add TURN servers, edit the template in the repo and rerun `install_server.sh` so every box stays in sync automatically.
@@ -83,5 +83,5 @@ Once finished, update `server/config.yaml` with your admin passwords and `media.
 
 ### Video handshake + diagnostics
 
-- Every `video:request` returns `{ url, token }`. The browser posts the SDP offer to `url` and includes `Authorization: Bearer <token>`. mediaMTX forwards the token to `/mediamtx/auth`, which checks the socket’s permissions and either returns 200 or 401—no query parameters are involved anymore.
+- Every `video:request` returns `{ url, token }`. The browser posts the SDP offer to `url` and includes `Authorization: Basic base64(token:token)`. mediaMTX forwards the username (`token`) to `/mediamtx/auth`, which checks the socket’s permissions (driver assignment, admin/spectator role, lockdown state) and either returns 200 or 401—no query parameters are involved anymore.
 - To see what mediaMTX is ingesting from the Pis, run `npm run check:media` (or `node scripts/checkMedia.js`). It hits `/v3/paths/list` and prints each rover’s `ready` state and byte counters so you can instantly spot publish issues.

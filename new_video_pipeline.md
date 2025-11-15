@@ -24,7 +24,7 @@
 3. **Web clients**
    - Tiny helper (React hook or vanilla class) that:
      1. Requests a viewer JWT for rover `<id>`.
-     2. Issues a `POST` to `/whep/rover-<id>` with `Authorization: Bearer <JWT>`.
+     2. Issues a `POST` to `/whep/rover-<id>` with `Authorization: Basic base64(token:token)` (token issued by the server when the client calls `video:request`).
      3. Maintains auto-reconnect timers on ICE failure so dashboard widgets can come/go without reloading the page.
    - Operator dashboard mounts one player tied to the assigned rover. The spectator view instantiates one player per tile, muting + pausing hidden elements to keep CPU usage sane even when every rover is shown simultaneously.
 
