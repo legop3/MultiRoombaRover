@@ -79,7 +79,7 @@ The script must be executed via `sudo` from the user that owns the repo. It will
 
 Publishing rovers lives on a trusted network, so the shipped config (tracked at `server/mediamtx/mediamtx.yml`) skips HTTP auth for SRT ingest and whitelists any path that matches `rover-*`. The installer overwrites `/etc/mediamtx/mediamtx.yml` every time you run it—if you need to tweak ports or add TURN servers, edit the template in the repo and rerun `install_server.sh` so every box stays in sync automatically.
 
-Once finished, update `server/config.yaml` with your admin passwords and `media.whepBaseUrl` (`http://192.168.0.86:8889/whep`). Restart `multirover.service` whenever you edit the config. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.
+Once finished, update `server/config.yaml` with your admin passwords and `media.whepBaseUrl` (`http://192.168.0.86:8889/whep`). The UI appends the rover ID to whatever you provide; if you prefer a different layout, include `{roverId}` or `{id}` in the URL (for example `http://192.168.0.86:8889/{id}/whep`). Restart `multirover.service` whenever you edit the config. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.
 
 ### Video handshake + diagnostics
 

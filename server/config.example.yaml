@@ -8,4 +8,8 @@ admins:
     discord_id: "0987654321"
     lockdown: true
 media:
+  # Base URL for mediaMTX WHEP publishes. Append the rover ID automatically, or embed {roverId}/{id}.
+  # Examples:
+  #   http://192.168.0.86:8889/whep          -> becomes http://192.168.0.86:8889/whep/<roverId>
+  #   http://192.168.0.86:8889/{id}/whep     -> becomes http://192.168.0.86:8889/Freaky/whep
   whepBaseUrl: "http://192.168.0.86:8889/whep"

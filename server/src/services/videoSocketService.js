@@ -9,6 +9,21 @@ const { loadConfig } = require('../helpers/configLoader');
 const config = loadConfig();
 const mediaConfig = config.media || {};
 
+function buildWhepUrl(roverId) {
+  const base = mediaConfig.whepBaseUrl;
+  if (!base) {
+    return '';
+  }
+  const encodedId = encodeURIComponent(roverId);
+  if (base.includes('{roverId}')) {
+    return base.replace(/\{roverId\}/g, encodedId);
+  }
+  if (base.includes('{id}')) {
+    return base.replace(/\{id\}/g, encodedId);
+  }
+  return `${base.replace(/\/$/, '')}/${encodedId}`;
+}
+
 function canView(socket, roverId) {
   const mode = getMode();
   if (mode === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
@@ -27,9 +42,6 @@ function canView(socket, roverId) {
 io.on('connection', (socket) => {
   socket.on('video:request', ({ roverId } = {}, cb = () => {}) => {
     try {
-      if (!mediaConfig.whepBaseUrl) {
-        throw new Error('Server video base URL missing');
-      }
       if (!roverId) {
         throw new Error('roverId required');
       }
@@ -39,8 +51,11 @@ io.on('connection', (socket) => {
       if (!canView(socket, roverId)) {
         throw new Error('Not authorized for video');
       }
+      const url = buildWhepUrl(roverId);
+      if (!url) {
+        throw new Error('Server video base URL missing');
+      }
       const sessionId = videoSessions.createSession(socket, roverId);
-      const url = `${mediaConfig.whepBaseUrl.replace(/\/$/, '')}/${roverId}`;
       cb({ url, token: sessionId });
     } catch (err) {
       logger.warn('video request failed: %s', err.message);
