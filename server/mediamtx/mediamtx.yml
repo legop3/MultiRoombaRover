@@ -33,5 +33,3 @@ paths:
   "~^rover-(?P<id>[a-z0-9_-]+)$":
     source: publisher
     sourceOnDemand: no
-    readBufferCount: 512
-    overridePublisher: yes
