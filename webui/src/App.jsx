@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useSession } from './context/SessionContext.jsx';
+import TelemetryPanel from './components/TelemetryPanel.jsx';
+import VideoTile from './components/VideoTile.jsx';
+import { useVideoRequests } from './hooks/useVideoRequests.js';
 
 function StatusBadge({ connected, role, mode }) {
   const color = connected ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-200';
@@ -156,6 +159,31 @@ function SessionInspector() {
   );
 }
 
+function DriverVideoPanel() {
+  const { session } = useSession();
+  const roverId = session?.assignment?.roverId;
+  const sources = useVideoRequests(roverId ? [roverId] : []);
+  const info = roverId ? sources[roverId] : null;
+
+  return (
+    <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+      <header className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Video Feed</p>
+          <h2 className="text-2xl font-semibold text-white">
+            {roverId ? `Rover ${roverId}` : 'No rover assigned'}
+          </h2>
+        </div>
+      </header>
+      {roverId ? (
+        <VideoTile sessionInfo={info} label={roverId} muted={false} />
+      ) : (
+        <p className="text-sm text-slate-400">Assignment required to initialize video.</p>
+      )}
+    </section>
+  );
+}
+
 function AuthPanel() {
   const { login, setRole } = useSession();
   const [username, setUsername] = useState('');
@@ -231,9 +259,11 @@ function App() {
           <h1 className="text-4xl font-semibold text-white">Multi Roomba Rover Console</h1>
           <StatusBadge connected={connected} role={session?.role} mode={session?.mode} />
         </header>
+        <DriverVideoPanel />
         <section className="grid gap-6 lg:grid-cols-2">
           <RosterPanel />
           <AssignmentCard />
+          <TelemetryPanel />
           <AuthPanel />
           <SessionInspector />
         </section>

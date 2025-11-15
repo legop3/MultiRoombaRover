@@ -7,9 +7,18 @@ export function useVideoRequests(roverIds = []) {
 
   useEffect(() => {
     const ids = Array.from(new Set(roverIds.filter(Boolean)));
-    if (!ids.length) return;
+    if (!ids.length) {
+      setSources({});
+      return;
+    }
     let cancelled = false;
-
+    setSources((prev) => {
+      const next = {};
+      ids.forEach((id) => {
+        if (prev[id]) next[id] = prev[id];
+      });
+      return next;
+    });
     ids.forEach((roverId) => {
       socket.emit('video:request', { roverId }, (resp = {}) => {
         if (cancelled) return;

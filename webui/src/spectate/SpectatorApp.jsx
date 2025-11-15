@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
-import { useSensorFeed } from '../hooks/useSensorFeed.js';
+import { useTelemetryFrames } from '../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
+import VideoTile from '../components/VideoTile.jsx';
 
 function SpectatorStatus({ connected, ready, rosterCount }) {
   return (
@@ -65,19 +66,7 @@ function RoverSpectatorCard({ rover, frame, videoInfo }) {
           {frame?.receivedAt ? `Updated ${new Date(frame.receivedAt).toLocaleTimeString()}` : 'Waiting for telemetry…'}
         </p>
       </header>
-      <div className="aspect-video w-full rounded-2xl border border-slate-800 bg-black/60 flex items-center justify-center text-sm text-slate-400">
-        {videoInfo?.error ? (
-          <span>Video error: {videoInfo.error}</span>
-        ) : videoInfo?.url ? (
-          <div className="text-center text-xs text-slate-300">
-            <p className="font-semibold text-white">Video feed placeholder</p>
-            <p>WHEP URL: {videoInfo.url}</p>
-            <p>Token: {videoInfo.token || 'retrieving…'}</p>
-          </div>
-        ) : (
-          <span>Requesting video session…</span>
-        )}
-      </div>
+      <VideoTile sessionInfo={videoInfo} label={rover.name} />
       <section className="rounded-2xl border border-slate-800/80 bg-slate-950/50 p-4">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Telemetry</p>
         {sensorList.length === 0 ? (
@@ -100,7 +89,7 @@ function RoverSpectatorCard({ rover, frame, videoInfo }) {
 export default function SpectatorApp() {
   const { connected, session, logs } = useSession();
   const spectatorReady = useSpectatorMode();
-  const frames = useSensorFeed();
+  const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
   const videoSources = useVideoRequests(roster.map((rover) => rover.id));
 
