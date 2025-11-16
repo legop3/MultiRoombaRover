@@ -17,7 +17,8 @@ export default function TelemetryPanel() {
   const charge = sensors.batteryChargeMah;
   const capacity = sensors.batteryCapacityMah;
   const updated = frame?.receivedAt ? new Date(frame.receivedAt).toLocaleTimeString() : null;
-  const rawSnippet = frame?.raw ? (frame.raw.length > 80 ? `${frame.raw.slice(0, 80)}…` : frame.raw) : null;
+  // const rawSnippet = frame?.raw ? (frame.raw.length > 80 ? `${frame.raw.slice(0, 80)}…` : frame.raw) : null;
+  const rawSnippet = frame?.raw ? frame.raw : null;
   const roster = session?.roster ?? [];
   const isAdmin = useMemo(
     () => session?.role === 'admin' || session?.role === 'lockdown' || session?.role === 'lockdown-admin',
