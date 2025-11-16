@@ -18,8 +18,7 @@ export default function DriverVideoPanel() {
   return (
     <section className="rounded-sm bg-[#242a32] p-1">
       {roverId ? (
-        <div className="">
-        {/* <div className="lg:min-h-[70vh]"> */}
+        <div className="w-full">
           <VideoTile
             sessionInfo={info}
             label={roverId}

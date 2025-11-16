@@ -130,7 +130,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="relative w-full overflow-hidden rounded-sm bg-black">
+      <div className="relative w-full overflow-hidden rounded-sm bg-black aspect-video">
         <video
           ref={videoRef}
           muted={forceMute || muted}

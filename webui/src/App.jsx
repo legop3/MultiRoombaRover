@@ -9,6 +9,7 @@ import RoomCameraPanel from './components/RoomCameraPanel.jsx';
 import LogPanel from './components/LogPanel.jsx';
 import AuthPanel from './components/AuthPanel.jsx';
 import DriverVideoPanel from './components/DriverVideoPanel.jsx';
+import RightPaneTabs from './components/RightPaneTabs.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -40,20 +41,15 @@ function useLayoutMode() {
   return mode;
 }
 
-function DesktopLayout() {
+function DesktopLayout({ layout }) {
   return (
     <div className="flex flex-col gap-1">
-      <section className="grid grid-cols-[minmax(0,0.6fr)_minmax(0,2.2fr)_minmax(0,0.6fr)] gap-1">
-        <TelemetryPanel />
+      <section className="grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)] gap-1">
         <DriverVideoPanel />
-        <DrivePanel />
+        <RightPaneTabs layout={layout} />
       </section>
-      <section className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1">
-        <div className="flex flex-col gap-1">
-          <AuthPanel />
-          <AdminPanel />
-        </div>
-        <RoomCameraPanel />
+      <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-1">
+        <AdminPanel />
         <LogPanel />
       </section>
     </div>
@@ -105,7 +101,12 @@ function MobileLandscapeLayout() {
 
 function App() {
   const layout = useLayoutMode();
-  const renderedLayout = layout === 'desktop' ? <DesktopLayout /> : layout === 'mobile-landscape' ? <MobileLandscapeLayout /> : <MobilePortraitLayout />;
+  const renderedLayout =
+    layout === 'desktop'
+      ? <DesktopLayout layout={layout} />
+      : layout === 'mobile-landscape'
+      ? <MobileLandscapeLayout />
+      : <MobilePortraitLayout />;
 
   return (
     <div className="min-h-screen bg-black text-slate-50">
