@@ -50,7 +50,7 @@ export default function TelemetryPanel() {
       ) : !frame ? (
         <p className="mt-1 text-[0.75rem] text-slate-400">Waiting for sensor frames…</p>
       ) : (
-        <div className="mt-1 space-y-1 text-base flex">
+        <div className="mt-1 space-y-1 flex gap-0.5">
           <Metric label="Charge" value={formatMetric(charge != null && capacity != null ? `${charge}/${capacity} mAh` : null)} />
           <Metric label="Charging" value={formatMetric(sensors.chargingState?.label)} />
           <Metric label="OI mode" value={formatMetric(sensors.oiMode?.label)} />
@@ -102,7 +102,7 @@ function Metric({ label, value }) {
     //   <span className="text-slate-400">{label}</span>
     //   <span className="text-slate-200">{value}</span>
     // </div>
-    <div className="bg-gray-500 rounded-sm p-0.5">
+    <div className="bg-gray-500 rounded-sm p-0.5 text-sm">
       {label}: {value}
     </div>
   );
