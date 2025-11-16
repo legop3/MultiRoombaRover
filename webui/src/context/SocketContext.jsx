@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 // src/context/SocketContext.jsx
 import { createContext, useContext } from "react";
 import { socket } from "../lib/socket";

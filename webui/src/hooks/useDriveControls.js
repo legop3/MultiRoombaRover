@@ -1,3 +1,5 @@
+/* global Buffer */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
@@ -9,6 +11,16 @@ const OI_COMMANDS = {
   passive: [128],
   dock: [143],
 };
+
+const AUX_LIMITS = {
+  main: [-127, 127],
+  side: [-127, 127],
+  vacuum: [0, 127],
+};
+
+const COMMAND_DELAY_MS = 200;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -51,6 +63,11 @@ function computeSpeeds(keys) {
   };
 }
 
+function clampUnit(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 0;
+  return Math.max(-1, Math.min(1, value));
+}
+
 function shouldIgnoreEvent(event) {
   const target = event.target;
   if (!target) return false;
@@ -66,7 +83,10 @@ function shouldIgnoreEvent(event) {
 function bytesToBase64(bytes) {
   const binary = String.fromCharCode(...bytes);
   if (typeof btoa === 'function') return btoa(binary);
-  return Buffer.from(bytes).toString('base64');
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64');
+  }
+  throw new Error('No base64 encoder available');
 }
 
 export function useDriveControls() {
@@ -75,7 +95,7 @@ export function useDriveControls() {
   const roverId = session?.assignment?.roverId;
   const keysRef = useRef(new Set());
   const lastSpeedsRef = useRef({ left: 0, right: 0 });
-  const [currentSpeeds, setCurrentSpeeds] = useState(lastSpeedsRef.current);
+  const [currentSpeeds, setCurrentSpeeds] = useState(() => ({ left: 0, right: 0 }));
 
   const emitCommand = useCallback(
     (payload, cb) => {
@@ -106,16 +126,49 @@ export function useDriveControls() {
     });
   }, [emitCommand, roverId]);
 
+  const driveWithVector = useCallback(
+    ({ x = 0, y = 0, boost = false } = {}) => {
+      if (!roverId) return;
+      const base = boost ? 400 : 250;
+      const forward = clampUnit(y) * base;
+      const turn = clampUnit(x) * base;
+      const speeds = {
+        left: clamp(Math.round(forward + turn), -500, 500),
+        right: clamp(Math.round(forward - turn), -500, 500),
+      };
+      lastSpeedsRef.current = speeds;
+      setCurrentSpeeds(speeds);
+      emitCommand({
+        type: 'drive',
+        data: { driveDirect: speeds },
+      });
+    },
+    [emitCommand, roverId],
+  );
+
+  const sendMotorPwm = useCallback(
+    ({ main = 0, side = 0, vacuum = 0 } = {}) => {
+      if (!roverId) return;
+      const payload = {
+        main: clamp(main, AUX_LIMITS.main[0], AUX_LIMITS.main[1]),
+        side: clamp(side, AUX_LIMITS.side[0], AUX_LIMITS.side[1]),
+        vacuum: clamp(vacuum, AUX_LIMITS.vacuum[0], AUX_LIMITS.vacuum[1]),
+      };
+      emitCommand({
+        type: 'motors',
+        data: { motorPwm: payload },
+      });
+    },
+    [emitCommand, roverId],
+  );
+
   const stopMotors = useCallback(() => {
     if (!roverId) return;
     keysRef.current.clear();
     lastSpeedsRef.current = { left: 0, right: 0 };
     setCurrentSpeeds(lastSpeedsRef.current);
-    emitCommand({
-      type: 'motors',
-      data: { motorPwm: { main: 0, side: 0, vacuum: 0 } },
-    });
-  }, [emitCommand, roverId]);
+    sendMotorPwm({ main: 0, side: 0, vacuum: 0 });
+  }, [roverId, sendMotorPwm]);
 
   const sendOiCommand = useCallback(
     (key) => {
@@ -129,6 +182,27 @@ export function useDriveControls() {
       enableSensorStream();
     },
     [emitCommand, enableSensorStream, roverId],
+  );
+
+  const runStartDockFull = useCallback(async () => {
+    if (!roverId) return;
+    for (const key of ['start', 'dock', 'full']) {
+      sendOiCommand(key);
+      // brief pause so the commands aren't collapsed by the rover
+      await sleep(COMMAND_DELAY_MS);
+    }
+  }, [roverId, sendOiCommand]);
+
+  const seekDock = useCallback(() => {
+    sendOiCommand('dock');
+  }, [sendOiCommand]);
+
+  const setAuxMotors = useCallback(
+    (values) => {
+      if (!roverId) return;
+      sendMotorPwm(values);
+    },
+    [roverId, sendMotorPwm],
   );
 
   useEffect(() => {
@@ -171,5 +245,9 @@ export function useDriveControls() {
     speeds: currentSpeeds,
     stopMotors,
     sendOiCommand,
+    runStartDockFull,
+    seekDock,
+    setAuxMotors,
+    driveWithVector,
   };
 }

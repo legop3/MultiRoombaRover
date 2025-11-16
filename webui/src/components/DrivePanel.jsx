@@ -1,79 +1,120 @@
-import { useDriveControls } from '../hooks/useDriveControls.js';
+import { useDriveControl } from '../context/DriveControlContext.jsx';
+import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 
-const oiButtons = [
-  { key: 'start', label: 'Start OI' },
+const manualOiButtons = [
   { key: 'safe', label: 'Safe' },
-  { key: 'full', label: 'Full' },
   { key: 'passive', label: 'Passive' },
-  { key: 'dock', label: 'Dock' },
+  { key: 'full', label: 'Full' },
 ];
 
-function SpeedMeter({ left, right }) {
+export default function DrivePanel() {
+  const { roverId, speeds, stopMotors, sendOiCommand, runStartDockFull, seekDock } = useDriveControl();
+  const frame = useTelemetryFrame(roverId);
+  const sensors = frame?.sensors || {};
+  const drivingMode = (sensors.oiMode?.label || '').toLowerCase() === 'full';
+  const docked = Boolean(sensors.chargingSources?.homeBase);
+  const charging = Boolean(
+    sensors.chargingState?.label && sensors.chargingState.label.toLowerCase() !== 'not charging',
+  );
+  const updated = frame?.receivedAt ? new Date(frame.receivedAt).toLocaleTimeString() : null;
+
   return (
-    <div className="grid grid-cols-2 gap-4 rounded-2xl border border-slate-800/60 bg-slate-950/40 p-4 text-sm">
+    <section className="rounded-lg border border-slate-900 bg-slate-950/70 p-2 text-[0.8rem] text-slate-100">
+      <div className="flex items-center justify-between text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">
+        <span>Drive Control</span>
+        <span>{roverId ? `Rover ${roverId}` : 'unassigned'}</span>
+      </div>
+      <div className="mt-2 space-y-2">
+        <div>
+          <button
+            type="button"
+            onClick={runStartDockFull}
+            disabled={!roverId}
+            className="w-full rounded border border-emerald-500/40 bg-emerald-500/10 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-emerald-200 disabled:opacity-40"
+          >
+            Enable Driving Mode
+          </button>
+          <p className="mt-1 text-[0.65rem] text-slate-400">Runs Start → Dock → Full commands to ready the rover.</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1 text-[0.6rem]">
+            <StatusPill label="Driving mode" active={drivingMode} />
+            {updated && <span className="text-slate-500">Updated {updated}</span>}
+          </div>
+        </div>
+        <div>
+          <button
+            type="button"
+            onClick={seekDock}
+            disabled={!roverId}
+            className="w-full rounded border border-cyan-500/40 bg-cyan-500/10 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-cyan-200 disabled:opacity-40"
+          >
+            Seek Dock
+          </button>
+          <p className="mt-1 text-[0.65rem] text-slate-400">
+            Point the rover straight at the dock, about one foot away, before triggering.
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <StatusPill label={docked ? 'Docked' : 'Not docked'} active={docked} />
+            <StatusPill label={charging ? 'Charging' : 'Not charging'} active={charging} />
+          </div>
+        </div>
+        <SpeedRow left={speeds.left} right={speeds.right} />
+        <div>
+          <p className="text-[0.6rem] uppercase tracking-[0.3em] text-slate-500">Manual OI</p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {manualOiButtons.map((btn) => (
+              <button
+                key={btn.key}
+                type="button"
+                onClick={() => sendOiCommand(btn.key)}
+                disabled={!roverId}
+                className="rounded border border-slate-800 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.2em] text-slate-200 disabled:opacity-30"
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={stopMotors}
+            disabled={!roverId}
+            className="flex-1 rounded border border-red-500/50 bg-red-500/10 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-red-200 disabled:opacity-40"
+          >
+            Stop Motors
+          </button>
+        </div>
+      </div>
+      <p className="mt-2 text-[0.6rem] text-slate-500">Sensor streaming auto-starts after each OI change.</p>
+    </section>
+  );
+}
+
+function SpeedRow({ left, right }) {
+  return (
+    <div className="grid grid-cols-2 gap-1 rounded border border-slate-900 bg-black/50 p-1 text-[0.7rem]">
       <div>
-        <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Left</p>
-        <p className="text-2xl font-semibold text-white">{left}</p>
+        <p className="text-[0.55rem] uppercase tracking-[0.3em] text-slate-500">Left</p>
+        <p className="font-semibold text-slate-100">{left}</p>
       </div>
       <div>
-        <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Right</p>
-        <p className="text-2xl font-semibold text-white">{right}</p>
+        <p className="text-[0.55rem] uppercase tracking-[0.3em] text-slate-500">Right</p>
+        <p className="font-semibold text-slate-100">{right}</p>
       </div>
     </div>
   );
 }
 
-export default function DrivePanel() {
-  const { roverId, speeds, stopMotors, sendOiCommand } = useDriveControls();
-
+function StatusPill({ label, active }) {
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Drive Controls</p>
-          <h2 className="text-2xl font-semibold text-white">
-            {roverId ? `Driving rover ${roverId}` : 'No rover assigned'}
-          </h2>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-          <span>W/A/S/D: move</span>
-          <span>Shift: boost</span>
-        </div>
-      </header>
-
-      <SpeedMeter left={speeds.left} right={speeds.right} />
-
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={stopMotors}
-          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          disabled={!roverId}
-        >
-          Stop Motors
-        </button>
-      </div>
-
-      <div className="mt-6 space-y-2">
-        <p className="text-xs uppercase tracking-[0.3em] text-slate-500">OI Modes</p>
-        <div className="flex flex-wrap gap-2">
-          {oiButtons.map((btn) => (
-            <button
-              key={btn.key}
-              type="button"
-              onClick={() => sendOiCommand(btn.key)}
-              disabled={!roverId}
-              className="rounded-lg border border-slate-700 px-3 py-1 text-sm font-semibold text-slate-200 disabled:opacity-50"
-            >
-              {btn.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <p className="mt-4 text-xs text-slate-500">
-        Sensor streaming starts automatically after each OI change. Keep this tab focused while driving.
-      </p>
-    </section>
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[0.55rem] uppercase tracking-[0.3em] ${
+        active
+          ? 'border-emerald-400 bg-emerald-500/10 text-emerald-200'
+          : 'border-slate-700 bg-slate-900 text-slate-500'
+      }`}
+    >
+      {label}
+    </span>
   );
 }

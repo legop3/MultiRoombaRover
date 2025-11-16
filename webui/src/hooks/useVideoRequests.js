@@ -1,24 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 
 export function useVideoRequests(roverIds = []) {
   const socket = useSocket();
   const [sources, setSources] = useState({});
+  const ids = useMemo(() => Array.from(new Set(roverIds.filter(Boolean))), [roverIds]);
+  const idsKey = ids.join('|');
 
   useEffect(() => {
-    const ids = Array.from(new Set(roverIds.filter(Boolean)));
     if (!ids.length) {
-      setSources({});
-      return;
+      return undefined;
     }
     let cancelled = false;
-    setSources((prev) => {
-      const next = {};
-      ids.forEach((id) => {
-        if (prev[id]) next[id] = prev[id];
-      });
-      return next;
-    });
     ids.forEach((roverId) => {
       socket.emit('video:request', { roverId }, (resp = {}) => {
         if (cancelled) return;
@@ -32,7 +25,17 @@ export function useVideoRequests(roverIds = []) {
     return () => {
       cancelled = true;
     };
-  }, [socket, roverIds.join('|')]);
+  }, [socket, idsKey, ids]);
+  const filtered = useMemo(() => {
+    if (!ids.length) return {};
+    const next = {};
+    ids.forEach((id) => {
+      if (sources[id]) {
+        next[id] = sources[id];
+      }
+    });
+    return next;
+  }, [ids, sources]);
 
-  return sources;
+  return filtered;
 }

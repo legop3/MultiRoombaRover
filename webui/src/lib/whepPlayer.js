@@ -1,3 +1,5 @@
+/* global Buffer */
+
 const RTC_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -8,11 +10,20 @@ const RTC_CONFIG = {
 };
 
 
+function encodeBase64(value) {
+  if (typeof btoa === 'function') {
+    return btoa(value);
+  }
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(value).toString('base64');
+  }
+  throw new Error('No base64 encoder available');
+}
+
 function buildAuthHeader(token) {
   if (!token) return {};
   const credential = `${token}:${token}`;
-  const encoded =
-    typeof btoa === 'function' ? btoa(credential) : Buffer.from(credential).toString('base64');
+  const encoded = encodeBase64(credential);
   return { Authorization: `Basic ${encoded}` };
 }
 
@@ -54,9 +65,9 @@ export class WhepPlayer {
     this.pc = pc;
     const stream = new MediaStream();
     pc.ontrack = (event) => {
-      event.streams[0]?.getTracks().forEach((track) => stream.addTrack(track));
+      event.streams[0]?.getTracks().forEach((mediaTrack) => stream.addTrack(mediaTrack));
       this.video.srcObject = stream;
-      if (track.kind === 'video' && 'playoutDelayHint' in event.receiver) {
+      if (event.track?.kind === 'video' && 'playoutDelayHint' in event.receiver) {
         event.receiver.playoutDelayHint = 0;
       }
     };

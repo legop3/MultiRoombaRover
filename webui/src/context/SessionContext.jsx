@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useSocket } from './SocketContext.jsx';
 
@@ -61,7 +63,13 @@ export function SessionProvider({ children }) {
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
     socket.on('alert:new', (payload = {}) => {
-      setAlerts((prev) => [...prev.slice(-49), payload]);
+      setAlerts((prev) => [
+        ...prev.slice(-49),
+        {
+          ...payload,
+          receivedAt: Date.now(),
+        },
+      ]);
     });
     return () => {
       socket.off('session:sync', handleSession);

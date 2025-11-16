@@ -10,7 +10,7 @@ const MODES = [
 
 export default function AdminPanel() {
   const { session, lockRover, setMode, requestControl } = useSession();
-  const roster = session?.roster ?? [];
+  const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
 
   const isAdmin =

@@ -1,27 +1,69 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from './context/SessionContext.jsx';
+import { useTelemetryFrame } from './context/TelemetryContext.jsx';
 import TelemetryPanel from './components/TelemetryPanel.jsx';
 import VideoTile from './components/VideoTile.jsx';
 import DrivePanel from './components/DrivePanel.jsx';
 import AlertFeed from './components/AlertFeed.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
+import MobileControls, { MobileJoystick, AuxMotorControls } from './components/MobileControls.jsx';
+import { DriveControlProvider } from './context/DriveControlContext.jsx';
 import { useVideoRequests } from './hooks/useVideoRequests.js';
 
 function StatusBadge({ connected, role, mode }) {
   const color = connected ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-200';
   return (
-    <div className="flex flex-wrap items-center gap-3 text-sm">
-      <span className={`rounded-full px-3 py-1 font-medium ${color}`}>
+    <div className="flex flex-wrap items-center gap-1 text-[0.65rem] uppercase tracking-[0.2em]">
+      <span className={`rounded-full px-2 py-0.5 font-medium ${color}`}>
         {connected ? 'Connected' : 'Disconnected'}
       </span>
-      <span className="rounded-full bg-slate-800/80 px-3 py-1 text-slate-200">
-        Role: {role || 'unknown'}
+      <span className="rounded-full bg-slate-800/80 px-2 py-0.5 text-slate-200">
+        Role {role || 'unknown'}
       </span>
-      <span className="rounded-full bg-slate-800/80 px-3 py-1 text-slate-200">
-        Mode: {mode || '--'}
+      <span className="rounded-full bg-slate-800/80 px-2 py-0.5 text-slate-200">
+        Mode {mode || '--'}
       </span>
     </div>
   );
+}
+
+function RoomCameraPanel() {
+  return (
+    <div className="min-h-[8rem] rounded-lg border border-slate-800 bg-slate-900/70 p-2 text-[0.75rem] text-slate-400">
+      <p className="text-center text-xs uppercase tracking-[0.3em] text-slate-500">Room camera</p>
+      <p className="mt-2 text-center text-sm text-slate-300">Feed placeholder. Wire upcoming room cam here.</p>
+    </div>
+  );
+}
+
+function useLayoutMode() {
+  const [mode, setMode] = useState(() => {
+    if (typeof window === 'undefined') return 'desktop';
+    return window.innerWidth >= 1024
+      ? 'desktop'
+      : window.innerWidth > window.innerHeight
+      ? 'mobile-landscape'
+      : 'mobile-portrait';
+  });
+
+  useEffect(() => {
+    function updateMode() {
+      if (typeof window === 'undefined') return;
+      const { innerWidth, innerHeight } = window;
+      if (innerWidth >= 1024) {
+        setMode('desktop');
+      } else if (innerWidth > innerHeight) {
+        setMode('mobile-landscape');
+      } else {
+        setMode('mobile-portrait');
+      }
+    }
+    updateMode();
+    window.addEventListener('resize', updateMode);
+    return () => window.removeEventListener('resize', updateMode);
+  }, []);
+
+  return mode;
 }
 
 function LogPanel() {
@@ -167,6 +209,12 @@ function DriverVideoPanel() {
   const roverId = session?.assignment?.roverId;
   const sources = useVideoRequests(roverId ? [roverId] : []);
   const info = roverId ? sources[roverId] : null;
+  const frame = useTelemetryFrame(roverId);
+  const batteryConfig = useMemo(() => {
+    if (!roverId) return null;
+    const record = session?.roster?.find((item) => item.id === roverId);
+    return record?.battery ?? null;
+  }, [session?.roster, roverId]);
 
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
@@ -179,7 +227,13 @@ function DriverVideoPanel() {
         </div>
       </header>
       {roverId ? (
-        <VideoTile sessionInfo={info} label={roverId} muted={false} />
+        <VideoTile
+          sessionInfo={info}
+          label={roverId}
+          muted={false}
+          telemetryFrame={frame}
+          batteryConfig={batteryConfig}
+        />
       ) : (
         <p className="text-sm text-slate-400">Assignment required to initialize video.</p>
       )}
@@ -252,28 +306,95 @@ function AuthPanel() {
   );
 }
 
-function App() {
-  const { connected, session } = useSession();
-
+function DesktopLayout() {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
-        <header className="space-y-4">
-          <h1 className="text-4xl font-semibold text-white">Multi Roomba Rover Console</h1>
-          <StatusBadge connected={connected} role={session?.role} mode={session?.mode} />
-        </header>
+    <div className="flex flex-col gap-2">
+      <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)] gap-2">
+        <TelemetryPanel />
         <DriverVideoPanel />
-        <section className="grid gap-6 lg:grid-cols-2">
+        <DrivePanel />
+      </section>
+      <section className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
+        <div className="flex flex-col gap-2">
+          <AuthPanel />
+          <AdminPanel />
+          <RosterPanel />
+        </div>
+        <RoomCameraPanel />
+        <div className="flex flex-col gap-2">
+          <AssignmentCard />
+          <LogPanel />
+          <SessionInspector />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MobilePortraitLayout() {
+  return (
+    <div className="flex flex-col gap-2">
+      <DriverVideoPanel />
+      <MobileControls />
+      <DrivePanel />
+      <TelemetryPanel />
+      <RosterPanel />
+      <AssignmentCard />
+      <AuthPanel />
+      <AdminPanel />
+      <RoomCameraPanel />
+      <LogPanel />
+      <SessionInspector />
+    </div>
+  );
+}
+
+function MobileLandscapeLayout() {
+  return (
+    <div className="flex flex-col gap-2">
+      <section className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)_minmax(0,0.9fr)] gap-2">
+        <div className="flex flex-col gap-2">
+          <DrivePanel />
+          <AuxMotorControls />
+        </div>
+        <DriverVideoPanel />
+        <div className="flex flex-col gap-2">
+          <MobileJoystick />
+          <TelemetryPanel />
+        </div>
+      </section>
+      <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
+        <div className="flex flex-col gap-2">
           <RosterPanel />
           <AssignmentCard />
-          <DrivePanel />
-          <TelemetryPanel />
           <AuthPanel />
-          <SessionInspector />
           <AdminPanel />
+        </div>
+        <div className="flex flex-col gap-2">
+          <RoomCameraPanel />
+          <LogPanel />
+          <SessionInspector />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function App() {
+  const { connected, session } = useSession();
+  const layout = useLayoutMode();
+  const renderedLayout = layout === 'desktop' ? <DesktopLayout /> : layout === 'mobile-landscape' ? <MobileLandscapeLayout /> : <MobilePortraitLayout />;
+
+  return (
+    <div className="min-h-screen bg-black text-slate-50">
+      <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-2 px-1 py-1">
+        <DriveControlProvider>
+          <div className="flex justify-end">
+            <StatusBadge connected={connected} role={session?.role} mode={session?.mode} />
+          </div>
+          {renderedLayout}
           <AlertFeed />
-        </section>
-        <LogPanel />
+        </DriveControlProvider>
       </main>
     </div>
   );
