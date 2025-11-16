@@ -57,13 +57,13 @@ export default function AdminPanel() {
   if (!isAdmin) return null;
 
   return (
-    <section className="rounded-sm bg-[#242a32] p-1 text-xs text-slate-200">
-      <div className="flex items-center justify-between gap-1">
+    <section className="rounded-sm bg-[#242a32] p-2 text-base text-slate-100">
+      <div className="flex items-center justify-between gap-2 text-sm">
         <span>Admin controls</span>
         <select
           value={currentMode}
           onChange={handleModeChange}
-          className="rounded-sm bg-black/40 px-1 py-0.5 text-[0.7rem] text-slate-200"
+          className="rounded-sm bg-black/40 px-2 py-1 text-sm text-slate-100"
         >
           {MODES.map((mode) => (
             <option key={mode.key} value={mode.key}>
@@ -73,25 +73,25 @@ export default function AdminPanel() {
         </select>
       </div>
 
-      <div className="mt-1 space-y-1">
+      <div className="mt-2 space-y-2 text-sm">
         {roster.map((rover) => (
-          <div key={rover.id} className="flex flex-wrap items-center justify-between gap-1 rounded-sm bg-black/30 px-1 py-1">
+          <div key={rover.id} className="flex flex-wrap items-center justify-between gap-2 rounded-sm bg-black/30 px-2 py-2">
             <div>
               <p className="text-slate-100">{rover.name}</p>
-              <p className="text-[0.6rem] text-slate-500">{lockMap[rover.id] ? 'locked' : 'unlocked'}</p>
+              <p className="text-xs text-slate-400">{lockMap[rover.id] ? 'locked' : 'unlocked'}</p>
             </div>
-            <div className="flex flex-wrap gap-1 text-[0.6rem]">
+            <div className="flex flex-wrap gap-1 text-xs">
               <button
                 type="button"
                 onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
-                className="rounded-sm bg-black/50 px-1 py-0.5 text-slate-100"
+                className="rounded-sm bg-black/50 px-2 py-1 text-slate-100"
               >
                 {lockMap[rover.id] ? 'Unlock' : 'Lock'}
               </button>
               <button
                 type="button"
                 onClick={() => handleForceControl(rover.id)}
-                className="rounded-sm bg-black/50 px-1 py-0.5 text-slate-100"
+                className="rounded-sm bg-black/50 px-2 py-1 text-slate-100"
               >
                 Force
               </button>

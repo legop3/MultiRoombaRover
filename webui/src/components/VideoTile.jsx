@@ -145,9 +145,12 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
 function BatteryBar({ charge, capacity, config, label, status }) {
   if (charge == null || !config?.full || config.warn == null) {
     return (
-      <div className="flex items-center justify-between text-xs text-slate-400">
-        <span>{label}</span>
-        <span>{status}</span>
+      <div className="rounded-sm bg-[#1e1e1e] px-2 py-1 text-sm text-slate-200">
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>{label}</span>
+          <span>{status}</span>
+        </div>
+        <p className="mt-1 text-xs text-slate-400">Battery telemetry unavailable</p>
       </div>
     );
   }
@@ -161,16 +164,16 @@ function BatteryBar({ charge, capacity, config, label, status }) {
   const barClass = depleted ? 'bg-red-500 animate-pulse' : urgent ? 'bg-amber-400' : 'bg-emerald-500';
   const capText = capacity ? `${charge}/${capacity}` : `${charge}`;
   return (
-    <div className="space-y-1 rounded-sm bg-[#111] p-1 text-xs text-slate-200">
-      <div className="flex items-center justify-between text-[0.65rem] text-slate-400">
+    <div className="space-y-2 rounded-sm bg-[#1e1e1e] px-2 py-2 text-sm text-slate-200">
+      <div className="flex items-center justify-between text-xs text-slate-400">
         <span>{label}</span>
         <span>{status}</span>
       </div>
-      <div className="flex items-center justify-between text-[0.7rem]">
+      <div className="flex items-center justify-between text-sm">
         <span>Battery</span>
         <span>{capText} mAh</span>
       </div>
-      <div className="h-2 w-full rounded-full bg-slate-800">
+      <div className="h-4 w-full rounded-full bg-slate-800">
         <div className={`h-full rounded-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }} />
       </div>
     </div>

@@ -38,8 +38,8 @@ export default function TelemetryPanel() {
   }
 
   return (
-    <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-200">
-      <div className="text-[0.7rem] text-slate-400">
+    <section className="rounded-sm bg-[#242a32] p-2 text-base text-slate-100">
+      <div className="text-sm text-slate-400">
         <span>{connected ? 'online' : 'offline'}</span>
         <span> · role {session?.role || 'unknown'}</span>
         <span> · mode {session?.mode || '--'}</span>
@@ -50,7 +50,7 @@ export default function TelemetryPanel() {
       ) : !frame ? (
         <p className="mt-1 text-[0.75rem] text-slate-400">Waiting for sensor frames…</p>
       ) : (
-        <div className="mt-1 space-y-1 text-[0.75rem]">
+        <div className="mt-2 space-y-1 text-base">
           <Metric label="Charge" value={formatMetric(charge != null && capacity != null ? `${charge}/${capacity} mAh` : null)} />
           <Metric label="Charging" value={formatMetric(sensors.chargingState?.label)} />
           <Metric label="OI mode" value={formatMetric(sensors.oiMode?.label)} />
@@ -59,21 +59,21 @@ export default function TelemetryPanel() {
         </div>
       )}
       {rawSnippet && (
-        <pre className="mt-1 overflow-hidden rounded-sm bg-black/60 p-1 text-[0.6rem] text-lime-300">
+        <pre className="mt-2 overflow-hidden rounded-sm bg-black/60 p-2 text-sm text-lime-300">
           {rawSnippet}
         </pre>
       )}
-      <div className="mt-1">
-        <p className="text-xs text-slate-400">Rovers</p>
+      <div className="mt-2">
+        <p className="text-sm text-slate-400">Rovers</p>
         {roster.length === 0 ? (
-          <p className="text-xs text-slate-500">No roster data.</p>
+          <p className="text-sm text-slate-500">No roster data.</p>
         ) : (
-          <ul className="mt-1 space-y-1 text-xs">
+          <ul className="mt-2 space-y-1 text-sm">
             {roster.map((rover) => (
               <li key={rover.id} className="flex items-center justify-between gap-1">
                 <div>
                   <p className="text-slate-200">{rover.name}</p>
-                  <p className="text-[0.6rem] text-slate-500">
+                  <p className="text-xs text-slate-500">
                     {rover.locked ? 'locked' : 'free'} · {rover.lastSeen ? 'seen' : 'unknown'}
                   </p>
                 </div>
@@ -82,7 +82,7 @@ export default function TelemetryPanel() {
                     type="button"
                     onClick={() => handleRequest(rover.id)}
                     disabled={pending[rover.id]}
-                    className="rounded-sm bg-black/40 px-1 py-0.5 text-[0.6rem] text-slate-200 disabled:opacity-40"
+                    className="rounded-sm bg-black/40 px-2 py-0.5 text-xs text-slate-200 disabled:opacity-40"
                   >
                     {pending[rover.id] ? '...' : 'request'}
                   </button>
