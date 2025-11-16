@@ -59,15 +59,17 @@ export default function TelemetryPanel() {
         </div>
       )}
       {rawSnippet && (
-        <pre className="mt-1 overflow-hidden rounded-sm bg-black/60 p-1 text-sm text-lime-300">
+        <pre className="mt-1 overflow-scroll p-1 text-xs text-lime-300">
           {rawSnippet}
         </pre>
       )}
       <div className="mt-1">
         <p className="text-sm text-slate-400">Rovers</p>
         {roster.length === 0 ? (
+          // if there ARE NO rovers
           <p className="text-sm text-slate-500">No roster data.</p>
         ) : (
+          // if there ARE rovers
           <ul className="mt-1 space-y-1 text-sm">
             {roster.map((rover) => (
               <li key={rover.id} className="flex items-center justify-between gap-1">
@@ -102,7 +104,7 @@ function Metric({ label, value }) {
     //   <span className="text-slate-400">{label}</span>
     //   <span className="text-slate-200">{value}</span>
     // </div>
-    <div className="bg-gray-500 rounded-sm p-0.5 text-sm">
+    <div className="bg-gray-700 rounded-sm p-0.5 text-sm">
       {label}: {value}
     </div>
   );
