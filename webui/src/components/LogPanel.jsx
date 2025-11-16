@@ -8,7 +8,7 @@ export default function LogPanel() {
         <span>Server logs</span>
         <span>{logs.length}</span>
       </div>
-      <div className="mt-1 h-48 overflow-y-auto rounded-sm bg-black/40 p-1 font-mono text-sm text-slate-300">
+      <div className="mt-1 h-48 overflow-y-auto rounded-sm bg-black/40 p-1 font-mono text-xs">
         {logs.length === 0 ? (
           <p>No logs yet.</p>
         ) : (
@@ -17,9 +17,9 @@ export default function LogPanel() {
             .reverse()
             .map((entry) => (
               <div key={entry.id} className="mb-1">
-                <span className="text-slate-500">{entry.timestamp}</span>{' '}
-                <span className="text-slate-300">[{entry.level}]</span>{' '}
-                {entry.label && <span className="text-slate-400">[{entry.label}]</span>}{' '}
+                <span className="text-amber-400">{entry.timestamp}</span>{' '}
+                <span className="text-lime-400">[{entry.level}]</span>{' '}
+                {entry.label && <span className="text-teal-400">[{entry.label}]</span>}{' '}
                 <span>{entry.message}</span>
               </div>
             ))
