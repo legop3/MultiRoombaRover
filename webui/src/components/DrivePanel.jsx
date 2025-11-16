@@ -19,42 +19,32 @@ export default function DrivePanel() {
   const updated = frame?.receivedAt ? new Date(frame.receivedAt).toLocaleTimeString() : null;
 
   return (
-    <section className="rounded-sm bg-[#1b1b1b] p-1 text-sm text-slate-100">
-      <div className="flex items-center justify-between text-xs text-slate-400">
+    <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
+      <div className="flex items-center justify-between text-xs text-slate-300">
         <span>Drive control</span>
         <span>{roverId ? `Rover ${roverId}` : 'unassigned'}</span>
       </div>
       <div className="mt-1 space-y-1">
-        <div>
-          <button
-            type="button"
-            onClick={runStartDockFull}
-            disabled={!roverId}
-            className="w-full rounded-sm bg-black/50 px-1 py-1 text-xs text-slate-200 disabled:opacity-30"
-          >
-            Enable driving mode
-          </button>
-          <p className="mt-1 text-xs text-slate-400">Runs Start → Dock → Full to prep sensors.</p>
-          <div className="mt-1 flex flex-wrap items-center gap-1 text-[0.65rem]">
-            <StatusPill label="Driving" active={drivingMode} />
-            {updated && <span className="text-slate-500">Sensors {updated}</span>}
-          </div>
-        </div>
-        <div>
-          <button
-            type="button"
-            onClick={seekDock}
-            disabled={!roverId}
-            className="w-full rounded-sm bg-black/50 px-1 py-1 text-xs text-slate-200 disabled:opacity-30"
-          >
-            Seek dock
-          </button>
-          <p className="mt-1 text-xs text-slate-400">Point the rover straight at the dock, about one foot away.</p>
-          <div className="mt-1 flex flex-wrap gap-1">
-            <StatusPill label={docked ? 'Docked' : 'Not docked'} active={docked} />
-            <StatusPill label={charging ? 'Charging' : 'Not charging'} active={charging} />
-          </div>
-        </div>
+        <ActionCard
+          title="Start Driving"
+          description="Press to enable driving mode, then start moving. The headlamps should illuminate."
+          statuses={[{ label: drivingMode ? 'Ready!' : 'Not Ready!', active: drivingMode }]}
+          gradient="from-emerald-600 to-emerald-400"
+          onClick={runStartDockFull}
+          disabled={!roverId}
+          footnote={updated ? `Sensor ping ${updated}` : null}
+        />
+        <ActionCard
+          title="Dock and Charge"
+          description="Line the rover up about a foot from the dock, then trigger an automatic approach."
+          statuses={[
+            { label: docked ? 'Docked!' : 'Not Docked!', active: docked },
+            { label: charging ? 'Charging!' : 'Not Charging!', active: charging },
+          ]}
+          gradient="from-indigo-600 to-purple-500"
+          onClick={seekDock}
+          disabled={!roverId}
+        />
         <SpeedRow left={speeds.left} right={speeds.right} />
         <div>
           <p className="text-xs text-slate-400">Manual OI</p>
@@ -85,6 +75,33 @@ export default function DrivePanel() {
       </div>
       <p className="mt-1 text-[0.65rem] text-slate-500">Sensor streaming auto-starts after each OI change.</p>
     </section>
+  );
+}
+
+function ActionCard({ title, description, statuses, gradient, onClick, disabled, footnote }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full rounded-lg bg-gradient-to-r ${gradient} px-2 py-2 text-left text-white disabled:opacity-40`}
+    >
+      <p className="text-base font-semibold">{title}</p>
+      <p className="text-sm text-emerald-50/80">{description}</p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {statuses.map((status) => (
+          <span
+            key={status.label}
+            className={`rounded-full px-3 py-0.5 text-xs font-semibold ${
+              status.active ? 'bg-lime-300 text-emerald-900' : 'bg-emerald-900 text-emerald-100'
+            }`}
+          >
+            {status.label}
+          </span>
+        ))}
+      </div>
+      {footnote && <p className="mt-1 text-xs text-emerald-50/80">{footnote}</p>}
+    </button>
   );
 }
 

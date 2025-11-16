@@ -12,7 +12,7 @@ import { useVideoRequests } from './hooks/useVideoRequests.js';
 
 function RoomCameraPanel() {
   return (
-    <div className="min-h-[8rem] rounded-sm bg-[#1b1b1b] p-1 text-sm text-slate-200">
+    <div className="min-h-[8rem] rounded-sm bg-[#242a32] p-1 text-sm text-slate-200">
       <p className="text-center text-xs text-slate-400">Room camera</p>
       <p className="mt-1 text-center text-sm text-slate-200">Feed placeholder. Wire upcoming room cam here.</p>
     </div>
@@ -52,7 +52,7 @@ function useLayoutMode() {
 function LogPanel() {
   const { logs } = useSession();
   return (
-    <div className="rounded-sm bg-[#1b1b1b] p-1 text-xs text-slate-200">
+    <div className="rounded-sm bg-[#242a32] p-1 text-xs text-slate-200">
       <div className="flex items-center justify-between text-[0.7rem] text-slate-400">
         <span>Server logs</span>
         <span>{logs.length}</span>
@@ -91,7 +91,7 @@ function DriverVideoPanel() {
   }, [session?.roster, roverId]);
 
   return (
-    <section className="rounded-sm bg-[#1b1b1b] p-1">
+    <section className="rounded-sm bg-[#242a32] p-1">
       {roverId ? (
         <div className="min-h-[55vh]">
           <VideoTile
@@ -130,7 +130,7 @@ function AuthPanel() {
   }
 
   return (
-    <div className="rounded-sm bg-[#1b1b1b] p-1 text-sm text-slate-200">
+    <div className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-200">
       <p className="text-xs text-slate-400">Admin login</p>
       <form className="mt-1 flex flex-col gap-1" onSubmit={handleLogin}>
         <input

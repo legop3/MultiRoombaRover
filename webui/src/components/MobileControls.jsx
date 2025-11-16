@@ -27,7 +27,7 @@ function MobileJoystick() {
   }, [disabled, driveWithVector]);
 
   return (
-    <section className="rounded-sm bg-[#1b1b1b] p-1 text-sm text-slate-100">
+    <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
       <div className="text-xs text-slate-400">Joystick</div>
       <div className="mt-1 flex items-center justify-center">
         <Joystick
@@ -79,7 +79,7 @@ function AuxMotorControls() {
   ];
 
   return (
-    <section className="rounded-sm bg-[#1b1b1b] p-1 text-sm text-slate-100">
+    <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
       <div className="text-xs text-slate-400">Aux motors</div>
       <div className="mt-1 flex flex-wrap gap-1">
         <button

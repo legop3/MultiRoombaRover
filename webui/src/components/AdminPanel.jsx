@@ -57,7 +57,7 @@ export default function AdminPanel() {
   if (!isAdmin) return null;
 
   return (
-    <section className="rounded-sm bg-[#1b1b1b] p-1 text-xs text-slate-200">
+    <section className="rounded-sm bg-[#242a32] p-1 text-xs text-slate-200">
       <div className="flex items-center justify-between gap-1">
         <span>Admin controls</span>
         <select

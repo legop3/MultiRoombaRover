@@ -38,7 +38,7 @@ export default function TelemetryPanel() {
   }
 
   return (
-    <section className="rounded-sm bg-[#1b1b1b] p-1 text-sm text-slate-200">
+    <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-200">
       <div className="text-[0.7rem] text-slate-400">
         <span>{connected ? 'online' : 'offline'}</span>
         <span> · role {session?.role || 'unknown'}</span>
