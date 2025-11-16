@@ -157,7 +157,17 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
 }
 
 function BatteryBar({ charge, capacity, config, label, status }) {
-  if (charge == null || !config?.full || config.warn == null) {
+  if (!config) {
+    return null;
+  }
+
+  const normalizedConfig = {
+    full: config.full ?? config.Full ?? 0,
+    warn: config.warn ?? config.Warn ?? 0,
+    urgent: config.urgent ?? config.Urgent ?? null,
+  };
+
+  if (charge == null || normalizedConfig.full === 0 || normalizedConfig.warn == null) {
     return (
       <div className="rounded-sm bg-[#1e1e1e] px-2 py-1 text-sm text-slate-200">
         <div className="flex items-center justify-between text-xs text-slate-400">
@@ -168,11 +178,6 @@ function BatteryBar({ charge, capacity, config, label, status }) {
       </div>
     );
   }
-  const normalizedConfig = {
-    full: config.full ?? config.Full ?? 0,
-    warn: config.warn ?? config.Warn ?? 0,
-    urgent: config.urgent ?? config.Urgent ?? null,
-  };
 
   const span = normalizedConfig.full - normalizedConfig.warn;
   if (span <= 0) return null;
