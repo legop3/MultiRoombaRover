@@ -76,6 +76,7 @@ export default function TelemetryPanel() {
   
 
       {rawSnippet && (
+        console.log('rawSnippet:', rawSnippet),
         <pre className="mt-1 text-wrap word-break p-1 text-xs text-lime-300">
           {rawSnippet}
         </pre>
