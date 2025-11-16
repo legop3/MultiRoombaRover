@@ -159,6 +159,7 @@ function BatteryBar({ charge, capacity, config, label, status }) {
   const normalized = (charge - config.warn) / span;
   const percent = Math.min(1, Math.max(0, normalized));
   const percentDisplay = Math.round(percent * 100);
+  const percentText = `${percentDisplay}%`;
   const depleted = normalized <= 0;
   const urgent = config.urgent != null && charge <= config.urgent;
   const barClass = depleted ? 'bg-red-500 animate-pulse' : urgent ? 'bg-amber-400' : 'bg-emerald-500';
@@ -173,8 +174,11 @@ function BatteryBar({ charge, capacity, config, label, status }) {
         <span>Battery</span>
         <span>{capText} mAh</span>
       </div>
-      <div className="h-4 w-full rounded-full bg-slate-800">
+      <div className="relative h-4 w-full rounded-full bg-slate-800">
         <div className={`h-full rounded-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }} />
+        <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-black/80">
+          {percentText}
+        </span>
       </div>
     </div>
   );
