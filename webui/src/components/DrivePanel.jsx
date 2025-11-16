@@ -32,7 +32,7 @@ export default function DrivePanel() {
           tone="emerald"
           onClick={runStartDockFull}
           disabled={!roverId}
-          footnote={updated ? `Sensor ping ${updated}` : null}
+          // footnote={updated ? `Sensor ping ${updated}` : null}
         />
         <ActionCard
           title="Dock and Charge"
@@ -45,8 +45,8 @@ export default function DrivePanel() {
           onClick={seekDock}
           disabled={!roverId}
         />
-        <SpeedRow left={speeds.left} right={speeds.right} />
-        <div>
+        {/* <SpeedRow left={speeds.left} right={speeds.right} /> */}
+        {/* <div>
           <p className="text-sm text-slate-300">Manual OI</p>
           <div className="mt-1 flex flex-wrap gap-1">
             {manualOiButtons.map((btn) => (
@@ -61,8 +61,8 @@ export default function DrivePanel() {
               </button>
             ))}
           </div>
-        </div>
-        <div className="flex flex-wrap gap-1">
+        </div> */}
+        {/* <div className="flex flex-wrap gap-1">
           <button
             type="button"
             onClick={stopMotors}
@@ -71,9 +71,9 @@ export default function DrivePanel() {
           >
             Stop motors
           </button>
-        </div>
+        </div> */}
       </div>
-      <p className="mt-1 text-sm text-slate-400">Sensor streaming auto-starts after each OI change.</p>
+      {/* <p className="mt-1 text-sm text-slate-400">Sensor streaming auto-starts after each OI change.</p> */}
     </section>
   );
 }
