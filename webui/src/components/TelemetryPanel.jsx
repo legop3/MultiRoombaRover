@@ -58,6 +58,12 @@ export default function TelemetryPanel() {
           <Metric label="Current" value={formatMetric(current)} />
         </div>
       )}
+      <div className="flex gap-0.5 mt-1">
+        <CliffBar value={sensors.cliffLeftSignal} />
+        <CliffBar value={sensors.cliffFrontLeftSignal} />
+        <CliffBar value={sensors.cliffFrontRightSignal} />
+        <CliffBar value={sensors.cliffRightSignal} />
+      </div>
       {rawSnippet && (
         <pre className="mt-1 overflow-scroll p-1 text-xs text-lime-300">
           {rawSnippet}
@@ -95,6 +101,19 @@ export default function TelemetryPanel() {
         )}
       </div>
     </section>
+  );
+}
+
+function CliffBar({ value }) {
+  // Render a small vertical bar; value is clamped to 0-100 for display
+  // const pct = value == null ? 0 : Math.max(0, Math.min(100, value));
+  // goes from 0 to 4095. calculate percentage for height
+  const pct = value == null ? 0 : Math.max(0, Math.min(100, (value / 4095) * 100));
+  const height = `${pct}%`;
+  return (
+    <div className="w-1/4 h-6 bg-gray-800 rounded-sm overflow-hidden">
+      <div className="w-full bg-lime-400" style={{ height }} />
+    </div>
   );
 }
 

@@ -50,8 +50,8 @@ export default function RightPaneTabs({ layout }) {
       <div className="mt-1 space-y-1">
         {active === 'telemetry' && (
           <div className="space-y-1">
-            <TelemetryPanel />
             <DrivePanel />
+            <TelemetryPanel />
           </div>
         )}
         {active === 'room' && (
