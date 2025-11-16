@@ -19,12 +19,12 @@ export default function DrivePanel() {
   const updated = frame?.receivedAt ? new Date(frame.receivedAt).toLocaleTimeString() : null;
 
   return (
-    <section className="rounded-sm bg-[#242a32] p-2 text-base text-slate-100">
+    <section className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
       <div className="flex items-center justify-between text-sm text-slate-300">
         <span>Drive control</span>
         <span>{roverId ? `Rover ${roverId}` : 'unassigned'}</span>
       </div>
-      <div className="mt-2 space-y-2">
+      <div className="mt-1 space-y-1">
         <ActionCard
           title="Start Driving"
           description="Press to enable driving mode, then start moving. The headlamps should illuminate."
@@ -55,7 +55,7 @@ export default function DrivePanel() {
                 type="button"
                 onClick={() => sendOiCommand(btn.key)}
                 disabled={!roverId}
-                className="rounded-sm bg-black/40 px-2 py-0.5 text-sm text-slate-200 disabled:opacity-30"
+                className="rounded-sm bg-black/40 px-1 py-0.5 text-sm text-slate-200 disabled:opacity-30"
               >
                 {btn.label}
               </button>
@@ -67,13 +67,13 @@ export default function DrivePanel() {
             type="button"
             onClick={stopMotors}
             disabled={!roverId}
-            className="flex-1 rounded-sm bg-red-600/70 px-2 py-1 text-sm text-white disabled:opacity-40"
+            className="flex-1 rounded-sm bg-red-600/70 px-1 py-1 text-sm text-white disabled:opacity-40"
           >
             Stop motors
           </button>
         </div>
       </div>
-      <p className="mt-2 text-sm text-slate-400">Sensor streaming auto-starts after each OI change.</p>
+      <p className="mt-1 text-sm text-slate-400">Sensor streaming auto-starts after each OI change.</p>
     </section>
   );
 }
@@ -85,15 +85,15 @@ function ActionCard({ title, description, statuses, tone, onClick, disabled, foo
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-full rounded-lg ${baseColor} px-3 py-2 text-left text-white disabled:opacity-40`}
+      className={`w-full rounded-lg ${baseColor} px-1 py-1 text-left text-white disabled:opacity-40`}
     >
       <p className="text-base font-semibold">{title}</p>
       <p className="text-sm text-white/90">{description}</p>
-      <div className="mt-2 flex flex-wrap gap-1">
+      <div className="mt-1 flex flex-wrap gap-1">
         {statuses.map((status) => (
           <span
             key={status.label}
-            className={`rounded-full px-3 py-0.5 text-xs font-semibold ${
+            className={`rounded-full px-1 py-0.5 text-xs font-semibold ${
               status.active ? 'bg-lime-300 text-emerald-900' : 'bg-emerald-900 text-emerald-100'
             }`}
           >
@@ -108,7 +108,7 @@ function ActionCard({ title, description, statuses, tone, onClick, disabled, foo
 
 function SpeedRow({ left, right }) {
   return (
-    <div className="grid grid-cols-2 gap-1 rounded-sm bg-black/40 p-2 text-base">
+    <div className="grid grid-cols-2 gap-1 rounded-sm bg-black/40 p-1 text-base">
       <div>
         <p className="text-sm text-slate-300">Left</p>
         <p className="font-semibold text-slate-100">{left}</p>
@@ -124,7 +124,7 @@ function SpeedRow({ left, right }) {
 function StatusPill({ label, active }) {
   return (
     <span
-      className={`rounded-sm px-2 py-0.5 text-xs ${
+      className={`rounded-sm px-1 py-0.5 text-xs ${
         active ? 'bg-emerald-500/30 text-emerald-100' : 'bg-black/40 text-slate-500'
       }`}
     >

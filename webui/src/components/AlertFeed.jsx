@@ -46,7 +46,7 @@ function AlertToast({ alert }) {
       ? 'bg-amber-500/30 text-amber-100'
       : 'bg-emerald-500/30 text-emerald-100';
   return (
-    <div className={`pointer-events-auto rounded-sm px-2 py-1 text-[0.75rem] shadow-lg shadow-black/60 ${colorClasses}`}>
+    <div className={`pointer-events-auto rounded-sm px-1 py-1 text-[0.75rem] shadow-lg shadow-black/60 ${colorClasses}`}>
       <p className="text-[0.65rem] text-slate-300">{alert.title || 'Alert'}</p>
       <p className="text-sm text-white">{alert.message}</p>
     </div>

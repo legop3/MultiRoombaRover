@@ -153,7 +153,7 @@ function BatteryBar({ charge, config, label, status }) {
   const urgent = config?.Urgent ?? null;
   if (charge == null || full == null || warn == null) {
     return (
-      <div className="rounded-sm bg-[#1e1e1e] px-2 py-1 text-sm text-slate-200">
+      <div className="rounded-sm bg-[#1e1e1e] px-1 py-1 text-sm text-slate-200">
         <div className="flex items-center justify-between text-xs text-slate-400">
           <span>{label}</span>
           <span>{status}</span>
@@ -173,7 +173,7 @@ function BatteryBar({ charge, config, label, status }) {
   const warnTriggered = urgent != null && charge <= urgent;
   const barClass = depleted ? 'bg-red-500 animate-pulse' : warnTriggered ? 'bg-amber-400' : 'bg-emerald-500';
   return (
-    <div className="space-y-2 rounded-sm bg-[#1e1e1e] px-2 py-2 text-sm text-slate-200">
+    <div className="space-y-2 rounded-sm bg-[#1e1e1e] px-1 py-1 text-sm text-slate-200">
       <div className="flex items-center justify-between text-xs text-slate-400">
         <span>{label}</span>
         <span>{status}</span>

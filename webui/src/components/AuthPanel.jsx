@@ -22,17 +22,17 @@ export default function AuthPanel() {
   }
 
   return (
-    <div className="rounded-sm bg-[#242a32] p-2 text-base text-slate-100">
+    <div className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
       <p className="text-sm text-slate-400">Admin login</p>
-      <form className="mt-2 flex flex-col gap-2" onSubmit={handleLogin}>
+      <form className="mt-1 flex flex-col gap-1" onSubmit={handleLogin}>
         <input
-          className="rounded-sm bg-black/50 px-2 py-1 text-slate-100"
+          className="rounded-sm bg-black/50 px-1 py-1 text-slate-100"
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
         />
         <input
-          className="rounded-sm bg-black/50 px-2 py-1 text-slate-100"
+          className="rounded-sm bg-black/50 px-1 py-1 text-slate-100"
           placeholder="Password"
           type="password"
           value={password}
@@ -41,23 +41,23 @@ export default function AuthPanel() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-sm bg-slate-200 px-2 py-1 text-sm font-semibold text-black disabled:opacity-50"
+          className="rounded-sm bg-slate-200 px-1 py-1 text-sm font-semibold text-black disabled:opacity-50"
         >
           {loading ? 'Logging in…' : 'Login'}
         </button>
       </form>
-      <div className="mt-2 flex gap-2 text-sm">
+      <div className="mt-1 flex gap-1 text-sm">
         <button
           type="button"
           onClick={() => setRole('user')}
-          className="flex-1 rounded-sm bg-black/40 px-2 py-1 text-slate-200"
+          className="flex-1 rounded-sm bg-black/40 px-1 py-1 text-slate-200"
         >
           Driver
         </button>
         <button
           type="button"
           onClick={() => setRole('spectator')}
-          className="flex-1 rounded-sm bg-black/40 px-2 py-1 text-slate-200"
+          className="flex-1 rounded-sm bg-black/40 px-1 py-1 text-slate-200"
         >
           Spectator
         </button>
