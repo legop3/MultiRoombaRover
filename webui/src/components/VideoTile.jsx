@@ -14,7 +14,6 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
   const [muted, setMuted] = useState(true);
   const sensors = telemetryFrame?.sensors;
   const batteryCharge = sensors?.batteryChargeMah ?? null;
-  const batteryCapacity = sensors?.batteryCapacityMah ?? null;
   // console.log('[BatteryBarDebug]', {
   //   frameSensors: sensors,
   //   batteryCharge,
@@ -143,12 +142,12 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
         <HudOverlay frame={telemetryFrame} />
         <OvercurrentOverlay active={overcurrentActive} />
       </div>
-      <BatteryBar charge={batteryCharge} capacity={batteryCapacity} config={batteryConfig} label={label} status={renderedStatus} />
+      <BatteryBar charge={batteryCharge} config={batteryConfig} label={label} status={renderedStatus} />
     </div>
   );
 }
 
-function BatteryBar({ charge, capacity, config, label, status }) {
+function BatteryBar({ charge, config, label, status }) {
   const full = config?.Full;
   const warn = config?.Warn;
   const urgent = config?.Urgent ?? null;
@@ -173,17 +172,12 @@ function BatteryBar({ charge, capacity, config, label, status }) {
   const depleted = normalized <= 0;
   const warnTriggered = urgent != null && charge <= urgent;
   const barClass = depleted ? 'bg-red-500 animate-pulse' : warnTriggered ? 'bg-amber-400' : 'bg-emerald-500';
-  const capText = capacity ? `${charge}/${capacity}` : `${charge}`;
   return (
     <div className="space-y-2 rounded-sm bg-[#1e1e1e] px-2 py-2 text-sm text-slate-200">
       <div className="flex items-center justify-between text-xs text-slate-400">
         <span>{label}</span>
         <span>{status}</span>
       </div>
-      {/* <div className="flex items-center justify-between text-sm">
-        <span>Battery</span>
-        <span>{capText} mAh</span>
-      </div> */}
       <div className="relative h-4 w-full rounded-full bg-slate-800">
         <div className={`h-full rounded-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }} />
         <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-black/80">

@@ -118,9 +118,13 @@ function AuxMotorControls() {
 
 export default function MobileControlsStack() {
   return (
-    <div className="flex flex-col gap-1">
-      <MobileJoystick />
-      <AuxMotorControls />
+    <div className="flex flex-col gap-1 sm:flex-row">
+      <div className="flex-1">
+        <MobileJoystick />
+      </div>
+      <div className="flex-1">
+        <AuxMotorControls />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from './context/SessionContext.jsx';
 import { useTelemetryFrame } from './context/TelemetryContext.jsx';
 import TelemetryPanel from './components/TelemetryPanel.jsx';
@@ -84,16 +84,16 @@ function DriverVideoPanel() {
   const sources = useVideoRequests(roverId ? [roverId] : []);
   const info = roverId ? sources[roverId] : null;
   const frame = useTelemetryFrame(roverId);
-  const batteryConfig = useMemo(() => {
-    if (!roverId || !session?.roster) return null;
-    const record = session.roster.find((item) => String(item.id) === String(roverId));
-    return record?.battery ?? null;
-  }, [session?.roster, roverId]);
+  const batteryRecord =
+    roverId && session?.roster
+      ? session.roster.find((item) => String(item.id) === String(roverId))
+      : null;
+  const batteryConfig = batteryRecord?.battery ?? null;
 
   return (
     <section className="rounded-sm bg-[#242a32] p-1">
       {roverId ? (
-        <div className="min-h-[70vh]">
+        <div className="lg:min-h-[70vh]">
           <VideoTile
             sessionInfo={info}
             label={roverId}
