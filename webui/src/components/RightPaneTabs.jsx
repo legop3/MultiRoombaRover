@@ -35,10 +35,10 @@ export default function RightPaneTabs({ layout }) {
     <section className="rounded-sm bg-[#1a1d23] p-1 text-base text-slate-100">
       <div className="flex gap-1">
         <TabButton active={active === 'telemetry'} onClick={() => setActive('telemetry')}>
-          Telemetry
+          Rover Controls
         </TabButton>
         <TabButton active={active === 'room'} onClick={() => setActive('room')}>
-          Room
+          Room Controls
         </TabButton>
         <TabButton active={active === 'advanced'} onClick={() => setActive('advanced')}>
           Advanced

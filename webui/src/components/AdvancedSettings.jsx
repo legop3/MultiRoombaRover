@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useDriveControl } from '../context/DriveControlContext.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
 import AuthPanel from './AuthPanel.jsx';
+import AdminPanel from './AdminPanel.jsx';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -69,6 +70,7 @@ export default function AdvancedSettings() {
         {!canControl && <p className="mt-1 text-xs text-slate-500">Assign a rover to toggle streams.</p>}
       </section>
       <AuthPanel />
+      <AdminPanel />
     </div>
   );
 }
