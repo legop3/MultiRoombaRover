@@ -27,9 +27,9 @@ function MobileJoystick() {
   }, [disabled, driveWithVector]);
 
   return (
-    <section className="rounded-lg border border-slate-900 bg-slate-950/70 p-2 text-[0.8rem] text-slate-100">
-      <div className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">Joystick</div>
-      <div className="mt-2 flex items-center justify-center">
+    <section className="rounded-sm bg-[#1b1b1b] p-1 text-sm text-slate-100">
+      <div className="text-xs text-slate-400">Joystick</div>
+      <div className="mt-1 flex items-center justify-center">
         <Joystick
           size={120}
           baseColor="#0f172a"
@@ -40,14 +40,14 @@ function MobileJoystick() {
           disabled={disabled}
         />
       </div>
-      <p className="mt-2 text-[0.65rem] text-slate-400">
+      <p className="mt-1 text-xs text-slate-400">
         Drag to drive. Release to stop sending drive commands.
       </p>
       <button
         type="button"
         onClick={stopMotors}
         disabled={disabled}
-        className="mt-2 w-full rounded border border-slate-800 bg-black/40 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-200 disabled:opacity-40"
+        className="mt-1 w-full rounded-sm bg-black/40 px-1 py-1 text-xs text-slate-200 disabled:opacity-40"
       >
         Panic Stop
       </button>
@@ -79,14 +79,14 @@ function AuxMotorControls() {
   ];
 
   return (
-    <section className="rounded-lg border border-slate-900 bg-slate-950/70 p-2 text-[0.8rem] text-slate-100">
-      <div className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">Aux Motors</div>
-      <div className="mt-2 flex flex-wrap gap-1">
+    <section className="rounded-sm bg-[#1b1b1b] p-1 text-sm text-slate-100">
+      <div className="text-xs text-slate-400">Aux motors</div>
+      <div className="mt-1 flex flex-wrap gap-1">
         <button
           type="button"
           onClick={runAllForward}
           disabled={disabled}
-          className="flex-1 rounded border border-emerald-500/40 bg-emerald-500/10 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-emerald-200 disabled:opacity-40"
+          className="flex-1 rounded-sm bg-black/40 px-1 py-1 text-xs text-slate-200 disabled:opacity-40"
         >
           All forward
         </button>
@@ -94,19 +94,19 @@ function AuxMotorControls() {
           type="button"
           onClick={stopAll}
           disabled={disabled}
-          className="flex-1 rounded border border-slate-800 bg-black/40 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-200 disabled:opacity-40"
+          className="flex-1 rounded-sm bg-black/40 px-1 py-1 text-xs text-slate-200 disabled:opacity-40"
         >
           Stop all
         </button>
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-1 text-[0.7rem]">
+      <div className="mt-1 grid grid-cols-2 gap-1 text-[0.75rem]">
         {auxButtons.map((btn) => (
           <button
             key={btn.label}
             type="button"
             onClick={() => !disabled && setAuxMotors(btn.values)}
             disabled={disabled}
-            className="rounded border border-slate-800 bg-black/30 py-1 uppercase tracking-[0.2em] text-slate-200 disabled:opacity-30"
+            className="rounded-sm bg-black/30 px-1 py-1 text-slate-200 disabled:opacity-30"
           >
             {btn.label}
           </button>
@@ -118,7 +118,7 @@ function AuxMotorControls() {
 
 export default function MobileControlsStack() {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1">
       <MobileJoystick />
       <AuxMotorControls />
     </div>

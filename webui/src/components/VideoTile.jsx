@@ -124,8 +124,8 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
     : status;
 
   return (
-    <div className="space-y-1">
-      <div className="relative w-full overflow-hidden rounded-lg border border-slate-900 bg-black">
+    <div className="flex flex-col gap-1">
+      <div className="relative w-full overflow-hidden rounded-sm bg-black">
         <video
           ref={videoRef}
           muted={forceMute || muted}
@@ -137,21 +137,19 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
         <HudOverlay frame={telemetryFrame} />
         <OvercurrentOverlay active={overcurrentActive} />
       </div>
-      <BatteryBar
-        charge={batteryCharge}
-        capacity={batteryCapacity}
-        config={batteryConfig}
-      />
-      <div className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">
-        <span className="text-slate-200">{label}</span> · {renderedStatus}
-      </div>
+      <BatteryBar charge={batteryCharge} capacity={batteryCapacity} config={batteryConfig} label={label} status={renderedStatus} />
     </div>
   );
 }
 
-function BatteryBar({ charge, capacity, config }) {
+function BatteryBar({ charge, capacity, config, label, status }) {
   if (charge == null || !config?.full || config.warn == null) {
-    return null;
+    return (
+      <div className="flex items-center justify-between text-xs text-slate-400">
+        <span>{label}</span>
+        <span>{status}</span>
+      </div>
+    );
   }
   const span = config.full - config.warn;
   if (span <= 0) return null;
@@ -160,23 +158,20 @@ function BatteryBar({ charge, capacity, config }) {
   const percentDisplay = Math.round(percent * 100);
   const depleted = normalized <= 0;
   const urgent = config.urgent != null && charge <= config.urgent;
-  const barClass = depleted
-    ? 'bg-red-500 animate-pulse'
-    : urgent
-    ? 'bg-amber-400'
-    : 'bg-emerald-500';
+  const barClass = depleted ? 'bg-red-500 animate-pulse' : urgent ? 'bg-amber-400' : 'bg-emerald-500';
   const capText = capacity ? `${charge}/${capacity}` : `${charge}`;
   return (
-    <div className="rounded border border-slate-900 bg-slate-950/80 p-1">
-      <div className="flex items-center justify-between text-[0.65rem] text-slate-300">
+    <div className="space-y-1 rounded-sm bg-[#111] p-1 text-xs text-slate-200">
+      <div className="flex items-center justify-between text-[0.65rem] text-slate-400">
+        <span>{label}</span>
+        <span>{status}</span>
+      </div>
+      <div className="flex items-center justify-between text-[0.7rem]">
         <span>Battery</span>
         <span>{capText} mAh</span>
       </div>
-      <div className="mt-1 h-2 w-full rounded-full bg-slate-800">
-        <div
-          className={`h-full rounded-full transition-[width] ${barClass}`}
-          style={{ width: `${percentDisplay}%` }}
-        />
+      <div className="h-2 w-full rounded-full bg-slate-800">
+        <div className={`h-full rounded-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }} />
       </div>
     </div>
   );
@@ -199,20 +194,16 @@ function HudOverlay({ frame }) {
     { label: 'B-R', active: bumps.bumpRight },
   ];
   const wheelBadges = [
-    { label: 'DROP L', active: bumps.wheelDropLeft },
-    { label: 'DROP R', active: bumps.wheelDropRight },
+    { label: 'Drop L', active: bumps.wheelDropLeft },
+    { label: 'Drop R', active: bumps.wheelDropRight },
   ];
 
   return (
-    <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-2 text-[0.6rem] uppercase tracking-[0.3em] text-slate-200">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span
-            className={`h-2 w-2 rounded-full ${
-              pulse ? 'bg-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.9)]' : 'bg-slate-700'
-            }`}
-          ></span>
-          <span className="text-slate-400">SENSORS</span>
+    <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-1 text-[0.65rem] text-slate-200">
+      <div className="flex items-center justify-between gap-1">
+        <div className="flex items-center gap-1 text-[0.55rem] text-slate-400">
+          <span className={`h-2 w-2 rounded-full ${pulse ? 'bg-emerald-300 shadow-[0_0_4px_rgba(16,185,129,0.8)]' : 'bg-slate-700'}`} />
+          <span>sensor</span>
         </div>
         <div className="flex gap-1">
           {bumperBadges.map((badge) => (
@@ -232,11 +223,7 @@ function HudOverlay({ frame }) {
 function HudBadge({ label, active }) {
   return (
     <span
-      className={`rounded-sm border px-1 py-0.5 text-[0.55rem] ${
-        active
-          ? 'border-emerald-400 bg-emerald-500/10 text-emerald-200'
-          : 'border-slate-700 bg-black/40 text-slate-500'
-      }`}
+      className={`rounded-sm px-1 py-0.5 text-[0.55rem] ${active ? 'bg-emerald-500/30 text-emerald-100' : 'bg-black/40 text-slate-500'}`}
     >
       {label}
     </span>
@@ -247,9 +234,7 @@ function OvercurrentOverlay({ active }) {
   if (!active) return null;
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-red-900/60">
-      <div className="text-center text-lg font-black uppercase tracking-[0.6em] text-red-100 animate-pulse">
-        Overcurrent
-      </div>
+      <div className="text-center text-sm font-semibold text-red-100 animate-pulse">Overcurrent</div>
     </div>
   );
 }

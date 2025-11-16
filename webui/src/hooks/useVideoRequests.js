@@ -4,13 +4,13 @@ import { useSocket } from '../context/SocketContext.jsx';
 export function useVideoRequests(roverIds = []) {
   const socket = useSocket();
   const [sources, setSources] = useState({});
-  const ids = useMemo(() => Array.from(new Set(roverIds.filter(Boolean))), [roverIds]);
-  const idsKey = ids.join('|');
+  const normalizedKey = Array.isArray(roverIds) ? roverIds.filter(Boolean).join('|') : '';
 
   useEffect(() => {
-    if (!ids.length) {
+    if (!normalizedKey) {
       return undefined;
     }
+    const ids = normalizedKey.split('|');
     let cancelled = false;
     ids.forEach((roverId) => {
       socket.emit('video:request', { roverId }, (resp = {}) => {
@@ -25,9 +25,11 @@ export function useVideoRequests(roverIds = []) {
     return () => {
       cancelled = true;
     };
-  }, [socket, idsKey, ids]);
+  }, [socket, normalizedKey]);
+
   const filtered = useMemo(() => {
-    if (!ids.length) return {};
+    if (!normalizedKey) return {};
+    const ids = normalizedKey.split('|');
     const next = {};
     ids.forEach((id) => {
       if (sources[id]) {
@@ -35,7 +37,7 @@ export function useVideoRequests(roverIds = []) {
       }
     });
     return next;
-  }, [ids, sources]);
+  }, [normalizedKey, sources]);
 
   return filtered;
 }
