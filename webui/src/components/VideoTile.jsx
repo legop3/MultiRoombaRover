@@ -23,6 +23,12 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
     sensors?.batteryCapacity ??
     sensors?.battery?.capacity ??
     null;
+  console.log('[BatteryBarDebug]', {
+    frameSensors: sensors,
+    batteryCharge,
+    batteryCapacity,
+    config: batteryConfig,
+  });
   const wheelOvercurrents = sensors?.wheelOvercurrents || null;
   const overcurrentActive = Boolean(
     wheelOvercurrents && Object.values(wheelOvercurrents).some((value) => Boolean(value)),
