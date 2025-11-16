@@ -13,8 +13,16 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
   const [restartToken, setRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
   const sensors = telemetryFrame?.sensors;
-  const batteryCharge = sensors?.batteryChargeMah ?? null;
-  const batteryCapacity = sensors?.batteryCapacityMah ?? null;
+  const batteryCharge =
+    sensors?.batteryChargeMah ??
+    sensors?.batteryCharge ??
+    sensors?.battery?.charge ??
+    null;
+  const batteryCapacity =
+    sensors?.batteryCapacityMah ??
+    sensors?.batteryCapacity ??
+    sensors?.battery?.capacity ??
+    null;
   const wheelOvercurrents = sensors?.wheelOvercurrents || null;
   const overcurrentActive = Boolean(
     wheelOvercurrents && Object.values(wheelOvercurrents).some((value) => Boolean(value)),
