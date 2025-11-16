@@ -85,8 +85,8 @@ function DriverVideoPanel() {
   const info = roverId ? sources[roverId] : null;
   const frame = useTelemetryFrame(roverId);
   const batteryConfig = useMemo(() => {
-    if (!roverId) return null;
-    const record = session?.roster?.find((item) => item.id === roverId);
+    if (!roverId || !session?.roster) return null;
+    const record = session.roster.find((item) => String(item.id) === String(roverId));
     return record?.battery ?? null;
   }, [session?.roster, roverId]);
 
