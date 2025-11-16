@@ -168,14 +168,20 @@ function BatteryBar({ charge, capacity, config, label, status }) {
       </div>
     );
   }
-  const span = config.full - config.warn;
+  const normalizedConfig = {
+    full: config.full ?? config.Full ?? 0,
+    warn: config.warn ?? config.Warn ?? 0,
+    urgent: config.urgent ?? config.Urgent ?? null,
+  };
+
+  const span = normalizedConfig.full - normalizedConfig.warn;
   if (span <= 0) return null;
-  const normalized = (charge - config.warn) / span;
+  const normalized = (charge - normalizedConfig.warn) / span;
   const percent = Math.min(1, Math.max(0, normalized));
   const percentDisplay = Math.round(percent * 100);
   const percentText = `${percentDisplay}%`;
   const depleted = normalized <= 0;
-  const urgent = config.urgent != null && charge <= config.urgent;
+  const urgent = normalizedConfig.urgent != null && charge <= normalizedConfig.urgent;
   const barClass = depleted ? 'bg-red-500 animate-pulse' : urgent ? 'bg-amber-400' : 'bg-emerald-500';
   const capText = capacity ? `${charge}/${capacity}` : `${charge}`;
   return (
