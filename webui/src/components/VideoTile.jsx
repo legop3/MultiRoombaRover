@@ -13,22 +13,14 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
   const [restartToken, setRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
   const sensors = telemetryFrame?.sensors;
-  const batteryCharge =
-    sensors?.batteryChargeMah ??
-    sensors?.batteryCharge ??
-    sensors?.battery?.charge ??
-    null;
-  const batteryCapacity =
-    sensors?.batteryCapacityMah ??
-    sensors?.batteryCapacity ??
-    sensors?.battery?.capacity ??
-    null;
-  console.log('[BatteryBarDebug]', {
-    frameSensors: sensors,
-    batteryCharge,
-    batteryCapacity,
-    config: batteryConfig,
-  });
+  const batteryCharge = sensors?.batteryChargeMah ?? null;
+  const batteryCapacity = sensors?.batteryCapacityMah ?? null;
+  // console.log('[BatteryBarDebug]', {
+  //   frameSensors: sensors,
+  //   batteryCharge,
+  //   batteryCapacity,
+  //   config: batteryConfig,
+  // });
   const wheelOvercurrents = sensors?.wheelOvercurrents || null;
   const overcurrentActive = Boolean(
     wheelOvercurrents && Object.values(wheelOvercurrents).some((value) => Boolean(value)),
@@ -157,17 +149,10 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
 }
 
 function BatteryBar({ charge, capacity, config, label, status }) {
-  if (!config) {
-    return null;
-  }
-
-  const normalizedConfig = {
-    full: config.full ?? config.Full ?? 0,
-    warn: config.warn ?? config.Warn ?? 0,
-    urgent: config.urgent ?? config.Urgent ?? null,
-  };
-
-  if (charge == null || normalizedConfig.full === 0 || normalizedConfig.warn == null) {
+  const full = config?.Full;
+  const warn = config?.Warn;
+  const urgent = config?.Urgent ?? null;
+  if (charge == null || full == null || warn == null) {
     return (
       <div className="rounded-sm bg-[#1e1e1e] px-2 py-1 text-sm text-slate-200">
         <div className="flex items-center justify-between text-xs text-slate-400">
@@ -179,15 +164,15 @@ function BatteryBar({ charge, capacity, config, label, status }) {
     );
   }
 
-  const span = normalizedConfig.full - normalizedConfig.warn;
+  const span = full - warn;
   if (span <= 0) return null;
-  const normalized = (charge - normalizedConfig.warn) / span;
+  const normalized = (charge - warn) / span;
   const percent = Math.min(1, Math.max(0, normalized));
   const percentDisplay = Math.round(percent * 100);
   const percentText = `${percentDisplay}%`;
   const depleted = normalized <= 0;
-  const urgent = normalizedConfig.urgent != null && charge <= normalizedConfig.urgent;
-  const barClass = depleted ? 'bg-red-500 animate-pulse' : urgent ? 'bg-amber-400' : 'bg-emerald-500';
+  const warnTriggered = urgent != null && charge <= urgent;
+  const barClass = depleted ? 'bg-red-500 animate-pulse' : warnTriggered ? 'bg-amber-400' : 'bg-emerald-500';
   const capText = capacity ? `${charge}/${capacity}` : `${charge}`;
   return (
     <div className="space-y-2 rounded-sm bg-[#1e1e1e] px-2 py-2 text-sm text-slate-200">
@@ -195,10 +180,10 @@ function BatteryBar({ charge, capacity, config, label, status }) {
         <span>{label}</span>
         <span>{status}</span>
       </div>
-      <div className="flex items-center justify-between text-sm">
+      {/* <div className="flex items-center justify-between text-sm">
         <span>Battery</span>
         <span>{capText} mAh</span>
-      </div>
+      </div> */}
       <div className="relative h-4 w-full rounded-full bg-slate-800">
         <div className={`h-full rounded-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }} />
         <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-black/80">
