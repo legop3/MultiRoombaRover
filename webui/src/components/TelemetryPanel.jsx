@@ -76,7 +76,7 @@ export default function TelemetryPanel() {
   
 
       {rawSnippet && (
-        <pre className="mt-1 text-wrap p-1 text-xs text-lime-300">
+        <pre className="mt-1 text-wrap word-break p-1 text-xs text-lime-300">
           {rawSnippet}
         </pre>
       )}
