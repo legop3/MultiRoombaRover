@@ -50,22 +50,32 @@ export default function TelemetryPanel() {
       ) : !frame ? (
         <p className="mt-1 text-[0.75rem] text-slate-400">Waiting for sensor frames…</p>
       ) : (
-        <div className="flex gap-0.5 flex-wrap">
-          <Metric label="Charge" value={formatMetric(charge != null && capacity != null ? `${charge}/${capacity}` : null)} />
-          <Metric label="Charging" value={formatMetric(sensors.chargingState?.label)} />
-          <Metric label="OI mode" value={formatMetric(sensors.oiMode?.label)} />
-          <Metric label="Voltage" value={formatMetric(voltage)} />
-          <Metric label="Current" value={formatMetric(current)} />
-        </div>
+        <>
+
+          <div className="flex gap-0.5 flex-wrap">
+            <Metric label="Charge" value={formatMetric(charge != null && capacity != null ? `${charge}/${capacity}` : null)} />
+            <Metric label="Charging" value={formatMetric(sensors.chargingState?.label)} />
+            <Metric label="OI mode" value={formatMetric(sensors.oiMode?.label)} />
+            <Metric label="Voltage" value={formatMetric(voltage)} />
+            <Metric label="Current" value={formatMetric(current)} />
+            <Metric label="Left Encoder" value={formatMetric(sensors.encoderCountsLeft)}/>
+            <Metric label="Right Encoder" value={formatMetric(sensors.encoderCountsRight)}/>
+          </div>
+          <div className="flex gap-0.5 mt-1">
+            <CliffBar value={sensors.cliffLeftSignal} />
+            <CliffBar value={sensors.cliffFrontLeftSignal} />
+            <CliffBar value={sensors.cliffFrontRightSignal} />
+            <CliffBar value={sensors.cliffRightSignal} />
+          </div>
+
+        </>
+
       )}
-      <div className="flex gap-0.5 mt-1">
-        <CliffBar value={sensors.cliffLeftSignal} />
-        <CliffBar value={sensors.cliffFrontLeftSignal} />
-        <CliffBar value={sensors.cliffFrontRightSignal} />
-        <CliffBar value={sensors.cliffRightSignal} />
-      </div>
+
+  
+
       {rawSnippet && (
-        <pre className="mt-1 overflow-scroll p-1 text-xs text-lime-300">
+        <pre className="mt-1 text-wrap p-1 text-xs text-lime-300">
           {rawSnippet}
         </pre>
       )}
@@ -111,7 +121,7 @@ function CliffBar({ value }) {
   const pct = value == null ? 0 : Math.max(0, Math.min(100, (value / 4095) * 100));
   const height = `${pct}%`;
   return (
-    <div className="w-1/4 h-6 bg-gray-800 rounded-sm overflow-hidden">
+    <div className="w-1/4 h-6 bg-gray-700 rounded-sm overflow-hidden">
       <div className="w-full bg-lime-400" style={{ height }} />
     </div>
   );
