@@ -76,8 +76,8 @@ export default function TelemetryPanel() {
   
 
       {rawSnippet && (
-        console.log('rawSnippet:', rawSnippet),
-        <pre className="mt-1 text-wrap word-break p-1 text-xs text-lime-300">
+        // console.log('rawSnippet:', rawSnippet),
+        <pre className="mt-1 text-wrap break-words p-1 text-xs text-lime-300 bg-gray-700">
           {rawSnippet}
         </pre>
       )}
@@ -124,7 +124,7 @@ function CliffBar({ value }) {
   const height = `${pct}%`;
   return (
     <div className="w-1/4 h-6 bg-gray-700 rounded-sm overflow-hidden">
-      <div className="w-full bg-lime-400" style={{ height }} />
+      <div className="w-full bg-amber-400" style={{ height }} />
     </div>
   );
 }
