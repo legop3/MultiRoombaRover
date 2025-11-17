@@ -70,6 +70,7 @@ func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
 		Battery:       c.cfg.Battery,
 		MaxWheelSpeed: c.cfg.MaxWheelMMs,
 		Media:         c.cfg.Media,
+		CameraServo:   c.cfg.CameraServo,
 	}
 	return writeJSON(ctx, conn, msg)
 }

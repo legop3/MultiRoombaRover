@@ -1,11 +1,12 @@
 package roverd
 
 type helloMessage struct {
-	Type          string        `json:"type"`
-	Name          string        `json:"name"`
-	Battery       BatteryConfig `json:"battery"`
-	MaxWheelSpeed int           `json:"maxWheelSpeed"`
-	Media         MediaConfig   `json:"media"`
+	Type          string            `json:"type"`
+	Name          string            `json:"name"`
+	Battery       BatteryConfig     `json:"battery"`
+	MaxWheelSpeed int               `json:"maxWheelSpeed"`
+	Media         MediaConfig       `json:"media"`
+	CameraServo   CameraServoConfig `json:"cameraServo,omitempty"`
 }
 
 type sensorMessage struct {

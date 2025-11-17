@@ -1,6 +1,6 @@
 /* global Buffer */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 
@@ -96,6 +96,7 @@ export function useDriveControls() {
   const keysRef = useRef(new Set());
   const lastSpeedsRef = useRef({ left: 0, right: 0 });
   const [currentSpeeds, setCurrentSpeeds] = useState(() => ({ left: 0, right: 0 }));
+  const [servoAngle, setServoAngle] = useState(null);
 
   const emitCommand = useCallback(
     (payload, cb) => {
@@ -104,6 +105,18 @@ export function useDriveControls() {
     },
     [socket, roverId],
   );
+
+  const currentRosterEntry = useMemo(() => {
+    if (!roverId || !Array.isArray(session?.roster)) return null;
+    return session.roster.find((entry) => String(entry.id) === String(roverId)) || null;
+  }, [roverId, session?.roster]);
+
+  const servoConfig = useMemo(() => {
+    if (!currentRosterEntry?.cameraServo || !currentRosterEntry.cameraServo.enabled) {
+      return null;
+    }
+    return currentRosterEntry.cameraServo;
+  }, [currentRosterEntry]);
 
   const enableSensorStream = useCallback(() => {
     if (!roverId) return;
@@ -205,6 +218,60 @@ export function useDriveControls() {
     [roverId, sendMotorPwm],
   );
 
+  const sendServoCommand = useCallback(
+    (payload) => {
+      if (!roverId || !servoConfig) return;
+      emitCommand({
+        type: 'servo',
+        data: { servo: payload },
+      });
+    },
+    [emitCommand, roverId, servoConfig],
+  );
+
+  const applyServoAngle = useCallback(
+    (angle) => {
+      if (!servoConfig) return;
+      const min = typeof servoConfig.minAngle === 'number' ? servoConfig.minAngle : -45;
+      const max = typeof servoConfig.maxAngle === 'number' ? servoConfig.maxAngle : 45;
+      const clamped = clamp(angle, min, max);
+      setServoAngle(clamped);
+      sendServoCommand({ angle: clamped });
+    },
+    [sendServoCommand, servoConfig],
+  );
+
+  const nudgeServo = useCallback(
+    (delta) => {
+      if (!servoConfig) return;
+      const min = typeof servoConfig.minAngle === 'number' ? servoConfig.minAngle : -45;
+      const max = typeof servoConfig.maxAngle === 'number' ? servoConfig.maxAngle : 45;
+      const midpoint = (min + max) / 2;
+      const step =
+        typeof delta === 'number' && !Number.isNaN(delta) && delta !== 0
+          ? delta
+          : servoConfig.nudgeDegrees || 1;
+      const baseline =
+        typeof servoAngle === 'number'
+          ? servoAngle
+          : servoConfig.homeAngle ?? midpoint;
+      applyServoAngle(baseline + step);
+    },
+    [applyServoAngle, servoAngle, servoConfig],
+  );
+
+  useEffect(() => {
+    if (!servoConfig) {
+      setServoAngle(null);
+      return;
+    }
+    const min = typeof servoConfig.minAngle === 'number' ? servoConfig.minAngle : -45;
+    const max = typeof servoConfig.maxAngle === 'number' ? servoConfig.maxAngle : 45;
+    const initial =
+      typeof servoConfig.homeAngle === 'number' ? servoConfig.homeAngle : (min + max) / 2;
+    setServoAngle(clamp(initial, min, max));
+  }, [servoConfig, roverId]);
+
   useEffect(() => {
     if (!roverId) {
       keysRef.current.clear();
@@ -249,5 +316,19 @@ export function useDriveControls() {
     seekDock,
     setAuxMotors,
     driveWithVector,
+    servo: {
+      enabled: Boolean(roverId && servoConfig),
+      config: servoConfig,
+      angle:
+        typeof servoAngle === 'number'
+          ? servoAngle
+          : servoConfig?.homeAngle ?? servoConfig?.minAngle ?? 0,
+      setAngle: applyServoAngle,
+      nudge: nudgeServo,
+      goHome: () => {
+        if (!servoConfig) return;
+        applyServoAngle(servoConfig.homeAngle ?? 0);
+      },
+    },
   };
 }

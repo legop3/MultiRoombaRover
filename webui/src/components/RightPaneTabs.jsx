@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import TelemetryPanel from './TelemetryPanel.jsx';
 import DrivePanel from './DrivePanel.jsx';
+import CameraServoPanel from './CameraServoPanel.jsx';
 import RoomCameraPanel from './RoomCameraPanel.jsx';
 import AdvancedSettings from './AdvancedSettings.jsx';
 import HelpPanel from './HelpPanel.jsx';
@@ -51,6 +52,7 @@ export default function RightPaneTabs({ layout }) {
         {active === 'telemetry' && (
           <div className="space-y-1">
             <DrivePanel />
+            <CameraServoPanel />
             <TelemetryPanel />
           </div>
         )}
