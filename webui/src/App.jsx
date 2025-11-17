@@ -10,6 +10,7 @@ import LogPanel from './components/LogPanel.jsx';
 import AuthPanel from './components/AuthPanel.jsx';
 import DriverVideoPanel from './components/DriverVideoPanel.jsx';
 import RightPaneTabs from './components/RightPaneTabs.jsx';
+import SessionSnapshot from './components/SessionSnapshot.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -50,7 +51,7 @@ function DesktopLayout({ layout }) {
       </section>
       <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-1">
         <AdminPanel />
-        <LogPanel />
+        <SessionSnapshot />
       </section>
     </div>
   );
