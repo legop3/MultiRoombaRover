@@ -66,14 +66,29 @@ type MediaConfig struct {
 	VideoBitrate   int      `yaml:"videoBitrate" json:"-"`
 }
 
+type CameraServoConfig struct {
+	Enabled       bool    `yaml:"enabled"`
+	Pin           int     `yaml:"pin"`
+	FreqHz        int     `yaml:"freqHz"`
+	CycleLen      int     `yaml:"cycleLen"`
+	MinPulseUs    int     `yaml:"minPulseUs"`
+	MaxPulseUs    int     `yaml:"maxPulseUs"`
+	MinAngle      float64 `yaml:"minAngle"`
+	MaxAngle      float64 `yaml:"maxAngle"`
+	HomeAngle     float64 `yaml:"homeAngle"`
+	NudgeDegrees  float64 `yaml:"nudgeDegrees"`
+	AllowRawPulse bool    `yaml:"allowRawPulse"`
+}
+
 type Config struct {
-	Name        string        `yaml:"name"`
-	ServerURL   string        `yaml:"serverUrl"`
-	Serial      SerialConfig  `yaml:"serial"`
-	BRC         BRCConfig     `yaml:"brc"`
-	Battery     BatteryConfig `yaml:"battery"`
-	MaxWheelMMs int           `yaml:"maxWheelSpeed"`
-	Media       MediaConfig   `yaml:"media"`
+	Name        string            `yaml:"name"`
+	ServerURL   string            `yaml:"serverUrl"`
+	Serial      SerialConfig      `yaml:"serial"`
+	BRC         BRCConfig         `yaml:"brc"`
+	Battery     BatteryConfig     `yaml:"battery"`
+	MaxWheelMMs int               `yaml:"maxWheelSpeed"`
+	Media       MediaConfig       `yaml:"media"`
+	CameraServo CameraServoConfig `yaml:"cameraServo"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -100,6 +115,17 @@ func LoadConfig(path string) (*Config, error) {
 			VideoHeight:    720,
 			VideoFPS:       30,
 			VideoBitrate:   3000000,
+		},
+		CameraServo: CameraServoConfig{
+			Pin:          19,
+			FreqHz:       50,
+			CycleLen:     20000,
+			MinPulseUs:   900,
+			MaxPulseUs:   2100,
+			MinAngle:     -15,
+			MaxAngle:     30,
+			HomeAngle:    0,
+			NudgeDegrees: 2,
 		},
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -151,7 +177,46 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		cfg.Media.PublishURL = derived
 	}
+	if err := validateServoConfig(&cfg.CameraServo); err != nil {
+		return nil, fmt.Errorf("cameraServo: %w", err)
+	}
 	return &cfg, nil
+}
+
+func validateServoConfig(cfg *CameraServoConfig) error {
+	if !cfg.Enabled {
+		return nil
+	}
+	if cfg.Pin <= 0 {
+		return errors.New("pin must be > 0")
+	}
+	if cfg.FreqHz <= 0 {
+		return errors.New("freqHz must be > 0")
+	}
+	if cfg.CycleLen <= 0 {
+		return errors.New("cycleLen must be > 0")
+	}
+	if cfg.MinPulseUs <= 0 || cfg.MaxPulseUs <= 0 || cfg.MinPulseUs >= cfg.MaxPulseUs {
+		return errors.New("minPulseUs/maxPulseUs invalid")
+	}
+	if cfg.MinAngle >= cfg.MaxAngle {
+		return errors.New("minAngle must be less than maxAngle")
+	}
+	cfg.HomeAngle = clampFloat(cfg.HomeAngle, cfg.MinAngle, cfg.MaxAngle)
+	if cfg.NudgeDegrees <= 0 {
+		cfg.NudgeDegrees = 2
+	}
+	return nil
+}
+
+func clampFloat(value, min, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 func derivePublishURL(serverURL, roverName string, port int) (string, error) {

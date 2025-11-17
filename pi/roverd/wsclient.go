@@ -17,16 +17,18 @@ type WSClient struct {
 	sensorFrames <-chan []byte
 	events       <-chan RoverEvent
 	media        *MediaSupervisor
+	servo        *CameraServo
 	log          *log.Logger
 }
 
-func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events <-chan RoverEvent, media *MediaSupervisor, logger *log.Logger) *WSClient {
+func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events <-chan RoverEvent, media *MediaSupervisor, servo *CameraServo, logger *log.Logger) *WSClient {
 	return &WSClient{
 		cfg:          cfg,
 		adapter:      adapter,
 		sensorFrames: frames,
 		events:       events,
 		media:        media,
+		servo:        servo,
 		log:          logger,
 	}
 }
@@ -141,8 +143,26 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 			return fmt.Errorf("media supervisor disabled")
 		}
 		return c.media.HandleAction(ctx, msg.Media.Action)
+	case msg.Servo != nil:
+		if c.servo == nil {
+			return fmt.Errorf("camera servo disabled")
+		}
+		return c.handleServoCommand(msg.Servo)
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
+	}
+}
+
+func (c *WSClient) handleServoCommand(payload *servoPayload) error {
+	switch {
+	case payload.Angle != nil:
+		return c.servo.SetAngle(*payload.Angle)
+	case payload.Nudge != nil:
+		return c.servo.Nudge(*payload.Nudge)
+	case payload.PulseUs != nil:
+		return c.servo.SetPulseWidth(*payload.PulseUs)
+	default:
+		return fmt.Errorf("servo command requires angle, nudge, or pulseUs")
 	}
 }
 

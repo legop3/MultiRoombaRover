@@ -22,6 +22,7 @@ type inboundMessage struct {
 	Raw          string               `json:"raw,omitempty"`
 	SensorStream *sensorStreamPayload `json:"sensorStream,omitempty"`
 	Media        *mediaCommand        `json:"media,omitempty"`
+	Servo        *servoPayload        `json:"servo,omitempty"`
 }
 
 type driveDirectPayload struct {
@@ -41,6 +42,12 @@ type sensorStreamPayload struct {
 
 type mediaCommand struct {
 	Action string `json:"action"`
+}
+
+type servoPayload struct {
+	Angle   *float64 `json:"angle,omitempty"`
+	Nudge   *float64 `json:"nudge,omitempty"`
+	PulseUs *int     `json:"pulseUs,omitempty"`
 }
 
 type ackMessage struct {

@@ -8,8 +8,6 @@ Type=simple
 ExecStart=/usr/local/bin/roverd -config /etc/roverd.yaml
 Restart=on-failure
 RestartSec=5
-User=roverd
-Group=roverd
 AmbientCapabilities=CAP_SYS_TTY_CONFIG CAP_SYS_RAWIO
 
 [Install]

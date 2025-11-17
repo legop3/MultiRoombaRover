@@ -60,10 +60,19 @@ func main() {
 		mediaSupervisor.Start(ctx)
 	}
 
+	var cameraServo *roverd.CameraServo
+	if cfg.CameraServo.Enabled {
+		cameraServo, err = roverd.NewCameraServo(cfg.CameraServo, logger)
+		if err != nil {
+			logger.Fatalf("init camera servo: %v", err)
+		}
+		defer cameraServo.Close()
+	}
+
 	autoCharge := roverd.NewAutoChargeController(adapter, eventStream, logger)
 	go autoCharge.Run(ctx, sensorSamples)
 
-	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, logger)
+	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, logger)
 
 	retryDelay := time.Second
 	for ctx.Err() == nil {

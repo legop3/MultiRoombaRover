@@ -25,3 +25,15 @@ media:
   service: video-publisher.service
   healthUrl: ""
   healthInterval: 30s
+cameraServo:
+  enabled: false
+  pin: 19
+  freqHz: 50
+  cycleLen: 20000
+  minPulseUs: 900
+  maxPulseUs: 2100
+  minAngle: -15
+  maxAngle: 30
+  homeAngle: 0
+  nudgeDegrees: 2
+  allowRawPulse: false
