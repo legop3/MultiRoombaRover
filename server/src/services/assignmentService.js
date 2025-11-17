@@ -1,3 +1,4 @@
+const EventEmitter = require('events');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('assignment');
 const { MODES, getMode, modeEvents } = require('./modeManager');
@@ -7,6 +8,7 @@ const roverManager = require('./roverManager');
 const socketRefs = new Map(); // socketId -> socket
 const assignments = new Map(); // socketId -> roverId
 const waiting = new Set(); // socketIds waiting for placement
+const assignmentEvents = new EventEmitter();
 
 io.on('connection', (socket) => {
   socketRefs.set(socket.id, socket);
@@ -64,6 +66,7 @@ function assignSocket(socket) {
   if (!target) {
     waiting.add(socket.id);
     logger.info('No rover available, user waiting', socket.id);
+    assignmentEvents.emit('update', socket.id);
     return;
   }
   try {
@@ -71,9 +74,11 @@ function assignSocket(socket) {
     assignments.set(socket.id, target.id);
     waiting.delete(socket.id);
     logger.info('Assigned user to rover', socket.id, target.id);
+    assignmentEvents.emit('update', socket.id);
   } catch (err) {
     logger.warn('Failed to assign user', err.message);
     waiting.add(socket.id);
+    assignmentEvents.emit('update', socket.id);
   }
 }
 
@@ -84,6 +89,8 @@ function unassignSocket(socket) {
   if (roverId) {
     roverManager.releaseControl(roverId, socket);
     assignments.delete(socket.id);
+    logger.info('Unassigned socket from rover', socket.id, roverId);
+    assignmentEvents.emit('update', socket.id);
   }
 }
 
@@ -98,6 +105,7 @@ function reassignFromRover(roverId) {
     roverManager.releaseControl(rid, socket);
     assignments.delete(socketId);
     assignSocket(socket);
+    assignmentEvents.emit('update', socketId);
   }
 }
 
@@ -109,6 +117,7 @@ function reassignWaiting() {
     } else {
       waiting.delete(socketId);
     }
+    assignmentEvents.emit('update', socketId);
   }
 }
 
@@ -116,6 +125,8 @@ function releaseAssignment(socket, roverId) {
   roverManager.releaseControl(roverId, socket);
   assignments.delete(socket.id);
   waiting.add(socket.id);
+  logger.info('Released assignment back to queue', socket.id, roverId);
+  assignmentEvents.emit('update', socket.id);
 }
 
 function pickRover() {
@@ -133,3 +144,21 @@ function pickRover() {
   candidates.sort((a, b) => a.drivers.size - b.drivers.size);
   return candidates[0];
 }
+
+function describeAssignment(socketId) {
+  const assignedRoverId = assignments.get(socketId) || null;
+  const adminRoverId = assignedRoverId ? null : roverManager.getPrimaryRoverForSocket(socketId);
+  const waitingIndex = waiting.has(socketId) ? Array.from(waiting).indexOf(socketId) : -1;
+  const roverId = assignedRoverId || adminRoverId || null;
+  const waitingStatus = waiting.has(socketId);
+  return {
+    roverId,
+    status: assignedRoverId ? 'assigned' : adminRoverId ? 'admin' : waitingStatus ? 'waiting' : null,
+    queuePosition: waitingIndex >= 0 ? waitingIndex + 1 : null,
+  };
+}
+
+module.exports = {
+  assignmentEvents,
+  describeAssignment,
+};

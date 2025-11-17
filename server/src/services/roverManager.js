@@ -115,6 +115,7 @@ function removeSocket(socket) {
       record.drivers.delete(socket.id);
     }
     turnService.driverRemoved(roverId, socket.id);
+    managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'remove' });
   }
   socketToRovers.delete(socket.id);
   disableSpectator(socket);
@@ -147,6 +148,7 @@ function requestControl(roverId, socket, options = {}) {
   socket.join(record.room);
   turnService.driverAdded(roverId, socket.id, force && isAdmin(socket));
   socket.emit('controlGranted', { roverId });
+  managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'add' });
   sendAlert({
     color: COLORS.success,
     title: 'Control Granted',
@@ -168,6 +170,7 @@ function releaseControl(roverId, socket) {
   }
   socket.leave(record.room);
   turnService.driverRemoved(roverId, socket.id);
+  managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'remove' });
 }
 
 function isDriver(roverId, socket) {
@@ -178,6 +181,24 @@ function isDriver(roverId, socket) {
 
 function canDrive(roverId, socket) {
   return turnService.canDrive(roverId, socket) || isAdmin(socket);
+}
+
+function getRoversForSocket(socketId) {
+  const joined = socketToRovers.get(socketId);
+  if (!joined || joined.size === 0) {
+    return [];
+  }
+  return Array.from(joined);
+}
+
+function getPrimaryRoverForSocket(socketId) {
+  const joined = socketToRovers.get(socketId);
+  if (!joined || joined.size === 0) {
+    return null;
+  }
+  const iterator = joined.values();
+  const first = iterator.next();
+  return first.done ? null : first.value;
 }
 
 module.exports = {
@@ -196,6 +217,8 @@ module.exports = {
   disableSpectator,
   rovers,
   managerEvents,
+  getRoversForSocket,
+  getPrimaryRoverForSocket,
 };
 
 roleEvents.on('change', ({ socket, role }) => {
@@ -212,43 +235,72 @@ io.on('connection', (socket) => {
     enableSpectator(socket);
   }
 
-  socket.on('requestControl', ({ roverId, force } = {}) => {
+  function handleRequestControl({ roverId, force } = {}, cb = () => {}) {
     try {
       const targetId = roverId || Array.from(rovers.keys())[0];
       if (!targetId) {
         throw new Error('No rovers available');
       }
+      logger.info('Request control', socket.id, targetId, { force });
       requestControl(targetId, socket, { force: Boolean(force) });
       socket.emit('controlGranted', { roverId: targetId });
+      cb({ success: true, roverId: targetId });
     } catch (err) {
+      logger.warn('Request control failed', socket.id, err.message);
       sendAlert({ color: COLORS.warn, title: 'Control denied', message: err.message });
+      cb({ error: err.message });
     }
-  });
+  }
 
-  socket.on('releaseControl', ({ roverId }) => {
-    if (!roverId) return;
-    releaseControl(roverId, socket);
-  });
-
-  socket.on('lockRover', ({ roverId, locked }) => {
-    if (!isAdmin(socket)) return;
-    try {
-      lockRover(roverId, locked);
-    } catch (err) {
-      sendAlert({ color: COLORS.error, title: 'Lock failed', message: err.message });
-    }
-  });
-
-  socket.on('subscribeAll', () => {
-    if (socket.data?.role !== 'spectator') {
+  function handleReleaseControl({ roverId } = {}, cb = () => {}) {
+    if (!roverId) {
+      cb({ error: 'roverId required' });
       return;
     }
+    logger.info('Release control', socket.id, roverId);
+    releaseControl(roverId, socket);
+    cb({ success: true, roverId });
+  }
+
+  function handleLockToggle({ roverId, locked } = {}, cb = () => {}) {
+    if (!isAdmin(socket)) {
+      cb({ error: 'Not authorized' });
+      return;
+    }
+    try {
+      lockRover(roverId, locked);
+      logger.info('Lock state changed', roverId, locked);
+      cb({ success: true });
+    } catch (err) {
+      logger.warn('Lock change failed', roverId, err.message);
+      sendAlert({ color: COLORS.error, title: 'Lock failed', message: err.message });
+      cb({ error: err.message });
+    }
+  }
+
+  function handleSubscribeAll(_, cb = () => {}) {
+    if (socket.data?.role !== 'spectator') {
+      cb({ error: 'Spectator role required' });
+      return;
+    }
+    logger.info('Spectator subscribing to all rovers', socket.id);
     for (const record of rovers.values()) {
       socket.join(record.room);
     }
-  });
+    cb({ success: true });
+  }
+
+  socket.on('requestControl', handleRequestControl);
+  socket.on('session:requestControl', handleRequestControl);
+  socket.on('releaseControl', handleReleaseControl);
+  socket.on('session:releaseControl', handleReleaseControl);
+  socket.on('lockRover', handleLockToggle);
+  socket.on('session:lockRover', handleLockToggle);
+  socket.on('subscribeAll', handleSubscribeAll);
+  socket.on('session:subscribeAll', handleSubscribeAll);
 
   socket.on('disconnect', () => {
+    logger.info('Socket disconnected', socket.id);
     removeSocket(socket);
   });
 });

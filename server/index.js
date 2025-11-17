@@ -17,4 +17,6 @@ require('./src/services/assignmentService');
 require('./src/services/videoSessions');
 require('./src/services/videoAuthService');
 require('./src/services/videoSocketService');
+require('./src/services/logStreamService');
+require('./src/services/sessionService');
 require('./src/services/httpServer');

@@ -15,6 +15,7 @@ function sendAlert({ color, title, message, ts = Date.now() }) {
     ts,
   };
   io.emit('alert', payload);
+  io.emit('alert:new', { id: `${ts}-${Math.random().toString(36).slice(2)}`, ...payload });
 }
 
 module.exports = {

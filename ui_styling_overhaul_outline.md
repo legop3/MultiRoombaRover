@@ -1,0 +1,67 @@
+# general idea:
+- very compact UI
+- utilitarian
+  - function before pretty
+  - tiny text, too.
+- no large margins or padding. very little wasted space
+  - up to 1 tailwind unit unless otherwise needed
+- black background, gray cards, white or gray text
+- tailwind
+- no title or bar at the top, vertical screen space is precious on all layouts
+- alerts should be moved to a tiny toast popup that will show at the top center of the screen
+
+# three different layouts for the driver page
+- desktop
+  - rover video central, no title or anything above it
+  - overlayed on rover video (HUD like in a video game)
+    - build the HUD into the video tile
+      - because everywhere the video is, the HUD should be too
+    - shows a dot that blinks on each sensor frame
+    - shows wheel drops and bumpers
+    - shows a big "loud" warning overlay during an overcurrent
+    - simple, easy to understand battery bar UNDERNEATH the video:
+      - takes in battery full, warn, and urgent values
+      - treat full as 100% and warn as 0%
+      - make the bar flash red when its 0% or lower
+  - on left side of rover video:
+    - sensor data, visualized.
+      - battery charge out of capacity (1763/2068)
+      - charging status
+      - OI mode
+      - battery voltage (in volts not mv)
+      - battery current
+      - a teeny show of the raw data (because we get it on the client and it looks cool)
+  - on right side of rover video
+    - a simple, easy control panel with the following actions:
+      - a button that runs the start OI, dock, then full commands (in that order)
+        - also contains a little status of whether or not the rover is in "driving mode" (OI in full mode)
+      - a button that tells the rover to seek dock
+        - explains that you should be straight in front of, and about a foot from the dock for a successful attempt
+        - contains two status indicators:
+          - docked / not docked (homebase true)
+          - charging / not charging (when chargingstate isn't "not charging" the rover is charging)
+  - below the upper control and video row
+    - center:
+      - a place for the room camera (not implemented yet)
+    - left:
+      - admin login and controls
+    - right:
+      - logs
+- mobile in portrait mode
+  - rover video at the top, with HUD
+  - just below:
+    - joystick with buttons for aux. motor controls
+      - have a button to run all aux motors forward at max speed
+      - also have buttons to run motors forward / backward individually
+      - probably use some premade react joystick
+  - scroll down more to see:
+    - the same simple mode control buttons from the desktop layout
+    - also needs to have the admin login and controls
+    - needs to have all the functionality as the desktop page
+- mobile in landscape mode
+  - made for videogame-like control of the rover
+  - control buttons and aux motors on the left
+  - rover video in the middle
+  - joystick on the right
+  - again, scroll down to see more
+  - also has to do everything

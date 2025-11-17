@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const io = require('../globals/io');
 const roverManager = require('./roverManager');
+const logger = require('../globals/logger').child('commandService');
 
 const pendingCommands = new Map(); // id -> { roverId }
 
@@ -13,6 +14,7 @@ function issueCommand(roverId, payload) {
   const message = { ...payload, id };
   record.ws.send(JSON.stringify(message));
   pendingCommands.set(id, { roverId, ts: Date.now(), type: payload.type });
+  logger.info('Issued command', roverId, payload.type, id);
   return id;
 }
 
@@ -20,6 +22,7 @@ function handleAck(msg) {
   const pending = pendingCommands.get(msg.id);
   if (!pending) return;
   pendingCommands.delete(msg.id);
+  logger.info('Command acknowledged', pending.roverId, pending.type, msg.status);
   io.emit('commandAck', {
     roverId: pending.roverId,
     id: msg.id,
@@ -34,7 +37,8 @@ module.exports = {
 };
 
 io.on('connection', (socket) => {
-  socket.on('command', ({ roverId, type, data } = {}, cb = () => {}) => {
+  function handleCommand({ roverId, type, data } = {}, cb) {
+    const reply = typeof cb === 'function' ? cb : () => {};
     try {
       if (!roverId) {
         throw new Error('roverId required');
@@ -44,9 +48,14 @@ io.on('connection', (socket) => {
       }
       const payload = data ? { ...data } : {};
       const id = issueCommand(roverId, { type, ...payload });
-      cb({ id });
+      logger.info('Queued command', socket.id, roverId, type);
+      reply({ id });
     } catch (err) {
-      cb({ error: err.message });
+      logger.warn('Command rejected', socket.id, err.message);
+      reply({ error: err.message });
     }
-  });
+  }
+
+  socket.on('command', handleCommand);
+  socket.on('command:issue', handleCommand);
 });

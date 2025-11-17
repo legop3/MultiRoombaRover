@@ -1,3 +1,4 @@
+const EventEmitter = require('events');
 const io = require('../globals/io');
 const { sendAlert, COLORS } = require('./alertService');
 const { MODES, getMode, modeEvents } = require('./modeManager');
@@ -5,6 +6,7 @@ const { MODES, getMode, modeEvents } = require('./modeManager');
 const driverQueues = new Map(); // roverId -> { queue: [], current: socketId, timer: Timeout | null }
 const activeDrivers = new Map();
 const TURN_DURATION_MS = 60 * 1000;
+const turnEvents = new EventEmitter();
 
 function driverAdded(roverId, socketId, force) {
   const queue = ensureQueue(roverId);
@@ -104,7 +106,15 @@ function setActiveDriver(roverId, socketId) {
   } else {
     activeDrivers.set(roverId, socketId);
   }
-  io.emit('activeDriver', { roverId, socketId });
+  turnEvents.emit('activeDriver', { roverId, socketId });
+}
+
+function getActiveDrivers() {
+  const map = {};
+  activeDrivers.forEach((socketId, roverId) => {
+    map[roverId] = socketId;
+  });
+  return map;
 }
 
 function stopRover(roverId) {
@@ -126,4 +136,6 @@ module.exports = {
   driverRemoved,
   cleanupRover,
   canDrive,
+  getActiveDrivers,
+  turnEvents,
 };
