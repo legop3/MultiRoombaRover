@@ -20,6 +20,14 @@ export default function TelemetryPanel() {
   // const rawSnippet = frame?.raw ? (frame.raw.length > 80 ? `${frame.raw.slice(0, 80)}…` : frame.raw) : null;
   const rawSnippet = frame?.raw ? frame.raw : null;
   const roster = session?.roster ?? [];
+  const activeDriverId = roverId ? session?.activeDrivers?.[roverId] : null;
+  const driverLabel = !roverId
+    ? 'n/a'
+    : activeDriverId
+    ? activeDriverId === session?.socketId
+      ? 'You'
+      : activeDriverId.slice(0, 6)
+    : 'Available';
   const isAdmin = useMemo(
     () => session?.role === 'admin' || session?.role === 'lockdown' || session?.role === 'lockdown-admin',
     [session?.role],
@@ -45,6 +53,7 @@ export default function TelemetryPanel() {
         <span> · role {session?.role || 'unknown'}</span>
         <span> · mode {session?.mode || '--'}</span>
         {updated && <span> · sensors {updated}</span>}
+        <span> · driver {driverLabel}</span>
       </div>
       {!roverId ? (
         <p className="mt-1 text-[0.75rem] text-slate-400">Assign a rover to view sensors.</p>
@@ -52,23 +61,21 @@ export default function TelemetryPanel() {
         <p className="mt-1 text-[0.75rem] text-slate-400">Waiting for sensor frames…</p>
       ) : (
         <>
-
-          <div className="flex gap-0.5 flex-wrap">
+          <div className="flex flex-wrap gap-0.5">
             <Metric label="Charge" value={formatMetric(charge != null && capacity != null ? `${charge}/${capacity}` : null)} />
             <Metric label="Charging" value={formatMetric(sensors.chargingState?.label)} />
             <Metric label="OI mode" value={formatMetric(sensors.oiMode?.label)} />
             <Metric label="Voltage" value={formatMetric(voltage)} />
             <Metric label="Current" value={formatMetric(current)} />
-            <Metric label="Left Encoder" value={formatMetric(sensors.encoderCountsLeft)}/>
-            <Metric label="Right Encoder" value={formatMetric(sensors.encoderCountsRight)}/>
+            <Metric label="Left Encoder" value={formatMetric(sensors.encoderCountsLeft)} />
+            <Metric label="Right Encoder" value={formatMetric(sensors.encoderCountsRight)} />
           </div>
-          <div className="flex gap-0.5 mt-1">
+          <div className="mt-1 flex gap-0.5">
             <CliffBar value={sensors.cliffLeftSignal} />
             <CliffBar value={sensors.cliffFrontLeftSignal} />
             <CliffBar value={sensors.cliffFrontRightSignal} />
             <CliffBar value={sensors.cliffRightSignal} />
           </div>
-
         </>
 
       )}
@@ -131,10 +138,6 @@ function CliffBar({ value }) {
 
 function Metric({ label, value }) {
   return (
-    // <div className="flex items-center justify-between">
-    //   <span className="text-slate-400">{label}</span>
-    //   <span className="text-slate-200">{value}</span>
-    // </div>
     <div className="bg-gray-700 rounded-sm p-0.5 text-sm">
       {label}: {value}
     </div>

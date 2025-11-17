@@ -5,13 +5,16 @@ const { getMode, modeEvents } = require('./modeManager');
 const roverManager = require('./roverManager');
 const { managerEvents } = roverManager;
 const assignmentService = require('./assignmentService');
+const { getActiveDrivers, turnEvents } = require('./turnService');
 
 function buildSession(socket) {
   return {
+    socketId: socket?.id || null,
     role: getRole(socket),
     mode: getMode(),
     roster: roverManager.getRoster(),
     assignment: assignmentService.describeAssignment(socket?.id || ''),
+    activeDrivers: getActiveDrivers(),
   };
 }
 
@@ -58,6 +61,11 @@ managerEvents.on('rover', () => {
 
 managerEvents.on('lock', ({ roverId, locked }) => {
   logger.info('Rover lock change', roverId, locked);
+  syncAll();
+});
+
+turnEvents.on('activeDriver', () => {
+  logger.info('Active driver change; syncing all clients');
   syncAll();
 });
 
