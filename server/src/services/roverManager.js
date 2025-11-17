@@ -30,6 +30,11 @@ function ensureRecord(id) {
 
 function upsertRover(meta, ws) {
   const id = meta.name || meta.id;
+  if (!meta.cameraServo) {
+    logger.info('Rover hello missing camera servo block', { id, keys: Object.keys(meta || {}) });
+  } else {
+    logger.info('Rover hello camera servo', { id, servo: meta.cameraServo });
+  }
   const record = ensureRecord(id);
   record.meta = meta;
   record.ws = ws;
