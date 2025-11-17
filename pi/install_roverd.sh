@@ -94,6 +94,38 @@ install_video_deps() {
 	apt-get install -y --no-install-recommends libcamera-apps ffmpeg
 }
 
+find_boot_config() {
+	if [[ -f /boot/firmware/config.txt ]]; then
+		printf "/boot/firmware/config.txt"
+		return 0
+	fi
+	if [[ -f /boot/config.txt ]]; then
+		printf "/boot/config.txt"
+		return 0
+	fi
+	return 1
+}
+
+ensure_pwm_overlay() {
+	local boot_config
+	if ! boot_config="$(find_boot_config)"; then
+		log "WARNING: unable to locate /boot config.txt; please ensure dtoverlay=pwm-2chan is added manually for servo support"
+		return
+	fi
+	if grep -Eq '^\s*dtoverlay=pwm(-2chan)?\b' "$boot_config"; then
+		log "PWM overlay already present in $boot_config"
+		return
+	fi
+	local backup="${boot_config}.roverd.$(date +%Y%m%d%H%M%S).bak"
+	cp "$boot_config" "$backup"
+	{
+		echo ""
+		echo "# Added by roverd installer to expose PWM hardware for camera servo control"
+		echo "dtoverlay=pwm-2chan"
+	} >> "$boot_config"
+	log "Enabled dtoverlay=pwm-2chan in $boot_config (backup at $backup). Reboot required for changes to apply."
+}
+
 ensure_user roverd "dialout,gpio,video,render"
 install -o roverd -g roverd -m 0755 "$BINARY_SRC" /usr/local/bin/roverd
 log "Installed roverd binary"
@@ -112,6 +144,7 @@ install -m 0644 pi/systemd/roverd.service /etc/systemd/system/roverd.service
 log "Installed roverd systemd unit"
 
 install_video_deps
+ensure_pwm_overlay
 
 # Install video publisher assets
 install -D -o root -g root -m 0755 pi/bin/video-publisher.sh /usr/local/bin/video-publisher
