@@ -8,7 +8,7 @@ export default function LogPanel() {
         <span>Server logs</span>
         <span>{logs.length}</span>
       </div>
-      <div className="mt-1 h-48 overflow-y-auto rounded-sm bg-black/40 p-1 font-mono text-xs">
+      <div className="mt-1 h-64 overflow-y-auto rounded-sm bg-black/40 p-1 font-mono text-xs">
         {logs.length === 0 ? (
           <p>No logs yet.</p>
         ) : (
