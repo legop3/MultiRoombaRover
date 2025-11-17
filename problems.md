@@ -9,5 +9,5 @@
   - says "safe" when in passive, and "unknown" when in full.
 
 ## react UI and auth
-- after logging in as an admin and selecting a rover, the UI is still greyed out anc blocked. No video shows
+- after logging in as an admin and selecting a rover, the UI is still greyed out and blocked. No video shows
 
