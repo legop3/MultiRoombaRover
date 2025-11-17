@@ -50,7 +50,8 @@ function DesktopLayout({ layout }) {
         <RightPaneTabs layout={layout} />
       </section>
       <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-1">
-        <AdminPanel />
+        {/* <AdminPanel /> */}
+        <LogPanel />
         <SessionSnapshot />
       </section>
     </div>
