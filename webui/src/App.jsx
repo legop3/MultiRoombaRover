@@ -10,6 +10,7 @@ import LogPanel from './components/LogPanel.jsx';
 import AuthPanel from './components/AuthPanel.jsx';
 import DriverVideoPanel from './components/DriverVideoPanel.jsx';
 import RightPaneTabs from './components/RightPaneTabs.jsx';
+import ModeGateOverlay from './components/ModeGateOverlay.jsx';
 import SessionSnapshot from './components/SessionSnapshot.jsx';
 
 function useLayoutMode() {
@@ -115,6 +116,7 @@ function App() {
       <DriveControlProvider>
         <main className="flex w-full flex-col gap-1 px-1 py-1 text-base">{renderedLayout}</main>
         <AlertFeed />
+        <ModeGateOverlay />
       </DriveControlProvider>
     </div>
   );

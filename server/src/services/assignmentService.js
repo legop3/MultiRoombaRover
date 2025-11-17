@@ -146,11 +146,14 @@ function pickRover() {
 }
 
 function describeAssignment(socketId) {
-  const roverId = assignments.get(socketId) || null;
+  const assignedRoverId = assignments.get(socketId) || null;
+  const adminRoverId = assignedRoverId ? null : roverManager.getPrimaryRoverForSocket(socketId);
   const waitingIndex = waiting.has(socketId) ? Array.from(waiting).indexOf(socketId) : -1;
+  const roverId = assignedRoverId || adminRoverId || null;
+  const waitingStatus = waiting.has(socketId);
   return {
     roverId,
-    status: roverId ? 'assigned' : waiting.has(socketId) ? 'waiting' : null,
+    status: assignedRoverId ? 'assigned' : adminRoverId ? 'admin' : waitingStatus ? 'waiting' : null,
     queuePosition: waitingIndex >= 0 ? waitingIndex + 1 : null,
   };
 }

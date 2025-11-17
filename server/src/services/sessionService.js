@@ -64,6 +64,15 @@ managerEvents.on('lock', ({ roverId, locked }) => {
   syncAll();
 });
 
+managerEvents.on('driver', ({ socketId }) => {
+  if (!socketId) return;
+  const socket = io.sockets.sockets.get(socketId);
+  if (socket) {
+    logger.info('Driver assignment change; syncing session', socketId);
+    syncSocket(socket);
+  }
+});
+
 turnEvents.on('activeDriver', () => {
   logger.info('Active driver change; syncing all clients');
   syncAll();

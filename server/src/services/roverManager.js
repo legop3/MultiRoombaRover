@@ -115,6 +115,7 @@ function removeSocket(socket) {
       record.drivers.delete(socket.id);
     }
     turnService.driverRemoved(roverId, socket.id);
+    managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'remove' });
   }
   socketToRovers.delete(socket.id);
   disableSpectator(socket);
@@ -147,6 +148,7 @@ function requestControl(roverId, socket, options = {}) {
   socket.join(record.room);
   turnService.driverAdded(roverId, socket.id, force && isAdmin(socket));
   socket.emit('controlGranted', { roverId });
+  managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'add' });
   sendAlert({
     color: COLORS.success,
     title: 'Control Granted',
@@ -168,6 +170,7 @@ function releaseControl(roverId, socket) {
   }
   socket.leave(record.room);
   turnService.driverRemoved(roverId, socket.id);
+  managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'remove' });
 }
 
 function isDriver(roverId, socket) {
@@ -178,6 +181,24 @@ function isDriver(roverId, socket) {
 
 function canDrive(roverId, socket) {
   return turnService.canDrive(roverId, socket) || isAdmin(socket);
+}
+
+function getRoversForSocket(socketId) {
+  const joined = socketToRovers.get(socketId);
+  if (!joined || joined.size === 0) {
+    return [];
+  }
+  return Array.from(joined);
+}
+
+function getPrimaryRoverForSocket(socketId) {
+  const joined = socketToRovers.get(socketId);
+  if (!joined || joined.size === 0) {
+    return null;
+  }
+  const iterator = joined.values();
+  const first = iterator.next();
+  return first.done ? null : first.value;
 }
 
 module.exports = {
@@ -196,6 +217,8 @@ module.exports = {
   disableSpectator,
   rovers,
   managerEvents,
+  getRoversForSocket,
+  getPrimaryRoverForSocket,
 };
 
 roleEvents.on('change', ({ socket, role }) => {
