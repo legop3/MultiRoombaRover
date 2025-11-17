@@ -8,6 +8,10 @@
 - OI mode is not decoded properly
   - says "safe" when in passive, and "unknown" when in full.
 
-## react UI and auth
-- after logging in as an admin and selecting a rover, the UI is still greyed out and blocked. No video shows
+## UI and session info
+- UI needs a display for the turns mode
 
+## Mobile UI
+- need to make it good
+- joystick needs to be floating
+- aux motor buttons need redone
