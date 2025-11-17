@@ -1,0 +1,21 @@
+# Sample configuration for roverd
+name: roomba-alpha
+serverUrl: ws://control-server.local:8080/rover
+serial:
+  device: /dev/ttyAMA0
+  baud: 115200
+brc:
+  gpioPin: 17
+  gpioChip: gpiochip0
+  pulseEvery: 1m
+  pulseWidth: 1s
+battery:
+  full: 2068
+  warn: 1700
+  urgent: 1650
+maxWheelSpeed: 350
+media:
+  manage: false
+  service: mediamtx.service
+  healthUrl: http://127.0.0.1:9997/v3/paths/list
+  healthInterval: 30s

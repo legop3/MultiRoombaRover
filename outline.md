@@ -1,40 +1,38 @@
-## esp32 firmware
-- hooked up to the roomba's UART on pins 16 and 17
-- pin 5 is connected to the roomba's BRC pin
-  - pulse the BRC pin low for 1 second every minute to keep the roomba awake
-- connect to wifi
-- connect to the server
-- get a full frame of sensor group 100 from the roomba every 500ms
-  - send it to the server over the sensor UDP stream
-- listen to the server's control UDP stream (per roomba) and do the following accordingly:
-  - set wheel speeds
-  - seek dock
-  - enable OI
-  - safe mode
-  - full mode
-  - play song
-  - load song
+## multi roomba rover
 
-## esp32 -> server communication
-- one UDP stream to the esp32 for controlling the roomba
-  - might look like this:
-    - left wheel speed
-    - right wheel speed
-    - OI mode
-    - seek dock?
-  - blasts out at a constant rate from the server for each roomba
-  - the esp32 will listen, and follow the latest command that it sees
-- one UDP stream from the esp32 to the server for sending sensor data frames and other telemetry
-  - one full frame of sensor data per datagram
-  - send raw sensor data, the server will decode it
-  - add other telemetry from the esp32, like signal strength, etc. 
-  - maybe use this stream as a sign that the esp32 is still running healthily?
+a website where people can control multiple irobot create 2 robots in real time 100% responsively
+with a raspberry pi zero 2 W on each roomba, along with a raspberry pi camera
+a central nodejs control server will tell the raspberry pis what to do with the roomba
+
+## the pi side (roomba side)
+- pi's onboard UART is hooked up to the roomba's serial port
+- another GPIO pin connected to the roomba's BRC pin
+  - pull it low for one second every minute to keep the roomba awake
+- streams the rpi camera over webRTC with mediamtx
+- streams roomba sensor group 100 to the server
+  - sensor streaming is required and important, but is allowed to falter sometimes
+- listens for roomba commands from the server
+  - commands NEED to happen
+- roomba control program needs to be simple, lightweight, and 100% responsive
+
+## pi -> server communication
+- stateless
+- streaming based
+- on connection, the pi will send the following info:
+  - rover's name
+  - motor enable / disable
+    - vacuum
+    - main brush
+    - side brush
+  - battery full number
+  - battery warning number
+  - battery urgent number
 
 ## nodejs server
 - KISS
 - decode the sensor data from each roomba
 - can support multiple roombas connected from the ground up
-- keep it simple, worry about getting the esp32 firmware right.
+- keep it simple, worry about getting the pi comms right.
   - but the server DOES have to exist for testing
 - IS the web server, hosts an entire static folder for the web UI
 
@@ -58,10 +56,3 @@
 - everything modular
 - everything easy to read, understand, and work on
 - comment where you think is best to describe whats going on
-
-## closing notes
-- keep the user input path (web UI -> server -> roomba) as light and responsive as possible. responsiveness is key for this.
-- responsiveness is the name of the game. The future of this program is teleoperation over the internet, with a camera on each roomba. keyboard inputs from the user must be near instant.
-- on the esp32 firmware side of things, sensor data is second priority to having a responsive control system
-  - but sensor data DOES have to exist.
-- the future of this project will involve assigning one roomba to a user, make the server able to do that from the ground up.

@@ -1,0 +1,13 @@
+admins:
+  - username: admin
+    password_hash: "$2b$10$ZW4Jy7ctIt7k9V1AogFky.v4wedLF92t4/ZlT9kWPlIiCmdQNzJ.C" # password: adminpass
+    discord_id: "1234567890"
+    lockdown: false
+  - username: lockdown
+    password_hash: "$2b$10$n0L0oe1ZQy7IgM.FvVAzb.aXz43uaZWFiT0wr.05uNoVIDLawmrCG" # password: lockdownpass
+    discord_id: "0987654321"
+    lockdown: true
+media:
+  # Base address for mediaMTX (scheme + host + optional port). The UI will always request
+  #   http://<base>/<roverId>/whep
+  whepBaseUrl: "http://192.168.0.86:8889"

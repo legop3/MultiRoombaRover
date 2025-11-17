@@ -1,0 +1,30 @@
+import { useSession } from '../context/SessionContext.jsx';
+
+export default function LogPanel() {
+  const { logs } = useSession();
+  return (
+    <div className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
+      <div className="flex items-center justify-between text-sm text-slate-400">
+        <span>Server logs</span>
+        <span>{logs.length}</span>
+      </div>
+      <div className="mt-1 h-64 overflow-y-auto rounded-sm bg-black/40 p-1 font-mono text-xs">
+        {logs.length === 0 ? (
+          <p>No logs yet.</p>
+        ) : (
+          logs
+            .slice()
+            .reverse()
+            .map((entry) => (
+              <div key={entry.id} className="mb-1">
+                <span className="text-amber-400">{entry.timestamp}</span>{' '}
+                <span className="text-lime-400">[{entry.level}]</span>{' '}
+                {entry.label && <span className="text-teal-400">[{entry.label}]</span>}{' '}
+                <span>{entry.message}</span>
+              </div>
+            ))
+        )}
+      </div>
+    </div>
+  );
+}

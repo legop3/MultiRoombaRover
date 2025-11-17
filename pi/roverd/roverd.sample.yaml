@@ -1,0 +1,27 @@
+# Sample configuration for roverd
+name: roomba-alpha
+serverUrl: ws://control-server.local:8080/rover
+serial:
+  device: /dev/ttyAMA0
+  baud: 115200
+brc:
+  gpioPin: 17
+  gpioChip: gpiochip0
+  pulseEvery: 1m
+  pulseWidth: 1s
+battery:
+  full: 2068
+  warn: 1700
+  urgent: 1650
+maxWheelSpeed: 350
+media:
+  publishUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha,m=publish&latency=20&mode=caller&transtype=live&pkt_size=1316
+  publishPort: 9000
+  videoWidth: 1280
+  videoHeight: 720
+  videoFps: 30
+  videoBitrate: 3000000
+  manage: true
+  service: video-publisher.service
+  healthUrl: ""
+  healthInterval: 30s
