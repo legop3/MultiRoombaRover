@@ -81,6 +81,7 @@ function getRoster() {
     battery: record.meta?.battery,
     maxWheelSpeed: record.meta?.maxWheelSpeed,
     media: record.meta?.media,
+    cameraServo: record.meta?.cameraServo,
     locked: record.locked,
     lastSeen: record.lastSeen,
   }));

@@ -263,6 +263,12 @@ export function useDriveControls() {
   useEffect(() => {
     if (!servoConfig) {
       setServoAngle(null);
+      if (roverId) {
+        // eslint-disable-next-line no-console
+        console.debug('Camera servo unavailable for rover', roverId, {
+          rosterEntry: currentRosterEntry,
+        });
+      }
       return;
     }
     const min = typeof servoConfig.minAngle === 'number' ? servoConfig.minAngle : -45;
@@ -270,7 +276,7 @@ export function useDriveControls() {
     const initial =
       typeof servoConfig.homeAngle === 'number' ? servoConfig.homeAngle : (min + max) / 2;
     setServoAngle(clamp(initial, min, max));
-  }, [servoConfig, roverId]);
+  }, [currentRosterEntry, roverId, servoConfig]);
 
   useEffect(() => {
     if (!roverId) {
