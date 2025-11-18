@@ -80,23 +80,25 @@ function MobilePortraitLayout() {
 function MobileLandscapeLayout() {
   return (
     <div className="flex flex-col gap-1">
-      <section className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-1">
+      <section className="grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-1">
         <MobileLandscapeAuxColumn />
         <DriverVideoPanel />
         <MobileLandscapeControlColumn />
       </section>
-      <RoomCameraPanel />
-      <DrivePanel />
-      <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-1">
-        <div className="flex flex-col gap-1">
-          <AuthPanel />
-          <AdminPanel />
-        </div>
-        <div className="flex flex-col gap-1">
-          <LogPanel />
-          <TelemetryPanel />
-        </div>
-      </section>
+      <div className="flex flex-col gap-1 pb-2">
+        <RoomCameraPanel />
+        <DrivePanel />
+        <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-1">
+          <div className="flex flex-col gap-1">
+            <AuthPanel />
+            <AdminPanel />
+          </div>
+          <div className="flex flex-col gap-1">
+            <LogPanel />
+            <TelemetryPanel />
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

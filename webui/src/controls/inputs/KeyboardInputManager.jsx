@@ -4,6 +4,7 @@ import { useControlSystem } from '../ControlContext.jsx';
 const SOURCE = 'keyboard';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
 const ZERO_AUX = { main: 0, side: 0, vacuum: 0 };
+const SERVO_REPEAT_MS = 110;
 
 function shouldIgnoreEvent(event) {
   const target = event.target;
@@ -118,8 +119,19 @@ export default function KeyboardInputManager() {
   const pressedKeysRef = useRef(new Set());
   const lastVectorRef = useRef(ZERO_VECTOR);
   const lastAuxRef = useRef(ZERO_AUX);
+  const cameraHoldRef = useRef(new Set());
+  const servoIntervalRef = useRef(null);
 
-  const updateFromKeys = useCallback(() => {
+  const actionKeys = useMemo(() => {
+    const entries = Object.values(keymap);
+    const set = new Set();
+    entries.forEach((bindingSet) => {
+      bindingSet?.forEach((binding) => set.add(binding));
+    });
+    return set;
+  }, [keymap]);
+
+  const driveFromKeys = useCallback(() => {
     const keys = pressedKeysRef.current;
     const vector = computeDriveVector(keys, keymap);
     const aux = computeAuxMotors(keys, keymap);
@@ -138,46 +150,100 @@ export default function KeyboardInputManager() {
     });
   }, [keymap, registerInputState, setAuxMotors, setDriveVector]);
 
+  const stopServoLoop = useCallback(() => {
+    if (servoIntervalRef.current) {
+      clearTimeout(servoIntervalRef.current);
+      servoIntervalRef.current = null;
+    }
+  }, []);
+
+  const startServoLoop = useCallback(() => {
+    if (servoIntervalRef.current) return;
+    const tick = () => {
+      const up = cameraHoldRef.current.has('up') ? 1 : 0;
+      const down = cameraHoldRef.current.has('down') ? 1 : 0;
+      const direction = up - down;
+      if (direction === 0) {
+        servoIntervalRef.current = null;
+        return;
+      }
+      nudgeServo(direction * servoStep);
+      servoIntervalRef.current = setTimeout(tick, SERVO_REPEAT_MS);
+    };
+    servoIntervalRef.current = setTimeout(tick, 0);
+  }, [nudgeServo, servoStep]);
+
+  const updateServoHold = useCallback(() => {
+    if (cameraHoldRef.current.size === 0) {
+      stopServoLoop();
+    } else {
+      startServoLoop();
+    }
+  }, [startServoLoop, stopServoLoop]);
+
   const resetAll = useCallback(() => {
     pressedKeysRef.current.clear();
+    cameraHoldRef.current.clear();
+    stopServoLoop();
     lastVectorRef.current = ZERO_VECTOR;
     lastAuxRef.current = ZERO_AUX;
     stopAllMotion();
     registerInputState(SOURCE, { keys: [], vector: ZERO_VECTOR, aux: ZERO_AUX });
-  }, [registerInputState, stopAllMotion]);
+  }, [registerInputState, stopAllMotion, stopServoLoop]);
 
   useEffect(() => {
     function handleKeyDown(event) {
       if (shouldIgnoreEvent(event)) return;
       const key = event.key?.toLowerCase();
       if (!key) return;
-      if (pressedKeysRef.current.has(key)) return;
-      pressedKeysRef.current.add(key);
+      if (actionKeys.has(key)) {
+        event.preventDefault();
+      }
+      if (!pressedKeysRef.current.has(key)) {
+        pressedKeysRef.current.add(key);
+      }
 
       if (bindingHas(keymap.driveMacro, key)) {
-        event.preventDefault();
         setMode('drive');
         runMacro('drive-sequence');
       } else if (bindingHas(keymap.dockMacro, key)) {
-        event.preventDefault();
         setMode('dock');
         runMacro('seek-dock');
       } else if (bindingHas(keymap.cameraUp, key)) {
-        event.preventDefault();
-        nudgeServo(servoStep);
+        cameraHoldRef.current.add('up');
+        updateServoHold();
       } else if (bindingHas(keymap.cameraDown, key)) {
-        event.preventDefault();
-        nudgeServo(-servoStep);
+        cameraHoldRef.current.add('down');
+        updateServoHold();
       }
 
-      updateFromKeys();
+      driveFromKeys();
     }
 
     function handleKeyUp(event) {
       const key = event.key?.toLowerCase();
-      if (!key || !pressedKeysRef.current.has(key)) return;
+      if (!key || !pressedKeysRef.current.has(key)) {
+        if (bindingHas(keymap.cameraUp, key)) {
+          cameraHoldRef.current.delete('up');
+          updateServoHold();
+        } else if (bindingHas(keymap.cameraDown, key)) {
+          cameraHoldRef.current.delete('down');
+          updateServoHold();
+        }
+        return;
+      }
+
       pressedKeysRef.current.delete(key);
-      updateFromKeys();
+
+      if (bindingHas(keymap.cameraUp, key)) {
+        cameraHoldRef.current.delete('up');
+        updateServoHold();
+      } else if (bindingHas(keymap.cameraDown, key)) {
+        cameraHoldRef.current.delete('down');
+        updateServoHold();
+      }
+
+      driveFromKeys();
     }
 
     function handleBlur() {
@@ -192,11 +258,18 @@ export default function KeyboardInputManager() {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [keymap, nudgeServo, resetAll, runMacro, servoStep, setMode, updateFromKeys]);
+  }, [actionKeys, driveFromKeys, keymap, resetAll, runMacro, setMode, updateServoHold]);
 
   useEffect(() => {
     resetAll();
   }, [state.roverId, resetAll]);
+
+  useEffect(
+    () => () => {
+      stopServoLoop();
+    },
+    [stopServoLoop],
+  );
 
   return null;
 }
