@@ -9,10 +9,10 @@ const CHARGING_STATE = {
 };
 
 const OI_MODES = {
-  0: 'off',
-  1: 'passive',
-  2: 'safe',
-  3: 'full',
+  1: 'off',
+  2: 'passive',
+  3: 'safe',
+  4: 'full',
 };
 
 const GROUP100_LAYOUT = [
