@@ -31,7 +31,7 @@ export default function AdvancedSettings() {
     if (!roverId) return;
     setSensorStream(enable);
   };
-
+// why is this broken
   return (
     <div className="space-y-1">
       <KeymapSettings />

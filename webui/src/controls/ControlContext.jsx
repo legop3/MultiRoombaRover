@@ -98,6 +98,23 @@ export function ControlSystemProvider({ children }) {
     [pipeline],
   );
 
+  const persistSettings = useCallback(
+    (partial) => {
+      const merged = { ...(state.settings.data ?? {}), ...(partial ?? {}) };
+      const success = saveControlSettings(merged);
+      if (success) {
+        dispatch({ type: 'control/settings/loaded', payload: merged });
+      } else {
+        dispatch({
+          type: 'control/settings/error',
+          payload: new Error('Failed to save control settings'),
+        });
+      }
+      return success;
+    },
+    [state.settings.data],
+  );
+
   const updateKeyBinding = useCallback(
     (bindingId, keyValue) => {
       if (!bindingId) return false;
@@ -206,23 +223,6 @@ export function ControlSystemProvider({ children }) {
     const next = loadControlSettings();
     dispatch({ type: 'control/settings/loaded', payload: next });
   }, []);
-
-  const persistSettings = useCallback(
-    (partial) => {
-      const merged = { ...(state.settings.data ?? {}), ...(partial ?? {}) };
-      const success = saveControlSettings(merged);
-      if (success) {
-        dispatch({ type: 'control/settings/loaded', payload: merged });
-      } else {
-        dispatch({
-          type: 'control/settings/error',
-          payload: new Error('Failed to save control settings'),
-        });
-      }
-      return success;
-    },
-    [state.settings.data],
-  );
 
   const contextValue = useMemo(
     () => ({
