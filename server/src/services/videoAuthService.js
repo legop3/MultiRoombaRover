@@ -5,6 +5,35 @@ const videoSessions = require('./videoSessions');
 const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const roverManager = require('./roverManager');
+const { loadConfig } = require('../helpers/configLoader');
+
+const config = loadConfig();
+const mediaConfig = config.media || {};
+
+function getPathPrefix() {
+  const base = mediaConfig.whepBaseUrl;
+  if (!base) return '';
+  try {
+    const parsed = new URL(base);
+    return parsed.pathname || '';
+  } catch {
+    return base.replace(/^[^/]*:\/\//, '').replace(/^[^/]+/, '');
+  }
+}
+
+const whepPathPrefix = getPathPrefix().replace(/\/+$/, '').replace(/^\/+/, '');
+
+function extractRoverId(path) {
+  let clean = (path || '').replace(/^\//, '');
+  if (!clean) return '';
+  if (clean.endsWith('/whep')) {
+    clean = clean.slice(0, -'/whep'.length);
+  }
+  if (whepPathPrefix && clean.startsWith(`${whepPathPrefix}/`)) {
+    clean = clean.slice(whepPathPrefix.length + 1);
+  }
+  return clean;
+}
 
 function canView(socket) {
   const mode = getMode();
@@ -24,7 +53,7 @@ app.post('/mediamtx/auth', (req, res) => {
   const body = req.body || {};
   const path = (body.path || '').replace(/^\//, '');
   const sessionId = body.user;
-  const roverId = path;
+  const roverId = extractRoverId(path);
 
   if (!sessionId || !roverId) {
     logger.warn('auth missing session or rover (session=%s path=%s)', sessionId, path);
