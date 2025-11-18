@@ -72,7 +72,7 @@ func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
 		Media:         c.cfg.Media,
 		CameraServo:   c.cfg.CameraServo,
 	}
-	c.log.Printf("sending hello (camera servo enabled=%v pin=%d)", msg.CameraServo.Enabled, msg.CameraServo.Pin)
+	// c.log.Printf("sending hello (camera servo enabled=%v pin=%d)", msg.CameraServo.Enabled, msg.CameraServo.Pin)
 	return writeJSON(ctx, conn, msg)
 }
 
