@@ -15,9 +15,18 @@ hls: no
 webrtc: yes
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: :8189
-webrtcAdditionalHosts: []
-webrtcICEServers2: []
+webrtcAdditionalHosts: ['rover.otter.land', '192.168.0.100']
+webrtcICEServers2:
+  # Google public STUN (world-wide, very commonly used)
+  - url: stun:stun.l.google.com:19302
+  - url: stun:stun1.l.google.com:19302
+  - url: stun:stun2.l.google.com:19302
+  - url: stun:stun3.l.google.com:19302
+  - url: stun:stun4.l.google.com:19302
 
+  # Cloudflare STUN (anycast, global PoPs)
+  - url: stun:stun.cloudflare.com:3478
+  
 srt: yes
 srtAddress: :9000
 
@@ -30,7 +39,7 @@ authHTTPExclude:
   - action: pprof
 
 paths:
-  all:
+  ~^video/.+:
     source: publisher
     sourceOnDemand: no
     # webrtcMaxPlayoutDelay: 0
