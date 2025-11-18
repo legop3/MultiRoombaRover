@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsNamespace } from '../settings/index.js';
 import { GAMEPAD_MAPPING_DEFAULT } from '../settings/namespaces.js';
 
@@ -60,6 +60,11 @@ export default function GamepadMappingSettings() {
   const gamepadConnected = useGamepad();
   const { value: mapping, save, reset } = useSettingsNamespace('gamepadMapping', GAMEPAD_MAPPING_DEFAULT);
   const [capture, setCapture] = useState(null);
+  const axisBaselineRef = useRef(null);
+
+  useEffect(() => {
+    axisBaselineRef.current = null;
+  }, [capture]);
 
   useEffect(() => {
     if (!capture) return undefined;
@@ -69,9 +74,14 @@ export default function GamepadMappingSettings() {
       const pad = pads && Array.from(pads).find(Boolean);
       if (pad) {
         if (capture.type === 'axis') {
+          if (!axisBaselineRef.current) {
+            axisBaselineRef.current = Array.from(pad.axes ?? []).map((value) => value ?? 0);
+          }
           for (let i = 0; i < pad.axes.length; i += 1) {
             const value = pad.axes[i];
-            if (Math.abs(value) > 0.65) {
+            const baseline = axisBaselineRef.current?.[i] ?? 0;
+            const delta = Math.abs(value - baseline);
+            if (Math.abs(value) > 0.65 && delta > 0.5) {
               save((prev) =>
                 updatePath(prev, capture.path, () => ({
                   index: i,
