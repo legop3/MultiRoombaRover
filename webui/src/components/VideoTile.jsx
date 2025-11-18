@@ -21,9 +21,13 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
   //   config: batteryConfig,
   // });
   const wheelOvercurrents = sensors?.wheelOvercurrents || null;
-  const overcurrentActive = Boolean(
-    wheelOvercurrents && Object.values(wheelOvercurrents).some((value) => Boolean(value)),
-  );
+  const overcurrentMotors =
+    wheelOvercurrents == null
+      ? []
+      : Object.entries(wheelOvercurrents)
+          .filter(([, active]) => Boolean(active))
+          .map(([key]) => key);
+  const overcurrentActive = overcurrentMotors.length > 0;
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
@@ -140,7 +144,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
           className="h-full w-full object-contain"
         />
         <HudOverlay frame={telemetryFrame} />
-        <OvercurrentOverlay active={overcurrentActive} />
+        <OvercurrentOverlay motors={overcurrentMotors} />
       </div>
       <BatteryBar charge={batteryCharge} config={batteryConfig} label={label} status={renderedStatus} />
     </div>
@@ -200,18 +204,18 @@ function HudOverlay({ frame }) {
 
   const pulse = frame?.receivedAt ? now - frame.receivedAt < 200 : false;
 
-  const bumperBadges = [
-    { label: 'B-L', active: bumps.bumpLeft },
-    { label: 'B-R', active: bumps.bumpRight },
-  ];
-  const wheelBadges = [
-    { label: 'Drop L', active: bumps.wheelDropLeft },
-    { label: 'Drop R', active: bumps.wheelDropRight },
-  ];
+  // const bumperBadges = [
+  //   { label: 'B-L', active: bumps.bumpLeft },
+  //   { label: 'B-R', active: bumps.bumpRight },
+  // ];
+  // const wheelBadges = [
+  //   { label: 'Drop L', active: bumps.wheelDropLeft },
+  //   { label: 'Drop R', active: bumps.wheelDropRight },
+  // ];
 
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-1 text-[0.65rem] text-slate-200">
-      <div className="flex items-center justify-between gap-1">
+      {/* <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1 text-[0.55rem] text-slate-400">
           <span className={`h-2 w-2 rounded-full ${pulse ? 'bg-emerald-300 shadow-[0_0_4px_rgba(16,185,129,0.8)]' : 'bg-slate-700'}`} />
           <span>sensor</span>
@@ -226,26 +230,55 @@ function HudOverlay({ frame }) {
         {wheelBadges.map((badge) => (
           <HudBadge key={badge.label} label={badge.label} active={badge.active} />
         ))}
+      </div> */}
+      {/* bump and wheel drops bar */}
+      <div className="flex top-3 left-1/2 -translate-x-1/2 gap-1 bg-gray-900/40 rounded-full">
+        <div className={`px-1 py-0.5 rounded-full ${bumps.bumpLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
+          Left Bump
+        </div>
+        {/* left wheel drop */}
+        <div className={`px-1 py-0.5 rounded-full ${bumps.wheelDropLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
+          Left Wheel Drop
+        </div>
+        {/* right wheel drop */}
+        <div className={`px-1 py-0.5 rounded-full ${bumps.wheelDropRight ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
+          Right Wheel Drop
+        </div>
+        {/* right bump */}
+        <div className={`px-1 py-0.5 rounded-full ${bumps.bumpRight ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
+          Right Bump
+        </div>
       </div>
     </div>
   );
 }
 
-function HudBadge({ label, active }) {
-  return (
-    <span
-      className={`rounded-sm px-1 py-0.5 text-[0.55rem] ${active ? 'bg-emerald-500/30 text-emerald-100' : 'bg-black/40 text-slate-500'}`}
-    >
-      {label}
-    </span>
-  );
-}
+// function HudBadge({ label, active }) {
+//   return (
+//     <span
+//       className={`rounded-sm px-1 py-0.5 text-[0.55rem] ${active ? 'bg-emerald-500/30 text-emerald-100' : 'bg-black/40 text-slate-500'}`}
+//     >
+//       {label}
+//     </span>
+//   );
+// }
 
-function OvercurrentOverlay({ active }) {
-  if (!active) return null;
+const OVERCURRENT_LABELS = {
+  leftWheel: 'Left wheel',
+  rightWheel: 'Right wheel',
+  mainBrush: 'Main brush',
+  sideBrush: 'Side brush',
+};
+
+function OvercurrentOverlay({ motors }) {
+  if (!motors?.length) return null;
+  const labels = motors.map((name) => OVERCURRENT_LABELS[name] || name);
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-red-900/60">
-      <div className="text-center text-sm font-semibold text-red-100 animate-pulse">Overcurrent</div>
+      <div className="text-center text-2xl font-semibold text-white animate-pulse">
+        <div>Overcurrent</div>
+        <div className="mt-1 text-xl font-medium text-white">{labels.join(', ')}</div>
+      </div>
     </div>
   );
 }
