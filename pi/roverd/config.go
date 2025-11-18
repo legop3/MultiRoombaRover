@@ -67,17 +67,17 @@ type MediaConfig struct {
 }
 
 type CameraServoConfig struct {
-	Enabled       bool    `yaml:"enabled"`
-	Pin           int     `yaml:"pin"`
-	FreqHz        int     `yaml:"freqHz"`
-	CycleLen      int     `yaml:"cycleLen"`
-	MinPulseUs    int     `yaml:"minPulseUs"`
-	MaxPulseUs    int     `yaml:"maxPulseUs"`
-	MinAngle      float64 `yaml:"minAngle"`
-	MaxAngle      float64 `yaml:"maxAngle"`
-	HomeAngle     float64 `yaml:"homeAngle"`
-	NudgeDegrees  float64 `yaml:"nudgeDegrees"`
-	AllowRawPulse bool    `yaml:"allowRawPulse"`
+	Enabled       bool    `yaml:"enabled" json:"enabled"`
+	Pin           int     `yaml:"pin" json:"pin"`
+	FreqHz        int     `yaml:"freqHz" json:"freqHz"`
+	CycleLen      int     `yaml:"cycleLen" json:"cycleLen"`
+	MinPulseUs    int     `yaml:"minPulseUs" json:"minPulseUs"`
+	MaxPulseUs    int     `yaml:"maxPulseUs" json:"maxPulseUs"`
+	MinAngle      float64 `yaml:"minAngle" json:"minAngle"`
+	MaxAngle      float64 `yaml:"maxAngle" json:"maxAngle"`
+	HomeAngle     float64 `yaml:"homeAngle" json:"homeAngle"`
+	NudgeDegrees  float64 `yaml:"nudgeDegrees" json:"nudgeDegrees"`
+	AllowRawPulse bool    `yaml:"allowRawPulse" json:"allowRawPulse"`
 }
 
 type Config struct {
