@@ -8,6 +8,7 @@ admins:
     discord_id: "0987654321"
     lockdown: true
 media:
-  # Base address for mediaMTX (scheme + host + optional port). The UI will always request
+  # Base address for mediaMTX (scheme + host + optional port/path). The UI will always request
   #   http://<base>/<roverId>/whep
-  whepBaseUrl: "http://192.168.0.86:8889"
+  # Example: http://192.168.0.86:8889/video
+  whepBaseUrl: "http://192.168.0.86:8889/video"
