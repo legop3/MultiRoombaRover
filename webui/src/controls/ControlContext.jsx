@@ -3,8 +3,16 @@ import { controlReducer, initialControlState } from './controlReducer.js';
 import { computeDifferentialSpeeds, clamp } from './controlMath.js';
 import { useCommandPipeline } from './commandPipeline.js';
 import { loadControlSettings, saveControlSettings } from './persistence.js';
+import { DEFAULT_KEYMAP } from './constants.js';
+import { canonicalizeKeyInput } from './keymapUtils.js';
 
 const ControlSystemContext = createContext(null);
+
+function cloneKeymap(map) {
+  return Object.fromEntries(
+    Object.entries(map || {}).map(([key, values]) => [key, Array.isArray(values) ? [...values] : []]),
+  );
+}
 
 function clampServoAngle(config, value) {
   if (!config) return value;
@@ -89,6 +97,26 @@ export function ControlSystemProvider({ children }) {
     },
     [pipeline],
   );
+
+  const updateKeyBinding = useCallback(
+    (bindingId, keyValue) => {
+      if (!bindingId) return false;
+      const canonical = canonicalizeKeyInput(keyValue);
+      if (!canonical) return false;
+      const next = cloneKeymap(state.keymap);
+      next[bindingId] = [canonical];
+      dispatch({ type: 'control/set-keymap', payload: next });
+      persistSettings({ keymap: next });
+      return true;
+    },
+    [state.keymap, persistSettings],
+  );
+
+  const resetKeyBindings = useCallback(() => {
+    const defaults = cloneKeymap(DEFAULT_KEYMAP);
+    dispatch({ type: 'control/set-keymap', payload: defaults });
+    persistSettings({ keymap: defaults });
+  }, [persistSettings]);
 
   const setServoAngle = useCallback(
     (value) => {
@@ -212,6 +240,8 @@ export function ControlSystemProvider({ children }) {
         stopAllMotion,
         sendOiCommand,
         setSensorStream,
+        updateKeyBinding,
+        resetKeyBindings,
         registerInputState,
         reloadSettings,
         persistSettings,
@@ -230,6 +260,8 @@ export function ControlSystemProvider({ children }) {
       stopAllMotion,
       sendOiCommand,
       setSensorStream,
+      updateKeyBinding,
+      resetKeyBindings,
       registerInputState,
       reloadSettings,
       persistSettings,

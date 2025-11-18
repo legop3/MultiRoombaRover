@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import AuthPanel from './AuthPanel.jsx';
 import AdminPanel from './AdminPanel.jsx';
+import KeymapSettings from './KeymapSettings.jsx';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -33,6 +34,7 @@ export default function AdvancedSettings() {
 
   return (
     <div className="space-y-1">
+      <KeymapSettings />
       <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
         <p className="text-xs text-slate-400">Manual OI commands</p>
         <div className="mt-1 flex flex-wrap gap-1">

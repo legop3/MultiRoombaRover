@@ -1,37 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
+import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
 
 const SOURCE = 'keyboard';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
 const ZERO_AUX = { main: 0, side: 0, vacuum: 0 };
 const SERVO_REPEAT_MS = 110;
-const KEY_ALIASES = {
-  '{': '[',
-  '}': ']',
-  ':': ';',
-  '"': "'",
-  '<': ',',
-  '>': '.',
-  '?': '/',
-  '|': '\\',
-  '_': '-',
-  '+': '=',
-};
-const BINDING_CODE_MAP = {
-  '[': 'BracketLeft',
-  ']': 'BracketRight',
-  '\\': 'Backslash',
-  ';': 'Semicolon',
-  "'": 'Quote',
-  ',': 'Comma',
-  '.': 'Period',
-  '/': 'Slash',
-  '-': 'Minus',
-  '=': 'Equal',
-  '`': 'Backquote',
-};
-const CODE_PREFIX = 'code:';
-const KEY_PREFIX = 'key:';
 
 function shouldIgnoreEvent(event) {
   const target = event.target;
@@ -43,59 +17,6 @@ function shouldIgnoreEvent(event) {
     target.isContentEditable ||
     tag === 'SELECT'
   );
-}
-
-function canonicalizeValue(value) {
-  if (typeof value !== 'string') return '';
-  const lower = value.toLowerCase();
-  return KEY_ALIASES[lower] ?? lower;
-}
-
-function deriveCodeForValue(value) {
-  if (!value) return null;
-  if (BINDING_CODE_MAP[value]) return BINDING_CODE_MAP[value];
-  if (value.length === 1) {
-    if (/[a-z]/.test(value)) return `Key${value.toUpperCase()}`;
-    if (/[0-9]/.test(value)) return `Digit${value}`;
-  }
-  return null;
-}
-
-function makeKeyToken(value) {
-  const canonical = canonicalizeValue(value);
-  return canonical ? `${KEY_PREFIX}${canonical}` : null;
-}
-
-function makeCodeToken(value) {
-  const canonical = canonicalizeValue(value);
-  const code = deriveCodeForValue(canonical);
-  return code ? `${CODE_PREFIX}${code}` : null;
-}
-
-function tokensFromEvent(event) {
-  const tokens = new Set();
-  const keyToken = makeKeyToken(event?.key ?? '');
-  if (keyToken) tokens.add(keyToken);
-  const code = event?.code;
-  if (code) {
-    tokens.add(`${CODE_PREFIX}${code}`);
-  }
-  return Array.from(tokens);
-}
-
-function normalizeKeymap(keymap = {}) {
-  const entries = Object.entries(keymap).map(([action, bindings]) => {
-    const values = Array.isArray(bindings) ? bindings : [bindings];
-    const normalized = new Set();
-    values.forEach((value) => {
-      const keyToken = makeKeyToken(String(value));
-      if (keyToken) normalized.add(keyToken);
-      const codeToken = makeCodeToken(String(value));
-      if (codeToken) normalized.add(codeToken);
-    });
-    return [action, normalized];
-  });
-  return Object.fromEntries(entries);
 }
 
 function bindingActive(bindingSet, keys) {
@@ -166,7 +87,7 @@ export default function KeyboardInputManager() {
       registerInputState,
     },
   } = useControlSystem();
-  const keymap = useMemo(() => normalizeKeymap(state.keymap), [state.keymap]);
+  const keymap = useMemo(() => normalizeKeymapEntries(state.keymap), [state.keymap]);
   const actionTokens = useMemo(() => {
     const tokens = new Set();
     Object.values(keymap).forEach((bindingSet) => {
@@ -271,7 +192,7 @@ export default function KeyboardInputManager() {
   useEffect(() => {
     function handleKeyDown(event) {
       if (shouldIgnoreEvent(event)) return;
-      const tokens = tokensFromEvent(event);
+      const tokens = tokensForEvent(event);
       if (tokens.length === 0) return;
       if (tokens.some((token) => actionTokens.has(token))) {
         event.preventDefault();
@@ -296,7 +217,7 @@ export default function KeyboardInputManager() {
     }
 
     function handleKeyUp(event) {
-      const tokens = tokensFromEvent(event);
+      const tokens = tokensForEvent(event);
       // eslint-disable-next-line no-console
       console.debug('[keyboard] keyup', { key: event.key, code: event.code, tokens });
       tokens.forEach((token) => activeTokensRef.current.delete(token));
