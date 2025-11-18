@@ -2,7 +2,7 @@ import TelemetryPanel from './TelemetryPanel.jsx';
 import DrivePanel from './DrivePanel.jsx';
 import CameraServoPanel from './CameraServoPanel.jsx';
 import RoomCameraPanel from './RoomCameraPanel.jsx';
-import AdvancedSettings from './AdvancedSettings.jsx';
+import SettingsPanel from './SettingsPanel.jsx';
 import HelpPanel from './HelpPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 
@@ -40,7 +40,7 @@ export default function RightPaneTabs({ layout }) {
             </div>
           </TabPanel>
           <TabPanel id="settings">
-            <AdvancedSettings />
+            <SettingsPanel />
           </TabPanel>
           <TabPanel id="help">
             <HelpPanel layout={layout} />
