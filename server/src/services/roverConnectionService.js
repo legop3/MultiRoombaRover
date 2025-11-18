@@ -33,6 +33,11 @@ roverWSS.on('connection', (ws) => {
     }
     if (msg.type === 'hello') {
       roverId = msg.name;
+      logger.info('Received rover hello', {
+        roverId,
+        keys: Object.keys(msg),
+        cameraServo: msg.cameraServo,
+      });
       roverManager.upsertRover(msg, ws);
       roverManager.broadcastRoster();
       sendAlert({ color: COLORS.success, title: 'Rover Online', message: roverId });

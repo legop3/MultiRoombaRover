@@ -80,16 +80,19 @@ function lockRover(id, locked, actorSocket) {
 }
 
 function getRoster() {
-  return Array.from(rovers.values()).map((record) => ({
-    id: record.id,
-    name: record.meta?.name || record.id,
-    battery: record.meta?.battery,
-    maxWheelSpeed: record.meta?.maxWheelSpeed,
-    media: record.meta?.media,
-    cameraServo: record.meta?.cameraServo,
-    locked: record.locked,
-    lastSeen: record.lastSeen,
-  }));
+  return Array.from(rovers.values()).map((record) => {
+    const cameraServo = record.meta?.cameraServo ?? record.meta?.CameraServo ?? null;
+    return {
+      id: record.id,
+      name: record.meta?.name || record.id,
+      battery: record.meta?.battery,
+      maxWheelSpeed: record.meta?.maxWheelSpeed,
+      media: record.meta?.media,
+      cameraServo,
+      locked: record.locked,
+      lastSeen: record.lastSeen,
+    };
+  });
 }
 
 function broadcastRoster() {
