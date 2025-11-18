@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
 import { useDriveControl } from '../context/DriveControlContext.jsx';
+
+const SLIDER_THROTTLE_MS = 150;
 
 function formatDegrees(value) {
   if (typeof value !== 'number' || Number.isNaN(value)) return '—';
@@ -20,15 +23,53 @@ export default function CameraServoPanel() {
 
   if (!enabled) return null;
 
+  const [pendingAngle, setPendingAngle] = useState(value);
+  const throttleRef = useRef(null);
+  const draggingRef = useRef(false);
+
+  useEffect(() => {
+    if (!draggingRef.current) {
+      setPendingAngle(value);
+    }
+  }, [value]);
+
+  useEffect(
+    () => () => {
+      if (throttleRef.current) {
+        clearTimeout(throttleRef.current);
+      }
+    },
+    [],
+  );
+
   const step =
     typeof config?.nudgeDegrees === 'number' && config.nudgeDegrees > 0
       ? config.nudgeDegrees
       : 1;
 
+  const scheduleSend = (next) => {
+    if (throttleRef.current) {
+      clearTimeout(throttleRef.current);
+    }
+    throttleRef.current = setTimeout(() => {
+      servo.setAngle(next);
+    }, SLIDER_THROTTLE_MS);
+  };
+
   const handleSlider = (event) => {
     const next = Number.parseFloat(event.target.value);
     if (Number.isNaN(next)) return;
-    servo.setAngle(next);
+    draggingRef.current = true;
+    setPendingAngle(next);
+    scheduleSend(next);
+  };
+
+  const commitSlider = () => {
+    draggingRef.current = false;
+    if (throttleRef.current) {
+      clearTimeout(throttleRef.current);
+    }
+    servo.setAngle(pendingAngle);
   };
 
   const handleNudge = (direction) => {
@@ -49,8 +90,11 @@ export default function CameraServoPanel() {
           min={min}
           max={max}
           step={0.5}
-          value={value}
+          value={pendingAngle}
           onChange={handleSlider}
+          onMouseUp={commitSlider}
+          onTouchEnd={commitSlider}
+          onPointerUp={commitSlider}
         />
         <div className="mt-1 flex justify-between text-xs text-slate-400">
           <span>{formatDegrees(min)}</span>
