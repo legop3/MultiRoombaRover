@@ -25,19 +25,19 @@ export const DEFAULT_KEYMAP = {
   driveBackward: ['s'],
   driveLeft: ['a'],
   driveRight: ['d'],
-  boostModifier: ['\\\\'],
+  boostModifier: ['\\'],
   slowModifier: ['shift'],
-  auxMainForward: ['o'],
-  auxMainReverse: ['l'],
-  auxSideForward: ['p'],
-  auxSideReverse: [';'],
-  auxVacuumFast: ['['],
-  auxVacuumSlow: ["'"],
-  auxAllForward: ['.'],
-  cameraUp: ['i'],
-  cameraDown: ['k'],
-  driveMacro: ['g'],
-  dockMacro: ['h'],
+  auxMainForward: ['i'],
+  auxMainReverse: ['k'],
+  auxSideForward: ['o'],
+  auxSideReverse: ['l'],
+  auxVacuumFast: ['p'],
+  auxVacuumSlow: [';'],
+  auxAllForward: [","],
+  cameraUp: ['u'],
+  cameraDown: ['j'],
+  driveMacro: ['f'],
+  dockMacro: ['g'],
 };
 
 export const DEFAULT_MACROS = [
@@ -57,7 +57,9 @@ export const DEFAULT_MACROS = [
     id: 'seek-dock',
     label: 'Dock',
     description: 'Send the seek dock command.',
-    steps: [{ type: 'oi', command: 'dock' }],
+    steps: [
+      { type: 'oi', command: 'dock' }
+    ],
   },
 ];
 
