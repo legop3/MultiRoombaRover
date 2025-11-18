@@ -34,6 +34,17 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
     restartTimer.current = setTimeout(() => setRestartToken(Date.now()), RESTART_DELAY_MS);
   }, []);
 
+  const ensurePlayback = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      video.muted = true;
+      await video.play();
+    } catch {
+      // Autoplay might still be blocked; retry logic elsewhere will handle it.
+    }
+  }, []);
+
   const attemptUnmute = useCallback(
     (delay = 0) => {
       if (forceMute) return;
@@ -52,6 +63,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
         const video = videoRef.current;
         if (!video) return;
         try {
+          await ensurePlayback();
           video.muted = false;
           await video.play();
           setMuted(false);
@@ -64,7 +76,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
 
       unmuteTimer.current = setTimeout(tryPlay, delay);
     },
-    [forceMute],
+    [ensurePlayback, forceMute],
   );
 
   useEffect(
@@ -92,6 +104,9 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
       if (!active) return;
       setStatus(nextStatus);
       setDetail(info || null);
+      if (nextStatus === 'playing') {
+        ensurePlayback();
+      }
       if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
         scheduleRestart();
       }
@@ -116,7 +131,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
       clearTimeout(resetMuteId);
       player?.stop();
     };
-  }, [sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart]);
+  }, [sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback]);
 
   useEffect(() => {
     if (status === 'stopped' && sessionInfo?.url) {
@@ -133,8 +148,8 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
     : status;
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="relative w-full overflow-hidden rounded-sm bg-black aspect-video">
+    <div className="flex flex-col gap-0.5">
+      <div className="relative w-full overflow-hidden bg-black aspect-video">
         <video
           ref={videoRef}
           muted={forceMute || muted}
@@ -157,12 +172,11 @@ function BatteryBar({ charge, config, label, status }) {
   const urgent = config?.Urgent ?? null;
   if (charge == null || full == null || warn == null) {
     return (
-      <div className="rounded-sm bg-[#1e1e1e] px-1 py-1 text-sm text-slate-200">
+      <div className="panel-section space-y-0.5 text-sm">
         <div className="flex items-center justify-between text-xs text-slate-400">
-          {/* <span>{label}</span> */}
           <span>{status}</span>
         </div>
-        <p className="mt-1 text-xs text-slate-400">Battery telemetry unavailable</p>
+        <p className="text-xs text-slate-500">Battery telemetry unavailable</p>
       </div>
     );
   }
@@ -177,13 +191,12 @@ function BatteryBar({ charge, config, label, status }) {
   const warnTriggered = urgent != null && charge <= urgent;
   const barClass = depleted ? 'bg-red-500 animate-pulse' : warnTriggered ? 'bg-amber-400' : 'bg-emerald-500';
   return (
-    <div className="space-y-2 rounded-sm bg-[#1e1e1e] px-1 py-1 text-sm text-slate-200">
+    <div className="panel-section space-y-0.5 text-sm">
       <div className="flex items-center justify-between text-xs text-slate-400">
-        {/* <span>{label}</span> */}
         <span>{status}</span>
       </div>
-      <div className="relative h-4 w-full rounded-full bg-slate-800">
-        <div className={`h-full rounded-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }} />
+      <div className="relative h-4 w-full bg-zinc-900">
+        <div className={`h-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }} />
         <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-black/80">
           Battery {percentText}
         </span>
@@ -204,72 +217,24 @@ function HudOverlay({ frame, label }) {
 
   const pulse = frame?.receivedAt ? now - frame.receivedAt < 200 : false;
 
-  // const bumperBadges = [
-  //   { label: 'B-L', active: bumps.bumpLeft },
-  //   { label: 'B-R', active: bumps.bumpRight },
-  // ];
-  // const wheelBadges = [
-  //   { label: 'Drop L', active: bumps.wheelDropLeft },
-  //   { label: 'Drop R', active: bumps.wheelDropRight },
-  // ];
-  // console.log('session', session);
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      {/* <div className="flex items-center justify-between gap-1">
-        <div className="flex items-center gap-1 text-[0.55rem] text-slate-400">
-          <span className={`h-2 w-2 rounded-full ${pulse ? 'bg-emerald-300 shadow-[0_0_4px_rgba(16,185,129,0.8)]' : 'bg-slate-700'}`} />
-          <span>sensor</span>
-        </div>
-        <div className="flex gap-1">
-          {bumperBadges.map((badge) => (
-            <HudBadge key={badge.label} label={badge.label} active={badge.active} />
-          ))}
-        </div>
-      </div>
-      <div className="flex justify-end gap-1">
-        {wheelBadges.map((badge) => (
-          <HudBadge key={badge.label} label={badge.label} active={badge.active} />
-        ))}
-      </div> */}
-      {/* status that tells you the name of your rover (label) */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 rounded-full bg-gray-900/40 px-2 py-0.5 text-[0.65rem] font-medium text-slate-200">
+      <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 px-0.5 py-0.5 text-xs text-slate-100">
         <span>You are driving {label || 'Unnamed Rover'}</span>
-        <span>|</span>
-        <span>{pulse ? 'Sensors Active' : 'No Recent Sensor Data'}</span>
+        <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span>
       </div>
 
 
       {/* bump and wheel drops bar */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-1 rounded-full bg-gray-900/40 text-[0.55rem] font-medium">
-        <div className={`px-0.5 rounded-full ${bumps.bumpLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
-          Left Bump
-        </div>
-        {/* left wheel drop */}
-        <div className={`px-0.5 rounded-full ${bumps.wheelDropLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
-          Left Wheel Drop
-        </div>
-        {/* right wheel drop */}
-        <div className={`px-0.5 rounded-full ${bumps.wheelDropRight ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
-          Right Wheel Drop
-        </div>
-        {/* right bump */}
-        <div className={`px-0.5 rounded-full ${bumps.bumpRight ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
-          Right Bump
-        </div>
+      <div className="absolute top-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/70 px-0.5 py-0.5 text-[0.6rem] font-medium text-slate-200">
+        <div className={`px-0.5 py-0.5 ${bumps.bumpLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left bump</div>
+        <div className={`px-0.5 py-0.5 ${bumps.wheelDropLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left wheel drop</div>
+        <div className={`px-0.5 py-0.5 ${bumps.wheelDropRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right wheel drop</div>
+        <div className={`px-0.5 py-0.5 ${bumps.bumpRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right bump</div>
       </div>
     </div>
   );
 }
-
-// function HudBadge({ label, active }) {
-//   return (
-//     <span
-//       className={`rounded-sm px-1 py-0.5 text-[0.55rem] ${active ? 'bg-emerald-500/30 text-emerald-100' : 'bg-black/40 text-slate-500'}`}
-//     >
-//       {label}
-//     </span>
-//   );
-// }
 
 const OVERCURRENT_LABELS = {
   leftWheel: 'Left wheel',
@@ -285,7 +250,7 @@ function OvercurrentOverlay({ motors }) {
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-red-900/60">
       <div className="text-center text-2xl font-semibold text-white animate-pulse">
         <div>Overcurrent</div>
-        <div className="mt-1 text-xl font-medium text-white">{labels.join(', ')}</div>
+        <div className="mt-0.5 text-xl font-medium text-white">{labels.join(', ')}</div>
       </div>
     </div>
   );

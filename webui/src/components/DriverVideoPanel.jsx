@@ -15,20 +15,14 @@ export default function DriverVideoPanel() {
       : null;
   const batteryConfig = batteryRecord?.battery ?? null;
 
+  const roverLabel = batteryRecord?.name || (roverId ? `Rover ${roverId}` : '');
+
   return (
-    <section className="rounded-sm bg-[#242a32] p-1">
+    <section className="panel">
       {roverId ? (
-        <div className="w-full">
-          <VideoTile
-            sessionInfo={info}
-            label={roverId}
-            muted={false}
-            telemetryFrame={frame}
-            batteryConfig={batteryConfig}
-          />
-        </div>
+        <VideoTile sessionInfo={info} label={roverLabel} telemetryFrame={frame} batteryConfig={batteryConfig} />
       ) : (
-        <p className="text-sm text-slate-400">Assign a rover to view the video feed.</p>
+        <p className="panel-muted">Assign a rover to view the video feed.</p>
       )}
     </section>
   );

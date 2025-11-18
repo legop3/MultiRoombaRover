@@ -71,51 +71,40 @@ export default function KeymapSettings() {
   );
 
   return (
-    <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
+    <section className="panel-section space-y-0.5 text-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Keyboard Layout</p>
+          <p className="text-xs text-slate-400">Keyboard layout</p>
           <p className="text-[0.7rem] text-slate-500">Per-browser · click to change a binding</p>
         </div>
-        <button
-          type="button"
-          onClick={() => resetKeyBindings()}
-          className="rounded-sm bg-black/40 px-2 py-1 text-xs uppercase tracking-wide text-slate-200 hover:bg-black/60"
-        >
-          Reset Defaults
+        <button type="button" onClick={() => resetKeyBindings()} className="button-dark text-xs">
+          Reset defaults
         </button>
       </div>
-      <div className="mt-2 space-y-2">
+      <div className="space-y-0.5">
         {Object.entries(grouped).map(([group, actions]) => (
-          <div key={group} className="rounded border border-white/5 p-1">
-            <p className="text-[0.7rem] uppercase tracking-wide text-slate-400">{group}</p>
-            <div className="mt-1 space-y-1">
+          <div key={group} className="space-y-0.5 surface">
+            <p className="text-[0.75rem] text-slate-400">{group}</p>
+            <div className="space-y-0.5">
               {actions.map((action) => {
                 const value = currentKey(action.id);
                 const isActive = active === action.id;
                 return (
-                  <div
-                    key={action.id}
-                    className="flex items-center justify-between rounded bg-black/30 px-1 py-1 text-xs"
-                  >
+                  <div key={action.id} className="surface-muted flex items-center justify-between text-xs">
                     <div>
                       <p className="font-semibold text-slate-100">{action.label}</p>
                       <p className="text-[0.65rem] text-slate-400">{formatKeyLabel(value)}</p>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
                       {isActive && (
-                        <button
-                          type="button"
-                          onClick={() => cancel()}
-                          className="rounded bg-red-600 px-2 py-1 text-[0.65rem] uppercase tracking-wide text-red-100"
-                        >
+                        <button type="button" onClick={() => cancel()} className="button-danger text-[0.7rem]">
                           Cancel
                         </button>
                       )}
                       <button
                         type="button"
                         onClick={() => startCapture(action.id)}
-                        className={`rounded px-2 py-1 text-[0.65rem] uppercase tracking-wide ${isActive ? 'bg-emerald-500 text-emerald-950' : 'bg-slate-700 text-slate-100'}`}
+                        className={`${isActive ? 'px-0.5 py-0.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400' : 'button-dark'} text-[0.7rem] font-medium transition-colors`}
                       >
                         {isActive ? 'Press a key…' : 'Change'}
                       </button>

@@ -96,7 +96,7 @@ function FloatingJoystick({ disabled, layout, radius, onMove, onStop }) {
     <div
       ref={containerRef}
       role="presentation"
-      className={`relative w-full ${heightClass} select-none overflow-hidden rounded-lg border border-slate-800 bg-slate-900/70`}
+      className={`relative w-full ${heightClass} select-none overflow-hidden bg-zinc-950`}
       style={{ touchAction: 'none' }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -114,11 +114,11 @@ function FloatingJoystick({ disabled, layout, radius, onMove, onStop }) {
       {visual.active && (
         <>
           <div
-            className="pointer-events-none absolute h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-cyan-400/60 bg-cyan-400/10"
+            className="pointer-events-none absolute h-28 w-28 -translate-x-1/2 -translate-y-1/2 bg-cyan-400/10 outline outline-2 outline-cyan-400/60 [clip-path:circle(50%)]"
             style={{ left: visual.base.x, top: visual.base.y }}
           />
           <div
-            className="pointer-events-none absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/80 shadow-lg"
+            className="pointer-events-none absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 bg-cyan-300/80 shadow-lg [clip-path:circle(50%)]"
             style={{
               left: visual.base.x + visual.knob.x,
               top: visual.base.y + visual.knob.y,
@@ -195,7 +195,7 @@ function MobileJoystickPanel({ layout }) {
   };
 
   return (
-    <div className="flex flex-col gap-1 text-slate-100">
+    <div className="flex flex-col gap-0.5 text-slate-100">
       <DriveModeToggle size="compact" />
       <FloatingJoystick
         disabled={disabled}
@@ -204,17 +204,12 @@ function MobileJoystickPanel({ layout }) {
         onMove={handleMove}
         onStop={handleStop}
       />
-      <button
-        type="button"
-        onClick={stopAllMotion}
-        disabled={disabled}
-        className="rounded bg-red-600 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-red-100 disabled:opacity-40"
-      >
+      <button type="button" onClick={stopAllMotion} disabled={disabled} className="button-danger w-full disabled:opacity-40">
         Panic Stop
       </button>
       {cameraEnabled && (
-        <div className="rounded-lg bg-slate-900/70 p-2 text-xs">
-          <div className="flex items-center justify-between text-[0.7rem] uppercase tracking-wide text-slate-400">
+        <div className="bg-zinc-950 p-0.5 text-xs">
+          <div className="flex items-center justify-between text-[0.75rem] text-slate-400">
             <span>Camera Tilt</span>
             <span className="font-mono text-slate-200">{cameraValue.toFixed(1)}°</span>
           </div>
@@ -225,7 +220,7 @@ function MobileJoystickPanel({ layout }) {
             step={0.5}
             value={cameraValue}
             onChange={handleCameraSlider}
-            className="mt-1 w-full accent-cyan-400"
+            className="mt-0.5 w-full accent-cyan-400"
           />
         </div>
       )}
@@ -269,9 +264,9 @@ function AuxMotorPanel({ orientation }) {
   const gridCols = orientation === 'landscape' ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2';
 
   return (
-    <div className="flex flex-col gap-1 text-slate-100">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Aux controls</p>
-      <div className={`grid ${gridCols} gap-1`}>
+    <div className="flex flex-col gap-0.5 text-slate-100">
+      <p className="text-xs text-slate-400">Aux controls</p>
+      <div className={`grid ${gridCols} gap-0.5`}>
         {AUX_BUTTONS.map((button) => (
           <button
             key={button.id}
@@ -285,7 +280,7 @@ function AuxMotorPanel({ orientation }) {
             onPointerLeave={() => handleRelease(button)}
             onPointerCancel={() => handleRelease(button)}
             onContextMenu={(event) => event.preventDefault()}
-            className={`rounded-lg px-2 py-2 text-left text-sm font-semibold uppercase tracking-wide text-white transition ${button.color} disabled:opacity-30`}
+            className={`px-0.5 py-0.5 text-left text-sm font-semibold text-white transition ${button.color} hover:brightness-110 disabled:opacity-30`}
           >
             {button.label}
           </button>
@@ -297,7 +292,7 @@ function AuxMotorPanel({ orientation }) {
 
 export function MobileLandscapeAuxColumn() {
   return (
-    <div className="flex h-full flex-col gap-1">
+    <div className="flex h-full flex-col gap-0.5">
       <AuxMotorPanel orientation="landscape" />
     </div>
   );
@@ -305,7 +300,7 @@ export function MobileLandscapeAuxColumn() {
 
 export function MobileLandscapeControlColumn() {
   return (
-    <div className="flex h-full flex-col gap-1">
+    <div className="flex h-full flex-col gap-0.5">
       <MobileJoystickPanel layout="landscape" />
     </div>
   );
@@ -313,8 +308,8 @@ export function MobileLandscapeControlColumn() {
 
 export default function MobilePortraitControls() {
   return (
-    <section className="w-full">
-      <div className="grid grid-cols-2 gap-1">
+    <section className="panel">
+      <div className="grid grid-cols-2 gap-0.5">
         <AuxMotorPanel orientation="portrait" />
         <MobileJoystickPanel layout="portrait" />
       </div>

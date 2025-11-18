@@ -37,25 +37,21 @@ export default function DriveModeToggle({ size = 'default' }) {
     }
   };
 
-  const pillClass =
-    size === 'compact'
-      ? 'text-xs px-1 py-0.5'
-      : 'text-sm px-1.5 py-0.5';
+  const pillClass = size === 'compact' ? 'text-xs px-0.5 py-0.5' : 'text-sm px-0.5 py-0.5';
 
   return (
-    <div className="rounded-sm bg-black/30 p-1 text-slate-100">
-      <div className="flex items-center justify-between">
-        <span className={`rounded-full ${driveReady ? 'bg-emerald-700' : 'bg-indigo-700'} ${pillClass}`}>
+    <div className="bg-black/30 p-0.5 text-slate-100">
+      <div className="flex items-center">
+        <span className={`${driveReady ? 'bg-emerald-700' : 'bg-indigo-700'} ${pillClass}`}>
           {currentLabel}
         </span>
-        <span className="text-[0.65rem] text-slate-400">Rover {roverId ?? '—'}</span>
       </div>
-      <div className="mt-1 grid grid-cols-2 gap-1 text-xs">
+      <div className="mt-0.5 grid grid-cols-2 gap-0.5 text-xs">
         <button
           type="button"
           onClick={handleDrive}
           disabled={disabled}
-          className={`rounded-sm bg-emerald-600 px-1 py-1 font-semibold uppercase tracking-wide text-emerald-50 disabled:opacity-40 ${size === 'compact' ? 'text-xs' : 'text-sm'}`}
+          className={`bg-emerald-600 px-0.5 py-0.5 font-semibold text-emerald-50 transition-colors hover:bg-emerald-500 disabled:opacity-40 ${size === 'compact' ? 'text-xs' : 'text-sm'}`}
         >
           Drive
         </button>
@@ -63,7 +59,7 @@ export default function DriveModeToggle({ size = 'default' }) {
           type="button"
           onClick={handleDock}
           disabled={disabled}
-          className={`rounded-sm bg-indigo-600 px-1 py-1 font-semibold uppercase tracking-wide text-indigo-50 disabled:opacity-40 ${size === 'compact' ? 'text-xs' : 'text-sm'}`}
+          className={`bg-indigo-600 px-0.5 py-0.5 font-semibold text-indigo-50 transition-colors hover:bg-indigo-500 disabled:opacity-40 ${size === 'compact' ? 'text-xs' : 'text-sm'}`}
         >
           Dock
         </button>

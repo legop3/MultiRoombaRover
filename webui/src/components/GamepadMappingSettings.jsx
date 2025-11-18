@@ -42,7 +42,7 @@ const ACTIONS = [
 
 function SliderField({ label, description, min, max, step, value, onChange }) {
   return (
-    <label className="block rounded border border-white/5 p-1">
+    <label className="surface block">
       <div className="flex items-center justify-between text-xs text-slate-300">
         <span className="font-semibold text-slate-100">{label}</span>
         <span className="font-mono text-slate-400">{NUMBER_FORMAT.format(value)}</span>
@@ -55,7 +55,7 @@ function SliderField({ label, description, min, max, step, value, onChange }) {
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-1 w-full accent-emerald-400"
+        className="mt-0.5 w-full accent-emerald-400"
       />
     </label>
   );
@@ -162,31 +162,27 @@ export default function GamepadMappingSettings() {
   };
 
   return (
-    <section className="rounded-sm bg-[#1d232b] p-1 text-sm text-slate-100">
+    <section className="panel-section space-y-0.5 text-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Gamepad mapping</p>
+          <p className="text-xs text-slate-400">Gamepad mapping</p>
           <p className="text-[0.65rem] text-slate-500">
             {gamepadConnected
               ? 'Move sticks/axes with a big sweep or press buttons when capturing.'
               : 'Connect a controller to configure.'}
           </p>
           {capture && (
-            <p className="mt-1 text-[0.7rem] text-emerald-400">Capturing {capture.label}…</p>
+            <p className="mt-0.5 text-[0.7rem] text-emerald-400">Capturing {capture.label}…</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => reset()}
-          className="rounded-sm bg-black/40 px-2 py-1 text-xs uppercase tracking-wide text-slate-200 hover:bg-black/60"
-        >
+        <button type="button" onClick={() => reset()} className="button-dark text-xs">
           Clear all
         </button>
       </div>
-      <div className="mt-2 space-y-2">
-        <div className="rounded border border-white/5 p-1">
-          <p className="text-[0.7rem] uppercase tracking-wide text-slate-500">Sensitivity &amp; feel</p>
-          <div className="mt-1 space-y-1">
+      <div className="space-y-0.5">
+        <div className="space-y-0.5 surface">
+          <p className="text-[0.7rem] text-slate-500">Sensitivity &amp; feel</p>
+          <div className="space-y-0.5">
             <SliderField
               label="Drive deadzone"
               description="Ignore small drive stick movement"
@@ -226,27 +222,23 @@ export default function GamepadMappingSettings() {
           </div>
         </div>
         {Object.entries(grouped).map(([section, actions]) => (
-          <div key={section} className="rounded border border-white/5 p-1">
-            <p className="text-[0.7rem] uppercase tracking-wide text-slate-500">{section}</p>
-            <div className="mt-1 space-y-1">
+          <div key={section} className="space-y-0.5 surface">
+            <p className="text-[0.7rem] text-slate-500">{section}</p>
+            <div className="space-y-0.5">
               {actions.map((action) => (
-                <div key={action.id} className="flex items-center justify-between rounded bg-black/30 px-1 py-1 text-xs">
+                <div key={action.id} className="surface-muted flex items-center justify-between text-xs">
                   <div>
                     <p className="font-semibold text-slate-100">{action.label}</p>
                     <p className="text-[0.65rem] text-slate-400">{getValueLabel(action)}</p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleClear(action)}
-                      className="rounded bg-slate-800 px-2 py-1 text-[0.65rem] uppercase tracking-wide"
-                    >
+                  <div className="flex items-center gap-0.5">
+                    <button type="button" onClick={() => handleClear(action)} className="button-dark text-[0.7rem]">
                       Clear
                     </button>
                     <button
                       type="button"
                       onClick={() => setCapture(action)}
-                      className={`rounded px-2 py-1 text-[0.65rem] uppercase tracking-wide ${capture?.id === action.id ? 'bg-emerald-500 text-emerald-950' : 'bg-slate-700 text-slate-100'}`}
+                      className={`${capture?.id === action.id ? 'px-0.5 py-0.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400' : 'button-dark'} text-[0.7rem] font-medium`}
                     >
                       {capture?.id === action.id ? 'Waiting…' : 'Capture'}
                     </button>

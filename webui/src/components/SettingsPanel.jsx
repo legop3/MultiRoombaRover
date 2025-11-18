@@ -42,49 +42,49 @@ export default function SettingsPanel() {
       </TabList>
       <TabPanels>
         <TabPanel id="keybindings">
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <KeymapSettings />
           </div>
         </TabPanel>
         <TabPanel id="controller">
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <GamepadMappingSettings />
           </div>
         </TabPanel>
         <TabPanel id="admin">
-          <div className="space-y-1">
-            <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
-              <p className="text-xs text-slate-400">Manual OI commands</p>
-              <div className="mt-1 flex flex-wrap gap-1">
+          <div className="space-y-0.5">
+            <section className="panel-section space-y-0.5 text-sm">
+              <p className="text-slate-400">Manual OI commands</p>
+              <div className="surface flex flex-wrap gap-0.5">
                 {manualTabs.map((tab) => (
                   <button
                     key={tab.key}
                     type="button"
                     onClick={() => sendOiCommand(tab.key)}
                     disabled={!canControl}
-                    className="rounded-sm bg-black/40 px-1 py-0.5 text-xs text-slate-200 disabled:opacity-30"
+                    className="button-dark text-xs disabled:opacity-30"
                   >
                     {tab.label}
                   </button>
                 ))}
               </div>
             </section>
-            <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
-              <p className="text-xs text-slate-400">Sensor stream</p>
-              <div className="mt-1 flex gap-1">
+            <section className="panel-section space-y-0.5 text-sm">
+              <p className="text-slate-400">Sensor stream</p>
+              <div className="surface flex gap-0.5">
                 {sensorButtons.map((btn) => (
                   <button
                     key={btn.key}
                     type="button"
                     onClick={() => handleSensorToggle(btn.enable)}
                     disabled={!canControl}
-                    className="flex-1 rounded-sm bg-black/40 px-1 py-1 text-xs text-slate-200 disabled:opacity-30"
+                    className="flex-1 button-dark text-xs disabled:opacity-30"
                   >
                     {btn.label}
                   </button>
                 ))}
               </div>
-              {!canControl && <p className="mt-1 text-xs text-slate-500">Assign a rover to toggle streams.</p>}
+              {!canControl && <p className="text-xs text-slate-500">Assign a rover to toggle streams.</p>}
             </section>
             <AuthPanel />
             <AdminPanel />

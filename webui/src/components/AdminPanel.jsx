@@ -57,14 +57,10 @@ export default function AdminPanel() {
   if (!isAdmin) return null;
 
   return (
-    <section className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
-      <div className="flex items-center justify-between gap-1 text-sm">
+    <section className="panel-section space-y-0.5 text-base">
+      <div className="flex items-center justify-between gap-0.5 text-sm">
         <span>Admin controls</span>
-        <select
-          value={currentMode}
-          onChange={handleModeChange}
-          className="rounded-sm bg-black/40 px-1 py-1 text-sm text-slate-100"
-        >
+        <select value={currentMode} onChange={handleModeChange} className="field-input text-sm">
           {MODES.map((mode) => (
             <option key={mode.key} value={mode.key}>
               {mode.label}
@@ -73,25 +69,25 @@ export default function AdminPanel() {
         </select>
       </div>
 
-      <div className="mt-1 space-y-1 text-sm">
+      <div className="space-y-0.5 text-sm">
         {roster.map((rover) => (
-          <div key={rover.id} className="flex flex-wrap items-center justify-between gap-1 rounded-sm bg-black/30 px-1 py-1">
+          <div key={rover.id} className="surface flex flex-wrap items-center justify-between gap-0.5">
             <div>
               <p className="text-slate-100">{rover.name}</p>
               <p className="text-xs text-slate-400">{lockMap[rover.id] ? 'locked' : 'unlocked'}</p>
             </div>
-            <div className="flex flex-wrap gap-1 text-xs">
+            <div className="flex flex-wrap gap-0.5 text-xs">
               <button
                 type="button"
                 onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
-                className="rounded-sm bg-black/50 px-1 py-1 text-slate-100"
+                className="button-dark"
               >
                 {lockMap[rover.id] ? 'Unlock' : 'Lock'}
               </button>
               <button
                 type="button"
                 onClick={() => handleForceControl(rover.id)}
-                className="rounded-sm bg-black/50 px-1 py-1 text-slate-100"
+                className="button-dark"
               >
                 Force
               </button>

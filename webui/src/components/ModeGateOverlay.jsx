@@ -33,13 +33,13 @@ export default function ModeGateOverlay() {
   const details = getModeDetails(mode);
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-2 py-2">
-      <div className="w-full max-w-md space-y-2 rounded-lg bg-[#141821] p-2 text-slate-100 shadow-2xl">
-        <div className="space-y-1">
+    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-0.5 py-0.5">
+      <div className="surface w-full max-w-md space-y-0.5 text-slate-100 shadow-2xl">
+        <div className="space-y-0.5">
           <p className="text-lg font-semibold">{details.title}</p>
           <p className="text-sm text-slate-300">{details.description}</p>
         </div>
-        <div className="rounded-md bg-black/40 p-1">
+        <div className="surface-muted">
           <AuthPanel />
         </div>
         <p className="text-xs text-slate-500">

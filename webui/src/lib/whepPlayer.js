@@ -47,6 +47,7 @@ export class WhepPlayer {
     if (!this.video) return;
     this.video.playsInline = true;
     this.video.autoplay = true;
+     this.video.muted = true;
     this.video.disableRemotePlayback = true;
     if ('latencyHint' in HTMLMediaElement.prototype) {
       this.video.latencyHint = 'interactive';

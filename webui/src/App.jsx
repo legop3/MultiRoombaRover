@@ -49,12 +49,12 @@ function useLayoutMode() {
 
 function DesktopLayout({ layout }) {
   return (
-    <div className="flex flex-col gap-1">
-      <section className="grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)] gap-1">
+    <div className="flex flex-col gap-0.5">
+      <section className="grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)] gap-0.5">
         <DriverVideoPanel />
         <RightPaneTabs layout={layout} />
       </section>
-      <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-1">
+      <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-0.5">
         {/* <AdminPanel /> */}
         <LogPanel />
         <SessionSnapshot />
@@ -65,7 +65,7 @@ function DesktopLayout({ layout }) {
 
 function MobilePortraitLayout() {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-0.5">
       <DriverVideoPanel />
       <MobileControls />
       <DrivePanel />
@@ -80,21 +80,21 @@ function MobilePortraitLayout() {
 
 function MobileLandscapeLayout() {
   return (
-    <div className="flex flex-col gap-1">
-      <section className="grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-1">
+    <div className="flex flex-col gap-0.5">
+      <section className="grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-0.5">
         <MobileLandscapeAuxColumn />
         <DriverVideoPanel />
         <MobileLandscapeControlColumn />
       </section>
-      <div className="flex flex-col gap-1 pb-2">
+      <div className="flex flex-col gap-0.5 pb-0.5">
         <RoomCameraPanel />
         <DrivePanel />
-        <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-1">
-          <div className="flex flex-col gap-1">
+        <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-0.5">
+          <div className="flex flex-col gap-0.5">
             <AuthPanel />
             <AdminPanel />
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-0.5">
             <LogPanel />
             <TelemetryPanel />
           </div>
@@ -114,12 +114,12 @@ function App() {
       : <MobilePortraitLayout />;
 
   return (
-    <div className="min-h-screen bg-black text-slate-50">
+    <div className="min-h-screen bg-black text-slate-100">
       <SettingsProvider>
         <ControlSystemProvider>
           <KeyboardInputManager />
           <GamepadInputManager />
-          <main className="flex w-full flex-col gap-1 text-base">{renderedLayout}</main>
+          <main className="flex w-full flex-col gap-0.5 text-base">{renderedLayout}</main>
           <AlertFeed />
           <ModeGateOverlay />
         </ControlSystemProvider>

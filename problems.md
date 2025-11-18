@@ -4,9 +4,6 @@
 - video stream currently unloads and reloads based on the tab being active
   - just remove this feature. It needs to stay running all the time.
 
-## UI and session info
-- UI needs a display for the turns mode
-
 ## UI tweaks and fixes
 - remove redundant rover name tags everywhere
   - just have one in the hud: "You are driving <name>"
@@ -20,4 +17,7 @@
       - buttons should be even darker, almost black
       - all buttons should have a hover effect which lightens them a little
   - text should be either white or the same gray
-  - 
+
+## mobile UI elements
+- they are currently not styled to match the rest of the program
+- make them match

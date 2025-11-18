@@ -27,12 +27,12 @@ export default function DrivePanel() {
   };
 
   return (
-    <section className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
+    <section className="panel-section space-y-0.5 text-base">
       <div className="flex items-center justify-between text-sm text-slate-300">
         <span>Drive control</span>
-        <span>{roverId ? `Rover ${roverId}` : 'unassigned'}</span>
+        <span>{roverId ? 'Ready to drive' : 'No rover assigned'}</span>
       </div>
-      <div className="mt-1 space-y-1">
+      <div className="space-y-0.5">
         <ActionCard
           title="Start Driving"
           description="Press to enable driving mode, then start moving. The headlamps should illuminate."
@@ -58,21 +58,24 @@ export default function DrivePanel() {
 }
 
 function ActionCard({ title, description, statuses, tone, onClick, disabled, footnote }) {
-  const baseColor = tone === 'indigo' ? 'bg-indigo-600' : 'bg-emerald-600';
+  const colors =
+    tone === 'indigo'
+      ? { base: 'bg-indigo-600', hover: 'hover:bg-indigo-500' }
+      : { base: 'bg-emerald-600', hover: 'hover:bg-emerald-500' };
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-full rounded-lg ${baseColor} px-1 py-1 text-left text-white disabled:opacity-40`}
+      className={`w-full ${colors.base} ${colors.hover} px-0.5 py-0.5 text-left text-white transition-colors disabled:opacity-40`}
     >
       <p className="text-base font-semibold">{title}</p>
       <p className="text-sm text-white/90">{description}</p>
-      <div className="mt-1 flex flex-wrap gap-1">
+      <div className="mt-0.5 flex flex-wrap gap-0.5">
         {statuses.map((status) => (
           <span
             key={status.label}
-            className={`rounded-full px-1 py-0.5 text-xs font-semibold ${
+            className={`px-0.5 py-0.5 text-xs font-semibold ${
               status.active ? 'bg-lime-300 text-emerald-900' : 'bg-emerald-900 text-emerald-100'
             }`}
           >
@@ -80,7 +83,7 @@ function ActionCard({ title, description, statuses, tone, onClick, disabled, foo
           </span>
         ))}
       </div>
-      {footnote && <p className="mt-1 text-xs text-emerald-50/80">{footnote}</p>}
+      {footnote && <p className="mt-0.5 text-xs text-emerald-50/80">{footnote}</p>}
     </button>
   );
 }

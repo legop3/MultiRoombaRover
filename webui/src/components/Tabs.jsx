@@ -12,9 +12,9 @@ function useTabsContext() {
 
 const TAB_VARIANTS = {
   primary: {
-    base: 'flex-1 rounded-sm px-1 py-1 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-slate-500',
-    active: 'bg-slate-100 text-slate-900',
-    inactive: 'bg-black/30 text-slate-300 hover:text-slate-100',
+    base: 'flex-1 px-0.5 py-0.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-slate-500',
+    active: 'bg-sky-600 text-white',
+    inactive: 'bg-zinc-800 text-slate-200 hover:bg-sky-500 hover:text-white',
   },
 };
 
@@ -86,7 +86,7 @@ export default function Tabs({ children, defaultTab, currentTab, onTabChange, va
 }
 
 export function TabList({ children, className = '' }) {
-  return <div className={classNames('flex gap-1', className)}>{children}</div>;
+  return <div className={classNames('flex gap-0.5', className)}>{children}</div>;
 }
 
 export function Tab({ id, children, className = '', disabled = false }) {
@@ -118,7 +118,7 @@ export function Tab({ id, children, className = '', disabled = false }) {
 }
 
 export function TabPanels({ children, className = '' }) {
-  return <div className={classNames('mt-1 space-y-1', className)}>{children}</div>;
+  return <div className={classNames('mt-0.5 space-y-0.5', className)}>{children}</div>;
 }
 
 export function TabPanel({ id, children, keepMounted = false }) {

@@ -8,16 +8,16 @@ import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 
 function RoomControlsPlaceholder() {
   return (
-    <div className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
-      <p className="text-xs text-slate-400">Room controls</p>
-      <p className="text-sm text-slate-200">Coming soon: lighting, docks, and environmental toggles.</p>
+    <div className="panel-section space-y-0.5 text-sm">
+      <p className="text-slate-400">Room controls</p>
+      <p className="text-slate-200">Coming soon: lighting, docks, and environmental toggles.</p>
     </div>
   );
 }
 
 export default function RightPaneTabs({ layout }) {
   return (
-    <section className="rounded-sm bg-[#1a1d23] p-1 text-base text-slate-100">
+    <section className="panel text-base">
       <Tabs defaultTab="telemetry">
         <TabList>
           <Tab id="telemetry">Rover Controls</Tab>
@@ -27,14 +27,14 @@ export default function RightPaneTabs({ layout }) {
         </TabList>
         <TabPanels>
           <TabPanel id="telemetry">
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <DrivePanel />
               <CameraServoPanel />
               <TelemetryPanel />
             </div>
           </TabPanel>
           <TabPanel id="room">
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <RoomCameraPanel />
               <RoomControlsPlaceholder />
             </div>

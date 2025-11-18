@@ -81,12 +81,12 @@ export default function CameraServoPanel() {
   };
 
   return (
-    <section className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
+    <section className="panel-section space-y-0.5 text-base">
       <div className="flex items-center justify-between text-sm text-slate-300">
         <span>Camera Tilt</span>
         <span className="font-mono text-sm text-slate-100">{formatDegrees(value)}</span>
       </div>
-      <div className="mt-2">
+      <div>
         <input
           type="range"
           className="w-full accent-emerald-400"
@@ -99,35 +99,23 @@ export default function CameraServoPanel() {
           onTouchEnd={commitSlider}
           onPointerUp={commitSlider}
         />
-        <div className="mt-1 flex justify-between text-xs text-slate-400">
+        <div className="mt-0.5 flex justify-between text-xs text-slate-400">
           <span>{formatDegrees(min)}</span>
           <span>{formatDegrees(max)}</span>
         </div>
       </div>
-      <div className="mt-2 flex gap-1 text-sm">
-        <button
-          type="button"
-          className="flex-1 rounded bg-slate-800 px-1 py-0.5 text-slate-100 hover:bg-slate-700"
-          onClick={() => handleNudge(-1)}
-        >
+      <div className="flex gap-0.5 text-sm">
+        <button type="button" className="flex-1 button-dark" onClick={() => handleNudge(-1)}>
           Tilt Down
         </button>
-        <button
-          type="button"
-          className="flex-1 rounded bg-slate-700 px-1 py-0.5 text-slate-100 hover:bg-slate-600"
-          onClick={() => goServoHome()}
-        >
+        <button type="button" className="flex-1 button-dark" onClick={() => goServoHome()}>
           Center
         </button>
-        <button
-          type="button"
-          className="flex-1 rounded bg-slate-800 px-1 py-0.5 text-slate-100 hover:bg-slate-700"
-          onClick={() => handleNudge(1)}
-        >
+        <button type="button" className="flex-1 button-dark" onClick={() => handleNudge(1)}>
           Tilt Up
         </button>
       </div>
-      <p className="mt-1 text-xs text-slate-400">
+      <p className="text-xs text-slate-400">
         Step: {formatDegrees(step)} · Pin GPIO {config?.pin}
       </p>
     </section>

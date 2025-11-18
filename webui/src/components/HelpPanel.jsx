@@ -18,11 +18,11 @@ export default function HelpPanel({ layout }) {
   };
   const tips = presets[layout] || presets.desktop;
   return (
-    <section className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
+    <section className="panel-section space-y-0.5 text-base">
       <p className="text-sm text-slate-400">Help</p>
-      <ul className="mt-1 space-y-1 text-sm">
+      <ul className="space-y-0.5 text-sm">
         {tips.map((tip) => (
-          <li key={tip} className="rounded-sm bg-black/30 px-1 py-1 text-slate-200">
+          <li key={tip} className="surface text-slate-200">
             {tip}
           </li>
         ))}

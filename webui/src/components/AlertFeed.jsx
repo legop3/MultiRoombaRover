@@ -30,7 +30,7 @@ export default function AlertFeed() {
   if (!visible.length) return null;
 
   return (
-    <div className="pointer-events-none fixed top-1 left-1/2 z-50 flex -translate-x-1/2 flex-col gap-1">
+    <div className="pointer-events-none fixed top-0.5 left-1/2 z-50 flex -translate-x-1/2 flex-col gap-0.5">
       {visible.map((toast) => (
         <AlertToast key={toast.key} alert={toast.alert} />
       ))}
@@ -46,8 +46,8 @@ function AlertToast({ alert }) {
       ? 'bg-amber-500/30 text-amber-100'
       : 'bg-emerald-500/30 text-emerald-100';
   return (
-    <div className={`pointer-events-auto rounded-sm px-1 py-1 text-[0.75rem] ${colorClasses}`}>
-      <p className="text-[0.65rem] text-slate-300">{alert.title || 'Alert'}</p>
+    <div className={`pointer-events-auto px-0.5 py-0.5 text-[0.85rem] ${colorClasses}`}>
+      <p className="text-xs text-slate-200">{alert.title || 'Alert'}</p>
       <p className="text-sm text-white">{alert.message}</p>
     </div>
   );

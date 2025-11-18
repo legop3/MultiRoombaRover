@@ -22,43 +22,31 @@ export default function AuthPanel() {
   }
 
   return (
-    <div className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
+    <div className="panel-section space-y-0.5 text-base">
       <p className="text-sm text-slate-400">Admin login</p>
-      <form className="mt-1 flex flex-col gap-1" onSubmit={handleLogin}>
+      <form className="flex flex-col gap-0.5" onSubmit={handleLogin}>
         <input
-          className="rounded-sm bg-black/50 px-1 py-1 text-slate-100"
+          className="field-input"
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
         />
         <input
-          className="rounded-sm bg-black/50 px-1 py-1 text-slate-100"
+          className="field-input"
           placeholder="Password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-sm bg-slate-200 px-1 py-1 text-sm font-semibold text-black disabled:opacity-50"
-        >
+        <button type="submit" disabled={loading} className="button-dark w-full disabled:opacity-50">
           {loading ? 'Logging in…' : 'Login'}
         </button>
       </form>
-      <div className="mt-1 flex gap-1 text-sm">
-        <button
-          type="button"
-          onClick={() => setRole('user')}
-          className="flex-1 rounded-sm bg-black/40 px-1 py-1 text-slate-200"
-        >
+      <div className="flex gap-0.5 text-sm">
+        <button type="button" onClick={() => setRole('user')} className="flex-1 button-dark">
           Driver
         </button>
-        <button
-          type="button"
-          onClick={() => setRole('spectator')}
-          className="flex-1 rounded-sm bg-black/40 px-1 py-1 text-slate-200"
-        >
+        <button type="button" onClick={() => setRole('spectator')} className="flex-1 button-dark">
           Spectator
         </button>
       </div>

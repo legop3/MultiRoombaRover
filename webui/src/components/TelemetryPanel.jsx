@@ -47,7 +47,7 @@ export default function TelemetryPanel() {
   }
 
   return (
-    <section className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
+    <section className="panel-section space-y-0.5 text-base text-slate-100">
       <div className="text-sm text-slate-400">
         <span>{connected ? 'online' : 'offline'}</span>
         <span> · role {session?.role || 'unknown'}</span>
@@ -56,12 +56,12 @@ export default function TelemetryPanel() {
         <span> · driver {driverLabel}</span>
       </div>
       {!roverId ? (
-        <p className="mt-1 text-[0.75rem] text-slate-400">Assign a rover to view sensors.</p>
+        <p className="text-sm text-slate-500">Assign a rover to view sensors.</p>
       ) : !frame ? (
-        <p className="mt-1 text-[0.75rem] text-slate-400">Waiting for sensor frames…</p>
+        <p className="text-sm text-slate-500">Waiting for sensor frames…</p>
       ) : (
         <>
-          <div className="flex flex-wrap gap-0.5">
+          <div className="flex flex-wrap gap-0.5 text-sm">
             <Metric label="Charge" value={formatMetric(charge != null && capacity != null ? `${charge}/${capacity}` : null)} />
             <Metric label="Charging" value={formatMetric(sensors.chargingState?.label)} />
             <Metric label="OI mode" value={formatMetric(sensors.oiMode?.label)} />
@@ -70,7 +70,7 @@ export default function TelemetryPanel() {
             <Metric label="Left Encoder" value={formatMetric(sensors.encoderCountsLeft)} />
             <Metric label="Right Encoder" value={formatMetric(sensors.encoderCountsRight)} />
           </div>
-          <div className="mt-1 flex gap-0.5">
+          <div className="flex gap-0.5">
             <CliffBar value={sensors.cliffLeftSignal} />
             <CliffBar value={sensors.cliffFrontLeftSignal} />
             <CliffBar value={sensors.cliffFrontRightSignal} />
@@ -80,24 +80,24 @@ export default function TelemetryPanel() {
 
       )}
 
-  
+
 
       {rawSnippet && (
         // console.log('rawSnippet:', rawSnippet),
-        <pre className="mt-1 text-wrap break-words p-1 text-xs text-lime-300 bg-gray-700">
+        <pre className="surface whitespace-pre-wrap break-words text-xs text-lime-300">
           {rawSnippet}
         </pre>
       )}
-      <div className="mt-1">
+      <div className="space-y-0.5">
         <p className="text-sm text-slate-400">Rovers</p>
         {roster.length === 0 ? (
           // if there ARE NO rovers
           <p className="text-sm text-slate-500">No roster data.</p>
         ) : (
           // if there ARE rovers
-          <ul className="mt-1 space-y-1 text-sm">
+          <ul className="space-y-0.5 text-sm">
             {roster.map((rover) => (
-              <li key={rover.id} className="flex items-center justify-between gap-1">
+              <li key={rover.id} className="surface flex items-center justify-between gap-0.5">
                 <div>
                   <p className="text-slate-200">{rover.name}</p>
                   <p className="text-xs text-slate-500">
@@ -109,7 +109,7 @@ export default function TelemetryPanel() {
                     type="button"
                     onClick={() => handleRequest(rover.id)}
                     disabled={pending[rover.id]}
-                    className="rounded-sm bg-black/40 px-1 py-0.5 text-xs text-slate-200 disabled:opacity-40"
+                    className="button-dark disabled:opacity-40"
                   >
                     {pending[rover.id] ? '...' : 'request'}
                   </button>
@@ -130,15 +130,15 @@ function CliffBar({ value }) {
   const pct = value == null ? 0 : Math.max(0, Math.min(100, (value / 4095) * 100));
   const height = `${pct}%`;
   return (
-    <div className="w-1/4 h-6 bg-gray-700 rounded-sm overflow-hidden">
-      <div className="w-full bg-amber-400" style={{ height }} />
+    <div className="surface-muted h-6 w-1/4">
+      <div className="w-full bg-amber-500" style={{ height }} />
     </div>
   );
 }
 
 function Metric({ label, value }) {
   return (
-    <div className="bg-gray-700 rounded-sm p-0.5 text-sm">
+    <div className="surface text-sm">
       {label}: {value}
     </div>
   );
