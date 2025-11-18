@@ -212,7 +212,7 @@ function HudOverlay({ frame, session }) {
   //   { label: 'Drop L', active: bumps.wheelDropLeft },
   //   { label: 'Drop R', active: bumps.wheelDropRight },
   // ];
-  console.log('session', session);
+  // console.log('session', session);
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
       {/* <div className="flex items-center justify-between gap-1">
@@ -237,19 +237,19 @@ function HudOverlay({ frame, session }) {
 
       {/* bump and wheel drops bar */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-1 rounded-full bg-gray-900/40 p-0.5 text-[0.55rem] font-medium">
-        <div className={`px-1 py-0.5 rounded-full ${bumps.bumpLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
+        <div className={`px-0.5 py-0.5 rounded-full ${bumps.bumpLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
           Left Bump
         </div>
         {/* left wheel drop */}
-        <div className={`px-1 py-0.5 rounded-full ${bumps.wheelDropLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
+        <div className={`px-0.5 py-0.5 rounded-full ${bumps.wheelDropLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
           Left Wheel Drop
         </div>
         {/* right wheel drop */}
-        <div className={`px-1 py-0.5 rounded-full ${bumps.wheelDropRight ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
+        <div className={`px-0.5 py-0.5 rounded-full ${bumps.wheelDropRight ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
           Right Wheel Drop
         </div>
         {/* right bump */}
-        <div className={`px-1 py-0.5 rounded-full ${bumps.bumpRight ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
+        <div className={`px-0.5 py-0.5 rounded-full ${bumps.bumpRight ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
           Right Bump
         </div>
       </div>
