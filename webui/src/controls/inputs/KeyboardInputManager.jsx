@@ -17,19 +17,21 @@ const KEY_ALIASES = {
   '_': '-',
   '+': '=',
 };
-const CODE_ALIASES = {
-  BracketLeft: '[',
-  BracketRight: ']',
-  Backslash: '\\',
-  Semicolon: ';',
-  Quote: "'",
-  Comma: ',',
-  Period: '.',
-  Slash: '/',
-  Minus: '-',
-  Equal: '=',
-  Backquote: '`',
+const BINDING_CODE_MAP = {
+  '[': 'BracketLeft',
+  ']': 'BracketRight',
+  '\\': 'Backslash',
+  ';': 'Semicolon',
+  "'": 'Quote',
+  ',': 'Comma',
+  '.': 'Period',
+  '/': 'Slash',
+  '-': 'Minus',
+  '=': 'Equal',
+  '`': 'Backquote',
 };
+const CODE_PREFIX = 'code:';
+const KEY_PREFIX = 'key:';
 
 function shouldIgnoreEvent(event) {
   const target = event.target;
@@ -49,28 +51,35 @@ function canonicalizeValue(value) {
   return KEY_ALIASES[lower] ?? lower;
 }
 
-function resolveCodeToken(code) {
-  if (!code || typeof code !== 'string') return '';
-  if (CODE_ALIASES[code]) return CODE_ALIASES[code];
-  if (code.startsWith('Key') && code.length === 4) {
-    return code.slice(3).toLowerCase();
+function deriveCodeForValue(value) {
+  if (!value) return null;
+  if (BINDING_CODE_MAP[value]) return BINDING_CODE_MAP[value];
+  if (value.length === 1) {
+    if (/[a-z]/.test(value)) return `Key${value.toUpperCase()}`;
+    if (/[0-9]/.test(value)) return `Digit${value}`;
   }
-  if (code.startsWith('Digit') && code.length === 6) {
-    return code.slice(5);
-  }
-  if (code.startsWith('Numpad') && code.length > 6) {
-    const suffix = code.slice(6);
-    if (/^[0-9]$/.test(suffix)) return suffix;
-  }
-  return '';
+  return null;
 }
 
-function eventToTokens(event) {
+function makeKeyToken(value) {
+  const canonical = canonicalizeValue(value);
+  return canonical ? `${KEY_PREFIX}${canonical}` : null;
+}
+
+function makeCodeToken(value) {
+  const canonical = canonicalizeValue(value);
+  const code = deriveCodeForValue(canonical);
+  return code ? `${CODE_PREFIX}${code}` : null;
+}
+
+function tokensFromEvent(event) {
   const tokens = new Set();
-  const keyToken = canonicalizeValue(event?.key ?? '');
+  const keyToken = makeKeyToken(event?.key ?? '');
   if (keyToken) tokens.add(keyToken);
-  const codeToken = resolveCodeToken(event?.code ?? '');
-  if (codeToken) tokens.add(codeToken);
+  const code = event?.code;
+  if (code) {
+    tokens.add(`${CODE_PREFIX}${code}`);
+  }
   return Array.from(tokens);
 }
 
@@ -79,8 +88,10 @@ function normalizeKeymap(keymap = {}) {
     const values = Array.isArray(bindings) ? bindings : [bindings];
     const normalized = new Set();
     values.forEach((value) => {
-      const token = canonicalizeValue(String(value));
-      if (token) normalized.add(token);
+      const keyToken = makeKeyToken(String(value));
+      if (keyToken) normalized.add(keyToken);
+      const codeToken = makeCodeToken(String(value));
+      if (codeToken) normalized.add(codeToken);
     });
     return [action, normalized];
   });
@@ -169,15 +180,15 @@ export default function KeyboardInputManager() {
     [state.camera?.config?.nudgeDegrees],
   );
 
-  const activeKeysRef = useRef(new Set());
+  const activeTokensRef = useRef(new Set());
   const lastVectorRef = useRef(ZERO_VECTOR);
   const lastAuxRef = useRef(ZERO_AUX);
   const servoIntervalRef = useRef(null);
 
   const driveFromKeys = useCallback(() => {
-    const keysSnapshot = new Set(activeKeysRef.current);
-    const vector = computeDriveVector(keysSnapshot, keymap);
-    const aux = computeAuxMotors(keysSnapshot, keymap);
+    const tokensSnapshot = new Set(activeTokensRef.current);
+    const vector = computeDriveVector(tokensSnapshot, keymap);
+    const aux = computeAuxMotors(tokensSnapshot, keymap);
     if (
       vector.x !== lastVectorRef.current.x ||
       vector.y !== lastVectorRef.current.y ||
@@ -195,7 +206,7 @@ export default function KeyboardInputManager() {
       setAuxMotors(aux);
     }
     registerInputState(SOURCE, {
-      keys: Array.from(keysSnapshot),
+      keys: Array.from(tokensSnapshot),
       vector,
       aux,
     });
@@ -209,9 +220,9 @@ export default function KeyboardInputManager() {
   }, []);
 
   const computeServoDirection = useCallback(() => {
-    const keysSnapshot = new Set(activeKeysRef.current);
-    const up = bindingActive(keymap.cameraUp, keysSnapshot);
-    const down = bindingActive(keymap.cameraDown, keysSnapshot);
+    const tokensSnapshot = new Set(activeTokensRef.current);
+    const up = bindingActive(keymap.cameraUp, tokensSnapshot);
+    const down = bindingActive(keymap.cameraDown, tokensSnapshot);
     return (up ? 1 : 0) - (down ? 1 : 0);
   }, [keymap]);
 
@@ -237,7 +248,7 @@ export default function KeyboardInputManager() {
   }, [computeServoDirection, nudgeServo, servoStep, stopServoLoop]);
 
   const resetAll = useCallback(() => {
-    activeKeysRef.current.clear();
+    activeTokensRef.current.clear();
     lastVectorRef.current = ZERO_VECTOR;
     lastAuxRef.current = ZERO_AUX;
     stopServoLoop();
@@ -248,13 +259,13 @@ export default function KeyboardInputManager() {
   useEffect(() => {
     function handleKeyDown(event) {
       if (shouldIgnoreEvent(event)) return;
-      const tokens = eventToTokens(event);
+      const tokens = tokensFromEvent(event);
       if (tokens.length === 0) return;
       if (tokens.some((token) => actionTokens.has(token))) {
         event.preventDefault();
       }
-      const newlyPressed = tokens.filter((token) => !activeKeysRef.current.has(token));
-      newlyPressed.forEach((token) => activeKeysRef.current.add(token));
+      const newlyPressed = tokens.filter((token) => !activeTokensRef.current.has(token));
+      newlyPressed.forEach((token) => activeTokensRef.current.add(token));
 
       if (newlyPressed.length > 0) {
         if (newlyPressed.some((token) => keymap.driveMacro?.has(token))) {
@@ -271,8 +282,8 @@ export default function KeyboardInputManager() {
     }
 
     function handleKeyUp(event) {
-      const tokens = eventToTokens(event);
-      tokens.forEach((token) => activeKeysRef.current.delete(token));
+      const tokens = tokensFromEvent(event);
+      tokens.forEach((token) => activeTokensRef.current.delete(token));
       ensureServoLoop();
       driveFromKeys();
     }
