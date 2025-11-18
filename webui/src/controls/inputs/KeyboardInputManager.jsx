@@ -5,6 +5,30 @@ const SOURCE = 'keyboard';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
 const ZERO_AUX = { main: 0, side: 0, vacuum: 0 };
 const SERVO_REPEAT_MS = 110;
+const KEY_ALIASES = {
+  '{': '[',
+  '}': ']',
+  ':': ';',
+  '"': "'",
+  '<': ',',
+  '>': '.',
+  '?': '/',
+  '|': '\\',
+  '_': '-',
+  '+': '=',
+};
+const CODE_ALIASES = {
+  BracketLeft: '[',
+  BracketRight: ']',
+  Backslash: '\\',
+  Semicolon: ';',
+  Quote: "'",
+  Comma: ',',
+  Period: '.',
+  Slash: '/',
+  Minus: '-',
+  Equal: '=',
+};
 
 function shouldIgnoreEvent(event) {
   const target = event.target;
@@ -18,13 +42,30 @@ function shouldIgnoreEvent(event) {
   );
 }
 
+function canonicalizeBinding(value) {
+  if (typeof value !== 'string') return '';
+  const lower = value.toLowerCase();
+  return KEY_ALIASES[lower] ?? lower;
+}
+
 function normalizeKeymap(keymap = {}) {
   const entries = Object.entries(keymap).map(([action, bindings]) => {
     const values = Array.isArray(bindings) ? bindings : [bindings];
-    const normalized = new Set(values.map((value) => String(value).toLowerCase()));
+    const normalized = new Set(values.map((value) => canonicalizeBinding(String(value))));
     return [action, normalized];
   });
   return Object.fromEntries(entries);
+}
+
+function canonicalizeEventKey(event) {
+  if (!event) return '';
+  const code = event.code;
+  if (code && CODE_ALIASES[code]) {
+    return CODE_ALIASES[code];
+  }
+  const key = event.key ?? '';
+  const lower = key.toLowerCase();
+  return KEY_ALIASES[lower] ?? lower;
 }
 
 function bindingHas(bindingSet, key) {
@@ -194,7 +235,7 @@ export default function KeyboardInputManager() {
   useEffect(() => {
     function handleKeyDown(event) {
       if (shouldIgnoreEvent(event)) return;
-      const key = event.key?.toLowerCase();
+      const key = canonicalizeEventKey(event);
       if (!key) return;
       if (actionKeys.has(key)) {
         event.preventDefault();
@@ -221,7 +262,7 @@ export default function KeyboardInputManager() {
     }
 
     function handleKeyUp(event) {
-      const key = event.key?.toLowerCase();
+      const key = canonicalizeEventKey(event);
       if (!key || !pressedKeysRef.current.has(key)) {
         if (bindingHas(keymap.cameraUp, key)) {
           cameraHoldRef.current.delete('up');

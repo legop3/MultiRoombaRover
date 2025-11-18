@@ -131,10 +131,20 @@ function FloatingJoystick({ disabled, layout, onMove, onStop }) {
 
 function MobileJoystickPanel({ layout }) {
   const {
-    state: { roverId },
-    actions: { setDriveVector, registerInputState, stopAllMotion },
+    state: { roverId, camera },
+    actions: { setDriveVector, registerInputState, stopAllMotion, setServoAngle },
   } = useControlSystem();
   const disabled = !roverId;
+  const cameraConfig = camera?.config;
+  const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
+  const cameraMin = typeof cameraConfig?.minAngle === 'number' ? cameraConfig.minAngle : -45;
+  const cameraMax = typeof cameraConfig?.maxAngle === 'number' ? cameraConfig.maxAngle : 45;
+  const cameraValue =
+    typeof camera?.angle === 'number'
+      ? camera.angle
+      : typeof cameraConfig?.homeAngle === 'number'
+        ? cameraConfig.homeAngle
+        : (cameraMin + cameraMax) / 2;
 
   const handleMove = useCallback(
     (vector = {}) => {
@@ -157,6 +167,13 @@ function MobileJoystickPanel({ layout }) {
     registerInputState(SOURCE, { vector: zero, lastEvent: 'stop' });
   }, [disabled, registerInputState, setDriveVector]);
 
+  const handleCameraSlider = (event) => {
+    if (!cameraEnabled) return;
+    const next = Number(event.target.value);
+    if (Number.isNaN(next)) return;
+    setServoAngle(next);
+  };
+
   return (
     <div className="flex flex-col gap-1 text-slate-100">
       <DriveModeToggle size="compact" />
@@ -169,6 +186,23 @@ function MobileJoystickPanel({ layout }) {
       >
         Panic Stop
       </button>
+      {cameraEnabled && (
+        <div className="rounded-lg bg-slate-900/70 p-2 text-xs">
+          <div className="flex items-center justify-between text-[0.7rem] uppercase tracking-wide text-slate-400">
+            <span>Camera Tilt</span>
+            <span className="font-mono text-slate-200">{cameraValue.toFixed(1)}°</span>
+          </div>
+          <input
+            type="range"
+            min={cameraMin}
+            max={cameraMax}
+            step={0.5}
+            value={cameraValue}
+            onChange={handleCameraSlider}
+            className="mt-1 w-full accent-cyan-400"
+          />
+        </div>
+      )}
     </div>
   );
 }

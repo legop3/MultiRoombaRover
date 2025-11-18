@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
 import { controlReducer, initialControlState } from './controlReducer.js';
 import { computeDifferentialSpeeds, clamp } from './controlMath.js';
 import { useCommandPipeline } from './commandPipeline.js';
@@ -16,6 +16,7 @@ function clampServoAngle(config, value) {
 export function ControlSystemProvider({ children }) {
   const pipeline = useCommandPipeline();
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
+  const servoAngleRef = useRef(initialControlState.camera.angle);
 
   useEffect(() => {
     dispatch({ type: 'control/set-rover', payload: pipeline.roverId });
@@ -31,6 +32,7 @@ export function ControlSystemProvider({ children }) {
     const config = pipeline.servoConfig;
     if (!config) {
       dispatch({ type: 'control/set-camera-config', payload: { config: null } });
+      servoAngleRef.current = null;
       return;
     }
     const min = typeof config.minAngle === 'number' ? config.minAngle : -45;
@@ -40,7 +42,13 @@ export function ControlSystemProvider({ children }) {
       type: 'control/set-camera-config',
       payload: { config, angle: clamp(base, min, max) },
     });
+    servoAngleRef.current = clamp(base, min, max);
   }, [pipeline.servoConfig]);
+
+  useEffect(() => {
+    servoAngleRef.current =
+      typeof state.camera.angle === 'number' ? state.camera.angle : servoAngleRef.current;
+  }, [state.camera.angle]);
 
   useEffect(() => {
     if (pipeline.roverId) {
@@ -84,6 +92,7 @@ export function ControlSystemProvider({ children }) {
       const clamped = clampServoAngle(pipeline.servoConfig, value);
       dispatch({ type: 'control/set-camera-angle', payload: clamped });
       pipeline.sendServoAngle(clamped);
+      servoAngleRef.current = clamped;
     },
     [pipeline],
   );
@@ -94,14 +103,14 @@ export function ControlSystemProvider({ children }) {
       if (!config) return;
       const step = typeof delta === 'number' && delta !== 0 ? delta : config.nudgeDegrees || 1;
       const baseline =
-        typeof state.camera.angle === 'number'
-          ? state.camera.angle
+        typeof servoAngleRef.current === 'number'
+          ? servoAngleRef.current
           : typeof config.homeAngle === 'number'
           ? config.homeAngle
           : 0;
       setServoAngle(baseline + step);
     },
-    [pipeline.servoConfig, setServoAngle, state.camera.angle],
+    [pipeline.servoConfig, setServoAngle],
   );
 
   const goServoHome = useCallback(() => {

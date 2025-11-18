@@ -1,13 +1,19 @@
 import { useState } from 'react';
 import { useControlSystem } from '../../controls/index.js';
+import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
 
 export default function DriveModeToggle({ size = 'default' }) {
   const {
-    state: { roverId, mode },
+    state: { roverId },
     actions,
   } = useControlSystem();
   const [pending, setPending] = useState(null);
   const disabled = !roverId || pending !== null;
+  const frame = useTelemetryFrame(roverId);
+  const oiLabel = frame?.sensors?.oiMode?.label || 'Unknown';
+  const oiNormalized = oiLabel.toLowerCase();
+  const driveReady = oiNormalized === 'full';
+  const currentLabel = driveReady ? 'Drive Ready' : `OI Mode: ${oiLabel}`;
 
   const handleDrive = async () => {
     if (!roverId) return;
@@ -35,12 +41,13 @@ export default function DriveModeToggle({ size = 'default' }) {
     size === 'compact'
       ? 'text-xs px-1 py-0.5'
       : 'text-sm px-1.5 py-0.5';
-  const currentLabel = mode === 'dock' ? 'Dock mode' : 'Drive mode';
 
   return (
     <div className="rounded-sm bg-black/30 p-1 text-slate-100">
       <div className="flex items-center justify-between">
-        <span className={`rounded-full bg-slate-800 ${pillClass}`}>{currentLabel}</span>
+        <span className={`rounded-full ${driveReady ? 'bg-emerald-700' : 'bg-indigo-700'} ${pillClass}`}>
+          {currentLabel}
+        </span>
         <span className="text-[0.65rem] text-slate-400">Rover {roverId ?? '—'}</span>
       </div>
       <div className="mt-1 grid grid-cols-2 gap-1 text-xs">
