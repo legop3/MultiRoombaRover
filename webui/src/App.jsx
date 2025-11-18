@@ -3,8 +3,11 @@ import TelemetryPanel from './components/TelemetryPanel.jsx';
 import DrivePanel from './components/DrivePanel.jsx';
 import AlertFeed from './components/AlertFeed.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
-import MobileControls, { MobileJoystick, AuxMotorControls } from './components/MobileControls.jsx';
-import { DriveControlProvider } from './context/DriveControlContext.jsx';
+import MobileControls, {
+  MobileLandscapeAuxColumn,
+  MobileLandscapeControlColumn,
+} from './components/MobileControls.jsx';
+import { ControlSystemProvider, KeyboardInputManager, GamepadInputManager } from './controls/index.js';
 import RoomCameraPanel from './components/RoomCameraPanel.jsx';
 import LogPanel from './components/LogPanel.jsx';
 import AuthPanel from './components/AuthPanel.jsx';
@@ -78,13 +81,9 @@ function MobileLandscapeLayout() {
   return (
     <div className="flex flex-col gap-1">
       <section className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-1">
-        <div className="flex flex-col gap-1">
-          <AuxMotorControls />
-        </div>
+        <MobileLandscapeAuxColumn />
         <DriverVideoPanel />
-        <div className="flex flex-col gap-1">
-          <MobileJoystick />
-        </div>
+        <MobileLandscapeControlColumn />
       </section>
       <RoomCameraPanel />
       <DrivePanel />
@@ -113,11 +112,13 @@ function App() {
 
   return (
     <div className="min-h-screen bg-black text-slate-50">
-      <DriveControlProvider>
+      <ControlSystemProvider>
+        <KeyboardInputManager />
+        <GamepadInputManager />
         <main className="flex w-full flex-col gap-1 px-1 py-1 text-base">{renderedLayout}</main>
         <AlertFeed />
         <ModeGateOverlay />
-      </DriveControlProvider>
+      </ControlSystemProvider>
     </div>
   );
 }

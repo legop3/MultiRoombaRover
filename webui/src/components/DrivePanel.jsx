@@ -1,8 +1,11 @@
-import { useDriveControl } from '../context/DriveControlContext.jsx';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
+import { useControlSystem } from '../controls/index.js';
 
 export default function DrivePanel() {
-  const { roverId, runStartDockFull, seekDock } = useDriveControl();
+  const {
+    state: { roverId },
+    actions,
+  } = useControlSystem();
   const frame = useTelemetryFrame(roverId);
   const sensors = frame?.sensors || {};
   const drivingMode = (sensors.oiMode?.label || '').toLowerCase() === 'full';
@@ -10,6 +13,18 @@ export default function DrivePanel() {
   const charging = Boolean(
     sensors.chargingState?.label && sensors.chargingState.label.toLowerCase() !== 'not charging',
   );
+
+  const handleStartDrive = () => {
+    if (!roverId) return;
+    actions.setMode('drive');
+    actions.runMacro('drive-sequence');
+  };
+
+  const handleDock = () => {
+    if (!roverId) return;
+    actions.setMode('dock');
+    actions.runMacro('seek-dock');
+  };
 
   return (
     <section className="rounded-sm bg-[#242a32] p-1 text-base text-slate-100">
@@ -23,7 +38,7 @@ export default function DrivePanel() {
           description="Press to enable driving mode, then start moving. The headlamps should illuminate."
           statuses={[{ label: drivingMode ? 'Ready!' : 'Not Ready!', active: drivingMode }]}
           tone="emerald"
-          onClick={runStartDockFull}
+          onClick={handleStartDrive}
           disabled={!roverId}
         />
         <ActionCard
@@ -34,7 +49,7 @@ export default function DrivePanel() {
             { label: charging ? 'Charging!' : 'Not Charging!', active: charging },
           ]}
           tone="indigo"
-          onClick={seekDock}
+          onClick={handleDock}
           disabled={!roverId}
         />
       </div>

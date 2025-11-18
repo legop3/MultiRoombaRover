@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { useDriveControl } from '../context/DriveControlContext.jsx';
-import { useSocket } from '../context/SocketContext.jsx';
+import { useControlSystem } from '../controls/index.js';
 import AuthPanel from './AuthPanel.jsx';
 import AdminPanel from './AdminPanel.jsx';
 
@@ -13,8 +12,10 @@ const manualTabs = [
 ];
 
 export default function AdvancedSettings() {
-  const { roverId, sendOiCommand } = useDriveControl();
-  const socket = useSocket();
+  const {
+    state: { roverId },
+    actions: { sendOiCommand, setSensorStream },
+  } = useControlSystem();
   const canControl = Boolean(roverId);
 
   const sensorButtons = useMemo(
@@ -27,11 +28,7 @@ export default function AdvancedSettings() {
 
   const handleSensorToggle = (enable) => {
     if (!roverId) return;
-    socket.emit('command', {
-      roverId,
-      type: 'sensorStream',
-      data: { sensorStream: { enable } },
-    });
+    setSensorStream(enable);
   };
 
   return (

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useDriveControl } from '../context/DriveControlContext.jsx';
+import { useControlSystem } from '../controls/index.js';
 
 const SLIDER_THROTTLE_MS = 150;
 
@@ -9,14 +9,17 @@ function formatDegrees(value) {
 }
 
 export default function CameraServoPanel() {
-  const { roverId, servo } = useDriveControl();
-  const config = servo?.config;
-  const enabled = Boolean(roverId && servo?.enabled && config);
+  const {
+    state: { roverId, camera },
+    actions: { setServoAngle, nudgeServo, goServoHome },
+  } = useControlSystem();
+  const config = camera?.config;
+  const enabled = Boolean(roverId && camera?.enabled && config);
   const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
   const max = typeof config?.maxAngle === 'number' ? config.maxAngle : 30;
   const value =
-    typeof servo?.angle === 'number'
-      ? servo.angle
+    typeof camera?.angle === 'number'
+      ? camera.angle
       : typeof config?.homeAngle === 'number'
         ? config.homeAngle
         : (min + max) / 2;
@@ -52,7 +55,7 @@ export default function CameraServoPanel() {
       clearTimeout(throttleRef.current);
     }
     throttleRef.current = setTimeout(() => {
-      servo.setAngle(next);
+      setServoAngle(next);
     }, SLIDER_THROTTLE_MS);
   };
 
@@ -69,12 +72,12 @@ export default function CameraServoPanel() {
     if (throttleRef.current) {
       clearTimeout(throttleRef.current);
     }
-    servo.setAngle(pendingAngle);
+    setServoAngle(pendingAngle);
   };
 
   const handleNudge = (direction) => {
     const delta = step * direction;
-    servo.nudge(delta);
+    nudgeServo(delta);
   };
 
   return (
@@ -112,7 +115,7 @@ export default function CameraServoPanel() {
         <button
           type="button"
           className="flex-1 rounded bg-slate-700 px-1 py-0.5 text-slate-100 hover:bg-slate-600"
-          onClick={() => servo.goHome()}
+          onClick={() => goServoHome()}
         >
           Center
         </button>
