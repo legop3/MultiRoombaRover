@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import { clampUnit } from '../controls/controlMath.js';
+import { useSettingsNamespace } from '../settings/index.js';
+import { INPUT_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 import DriveModeToggle from './controls/DriveModeToggle.jsx';
 
 const SOURCE = 'mobile-joystick';
-const JOYSTICK_RADIUS = 80;
 const AUX_BUTTONS = [
   { id: 'main-forward', label: 'Main +', values: { main: 127 }, hold: true, color: 'bg-emerald-600' },
   { id: 'main-reverse', label: 'Main -', values: { main: -127 }, hold: true, color: 'bg-emerald-800' },
@@ -16,7 +17,7 @@ const AUX_BUTTONS = [
   { id: 'stop-all', label: 'Stop', values: { main: 0, side: 0, vacuum: 0 }, hold: false, color: 'bg-slate-900' },
 ];
 
-function FloatingJoystick({ disabled, layout, onMove, onStop }) {
+function FloatingJoystick({ disabled, layout, radius, onMove, onStop }) {
   const containerRef = useRef(null);
   const pointerIdRef = useRef(null);
   const baseRef = useRef({ x: 0, y: 0 });
@@ -57,13 +58,13 @@ function FloatingJoystick({ disabled, layout, onMove, onStop }) {
       const currentY = event.clientY - rect.top;
       const dx = currentX - baseRef.current.x;
       const dy = currentY - baseRef.current.y;
-      const distance = Math.min(Math.hypot(dx, dy), JOYSTICK_RADIUS);
+      const distance = Math.min(Math.hypot(dx, dy), radius);
       const angle = Math.atan2(dy, dx);
       const knobX = Math.cos(angle) * distance;
       const knobY = Math.sin(angle) * distance;
       const vector = {
-        x: clampUnit(knobX / JOYSTICK_RADIUS),
-        y: clampUnit(-knobY / JOYSTICK_RADIUS),
+        x: clampUnit(knobX / radius),
+        y: clampUnit(-knobY / radius),
         boost: false,
       };
       setVisual((prev) => ({ ...prev, knob: { x: knobX, y: knobY } }));
@@ -134,6 +135,8 @@ function MobileJoystickPanel({ layout }) {
     state: { roverId, camera },
     actions: { setDriveVector, registerInputState, stopAllMotion, setServoAngle },
   } = useControlSystem();
+  const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
+  const mobileSettings = inputSettings.mobile ?? INPUT_SETTINGS_DEFAULTS.mobile;
   const disabled = !roverId;
   const cameraConfig = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
@@ -142,9 +145,18 @@ function MobileJoystickPanel({ layout }) {
   const cameraValue =
     typeof camera?.angle === 'number'
       ? camera.angle
-      : typeof cameraConfig?.homeAngle === 'number'
-        ? cameraConfig.homeAngle
-        : (cameraMin + cameraMax) / 2;
+        : typeof cameraConfig?.homeAngle === 'number'
+          ? cameraConfig.homeAngle
+          : (cameraMin + cameraMax) / 2;
+  const joystickRadius = Math.max(40, mobileSettings.joystickRadius ?? INPUT_SETTINGS_DEFAULTS.mobile.joystickRadius);
+  const smoothing = Math.min(Math.max(mobileSettings.joystickSmoothing ?? 0, 0), 0.85);
+  const smoothedVectorRef = useRef({ x: 0, y: 0, boost: false });
+
+  useEffect(() => {
+    if (disabled) {
+      smoothedVectorRef.current = { x: 0, y: 0, boost: false };
+    }
+  }, [disabled]);
 
   const handleMove = useCallback(
     (vector = {}) => {
@@ -154,15 +166,25 @@ function MobileJoystickPanel({ layout }) {
         y: clampUnit(vector.y ?? 0),
         boost: Boolean(vector.boost),
       };
-      setDriveVector(next, { source: SOURCE });
-      registerInputState(SOURCE, { vector: next, lastEvent: 'move' });
+      const applied =
+        smoothing > 0
+          ? {
+              x: smoothedVectorRef.current.x + (next.x - smoothedVectorRef.current.x) * (1 - smoothing),
+              y: smoothedVectorRef.current.y + (next.y - smoothedVectorRef.current.y) * (1 - smoothing),
+              boost: next.boost,
+            }
+          : next;
+      smoothedVectorRef.current = applied;
+      setDriveVector(applied, { source: SOURCE });
+      registerInputState(SOURCE, { vector: applied, lastEvent: 'move' });
     },
-    [disabled, registerInputState, setDriveVector],
+    [disabled, registerInputState, setDriveVector, smoothing],
   );
 
   const handleStop = useCallback(() => {
     if (disabled) return;
     const zero = { x: 0, y: 0, boost: false };
+    smoothedVectorRef.current = zero;
     setDriveVector(zero, { source: SOURCE });
     registerInputState(SOURCE, { vector: zero, lastEvent: 'stop' });
   }, [disabled, registerInputState, setDriveVector]);
@@ -177,7 +199,13 @@ function MobileJoystickPanel({ layout }) {
   return (
     <div className="flex flex-col gap-1 text-slate-100">
       <DriveModeToggle size="compact" />
-      <FloatingJoystick disabled={disabled} layout={layout} onMove={handleMove} onStop={handleStop} />
+      <FloatingJoystick
+        disabled={disabled}
+        layout={layout}
+        radius={joystickRadius}
+        onMove={handleMove}
+        onStop={handleStop}
+      />
       <button
         type="button"
         onClick={stopAllMotion}

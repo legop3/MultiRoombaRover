@@ -3,6 +3,7 @@ import { useControlSystem } from '../controls/index.js';
 import AuthPanel from './AuthPanel.jsx';
 import AdminPanel from './AdminPanel.jsx';
 import KeymapSettings from './KeymapSettings.jsx';
+import InputSettings from './InputSettings.jsx';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -31,10 +32,10 @@ export default function AdvancedSettings() {
     if (!roverId) return;
     setSensorStream(enable);
   };
-// why is this broken
   return (
     <div className="space-y-1">
       <KeymapSettings />
+      <InputSettings />
       <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
         <p className="text-xs text-slate-400">Manual OI commands</p>
         <div className="mt-1 flex flex-wrap gap-1">

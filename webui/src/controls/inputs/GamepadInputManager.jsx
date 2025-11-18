@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
 import { clampUnit } from '../controlMath.js';
+import { useSettingsNamespace } from '../../settings/index.js';
+import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 
 const SOURCE = 'gamepad';
-const DEADZONE = 0.2;
 
-function applyDeadzone(value) {
-  return Math.abs(value) < DEADZONE ? 0 : value;
+function applyDeadzone(value, amount) {
+  return Math.abs(value) < amount ? 0 : value;
 }
 
 function computeTriggerSpeed(button, reverseButton, max = 127, reverseScale = 1) {
@@ -42,6 +43,12 @@ export default function GamepadInputManager() {
       registerInputState,
     },
   } = useControlSystem();
+  const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
+  const gamepadSettings = inputSettings.gamepad ?? INPUT_SETTINGS_DEFAULTS.gamepad;
+  const driveDeadzone = Math.min(Math.max(gamepadSettings.driveDeadzone ?? 0.2, 0), 0.8);
+  const cameraDeadzone = Math.min(Math.max(gamepadSettings.cameraDeadzone ?? 0.25, 0), 0.9);
+  const servoStep = gamepadSettings.servoStep ?? INPUT_SETTINGS_DEFAULTS.gamepad.servoStep;
+  const auxReverseScale = gamepadSettings.auxReverseScale ?? INPUT_SETTINGS_DEFAULTS.gamepad.auxReverseScale;
   const rafRef = useRef(null);
   const lastVectorRef = useRef({ x: 0, y: 0, boost: false });
   const lastAuxRef = useRef({ main: 0, side: 0, vacuum: 0 });
@@ -76,8 +83,8 @@ export default function GamepadInputManager() {
       return;
     }
 
-    const axisLX = clampUnit(applyDeadzone(pad.axes?.[0] ?? 0));
-    const axisLY = clampUnit(applyDeadzone(-(pad.axes?.[1] ?? 0)));
+    const axisLX = clampUnit(applyDeadzone(pad.axes?.[0] ?? 0, driveDeadzone));
+    const axisLY = clampUnit(applyDeadzone(-(pad.axes?.[1] ?? 0), driveDeadzone));
     const vector = { x: axisLX, y: axisLY, boost: false };
     if (!vectorsEqual(vector, lastVectorRef.current)) {
       lastVectorRef.current = vector;
@@ -85,7 +92,7 @@ export default function GamepadInputManager() {
     }
 
     const main = computeTriggerSpeed(pad.buttons?.[7], pad.buttons?.[5]);
-    const side = computeTriggerSpeed(pad.buttons?.[6], pad.buttons?.[4], 127, 0.55);
+    const side = computeTriggerSpeed(pad.buttons?.[6], pad.buttons?.[4], 127, auxReverseScale);
     const vacuum = pad.buttons?.[1]?.pressed ? 127 : 0;
     let aux = { main, side, vacuum };
     if (pad.buttons?.[0]?.pressed) {
@@ -96,11 +103,11 @@ export default function GamepadInputManager() {
       setAuxMotors(aux);
     }
 
-    const cameraAxis = clampUnit(applyDeadzone(-(pad.axes?.[3] ?? 0)));
+    const cameraAxis = clampUnit(applyDeadzone(-(pad.axes?.[3] ?? 0), cameraDeadzone));
     const now = performance.now();
     if (Math.abs(cameraAxis) > 0.25 && now - servoThrottleRef.current > 120) {
       servoThrottleRef.current = now;
-      nudgeServo(cameraAxis > 0 ? 2 : -2);
+      nudgeServo(cameraAxis > 0 ? servoStep : -servoStep);
     }
 
     if (handleButtonEdge(14, pad.buttons?.[14]?.pressed)) {
@@ -124,7 +131,19 @@ export default function GamepadInputManager() {
         rb: pad.buttons?.[5]?.pressed || false,
       },
     });
-  }, [handleButtonEdge, nudgeServo, registerInputState, runMacro, setAuxMotors, setDriveVector, setMode]);
+  }, [
+    auxReverseScale,
+    cameraDeadzone,
+    driveDeadzone,
+    handleButtonEdge,
+    nudgeServo,
+    registerInputState,
+    runMacro,
+    servoStep,
+    setAuxMotors,
+    setDriveVector,
+    setMode,
+  ]);
 
   useEffect(() => {
     function loop() {
