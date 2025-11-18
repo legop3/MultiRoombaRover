@@ -28,6 +28,20 @@ const CODE_ALIASES = {
   Slash: '/',
   Minus: '-',
   Equal: '=',
+  Backquote: '`',
+};
+const SPECIAL_CODE_FROM_KEY = {
+  '[': 'BracketLeft',
+  ']': 'BracketRight',
+  '\\': 'Backslash',
+  ';': 'Semicolon',
+  "'": 'Quote',
+  ',': 'Comma',
+  '.': 'Period',
+  '/': 'Slash',
+  '-': 'Minus',
+  '=': 'Equal',
+  '`': 'Backquote',
 };
 
 function shouldIgnoreEvent(event) {
@@ -48,10 +62,33 @@ function canonicalizeBinding(value) {
   return KEY_ALIASES[lower] ?? lower;
 }
 
+function deriveCodeFromKey(key) {
+  if (!key) return null;
+  if (SPECIAL_CODE_FROM_KEY[key]) return SPECIAL_CODE_FROM_KEY[key];
+  if (key.length === 1) {
+    if (key >= 'a' && key <= 'z') {
+      return `Key${key.toUpperCase()}`;
+    }
+    if (key >= '0' && key <= '9') {
+      return `Digit${key}`;
+    }
+  }
+  if (key === 'shift') return null;
+  return null;
+}
+
 function normalizeKeymap(keymap = {}) {
   const entries = Object.entries(keymap).map(([action, bindings]) => {
     const values = Array.isArray(bindings) ? bindings : [bindings];
-    const normalized = new Set(values.map((value) => canonicalizeBinding(String(value))));
+    const normalized = new Set();
+    values.forEach((value) => {
+      const canonical = canonicalizeBinding(String(value));
+      if (canonical) {
+        normalized.add(canonical);
+        const derivedCode = deriveCodeFromKey(canonical);
+        if (derivedCode) normalized.add(derivedCode);
+      }
+    });
     return [action, normalized];
   });
   return Object.fromEntries(entries);
@@ -236,12 +273,14 @@ export default function KeyboardInputManager() {
     function handleKeyDown(event) {
       if (shouldIgnoreEvent(event)) return;
       const key = canonicalizeEventKey(event);
+      const codeToken = event.code;
       if (!key) return;
-      if (actionKeys.has(key)) {
+      if (actionKeys.has(key) || (codeToken && actionKeys.has(codeToken))) {
         event.preventDefault();
       }
-      if (!pressedKeysRef.current.has(key)) {
-        pressedKeysRef.current.add(key);
+      pressedKeysRef.current.add(key);
+      if (codeToken) {
+        pressedKeysRef.current.add(codeToken);
       }
 
       if (bindingHas(keymap.driveMacro, key)) {
@@ -263,23 +302,21 @@ export default function KeyboardInputManager() {
 
     function handleKeyUp(event) {
       const key = canonicalizeEventKey(event);
-      if (!key || !pressedKeysRef.current.has(key)) {
-        if (bindingHas(keymap.cameraUp, key)) {
-          cameraHoldRef.current.delete('up');
-          updateServoHold();
-        } else if (bindingHas(keymap.cameraDown, key)) {
-          cameraHoldRef.current.delete('down');
-          updateServoHold();
-        }
-        return;
+      const codeToken = event.code;
+      if (key) {
+        pressedKeysRef.current.delete(key);
+      }
+      if (codeToken) {
+        pressedKeysRef.current.delete(codeToken);
       }
 
-      pressedKeysRef.current.delete(key);
-
-      if (bindingHas(keymap.cameraUp, key)) {
+      if (bindingHas(keymap.cameraUp, key) || (codeToken && bindingHas(keymap.cameraUp, codeToken))) {
         cameraHoldRef.current.delete('up');
         updateServoHold();
-      } else if (bindingHas(keymap.cameraDown, key)) {
+      } else if (
+        bindingHas(keymap.cameraDown, key) ||
+        (codeToken && bindingHas(keymap.cameraDown, codeToken))
+      ) {
         cameraHoldRef.current.delete('down');
         updateServoHold();
       }
