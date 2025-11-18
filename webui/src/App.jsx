@@ -8,6 +8,7 @@ import MobileControls, {
   MobileLandscapeControlColumn,
 } from './components/MobileControls.jsx';
 import { ControlSystemProvider, KeyboardInputManager, GamepadInputManager } from './controls/index.js';
+import { SettingsProvider } from './settings/index.js';
 import RoomCameraPanel from './components/RoomCameraPanel.jsx';
 import LogPanel from './components/LogPanel.jsx';
 import AuthPanel from './components/AuthPanel.jsx';
@@ -114,13 +115,15 @@ function App() {
 
   return (
     <div className="min-h-screen bg-black text-slate-50">
-      <ControlSystemProvider>
-        <KeyboardInputManager />
-        <GamepadInputManager />
-        <main className="flex w-full flex-col gap-1 px-1 py-1 text-base">{renderedLayout}</main>
-        <AlertFeed />
-        <ModeGateOverlay />
-      </ControlSystemProvider>
+      <SettingsProvider>
+        <ControlSystemProvider>
+          <KeyboardInputManager />
+          <GamepadInputManager />
+          <main className="flex w-full flex-col gap-1 text-base">{renderedLayout}</main>
+          <AlertFeed />
+          <ModeGateOverlay />
+        </ControlSystemProvider>
+      </SettingsProvider>
     </div>
   );
 }

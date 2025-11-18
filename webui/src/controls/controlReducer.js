@@ -30,32 +30,7 @@ export const initialControlState = {
   macros: DEFAULT_MACROS,
   keymap: DEFAULT_KEYMAP,
   inputs: {},
-  settings: {
-    status: 'idle',
-    error: null,
-    lastLoadedAt: null,
-    lastSavedAt: null,
-    data: null,
-  },
 };
-
-function mergeSettings(state, payload) {
-  const nextSettings = {
-    status: 'ready',
-    error: null,
-    lastLoadedAt: Date.now(),
-    lastSavedAt: state.settings.lastSavedAt,
-    data: payload ?? state.settings.data,
-  };
-  const nextState = { ...state, settings: nextSettings };
-  if (payload?.keymap) {
-    nextState.keymap = { ...state.keymap, ...payload.keymap };
-  }
-  if (payload?.macros) {
-    nextState.macros = payload.macros;
-  }
-  return nextState;
-}
 
 export function controlReducer(state, action) {
   switch (action.type) {
@@ -124,26 +99,6 @@ export function controlReducer(state, action) {
         },
       };
     }
-    case 'control/settings/loading':
-      return {
-        ...state,
-        settings: {
-          ...state.settings,
-          status: 'loading',
-          error: null,
-        },
-      };
-    case 'control/settings/loaded':
-      return mergeSettings(state, action.payload);
-    case 'control/settings/error':
-      return {
-        ...state,
-        settings: {
-          ...state.settings,
-          status: 'error',
-          error: action.payload,
-        },
-      };
     case 'control/set-keymap':
       return {
         ...state,

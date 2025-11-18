@@ -1,0 +1,12 @@
+export const INPUT_SETTINGS_DEFAULTS = {
+  gamepad: {
+    driveDeadzone: 0.2,
+    cameraDeadzone: 0.25,
+    servoStep: 2,
+    auxReverseScale: 0.55,
+  },
+  mobile: {
+    joystickRadius: 80,
+    joystickSmoothing: 0.15,
+  },
+};

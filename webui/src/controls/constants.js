@@ -62,6 +62,3 @@ export const DEFAULT_MACROS = [
     ],
   },
 ];
-
-export const CONTROL_SETTINGS_COOKIE = 'roverControlSettings';
-export const CONTROL_SETTINGS_MAX_AGE = 60 * 60 * 24 * 365; // 1 year

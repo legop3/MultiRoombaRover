@@ -2,9 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { controlReducer, initialControlState } from './controlReducer.js';
 import { computeDifferentialSpeeds, clamp } from './controlMath.js';
 import { useCommandPipeline } from './commandPipeline.js';
-import { loadControlSettings, saveControlSettings } from './persistence.js';
-import { DEFAULT_KEYMAP } from './constants.js';
+import { DEFAULT_KEYMAP, DEFAULT_MACROS } from './constants.js';
 import { canonicalizeKeyInput } from './keymapUtils.js';
+import { useSettingsNamespace } from '../settings/index.js';
 
 const ControlSystemContext = createContext(null);
 
@@ -25,16 +25,23 @@ export function ControlSystemProvider({ children }) {
   const pipeline = useCommandPipeline();
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
   const servoAngleRef = useRef(initialControlState.camera.angle);
+  const {
+    value: controlSettings,
+    save: saveControlSettings,
+  } = useSettingsNamespace('controls', { keymap: DEFAULT_KEYMAP, macros: DEFAULT_MACROS });
 
   useEffect(() => {
     dispatch({ type: 'control/set-rover', payload: pipeline.roverId });
   }, [pipeline.roverId]);
 
   useEffect(() => {
-    dispatch({ type: 'control/settings/loading' });
-    const data = loadControlSettings();
-    dispatch({ type: 'control/settings/loaded', payload: data });
-  }, []);
+    if (controlSettings?.keymap) {
+      dispatch({ type: 'control/set-keymap', payload: controlSettings.keymap });
+    }
+    if (controlSettings?.macros) {
+      dispatch({ type: 'control/set-macros', payload: controlSettings.macros });
+    }
+  }, [controlSettings?.keymap, controlSettings?.macros]);
 
   useEffect(() => {
     const config = pipeline.servoConfig;
@@ -98,23 +105,6 @@ export function ControlSystemProvider({ children }) {
     [pipeline],
   );
 
-  const persistSettings = useCallback(
-    (partial) => {
-      const merged = { ...(state.settings.data ?? {}), ...(partial ?? {}) };
-      const success = saveControlSettings(merged);
-      if (success) {
-        dispatch({ type: 'control/settings/loaded', payload: merged });
-      } else {
-        dispatch({
-          type: 'control/settings/error',
-          payload: new Error('Failed to save control settings'),
-        });
-      }
-      return success;
-    },
-    [state.settings.data],
-  );
-
   const updateKeyBinding = useCallback(
     (bindingId, keyValue) => {
       if (!bindingId) return false;
@@ -123,17 +113,23 @@ export function ControlSystemProvider({ children }) {
       const next = cloneKeymap(state.keymap);
       next[bindingId] = [canonical];
       dispatch({ type: 'control/set-keymap', payload: next });
-      persistSettings({ keymap: next });
+      saveControlSettings((current) => ({
+        ...(current ?? {}),
+        keymap: next,
+      }));
       return true;
     },
-    [state.keymap, persistSettings],
+    [state.keymap, saveControlSettings],
   );
 
   const resetKeyBindings = useCallback(() => {
     const defaults = cloneKeymap(DEFAULT_KEYMAP);
     dispatch({ type: 'control/set-keymap', payload: defaults });
-    persistSettings({ keymap: defaults });
-  }, [persistSettings]);
+    saveControlSettings((current) => ({
+      ...(current ?? {}),
+      keymap: defaults,
+    }));
+  }, [saveControlSettings]);
 
   const setServoAngle = useCallback(
     (value) => {
@@ -218,12 +214,6 @@ export function ControlSystemProvider({ children }) {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });
   }, []);
 
-  const reloadSettings = useCallback(() => {
-    dispatch({ type: 'control/settings/loading' });
-    const next = loadControlSettings();
-    dispatch({ type: 'control/settings/loaded', payload: next });
-  }, []);
-
   const contextValue = useMemo(
     () => ({
       state,
@@ -243,8 +233,6 @@ export function ControlSystemProvider({ children }) {
         updateKeyBinding,
         resetKeyBindings,
         registerInputState,
-        reloadSettings,
-        persistSettings,
       },
     }),
     [
@@ -263,8 +251,6 @@ export function ControlSystemProvider({ children }) {
       updateKeyBinding,
       resetKeyBindings,
       registerInputState,
-      reloadSettings,
-      persistSettings,
     ],
   );
 
