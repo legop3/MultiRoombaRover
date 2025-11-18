@@ -80,8 +80,6 @@ export function ControlSystemProvider({ children }) {
 
   const setDriveVector = useCallback(
     (vector, meta = {}) => {
-      // eslint-disable-next-line no-console
-      console.debug('[control] setDriveVector', vector, meta);
       const computed = computeDifferentialSpeeds(vector);
       dispatch({
         type: 'control/update-drive',
@@ -94,8 +92,6 @@ export function ControlSystemProvider({ children }) {
 
   const setAuxMotors = useCallback(
     (values = {}) => {
-      // eslint-disable-next-line no-console
-      console.debug('[control] setAuxMotors', values);
       const payload = pipeline.sendAuxMotors(values) ?? values;
       dispatch({
         type: 'control/set-aux-motors',
