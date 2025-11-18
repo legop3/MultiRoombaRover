@@ -68,6 +68,7 @@ app.post('/mediamtx/auth', (req, res) => {
   const path = (body.path || '').replace(/^\//, '');
   const sessionId = body.user;
   const roverId = extractRoverId(path);
+  logger.info('video auth request', { path: body.path, sessionId, roverId });
 
   if (!sessionId || !roverId) {
     logger.warn('auth missing session or rover (session=%s path=%s)', sessionId, path);
