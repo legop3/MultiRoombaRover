@@ -19,5 +19,5 @@
     - things inside panels should be a darker gray
       - buttons should be even darker, almost black
       - all buttons should have a hover effect which lightens them a little
-  - text should be either white or gray
+  - text should be either white or the same gray
   - 

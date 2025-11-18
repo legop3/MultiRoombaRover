@@ -159,7 +159,7 @@ function BatteryBar({ charge, config, label, status }) {
     return (
       <div className="rounded-sm bg-[#1e1e1e] px-1 py-1 text-sm text-slate-200">
         <div className="flex items-center justify-between text-xs text-slate-400">
-          <span>{label}</span>
+          {/* <span>{label}</span> */}
           <span>{status}</span>
         </div>
         <p className="mt-1 text-xs text-slate-400">Battery telemetry unavailable</p>
@@ -179,7 +179,7 @@ function BatteryBar({ charge, config, label, status }) {
   return (
     <div className="space-y-2 rounded-sm bg-[#1e1e1e] px-1 py-1 text-sm text-slate-200">
       <div className="flex items-center justify-between text-xs text-slate-400">
-        <span>{label}</span>
+        {/* <span>{label}</span> */}
         <span>{status}</span>
       </div>
       <div className="relative h-4 w-full rounded-full bg-slate-800">
@@ -233,7 +233,7 @@ function HudOverlay({ frame, label }) {
       </div> */}
       {/* status that tells you the name of your rover (label) */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 rounded-full bg-gray-900/40 px-2 py-0.5 text-[0.65rem] font-medium text-slate-200">
-        <span>{label || 'Unnamed Rover'}</span>
+        <span>You are driving {label || 'Unnamed Rover'}</span>
         <span>|</span>
         <span>{pulse ? 'Sensors Active' : 'No Recent Sensor Data'}</span>
       </div>
