@@ -10,3 +10,25 @@ export const INPUT_SETTINGS_DEFAULTS = {
     joystickSmoothing: 0.15,
   },
 };
+
+export const GAMEPAD_MAPPING_DEFAULT = {
+  drive: {
+    horizontal: null,
+    vertical: null,
+  },
+  camera: {
+    vertical: null,
+  },
+  triggers: {
+    main: null,
+    side: null,
+  },
+  buttons: {
+    mainReverse: null,
+    sideReverse: null,
+    vacuum: null,
+    allAux: null,
+    driveMacro: null,
+    dockMacro: null,
+  },
+};

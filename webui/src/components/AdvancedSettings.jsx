@@ -4,6 +4,7 @@ import AuthPanel from './AuthPanel.jsx';
 import AdminPanel from './AdminPanel.jsx';
 import KeymapSettings from './KeymapSettings.jsx';
 import InputSettings from './InputSettings.jsx';
+import GamepadMappingSettings from './GamepadMappingSettings.jsx';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -35,7 +36,8 @@ export default function AdvancedSettings() {
   return (
     <div className="space-y-1">
       <KeymapSettings />
-      <InputSettings />
+      {/* <InputSettings /> */}
+      <GamepadMappingSettings />
       <section className="rounded-sm bg-[#242a32] p-1 text-sm text-slate-100">
         <p className="text-xs text-slate-400">Manual OI commands</p>
         <div className="mt-1 flex flex-wrap gap-1">
