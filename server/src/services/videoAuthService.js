@@ -22,17 +22,31 @@ function getPathPrefix() {
 }
 
 const whepPathPrefix = getPathPrefix().replace(/\/+$/, '').replace(/^\/+/, '');
+const whepPrefixSegments = whepPathPrefix ? whepPathPrefix.split('/').filter(Boolean) : [];
 
 function extractRoverId(path) {
-  let clean = (path || '').replace(/^\//, '');
-  if (!clean) return '';
-  if (clean.endsWith('/whep')) {
-    clean = clean.slice(0, -'/whep'.length);
+  const segments = (path || '').split('/').filter(Boolean);
+  if (!segments.length) {
+    return '';
   }
-  if (whepPathPrefix && clean.startsWith(`${whepPathPrefix}/`)) {
-    clean = clean.slice(whepPathPrefix.length + 1);
+
+  let start = 0;
+  if (
+    whepPrefixSegments.length &&
+    whepPrefixSegments.every((segment, idx) => segments[idx] === segment)
+  ) {
+    start = whepPrefixSegments.length;
   }
-  return clean;
+
+  let end = segments.length;
+  if (segments[end - 1] === 'whep') {
+    end -= 1;
+  }
+
+  if (end - start !== 1) {
+    return '';
+  }
+  return segments[start] || '';
 }
 
 function canView(socket) {
