@@ -233,7 +233,7 @@ function HudOverlay({ frame, session }) {
       </div> */}
       {/* status that tells you the name of your rover (label) */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 rounded-full bg-gray-900/40 px-2 py-0.5 text-[0.65rem] font-medium text-slate-200">
-        <span>{session?.label || 'Unnamed Rover'}</span>
+        <span>{label || 'Unnamed Rover'}</span>
         <span>|</span>
         <span>{pulse ? 'Sensors Active' : 'No Recent Sensor Data'}</span>
       </div>
