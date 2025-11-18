@@ -19,16 +19,16 @@ export const GAMEPAD_MAPPING_DEFAULT = {
   camera: {
     vertical: null,
   },
-  triggers: {
-    main: null,
-    side: null,
+  brushes: {
+    mainAxis: null,
+    sideAxis: null,
   },
   buttons: {
+    allAux: null,
+    vacuum: null,
     mainReverse: null,
     sideReverse: null,
-    vacuum: null,
-    allAux: null,
-    driveMacro: null,
-    dockMacro: null,
+    dock: null,
+    drive: null,
   },
 };

@@ -25,17 +25,17 @@ function useGamepad() {
 }
 
 const ACTIONS = [
-  { id: 'driveHorizontal', label: 'Drive horizontal', type: 'axis', section: 'Drive stick', path: ['drive', 'horizontal'] },
-  { id: 'driveVertical', label: 'Drive vertical', type: 'axis', section: 'Drive stick', path: ['drive', 'vertical'] },
-  { id: 'cameraVertical', label: 'Camera vertical', type: 'axis', section: 'Camera stick', path: ['camera', 'vertical'] },
-  { id: 'mainTrigger', label: 'Main brush trigger', type: 'button', section: 'Brush triggers', path: ['triggers', 'main'] },
-  { id: 'mainReverse', label: 'Main reverse button', type: 'button', section: 'Brush triggers', path: ['buttons', 'mainReverse'] },
-  { id: 'sideTrigger', label: 'Side brush trigger', type: 'button', section: 'Brush triggers', path: ['triggers', 'side'] },
-  { id: 'sideReverse', label: 'Side reverse button', type: 'button', section: 'Brush triggers', path: ['buttons', 'sideReverse'] },
+  { id: 'driveHorizontal', label: 'Drive horizontal', type: 'axis', section: 'Drive joystick', path: ['drive', 'horizontal'] },
+  { id: 'driveVertical', label: 'Drive vertical', type: 'axis', section: 'Drive joystick', path: ['drive', 'vertical'] },
+  { id: 'cameraVertical', label: 'Camera vertical', type: 'axis', section: 'Camera joystick', path: ['camera', 'vertical'] },
+  { id: 'mainAxis', label: 'Main brush axis', type: 'axis', section: 'Brush analog', path: ['brushes', 'mainAxis'] },
+  { id: 'sideAxis', label: 'Side brush axis', type: 'axis', section: 'Brush analog', path: ['brushes', 'sideAxis'] },
+  { id: 'mainReverse', label: 'Toggle main reverse', type: 'button', section: 'Brush toggles', path: ['buttons', 'mainReverse'] },
+  { id: 'sideReverse', label: 'Toggle side reverse', type: 'button', section: 'Brush toggles', path: ['buttons', 'sideReverse'] },
   { id: 'vacuum', label: 'Vacuum button', type: 'button', section: 'Auxiliary buttons', path: ['buttons', 'vacuum'] },
-  { id: 'allAux', label: 'All aux forward button', type: 'button', section: 'Auxiliary buttons', path: ['buttons', 'allAux'] },
-  { id: 'driveMacro', label: 'Drive macro button', type: 'button', section: 'Mode buttons', path: ['buttons', 'driveMacro'] },
-  { id: 'dockMacro', label: 'Dock macro button', type: 'button', section: 'Mode buttons', path: ['buttons', 'dockMacro'] },
+  { id: 'allAux', label: 'All aux button', type: 'button', section: 'Auxiliary buttons', path: ['buttons', 'allAux'] },
+  { id: 'drive', label: 'Drive macro button', type: 'button', section: 'Mode buttons', path: ['buttons', 'drive'] },
+  { id: 'dock', label: 'Dock macro button', type: 'button', section: 'Mode buttons', path: ['buttons', 'dock'] },
 ];
 
 function formatAxis(value) {
@@ -71,8 +71,13 @@ export default function GamepadMappingSettings() {
         if (capture.type === 'axis') {
           for (let i = 0; i < pad.axes.length; i += 1) {
             const value = pad.axes[i];
-            if (Math.abs(value) > 0.55) {
-              save((prev) => updatePath(prev, capture.path, () => ({ index: i, invert: value < 0 })));
+            if (Math.abs(value) > 0.65) {
+              save((prev) =>
+                updatePath(prev, capture.path, () => ({
+                  index: i,
+                  invert: value < 0,
+                })),
+              );
               setCapture(null);
               return;
             }
@@ -120,7 +125,9 @@ export default function GamepadMappingSettings() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Gamepad mapping</p>
           <p className="text-[0.65rem] text-slate-500">
-            {gamepadConnected ? 'Press buttons or move sticks when prompted.' : 'Connect a controller to configure.'}
+            {gamepadConnected
+              ? 'Move sticks/axes with a big sweep or press buttons when capturing.'
+              : 'Connect a controller to configure.'}
           </p>
           {capture && (
             <p className="mt-1 text-[0.7rem] text-emerald-400">Capturing {capture.label}…</p>

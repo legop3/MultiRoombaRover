@@ -54,19 +54,20 @@ export default function GamepadInputManager() {
     Boolean(mapping?.drive?.horizontal) &&
     Boolean(mapping?.drive?.vertical) &&
     Boolean(mapping?.camera?.vertical) &&
-    Boolean(mapping?.triggers?.main) &&
-    Boolean(mapping?.triggers?.side) &&
+    Boolean(mapping?.brushes?.mainAxis) &&
+    Boolean(mapping?.brushes?.sideAxis) &&
     Boolean(mapping?.buttons?.mainReverse) &&
     Boolean(mapping?.buttons?.sideReverse) &&
     Boolean(mapping?.buttons?.vacuum) &&
     Boolean(mapping?.buttons?.allAux) &&
-    Boolean(mapping?.buttons?.driveMacro) &&
-    Boolean(mapping?.buttons?.dockMacro);
+    Boolean(mapping?.buttons?.drive) &&
+    Boolean(mapping?.buttons?.dock);
   const rafRef = useRef(null);
   const lastVectorRef = useRef({ x: 0, y: 0, boost: false });
   const lastAuxRef = useRef({ main: 0, side: 0, vacuum: 0 });
   const buttonStateRef = useRef(new Map());
   const servoThrottleRef = useRef(0);
+  const reverseStateRef = useRef({ main: false, side: false });
 
   const handleButtonEdge = useCallback((key, pressed) => {
     const prev = buttonStateRef.current.get(key) || false;
@@ -126,13 +127,15 @@ export default function GamepadInputManager() {
       setDriveVector(vector, { source: SOURCE });
     }
 
-    const mainMagnitude = Math.round(getButtonValue(pad, mapping.triggers.main) * 127);
-    const mainReverse = isButtonPressed(pad, mapping.buttons.mainReverse);
-    const main = mainReverse ? -mainMagnitude : mainMagnitude;
+    const mainRaw = getAxisValue(pad, mapping.brushes.mainAxis);
+    const mainMagnitude = Math.round(Math.min(Math.abs(mainRaw), 1) * 127);
+    const main = reverseStateRef.current.main ? -mainMagnitude : mainMagnitude;
 
-    const sideMagnitude = Math.round(getButtonValue(pad, mapping.triggers.side) * 127);
-    const sideReverse = isButtonPressed(pad, mapping.buttons.sideReverse);
-    const side = sideReverse ? -Math.round(sideMagnitude * auxReverseScale) : sideMagnitude;
+    const sideRaw = getAxisValue(pad, mapping.brushes.sideAxis);
+    const sideMagnitude = Math.round(Math.min(Math.abs(sideRaw), 1) * 127);
+    const side = reverseStateRef.current.side
+      ? -Math.round(sideMagnitude * auxReverseScale)
+      : Math.round(sideMagnitude * auxReverseScale);
 
     const vacuum = isButtonPressed(pad, mapping.buttons.vacuum) ? 127 : 0;
     let aux = { main, side, vacuum };
@@ -151,28 +154,29 @@ export default function GamepadInputManager() {
       nudgeServo(cameraAxis > 0 ? servoStep : -servoStep);
     }
 
-    const driveMacroPressed = isButtonPressed(pad, mapping.buttons.driveMacro);
-    if (handleButtonEdge(`macro-${mapping.buttons.driveMacro.index}`, driveMacroPressed)) {
+    if (handleButtonEdge('toggle-main', isButtonPressed(pad, mapping.buttons.mainReverse))) {
+      reverseStateRef.current.main = !reverseStateRef.current.main;
+    }
+    if (handleButtonEdge('toggle-side', isButtonPressed(pad, mapping.buttons.sideReverse))) {
+      reverseStateRef.current.side = !reverseStateRef.current.side;
+    }
+
+    if (handleButtonEdge(`macro-${mapping.buttons.drive.index}`, isButtonPressed(pad, mapping.buttons.drive))) {
       setMode('drive');
       runMacro('drive-sequence');
     }
-    const dockMacroPressed = isButtonPressed(pad, mapping.buttons.dockMacro);
-    if (handleButtonEdge(`macro-${mapping.buttons.dockMacro.index}`, dockMacroPressed)) {
+    if (handleButtonEdge(`macro-${mapping.buttons.dock.index}`, isButtonPressed(pad, mapping.buttons.dock))) {
       setMode('dock');
       runMacro('seek-dock');
     }
 
     registerInputState(SOURCE, {
       connected: true,
+      mappingReady: true,
       id: pad.id,
       index: pad.index,
       axes: [axisLX, axisLY, cameraAxis],
-      buttons: {
-        a: pad.buttons?.[0]?.pressed || false,
-        b: pad.buttons?.[1]?.pressed || false,
-        lb: pad.buttons?.[4]?.pressed || false,
-        rb: pad.buttons?.[5]?.pressed || false,
-      },
+      reverse: { ...reverseStateRef.current },
     });
   }, [
     auxReverseScale,
@@ -183,16 +187,16 @@ export default function GamepadInputManager() {
     handleButtonEdge,
     isButtonPressed,
     mapping.buttons?.allAux,
-    mapping.buttons?.dockMacro,
-    mapping.buttons?.driveMacro,
+    mapping.buttons?.dock,
+    mapping.buttons?.drive,
     mapping.buttons?.mainReverse,
     mapping.buttons?.sideReverse,
     mapping.buttons?.vacuum,
     mapping.camera?.vertical,
     mapping.drive?.horizontal,
     mapping.drive?.vertical,
-    mapping.triggers?.main,
-    mapping.triggers?.side,
+    mapping.brushes?.mainAxis,
+    mapping.brushes?.sideAxis,
     mappingReady,
     nudgeServo,
     registerInputState,
