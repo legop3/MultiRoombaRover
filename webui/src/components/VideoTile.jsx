@@ -214,7 +214,7 @@ function HudOverlay({ frame }) {
   // ];
 
   return (
-    <div className="absolute">
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
       {/* <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1 text-[0.55rem] text-slate-400">
           <span className={`h-2 w-2 rounded-full ${pulse ? 'bg-emerald-300 shadow-[0_0_4px_rgba(16,185,129,0.8)]' : 'bg-slate-700'}`} />
@@ -232,7 +232,7 @@ function HudOverlay({ frame }) {
         ))}
       </div> */}
       {/* bump and wheel drops bar */}
-      <div className="flex top-3 left-1/2 -translate-x-1/2 gap-1 bg-gray-900/40 rounded-full relative">
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-1 rounded-full bg-gray-900/40 px-2 py-1">
         <div className={`px-1 py-0.5 rounded-full ${bumps.bumpLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
           Left Bump
         </div>
