@@ -143,7 +143,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
           controls={false}
           className="h-full w-full object-contain"
         />
-        <HudOverlay frame={telemetryFrame} />
+        <HudOverlay frame={telemetryFrame} session={sessionInfo}/>
         <OvercurrentOverlay motors={overcurrentMotors} />
       </div>
       <BatteryBar charge={batteryCharge} config={batteryConfig} label={label} status={renderedStatus} />
@@ -159,7 +159,7 @@ function BatteryBar({ charge, config, label, status }) {
     return (
       <div className="rounded-sm bg-[#1e1e1e] px-1 py-1 text-sm text-slate-200">
         <div className="flex items-center justify-between text-xs text-slate-400">
-          <span>{label}</span>
+          {/* <span>{label}</span> */}
           <span>{status}</span>
         </div>
         <p className="mt-1 text-xs text-slate-400">Battery telemetry unavailable</p>
@@ -192,7 +192,7 @@ function BatteryBar({ charge, config, label, status }) {
   );
 }
 
-function HudOverlay({ frame }) {
+function HudOverlay({ frame, session }) {
   const sensors = frame?.sensors;
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const [now, setNow] = useState(() => Date.now());
@@ -212,7 +212,7 @@ function HudOverlay({ frame }) {
   //   { label: 'Drop L', active: bumps.wheelDropLeft },
   //   { label: 'Drop R', active: bumps.wheelDropRight },
   // ];
-
+  console.log('session', session);
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
       {/* <div className="flex items-center justify-between gap-1">
@@ -231,8 +231,12 @@ function HudOverlay({ frame }) {
           <HudBadge key={badge.label} label={badge.label} active={badge.active} />
         ))}
       </div> */}
+      {/* status that tells you the name of your rover */}
+
+
+
       {/* bump and wheel drops bar */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-1 rounded-full bg-gray-900/40 px-2 py-1">
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-1 rounded-full bg-gray-900/40 p-0.5 text-[0.55rem] font-medium">
         <div className={`px-1 py-0.5 rounded-full ${bumps.bumpLeft ? 'bg-red-500 text-white animate-pulse' : 'bg-black/40 text-slate-500'}`}>
           Left Bump
         </div>
