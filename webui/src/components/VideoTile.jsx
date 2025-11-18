@@ -143,7 +143,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
           controls={false}
           className="h-full w-full object-contain"
         />
-        <HudOverlay frame={telemetryFrame} session={sessionInfo}/>
+        <HudOverlay frame={telemetryFrame} label={label}/>
         <OvercurrentOverlay motors={overcurrentMotors} />
       </div>
       <BatteryBar charge={batteryCharge} config={batteryConfig} label={label} status={renderedStatus} />
@@ -192,7 +192,7 @@ function BatteryBar({ charge, config, label, status }) {
   );
 }
 
-function HudOverlay({ frame, session }) {
+function HudOverlay({ frame, label }) {
   const sensors = frame?.sensors;
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const [now, setNow] = useState(() => Date.now());
