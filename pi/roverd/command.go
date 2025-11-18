@@ -6,7 +6,7 @@ type helloMessage struct {
 	Battery       BatteryConfig     `json:"battery"`
 	MaxWheelSpeed int               `json:"maxWheelSpeed"`
 	Media         MediaConfig       `json:"media"`
-	CameraServo   CameraServoConfig `json:"cameraServo,omitempty"`
+	CameraServo   CameraServoConfig `json:"cameraServo"`
 }
 
 type sensorMessage struct {
