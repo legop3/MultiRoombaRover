@@ -42,6 +42,8 @@ export function useCommandPipeline() {
         left: clampRange(speeds?.left ?? 0, [-500, 500]),
         right: clampRange(speeds?.right ?? 0, [-500, 500]),
       };
+      // eslint-disable-next-line no-console
+      console.debug('[pipeline] sendDriveDirect', payload);
       emitCommand({
         type: 'drive',
         data: { driveDirect: payload },
@@ -59,6 +61,8 @@ export function useCommandPipeline() {
         side: clampRange(side, AUX_LIMITS.side),
         vacuum: clampRange(vacuum, AUX_LIMITS.vacuum),
       };
+      // eslint-disable-next-line no-console
+      console.debug('[pipeline] sendAuxMotors', payload);
       emitCommand({
         type: 'motors',
         data: { motorPwm: payload },

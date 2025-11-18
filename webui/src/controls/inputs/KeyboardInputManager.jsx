@@ -194,6 +194,8 @@ export default function KeyboardInputManager() {
       vector.y !== lastVectorRef.current.y ||
       vector.boost !== lastVectorRef.current.boost
     ) {
+      // eslint-disable-next-line no-console
+      console.debug('[keyboard] drive vector', Array.from(tokensSnapshot), vector);
       lastVectorRef.current = vector;
       setDriveVector(vector, { source: SOURCE });
     }
@@ -202,6 +204,8 @@ export default function KeyboardInputManager() {
       aux.side !== lastAuxRef.current.side ||
       aux.vacuum !== lastAuxRef.current.vacuum
     ) {
+      // eslint-disable-next-line no-console
+      console.debug('[keyboard] aux state', Array.from(tokensSnapshot), aux);
       lastAuxRef.current = aux;
       setAuxMotors(aux);
     }
@@ -229,18 +233,26 @@ export default function KeyboardInputManager() {
   const ensureServoLoop = useCallback(() => {
     const direction = computeServoDirection();
     if (direction === 0) {
+      if (servoIntervalRef.current) {
+        // eslint-disable-next-line no-console
+        console.debug('[keyboard] servo loop stop');
+      }
       stopServoLoop();
       return;
     }
     if (servoIntervalRef.current) {
       return;
     }
+    // eslint-disable-next-line no-console
+    console.debug('[keyboard] servo loop start', direction);
     const tick = () => {
       const nextDirection = computeServoDirection();
       if (nextDirection === 0) {
         stopServoLoop();
         return;
       }
+      // eslint-disable-next-line no-console
+      console.debug('[keyboard] servo tick', nextDirection);
       nudgeServo(nextDirection * servoStep);
       servoIntervalRef.current = setTimeout(tick, SERVO_REPEAT_MS);
     };
@@ -264,6 +276,8 @@ export default function KeyboardInputManager() {
       if (tokens.some((token) => actionTokens.has(token))) {
         event.preventDefault();
       }
+      // eslint-disable-next-line no-console
+      console.debug('[keyboard] keydown', { key: event.key, code: event.code, tokens });
       const newlyPressed = tokens.filter((token) => !activeTokensRef.current.has(token));
       newlyPressed.forEach((token) => activeTokensRef.current.add(token));
 
@@ -283,6 +297,8 @@ export default function KeyboardInputManager() {
 
     function handleKeyUp(event) {
       const tokens = tokensFromEvent(event);
+      // eslint-disable-next-line no-console
+      console.debug('[keyboard] keyup', { key: event.key, code: event.code, tokens });
       tokens.forEach((token) => activeTokensRef.current.delete(token));
       ensureServoLoop();
       driveFromKeys();
