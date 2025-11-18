@@ -10,14 +10,6 @@ function applyDeadzone(value, amount) {
   return Math.abs(value) < amount ? 0 : value;
 }
 
-function computeTriggerSpeed(button, reverseButton, max = 127, reverseScale = 1) {
-  if (!button) return 0;
-  const value = typeof button.value === 'number' ? button.value : button.pressed ? 1 : 0;
-  if (value < 0.05) return 0;
-  const direction = reverseButton?.pressed ? -1 : 1;
-  return Math.round(value * max * direction * reverseScale);
-}
-
 function vectorsEqual(a, b) {
   return (
     a &&

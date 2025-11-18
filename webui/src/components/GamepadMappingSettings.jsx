@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsNamespace } from '../settings/index.js';
-import { GAMEPAD_MAPPING_DEFAULT } from '../settings/namespaces.js';
+import { GAMEPAD_MAPPING_DEFAULT, INPUT_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 
 function useGamepad() {
   const [connected, setConnected] = useState(false);
@@ -24,6 +24,8 @@ function useGamepad() {
   return connected;
 }
 
+const NUMBER_FORMAT = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+
 const ACTIONS = [
   { id: 'driveHorizontal', label: 'Drive horizontal', type: 'axis', section: 'Drive joystick', path: ['drive', 'horizontal'] },
   { id: 'driveVertical', label: 'Drive vertical', type: 'axis', section: 'Drive joystick', path: ['drive', 'vertical'] },
@@ -37,6 +39,27 @@ const ACTIONS = [
   { id: 'drive', label: 'Drive macro button', type: 'button', section: 'Mode buttons', path: ['buttons', 'drive'] },
   { id: 'dock', label: 'Dock macro button', type: 'button', section: 'Mode buttons', path: ['buttons', 'dock'] },
 ];
+
+function SliderField({ label, description, min, max, step, value, onChange }) {
+  return (
+    <label className="block rounded border border-white/5 p-1">
+      <div className="flex items-center justify-between text-xs text-slate-300">
+        <span className="font-semibold text-slate-100">{label}</span>
+        <span className="font-mono text-slate-400">{NUMBER_FORMAT.format(value)}</span>
+      </div>
+      {description && <p className="text-[0.65rem] text-slate-500">{description}</p>}
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="mt-1 w-full accent-emerald-400"
+      />
+    </label>
+  );
+}
 
 function formatAxis(value) {
   if (!value) return 'Unassigned';
@@ -59,8 +82,17 @@ function updatePath(mapping, path, updater) {
 export default function GamepadMappingSettings() {
   const gamepadConnected = useGamepad();
   const { value: mapping, save, reset } = useSettingsNamespace('gamepadMapping', GAMEPAD_MAPPING_DEFAULT);
+  const { value: inputSettings, save: saveInputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
+  const gamepadTuning = inputSettings.gamepad ?? INPUT_SETTINGS_DEFAULTS.gamepad;
   const [capture, setCapture] = useState(null);
   const axisBaselineRef = useRef(null);
+
+  const updateTuning = (patch) => {
+    saveInputSettings((prev) => ({
+      ...prev,
+      gamepad: { ...(prev.gamepad ?? INPUT_SETTINGS_DEFAULTS.gamepad), ...patch },
+    }));
+  };
 
   useEffect(() => {
     axisBaselineRef.current = null;
@@ -152,6 +184,47 @@ export default function GamepadMappingSettings() {
         </button>
       </div>
       <div className="mt-2 space-y-2">
+        <div className="rounded border border-white/5 p-1">
+          <p className="text-[0.7rem] uppercase tracking-wide text-slate-500">Sensitivity &amp; feel</p>
+          <div className="mt-1 space-y-1">
+            <SliderField
+              label="Drive deadzone"
+              description="Ignore small drive stick movement"
+              min={0}
+              max={0.6}
+              step={0.01}
+              value={gamepadTuning.driveDeadzone ?? 0.2}
+              onChange={(driveDeadzone) => updateTuning({ driveDeadzone })}
+            />
+            <SliderField
+              label="Camera deadzone"
+              description="Tilt stick sensitivity"
+              min={0}
+              max={0.6}
+              step={0.01}
+              value={gamepadTuning.cameraDeadzone ?? 0.25}
+              onChange={(cameraDeadzone) => updateTuning({ cameraDeadzone })}
+            />
+            <SliderField
+              label="Servo step (deg)"
+              description="Degrees per camera tick"
+              min={0.5}
+              max={6}
+              step={0.25}
+              value={gamepadTuning.servoStep ?? 2}
+              onChange={(servoStep) => updateTuning({ servoStep })}
+            />
+            <SliderField
+              label="Side reverse multiplier"
+              description="Scale when reversing the side brush"
+              min={0.3}
+              max={1}
+              step={0.05}
+              value={gamepadTuning.auxReverseScale ?? 0.55}
+              onChange={(auxReverseScale) => updateTuning({ auxReverseScale })}
+            />
+          </div>
+        </div>
         {Object.entries(grouped).map(([section, actions]) => (
           <div key={section} className="rounded border border-white/5 p-1">
             <p className="text-[0.7rem] uppercase tracking-wide text-slate-500">{section}</p>

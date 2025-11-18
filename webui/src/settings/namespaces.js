@@ -5,10 +5,6 @@ export const INPUT_SETTINGS_DEFAULTS = {
     servoStep: 2,
     auxReverseScale: 0.55,
   },
-  mobile: {
-    joystickRadius: 80,
-    joystickSmoothing: 0.15,
-  },
 };
 
 export const GAMEPAD_MAPPING_DEFAULT = {

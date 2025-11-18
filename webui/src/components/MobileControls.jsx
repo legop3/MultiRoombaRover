@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import { clampUnit } from '../controls/controlMath.js';
-import { useSettingsNamespace } from '../settings/index.js';
-import { INPUT_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 import DriveModeToggle from './controls/DriveModeToggle.jsx';
 
 const SOURCE = 'mobile-joystick';
+const JOYSTICK_RADIUS = 80;
+const JOYSTICK_SMOOTHING = 0.15;
 const AUX_BUTTONS = [
   { id: 'main-forward', label: 'Main +', values: { main: 127 }, hold: true, color: 'bg-emerald-600' },
   { id: 'main-reverse', label: 'Main -', values: { main: -127 }, hold: true, color: 'bg-emerald-800' },
@@ -135,8 +135,6 @@ function MobileJoystickPanel({ layout }) {
     state: { roverId, camera },
     actions: { setDriveVector, registerInputState, stopAllMotion, setServoAngle },
   } = useControlSystem();
-  const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
-  const mobileSettings = inputSettings.mobile ?? INPUT_SETTINGS_DEFAULTS.mobile;
   const disabled = !roverId;
   const cameraConfig = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
@@ -145,11 +143,11 @@ function MobileJoystickPanel({ layout }) {
   const cameraValue =
     typeof camera?.angle === 'number'
       ? camera.angle
-        : typeof cameraConfig?.homeAngle === 'number'
-          ? cameraConfig.homeAngle
-          : (cameraMin + cameraMax) / 2;
-  const joystickRadius = Math.max(40, mobileSettings.joystickRadius ?? INPUT_SETTINGS_DEFAULTS.mobile.joystickRadius);
-  const smoothing = Math.min(Math.max(mobileSettings.joystickSmoothing ?? 0, 0), 0.85);
+      : typeof cameraConfig?.homeAngle === 'number'
+      ? cameraConfig.homeAngle
+      : (cameraMin + cameraMax) / 2;
+  const joystickRadius = JOYSTICK_RADIUS;
+  const smoothing = JOYSTICK_SMOOTHING;
   const smoothedVectorRef = useRef({ x: 0, y: 0, boost: false });
 
   useEffect(() => {
