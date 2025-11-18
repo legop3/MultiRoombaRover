@@ -42,7 +42,7 @@ export default function RightPaneTabs({ layout }) {
           Room Controls
         </TabButton>
         <TabButton active={active === 'advanced'} onClick={() => setActive('advanced')}>
-          Advanced
+          Settings
         </TabButton>
         <TabButton active={active === 'help'} onClick={() => setActive('help')}>
           Help
