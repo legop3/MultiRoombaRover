@@ -8,6 +8,7 @@ require('./src/helpers/sensorDecoder');
 
 require('./src/services/alertService');
 require('./src/services/authService');
+require('./src/services/eventBus');
 require('./src/services/modeManager');
 require('./src/services/lockdownGuard');
 require('./src/services/roverManager');

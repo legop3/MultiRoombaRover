@@ -21,6 +21,8 @@ function ensureRecord(id) {
       lastSensor: null,
       drivers: new Set(),
       locked: false,
+      lockReason: null,
+      batteryState: null,
       room: `rover:${id}`,
       lastSeen: Date.now(),
     });
@@ -62,20 +64,32 @@ function removeRover(id) {
   managerEvents.emit('rover', { roverId: id, action: 'removed' });
 }
 
-function lockRover(id, locked, actorSocket) {
+function lockRover(id, locked, options = {}) {
   const record = rovers.get(id);
   if (!record) {
     throw new Error('Unknown rover');
   }
+  const reason = locked ? options.reason || 'manual' : null;
+  const silent = Boolean(options.silent);
   if (locked) {
     record.locked = true;
-    sendAlert({ color: COLORS.warn, title: 'Rover Locked', message: `${id} locked by admin.` });
+    record.lockReason = reason;
+    if (!silent) {
+      sendAlert({
+        color: COLORS.warn,
+        title: 'Rover Locked',
+        message: `${id} locked${record.lockReason ? ` (${record.lockReason})` : ''}.`,
+      });
+    }
   } else {
     record.locked = false;
-    sendAlert({ color: COLORS.success, title: 'Rover Unlocked', message: `${id} unlocked.` });
+    record.lockReason = null;
+    if (!silent) {
+      sendAlert({ color: COLORS.success, title: 'Rover Unlocked', message: `${id} unlocked.` });
+    }
   }
   broadcastRoster();
-  managerEvents.emit('lock', { roverId: id, locked: record.locked });
+  managerEvents.emit('lock', { roverId: id, locked: record.locked, reason: record.lockReason });
   return record.locked;
 }
 
@@ -84,10 +98,12 @@ function getRoster() {
     id: record.id,
     name: record.meta?.name || record.id,
     battery: record.meta?.battery,
+    batteryState: record.batteryState,
     maxWheelSpeed: record.meta?.maxWheelSpeed,
     media: record.meta?.media,
     cameraServo: record.meta?.cameraServo,
     locked: record.locked,
+    lockReason: record.lockReason,
     lastSeen: record.lastSeen,
   }));
 }
@@ -96,17 +112,52 @@ function broadcastRoster() {
   io.emit('rovers', getRoster());
 }
 
+function computeBatteryState(record, sensors) {
+  if (!record) return null;
+  if (!sensors) return record.batteryState;
+  const config = record.meta?.battery || null;
+  const charge = sensors?.batteryChargeMah ?? null;
+  const capacity = sensors?.batteryCapacityMah ?? null;
+  const full = typeof config?.Full === 'number' ? config.Full : null;
+  const warn = typeof config?.Warn === 'number' ? config.Warn : null;
+  const urgent = typeof config?.Urgent === 'number' ? config.Urgent : null;
+  let percent = null;
+  if (charge != null && warn != null && full != null && full > warn) {
+    const span = full - warn;
+    percent = (charge - warn) / span;
+  } else if (charge != null && capacity != null && capacity > 0) {
+    percent = charge / capacity;
+  }
+  if (percent != null) {
+    percent = Math.max(0, Math.min(1, percent));
+  }
+  return {
+    charge,
+    capacity,
+    full,
+    warn,
+    urgent,
+    percent,
+    percentDisplay: percent == null ? null : Math.round(percent * 100),
+    warnActive: Boolean(warn != null && charge != null && charge <= warn),
+    urgentActive: Boolean(urgent != null && charge != null && charge <= urgent),
+    updatedAt: Date.now(),
+  };
+}
+
 function handleSensorFrame(roverId, frame) {
   const record = rovers.get(roverId);
   if (!record) return;
   record.lastSeen = Date.now();
   const decoded = parseSensorFrame(frame.data);
   record.lastSensor = { raw: frame, decoded };
+  record.batteryState = computeBatteryState(record, decoded);
   io.to(record.room).emit('sensorFrame', {
     roverId,
     frame,
     sensors: decoded,
   });
+  managerEvents.emit('sensor', { roverId, sensors: decoded, batteryState: record.batteryState });
 }
 
 function removeSocket(socket) {
@@ -274,7 +325,7 @@ io.on('connection', (socket) => {
       return;
     }
     try {
-      lockRover(roverId, locked);
+      lockRover(roverId, locked, { reason: 'manual' });
       logger.info('Lock state changed', roverId, locked);
       cb({ success: true });
     } catch (err) {
