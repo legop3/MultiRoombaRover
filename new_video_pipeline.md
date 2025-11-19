@@ -18,7 +18,7 @@
          webrtcMaxPlayoutDelay: 0
          alwaysRemuxWhep: no
      ```
-   - Pis publish to `srt://<server>:9000` with the streamid above; mediaMTX auto-creates the path and fans it out over WHEP/WebRTC.
+   - Pis publish to `srt://<server>:9000` with the streamid above; mediaMTX auto-creates the path and fans it out over WHEP/WebRTC. If you expose playback under `/video/<id>` externally, let the reverse proxy rewrite that prefix back to `<id>` before forwarding to mediaMTX so the wildcard continues to match every rover.
    - Only playback is gated: mediaMTX calls the Node server to validate JWTs on `/whep/rover-<id>`, so “locking” a stream is as simple as refusing to mint viewer tokens for that rover. Ingest stays unauthenticated because it lives on a secure LAN.
 
 3. **Web clients**

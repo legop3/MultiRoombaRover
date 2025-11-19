@@ -60,7 +60,7 @@ Flags:
 | `-b PATH` | use a different roverd binary (defaults to `dist/roverd`) |
 | `-c PATH` | seed `/etc/roverd.yaml` from another template |
 
-If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.publishUrl`. When left blank, roverd automatically publishes to `srt://<server-host>:9000?streamid=#!::r=<name>,m=publish…` (the host comes from `serverUrl`).
+If the script installs the sample config, it will remind you to edit `/etc/roverd.yaml` before manually restarting the service: set `name`, `serverUrl`, serial device, BRC pin, battery thresholds, and optionally override `media.publishUrl`. When left blank, roverd automatically publishes to `srt://<server-host>:9000?streamid=#!::r=<name>,m=publish…` (the host comes from `serverUrl`). If your reverse proxy adds prefixes (like `/video/<name>`), use its rewrite options so the rover keeps publishing to plain `<name>`.
 
 Re-run `pi/install_roverd.sh` any time you pull updates—the script overwrites the roverd + video-publisher binaries and drops the latest systemd units so the only configuration you ever touch manually is `/etc/roverd.yaml`. `roverd` rewrites `/var/lib/roverd/video.env` on startup, so no other files need editing.
 ## Manual installation
@@ -71,7 +71,7 @@ Re-run `pi/install_roverd.sh` any time you pull updates—the script overwrites 
    sudo install -o roverd -g roverd -m 0755 dist/roverd /usr/local/bin/roverd
    sudo install -o roverd -g roverd -m 0640 pi/roverd/roverd.sample.yaml /etc/roverd.yaml
    ```
-   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and (if needed) the media `publishUrl` override. Otherwise, roverd derives `srt://<server-host>:9000?streamid=#!::r=<name>,m=publish&latency=20&mode=caller&transtype=live&pkt_size=1316` based on the `serverUrl`.
+   Adjust `/etc/roverd.yaml` for each rover: `name`, `serverUrl` (e.g. `ws://control-server:8080/rover`), serial port path, battery thresholds, GPIO pin for BRC, and (if needed) the media `publishUrl` override. Otherwise, roverd derives `srt://<server-host>:9000?streamid=#!::r=<name>,m=publish&latency=20&mode=caller&transtype=live&pkt_size=1316` based on the `serverUrl`; keep proxy-only path prefixes out of this URL so every rover keeps the same simple stream name.
 
 2. Install the systemd unit:
    ```bash
