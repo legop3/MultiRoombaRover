@@ -26,7 +26,7 @@ webrtcICEServers2:
 
   # Cloudflare STUN (anycast, global PoPs)
   - url: stun:stun.cloudflare.com:3478
-  
+
 srt: yes
 srtAddress: :9000
 
@@ -39,7 +39,7 @@ authHTTPExclude:
   - action: pprof
 
 paths:
-  ~^video/.+:
+  all:
     source: publisher
     sourceOnDemand: no
     # webrtcMaxPlayoutDelay: 0
