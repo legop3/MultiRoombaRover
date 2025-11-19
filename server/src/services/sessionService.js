@@ -78,6 +78,12 @@ turnEvents.on('activeDriver', () => {
   syncAll();
 });
 
+// sync all sockets 5 seconds
+setInterval(() => {
+  logger.info('Periodic session sync for all clients');
+  syncAll();
+}, 5000);
+
 module.exports = {
   buildSession,
   syncSocket,
