@@ -8,3 +8,10 @@
 
 ## spectator page
 - video does not load in spectator page in admin mode
+
+## todo
+- nicknames
+- discord bot
+- turns display
+- discord link
+- 

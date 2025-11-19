@@ -8,7 +8,7 @@ export default function LogPanel() {
         <span>Server logs</span>
         <span>{logs.length}</span>
       </div>
-      <div className="surface h-64 overflow-y-auto space-y-0.5 font-mono text-xs">
+      <div className="surface h-64 overflow-y-auto font-mono text-xs">
         {logs.length === 0 ? (
           <p>No logs yet.</p>
         ) : (
@@ -16,7 +16,7 @@ export default function LogPanel() {
             .slice()
             .reverse()
             .map((entry) => (
-              <div key={entry.id} className="surface-muted">
+              <div key={entry.id} className="surface">
                 <span className="text-amber-400">{entry.timestamp}</span>{' '}
                 <span className="text-lime-400">[{entry.level}]</span>{' '}
                 {entry.label && <span className="text-teal-400">[{entry.label}]</span>}{' '}

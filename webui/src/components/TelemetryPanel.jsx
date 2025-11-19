@@ -70,15 +70,23 @@ export default function TelemetryPanel() {
             <Metric label="Left Encoder" value={formatMetric(sensors.encoderCountsLeft)} />
             <Metric label="Right Encoder" value={formatMetric(sensors.encoderCountsRight)} />
           </div>
-          <div className="flex gap-0.5">
-            <CliffBar value={sensors.cliffLeftSignal} />
-            <CliffBar value={sensors.cliffFrontLeftSignal} />
-            <CliffBar value={sensors.cliffFrontRightSignal} />
-            <CliffBar value={sensors.cliffRightSignal} />
+          <div className="surface space-y-0.5">
+            <div className="w-full text-center text-sm text-slate-300">Cliff Sensors</div>
+            <div className="flex gap-0.5 text-sm">
+              <CliffBar value={sensors.cliffLeftSignal} />
+              <CliffBar value={sensors.cliffFrontLeftSignal} />
+              <CliffBar value={sensors.cliffFrontRightSignal} />
+              <CliffBar value={sensors.cliffRightSignal} />
+            </div>
           </div>
-          <MotorCurrentBar label="Left Wheel" value={sensors.wheelLeftCurrentMa} overcurrent={sensors.wheelOvercurrents.leftWheel}/>
-        </>
 
+          <div className="surface flex gap-0.5 text-sm">
+            <MotorCurrentBar label="Left Wheel" value={sensors.wheelLeftCurrentMa} overcurrent={sensors.wheelOvercurrents.leftWheel} />
+            <MotorCurrentBar label="Right Wheel" value={sensors.wheelRightCurrentMa} overcurrent={sensors.wheelOvercurrents.rightWheel} />
+            <MotorCurrentBar label="Side Brush" value={sensors.sideBrushCurrentMa} overcurrent={sensors.wheelOvercurrents.sideBrush} />
+            <MotorCurrentBar label="Main Brush" value={sensors.mainBrushCurrentMa} overcurrent={sensors.wheelOvercurrents.mainBrush} />
+          </div>
+        </>
       )}
 
 
@@ -131,9 +139,20 @@ function CliffBar({ value }) {
   const pct = value == null ? 0 : Math.max(0, Math.min(100, (value / 4095) * 100));
   const height = `${pct}%`;
   return (
-    <div className="surface-muted h-6 w-1/4">
-      <div className="w-full bg-amber-500" style={{ height }} />
+    // <div className="surface-muted h-6 w-1/4 relative">
+    //   <div className="w-full bg-amber-500 absolute inset-0" style={{ height }} />
+    // </div>
+
+    <div className="flex flex-col items-center gap-0.5 w-1/4">
+      {/* <span className="text-sm text-slate-200">{label}</span> */}
+      <div className="surface-muted h-6 w-full relative">
+        <div className={`absolute top-0 left-0 right-0 bg-amber-500`} style={{ height }} />
+        <div className="absolute inset-0 flex items-center justify-center text-xs text-white">
+          {value != null ? `${value}` : '--'}
+        </div>
+      </div>
     </div>
+
   );
 }
 
@@ -148,14 +167,17 @@ function Metric({ label, value }) {
 // a reusable motor current bar, with overcurrent coloring. Use the overcurrent from sensors for each motor.
 // include a label to indicate which motor it is, with the label to the left of the bar
 function MotorCurrentBar({ label, value, overcurrent }) {
-  const pct = value == null ? 0 : Math.max(0, Math.min(100, (value / 5000) * 100));
+  const pct = value == null ? 0 : Math.max(0, Math.min(100, (value / 1000) * 100));
   const height = `${pct}%`;
   const barColor = overcurrent ? 'bg-red-500' : 'bg-emerald-500';
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5 w-1/4">
       <span className="text-sm text-slate-200">{label}</span>
-      <div className="surface-muted h-6 w-20">
-        <div className={barColor} style={{ height }} />
+      <div className="surface-muted h-6 w-full relative">
+        <div className={`${barColor} absolute bottom-0 left-0 right-0`} style={{ height }} />
+        <div className="absolute inset-0 flex items-center justify-center text-xs text-white">
+          {value != null ? `${value} mA` : '--'}
+        </div>
       </div>
     </div>
   );

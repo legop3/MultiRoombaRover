@@ -16,11 +16,11 @@ body {
 
 @layer components {
   .panel {
-    @apply bg-zinc-800 text-slate-100 p-0.5;
+    @apply bg-black text-white p-0.5;
   }
 
   .panel-section {
-    @apply bg-zinc-950 text-slate-100 p-0.5;
+    @apply bg-neutral-900 text-white p-0.5;
   }
 
   .panel-muted {
@@ -28,15 +28,15 @@ body {
   }
 
   .surface {
-    @apply bg-zinc-900/80 text-slate-100 border border-zinc-800 px-0.5 py-0.5;
+    @apply bg-neutral-800 text-white px-0.5 py-0.5;
   }
 
   .surface-muted {
-    @apply bg-zinc-950/80 text-slate-200 border border-zinc-900 px-0.5 py-0.5;
+    @apply bg-neutral-700 text-neutral-100 px-0.5 py-0.5;
   }
 
   .field-input {
-    @apply bg-zinc-900/80 text-slate-100 border border-zinc-800 px-0.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-slate-500;
+    @apply bg-neutral-800 text-white px-0.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-sky-500;
   }
 
   .button-dark {

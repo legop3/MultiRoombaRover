@@ -14,7 +14,7 @@ const TAB_VARIANTS = {
   primary: {
     base: 'flex-1 px-0.5 py-0.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-slate-500',
     active: 'bg-sky-600 text-white',
-    inactive: 'bg-zinc-800 text-slate-200 hover:bg-sky-500 hover:text-white',
+    inactive: 'bg-zinc-900 text-slate-300 hover:bg-sky-500 hover:text-white',
   },
 };
 
