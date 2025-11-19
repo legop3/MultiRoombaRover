@@ -7,15 +7,15 @@ const RESTRICTED_MODES = new Set(['admin', 'lockdown']);
 function getModeDetails(mode = 'admin') {
   if (mode === 'lockdown') {
     return {
-      title: 'Lockdown in effect',
+      title: 'Lockdown mode active',
       description:
-        'Only the lockdown admin can remain connected right now. If you have credentials, log in below. Otherwise please stand by until the server re-opens.',
+        'Only the server owners can access the interface at this time.',
     };
   }
   return {
     title: 'Admin mode active',
     description:
-      'The server is temporarily restricted to administrators. Log in below if you are authorized, or wait for admin mode to end.',
+      'The server is currently in admin mode. Only admins can access the interface.',
   };
 }
 
@@ -42,10 +42,10 @@ export default function ModeGateOverlay() {
         <div className="surface-muted">
           <AuthPanel />
         </div>
-        <p className="text-xs text-slate-500">
+        {/* <p className="text-xs text-slate-500">
           Your controls are paused until access is granted. You will automatically regain the interface once the mode
           changes or after a successful login.
-        </p>
+        </p> */}
       </div>
     </div>
   );

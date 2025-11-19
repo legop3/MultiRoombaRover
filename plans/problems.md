@@ -11,9 +11,13 @@
 
 ## todo
 1. battery manager
-2. room cameras
-3. nicknames
-4. discord bot
-5. turns mode display
-6. chat
-7. redo spectator view (last)
+2. pi-side sensor throttle (1/5th)
+3. convert rover roster to a reusable component, unbake it from telemetry and admin panels
+4. room cameras
+5. home assistant controls
+6. nicknames
+7. discord bot
+8. turns mode display
+9. online user list
+10. chat
+11. redo spectator view (last)
