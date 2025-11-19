@@ -1,6 +1,6 @@
 # general idea
 - uses the rover's reported battery full, warn, and urgent values
-- will apply to all rovers
+- will apply to all rovers individually
 - uses the rover locking system
 - completely server side
 - always use the battery warn value as 0% battery and the full value as 100%
@@ -19,7 +19,7 @@
 
 ## while we're at it...
 - add a lock reason to the rover locking system
-- add the following to the rover roster in the UI state message:
+- add the following to the rover roster in the UI session state:
   - battery full #
   - battery warn #
   - battery urgent #
