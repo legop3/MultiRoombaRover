@@ -76,7 +76,7 @@ export default function TelemetryPanel() {
             <CliffBar value={sensors.cliffFrontRightSignal} />
             <CliffBar value={sensors.cliffRightSignal} />
           </div>
-          <MotorCurrentBar label="Left Wheel" value={sensors.wheelLeftCurrentMa} overcurrent={sensors.wheelOverCurrents.leftWheel}/>
+          <MotorCurrentBar label="Left Wheel" value={sensors.wheelLeftCurrentMa} overcurrent={sensors.wheelOvercurrents.leftWheel}/>
         </>
 
       )}
