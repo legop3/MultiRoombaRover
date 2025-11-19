@@ -42,14 +42,14 @@ export default function AuthPanel() {
           {loading ? 'Logging in…' : 'Login'}
         </button>
       </form>
-      <div className="flex gap-0.5 text-sm">
+      {/* <div className="flex gap-0.5 text-sm">
         <button type="button" onClick={() => setRole('user')} className="flex-1 button-dark">
           Driver
         </button>
         <button type="button" onClick={() => setRole('spectator')} className="flex-1 button-dark">
           Spectator
         </button>
-      </div>
+      </div> */}
     </div>
   );
 }

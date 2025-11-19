@@ -76,6 +76,7 @@ export default function TelemetryPanel() {
             <CliffBar value={sensors.cliffFrontRightSignal} />
             <CliffBar value={sensors.cliffRightSignal} />
           </div>
+          <MotorCurrentBar label="Left Wheel" value={sensors.wheelLeftCurrentMa} overcurrent={sensors.wheelOverCurrents.leftWheel}/>
         </>
 
       )}
@@ -140,6 +141,22 @@ function Metric({ label, value }) {
   return (
     <div className="surface text-sm">
       {label}: {value}
+    </div>
+  );
+}
+
+// a reusable motor current bar, with overcurrent coloring. Use the overcurrent from sensors for each motor.
+// include a label to indicate which motor it is, with the label to the left of the bar
+function MotorCurrentBar({ label, value, overcurrent }) {
+  const pct = value == null ? 0 : Math.max(0, Math.min(100, (value / 5000) * 100));
+  const height = `${pct}%`;
+  const barColor = overcurrent ? 'bg-red-500' : 'bg-emerald-500';
+  return (
+    <div className="flex items-center gap-0.5">
+      <span className="text-sm text-slate-200">{label}</span>
+      <div className="surface-muted h-6 w-20">
+        <div className={barColor} style={{ height }} />
+      </div>
     </div>
   );
 }

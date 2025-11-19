@@ -5,3 +5,6 @@
 - https://www.thingiverse.com/thing:2873677
 - https://www.printables.com/model/356894-raspberry-camera-module-with-automatic-ir-cut-swit
 - https://www.thingiverse.com/thing:4514531
+
+## spectator page
+- video does not load in spectator page in admin mode
