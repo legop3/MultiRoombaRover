@@ -10,7 +10,7 @@ const MODES = {
   LOCKDOWN: 'lockdown',
 };
 
-let currentMode = MODES.OPEN;
+let currentMode = MODES.ADMIN;
 const modeEvents = new EventEmitter();
 
 function canChangeMode(socket, nextMode) {
