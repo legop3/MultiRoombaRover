@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { WhepPlayer } from '../lib/whepPlayer.js';
 
-const RESTART_DELAY_MS = 2500;
-const RETRYABLE_STATUSES = new Set(['error', 'failed', 'disconnected', 'closed', 'stopped']);
+const RESTART_DELAY_MS = 2000;
 
 export default function RoomCameraFeed({ sessionInfo, label }) {
   const videoRef = useRef(null);
@@ -13,7 +12,7 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
-    restartTimer.current = setTimeout(() => setRestartToken((token) => token + 1), RESTART_DELAY_MS);
+    restartTimer.current = setTimeout(() => setRestartToken(Date.now()), RESTART_DELAY_MS);
   }, []);
 
   const ensurePlayback = useCallback(async () => {
@@ -23,21 +22,23 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
       video.muted = true;
       await video.play();
     } catch {
-      // Autoplay might fail; we'll retry after reconnect.
+      // Autoplay might be blocked; retry later.
     }
   }, []);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       clearTimeout(restartTimer.current);
-    };
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!sessionInfo?.url || !videoRef.current) {
       return undefined;
     }
     let active = true;
+    let player;
     const handleStatus = (nextStatus, info) => {
       if (!active) return;
       setStatus(nextStatus);
@@ -45,12 +46,12 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
       if (nextStatus === 'playing') {
         ensurePlayback();
       }
-      if (RETRYABLE_STATUSES.has(nextStatus)) {
+      if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
         scheduleRestart();
       }
     };
 
-    const player = new WhepPlayer({
+    player = new WhepPlayer({
       url: sessionInfo.url,
       token: sessionInfo.token,
       video: videoRef.current,
@@ -69,6 +70,12 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
       player?.stop();
     };
   }, [sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback]);
+
+  useEffect(() => {
+    if (status === 'stopped' && sessionInfo?.url) {
+      scheduleRestart();
+    }
+  }, [status, sessionInfo?.url, scheduleRestart]);
 
   const renderedStatus = !sessionInfo?.url
     ? 'Waiting for stream session'
