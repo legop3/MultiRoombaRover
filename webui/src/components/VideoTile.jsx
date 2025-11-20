@@ -159,6 +159,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
         />
         <HudOverlay frame={telemetryFrame} label={label}/>
         <OvercurrentOverlay motors={overcurrentMotors} />
+        <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />
       </div>
       <BatteryBar charge={batteryCharge} config={batteryConfig} status={renderedStatus} />
     </div>
@@ -250,6 +251,31 @@ function OvercurrentOverlay({ motors }) {
       <div className="text-center text-2xl font-semibold text-white animate-pulse">
         <div>Overcurrent</div>
         <div className="mt-0.5 text-xl font-medium text-white">{labels.join(', ')}</div>
+      </div>
+    </div>
+  );
+}
+
+// low battery overlay, change text based on warn / urgent. use percentage calculated same as BatteryBar. change text based on warn or urgent.
+function LowBatteryOverlay({ charge, config }) {
+  if (charge == null || config == null) return null;
+  const full = config.Full;
+  const warn = config.Warn;
+  const urgent = config.Urgent ?? null;
+  const span = full - warn;
+  if (span <= 0) return null;
+  const normalized = (charge - warn) / span;
+  const percent = Math.min(1, Math.max(0, normalized));
+  const depleted = normalized <= 0;
+  const warnTriggered = urgent != null && charge <= urgent;
+  if (!warnTriggered && !depleted) return null;
+
+  const message = depleted ? 'BATTERY VERY LOW, PLEASE DOCK THE ROVER AND CHARGE IMMEDIATELY!!' : 'Battery low! please dock and charge the rover soon.';
+
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-amber-900/60">
+      <div className="text-center text-2xl font-semibold text-white animate-pulse">
+        <div>{message}</div>
       </div>
     </div>
   );
