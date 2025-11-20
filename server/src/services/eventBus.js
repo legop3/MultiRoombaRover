@@ -1,5 +1,6 @@
 const EventEmitter = require('events');
-const logger = require('../globals/logger').child('eventBus');
+const baseLogger = require('../globals/logger');
+const logger = baseLogger.child ? baseLogger.child('eventBus') : baseLogger;
 
 const eventBus = new EventEmitter();
 
@@ -23,7 +24,8 @@ function publishEvent({ source, type, payload = null }) {
     payload,
     ts: Date.now(),
   };
-  logger.debug('Publishing event', { source, type });
+  const logFn = typeof logger.debug === 'function' ? 'debug' : 'info';
+  logger[logFn](`Publishing event ${type}`, { source });
   eventBus.emit(type, event);
   eventBus.emit('*', event);
 }
