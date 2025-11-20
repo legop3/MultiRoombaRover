@@ -223,9 +223,14 @@ export default function KeyboardInputManager() {
     };
   }, [actionTokens, driveFromKeys, ensureServoLoop, keymap.dockMacro, keymap.driveMacro, resetAll, runMacro, setMode]);
 
+  const latestResetAllRef = useRef(resetAll);
   useEffect(() => {
-    resetAll();
-  }, [state.roverId, resetAll]);
+    latestResetAllRef.current = resetAll;
+  }, [resetAll]);
+
+  useEffect(() => {
+    latestResetAllRef.current();
+  }, [state.roverId]);
 
   useEffect(
     () => () => {
