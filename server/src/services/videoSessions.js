@@ -1,12 +1,21 @@
 const { v4: uuidv4 } = require('uuid');
 const io = require('../globals/io');
 
-const sessions = new Map(); // sessionId -> { socketId, roverId }
+const sessions = new Map(); // sessionId -> { socketId, sourceType, sourceId }
 const socketSessions = new Map(); // socketId -> Set(sessionId)
 
-function createSession(socket, roverId) {
+function validateSource(source = {}) {
+  const { type, id } = source;
+  if (!type || !id) {
+    throw new Error('Invalid video source');
+  }
+  return { type, id };
+}
+
+function createSession(socket, source) {
+  const { type, id } = validateSource(source);
   const sessionId = uuidv4();
-  sessions.set(sessionId, { socketId: socket.id, roverId });
+  sessions.set(sessionId, { socketId: socket.id, sourceType: type, sourceId: id });
   if (!socketSessions.has(socket.id)) {
     socketSessions.set(socket.id, new Set());
   }

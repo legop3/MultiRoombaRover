@@ -4,12 +4,13 @@ const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const videoSessions = require('./videoSessions');
 const roverManager = require('./roverManager');
+const { getRoomCamera } = require('./roomCameraService');
 const { loadConfig } = require('../helpers/configLoader');
 
 const config = loadConfig();
 const mediaConfig = config.media || {};
 
-function buildWhepUrl(roverId) {
+function getMediaPrefix() {
   const base = mediaConfig.whepBaseUrl;
   if (!base) {
     return '';
@@ -21,17 +22,34 @@ function buildWhepUrl(roverId) {
   } catch (err) {
     // leave prefix as-is when URL parsing fails; fall back to string cleanup below
   }
-  const cleanBase = prefix.replace(/\/+$/, '');
-  const encodedId = encodeURIComponent(roverId);
-  return `${cleanBase}/${encodedId}/whep`;
+  return prefix.replace(/\/+$/, '');
 }
 
-function canView(socket, roverId) {
+function buildWhepUrlForSource(source) {
+  const cleanBase = getMediaPrefix();
+  if (!cleanBase) return '';
+  const segments = [];
+  if (source.type === 'room') {
+    segments.push('room', encodeURIComponent(source.id));
+  } else {
+    segments.push(encodeURIComponent(source.id));
+  }
+  return `${cleanBase}/${segments.join('/')}/whep`;
+}
+
+function passesMode(socket) {
   const mode = getMode();
   if (mode === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
     return false;
   }
   if (mode === MODES.ADMIN && !isAdmin(socket)) {
+    return false;
+  }
+  return true;
+}
+
+function canViewRover(socket, roverId) {
+  if (!passesMode(socket)) {
     return false;
   }
   const role = getRole(socket);
@@ -41,27 +59,56 @@ function canView(socket, roverId) {
   return roverManager.isDriver(roverId, socket);
 }
 
+function canViewRoomCamera(socket) {
+  return passesMode(socket);
+}
+
+function normalizeRequest(payload = {}) {
+  if (!payload) return null;
+  if (payload.type && payload.id) {
+    return { type: payload.type, id: String(payload.id) };
+  }
+  if (payload.roverId) {
+    return { type: 'rover', id: String(payload.roverId) };
+  }
+  if (payload.roomCameraId) {
+    return { type: 'room', id: String(payload.roomCameraId) };
+  }
+  return null;
+}
+
 io.on('connection', (socket) => {
-  socket.on('video:request', ({ roverId } = {}, cb = () => {}) => {
+  socket.on('video:request', (payload = {}, cb = () => {}) => {
     try {
-      if (!roverId) {
-        throw new Error('roverId required');
+      const target = normalizeRequest(payload);
+      if (!target) {
+        throw new Error('video source required');
       }
-      if (!roverManager.rovers.has(roverId)) {
-        throw new Error('Rover offline');
+      if (target.type === 'rover') {
+        if (!roverManager.rovers.has(target.id)) {
+          throw new Error('Rover offline');
+        }
+        if (!canViewRover(socket, target.id)) {
+          throw new Error('Not authorized for video');
+        }
+      } else if (target.type === 'room') {
+        if (!getRoomCamera(target.id)) {
+          throw new Error('Unknown room camera');
+        }
+        if (!canViewRoomCamera(socket)) {
+          throw new Error('Not authorized for room camera');
+        }
+      } else {
+        throw new Error('Unsupported video source');
       }
-      if (!canView(socket, roverId)) {
-        throw new Error('Not authorized for video');
-      }
-      const url = buildWhepUrl(roverId);
+      const url = buildWhepUrlForSource(target);
       if (!url) {
         throw new Error('Server video base URL missing');
       }
-      const sessionId = videoSessions.createSession(socket, roverId);
-      cb({ url, token: sessionId });
+      const sessionId = videoSessions.createSession(socket, target);
+      cb({ url, token: sessionId, type: target.type, id: target.id });
     } catch (err) {
       logger.warn('video request failed: %s', err.message);
       cb({ error: err.message });
     }
   });
-});

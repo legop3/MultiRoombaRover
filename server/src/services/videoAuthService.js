@@ -24,10 +24,10 @@ function getPathPrefix() {
 const whepPathPrefix = getPathPrefix().replace(/\/+$/, '').replace(/^\/+/, '');
 const whepPrefixSegments = whepPathPrefix ? whepPathPrefix.split('/').filter(Boolean) : [];
 
-function extractRoverId(path) {
+function extractStreamInfo(path) {
   const segments = (path || '').split('/').filter(Boolean);
   if (!segments.length) {
-    return '';
+    return null;
   }
 
   let start = 0;
@@ -43,10 +43,14 @@ function extractRoverId(path) {
     end -= 1;
   }
 
-  if (end - start !== 1) {
-    return '';
+  const remaining = segments.slice(start, end);
+  if (remaining.length === 1) {
+    return { type: 'rover', id: remaining[0] || '' };
   }
-  return segments[start] || '';
+  if (remaining.length === 2 && remaining[0] === 'room') {
+    return { type: 'room', id: remaining[1] || '' };
+  }
+  return null;
 }
 
 function canView(socket) {
@@ -67,17 +71,17 @@ app.post('/mediamtx/auth', (req, res) => {
   const body = req.body || {};
   const path = (body.path || '').replace(/^\//, '');
   const sessionId = body.user;
-  const roverId = extractRoverId(path);
-  logger.info('video auth request', { path: body.path, sessionId, roverId });
+  const streamInfo = extractStreamInfo(path);
+  logger.info('video auth request', { path: body.path, sessionId, stream: streamInfo });
 
-  if (!sessionId || !roverId) {
-    logger.warn('auth missing session or rover (session=%s path=%s)', sessionId, path);
+  if (!sessionId || !streamInfo?.id) {
+    logger.warn('auth missing session or stream (session=%s path=%s)', sessionId, path);
     return res.status(401).end();
   }
 
   const info = videoSessions.getSession(sessionId);
-  if (!info || info.roverId !== roverId) {
-    logger.warn('invalid session %s for rover %s', sessionId, roverId);
+  if (!info || info.sourceType !== streamInfo.type || info.sourceId !== streamInfo.id) {
+    logger.warn('invalid session %s for stream %s:%s', sessionId, streamInfo.type, streamInfo.id);
     return res.status(401).end();
   }
   const socket = io.sockets.sockets.get(info.socketId);
@@ -89,8 +93,8 @@ app.post('/mediamtx/auth', (req, res) => {
     return res.status(401).end();
   }
   const role = getRole(socket);
-  if (role !== 'spectator' && !isAdmin(socket)) {
-    if (!roverManager.isDriver(roverId, socket)) {
+  if (streamInfo.type === 'rover' && role !== 'spectator' && !isAdmin(socket)) {
+    if (!roverManager.isDriver(streamInfo.id, socket)) {
       return res.status(401).end();
     }
   }

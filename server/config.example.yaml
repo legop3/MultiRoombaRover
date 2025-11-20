@@ -12,3 +12,10 @@ media:
   #   http://<base>/<roverId>/whep
   # Example: http://192.168.0.86:8889/video
   whepBaseUrl: "http://192.168.0.86:8889/video"
+roomCameras:
+  - id: "lobby"
+    name: "Lobby Camera"
+    description: "Wide shot of the staging area."
+  - id: "workshop"
+    name: "Workshop Bench"
+    description: "Shows the workbench and charging docks."

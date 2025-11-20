@@ -4,7 +4,14 @@ import { WhepPlayer } from '../lib/whepPlayer.js';
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 
-export default function VideoTile({ sessionInfo, label, forceMute = false, telemetryFrame, batteryConfig }) {
+export default function VideoTile({
+  sessionInfo,
+  label,
+  forceMute = false,
+  telemetryFrame,
+  batteryConfig,
+  showBatteryBar = true,
+}) {
   const videoRef = useRef(null);
   const restartTimer = useRef(null);
   const unmuteTimer = useRef(null);
@@ -27,7 +34,6 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
       : Object.entries(wheelOvercurrents)
           .filter(([, active]) => Boolean(active))
           .map(([key]) => key);
-  const overcurrentActive = overcurrentMotors.length > 0;
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
@@ -147,6 +153,14 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
     ? `${status} (${detail})`
     : status;
 
+  const renderStatusSection = () => (
+    <div className="panel-section space-y-0.5 text-sm">
+      <div className="flex items-center justify-between text-xs text-slate-400">
+        <span>{renderedStatus}</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-0.5">
       <div className="relative w-full overflow-hidden bg-black aspect-video">
@@ -161,12 +175,16 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
         <HudOverlay frame={telemetryFrame} label={label}/>
         <OvercurrentOverlay motors={overcurrentMotors} />
       </div>
-      <BatteryBar charge={batteryCharge} config={batteryConfig} label={label} status={renderedStatus} />
+      {showBatteryBar ? (
+        <BatteryBar charge={batteryCharge} config={batteryConfig} label={label} status={renderedStatus} />
+      ) : (
+        renderStatusSection()
+      )}
     </div>
   );
 }
 
-function BatteryBar({ charge, config, label, status }) {
+function BatteryBar({ charge, config, status }) {
   const full = config?.Full;
   const warn = config?.Warn;
   const urgent = config?.Urgent ?? null;

@@ -6,6 +6,7 @@ const roverManager = require('./roverManager');
 const { managerEvents } = roverManager;
 const assignmentService = require('./assignmentService');
 const { getActiveDrivers, turnEvents } = require('./turnService');
+const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 
 function buildSession(socket) {
   return {
@@ -15,6 +16,7 @@ function buildSession(socket) {
     roster: roverManager.getRoster(),
     assignment: assignmentService.describeAssignment(socket?.id || ''),
     activeDrivers: getActiveDrivers(),
+    roomCameras: getRoomCameras(),
   };
 }
 
@@ -75,6 +77,11 @@ managerEvents.on('driver', ({ socketId }) => {
 
 turnEvents.on('activeDriver', () => {
   logger.info('Active driver change; syncing all clients');
+  syncAll();
+});
+
+roomCameraEvents.on('update', () => {
+  logger.info('Room camera change detected; syncing all clients');
   syncAll();
 });
 
