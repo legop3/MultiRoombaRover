@@ -29,8 +29,9 @@ export default function RightPaneTabs({ layout }) {
           <TabPanel id="telemetry">
             <div className="space-y-0.5">
               <DrivePanel />
-              <CameraServoPanel />
+              <RoomCameraPanel defaultOrientation="horizontal" />
               <TelemetryPanel />
+              <CameraServoPanel />
             </div>
           </TabPanel>
           <TabPanel id="room">
