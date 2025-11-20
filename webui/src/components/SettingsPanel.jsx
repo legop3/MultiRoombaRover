@@ -5,6 +5,7 @@ import AdminPanel from './AdminPanel.jsx';
 import KeymapSettings from './KeymapSettings.jsx';
 import GamepadMappingSettings from './GamepadMappingSettings.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
+import SessionSnapshot from './SessionSnapshot.jsx';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -88,6 +89,7 @@ export default function SettingsPanel() {
             </section>
             <AuthPanel />
             <AdminPanel />
+            <SessionSnapshot />
           </div>
         </TabPanel>
       </TabPanels>

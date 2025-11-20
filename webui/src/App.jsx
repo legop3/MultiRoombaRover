@@ -49,16 +49,15 @@ function useLayoutMode() {
 
 function DesktopLayout({ layout }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <section className="grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)] gap-0.5">
+    <div className="flex h-full gap-0.5 overflow-hidden">
+      <div className="flex min-w-0 flex-[1.8] flex-col gap-0.5 overflow-y-auto pr-0.5">
         <DriverVideoPanel />
-        <RightPaneTabs layout={layout} />
-      </section>
-      <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-0.5">
-        {/* <AdminPanel /> */}
         <LogPanel />
-        <SessionSnapshot />
-      </section>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+        <RightPaneTabs layout={layout} />
+        {/* <SessionSnapshot /> */}
+      </div>
     </div>
   );
 }
@@ -106,20 +105,23 @@ function MobileLandscapeLayout() {
 
 function App() {
   const layout = useLayoutMode();
+  const isDesktop = layout === 'desktop';
   const renderedLayout =
-    layout === 'desktop'
+    isDesktop
       ? <DesktopLayout layout={layout} />
       : layout === 'mobile-landscape'
       ? <MobileLandscapeLayout />
       : <MobilePortraitLayout />;
 
   return (
-    <div className="min-h-screen bg-black text-slate-100">
+    <div className={`bg-black text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       <SettingsProvider>
         <ControlSystemProvider>
           <KeyboardInputManager />
           <GamepadInputManager />
-          <main className="flex w-full flex-col gap-0.5 text-base">{renderedLayout}</main>
+          <main className={`flex w-full flex-col gap-0.5 text-base ${isDesktop ? 'h-full overflow-hidden' : ''}`}>
+            {renderedLayout}
+          </main>
           <AlertFeed />
           <ModeGateOverlay />
         </ControlSystemProvider>
