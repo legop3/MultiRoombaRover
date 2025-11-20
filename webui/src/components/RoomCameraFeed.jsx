@@ -2,13 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { WhepPlayer } from '../lib/whepPlayer.js';
 
 const RESTART_DELAY_MS = 2000;
+const UNMUTE_RETRY_MS = 3000;
 
 export default function RoomCameraFeed({ sessionInfo, label }) {
   const videoRef = useRef(null);
   const restartTimer = useRef(null);
+  const unmuteTimer = useRef(null);
   const [status, setStatus] = useState('idle');
   const [detail, setDetail] = useState(null);
   const [restartToken, setRestartToken] = useState(0);
+  const [muted, setMuted] = useState(true);
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
@@ -26,9 +29,41 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
     }
   }, []);
 
+  const attemptUnmute = useCallback(
+    (delay = 0) => {
+      clearTimeout(unmuteTimer.current);
+
+      const scheduleRetry = () => {
+        clearTimeout(unmuteTimer.current);
+        unmuteTimer.current = setTimeout(() => {
+          tryPlay();
+        }, UNMUTE_RETRY_MS);
+      };
+
+      const tryPlay = async () => {
+        const video = videoRef.current;
+        if (!video) return;
+        try {
+          await ensurePlayback();
+          video.muted = false;
+          await video.play();
+          setMuted(false);
+        } catch {
+          video.muted = true;
+          setMuted(true);
+          scheduleRetry();
+        }
+      };
+
+      unmuteTimer.current = setTimeout(tryPlay, delay);
+    },
+    [ensurePlayback],
+  );
+
   useEffect(
     () => () => {
       clearTimeout(restartTimer.current);
+      clearTimeout(unmuteTimer.current);
     },
     [],
   );
@@ -39,12 +74,14 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
     }
     let active = true;
     let player;
+    const resetMuteId = setTimeout(() => setMuted(true), 0);
     const handleStatus = (nextStatus, info) => {
       if (!active) return;
       setStatus(nextStatus);
       setDetail(info || null);
       if (nextStatus === 'playing') {
         ensurePlayback();
+        attemptUnmute(0);
       }
       if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
         scheduleRestart();
@@ -67,9 +104,10 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
 
     return () => {
       active = false;
+      clearTimeout(resetMuteId);
       player?.stop();
     };
-  }, [sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback]);
+  }, [sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback, attemptUnmute]);
 
   useEffect(() => {
     if (status === 'stopped' && sessionInfo?.url) {
@@ -88,7 +126,7 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
   return (
     <div className="space-y-0.5">
       <div className="relative aspect-video w-full overflow-hidden bg-black">
-        <video ref={videoRef} muted playsInline autoPlay controls={false} className="h-full w-full object-cover" />
+        <video ref={videoRef} muted={muted} playsInline autoPlay controls={false} className="h-full w-full object-cover" />
         <div className="pointer-events-none absolute left-0 top-0 bg-black/70 px-0.5 py-0.5 text-xs font-semibold text-white">
           {label}
         </div>
