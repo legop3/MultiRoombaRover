@@ -28,10 +28,10 @@ export default function DrivePanel() {
 
   return (
     <section className="panel-section space-y-0.5 text-base">
-      <div className="flex items-center justify-between text-sm text-slate-300">
+      {/* <div className="flex items-center justify-between text-sm text-slate-300">
         <span>Drive control</span>
         <span>{roverId ? 'Ready to drive' : 'No rover assigned'}</span>
-      </div>
+      </div> */}
       <div className="space-y-0.5">
         <ActionCard
           title="Start Driving"
@@ -67,7 +67,7 @@ function ActionCard({ title, description, statuses, tone, onClick, disabled, foo
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-full ${colors.base} ${colors.hover} px-0.5 py-0.5 text-left text-white transition-colors disabled:opacity-40`}
+      className={`w-full ${colors.base} ${colors.hover} px-0.5 py-0.5 text-left text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-center content-center`}
     >
       <p className="text-base font-semibold">{title}</p>
       <p className="text-sm text-white/90">{description}</p>

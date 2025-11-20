@@ -104,7 +104,7 @@ export default function CameraServoPanel() {
           <span>{formatDegrees(max)}</span>
         </div>
       </div>
-      <div className="flex gap-0.5 text-sm">
+      {/* <div className="flex gap-0.5 text-sm">
         <button type="button" className="flex-1 button-dark" onClick={() => handleNudge(-1)}>
           Tilt Down
         </button>
@@ -114,10 +114,10 @@ export default function CameraServoPanel() {
         <button type="button" className="flex-1 button-dark" onClick={() => handleNudge(1)}>
           Tilt Up
         </button>
-      </div>
-      <p className="text-xs text-slate-400">
+      </div> */}
+      {/* <p className="text-xs text-slate-400">
         Step: {formatDegrees(step)} · Pin GPIO {config?.pin}
-      </p>
+      </p> */}
     </section>
   );
 }
