@@ -112,3 +112,4 @@ io.on('connection', (socket) => {
       cb({ error: err.message });
     }
   });
+});
