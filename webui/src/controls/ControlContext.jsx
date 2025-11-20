@@ -53,11 +53,14 @@ export function ControlSystemProvider({ children }) {
     const min = typeof config.minAngle === 'number' ? config.minAngle : -45;
     const max = typeof config.maxAngle === 'number' ? config.maxAngle : 45;
     const base = typeof config.homeAngle === 'number' ? config.homeAngle : (min + max) / 2;
+    const preserved =
+      typeof servoAngleRef.current === 'number' ? clamp(servoAngleRef.current, min, max) : null;
+    const angle = preserved != null ? preserved : clamp(base, min, max);
     dispatch({
       type: 'control/set-camera-config',
-      payload: { config, angle: clamp(base, min, max) },
+      payload: { config, angle },
     });
-    servoAngleRef.current = clamp(base, min, max);
+    servoAngleRef.current = angle;
   }, [pipeline.servoConfig]);
 
   useEffect(() => {
