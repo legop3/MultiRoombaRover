@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
+import RoverRoster from './RoverRoster.jsx';
 
 const MODES = [
   { key: 'open', label: 'Open' },
@@ -69,32 +70,23 @@ export default function AdminPanel() {
         </select>
       </div>
 
-      <div className="space-y-0.5 text-sm">
-        {roster.map((rover) => (
-          <div key={rover.id} className="surface flex flex-wrap items-center justify-between gap-0.5">
-            <div>
-              <p className="text-slate-100">{rover.name}</p>
-              <p className="text-xs text-slate-400">{lockMap[rover.id] ? 'locked' : 'unlocked'}</p>
-            </div>
-            <div className="flex flex-wrap gap-0.5 text-xs">
-              <button
-                type="button"
-                onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
-                className="button-dark"
-              >
-                {lockMap[rover.id] ? 'Unlock' : 'Lock'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleForceControl(rover.id)}
-                className="button-dark"
-              >
-                Force
-              </button>
-            </div>
+      <RoverRoster
+        roster={roster}
+        renderActions={(rover) => (
+          <div className="flex flex-wrap gap-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
+              className="button-dark"
+            >
+              {lockMap[rover.id] ? 'Unlock' : 'Lock'}
+            </button>
+            <button type="button" onClick={() => handleForceControl(rover.id)} className="button-dark">
+              Force
+            </button>
           </div>
-        ))}
-      </div>
+        )}
+      />
     </section>
   );
 }

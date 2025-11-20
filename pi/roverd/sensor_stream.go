@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	sensorHeader      = 19
-	sensorReadTimeout = 150 * time.Millisecond
+	sensorHeader          = 19
+	sensorReadTimeout     = 150 * time.Millisecond
+	sensorThrottleMinimum = 80 * time.Millisecond
 )
 
 type SensorStreamer struct {
@@ -29,6 +30,7 @@ func NewSensorStreamer(r io.Reader, rawOut chan<- []byte, parsed chan<- SensorSa
 
 func (s *SensorStreamer) Run(ctx context.Context) {
 	reader := bufio.NewReader(s.r)
+	var nextSend time.Time
 	for {
 		select {
 		case <-ctx.Done():
@@ -61,6 +63,12 @@ func (s *SensorStreamer) Run(ctx context.Context) {
 			s.logger.Printf("sensor checksum failed: %s", hex.EncodeToString(frame))
 			continue
 		}
+
+		now := time.Now()
+		if !nextSend.IsZero() && now.Before(nextSend) {
+			continue
+		}
+		nextSend = now.Add(sensorThrottleMinimum)
 
 		select {
 		case s.rawOut <- frame:

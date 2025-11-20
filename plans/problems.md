@@ -10,9 +10,9 @@
 - video does not load in spectator page in admin mode
 
 ## todo
-1. battery manager
+<!-- 1. battery manager -->
 2. pi-side sensor throttle (1/5th)
-3. convert rover roster to a reusable component, unbake it from telemetry and admin panels
+<!-- 3. convert rover roster to a reusable component, unbake it from telemetry and admin panels -->
 4. room cameras
 5. home assistant controls
 6. nicknames

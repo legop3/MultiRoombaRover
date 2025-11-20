@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
+import RoverRoster from './RoverRoster.jsx';
 
 function formatMetric(value, fallback = '--') {
   if (value == null || value === '') return fallback;
@@ -97,37 +98,22 @@ export default function TelemetryPanel() {
           {rawSnippet}
         </pre>
       )}
-      <div className="space-y-0.5">
-        <p className="text-sm text-slate-400">Rovers</p>
-        {roster.length === 0 ? (
-          // if there ARE NO rovers
-          <p className="text-sm text-slate-500">No roster data.</p>
-        ) : (
-          // if there ARE rovers
-          <ul className="space-y-0.5 text-sm">
-            {roster.map((rover) => (
-              <li key={rover.id} className="surface flex items-center justify-between gap-0.5">
-                <div>
-                  <p className="text-slate-200">{rover.name}</p>
-                  <p className="text-xs text-slate-500">
-                    {rover.locked ? 'locked' : 'free'} · {rover.lastSeen ? 'seen' : 'unknown'}
-                  </p>
-                </div>
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => handleRequest(rover.id)}
-                    disabled={pending[rover.id]}
-                    className="button-dark disabled:opacity-40"
-                  >
-                    {pending[rover.id] ? '...' : 'request'}
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <RoverRoster
+        title="Rovers"
+        roster={roster}
+        renderActions={(rover) =>
+          isAdmin ? (
+            <button
+              type="button"
+              onClick={() => handleRequest(rover.id)}
+              disabled={pending[rover.id]}
+              className="button-dark disabled:opacity-40"
+            >
+              {pending[rover.id] ? '...' : 'request'}
+            </button>
+          ) : null
+        }
+      />
     </section>
   );
 }
