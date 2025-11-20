@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 
+const RETRY_DELAY_MS = 3000;
+
 function normalizeEntry(entry) {
   if (!entry) return null;
   if (typeof entry === 'string') {
@@ -52,6 +54,7 @@ export function useVideoRequests(sourceList = []) {
     [normalizedEntries],
   );
   const entriesRef = useRef([]);
+  const retryTimers = useRef(new Map());
 
   useEffect(() => {
     entriesRef.current = normalizedEntries;
@@ -63,19 +66,55 @@ export function useVideoRequests(sourceList = []) {
     }
     const entries = entriesRef.current;
     let cancelled = false;
-    entries.forEach((entry) => {
+    const timers = retryTimers.current;
+
+    function clearRetry(key) {
+      const timer = timers.get(key);
+      if (timer) {
+        clearTimeout(timer);
+        timers.delete(key);
+      }
+    }
+
+    function scheduleRetry(entry) {
+      clearRetry(entry.key);
+      const timer = setTimeout(() => {
+        timers.delete(entry.key);
+        if (cancelled) return;
+        requestEntry(entry);
+      }, RETRY_DELAY_MS);
+      timers.set(entry.key, timer);
+    }
+
+    function requestEntry(entry) {
       const payload = entry.type === 'room' ? { roomCameraId: entry.id } : { roverId: entry.id };
       socket.emit('video:request', payload, (resp = {}) => {
         if (cancelled) return;
+        if (!resp || resp.error || !resp.url || !resp.token) {
+          scheduleRetry(entry);
+          setSources((prev) => ({
+            ...prev,
+            [entry.key]: resp,
+          }));
+          return;
+        }
+        clearRetry(entry.key);
         setSources((prev) => ({
           ...prev,
           [entry.key]: resp,
         }));
       });
+    }
+
+    entries.forEach((entry) => {
+      clearRetry(entry.key);
+      requestEntry(entry);
     });
 
     return () => {
       cancelled = true;
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
     };
   }, [socket, normalizedKey]);
 

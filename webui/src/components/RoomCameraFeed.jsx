@@ -115,7 +115,9 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
     }
   }, [status, sessionInfo?.url, scheduleRestart]);
 
-  const renderedStatus = !sessionInfo?.url
+  const renderedStatus = sessionInfo?.error
+    ? `Error: ${sessionInfo.error}`
+    : !sessionInfo?.url
     ? 'Waiting for stream session'
     : status === 'error'
     ? `Error: ${detail || 'unknown'}`

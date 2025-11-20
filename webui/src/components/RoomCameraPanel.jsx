@@ -71,10 +71,10 @@ export default function RoomCameraPanel({ defaultOrientation = 'horizontal', ori
           const sessionInfo = videoSources[key];
           return (
             <article key={camera.id} className="w-full space-y-0.5 rounded border border-slate-800 bg-zinc-950 p-0.5">
-              <header className="space-y-0.5">
+              {/* <header className="space-y-0.5">
                 <p className="text-lg font-semibold text-white">{camera.name || camera.id}</p>
                 {camera.description && <p className="text-xs text-slate-500">{camera.description}</p>}
-              </header>
+              </header> */}
               <RoomCameraFeed sessionInfo={sessionInfo} label={camera.name || camera.id} />
             </article>
           );
