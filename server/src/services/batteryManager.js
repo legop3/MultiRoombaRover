@@ -78,7 +78,13 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
     state.docked = false;
   }
 
-  if (docked && lockable && !record.locked) {
+  const fullThreshold =
+    typeof config?.Full === 'number' ? config.Full : batteryState?.full ?? null;
+  const isFull =
+    (batteryState?.charge != null && fullThreshold != null && batteryState.charge >= fullThreshold) ||
+    (batteryState?.percent != null && batteryState.percent >= 0.99);
+
+  if (docked && lockable && !state.batteryLocked && !isFull) {
     logger.info('Auto-locking rover for charging', { roverId });
     lockRover(roverId, true, { reason: 'battery' });
     state.batteryLocked = true;
@@ -89,23 +95,15 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
     });
   }
 
-  const fullThreshold =
-    typeof config?.Full === 'number' ? config.Full : batteryState?.full ?? null;
-  const isFull =
-    (batteryState?.charge != null && fullThreshold != null && batteryState.charge >= fullThreshold) ||
-    (batteryState?.percent != null && batteryState.percent >= 0.99);
-
-  if (record.locked && record.lockReason === 'battery') {
-    if (isFull || !docked) {
-      logger.info('Unlocking rover after charge', { roverId, isFull, docked });
-      lockRover(roverId, false, { reason: 'battery' });
-      state.batteryLocked = false;
-      publishEvent({
-        source: 'batteryManager',
-        type: 'battery.unlocked',
-        payload: { roverId, batteryState },
-      });
-    }
+  if (state.batteryLocked && (isFull || !docked)) {
+    logger.info('Unlocking rover after charge', { roverId, isFull, docked });
+    lockRover(roverId, false, { reason: 'battery' });
+    state.batteryLocked = false;
+    publishEvent({
+      source: 'batteryManager',
+      type: 'battery.unlocked',
+      payload: { roverId, batteryState },
+    });
   }
 }
 
