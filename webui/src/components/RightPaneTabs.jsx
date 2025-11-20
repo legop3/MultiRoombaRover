@@ -35,7 +35,7 @@ export default function RightPaneTabs({ layout }) {
           </TabPanel>
           <TabPanel id="room">
             <div className="space-y-0.5">
-              <RoomCameraPanel />
+              <RoomCameraPanel defaultOrientation="vertical" />
               <RoomControlsPlaceholder />
             </div>
           </TabPanel>
