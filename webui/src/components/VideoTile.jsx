@@ -4,14 +4,7 @@ import { WhepPlayer } from '../lib/whepPlayer.js';
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 
-export default function VideoTile({
-  sessionInfo,
-  label,
-  forceMute = false,
-  telemetryFrame,
-  batteryConfig,
-  showBatteryBar = true,
-}) {
+export default function VideoTile({ sessionInfo, label, forceMute = false, telemetryFrame, batteryConfig }) {
   const videoRef = useRef(null);
   const restartTimer = useRef(null);
   const unmuteTimer = useRef(null);
@@ -153,14 +146,6 @@ export default function VideoTile({
     ? `${status} (${detail})`
     : status;
 
-  const renderStatusSection = () => (
-    <div className="panel-section space-y-0.5 text-sm">
-      <div className="flex items-center justify-between text-xs text-slate-400">
-        <span>{renderedStatus}</span>
-      </div>
-    </div>
-  );
-
   return (
     <div className="flex flex-col gap-0.5">
       <div className="relative w-full overflow-hidden bg-black aspect-video">
@@ -175,11 +160,7 @@ export default function VideoTile({
         <HudOverlay frame={telemetryFrame} label={label}/>
         <OvercurrentOverlay motors={overcurrentMotors} />
       </div>
-      {showBatteryBar ? (
-        <BatteryBar charge={batteryCharge} config={batteryConfig} label={label} status={renderedStatus} />
-      ) : (
-        renderStatusSection()
-      )}
+      <BatteryBar charge={batteryCharge} config={batteryConfig} status={renderedStatus} />
     </div>
   );
 }

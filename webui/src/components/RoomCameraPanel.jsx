@@ -1,6 +1,6 @@
 import { useSession } from '../context/SessionContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
-import VideoTile from './VideoTile.jsx';
+import RoomCameraFeed from './RoomCameraFeed.jsx';
 
 function EmptyState() {
   return (
@@ -37,12 +37,7 @@ export default function RoomCameraPanel() {
                 <p className="text-lg font-semibold text-white">{camera.name || camera.id}</p>
                 {camera.description && <p className="text-xs text-slate-500">{camera.description}</p>}
               </header>
-              <VideoTile
-                sessionInfo={sessionInfo}
-                label={camera.name || camera.id}
-                forceMute
-                showBatteryBar={false}
-              />
+              <RoomCameraFeed sessionInfo={sessionInfo} label={camera.name || camera.id} />
             </article>
           );
         })}
