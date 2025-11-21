@@ -11,3 +11,4 @@ config.h
 robots.json
 roverd-dummy
 server/config.yaml
+package-lock.json
