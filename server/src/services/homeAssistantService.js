@@ -1,11 +1,6 @@
 const EventEmitter = require('events');
 const WebSocket = require('ws');
-const {
-  createConnection,
-  createLongLivedTokenAuth,
-  subscribeEntities,
-  callService,
-} = require('home-assistant-js-websocket');
+const { createConnection, subscribeEntities, callService, Auth } = require('home-assistant-js-websocket');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('homeAssistantService');
 const { loadConfig } = require('../helpers/configLoader');
@@ -28,6 +23,25 @@ let reconnectTimer = null;
 let connected = false;
 
 const enabled = Boolean(haConfig?.url && haConfig?.token);
+
+function buildAuth() {
+  const token = haConfig?.token?.trim();
+  const url = haConfig?.url?.trim();
+  if (!token || !url) {
+    throw new Error('Home Assistant url/token missing');
+  }
+  // Long-lived tokens last 10 years; set a far future expiry to avoid refresh attempts.
+  return new Auth(
+    {
+      hassUrl: url.replace(/\/+$/, ''),
+      access_token: token,
+      expires: Date.now() + 1000 * 60 * 60 * 24 * 365 * 10,
+      refresh_token: null,
+      clientId: 'multiroomba-rover',
+    },
+    null,
+  );
+}
 
 function inferType(entityId, explicitType) {
   if (explicitType === 'light' || explicitType === 'switch') {
@@ -161,8 +175,8 @@ async function connect() {
     return;
   }
   try {
-    const auth = await createLongLivedTokenAuth(haConfig.url, haConfig.token);
-    connection = await createConnection({ auth });
+    const auth = buildAuth();
+    connection = await createConnection({ auth, setupRetry: 0 });
     connected = true;
     emitStatus();
     logger.info('Connected to Home Assistant');
