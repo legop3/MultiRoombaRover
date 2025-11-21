@@ -4,6 +4,8 @@ const { createConnection, subscribeEntities, callService, Auth } = require('home
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('homeAssistantService');
 const { loadConfig } = require('../helpers/configLoader');
+const { getMode } = require('./modeManager');
+const { isAdmin } = require('./roleService');
 
 // home-assistant-js-websocket expects a global WebSocket in Node.
 if (!global.WebSocket) {
@@ -229,6 +231,10 @@ connect();
 
 io.on('connection', (socket) => {
   socket.on('homeAssistant:toggle', async ({ entityId } = {}, cb = () => {}) => {
+    if ((getMode() === 'admin' || getMode() === 'lockdown') && isAdmin(socket) !== true) {
+      return cb({ error: 'Insufficient permissions to control Home Assistant' });
+    }
+    
     try {
       if (!entityId) throw new Error('entityId required');
       await toggleEntity(entityId);
@@ -239,6 +245,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('homeAssistant:setState', async ({ entityId, state } = {}, cb = () => {}) => {
+    if ((getMode() === 'admin' || getMode() === 'lockdown') && isAdmin(socket) !== true) {
+      return cb({ error: 'Insufficient permissions to control Home Assistant' });
+    }
+
     try {
       if (!entityId) throw new Error('entityId required');
       await setEntityState(entityId, state);
