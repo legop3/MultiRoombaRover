@@ -100,7 +100,7 @@ export default function UserListPanel() {
           <span>Users</span>
           <span className="text-xs text-slate-500">{sorted.length}</span>
         </div>
-        <div className="surface h-48 overflow-y-auto space-y-0.5">
+        <div className="surface h-48 overflow-y-auto space-y-0.25">
           {sorted.length === 0 ? (
             <p className="text-sm text-slate-500">Waiting for users…</p>
           ) : (
@@ -110,14 +110,14 @@ export default function UserListPanel() {
               return (
                 <div
                   key={user.socketId}
-                  className="surface-muted flex items-center justify-between gap-0.5 text-sm"
+                  className="surface-muted flex items-center gap-1 text-sm"
                 >
-                  <div>
-                    <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
-                    <p className="text-[0.7rem] text-slate-400">
-                      {user.roverId ? `Driving ${user.roverId}` : 'No rover'}
-                    </p>
-                  </div>
+                  <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
+                  {user.roverId ? (
+                    <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {user.roverId}</span>
+                  ) : (
+                    <span className="text-[0.7rem] text-slate-500">no rover</span>
+                  )}
                   {isAdmin && (
                     <span className="rounded bg-amber-500/30 px-1 text-[0.7rem] text-amber-200">
                       Admin

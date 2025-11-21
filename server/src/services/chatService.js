@@ -11,7 +11,7 @@ const RATE_LIMIT_WINDOW_MS = 8000;
 const RATE_LIMIT_MAX = 5;
 const rateBuckets = new Map(); // socketId -> [timestamps]
 
-const PROFANITY_LIST = ['fuck', 'shit', 'bitch', 'cunt', 'nigger', 'nigga', 'asshole', 'dick'];
+const PROFANITY_LIST = ['bitch', 'cunt', 'nigger', 'nigga', 'asshole', 'dick'];
 const DUPLICATE_WINDOW_MS = 15000;
 const lastMessageBySocket = new Map(); // socketId -> { text, ts }
 
@@ -95,10 +95,10 @@ function handleIncoming({ text } = {}, socket, cb = () => {}) {
     cb({ error: 'Message blocked' });
     return;
   }
-  if (isDuplicate(socket.id, clean)) {
-    cb({ error: 'Duplicate message' });
-    return;
-  }
+  // if (isDuplicate(socket.id, clean)) {
+  //   cb({ error: 'Duplicate message' });
+  //   return;
+  // }
   if (isKeymash(clean)) {
     cb({ error: 'Message looks like spam' });
     return;

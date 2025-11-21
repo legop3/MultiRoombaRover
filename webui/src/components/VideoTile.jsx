@@ -157,25 +157,22 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
           controls={false}
           className="h-full w-full object-contain"
         />
-        <HudOverlay frame={telemetryFrame} label={label}/>
+        <HudOverlay frame={telemetryFrame} label={label} status={renderedStatus} />
         <OvercurrentOverlay motors={overcurrentMotors} />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />
       </div>
-      <BatteryBar charge={batteryCharge} config={batteryConfig} status={renderedStatus} />
+      <BatteryBar charge={batteryCharge} config={batteryConfig} />
     </div>
   );
 }
 
-function BatteryBar({ charge, config, status }) {
+function BatteryBar({ charge, config }) {
   const full = config?.Full;
   const warn = config?.Warn;
   const urgent = config?.Urgent ?? null;
   if (charge == null || full == null || warn == null) {
     return (
       <div className="panel-section space-y-0.5 text-sm">
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <span>{status}</span>
-        </div>
         <p className="text-xs text-slate-500">Battery telemetry unavailable</p>
       </div>
     );
@@ -192,22 +189,18 @@ function BatteryBar({ charge, config, status }) {
   const barClass = depleted ? 'bg-red-500 animate-pulse' : warnTriggered ? 'bg-amber-400' : 'bg-emerald-500';
   return (
     <div className="panel-section space-y-0.5 text-sm">
-      <div className="flex items-center justify-between text-xs text-slate-400">
-        <span>{status}</span>
-      </div>
       <div className="relative h-4 w-full bg-zinc-900 flex">
         <div className={`h-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }}>
           <span className="inset-0 flex items-center justify-center text-xs font-semibold text-black/80">
             Battery {percentText}
           </span>
         </div>
-
       </div>
     </div>
   );
 }
 
-function HudOverlay({ frame, label }) {
+function HudOverlay({ frame, label, status }) {
   const sensors = frame?.sensors;
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const [now, setNow] = useState(() => Date.now());
@@ -221,18 +214,21 @@ function HudOverlay({ frame, label }) {
 
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 px-0.5 py-0.5 text-xs text-slate-100">
-        <span>You are driving: {label || 'Unnamed Rover'}</span>
+      <div className="absolute left-1 top-1 bg-black/70 px-1 py-0.5 text-[0.65rem] font-medium text-slate-100">
+        <span>Status: {status}</span>
+      </div>
+      <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 px-0.5 py-0.5 text-slate-100">
+        <span>Rover: "{label || 'Unnamed Rover'}"</span>
         {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}
       </div>
 
 
       {/* bump and wheel drops bar */}
-      <div className="absolute top-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/70 px-0.5 py-0.5 text-[0.6rem] font-medium text-slate-200">
-        <div className={`px-0.5 py-0.5 ${bumps.bumpLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left bump</div>
-        <div className={`px-0.5 py-0.5 ${bumps.wheelDropLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left wheel drop</div>
-        <div className={`px-0.5 py-0.5 ${bumps.wheelDropRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right wheel drop</div>
-        <div className={`px-0.5 py-0.5 ${bumps.bumpRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right bump</div>
+      <div className="absolute top-0.5 left-1/2 flex -translate-x-1/2 gap-1 bg-black/70 px-0.5 py-0.5 text-[0.6rem] font-medium text-slate-200">
+        <div className={`px-1 py-0.5 ${bumps.bumpLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left bump</div>
+        <div className={`px-1 py-0.5 ${bumps.wheelDropLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left wheel drop</div>
+        <div className={`px-1 py-0.5 ${bumps.wheelDropRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right wheel drop</div>
+        <div className={`px-1 py-0.5 ${bumps.bumpRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right bump</div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '../context/ChatContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 
@@ -30,8 +30,14 @@ export default function ChatPanel() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const canChat = session?.role !== 'spectator';
+  const listRef = useRef(null);
 
   const sorted = useMemo(() => messages.slice(-200), [messages]);
+
+  useEffect(() => {
+    if (!listRef.current) return;
+    listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [sorted]);
 
   async function handleSend(event) {
     event.preventDefault();
@@ -56,7 +62,7 @@ export default function ChatPanel() {
         <span>Chat</span>
         <span className="text-xs text-slate-500">{sorted.length}</span>
       </div> */}
-      <div className="surface h-48 overflow-y-auto space-y-0.5">
+      <div className="surface h-48 overflow-y-auto space-y-0.25" ref={listRef}>
         {sorted.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet.</p>
         ) : (
@@ -66,16 +72,18 @@ export default function ChatPanel() {
             return (
               <div
                 key={msg.id}
-                className={`surface-muted text-sm ${isAdmin ? 'border border-amber-400/30' : ''}`}
+                className={`surface-muted text-sm flex items-start gap-1 ${
+                  isAdmin ? 'border border-amber-400/30' : ''
+                }`}
               >
-                <div className="flex items-center gap-1 text-[0.75rem] text-slate-400">
-                  <span>{formatTime(msg.ts)}</span>
-                  <span className={`font-semibold ${roleColors(msg.role)}`}>{displayName(msg)}</span>
-                  {msg.roverId && (
-                    <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {msg.roverId}</span>
-                  )}
-                </div>
-                <p className="text-slate-100 break-words">{msg.text}</p>
+                <span className="text-[0.75rem] text-slate-400">{formatTime(msg.ts)}</span>
+                <span className={`font-semibold text-[0.85rem] ${roleColors(msg.role)}`}>
+                  {displayName(msg)}
+                </span>
+                {msg.roverId && (
+                  <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {msg.roverId}</span>
+                )}
+                <span className="text-slate-100 break-words leading-tight">{msg.text}</span>
               </div>
             );
           })

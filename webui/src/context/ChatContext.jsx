@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from './SocketContext.jsx';
 import { useSession } from './SessionContext.jsx';
+import messageSound from '../assets/message.mp3';
 
 const ChatContext = createContext({
   messages: [],
@@ -21,16 +22,33 @@ export function ChatProvider({ children }) {
   const [messages, setMessages] = useState([]);
   const [isChatFocused, setIsChatFocused] = useState(false);
   const inputRef = useRef(null);
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    audioRef.current = new Audio(messageSound);
+    audioRef.current.load();
+  }, []);
+
+  const playSound = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }, []);
 
   useEffect(() => {
     function handleMessage(payload = {}) {
       setMessages((prev) => [...prev.slice(-99), payload]);
+      if (payload?.socketId && session?.socketId && payload.socketId === session.socketId) {
+        return;
+      }
+      playSound();
     }
     socket.on('chat:message', handleMessage);
     return () => {
       socket.off('chat:message', handleMessage);
     };
-  }, [socket]);
+  }, [playSound, session?.socketId, socket]);
 
   const sendMessage = useCallback(
     (text) =>
