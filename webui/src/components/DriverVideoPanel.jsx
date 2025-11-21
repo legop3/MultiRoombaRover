@@ -22,7 +22,15 @@ export default function DriverVideoPanel() {
       {roverId ? (
         <VideoTile sessionInfo={info} label={roverLabel} telemetryFrame={frame} batteryConfig={batteryConfig} />
       ) : (
-        <p className="panel-muted">Assign a rover to view the video feed.</p>
+        <div className="panel-muted content-center text-center text-sm text-slate-400 aspect-video">
+          <p>You are not assigned to a rover.</p>
+          {/* colored button to visit the spectator page */}
+          <p className="mt-2">
+            <a href="/spectate" className="text-blue-400 underline hover:text-blue-500">
+              Click here to visit the spectator page.
+            </a>
+          </p>
+        </div>
       )}
     </section>
   );
