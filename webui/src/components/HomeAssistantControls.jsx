@@ -21,12 +21,22 @@ function EntityRow({ entity, connected, onToggle }) {
   const statusTone = unavailable ? 'warn' : isOn ? 'success' : 'muted';
   const statusLabel = unavailable ? 'Unavailable' : isOn ? 'On' : 'Off';
   const disableToggle = !connected || unavailable;
+  const toneStyles = unavailable
+    ? 'border-slate-800 bg-slate-900 text-slate-400 cursor-not-allowed'
+    : isOn
+    ? 'border-emerald-700 bg-emerald-900/80 text-emerald-50 hover:bg-emerald-800'
+    : 'border-rose-800 bg-rose-900/80 text-rose-50 hover:bg-rose-800';
 
   return (
-    <article className="flex items-center justify-between gap-1 rounded border border-slate-800 bg-zinc-950 px-1 py-0.5">
+    <button
+      type="button"
+      onClick={() => onToggle(entity.id)}
+      disabled={disableToggle}
+      className={`flex w-full items-center justify-between gap-1 rounded  px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
+    >
       <div className="min-w-0">
-        <div className="flex items-center gap-1 text-sm text-white">
-          <span className="truncate font-semibold">{entity.name || entity.id}</span>
+        <div className="flex items-center gap-1 text-sm">
+          <span className="truncate font-semibold text-white">{entity.name || entity.id}</span>
           <StatusBadge label={entity.type === 'light' ? 'Light' : 'Switch'} />
         </div>
         <div className="flex items-center gap-1 text-xs text-slate-400">
@@ -34,17 +44,8 @@ function EntityRow({ entity, connected, onToggle }) {
           {!connected && <span className="text-amber-200"> · Offline</span>}
         </div>
       </div>
-      <div className="flex items-center gap-0.5">
-        <button
-          type="button"
-          className="button-dark whitespace-nowrap px-1 py-0.5 text-xs"
-          disabled={disableToggle}
-          onClick={() => onToggle(entity.id)}
-        >
-          {isOn ? 'Turn off' : 'Turn on'}
-        </button>
-      </div>
-    </article>
+      <div className="text-xs font-semibold text-white/90">{isOn ? 'Turn off' : 'Turn on'}</div>
+    </button>
   );
 }
 
@@ -77,7 +78,7 @@ export default function HomeAssistantControls() {
     <section className="panel-section space-y-0.5 text-base">
       <header className="flex items-center justify-between gap-0.5 text-sm text-slate-400">
         <div className="flex items-center gap-1">
-          <p>Home Assistant</p>
+          <p>Light Controls</p>
           <span className="text-xs text-slate-500">{entities.length}</span>
         </div>
         <StatusBadge label={connected ? 'Connected' : 'Offline'} tone={connected ? 'success' : 'warn'} />

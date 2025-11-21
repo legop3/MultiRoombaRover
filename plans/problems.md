@@ -15,7 +15,7 @@
 <!-- 3. convert rover roster to a reusable component, unbake it from telemetry and admin panels -->
 <!-- 4. room cameras -->
 4. fix gamepad input - add manual inversions?
-5. home assistant controls
+<!-- 5. home assistant controls -->
 6. nicknames
 7. discord bot
 8. turns mode display
