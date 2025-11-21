@@ -93,8 +93,16 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
     });
   }
 
-  if (state.batteryLocked && (isFull || !dockedCharging)) {
-    logger.info('Unlocking rover after charge', { roverId, isFull, docked: dockedCharging });
+  const waitingState = chargingState === 4;
+  const shouldUnlock = state.batteryLocked && (!dockedCharging || (isFull && waitingState));
+
+  if (shouldUnlock) {
+    logger.info('Unlocking rover after charge', {
+      roverId,
+      isFull,
+      docked: dockedCharging,
+      waitingState,
+    });
     lockRover(roverId, false, { reason: 'battery' });
     state.batteryLocked = false;
     publishEvent({
