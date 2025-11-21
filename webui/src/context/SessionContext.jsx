@@ -14,6 +14,7 @@ const SessionContext = createContext({
   subscribeAll: async () => {},
   homeAssistantToggle: async () => {},
   homeAssistantSetState: async () => {},
+  setNickname: async () => {},
 });
 
 function useAckEmitter(socket) {
@@ -94,6 +95,7 @@ export function SessionProvider({ children }) {
       homeAssistantToggle: (entityId) => emitWithAck('homeAssistant:toggle', { entityId }),
       homeAssistantSetState: (entityId, state) =>
         emitWithAck('homeAssistant:setState', { entityId, state }),
+      setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
     }),
     [emitWithAck],
   );

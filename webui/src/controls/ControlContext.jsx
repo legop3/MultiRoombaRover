@@ -35,9 +35,8 @@ export function ControlSystemProvider({ children }) {
   }, [pipeline.roverId]);
 
   useEffect(() => {
-    if (controlSettings?.keymap) {
-      dispatch({ type: 'control/set-keymap', payload: controlSettings.keymap });
-    }
+    const mergedKeymap = { ...DEFAULT_KEYMAP, ...(controlSettings?.keymap || {}) };
+    dispatch({ type: 'control/set-keymap', payload: mergedKeymap });
     if (controlSettings?.macros) {
       dispatch({ type: 'control/set-macros', payload: controlSettings.macros });
     }

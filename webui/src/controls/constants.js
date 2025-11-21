@@ -38,6 +38,7 @@ export const DEFAULT_KEYMAP = {
   cameraDown: ['j'],
   driveMacro: ['f'],
   dockMacro: ['g'],
+  chatFocus: ['enter'],
 };
 
 export const DEFAULT_MACROS = [

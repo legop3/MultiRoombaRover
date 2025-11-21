@@ -21,6 +21,7 @@ const KEY_ACTIONS = [
   { id: 'cameraDown', label: 'Camera Down', group: 'Camera' },
   { id: 'driveMacro', label: 'Drive Macro', group: 'Macros' },
   { id: 'dockMacro', label: 'Dock Macro', group: 'Macros' },
+  { id: 'chatFocus', label: 'Toggle Chat', group: 'Chat' },
 ];
 
 function groupActions(actions) {

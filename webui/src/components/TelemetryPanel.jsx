@@ -22,13 +22,13 @@ export default function TelemetryPanel() {
   const rawSnippet = frame?.raw ? frame.raw : null;
   const roster = session?.roster ?? [];
   const activeDriverId = roverId ? session?.activeDrivers?.[roverId] : null;
-  const driverLabel = !roverId
-    ? 'n/a'
-    : activeDriverId
-    ? activeDriverId === session?.socketId
-      ? 'You'
-      : activeDriverId.slice(0, 6)
-    : 'Available';
+  const driverLabel = useMemo(() => {
+    if (!roverId) return 'n/a';
+    if (!activeDriverId) return 'Available';
+    if (activeDriverId === session?.socketId) return 'You';
+    const user = (session?.users || []).find((entry) => entry.socketId === activeDriverId);
+    return user?.nickname || activeDriverId.slice(0, 6);
+  }, [activeDriverId, roverId, session?.socketId, session?.users]);
   const isAdmin = useMemo(
     () => session?.role === 'admin' || session?.role === 'lockdown' || session?.role === 'lockdown-admin',
     [session?.role],

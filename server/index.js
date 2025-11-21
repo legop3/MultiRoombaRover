@@ -15,6 +15,8 @@ require('./src/services/roverManager');
 require('./src/services/commandService');
 require('./src/services/roverConnectionService');
 require('./src/services/assignmentService');
+require('./src/services/nicknameService');
+require('./src/services/chatService');
 require('./src/services/videoSessions');
 require('./src/services/videoAuthService');
 require('./src/services/videoSocketService');

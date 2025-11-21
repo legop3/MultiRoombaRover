@@ -195,11 +195,13 @@ function BatteryBar({ charge, config, status }) {
       <div className="flex items-center justify-between text-xs text-slate-400">
         <span>{status}</span>
       </div>
-      <div className="relative h-4 w-full bg-zinc-900">
-        <div className={`h-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }} />
-        <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-black/80">
-          Battery {percentText}
-        </span>
+      <div className="relative h-4 w-full bg-zinc-900 flex">
+        <div className={`h-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }}>
+          <span className="inset-0 flex items-center justify-center text-xs font-semibold text-black/80">
+            Battery {percentText}
+          </span>
+        </div>
+
       </div>
     </div>
   );

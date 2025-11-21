@@ -17,6 +17,8 @@ import RightPaneTabs from './components/RightPaneTabs.jsx';
 import ModeGateOverlay from './components/ModeGateOverlay.jsx';
 import SessionSnapshot from './components/SessionSnapshot.jsx';
 import HomeAssistantControls from './components/HomeAssistantControls.jsx';
+import UserListPanel from './components/UserListPanel.jsx';
+import ChatPanel from './components/ChatPanel.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -53,6 +55,10 @@ function DesktopLayout({ layout }) {
     <div className="flex h-full gap-0.5 overflow-hidden">
       <div className="flex min-w-0 flex-[1.8] flex-col gap-0.5 overflow-y-auto pr-0.5">
         <DriverVideoPanel />
+        <div className="grid grid-cols-2 gap-0.5">
+          <UserListPanel />
+          <ChatPanel />
+        </div>
         <LogPanel />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto">

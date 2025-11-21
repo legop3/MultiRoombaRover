@@ -6,6 +6,7 @@ import App from './App.jsx'
 import { SocketProvider } from './context/SocketContext.jsx'
 import { SessionProvider } from './context/SessionContext.jsx'
 import { TelemetryProvider } from './context/TelemetryContext.jsx'
+import { ChatProvider } from './context/ChatContext.jsx'
 import SpectatorApp from './spectate/SpectatorApp.jsx'
 
 createRoot(document.getElementById('root')).render(
@@ -13,12 +14,14 @@ createRoot(document.getElementById('root')).render(
     <SocketProvider>
       <SessionProvider>
         <TelemetryProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<App />} />
-              <Route path="/spectate" element={<SpectatorApp />} />
-            </Routes>
-          </BrowserRouter>
+          <ChatProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<App />} />
+                <Route path="/spectate" element={<SpectatorApp />} />
+              </Routes>
+            </BrowserRouter>
+          </ChatProvider>
         </TelemetryProvider>
       </SessionProvider>
     </SocketProvider>

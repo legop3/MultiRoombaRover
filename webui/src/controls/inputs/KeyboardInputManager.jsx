@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
+import { useChat } from '../../context/ChatContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
 
 const SOURCE = 'keyboard';
@@ -87,6 +88,7 @@ export default function KeyboardInputManager() {
       registerInputState,
     },
   } = useControlSystem();
+  const { focusChat, blurChat, isChatFocused } = useChat();
   const keymap = useMemo(() => normalizeKeymapEntries(state.keymap), [state.keymap]);
   const actionTokens = useMemo(() => {
     const tokens = new Set();
@@ -182,6 +184,17 @@ export default function KeyboardInputManager() {
       if (shouldIgnoreEvent(event)) return;
       const tokens = tokensForEvent(event);
       if (tokens.length === 0) return;
+      const tokenSet = new Set(tokens);
+      if (bindingActive(keymap.chatFocus, tokenSet)) {
+        event.preventDefault();
+        resetAll();
+        if (isChatFocused) {
+          blurChat();
+        } else {
+          focusChat();
+        }
+        return;
+      }
       if (tokens.some((token) => actionTokens.has(token))) {
         event.preventDefault();
       }
@@ -221,7 +234,21 @@ export default function KeyboardInputManager() {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [actionTokens, driveFromKeys, ensureServoLoop, keymap.dockMacro, keymap.driveMacro, resetAll, runMacro, setMode]);
+  }, [
+    actionTokens,
+    blurChat,
+    driveFromKeys,
+    ensureServoLoop,
+    focusChat,
+    isChatFocused,
+    keymap.chatFocus,
+    keymap.dockMacro,
+    keymap.driveMacro,
+    resetAll,
+    runMacro,
+    setMode,
+    stopAllMotion,
+  ]);
 
   const latestResetAllRef = useRef(resetAll);
   useEffect(() => {
