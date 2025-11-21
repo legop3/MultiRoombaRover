@@ -42,18 +42,22 @@ export default function GamepadInputManager() {
   const cameraDeadzone = Math.min(Math.max(gamepadSettings.cameraDeadzone ?? 0.25, 0), 0.9);
   const servoStep = gamepadSettings.servoStep ?? INPUT_SETTINGS_DEFAULTS.gamepad.servoStep;
   const auxReverseScale = gamepadSettings.auxReverseScale ?? INPUT_SETTINGS_DEFAULTS.gamepad.auxReverseScale;
+  const driveReady = Boolean(mapping?.drive?.horizontal && mapping?.drive?.vertical);
+  const cameraReady = Boolean(mapping?.camera?.vertical);
+  const mainAxisReady = Boolean(mapping?.brushes?.mainAxis);
+  const sideAxisReady = Boolean(mapping?.brushes?.sideAxis);
+  const brushesReady = mainAxisReady || sideAxisReady;
+  const vacuumReady = Boolean(mapping?.buttons?.vacuum);
+  const allAuxReady = Boolean(mapping?.buttons?.allAux);
+  const auxButtonsReady = vacuumReady || allAuxReady;
+  const mainReverseReady = Boolean(mapping?.buttons?.mainReverse);
+  const sideReverseReady = Boolean(mapping?.buttons?.sideReverse);
+  const reverseButtonsReady = mainReverseReady || sideReverseReady;
+  const driveMacroReady = Boolean(mapping?.buttons?.drive);
+  const dockMacroReady = Boolean(mapping?.buttons?.dock);
+  const macrosReady = driveMacroReady || dockMacroReady;
   const mappingReady =
-    Boolean(mapping?.drive?.horizontal) &&
-    Boolean(mapping?.drive?.vertical) &&
-    Boolean(mapping?.camera?.vertical) &&
-    Boolean(mapping?.brushes?.mainAxis) &&
-    Boolean(mapping?.brushes?.sideAxis) &&
-    Boolean(mapping?.buttons?.mainReverse) &&
-    Boolean(mapping?.buttons?.sideReverse) &&
-    Boolean(mapping?.buttons?.vacuum) &&
-    Boolean(mapping?.buttons?.allAux) &&
-    Boolean(mapping?.buttons?.drive) &&
-    Boolean(mapping?.buttons?.dock);
+    driveReady || cameraReady || brushesReady || auxButtonsReady || reverseButtonsReady || macrosReady;
   const rafRef = useRef(null);
   const lastVectorRef = useRef({ x: 0, y: 0, boost: false });
   const lastAuxRef = useRef({ main: 0, side: 0, vacuum: 0 });
@@ -106,32 +110,31 @@ export default function GamepadInputManager() {
       return;
     }
 
-    if (!mappingReady) {
-      registerInputState(SOURCE, { connected: true, mappingReady: false });
-      return;
-    }
-
-    const axisLX = clampUnit(applyDeadzone(getAxisValue(pad, mapping.drive.horizontal), driveDeadzone));
-    const axisLY = clampUnit(applyDeadzone(-getAxisValue(pad, mapping.drive.vertical), driveDeadzone));
+    const axisLX = driveReady
+      ? clampUnit(applyDeadzone(getAxisValue(pad, mapping.drive.horizontal), driveDeadzone))
+      : 0;
+    const axisLY = driveReady
+      ? clampUnit(applyDeadzone(-getAxisValue(pad, mapping.drive.vertical), driveDeadzone))
+      : 0;
     const vector = { x: axisLX, y: axisLY, boost: false };
     if (!vectorsEqual(vector, lastVectorRef.current)) {
       lastVectorRef.current = vector;
       setDriveVector(vector, { source: SOURCE });
     }
 
-    const mainRaw = getAxisValue(pad, mapping.brushes.mainAxis);
+    const mainRaw = mainAxisReady ? getAxisValue(pad, mapping.brushes.mainAxis) : 0;
     const mainMagnitude = Math.round(Math.min(Math.abs(mainRaw), 1) * 127);
     const main = reverseStateRef.current.main ? -mainMagnitude : mainMagnitude;
 
-    const sideRaw = getAxisValue(pad, mapping.brushes.sideAxis);
+    const sideRaw = sideAxisReady ? getAxisValue(pad, mapping.brushes.sideAxis) : 0;
     const sideMagnitude = Math.round(Math.min(Math.abs(sideRaw), 1) * 127);
     const side = reverseStateRef.current.side
       ? -Math.round(sideMagnitude * auxReverseScale)
       : Math.round(sideMagnitude * auxReverseScale);
 
-    const vacuum = isButtonPressed(pad, mapping.buttons.vacuum) ? 127 : 0;
-    let aux = { main, side, vacuum };
-    if (isButtonPressed(pad, mapping.buttons.allAux)) {
+    const vacuum = vacuumReady && isButtonPressed(pad, mapping.buttons.vacuum) ? 127 : 0;
+    let aux = { main: mainAxisReady ? main : 0, side: sideAxisReady ? side : 0, vacuum };
+    if (allAuxReady && isButtonPressed(pad, mapping.buttons.allAux)) {
       aux = { main: 127, side: 127, vacuum: 127 };
     }
     if (!auxEqual(aux, lastAuxRef.current)) {
@@ -139,36 +142,58 @@ export default function GamepadInputManager() {
       setAuxMotors(aux);
     }
 
-    const cameraAxis = clampUnit(applyDeadzone(-getAxisValue(pad, mapping.camera.vertical), cameraDeadzone));
+    const cameraAxis = cameraReady
+      ? clampUnit(applyDeadzone(-getAxisValue(pad, mapping.camera.vertical), cameraDeadzone))
+      : 0;
     const now = performance.now();
-    if (Math.abs(cameraAxis) > 0.25 && now - servoThrottleRef.current > 120) {
+    if (cameraReady && Math.abs(cameraAxis) > 0.25 && now - servoThrottleRef.current > 120) {
       servoThrottleRef.current = now;
       nudgeServo(cameraAxis > 0 ? servoStep : -servoStep);
     }
 
-    if (handleButtonEdge('toggle-main', isButtonPressed(pad, mapping.buttons.mainReverse))) {
+    if (
+      mainReverseReady &&
+      handleButtonEdge('toggle-main', isButtonPressed(pad, mapping.buttons.mainReverse))
+    ) {
       reverseStateRef.current.main = !reverseStateRef.current.main;
     }
-    if (handleButtonEdge('toggle-side', isButtonPressed(pad, mapping.buttons.sideReverse))) {
+    if (
+      sideReverseReady &&
+      handleButtonEdge('toggle-side', isButtonPressed(pad, mapping.buttons.sideReverse))
+    ) {
       reverseStateRef.current.side = !reverseStateRef.current.side;
     }
 
-    if (handleButtonEdge(`macro-${mapping.buttons.drive.index}`, isButtonPressed(pad, mapping.buttons.drive))) {
+    if (
+      driveMacroReady &&
+      handleButtonEdge(`macro-${mapping.buttons.drive.index}`, isButtonPressed(pad, mapping.buttons.drive))
+    ) {
       setMode('drive');
       runMacro('drive-sequence');
     }
-    if (handleButtonEdge(`macro-${mapping.buttons.dock.index}`, isButtonPressed(pad, mapping.buttons.dock))) {
+    if (
+      dockMacroReady &&
+      handleButtonEdge(`macro-${mapping.buttons.dock.index}`, isButtonPressed(pad, mapping.buttons.dock))
+    ) {
       setMode('dock');
       runMacro('seek-dock');
     }
 
     registerInputState(SOURCE, {
       connected: true,
-      mappingReady: true,
+      mappingReady,
       id: pad.id,
       index: pad.index,
       axes: [axisLX, axisLY, cameraAxis],
       reverse: { ...reverseStateRef.current },
+      bindings: {
+        drive: driveReady,
+        camera: cameraReady,
+        brushes: brushesReady,
+        auxButtons: { vacuum: vacuumReady, allAux: allAuxReady },
+        reverseButtons: { main: mainReverseReady, side: sideReverseReady },
+        macros: { drive: driveMacroReady, dock: dockMacroReady },
+      },
     });
   }, [
     auxReverseScale,

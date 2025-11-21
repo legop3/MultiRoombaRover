@@ -19,6 +19,7 @@ require('./src/services/videoSessions');
 require('./src/services/videoAuthService');
 require('./src/services/videoSocketService');
 require('./src/services/logStreamService');
+require('./src/services/homeAssistantService');
 require('./src/services/sessionService');
 require('./src/services/batteryManager');
 require('./src/services/httpServer');

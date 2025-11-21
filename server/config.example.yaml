@@ -12,6 +12,16 @@ media:
   #   http://<base>/<roverId>/whep
   # Example: http://192.168.0.86:8889/video
   whepBaseUrl: "http://192.168.0.86:8889/video"
+
+homeAssistant:
+  url: "http://homeassistant.local:8123"
+  token: "REPLACE_WITH_LONG_LIVED_TOKEN"
+  entities:
+    - id: "light.lab_main"
+      name: "Lab Lights"
+    - id: "switch.dock_power"
+      name: "Dock Power"
+      # type is optional; if omitted it is inferred from the entity id (light/switch)
 roomCameras:
   - id: "lobby"
     name: "Lobby Camera"

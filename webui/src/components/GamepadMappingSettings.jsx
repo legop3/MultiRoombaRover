@@ -151,14 +151,29 @@ export default function GamepadMappingSettings() {
     }, {});
   }, []);
 
-  const getValueLabel = (action) => {
+  const getStored = (action) => {
     const [group, key] = action.path;
-    const stored = mapping?.[group]?.[key] ?? null;
+    return mapping?.[group]?.[key] ?? null;
+  };
+
+  const getValueLabel = (action) => {
+    const stored = getStored(action);
     return action.type === 'axis' ? formatAxis(stored) : formatButton(stored);
   };
 
   const handleClear = (action) => {
     save((prev) => updatePath(prev, action.path, () => null));
+  };
+
+  const handleInvert = (action) => {
+    const stored = getStored(action);
+    if (!stored) return;
+    save((prev) =>
+      updatePath(prev, action.path, (current) => ({
+        ...current,
+        invert: !current?.invert,
+      })),
+    );
   };
 
   return (
@@ -232,6 +247,20 @@ export default function GamepadMappingSettings() {
                     <p className="text-[0.65rem] text-slate-400">{getValueLabel(action)}</p>
                   </div>
                   <div className="flex items-center gap-0.5">
+                    {action.type === 'axis' && (
+                      <button
+                        type="button"
+                        disabled={!getStored(action)}
+                        onClick={() => handleInvert(action)}
+                        className={`${
+                          getStored(action)?.invert
+                            ? 'px-0.5 py-0.5 bg-amber-400 text-amber-900 hover:bg-amber-300'
+                            : 'button-dark'
+                        } text-[0.7rem] font-medium disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        Invert
+                      </button>
+                    )}
                     <button type="button" onClick={() => handleClear(action)} className="button-dark text-[0.7rem]">
                       Clear
                     </button>

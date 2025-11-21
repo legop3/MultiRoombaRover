@@ -7,6 +7,7 @@ const { managerEvents } = roverManager;
 const assignmentService = require('./assignmentService');
 const { getActiveDrivers, turnEvents } = require('./turnService');
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
+const { getState: getHomeAssistantState, homeAssistantEvents } = require('./homeAssistantService');
 
 function buildSession(socket) {
   return {
@@ -17,6 +18,7 @@ function buildSession(socket) {
     assignment: assignmentService.describeAssignment(socket?.id || ''),
     activeDrivers: getActiveDrivers(),
     roomCameras: getRoomCameras(),
+    homeAssistant: getHomeAssistantState(),
   };
 }
 
@@ -85,11 +87,21 @@ roomCameraEvents.on('update', () => {
   syncAll();
 });
 
-// sync all sockets 5 seconds
+homeAssistantEvents.on('update', () => {
+  logger.info('Home Assistant state change; syncing all clients');
+  syncAll();
+});
+
+homeAssistantEvents.on('status', () => {
+  logger.info('Home Assistant status change; syncing all clients');
+  syncAll();
+});
+
+// sync all sockets 20 seconds
 setInterval(() => {
   logger.info('Periodic session sync for all clients');
   syncAll();
-}, 5000);
+}, 20000);
 
 module.exports = {
   buildSession,

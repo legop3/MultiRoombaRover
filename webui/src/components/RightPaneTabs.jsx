@@ -2,18 +2,10 @@ import TelemetryPanel from './TelemetryPanel.jsx';
 import DrivePanel from './DrivePanel.jsx';
 import CameraServoPanel from './CameraServoPanel.jsx';
 import RoomCameraPanel from './RoomCameraPanel.jsx';
+import HomeAssistantControls from './HomeAssistantControls.jsx';
 import SettingsPanel from './SettingsPanel.jsx';
 import HelpPanel from './HelpPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
-
-function RoomControlsPlaceholder() {
-  return (
-    <div className="panel-section space-y-0.5 text-sm">
-      <p className="text-slate-400">Room controls</p>
-      <p className="text-slate-200">Coming soon: lighting, docks, and environmental toggles.</p>
-    </div>
-  );
-}
 
 export default function RightPaneTabs({ layout }) {
   return (
@@ -37,7 +29,7 @@ export default function RightPaneTabs({ layout }) {
           <TabPanel id="room">
             <div className="space-y-0.5">
               <RoomCameraPanel defaultOrientation="vertical" />
-              <RoomControlsPlaceholder />
+              <HomeAssistantControls />
             </div>
           </TabPanel>
           <TabPanel id="settings">

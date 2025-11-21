@@ -35,7 +35,7 @@ export default function DrivePanel() {
       <div className="space-y-0.5">
         <ActionCard
           title="Start Driving"
-          description="Press to enable driving mode, then start moving. The headlamps should illuminate."
+          description="Press to enable driving mode, then start moving."
           statuses={[{ label: drivingMode ? 'Ready!' : 'Not Ready!', active: drivingMode }]}
           tone="emerald"
           onClick={handleStartDrive}
@@ -43,7 +43,7 @@ export default function DrivePanel() {
         />
         <ActionCard
           title="Dock and Charge"
-          description="Line the rover up about a foot from the dock, then trigger an automatic approach."
+          description="Line the rover up about a foot from the dock, then trigger an automatic docking attempt."
           statuses={[
             { label: docked ? 'Docked!' : 'Not Docked!', active: docked },
             { label: charging ? 'Charging!' : 'Not Charging!', active: charging },
@@ -71,12 +71,13 @@ function ActionCard({ title, description, statuses, tone, onClick, disabled, foo
     >
       <p className="text-base font-semibold">{title}</p>
       <p className="text-sm text-white/90">{description}</p>
-      <div className="mt-0.5 flex flex-wrap gap-0.5">
+      {/* center statuses in button */}
+      <div className="mt-0.5 flex flex-wrap gap-0.5 items-center w-full justify-center">
         {statuses.map((status) => (
           <span
             key={status.label}
-            className={`px-0.5 py-0.5 text-xs font-semibold ${
-              status.active ? 'bg-lime-300 text-emerald-900' : 'bg-emerald-900 text-emerald-100'
+            className={`p-1 text-xs font-semibold ${
+              status.active ? 'bg-green-600 text-white' : 'bg-red-500 text-white'
             }`}
           >
             {status.label}
