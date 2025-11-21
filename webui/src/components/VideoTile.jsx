@@ -247,9 +247,9 @@ function OvercurrentOverlay({ motors }) {
   if (!motors?.length) return null;
   const labels = motors.map((name) => OVERCURRENT_LABELS[name] || name);
   return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-red-900/60">
-      <div className="text-center text-2xl font-semibold text-white animate-pulse">
-        <div>Overcurrent</div>
+    <div className="pointer-events-none absolute flex items-center justify-center bg-red-900/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-4">
+      <div className="text-center text-4xl font-semibold text-white animate-pulse">
+        <div>OVERCURRENT</div>
         <div className="mt-0.5 text-xl font-medium text-white">{labels.join(', ')}</div>
       </div>
     </div>
@@ -270,10 +270,10 @@ function LowBatteryOverlay({ charge, config }) {
   const warnTriggered = urgent != null && charge <= urgent;
   if (!warnTriggered && !depleted) return null;
 
-  const message = depleted ? 'BATTERY VERY LOW, PLEASE DOCK THE ROVER AND CHARGE IMMEDIATELY!!' : 'Battery low! please dock and charge the rover soon.';
+  const message = depleted ? 'Battery low! please dock and charge the rover soon.' : 'BATTERY VERY LOW, PLEASE DOCK THE ROVER AND CHARGE IMMEDIATELY!!';
 
   return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-amber-900/60">
+    <div className="pointer-events-none absolute flex items-center justify-center bg-amber-900/60 top-10 left-1/2 -translate-x-1/2 p-4">
       <div className="text-center text-2xl font-semibold text-white animate-pulse">
         <div>{message}</div>
       </div>

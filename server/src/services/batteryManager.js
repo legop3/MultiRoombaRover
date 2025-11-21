@@ -20,7 +20,7 @@ function getState(roverId) {
       lastPercent: null,
       warned: false,
       urgent: false,
-      docked: false,
+      dockedCharging: false,
       batteryLocked: false,
     });
   }
@@ -62,20 +62,18 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
 
   const chargingState = sensors?.chargingState?.code;
   const chargingSources = sensors?.chargingSources;
-  const docked =
-    Boolean(chargingSources?.homeBase) ||
-    chargingState === 2 ||
-    chargingState === 3 ||
-    chargingState === 4;
-  if (docked && !state.docked) {
-    state.docked = true;
+  const onDock = Boolean(chargingSources?.homeBase);
+  const isCharging = chargingState === 1 || chargingState === 2 || chargingState === 3;
+  const dockedCharging = onDock && isCharging;
+  if (dockedCharging && !state.dockedCharging) {
+    state.dockedCharging = true;
     publishEvent({
       source: 'batteryManager',
       type: 'battery.docked',
       payload: { roverId, batteryState },
     });
-  } else if (!docked && state.docked) {
-    state.docked = false;
+  } else if (!dockedCharging && state.dockedCharging) {
+    state.dockedCharging = false;
   }
 
   const fullThreshold =
@@ -84,7 +82,7 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
     (batteryState?.charge != null && fullThreshold != null && batteryState.charge >= fullThreshold) ||
     (batteryState?.percent != null && batteryState.percent >= 0.99);
 
-  if (docked && lockable && !state.batteryLocked && !isFull) {
+  if (dockedCharging && lockable && !state.batteryLocked && !isFull) {
     logger.info('Auto-locking rover for charging', { roverId });
     lockRover(roverId, true, { reason: 'battery' });
     state.batteryLocked = true;
@@ -95,8 +93,8 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
     });
   }
 
-  if (state.batteryLocked && (isFull || !docked)) {
-    logger.info('Unlocking rover after charge', { roverId, isFull, docked });
+  if (state.batteryLocked && (isFull || !dockedCharging)) {
+    logger.info('Unlocking rover after charge', { roverId, isFull, docked: dockedCharging });
     lockRover(roverId, false, { reason: 'battery' });
     state.batteryLocked = false;
     publishEvent({
