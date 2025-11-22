@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
+import { useSocket } from '../context/SocketContext.jsx';
 
 function roleColors(role) {
   switch (role) {
@@ -29,7 +30,8 @@ export default function UserListPanel() {
   const { value, save } = useSettingsNamespace('profile', { nickname: '' });
   const [nicknameInput, setNicknameInput] = useState(value.nickname || '');
   const [saving, setSaving] = useState(false);
-  const hasSyncedRef = useRef(false);
+  const lastSyncedSocketRef = useRef(null);
+  const socket = useSocket();
   const canSetNickname = session?.role !== 'spectator';
   const users = session?.users ?? [];
   const selfId = session?.socketId || null;
@@ -39,15 +41,29 @@ export default function UserListPanel() {
   }, [value.nickname]);
 
   useEffect(() => {
-    if (hasSyncedRef.current) return;
     if (!canSetNickname) return;
     if (!session?.socketId) return;
     if (!nicknameInput) return;
-    hasSyncedRef.current = true;
-    setNickname(nicknameInput).catch(() => {
-      hasSyncedRef.current = false;
-    });
+    if (session.socketId === lastSyncedSocketRef.current) return;
+    const currentId = session.socketId;
+    setNickname(nicknameInput).then(() => {
+      lastSyncedSocketRef.current = currentId;
+    }).catch(() => {});
   }, [canSetNickname, nicknameInput, session?.socketId, setNickname]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const handleConnect = () => {
+      if (!canSetNickname) return;
+      const nick = (value.nickname || '').trim();
+      if (!nick) return;
+      setNickname(nick).then(() => {
+        lastSyncedSocketRef.current = session?.socketId || null;
+      }).catch(() => {});
+    };
+    socket.on('connect', handleConnect);
+    return () => socket.off('connect', handleConnect);
+  }, [canSetNickname, setNickname, socket, value.nickname, session?.socketId]);
 
   const sorted = useMemo(
     () =>
