@@ -7,7 +7,7 @@
 - https://www.thingiverse.com/thing:4514531
 
 ## spectator page
-- video does not load in spectator page in admin mode
+- completely remake it from scratch
 
 ## todo
 <!-- 1. battery manager -->
@@ -16,9 +16,11 @@
 <!-- 4. room cameras -->
 4. fix gamepad input - add manual inversions?
 <!-- 5. home assistant controls -->
-6. nicknames
+<!-- 6. nicknames -->
 7. discord bot
 8. turns mode display
-9. online user list
-10. chat
+<!-- 9. online user list -->
+<!-- 10. chat -->
+10. redo both mobile layouts
 11. redo spectator view (last)
+21. finally.. set the favicon
