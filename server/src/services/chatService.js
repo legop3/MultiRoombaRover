@@ -55,15 +55,16 @@ function resolveRoverId(socketId) {
   return assignment?.roverId || null;
 }
 
-function buildMessage(socket, text) {
-  const roverId = resolveRoverId(socket.id);
+function buildMessage(socket, text, meta = {}) {
+  const roverId = meta.roverId || resolveRoverId(socket?.id);
   return {
     id: uuidv4(),
     ts: Date.now(),
-    socketId: socket.id,
-    nickname: getNickname(socket) || null,
-    role: getRole(socket),
+    socketId: socket?.id || null,
+    nickname: meta.nickname || getNickname(socket) || null,
+    role: meta.role || getRole(socket),
     roverId,
+    fromDiscord: Boolean(meta.fromDiscord),
     text,
   };
 }
@@ -103,10 +104,32 @@ function handleIncoming({ text } = {}, socket, cb = () => {}) {
     cb({ error: 'Message looks like spam' });
     return;
   }
-  const message = buildMessage(socket, clean);
+  const message = buildMessage(socket, clean, { fromDiscord: false });
   logger.info('Chat message', { socket: socket.id, roverId: message.roverId });
   broadcastMessage(message);
   cb({ success: true });
+}
+
+function sendExternalMessage({ text, nickname = 'Discord', role = 'admin', roverId = null }) {
+  const clean = typeof text === 'string' ? text.trim() : '';
+  if (!clean || clean.length > 256) {
+    throw new Error('Message invalid');
+  }
+  if (hasProfanity(clean)) {
+    throw new Error('Message blocked');
+  }
+  if (isKeymash(clean)) {
+    throw new Error('Message looks like spam');
+  }
+  const message = buildMessage(null, clean, {
+    nickname,
+    role,
+    roverId,
+    fromDiscord: true,
+  });
+  logger.info('External chat message', { roverId, nickname });
+  broadcastMessage(message);
+  return message;
 }
 
 io.on('connection', (socket) => {
@@ -117,3 +140,8 @@ subscribe('chat:message', ({ payload }) => {
   if (!payload) return;
   io.emit('chat:message', payload);
 });
+
+module.exports = {
+  handleIncoming,
+  sendExternalMessage,
+};

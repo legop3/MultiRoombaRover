@@ -2,6 +2,7 @@ const EventEmitter = require('events');
 const io = require('../globals/io');
 const { sendAlert, COLORS } = require('./alertService');
 const { isAdmin, isLockdownAdmin } = require('./roleService');
+const { publishEvent } = require('./eventBus');
 
 const MODES = {
   OPEN: 'open',
@@ -20,11 +21,12 @@ function canChangeMode(socket, nextMode) {
   return isAdmin(socket);
 }
 
-function setMode(nextMode, socket) {
+function setMode(nextMode, socket, options = {}) {
   if (!Object.values(MODES).includes(nextMode)) {
     throw new Error(`Unknown mode ${nextMode}`);
   }
-  if (!canChangeMode(socket, nextMode)) {
+  const force = Boolean(options.force);
+  if (!force && !canChangeMode(socket, nextMode)) {
     throw new Error('Not authorized to change mode');
   }
   if (currentMode === nextMode) {
@@ -35,6 +37,11 @@ function setMode(nextMode, socket) {
     color: COLORS.info,
     title: 'Mode Changed',
     message: `Server mode set to ${nextMode}`,
+  });
+  publishEvent({
+    source: 'modeManager',
+    type: 'mode.changed',
+    payload: { mode: currentMode, by: socket?.data?.user?.username || null },
   });
   modeEvents.emit('change', currentMode);
   io.emit('mode', { mode: currentMode });

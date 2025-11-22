@@ -5,6 +5,7 @@ const { sendAlert, COLORS } = require('./alertService');
 const { parseSensorFrame } = require('../helpers/sensorDecoder');
 const { MODES, getMode } = require('./modeManager');
 const { isAdmin, roleEvents } = require('./roleService');
+const { publishEvent } = require('./eventBus');
 
 const rovers = new Map(); // roverId -> record
 const socketToRovers = new Map(); // socketId -> Set(roverId)
@@ -37,6 +38,7 @@ function upsertRover(meta, ws) {
   } else {
     logger.info('Rover hello camera servo', { id, servo: meta.cameraServo });
   }
+  const isNew = !rovers.has(id);
   const record = ensureRecord(id);
   record.meta = meta;
   record.ws = ws;
@@ -47,6 +49,9 @@ function upsertRover(meta, ws) {
     sock?.join(record.room);
   });
   managerEvents.emit('rover', { roverId: id, action: 'upsert', record });
+  if (isNew) {
+    publishEvent({ source: 'roverManager', type: 'rover.online', payload: { roverId: id } });
+  }
   broadcastRoster();
   return record;
 }
@@ -62,6 +67,7 @@ function removeRover(id) {
   });
   broadcastRoster();
   managerEvents.emit('rover', { roverId: id, action: 'removed' });
+  publishEvent({ source: 'roverManager', type: 'rover.offline', payload: { roverId: id } });
 }
 
 function lockRover(id, locked, options = {}) {
@@ -81,12 +87,22 @@ function lockRover(id, locked, options = {}) {
         message: `${id} locked${record.lockReason ? ` (${record.lockReason})` : ''}.`,
       });
     }
+    publishEvent({
+      source: 'roverManager',
+      type: 'rover.locked',
+      payload: { roverId: id, reason: record.lockReason },
+    });
   } else {
     record.locked = false;
     record.lockReason = null;
     if (!silent) {
       sendAlert({ color: COLORS.success, title: 'Rover Unlocked', message: `${id} unlocked.` });
     }
+    publishEvent({
+      source: 'roverManager',
+      type: 'rover.unlocked',
+      payload: { roverId: id },
+    });
   }
   broadcastRoster();
   managerEvents.emit('lock', { roverId: id, locked: record.locked, reason: record.lockReason });

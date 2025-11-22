@@ -29,3 +29,14 @@ roomCameras:
   - id: "workshop"
     name: "Workshop Bench"
     description: "Shows the workbench and charging docks."
+
+discord:
+  token: "DISCORD_BOT_TOKEN"
+  guildId: "123456789012345678" # optional; bot works in any guild it's invited to
+  channels:
+    announcements: "123456789012345678"
+    adminAlerts: "123456789012345678"
+    chatBridge: "123456789012345678"
+  roles:
+    announcementPing: "123456789012345678"
+    adminPing: "123456789012345678"

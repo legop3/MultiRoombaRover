@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "discord.js": "^14.25.1",
     "express": "^4.19.2",
     "home-assistant-js-websocket": "^3.1.2",
     "js-yaml": "^4.1.1",
