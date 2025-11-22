@@ -17,10 +17,11 @@
 4. fix gamepad input - add manual inversions?
 <!-- 5. home assistant controls -->
 <!-- 6. nicknames -->
-7. discord bot
+<!-- 7. discord bot -->
 8. turns mode display
 <!-- 9. online user list -->
 <!-- 10. chat -->
+9. discord invite button
 10. redo both mobile layouts
 11. redo spectator view (last)
 21. finally.. set the favicon
