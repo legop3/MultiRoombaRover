@@ -306,6 +306,30 @@ function handleBusEvent(event) {
         description: `${payload?.roverId} is docked and charging.`,
       });
       break;
+    case 'battery.undocked':
+      announce({
+        channelId: channels.adminAlerts,
+        color: 0x2196f3,
+        title: 'Undocked',
+        description: `${payload?.roverId} undocked.`,
+      });
+      break;
+    case 'battery.charging.start':
+      announce({
+        channelId: channels.adminAlerts,
+        color: 0x2196f3,
+        title: 'Charging Started',
+        description: `${payload?.roverId} started charging.`,
+      });
+      break;
+    case 'battery.charging.stop':
+      announce({
+        channelId: channels.adminAlerts,
+        color: 0xf0b651,
+        title: 'Charging Stopped',
+        description: `${payload?.roverId} stopped charging.`,
+      });
+      break;
     case 'battery.locked':
       announce({
         channelId: channels.adminAlerts,

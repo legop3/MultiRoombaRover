@@ -73,13 +73,18 @@ export default function ChatPanel() {
               <div
                 key={msg.id}
                 className={`surface-muted text-sm flex items-start gap-1 ${
-                  isAdmin ? 'border border-amber-400/30' : ''
+                  isAdmin ? 'border border-amber-400/30' : msg.fromDiscord? 'border border-indigo-400/30' : ''
                 }`}
               >
                 <span className="text-[0.75rem] text-slate-400">{formatTime(msg.ts)}</span>
                 <span className={`font-semibold text-[0.85rem] ${roleColors(msg.role)}`}>
                   {displayName(msg)}
                 </span>
+                {msg.fromDiscord && (
+                  <span className="rounded bg-indigo-500/30 px-1 text-[0.7rem] text-indigo-100">
+                    Discord
+                  </span>
+                )}
                 {msg.roverId && (
                   <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {msg.roverId}</span>
                 )}
