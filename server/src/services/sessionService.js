@@ -5,7 +5,7 @@ const { getMode, modeEvents } = require('./modeManager');
 const roverManager = require('./roverManager');
 const { managerEvents } = roverManager;
 const assignmentService = require('./assignmentService');
-const { getActiveDrivers, turnEvents } = require('./turnService');
+const { getActiveDrivers, getTurnQueues, turnEvents } = require('./turnService');
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('./homeAssistantService');
 const { getNickname, nicknameEvents } = require('./nicknameService');
@@ -34,6 +34,7 @@ function buildSession(socket) {
     roster: roverManager.getRoster(),
     assignment: assignmentService.describeAssignment(socket?.id || ''),
     activeDrivers: getActiveDrivers(),
+    turnQueues: getTurnQueues(),
     roomCameras: getRoomCameras(),
     homeAssistant: getHomeAssistantState(),
     users,
@@ -97,6 +98,10 @@ managerEvents.on('driver', ({ socketId }) => {
 
 turnEvents.on('activeDriver', () => {
   logger.info('Active driver change; syncing all clients');
+  syncAll();
+});
+turnEvents.on('queue', () => {
+  logger.info('Turn queue change; syncing all clients');
   syncAll();
 });
 

@@ -7,6 +7,7 @@ const driverQueues = new Map(); // roverId -> { queue: [], current: socketId, ti
 const activeDrivers = new Map();
 const TURN_DURATION_MS = 60 * 1000;
 const turnEvents = new EventEmitter();
+const turnDeadlines = new Map(); // roverId -> timestamp when current driver expires
 
 function driverAdded(roverId, socketId, force) {
   const queue = ensureQueue(roverId);
@@ -35,6 +36,7 @@ function cleanupRover(roverId) {
   }
   driverQueues.delete(roverId);
   activeDrivers.delete(roverId);
+  turnDeadlines.delete(roverId);
 }
 
 function canDrive(roverId, socket) {
@@ -60,6 +62,8 @@ function syncState(roverId) {
     queue.current = queue.queue[0] || null;
     setActiveDriver(roverId, queue.current);
     clearTimeout(queue.timer);
+    turnDeadlines.delete(roverId);
+    turnEvents.emit('queue', { roverId });
     return;
   }
   if (!queue.current) {
@@ -67,13 +71,17 @@ function syncState(roverId) {
   }
   setActiveDriver(roverId, queue.current);
   scheduleNextTurn(roverId);
+  turnEvents.emit('queue', { roverId });
 }
 
 function scheduleNextTurn(roverId) {
   const queue = driverQueues.get(roverId);
   if (!queue) return;
   clearTimeout(queue.timer);
+  const deadline = Date.now() + TURN_DURATION_MS;
+  turnDeadlines.set(roverId, deadline);
   queue.timer = setTimeout(() => advanceTurn(roverId), TURN_DURATION_MS);
+  turnEvents.emit('queue', { roverId });
 }
 
 function advanceTurn(roverId) {
@@ -82,6 +90,8 @@ function advanceTurn(roverId) {
   if (queue.queue.length === 0) {
     clearTimeout(queue.timer);
     setActiveDriver(roverId, null);
+    turnDeadlines.delete(roverId);
+    turnEvents.emit('queue', { roverId });
     return;
   }
   const mode = getMode();
@@ -89,6 +99,8 @@ function advanceTurn(roverId) {
     queue.current = queue.queue[0] || null;
     setActiveDriver(roverId, queue.current);
     clearTimeout(queue.timer);
+    turnDeadlines.delete(roverId);
+    turnEvents.emit('queue', { roverId });
     return;
   }
   const idx = queue.queue.findIndex((id) => id === queue.current);
@@ -117,6 +129,20 @@ function getActiveDrivers() {
   return map;
 }
 
+function getTurnQueues() {
+  const mode = getMode();
+  const payload = {};
+  driverQueues.forEach((queue, roverId) => {
+    payload[roverId] = {
+      mode,
+      queue: Array.from(queue.queue),
+      current: queue.current,
+      deadline: turnDeadlines.get(roverId) || null,
+    };
+  });
+  return payload;
+}
+
 function stopRover(roverId) {
   try {
     const { issueCommand } = require('./commandService');
@@ -138,4 +164,5 @@ module.exports = {
   canDrive,
   getActiveDrivers,
   turnEvents,
+  getTurnQueues,
 };
