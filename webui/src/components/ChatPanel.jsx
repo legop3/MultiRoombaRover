@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '../context/ChatContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 
-function roleColors(role) {
+function roleColors(role, fromDiscord) {
+  if (fromDiscord) return 'text-indigo-200';
   switch (role) {
     case 'admin':
     case 'lockdown':
@@ -73,11 +74,15 @@ export default function ChatPanel() {
               <div
                 key={msg.id}
                 className={`surface-muted text-sm flex items-start gap-1 ${
-                  isAdmin ? 'border border-amber-400/30' : msg.fromDiscord? 'border border-indigo-400/30' : ''
+                  isAdmin
+                    ? 'border border-amber-400/30'
+                    : msg.fromDiscord
+                      ? 'border border-indigo-400/30 bg-indigo-900/20'
+                      : ''
                 }`}
               >
                 <span className="text-[0.75rem] text-slate-400">{formatTime(msg.ts)}</span>
-                <span className={`font-semibold text-[0.85rem] ${roleColors(msg.role)}`}>
+                <span className={`font-semibold text-[0.85rem] ${roleColors(msg.role, msg.fromDiscord)}`}>
                   {displayName(msg)}
                 </span>
                 {msg.fromDiscord && (

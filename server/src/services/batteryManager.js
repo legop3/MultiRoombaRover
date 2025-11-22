@@ -20,6 +20,7 @@ function getState(roverId) {
       lastPercent: null,
       warned: false,
       urgent: false,
+      onDock: false,
       dockedCharging: false,
       charging: false,
       batteryLocked: false,
@@ -64,6 +65,21 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
   const chargingState = sensors?.chargingState?.code;
   const chargingSources = sensors?.chargingSources;
   const onDock = Boolean(chargingSources?.homeBase);
+  if (onDock && !state.onDock) {
+    state.onDock = true;
+    publishEvent({
+      source: 'batteryManager',
+      type: 'battery.docked',
+      payload: { roverId, batteryState },
+    });
+  } else if (!onDock && state.onDock) {
+    state.onDock = false;
+    publishEvent({
+      source: 'batteryManager',
+      type: 'battery.undocked',
+      payload: { roverId, batteryState },
+    });
+  }
   const isCharging = chargingState === 1 || chargingState === 2 || chargingState === 3;
   if (isCharging && !state.charging) {
     state.charging = true;
@@ -83,18 +99,8 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
   const dockedCharging = onDock && isCharging;
   if (dockedCharging && !state.dockedCharging) {
     state.dockedCharging = true;
-    publishEvent({
-      source: 'batteryManager',
-      type: 'battery.docked',
-      payload: { roverId, batteryState },
-    });
   } else if (!dockedCharging && state.dockedCharging) {
     state.dockedCharging = false;
-    publishEvent({
-      source: 'batteryManager',
-      type: 'battery.undocked',
-      payload: { roverId, batteryState },
-    });
   }
 
   const fullThreshold =
