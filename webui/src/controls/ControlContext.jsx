@@ -37,7 +37,10 @@ export function ControlSystemProvider({ children }) {
   const turnOnAllLights = useCallback(() => {
     const entities = session?.homeAssistant?.entities || [];
     const targets = entities.filter(
-      (ent) => ent.type === 'light' && ent.available !== false && ent.state !== 'on',
+      (ent) =>
+        (ent.type === 'light' || ent.type === 'switch') &&
+        ent.available !== false &&
+        ent.state !== 'on',
     );
     if (targets.length === 0) {
       pendingLightsRef.current = false;
