@@ -97,11 +97,11 @@ function isAdminUser(discordId) {
 function formatHelp() {
   return [
     '**Rover Bot Commands**',
-    '`rover help` — show this help',
-    '`rover status [id]` — show rover status (all or one)',
-    '`rover lock <id>` — lock a rover',
-    '`rover unlock <id>` — unlock a rover',
-    '`rover mode <open|turns|admin|lockdown>` — change server mode',
+    '`rs help` — show this help',
+    '`rs status [id]` — show rover status (all or one)',
+    '`rs lock <id>` — lock a rover',
+    '`rs unlock <id>` — unlock a rover',
+    '`rs mode <open|turns|admin|lockdown>` — change server mode',
   ].join('\n');
 }
 
@@ -152,13 +152,13 @@ async function handleModeCommand(message, mode) {
 async function handleCommand(message) {
   if (message.author.bot) return;
   const content = (message.content || '').trim();
-  if (!content.toLowerCase().startsWith('rover')) return;
+  if (!content.toLowerCase().startsWith('rs')) return;
   if (!isAdminUser(message.author.id)) {
     return; // ignore non-admins
   }
 
   const tokens = content.split(/\s+/);
-  tokens.shift(); // remove "rover"
+  tokens.shift(); // remove prefix
   const action = (tokens.shift() || '').toLowerCase();
 
   switch (action) {
@@ -197,7 +197,7 @@ async function handleBridgeInbound(message) {
   if (String(message.channelId) !== String(bridgeChannelId)) return;
   if (message.author.bot) return;
   const content = (message.content || '').trim();
-  if (content.toLowerCase().startsWith('rover')) return; // don't echo commands
+  if (content.toLowerCase().startsWith('rs')) return; // don't echo commands
   const nickname =
     message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
   const role = isAdminUser(message.author.id) ? 'admin' : 'user';
