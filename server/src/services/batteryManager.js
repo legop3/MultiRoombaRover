@@ -80,10 +80,11 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
       payload: { roverId, batteryState },
     });
   }
-  const currentMa = sensors?.currentMa;
-  const chargingByCurrent = typeof currentMa === 'number' && currentMa > 50;
-  const chargingByState = chargingState === 1 || chargingState === 2 || chargingState === 3;
-  const isCharging = chargingByState || chargingByCurrent;
+  const chargingLabel = sensors?.chargingState?.label?.toLowerCase();
+  const chargingByLabel =
+    chargingLabel === 'waiting' || chargingLabel === 'full charging' || chargingLabel === 'trickle charging';
+  const chargingByCode = chargingState === 2 || chargingState === 3 || chargingState === 4;
+  const isCharging = chargingByLabel || chargingByCode;
   if (isCharging && !state.charging) {
     state.charging = true;
     publishEvent({
