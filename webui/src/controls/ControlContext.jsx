@@ -5,6 +5,7 @@ import { useCommandPipeline } from './commandPipeline.js';
 import { DEFAULT_KEYMAP, DEFAULT_MACROS } from './constants.js';
 import { canonicalizeKeyInput } from './keymapUtils.js';
 import { useSettingsNamespace } from '../settings/index.js';
+import { useSession } from '../context/SessionContext.jsx';
 
 const ControlSystemContext = createContext(null);
 
@@ -24,15 +25,32 @@ function clampServoAngle(config, value) {
 export function ControlSystemProvider({ children }) {
   const pipeline = useCommandPipeline();
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
+  const prevModeRef = useRef(initialControlState.mode);
   const servoAngleRef = useRef(initialControlState.camera.angle);
   const {
     value: controlSettings,
     save: saveControlSettings,
   } = useSettingsNamespace('controls', { keymap: DEFAULT_KEYMAP, macros: DEFAULT_MACROS });
+  const { session, homeAssistantSetState } = useSession();
 
   useEffect(() => {
     dispatch({ type: 'control/set-rover', payload: pipeline.roverId });
   }, [pipeline.roverId]);
+
+  useEffect(() => {
+    const prevMode = prevModeRef.current;
+    prevModeRef.current = state.mode;
+    if (prevMode !== 'drive' && state.mode === 'drive' && session?.homeAssistant?.entities) {
+      const targets = session.homeAssistant.entities.filter(
+        (ent) => ent.type === 'light' && ent.available !== false && ent.state !== 'on',
+      );
+      if (targets.length > 0) {
+        targets.forEach((ent) => {
+          homeAssistantSetState(ent.id, 'on').catch(() => {});
+        });
+      }
+    }
+  }, [state.mode, session?.homeAssistant?.entities, homeAssistantSetState]);
 
   useEffect(() => {
     const mergedKeymap = { ...DEFAULT_KEYMAP, ...(controlSettings?.keymap || {}) };
