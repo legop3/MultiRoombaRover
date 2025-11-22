@@ -9,6 +9,10 @@ const { getActiveDrivers, getTurnQueues, turnEvents } = require('./turnService')
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('./homeAssistantService');
 const { getNickname, nicknameEvents } = require('./nicknameService');
+const { loadConfig } = require('../helpers/configLoader');
+
+const discordInvite = loadConfig().discord?.invite || null;
+logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configured');
 
 function buildUserEntry(socket) {
   if (!socket) return null;
@@ -38,6 +42,9 @@ function buildSession(socket) {
     roomCameras: getRoomCameras(),
     homeAssistant: getHomeAssistantState(),
     users,
+    discord: {
+      invite: discordInvite,
+    },
   };
 }
 
