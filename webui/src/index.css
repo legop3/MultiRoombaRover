@@ -65,4 +65,45 @@ body {
   .button-danger {
     @apply px-0.5 py-0.5 text-sm font-medium text-white transition-colors bg-rose-600 hover:bg-rose-500;
   }
+
+  .rainbow-animate-bg {
+    background: linear-gradient(
+      270deg,
+      #ff0000,
+      #ff7f00,
+      #ffff00,
+      #00ff00,
+      #0000ff,
+      #4b0082,
+      #8b00ff
+
+      /* less colors: */
+      /* #ff0000,
+      #00ff00,
+      #0000ff */
+
+      /* blue, white, pink */
+      /* #00e5ff,
+      #ffffff,
+      #ff69b4 */
+
+      /* discord colors */
+      /* #5865f2,
+      #ffffff,
+      #ff4754 */
+    );
+    background-size: 1400% 1400%;
+    animation: rainbowBG 300s ease infinite;
+  }
+  @keyframes rainbowBG {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
 }
