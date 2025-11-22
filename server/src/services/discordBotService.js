@@ -302,8 +302,8 @@ function handleBusEvent(event) {
       announce({
         channelId: channels.adminAlerts,
         color: 0x2196f3,
-        title: 'Docked & Charging',
-        description: `${payload?.roverId} is docked and charging.`,
+        title: 'Docked',
+        description: `${payload?.roverId} docked.`,
       });
       break;
     case 'battery.undocked':
