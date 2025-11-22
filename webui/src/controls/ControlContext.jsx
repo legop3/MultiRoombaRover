@@ -25,7 +25,8 @@ function clampServoAngle(config, value) {
 export function ControlSystemProvider({ children }) {
   const pipeline = useCommandPipeline();
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
-  const prevModeRef = useRef(initialControlState.mode);
+  const prevModeRef = useRef(null);
+  const pendingLightsRef = useRef(false);
   const servoAngleRef = useRef(initialControlState.camera.angle);
   const {
     value: controlSettings,
@@ -38,10 +39,16 @@ export function ControlSystemProvider({ children }) {
     const targets = entities.filter(
       (ent) => ent.type === 'light' && ent.available !== false && ent.state !== 'on',
     );
-    if (targets.length === 0) return;
+    if (targets.length === 0) {
+      pendingLightsRef.current = false;
+      return;
+    }
+    pendingLightsRef.current = true;
     targets.forEach((ent) => {
       homeAssistantSetState(ent.id, 'on').catch(() => {});
     });
+    // Give the loop a chance; clear pending after issuing commands.
+    pendingLightsRef.current = false;
   }, [session?.homeAssistant?.entities, homeAssistantSetState]);
 
   useEffect(() => {
@@ -53,8 +60,16 @@ export function ControlSystemProvider({ children }) {
     prevModeRef.current = state.mode;
     if (prevMode !== 'drive' && state.mode === 'drive' && session?.homeAssistant?.entities) {
       turnOnAllLights();
+    } else if (prevMode !== 'drive' && state.mode === 'drive') {
+      pendingLightsRef.current = true;
     }
   }, [state.mode, session?.homeAssistant?.entities, turnOnAllLights]);
+
+  useEffect(() => {
+    if (pendingLightsRef.current && session?.homeAssistant?.entities) {
+      turnOnAllLights();
+    }
+  }, [session?.homeAssistant?.entities, turnOnAllLights]);
 
   useEffect(() => {
     const mergedKeymap = { ...DEFAULT_KEYMAP, ...(controlSettings?.keymap || {}) };
@@ -196,10 +211,13 @@ export function ControlSystemProvider({ children }) {
       if (!macro) return;
       if (macroId === 'drive-sequence') {
         turnOnAllLights();
+        if (!session?.homeAssistant?.entities) {
+          pendingLightsRef.current = true;
+        }
       }
       await pipeline.runMacroSteps(macro);
     },
-    [pipeline, state.macros, turnOnAllLights],
+    [pipeline, state.macros, session?.homeAssistant?.entities, turnOnAllLights],
   );
 
   const stopAllMotion = useCallback(() => {
