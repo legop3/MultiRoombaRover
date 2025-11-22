@@ -33,6 +33,17 @@ export function ControlSystemProvider({ children }) {
   } = useSettingsNamespace('controls', { keymap: DEFAULT_KEYMAP, macros: DEFAULT_MACROS });
   const { session, homeAssistantSetState } = useSession();
 
+  const turnOnAllLights = useCallback(() => {
+    const entities = session?.homeAssistant?.entities || [];
+    const targets = entities.filter(
+      (ent) => ent.type === 'light' && ent.available !== false && ent.state !== 'on',
+    );
+    if (targets.length === 0) return;
+    targets.forEach((ent) => {
+      homeAssistantSetState(ent.id, 'on').catch(() => {});
+    });
+  }, [session?.homeAssistant?.entities, homeAssistantSetState]);
+
   useEffect(() => {
     dispatch({ type: 'control/set-rover', payload: pipeline.roverId });
   }, [pipeline.roverId]);
@@ -41,16 +52,9 @@ export function ControlSystemProvider({ children }) {
     const prevMode = prevModeRef.current;
     prevModeRef.current = state.mode;
     if (prevMode !== 'drive' && state.mode === 'drive' && session?.homeAssistant?.entities) {
-      const targets = session.homeAssistant.entities.filter(
-        (ent) => ent.type === 'light' && ent.available !== false && ent.state !== 'on',
-      );
-      if (targets.length > 0) {
-        targets.forEach((ent) => {
-          homeAssistantSetState(ent.id, 'on').catch(() => {});
-        });
-      }
+      turnOnAllLights();
     }
-  }, [state.mode, session?.homeAssistant?.entities, homeAssistantSetState]);
+  }, [state.mode, session?.homeAssistant?.entities, turnOnAllLights]);
 
   useEffect(() => {
     const mergedKeymap = { ...DEFAULT_KEYMAP, ...(controlSettings?.keymap || {}) };
@@ -190,9 +194,12 @@ export function ControlSystemProvider({ children }) {
     async (macroId) => {
       const macro = state.macros.find((item) => item.id === macroId) || null;
       if (!macro) return;
+      if (macroId === 'drive-sequence') {
+        turnOnAllLights();
+      }
       await pipeline.runMacroSteps(macro);
     },
-    [pipeline, state.macros],
+    [pipeline, state.macros, turnOnAllLights],
   );
 
   const stopAllMotion = useCallback(() => {
