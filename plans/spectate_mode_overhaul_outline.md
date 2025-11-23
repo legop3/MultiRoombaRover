@@ -1,5 +1,6 @@
 # spectate system overhaul
 - rip out and remake the entire page
+  - basically keep nothing from it
 - right now the spectator page is a mess, and hasn't been updated in a while
   - does not work properly, aside from the page being out of date
 - the spectate page should use modules from the driver page
@@ -32,6 +33,7 @@
 
 ## layout and styling of the spectator page
 - use same styling style as the driver page
+- feel free to add spectator role checks to hide the features that spectators can't use in certain components.
 - mainly designed for a 4:3 monitor
   - make use of the vertical space
 - a row of columns, one for each rover at the top

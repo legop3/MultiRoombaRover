@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 
 export function useSpectatorMode() {
-  const { session, setRole, subscribeAll } = useSession();
+  const { session, setRole, subscribeAll, connected } = useSession();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function ensureSpectator() {
+      if (session?.mode === 'lockdown') {
+        setReady(false);
+        return;
+      }
       try {
         if (session?.role !== 'spectator') {
           await setRole('spectator');
@@ -18,13 +22,16 @@ export function useSpectatorMode() {
         }
       } catch (err) {
         console.error('Failed to enter spectator mode', err);
+        if (!cancelled) {
+          setReady(false);
+        }
       }
     }
     ensureSpectator();
     return () => {
       cancelled = true;
     };
-  }, [session?.role, setRole, subscribeAll]);
+  }, [connected, session?.mode, session?.role, setRole, subscribeAll]);
 
   return ready;
 }

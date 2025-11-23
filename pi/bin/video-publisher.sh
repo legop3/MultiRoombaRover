@@ -44,6 +44,7 @@ run_pipeline() {
 		--timeout 0 \
 		--width "${VIDEO_WIDTH}" \
 		--height "${VIDEO_HEIGHT}" \
+		--rotation 180 \
 		--framerate "${VIDEO_FPS}" \
 		--bitrate "${VIDEO_BITRATE}" \
 		--codec h264 \

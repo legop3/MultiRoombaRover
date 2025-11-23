@@ -356,6 +356,10 @@ io.on('connection', (socket) => {
       cb({ error: 'Spectator role required' });
       return;
     }
+    if (getMode() === MODES.LOCKDOWN) {
+      cb({ error: 'Spectating disabled in lockdown' });
+      return;
+    }
     logger.info('Spectator subscribing to all rovers', socket.id);
     for (const record of rovers.values()) {
       socket.join(record.room);

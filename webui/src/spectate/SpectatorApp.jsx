@@ -1,11 +1,16 @@
 import { useMemo } from 'react';
+import { SettingsProvider } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
 import { useTelemetryFrames } from '../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
 import VideoTile from '../components/VideoTile.jsx';
+import RoomCameraPanel from '../components/RoomCameraPanel.jsx';
+import UserListPanel from '../components/UserListPanel.jsx';
+import ChatPanel from '../components/ChatPanel.jsx';
+import LogPanel from '../components/LogPanel.jsx';
 
-function SpectatorStatus({ connected, ready, rosterCount }) {
+function SpectatorStatus({ connected, ready, rosterCount, mode, blocked }) {
   return (
     <div className="flex flex-wrap items-center gap-0.5 text-sm">
       <span className={`px-0.5 py-0.5 font-semibold ${connected ? 'bg-emerald-500/20 text-emerald-200' : 'bg-red-500/20 text-red-200'}`}>
@@ -15,111 +20,135 @@ function SpectatorStatus({ connected, ready, rosterCount }) {
         Spectator mode {ready ? 'active' : 'pending…'}
       </span>
       <span className="bg-slate-800 px-0.5 py-0.5 text-slate-200">Rovers: {rosterCount}</span>
+      <span className="bg-slate-800 px-0.5 py-0.5 text-slate-200">Mode: {mode || 'unknown'}</span>
+      {blocked && <span className="bg-red-700/60 px-0.5 py-0.5 text-red-100">Spectate blocked</span>}
     </div>
   );
 }
 
-function LogStream({ logs }) {
+function TelemetrySummary({ frame }) {
+  const sensors = frame?.sensors || {};
+  const updated = frame?.receivedAt ? new Date(frame.receivedAt).toLocaleTimeString() : null;
+  const entries = [
+    ['Voltage', sensors.voltageMv != null ? `${(sensors.voltageMv / 1000).toFixed(2)} V` : '--'],
+    ['Current', sensors.currentMa != null ? `${sensors.currentMa} mA` : '--'],
+    ['Charge', sensors.batteryChargeMah != null ? `${sensors.batteryChargeMah}` : '--'],
+    ['OI', sensors.oiMode?.label || '--'],
+  ];
+
   return (
-    <section className="panel space-y-0.5 text-sm">
-      <header className="mb-0.5 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">Server logs</h2>
-        <span className="text-xs text-slate-500">latest {logs.length}</span>
-      </header>
-      <div className="surface h-60 overflow-y-auto space-y-0.5 text-xs font-mono text-slate-300">
-        {logs.length === 0 ? (
-          <p>No log entries yet.</p>
-        ) : (
-          logs
-            .slice()
-            .reverse()
-            .map((entry) => (
-              <div key={entry.id} className="surface-muted">
-                <span className="text-slate-500">{entry.timestamp}</span>{' '}
-                <span className="text-cyan-300">[{entry.level}]</span>{' '}
-                {entry.label && <span className="text-pink-300">[{entry.label}]</span>}{' '}
-                <span>{entry.message}</span>
-              </div>
-            ))
-        )}
+    <div className="surface space-y-0.25 text-sm text-slate-200">
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <span>Telemetry</span>
+        <span>{updated ? `Updated ${updated}` : 'Waiting...'}</span>
       </div>
-    </section>
+      <div className="grid grid-cols-2 gap-0.25">
+        {entries.map(([label, value]) => (
+          <div key={label} className="surface-muted flex items-center justify-between px-0.5 py-0.25 text-xs">
+            <span className="text-slate-400">{label}</span>
+            <span className="font-semibold text-white">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
-function formatSensors(sensors = {}) {
-  return Object.entries(sensors).map(([key, value]) => ({
-    key,
-    value: typeof value === 'object' ? JSON.stringify(value) : value,
-  }));
+function CurrentDriverBadge({ roverId, session }) {
+  const activeDriverId = session?.activeDrivers?.[roverId] || null;
+  const user = (session?.users || []).find((entry) => entry.socketId === activeDriverId);
+  const label = user?.nickname || (activeDriverId ? activeDriverId.slice(0, 6) : 'No driver');
+  const mode = session?.mode;
+  const turnInfo = session?.turnQueues?.[roverId];
+  const driverText = mode === 'turns' && turnInfo?.current ? `Driver: ${label} (turns)` : `Driver: ${label}`;
+
+  return (
+    <div className="surface-muted text-xs text-slate-300">
+      {driverText}
+    </div>
+  );
 }
 
-function RoverSpectatorCard({ rover, frame, videoInfo }) {
-  const sensorList = formatSensors(frame?.sensors);
+function RoverSpectatorCard({ rover, frame, videoInfo, session }) {
   return (
     <article className="space-y-0.5 bg-zinc-900 p-0.5">
-      <header className="flex flex-col gap-0.5">
-        <h3 className="text-2xl font-semibold text-white">{rover.name}</h3>
-        <p className="text-sm text-slate-400">
-          {frame?.receivedAt ? `Updated ${new Date(frame.receivedAt).toLocaleTimeString()}` : 'Waiting for telemetry…'}
-        </p>
+      <header className="flex flex-col gap-0.25">
+        <h3 className="text-2xl font-semibold text-white leading-tight">{rover.name}</h3>
+        <CurrentDriverBadge roverId={rover.id} session={session} />
       </header>
-      <VideoTile sessionInfo={videoInfo} label={rover.name} forceMute />
-      <section className="surface">
-        <p className="text-xs text-slate-500">Telemetry</p>
-        {sensorList.length === 0 ? (
-          <p className="mt-0.5 text-sm text-slate-400">No sensor data yet.</p>
-        ) : (
-          <dl className="mt-0.5 grid gap-0.5 text-sm text-slate-200">
-            {sensorList.map(({ key, value }) => (
-              <div key={key} className="flex justify-between gap-0.5">
-                <dt className="text-slate-500">{key}</dt>
-                <dd className="text-right font-semibold text-white">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-      </section>
+      <VideoTile sessionInfo={videoInfo} label={rover.name} telemetryFrame={frame} batteryConfig={rover.battery} />
+      <TelemetrySummary frame={frame} />
     </article>
   );
 }
 
+function RoverRow({ roster, frames, videoSources, session }) {
+  if (roster.length === 0) {
+    return <p className="col-span-full text-slate-400">No rovers registered.</p>;
+  }
+  return (
+    <section className="grid grid-cols-1 gap-0.5 md:grid-cols-2 xl:grid-cols-3">
+      {roster.map((rover) => (
+        <RoverSpectatorCard
+          key={rover.id}
+          rover={rover}
+          frame={frames[rover.id]}
+          videoInfo={videoSources[rover.id]}
+          session={session}
+        />
+      ))}
+    </section>
+  );
+}
+
+function SecondaryRow() {
+  return (
+    <section className="grid grid-cols-1 gap-0.5 lg:grid-cols-[2fr_1fr_1fr]">
+      <RoomCameraPanel defaultOrientation="horizontal" />
+      <UserListPanel />
+      <ChatPanel />
+    </section>
+  );
+}
+
+function LogsRow() {
+  return (
+    <div className="panel">
+      <LogPanel />
+    </div>
+  );
+}
+
 export default function SpectatorApp() {
-  const { connected, session, logs } = useSession();
+  const { connected, session } = useSession();
   const spectatorReady = useSpectatorMode();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
   const videoSources = useVideoRequests(roster.map((rover) => rover.id));
+  const blocked = session?.mode === 'lockdown';
 
   const status = useMemo(
-    () => ({ connected, ready: spectatorReady, rosterCount: roster.length }),
-    [connected, spectatorReady, roster.length],
+    () => ({ connected, ready: spectatorReady, rosterCount: roster.length, mode: session?.mode, blocked }),
+    [blocked, connected, roster.length, session?.mode, spectatorReady],
   );
 
   return (
-    <div className="min-h-screen bg-black text-slate-100">
-      <main className="mx-auto flex max-w-7xl flex-col gap-0.5 px-0.5 py-0.5">
-        <header className="space-y-0.5">
-          <h1 className="text-4xl font-semibold text-white">Spectator Console</h1>
-          <p className="text-slate-400">Live rover telemetry & logs. This view is read-only.</p>
-          <SpectatorStatus {...status} />
-        </header>
-        <section className="grid gap-0.5 lg:grid-cols-3">
-          {roster.length === 0 ? (
-            <p className="col-span-full text-slate-400">No rovers registered.</p>
-          ) : (
-            roster.map((rover) => (
-              <RoverSpectatorCard
-                key={rover.id}
-                rover={rover}
-                frame={frames[rover.id]}
-                videoInfo={videoSources[rover.id]}
-              />
-            ))
-          )}
-        </section>
-        <LogStream logs={logs} />
-      </main>
-    </div>
+    <SettingsProvider>
+      <div className="min-h-screen bg-black text-slate-100">
+        <main className="mx-auto flex max-w-7xl flex-col gap-0.5 px-0.5 py-0.5">
+          <header className="space-y-0.5">
+            <h1 className="text-4xl font-semibold text-white">Spectator Console</h1>
+            <p className="text-slate-400">Live rover telemetry & logs. This view is read-only.</p>
+            <SpectatorStatus {...status} />
+            {blocked && (
+              <p className="text-sm text-amber-300">Lockdown active. Spectator view will resume automatically when access returns.</p>
+            )}
+          </header>
+          <RoverRow roster={roster} frames={frames} videoSources={videoSources} session={session} />
+          <SecondaryRow />
+          <LogsRow />
+        </main>
+      </div>
+    </SettingsProvider>
   );
 }
