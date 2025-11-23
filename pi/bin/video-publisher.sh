@@ -17,6 +17,7 @@ VIDEO_WIDTH="${VIDEO_WIDTH:-1920}"
 VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
+FLIP_ARGS=(--hflip --vflip)
 
 if [[ -n "${LIBCAMERA_BIN:-}" ]]; then
 	LIBCAMERA_BIN_PATH="$LIBCAMERA_BIN"
@@ -44,8 +45,7 @@ run_pipeline() {
 		--timeout 0 \
 		--width "${VIDEO_WIDTH}" \
 		--height "${VIDEO_HEIGHT}" \
-		--hflip \
-		--vflip \
+		"${FLIP_ARGS[@]}" \
 		--framerate "${VIDEO_FPS}" \
 		--bitrate "${VIDEO_BITRATE}" \
 		--codec h264 \
