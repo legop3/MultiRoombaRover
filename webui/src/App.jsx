@@ -19,6 +19,8 @@ import SessionSnapshot from './components/SessionSnapshot.jsx';
 import HomeAssistantControls from './components/HomeAssistantControls.jsx';
 import UserListPanel from './components/UserListPanel.jsx';
 import ChatPanel from './components/ChatPanel.jsx';
+import FullscreenPrompt from './components/FullscreenPrompt.jsx';
+import { useFullscreenPrompt } from './hooks/useFullscreenPrompt.js';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -121,6 +123,7 @@ function MobileLandscapeLayout() {
 function App() {
   const layout = useLayoutMode();
   const isDesktop = layout === 'desktop';
+  const { visible: fullscreenVisible, mode: fullscreenMode, enterFullscreen, dismiss } = useFullscreenPrompt(layout);
   const renderedLayout =
     isDesktop
       ? <DesktopLayout layout={layout} />
@@ -139,6 +142,12 @@ function App() {
           </main>
           <AlertFeed />
           <ModeGateOverlay />
+          <FullscreenPrompt
+            visible={fullscreenVisible}
+            mode={fullscreenMode}
+            onEnterFullscreen={enterFullscreen}
+            onDismiss={dismiss}
+          />
         </ControlSystemProvider>
       </SettingsProvider>
     </div>
