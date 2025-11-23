@@ -96,6 +96,11 @@ export function SessionProvider({ children }) {
       homeAssistantSetState: (entityId, state) =>
         emitWithAck('homeAssistant:setState', { entityId, state }),
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
+      pushAlert: (alert) =>
+        setAlerts((prev) => [
+          ...prev.slice(-49),
+          { ...alert, receivedAt: Date.now(), id: alert.id || Math.random().toString(36).slice(2) },
+        ]),
     }),
     [emitWithAck],
   );

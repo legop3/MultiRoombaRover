@@ -17,6 +17,7 @@ import RightPaneTabs from './components/RightPaneTabs.jsx';
 import ModeGateOverlay from './components/ModeGateOverlay.jsx';
 import SessionSnapshot from './components/SessionSnapshot.jsx';
 import HomeAssistantControls from './components/HomeAssistantControls.jsx';
+import TurnAlertListener from './components/TurnAlertListener.jsx';
 import UserListPanel from './components/UserListPanel.jsx';
 import ChatPanel from './components/ChatPanel.jsx';
 import FullscreenPrompt from './components/FullscreenPrompt.jsx';
@@ -141,6 +142,7 @@ function App() {
             {renderedLayout}
           </main>
           <AlertFeed />
+          <TurnAlertListener />
           <ModeGateOverlay />
           <FullscreenPrompt
             visible={fullscreenVisible}
