@@ -3,7 +3,7 @@ import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
 import VideoTile from './VideoTile.jsx';
 
-export default function DriverVideoPanel() {
+export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const { session } = useSession();
   const roverId = session?.assignment?.roverId;
   const sources = useVideoRequests(roverId ? [roverId] : []);
@@ -20,7 +20,7 @@ export default function DriverVideoPanel() {
   return (
     <section className="panel">
       {roverId ? (
-        <VideoTile sessionInfo={info} label={roverLabel} telemetryFrame={frame} batteryConfig={batteryConfig} />
+        <VideoTile sessionInfo={info} label={roverLabel} telemetryFrame={frame} batteryConfig={batteryConfig} layoutFormat={layoutFormat}/>
       ) : (
         <div className="panel-muted content-center text-center text-sm text-slate-400 aspect-video">
           <p>You are not assigned to a rover.</p>

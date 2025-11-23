@@ -72,8 +72,10 @@ function DesktopLayout({ layout }) {
 function MobilePortraitLayout() {
   return (
     <div className="flex flex-col gap-0.5">
-      <DriverVideoPanel />
+      <DriverVideoPanel layoutFormat='mobile'/>
       <MobileControls />
+      <ChatPanel />
+      <UserListPanel />
       <DrivePanel />
       <TelemetryPanel />
       <AuthPanel />
@@ -90,23 +92,27 @@ function MobileLandscapeLayout() {
     <div className="flex flex-col gap-0.5">
       <section className="grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-0.5">
         <MobileLandscapeAuxColumn />
-        <DriverVideoPanel />
+        <div>
+          <DriverVideoPanel layoutFormat='mobile'/>
+          <TelemetryPanel />
+        </div>
         <MobileLandscapeControlColumn />
       </section>
       <div className="flex flex-col gap-0.5 pb-0.5">
-        <RoomCameraPanel />
-        <HomeAssistantControls />
-        <DrivePanel />
         <section className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-0.5">
           <div className="flex flex-col gap-0.5">
-            <AuthPanel />
-            <AdminPanel />
+            {/* <AuthPanel /> */}
+            {/* <AdminPanel /> */}
+            <UserListPanel />
           </div>
           <div className="flex flex-col gap-0.5">
-            <LogPanel />
-            <TelemetryPanel />
+            {/* <LogPanel /> */}
+            <ChatPanel />
           </div>
         </section>
+        <RoomCameraPanel />
+        <HomeAssistantControls />
+        {/* <DrivePanel /> */}
       </div>
     </div>
   );

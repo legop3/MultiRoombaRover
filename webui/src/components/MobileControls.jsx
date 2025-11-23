@@ -7,13 +7,13 @@ const SOURCE = 'mobile-joystick';
 const JOYSTICK_RADIUS = 80;
 const JOYSTICK_SMOOTHING = 0.15;
 const AUX_BUTTONS = [
-  { id: 'main-forward', label: 'Main +', values: { main: 127 }, hold: true, color: 'bg-emerald-600' },
-  { id: 'main-reverse', label: 'Main -', values: { main: -127 }, hold: true, color: 'bg-emerald-800' },
-  { id: 'side-forward', label: 'Side +', values: { side: 127 }, hold: true, color: 'bg-cyan-600' },
-  { id: 'side-reverse', label: 'Side -', values: { side: -70 }, hold: true, color: 'bg-cyan-800' },
+  { id: 'main-forward', label: 'Main Brush +', values: { main: 127 }, hold: true, color: 'bg-emerald-600' },
+  { id: 'main-reverse', label: 'Main Brush -', values: { main: -127 }, hold: true, color: 'bg-emerald-800' },
+  { id: 'all-forward', label: 'All Motors +', values: { main: 127, side: 127, vacuum: 127 }, hold: true, color: 'bg-fuchsia-600' },
+  { id: 'side-forward', label: 'Side Brush +', values: { side: 127 }, hold: true, color: 'bg-cyan-600' },
+  { id: 'side-reverse', label: 'Side Brush -', values: { side: -70 }, hold: true, color: 'bg-cyan-800' },
   { id: 'vacuum-fast', label: 'Vacuum Max', values: { vacuum: 127 }, hold: true, color: 'bg-amber-500 text-amber-950' },
   { id: 'vacuum-slow', label: 'Vacuum Low', values: { vacuum: 50 }, hold: true, color: 'bg-amber-700' },
-  { id: 'all-forward', label: 'All +', values: { main: 127, side: 127, vacuum: 127 }, hold: true, color: 'bg-fuchsia-600' },
   { id: 'stop-all', label: 'Stop', values: { main: 0, side: 0, vacuum: 0 }, hold: false, color: 'bg-slate-900' },
 ];
 
@@ -196,17 +196,8 @@ function MobileJoystickPanel({ layout }) {
 
   return (
     <div className="flex flex-col gap-0.5 text-slate-100">
+      
       <DriveModeToggle size="compact" />
-      <FloatingJoystick
-        disabled={disabled}
-        layout={layout}
-        radius={joystickRadius}
-        onMove={handleMove}
-        onStop={handleStop}
-      />
-      <button type="button" onClick={stopAllMotion} disabled={disabled} className="button-danger w-full disabled:opacity-40">
-        Panic Stop
-      </button>
       {cameraEnabled && (
         <div className="bg-zinc-950 p-0.5 text-xs">
           <div className="flex items-center justify-between text-[0.75rem] text-slate-400">
@@ -224,6 +215,17 @@ function MobileJoystickPanel({ layout }) {
           />
         </div>
       )}
+      <FloatingJoystick
+        disabled={disabled}
+        layout={layout}
+        radius={joystickRadius}
+        onMove={handleMove}
+        onStop={handleStop}
+      />
+      <button type="button" onClick={stopAllMotion} disabled={disabled} className="button-danger w-full disabled:opacity-40">
+        Panic Stop
+      </button>
+
     </div>
   );
 }
@@ -280,7 +282,7 @@ function AuxMotorPanel({ orientation }) {
             onPointerLeave={() => handleRelease(button)}
             onPointerCancel={() => handleRelease(button)}
             onContextMenu={(event) => event.preventDefault()}
-            className={`px-0.5 py-0.5 text-left text-sm font-semibold text-white transition ${button.color} hover:brightness-110 disabled:opacity-30`}
+            className={`px-0.5 py-0.5 text-left text-sm font-semibold text-white transition ${button.color} hover:brightness-110 disabled:opacity-30 h-10`}
           >
             {button.label}
           </button>

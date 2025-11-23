@@ -4,7 +4,7 @@ import { WhepPlayer } from '../lib/whepPlayer.js';
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 
-export default function VideoTile({ sessionInfo, label, forceMute = false, telemetryFrame, batteryConfig }) {
+export default function VideoTile({ sessionInfo, label, forceMute = false, telemetryFrame, batteryConfig, layoutFormat = 'desktop' }) {
   const videoRef = useRef(null);
   const restartTimer = useRef(null);
   const unmuteTimer = useRef(null);
@@ -14,6 +14,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
   const [muted, setMuted] = useState(true);
   const sensors = telemetryFrame?.sensors;
   const batteryCharge = sensors?.batteryChargeMah ?? null;
+  const desktopLayout = layoutFormat === 'desktop';
   // console.log('[BatteryBarDebug]', {
   //   frameSensors: sensors,
   //   batteryCharge,
@@ -157,7 +158,7 @@ export default function VideoTile({ sessionInfo, label, forceMute = false, telem
           controls={false}
           className="h-full w-full object-contain"
         />
-        <HudOverlay frame={telemetryFrame} label={label} status={renderedStatus} />
+        <HudOverlay frame={telemetryFrame} label={label} status={renderedStatus} desktopLayout={desktopLayout}/>
         <OvercurrentOverlay motors={overcurrentMotors} />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />
       </div>
@@ -200,7 +201,7 @@ function BatteryBar({ charge, config }) {
   );
 }
 
-function HudOverlay({ frame, label, status }) {
+function HudOverlay({ frame, label, status, desktopLayout = true }) {
   const sensors = frame?.sensors;
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const [now, setNow] = useState(() => Date.now());
@@ -224,11 +225,11 @@ function HudOverlay({ frame, label, status }) {
 
 
       {/* bump and wheel drops bar */}
-      <div className="absolute top-0.5 left-1/2 flex -translate-x-1/2 gap-1 bg-black/70 px-0.5 py-0.5 text-[0.6rem] font-medium text-slate-200">
-        <div className={`px-1 py-0.5 ${bumps.bumpLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left bump</div>
-        <div className={`px-1 py-0.5 ${bumps.wheelDropLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left wheel drop</div>
-        <div className={`px-1 py-0.5 ${bumps.wheelDropRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right wheel drop</div>
-        <div className={`px-1 py-0.5 ${bumps.bumpRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right bump</div>
+      <div className="absolute top-0.5 left-1/2 flex -translate-x-1/2 gap-1 bg-black/70 text-[0.6rem] font-medium text-slate-200">
+        <div className={`${desktopLayout ? 'px-1 py-0.5':'px-0.5 py-0 text-nowrap'} ${bumps.bumpLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left bump</div>
+        <div className={`${desktopLayout ? 'px-1 py-0.5':'px-0.5 py-0 text-nowrap'} ${bumps.wheelDropLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left wheel drop</div>
+        <div className={`${desktopLayout ? 'px-1 py-0.5':'px-0.5 py-0 text-nowrap'} ${bumps.wheelDropRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right wheel drop</div>
+        <div className={`${desktopLayout ? 'px-1 py-0.5':'px-0.5 py-0 text-nowrap'} ${bumps.bumpRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right bump</div>
       </div>
     </div>
   );
