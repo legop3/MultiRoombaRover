@@ -17,7 +17,8 @@ VIDEO_WIDTH="${VIDEO_WIDTH:-1920}"
 VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
-FLIP_ARGS=(--transform rotate180)
+# Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
+FLIP_ARGS=(--rotation 180)
 
 if [[ -n "${LIBCAMERA_BIN:-}" ]]; then
 	LIBCAMERA_BIN_PATH="$LIBCAMERA_BIN"
@@ -37,6 +38,12 @@ elif command -v ffmpeg >/dev/null 2>&1; then
 else
 	echo "ffmpeg not found; install it via apt install ffmpeg." >&2
 	exit 1
+fi
+
+# Prefer a single rotate flag when supported; fall back to h+v flip otherwise.
+FLIP_ARGS=(--hflip --vflip)
+if "${LIBCAMERA_BIN_PATH}" --help 2>&1 | grep -q -- "--rotation"; then
+	FLIP_ARGS=(--rotation 180)
 fi
 
 run_pipeline() {
