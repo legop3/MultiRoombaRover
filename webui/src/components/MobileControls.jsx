@@ -282,7 +282,7 @@ function AuxMotorPanel({ orientation }) {
             onPointerLeave={() => handleRelease(button)}
             onPointerCancel={() => handleRelease(button)}
             onContextMenu={(event) => event.preventDefault()}
-            className={`px-0.5 py-0.5 text-left text-sm font-semibold text-white transition ${button.color} hover:brightness-110 disabled:opacity-30 h-10`}
+            className={`px-0.5 py-0.5 text-left text-sm font-semibold text-white transition select-none no-touch-select ${button.color} hover:brightness-110 disabled:opacity-30 h-10`}
           >
             {button.label}
           </button>

@@ -107,3 +107,12 @@ body {
     }
   }
 }
+
+@layer utilities {
+  .no-touch-select {
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
