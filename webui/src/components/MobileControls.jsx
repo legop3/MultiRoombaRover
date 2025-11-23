@@ -222,9 +222,9 @@ function MobileJoystickPanel({ layout }) {
         onMove={handleMove}
         onStop={handleStop}
       />
-      <button type="button" onClick={stopAllMotion} disabled={disabled} className="button-danger w-full disabled:opacity-40">
+      {/* <button type="button" onClick={stopAllMotion} disabled={disabled} className="button-danger w-full disabled:opacity-40">
         Panic Stop
-      </button>
+      </button> */}
 
     </div>
   );

@@ -1,6 +1,6 @@
 {
-  "name": "MultiRoomba Rover",
-  "short_name": "Rover",
+  "name": "Multi Roomba Rover",
+  "short_name": "MRR",
   "description": "Remote driving interface for the MultiRoomba Rover fleet.",
   "start_url": "/",
   "scope": "/",
@@ -9,9 +9,9 @@
   "theme_color": "#020617",
   "icons": [
     {
-      "src": "/vite.svg",
+      "src": "/bitmap.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     }
   ]
