@@ -40,8 +40,8 @@ else
 	exit 1
 fi
 
-# Force flip via h+v to work across rpicam-vid builds.
-FLIP_ARGS=(--hflip --vflip)
+# Flip using the native rotation flag (0/180 supported per rpicam-vid --help).
+FLIP_ARGS=(--rotation 180)
 
 run_pipeline() {
 	"${LIBCAMERA_BIN_PATH}" \
