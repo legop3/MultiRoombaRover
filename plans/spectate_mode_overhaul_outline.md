@@ -30,6 +30,13 @@
 - room cameras
 - online user list
 
-## problems with the current spectator page:
-- video pane does not load sensors
-- spectator page works when server is in lockdown mode (wrong)
+## layout and styling of the spectator page
+- use same styling style as the driver page
+- mainly designed for a 4:3 monitor
+  - make use of the vertical space
+- a row of columns, one for each rover at the top
+- below the row of columns:
+  - 50/50 split
+    - user list
+    - chat
+  - room cameras
