@@ -56,6 +56,7 @@ run_pipeline() {
 		--profile baseline \
 		--denoise cdn_off \
 		--nopreview \
+		--awb greyworld \
 		--output - \
 		| "${FFMPEG_BIN_PATH}" \
 			-hide_banner \
