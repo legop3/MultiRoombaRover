@@ -40,11 +40,8 @@ else
 	exit 1
 fi
 
-# Prefer a single rotate flag when supported; fall back to h+v flip otherwise.
+# Force flip via h+v to work across rpicam-vid builds.
 FLIP_ARGS=(--hflip --vflip)
-if "${LIBCAMERA_BIN_PATH}" --help 2>&1 | grep -q -- "--rotation"; then
-	FLIP_ARGS=(--rotation 180)
-fi
 
 run_pipeline() {
 	"${LIBCAMERA_BIN_PATH}" \
