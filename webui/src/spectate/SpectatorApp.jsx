@@ -121,7 +121,7 @@ export default function SpectatorApp() {
   return (
     <SettingsProvider>
       <div className="min-h-screen bg-black text-slate-100">
-        <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:grid-cols-[4fr_1fr] lg:grid-cols-[6fr_2fr]">
+        <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:grid-cols-[minmax(0,4.5fr)_minmax(14rem,1fr)] lg:grid-cols-[minmax(0,7fr)_minmax(18rem,1fr)]">
           <section className="flex min-h-0 flex-col gap-0.5">
             <RoverRow roster={roster} frames={frames} videoSources={videoSources} session={session} />
             <SecondaryRow />
