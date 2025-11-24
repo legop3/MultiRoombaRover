@@ -86,12 +86,12 @@ function RoverRow({ roster, frames, videoSources, session }) {
 
 function SecondaryRow() {
   return (
-    <section className="grid grid-cols-1 gap-0.5 lg:grid-cols-[2fr_1fr_1fr]">
+    <section className="grid grid-cols-1 items-start gap-0.5 lg:grid-cols-[2fr_1fr_1fr]">
       <RoomCameraPanel defaultOrientation="horizontal" hideLayoutToggle hideHeader />
-      <div className="flex h-[50vh] flex-col">
+      <div className="flex flex-col">
         <UserListPanel hideNicknameForm hideHeader />
       </div>
-      <div className="flex h-[50vh] flex-col">
+      <div className="flex flex-col">
         <ChatPanel hideInput hideSpectatorNotice />
       </div>
     </section>
