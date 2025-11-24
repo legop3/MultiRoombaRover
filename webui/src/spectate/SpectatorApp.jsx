@@ -127,10 +127,10 @@ export default function SpectatorApp() {
             <SecondaryRow />
           </section>
           <section className="grid min-h-0 min-w-0 grid-rows-[1fr_1.2fr_auto] gap-0.5">
-            <div className="min-h-0 min-w-0">
+            <div className="min-h-0 min-w-0 max-h-1/3">
               <UserListPanel hideNicknameForm hideHeader fillHeight />
             </div>
-            <div className="min-h-0 min-w-0">
+            <div className="min-h-0 min-w-0 max-h-1/3">
               <ChatPanel hideInput hideSpectatorNotice fillHeight />
             </div>
             <div className="min-h-0 min-w-0">
