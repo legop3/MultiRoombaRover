@@ -25,7 +25,7 @@ function displayName(message) {
   return message.nickname || message.socketId?.slice(0, 6) || 'unknown';
 }
 
-export default function ChatPanel() {
+export default function ChatPanel({ hideInput = false, hideSpectatorNotice = false }) {
   const { session } = useSession();
   const { messages, sendMessage, registerInputRef, onInputFocus, onInputBlur, blurChat } = useChat();
   const [draft, setDraft] = useState('');
@@ -42,7 +42,7 @@ export default function ChatPanel() {
 
   async function handleSend(event) {
     event.preventDefault();
-    if (!canChat) return;
+    if (!canChat || hideInput) return;
     const clean = draft.trim();
     if (!clean) return;
     setSending(true);
@@ -58,12 +58,12 @@ export default function ChatPanel() {
   }
 
   return (
-    <section className="panel-section space-y-0.5 text-base">
+    <section className="panel-section flex h-full flex-col space-y-0.5 text-base">
       {/* <div className="flex items-center justify-between text-sm text-slate-400">
         <span>Chat</span>
         <span className="text-xs text-slate-500">{sorted.length}</span>
       </div> */}
-      <div className="surface h-48 overflow-y-auto space-y-0.25" ref={listRef}>
+      <div className="surface flex-1 overflow-y-auto space-y-0.25" ref={listRef}>
         {sorted.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet.</p>
         ) : (
@@ -99,21 +99,23 @@ export default function ChatPanel() {
           })
         )}
       </div>
-      <form className="flex gap-0.5" onSubmit={handleSend}>
-        <input
-          className="field-input flex-1"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onFocus={onInputFocus}
-          onBlur={onInputBlur}
-          ref={(el) => registerInputRef(el)}
-          placeholder={canChat ? 'Type a message…' : 'Spectators cannot chat'}
-          disabled={!canChat}
-        />
-        <button type="submit" disabled={!canChat || sending} className="button-dark disabled:opacity-50">
-          {sending ? '...' : 'Send'}
-        </button>
-      </form>
+      {!hideInput && (
+        <form className="flex gap-0.5" onSubmit={handleSend}>
+          <input
+            className="field-input flex-1"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onFocus={onInputFocus}
+            onBlur={onInputBlur}
+            ref={(el) => registerInputRef(el)}
+            placeholder={canChat ? 'Type a message…' : hideSpectatorNotice ? '' : 'Spectators cannot chat'}
+            disabled={!canChat}
+          />
+          <button type="submit" disabled={!canChat || sending} className="button-dark disabled:opacity-50">
+            {sending ? '...' : 'Send'}
+          </button>
+        </form>
+      )}
     </section>
   );
 }

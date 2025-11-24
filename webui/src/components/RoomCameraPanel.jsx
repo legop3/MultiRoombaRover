@@ -21,7 +21,12 @@ function normalizeOrientation(value, fallback) {
   return fallback;
 }
 
-export default function RoomCameraPanel({ defaultOrientation = 'horizontal', orientation: forcedOrientation }) {
+export default function RoomCameraPanel({
+  defaultOrientation = 'horizontal',
+  orientation: forcedOrientation,
+  hideLayoutToggle = false,
+  hideHeader = false,
+}) {
   const { session } = useSession();
   const cameras = session?.roomCameras || [];
   const sourceDescriptors = cameras.map((camera) => ({ type: 'room', id: camera.id, key: `room:${camera.id}` }));
@@ -34,7 +39,7 @@ export default function RoomCameraPanel({ defaultOrientation = 'horizontal', ori
     : orientation;
   const containerClass =
     effectiveOrientation === 'vertical' ? 'flex flex-col gap-0.5' : 'grid gap-0.5 md:grid-cols-2';
-  const showLayoutToggle = !forcedOrientation && cameras.length > 0;
+  const showLayoutToggle = !hideLayoutToggle && !forcedOrientation && cameras.length > 0;
 
   if (cameras.length === 0) {
     return <EmptyState />;
@@ -42,29 +47,31 @@ export default function RoomCameraPanel({ defaultOrientation = 'horizontal', ori
 
   return (
     <section className="panel-section space-y-0.5 text-base">
-      <header className="flex flex-wrap items-center justify-between gap-0.5 text-sm text-slate-400">
-        <div className="flex items-center gap-1">
-          <p>Room cameras</p>
-          <span className="text-xs text-slate-500">{cameras.length}</span>
-        </div>
-        {showLayoutToggle && (
-          <div className="flex items-center gap-0.5 text-xs">
-            <span className="text-slate-500">Layout:</span>
-            <div className="inline-flex overflow-hidden rounded border border-slate-700">
-              {ORIENTATIONS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={`px-1 py-0.5 ${effectiveOrientation === option ? 'bg-slate-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`}
-                  onClick={() => setOrientation(option)}
-                >
-                  {option === 'vertical' ? 'Vertical' : 'Grid'}
-                </button>
-              ))}
-            </div>
+      {!hideHeader && (
+        <header className="flex flex-wrap items-center justify-between gap-0.5 text-sm text-slate-400">
+          <div className="flex items-center gap-1">
+            <p>Room cameras</p>
+            <span className="text-xs text-slate-500">{cameras.length}</span>
           </div>
-        )}
-      </header>
+          {showLayoutToggle && (
+            <div className="flex items-center gap-0.5 text-xs">
+              <span className="text-slate-500">Layout:</span>
+              <div className="inline-flex overflow-hidden rounded border border-slate-700">
+                {ORIENTATIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={`px-1 py-0.5 ${effectiveOrientation === option ? 'bg-slate-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`}
+                    onClick={() => setOrientation(option)}
+                  >
+                    {option === 'vertical' ? 'Vertical' : 'Grid'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </header>
+      )}
       <div className={containerClass}>
         {cameras.map((camera) => {
           const key = `room:${camera.id}`;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSocket } from '../context/SocketContext.jsx';
+import NicknameForm from './NicknameForm.jsx';
 
 function roleColors(role) {
   switch (role) {
@@ -25,11 +26,9 @@ function formatLabel(user, selfId) {
   return base;
 }
 
-export default function UserListPanel() {
+export default function UserListPanel({ hideNicknameForm = false, hideHeader = false }) {
   const { session, setNickname } = useSession();
-  const { value, save } = useSettingsNamespace('profile', { nickname: '' });
-  const [nicknameInput, setNicknameInput] = useState(value.nickname || '');
-  const [saving, setSaving] = useState(false);
+  const { value } = useSettingsNamespace('profile', { nickname: '' });
   const lastSyncedSocketRef = useRef(null);
   const socket = useSocket();
   const canSetNickname = session?.role !== 'spectator';
@@ -40,19 +39,16 @@ export default function UserListPanel() {
   const roster = session?.roster || [];
 
   useEffect(() => {
-    setNicknameInput(value.nickname || '');
-  }, [value.nickname]);
-
-  useEffect(() => {
     if (!canSetNickname) return;
     if (!session?.socketId) return;
+    const nicknameInput = value.nickname || '';
     if (!nicknameInput) return;
     if (session.socketId === lastSyncedSocketRef.current) return;
     const currentId = session.socketId;
     setNickname(nicknameInput).then(() => {
       lastSyncedSocketRef.current = currentId;
     }).catch(() => {});
-  }, [canSetNickname, nicknameInput, session?.socketId, setNickname]);
+  }, [canSetNickname, session?.socketId, setNickname, value.nickname]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -95,50 +91,25 @@ export default function UserListPanel() {
     return Math.ceil(ms / 1000);
   }, []);
 
-  async function handleSave(event) {
-    event.preventDefault();
-    if (!canSetNickname) return;
-    const trimmed = (nicknameInput || '').trim().slice(0, 32);
-    if (!trimmed) return;
-    setSaving(true);
-    try {
-      await setNickname(trimmed);
-      save({ nickname: trimmed });
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
-    <section className="panel-section space-y-0.5 text-base">
-      <div className="space-y-0.5">
-        {/* <p className="text-sm text-slate-400">Nickname</p> */}
-        <form className="flex gap-0.5" onSubmit={handleSave}>
-          <input
-            className="field-input flex-1"
-            value={nicknameInput}
-            onChange={(e) => setNicknameInput(e.target.value)}
-            maxLength={32}
-            placeholder="Enter a nickname"
-            disabled={!canSetNickname}
-          />
-          <button type="submit" disabled={!canSetNickname || saving} className="button-dark disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </form>
-        {!canSetNickname && <p className="text-xs text-slate-500">Spectators cannot set nicknames.</p>}
-      </div>
+    <section className="panel-section flex h-full flex-col space-y-0.5 text-base">
+      {!hideNicknameForm && (
+        <div className="space-y-0.5">
+          <NicknameForm />
+          {!canSetNickname && <p className="text-xs text-slate-500">Spectators cannot set nicknames.</p>}
+        </div>
+      )}
 
       <div className="space-y-0.5">
-        <div className="flex items-center justify-between text-sm text-slate-400">
-          <span>{isTurnsMode ? 'Turn queues' : 'Users'}</span>
-          <span className="text-xs text-slate-500">
-            {isTurnsMode ? Object.keys(turnQueues || {}).length : sorted.length}
-          </span>
-        </div>
-        <div className="surface h-48 overflow-y-auto space-y-0.25">
+        {!hideHeader && (
+          <div className="flex items-center justify-between text-sm text-slate-400">
+            <span>{isTurnsMode ? 'Turn queues' : 'Users'}</span>
+            <span className="text-xs text-slate-500">
+              {isTurnsMode ? Object.keys(turnQueues || {}).length : sorted.length}
+            </span>
+          </div>
+        )}
+        <div className="surface flex-1 min-h-[12rem] overflow-y-auto space-y-0.25">
           {isTurnsMode ? (
             Object.keys(turnQueues || {}).length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>

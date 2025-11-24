@@ -1,6 +1,8 @@
 import AuthPanel from './AuthPanel.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import DiscordInviteButton from './DiscordInviteButton.jsx';
+import ChatPanel from './ChatPanel.jsx';
+import NicknameForm from './NicknameForm.jsx';
 
 const PRIVILEGED_ROLES = new Set(['admin', 'lockdown', 'lockdown-admin']);
 const RESTRICTED_MODES = new Set(['admin', 'lockdown']);
@@ -46,6 +48,9 @@ export default function ModeGateOverlay() {
         <div className='w-full justify-center items-center'>
           <DiscordInviteButton text='Join our Discord server for updates!'/>
         </div>
+        You can use the chat from here though :3
+        <ChatPanel />
+        <NicknameForm />
         {/* <p className="text-xs text-slate-500">
           Your controls are paused until access is granted. You will automatically regain the interface once the mode
           changes or after a successful login.

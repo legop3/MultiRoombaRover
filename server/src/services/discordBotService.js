@@ -37,6 +37,16 @@ const client = new Client({
 
 const channelCache = new Map();
 
+function sanitizeMentions(text) {
+  if (!text) return '';
+  return String(text)
+    // strip mention tokens
+    .replace(/<(@[!&]?\d+|#\d+)>/g, '[ping removed]')
+    // neutralize everyone/here
+    .replace(/@everyone/gi, '[everyone]')
+    .replace(/@here/gi, '[here]');
+}
+
 function formatRoverStatus(rover) {
   if (!rover) return 'Unknown rover';
   const percent = rover.batteryState?.percentDisplay;
@@ -80,11 +90,11 @@ async function fetchChannel(id) {
   return null;
 }
 
-async function sendToChannel(id, content, options = {}) {
+async function sendToChannel(id, content, options = {}, allowedMentions = { parse: [] }) {
   const channel = await fetchChannel(id);
   if (!channel) return;
   try {
-    await channel.send({ content, ...options });
+    await channel.send({ content: sanitizeMentions(content), allowedMentions, ...options });
   } catch (err) {
     logger.warn('Failed to send Discord message', { id, error: err.message });
   }
@@ -115,37 +125,61 @@ async function handleStatusCommand(message, roverId) {
   const roster = getRoster();
   if (!roverId) {
     const summary = roster.map((r) => formatRoverStatus(r)).join('\n') || 'No rovers online.';
-    await message.reply(summary.slice(0, 1900));
+    await message.reply({
+      content: sanitizeMentions(summary.slice(0, 1900)),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
     return;
   }
   const rover = findRover(roverId);
-  await message.reply(formatRoverStatus(rover).slice(0, 1900));
+  await message.reply({
+    content: sanitizeMentions(formatRoverStatus(rover).slice(0, 1900)),
+    allowedMentions: { parse: [], repliedUser: false },
+  });
 }
 
 async function handleLockCommand(message, roverId, locked) {
   if (!roverId) {
-    await message.reply('Specify a rover ID. Example: `rover lock alpha`');
+    await message.reply({
+      content: 'Specify a rover ID. Example: `rs lock alpha`',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
     return;
   }
   try {
     lockRover(roverId, locked, { reason: 'discord' });
-    await message.reply(`${locked ? 'Locked' : 'Unlocked'} ${roverId}.`);
+    await message.reply({
+      content: sanitizeMentions(`${locked ? 'Locked' : 'Unlocked'} ${roverId}.`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
   } catch (err) {
-    await message.reply(`Failed: ${err.message}`);
+    await message.reply({
+      content: sanitizeMentions(`Failed: ${err.message}`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
   }
 }
 
 async function handleModeCommand(message, mode) {
   const next = String(mode || '').toLowerCase();
   if (!Object.values(MODES).includes(next)) {
-    await message.reply('Invalid mode. Use one of: open, turns, admin, lockdown.');
+    await message.reply({
+      content: 'Invalid mode. Use one of: open, turns, admin, lockdown.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
     return;
   }
   try {
     setMode(next, null, { force: true });
-    await message.reply(`Mode set to ${next}.`);
+    await message.reply({
+      content: sanitizeMentions(`Mode set to ${next}.`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
   } catch (err) {
-    await message.reply(`Failed to set mode: ${err.message}`);
+    await message.reply({
+      content: sanitizeMentions(`Failed to set mode: ${err.message}`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
   }
 }
 
@@ -224,7 +258,8 @@ async function announce({ channelId, content, pingRoleId, color, title, descript
   if (!channelId) return;
   const prefix = pingRoleId ? `<@&${pingRoleId}> ` : '';
   const embed = buildEmbed({ title, description, color });
-  await sendToChannel(channelId, `${prefix}${content || ''}`.trim(), { embeds: [embed] });
+  const allowedMentions = pingRoleId ? { roles: [pingRoleId], parse: [] } : { parse: [] };
+  await sendToChannel(channelId, `${prefix}${content || ''}`.trim(), { embeds: [embed] }, allowedMentions);
 }
 
 function handleBusEvent(event) {
@@ -360,7 +395,7 @@ function handleChatBridgeOutbound(event) {
   if (!bridgeChannelId) return;
   const line = formatChatLine(payload);
   const text = line.length > 1900 ? `${line.slice(0, 1897)}...` : line;
-  sendToChannel(bridgeChannelId, text);
+  sendToChannel(bridgeChannelId, text, {}, { parse: [] });
 }
 
 client.on('messageCreate', async (message) => {
