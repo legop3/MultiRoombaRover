@@ -58,12 +58,8 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
   }
 
   return (
-    <section className="panel-section space-y-0.5 text-base">
-      {/* <div className="flex items-center justify-between text-sm text-slate-400">
-        <span>Chat</span>
-        <span className="text-xs text-slate-500">{sorted.length}</span>
-      </div> */}
-      <div className="surface h-48 overflow-y-auto space-y-0.25" ref={listRef}>
+    <section className="panel-section flex h-full flex-col space-y-0.5 text-base overflow-hidden">
+      <div className="surface flex-1 min-h-[8rem] overflow-y-auto space-y-0.25" ref={listRef}>
         {sorted.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet.</p>
         ) : (

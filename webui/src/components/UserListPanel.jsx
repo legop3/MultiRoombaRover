@@ -92,7 +92,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
   }, []);
 
   return (
-    <section className={`panel-section space-y-0.5 text-base ${className}`}>
+    <section className={`panel-section flex h-full flex-col space-y-0.5 overflow-hidden text-base ${className}`}>
       {!hideNicknameForm && (
         <div className="space-y-0.5">
           <NicknameForm />
@@ -109,7 +109,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
             </span>
           </div>
         )}
-        <div className="surface h-48 overflow-y-auto space-y-0.25">
+        <div className="surface flex-1 min-h-[8rem] overflow-y-auto space-y-0.25">
           {isTurnsMode ? (
             Object.keys(turnQueues || {}).length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>
