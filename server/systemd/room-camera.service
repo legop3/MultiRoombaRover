@@ -5,8 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStartPre=/usr/bin/amixer -c 0 sset 'Mic Capture Switch' cap
-ExecStartPre=/usr/bin/amixer -c 0 sset 'Mic Capture Volume' 100%
+# Some USB mics only expose a single "Mic" control; don't fail if a control is missing.
+ExecStartPre=/usr/bin/sh -c "/usr/bin/amixer -q -c 0 sset 'Mic Capture Switch' cap || /usr/bin/true"
+ExecStartPre=/usr/bin/sh -c "/usr/bin/amixer -q -c 0 sset 'Mic Capture Volume' 100% || /usr/bin/amixer -q -c 0 sset 'Mic' 100% cap || /usr/bin/true"
 ExecStart=/usr/bin/ffmpeg \
   -fflags nobuffer -thread_queue_size 256 -f v4l2 -input_format h264 -i /dev/video2 \
   -fflags nobuffer -thread_queue_size 256 -f alsa -ar 16000 -ac 2 -i hw:0,0 \
