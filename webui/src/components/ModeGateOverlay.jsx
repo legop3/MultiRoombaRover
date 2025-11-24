@@ -50,7 +50,7 @@ export default function ModeGateOverlay() {
         </div>
         You can use the chat from here though :3
         {/* set max height of this box */}
-        <div className='max-h-60 overflow-y-auto'>
+        <div className='max-h-80 overflow-y-auto'>
           <ChatPanel />
           <NicknameForm />
         </div>
