@@ -62,7 +62,8 @@ function canView(socket) {
     return isLockdownAdmin(socket);
   }
   if (mode === MODES.ADMIN) {
-    return isAdmin(socket);
+    const role = getRole(socket);
+    return role === 'spectator' || isAdmin(socket);
   }
   return true;
 }
