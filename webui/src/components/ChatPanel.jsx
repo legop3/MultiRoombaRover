@@ -58,7 +58,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
   }
 
   const listClass = fillParent
-    ? 'flex-1 min-h-[8rem] min-h-0'
+    ? 'flex-1 min-h-[8rem]'
     : 'h-48';
 
   return (

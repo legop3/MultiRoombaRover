@@ -91,7 +91,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
     return Math.ceil(ms / 1000);
   }, []);
 
-  const listClass = fillParent ? 'flex-1 min-h-[8rem] min-h-0' : 'h-48';
+  const listClass = fillParent ? 'flex-1 min-h-[8rem]' : 'h-48';
 
   return (
     <section
