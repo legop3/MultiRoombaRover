@@ -25,7 +25,7 @@ function displayName(message) {
   return message.nickname || message.socketId?.slice(0, 6) || 'unknown';
 }
 
-export default function ChatPanel({ hideInput = false, hideSpectatorNotice = false }) {
+export default function ChatPanel({ hideInput = false, hideSpectatorNotice = false, fullHeight = false }) {
   const { session } = useSession();
   const { messages, sendMessage, registerInputRef, onInputFocus, onInputBlur, blurChat } = useChat();
   const [draft, setDraft] = useState('');
@@ -57,10 +57,12 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
     }
   }
 
-  const listClass = 'h-48';
+  const listClass = fullHeight ? 'flex-1 min-h-0' : 'h-48';
 
   return (
-    <section className="panel-section space-y-0.5 text-base">
+    <section
+      className={`panel-section space-y-0.5 text-base ${fullHeight ? 'flex h-full flex-col overflow-hidden' : ''}`}
+    >
       <div className={`surface overflow-y-auto space-y-0.25 ${listClass}`} ref={listRef}>
         {sorted.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet.</p>
