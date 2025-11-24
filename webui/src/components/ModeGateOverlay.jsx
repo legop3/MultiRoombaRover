@@ -49,8 +49,12 @@ export default function ModeGateOverlay() {
           <DiscordInviteButton text='Join our Discord server for updates!'/>
         </div>
         You can use the chat from here though :3
-        <ChatPanel />
-        <NicknameForm />
+        {/* set max height of this box */}
+        <div className='max-h-60 overflow-y-auto'>
+          <ChatPanel />
+          <NicknameForm />
+        </div>
+        
         {/* <p className="text-xs text-slate-500">
           Your controls are paused until access is granted. You will automatically regain the interface once the mode
           changes or after a successful login.
