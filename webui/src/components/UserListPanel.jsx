@@ -26,7 +26,7 @@ function formatLabel(user, selfId) {
   return base;
 }
 
-export default function UserListPanel({ hideNicknameForm = false, hideHeader = false, className = '' }) {
+export default function UserListPanel({ hideNicknameForm = false, hideHeader = false, className = '', fillParent = false }) {
   const { session, setNickname } = useSession();
   const { value } = useSettingsNamespace('profile', { nickname: '' });
   const lastSyncedSocketRef = useRef(null);
@@ -91,8 +91,12 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
     return Math.ceil(ms / 1000);
   }, []);
 
+  const listClass = fillParent ? 'flex-1 min-h-[8rem]' : 'h-48';
+
   return (
-    <section className={`panel-section flex h-full flex-col space-y-0.5 overflow-hidden text-base ${className}`}>
+    <section
+      className={`panel-section ${fillParent ? 'flex h-full flex-col overflow-hidden' : ''} space-y-0.5 text-base ${className}`}
+    >
       {!hideNicknameForm && (
         <div className="space-y-0.5">
           <NicknameForm />
@@ -109,7 +113,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
             </span>
           </div>
         )}
-        <div className="surface flex-1 min-h-[8rem] overflow-y-auto space-y-0.25">
+        <div className={`surface overflow-y-auto space-y-0.25 ${listClass}`}>
           {isTurnsMode ? (
             Object.keys(turnQueues || {}).length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>

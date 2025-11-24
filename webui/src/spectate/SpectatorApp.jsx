@@ -88,11 +88,11 @@ function SecondaryRow() {
   return (
     <section className="grid grid-cols-1 gap-0.5 lg:grid-cols-[2fr_1fr_1fr]">
       <RoomCameraPanel defaultOrientation="horizontal" hideLayoutToggle hideHeader />
-      <div className="flex h-full flex-col">
-        <UserListPanel hideNicknameForm hideHeader />
+      <div className="flex h-[50vh] flex-col">
+        <UserListPanel hideNicknameForm hideHeader fillParent />
       </div>
-      <div className="flex h-full flex-col">
-        <ChatPanel hideInput hideSpectatorNotice />
+      <div className="flex h-[50vh] flex-col">
+        <ChatPanel hideInput hideSpectatorNotice fillParent />
       </div>
     </section>
   );

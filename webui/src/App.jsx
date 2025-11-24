@@ -58,9 +58,9 @@ function DesktopLayout({ layout }) {
     <div className="flex h-full gap-0.5 overflow-hidden">
       <div className="flex min-w-0 flex-[1.8] flex-col gap-0.5 overflow-y-auto pr-0.5">
         <DriverVideoPanel />
-        <div className="grid grid-cols-2 gap-0.5">
-          <UserListPanel />
-          <ChatPanel />
+        <div className="grid grid-cols-2 gap-0.5 max-h-[50vh]">
+          <UserListPanel fillParent />
+          <ChatPanel fillParent />
         </div>
         <LogPanel />
       </div>
