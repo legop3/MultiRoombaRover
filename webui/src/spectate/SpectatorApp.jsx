@@ -121,19 +121,19 @@ export default function SpectatorApp() {
   return (
     <SettingsProvider>
       <div className="min-h-screen bg-black text-slate-100">
-        <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:grid-cols-[minmax(0,4.5fr)_minmax(14rem,1fr)] lg:grid-cols-[minmax(0,7fr)_minmax(18rem,1fr)]">
-          <section className="flex min-h-0 flex-col gap-0.5">
+        <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <section className="flex min-h-0 min-w-0 flex-col gap-0.5">
             <RoverRow roster={roster} frames={frames} videoSources={videoSources} session={session} />
             <SecondaryRow />
           </section>
-          <section className="grid min-h-0 grid-rows-[1fr_1.2fr_auto] gap-0.5">
-            <div className="min-h-0">
+          <section className="grid min-h-0 min-w-0 grid-rows-[1fr_1.2fr_auto] gap-0.5">
+            <div className="min-h-0 min-w-0">
               <UserListPanel hideNicknameForm hideHeader fillHeight />
             </div>
-            <div className="min-h-0">
+            <div className="min-h-0 min-w-0">
               <ChatPanel hideInput hideSpectatorNotice fillHeight />
             </div>
-            <div className="min-h-0">
+            <div className="min-h-0 min-w-0">
               <LogsRow />
             </div>
           </section>
