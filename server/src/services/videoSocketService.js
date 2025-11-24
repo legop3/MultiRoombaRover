@@ -39,11 +39,12 @@ function buildWhepUrlForSource(source) {
 
 function passesMode(socket) {
   const mode = getMode();
-  if (mode === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
-    return false;
+  if (mode === MODES.LOCKDOWN) {
+    return isLockdownAdmin(socket);
   }
-  if (mode === MODES.ADMIN && !isAdmin(socket)) {
-    return false;
+  if (mode === MODES.ADMIN) {
+    const role = getRole(socket);
+    return role === 'spectator' || isAdmin(socket);
   }
   return true;
 }

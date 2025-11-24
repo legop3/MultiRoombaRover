@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { SettingsProvider } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
@@ -9,22 +8,6 @@ import RoomCameraPanel from '../components/RoomCameraPanel.jsx';
 import UserListPanel from '../components/UserListPanel.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 import LogPanel from '../components/LogPanel.jsx';
-
-function SpectatorStatus({ connected, ready, rosterCount, mode, blocked }) {
-  return (
-    <div className="flex flex-wrap items-center gap-0.5 text-sm">
-      <span className={`px-0.5 py-0.5 font-semibold ${connected ? 'bg-emerald-500/20 text-emerald-200' : 'bg-red-500/20 text-red-200'}`}>
-        {connected ? 'Connected' : 'Disconnected'}
-      </span>
-      <span className={`px-0.5 py-0.5 ${ready ? 'bg-blue-600/40 text-blue-100' : 'bg-slate-700 text-slate-200'}`}>
-        Spectator mode {ready ? 'active' : 'pending…'}
-      </span>
-      <span className="bg-slate-800 px-0.5 py-0.5 text-slate-200">Rovers: {rosterCount}</span>
-      <span className="bg-slate-800 px-0.5 py-0.5 text-slate-200">Mode: {mode || 'unknown'}</span>
-      {blocked && <span className="bg-red-700/60 px-0.5 py-0.5 text-red-100">Spectate blocked</span>}
-    </div>
-  );
-}
 
 function TelemetrySummary({ frame }) {
   const sensors = frame?.sensors || {};
@@ -87,7 +70,7 @@ function RoverRow({ roster, frames, videoSources, session }) {
     return <p className="col-span-full text-slate-400">No rovers registered.</p>;
   }
   return (
-    <section className="grid grid-cols-1 gap-0.5 md:grid-cols-2 xl:grid-cols-3">
+    <section className="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {roster.map((rover) => (
         <RoverSpectatorCard
           key={rover.id}
@@ -120,30 +103,16 @@ function LogsRow() {
 }
 
 export default function SpectatorApp() {
-  const { connected, session } = useSession();
-  const spectatorReady = useSpectatorMode();
+  const { session } = useSession();
+  useSpectatorMode();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
   const videoSources = useVideoRequests(roster.map((rover) => rover.id));
-  const blocked = session?.mode === 'lockdown';
-
-  const status = useMemo(
-    () => ({ connected, ready: spectatorReady, rosterCount: roster.length, mode: session?.mode, blocked }),
-    [blocked, connected, roster.length, session?.mode, spectatorReady],
-  );
 
   return (
     <SettingsProvider>
       <div className="min-h-screen bg-black text-slate-100">
-        <main className="mx-auto flex max-w-7xl flex-col gap-0.5 px-0.5 py-0.5">
-          <header className="space-y-0.5">
-            <h1 className="text-4xl font-semibold text-white">Spectator Console</h1>
-            <p className="text-slate-400">Live rover telemetry & logs. This view is read-only.</p>
-            <SpectatorStatus {...status} />
-            {blocked && (
-              <p className="text-sm text-amber-300">Lockdown active. Spectator view will resume automatically when access returns.</p>
-            )}
-          </header>
+        <main className="flex flex-col gap-0.5 p-0.5">
           <RoverRow roster={roster} frames={frames} videoSources={videoSources} session={session} />
           <SecondaryRow />
           <LogsRow />
