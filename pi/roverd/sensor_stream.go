@@ -14,7 +14,7 @@ import (
 const (
 	sensorHeader          = 19
 	sensorReadTimeout     = 150 * time.Millisecond
-	sensorThrottleMinimum = 80 * time.Millisecond
+	sensorThrottleMinimum = 250 * time.Millisecond
 )
 
 type SensorStreamer struct {
