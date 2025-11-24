@@ -58,7 +58,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
   }
 
   return (
-    <section className={`panel-section flex h-full flex-col space-y-0.5 text-base ${maxHeightClass}`}>
+    <section className={`panel-section flex h-full flex-col space-y-0.5 overflow-hidden text-base ${maxHeightClass}`}>
       {/* <div className="flex items-center justify-between text-sm text-slate-400">
         <span>Chat</span>
         <span className="text-xs text-slate-500">{sorted.length}</span>

@@ -92,7 +92,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
   }, []);
 
   return (
-    <section className={`panel-section flex h-full flex-col space-y-0.5 text-base ${className}`}>
+    <section className={`panel-section flex h-full flex-col space-y-0.5 overflow-hidden text-base ${className}`}>
       {!hideNicknameForm && (
         <div className="space-y-0.5">
           <NicknameForm />
