@@ -55,12 +55,17 @@ function CurrentDriverBadge({ roverId, session }) {
 
 function RoverSpectatorCard({ rover, frame, videoInfo, session }) {
   return (
-    <article className="space-y-0.5 bg-zinc-900 p-0.5">
+    <article className="space-y-1 bg-zinc-900 p-0.5">
       <header className="flex flex-col gap-0.25">
         <h3 className="text-2xl font-semibold text-white leading-tight">{rover.name}</h3>
         <CurrentDriverBadge roverId={rover.id} session={session} />
       </header>
-      <VideoTile sessionInfo={videoInfo} label={rover.name} telemetryFrame={frame} batteryConfig={rover.battery} />
+      <VideoTile
+        sessionInfo={videoInfo}
+        label={rover.name}
+        telemetryFrame={frame}
+        batteryConfig={rover.battery}
+      />
       <TelemetrySummary frame={frame} />
     </article>
   );
@@ -71,7 +76,7 @@ function RoverRow({ roster, frames, videoSources, session }) {
     return <p className="col-span-full text-slate-400">No rovers registered.</p>;
   }
   return (
-    <section className="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <section className="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
       {roster.map((rover) => (
         <RoverSpectatorCard
           key={rover.id}

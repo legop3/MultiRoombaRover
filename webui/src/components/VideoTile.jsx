@@ -4,7 +4,14 @@ import { WhepPlayer } from '../lib/whepPlayer.js';
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 
-export default function VideoTile({ sessionInfo, label, forceMute = false, telemetryFrame, batteryConfig, layoutFormat = 'desktop' }) {
+export default function VideoTile({
+  sessionInfo,
+  label,
+  forceMute = false,
+  telemetryFrame,
+  batteryConfig,
+  layoutFormat = 'desktop',
+}) {
   const videoRef = useRef(null);
   const restartTimer = useRef(null);
   const unmuteTimer = useRef(null);
