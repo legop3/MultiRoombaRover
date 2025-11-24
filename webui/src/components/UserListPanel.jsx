@@ -26,7 +26,7 @@ function formatLabel(user, selfId) {
   return base;
 }
 
-export default function UserListPanel({ hideNicknameForm = false, hideHeader = false }) {
+export default function UserListPanel({ hideNicknameForm = false, hideHeader = false, className = '' }) {
   const { session, setNickname } = useSession();
   const { value } = useSettingsNamespace('profile', { nickname: '' });
   const lastSyncedSocketRef = useRef(null);
@@ -92,7 +92,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
   }, []);
 
   return (
-    <section className="panel-section flex h-full flex-col space-y-0.5 text-base">
+    <section className={`panel-section flex h-full flex-col space-y-0.5 text-base ${className}`}>
       {!hideNicknameForm && (
         <div className="space-y-0.5">
           <NicknameForm />
