@@ -111,13 +111,13 @@ function SecondaryRow() {
         className="flex min-h-0 flex-col"
         style={roomHeight ? { height: roomHeight } : undefined}
       >
-        <UserListPanel hideNicknameForm hideHeader fullHeight />
+        <UserListPanel hideNicknameForm hideHeader fillHeight />
       </div>
       <div
         className="flex min-h-0 flex-col"
         style={roomHeight ? { height: roomHeight } : undefined}
       >
-        <ChatPanel hideInput hideSpectatorNotice fullHeight />
+        <ChatPanel hideInput hideSpectatorNotice fillHeight />
       </div>
     </section>
   );

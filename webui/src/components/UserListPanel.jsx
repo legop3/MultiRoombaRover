@@ -26,7 +26,7 @@ function formatLabel(user, selfId) {
   return base;
 }
 
-export default function UserListPanel({ hideNicknameForm = false, hideHeader = false, className = '' }) {
+export default function UserListPanel({ hideNicknameForm = false, hideHeader = false, className = '', fillHeight = false }) {
   const { session, setNickname } = useSession();
   const { value } = useSettingsNamespace('profile', { nickname: '' });
   const lastSyncedSocketRef = useRef(null);
@@ -91,10 +91,12 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
     return Math.ceil(ms / 1000);
   }, []);
 
-  const listClass = 'h-48';
+  const listClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : 'h-48 overflow-y-auto';
 
   return (
-    <section className={`panel-section space-y-0.5 text-base ${className}`}>
+    <section
+      className={`panel-section space-y-0.5 text-base ${fillHeight ? 'flex h-full min-h-0 flex-col overflow-hidden' : ''} ${className}`}
+    >
       {!hideNicknameForm && (
         <div className="space-y-0.5">
           <NicknameForm />
@@ -102,7 +104,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
         </div>
       )}
 
-      <div className="space-y-0.5">
+      <div className={`space-y-0.5 ${fillHeight ? 'flex flex-1 min-h-0 flex-col' : ''}`}>
         {!hideHeader && (
           <div className="flex items-center justify-between text-sm text-slate-400">
             <span>{isTurnsMode ? 'Turn queues' : 'Users'}</span>
@@ -111,7 +113,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
             </span>
           </div>
         )}
-        <div className={`surface overflow-y-auto space-y-0.25 ${listClass}`}>
+        <div className={`surface space-y-0.25 ${listClass}`}>
           {isTurnsMode ? (
             Object.keys(turnQueues || {}).length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>
