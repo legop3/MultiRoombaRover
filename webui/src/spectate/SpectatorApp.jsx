@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { SettingsProvider } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
@@ -85,15 +86,37 @@ function RoverRow({ roster, frames, videoSources, session }) {
 }
 
 function SecondaryRow() {
+  const roomRef = useRef(null);
+  const [roomHeight, setRoomHeight] = useState(0);
+
+  useEffect(() => {
+    const target = roomRef.current;
+    if (!target || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const nextHeight = entry.contentRect?.height || 0;
+      setRoomHeight(nextHeight);
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section className="grid grid-cols-1 items-stretch gap-0.5 lg:grid-cols-[2fr_1fr_1fr]">
-      <div className="flex h-full flex-col">
+      <div ref={roomRef} className="flex h-full min-h-0 flex-col">
         <RoomCameraPanel defaultOrientation="horizontal" hideLayoutToggle hideHeader />
       </div>
-      <div className="flex h-full min-h-0 flex-col">
+      <div
+        className="flex min-h-0 flex-col"
+        style={roomHeight ? { height: roomHeight } : undefined}
+      >
         <UserListPanel hideNicknameForm hideHeader fullHeight />
       </div>
-      <div className="flex h-full min-h-0 flex-col">
+      <div
+        className="flex min-h-0 flex-col"
+        style={roomHeight ? { height: roomHeight } : undefined}
+      >
         <ChatPanel hideInput hideSpectatorNotice fullHeight />
       </div>
     </section>
