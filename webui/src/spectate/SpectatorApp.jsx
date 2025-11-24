@@ -79,7 +79,7 @@ function RoverRow({ roster, frames, videoSources, session }) {
     return <p className="col-span-full text-slate-400">No rovers registered.</p>;
   }
   return (
-    <section className="grid grid-cols-1 gap-0.5 md:grid-cols-2 xl:grid-cols-3">
+    <section className="grid grid-cols-1 gap-0.5 md:grid-cols-2">
       {roster.map((rover) => (
         <RoverSpectatorCard
           key={rover.id}
