@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { SettingsProvider } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
@@ -21,19 +20,16 @@ function TelemetrySummary({ frame }) {
   ];
 
   return (
-    <div className="surface space-y-0.25 text-sm text-slate-200">
-      <div className="flex items-center justify-between text-xs text-slate-500">
-        <span>Telemetry</span>
-        <span>{updated ? `Updated ${updated}` : 'Waiting...'}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-0.25">
-        {entries.map(([label, value]) => (
-          <div key={label} className="surface-muted flex items-center justify-between px-0.5 py-0.25 text-xs">
-            <span className="text-slate-400">{label}</span>
-            <span className="font-semibold text-white">{value}</span>
-          </div>
-        ))}
-      </div>
+    <div className="surface-muted flex flex-wrap items-center gap-0.5 rounded px-0.5 py-0.25 text-[0.75rem] text-slate-200">
+      <span className="text-[0.7rem] uppercase tracking-wide text-slate-500">
+        {updated ? `Updated ${updated}` : 'Telemetry'}
+      </span>
+      {entries.map(([label, value]) => (
+        <span key={label} className="flex items-center gap-0.25 rounded bg-slate-900/50 px-0.5 py-0.25">
+          <span className="text-slate-400">{label}</span>
+          <span className="font-semibold text-white">{value}</span>
+        </span>
+      ))}
     </div>
   );
 }
@@ -55,17 +51,24 @@ function CurrentDriverBadge({ roverId, session }) {
 
 function RoverSpectatorCard({ rover, frame, videoInfo, session }) {
   return (
-    <article className="space-y-1 bg-zinc-900 p-0.5">
-      <header className="flex flex-col gap-0.25">
-        <h3 className="text-2xl font-semibold text-white leading-tight">{rover.name}</h3>
-        <CurrentDriverBadge roverId={rover.id} session={session} />
+    <article className="grid min-h-[16rem] grid-rows-[auto_minmax(0,1fr)_auto] gap-0.5 rounded bg-zinc-900 p-0.5 sm:min-h-[18rem]">
+      <header className="flex items-center justify-between gap-0.5">
+        <div className="flex flex-col leading-tight">
+          <h3 className="text-xl font-semibold text-white">{rover.name}</h3>
+          <CurrentDriverBadge roverId={rover.id} session={session} />
+        </div>
+        <span className="rounded bg-slate-800 px-1 text-[0.7rem] text-slate-300">
+          Rover {rover.id}
+        </span>
       </header>
-      <VideoTile
-        sessionInfo={videoInfo}
-        label={rover.name}
-        telemetryFrame={frame}
-        batteryConfig={rover.battery}
-      />
+      <div className="min-h-0 overflow-hidden rounded bg-black/20">
+        <VideoTile
+          sessionInfo={videoInfo}
+          label={rover.name}
+          telemetryFrame={frame}
+          batteryConfig={rover.battery}
+        />
+      </div>
       <TelemetrySummary frame={frame} />
     </article>
   );
@@ -76,7 +79,7 @@ function RoverRow({ roster, frames, videoSources, session }) {
     return <p className="col-span-full text-slate-400">No rovers registered.</p>;
   }
   return (
-    <section className="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
+    <section className="grid grid-cols-1 gap-0.5 md:grid-cols-2 xl:grid-cols-3">
       {roster.map((rover) => (
         <RoverSpectatorCard
           key={rover.id}
@@ -91,38 +94,10 @@ function RoverRow({ roster, frames, videoSources, session }) {
 }
 
 function SecondaryRow() {
-  const roomRef = useRef(null);
-  const [roomHeight, setRoomHeight] = useState(0);
-
-  useEffect(() => {
-    const target = roomRef.current;
-    if (!target || typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const nextHeight = entry.contentRect?.height || 0;
-      setRoomHeight(nextHeight);
-    });
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <section className="grid grid-cols-1 items-stretch gap-0.5 lg:grid-cols-[2fr_1fr_1fr]">
-      <div ref={roomRef} className="flex h-full min-h-0 flex-col">
+    <section className="min-h-0">
+      <div className="surface min-h-[14rem] overflow-hidden">
         <RoomCameraPanel defaultOrientation="horizontal" hideLayoutToggle hideHeader />
-      </div>
-      <div
-        className="flex min-h-0 flex-col"
-        style={roomHeight ? { height: roomHeight } : undefined}
-      >
-        <UserListPanel hideNicknameForm hideHeader fillHeight />
-      </div>
-      <div
-        className="flex min-h-0 flex-col"
-        style={roomHeight ? { height: roomHeight } : undefined}
-      >
-        <ChatPanel hideInput hideSpectatorNotice fillHeight />
       </div>
     </section>
   );
@@ -146,10 +121,22 @@ export default function SpectatorApp() {
   return (
     <SettingsProvider>
       <div className="min-h-screen bg-black text-slate-100">
-        <main className="flex flex-col gap-0.5 p-0.5">
-          <RoverRow roster={roster} frames={frames} videoSources={videoSources} session={session} />
-          <SecondaryRow />
-          <LogsRow />
+        <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:grid-cols-[3fr_1.15fr] lg:grid-cols-[5fr_2fr]">
+          <section className="flex min-h-0 flex-col gap-0.5">
+            <RoverRow roster={roster} frames={frames} videoSources={videoSources} session={session} />
+            <SecondaryRow />
+          </section>
+          <section className="grid min-h-0 grid-rows-[1fr_1.2fr_auto] gap-0.5">
+            <div className="min-h-0">
+              <UserListPanel hideNicknameForm hideHeader fillHeight />
+            </div>
+            <div className="min-h-0">
+              <ChatPanel hideInput hideSpectatorNotice fillHeight />
+            </div>
+            <div className="min-h-0">
+              <LogsRow />
+            </div>
+          </section>
         </main>
       </div>
     </SettingsProvider>
