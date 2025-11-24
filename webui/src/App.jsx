@@ -56,11 +56,15 @@ function useLayoutMode() {
 function DesktopLayout({ layout }) {
   return (
     <div className="flex h-full gap-0.5 overflow-hidden">
-      <div className="flex min-w-0 flex-[1.8] flex-col gap-0.5 overflow-y-auto pr-0.5">
+      <div className="flex min-h-0 min-w-0 flex-[1.8] flex-col gap-0.5 overflow-y-auto pr-0.5">
         <DriverVideoPanel />
-        <div className="grid grid-cols-2 gap-0.5 max-h-[50vh]">
-          <UserListPanel fillParent />
-          <ChatPanel fillParent />
+        <div className="grid grid-cols-2 gap-0.5 h-48 overflow-hidden min-h-0">
+          <div className="h-full min-h-0">
+            <UserListPanel fillParent />
+          </div>
+          <div className="h-full min-h-0">
+            <ChatPanel fillParent />
+          </div>
         </div>
         <LogPanel />
       </div>
