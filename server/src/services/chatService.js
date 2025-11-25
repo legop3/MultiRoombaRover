@@ -75,10 +75,10 @@ function broadcastMessage(message) {
 
 function handleIncoming({ text } = {}, socket, cb = () => {}) {
   const role = getRole(socket);
-  if (role === 'spectator') {
-    cb({ error: 'Spectators cannot chat' });
-    return;
-  }
+  // if (role === 'spectator') {
+  //   cb({ error: 'Spectators cannot chat' });
+  //   return;
+  // }
   const clean = typeof text === 'string' ? text.trim() : '';
   if (!clean) {
     cb({ error: 'Message required' });
