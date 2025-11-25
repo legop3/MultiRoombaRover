@@ -120,7 +120,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
             ) : (
               Object.entries(turnQueues).map(([roverId, info]) => {
                 const queue = info?.queue || [];
-                const deadline = info?.deadline || null;
+                const deadline = info?.idleDeadline || info?.deadline || null;
                 const remaining = secondsRemaining(deadline);
                 return (
                   <div key={roverId} className="surface-muted flex flex-col gap-0.25 text-sm">

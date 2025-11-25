@@ -49,6 +49,12 @@ io.on('connection', (socket) => {
       const payload = data ? { ...data } : {};
       const id = issueCommand(roverId, { type, ...payload });
       logger.info('Queued command', socket.id, roverId, type);
+      try {
+        const { recordActivity } = require('./turnService');
+        recordActivity(roverId, socket.id);
+      } catch (err) {
+        // best effort; ignore activity update errors
+      }
       reply({ id });
     } catch (err) {
       logger.warn('Command rejected', socket.id, err.message);

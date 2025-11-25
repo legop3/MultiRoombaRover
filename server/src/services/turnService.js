@@ -6,8 +6,13 @@ const { MODES, getMode, modeEvents } = require('./modeManager');
 const driverQueues = new Map(); // roverId -> { queue: [], current: socketId, timer: Timeout | null }
 const activeDrivers = new Map();
 const TURN_DURATION_MS = 60 * 1000;
+const IDLE_TIMEOUT_MS = 7 * 1000;
+const MAX_IDLE_SKIPS = 3;
 const turnEvents = new EventEmitter();
 const turnDeadlines = new Map(); // roverId -> timestamp when current driver expires
+const idleDeadlines = new Map(); // roverId -> timestamp when idle skip will happen
+const idleTimers = new Map(); // roverId -> Timeout
+const idleSkips = new Map(); // roverId -> Map(socketId -> count)
 
 function driverAdded(roverId, socketId, force) {
   const queue = ensureQueue(roverId);
@@ -24,8 +29,17 @@ function driverRemoved(roverId, socketId) {
   const queue = driverQueues.get(roverId);
   if (!queue) return;
   queue.queue = queue.queue.filter((id) => id !== socketId);
+  const skips = idleSkips.get(roverId);
+  if (skips) {
+    skips.delete(socketId);
+    if (skips.size === 0) {
+      idleSkips.delete(roverId);
+    }
+  }
   if (queue.current === socketId) {
     advanceTurn(roverId);
+  } else {
+    scheduleIdleTimer(roverId);
   }
 }
 
@@ -34,9 +48,13 @@ function cleanupRover(roverId) {
   if (queue) {
     clearTimeout(queue.timer);
   }
+  clearTimeout(idleTimers.get(roverId));
   driverQueues.delete(roverId);
   activeDrivers.delete(roverId);
   turnDeadlines.delete(roverId);
+  idleDeadlines.delete(roverId);
+  idleTimers.delete(roverId);
+  idleSkips.delete(roverId);
 }
 
 function canDrive(roverId, socket) {
@@ -63,6 +81,8 @@ function syncState(roverId) {
     setActiveDriver(roverId, queue.current);
     clearTimeout(queue.timer);
     turnDeadlines.delete(roverId);
+    clearTimeout(idleTimers.get(roverId));
+    idleDeadlines.delete(roverId);
     turnEvents.emit('queue', { roverId });
     return;
   }
@@ -71,6 +91,7 @@ function syncState(roverId) {
   }
   setActiveDriver(roverId, queue.current);
   scheduleNextTurn(roverId);
+  scheduleIdleTimer(roverId);
   turnEvents.emit('queue', { roverId });
 }
 
@@ -84,6 +105,58 @@ function scheduleNextTurn(roverId) {
   turnEvents.emit('queue', { roverId });
 }
 
+function scheduleIdleTimer(roverId) {
+  const queue = driverQueues.get(roverId);
+  clearTimeout(idleTimers.get(roverId));
+  idleDeadlines.delete(roverId);
+  if (!queue || getMode() !== MODES.TURNS || queue.queue.length <= 1 || !queue.current) {
+    turnEvents.emit('queue', { roverId });
+    return;
+  }
+  const deadline = Date.now() + IDLE_TIMEOUT_MS;
+  idleDeadlines.set(roverId, deadline);
+  idleTimers.set(
+    roverId,
+    setTimeout(() => handleIdleTimeout(roverId, queue.current), IDLE_TIMEOUT_MS),
+  );
+  turnEvents.emit('queue', { roverId });
+}
+
+function incrementSkip(roverId, socketId) {
+  if (!idleSkips.has(roverId)) {
+    idleSkips.set(roverId, new Map());
+  }
+  const map = idleSkips.get(roverId);
+  const next = (map.get(socketId) || 0) + 1;
+  map.set(socketId, next);
+  return next;
+}
+
+function handleIdleTimeout(roverId, expectedDriver) {
+  const queue = driverQueues.get(roverId);
+  if (!queue || queue.current !== expectedDriver) {
+    scheduleIdleTimer(roverId);
+    return;
+  }
+  const skips = incrementSkip(roverId, expectedDriver);
+  stopRover(roverId);
+  if (skips >= MAX_IDLE_SKIPS) {
+    sendAlert({
+      color: COLORS.error,
+      title: 'Driver removed',
+      message: `${expectedDriver} removed from ${roverId} after ${skips} idle skips`,
+    });
+    removeDriverCompletely(roverId, expectedDriver);
+    return;
+  }
+  sendAlert({
+    color: COLORS.warn,
+    title: 'Turn skipped',
+    message: `${expectedDriver} skipped on ${roverId} (idle ${skips}/${MAX_IDLE_SKIPS})`,
+  });
+  advanceTurn(roverId);
+}
+
 function advanceTurn(roverId) {
   const queue = driverQueues.get(roverId);
   if (!queue) return;
@@ -91,6 +164,9 @@ function advanceTurn(roverId) {
     clearTimeout(queue.timer);
     setActiveDriver(roverId, null);
     turnDeadlines.delete(roverId);
+    idleDeadlines.delete(roverId);
+    clearTimeout(idleTimers.get(roverId));
+    idleTimers.delete(roverId);
     turnEvents.emit('queue', { roverId });
     return;
   }
@@ -100,6 +176,9 @@ function advanceTurn(roverId) {
     setActiveDriver(roverId, queue.current);
     clearTimeout(queue.timer);
     turnDeadlines.delete(roverId);
+    idleDeadlines.delete(roverId);
+    clearTimeout(idleTimers.get(roverId));
+    idleTimers.delete(roverId);
     turnEvents.emit('queue', { roverId });
     return;
   }
@@ -110,6 +189,7 @@ function advanceTurn(roverId) {
   sendAlert({ color: COLORS.info, title: 'Turn switch', message: `${queue.current} now controls ${roverId}` });
   stopRover(roverId);
   scheduleNextTurn(roverId);
+  scheduleIdleTimer(roverId);
 }
 
 function setActiveDriver(roverId, socketId) {
@@ -138,6 +218,7 @@ function getTurnQueues() {
       queue: Array.from(queue.queue),
       current: queue.current,
       deadline: turnDeadlines.get(roverId) || null,
+      idleDeadline: idleDeadlines.get(roverId) || null,
     };
   });
   return payload;
@@ -153,6 +234,21 @@ function stopRover(roverId) {
   }
 }
 
+function removeDriverCompletely(roverId, socketId) {
+  try {
+    const assignmentService = require('./assignmentService');
+    assignmentService.forceRelease(roverId, socketId);
+  } catch (err) {
+    // best effort; log elsewhere if needed
+  }
+}
+
+function recordActivity(roverId, socketId) {
+  const queue = driverQueues.get(roverId);
+  if (!queue || queue.current !== socketId) return;
+  scheduleIdleTimer(roverId);
+}
+
 modeEvents.on('change', (mode) => {
   driverQueues.forEach((_, roverId) => syncState(roverId));
 });
@@ -165,4 +261,5 @@ module.exports = {
   getActiveDrivers,
   turnEvents,
   getTurnQueues,
+  recordActivity,
 };

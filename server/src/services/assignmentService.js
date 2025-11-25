@@ -129,6 +129,21 @@ function releaseAssignment(socket, roverId) {
   assignmentEvents.emit('update', socket.id);
 }
 
+function forceRelease(roverId, socketId) {
+  const socket = socketRefs.get(socketId) || io.sockets.sockets.get(socketId);
+  if (assignments.get(socketId) === roverId) {
+    assignments.delete(socketId);
+  }
+  waiting.delete(socketId);
+  if (socket) {
+    roverManager.releaseControl(roverId, socket);
+    logger.info('Force released socket from rover', socketId, roverId);
+  } else {
+    logger.warn('Force release: socket not found', socketId, roverId);
+  }
+  assignmentEvents.emit('update', socketId);
+}
+
 function pickRover() {
   const mode = getMode();
   if (mode === MODES.ADMIN || mode === MODES.LOCKDOWN) {
@@ -161,4 +176,5 @@ function describeAssignment(socketId) {
 module.exports = {
   assignmentEvents,
   describeAssignment,
+  forceRelease,
 };
