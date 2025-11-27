@@ -50,7 +50,8 @@ FLIP_ARGS=(--rotation 180)
 
 run_pipeline() {
 	if [[ "${AUDIO_ENABLE}" -eq 1 ]]; then
-		"${LIBCAMERA_BIN_PATH}" \
+		# Try audio + video; if audio device is missing, fallback to video-only.
+		if ! "${LIBCAMERA_BIN_PATH}" \
 			--inline \
 			--timeout 0 \
 			--width "${VIDEO_WIDTH}" \
@@ -85,7 +86,13 @@ run_pipeline() {
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
-	else
+		then
+			echo "Audio pipeline failed; falling back to video-only this run" >&2
+			AUDIO_ENABLE=0
+		fi
+	fi
+
+	if [[ "${AUDIO_ENABLE}" -ne 1 ]]; then
 		"${LIBCAMERA_BIN_PATH}" \
 			--inline \
 			--timeout 0 \
