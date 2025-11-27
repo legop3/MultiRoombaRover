@@ -120,20 +120,20 @@ export default function SpectatorApp() {
 
   return (
     <SettingsProvider>
-      <div className="min-h-screen bg-black text-slate-100">
-        <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <section className="flex min-h-0 min-w-0 flex-col gap-0.5">
+      <div className="min-h-screen bg-black text-slate-100 md:h-screen md:overflow-hidden">
+        <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:overflow-y-auto">
             <RoverRow roster={roster} frames={frames} videoSources={videoSources} session={session} />
             <SecondaryRow />
           </section>
-          <section className="grid min-h-0 min-w-0 grid-rows-[1fr_1.2fr_auto] gap-0.5">
-            <div className="min-h-0 min-w-0 max-h-1/3">
-              <UserListPanel hideNicknameForm hideHeader fillHeight />
+          <section className="grid min-h-0 min-w-0 gap-0.5 md:h-full grid-rows-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
+            <div className="min-h-0 min-w-0 overflow-hidden">
+              <UserListPanel hideNicknameForm hideHeader fillHeight className="h-full" />
             </div>
-            <div className="min-h-0 min-w-0 max-h-1/3">
+            <div className="min-h-0 min-w-0 overflow-hidden">
               <ChatPanel hideInput hideSpectatorNotice fillHeight />
             </div>
-            <div className="min-h-0 min-w-0">
+            <div className="min-h-0 min-w-0 overflow-hidden">
               <LogsRow />
             </div>
           </section>
