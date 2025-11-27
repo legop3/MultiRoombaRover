@@ -152,6 +152,15 @@ install_audio_support() {
 	if ! boot_config="$(find_boot_config)"; then
 		log "WARNING: unable to locate /boot config.txt; please enable googlevoicehat-soundcard overlay manually"
 	else
+		# Ensure onboard audio is disabled (prevents card index flapping)
+		if grep -Eq '^\s*dtparam=audio=on\b' "$boot_config"; then
+			log "Disabling onboard audio (dtparam=audio=on -> off) in $boot_config"
+			sed -i 's/^\s*dtparam=audio=on\b/# roverd disabled onboard audio\ndtparam=audio=off/' "$boot_config"
+		fi
+		if ! grep -Eq '^\s*dtparam=audio=off\b' "$boot_config"; then
+			log "Adding dtparam=audio=off to $boot_config"
+			echo "dtparam=audio=off" >> "$boot_config"
+		fi
 		if ! grep -Eq '^\s*dtoverlay=googlevoicehat-soundcard\b' "$boot_config"; then
 			local backup="${boot_config}.roverd.$(date +%Y%m%d%H%M%S).bak"
 			cp "$boot_config" "$backup"
@@ -159,7 +168,6 @@ install_audio_support() {
 				echo ""
 				echo "# Added by roverd installer to enable Google AIY v1 sound card"
 				echo "dtoverlay=googlevoicehat-soundcard"
-				echo "dtparam=audio=off"
 			} >> "$boot_config"
 			log "Enabled googlevoicehat-soundcard overlay in $boot_config (backup at $backup). Reboot required."
 		else
