@@ -23,6 +23,11 @@ AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
 AUDIO_RATE="${AUDIO_RATE:-16000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
+
+# Normalize device if env still says "default"
+if [[ "${AUDIO_DEVICE}" == "default" ]]; then
+	AUDIO_DEVICE="plughw:0,0"
+fi
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
