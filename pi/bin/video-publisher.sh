@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Disable history expansion so PUBLISH_URL values with "!" are safe when sourcing env files.
+set +H
 
 ENV_FILE="${VIDEO_ENV_FILE:-/var/lib/roverd/video.env}"
 
@@ -10,7 +12,6 @@ fi
 
 # shellcheck disable=SC1090
 source "$ENV_FILE"
-
 : "${PUBLISH_URL:?PUBLISH_URL not set in ${ENV_FILE}}"
 
 VIDEO_WIDTH="${VIDEO_WIDTH:-1920}"
@@ -18,7 +19,7 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
-AUDIO_DEVICE="${AUDIO_DEVICE:-default}"
+AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
 AUDIO_RATE="${AUDIO_RATE:-16000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
