@@ -36,6 +36,7 @@ const client = new Client({
 });
 
 const channelCache = new Map();
+let skippedFirstModeAnnouncement = false;
 
 function sanitizeMentions(text) {
   if (!text) return '';
@@ -268,6 +269,11 @@ function handleBusEvent(event) {
   const roles = discordConfig.roles || {};
   switch (type) {
     case 'mode.changed':
+      if (!skippedFirstModeAnnouncement) {
+        skippedFirstModeAnnouncement = true;
+        updatePresence();
+        break;
+      }
       announce({
         channelId: channels.announcements,
         pingRoleId: roles.announcementPing || null,
