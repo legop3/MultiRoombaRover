@@ -130,7 +130,7 @@ func LoadConfig(path string) (*Config, error) {
 			VideoBitrate:   3000000,
 		},
 		CameraServo: CameraServoConfig{
-			Pin:          19,
+			Pin:          12,
 			FreqHz:       50,
 			CycleLen:     20000,
 			MinPulseUs:   900,

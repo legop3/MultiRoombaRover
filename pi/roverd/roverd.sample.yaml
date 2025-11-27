@@ -27,7 +27,7 @@ media:
   healthInterval: 30s
 cameraServo:
   enabled: false
-  pin: 19
+  pin: 12
   freqHz: 50
   cycleLen: 20000
   minPulseUs: 900

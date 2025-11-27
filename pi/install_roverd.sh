@@ -112,7 +112,7 @@ ensure_pwm_overlay() {
 		log "WARNING: unable to locate /boot config.txt; please ensure dtoverlay=pwm-2chan is added manually for servo support"
 		return
 	fi
-	if grep -Eq '^\s*dtoverlay=pwm(-2chan)?\b' "$boot_config"; then
+	if grep -Eq '^\s*dtoverlay=pwm(-2chan)?' "$boot_config"; then
 		log "PWM overlay already present in $boot_config"
 		return
 	fi
@@ -120,10 +120,10 @@ ensure_pwm_overlay() {
 	cp "$boot_config" "$backup"
 	{
 		echo ""
-		echo "# Added by roverd installer to expose PWM hardware for camera servo control"
-		echo "dtoverlay=pwm-2chan"
+		echo "# Added by roverd installer to expose PWM hardware for camera servo control on GPIO12/13 (leaves GPIO18/19 free for I2S)"
+		echo "dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4"
 	} >> "$boot_config"
-	log "Enabled dtoverlay=pwm-2chan in $boot_config (backup at $backup). Reboot required for changes to apply."
+	log "Enabled dtoverlay=pwm-2chan on GPIO12/13 in $boot_config (backup at $backup). Reboot required for changes to apply."
 }
 
 ensure_user roverd "dialout,gpio,video,render"
