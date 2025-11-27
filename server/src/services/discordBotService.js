@@ -289,6 +289,7 @@ function handleBusEvent(event) {
     case 'rover.unlocked':
       announce({
         channelId: channels.announcements,
+        pingRoleId: roles.announcementPing || null,
         color: 0x4caf50,
         title: 'Rover Unlocked',
         description: `${payload?.roverId} unlocked.`,

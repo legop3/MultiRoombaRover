@@ -12,6 +12,8 @@ const STATES = {
   LOCKED: 'locked',
 };
 
+const WAITING_UNLOCK_MS = 5 * 60 * 1000;
+
 const roverState = new Map(); // roverId -> state snapshot
 
 function getState(roverId) {
@@ -24,6 +26,7 @@ function getState(roverId) {
       dockedCharging: false,
       charging: false,
       batteryLocked: false,
+      waitingSince: null,
     });
   }
   return roverState.get(roverId);
@@ -127,7 +130,15 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
   }
 
   const waitingState = chargingState === 4;
-  const shouldUnlock = state.batteryLocked && (!dockedCharging || (isFull && waitingState));
+  if (waitingState && state.waitingSince == null) {
+    state.waitingSince = Date.now();
+  } else if (!waitingState && state.waitingSince != null) {
+    state.waitingSince = null;
+  }
+  const waitingLongEnough =
+    waitingState && state.waitingSince != null && Date.now() - state.waitingSince >= WAITING_UNLOCK_MS;
+
+  const shouldUnlock = state.batteryLocked && (!dockedCharging || waitingLongEnough);
 
   if (shouldUnlock) {
     logger.info('Unlocking rover after charge', {
@@ -135,11 +146,13 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
       isFull,
       docked: dockedCharging,
       waitingState,
+      waitedMs: state.waitingSince ? Date.now() - state.waitingSince : null,
     });
     lockRover(roverId, false, { reason: 'battery' });
     state.batteryLocked = false;
     state.warned = false;
     state.urgent = false;
+    state.waitingSince = null;
     publishEvent({
       source: 'batteryManager',
       type: 'battery.unlocked',
