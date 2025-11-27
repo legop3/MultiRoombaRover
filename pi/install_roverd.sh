@@ -161,6 +161,10 @@ install_audio_support() {
 			log "Adding dtparam=audio=off to $boot_config"
 			echo "dtparam=audio=off" >> "$boot_config"
 		fi
+		if ! grep -Eq '^\s*dtparam=i2s=on\b' "$boot_config"; then
+			log "Adding dtparam=i2s=on to $boot_config"
+			echo "dtparam=i2s=on" >> "$boot_config"
+		fi
 		if ! grep -Eq '^\s*dtoverlay=googlevoicehat-soundcard\b' "$boot_config"; then
 			local backup="${boot_config}.roverd.$(date +%Y%m%d%H%M%S).bak"
 			cp "$boot_config" "$backup"
