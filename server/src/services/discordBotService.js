@@ -91,11 +91,12 @@ async function fetchChannel(id) {
   return null;
 }
 
-async function sendToChannel(id, content, options = {}, allowedMentions = { parse: [] }) {
+async function sendToChannel(id, content, options = {}, allowedMentions = { parse: [] }, sanitizeContent = true) {
   const channel = await fetchChannel(id);
   if (!channel) return;
   try {
-    await channel.send({ content: sanitizeMentions(content), allowedMentions, ...options });
+    const messageContent = sanitizeContent ? sanitizeMentions(content) : content;
+    await channel.send({ content: messageContent, allowedMentions, ...options });
   } catch (err) {
     logger.warn('Failed to send Discord message', { id, error: err.message });
   }
@@ -260,7 +261,13 @@ async function announce({ channelId, content, pingRoleId, color, title, descript
   const prefix = pingRoleId ? `<@&${pingRoleId}> ` : '';
   const embed = buildEmbed({ title, description, color });
   const allowedMentions = pingRoleId ? { roles: [pingRoleId], parse: [] } : { parse: [] };
-  await sendToChannel(channelId, `${prefix}${content || ''}`.trim(), { embeds: [embed] }, allowedMentions);
+  await sendToChannel(
+    channelId,
+    `${prefix}${content || ''}`.trim(),
+    { embeds: [embed] },
+    allowedMentions,
+    !pingRoleId, // keep role mention intact when pinging
+  );
 }
 
 function handleBusEvent(event) {

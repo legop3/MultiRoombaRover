@@ -14,6 +14,10 @@ const { loadConfig } = require('../helpers/configLoader');
 const discordInvite = loadConfig().discord?.invite || null;
 logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configured');
 
+const ACTIVITY_SYNC_COOLDOWN_MS = 3000;
+let lastActivitySync = 0;
+let pendingActivitySync = null;
+
 function buildUserEntry(socket) {
   if (!socket) return null;
   const role = getRole(socket);
@@ -107,7 +111,32 @@ turnEvents.on('activeDriver', () => {
   logger.info('Active driver change; syncing all clients');
   syncAll();
 });
-turnEvents.on('queue', () => {
+turnEvents.on('queue', (event = {}) => {
+  const { reason } = event;
+  if (reason === 'activity') {
+    const now = Date.now();
+    const elapsed = now - lastActivitySync;
+    if (elapsed >= ACTIVITY_SYNC_COOLDOWN_MS) {
+      lastActivitySync = now;
+      logger.info('Turn activity; syncing all clients (immediate)');
+      syncAll();
+      return;
+    }
+    if (!pendingActivitySync) {
+      const delay = ACTIVITY_SYNC_COOLDOWN_MS - elapsed;
+      pendingActivitySync = setTimeout(() => {
+        lastActivitySync = Date.now();
+        pendingActivitySync = null;
+        logger.info('Turn activity; syncing all clients (delayed)');
+        syncAll();
+      }, delay);
+    }
+    return;
+  }
+  if (pendingActivitySync) {
+    clearTimeout(pendingActivitySync);
+    pendingActivitySync = null;
+  }
   logger.info('Turn queue change; syncing all clients');
   syncAll();
 });

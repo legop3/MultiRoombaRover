@@ -268,7 +268,7 @@ function recordActivity(roverId, socketId) {
   idleDisarmed.set(roverId, true);
   clearTimeout(idleTimers.get(roverId));
   idleDeadlines.delete(roverId);
-  turnEvents.emit('queue', { roverId });
+  turnEvents.emit('queue', { roverId, reason: 'activity' });
 }
 
 modeEvents.on('change', (mode) => {
