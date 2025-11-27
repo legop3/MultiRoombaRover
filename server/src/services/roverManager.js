@@ -118,6 +118,7 @@ function getRoster() {
     maxWheelSpeed: record.meta?.maxWheelSpeed,
     media: record.meta?.media,
     cameraServo: record.meta?.cameraServo,
+    audio: record.meta?.audio,
     locked: record.locked,
     lockReason: record.lockReason,
     lastSeen: record.lastSeen,

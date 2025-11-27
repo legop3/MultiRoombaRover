@@ -6,6 +6,7 @@ const { getRole } = require('./roleService');
 const { describeAssignment } = require('./assignmentService');
 const roverManager = require('./roverManager');
 const { getNickname } = require('./nicknameService');
+const { issueCommand } = require('./commandService');
 
 const RATE_LIMIT_WINDOW_MS = 8000;
 const RATE_LIMIT_MAX = 5;
@@ -66,6 +67,7 @@ function buildMessage(socket, text, meta = {}) {
     roverId,
     fromDiscord: Boolean(meta.fromDiscord),
     text,
+    tts: meta.tts || null,
   };
 }
 
@@ -73,7 +75,20 @@ function broadcastMessage(message) {
   publishEvent({ source: 'chat', type: 'chat:message', payload: message });
 }
 
-function handleIncoming({ text } = {}, socket, cb = () => {}) {
+function normalizeTtsOptions(raw = {}) {
+  if (!raw || typeof raw !== 'object') return null;
+  const speak = raw.speak !== false;
+  if (!speak) return null;
+  const engine = typeof raw.engine === 'string' && raw.engine.toLowerCase() === 'espeak' ? 'espeak' : 'flite';
+  const voice = typeof raw.voice === 'string' ? raw.voice.trim() : undefined;
+  let pitch = Number.isFinite(raw.pitch) ? Math.round(raw.pitch) : undefined;
+  if (typeof pitch === 'number') {
+    pitch = Math.max(0, Math.min(99, pitch));
+  }
+  return { speak, engine, voice, pitch };
+}
+
+function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
   const role = getRole(socket);
   // if (role === 'spectator') {
   //   cb({ error: 'Spectators cannot chat' });
@@ -104,10 +119,37 @@ function handleIncoming({ text } = {}, socket, cb = () => {}) {
     cb({ error: 'Message looks like spam' });
     return;
   }
-  const message = buildMessage(socket, clean, { fromDiscord: false });
+  const roverId = resolveRoverId(socket?.id);
+  const ttsOptions = normalizeTtsOptions(tts);
+  const message = buildMessage(socket, clean, { fromDiscord: false, roverId, tts: ttsOptions });
   logger.info('Chat message', { socket: socket.id, roverId: message.roverId });
   broadcastMessage(message);
+  maybeSpeak(socket, message, ttsOptions);
   cb({ success: true });
+}
+
+function maybeSpeak(socket, message, ttsOptions) {
+  if (!ttsOptions || !message?.roverId) return;
+  const record = roverManager.rovers.get(message.roverId);
+  const audio = record?.meta?.audio || {};
+  const ttsEnabled = Boolean(audio.ttsEnabled);
+  if (!ttsEnabled) return;
+  if (!roverManager.canDrive(message.roverId, socket)) return;
+  try {
+    issueCommand(message.roverId, {
+      type: 'tts',
+      tts: {
+        text: message.text,
+        engine: ttsOptions.engine,
+        voice: ttsOptions.voice,
+        pitch: ttsOptions.pitch,
+        speak: true,
+      },
+    });
+    logger.info('TTS sent', { roverId: message.roverId, engine: ttsOptions.engine, socket: socket.id });
+  } catch (err) {
+    logger.warn('TTS send failed', { roverId: message.roverId, error: err.message });
+  }
 }
 
 function sendExternalMessage({ text, nickname = 'Discord', role = 'admin', roverId = null }) {

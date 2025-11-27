@@ -25,13 +25,27 @@ function displayName(message) {
   return message.nickname || message.socketId?.slice(0, 6) || 'unknown';
 }
 
+const FLITE_VOICES = ['kal', 'rms', 'slt', 'ksp', 'bdl'];
+const ESPEAK_PITCHES = Array.from({ length: 10 }, (_, idx) => idx * 10);
+
 export default function ChatPanel({ hideInput = false, hideSpectatorNotice = false, fillHeight = false }) {
   const { session } = useSession();
   const { messages, sendMessage, registerInputRef, onInputFocus, onInputBlur, blurChat } = useChat();
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [speak, setSpeak] = useState(false);
+  const [engine, setEngine] = useState('flite');
+  const [voice, setVoice] = useState('rms');
+  const [pitch, setPitch] = useState(50);
   const canChat = session?.role !== 'spectator';
   const listRef = useRef(null);
+  const currentRoverId = session?.assignment?.roverId || null;
+
+  const rover = useMemo(
+    () => session?.roster?.find((entry) => String(entry.id) === String(currentRoverId)) || null,
+    [currentRoverId, session?.roster],
+  );
+  const ttsSupported = Boolean(rover?.audio?.ttsEnabled);
 
   const sorted = useMemo(() => messages.slice(-200), [messages]);
 
@@ -40,6 +54,22 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [sorted]);
 
+  useEffect(() => {
+    if (ttsSupported) {
+      setSpeak(true);
+    } else {
+      setSpeak(false);
+    }
+  }, [ttsSupported]);
+
+  const ttsPayload = useMemo(() => {
+    if (!ttsSupported || !speak) return null;
+    if (engine === 'espeak') {
+      return { speak: true, engine, pitch };
+    }
+    return { speak: true, engine, voice };
+  }, [engine, pitch, speak, ttsSupported, voice]);
+
   async function handleSend(event) {
     event.preventDefault();
     if (!canChat || hideInput) return;
@@ -47,7 +77,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
     if (!clean) return;
     setSending(true);
     try {
-      await sendMessage(clean);
+      await sendMessage(clean, ttsPayload);
       setDraft('');
       blurChat();
     } catch (err) {
@@ -109,6 +139,52 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
             placeholder={canChat ? 'Type a message…' : hideSpectatorNotice ? '' : 'Spectators cannot chat'}
             disabled={!canChat}
           />
+          {ttsSupported && (
+            <div className="flex items-center gap-0.5">
+              <label className="flex items-center gap-0.25 text-xs text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={speak}
+                  onChange={(e) => setSpeak(e.target.checked)}
+                  className="accent-cyan-500"
+                />
+                <span>Speak</span>
+              </label>
+              <select
+                value={engine}
+                onChange={(e) => setEngine(e.target.value)}
+                className="field-input text-xs"
+              >
+                <option value="flite">flite</option>
+                <option value="espeak">espeak</option>
+              </select>
+              {engine === 'flite' ? (
+                <select
+                  value={voice}
+                  onChange={(e) => setVoice(e.target.value)}
+                  className="field-input text-xs"
+                >
+                  {FLITE_VOICES.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={pitch}
+                  onChange={(e) => setPitch(Number(e.target.value))}
+                  className="field-input text-xs"
+                >
+                  {ESPEAK_PITCHES.map((p) => (
+                    <option key={p} value={p}>
+                      pitch {p}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
           <button type="submit" disabled={!canChat || sending} className="button-dark disabled:opacity-50">
             {sending ? '...' : 'Send'}
           </button>

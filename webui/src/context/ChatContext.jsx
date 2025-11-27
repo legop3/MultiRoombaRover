@@ -51,9 +51,9 @@ export function ChatProvider({ children }) {
   }, [playSound, session?.socketId, socket]);
 
   const sendMessage = useCallback(
-    (text) =>
+    (text, tts = null) =>
       new Promise((resolve, reject) => {
-        socket.emit('chat:send', { text }, (resp = {}) => {
+        socket.emit('chat:send', { text, tts }, (resp = {}) => {
           if (resp.error) {
             reject(new Error(resp.error));
           } else {

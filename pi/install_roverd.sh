@@ -146,6 +146,41 @@ log "Installed roverd systemd unit"
 install_video_deps
 ensure_pwm_overlay
 
+# Enable Google AIY v1 sound card, ALSA defaults, and TTS engines
+install_audio_support() {
+	local boot_config
+	if ! boot_config="$(find_boot_config)"; then
+		log "WARNING: unable to locate /boot config.txt; please enable googlevoicehat-soundcard overlay manually"
+	else
+		if ! grep -Eq '^\s*dtoverlay=googlevoicehat-soundcard\b' "$boot_config"; then
+			local backup="${boot_config}.roverd.$(date +%Y%m%d%H%M%S).bak"
+			cp "$boot_config" "$backup"
+			{
+				echo ""
+				echo "# Added by roverd installer to enable Google AIY v1 sound card"
+				echo "dtoverlay=googlevoicehat-soundcard"
+				echo "dtparam=audio=off"
+			} >> "$boot_config"
+			log "Enabled googlevoicehat-soundcard overlay in $boot_config (backup at $backup). Reboot required."
+		else
+			log "googlevoicehat-soundcard overlay already present in $boot_config"
+		fi
+	fi
+	if [[ -f pi/asound.conf ]]; then
+		install -m 0644 pi/asound.conf /etc/asound.conf
+		log "Installed ALSA config to /etc/asound.conf"
+		alsa_reload_notice=1
+	else
+		log "WARNING: pi/asound.conf missing; skipping ALSA config install"
+	fi
+	log "Installing TTS/audio packages (flite, espeak)..."
+	apt-get update
+	apt-get install -y --no-install-recommends flite espeak
+	if [[ "${alsa_reload_notice:-0}" -eq 1 ]]; then
+		log "ALSA config updated; reboot recommended for overlay + audio changes"
+	fi
+}
+
 # Install video publisher assets
 install -D -o root -g root -m 0755 pi/bin/video-publisher.sh /usr/local/bin/video-publisher
 install -m 0644 pi/systemd/video-publisher.service /etc/systemd/system/video-publisher.service
@@ -158,10 +193,17 @@ VIDEO_WIDTH=1280
 VIDEO_HEIGHT=720
 VIDEO_FPS=30
 VIDEO_BITRATE=3000000
+AUDIO_ENABLE=1
+AUDIO_DEVICE=default
+AUDIO_RATE=16000
+AUDIO_CHANNELS=1
+AUDIO_BITRATE=64000
 ENV
 	chown roverd:roverd /var/lib/roverd/video.env
 	chmod 0640 /var/lib/roverd/video.env
 fi
+
+install_audio_support
 
 systemctl daemon-reload
 systemctl enable roverd.service

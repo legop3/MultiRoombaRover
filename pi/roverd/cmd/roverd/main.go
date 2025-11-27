@@ -21,7 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	if err := roverd.UpdatePublisherEnv(cfg.Media); err != nil {
+	if err := roverd.UpdatePublisherEnv(cfg.Media, cfg.Audio); err != nil {
 		log.Fatalf("prepare media env: %v", err)
 	}
 
@@ -55,7 +55,7 @@ func main() {
 
 	adapter := roverd.NewSerialAdapter(serialPort, logger)
 
-	mediaSupervisor := roverd.NewMediaSupervisor(cfg.Media, logger)
+	mediaSupervisor := roverd.NewMediaSupervisor(cfg.Media, cfg.Audio, logger)
 	if mediaSupervisor != nil {
 		mediaSupervisor.Start(ctx)
 	}

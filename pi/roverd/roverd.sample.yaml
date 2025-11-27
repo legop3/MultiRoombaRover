@@ -37,3 +37,13 @@ cameraServo:
   homeAngle: 0
   nudgeDegrees: 2
   allowRawPulse: false
+audio:
+  captureEnabled: true
+  captureDevice: default
+  sampleRate: 16000
+  channels: 1
+  bitrate: 64000
+  ttsEnabled: false
+  defaultEngine: flite
+  defaultVoice: rms
+  defaultPitch: 50

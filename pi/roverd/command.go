@@ -7,6 +7,7 @@ type helloMessage struct {
 	MaxWheelSpeed int               `json:"maxWheelSpeed"`
 	Media         MediaConfig       `json:"media"`
 	CameraServo   CameraServoConfig `json:"cameraServo"`
+	Audio         AudioConfig       `json:"audio"`
 }
 
 type sensorMessage struct {
@@ -24,6 +25,7 @@ type inboundMessage struct {
 	SensorStream *sensorStreamPayload `json:"sensorStream,omitempty"`
 	Media        *mediaCommand        `json:"media,omitempty"`
 	Servo        *servoPayload        `json:"servo,omitempty"`
+	TTS          *ttsPayload          `json:"tts,omitempty"`
 }
 
 type driveDirectPayload struct {
@@ -49,6 +51,14 @@ type servoPayload struct {
 	Angle   *float64 `json:"angle,omitempty"`
 	Nudge   *float64 `json:"nudge,omitempty"`
 	PulseUs *int     `json:"pulseUs,omitempty"`
+}
+
+type ttsPayload struct {
+	Text   string `json:"text"`
+	Engine string `json:"engine,omitempty"`
+	Voice  string `json:"voice,omitempty"`
+	Pitch  int    `json:"pitch,omitempty"`
+	Speak  bool   `json:"speak,omitempty"`
 }
 
 type ackMessage struct {

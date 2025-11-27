@@ -13,13 +13,14 @@ import (
 
 type MediaSupervisor struct {
 	cfg           MediaConfig
+	audio         AudioConfig
 	logger        *log.Logger
 	client        *http.Client
 	checkInterval time.Duration
 }
 
-func NewMediaSupervisor(cfg MediaConfig, logger *log.Logger) *MediaSupervisor {
-	if err := UpdatePublisherEnv(cfg); err != nil {
+func NewMediaSupervisor(cfg MediaConfig, audio AudioConfig, logger *log.Logger) *MediaSupervisor {
+	if err := UpdatePublisherEnv(cfg, audio); err != nil {
 		logger.Printf("media supervisor: update env failed: %v", err)
 	}
 	if !cfg.Manage || cfg.Service == "" {
@@ -35,6 +36,7 @@ func NewMediaSupervisor(cfg MediaConfig, logger *log.Logger) *MediaSupervisor {
 	}
 	return &MediaSupervisor{
 		cfg:           cfg,
+		audio:         audio,
 		logger:        logger,
 		client:        client,
 		checkInterval: interval,
@@ -45,7 +47,7 @@ func (m *MediaSupervisor) Start(ctx context.Context) {
 	if m == nil {
 		return
 	}
-	if err := UpdatePublisherEnv(m.cfg); err != nil {
+	if err := UpdatePublisherEnv(m.cfg, m.audio); err != nil {
 		m.logger.Printf("media supervisor: update env failed: %v", err)
 	}
 	if m.cfg.HealthURL == "" || m.client == nil {
@@ -76,7 +78,7 @@ func (m *MediaSupervisor) HandleAction(ctx context.Context, action string) error
 	if m == nil {
 		return errors.New("media supervisor disabled")
 	}
-	if err := UpdatePublisherEnv(m.cfg); err != nil {
+	if err := UpdatePublisherEnv(m.cfg, m.audio); err != nil {
 		return err
 	}
 	switch action {

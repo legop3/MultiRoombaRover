@@ -71,6 +71,7 @@ func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
 		MaxWheelSpeed: c.cfg.MaxWheelMMs,
 		Media:         c.cfg.Media,
 		CameraServo:   c.cfg.CameraServo,
+		Audio:         c.cfg.Audio,
 	}
 	c.log.Printf("sending hello (camera servo enabled=%v pin=%d)", msg.CameraServo.Enabled, msg.CameraServo.Pin)
 	return writeJSON(ctx, conn, msg)
@@ -150,6 +151,8 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 			return fmt.Errorf("camera servo disabled")
 		}
 		return c.handleServoCommand(msg.Servo)
+	case msg.TTS != nil:
+		return c.handleTTSPayload(msg.TTS)
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
 	}

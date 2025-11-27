@@ -53,6 +53,18 @@ type BatteryConfig struct {
 	Urgent int `yaml:"urgent"`
 }
 
+type AudioConfig struct {
+	CaptureEnabled bool   `yaml:"captureEnabled" json:"captureEnabled"`
+	CaptureDevice  string `yaml:"captureDevice" json:"captureDevice,omitempty"`
+	SampleRate     int    `yaml:"sampleRate" json:"sampleRate,omitempty"`
+	Channels       int    `yaml:"channels" json:"channels,omitempty"`
+	Bitrate        int    `yaml:"bitrate" json:"bitrate,omitempty"`
+	TTSEnabled     bool   `yaml:"ttsEnabled" json:"ttsEnabled"`
+	DefaultEngine  string `yaml:"defaultEngine" json:"defaultEngine,omitempty"`
+	DefaultVoice   string `yaml:"defaultVoice" json:"defaultVoice,omitempty"`
+	DefaultPitch   int    `yaml:"defaultPitch" json:"defaultPitch,omitempty"`
+}
+
 type MediaConfig struct {
 	PublishURL     string   `yaml:"publishUrl" json:"publishUrl,omitempty"`
 	PublishPort    int      `yaml:"publishPort" json:"-"`
@@ -89,6 +101,7 @@ type Config struct {
 	MaxWheelMMs int               `yaml:"maxWheelSpeed"`
 	Media       MediaConfig       `yaml:"media"`
 	CameraServo CameraServoConfig `yaml:"cameraServo"`
+	Audio       AudioConfig       `yaml:"audio"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -126,6 +139,17 @@ func LoadConfig(path string) (*Config, error) {
 			MaxAngle:     30,
 			HomeAngle:    0,
 			NudgeDegrees: 2,
+		},
+		Audio: AudioConfig{
+			CaptureEnabled: true,
+			CaptureDevice:  "default",
+			SampleRate:     16000,
+			Channels:       1,
+			Bitrate:        64000,
+			TTSEnabled:     false,
+			DefaultEngine:  "flite",
+			DefaultVoice:   "rms",
+			DefaultPitch:   50,
 		},
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -180,6 +204,7 @@ func LoadConfig(path string) (*Config, error) {
 	if err := validateServoConfig(&cfg.CameraServo); err != nil {
 		return nil, fmt.Errorf("cameraServo: %w", err)
 	}
+	validateAudioConfig(&cfg.Audio)
 	return &cfg, nil
 }
 
@@ -217,6 +242,30 @@ func clampFloat(value, min, max float64) float64 {
 		return max
 	}
 	return value
+}
+
+func validateAudioConfig(cfg *AudioConfig) {
+	if cfg.CaptureEnabled && cfg.CaptureDevice == "" {
+		cfg.CaptureDevice = "default"
+	}
+	if cfg.SampleRate <= 0 {
+		cfg.SampleRate = 16000
+	}
+	if cfg.Channels <= 0 {
+		cfg.Channels = 1
+	}
+	if cfg.Bitrate <= 0 {
+		cfg.Bitrate = 64000
+	}
+	if cfg.DefaultEngine == "" {
+		cfg.DefaultEngine = "flite"
+	}
+	if cfg.DefaultVoice == "" {
+		cfg.DefaultVoice = "rms"
+	}
+	if cfg.DefaultPitch <= 0 {
+		cfg.DefaultPitch = 50
+	}
 }
 
 func derivePublishURL(serverURL, roverName string, port int) (string, error) {

@@ -17,6 +17,11 @@ VIDEO_WIDTH="${VIDEO_WIDTH:-1920}"
 VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
+AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
+AUDIO_DEVICE="${AUDIO_DEVICE:-default}"
+AUDIO_RATE="${AUDIO_RATE:-16000}"
+AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
+AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -44,33 +49,71 @@ fi
 FLIP_ARGS=(--rotation 180)
 
 run_pipeline() {
-	"${LIBCAMERA_BIN_PATH}" \
-		--inline \
-		--timeout 0 \
-		--width "${VIDEO_WIDTH}" \
-		--height "${VIDEO_HEIGHT}" \
-		"${FLIP_ARGS[@]}" \
-		--framerate "${VIDEO_FPS}" \
-		--bitrate "${VIDEO_BITRATE}" \
-		--codec h264 \
-		--profile baseline \
-		--denoise cdn_off \
-		--nopreview \
-		--awb custom \
-		--awbgains 1.5,1.8 \
-		--output - \
-		| "${FFMPEG_BIN_PATH}" \
-			-hide_banner \
-			-loglevel warning \
-			-fflags nobuffer \
-			-use_wallclock_as_timestamps 1 \
-			-f h264 \
-			-i pipe:0 \
-			-c:v copy \
-			-an \
-			-flush_packets 1 \
-			-f mpegts \
-			"${PUBLISH_URL}"
+	if [[ "${AUDIO_ENABLE}" -eq 1 ]]; then
+		"${LIBCAMERA_BIN_PATH}" \
+			--inline \
+			--timeout 0 \
+			--width "${VIDEO_WIDTH}" \
+			--height "${VIDEO_HEIGHT}" \
+			"${FLIP_ARGS[@]}" \
+			--framerate "${VIDEO_FPS}" \
+			--bitrate "${VIDEO_BITRATE}" \
+			--codec h264 \
+			--profile baseline \
+			--denoise cdn_off \
+			--nopreview \
+			--awb custom \
+			--awbgains 1.5,1.8 \
+			--output - \
+			| "${FFMPEG_BIN_PATH}" \
+				-hide_banner \
+				-loglevel warning \
+				-fflags nobuffer \
+				-use_wallclock_as_timestamps 1 \
+				-f h264 \
+				-i pipe:0 \
+				-f alsa \
+				-thread_queue_size 512 \
+				-ac "${AUDIO_CHANNELS}" \
+				-ar "${AUDIO_RATE}" \
+				-i "${AUDIO_DEVICE}" \
+				-c:v copy \
+				-c:a aac \
+				-b:a "${AUDIO_BITRATE}" \
+				-ac "${AUDIO_CHANNELS}" \
+				-ar "${AUDIO_RATE}" \
+				-flush_packets 1 \
+				-f mpegts \
+				"${PUBLISH_URL}"
+	else
+		"${LIBCAMERA_BIN_PATH}" \
+			--inline \
+			--timeout 0 \
+			--width "${VIDEO_WIDTH}" \
+			--height "${VIDEO_HEIGHT}" \
+			"${FLIP_ARGS[@]}" \
+			--framerate "${VIDEO_FPS}" \
+			--bitrate "${VIDEO_BITRATE}" \
+			--codec h264 \
+			--profile baseline \
+			--denoise cdn_off \
+			--nopreview \
+			--awb custom \
+			--awbgains 1.5,1.8 \
+			--output - \
+			| "${FFMPEG_BIN_PATH}" \
+				-hide_banner \
+				-loglevel warning \
+				-fflags nobuffer \
+				-use_wallclock_as_timestamps 1 \
+				-f h264 \
+				-i pipe:0 \
+				-c:v copy \
+				-an \
+				-flush_packets 1 \
+				-f mpegts \
+				"${PUBLISH_URL}"
+	fi
 }
 
 while true; do
