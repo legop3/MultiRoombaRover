@@ -38,7 +38,7 @@ AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
 AUDIO_OUT_RATE="${AUDIO_OUT_RATE:-16000}"
 AUDIO_OUT_CHANNELS="${AUDIO_OUT_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-32000}"
-AUDIO_FORMAT="${AUDIO_FORMAT:-s32}"
+AUDIO_FORMAT="${AUDIO_FORMAT:-s32le}"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -121,11 +121,12 @@ run_pipeline() {
 			-thread_queue_size 512 \
 			-f h264 \
 			-i pipe:0 \
-			-thread_queue_size 512 \
-			-f alsa \
-			-ar "${AUDIO_RATE}" \
-			-ac "${AUDIO_CHANNELS}" \
-			-i "${AUDIO_DEVICE}" \
+				-thread_queue_size 512 \
+				-f alsa \
+				-ar "${AUDIO_RATE}" \
+				-ac "${AUDIO_CHANNELS}" \
+				-sample_fmt "${AUDIO_FORMAT}" \
+				-i "${AUDIO_DEVICE}" \
 			-map 0:v:0 -map 1:a:0 \
 			-c:v copy \
 			-c:a "${AUDIO_CODEC}" \
