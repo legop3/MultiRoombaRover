@@ -34,7 +34,9 @@ AUDIO_CODEC="${AUDIO_CODEC:-pcm_s32le}"
 # Keep the audio path simple for the Pi Zero; default to raw PCM (no encoding) and honor overrides.
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
-AUDIO_FORMAT="${AUDIO_FORMAT:-s32le}"
+# AUDIO_FORMAT is the ALSA format; FFmpeg expects lowercase.
+AUDIO_FORMAT="${AUDIO_FORMAT:-S32_LE}"
+AUDIO_FORMAT_FFMPEG="$(printf '%s' "${AUDIO_FORMAT}" | tr 'A-Z' 'a-z')"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -65,12 +67,18 @@ run_pipeline() {
 		rm -f "${AUDIO_FIFO}"
 		mkfifo "${AUDIO_FIFO}"
 		# Background ALSA capture; keep it simple to avoid CPU on ffmpeg.
-		arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
-		ARECORD_PID=$!
-		trap 'kill "${ARECORD_PID}" >/dev/null 2>&1 || true; wait "${ARECORD_PID}" 2>/dev/null || true; rm -f "${AUDIO_FIFO}"' EXIT INT TERM
+		if ! arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
+		then
+			echo "Audio capture failed (arecord); falling back to video-only" >&2
+			AUDIO_ENABLE=0
+			rm -f "${AUDIO_FIFO}"
+		else
+			ARECORD_PID=$!
+			trap 'kill "${ARECORD_PID}" >/dev/null 2>&1 || true; wait "${ARECORD_PID}" 2>/dev/null || true; rm -f "${AUDIO_FIFO}"' EXIT INT TERM
+		fi
 
 		# Try audio + video; if audio device is missing, fallback to video-only.
-		if ! "${LIBCAMERA_BIN_PATH}" \
+		if [[ "${AUDIO_ENABLE}" -eq 1 ]] && ! "${LIBCAMERA_BIN_PATH}" \
 			--inline \
 			--timeout 0 \
 			--width "${VIDEO_WIDTH}" \
@@ -93,7 +101,7 @@ run_pipeline() {
 				-thread_queue_size 512 \
 				-f h264 \
 				-i pipe:0 \
-				-f "${AUDIO_FORMAT}" \
+				-f "${AUDIO_FORMAT_FFMPEG}" \
 				-ar "${AUDIO_RATE}" \
 				-ac "${AUDIO_CHANNELS}" \
 				-i "${AUDIO_FIFO}" \
@@ -108,10 +116,13 @@ run_pipeline() {
 			echo "Audio pipeline failed; falling back to video-only this run" >&2
 			AUDIO_ENABLE=0
 		fi
-		kill "${ARECORD_PID}" >/dev/null 2>&1 || true
-		wait "${ARECORD_PID}" 2>/dev/null || true
-		rm -f "${AUDIO_FIFO}"
-		trap - EXIT INT TERM
+		if [[ -n "${ARECORD_PID:-}" ]]; then
+			kill "${ARECORD_PID}" >/dev/null 2>&1 || true
+			wait "${ARECORD_PID}" 2>/dev/null || true
+			rm -f "${AUDIO_FIFO}"
+			trap - EXIT INT TERM
+			unset ARECORD_PID
+		fi
 	fi
 
 	if [[ "${AUDIO_ENABLE}" -ne 1 ]]; then
