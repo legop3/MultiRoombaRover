@@ -82,15 +82,16 @@ run_pipeline() {
 				-f h264 \
 				-i pipe:0 \
 				-f alsa \
-				-thread_queue_size 1024 \
+				-thread_queue_size 2048 \
 				-ac "${AUDIO_CHANNELS}" \
 				-ar "${AUDIO_RATE}" \
 				-i "${AUDIO_DEVICE}" \
 				-c:v copy \
 				-c:a aac \
 				-b:a "${AUDIO_BITRATE}" \
-				-ac:a 1 \
-				-ar:a 24000 \
+				-ac:a "${AUDIO_CHANNELS}" \
+				-ar:a "${AUDIO_RATE}" \
+				-af "aresample=async=1:min_hard_comp=0.050:first_pts=0" \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
