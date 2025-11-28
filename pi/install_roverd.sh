@@ -185,6 +185,11 @@ install_audio_support() {
 	else
 		log "WARNING: pi/asound.conf missing; skipping ALSA config install"
 	fi
+
+	if [[ "${alsa_reload_notice:-0}" -eq 1 ]]; then
+		log "ALSA config updated; reboot recommended for overlay + audio changes"
+	fi
+
 	log "Installing TTS/audio packages (flite, espeak)..."
 	# check for flite and espeak before installing, and then install them if either is missing
 	if command -v flite >/dev/null 2>&1 && command -v espeak >/dev/null 2>&1; then
@@ -194,9 +199,6 @@ install_audio_support() {
 	
 	apt-get update
 	apt-get install -y --no-install-recommends flite espeak
-	if [[ "${alsa_reload_notice:-0}" -eq 1 ]]; then
-		log "ALSA config updated; reboot recommended for overlay + audio changes"
-	fi
 }
 
 # Install video publisher assets
