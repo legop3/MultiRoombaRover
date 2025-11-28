@@ -34,6 +34,7 @@ AUDIO_CODEC="${AUDIO_CODEC:-pcm_s32le}"
 # Keep the audio path simple for the Pi Zero; default to raw PCM (no encoding) and honor overrides.
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
+AUDIO_FORMAT="${AUDIO_FORMAT:-s32le}"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -59,6 +60,23 @@ fi
 
 run_pipeline() {
 	if [[ "${AUDIO_ENABLE}" -eq 1 ]]; then
+		# Capture audio with arecord into a FIFO so ffmpeg just muxes it.
+		AUDIO_FIFO="$(mktemp -u /tmp/roverd-audio.XXXXXX)"
+		rm -f "${AUDIO_FIFO}"
+		mkfifo "${AUDIO_FIFO}"
+		# Background ALSA capture; keep it simple to avoid CPU on ffmpeg.
+		arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
+		ARECORD_PID=$!
+		cleanup_audio() {
+			if [[ -n "${ARECORD_PID:-}" ]]; then
+				kill "${ARECORD_PID}" >/dev/null 2>&1 || true
+				wait "${ARECORD_PID}" 2>/dev/null || true
+				unset ARECORD_PID
+			}
+			rm -f "${AUDIO_FIFO:-}"
+		}
+		trap cleanup_audio EXIT INT TERM
+
 		# Try audio + video; if audio device is missing, fallback to video-only.
 		if ! "${LIBCAMERA_BIN_PATH}" \
 			--inline \
@@ -83,12 +101,10 @@ run_pipeline() {
 				-thread_queue_size 512 \
 				-f h264 \
 				-i pipe:0 \
-				-f alsa \
-				-guess_layout_max 0 \
-				-thread_queue_size 2048 \
-				-ac "${AUDIO_CHANNELS}" \
+				-f "${AUDIO_FORMAT}" \
 				-ar "${AUDIO_RATE}" \
-				-i "${AUDIO_DEVICE}" \
+				-ac "${AUDIO_CHANNELS}" \
+				-i "${AUDIO_FIFO}" \
 				-c:v copy \
 				-c:a "${AUDIO_CODEC}" \
 				-ar:a "${AUDIO_RATE}" \
@@ -100,6 +116,8 @@ run_pipeline() {
 			echo "Audio pipeline failed; falling back to video-only this run" >&2
 			AUDIO_ENABLE=0
 		fi
+		cleanup_audio
+		trap - EXIT INT TERM
 	fi
 
 	if [[ "${AUDIO_ENABLE}" -ne 1 ]]; then
