@@ -68,10 +68,10 @@ function startBridge(rawName, baseName) {
   logger.info('started bridge', { rawName, baseName });
 
   proc.stdout.on('data', (data) => {
-    logger.debug(data.toString().trim());
+    logger.info(data.toString().trim());
   });
   proc.stderr.on('data', (data) => {
-    logger.debug(data.toString().trim());
+    logger.info(data.toString().trim());
   });
   proc.on('exit', (code, signal) => {
     bridges.delete(rawName);
