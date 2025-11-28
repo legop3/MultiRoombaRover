@@ -18,6 +18,6 @@
 
 
 sudo systemctl restart roverd
-sudo systemctl restart audio-capture
+#sudo systemctl restart audio-capture
 sudo systemctl restart video-publisher
 sudo cat /var/lib/roverd/video.env
