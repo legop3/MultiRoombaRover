@@ -186,6 +186,12 @@ install_audio_support() {
 		log "WARNING: pi/asound.conf missing; skipping ALSA config install"
 	fi
 	log "Installing TTS/audio packages (flite, espeak)..."
+	# check for flite and espeak before installing, and then install them if either is missing
+	if command -v flite >/dev/null 2>&1 && command -v espeak >/dev/null 2>&1; then
+		log "TTS packages flite and espeak already installed; skipping apt install"
+		return
+	fi
+	
 	apt-get update
 	apt-get install -y --no-install-recommends flite espeak
 	if [[ "${alsa_reload_notice:-0}" -eq 1 ]]; then
