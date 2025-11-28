@@ -23,14 +23,14 @@ AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
 AUDIO_RATE="${AUDIO_RATE:-16000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
-AUDIO_FORMAT="${AUDIO_FORMAT:-s32le}"
+AUDIO_FORMAT="${AUDIO_FORMAT:-s32}"
 
 # Normalize device/rate aggressively to reduce CPU and match the HAT on card0
 AUDIO_DEVICE="hw:0,0"
 AUDIO_RATE=16000
 AUDIO_CHANNELS=2
 AUDIO_BITRATE=64000
-AUDIO_FORMAT="s32le"
+AUDIO_FORMAT="s32"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
