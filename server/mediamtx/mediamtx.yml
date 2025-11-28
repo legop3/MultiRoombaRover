@@ -42,4 +42,3 @@ paths:
   all:
     source: publisher
     sourceOnDemand: no
-    webrtcMaxPlayoutDelay: 0
