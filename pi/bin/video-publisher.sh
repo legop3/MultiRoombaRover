@@ -66,16 +66,30 @@ run_pipeline() {
 		AUDIO_FIFO="$(mktemp -u /tmp/roverd-audio.XXXXXX)"
 		rm -f "${AUDIO_FIFO}"
 		mkfifo "${AUDIO_FIFO}"
+		ACTIVE_AUDIO_DEVICE="${AUDIO_DEVICE}"
+		ACTIVE_AUDIO_FORMAT="${AUDIO_FORMAT}"
+		ACTIVE_AUDIO_CODEC="${AUDIO_CODEC}"
 		# Background ALSA capture; keep it simple to avoid CPU on ffmpeg.
-		if ! arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
+		if ! arecord -D "${ACTIVE_AUDIO_DEVICE}" -f "${ACTIVE_AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
 		then
-			echo "Audio capture failed (arecord); falling back to video-only" >&2
-			AUDIO_ENABLE=0
-			rm -f "${AUDIO_FIFO}"
+			echo "Audio capture failed (arecord, ${ACTIVE_AUDIO_DEVICE} ${ACTIVE_AUDIO_FORMAT}); trying fallback to plughw S16_LE" >&2
+			ACTIVE_AUDIO_DEVICE="plughw:0,0"
+			ACTIVE_AUDIO_FORMAT="S16_LE"
+			ACTIVE_AUDIO_CODEC="pcm_s16le"
+			if ! arecord -D "${ACTIVE_AUDIO_DEVICE}" -f "${ACTIVE_AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
+			then
+				echo "Audio capture failed (fallback); falling back to video-only" >&2
+				AUDIO_ENABLE=0
+				rm -f "${AUDIO_FIFO}"
+			else
+				ARECORD_PID=$!
+				trap 'kill "${ARECORD_PID}" >/dev/null 2>&1 || true; wait "${ARECORD_PID}" 2>/dev/null || true; rm -f "${AUDIO_FIFO}"' EXIT INT TERM
+			fi
 		else
 			ARECORD_PID=$!
 			trap 'kill "${ARECORD_PID}" >/dev/null 2>&1 || true; wait "${ARECORD_PID}" 2>/dev/null || true; rm -f "${AUDIO_FIFO}"' EXIT INT TERM
 		fi
+		ACTIVE_AUDIO_FORMAT_FFMPEG="$(printf '%s' "${ACTIVE_AUDIO_FORMAT}" | tr 'A-Z' 'a-z')"
 
 		# Try audio + video; if audio device is missing, fallback to video-only.
 		if [[ "${AUDIO_ENABLE}" -eq 1 ]] && ! "${LIBCAMERA_BIN_PATH}" \
@@ -101,12 +115,12 @@ run_pipeline() {
 				-thread_queue_size 512 \
 				-f h264 \
 				-i pipe:0 \
-				-f "${AUDIO_FORMAT_FFMPEG}" \
+				-f "${ACTIVE_AUDIO_FORMAT_FFMPEG}" \
 				-ar "${AUDIO_RATE}" \
 				-ac "${AUDIO_CHANNELS}" \
 				-i "${AUDIO_FIFO}" \
 				-c:v copy \
-				-c:a "${AUDIO_CODEC}" \
+				-c:a "${ACTIVE_AUDIO_CODEC}" \
 				-ar:a "${AUDIO_RATE}" \
 				-ac:a "${AUDIO_CHANNELS}" \
 				-flush_packets 1 \
