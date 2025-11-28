@@ -20,7 +20,7 @@ media:
   videoWidth: 1280
   videoHeight: 720
   videoFps: 30
-  videoBitrate: 3000000
+  videoBitrate: 2000000
   manage: true
   service: video-publisher.service
   healthUrl: ""

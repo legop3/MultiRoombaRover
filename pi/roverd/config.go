@@ -127,7 +127,7 @@ func LoadConfig(path string) (*Config, error) {
 			VideoWidth:     1280,
 			VideoHeight:    720,
 			VideoFPS:       30,
-			VideoBitrate:   3000000,
+			VideoBitrate:   2000000,
 		},
 		CameraServo: CameraServoConfig{
 			Pin:          12,
