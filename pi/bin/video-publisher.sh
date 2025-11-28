@@ -83,6 +83,8 @@ run_pipeline() {
 			--bitrate "${VIDEO_BITRATE}" \
 			--codec h264 \
 			--profile baseline \
+			--intra 15 \
+			--idrperiod 15 \
 			--denoise cdn_off \
 			--nopreview \
 			--awb custom \
@@ -109,6 +111,8 @@ run_pipeline() {
 				-application voip \
 				-frame_duration 60 \
 				-compression_level 0 \
+				-muxpreload 0 \
+				-muxdelay 0 \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
