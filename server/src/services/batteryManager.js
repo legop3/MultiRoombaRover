@@ -110,15 +110,33 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
     state.dockedCharging = false;
   }
 
+  const waitingState = chargingState === 4;
+  if (waitingState && state.waitingSince == null) {
+    state.waitingSince = Date.now();
+  } else if (!waitingState && state.waitingSince != null) {
+    state.waitingSince = null;
+  }
+  const waitingLongEnough =
+    waitingState && state.waitingSince != null && Date.now() - state.waitingSince >= WAITING_UNLOCK_MS;
+
+  const warnThreshold =
+    typeof config?.Warn === 'number' ? config.Warn : batteryState?.warn ?? null;
   const fullThreshold =
     typeof config?.Full === 'number' ? config.Full : batteryState?.full ?? null;
+  const chargeMah = batteryState?.charge ?? null;
+  let waitingPercent = batteryState?.percent ?? null;
+  if (chargeMah != null && warnThreshold != null && fullThreshold != null && fullThreshold > warnThreshold) {
+    waitingPercent = (chargeMah - warnThreshold) / (fullThreshold - warnThreshold);
+    waitingPercent = Math.max(0, Math.min(1, waitingPercent));
+  }
+
   const isFull =
     (batteryState?.charge != null && fullThreshold != null && batteryState.charge >= fullThreshold) ||
     (batteryState?.percent != null && batteryState.percent >= 0.99);
 
   const needsCharge = state.warned;
 
-  if (dockedCharging && lockable && needsCharge && !state.batteryLocked && !isFull) {
+  if (dockedCharging && lockable && needsCharge && !state.batteryLocked && !isFull && !waitingLongEnough) {
     logger.info('Auto-locking rover for charging', { roverId });
     lockRover(roverId, true, { reason: 'battery' });
     state.batteryLocked = true;
@@ -129,16 +147,8 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
     });
   }
 
-  const waitingState = chargingState === 4;
-  if (waitingState && state.waitingSince == null) {
-    state.waitingSince = Date.now();
-  } else if (!waitingState && state.waitingSince != null) {
-    state.waitingSince = null;
-  }
-  const waitingLongEnough =
-    waitingState && state.waitingSince != null && Date.now() - state.waitingSince >= WAITING_UNLOCK_MS;
-
-  const shouldUnlock = state.batteryLocked && (!dockedCharging || waitingLongEnough);
+  const waitingHalfOrMore = waitingPercent != null && waitingPercent >= 0.5;
+  const shouldUnlock = state.batteryLocked && waitingLongEnough && waitingHalfOrMore;
 
   if (shouldUnlock) {
     logger.info('Unlocking rover after charge', {
@@ -146,6 +156,7 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
       isFull,
       docked: dockedCharging,
       waitingState,
+      waitingPercent,
       waitedMs: state.waitingSince ? Date.now() - state.waitingSince : null,
     });
     lockRover(roverId, false, { reason: 'battery' });
