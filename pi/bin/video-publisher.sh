@@ -67,15 +67,7 @@ run_pipeline() {
 		# Background ALSA capture; keep it simple to avoid CPU on ffmpeg.
 		arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
 		ARECORD_PID=$!
-		cleanup_audio() {
-			if [[ -n "${ARECORD_PID:-}" ]]; then
-				kill "${ARECORD_PID}" >/dev/null 2>&1 || true
-				wait "${ARECORD_PID}" 2>/dev/null || true
-				unset ARECORD_PID
-			}
-			rm -f "${AUDIO_FIFO:-}"
-		}
-		trap cleanup_audio EXIT INT TERM
+		trap 'kill "${ARECORD_PID}" >/dev/null 2>&1 || true; wait "${ARECORD_PID}" 2>/dev/null || true; rm -f "${AUDIO_FIFO}"' EXIT INT TERM
 
 		# Try audio + video; if audio device is missing, fallback to video-only.
 		if ! "${LIBCAMERA_BIN_PATH}" \
@@ -116,7 +108,9 @@ run_pipeline() {
 			echo "Audio pipeline failed; falling back to video-only this run" >&2
 			AUDIO_ENABLE=0
 		fi
-		cleanup_audio
+		kill "${ARECORD_PID}" >/dev/null 2>&1 || true
+		wait "${ARECORD_PID}" 2>/dev/null || true
+		rm -f "${AUDIO_FIFO}"
 		trap - EXIT INT TERM
 	fi
 
