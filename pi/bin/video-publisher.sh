@@ -22,13 +22,13 @@ AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
 AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
-AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
+AUDIO_BITRATE="${AUDIO_BITRATE:-32000}"
 
 # Normalize device/rate to match the HAT capture (2ch/48k S32_LE); plughw handles any minor conversions.
 AUDIO_DEVICE="plughw:0,0"
 AUDIO_RATE=48000
 AUDIO_CHANNELS=2
-AUDIO_BITRATE=64000
+AUDIO_BITRATE=32000
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -87,9 +87,10 @@ run_pipeline() {
 				-ar "${AUDIO_RATE}" \
 				-i "${AUDIO_DEVICE}" \
 				-c:v copy \
-				-c:a pcm_s16le \
-				-ac "${AUDIO_CHANNELS}" \
-				-ar "${AUDIO_RATE}" \
+				-c:a aac \
+				-b:a "${AUDIO_BITRATE}" \
+				-ac:a 1 \
+				-ar:a 24000 \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"

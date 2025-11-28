@@ -42,7 +42,7 @@ audio:
   captureDevice: plughw:0,0
   sampleRate: 48000
   channels: 2
-  bitrate: 64000
+  bitrate: 32000
   ttsEnabled: false
   defaultEngine: flite
   defaultVoice: rms

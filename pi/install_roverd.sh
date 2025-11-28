@@ -208,7 +208,7 @@ AUDIO_ENABLE=1
 AUDIO_DEVICE=plughw:0,0
 AUDIO_RATE=48000
 AUDIO_CHANNELS=2
-AUDIO_BITRATE=64000
+AUDIO_BITRATE=32000
 ENV
 chown roverd:roverd /var/lib/roverd/video.env
 chmod 0640 /var/lib/roverd/video.env

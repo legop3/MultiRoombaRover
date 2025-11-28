@@ -145,7 +145,7 @@ func LoadConfig(path string) (*Config, error) {
 			CaptureDevice:  "plughw:0,0",
 			SampleRate:     48000,
 			Channels:       2,
-			Bitrate:        64000,
+			Bitrate:        32000,
 			TTSEnabled:     false,
 			DefaultEngine:  "flite",
 			DefaultVoice:   "rms",
