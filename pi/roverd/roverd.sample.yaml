@@ -39,8 +39,8 @@ cameraServo:
   allowRawPulse: false
 audio:
   captureEnabled: true
-  captureDevice: plughw:0,0
-  sampleRate: 16000
+  captureDevice: hw:0,0
+  sampleRate: 8000
   channels: 1
   bitrate: 64000
   ttsEnabled: false

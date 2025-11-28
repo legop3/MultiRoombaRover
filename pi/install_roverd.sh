@@ -126,7 +126,7 @@ ensure_pwm_overlay() {
 	log "Enabled dtoverlay=pwm-2chan on GPIO12/13 in $boot_config (backup at $backup). Reboot required for changes to apply."
 }
 
-ensure_user roverd "dialout,gpio,video,render"
+ensure_user roverd "dialout,gpio,video,render,audio"
 install -o roverd -g roverd -m 0755 "$BINARY_SRC" /usr/local/bin/roverd
 log "Installed roverd binary"
 
@@ -205,8 +205,8 @@ VIDEO_HEIGHT=720
 VIDEO_FPS=30
 VIDEO_BITRATE=3000000
 AUDIO_ENABLE=1
-AUDIO_DEVICE=plughw:sndrpigooglevoi,0
-AUDIO_RATE=16000
+AUDIO_DEVICE=hw:0,0
+AUDIO_RATE=8000
 AUDIO_CHANNELS=1
 AUDIO_BITRATE=64000
 ENV

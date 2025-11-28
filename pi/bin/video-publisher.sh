@@ -19,14 +19,14 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
-AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
-AUDIO_RATE="${AUDIO_RATE:-16000}"
+AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
+AUDIO_RATE="${AUDIO_RATE:-8000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
 
 # Normalize device if env still says "default"
 if [[ "${AUDIO_DEVICE}" == "default" ]]; then
-	AUDIO_DEVICE="plughw:0,0"
+	AUDIO_DEVICE="hw:0,0"
 fi
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
@@ -86,10 +86,9 @@ run_pipeline() {
 				-ar "${AUDIO_RATE}" \
 				-i "${AUDIO_DEVICE}" \
 				-c:v copy \
-				-c:a pcm_alaw \
+				-c:a pcm_s16le \
 				-ac "${AUDIO_CHANNELS}" \
 				-ar "${AUDIO_RATE}" \
-				-af "aresample=async=1:min_hard_comp=0.100:first_pts=0" \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
