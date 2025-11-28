@@ -94,7 +94,6 @@ run_pipeline() {
 				-c:a "${AUDIO_CODEC}" \
 				-ar:a "${AUDIO_RATE}" \
 				-ac:a "${AUDIO_CHANNELS}" \
-				-af "volume=20dB" \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
