@@ -71,15 +71,20 @@ function canView(socket) {
 app.post('/mediamtx/auth', (req, res) => {
   const body = req.body || {};
   const path = (body.path || '').replace(/^\//, '');
+  const password = body.pass || body.password || '';
+  const action = body.action || '';
   const sessionId = body.user;
   const streamInfo = extractStreamInfo(path);
 
   // Allow internal bridge (server-side audio transcode) to pull/push without a websocket session.
-  if (body.user === 'bridge' && body.pass === 'bridge') {
+  if (body.user === 'bridge' && password === 'bridge') {
     return res.status(200).end();
   }
   // Also allow localhost reads of *-raw paths for the bridge even if creds are missing.
-  if (!body.user && streamInfo?.id?.endsWith('-raw') && (req.ip === '127.0.0.1' || req.ip === '::1')) {
+  if (
+    streamInfo?.id?.endsWith('-raw') &&
+    (req.ip === '127.0.0.1' || req.ip === '::1')
+  ) {
     return res.status(200).end();
   }
 
