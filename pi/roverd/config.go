@@ -142,8 +142,8 @@ func LoadConfig(path string) (*Config, error) {
 		},
 		Audio: AudioConfig{
 			CaptureEnabled: false,
-			CaptureDevice:  "plughw:0,0",
-			SampleRate:     16000,
+			CaptureDevice:  "hw:0,0",
+			SampleRate:     48000,
 			Channels:       1,
 			Bitrate:        24000,
 			TTSEnabled:     false,
@@ -246,10 +246,10 @@ func clampFloat(value, min, max float64) float64 {
 
 func validateAudioConfig(cfg *AudioConfig) {
 	if cfg.CaptureEnabled && cfg.CaptureDevice == "" {
-		cfg.CaptureDevice = "default"
+		cfg.CaptureDevice = "hw:0,0"
 	}
 	if cfg.SampleRate <= 0 {
-		cfg.SampleRate = 16000
+		cfg.SampleRate = 48000
 	}
 	if cfg.Channels <= 0 {
 		cfg.Channels = 1

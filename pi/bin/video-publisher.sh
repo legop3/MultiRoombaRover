@@ -31,10 +31,10 @@ VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
 AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
 AUDIO_CODEC="pcm_s16le"
-# Keep the audio path simple for the Pi Zero; we hardcode a single PCM profile.
-AUDIO_RATE=16000
-AUDIO_CHANNELS=1
-AUDIO_DEVICE="plughw:0,0"
+# Keep the audio path simple for the Pi Zero; default to PCM, and honor any rate/channels provided.
+AUDIO_RATE="${AUDIO_RATE:-48000}"
+AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
+AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
