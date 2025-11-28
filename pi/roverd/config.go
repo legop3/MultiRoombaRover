@@ -143,7 +143,7 @@ func LoadConfig(path string) (*Config, error) {
 		Audio: AudioConfig{
 			CaptureEnabled: false,
 			CaptureDevice:  "plughw:0,0",
-			SampleRate:     48000,
+			SampleRate:     16000,
 			Channels:       1,
 			Bitrate:        24000,
 			TTSEnabled:     false,

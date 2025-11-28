@@ -204,8 +204,10 @@ VIDEO_WIDTH=1280
 VIDEO_HEIGHT=720
 VIDEO_FPS=30
 VIDEO_BITRATE=2000000
-AUDIO_ENABLE=1
 AUDIO_ENABLE=0
+AUDIO_DEVICE=plughw:0,0
+AUDIO_RATE=16000
+AUDIO_CHANNELS=1
 ENV
 chown roverd:roverd /var/lib/roverd/video.env
 chmod 0640 /var/lib/roverd/video.env

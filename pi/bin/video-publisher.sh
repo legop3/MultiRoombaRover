@@ -20,27 +20,11 @@ VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
 AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
-AUDIO_RATE="${AUDIO_RATE:-48000}"
-AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
-AUDIO_BITRATE="${AUDIO_BITRATE:-24000}"
-AUDIO_CODEC="${AUDIO_CODEC:-pcm_mulaw}"
-
-# Normalize device/rate to match the HAT capture; plughw handles any minor conversions.
-AUDIO_DEVICE="plughw:0,0"
+AUDIO_CODEC="pcm_s16le"
+# Keep the audio path simple for the Pi Zero; we hardcode a single PCM profile.
+AUDIO_RATE=16000
 AUDIO_CHANNELS=1
-# Defaults chosen to keep Pi Zero CPU low. Opus can be enabled by setting AUDIO_CODEC=libopus.
-if [[ "${AUDIO_CODEC}" == "libopus" ]]; then
-	AUDIO_RATE=16000
-	AUDIO_BITRATE=16000
-else
-	# G.711 mu-law (or A-law if AUDIO_CODEC=pcm_alaw): very low CPU, 8 kHz mono, ~64 kbps.
-	AUDIO_CODEC="pcm_mulaw"
-	AUDIO_RATE=8000
-	AUDIO_BITRATE=64000
-fi
-
-# Disable audio streaming for now; only video will be published.
-AUDIO_ENABLE=0
+AUDIO_DEVICE="plughw:0,0"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -63,9 +47,6 @@ else
 	echo "ffmpeg not found; install it via apt install ffmpeg." >&2
 	exit 1
 fi
-
-# Flip using the native rotation flag (0/180 supported per rpicam-vid --help).
-FLIP_ARGS=(--rotation 180)
 
 run_pipeline() {
 	if [[ "${AUDIO_ENABLE}" -eq 1 ]]; then
@@ -101,11 +82,9 @@ run_pipeline() {
 				-i "${AUDIO_DEVICE}" \
 				-c:v copy \
 				-c:a "${AUDIO_CODEC}" \
-				-b:a "${AUDIO_BITRATE}" \
-				$( [[ "${AUDIO_CODEC}" == "libopus" ]] && echo "-compression_level 0 -application voip -frame_duration 60" ) \
-				-ac:a "${AUDIO_CHANNELS}" \
 				-ar:a "${AUDIO_RATE}" \
-				-af "$( [[ "${AUDIO_CODEC}" == "libopus" ]] && echo "pan=1c|c0=c0," )volume=20dB" \
+				-ac:a "${AUDIO_CHANNELS}" \
+				-af "volume=20dB" \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
