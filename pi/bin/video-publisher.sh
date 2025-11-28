@@ -12,7 +12,12 @@ fi
 
 # shellcheck disable=SC1090
 source "$ENV_FILE"
-: "${PUBLISH_URL:?PUBLISH_URL not set in ${ENV_FILE}}"
+PUBLISH_URL="${PUBLISH_URL:-}"
+if [[ -z "${PUBLISH_URL}" ]]; then
+	echo "PUBLISH_URL not set in ${ENV_FILE}; contents:" >&2
+	sed -n '1,200p' "$ENV_FILE" >&2
+	exit 1
+fi
 
 VIDEO_WIDTH="${VIDEO_WIDTH:-1920}"
 VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"

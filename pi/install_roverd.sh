@@ -195,7 +195,9 @@ install_audio_support() {
 
 # Install video publisher assets
 install -D -o root -g root -m 0755 pi/bin/video-publisher.sh /usr/local/bin/video-publisher
+log "Installed video-publisher helper"
 install -m 0644 pi/systemd/video-publisher.service /etc/systemd/system/video-publisher.service
+log "Installed video-publisher systemd unit"
 install -d -o roverd -g roverd /var/lib/roverd
 cat > /var/lib/roverd/video.env <<'ENV'
 # Managed by roverd; placeholder values will be overwritten at runtime.
