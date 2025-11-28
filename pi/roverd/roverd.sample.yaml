@@ -41,7 +41,7 @@ audio:
   captureEnabled: true
   captureDevice: hw:0,0
   sampleRate: 16000
-  channels: 1
+  channels: 2
   bitrate: 64000
   ttsEnabled: false
   defaultEngine: flite

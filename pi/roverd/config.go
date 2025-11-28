@@ -144,7 +144,7 @@ func LoadConfig(path string) (*Config, error) {
 			CaptureEnabled: true,
 			CaptureDevice:  "hw:0,0",
 			SampleRate:     16000,
-			Channels:       1,
+			Channels:       2,
 			Bitrate:        64000,
 			TTSEnabled:     false,
 			DefaultEngine:  "flite",
