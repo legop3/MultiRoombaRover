@@ -25,10 +25,11 @@ AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-24000}"
 
 # Normalize device/rate to match the HAT capture; plughw handles any minor conversions.
+# Keep audio encode light for the Pi Zero by using 16 kHz mono Opus at a low complexity.
 AUDIO_DEVICE="plughw:0,0"
-AUDIO_RATE=48000
+AUDIO_RATE=16000
 AUDIO_CHANNELS=1
-AUDIO_BITRATE=24000
+AUDIO_BITRATE=16000
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -90,6 +91,7 @@ run_pipeline() {
 				-c:v copy \
 				-c:a libopus \
 				-b:a "${AUDIO_BITRATE}" \
+				-compression_level 0 \
 				-application voip \
 				-frame_duration 60 \
 				-ac:a "${AUDIO_CHANNELS}" \
