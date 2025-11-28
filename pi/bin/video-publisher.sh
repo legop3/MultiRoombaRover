@@ -63,61 +63,6 @@ else
 fi
 
 run_pipeline() {
-	if [[ "${AUDIO_ENABLE}" -eq 1 ]]; then
-		if ! "${LIBCAMERA_BIN_PATH}" \
-			--inline \
-			--timeout 0 \
-			--width "${VIDEO_WIDTH}" \
-			--height "${VIDEO_HEIGHT}" \
-			"${FLIP_ARGS[@]}" \
-			--framerate "${VIDEO_FPS}" \
-			--bitrate "${VIDEO_BITRATE}" \
-			--codec h264 \
-			--profile baseline \
-			--denoise cdn_off \
-			--nopreview \
-			--awb custom \
-			--awbgains 1.5,1.8 \
-			--output - \
-			| "${FFMPEG_BIN_PATH}" \
-				-hide_banner \
-				-loglevel warning \
-				-fflags nobuffer+genpts \
-				-flags low_delay \
-				-max_interleave_delta 0 \
-				-use_wallclock_as_timestamps 1 \
-				-thread_queue_size 512 \
-				-f h264 \
-				-i pipe:0 \
-				-thread_queue_size 512 \
-				-f alsa \
-				-guess_layout_max 0 \
-				-sample_fmt "${AUDIO_FORMAT}" \
-				-ar "${AUDIO_RATE}" \
-				-ac "${AUDIO_CHANNELS}" \
-				-channel_layout stereo \
-				-i "${AUDIO_DEVICE}" \
-				-map 0:v:0 -map 1:a:0 \
-				-c:v copy \
-				-c:a "${AUDIO_CODEC}" \
-				-b:a "${AUDIO_BITRATE}" \
-				-ar:a "${AUDIO_OUT_RATE}" \
-				-ac:a "${AUDIO_OUT_CHANNELS}" \
-				-application lowdelay \
-				-frame_duration 20 \
-				-compression_level 0 \
-				-muxpreload 0 \
-				-muxdelay 0 \
-				-vsync passthrough \
-				-flush_packets 1 \
-				-f mpegts \
-				"${PUBLISH_URL}"
-		then
-			echo "Audio pipeline failed; falling back to video-only this run" >&2
-			AUDIO_ENABLE=0
-		fi
-	fi
-
 	if [[ "${AUDIO_ENABLE}" -ne 1 ]]; then
 		"${LIBCAMERA_BIN_PATH}" \
 			--inline \
@@ -147,6 +92,58 @@ run_pipeline() {
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
+		return
+	fi
+
+	# Audio + video path
+	if ! "${LIBCAMERA_BIN_PATH}" \
+		--inline \
+		--timeout 0 \
+		--width "${VIDEO_WIDTH}" \
+		--height "${VIDEO_HEIGHT}" \
+		"${FLIP_ARGS[@]}" \
+		--framerate "${VIDEO_FPS}" \
+		--bitrate "${VIDEO_BITRATE}" \
+		--codec h264 \
+		--profile baseline \
+		--denoise cdn_off \
+		--nopreview \
+		--awb custom \
+		--awbgains 1.5,1.8 \
+		--output - \
+		| "${FFMPEG_BIN_PATH}" \
+			-hide_banner \
+			-loglevel warning \
+			-fflags nobuffer+genpts \
+			-flags low_delay \
+			-max_interleave_delta 0 \
+			-use_wallclock_as_timestamps 1 \
+			-thread_queue_size 512 \
+			-f h264 \
+			-i pipe:0 \
+			-thread_queue_size 512 \
+			-f alsa \
+			-ar "${AUDIO_RATE}" \
+			-ac "${AUDIO_CHANNELS}" \
+			-i "${AUDIO_DEVICE}" \
+			-map 0:v:0 -map 1:a:0 \
+			-c:v copy \
+			-c:a "${AUDIO_CODEC}" \
+			-b:a "${AUDIO_BITRATE}" \
+			-ar:a "${AUDIO_OUT_RATE}" \
+			-ac:a "${AUDIO_OUT_CHANNELS}" \
+			-application lowdelay \
+			-frame_duration 20 \
+			-compression_level 0 \
+			-muxpreload 0 \
+			-muxdelay 0 \
+			-vsync passthrough \
+			-flush_packets 1 \
+			-f mpegts \
+			"${PUBLISH_URL}"
+	then
+		echo "Audio pipeline failed; falling back to video-only this run" >&2
+		AUDIO_ENABLE=0
 	fi
 }
 
