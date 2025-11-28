@@ -24,10 +24,11 @@ AUDIO_RATE="${AUDIO_RATE:-8000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
 
-# Normalize device if env still says "default"
-if [[ "${AUDIO_DEVICE}" == "default" ]]; then
-	AUDIO_DEVICE="hw:0,0"
-fi
+# Normalize device/rate aggressively to reduce CPU and match the HAT on card0
+AUDIO_DEVICE="hw:0,0"
+AUDIO_RATE=8000
+AUDIO_CHANNELS=1
+AUDIO_BITRATE=64000
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
