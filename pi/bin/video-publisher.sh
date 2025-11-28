@@ -92,6 +92,8 @@ run_pipeline() {
 				-hide_banner \
 				-loglevel warning \
 				-fflags nobuffer \
+				-flags low_delay \
+				-max_interleave_delta 0 \
 				-use_wallclock_as_timestamps 1 \
 				-thread_queue_size 512 \
 				-f h264 \
@@ -107,8 +109,8 @@ run_pipeline() {
 				-b:a "${AUDIO_BITRATE}" \
 				-ar:a "${AUDIO_OUT_RATE}" \
 				-ac:a "${AUDIO_OUT_CHANNELS}" \
-				-application voip \
-				-frame_duration 60 \
+				-application lowdelay \
+				-frame_duration 20 \
 				-compression_level 0 \
 				-muxpreload 0 \
 				-muxdelay 0 \
