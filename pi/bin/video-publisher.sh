@@ -15,6 +15,10 @@ fi
 source <(tr -d '\r' < "$ENV_FILE")
 PUBLISH_URL="${PUBLISH_URL:-}"
 if [[ -z "${PUBLISH_URL}" ]]; then
+	# Fallback parser in case sourcing missed due to weird whitespace/BOM
+	PUBLISH_URL="$(grep -E '^PUBLISH_URL=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '\r')"
+fi
+if [[ -z "${PUBLISH_URL}" ]]; then
 	echo "PUBLISH_URL not set in ${ENV_FILE}; contents:" >&2
 	sed -n '1,200p' "$ENV_FILE" >&2
 	exit 1
