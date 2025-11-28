@@ -40,9 +40,9 @@ cameraServo:
 audio:
   captureEnabled: true
   captureDevice: plughw:0,0
-  sampleRate: 8000
+  sampleRate: 48000
   channels: 1
-  bitrate: 64000
+  bitrate: 24000
   ttsEnabled: false
   defaultEngine: flite
   defaultVoice: rms

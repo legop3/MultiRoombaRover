@@ -20,15 +20,15 @@ VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
 AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
-AUDIO_RATE="${AUDIO_RATE:-8000}"
+AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
-AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
+AUDIO_BITRATE="${AUDIO_BITRATE:-24000}"
 
-# Normalize device/rate to match the HAT capture (2ch/48k S32_LE); plughw handles any minor conversions.
+# Normalize device/rate to match the HAT capture; plughw handles any minor conversions.
 AUDIO_DEVICE="plughw:0,0"
-AUDIO_RATE=8000
+AUDIO_RATE=48000
 AUDIO_CHANNELS=1
-AUDIO_BITRATE=64000
+AUDIO_BITRATE=24000
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -87,7 +87,10 @@ run_pipeline() {
 				-ar "${AUDIO_RATE}" \
 				-i "${AUDIO_DEVICE}" \
 				-c:v copy \
-				-c:a pcm_mulaw \
+				-c:a libopus \
+				-b:a "${AUDIO_BITRATE}" \
+				-application voip \
+				-frame_duration 60 \
 				-ac:a "${AUDIO_CHANNELS}" \
 				-ar:a "${AUDIO_RATE}" \
 				-af "aresample=async=1:min_hard_comp=0.050:first_pts=0" \
