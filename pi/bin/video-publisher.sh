@@ -97,6 +97,7 @@ run_pipeline() {
 				-ar "${AUDIO_RATE}" \
 				-ac "${AUDIO_CHANNELS}" \
 				-i "${AUDIO_FIFO}" \
+				-map 0:v:0 -map 1:a:0 \
 				-c:v copy \
 				-c:a "${AUDIO_CODEC}" \
 				-ar:a "${AUDIO_OUT_RATE}" \
