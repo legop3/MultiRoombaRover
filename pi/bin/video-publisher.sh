@@ -82,6 +82,7 @@ run_pipeline() {
 				-f h264 \
 				-i pipe:0 \
 				-f alsa \
+				-guess_layout_max 0 \
 				-thread_queue_size 2048 \
 				-ac "${AUDIO_CHANNELS}" \
 				-ar "${AUDIO_RATE}" \
@@ -93,7 +94,7 @@ run_pipeline() {
 				-frame_duration 60 \
 				-ac:a "${AUDIO_CHANNELS}" \
 				-ar:a "${AUDIO_RATE}" \
-				-af "aresample=async=1:min_hard_comp=0.050:first_pts=0" \
+				-af "pan=1c|c0=c0,volume=20dB" \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
