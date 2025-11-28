@@ -11,7 +11,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 # shellcheck disable=SC1090
-source "$ENV_FILE"
+# Strip any CRLFs to avoid sourcing a PUBLISH_URL with a stray carriage return in the name.
+source <(tr -d '\r' < "$ENV_FILE")
 PUBLISH_URL="${PUBLISH_URL:-}"
 if [[ -z "${PUBLISH_URL}" ]]; then
 	echo "PUBLISH_URL not set in ${ENV_FILE}; contents:" >&2
