@@ -83,8 +83,6 @@ run_pipeline() {
 			--bitrate "${VIDEO_BITRATE}" \
 			--codec h264 \
 			--profile baseline \
-			--intra 15 \
-			--idrperiod 15 \
 			--denoise cdn_off \
 			--nopreview \
 			--awb custom \
@@ -98,6 +96,7 @@ run_pipeline() {
 				-thread_queue_size 512 \
 				-f h264 \
 				-i pipe:0 \
+				-thread_queue_size 512 \
 				-f "${AUDIO_FORMAT}" \
 				-ar "${AUDIO_RATE}" \
 				-ac "${AUDIO_CHANNELS}" \
