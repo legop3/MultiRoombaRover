@@ -30,7 +30,7 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 		audioDevice = "hw:0,0"
 	}
 	if audio.SampleRate <= 0 {
-		audio.SampleRate = 8000
+		audio.SampleRate = 48000
 	}
 	if audio.Channels <= 0 {
 		audio.Channels = 1
