@@ -30,12 +30,15 @@ VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
 AUDIO_FIFO="${AUDIO_FIFO:-/var/lib/roverd/audio.pcm}"
-AUDIO_CODEC="${AUDIO_CODEC:-pcm_mulaw}"
-# Raw PCM from the capture FIFO; transcode to mu-law (lightweight, TS-friendly).
+AUDIO_CODEC="aac"
+# Raw PCM from the capture FIFO; transcode to low-bitrate AAC for TS/mediamtx compatibility.
+AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
-AUDIO_OUT_RATE="${AUDIO_OUT_RATE:-8000}"
+# Output aac params (tuned for low CPU/bandwidth).
+AUDIO_OUT_RATE="${AUDIO_OUT_RATE:-16000}"
 AUDIO_OUT_CHANNELS="${AUDIO_OUT_CHANNELS:-1}"
+AUDIO_BITRATE="${AUDIO_BITRATE:-32000}"
 AUDIO_FORMAT="${AUDIO_FORMAT:-s32le}"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
@@ -100,8 +103,11 @@ run_pipeline() {
 				-map 0:v:0 -map 1:a:0 \
 				-c:v copy \
 				-c:a "${AUDIO_CODEC}" \
+				-b:a "${AUDIO_BITRATE}" \
 				-ar:a "${AUDIO_OUT_RATE}" \
 				-ac:a "${AUDIO_OUT_CHANNELS}" \
+				-profile:a aac_low \
+				-muxpreload 0 -muxdelay 0 \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
