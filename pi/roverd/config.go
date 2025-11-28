@@ -142,7 +142,7 @@ func LoadConfig(path string) (*Config, error) {
 		},
 		Audio: AudioConfig{
 			CaptureEnabled: true,
-			CaptureDevice:  "plughw:sndrpigooglevoi,0",
+			CaptureDevice:  "plughw:0,0",
 			SampleRate:     16000,
 			Channels:       1,
 			Bitrate:        64000,

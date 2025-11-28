@@ -39,7 +39,7 @@ cameraServo:
   allowRawPulse: false
 audio:
   captureEnabled: true
-  captureDevice: plughw:sndrpigooglevoi,0
+  captureDevice: plughw:0,0
   sampleRate: 16000
   channels: 1
   bitrate: 64000
