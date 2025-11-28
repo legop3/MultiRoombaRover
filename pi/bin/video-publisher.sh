@@ -29,7 +29,7 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
-AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
+AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
 AUDIO_CODEC="${AUDIO_CODEC:-pcm_s32le}"
 # Keep the audio path simple for the Pi Zero; default to raw PCM (no encoding) and honor overrides.
 AUDIO_RATE="${AUDIO_RATE:-48000}"
@@ -72,19 +72,9 @@ run_pipeline() {
 		# Background ALSA capture; keep it simple to avoid CPU on ffmpeg.
 		if ! arecord -D "${ACTIVE_AUDIO_DEVICE}" -f "${ACTIVE_AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
 		then
-			echo "Audio capture failed (arecord, ${ACTIVE_AUDIO_DEVICE} ${ACTIVE_AUDIO_FORMAT}); trying fallback to plughw S16_LE" >&2
-			ACTIVE_AUDIO_DEVICE="plughw:0,0"
-			ACTIVE_AUDIO_FORMAT="S16_LE"
-			ACTIVE_AUDIO_CODEC="pcm_s16le"
-			if ! arecord -D "${ACTIVE_AUDIO_DEVICE}" -f "${ACTIVE_AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
-			then
-				echo "Audio capture failed (fallback); falling back to video-only" >&2
-				AUDIO_ENABLE=0
-				rm -f "${AUDIO_FIFO}"
-			else
-				ARECORD_PID=$!
-				trap 'kill "${ARECORD_PID}" >/dev/null 2>&1 || true; wait "${ARECORD_PID}" 2>/dev/null || true; rm -f "${AUDIO_FIFO}"' EXIT INT TERM
-			fi
+			echo "Audio capture failed (arecord, ${ACTIVE_AUDIO_DEVICE} ${ACTIVE_AUDIO_FORMAT}); falling back to video-only" >&2
+			AUDIO_ENABLE=0
+			rm -f "${AUDIO_FIFO}"
 		else
 			ARECORD_PID=$!
 			trap 'kill "${ARECORD_PID}" >/dev/null 2>&1 || true; wait "${ARECORD_PID}" 2>/dev/null || true; rm -f "${AUDIO_FIFO}"' EXIT INT TERM
