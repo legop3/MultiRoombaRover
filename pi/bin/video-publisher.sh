@@ -29,17 +29,16 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
-AUDIO_FIFO="${AUDIO_FIFO:-/var/lib/roverd/audio.pcm}"
+AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
 AUDIO_CODEC="libopus"
 # Raw PCM from the capture FIFO; transcode to low-bitrate Opus for TS/mediamtx/WHEP compatibility.
-AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
 # Output params (tuned for low CPU/bandwidth).
 AUDIO_OUT_RATE="${AUDIO_OUT_RATE:-16000}"
 AUDIO_OUT_CHANNELS="${AUDIO_OUT_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-32000}"
-AUDIO_FORMAT="${AUDIO_FORMAT:-s32le}"
+AUDIO_FORMAT="${AUDIO_FORMAT:-alsa}"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -65,14 +64,6 @@ fi
 
 run_pipeline() {
 	if [[ "${AUDIO_ENABLE}" -eq 1 ]]; then
-		if [[ ! -p "${AUDIO_FIFO}" ]]; then
-			echo "Audio FIFO ${AUDIO_FIFO} missing; falling back to video-only" >&2
-			AUDIO_ENABLE=0
-		fi
-	fi
-
-	if [[ "${AUDIO_ENABLE}" -eq 1 ]]; then
-		# Try audio + video; if FIFO is missing/empty, fallback to video-only.
 		if ! "${LIBCAMERA_BIN_PATH}" \
 			--inline \
 			--timeout 0 \
@@ -99,10 +90,11 @@ run_pipeline() {
 				-f h264 \
 				-i pipe:0 \
 				-thread_queue_size 512 \
-				-f "${AUDIO_FORMAT}" \
+				-f alsa \
+				-guess_layout_max 0 \
 				-ar "${AUDIO_RATE}" \
 				-ac "${AUDIO_CHANNELS}" \
-				-i "${AUDIO_FIFO}" \
+				-i "${AUDIO_DEVICE}" \
 				-map 0:v:0 -map 1:a:0 \
 				-c:v copy \
 				-c:a "${AUDIO_CODEC}" \

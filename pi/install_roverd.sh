@@ -198,7 +198,7 @@ install -D -o root -g root -m 0755 pi/bin/video-publisher.sh /usr/local/bin/vide
 log "Installed video-publisher helper"
 install -m 0644 pi/systemd/video-publisher.service /etc/systemd/system/video-publisher.service
 log "Installed video-publisher systemd unit"
-# Install audio capture assets (arecord -> FIFO)
+# Install audio capture assets (arecord -> FIFO) [optional, not enabled by default]
 install -D -o root -g root -m 0755 pi/bin/audio-capture.sh /usr/local/bin/audio-capture
 install -m 0644 pi/systemd/audio-capture.service /etc/systemd/system/audio-capture.service
 log "Installed audio-capture helper + systemd unit"
@@ -233,15 +233,13 @@ install_audio_support
 
 systemctl daemon-reload
 systemctl enable roverd.service
-systemctl enable audio-capture.service
 systemctl enable video-publisher.service
 if [[ $CONFIG_EXISTS -eq 1 ]]; then
 	systemctl restart roverd.service
-	systemctl restart audio-capture.service
 	systemctl restart video-publisher.service
-	log "Restarted roverd, audio-capture, video publisher"
+	log "Restarted roverd + video publisher"
 else
-	log "Skipped auto-start because config is the sample; edit $CONFIG_DEST then run: sudo systemctl restart roverd audio-capture video-publisher"
+	log "Skipped auto-start because config is the sample; edit $CONFIG_DEST then run: sudo systemctl restart roverd video-publisher"
 fi
 
 log "Install complete"
