@@ -12,6 +12,8 @@ media:
   #   http://<base>/<roverId>/whep
   # Example: http://192.168.0.86:8889/video
   whepBaseUrl: "http://192.168.0.86:8889/video"
+  # Set audioBridge to false to disable server-side audio transcoding from <id>-raw -> <id>
+  # audioBridge: true
 
 homeAssistant:
   url: "http://homeassistant.local:8123"
