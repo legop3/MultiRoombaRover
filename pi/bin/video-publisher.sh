@@ -90,7 +90,7 @@ run_pipeline() {
 				-sample_fmt "${AUDIO_FORMAT}" \
 				-i "${AUDIO_DEVICE}" \
 				-c:v copy \
-				-c:a pcm_s16le \
+				-c:a pcm_s32le \
 				-ac "${AUDIO_CHANNELS}" \
 				-ar "${AUDIO_RATE}" \
 				-flush_packets 1 \
