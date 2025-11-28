@@ -15,3 +15,9 @@
 -ac:a 1 -ar:a 48000 -af "pan=1c|c0=c0,volume=20dB"
 ```
 - the raspberry pi CANNOT HANDLE AUDIO ENCODING onboard. this is just to show you how to use the mic.
+
+
+sudo systemctl restart roverd
+sudo systemctl restart audio-capture
+sudo systemctl restart video-publisher
+sudo cat /var/lib/roverd/video.env

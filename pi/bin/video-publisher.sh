@@ -91,7 +91,7 @@ run_pipeline() {
 			| "${FFMPEG_BIN_PATH}" \
 				-hide_banner \
 				-loglevel warning \
-				-fflags nobuffer \
+				-fflags nobuffer+genpts \
 				-flags low_delay \
 				-max_interleave_delta 0 \
 				-use_wallclock_as_timestamps 1 \
@@ -114,6 +114,7 @@ run_pipeline() {
 				-compression_level 0 \
 				-muxpreload 0 \
 				-muxdelay 0 \
+				-vsync passthrough \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
