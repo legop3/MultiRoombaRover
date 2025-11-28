@@ -197,8 +197,7 @@ install_audio_support() {
 install -D -o root -g root -m 0755 pi/bin/video-publisher.sh /usr/local/bin/video-publisher
 install -m 0644 pi/systemd/video-publisher.service /etc/systemd/system/video-publisher.service
 install -d -o roverd -g roverd /var/lib/roverd
-if [[ ! -f /var/lib/roverd/video.env ]]; then
-	cat > /var/lib/roverd/video.env <<'ENV'
+cat > /var/lib/roverd/video.env <<'ENV'
 # Managed by roverd; placeholder values will be overwritten at runtime.
 PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME,m=publish&latency=20&mode=caller&transtype=live&pkt_size=1316
 VIDEO_WIDTH=1280
@@ -206,14 +205,13 @@ VIDEO_HEIGHT=720
 VIDEO_FPS=30
 VIDEO_BITRATE=3000000
 AUDIO_ENABLE=1
-AUDIO_DEVICE=default
+AUDIO_DEVICE=plughw:sndrpigooglevoicehat_soundcar,0
 AUDIO_RATE=16000
 AUDIO_CHANNELS=1
 AUDIO_BITRATE=64000
 ENV
-	chown roverd:roverd /var/lib/roverd/video.env
-	chmod 0640 /var/lib/roverd/video.env
-fi
+chown roverd:roverd /var/lib/roverd/video.env
+chmod 0640 /var/lib/roverd/video.env
 
 install_audio_support
 
