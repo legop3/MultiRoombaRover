@@ -40,7 +40,7 @@ cameraServo:
 audio:
   captureEnabled: true
   captureDevice: hw:0,0
-  sampleRate: 8000
+  sampleRate: 16000
   channels: 1
   bitrate: 64000
   ttsEnabled: false

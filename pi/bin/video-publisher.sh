@@ -20,15 +20,17 @@ VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
 AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
-AUDIO_RATE="${AUDIO_RATE:-8000}"
+AUDIO_RATE="${AUDIO_RATE:-16000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
+AUDIO_FORMAT="${AUDIO_FORMAT:-s32le}"
 
 # Normalize device/rate aggressively to reduce CPU and match the HAT on card0
 AUDIO_DEVICE="hw:0,0"
-AUDIO_RATE=8000
+AUDIO_RATE=16000
 AUDIO_CHANNELS=1
 AUDIO_BITRATE=64000
+AUDIO_FORMAT="s32le"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -85,6 +87,7 @@ run_pipeline() {
 				-thread_queue_size 1024 \
 				-ac "${AUDIO_CHANNELS}" \
 				-ar "${AUDIO_RATE}" \
+				-sample_fmt "${AUDIO_FORMAT}" \
 				-i "${AUDIO_DEVICE}" \
 				-c:v copy \
 				-c:a pcm_s16le \
