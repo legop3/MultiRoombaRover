@@ -35,7 +35,7 @@ AUDIO_CODEC="libopus"
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
 # Output params (tuned for low CPU/bandwidth).
-AUDIO_OUT_RATE="${AUDIO_OUT_RATE:-16000}"
+AUDIO_OUT_RATE="${AUDIO_OUT_RATE:-48000}"
 AUDIO_OUT_CHANNELS="${AUDIO_OUT_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-32000}"
 AUDIO_FORMAT="${AUDIO_FORMAT:-S32_LE}"
@@ -79,16 +79,15 @@ run_pipeline() {
 			--awb custom \
 			--awbgains 1.5,1.8 \
 			--output - \
-			| "${FFMPEG_BIN_PATH}" \
-				-hide_banner \
-				-loglevel warning \
-				-fflags nobuffer \
-				-use_wallclock_as_timestamps 1 \
-				-thread_queue_size 512 \
-				-f h264 \
-				-i pipe:0 \
-				-c:v copy \
-				-an \
+				| "${FFMPEG_BIN_PATH}" \
+					-hide_banner \
+					-loglevel warning \
+					-fflags nobuffer \
+					-thread_queue_size 512 \
+					-f h264 \
+					-i pipe:0 \
+					-c:v copy \
+					-an \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
@@ -113,10 +112,10 @@ run_pipeline() {
 		| "${FFMPEG_BIN_PATH}" \
 			-hide_banner \
 			-loglevel warning \
-			-fflags nobuffer+genpts \
+			-fflags nobuffer \
 			-flags low_delay \
 			-max_interleave_delta 0 \
-			-use_wallclock_as_timestamps 1 \
+			-rtbufsize 0 \
 			-thread_queue_size 512 \
 			-f h264 \
 			-i pipe:0 \
