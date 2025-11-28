@@ -33,7 +33,7 @@ AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
 AUDIO_CODEC="${AUDIO_CODEC:-pcm_s32le}"
 # Keep the audio path simple for the Pi Zero; default to raw PCM (no encoding) and honor overrides.
 AUDIO_RATE="${AUDIO_RATE:-48000}"
-AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
+AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
 # AUDIO_FORMAT is the ALSA format; FFmpeg expects lowercase.
 AUDIO_FORMAT="${AUDIO_FORMAT:-S32_LE}"
 AUDIO_FORMAT_FFMPEG="$(printf '%s' "${AUDIO_FORMAT}" | tr 'A-Z' 'a-z')"

@@ -33,7 +33,7 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 		audio.SampleRate = 48000
 	}
 	if audio.Channels <= 0 {
-		audio.Channels = 1
+		audio.Channels = 2
 	}
 	fmt.Fprintf(&buf, "AUDIO_ENABLE=%d\n", boolToInt(audio.CaptureEnabled))
 	fmt.Fprintf(&buf, "AUDIO_DEVICE=%s\n", audioDevice)

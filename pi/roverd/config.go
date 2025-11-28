@@ -144,7 +144,7 @@ func LoadConfig(path string) (*Config, error) {
 			CaptureEnabled: false,
 			CaptureDevice:  "hw:0,0",
 			SampleRate:     48000,
-			Channels:       1,
+			Channels:       2,
 			Bitrate:        24000,
 			TTSEnabled:     false,
 			DefaultEngine:  "flite",
@@ -252,7 +252,7 @@ func validateAudioConfig(cfg *AudioConfig) {
 		cfg.SampleRate = 48000
 	}
 	if cfg.Channels <= 0 {
-		cfg.Channels = 1
+		cfg.Channels = 2
 	}
 	if cfg.Bitrate <= 0 {
 		cfg.Bitrate = 64000
