@@ -29,14 +29,12 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
-AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
+AUDIO_FIFO="${AUDIO_FIFO:-/var/lib/roverd/audio.pcm}"
 AUDIO_CODEC="${AUDIO_CODEC:-pcm_s32le}"
-# Keep the audio path simple for the Pi Zero; default to raw PCM (no encoding) and honor overrides.
+# Keep the audio path simple for the Pi Zero; raw PCM coming from the capture FIFO.
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
-# AUDIO_FORMAT is the ALSA format; FFmpeg expects lowercase.
-AUDIO_FORMAT="${AUDIO_FORMAT:-S32_LE}"
-AUDIO_FORMAT_FFMPEG="$(printf '%s' "${AUDIO_FORMAT}" | tr 'A-Z' 'a-z')"
+AUDIO_FORMAT="${AUDIO_FORMAT:-s32le}"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
@@ -62,27 +60,15 @@ fi
 
 run_pipeline() {
 	if [[ "${AUDIO_ENABLE}" -eq 1 ]]; then
-		# Capture audio with arecord into a FIFO so ffmpeg just muxes it.
-		AUDIO_FIFO="$(mktemp -u /tmp/roverd-audio.XXXXXX)"
-		rm -f "${AUDIO_FIFO}"
-		mkfifo "${AUDIO_FIFO}"
-		ACTIVE_AUDIO_DEVICE="${AUDIO_DEVICE}"
-		ACTIVE_AUDIO_FORMAT="${AUDIO_FORMAT}"
-		ACTIVE_AUDIO_CODEC="${AUDIO_CODEC}"
-		# Background ALSA capture; keep it simple to avoid CPU on ffmpeg.
-		if ! arecord -D "${ACTIVE_AUDIO_DEVICE}" -f "${ACTIVE_AUDIO_FORMAT}" -r "${AUDIO_RATE}" -c "${AUDIO_CHANNELS}" -q -t raw "${AUDIO_FIFO}" &
-		then
-			echo "Audio capture failed (arecord, ${ACTIVE_AUDIO_DEVICE} ${ACTIVE_AUDIO_FORMAT}); falling back to video-only" >&2
+		if [[ ! -p "${AUDIO_FIFO}" ]]; then
+			echo "Audio FIFO ${AUDIO_FIFO} missing; falling back to video-only" >&2
 			AUDIO_ENABLE=0
-			rm -f "${AUDIO_FIFO}"
-		else
-			ARECORD_PID=$!
-			trap 'kill "${ARECORD_PID}" >/dev/null 2>&1 || true; wait "${ARECORD_PID}" 2>/dev/null || true; rm -f "${AUDIO_FIFO}"' EXIT INT TERM
 		fi
-		ACTIVE_AUDIO_FORMAT_FFMPEG="$(printf '%s' "${ACTIVE_AUDIO_FORMAT}" | tr 'A-Z' 'a-z')"
+	fi
 
-		# Try audio + video; if audio device is missing, fallback to video-only.
-		if [[ "${AUDIO_ENABLE}" -eq 1 ]] && ! "${LIBCAMERA_BIN_PATH}" \
+	if [[ "${AUDIO_ENABLE}" -eq 1 ]]; then
+		# Try audio + video; if FIFO is missing/empty, fallback to video-only.
+		if ! "${LIBCAMERA_BIN_PATH}" \
 			--inline \
 			--timeout 0 \
 			--width "${VIDEO_WIDTH}" \
@@ -105,12 +91,12 @@ run_pipeline() {
 				-thread_queue_size 512 \
 				-f h264 \
 				-i pipe:0 \
-				-f "${ACTIVE_AUDIO_FORMAT_FFMPEG}" \
+				-f "${AUDIO_FORMAT}" \
 				-ar "${AUDIO_RATE}" \
 				-ac "${AUDIO_CHANNELS}" \
 				-i "${AUDIO_FIFO}" \
 				-c:v copy \
-				-c:a "${ACTIVE_AUDIO_CODEC}" \
+				-c:a "${AUDIO_CODEC}" \
 				-ar:a "${AUDIO_RATE}" \
 				-ac:a "${AUDIO_CHANNELS}" \
 				-flush_packets 1 \
@@ -119,13 +105,6 @@ run_pipeline() {
 		then
 			echo "Audio pipeline failed; falling back to video-only this run" >&2
 			AUDIO_ENABLE=0
-		fi
-		if [[ -n "${ARECORD_PID:-}" ]]; then
-			kill "${ARECORD_PID}" >/dev/null 2>&1 || true
-			wait "${ARECORD_PID}" 2>/dev/null || true
-			rm -f "${AUDIO_FIFO}"
-			trap - EXIT INT TERM
-			unset ARECORD_PID
 		fi
 	fi
 

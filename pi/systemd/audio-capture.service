@@ -1,0 +1,19 @@
+[Unit]
+Description=Rover Audio Capture (arecord to FIFO)
+After=network.target
+
+[Service]
+Type=simple
+User=roverd
+Group=audio
+Environment=AUDIO_FIFO=/var/lib/roverd/audio.pcm
+Environment=AUDIO_DEVICE=hw:0,0
+Environment=AUDIO_FORMAT=S32_LE
+Environment=AUDIO_RATE=48000
+Environment=AUDIO_CHANNELS=2
+ExecStart=/usr/local/bin/audio-capture
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

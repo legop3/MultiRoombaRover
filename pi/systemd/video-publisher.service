@@ -1,7 +1,7 @@
 [Unit]
 Description=Rover Video Publisher (libcamera -> SRT)
-After=network-online.target roverd.service
-Wants=network-online.target
+After=network-online.target roverd.service audio-capture.service
+Wants=network-online.target audio-capture.service
 
 [Service]
 Type=simple
