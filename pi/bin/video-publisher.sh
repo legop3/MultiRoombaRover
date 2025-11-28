@@ -19,14 +19,14 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
-AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:0,0}"
+AUDIO_DEVICE="${AUDIO_DEVICE:-plughw:sndrpigooglevoi,0}"
 AUDIO_RATE="${AUDIO_RATE:-16000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-1}"
 AUDIO_BITRATE="${AUDIO_BITRATE:-64000}"
 
 # Normalize device if env still says "default"
 if [[ "${AUDIO_DEVICE}" == "default" ]]; then
-	AUDIO_DEVICE="plughw:sndrpigooglevoicehat_soundcar,0"
+	AUDIO_DEVICE="plughw:sndrpigooglevoi,0"
 fi
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
