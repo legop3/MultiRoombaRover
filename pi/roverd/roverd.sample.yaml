@@ -38,7 +38,7 @@ cameraServo:
   nudgeDegrees: 2
   allowRawPulse: false
 audio:
-  captureEnabled: true
+  captureEnabled: false
   captureDevice: plughw:0,0
   sampleRate: 48000
   channels: 1

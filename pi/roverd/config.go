@@ -141,7 +141,7 @@ func LoadConfig(path string) (*Config, error) {
 			NudgeDegrees: 2,
 		},
 		Audio: AudioConfig{
-			CaptureEnabled: true,
+			CaptureEnabled: false,
 			CaptureDevice:  "plughw:0,0",
 			SampleRate:     48000,
 			Channels:       1,

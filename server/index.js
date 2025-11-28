@@ -26,4 +26,3 @@ require('./src/services/sessionService');
 require('./src/services/batteryManager');
 require('./src/services/discordBotService');
 require('./src/services/httpServer');
-require('./src/services/audioBridgeService');

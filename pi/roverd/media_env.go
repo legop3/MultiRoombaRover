@@ -25,11 +25,8 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	fmt.Fprintf(&buf, "VIDEO_HEIGHT=%d\n", media.VideoHeight)
 	fmt.Fprintf(&buf, "VIDEO_FPS=%d\n", media.VideoFPS)
 	fmt.Fprintf(&buf, "VIDEO_BITRATE=%d\n", media.VideoBitrate)
-	fmt.Fprintf(&buf, "AUDIO_ENABLE=%d\n", boolToInt(audio.CaptureEnabled))
-	fmt.Fprintf(&buf, "AUDIO_DEVICE=%s\n", audio.CaptureDevice)
-	fmt.Fprintf(&buf, "AUDIO_RATE=%d\n", audio.SampleRate)
-	fmt.Fprintf(&buf, "AUDIO_CHANNELS=%d\n", audio.Channels)
-	fmt.Fprintf(&buf, "AUDIO_BITRATE=%d\n", audio.Bitrate)
+	// Disable mic streaming; audio is handled locally for TTS only.
+	fmt.Fprintf(&buf, "AUDIO_ENABLE=0\n")
 	if err := os.WriteFile(publisherEnvPath, buf.Bytes(), 0o640); err != nil {
 		return err
 	}

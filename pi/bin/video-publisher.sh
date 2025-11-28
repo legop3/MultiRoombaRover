@@ -38,6 +38,9 @@ else
 	AUDIO_RATE=8000
 	AUDIO_BITRATE=64000
 fi
+
+# Disable audio streaming for now; only video will be published.
+AUDIO_ENABLE=0
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
