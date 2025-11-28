@@ -78,6 +78,10 @@ app.post('/mediamtx/auth', (req, res) => {
   if (body.user === 'bridge' && body.pass === 'bridge') {
     return res.status(200).end();
   }
+  // Also allow localhost reads of *-raw paths for the bridge even if creds are missing.
+  if (!body.user && streamInfo?.id?.endsWith('-raw') && (req.ip === '127.0.0.1' || req.ip === '::1')) {
+    return res.status(200).end();
+  }
 
   logger.info('video auth request', { path: body.path, sessionId, stream: streamInfo });
 
