@@ -73,6 +73,12 @@ app.post('/mediamtx/auth', (req, res) => {
   const path = (body.path || '').replace(/^\//, '');
   const sessionId = body.user;
   const streamInfo = extractStreamInfo(path);
+
+  // Allow internal bridge (server-side audio transcode) to pull/push without a websocket session.
+  if (body.user === 'bridge' && body.pass === 'bridge') {
+    return res.status(200).end();
+  }
+
   logger.info('video auth request', { path: body.path, sessionId, stream: streamInfo });
 
   if (!sessionId || !streamInfo?.id) {

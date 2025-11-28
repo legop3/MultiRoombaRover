@@ -23,7 +23,8 @@ function stopBridge(rawName) {
 function startBridge(rawName, baseName) {
   if (bridges.has(rawName)) return;
 
-  const inputUrl = `srt://${SRT_HOST}:9000?streamid=#!::r=${rawName},m=request&mode=caller&transtype=live&latency=20`;
+  // Use explicit credentials so mediamtx auth will allow the bridge to pull.
+  const inputUrl = `srt://${SRT_HOST}:9000?streamid=#!::r=${rawName},m=request&mode=caller&transtype=live&latency=20&u=bridge&p=bridge`;
   const outputUrl = `srt://${SRT_HOST}:9000?streamid=#!::r=${baseName},m=publish&mode=caller&transtype=live&pkt_size=1316`;
 
   const args = [
