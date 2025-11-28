@@ -30,10 +30,12 @@ VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
 AUDIO_FIFO="${AUDIO_FIFO:-/var/lib/roverd/audio.pcm}"
-AUDIO_CODEC="${AUDIO_CODEC:-pcm_s32le}"
-# Keep the audio path simple for the Pi Zero; raw PCM coming from the capture FIFO.
+AUDIO_CODEC="${AUDIO_CODEC:-pcm_mulaw}"
+# Raw PCM from the capture FIFO; transcode to mu-law (lightweight, TS-friendly).
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
+AUDIO_OUT_RATE="${AUDIO_OUT_RATE:-8000}"
+AUDIO_OUT_CHANNELS="${AUDIO_OUT_CHANNELS:-1}"
 AUDIO_FORMAT="${AUDIO_FORMAT:-s32le}"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
@@ -97,8 +99,8 @@ run_pipeline() {
 				-i "${AUDIO_FIFO}" \
 				-c:v copy \
 				-c:a "${AUDIO_CODEC}" \
-				-ar:a "${AUDIO_RATE}" \
-				-ac:a "${AUDIO_CHANNELS}" \
+				-ar:a "${AUDIO_OUT_RATE}" \
+				-ac:a "${AUDIO_OUT_CHANNELS}" \
 				-flush_packets 1 \
 				-f mpegts \
 				"${PUBLISH_URL}"
