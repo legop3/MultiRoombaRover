@@ -115,6 +115,8 @@ run_pipeline() {
 			-fflags nobuffer \
 			-flags low_delay \
 			-max_interleave_delta 0 \
+			-fflags +genpts \
+			-use_wallclock_as_timestamps 1 \
 			-rtbufsize 0 \
 			-thread_queue_size 512 \
 			-f h264 \
