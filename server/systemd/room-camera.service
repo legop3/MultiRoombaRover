@@ -9,10 +9,12 @@ Type=simple
 ExecStartPre=/usr/bin/sh -c "/usr/bin/amixer -q -c 0 sset 'Mic Capture Switch' cap || /usr/bin/true"
 ExecStartPre=/usr/bin/sh -c "/usr/bin/amixer -q -c 0 sset 'Mic Capture Volume' 100% || /usr/bin/amixer -q -c 0 sset 'Mic' 100% cap || /usr/bin/true"
 ExecStart=/usr/bin/ffmpeg \
-  -fflags nobuffer -thread_queue_size 256 -f v4l2 -input_format h264 -i /dev/video2 \
+  -fflags nobuffer -rtbufsize 0 -probesize 32 -analyzeduration 0 -use_wallclock_as_timestamps 1 \
+  -thread_queue_size 256 -f v4l2 -input_format h264 -i /dev/video2 \
   -fflags nobuffer -thread_queue_size 256 -f alsa -ar 16000 -ac 2 -i hw:0,0 \
   -map 0:v:0 -map 1:a:0 \
-  -c:v libx264 -preset ultrafast -tune zerolatency -b:v 600k -maxrate 700k -bufsize 1400k \
+  -c:v libx264 -preset ultrafast -tune zerolatency -flags +low_delay \
+  -b:v 600k -maxrate 700k -bufsize 700k -g 30 -bf 0 -x264-params keyint=30:min-keyint=30:scenecut=0 \
   -c:a libopus -b:a 64k -ar 16000 -ac 1 \
   -flush_packets 1 -f mpegts \
   srt://192.168.0.86:9000?streamid=#!::r=room/carpet,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
