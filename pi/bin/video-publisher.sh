@@ -120,7 +120,7 @@ run_pipeline() {
 			-thread_queue_size 512 \
 			-f h264 \
 			-i pipe:0 \
-			-thread_queue_size 2048 \
+			-thread_queue_size 8192 \
 			-f s32le \
 			-ar "${AUDIO_RATE}" \
 			-ac "${AUDIO_CHANNELS}" \
