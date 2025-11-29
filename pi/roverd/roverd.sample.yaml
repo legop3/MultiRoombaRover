@@ -15,7 +15,7 @@ battery:
   urgent: 1650
 maxWheelSpeed: 350
 media:
-  publishUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha,m=publish&latency=20&mode=caller&transtype=live&pkt_size=1316
+  publishUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
   publishPort: 9000
   videoWidth: 1280
   videoHeight: 720

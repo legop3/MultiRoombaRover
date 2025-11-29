@@ -132,7 +132,7 @@ run_pipeline() {
 			-ar:a "${AUDIO_OUT_RATE}" \
 			-ac:a "${AUDIO_OUT_CHANNELS}" \
 			-application lowdelay \
-			-frame_duration 20 \
+			-frame_duration 10 \
 			-compression_level 0 \
 			-muxpreload 0 \
 			-muxdelay 0 \

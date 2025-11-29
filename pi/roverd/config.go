@@ -284,5 +284,5 @@ func derivePublishURL(serverURL, roverName string, port int) (string, error) {
 		port = 9000
 	}
 	streamName := url.PathEscape(roverName)
-	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=publish&latency=20&mode=caller&transtype=live&pkt_size=1316", host, port, streamName), nil
+	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316", host, port, streamName), nil
 }
