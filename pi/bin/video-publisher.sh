@@ -29,9 +29,9 @@ VIDEO_HEIGHT="${VIDEO_HEIGHT:-1080}"
 VIDEO_FPS="${VIDEO_FPS:-30}"
 VIDEO_BITRATE="${VIDEO_BITRATE:-2000000}"
 AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
-AUDIO_DEVICE="${AUDIO_DEVICE:-rovermic}"
+AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
 AUDIO_CODEC="libopus"
-# Raw PCM from the capture FIFO; transcode to low-bitrate Opus for TS/mediamtx/WHEP compatibility.
+# Capture raw PCM and transcode to low-bitrate Opus for TS/mediamtx/WHEP compatibility.
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
 # Output params (tuned for low CPU/bandwidth).
@@ -121,10 +121,10 @@ run_pipeline() {
 			-f h264 \
 			-i pipe:0 \
 			-thread_queue_size 2048 \
-			-f alsa \
+			-f s32le \
 			-ar "${AUDIO_RATE}" \
 			-ac "${AUDIO_CHANNELS}" \
-			-i "${AUDIO_DEVICE}" \
+			-i <(arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -q -t raw) \
 			-map 0:v:0 -map 1:a:0 \
 			-c:v copy \
 			-c:a "${AUDIO_CODEC}" \
