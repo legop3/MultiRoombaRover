@@ -236,6 +236,9 @@ else
 	chown roverd:audio "$FIFO_PATH"
 	chmod 0660 "$FIFO_PATH"
 fi
+# Ensure ALSA config is in place for rovermic device
+install -m 0644 pi/asound.conf /etc/asound.conf
+log "Installed ALSA config (/etc/asound.conf)"
 
 install_audio_support
 

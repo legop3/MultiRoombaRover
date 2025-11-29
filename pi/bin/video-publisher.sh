@@ -112,20 +112,19 @@ run_pipeline() {
 		| "${FFMPEG_BIN_PATH}" \
 			-hide_banner \
 			-loglevel warning \
-			-fflags nobuffer \
+			-fflags nobuffer+genpts \
 			-flags low_delay \
 			-max_interleave_delta 0 \
-			-fflags +genpts \
 			-use_wallclock_as_timestamps 1 \
 			-rtbufsize 0 \
 			-thread_queue_size 512 \
 			-f h264 \
 			-i pipe:0 \
 			-thread_queue_size 2048 \
-			-f s32le \
+			-f alsa \
 			-ar "${AUDIO_RATE}" \
 			-ac "${AUDIO_CHANNELS}" \
-			-i <(arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -q -t raw) \
+			-i "${AUDIO_DEVICE}" \
 			-map 0:v:0 -map 1:a:0 \
 			-c:v copy \
 			-c:a "${AUDIO_CODEC}" \
