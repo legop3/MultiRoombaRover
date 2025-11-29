@@ -142,7 +142,7 @@ func LoadConfig(path string) (*Config, error) {
 		},
 		Audio: AudioConfig{
 			CaptureEnabled: false,
-			CaptureDevice:  "hw:0,0",
+			CaptureDevice:  "rovermic",
 			SampleRate:     48000,
 			Channels:       2,
 			Bitrate:        24000,
@@ -246,7 +246,7 @@ func clampFloat(value, min, max float64) float64 {
 
 func validateAudioConfig(cfg *AudioConfig) {
 	if cfg.CaptureEnabled && cfg.CaptureDevice == "" {
-		cfg.CaptureDevice = "hw:0,0"
+		cfg.CaptureDevice = "rovermic"
 	}
 	if cfg.SampleRate <= 0 {
 		cfg.SampleRate = 48000

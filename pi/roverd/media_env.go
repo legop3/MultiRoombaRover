@@ -27,7 +27,7 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	fmt.Fprintf(&buf, "VIDEO_BITRATE=%d\n", media.VideoBitrate)
 	audioDevice := audio.CaptureDevice
 	if audioDevice == "" {
-		audioDevice = "hw:0,0"
+		audioDevice = "rovermic"
 	}
 	if audio.SampleRate <= 0 {
 		audio.SampleRate = 48000
