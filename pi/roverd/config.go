@@ -256,7 +256,7 @@ func clampFloat(value, min, max float64) float64 {
 
 func validateAudioConfig(cfg *AudioConfig) {
 	if cfg.CaptureEnabled && cfg.CaptureDevice == "" {
-		cfg.CaptureDevice = "rovermic"
+		cfg.CaptureDevice = "hw:0,0"
 	}
 	if cfg.SampleRate <= 0 {
 		cfg.SampleRate = 48000

@@ -99,8 +99,6 @@ export function useVideoRequests(sourceList = []) {
       socket.emit('video:request', payload, (resp = {}) => {
         if (cancelled) return;
         if (!resp || resp.error || !resp.url || !resp.token) {
-          // eslint-disable-next-line no-console
-          console.warn('video:request failed', { entry, resp });
           scheduleRetry(entry);
           setSources((prev) => ({
             ...prev,
@@ -110,8 +108,6 @@ export function useVideoRequests(sourceList = []) {
         }
         clearRetry(entry.key);
         setSources((prev) => ({ ...prev, [entry.key]: resp }));
-        // eslint-disable-next-line no-console
-        console.info('video:request ok', { entry, url: resp.url });
       });
     }
 

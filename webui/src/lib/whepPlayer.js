@@ -82,8 +82,7 @@ export class WhepPlayer {
     }
 
     pc.onconnectionstatechange = () => {
-      const state = pc.connectionState;
-      this.notify(state);
+      this.notify(pc.connectionState);
     };
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState;
