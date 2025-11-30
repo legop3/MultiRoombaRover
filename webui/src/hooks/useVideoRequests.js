@@ -13,6 +13,7 @@ function normalizeEntry(entry) {
   if (typeof entry === 'object') {
     if (entry.type && entry.id) {
       const id = String(entry.id);
+      const audioId = entry.audioId ? String(entry.audioId) : null;
       let key = entry.key;
       if (!key) {
         key = entry.type === 'room' ? `room:${id}` : id;
@@ -21,6 +22,7 @@ function normalizeEntry(entry) {
         type: entry.type,
         id,
         key,
+        audioId,
       };
     }
     if (entry.roverId) {
@@ -109,7 +111,17 @@ export function useVideoRequests(sourceList = []) {
           return;
         }
         clearRetry(entry.key);
-        setSources((prev) => ({ ...prev, [entry.key]: resp }));
+        setSources((prev) => {
+          const next = { ...prev, [entry.key]: resp };
+          if (entry.audioId && resp.url && resp.token) {
+            const audioUrl = resp.url.replace(
+              `/${encodeURIComponent(entry.id)}/whep`,
+              `/${encodeURIComponent(entry.audioId)}/whep`,
+            );
+            next[entry.audioId] = { url: audioUrl, token: resp.token };
+          }
+          return next;
+        });
         // eslint-disable-next-line no-console
         console.info('video:request ok', { entry, url: resp.url });
       });
@@ -133,6 +145,9 @@ export function useVideoRequests(sourceList = []) {
     normalizedEntries.forEach((entry) => {
       if (sources[entry.key]) {
         next[entry.key] = sources[entry.key];
+      }
+      if (entry.audioId && sources[entry.audioId]) {
+        next[entry.audioId] = sources[entry.audioId];
       }
     });
     return next;
