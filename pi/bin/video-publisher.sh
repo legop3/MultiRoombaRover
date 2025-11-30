@@ -120,11 +120,11 @@ run_pipeline() {
 			-thread_queue_size 512 \
 			-f h264 \
 			-i pipe:0 \
-			-thread_queue_size 8192 \
+			-thread_queue_size 16384 \
 			-f s32le \
 			-ar "${AUDIO_RATE}" \
 			-ac "${AUDIO_CHANNELS}" \
-			-i <(arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -B 4096 -F 1024 -q -t raw) \
+			-i <(arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -B 65536 -F 2048 -q -t raw) \
 			-map 0:v:0 -map 1:a:0 \
 			-c:v copy \
 			-c:a "${AUDIO_CODEC}" \
