@@ -204,6 +204,16 @@ export default function VideoTile({
     : detail
     ? `${status} (${detail})`
     : status;
+  // eslint-disable-next-line no-console
+  useEffect(() => {
+    if (!audioSessionInfo?.url && !sessionInfo?.url) return;
+    console.info('VideoTile sessions', {
+      video: sessionInfo,
+      audio: audioSessionInfo,
+      status,
+      audioStatus,
+    });
+  }, [sessionInfo, audioSessionInfo, status, audioStatus]);
 
   return (
     <div className="flex flex-col gap-0.5">

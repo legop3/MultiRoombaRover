@@ -122,6 +122,8 @@ export function useVideoRequests(sourceList = []) {
           }
           return next;
         });
+        // eslint-disable-next-line no-console
+        console.info('video:request ok', { entry, url: resp.url });
       });
     }
 
