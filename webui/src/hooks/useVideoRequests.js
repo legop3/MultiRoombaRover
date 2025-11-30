@@ -96,6 +96,8 @@ export function useVideoRequests(sourceList = []) {
       socket.emit('video:request', payload, (resp = {}) => {
         if (cancelled) return;
         if (!resp || resp.error || !resp.url || !resp.token) {
+          // eslint-disable-next-line no-console
+          console.warn('video:request failed', { entry, resp });
           scheduleRetry(entry);
           setSources((prev) => ({
             ...prev,
