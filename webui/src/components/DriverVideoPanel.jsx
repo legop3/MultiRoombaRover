@@ -6,8 +6,14 @@ import VideoTile from './VideoTile.jsx';
 export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const { session } = useSession();
   const roverId = session?.assignment?.roverId;
-  const sources = useVideoRequests(roverId ? [roverId] : []);
+  const rosterEntry =
+    roverId && session?.roster ? session.roster.find((item) => String(item.id) === String(roverId)) : null;
+  const hasAudio = Boolean(rosterEntry?.media?.audioPublishUrl);
+  const sources = useVideoRequests(
+    roverId ? [{ type: 'rover', id: roverId, audioId: hasAudio ? `${roverId}-audio` : null }] : [],
+  );
   const info = roverId ? sources[roverId] : null;
+  const audioInfo = roverId && hasAudio ? sources[`${roverId}-audio`] : null;
   const frame = useTelemetryFrame(roverId);
   const batteryRecord =
     roverId && session?.roster
@@ -20,7 +26,14 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   return (
     <section className="panel">
       {roverId ? (
-        <VideoTile sessionInfo={info} label={roverLabel} telemetryFrame={frame} batteryConfig={batteryConfig} layoutFormat={layoutFormat}/>
+        <VideoTile
+          sessionInfo={info}
+          audioSessionInfo={audioInfo}
+          label={roverLabel}
+          telemetryFrame={frame}
+          batteryConfig={batteryConfig}
+          layoutFormat={layoutFormat}
+        />
       ) : (
         <div className="panel-muted content-center text-center text-sm text-slate-400 aspect-video">
           <p>You are not assigned to a rover.</p>

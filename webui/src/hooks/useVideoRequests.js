@@ -13,7 +13,12 @@ function normalizeEntry(entry) {
   if (typeof entry === 'object') {
     if (entry.type && entry.id) {
       const id = String(entry.id);
-      return { type: entry.type, id, key: entry.key || `${entry.type}:${id}` };
+      return {
+        type: entry.type,
+        id,
+        key: entry.key || `${entry.type}:${id}`,
+        audioId: entry.audioId ? String(entry.audioId) : null,
+      };
     }
     if (entry.roverId) {
       const id = String(entry.roverId);
@@ -99,10 +104,17 @@ export function useVideoRequests(sourceList = []) {
           return;
         }
         clearRetry(entry.key);
-        setSources((prev) => ({
-          ...prev,
-          [entry.key]: resp,
-        }));
+        setSources((prev) => {
+          const next = { ...prev, [entry.key]: resp };
+          if (entry.audioId && resp.url && resp.token) {
+            const audioUrl = resp.url.replace(
+              `/${encodeURIComponent(entry.id)}/whep`,
+              `/${encodeURIComponent(entry.audioId)}/whep`,
+            );
+            next[entry.audioId] = { url: audioUrl, token: resp.token };
+          }
+          return next;
+        });
       });
     }
 

@@ -49,7 +49,7 @@ function CurrentDriverBadge({ roverId, session }) {
   );
 }
 
-function RoverSpectatorCard({ rover, frame, videoInfo, session }) {
+function RoverSpectatorCard({ rover, frame, videoInfo, audioInfo, session }) {
   return (
     <article className="grid min-h-[16rem] grid-rows-[auto_minmax(0,1fr)_auto] gap-0.5 rounded bg-zinc-900 p-0.5 sm:min-h-[18rem]">
       <header className="flex items-center justify-between gap-0.5">
@@ -64,6 +64,7 @@ function RoverSpectatorCard({ rover, frame, videoInfo, session }) {
       <div className="min-h-0 overflow-hidden rounded bg-black/20">
         <VideoTile
           sessionInfo={videoInfo}
+          audioSessionInfo={audioInfo}
           label={rover.name}
           telemetryFrame={frame}
           batteryConfig={rover.battery}
@@ -86,6 +87,7 @@ function RoverRow({ roster, frames, videoSources, session }) {
           rover={rover}
           frame={frames[rover.id]}
           videoInfo={videoSources[rover.id]}
+          audioInfo={videoSources[`${rover.id}-audio`]}
           session={session}
         />
       ))}
@@ -116,7 +118,12 @@ export default function SpectatorApp() {
   useSpectatorMode();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
-  const videoSources = useVideoRequests(roster.map((rover) => rover.id));
+  const entries = roster.map((rover) => ({
+    type: 'rover',
+    id: rover.id,
+    audioId: rover.media?.audioPublishUrl ? `${rover.id}-audio` : null,
+  }));
+  const videoSources = useVideoRequests(entries);
 
   return (
     <SettingsProvider>

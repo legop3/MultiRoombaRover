@@ -11,6 +11,11 @@ fi
 
 # shellcheck disable=SC1090
 source "$ENV_FILE"
+AUDIO_ENABLE="${AUDIO_ENABLE:-0}"
+if [[ "${AUDIO_ENABLE}" -ne 1 ]]; then
+	echo "Audio capture disabled; skipping audio-only publisher" >&2
+	exit 0
+fi
 : "${AUDIO_PUBLISH_URL:?AUDIO_PUBLISH_URL not set in ${ENV_FILE}}"
 
 AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"

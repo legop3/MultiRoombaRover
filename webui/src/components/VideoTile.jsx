@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { WhepPlayer } from '../lib/whepPlayer.js';
+import { AudioWhepPlayer } from '../lib/audioWhepPlayer.js';
 
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 
 export default function VideoTile({
   sessionInfo,
+  audioSessionInfo,
   label,
   forceMute = false,
   telemetryFrame,
@@ -13,11 +15,16 @@ export default function VideoTile({
   layoutFormat = 'desktop',
 }) {
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
   const restartTimer = useRef(null);
+  const audioRestartTimer = useRef(null);
   const unmuteTimer = useRef(null);
   const [status, setStatus] = useState('idle');
   const [detail, setDetail] = useState(null);
+  const [audioStatus, setAudioStatus] = useState('idle');
+  const [audioDetail, setAudioDetail] = useState(null);
   const [restartToken, setRestartToken] = useState(0);
+  const [audioRestartToken, setAudioRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
   const sensors = telemetryFrame?.sensors;
   const batteryCharge = sensors?.batteryChargeMah ?? null;
@@ -39,6 +46,10 @@ export default function VideoTile({
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
     restartTimer.current = setTimeout(() => setRestartToken(Date.now()), RESTART_DELAY_MS);
+  }, []);
+  const scheduleAudioRestart = useCallback(() => {
+    clearTimeout(audioRestartTimer.current);
+    audioRestartTimer.current = setTimeout(() => setAudioRestartToken(Date.now()), RESTART_DELAY_MS);
   }, []);
 
   const ensurePlayback = useCallback(async () => {
@@ -89,6 +100,7 @@ export default function VideoTile({
   useEffect(
     () => () => {
       clearTimeout(restartTimer.current);
+      clearTimeout(audioRestartTimer.current);
       clearTimeout(unmuteTimer.current);
     },
     [],
@@ -146,6 +158,45 @@ export default function VideoTile({
     }
   }, [status, sessionInfo?.url, scheduleRestart]);
 
+  // Audio-only WHEP (no pausing/muting; keeps trying to play)
+  useEffect(() => {
+    if (!audioSessionInfo?.url || !audioRef.current) {
+      return undefined;
+    }
+    let active = true;
+    let player;
+    const handleStatus = (nextStatus, info) => {
+      if (!active) return;
+      setAudioStatus(nextStatus);
+      setAudioDetail(info || null);
+      if (nextStatus === 'playing') {
+        audioRef.current?.play().catch(() => {});
+      }
+      if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
+        scheduleAudioRestart();
+      }
+    };
+
+    player = new AudioWhepPlayer({
+      url: audioSessionInfo.url,
+      token: audioSessionInfo.token,
+      audio: audioRef.current,
+      onStatus: handleStatus,
+    });
+
+    player.start().catch((err) => {
+      if (!active) return;
+      setAudioStatus('error');
+      setAudioDetail(err.message);
+      scheduleAudioRestart();
+    });
+
+    return () => {
+      active = false;
+      player?.stop();
+    };
+  }, [audioSessionInfo?.url, audioSessionInfo?.token, audioRestartToken, scheduleAudioRestart]);
+
   const renderedStatus = !sessionInfo?.url
     ? 'waiting'
     : status === 'error'
@@ -165,6 +216,7 @@ export default function VideoTile({
           controls={false}
           className="h-full w-full object-contain"
         />
+        <audio ref={audioRef} autoPlay hidden />
         <HudOverlay frame={telemetryFrame} label={label} status={renderedStatus} desktopLayout={desktopLayout}/>
         <OvercurrentOverlay motors={overcurrentMotors} />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />

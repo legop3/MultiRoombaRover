@@ -45,7 +45,9 @@ function extractStreamInfo(path) {
 
   const remaining = segments.slice(start, end);
   if (remaining.length === 1) {
-    return { type: 'rover', id: remaining[0] || '' };
+    const rawId = remaining[0] || '';
+    const id = rawId.endsWith('-audio') ? rawId.slice(0, -6) : rawId;
+    return { type: 'rover', id };
   }
   if (remaining.length === 2 && remaining[0] === 'room') {
     return { type: 'room', id: remaining[1] || '' };

@@ -9,7 +9,7 @@ User=roverd
 Group=roverd
 EnvironmentFile=/var/lib/roverd/video.env
 ExecStart=/usr/local/bin/audio-only-publisher
-Restart=always
+Restart=on-failure
 RestartSec=2
 
 [Install]

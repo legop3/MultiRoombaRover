@@ -1,3 +1,5 @@
+/* global Buffer */
+
 import { buildAuthHeader } from './whepAuth.js';
 
 const RTC_CONFIG = {
@@ -9,11 +11,11 @@ const RTC_CONFIG = {
   rtcpMuxPolicy: 'require',
 };
 
-export class WhepPlayer {
-  constructor({ url, token, video, onStatus }) {
+export class AudioWhepPlayer {
+  constructor({ url, token, audio, onStatus }) {
     this.url = url;
     this.token = token;
-    this.video = video;
+    this.audio = audio;
     this.pc = null;
     this.abortController = null;
     this.onStatus = onStatus;
@@ -25,41 +27,35 @@ export class WhepPlayer {
     }
   }
 
-  configureVideoElement() {
-    if (!this.video) return;
-    this.video.playsInline = true;
-    this.video.autoplay = true;
-     this.video.muted = true;
-    this.video.disableRemotePlayback = true;
-    if ('latencyHint' in HTMLMediaElement.prototype) {
-      this.video.latencyHint = 'interactive';
-    }
+  configureElement() {
+    if (!this.audio) return;
+    this.audio.autoplay = true;
+    this.audio.muted = false;
+    this.audio.playsInline = true;
   }
 
   async start() {
-    if (!this.url || !this.video) {
-      throw new Error('Video target missing');
+    if (!this.url || !this.audio) {
+      throw new Error('Audio target missing');
     }
     this.stop();
+    this.configureElement();
     this.notify('connecting');
-    this.configureVideoElement();
     this.abortController = new AbortController();
     const pc = new RTCPeerConnection(RTC_CONFIG);
     this.pc = pc;
     const stream = new MediaStream();
     pc.ontrack = (event) => {
-      event.streams[0]?.getTracks().forEach((mediaTrack) => stream.addTrack(mediaTrack));
-      this.video.srcObject = stream;
-      if (event.track?.kind === 'video' && 'playoutDelayHint' in event.receiver) {
+      event.streams[0]?.getTracks().forEach((track) => stream.addTrack(track));
+      this.audio.srcObject = stream;
+      if (event.receiver && 'playoutDelayHint' in event.receiver) {
         event.receiver.playoutDelayHint = 0;
       }
     };
-    pc.addTransceiver('video', { direction: 'recvonly' });
     pc.addTransceiver('audio', { direction: 'recvonly' });
 
     pc.onconnectionstatechange = () => {
-      const state = pc.connectionState;
-      this.notify(state);
+      this.notify(pc.connectionState);
     };
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState;
@@ -69,12 +65,8 @@ export class WhepPlayer {
     };
 
     try {
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true,
-      });
+      const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
       await pc.setLocalDescription(offer);
-
       const response = await fetch(this.url, {
         method: 'POST',
         headers: {
@@ -85,7 +77,7 @@ export class WhepPlayer {
         signal: this.abortController.signal,
       });
       if (!response.ok) {
-        throw new Error(`WHEP request failed: ${response.status}`);
+        throw new Error(`WHEP audio request failed: ${response.status}`);
       }
       const answerSdp = await response.text();
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
@@ -94,7 +86,7 @@ export class WhepPlayer {
           receiver.playoutDelayHint = 0;
         }
       });
-      await this.video.play().catch(() => {});
+      await this.audio.play().catch(() => {});
       this.notify('playing');
     } catch (err) {
       this.notify('error', err.message);
@@ -109,13 +101,13 @@ export class WhepPlayer {
       this.abortController = null;
     }
     if (this.pc) {
-      this.pc.getSenders().forEach((sender) => sender.track?.stop());
-      this.pc.getReceivers().forEach((receiver) => receiver.track?.stop());
+      this.pc.getSenders().forEach((s) => s.track?.stop());
+      this.pc.getReceivers().forEach((r) => r.track?.stop());
       this.pc.close();
       this.pc = null;
     }
-    if (this.video) {
-      this.video.srcObject = null;
+    if (this.audio) {
+      this.audio.srcObject = null;
     }
     this.notify('stopped');
   }
