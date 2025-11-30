@@ -13,6 +13,9 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	if media.PublishURL == "" {
 		return fmt.Errorf("media publishUrl missing")
 	}
+	if media.AudioPublishURL == "" && audio.CaptureEnabled {
+		return fmt.Errorf("audio publishUrl missing")
+	}
 	if media.VideoWidth <= 0 || media.VideoHeight <= 0 || media.VideoFPS <= 0 || media.VideoBitrate <= 0 {
 		return fmt.Errorf("invalid media dimensions/bitrate")
 	}
@@ -21,6 +24,9 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	}
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "PUBLISH_URL=%s\n", media.PublishURL)
+	if audio.CaptureEnabled && media.AudioPublishURL != "" {
+		fmt.Fprintf(&buf, "AUDIO_PUBLISH_URL=%s\n", media.AudioPublishURL)
+	}
 	fmt.Fprintf(&buf, "VIDEO_WIDTH=%d\n", media.VideoWidth)
 	fmt.Fprintf(&buf, "VIDEO_HEIGHT=%d\n", media.VideoHeight)
 	fmt.Fprintf(&buf, "VIDEO_FPS=%d\n", media.VideoFPS)

@@ -1,0 +1,16 @@
+[Unit]
+Description=Rover Audio Publisher (ALSA -> SRT)
+After=network-online.target roverd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=roverd
+Group=roverd
+EnvironmentFile=/var/lib/roverd/video.env
+ExecStart=/usr/local/bin/audio-only-publisher
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

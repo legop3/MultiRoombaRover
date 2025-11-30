@@ -66,16 +66,19 @@ type AudioConfig struct {
 }
 
 type MediaConfig struct {
-	PublishURL     string   `yaml:"publishUrl" json:"publishUrl,omitempty"`
-	PublishPort    int      `yaml:"publishPort" json:"-"`
-	Manage         bool     `yaml:"manage"`
-	Service        string   `yaml:"service"`
-	HealthURL      string   `yaml:"healthUrl"`
-	HealthInterval Duration `yaml:"healthInterval"`
-	VideoWidth     int      `yaml:"videoWidth" json:"-"`
-	VideoHeight    int      `yaml:"videoHeight" json:"-"`
-	VideoFPS       int      `yaml:"videoFps" json:"-"`
-	VideoBitrate   int      `yaml:"videoBitrate" json:"-"`
+	PublishURL      string   `yaml:"publishUrl" json:"publishUrl,omitempty"`
+	AudioPublishURL string   `yaml:"audioPublishUrl" json:"audioPublishUrl,omitempty"`
+	PublishPort     int      `yaml:"publishPort" json:"-"`
+	Manage          bool     `yaml:"manage"`
+	ManageAudio     bool     `yaml:"manageAudio"`
+	Service         string   `yaml:"service"`
+	AudioService    string   `yaml:"audioService"`
+	HealthURL       string   `yaml:"healthUrl"`
+	HealthInterval  Duration `yaml:"healthInterval"`
+	VideoWidth      int      `yaml:"videoWidth" json:"-"`
+	VideoHeight     int      `yaml:"videoHeight" json:"-"`
+	VideoFPS        int      `yaml:"videoFps" json:"-"`
+	VideoBitrate    int      `yaml:"videoBitrate" json:"-"`
 }
 
 type CameraServoConfig struct {
@@ -201,6 +204,13 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		cfg.Media.PublishURL = derived
 	}
+	if cfg.Media.AudioPublishURL == "" {
+		derived, err := derivePublishURL(cfg.ServerURL, cfg.Name+"-audio", cfg.Media.PublishPort)
+		if err != nil {
+			return nil, fmt.Errorf("derive audioPublishUrl: %w", err)
+		}
+		cfg.Media.AudioPublishURL = derived
+	}
 	if err := validateServoConfig(&cfg.CameraServo); err != nil {
 		return nil, fmt.Errorf("cameraServo: %w", err)
 	}
@@ -268,9 +278,9 @@ func validateAudioConfig(cfg *AudioConfig) {
 	}
 }
 
-func derivePublishURL(serverURL, roverName string, port int) (string, error) {
-	if roverName == "" {
-		return "", errors.New("missing rover name for publishUrl")
+func derivePublishURL(serverURL, streamName string, port int) (string, error) {
+	if streamName == "" {
+		return "", errors.New("missing stream name for publishUrl")
 	}
 	parsed, err := url.Parse(serverURL)
 	if err != nil {
@@ -283,6 +293,6 @@ func derivePublishURL(serverURL, roverName string, port int) (string, error) {
 	if port <= 0 {
 		port = 9000
 	}
-	streamName := url.PathEscape(roverName)
-	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316", host, port, streamName), nil
+	escaped := url.PathEscape(streamName)
+	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316", host, port, escaped), nil
 }

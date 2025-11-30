@@ -206,6 +206,10 @@ install -D -o root -g root -m 0755 pi/bin/video-publisher.sh /usr/local/bin/vide
 log "Installed video-publisher helper"
 install -m 0644 pi/systemd/video-publisher.service /etc/systemd/system/video-publisher.service
 log "Installed video-publisher systemd unit"
+# Install audio-only publisher assets
+install -D -o root -g root -m 0755 pi/bin/audio-only-publisher.sh /usr/local/bin/audio-only-publisher
+install -m 0644 pi/systemd/audio-only-publisher.service /etc/systemd/system/audio-only-publisher.service
+log "Installed audio-only publisher helper + systemd unit"
 # Install audio capture assets (arecord -> FIFO) [optional, not enabled by default]
 install -D -o root -g root -m 0755 pi/bin/audio-capture.sh /usr/local/bin/audio-capture
 install -m 0644 pi/systemd/audio-capture.service /etc/systemd/system/audio-capture.service
@@ -214,6 +218,7 @@ install -d -o roverd -g roverd /var/lib/roverd
 cat > /var/lib/roverd/video.env <<'ENV'
 # Managed by roverd; placeholder values will be overwritten at runtime.
 PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
+AUDIO_PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-audio,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
 VIDEO_WIDTH=1280
 VIDEO_HEIGHT=720
 VIDEO_FPS=30
@@ -245,12 +250,14 @@ install_audio_support
 systemctl daemon-reload
 systemctl enable roverd.service
 systemctl enable video-publisher.service
+systemctl enable audio-only-publisher.service
 if [[ $CONFIG_EXISTS -eq 1 ]]; then
 	systemctl restart roverd.service
 	systemctl restart video-publisher.service
-	log "Restarted roverd + video publisher"
+	systemctl restart audio-only-publisher.service
+	log "Restarted roverd + video/audio publishers"
 else
-	log "Skipped auto-start because config is the sample; edit $CONFIG_DEST then run: sudo systemctl restart roverd video-publisher"
+	log "Skipped auto-start because config is the sample; edit $CONFIG_DEST then run: sudo systemctl restart roverd video-publisher audio-only-publisher"
 fi
 
 log "Install complete"
