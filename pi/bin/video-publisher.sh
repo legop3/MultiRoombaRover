@@ -35,9 +35,9 @@ AUDIO_CODEC="libopus"
 AUDIO_RATE="${AUDIO_RATE:-48000}"
 AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
 # Output params (tuned for low CPU/bandwidth).
-AUDIO_OUT_RATE="${AUDIO_OUT_RATE:-48000}"
+AUDIO_OUT_RATE="${AUDIO_OUT_RATE:-16000}"
 AUDIO_OUT_CHANNELS="${AUDIO_OUT_CHANNELS:-1}"
-AUDIO_BITRATE="${AUDIO_BITRATE:-32000}"
+AUDIO_BITRATE="${AUDIO_BITRATE:-24000}"
 AUDIO_FORMAT="${AUDIO_FORMAT:-S32_LE}"
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
@@ -125,6 +125,7 @@ run_pipeline() {
 			-ar "${AUDIO_RATE}" \
 			-ac "${AUDIO_CHANNELS}" \
 			-i <(arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -B 65536 -F 2048 -q -t raw) \
+			-af "aresample=16000,pan=mono|c0=0.5*FL+0.5*FR" \
 			-map 0:v:0 -map 1:a:0 \
 			-c:v copy \
 			-c:a "${AUDIO_CODEC}" \
@@ -132,7 +133,7 @@ run_pipeline() {
 			-ar:a "${AUDIO_OUT_RATE}" \
 			-ac:a "${AUDIO_OUT_CHANNELS}" \
 			-application lowdelay \
-			-frame_duration 5 \
+			-frame_duration 20 \
 			-compression_level 0 \
 			-muxpreload 0 \
 			-muxdelay 0 \
