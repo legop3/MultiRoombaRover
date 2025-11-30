@@ -73,7 +73,9 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
   async function handleSend(event) {
     event.preventDefault();
     if (!canChat || hideInput) return;
-    const clean = draft.trim();
+    // Allow users to type "\n" to represent a newline in messages
+    const normalizedDraft = draft.replace(/\\n/g, '\n');
+    const clean = normalizedDraft.trim();
     if (!clean) return;
     setSending(true);
     try {
@@ -121,7 +123,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
                 {msg.roverId && (
                   <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {msg.roverId}</span>
                 )}
-                <span className="text-slate-100 break-words leading-tight">{msg.text}</span>
+                <span className="text-slate-100 break-words leading-tight whitespace-pre-wrap">{msg.text}</span>
               </div>
             );
           })

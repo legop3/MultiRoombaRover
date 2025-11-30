@@ -56,6 +56,11 @@ function resolveRoverId(socketId) {
   return assignment?.roverId || null;
 }
 
+function normalizeUserText(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/\\n/g, '\n');
+}
+
 function buildMessage(socket, text, meta = {}) {
   const roverId = meta.roverId || resolveRoverId(socket?.id);
   return {
@@ -94,7 +99,8 @@ function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
   //   cb({ error: 'Spectators cannot chat' });
   //   return;
   // }
-  const clean = typeof text === 'string' ? text.trim() : '';
+  const normalized = normalizeUserText(text);
+  const clean = normalized.trim();
   if (!clean) {
     cb({ error: 'Message required' });
     return;
@@ -153,7 +159,8 @@ function maybeSpeak(socket, message, ttsOptions) {
 }
 
 function sendExternalMessage({ text, nickname = 'Discord', role = 'admin', roverId = null }) {
-  const clean = typeof text === 'string' ? text.trim() : '';
+  const normalized = normalizeUserText(text);
+  const clean = normalized.trim();
   if (!clean || clean.length > 256) {
     throw new Error('Message invalid');
   }
