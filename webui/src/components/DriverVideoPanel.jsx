@@ -9,9 +9,13 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const rosterEntry =
     roverId && session?.roster ? session.roster.find((item) => String(item.id) === String(roverId)) : null;
   const hasAudio = Boolean(rosterEntry?.media?.audioPublishUrl);
-  const sources = useVideoRequests(
-    roverId ? [{ type: 'rover', id: roverId, audioId: hasAudio ? `${roverId}-audio` : null }] : [],
-  );
+  const entries = roverId
+    ? [
+        { type: 'rover', id: roverId, key: roverId },
+        ...(hasAudio ? [{ type: 'rover', id: `${roverId}-audio`, key: `${roverId}-audio` }] : []),
+      ]
+    : [];
+  const sources = useVideoRequests(entries);
   const info = roverId ? sources[roverId] : null;
   const audioInfo = roverId && hasAudio ? sources[`${roverId}-audio`] : null;
   const frame = useTelemetryFrame(roverId);

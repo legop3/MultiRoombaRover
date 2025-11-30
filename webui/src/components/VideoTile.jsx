@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { WhepPlayer } from '../lib/whepPlayer.js';
-import { AudioWhepPlayer } from '../lib/audioWhepPlayer.js';
 
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
@@ -177,10 +176,11 @@ export default function VideoTile({
       }
     };
 
-    player = new AudioWhepPlayer({
+    player = new WhepPlayer({
       url: audioSessionInfo.url,
       token: audioSessionInfo.token,
-      audio: audioRef.current,
+      video: audioRef.current,
+      audioOnly: true,
       onStatus: handleStatus,
     });
 

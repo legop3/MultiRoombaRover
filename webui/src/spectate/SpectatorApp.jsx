@@ -118,11 +118,13 @@ export default function SpectatorApp() {
   useSpectatorMode();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
-  const entries = roster.map((rover) => ({
-    type: 'rover',
-    id: rover.id,
-    audioId: rover.media?.audioPublishUrl ? `${rover.id}-audio` : null,
-  }));
+  const entries = roster.flatMap((rover) => {
+    const base = { type: 'rover', id: rover.id, key: rover.id };
+    if (rover.media?.audioPublishUrl) {
+      return [base, { type: 'rover', id: `${rover.id}-audio`, key: `${rover.id}-audio` }];
+    }
+    return [base];
+  });
   const videoSources = useVideoRequests(entries);
 
   return (

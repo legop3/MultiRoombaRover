@@ -1,4 +1,4 @@
-import { buildAuthHeader } from './whepAuth.js';
+/* global Buffer */
 
 const RTC_CONFIG = {
   iceServers: [
@@ -9,11 +9,29 @@ const RTC_CONFIG = {
   rtcpMuxPolicy: 'require',
 };
 
+function encodeBase64(value) {
+  if (typeof btoa === 'function') {
+    return btoa(value);
+  }
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(value).toString('base64');
+  }
+  throw new Error('No base64 encoder available');
+}
+
+function buildAuthHeader(token) {
+  if (!token) return {};
+  const credential = `${token}:${token}`;
+  const encoded = encodeBase64(credential);
+  return { Authorization: `Basic ${encoded}` };
+}
+
 export class WhepPlayer {
-  constructor({ url, token, video, onStatus }) {
+  constructor({ url, token, video, onStatus, audioOnly = false }) {
     this.url = url;
     this.token = token;
     this.video = video;
+    this.audioOnly = audioOnly;
     this.pc = null;
     this.abortController = null;
     this.onStatus = onStatus;
@@ -38,7 +56,7 @@ export class WhepPlayer {
 
   async start() {
     if (!this.url || !this.video) {
-      throw new Error('Video target missing');
+      throw new Error('Media target missing');
     }
     this.stop();
     this.notify('connecting');
@@ -54,8 +72,12 @@ export class WhepPlayer {
         event.receiver.playoutDelayHint = 0;
       }
     };
-    pc.addTransceiver('video', { direction: 'recvonly' });
-    pc.addTransceiver('audio', { direction: 'recvonly' });
+    if (this.audioOnly) {
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+    } else {
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+    }
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
@@ -71,7 +93,7 @@ export class WhepPlayer {
     try {
       const offer = await pc.createOffer({
         offerToReceiveAudio: true,
-        offerToReceiveVideo: true,
+        offerToReceiveVideo: !this.audioOnly,
       });
       await pc.setLocalDescription(offer);
 
