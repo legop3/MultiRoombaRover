@@ -210,10 +210,6 @@ log "Installed video-publisher systemd unit"
 install -D -o root -g root -m 0755 pi/bin/audio-only-publisher.sh /usr/local/bin/audio-only-publisher
 install -m 0644 pi/systemd/audio-only-publisher.service /etc/systemd/system/audio-only-publisher.service
 log "Installed audio-only publisher helper + systemd unit"
-# Install audio capture assets (arecord -> FIFO) [optional, not enabled by default]
-install -D -o root -g root -m 0755 pi/bin/audio-capture.sh /usr/local/bin/audio-capture
-install -m 0644 pi/systemd/audio-capture.service /etc/systemd/system/audio-capture.service
-log "Installed audio-capture helper + systemd unit"
 install -d -o roverd -g roverd /var/lib/roverd
 cat > /var/lib/roverd/video.env <<'ENV'
 # Managed by roverd; placeholder values will be overwritten at runtime.

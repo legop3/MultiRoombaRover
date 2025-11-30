@@ -42,7 +42,7 @@ run_pipeline() {
 		-ar "${AUDIO_RATE}" \
 		-ac "${AUDIO_CHANNELS}" \
 		-i <(arecord -D "${AUDIO_DEVICE}" -f S32_LE -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -B 65536 -F 2048 -q -t raw) \
-		-af "aresample=16000,pan=mono|c0=0.5*FL+0.5*FR" \
+		-af "aresample=16000,pan=mono|c0=0.5*FL+0.5*FR,volume=10dB" \
 		-c:a libopus \
 		-b:a 24000 \
 		-ar:a 16000 \
