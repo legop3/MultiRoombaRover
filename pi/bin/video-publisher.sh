@@ -124,7 +124,7 @@ run_pipeline() {
 			-f s32le \
 			-ar "${AUDIO_RATE}" \
 			-ac "${AUDIO_CHANNELS}" \
-			-i <(arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -q -t raw) \
+			-i <(arecord -D "${AUDIO_DEVICE}" -f "${AUDIO_FORMAT}" -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -B 4096 -F 1024 -q -t raw) \
 			-map 0:v:0 -map 1:a:0 \
 			-c:v copy \
 			-c:a "${AUDIO_CODEC}" \
