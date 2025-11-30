@@ -304,7 +304,7 @@ function BatteryBarVertical({ visual }) {
   if (!visual?.available) return null;
   const percentText = `${visual.percentDisplay}%`;
   return (
-    <div className="pointer-events-none absolute right-1 top-1 flex h-[70%] flex-col items-center justify-end rounded bg-black/60 px-0.5 pb-1 pt-1">
+    <div className="pointer-events-none absolute right-1 top-1/2 flex h-[70%] -translate-y-1/2 flex-col items-center justify-end rounded bg-black/60 px-0.5 pb-1 pt-1">
       <div className="flex h-full w-4 items-end overflow-hidden rounded bg-zinc-900">
         <div
           className={`${visual.barClass} w-full transition-[height]`}
@@ -346,21 +346,16 @@ function HudOverlay({
     ];
     return (
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="absolute left-1 top-1 flex flex-col gap-0.25 bg-black/70 px-1 py-0.5 text-[0.65rem] font-medium text-slate-100">
+        <div className="absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.25 bg-black/70 px-1 py-0.75 text-[0.65rem] text-slate-100">
+          <span className="text-[0.6rem] uppercase tracking-wide text-slate-400">Telemetry</span>
           <span>Status: {status}</span>
           {audioStatus ? <span>Audio: {audioStatus}</span> : null}
-        </div>
-
-        <div className="absolute bottom-1 left-1 flex flex-col gap-0.25 bg-black/70 px-1 py-0.5 text-[0.65rem] text-slate-100">
-          <span className="text-[0.6rem] uppercase tracking-wide text-slate-400">Telemetry</span>
-          <div className="grid grid-cols-2 gap-x-1 gap-y-0.25">
-            {telemetryEntries.map(([labelText, value]) => (
-              <span key={labelText} className="flex items-center justify-between gap-0.5">
-                <span className="text-slate-400">{labelText}</span>
-                <span className="font-semibold text-white">{value}</span>
-              </span>
-            ))}
-          </div>
+          {telemetryEntries.map(([labelText, value]) => (
+            <span key={labelText} className="flex items-center justify-between gap-0.5">
+              <span className="text-slate-400">{labelText}</span>
+              <span className="font-semibold text-white">{value}</span>
+            </span>
+          ))}
         </div>
 
         <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-1 bg-black/80 px-1 py-0.5 text-[0.8rem] text-slate-100">
