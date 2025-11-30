@@ -346,10 +346,13 @@ function HudOverlay({
     ];
     return (
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="absolute left-1 top-1 bg-black/70 px-1 py-0.5 text-[0.65rem] font-medium text-slate-100">
+          <span>Status: {status}</span>
+          {audioStatus ? <div>Audio: {audioStatus}</div> : null}
+        </div>
+
         <div className="absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.25 bg-black/70 px-1 py-0.75 text-[0.65rem] text-slate-100">
           <span className="text-[0.6rem] uppercase tracking-wide text-slate-400">Telemetry</span>
-          <span>Status: {status}</span>
-          {audioStatus ? <span>Audio: {audioStatus}</span> : null}
           {telemetryEntries.map(([labelText, value]) => (
             <span key={labelText} className="flex items-center justify-between gap-0.5">
               <span className="text-slate-400">{labelText}</span>
