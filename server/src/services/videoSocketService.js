@@ -86,10 +86,11 @@ io.on('connection', (socket) => {
         throw new Error('video source required');
       }
       if (target.type === 'rover') {
-        if (!roverManager.rovers.has(target.id)) {
+        const baseId = target.id.endsWith('-audio') ? target.id.slice(0, -6) : target.id;
+        if (!roverManager.rovers.has(baseId)) {
           throw new Error('Rover offline');
         }
-        if (!canViewRover(socket, target.id)) {
+        if (!canViewRover(socket, baseId)) {
           throw new Error('Not authorized for video');
         }
       } else if (target.type === 'room') {
