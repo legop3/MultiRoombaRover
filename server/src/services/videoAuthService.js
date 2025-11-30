@@ -46,8 +46,8 @@ function extractStreamInfo(path) {
   const remaining = segments.slice(start, end);
   if (remaining.length === 1) {
     const rawId = remaining[0] || '';
-    const id = rawId.endsWith('-audio') ? rawId.slice(0, -6) : rawId;
-    return { type: 'rover', id };
+    const baseId = rawId.endsWith('-audio') ? rawId.slice(0, -6) : rawId;
+    return { type: 'rover', id: rawId, baseId };
   }
   if (remaining.length === 2 && remaining[0] === 'room') {
     return { type: 'room', id: remaining[1] || '' };
@@ -98,7 +98,8 @@ app.post('/mediamtx/auth', (req, res) => {
   }
   const role = getRole(socket);
   if (streamInfo.type === 'rover' && role !== 'spectator' && !isAdmin(socket)) {
-    if (!roverManager.isDriver(streamInfo.id, socket)) {
+    const roverId = streamInfo.baseId || streamInfo.id;
+    if (!roverManager.isDriver(roverId, socket)) {
       return res.status(401).end();
     }
   }
