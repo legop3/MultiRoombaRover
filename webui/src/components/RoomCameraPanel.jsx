@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
+import { useSettingsNamespace } from '../settings/index.js';
 import RoomCameraFeed from './RoomCameraFeed.jsx';
 
 function EmptyState() {
@@ -26,20 +27,39 @@ export default function RoomCameraPanel({
   orientation: forcedOrientation,
   hideLayoutToggle = false,
   hideHeader = false,
+  panelId = null,
 }) {
   const { session } = useSession();
   const cameras = session?.roomCameras || [];
   const sourceDescriptors = cameras.map((camera) => ({ type: 'room', id: camera.id, key: `room:${camera.id}` }));
   const videoSources = useVideoRequests(sourceDescriptors);
+  const { value: orientationSettings, save: saveOrientationSettings } = useSettingsNamespace('roomCameraPanels', {});
   const [orientation, setOrientation] = useState(() =>
-    normalizeOrientation(defaultOrientation, 'horizontal'),
+    normalizeOrientation(
+      panelId ? orientationSettings?.[panelId] : defaultOrientation,
+      'horizontal',
+    ),
   );
+
+  useEffect(() => {
+    if (!panelId) return;
+    const stored = orientationSettings?.[panelId];
+    if (!stored) return;
+    setOrientation(normalizeOrientation(stored, 'horizontal'));
+    // only respond to changes for this panel id
+  }, [panelId, orientationSettings?.[panelId]]);
   const effectiveOrientation = forcedOrientation
     ? normalizeOrientation(forcedOrientation, 'horizontal')
     : orientation;
   const containerClass =
     effectiveOrientation === 'vertical' ? 'flex flex-col gap-0.5' : 'grid gap-0.5 md:grid-cols-2';
   const showLayoutToggle = !hideLayoutToggle && !forcedOrientation && cameras.length > 0;
+  const applyOrientation = (next) => {
+    setOrientation(next);
+    if (panelId) {
+      saveOrientationSettings((current) => ({ ...(current || {}), [panelId]: next }));
+    }
+  };
 
   if (cameras.length === 0) {
     return <EmptyState />;
@@ -62,7 +82,7 @@ export default function RoomCameraPanel({
                     key={option}
                     type="button"
                     className={`px-1 py-0.5 ${effectiveOrientation === option ? 'bg-slate-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`}
-                    onClick={() => setOrientation(option)}
+                    onClick={() => applyOrientation(option)}
                   >
                     {option === 'vertical' ? 'Vertical' : 'Grid'}
                   </button>
@@ -77,7 +97,7 @@ export default function RoomCameraPanel({
           const key = `room:${camera.id}`;
           const sessionInfo = videoSources[key];
           return (
-            <article key={camera.id} className="w-full space-y-0.5 rounded border border-slate-800 bg-zinc-950 p-0.5">
+            <article key={camera.id} className="w-full space-y-0.5 rounded bg-zinc-950 p-0.5 shadow-inner shadow-black/40">
               {/* <header className="space-y-0.5">
                 <p className="text-lg font-semibold text-white">{camera.name || camera.id}</p>
                 {camera.description && <p className="text-xs text-slate-500">{camera.description}</p>}

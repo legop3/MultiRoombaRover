@@ -126,14 +126,21 @@ export default function RoomCameraFeed({ sessionInfo, label }) {
     : status;
 
   return (
-    <div className="space-y-0.5">
-      <div className="relative aspect-video w-full overflow-hidden bg-black">
-        <video ref={videoRef} muted={muted} playsInline autoPlay controls={false} className="h-full w-full object-cover" />
-        <div className="pointer-events-none absolute left-0 top-0 bg-black/70 px-0.5 py-0.5 text-xs font-semibold text-white">
-          {label}
-        </div>
+    <div className="relative aspect-video w-full overflow-hidden rounded bg-black">
+      <video
+        ref={videoRef}
+        muted={muted}
+        playsInline
+        autoPlay
+        controls={false}
+        className="h-full w-full object-cover"
+      />
+      <div className="pointer-events-none absolute left-0 top-0 bg-black/70 px-0.5 py-0.5 text-xs font-semibold text-white">
+        {label}
       </div>
-      <p className="text-xs text-slate-500">{renderedStatus}</p>
+      <div className="pointer-events-none absolute bottom-0 left-0 m-0.5 rounded bg-black/70 px-0.5 py-0.25 text-[0.7rem] text-slate-100">
+        {renderedStatus}
+      </div>
     </div>
   );
 }

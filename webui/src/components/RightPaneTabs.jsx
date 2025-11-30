@@ -21,14 +21,14 @@ export default function RightPaneTabs({ layout }) {
           <TabPanel id="telemetry">
             <div className="space-y-0.5">
               <DrivePanel />
-              <RoomCameraPanel defaultOrientation="horizontal" />
+              <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
               <TelemetryPanel />
               <CameraServoPanel />
             </div>
           </TabPanel>
           <TabPanel id="room">
             <div className="space-y-0.5">
-              <RoomCameraPanel defaultOrientation="vertical" />
+              <RoomCameraPanel defaultOrientation="vertical" panelId="rightpane-room" />
               <HomeAssistantControls />
             </div>
           </TabPanel>

@@ -4,6 +4,32 @@ import { WhepPlayer } from '../lib/whepPlayer.js';
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 
+function buildBatteryVisual(charge, config) {
+  const full = config?.Full;
+  const warn = config?.Warn;
+  const urgent = config?.Urgent ?? null;
+  if (charge == null || full == null || warn == null) {
+    return { available: false };
+  }
+
+  const span = full - warn;
+  if (span <= 0) return { available: false };
+  const normalized = (charge - warn) / span;
+  const percent = Math.min(1, Math.max(0, normalized));
+  const percentDisplay = Math.round(percent * 100);
+  const depleted = normalized <= 0;
+  const warnTriggered = urgent != null && charge <= urgent;
+  const barClass = depleted ? 'bg-red-500 animate-pulse' : warnTriggered ? 'bg-amber-400' : 'bg-emerald-500';
+
+  return {
+    available: true,
+    percentDisplay,
+    depleted,
+    warnTriggered,
+    barClass,
+  };
+}
+
 export default function VideoTile({
   sessionInfo,
   audioSessionInfo,
@@ -12,6 +38,8 @@ export default function VideoTile({
   telemetryFrame,
   batteryConfig,
   layoutFormat = 'desktop',
+  hudVariant = 'default',
+  driverLabel = null,
 }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -28,6 +56,7 @@ export default function VideoTile({
   const sensors = telemetryFrame?.sensors;
   const batteryCharge = sensors?.batteryChargeMah ?? null;
   const desktopLayout = layoutFormat === 'desktop';
+  const batteryVisual = buildBatteryVisual(batteryCharge, batteryConfig);
   // console.log('[BatteryBarDebug]', {
   //   frameSensors: sensors,
   //   batteryCharge,
@@ -204,6 +233,16 @@ export default function VideoTile({
     : detail
     ? `${status} (${detail})`
     : status;
+  const renderedAudioStatus = audioSessionInfo?.error
+    ? `Error: ${audioSessionInfo.error}`
+    : !audioSessionInfo?.url
+    ? null
+    : audioStatus === 'error'
+    ? `Error: ${audioDetail || 'unknown'}`
+    : audioDetail
+    ? `${audioStatus} (${audioDetail})`
+    : audioStatus;
+  const showVerticalBattery = hudVariant === 'spectator';
 
   return (
     <div className="flex flex-col gap-0.5">
@@ -217,40 +256,41 @@ export default function VideoTile({
           className="h-full w-full object-contain"
         />
         <audio ref={audioRef} autoPlay hidden />
-        <HudOverlay frame={telemetryFrame} label={label} status={renderedStatus} desktopLayout={desktopLayout}/>
+        <HudOverlay
+          frame={telemetryFrame}
+          label={label}
+          status={renderedStatus}
+          audioStatus={renderedAudioStatus}
+          desktopLayout={desktopLayout}
+          variant={hudVariant}
+          driverLabel={driverLabel}
+          battery={batteryVisual}
+        />
         <OvercurrentOverlay motors={overcurrentMotors} />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />
+        {showVerticalBattery && batteryVisual.available ? (
+          <BatteryBarVertical visual={batteryVisual} />
+        ) : null}
       </div>
-      <BatteryBar charge={batteryCharge} config={batteryConfig} />
+      {!showVerticalBattery && <BatteryBar visual={batteryVisual} />}
     </div>
   );
 }
 
-function BatteryBar({ charge, config }) {
-  const full = config?.Full;
-  const warn = config?.Warn;
-  const urgent = config?.Urgent ?? null;
-  if (charge == null || full == null || warn == null) {
+function BatteryBar({ visual }) {
+  if (!visual?.available) {
     return (
       <div className="panel-section space-y-0.5 text-sm">
         <p className="text-xs text-slate-500">Battery telemetry unavailable</p>
       </div>
     );
   }
-
-  const span = full - warn;
-  if (span <= 0) return null;
-  const normalized = (charge - warn) / span;
-  const percent = Math.min(1, Math.max(0, normalized));
-  const percentDisplay = Math.round(percent * 100);
-  const percentText = `${percentDisplay}%`;
-  const depleted = normalized <= 0;
-  const warnTriggered = urgent != null && charge <= urgent;
-  const barClass = depleted ? 'bg-red-500 animate-pulse' : warnTriggered ? 'bg-amber-400' : 'bg-emerald-500';
+  const percentText = `${visual.percentDisplay}%`;
+  const barClass = visual.barClass;
   return (
     <div className="panel-section space-y-0.5 text-sm">
       <div className="relative h-4 w-full bg-zinc-900 flex">
-        <div className={`h-full transition-[width] ${barClass}`} style={{ width: `${percentDisplay}%` }}>
+        <div className={`h-full transition-[width] ${barClass}`} style={{ width: `${visual.percentDisplay}%` }}>
           <span className="inset-0 flex items-center justify-center text-xs font-semibold text-black/80">
             Battery {percentText}
           </span>
@@ -260,7 +300,32 @@ function BatteryBar({ charge, config }) {
   );
 }
 
-function HudOverlay({ frame, label, status, desktopLayout = true }) {
+function BatteryBarVertical({ visual }) {
+  if (!visual?.available) return null;
+  const percentText = `${visual.percentDisplay}%`;
+  return (
+    <div className="pointer-events-none absolute right-1 top-1 flex h-[70%] flex-col items-center justify-end rounded bg-black/60 px-0.5 pb-1 pt-1">
+      <div className="flex h-full w-4 items-end overflow-hidden rounded bg-zinc-900">
+        <div
+          className={`${visual.barClass} w-full transition-[height]`}
+          style={{ height: `${visual.percentDisplay}%` }}
+        />
+      </div>
+      <span className="mt-0.5 text-[0.65rem] font-semibold text-slate-100">{percentText}</span>
+    </div>
+  );
+}
+
+function HudOverlay({
+  frame,
+  label,
+  status,
+  audioStatus,
+  desktopLayout = true,
+  variant = 'default',
+  driverLabel = null,
+  battery,
+}) {
   const sensors = frame?.sensors;
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const [now, setNow] = useState(() => Date.now());
@@ -272,10 +337,52 @@ function HudOverlay({ frame, label, status, desktopLayout = true }) {
 
   const pulse = frame?.receivedAt ? now - frame.receivedAt < 200 : false;
 
+  if (variant === 'spectator') {
+    const telemetryEntries = [
+      ['Voltage', sensors?.voltageMv != null ? `${(sensors.voltageMv / 1000).toFixed(2)} V` : '--'],
+      ['Current', sensors?.currentMa != null ? `${sensors.currentMa} mA` : '--'],
+      ['Charge', sensors?.batteryChargeMah != null ? `${sensors.batteryChargeMah}` : '--'],
+      ['OI', sensors?.oiMode?.label || '--'],
+    ];
+    return (
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="absolute left-1 top-1 flex flex-col gap-0.25 bg-black/70 px-1 py-0.5 text-[0.65rem] font-medium text-slate-100">
+          <span>Status: {status}</span>
+          {audioStatus ? <span>Audio: {audioStatus}</span> : null}
+        </div>
+
+        <div className="absolute bottom-1 left-1 flex flex-col gap-0.25 bg-black/70 px-1 py-0.5 text-[0.65rem] text-slate-100">
+          <span className="text-[0.6rem] uppercase tracking-wide text-slate-400">Telemetry</span>
+          <div className="grid grid-cols-2 gap-x-1 gap-y-0.25">
+            {telemetryEntries.map(([labelText, value]) => (
+              <span key={labelText} className="flex items-center justify-between gap-0.5">
+                <span className="text-slate-400">{labelText}</span>
+                <span className="font-semibold text-white">{value}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-1 bg-black/80 px-1 py-0.5 text-[0.8rem] text-slate-100">
+          <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
+          {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
+        </div>
+
+        <div className="absolute top-0.5 left-1/2 flex -translate-x-1/2 gap-1 bg-black/70 text-[0.6rem] font-medium text-slate-200">
+          <div className={`${desktopLayout ? 'px-1 py-0.5' : 'px-0.5 py-0 text-nowrap'} ${bumps.bumpLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left bump</div>
+          <div className={`${desktopLayout ? 'px-1 py-0.5' : 'px-0.5 py-0 text-nowrap'} ${bumps.wheelDropLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left wheel drop</div>
+          <div className={`${desktopLayout ? 'px-1 py-0.5' : 'px-0.5 py-0 text-nowrap'} ${bumps.wheelDropRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right wheel drop</div>
+          <div className={`${desktopLayout ? 'px-1 py-0.5' : 'px-0.5 py-0 text-nowrap'} ${bumps.bumpRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right bump</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
       <div className="absolute left-1 top-1 bg-black/70 px-1 py-0.5 text-[0.65rem] font-medium text-slate-100">
         <span>Status: {status}</span>
+        {audioStatus ? <div>Audio: {audioStatus}</div> : null}
       </div>
       <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 px-0.5 py-0.5 text-slate-100">
         <span>Rover: "{label || 'Unnamed Rover'}"</span>

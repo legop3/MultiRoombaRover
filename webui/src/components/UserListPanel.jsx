@@ -91,7 +91,37 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
     return Math.ceil(ms / 1000);
   }, []);
 
-  const listClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : 'h-48 overflow-y-auto';
+  const baseListClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : 'h-48 overflow-y-auto';
+  const turnsListClass = isTurnsMode && fillHeight ? 'max-h-40 overflow-y-auto' : baseListClass;
+  const usersListClass = isTurnsMode && fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : baseListClass;
+
+  const renderUserList = () =>
+    sorted.length === 0 ? (
+      <p className="text-sm text-slate-500">Waiting for users…</p>
+    ) : (
+      sorted.map((user) => {
+        const isAdmin =
+          user.role === 'admin' || user.role === 'lockdown' || user.role === 'lockdown-admin';
+        return (
+          <div
+            key={user.socketId}
+            className="surface-muted flex items-center gap-1 text-sm"
+          >
+            <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
+            {user.roverId ? (
+              <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {user.roverId}</span>
+            ) : (
+              <span className="text-[0.7rem] text-slate-500">no rover</span>
+            )}
+            {isAdmin && (
+              <span className="rounded bg-amber-500/30 px-1 text-[0.7rem] text-amber-200">
+                Admin
+              </span>
+            )}
+          </div>
+        );
+      })
+    );
 
   return (
     <section
@@ -113,7 +143,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
             </span>
           </div>
         )}
-        <div className={`surface space-y-0.25 ${listClass}`}>
+        <div className={`surface space-y-0.25 ${isTurnsMode ? turnsListClass : baseListClass}`}>
           {isTurnsMode ? (
             Object.keys(turnQueues || {}).length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>
@@ -162,33 +192,22 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
                 );
               })
             )
-          ) : sorted.length === 0 ? (
-            <p className="text-sm text-slate-500">Waiting for users…</p>
           ) : (
-            sorted.map((user) => {
-              const isAdmin =
-                user.role === 'admin' || user.role === 'lockdown' || user.role === 'lockdown-admin';
-              return (
-                <div
-                  key={user.socketId}
-                  className="surface-muted flex items-center gap-1 text-sm"
-                >
-                  <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
-                  {user.roverId ? (
-                    <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {user.roverId}</span>
-                  ) : (
-                    <span className="text-[0.7rem] text-slate-500">no rover</span>
-                  )}
-                  {isAdmin && (
-                    <span className="rounded bg-amber-500/30 px-1 text-[0.7rem] text-amber-200">
-                      Admin
-                    </span>
-                  )}
-                </div>
-              );
-            })
+            renderUserList()
           )}
         </div>
+
+        {isTurnsMode ? (
+          <div className={`space-y-0.25 ${fillHeight ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>Users</span>
+              <span className="text-[0.7rem] text-slate-500">{sorted.length}</span>
+            </div>
+            <div className={`surface space-y-0.25 ${usersListClass}`}>
+              {renderUserList()}
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

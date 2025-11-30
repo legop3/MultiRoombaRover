@@ -8,59 +8,23 @@ import RoomCameraPanel from '../components/RoomCameraPanel.jsx';
 import UserListPanel from '../components/UserListPanel.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 import LogPanel from '../components/LogPanel.jsx';
+import RoverRoster from '../components/RoverRoster.jsx';
 
-function TelemetrySummary({ frame }) {
-  const sensors = frame?.sensors || {};
-  const updated = frame?.receivedAt ? new Date(frame.receivedAt).toLocaleTimeString() : null;
-  const entries = [
-    ['Voltage', sensors.voltageMv != null ? `${(sensors.voltageMv / 1000).toFixed(2)} V` : '--'],
-    ['Current', sensors.currentMa != null ? `${sensors.currentMa} mA` : '--'],
-    ['Charge', sensors.batteryChargeMah != null ? `${sensors.batteryChargeMah}` : '--'],
-    ['OI', sensors.oiMode?.label || '--'],
-  ];
-
-  return (
-    <div className="surface-muted flex flex-wrap items-center gap-0.5 rounded px-0.5 py-0.25 text-[0.75rem] text-slate-200">
-      <span className="text-[0.7rem] uppercase tracking-wide text-slate-500">
-        {updated ? `Updated ${updated}` : 'Telemetry'}
-      </span>
-      {entries.map(([label, value]) => (
-        <span key={label} className="flex items-center gap-0.25 rounded bg-slate-900/50 px-0.5 py-0.25">
-          <span className="text-slate-400">{label}</span>
-          <span className="font-semibold text-white">{value}</span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function CurrentDriverBadge({ roverId, session }) {
+function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
   const user = (session?.users || []).find((entry) => entry.socketId === activeDriverId);
   const label = user?.nickname || (activeDriverId ? activeDriverId.slice(0, 6) : 'No driver');
   const mode = session?.mode;
   const turnInfo = session?.turnQueues?.[roverId];
-  const driverText = mode === 'turns' && turnInfo?.current ? `Driver: ${label} (turns)` : `Driver: ${label}`;
+  const driverText = mode === 'turns' && turnInfo?.current ? `${label} (turns)` : label;
 
-  return (
-    <div className="surface-muted text-xs text-slate-300">
-      {driverText}
-    </div>
-  );
+  return driverText;
 }
 
 function RoverSpectatorCard({ rover, frame, videoInfo, audioInfo, session }) {
+  const driverLabel = formatDriverLabel({ roverId: rover.id, session });
   return (
-    <article className="grid min-h-[16rem] grid-rows-[auto_minmax(0,1fr)_auto] gap-0.5 rounded bg-zinc-900 p-0.5 sm:min-h-[18rem]">
-      <header className="flex items-center justify-between gap-0.5">
-        <div className="flex flex-col leading-tight">
-          <h3 className="text-xl font-semibold text-white">{rover.name}</h3>
-          <CurrentDriverBadge roverId={rover.id} session={session} />
-        </div>
-        <span className="rounded bg-slate-800 px-1 text-[0.7rem] text-slate-300">
-          Rover {rover.id}
-        </span>
-      </header>
+    <article className="min-h-[16rem] rounded bg-zinc-900 p-0.5 sm:min-h-[18rem]">
       <div className="min-h-0 overflow-hidden rounded bg-black/20">
         <VideoTile
           sessionInfo={videoInfo}
@@ -68,9 +32,10 @@ function RoverSpectatorCard({ rover, frame, videoInfo, audioInfo, session }) {
           label={rover.name}
           telemetryFrame={frame}
           batteryConfig={rover.battery}
+          hudVariant="spectator"
+          driverLabel={driverLabel}
         />
       </div>
-      <TelemetrySummary frame={frame} />
     </article>
   );
 }
@@ -99,15 +64,20 @@ function SecondaryRow() {
   return (
     <section className="min-h-0">
       <div className="surface min-h-[14rem] overflow-hidden">
-        <RoomCameraPanel defaultOrientation="horizontal" hideLayoutToggle hideHeader />
+        <RoomCameraPanel
+          defaultOrientation="horizontal"
+          hideLayoutToggle
+          hideHeader
+          panelId="spectator-secondary"
+        />
       </div>
     </section>
   );
 }
 
-function LogsRow() {
+function LogsRow({ className = '' }) {
   return (
-    <div className="panel">
+    <div className={`panel ${className}`}>
       <LogPanel />
     </div>
   );
@@ -135,15 +105,18 @@ export default function SpectatorApp() {
             <RoverRow roster={roster} frames={frames} videoSources={videoSources} session={session} />
             <SecondaryRow />
           </section>
-          <section className="grid min-h-0 min-w-0 gap-0.5 md:h-full grid-rows-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
-            <div className="min-h-0 min-w-0 overflow-hidden">
+          <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:h-full">
+            <div className="panel">
+              <RoverRoster roster={roster} title="Rovers" emptyText="No rovers registered." />
+            </div>
+            <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
               <UserListPanel hideNicknameForm hideHeader fillHeight className="h-full" />
             </div>
-            <div className="min-h-0 min-w-0 overflow-hidden">
+            <div className="min-h-0 min-w-0 flex-[1.1] overflow-hidden">
               <ChatPanel hideInput hideSpectatorNotice fillHeight />
             </div>
-            <div className="min-h-0 min-w-0 overflow-hidden">
-              <LogsRow />
+            <div className="min-h-0 min-w-0">
+              <LogsRow className="h-40 overflow-hidden" />
             </div>
           </section>
         </main>
