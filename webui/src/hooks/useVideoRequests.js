@@ -13,11 +13,16 @@ function normalizeEntry(entry) {
   if (typeof entry === 'object') {
     if (entry.type && entry.id) {
       const id = String(entry.id);
+      const audioId = entry.audioId ? String(entry.audioId) : null;
+      let key = entry.key;
+      if (!key) {
+        key = entry.type === 'room' ? `room:${id}` : id;
+      }
       return {
         type: entry.type,
         id,
-        key: entry.key || `${entry.type}:${id}`,
-        audioId: entry.audioId ? String(entry.audioId) : null,
+        key,
+        audioId,
       };
     }
     if (entry.roverId) {
@@ -138,6 +143,9 @@ export function useVideoRequests(sourceList = []) {
     normalizedEntries.forEach((entry) => {
       if (sources[entry.key]) {
         next[entry.key] = sources[entry.key];
+      }
+      if (entry.audioId && sources[entry.audioId]) {
+        next[entry.audioId] = sources[entry.audioId];
       }
     });
     return next;
