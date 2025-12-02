@@ -32,6 +32,11 @@ export function useRoomCameraSnapshots(sourceList = []) {
   const normalizedEntries = useMemo(() => dedupe(sourceList.map(normalizeCamera).filter(Boolean)), [sourceList]);
   const entriesKey = useMemo(() => normalizedEntries.map((e) => e.key).join('|'), [normalizedEntries]);
   const retryTimers = useRef(new Map());
+  const entriesRef = useRef([]);
+
+  useEffect(() => {
+    entriesRef.current = normalizedEntries;
+  }, [normalizedEntries]);
 
   useEffect(() => {
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
@@ -42,10 +47,11 @@ export function useRoomCameraSnapshots(sourceList = []) {
   }, [entriesKey]);
 
   useEffect(() => {
-    if (!normalizedEntries.length || !socket) {
+    if (!entriesKey || !socket) {
       return undefined;
     }
     let cancelled = false;
+    const entries = entriesRef.current;
 
     const clearRetry = (id) => {
       const timer = retryTimers.current.get(id);
@@ -101,7 +107,7 @@ export function useRoomCameraSnapshots(sourceList = []) {
     };
 
     const requestSubscribe = (id) => {
-      const entry = normalizedEntries.find((e) => e.id === id);
+      const entry = entries.find((e) => e.id === id);
       if (!entry) return;
       socket.emit('roomCamera:subscribe', { roomCameraId: entry.id }, (resp = {}) => {
         if (resp.error) {
@@ -117,11 +123,11 @@ export function useRoomCameraSnapshots(sourceList = []) {
     socket.on('roomCamera:frame', handleFrame);
     socket.on('roomCamera:status', handleStatus);
 
-    normalizedEntries.forEach((entry) => requestSubscribe(entry.id));
+    entries.forEach((entry) => requestSubscribe(entry.id));
 
     return () => {
       cancelled = true;
-      normalizedEntries.forEach((entry) => {
+      entries.forEach((entry) => {
         socket.emit('roomCamera:unsubscribe', { roomCameraId: entry.id });
       });
       socket.off('roomCamera:frame', handleFrame);
@@ -131,7 +137,7 @@ export function useRoomCameraSnapshots(sourceList = []) {
       retryTimers.current.forEach((timer) => clearTimeout(timer));
       retryTimers.current.clear();
     };
-  }, [socket, normalizedEntries, entriesKey]);
+  }, [socket, entriesKey]);
 
   const filtered = useMemo(() => {
     if (!entriesKey) return {};
