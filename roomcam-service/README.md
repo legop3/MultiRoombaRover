@@ -19,6 +19,7 @@ Lightweight systemd service that serves a JPEG snapshot from any MJPEG-capable w
    - `QUALITY=5` (ffmpeg MJPEG quality; lower is higher quality)
    - `PORT=8080`
    - `WORKDIR=/run/roomcam`
+   - `INPUT_FORMAT=mjpeg` (use `bayer_grbg8` for OV534/raw Bayer cams; auto-converts to JPEG)
 3) Point the server `roomCameras[].url` to `http://<host>:8080/snapshot.jpg`.
 
 Notes:

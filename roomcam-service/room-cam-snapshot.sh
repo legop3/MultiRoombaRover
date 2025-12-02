@@ -7,6 +7,8 @@ RESOLUTION="${RESOLUTION:-640x480}"
 QUALITY="${QUALITY:-5}" # ffmpeg MJPEG quality (lower is better)
 PORT="${PORT:-8088}"
 WORKDIR="${WORKDIR:-/run/roomcam}"
+# Optional: set INPUT_FORMAT=bayer_grbg8 to transcode raw Bayer cams (e.g., OV534) to JPEG.
+INPUT_FORMAT="${INPUT_FORMAT:-mjpeg}"
 
 mkdir -p "${WORKDIR}"
 SNAPSHOT_PATH="${WORKDIR}/snapshot.jpg"
@@ -18,9 +20,17 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 0' SIGTERM INT
 
+FFMPEG_INPUT_ARGS=(-f v4l2 -input_format "${INPUT_FORMAT}" -video_size "${RESOLUTION}" -i "${DEVICE}")
+FFMPEG_FILTERS=()
+if [[ "${INPUT_FORMAT}" == bayer_* ]]; then
+  # Convert raw Bayer to a JPEG-friendly pixel format.
+  FFMPEG_FILTERS=(-pix_fmt yuv420p)
+fi
+
 /usr/bin/ffmpeg \
   -loglevel warning -nostats \
-  -f v4l2 -input_format mjpeg -video_size "${RESOLUTION}" -i "${DEVICE}" \
+  "${FFMPEG_INPUT_ARGS[@]}" \
+  "${FFMPEG_FILTERS[@]}" \
   -q:v "${QUALITY}" \
   -f image2 -update 1 "${SNAPSHOT_PATH}" &
 FFMPEG_PID=$!
