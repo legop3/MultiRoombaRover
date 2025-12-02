@@ -7,9 +7,8 @@ Wants=network-online.target
 Type=simple
 Environment=DEVICE=/dev/video0
 Environment=RESOLUTION=640x480
-Environment=FPS=4
 Environment=QUALITY=5
-Environment=PORT=8080
+Environment=PORT=8088
 Environment=WORKDIR=/run/roomcam
 WorkingDirectory=/home/daniel/gits/MultiRoombaRover/roomcam-service
 ExecStart=/usr/bin/env bash /home/daniel/gits/MultiRoombaRover/roomcam-service/room-cam-snapshot.sh
