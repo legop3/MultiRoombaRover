@@ -5,16 +5,17 @@ export function useRoomCameraSnapshots(sourceList = []) {
   const socket = useSocket();
   const [feeds, setFeeds] = useState({});
   const objectUrls = useRef(new Map());
-  const entriesKey = useMemo(() => sourceList.map((e) => (typeof e === 'string' ? e : e.id)).join('|'), [sourceList]);
+  const ids = useMemo(() => sourceList.map((e) => (typeof e === 'string' ? e : e.id)), [sourceList]);
+  const idsKey = useMemo(() => ids.join('|'), [ids]);
 
   useEffect(() => {
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.current.clear();
     setFeeds({});
-  }, [entriesKey]);
+  }, [idsKey]);
 
   useEffect(() => {
-    if (!sourceList.length || !socket) {
+    if (!ids.length || !socket) {
       return undefined;
     }
     let cancelled = false;
@@ -58,17 +59,17 @@ export function useRoomCameraSnapshots(sourceList = []) {
     socket.on('roomCamera:frame', handleFrame);
     socket.on('roomCamera:status', handleStatus);
 
-    socket.emit('roomCamera:subscribe', { ids: sourceList.map((e) => (typeof e === 'string' ? e : e.id)) });
+    socket.emit('roomCamera:subscribe', { ids });
 
     return () => {
       cancelled = true;
-      socket.emit('roomCamera:unsubscribe', { ids: sourceList.map((e) => (typeof e === 'string' ? e : e.id)) });
+      socket.emit('roomCamera:unsubscribe', { ids });
       socket.off('roomCamera:frame', handleFrame);
       socket.off('roomCamera:status', handleStatus);
       objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.current.clear();
     };
-  }, [socket, sourceList, entriesKey]);
+  }, [socket, idsKey, ids]);
 
   return feeds;
 }
