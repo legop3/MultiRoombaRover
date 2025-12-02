@@ -8,6 +8,7 @@ export function useRoomCameraSnapshots(sourceList = []) {
   const ids = useMemo(() => sourceList.map((e) => (typeof e === 'string' ? e : e.id)), [sourceList]);
   const idsKey = useMemo(() => ids.join('|'), [ids]);
   const idsRef = useRef([]);
+  const retryTimer = useRef(null);
 
   useEffect(() => {
     idsRef.current = ids;
@@ -17,6 +18,10 @@ export function useRoomCameraSnapshots(sourceList = []) {
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.current.clear();
     setFeeds({});
+    if (retryTimer.current) {
+      clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
   }, [idsKey]);
 
   useEffect(() => {
@@ -60,12 +65,35 @@ export function useRoomCameraSnapshots(sourceList = []) {
           objectUrl: prev[meta.id]?.objectUrl || null,
         },
       }));
+      if (meta.error && !cancelled) {
+        scheduleRetry();
+      }
+    };
+
+    const scheduleRetry = (delay = 5000) => {
+      if (retryTimer.current) {
+        clearTimeout(retryTimer.current);
+      }
+      retryTimer.current = setTimeout(() => {
+        retryTimer.current = null;
+        if (!cancelled) {
+          socket.emit('roomCamera:subscribe', { ids: currentIds }, (resp = {}) => {
+            if (resp.error && !retryTimer.current) {
+              scheduleRetry();
+            }
+          });
+        }
+      }, delay);
     };
 
     socket.on('roomCamera:frame', handleFrame);
     socket.on('roomCamera:status', handleStatus);
 
-    socket.emit('roomCamera:subscribe', { ids: currentIds });
+    socket.emit('roomCamera:subscribe', { ids: currentIds }, (resp = {}) => {
+      if (resp.error) {
+        scheduleRetry();
+      }
+    });
 
     return () => {
       cancelled = true;
@@ -74,6 +102,10 @@ export function useRoomCameraSnapshots(sourceList = []) {
       socket.off('roomCamera:status', handleStatus);
       objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.current.clear();
+      if (retryTimer.current) {
+        clearTimeout(retryTimer.current);
+        retryTimer.current = null;
+      }
     };
   }, [socket, idsKey]);
 
