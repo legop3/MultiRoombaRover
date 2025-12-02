@@ -5,8 +5,8 @@ const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const { getRoomCamera } = require('./roomCameraService');
 const { roomCameraStreamEvents, getRoomCameraState } = require('./roomCameraSnapshotService');
 
-const SUBSCRIBE_LIMIT = 20;
-const SUBSCRIBE_WINDOW_MS = 1000;
+const SUBSCRIBE_LIMIT = 50;
+const SUBSCRIBE_WINDOW_MS = 10000;
 
 function passesMode(socket) {
   const mode = getMode();
