@@ -14,10 +14,15 @@ function normalizeCamera(camera) {
     logger.warn('Room camera missing id', camera);
     return null;
   }
+  if (!camera.url) {
+    logger.warn('Room camera missing url', { id, camera });
+    return null;
+  }
   return {
     id: String(id),
     name: camera.name || camera.id || String(id),
     description: camera.description || null,
+    url: camera.url,
   };
 }
 

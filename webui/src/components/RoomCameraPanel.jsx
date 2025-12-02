@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
-import { useVideoRequests } from '../hooks/useVideoRequests.js';
 import { useSettingsNamespace } from '../settings/index.js';
+import { useRoomCameraSnapshots } from '../hooks/useRoomCameraSnapshots.js';
 import RoomCameraFeed from './RoomCameraFeed.jsx';
 
 function EmptyState() {
@@ -31,8 +31,7 @@ export default function RoomCameraPanel({
 }) {
   const { session } = useSession();
   const cameras = session?.roomCameras || [];
-  const sourceDescriptors = cameras.map((camera) => ({ type: 'room', id: camera.id, key: `room:${camera.id}` }));
-  const videoSources = useVideoRequests(sourceDescriptors);
+  const feedMap = useRoomCameraSnapshots(cameras.map((camera) => ({ id: camera.id })));
   const { value: orientationSettings, save: saveOrientationSettings } = useSettingsNamespace('roomCameraPanels', {});
   const [orientation, setOrientation] = useState(() =>
     normalizeOrientation(
@@ -94,15 +93,14 @@ export default function RoomCameraPanel({
       )}
       <div className={containerClass}>
         {cameras.map((camera) => {
-          const key = `room:${camera.id}`;
-          const sessionInfo = videoSources[key];
+          const feed = feedMap[camera.id] || null;
           return (
             <article key={camera.id} className="w-full space-y-0.5 rounded bg-zinc-950 p-0.5 shadow-inner shadow-black/40">
               {/* <header className="space-y-0.5">
                 <p className="text-lg font-semibold text-white">{camera.name || camera.id}</p>
                 {camera.description && <p className="text-xs text-slate-500">{camera.description}</p>}
               </header> */}
-              <RoomCameraFeed sessionInfo={sessionInfo} label={camera.name || camera.id} />
+              <RoomCameraFeed feed={feed} label={camera.name || camera.id} />
             </article>
           );
         })}
