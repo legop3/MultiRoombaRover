@@ -36,6 +36,7 @@ export const DEFAULT_KEYMAP = {
   auxAllForward: [","],
   cameraUp: ['u'],
   cameraDown: ['j'],
+  nightVisionToggle: ['e'],
   driveMacro: ['f'],
   dockMacro: ['g'],
   chatFocus: ['enter'],

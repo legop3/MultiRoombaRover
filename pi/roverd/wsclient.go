@@ -18,10 +18,11 @@ type WSClient struct {
 	events       <-chan RoverEvent
 	media        *MediaSupervisor
 	servo        *CameraServo
+	nightVision  *NightVisionLight
 	log          *log.Logger
 }
 
-func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events <-chan RoverEvent, media *MediaSupervisor, servo *CameraServo, logger *log.Logger) *WSClient {
+func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events <-chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
 	return &WSClient{
 		cfg:          cfg,
 		adapter:      adapter,
@@ -29,6 +30,7 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		events:       events,
 		media:        media,
 		servo:        servo,
+		nightVision:  nightVision,
 		log:          logger,
 	}
 }
@@ -72,6 +74,7 @@ func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
 		Media:         c.cfg.Media,
 		CameraServo:   c.cfg.CameraServo,
 		Audio:         c.cfg.Audio,
+		NightVision:   c.cfg.NightVision,
 	}
 	c.log.Printf("sending hello (camera servo enabled=%v pin=%d)", msg.CameraServo.Enabled, msg.CameraServo.Pin)
 	return writeJSON(ctx, conn, msg)
@@ -153,6 +156,11 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		return c.handleServoCommand(msg.Servo)
 	case msg.TTS != nil:
 		return c.handleTTSPayload(msg.TTS)
+	case msg.NightVision != nil:
+		if c.nightVision == nil {
+			return fmt.Errorf("night vision disabled")
+		}
+		return c.nightVision.HandleAction(msg.NightVision.Action)
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
 	}

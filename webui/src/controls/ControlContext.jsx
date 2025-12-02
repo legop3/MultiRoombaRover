@@ -254,6 +254,10 @@ export function ControlSystemProvider({ children }) {
     [pipeline],
   );
 
+  const toggleNightVision = useCallback(() => {
+    pipeline.sendNightVision('toggle');
+  }, [pipeline]);
+
   const registerInputState = useCallback((source, data) => {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });
   }, []);
@@ -274,6 +278,7 @@ export function ControlSystemProvider({ children }) {
         stopAllMotion,
         sendOiCommand,
         setSensorStream,
+        toggleNightVision,
         updateKeyBinding,
         resetKeyBindings,
         registerInputState,
@@ -292,6 +297,7 @@ export function ControlSystemProvider({ children }) {
       stopAllMotion,
       sendOiCommand,
       setSensorStream,
+      toggleNightVision,
       updateKeyBinding,
       resetKeyBindings,
       registerInputState,

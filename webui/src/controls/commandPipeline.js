@@ -19,6 +19,11 @@ export function useCommandPipeline() {
     return rosterEntry.cameraServo;
   }, [rosterEntry]);
 
+  const nightVision = useMemo(() => {
+    if (!rosterEntry?.nightVision || !rosterEntry.nightVision.enabled) return null;
+    return rosterEntry.nightVision;
+  }, [rosterEntry]);
+
   const emitCommand = useCallback(
     (payload, cb) => {
       if (!roverId) return;
@@ -134,29 +139,45 @@ export function useCommandPipeline() {
     [roverId, sendOiCommand, sendDriveDirect, sendAuxMotors, sendServoAngle],
   );
 
+  const sendNightVision = useCallback(
+    (action = 'toggle') => {
+      if (!roverId || !nightVision) return null;
+      emitCommand({
+        type: 'nightVision',
+        data: { nightVision: { action } },
+      });
+      return action;
+    },
+    [emitCommand, nightVision, roverId],
+  );
+
   return useMemo(
     () => ({
       roverId,
       rosterEntry,
       servoConfig,
+      nightVision,
       emitCommand,
       enableSensorStream,
       sendDriveDirect,
       sendAuxMotors,
       sendServoAngle,
       sendOiCommand,
+      sendNightVision,
       runMacroSteps,
     }),
     [
       roverId,
       rosterEntry,
       servoConfig,
+      nightVision,
       emitCommand,
       enableSensorStream,
       sendDriveDirect,
       sendAuxMotors,
       sendServoAngle,
       sendOiCommand,
+      sendNightVision,
       runMacroSteps,
     ],
   );

@@ -95,6 +95,13 @@ type CameraServoConfig struct {
 	AllowRawPulse bool    `yaml:"allowRawPulse" json:"allowRawPulse"`
 }
 
+type NightVisionConfig struct {
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	GPIOPin   int    `yaml:"gpioPin" json:"gpioPin"`
+	GPIOChip  string `yaml:"gpioChip" json:"gpioChip"`
+	InitialOn bool   `yaml:"initialOn" json:"initialOn"`
+}
+
 type Config struct {
 	Name        string            `yaml:"name"`
 	ServerURL   string            `yaml:"serverUrl"`
@@ -105,6 +112,7 @@ type Config struct {
 	Media       MediaConfig       `yaml:"media"`
 	CameraServo CameraServoConfig `yaml:"cameraServo"`
 	Audio       AudioConfig       `yaml:"audio"`
+	NightVision NightVisionConfig `yaml:"nightVision" json:"nightVision"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -153,6 +161,12 @@ func LoadConfig(path string) (*Config, error) {
 			DefaultEngine:  "flite",
 			DefaultVoice:   "rms",
 			DefaultPitch:   50,
+		},
+		NightVision: NightVisionConfig{
+			Enabled:   true,
+			GPIOPin:   22,
+			GPIOChip:  "gpiochip0",
+			InitialOn: true,
 		},
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -213,6 +227,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if err := validateServoConfig(&cfg.CameraServo); err != nil {
 		return nil, fmt.Errorf("cameraServo: %w", err)
+	}
+	if err := validateNightVisionConfig(&cfg.NightVision); err != nil {
+		return nil, fmt.Errorf("nightVision: %w", err)
 	}
 	validateAudioConfig(&cfg.Audio)
 	return &cfg, nil
@@ -276,6 +293,19 @@ func validateAudioConfig(cfg *AudioConfig) {
 	if cfg.DefaultPitch <= 0 {
 		cfg.DefaultPitch = 50
 	}
+}
+
+func validateNightVisionConfig(cfg *NightVisionConfig) error {
+	if !cfg.Enabled {
+		return nil
+	}
+	if cfg.GPIOPin <= 0 {
+		return errors.New("gpioPin must be > 0")
+	}
+	if cfg.GPIOChip == "" {
+		cfg.GPIOChip = "gpiochip0"
+	}
+	return nil
 }
 
 func derivePublishURL(serverURL, streamName string, port int) (string, error) {

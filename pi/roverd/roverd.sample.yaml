@@ -47,3 +47,8 @@ audio:
   defaultEngine: flite
   defaultVoice: rms
   defaultPitch: 50
+nightVision:
+  enabled: true
+  gpioPin: 22
+  gpioChip: gpiochip0
+  initialOn: true

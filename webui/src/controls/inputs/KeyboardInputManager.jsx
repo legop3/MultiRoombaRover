@@ -86,6 +86,7 @@ export default function KeyboardInputManager() {
       runMacro,
       stopAllMotion,
       registerInputState,
+      toggleNightVision,
     },
   } = useControlSystem();
   const { focusChat, blurChat, isChatFocused } = useChat();
@@ -208,6 +209,8 @@ export default function KeyboardInputManager() {
         } else if (newlyPressed.some((token) => keymap.dockMacro?.has(token))) {
           setMode('dock');
           runMacro('seek-dock');
+        } else if (newlyPressed.some((token) => keymap.nightVisionToggle?.has(token))) {
+          toggleNightVision();
         }
       }
 

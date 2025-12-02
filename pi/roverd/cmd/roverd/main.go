@@ -69,10 +69,19 @@ func main() {
 		defer cameraServo.Close()
 	}
 
+	var nightVision *roverd.NightVisionLight
+	if cfg.NightVision.Enabled {
+		nightVision, err = roverd.NewNightVisionLight(cfg.NightVision, logger)
+		if err != nil {
+			logger.Fatalf("init night vision: %v", err)
+		}
+		defer nightVision.Close()
+	}
+
 	autoCharge := roverd.NewAutoChargeController(adapter, eventStream, logger)
 	go autoCharge.Run(ctx, sensorSamples)
 
-	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, logger)
+	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, nightVision, logger)
 
 	retryDelay := time.Second
 	for ctx.Err() == nil {

@@ -133,11 +133,13 @@ function FloatingJoystick({ disabled, layout, radius, onMove, onStop }) {
 function MobileJoystickPanel({ layout }) {
   const {
     state: { roverId, camera },
-    actions: { setDriveVector, registerInputState, stopAllMotion, setServoAngle },
+    pipeline,
+    actions: { setDriveVector, registerInputState, stopAllMotion, setServoAngle, toggleNightVision },
   } = useControlSystem();
   const disabled = !roverId;
   const cameraConfig = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
+  const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
   const cameraMin = typeof cameraConfig?.minAngle === 'number' ? cameraConfig.minAngle : -45;
   const cameraMax = typeof cameraConfig?.maxAngle === 'number' ? cameraConfig.maxAngle : 45;
   const cameraValue =
@@ -198,6 +200,16 @@ function MobileJoystickPanel({ layout }) {
     <div className="flex flex-col gap-0.5 text-slate-100">
       
       <DriveModeToggle size="compact" />
+      {nightVisionAvailable && (
+        <button
+          type="button"
+          onClick={() => toggleNightVision()}
+          disabled={disabled}
+          className="bg-amber-600 px-0.5 py-1 text-sm font-semibold text-amber-50 transition hover:bg-amber-500 disabled:opacity-40"
+        >
+          Toggle Night Vision
+        </button>
+      )}
       {cameraEnabled && (
         <div className="bg-zinc-950 p-0.5 text-xs">
           <div className="flex items-center justify-between text-[0.75rem] text-slate-400">

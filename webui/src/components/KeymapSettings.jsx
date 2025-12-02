@@ -19,6 +19,7 @@ const KEY_ACTIONS = [
   { id: 'auxAllForward', label: 'All Aux Forward', group: 'Aux Motors' },
   { id: 'cameraUp', label: 'Camera Up', group: 'Camera' },
   { id: 'cameraDown', label: 'Camera Down', group: 'Camera' },
+  { id: 'nightVisionToggle', label: 'Toggle Night Vision', group: 'Camera' },
   { id: 'driveMacro', label: 'Drive Macro', group: 'Macros' },
   { id: 'dockMacro', label: 'Dock Macro', group: 'Macros' },
   { id: 'chatFocus', label: 'Toggle Chat', group: 'Chat' },

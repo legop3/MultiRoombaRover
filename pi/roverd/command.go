@@ -8,6 +8,7 @@ type helloMessage struct {
 	Media         MediaConfig       `json:"media"`
 	CameraServo   CameraServoConfig `json:"cameraServo"`
 	Audio         AudioConfig       `json:"audio"`
+	NightVision   NightVisionConfig `json:"nightVision"`
 }
 
 type sensorMessage struct {
@@ -26,6 +27,7 @@ type inboundMessage struct {
 	Media        *mediaCommand        `json:"media,omitempty"`
 	Servo        *servoPayload        `json:"servo,omitempty"`
 	TTS          *ttsPayload          `json:"tts,omitempty"`
+	NightVision  *nightVisionPayload  `json:"nightVision,omitempty"`
 }
 
 type driveDirectPayload struct {
@@ -59,6 +61,10 @@ type ttsPayload struct {
 	Voice  string `json:"voice,omitempty"`
 	Pitch  int    `json:"pitch,omitempty"`
 	Speak  bool   `json:"speak,omitempty"`
+}
+
+type nightVisionPayload struct {
+	Action string `json:"action"`
 }
 
 type ackMessage struct {

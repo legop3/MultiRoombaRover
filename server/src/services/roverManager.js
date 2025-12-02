@@ -119,6 +119,7 @@ function getRoster() {
     media: record.meta?.media,
     cameraServo: record.meta?.cameraServo,
     audio: record.meta?.audio,
+    nightVision: record.meta?.nightVision,
     locked: record.locked,
     lockReason: record.lockReason,
     lastSeen: record.lastSeen,
