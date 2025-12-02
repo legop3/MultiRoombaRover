@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 
+const RETRY_DELAY_MS = 3000;
+
 function normalizeCamera(entry) {
   if (!entry) return null;
   if (typeof entry === 'string') {
@@ -29,11 +31,14 @@ export function useRoomCameraSnapshots(sourceList = []) {
   const objectUrls = useRef(new Map());
   const normalizedEntries = useMemo(() => dedupe(sourceList.map(normalizeCamera).filter(Boolean)), [sourceList]);
   const entriesKey = useMemo(() => normalizedEntries.map((e) => e.key).join('|'), [normalizedEntries]);
+  const retryTimers = useRef(new Map());
 
   useEffect(() => {
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.current.clear();
     setFeeds({});
+    retryTimers.current.forEach((timer) => clearTimeout(timer));
+    retryTimers.current.clear();
   }, [entriesKey]);
 
   useEffect(() => {
@@ -41,6 +46,23 @@ export function useRoomCameraSnapshots(sourceList = []) {
       return undefined;
     }
     let cancelled = false;
+
+    const clearRetry = (id) => {
+      const timer = retryTimers.current.get(id);
+      if (timer) {
+        clearTimeout(timer);
+        retryTimers.current.delete(id);
+      }
+    };
+
+    const scheduleRetry = (id) => {
+      clearRetry(id);
+      const timer = setTimeout(() => {
+        retryTimers.current.delete(id);
+        requestSubscribe(id);
+      }, RETRY_DELAY_MS);
+      retryTimers.current.set(id, timer);
+    };
 
     const handleFrame = (meta = {}, buffer) => {
       if (cancelled || !meta.id || !buffer) return;
@@ -78,18 +100,24 @@ export function useRoomCameraSnapshots(sourceList = []) {
       }));
     };
 
-    socket.on('roomCamera:frame', handleFrame);
-    socket.on('roomCamera:status', handleStatus);
-
-    normalizedEntries.forEach((entry) => {
+    const requestSubscribe = (id) => {
+      const entry = normalizedEntries.find((e) => e.id === id);
+      if (!entry) return;
       socket.emit('roomCamera:subscribe', { roomCameraId: entry.id }, (resp = {}) => {
         if (resp.error) {
           handleStatus({ id: entry.id, error: resp.error });
+          scheduleRetry(entry.id);
         } else {
+          clearRetry(entry.id);
           handleStatus({ id: entry.id, stale: true });
         }
       });
-    });
+    };
+
+    socket.on('roomCamera:frame', handleFrame);
+    socket.on('roomCamera:status', handleStatus);
+
+    normalizedEntries.forEach((entry) => requestSubscribe(entry.id));
 
     return () => {
       cancelled = true;
@@ -100,6 +128,8 @@ export function useRoomCameraSnapshots(sourceList = []) {
       socket.off('roomCamera:status', handleStatus);
       objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.current.clear();
+      retryTimers.current.forEach((timer) => clearTimeout(timer));
+      retryTimers.current.clear();
     };
   }, [socket, normalizedEntries, entriesKey]);
 

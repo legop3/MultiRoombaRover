@@ -5,6 +5,9 @@ const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const { getRoomCamera } = require('./roomCameraService');
 const { roomCameraStreamEvents, getRoomCameraState } = require('./roomCameraSnapshotService');
 
+const SUBSCRIBE_LIMIT = 20;
+const SUBSCRIBE_WINDOW_MS = 1000;
+
 function passesMode(socket) {
   const mode = getMode();
   if (mode === MODES.LOCKDOWN) {
@@ -23,6 +26,7 @@ function canViewRoomCamera(socket) {
 
 const cameraSubscribers = new Map(); // id -> Set(socketId)
 const socketSubscriptions = new Map(); // socketId -> Set(id)
+const subscribeBuckets = new Map(); // socketId -> { start, count }
 
 function addSubscription(socket, cameraId) {
   if (!cameraSubscribers.has(cameraId)) {
@@ -59,6 +63,17 @@ function removeAllSubscriptions(socketId) {
   bucket.forEach((cameraId) => removeSubscription(socketId, cameraId));
 }
 
+function allowSubscribe(socketId) {
+  const now = Date.now();
+  let bucket = subscribeBuckets.get(socketId);
+  if (!bucket || now - bucket.start >= SUBSCRIBE_WINDOW_MS) {
+    bucket = { start: now, count: 0 };
+  }
+  bucket.count += 1;
+  subscribeBuckets.set(socketId, bucket);
+  return bucket.count <= SUBSCRIBE_LIMIT;
+}
+
 function sendFrame(socket, cameraId, payload, buffer) {
   socket.emit('roomCamera:frame', { id: cameraId, ...payload }, buffer);
 }
@@ -91,6 +106,10 @@ io.on('connection', (socket) => {
   socket.on('roomCamera:subscribe', (payload = {}, cb = () => {}) => {
     const cameraId = payload.roomCameraId || payload.id;
     try {
+      if (!allowSubscribe(socket.id)) {
+        cb({ error: 'Rate limited' });
+        return;
+      }
       if (!cameraId) {
         throw new Error('roomCameraId required');
       }
@@ -122,5 +141,6 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     removeAllSubscriptions(socket.id);
+    subscribeBuckets.delete(socket.id);
   });
 });
