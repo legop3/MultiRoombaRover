@@ -4,7 +4,7 @@ set -euo pipefail
 # Configurable via environment
 DEVICE="${DEVICE:-/dev/video0}"
 RESOLUTION="${RESOLUTION:-640x480}"
-QUALITY="${QUALITY:-8}" # ffmpeg MJPEG quality (lower is better)
+QUALITY="${QUALITY:-10}" # ffmpeg MJPEG quality (lower is better)
 PORT="${PORT:-8088}"
 WORKDIR="${WORKDIR:-/run/roomcam}"
 # Optional: set INPUT_FORMAT=bayer_grbg8 to transcode raw Bayer cams (e.g., OV534) to JPEG.
