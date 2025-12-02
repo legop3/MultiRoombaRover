@@ -43,7 +43,7 @@ async function fetchSnapshot(camera) {
     const failures = (state?.failures || 0) + 1;
     markState(id, { error: err.message, failures });
     events.emit('status', { id, error: err.message });
-    logger.debug('Snapshot fetch failed', { id, err: err.message });
+    logger.warn('Snapshot fetch failed', { id, err: err.message });
   } finally {
     clearTimeout(timeout);
     markState(id, { fetching: false });
