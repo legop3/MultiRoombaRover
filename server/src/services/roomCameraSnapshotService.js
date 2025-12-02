@@ -7,8 +7,8 @@ const FETCH_TIMEOUT_MS = 2000;
 const STALE_AFTER_MS = 4000;
 
 const cameraState = new Map(); // id -> {frame, ts, stale, error, failures, fetching}
-const pollers = new Map();
 const events = new EventEmitter(); // frame, status
+let pollTimer = null;
 
 function markState(id, updates = {}) {
   const prev = cameraState.get(id) || {};
@@ -50,28 +50,21 @@ async function fetchSnapshot(camera) {
   }
 }
 
-function startCamera(camera) {
-  const { id, url } = camera;
-  if (!url) {
-    logger.warn('Skipping room camera without URL', { id });
-    return;
-  }
-  if (pollers.has(id)) return;
-  markState(id, { frame: null, ts: null, error: null, failures: 0, fetching: false });
-  const poller = setInterval(() => fetchSnapshot(camera), POLL_INTERVAL_MS);
-  pollers.set(id, poller);
-  logger.info('Started snapshot polling', { id, url });
-}
-
 function stopAll() {
-  pollers.forEach((poller) => clearInterval(poller));
-  pollers.clear();
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
   cameraState.clear();
 }
 
 function startAll() {
   stopAll();
-  getRoomCameras().forEach((camera) => startCamera(camera));
+  pollTimer = setInterval(() => {
+    getRoomCameras().forEach((camera) => fetchSnapshot(camera));
+  }, POLL_INTERVAL_MS);
+  getRoomCameras().forEach((camera) => fetchSnapshot(camera));
+  logger.info('Started snapshot polling', { count: getRoomCameras().length });
 }
 
 function getState(id) {

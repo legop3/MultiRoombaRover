@@ -2,7 +2,7 @@ const io = require('../globals/io');
 const logger = require('../globals/logger').child('roomCameraSocket');
 const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
-const { getRoomCamera } = require('./roomCameraService');
+const { getRoomCamera, getRoomCameras } = require('./roomCameraService');
 const { roomCameraStreamEvents, getRoomCameraState } = require('./roomCameraSnapshotService');
 
 const SUBSCRIBE_LIMIT = 50;
@@ -104,39 +104,47 @@ roomCameraStreamEvents.on('status', ({ id, error }) => {
 
 io.on('connection', (socket) => {
   socket.on('roomCamera:subscribe', (payload = {}, cb = () => {}) => {
-    const cameraId = payload.roomCameraId || payload.id;
+    const list = Array.isArray(payload?.ids)
+      ? payload.ids.map(String)
+      : payload?.roomCameraId || payload?.id
+      ? [String(payload.roomCameraId || payload.id)]
+      : getRoomCameras().map((cam) => cam.id);
+    const uniqueIds = Array.from(new Set(list));
     try {
       if (!allowSubscribe(socket.id)) {
         cb({ error: 'Rate limited' });
         return;
       }
-      if (!cameraId) {
-        throw new Error('roomCameraId required');
-      }
-      const camera = getRoomCamera(cameraId);
-      if (!camera) {
-        throw new Error('Unknown room camera');
-      }
       if (!canViewRoomCamera(socket)) {
         throw new Error('Not authorized for room camera');
       }
-      addSubscription(socket, camera.id);
-      const state = getRoomCameraState(camera.id);
-      if (state?.frame) {
-        sendFrame(socket, camera.id, { ts: state.ts, stale: !!state.stale }, state.frame);
-      }
-      sendStatus(socket, camera.id, { ts: state?.ts || null, stale: state?.stale ?? true, error: state?.error || null });
-      cb({ ok: true });
+      const validIds = uniqueIds.filter((id) => !!getRoomCamera(id));
+      validIds.forEach((cameraId) => addSubscription(socket, cameraId));
+      validIds.forEach((cameraId) => {
+        const state = getRoomCameraState(cameraId);
+        if (state?.frame) {
+          sendFrame(socket, cameraId, { ts: state.ts, stale: !!state.stale }, state.frame);
+        }
+        sendStatus(socket, cameraId, {
+          ts: state?.ts || null,
+          stale: state?.stale ?? true,
+          error: state?.error || null,
+        });
+      });
+      cb({ ok: true, subscribed: validIds });
     } catch (err) {
-      logger.warn('Room camera subscribe failed', { socketId: socket.id, cameraId, err: err.message });
+      logger.warn('Room camera subscribe failed', { socketId: socket.id, err: err.message });
       cb({ error: err.message });
     }
   });
 
   socket.on('roomCamera:unsubscribe', (payload = {}) => {
-    const cameraId = payload.roomCameraId || payload.id;
-    if (!cameraId) return;
-    removeSubscription(socket.id, String(cameraId));
+    const list = Array.isArray(payload?.ids)
+      ? payload.ids.map(String)
+      : payload?.roomCameraId || payload?.id
+      ? [String(payload.roomCameraId || payload.id)]
+      : [];
+    list.forEach((cameraId) => removeSubscription(socket.id, cameraId));
   });
 
   socket.on('disconnect', () => {

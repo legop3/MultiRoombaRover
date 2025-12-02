@@ -1,77 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 
-const RETRY_DELAY_MS = 3000;
-const RATE_LIMIT_RETRY_MS = 5000;
-
-function normalizeCamera(entry) {
-  if (!entry) return null;
-  if (typeof entry === 'string') {
-    return { id: entry, key: entry };
-  }
-  if (entry.id) {
-    return { id: String(entry.id), key: entry.id };
-  }
-  return null;
-}
-
-function dedupe(entries = []) {
-  const seen = new Set();
-  const unique = [];
-  entries.forEach((entry) => {
-    if (!entry?.key || seen.has(entry.key)) return;
-    seen.add(entry.key);
-    unique.push(entry);
-  });
-  return unique.sort((a, b) => a.key.localeCompare(b.key));
-}
-
 export function useRoomCameraSnapshots(sourceList = []) {
   const socket = useSocket();
   const [feeds, setFeeds] = useState({});
   const objectUrls = useRef(new Map());
-  const normalizedEntries = useMemo(() => dedupe(sourceList.map(normalizeCamera).filter(Boolean)), [sourceList]);
-  const entriesKey = useMemo(() => normalizedEntries.map((e) => e.key).join('|'), [normalizedEntries]);
-  const retryTimers = useRef(new Map());
-  const entriesRef = useRef([]);
-  const subscribeState = useRef(new Map()); // id -> 'idle' | 'pending' | 'subscribed'
-
-  useEffect(() => {
-    entriesRef.current = normalizedEntries;
-  }, [normalizedEntries]);
+  const entriesKey = useMemo(() => sourceList.map((e) => (typeof e === 'string' ? e : e.id)).join('|'), [sourceList]);
 
   useEffect(() => {
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.current.clear();
     setFeeds({});
-    retryTimers.current.forEach((timer) => clearTimeout(timer));
-    retryTimers.current.clear();
-    subscribeState.current.clear();
   }, [entriesKey]);
 
   useEffect(() => {
-    if (!entriesKey || !socket) {
+    if (!sourceList.length || !socket) {
       return undefined;
     }
     let cancelled = false;
-    const entries = entriesRef.current;
-
-    const clearRetry = (id) => {
-      const timer = retryTimers.current.get(id);
-      if (timer) {
-        clearTimeout(timer);
-        retryTimers.current.delete(id);
-      }
-    };
-
-    const scheduleRetry = (id) => {
-      clearRetry(id);
-      const timer = setTimeout(() => {
-        retryTimers.current.delete(id);
-        requestSubscribe(id);
-      }, RETRY_DELAY_MS);
-      retryTimers.current.set(id, timer);
-    };
 
     const handleFrame = (meta = {}, buffer) => {
       if (cancelled || !meta.id || !buffer) return;
@@ -109,64 +55,20 @@ export function useRoomCameraSnapshots(sourceList = []) {
       }));
     };
 
-    const requestSubscribe = (id) => {
-      const entry = entries.find((e) => e.id === id);
-      if (!entry) return;
-       // Avoid spamming subscribe if already pending/subscribed.
-      const state = subscribeState.current.get(id) || 'idle';
-      if (state === 'pending' || state === 'subscribed') {
-        return;
-      }
-      subscribeState.current.set(id, 'pending');
-      socket.emit('roomCamera:subscribe', { roomCameraId: entry.id }, (resp = {}) => {
-        if (resp.error) {
-          subscribeState.current.set(id, 'idle');
-          handleStatus({ id: entry.id, error: resp.error });
-          const delay = resp.error.toLowerCase().includes('rate') ? RATE_LIMIT_RETRY_MS : RETRY_DELAY_MS;
-          clearRetry(entry.id);
-          const timer = setTimeout(() => {
-            retryTimers.current.delete(entry.id);
-            requestSubscribe(entry.id);
-          }, delay);
-          retryTimers.current.set(entry.id, timer);
-        } else {
-          clearRetry(entry.id);
-          subscribeState.current.set(id, 'subscribed');
-          handleStatus({ id: entry.id, stale: true });
-        }
-      });
-    };
-
     socket.on('roomCamera:frame', handleFrame);
     socket.on('roomCamera:status', handleStatus);
 
-    entries.forEach((entry) => requestSubscribe(entry.id));
+    socket.emit('roomCamera:subscribe', { ids: sourceList.map((e) => (typeof e === 'string' ? e : e.id)) });
 
     return () => {
       cancelled = true;
-      entries.forEach((entry) => {
-        socket.emit('roomCamera:unsubscribe', { roomCameraId: entry.id });
-      });
+      socket.emit('roomCamera:unsubscribe', { ids: sourceList.map((e) => (typeof e === 'string' ? e : e.id)) });
       socket.off('roomCamera:frame', handleFrame);
       socket.off('roomCamera:status', handleStatus);
       objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.current.clear();
-      retryTimers.current.forEach((timer) => clearTimeout(timer));
-      retryTimers.current.clear();
-      subscribeState.current.clear();
     };
-  }, [socket, entriesKey]);
+  }, [socket, sourceList, entriesKey]);
 
-  const filtered = useMemo(() => {
-    if (!entriesKey) return {};
-    const next = {};
-    normalizedEntries.forEach((entry) => {
-      if (feeds[entry.id]) {
-        next[entry.id] = feeds[entry.id];
-      }
-    });
-    return next;
-  }, [feeds, entriesKey, normalizedEntries]);
-
-  return filtered;
+  return feeds;
 }
