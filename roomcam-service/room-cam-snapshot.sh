@@ -12,6 +12,7 @@ INPUT_FORMAT="${INPUT_FORMAT:-mjpeg}"
 
 mkdir -p "${WORKDIR}"
 SNAPSHOT_PATH="${WORKDIR}/snapshot.jpg"
+rm -f "${SNAPSHOT_PATH}"
 
 cleanup() {
   [[ -n "${FFMPEG_PID:-}" ]] && kill "${FFMPEG_PID}" 2>/dev/null || true
@@ -27,7 +28,7 @@ if [[ "${INPUT_FORMAT}" == bayer_* ]]; then
   FFMPEG_FILTERS=(-pix_fmt yuv420p)
 fi
 
-/usr/bin/ffmpeg \
+/usr/bin/ffmpeg -y \
   -loglevel warning -nostats \
   "${FFMPEG_INPUT_ARGS[@]}" \
   "${FFMPEG_FILTERS[@]}" \
