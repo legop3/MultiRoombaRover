@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 
 const RETRY_DELAY_MS = 3000;
+const RATE_LIMIT_RETRY_MS = 5000;
 
 function normalizeCamera(entry) {
   if (!entry) return null;
@@ -33,6 +34,7 @@ export function useRoomCameraSnapshots(sourceList = []) {
   const entriesKey = useMemo(() => normalizedEntries.map((e) => e.key).join('|'), [normalizedEntries]);
   const retryTimers = useRef(new Map());
   const entriesRef = useRef([]);
+  const subscribeState = useRef(new Map()); // id -> 'idle' | 'pending' | 'subscribed'
 
   useEffect(() => {
     entriesRef.current = normalizedEntries;
@@ -44,6 +46,7 @@ export function useRoomCameraSnapshots(sourceList = []) {
     setFeeds({});
     retryTimers.current.forEach((timer) => clearTimeout(timer));
     retryTimers.current.clear();
+    subscribeState.current.clear();
   }, [entriesKey]);
 
   useEffect(() => {
@@ -109,12 +112,26 @@ export function useRoomCameraSnapshots(sourceList = []) {
     const requestSubscribe = (id) => {
       const entry = entries.find((e) => e.id === id);
       if (!entry) return;
+       // Avoid spamming subscribe if already pending/subscribed.
+      const state = subscribeState.current.get(id) || 'idle';
+      if (state === 'pending' || state === 'subscribed') {
+        return;
+      }
+      subscribeState.current.set(id, 'pending');
       socket.emit('roomCamera:subscribe', { roomCameraId: entry.id }, (resp = {}) => {
         if (resp.error) {
+          subscribeState.current.set(id, 'idle');
           handleStatus({ id: entry.id, error: resp.error });
-          scheduleRetry(entry.id);
+          const delay = resp.error.toLowerCase().includes('rate') ? RATE_LIMIT_RETRY_MS : RETRY_DELAY_MS;
+          clearRetry(entry.id);
+          const timer = setTimeout(() => {
+            retryTimers.current.delete(entry.id);
+            requestSubscribe(entry.id);
+          }, delay);
+          retryTimers.current.set(entry.id, timer);
         } else {
           clearRetry(entry.id);
+          subscribeState.current.set(id, 'subscribed');
           handleStatus({ id: entry.id, stale: true });
         }
       });
@@ -136,6 +153,7 @@ export function useRoomCameraSnapshots(sourceList = []) {
       objectUrls.current.clear();
       retryTimers.current.forEach((timer) => clearTimeout(timer));
       retryTimers.current.clear();
+      subscribeState.current.clear();
     };
   }, [socket, entriesKey]);
 
