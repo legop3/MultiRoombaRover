@@ -4,7 +4,6 @@ const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const videoSessions = require('./videoSessions');
 const roverManager = require('./roverManager');
-const { getRoomCamera } = require('./roomCameraService');
 const { loadConfig } = require('../helpers/configLoader');
 
 const config = loadConfig();
@@ -94,12 +93,7 @@ io.on('connection', (socket) => {
           throw new Error('Not authorized for video');
         }
       } else if (target.type === 'room') {
-        if (!getRoomCamera(target.id)) {
-          throw new Error('Unknown room camera');
-        }
-        if (!canViewRoomCamera(socket)) {
-          throw new Error('Not authorized for room camera');
-        }
+        throw new Error('Room cameras now use the snapshot feed');
       } else {
         throw new Error('Unsupported video source');
       }

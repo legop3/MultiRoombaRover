@@ -20,6 +20,7 @@ require('./src/services/chatService');
 require('./src/services/videoSessions');
 require('./src/services/videoAuthService');
 require('./src/services/videoSocketService');
+require('./src/services/roomCameraSocketService');
 require('./src/services/logStreamService');
 require('./src/services/homeAssistantService');
 require('./src/services/sessionService');

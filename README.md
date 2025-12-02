@@ -81,6 +81,8 @@ Publishing rovers lives on a trusted network, so the shipped config (tracked at 
 
 Once finished, update `server/config.yaml` with your admin passwords and `media.whepBaseUrl` (set it to the URL you expose publicly, e.g. `https://rover.otter.land/video`). If your proxy can’t rewrite paths, create the `/video` location there and add a custom nginx snippet to rewrite `/video/<rover>/whep` to `/<>/whep` before forwarding to mediaMTX. Restart `multirover.service` whenever you edit the config. To pull updates later, just `git pull`, re-run `npm install --production` inside `server/`, and restart the service—no need to rerun the installer.
 
+Room cameras now use JPEG snapshots (4 fps) instead of WHEP. Each entry in `roomCameras` must include a `url` pointing at the snapshot endpoint; the server polls and relays frames over socket.io with the same access rules as before.
+
 ### Video handshake + diagnostics
 
 - Every `video:request` returns `{ url, token }`. The browser posts the SDP offer to `url` and includes `Authorization: Basic base64(token:token)`. mediaMTX forwards the username (`token`) to `/mediamtx/auth`, which checks the socket’s permissions (driver assignment, admin/spectator role, lockdown state) and either returns 200 or 401—no query parameters are involved anymore.
