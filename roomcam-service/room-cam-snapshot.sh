@@ -13,7 +13,7 @@ INPUT_FORMAT="${INPUT_FORMAT:-mjpeg}"
 mkdir -p "${WORKDIR}"
 SNAPSHOT_PATH="${WORKDIR}/snapshot.jpg"
 rm -f "${SNAPSHOT_PATH}"
-
+# push
 cleanup() {
   [[ -n "${FFMPEG_PID:-}" ]] && kill "${FFMPEG_PID}" 2>/dev/null || true
   [[ -n "${HTTP_PID:-}" ]] && kill "${HTTP_PID}" 2>/dev/null || true
