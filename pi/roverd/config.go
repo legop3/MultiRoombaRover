@@ -115,7 +115,7 @@ func LoadConfig(path string) (*Config, error) {
 	cfg := Config{
 		MaxWheelMMs: 500,
 		BRC: BRCConfig{
-			GPIOPin:  -1,
+			GPIOPin:  4,
 			GPIOChip: "gpiochip0",
 			PulseEvery: Duration{
 				Duration: time.Minute,

@@ -5,7 +5,7 @@ serial:
   device: /dev/ttyAMA0
   baud: 115200
 brc:
-  gpioPin: 17
+  gpioPin: 4
   gpioChip: gpiochip0
   pulseEvery: 1m
   pulseWidth: 1s
