@@ -2,7 +2,7 @@ const EventEmitter = require('events');
 const logger = require('../globals/logger').child('roomCameraSnapshot');
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 
-const POLL_INTERVAL_MS = 250; // 4 fps target
+const POLL_INTERVAL_MS = 500; // 2 fps target
 const FETCH_TIMEOUT_MS = 2000;
 const STALE_AFTER_MS = 4000;
 
