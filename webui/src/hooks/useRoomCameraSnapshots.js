@@ -44,7 +44,6 @@ export function useRoomCameraSnapshots(sourceList = []) {
         ...prev,
         [meta.id]: {
           status: 'playing',
-          stale: !!meta.stale,
           ts: meta.ts || Date.now(),
           error: null,
           objectUrl: url,
@@ -60,7 +59,6 @@ export function useRoomCameraSnapshots(sourceList = []) {
           ...(prev[meta.id] || {}),
           status: meta.error ? 'error' : prev[meta.id]?.status || 'connecting',
           error: meta.error || null,
-          stale: meta.stale ?? prev[meta.id]?.stale ?? true,
           ts: meta.ts || prev[meta.id]?.ts || null,
           objectUrl: prev[meta.id]?.objectUrl || null,
         },

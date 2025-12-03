@@ -82,13 +82,13 @@ function sendStatus(socket, cameraId, status) {
   socket.emit('roomCamera:status', { id: cameraId, ...status });
 }
 
-roomCameraStreamEvents.on('frame', ({ id, buffer, ts, stale }) => {
+roomCameraStreamEvents.on('frame', ({ id, buffer, ts }) => {
   const bucket = cameraSubscribers.get(id);
   if (!bucket || !buffer) return;
   bucket.forEach((socketId) => {
     const socket = io.sockets.sockets.get(socketId);
     if (!socket) return;
-    sendFrame(socket, id, { ts, stale: !!stale }, buffer);
+    sendFrame(socket, id, { ts }, buffer);
   });
 });
 
@@ -123,11 +123,10 @@ io.on('connection', (socket) => {
       validIds.forEach((cameraId) => {
         const state = getRoomCameraState(cameraId);
         if (state?.frame) {
-          sendFrame(socket, cameraId, { ts: state.ts, stale: !!state.stale }, state.frame);
+          sendFrame(socket, cameraId, { ts: state.ts }, state.frame);
         }
         sendStatus(socket, cameraId, {
           ts: state?.ts || null,
-          stale: state?.stale ?? true,
           error: state?.error || null,
         });
       });
