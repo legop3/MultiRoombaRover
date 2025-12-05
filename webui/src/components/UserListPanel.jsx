@@ -3,6 +3,7 @@ import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSocket } from '../context/SocketContext.jsx';
 import NicknameForm from './NicknameForm.jsx';
+import DiscordInviteButton from './DiscordInviteButton.jsx';
 
 function roleColors(role) {
   switch (role) {
@@ -128,8 +129,14 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
       className={`panel-section space-y-0.5 text-base ${fillHeight ? 'flex h-full min-h-0 flex-col overflow-hidden' : ''} ${className}`}
     >
       {!hideNicknameForm && (
-        <div className="space-y-0.5">
+        <div className="space-y-0.5 flex">
+          <div className='w-1/2'>
           <NicknameForm />
+
+          </div>
+          <div className='w-1/2'>
+            <DiscordInviteButton />
+          </div>
           {!canSetNickname && <p className="text-xs text-slate-500">Spectators cannot set nicknames.</p>}
         </div>
       )}

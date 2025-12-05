@@ -7,7 +7,7 @@ import SettingsPanel from './SettingsPanel.jsx';
 import HelpPanel from './HelpPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 
-export default function RightPaneTabs({ layout }) {
+export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   return (
     <section className="panel text-base">
       <Tabs defaultTab="telemetry">
@@ -36,7 +36,7 @@ export default function RightPaneTabs({ layout }) {
             <SettingsPanel />
           </TabPanel>
           <TabPanel id="help">
-            <HelpPanel layout={layout} />
+            <HelpPanel layout={layout} onOpenOverlay={onOpenHelpOverlay} />
           </TabPanel>
         </TabPanels>
       </Tabs>

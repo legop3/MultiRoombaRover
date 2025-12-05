@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import TelemetryPanel from './components/TelemetryPanel.jsx';
 import DrivePanel from './components/DrivePanel.jsx';
 import AlertFeed from './components/AlertFeed.jsx';
@@ -22,6 +22,8 @@ import UserListPanel from './components/UserListPanel.jsx';
 import ChatPanel from './components/ChatPanel.jsx';
 import FullscreenPrompt from './components/FullscreenPrompt.jsx';
 import { useFullscreenPrompt } from './hooks/useFullscreenPrompt.js';
+import { useSettingsNamespace } from './settings/index.js';
+import HelpOverlay from './components/HelpOverlay.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -53,7 +55,7 @@ function useLayoutMode() {
   return mode;
 }
 
-function DesktopLayout({ layout }) {
+function DesktopLayout({ layout, onOpenHelpOverlay }) {
   return (
     <div className="flex h-full gap-0.5 overflow-hidden">
       <div className="flex min-w-0 flex-[1.8] flex-col gap-0.5 overflow-y-auto pr-0.5">
@@ -69,7 +71,7 @@ function DesktopLayout({ layout }) {
         <LogPanel />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-        <RightPaneTabs layout={layout} />
+        <RightPaneTabs layout={layout} onOpenHelpOverlay={onOpenHelpOverlay} />
         {/* <SessionSnapshot /> */}
       </div>
     </div>
@@ -128,35 +130,80 @@ function MobileLandscapeLayout() {
 function App() {
   const layout = useLayoutMode();
   const isDesktop = layout === 'desktop';
-  const { visible: fullscreenVisible, mode: fullscreenMode, enterFullscreen, dismiss } = useFullscreenPrompt(layout);
-  const renderedLayout =
-    isDesktop
-      ? <DesktopLayout layout={layout} />
-      : layout === 'mobile-landscape'
-      ? <MobileLandscapeLayout />
-      : <MobilePortraitLayout />;
+  const fullscreen = useFullscreenPrompt(layout);
 
   return (
     <div className={`bg-black text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       <SettingsProvider>
-        <ControlSystemProvider>
-          <KeyboardInputManager />
-          <GamepadInputManager />
-          <main className={`flex w-full flex-col gap-0.5 text-base ${isDesktop ? 'h-full overflow-hidden' : ''}`}>
-            {renderedLayout}
-          </main>
-          <AlertFeed />
-          <TurnAlertListener />
-          <ModeGateOverlay />
-          <FullscreenPrompt
-            visible={fullscreenVisible}
-            mode={fullscreenMode}
-            onEnterFullscreen={enterFullscreen}
-            onDismiss={dismiss}
-          />
-        </ControlSystemProvider>
+        <AppWithProviders layout={layout} isDesktop={isDesktop} fullscreen={fullscreen} />
       </SettingsProvider>
     </div>
+  );
+}
+
+function AppWithProviders({ layout, isDesktop, fullscreen }) {
+  const {
+    visible: fullscreenVisible,
+    mode: fullscreenMode,
+    enterFullscreen,
+    dismiss,
+  } = fullscreen;
+
+  const {
+    value: helpSettings,
+    save: saveHelpSettings,
+  } = useSettingsNamespace('help', { showOnLoad: true });
+  const [helpVisible, setHelpVisible] = useState(false);
+
+  useEffect(() => {
+    if (helpSettings?.showOnLoad !== false) {
+      setHelpVisible(true);
+    }
+  }, [helpSettings?.showOnLoad]);
+
+  const openHelp = useCallback(() => setHelpVisible(true), []);
+  const closeHelp = useCallback(() => setHelpVisible(false), []);
+  const setShowOnLoad = useCallback(
+    (enabled) => {
+      saveHelpSettings((current) => ({ ...(current ?? {}), showOnLoad: Boolean(enabled) }));
+    },
+    [saveHelpSettings],
+  );
+
+  const renderedLayout = useMemo(
+    () =>
+      isDesktop
+        ? <DesktopLayout layout={layout} onOpenHelpOverlay={openHelp} />
+        : layout === 'mobile-landscape'
+        ? <MobileLandscapeLayout />
+        : <MobilePortraitLayout />,
+    [isDesktop, layout, openHelp],
+  );
+
+  return (
+    <ControlSystemProvider>
+      <KeyboardInputManager />
+      <GamepadInputManager />
+      <main className={`flex w-full flex-col gap-0.5 text-base ${isDesktop ? 'h-full overflow-hidden' : ''}`}>
+        {renderedLayout}
+      </main>
+      <AlertFeed />
+      <TurnAlertListener />
+      <ModeGateOverlay />
+      <HelpOverlay
+        visible={helpVisible}
+        layout={layout}
+        onClose={closeHelp}
+        showOnLoad={helpSettings?.showOnLoad !== false}
+        onToggleShowOnLoad={setShowOnLoad}
+      />
+      <FullscreenPrompt
+        visible={fullscreenVisible}
+        mode={fullscreenMode}
+        onEnterFullscreen={enterFullscreen}
+        onDismiss={dismiss}
+      />
+    </ControlSystemProvider>
   );
 }
 
