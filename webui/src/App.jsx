@@ -151,21 +151,26 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
 
   const {
     value: helpSettings,
+    status: helpStatus,
     save: saveHelpSettings,
   } = useSettingsNamespace('help', { showOnLoad: true });
   const [helpVisible, setHelpVisible] = useState(false);
 
   useEffect(() => {
-    if (helpSettings?.showOnLoad !== false) {
-      setHelpVisible(true);
+    if (helpStatus === 'ready') {
+      setHelpVisible(helpSettings?.showOnLoad !== false);
     }
-  }, [helpSettings?.showOnLoad]);
+  }, [helpStatus, helpSettings?.showOnLoad]);
 
   const openHelp = useCallback(() => setHelpVisible(true), []);
   const closeHelp = useCallback(() => setHelpVisible(false), []);
   const setShowOnLoad = useCallback(
     (enabled) => {
-      saveHelpSettings((current) => ({ ...(current ?? {}), showOnLoad: Boolean(enabled) }));
+      const next = Boolean(enabled);
+      saveHelpSettings((current) => ({ ...(current ?? {}), showOnLoad: next }));
+      if (!next) {
+        setHelpVisible(false);
+      }
     },
     [saveHelpSettings],
   );
