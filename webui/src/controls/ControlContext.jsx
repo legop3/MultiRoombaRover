@@ -122,7 +122,7 @@ export function ControlSystemProvider({ children }) {
 
   const setDriveVector = useCallback(
     (vector, meta = {}) => {
-      const computed = computeDifferentialSpeeds(vector);
+      const computed = computeDifferentialSpeeds(vector, meta.speedOptions);
       dispatch({
         type: 'control/update-drive',
         payload: { ...computed, source: meta.source ?? null },

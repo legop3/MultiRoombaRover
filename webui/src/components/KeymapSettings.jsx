@@ -2,6 +2,8 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import { DEFAULT_KEYMAP } from '../controls/constants.js';
 import { canonicalizeKeyInput, formatKeyLabel } from '../controls/keymapUtils.js';
+import { useSettingsNamespace } from '../settings/index.js';
+import { INPUT_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 
 const KEY_ACTIONS = [
   { id: 'driveForward', label: 'Drive Forward', group: 'Driving' },
@@ -33,6 +35,12 @@ function groupActions(actions) {
   }, {});
 }
 
+function clampSpeed(value, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(0, Math.min(500, num));
+}
+
 function useKeyCapture(onCapture) {
   const [active, setActive] = useState(null);
 
@@ -57,11 +65,44 @@ function useKeyCapture(onCapture) {
   return { active, startCapture: setActive, cancel: () => setActive(null) };
 }
 
+function SpeedField({ label, description, value, onChange }) {
+  return (
+    <label className="surface-muted block p-0.5">
+      <div className="flex items-center justify-between text-xs text-slate-300">
+        <span className="font-semibold text-slate-100">{label}</span>
+        <input
+          type="number"
+          min={0}
+          max={500}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="w-16 rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.75rem] font-mono text-slate-100"
+        />
+      </div>
+      {description && <p className="text-[0.65rem] text-slate-500">{description}</p>}
+      <div className="mt-0.5 flex items-center gap-0.5">
+        <input
+          type="range"
+          min={0}
+          max={500}
+          step={5}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-2 flex-1 accent-emerald-400"
+        />
+        <span className="w-12 text-right text-[0.75rem] font-mono text-slate-400">{value}</span>
+      </div>
+    </label>
+  );
+}
+
 export default function KeymapSettings() {
   const {
     state: { keymap },
     actions: { updateKeyBinding, resetKeyBindings },
   } = useControlSystem();
+  const { value: inputSettings, save: saveInputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
+  const keyboardSpeeds = inputSettings.keyboard ?? INPUT_SETTINGS_DEFAULTS.keyboard;
   const grouped = useMemo(() => groupActions(KEY_ACTIONS), []);
   const { active, startCapture, cancel } = useKeyCapture((actionId, value) => {
     updateKeyBinding(actionId, value);
@@ -70,6 +111,21 @@ export default function KeymapSettings() {
   const currentKey = useCallback(
     (id) => keymap?.[id]?.[0] || DEFAULT_KEYMAP[id]?.[0] || '',
     [keymap],
+  );
+
+  const updateKeyboardSpeed = useCallback(
+    (key, nextValue) => {
+      const defaults = INPUT_SETTINGS_DEFAULTS.keyboard;
+      const clamped = clampSpeed(nextValue, defaults[key]);
+      saveInputSettings((prev) => ({
+        ...(prev ?? {}),
+        keyboard: {
+          ...(prev?.keyboard ?? defaults),
+          [key]: clamped,
+        },
+      }));
+    },
+    [saveInputSettings],
   );
 
   return (
@@ -82,6 +138,29 @@ export default function KeymapSettings() {
         <button type="button" onClick={() => resetKeyBindings()} className="button-dark text-xs">
           Reset defaults
         </button>
+      </div>
+      <div className="space-y-0.5 surface">
+        <p className="text-[0.7rem] text-slate-500">Keyboard speeds</p>
+        <div className="space-y-0.5">
+          <SpeedField
+            label="Base speed"
+            description="Normal driving speed"
+            value={keyboardSpeeds.baseSpeed}
+            onChange={(value) => updateKeyboardSpeed('baseSpeed', value)}
+          />
+          <SpeedField
+            label="Turbo speed"
+            description="Used when holding the boost modifier"
+            value={keyboardSpeeds.turboSpeed}
+            onChange={(value) => updateKeyboardSpeed('turboSpeed', value)}
+          />
+          <SpeedField
+            label="Precision speed"
+            description="Used when holding the precision modifier"
+            value={keyboardSpeeds.precisionSpeed}
+            onChange={(value) => updateKeyboardSpeed('precisionSpeed', value)}
+          />
+        </div>
       </div>
       <div className="space-y-0.5">
         {Object.entries(grouped).map(([group, actions]) => (

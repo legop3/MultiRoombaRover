@@ -2,11 +2,19 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
 import { useChat } from '../../context/ChatContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
+import { useSettingsNamespace } from '../../settings/index.js';
+import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 
 const SOURCE = 'keyboard';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
 const ZERO_AUX = { main: 0, side: 0, vacuum: 0 };
 const SERVO_REPEAT_MS = 110;
+
+function clampSpeed(value, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(0, Math.min(500, num));
+}
 
 function shouldIgnoreEvent(event) {
   const target = event.target;
@@ -90,6 +98,7 @@ export default function KeyboardInputManager() {
     },
   } = useControlSystem();
   const { focusChat, blurChat, isChatFocused } = useChat();
+  const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const keymap = useMemo(() => normalizeKeymapEntries(state.keymap), [state.keymap]);
   const actionTokens = useMemo(() => {
     const tokens = new Set();
@@ -99,6 +108,15 @@ export default function KeyboardInputManager() {
     });
     return tokens;
   }, [keymap]);
+  const keyboardSpeeds = useMemo(() => {
+    const defaults = INPUT_SETTINGS_DEFAULTS.keyboard;
+    const current = inputSettings?.keyboard ?? {};
+    return {
+      baseSpeed: clampSpeed(current.baseSpeed, defaults.baseSpeed),
+      turboSpeed: clampSpeed(current.turboSpeed, defaults.turboSpeed),
+      precisionSpeed: clampSpeed(current.precisionSpeed, defaults.precisionSpeed),
+    };
+  }, [inputSettings?.keyboard]);
   const servoStep = useMemo(
     () => Math.abs(state.camera?.config?.nudgeDegrees || 1),
     [state.camera?.config?.nudgeDegrees],
@@ -111,6 +129,11 @@ export default function KeyboardInputManager() {
 
   const driveFromKeys = useCallback(() => {
     const tokensSnapshot = new Set(activeTokensRef.current);
+    const boostActive = bindingActive(keymap.boostModifier, tokensSnapshot);
+    const slowActive = bindingActive(keymap.slowModifier, tokensSnapshot);
+    const speedOptions = slowActive
+      ? { baseSpeed: keyboardSpeeds.precisionSpeed, boostSpeed: keyboardSpeeds.precisionSpeed }
+      : { baseSpeed: keyboardSpeeds.baseSpeed, boostSpeed: keyboardSpeeds.turboSpeed };
     const vector = computeDriveVector(tokensSnapshot, keymap);
     const aux = computeAuxMotors(tokensSnapshot, keymap);
     if (
@@ -119,7 +142,7 @@ export default function KeyboardInputManager() {
       vector.boost !== lastVectorRef.current.boost
     ) {
       lastVectorRef.current = vector;
-      setDriveVector(vector, { source: SOURCE });
+      setDriveVector(vector, { source: SOURCE, speedOptions });
     }
     if (
       aux.main !== lastAuxRef.current.main ||
@@ -134,7 +157,7 @@ export default function KeyboardInputManager() {
       vector,
       aux,
     });
-  }, [keymap, registerInputState, setAuxMotors, setDriveVector]);
+  }, [keymap, keyboardSpeeds, registerInputState, setAuxMotors, setDriveVector]);
 
   const stopServoLoop = useCallback(() => {
     if (servoIntervalRef.current) {

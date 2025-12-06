@@ -35,7 +35,7 @@ export const HELP_CONTENT = {
       {
         type: 'keyboard',
         title: 'Keyboard controls',
-        footnote: 'Per-browser; adjust in Settings → Keybindings.',
+        footnote: 'Per-browser; adjust bindings and speeds in Settings → Keybindings.',
         groups: [
           {
             id: 'movement',

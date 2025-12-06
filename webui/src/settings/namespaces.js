@@ -1,4 +1,9 @@
 export const INPUT_SETTINGS_DEFAULTS = {
+  keyboard: {
+    baseSpeed: 250,
+    turboSpeed: 400,
+    precisionSpeed: 125,
+  },
   gamepad: {
     driveDeadzone: 0.2,
     cameraDeadzone: 0.25,
