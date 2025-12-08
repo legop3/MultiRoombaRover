@@ -6,6 +6,7 @@ const { parseSensorFrame } = require('../helpers/sensorDecoder');
 const { MODES, getMode } = require('./modeManager');
 const { isAdmin, roleEvents } = require('./roleService');
 const { publishEvent } = require('./eventBus');
+const videoSessions = require('./videoSessions');
 
 const rovers = new Map(); // roverId -> record
 const socketToRovers = new Map(); // socketId -> Set(roverId)
@@ -276,6 +277,41 @@ function getPrimaryRoverForSocket(socketId) {
   return first.done ? null : first.value;
 }
 
+function isDockedAndCharging(record) {
+  const sensors = record?.lastSensor?.decoded || record?.lastSensor?.sensors || null;
+  if (!sensors) return false;
+  const docked = Boolean(sensors.chargingSources?.homeBase);
+  const code = sensors.chargingState?.code;
+  const charging = code === 2 || code === 3 || code === 4;
+  return docked && charging;
+}
+
+function hasOtherDrivers(record, socketId) {
+  if (!record) return false;
+  for (const driver of record.drivers) {
+    if (driver !== socketId) return true;
+  }
+  return false;
+}
+
+function canSwitchRover(socket, targetRoverId) {
+  const currentId = getPrimaryRoverForSocket(socket.id);
+  if (!currentId || currentId === targetRoverId) {
+    return { ok: true, currentId };
+  }
+  const currentRecord = rovers.get(currentId);
+  if (!currentRecord) {
+    return { ok: true, currentId };
+  }
+  if (hasOtherDrivers(currentRecord, socket.id)) {
+    return { ok: true, currentId };
+  }
+  if (isDockedAndCharging(currentRecord)) {
+    return { ok: true, currentId };
+  }
+  return { ok: false, currentId, message: 'Dock and charge your current rover before switching.' };
+}
+
 module.exports = {
   upsertRover,
   removeRover,
@@ -312,12 +348,35 @@ io.on('connection', (socket) => {
 
   function handleRequestControl({ roverId, force } = {}, cb = () => {}) {
     try {
+      if (socket.data?.role === 'spectator') {
+        throw new Error('Spectators cannot drive');
+      }
       const targetId = roverId || Array.from(rovers.keys())[0];
       if (!targetId) {
         throw new Error('No rovers available');
       }
+      const previousJoined = getRoversForSocket(socket.id);
+      if (!isAdmin(socket)) {
+        const { ok, message } = canSwitchRover(socket, targetId);
+        if (!ok) {
+          throw new Error(message || 'Switch denied');
+        }
+      }
       logger.info('Request control', socket.id, targetId, { force });
-      requestControl(targetId, socket, { force: Boolean(force) });
+      requestControl(targetId, socket, { force: Boolean(force), allowUser: true });
+      previousJoined.forEach((rid) => {
+        if (rid !== targetId) {
+          releaseControl(rid, socket);
+        }
+      });
+      videoSessions.revokeWhere(
+        (info) =>
+          info.socketId === socket.id &&
+          info.sourceType === 'rover' &&
+          info.sourceId !== targetId &&
+          info.sourceId !== `${targetId}-audio`,
+      );
+      managerEvents.emit('switch', { socketId: socket.id, roverId: targetId });
       socket.emit('controlGranted', { roverId: targetId });
       cb({ success: true, roverId: targetId });
     } catch (err) {

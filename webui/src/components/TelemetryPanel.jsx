@@ -29,10 +29,7 @@ export default function TelemetryPanel() {
     const user = (session?.users || []).find((entry) => entry.socketId === activeDriverId);
     return user?.nickname || activeDriverId.slice(0, 6);
   }, [activeDriverId, roverId, session?.socketId, session?.users]);
-  const isAdmin = useMemo(
-    () => session?.role === 'admin' || session?.role === 'lockdown' || session?.role === 'lockdown-admin',
-    [session?.role],
-  );
+  const canRequest = useMemo(() => session?.role && session.role !== 'spectator', [session?.role]);
   const [pending, setPending] = useState({});
 
   async function handleRequest(roverId) {
@@ -102,7 +99,7 @@ export default function TelemetryPanel() {
         title="Rovers"
         roster={roster}
         renderActions={(rover) =>
-          isAdmin ? (
+          canRequest ? (
             <button
               type="button"
               onClick={() => handleRequest(rover.id)}

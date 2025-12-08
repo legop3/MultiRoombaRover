@@ -54,6 +54,15 @@ roverManager.managerEvents.on('rover', ({ action }) => {
   }
 });
 
+roverManager.managerEvents.on('switch', ({ socketId, roverId }) => {
+  if (!socketId || !roverId) return;
+  const socket = socketRefs.get(socketId);
+  if (!socket) return;
+  assignments.set(socketId, roverId);
+  waiting.delete(socketId);
+  assignmentEvents.emit('update', socketId);
+});
+
 function assignSocket(socket) {
   if (!socket || isAdmin(socket) || getRole(socket) !== 'user') {
     return;
@@ -177,4 +186,15 @@ module.exports = {
   assignmentEvents,
   describeAssignment,
   forceRelease,
+  getAssignedRover: (socketId) => assignments.get(socketId) || null,
+  moveAssignment: (socket, roverId, { releasePrevious = true } = {}) => {
+    if (!socket || !roverId) return;
+    const previous = assignments.get(socket.id);
+    if (previous && previous !== roverId && releasePrevious) {
+      roverManager.releaseControl(previous, socket);
+    }
+    assignments.set(socket.id, roverId);
+    waiting.delete(socket.id);
+    assignmentEvents.emit('update', socket.id);
+  },
 };
