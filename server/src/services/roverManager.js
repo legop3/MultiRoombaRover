@@ -206,7 +206,7 @@ function requestControl(roverId, socket, options = {}) {
   if (!allowUser && !isAdmin(socket)) {
     throw new Error('Only admins can request control');
   }
-  if (record.locked && !isAdmin(socket) && !allowUser) {
+  if (record.locked && !isAdmin(socket)) {
     throw new Error('Rover locked');
   }
   const mode = getMode();
