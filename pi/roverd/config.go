@@ -249,8 +249,15 @@ func validateServoConfig(cfg *CameraServoConfig) error {
 	if cfg.CycleLen <= 0 {
 		return errors.New("cycleLen must be > 0")
 	}
-	if cfg.MinPulseUs <= 0 || cfg.MaxPulseUs <= 0 || cfg.MinPulseUs >= cfg.MaxPulseUs {
+	if cfg.MinPulseUs <= 0 || cfg.MaxPulseUs <= 0 {
 		return errors.New("minPulseUs/maxPulseUs invalid")
+	}
+	if cfg.MinPulseUs == cfg.MaxPulseUs {
+		return errors.New("minPulseUs/maxPulseUs cannot be equal")
+	}
+	if cfg.MinPulseUs > cfg.MaxPulseUs {
+		cfg.MinPulseUs, cfg.MaxPulseUs = cfg.MaxPulseUs, cfg.MinPulseUs
+		cfg.Invert = !cfg.Invert
 	}
 	if cfg.MinAngle >= cfg.MaxAngle {
 		return errors.New("minAngle must be less than maxAngle")

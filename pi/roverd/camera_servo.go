@@ -42,7 +42,7 @@ func NewCameraServo(cfg CameraServoConfig, logger *log.Logger) (*CameraServo, er
 		rpio.Close()
 		return nil, err
 	}
-	logger.Printf("camera servo initialized on GPIO %d (%.1f..%.1f deg)", cfg.Pin, cfg.MinAngle, cfg.MaxAngle)
+	logger.Printf("camera servo initialized on GPIO %d (%.1f..%.1f deg, %d..%d us, invert=%v)", cfg.Pin, cfg.MinAngle, cfg.MaxAngle, cfg.MinPulseUs, cfg.MaxPulseUs, cfg.Invert)
 	return servo, nil
 }
 
