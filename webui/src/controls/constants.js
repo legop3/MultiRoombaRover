@@ -14,7 +14,7 @@ export const COMMAND_DELAY_MS = 100;
 
 export const SONG_NOTE_RANGE = [31, 127];
 export const SONG_DEFAULT_NOTE = 60;
-export const SONG_DEFAULT_DURATION = 32;
+export const SONG_DEFAULT_DURATION = 8;
 export const SONG_REPEAT_MS = 150;
 
 export const OI_COMMANDS = {
