@@ -93,6 +93,7 @@ type CameraServoConfig struct {
 	HomeAngle     float64 `yaml:"homeAngle" json:"homeAngle"`
 	NudgeDegrees  float64 `yaml:"nudgeDegrees" json:"nudgeDegrees"`
 	AllowRawPulse bool    `yaml:"allowRawPulse" json:"allowRawPulse"`
+	Invert        bool    `yaml:"invert" json:"invert"`
 }
 
 type NightVisionConfig struct {

@@ -32,6 +32,7 @@ cameraServo:
   cycleLen: 20000
   minPulseUs: 900
   maxPulseUs: 2100
+  invert: false
   minAngle: -15
   maxAngle: 30
   homeAngle: 0

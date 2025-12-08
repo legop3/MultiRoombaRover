@@ -118,6 +118,9 @@ func (s *CameraServo) angleToPulse(angle float64) int {
 	}
 	norm := (angle - s.cfg.MinAngle) / totalRange
 	norm = math.Max(0, math.Min(1, norm))
+	if s.cfg.Invert {
+		norm = 1 - norm
+	}
 	pulseRange := s.cfg.MaxPulseUs - s.cfg.MinPulseUs
 	return s.cfg.MinPulseUs + int(math.Round(norm*float64(pulseRange)))
 }
@@ -129,6 +132,9 @@ func (s *CameraServo) pulseToAngle(pulse int) float64 {
 	}
 	norm := float64(pulse-s.cfg.MinPulseUs) / float64(pulseRange)
 	norm = math.Max(0, math.Min(1, norm))
+	if s.cfg.Invert {
+		norm = 1 - norm
+	}
 	return s.cfg.MinAngle + norm*(s.cfg.MaxAngle-s.cfg.MinAngle)
 }
 
