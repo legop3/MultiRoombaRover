@@ -80,6 +80,14 @@ export const HELP_CONTENT = {
               { action: 'auxAllForward', label: 'All motors forward' },
             ],
           },
+          {
+            id: 'audio',
+            title: 'Audio / Song',
+            items: [
+              { action: 'songNoteUp', label: 'Song note up' },
+              { action: 'songNoteDown', label: 'Song note down' },
+            ],
+          },
         ],
       },
       {

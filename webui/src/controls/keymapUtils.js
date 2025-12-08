@@ -92,5 +92,9 @@ export function formatKeyLabel(value) {
   if (canonical === '/') return '/ or ?';
   if (canonical === '-') return '- or _';
   if (canonical === '=') return '= or +';
+  if (canonical === 'arrowup') return 'Arrow Up';
+  if (canonical === 'arrowdown') return 'Arrow Down';
+  if (canonical === 'arrowleft') return 'Arrow Left';
+  if (canonical === 'arrowright') return 'Arrow Right';
   return canonical.length === 1 ? canonical.toUpperCase() : canonical;
 }

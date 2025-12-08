@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { controlReducer, initialControlState } from './controlReducer.js';
 import { computeDifferentialSpeeds, clamp } from './controlMath.js';
 import { useCommandPipeline } from './commandPipeline.js';
-import { DEFAULT_KEYMAP, DEFAULT_MACROS } from './constants.js';
+import { DEFAULT_KEYMAP, DEFAULT_MACROS, SONG_DEFAULT_NOTE } from './constants.js';
 import { canonicalizeKeyInput } from './keymapUtils.js';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
@@ -258,6 +258,22 @@ export function ControlSystemProvider({ children }) {
     pipeline.sendNightVision('toggle');
   }, [pipeline]);
 
+  const setSongNote = useCallback(
+    (note) => {
+      const next = typeof note === 'number' ? note : SONG_DEFAULT_NOTE;
+      dispatch({ type: 'control/set-song-note', payload: next });
+      return next;
+    },
+    [],
+  );
+
+  const sendSong = useCallback(
+    (notes, options) => {
+      return pipeline.sendSong(notes, options);
+    },
+    [pipeline],
+  );
+
   const registerInputState = useCallback((source, data) => {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });
   }, []);
@@ -282,6 +298,8 @@ export function ControlSystemProvider({ children }) {
         updateKeyBinding,
         resetKeyBindings,
         registerInputState,
+        setSongNote,
+        sendSong,
       },
     }),
     [
@@ -301,6 +319,8 @@ export function ControlSystemProvider({ children }) {
       updateKeyBinding,
       resetKeyBindings,
       registerInputState,
+      setSongNote,
+      sendSong,
     ],
   );
 

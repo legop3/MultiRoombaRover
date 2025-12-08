@@ -95,3 +95,26 @@ func (s *SerialAdapter) SendRaw(raw []byte) error {
 func (s *SerialAdapter) SeekDock() error {
 	return s.write([]byte{143})
 }
+
+func (s *SerialAdapter) PlaySong(slot int, notes []songNote) error {
+	if len(notes) == 0 {
+		return fmt.Errorf("song requires at least one note")
+	}
+	if len(notes) > 16 {
+		return fmt.Errorf("song supports up to 16 notes, got %d", len(notes))
+	}
+	if slot < 0 || slot > 4 {
+		return fmt.Errorf("song slot must be 0-4")
+	}
+
+	payload := []byte{140, byte(slot), byte(len(notes))}
+	for _, n := range notes {
+		note := clampInt(n.Note, 31, 127)
+		duration := clampInt(n.Duration, 1, 255)
+		payload = append(payload, byte(note), byte(duration))
+	}
+	if err := s.write(payload); err != nil {
+		return err
+	}
+	return s.write([]byte{141, byte(slot)})
+}

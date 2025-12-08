@@ -1,4 +1,4 @@
-import { DEFAULT_KEYMAP, DEFAULT_MACROS } from './constants.js';
+import { DEFAULT_KEYMAP, DEFAULT_MACROS, SONG_DEFAULT_NOTE } from './constants.js';
 
 function createDriveState() {
   return {
@@ -21,12 +21,19 @@ function createCameraState() {
   };
 }
 
+function createSongState() {
+  return {
+    note: SONG_DEFAULT_NOTE,
+  };
+}
+
 export const initialControlState = {
   roverId: null,
   mode: 'drive',
   drive: createDriveState(),
   aux: createAuxState(),
   camera: createCameraState(),
+  song: createSongState(),
   macros: DEFAULT_MACROS,
   keymap: DEFAULT_KEYMAP,
   inputs: {},
@@ -40,6 +47,7 @@ export function controlReducer(state, action) {
         roverId: action.payload ?? null,
         drive: action.payload ? state.drive : createDriveState(),
         aux: action.payload ? state.aux : createAuxState(),
+        song: action.payload ? state.song : createSongState(),
       };
     case 'control/set-mode':
       return state.mode === action.payload
@@ -114,6 +122,15 @@ export function controlReducer(state, action) {
         ...state,
         drive: createDriveState(),
         aux: createAuxState(),
+        song: createSongState(),
+      };
+    case 'control/set-song-note':
+      return {
+        ...state,
+        song: {
+          ...(state.song || createSongState()),
+          note: action.payload ?? SONG_DEFAULT_NOTE,
+        },
       };
     default:
       return state;

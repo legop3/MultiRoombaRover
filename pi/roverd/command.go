@@ -28,6 +28,7 @@ type inboundMessage struct {
 	Servo        *servoPayload        `json:"servo,omitempty"`
 	TTS          *ttsPayload          `json:"tts,omitempty"`
 	NightVision  *nightVisionPayload  `json:"nightVision,omitempty"`
+	Song         *songPayload         `json:"song,omitempty"`
 }
 
 type driveDirectPayload struct {
@@ -65,6 +66,17 @@ type ttsPayload struct {
 
 type nightVisionPayload struct {
 	Action string `json:"action"`
+}
+
+type songPayload struct {
+	Slot  *int       `json:"slot,omitempty"`
+	Notes []songNote `json:"notes"`
+	Loop  bool       `json:"loop,omitempty"`
+}
+
+type songNote struct {
+	Note     int `json:"note"`
+	Duration int `json:"duration"`
 }
 
 type ackMessage struct {

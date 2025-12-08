@@ -161,6 +161,12 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 			return fmt.Errorf("night vision disabled")
 		}
 		return c.nightVision.HandleAction(msg.NightVision.Action)
+	case msg.Song != nil:
+		slot := 0
+		if msg.Song.Slot != nil {
+			slot = clampInt(*msg.Song.Slot, 0, 4)
+		}
+		return c.adapter.PlaySong(slot, msg.Song.Notes)
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
 	}

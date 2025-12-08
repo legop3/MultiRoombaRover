@@ -56,3 +56,8 @@ func (s *SerialAdapter) SeekDock() error {
 	s.log.Printf("[dummy] seek dock")
 	return nil
 }
+
+func (s *SerialAdapter) PlaySong(slot int, notes []songNote) error {
+	s.log.Printf("[dummy] play song slot=%d notes=%v", slot, notes)
+	return nil
+}

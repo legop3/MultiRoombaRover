@@ -4,11 +4,19 @@ import { useChat } from '../../context/ChatContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import {
+  SONG_DEFAULT_DURATION,
+  SONG_DEFAULT_NOTE,
+  SONG_NOTE_RANGE,
+  SONG_REPEAT_MS,
+} from '../constants.js';
 
 const SOURCE = 'keyboard';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
 const ZERO_AUX = { main: 0, side: 0, vacuum: 0 };
 const SERVO_REPEAT_MS = 110;
+const NOTE_MIN = SONG_NOTE_RANGE[0];
+const NOTE_MAX = SONG_NOTE_RANGE[1];
 
 function clampSpeed(value, fallback) {
   const num = Number(value);
@@ -95,6 +103,8 @@ export default function KeyboardInputManager() {
       stopAllMotion,
       registerInputState,
       toggleNightVision,
+      setSongNote,
+      sendSong,
     },
   } = useControlSystem();
   const { focusChat, blurChat, isChatFocused } = useChat();
@@ -126,6 +136,7 @@ export default function KeyboardInputManager() {
   const lastVectorRef = useRef(ZERO_VECTOR);
   const lastAuxRef = useRef(ZERO_AUX);
   const servoIntervalRef = useRef(null);
+  const songIntervalRef = useRef(null);
 
   const driveFromKeys = useCallback(() => {
     const tokensSnapshot = new Set(activeTokensRef.current);
@@ -194,14 +205,66 @@ export default function KeyboardInputManager() {
     servoIntervalRef.current = setTimeout(tick, 0);
   }, [computeServoDirection, nudgeServo, servoStep, stopServoLoop]);
 
+  const stopSongLoop = useCallback(() => {
+    if (songIntervalRef.current) {
+      clearTimeout(songIntervalRef.current);
+      songIntervalRef.current = null;
+    }
+  }, []);
+
+  const computeSongDirection = useCallback(() => {
+    const tokensSnapshot = new Set(activeTokensRef.current);
+    const up = bindingActive(keymap.songNoteUp, tokensSnapshot);
+    const down = bindingActive(keymap.songNoteDown, tokensSnapshot);
+    return (up ? 1 : 0) - (down ? 1 : 0);
+  }, [keymap]);
+
+  const triggerSongChange = useCallback(
+    (direction) => {
+      if (direction === 0) return;
+      const current = typeof state.song?.note === 'number' ? state.song.note : SONG_DEFAULT_NOTE;
+      let next = current + direction;
+      if (next > NOTE_MAX) {
+        next = NOTE_MIN;
+      } else if (next < NOTE_MIN) {
+        next = NOTE_MAX;
+      }
+      const finalNote = setSongNote(next);
+      sendSong([{ note: finalNote, duration: SONG_DEFAULT_DURATION }], { slot: 0 });
+    },
+    [sendSong, setSongNote, state.song?.note],
+  );
+
+  const ensureSongLoop = useCallback(() => {
+    const direction = computeSongDirection();
+    if (direction === 0) {
+      stopSongLoop();
+      return;
+    }
+    if (songIntervalRef.current) {
+      return;
+    }
+    const tick = () => {
+      const nextDirection = computeSongDirection();
+      if (nextDirection === 0) {
+        stopSongLoop();
+        return;
+      }
+      triggerSongChange(nextDirection);
+      songIntervalRef.current = setTimeout(tick, SONG_REPEAT_MS);
+    };
+    songIntervalRef.current = setTimeout(tick, 0);
+  }, [computeSongDirection, stopSongLoop, triggerSongChange]);
+
   const resetAll = useCallback(() => {
     activeTokensRef.current.clear();
     lastVectorRef.current = ZERO_VECTOR;
     lastAuxRef.current = ZERO_AUX;
     stopServoLoop();
+    stopSongLoop();
     stopAllMotion();
     registerInputState(SOURCE, { keys: [], vector: ZERO_VECTOR, aux: ZERO_AUX });
-  }, [registerInputState, stopAllMotion, stopServoLoop]);
+  }, [registerInputState, stopAllMotion, stopServoLoop, stopSongLoop]);
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -238,6 +301,7 @@ export default function KeyboardInputManager() {
       }
 
       ensureServoLoop();
+      ensureSongLoop();
       driveFromKeys();
     }
 
@@ -245,6 +309,7 @@ export default function KeyboardInputManager() {
       const tokens = tokensForEvent(event);
       tokens.forEach((token) => activeTokensRef.current.delete(token));
       ensureServoLoop();
+      ensureSongLoop();
       driveFromKeys();
     }
 
@@ -265,6 +330,7 @@ export default function KeyboardInputManager() {
     blurChat,
     driveFromKeys,
     ensureServoLoop,
+    ensureSongLoop,
     focusChat,
     isChatFocused,
     keymap.chatFocus,
@@ -274,6 +340,7 @@ export default function KeyboardInputManager() {
     runMacro,
     setMode,
     stopAllMotion,
+    stopSongLoop,
   ]);
 
   const latestResetAllRef = useRef(resetAll);
@@ -288,8 +355,9 @@ export default function KeyboardInputManager() {
   useEffect(
     () => () => {
       stopServoLoop();
+      stopSongLoop();
     },
-    [stopServoLoop],
+    [stopServoLoop, stopSongLoop],
   );
 
   return null;

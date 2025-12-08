@@ -1,10 +1,14 @@
 import { useSession } from '../context/SessionContext.jsx';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
+import { useControlSystem } from '../controls/index.js';
 import VideoTile from './VideoTile.jsx';
 
 export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const { session } = useSession();
+  const {
+    state: { song },
+  } = useControlSystem();
   const roverId = session?.assignment?.roverId;
   const rosterEntry =
     roverId && session?.roster ? session.roster.find((item) => String(item.id) === String(roverId)) : null;
@@ -37,6 +41,7 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
           telemetryFrame={frame}
           batteryConfig={batteryConfig}
           layoutFormat={layoutFormat}
+          songNote={song?.note}
         />
       ) : (
         <div className="panel-muted content-center text-center text-sm text-slate-400 aspect-video">

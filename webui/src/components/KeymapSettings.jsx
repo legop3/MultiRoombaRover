@@ -25,6 +25,8 @@ const KEY_ACTIONS = [
   { id: 'driveMacro', label: 'Drive Macro', group: 'Macros' },
   { id: 'dockMacro', label: 'Dock Macro', group: 'Macros' },
   { id: 'chatFocus', label: 'Toggle Chat', group: 'Chat' },
+  { id: 'songNoteUp', label: 'Song Note Up', group: 'Audio' },
+  { id: 'songNoteDown', label: 'Song Note Down', group: 'Audio' },
 ];
 
 function groupActions(actions) {

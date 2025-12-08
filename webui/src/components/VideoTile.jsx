@@ -4,6 +4,15 @@ import { WhepPlayer } from '../lib/whepPlayer.js';
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+function formatNoteLabel(note) {
+  if (typeof note !== 'number' || !Number.isFinite(note)) return '--';
+  const name = NOTE_NAMES[note % 12] || '?';
+  const octave = Math.floor(note / 12) - 1;
+  return `${name}${octave}`;
+}
+
 function buildBatteryVisual(charge, config) {
   const full = config?.Full;
   const warn = config?.Warn;
@@ -40,6 +49,7 @@ export default function VideoTile({
   layoutFormat = 'desktop',
   hudVariant = 'default',
   driverLabel = null,
+  songNote = null,
 }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -265,6 +275,7 @@ export default function VideoTile({
           variant={hudVariant}
           driverLabel={driverLabel}
           battery={batteryVisual}
+          songNote={songNote}
         />
         <OvercurrentOverlay motors={overcurrentMotors} />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />
@@ -325,6 +336,7 @@ function HudOverlay({
   variant = 'default',
   driverLabel = null,
   battery,
+  songNote = null,
 }) {
   const sensors = frame?.sensors;
   const bumps = sensors?.bumpsAndWheelDrops || {};
@@ -350,6 +362,11 @@ function HudOverlay({
           <span>Status: {status}</span>
           {audioStatus ? <div>Audio: {audioStatus}</div> : null}
         </div>
+        {songNote != null ? (
+          <div className="absolute right-1 top-1 rounded bg-black/70 px-1 py-0.25 text-[0.65rem] font-semibold text-emerald-200">
+            Song {formatNoteLabel(songNote)} <span className="text-slate-400">({songNote})</span>
+          </div>
+        ) : null}
 
         <div className="absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.25 bg-black/70 px-1 py-0.75 text-[0.65rem] text-slate-100">
           <span className="text-[0.6rem] uppercase tracking-wide text-slate-400">Telemetry</span>
@@ -382,6 +399,11 @@ function HudOverlay({
         <span>Status: {status}</span>
         {audioStatus ? <div>Audio: {audioStatus}</div> : null}
       </div>
+      {songNote != null ? (
+        <div className="absolute right-1 top-1 rounded bg-black/70 px-1 py-0.25 text-[0.65rem] font-semibold text-emerald-200">
+          Song {formatNoteLabel(songNote)} <span className="text-slate-400">({songNote})</span>
+        </div>
+      ) : null}
       <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 px-0.5 py-0.5 text-slate-100">
         <span>Rover: "{label || 'Unnamed Rover'}"</span>
         {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}

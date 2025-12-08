@@ -1,7 +1,14 @@
 import { useCallback, useMemo } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
-import { AUX_LIMITS, COMMAND_DELAY_MS, OI_COMMANDS } from './constants.js';
+import {
+  AUX_LIMITS,
+  COMMAND_DELAY_MS,
+  OI_COMMANDS,
+  SONG_DEFAULT_DURATION,
+  SONG_DEFAULT_NOTE,
+  SONG_NOTE_RANGE,
+} from './constants.js';
 import { bytesToBase64, clampRange, sleep } from './controlMath.js';
 
 export function useCommandPipeline() {
@@ -151,6 +158,32 @@ export function useCommandPipeline() {
     [emitCommand, nightVision, roverId],
   );
 
+  const sendSong = useCallback(
+    (notes = [], options = {}) => {
+      if (!roverId) return null;
+      const prepared =
+        Array.isArray(notes) && notes.length > 0
+          ? notes
+          : [{ note: SONG_DEFAULT_NOTE, duration: SONG_DEFAULT_DURATION }];
+      const payloadNotes = prepared.slice(0, 16).map((entry) => ({
+        note: clampRange(Math.round(entry?.note ?? SONG_DEFAULT_NOTE), SONG_NOTE_RANGE),
+        duration: clampRange(Math.round(entry?.duration ?? SONG_DEFAULT_DURATION), [1, 255]),
+      }));
+      emitCommand({
+        type: 'song',
+        data: {
+          song: {
+            notes: payloadNotes,
+            slot: options.slot,
+            loop: options.loop,
+          },
+        },
+      });
+      return payloadNotes;
+    },
+    [emitCommand, roverId],
+  );
+
   return useMemo(
     () => ({
       roverId,
@@ -164,6 +197,7 @@ export function useCommandPipeline() {
       sendServoAngle,
       sendOiCommand,
       sendNightVision,
+      sendSong,
       runMacroSteps,
     }),
     [
