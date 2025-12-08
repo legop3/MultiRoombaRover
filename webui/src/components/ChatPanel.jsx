@@ -130,9 +130,9 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
         )}
       </div>
       {!hideInput && (
-        <form className="flex gap-0.5" onSubmit={handleSend}>
+        <form className="flex flex-wrap items-start gap-0.5" onSubmit={handleSend}>
           <input
-            className="field-input flex-1"
+            className="field-input flex-1 min-w-[10rem]"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onFocus={onInputFocus}
@@ -142,7 +142,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
             disabled={!canChat}
           />
           {ttsSupported && (
-            <div className="flex items-center gap-0.5">
+            <div className="flex flex-wrap items-center gap-0.5 basis-full sm:basis-auto">
               <label className="flex items-center gap-0.25 text-xs text-slate-300">
                 <input
                   type="checkbox"
@@ -187,7 +187,11 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
               )}
             </div>
           )}
-          <button type="submit" disabled={!canChat || sending} className="button-dark disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={!canChat || sending}
+            className="button-dark disabled:opacity-50 self-start"
+          >
             {sending ? '...' : 'Send'}
           </button>
         </form>
