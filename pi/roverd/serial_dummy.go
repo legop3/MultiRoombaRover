@@ -52,6 +52,11 @@ func (s *SerialAdapter) SendRaw(raw []byte) error {
 	return nil
 }
 
+func (s *SerialAdapter) StartOI() error {
+	s.log.Printf("[dummy] start OI")
+	return nil
+}
+
 func (s *SerialAdapter) SeekDock() error {
 	s.log.Printf("[dummy] seek dock")
 	return nil

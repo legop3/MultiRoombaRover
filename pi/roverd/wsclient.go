@@ -15,14 +15,14 @@ type WSClient struct {
 	cfg          *Config
 	adapter      *SerialAdapter
 	sensorFrames <-chan []byte
-	events       <-chan RoverEvent
+	events       chan RoverEvent
 	media        *MediaSupervisor
 	servo        *CameraServo
 	nightVision  *NightVisionLight
 	log          *log.Logger
 }
 
-func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events <-chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
+func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
 	return &WSClient{
 		cfg:          cfg,
 		adapter:      adapter,
@@ -186,11 +186,64 @@ func (c *WSClient) handleServoCommand(payload *servoPayload) error {
 }
 
 func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
+	const (
+		sensorSilenceTimeout   = 5 * time.Second
+		sensorRecoveryCooldown = 3 * time.Second
+	)
+
+	timer := time.NewTimer(sensorSilenceTimeout)
+	defer timer.Stop()
+
+	resetTimer := func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+		timer.Reset(sensorSilenceTimeout)
+	}
+
+	lastRecovery := time.Time{}
+	lastFrame := time.Now()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-timer.C:
+			now := time.Now()
+			if !lastRecovery.IsZero() && now.Sub(lastRecovery) < sensorRecoveryCooldown {
+				resetTimer()
+				continue
+			}
+
+			idleFor := now.Sub(lastFrame)
+			if idleFor < 0 {
+				idleFor = sensorSilenceTimeout
+			}
+
+			c.log.Printf("no sensor frames for %v; restarting OI and sensor stream", idleFor)
+			c.emitEvent("sensorWatchdog.restart", map[string]any{
+				"idleMs": idleFor.Milliseconds(),
+			})
+			if err := c.adapter.StartOI(); err != nil {
+				c.log.Printf("start OI failed: %v", err)
+				c.emitEvent("sensorWatchdog.startOI.error", map[string]any{"error": err.Error()})
+			}
+			if err := c.ensureSensorStream(); err != nil {
+				c.log.Printf("sensor stream restart failed: %v", err)
+				c.emitEvent("sensorWatchdog.streamRestart.error", map[string]any{"error": err.Error()})
+			} else {
+				c.emitEvent("sensorWatchdog.streamRestart.ok", map[string]any{
+					"idleMs": idleFor.Milliseconds(),
+				})
+			}
+			lastRecovery = now
+			resetTimer()
 		case frame := <-c.sensorFrames:
+			resetTimer()
+			lastFrame = time.Now()
 			msg := sensorMessage{
 				Type:      "sensor",
 				Timestamp: time.Now().UnixMilli(),
@@ -221,6 +274,21 @@ func (c *WSClient) forwardEvents(ctx context.Context, conn *websocket.Conn) {
 				return
 			}
 		}
+	}
+}
+
+func (c *WSClient) emitEvent(event string, data map[string]any) {
+	if c.events == nil {
+		return
+	}
+	select {
+	case c.events <- RoverEvent{
+		Type:  "event",
+		Event: event,
+		Ts:    time.Now().UnixMilli(),
+		Data:  data,
+	}:
+	default:
 	}
 }
 
