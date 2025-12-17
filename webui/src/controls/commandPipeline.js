@@ -105,10 +105,9 @@ export function useCommandPipeline() {
         type: 'raw',
         data: { raw: bytesToBase64(bytes) },
       });
-      enableSensorStream();
       return true;
     },
-    [emitCommand, enableSensorStream, roverId],
+    [emitCommand, roverId],
   );
 
   const runMacroSteps = useCallback(
