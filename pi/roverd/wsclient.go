@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"nhooyr.io/websocket"
@@ -20,6 +21,8 @@ type WSClient struct {
 	servo        *CameraServo
 	nightVision  *NightVisionLight
 	log          *log.Logger
+	recoverMu    sync.Mutex
+	recovering   bool
 }
 
 func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
@@ -126,12 +129,9 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		return c.adapter.MotorPWM(main, side, vac)
 	case msg.SensorStream != nil:
 		if msg.SensorStream.Enable {
-			if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
-				return err
-			}
-			return c.adapter.PauseSensorStream(false)
+			return c.adapter.StartSensorStream(defaultStreamPackets)
 		}
-		return c.adapter.PauseSensorStream(true)
+		return nil
 	case msg.Raw != "" && len(msg.Raw) > 0:
 		buf, err := base64.StdEncoding.DecodeString(msg.Raw)
 		if err != nil {
@@ -186,11 +186,50 @@ func (c *WSClient) handleServoCommand(payload *servoPayload) error {
 }
 
 func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
+	const (
+		sensorSilenceTimeout   = 5 * time.Second
+		sensorRecoveryCooldown = 3 * time.Second
+		sensorCommandPause     = 50 * time.Millisecond
+	)
+
+	timer := time.NewTimer(sensorSilenceTimeout)
+	defer timer.Stop()
+
+	resetTimer := func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+		timer.Reset(sensorSilenceTimeout)
+	}
+
+	lastRecovery := time.Time{}
+	lastFrame := time.Now()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-timer.C:
+			now := time.Now()
+			if !lastRecovery.IsZero() && now.Sub(lastRecovery) < sensorRecoveryCooldown {
+				resetTimer()
+				continue
+			}
+
+			idleFor := now.Sub(lastFrame)
+			if idleFor < 0 {
+				idleFor = sensorSilenceTimeout
+			}
+
+			c.recoverSensorStream(idleFor, sensorCommandPause)
+			lastRecovery = now
+			resetTimer()
 		case frame := <-c.sensorFrames:
+			lastFrame = time.Now()
+			resetTimer()
 			msg := sensorMessage{
 				Type:      "sensor",
 				Timestamp: time.Now().UnixMilli(),
@@ -261,7 +300,46 @@ func (c *WSClient) ensureSensorStream() error {
 	if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
 		return err
 	}
-	return c.adapter.PauseSensorStream(false)
+	return nil
+}
+
+func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Duration) {
+	c.recoverMu.Lock()
+	if c.recovering {
+		c.recoverMu.Unlock()
+		return
+	}
+	c.recovering = true
+	c.recoverMu.Unlock()
+
+	defer func() {
+		c.recoverMu.Lock()
+		c.recovering = false
+		c.recoverMu.Unlock()
+	}()
+
+	c.emitEvent("sensorWatchdog.restart", map[string]any{
+		"idleMs": idleFor.Milliseconds(),
+	})
+
+	if err := c.adapter.StartOI(); err != nil {
+		c.log.Printf("watchdog start OI failed: %v", err)
+		c.emitEvent("sensorWatchdog.error", map[string]any{"error": err.Error()})
+		return
+	}
+	if cmdPause > 0 {
+		time.Sleep(cmdPause)
+	}
+
+	if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
+		c.log.Printf("watchdog start stream failed: %v", err)
+		c.emitEvent("sensorWatchdog.error", map[string]any{"error": err.Error()})
+		return
+	}
+
+	c.emitEvent("sensorWatchdog.ok", map[string]any{
+		"idleMs": idleFor.Milliseconds(),
+	})
 }
 
 func isModeOpcode(op byte) bool {
