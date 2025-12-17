@@ -25,7 +25,7 @@ type WSClient struct {
 const (
 	sensorSilenceTimeout   = 5 * time.Second
 	sensorRecoveryCooldown = 5 * time.Second
-	sensorCommandPause     = 100 * time.Millisecond
+	sensorCommandPause     = 1 * time.Millisecond
 )
 
 func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
