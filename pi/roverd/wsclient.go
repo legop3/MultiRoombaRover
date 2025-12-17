@@ -22,6 +22,12 @@ type WSClient struct {
 	log          *log.Logger
 }
 
+const (
+	sensorSilenceTimeout   = 5 * time.Second
+	sensorRecoveryCooldown = 5 * time.Second
+	sensorCommandPause     = 100 * time.Millisecond
+)
+
 func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
 	return &WSClient{
 		cfg:          cfg,
@@ -126,12 +132,9 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		return c.adapter.MotorPWM(main, side, vac)
 	case msg.SensorStream != nil:
 		if msg.SensorStream.Enable {
-			if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
-				return err
-			}
-			return c.adapter.PauseSensorStream(false)
+			return c.kickstartSensorStream(sensorCommandPause)
 		}
-		return c.adapter.PauseSensorStream(true)
+		return nil
 	case msg.Raw != "" && len(msg.Raw) > 0:
 		buf, err := base64.StdEncoding.DecodeString(msg.Raw)
 		if err != nil {
@@ -186,12 +189,6 @@ func (c *WSClient) handleServoCommand(payload *servoPayload) error {
 }
 
 func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
-	const (
-		sensorSilenceTimeout   = 5 * time.Second
-		sensorRecoveryCooldown = 3 * time.Second
-		streamCommandPause     = 75 * time.Millisecond
-	)
-
 	timer := time.NewTimer(sensorSilenceTimeout)
 	defer timer.Stop()
 
@@ -225,7 +222,7 @@ func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
 			}
 
 			c.log.Printf("no sensor frames for %v; restarting OI and sensor stream", idleFor)
-			c.recoverSensorStream(idleFor, streamCommandPause)
+			c.recoverSensorStream(idleFor, sensorCommandPause)
 			lastRecovery = now
 			resetTimer()
 		case frame := <-c.sensorFrames:
@@ -298,10 +295,7 @@ func clamp(value, min, max int) int {
 }
 
 func (c *WSClient) ensureSensorStream() error {
-	if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
-		return err
-	}
-	return c.adapter.PauseSensorStream(false)
+	return c.kickstartSensorStream(sensorCommandPause)
 }
 
 func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Duration) {
@@ -309,32 +303,8 @@ func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Dura
 		"idleMs": idleFor.Milliseconds(),
 	})
 
-	if err := c.adapter.PauseSensorStream(true); err != nil {
-		c.log.Printf("sensor stream pause failed: %v", err)
-	}
-	if cmdPause > 0 {
-		time.Sleep(cmdPause)
-	}
-
-	if err := c.adapter.StartOI(); err != nil {
-		c.log.Printf("start OI failed: %v", err)
-		c.emitEvent("sensorWatchdog.startOI.error", map[string]any{"error": err.Error()})
-	}
-	if cmdPause > 0 {
-		time.Sleep(cmdPause)
-	}
-
-	if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
+	if err := c.kickstartSensorStream(cmdPause); err != nil {
 		c.log.Printf("sensor stream restart failed: %v", err)
-		c.emitEvent("sensorWatchdog.streamRestart.error", map[string]any{"error": err.Error()})
-		return
-	}
-	if cmdPause > 0 {
-		time.Sleep(cmdPause)
-	}
-
-	if err := c.adapter.PauseSensorStream(false); err != nil {
-		c.log.Printf("sensor stream unpause failed: %v", err)
 		c.emitEvent("sensorWatchdog.streamRestart.error", map[string]any{"error": err.Error()})
 		return
 	}
@@ -342,6 +312,22 @@ func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Dura
 	c.emitEvent("sensorWatchdog.streamRestart.ok", map[string]any{
 		"idleMs": idleFor.Milliseconds(),
 	})
+}
+
+func (c *WSClient) kickstartSensorStream(cmdPause time.Duration) error {
+	if err := c.adapter.StartOI(); err != nil {
+		return err
+	}
+	if cmdPause > 0 {
+		time.Sleep(cmdPause)
+	}
+	if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
+		return err
+	}
+	if cmdPause > 0 {
+		time.Sleep(cmdPause)
+	}
+	return nil
 }
 
 func isModeOpcode(op byte) bool {
