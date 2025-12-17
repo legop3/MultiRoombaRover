@@ -92,10 +92,6 @@ func (s *SerialAdapter) SendRaw(raw []byte) error {
 	return s.write(raw)
 }
 
-func (s *SerialAdapter) StartOI() error {
-	return s.write([]byte{128})
-}
-
 func (s *SerialAdapter) SeekDock() error {
 	return s.write([]byte{143})
 }

@@ -105,9 +105,10 @@ export function useCommandPipeline() {
         type: 'raw',
         data: { raw: bytesToBase64(bytes) },
       });
+      enableSensorStream();
       return true;
     },
-    [emitCommand, roverId],
+    [emitCommand, enableSensorStream, roverId],
   );
 
   const runMacroSteps = useCallback(
@@ -118,9 +119,6 @@ export function useCommandPipeline() {
         switch (step.type) {
           case 'oi':
             sendOiCommand(step.command);
-            break;
-          case 'sensorStream':
-            enableSensorStream();
             break;
           case 'drive':
             sendDriveDirect(step.speeds ?? { left: 0, right: 0 });
@@ -145,7 +143,7 @@ export function useCommandPipeline() {
         }
       }
     },
-    [roverId, sendOiCommand, sendDriveDirect, sendAuxMotors, sendServoAngle, enableSensorStream],
+    [roverId, sendOiCommand, sendDriveDirect, sendAuxMotors, sendServoAngle],
   );
 
   const sendNightVision = useCallback(
