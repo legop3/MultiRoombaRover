@@ -140,13 +140,7 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		if err != nil {
 			return fmt.Errorf("raw decode: %w", err)
 		}
-		if err := c.adapter.SendRaw(buf); err != nil {
-			return err
-		}
-		if len(buf) > 0 && isModeOpcode(buf[0]) {
-			return c.ensureSensorStream()
-		}
-		return nil
+		return c.adapter.SendRaw(buf)
 	case msg.Media != nil:
 		if c.media == nil {
 			return fmt.Errorf("media supervisor disabled")

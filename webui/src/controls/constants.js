@@ -53,9 +53,11 @@ export const DEFAULT_MACROS = [
   {
     id: 'drive-sequence',
     label: 'Drive',
-    description: 'Start, dock, and full command sequence used by the drive button.',
+    description: 'Start OI, request sensors, dock poke, then full mode for driving.',
     steps: [
       { type: 'oi', command: 'start' },
+      { type: 'pause', duration: COMMAND_DELAY_MS },
+      { type: 'sensorStream', enable: true },
       { type: 'pause', duration: COMMAND_DELAY_MS },
       { type: 'oi', command: 'dock' },
       { type: 'pause', duration: COMMAND_DELAY_MS },

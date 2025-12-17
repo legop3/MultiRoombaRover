@@ -120,6 +120,9 @@ export function useCommandPipeline() {
           case 'oi':
             sendOiCommand(step.command);
             break;
+          case 'sensorStream':
+            enableSensorStream();
+            break;
           case 'drive':
             sendDriveDirect(step.speeds ?? { left: 0, right: 0 });
             break;
@@ -143,7 +146,7 @@ export function useCommandPipeline() {
         }
       }
     },
-    [roverId, sendOiCommand, sendDriveDirect, sendAuxMotors, sendServoAngle],
+    [roverId, sendOiCommand, sendDriveDirect, sendAuxMotors, sendServoAngle, enableSensorStream],
   );
 
   const sendNightVision = useCallback(
