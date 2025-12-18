@@ -140,7 +140,7 @@ function maybeSpeak(socket, message, ttsOptions) {
   const audio = record?.meta?.audio || {};
   const ttsEnabled = Boolean(audio.ttsEnabled);
   if (!ttsEnabled) return;
-  if (!roverManager.canDrive(message.roverId, socket)) return;
+  // if (!roverManager.canDrive(message.roverId, socket)) return;
   try {
     issueCommand(message.roverId, {
       type: 'tts',
