@@ -32,32 +32,35 @@ else
 fi
 
 run_pipeline() {
-	"${FFMPEG_BIN_PATH}" \
-		-hide_banner \
-		-loglevel warning \
-		-fflags nobuffer \
-		-rtbufsize 0 \
-		-thread_queue_size 4096 \
-		-f s32le \
-		-ar "${AUDIO_RATE}" \
-		-ac "${AUDIO_CHANNELS}" \
-		-i <(arecord -D "${AUDIO_DEVICE}" -f S32_LE -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -B 65536 -F 2048 -q -t raw) \
-		-af "aresample=16000,pan=mono|c0=0.5*FL+0.5*FR,volume=25dB" \
-		-c:a libopus \
-		-b:a 24000 \
-		-ar:a 16000 \
-		-ac:a 1 \
-		-application lowdelay \
-		-frame_duration 20 \
-		-compression_level 0 \
-		-f mpegts \
-		"${AUDIO_PUBLISH_URL}"
+	arecord -D "${AUDIO_DEVICE}" -f S32_LE -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -B 65536 -F 2048 -q -t raw \
+		| "${FFMPEG_BIN_PATH}" \
+			-hide_banner \
+			-loglevel warning \
+			-fflags nobuffer \
+			-rtbufsize 0 \
+			-thread_queue_size 4096 \
+			-f s32le \
+			-ar "${AUDIO_RATE}" \
+			-ac "${AUDIO_CHANNELS}" \
+			-i pipe:0 \
+			-af "aresample=16000,pan=mono|c0=0.5*FL+0.5*FR,volume=25dB" \
+			-c:a libopus \
+			-b:a 24000 \
+			-ar:a 16000 \
+			-ac:a 1 \
+			-application lowdelay \
+			-frame_duration 20 \
+			-compression_level 0 \
+			-f mpegts \
+			"${AUDIO_PUBLISH_URL}"
 }
+
+trap 'kill 0 2>/dev/null' EXIT INT TERM
 
 while true; do
 	if run_pipeline; then
 		exit 0
 	fi
-	echo "Audio-only publisher exited, restarting in 2s..." >&2
+	echo "Audio-only publisher exited arecord=${PIPESTATUS[0]} ffmpeg=${PIPESTATUS[1]}, restarting in 2s..." >&2
 	sleep 2
 done
