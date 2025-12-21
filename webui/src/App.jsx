@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TelemetryPanel from './components/TelemetryPanel.jsx';
-import DrivePanel from './components/DrivePanel.jsx';
+import ControlSummary from './components/ControlSummary.jsx';
 import AlertFeed from './components/AlertFeed.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
 import MobileControls, {
@@ -83,9 +83,9 @@ function MobilePortraitLayout() {
     <div className="flex flex-col gap-0.5">
       <DriverVideoPanel layoutFormat='mobile'/>
       <MobileControls />
+      <ControlSummary />
       <ChatPanel />
       <UserListPanel />
-      <DrivePanel />
       <TelemetryPanel />
       <AuthPanel />
       <AdminPanel />

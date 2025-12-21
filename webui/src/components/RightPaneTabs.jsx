@@ -1,6 +1,5 @@
 import TelemetryPanel from './TelemetryPanel.jsx';
-import DrivePanel from './DrivePanel.jsx';
-import CameraServoPanel from './CameraServoPanel.jsx';
+import ControlSummary from './ControlSummary.jsx';
 import RoomCameraPanel from './RoomCameraPanel.jsx';
 import HomeAssistantControls from './HomeAssistantControls.jsx';
 import SettingsPanel from './SettingsPanel.jsx';
@@ -19,11 +18,10 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
         <TabPanels>
           <TabPanel id="telemetry">
             <div className="space-y-0.5">
-              <DrivePanel />
+              <ControlSummary />
               <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
               <HomeAssistantControls />
               <TelemetryPanel />
-              <CameraServoPanel />
             </div>
           </TabPanel>
           <TabPanel id="help">
