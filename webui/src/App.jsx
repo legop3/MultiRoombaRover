@@ -24,6 +24,7 @@ import FullscreenPrompt from './components/FullscreenPrompt.jsx';
 import { useFullscreenPrompt } from './hooks/useFullscreenPrompt.js';
 import { useSettingsNamespace } from './settings/index.js';
 import HelpOverlay from './components/HelpOverlay.jsx';
+import DrivePanel from './components/DrivePanel.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -121,7 +122,7 @@ function MobileLandscapeLayout() {
         </section>
         <RoomCameraPanel panelId="mobile-landscape-room" />
         <HomeAssistantControls />
-        {/* <DrivePanel /> */}
+        <DrivePanel />
       </div>
     </div>
   );
