@@ -392,8 +392,8 @@ function HudOverlay({
           </div>
         ) : null}
 
-        <div className="absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.5 bg-black/70 px-1 py-0.75 text-[0.65rem] text-slate-100">
-          <div className="space-y-0.25">
+        <div className="absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.35 bg-black/70 px-1 py-0.35 text-[0.65rem] text-slate-100">
+          <div className="space-y-0.1 leading-tight">
             <span className="text-[0.6rem] uppercase tracking-wide text-slate-400">Telemetry</span>
             {telemetryEntries.map(([labelText, value]) => (
               <span key={labelText} className="flex items-center justify-between gap-0.5">
@@ -403,18 +403,18 @@ function HudOverlay({
             ))}
           </div>
           {showTopDown ? (
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center pt-0.25">
               <div
                 className="pointer-events-none rounded"
                 style={{
-                  width: '160px',
-                  height: '160px',
-                  opacity: 0.8,
-                  transform: 'scale(0.7)',
+                  width: '130px',
+                  height: '130px',
+                  opacity: 0.9,
+                  transform: 'scale(0.85)',
                   transformOrigin: 'top left',
                 }}
               >
-                <TopDownMap sensors={sensors} size={200} overlay />
+                <TopDownMap sensors={sensors} size={160} overlay />
               </div>
             </div>
           ) : null}
