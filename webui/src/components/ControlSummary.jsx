@@ -63,8 +63,8 @@ export default function ControlSummary() {
         <div className="grid h-full grid-rows-[1fr_1fr_auto] gap-0.75">
           <ActionButton
             title="Start Driving"
-            description="Enable driving mode, then move the rover."
-            statuses={[{ label: driving ? 'Ready' : 'Not ready', active: driving }]}
+            description="Enable driving mode, then begin driving."
+            statuses={[{ label: driving ? 'Ready' : 'Press to enter driving mode', active: driving }]}
             tone="emerald"
             onClick={handleStartDrive}
             disabled={!roverId}
@@ -73,7 +73,7 @@ export default function ControlSummary() {
           />
           <ActionButton
             title="Dock and Charge"
-            description="Trigger an automatic docking attempt."
+            description="Line up about a foot from the dock, then press to attempt auto-dock."
             statuses={[
               { label: docked ? 'Docked' : 'Not docked', active: docked },
               { label: charging ? 'Charging' : 'Not charging', active: charging },
@@ -142,7 +142,7 @@ function StatusPill({ label, active }) {
   return (
     <span
       className={`rounded px-1.5 py-0.5 text-[0.7rem] font-semibold ${
-        active ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-200'
+        active ? 'bg-emerald-600 text-white' : 'bg-red-500 text-white'
       }`}
     >
       {label}
