@@ -574,9 +574,7 @@ const LIGHT_BUMP_SENSITIVITY = 1; // increase to spin through hues faster
 function lightBumpColor(value) {
   if (value == null || value <= 0) return '#000000';
   const hue = (value * LIGHT_BUMP_SENSITIVITY) % 360; // cycles through the whole spectrum
-  const t = clamp01(value / 3000); // controls lightness only
-  const lightness = 20 + t * 50;
-  return `hsl(${hue} 90% ${lightness}%)`;
+  return `hsl(${hue} 100% 60%)`; // fully saturated, bright
 }
 
 function cliffColor(value, active) {
