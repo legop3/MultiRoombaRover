@@ -570,7 +570,7 @@ function buildSegments({ count, totalSpan, gap, startAngle }) {
   return segments;
 }
 
-const LIGHT_BUMP_SENSITIVITY = 0.18; // increase to spin through hues faster
+const LIGHT_BUMP_SENSITIVITY = 1; // increase to spin through hues faster
 function lightBumpColor(value) {
   if (value == null || value <= 0) return '#000000';
   const hue = (value * LIGHT_BUMP_SENSITIVITY) % 360; // cycles through the whole spectrum
