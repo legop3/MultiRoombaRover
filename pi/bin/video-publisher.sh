@@ -52,10 +52,13 @@ run_pipeline() {
 		--bitrate "${VIDEO_BITRATE}" \
 		--codec h264 \
 		--profile baseline \
-		--denoise cdn_off \
+		--denoise auto \
 		--nopreview \
-		--awb custom \
-		--awbgains 1.5,1.8 \
+		--metering centre \
+		--ev 0.1 \
+		--awb auto \
+		--saturation 0.6 \
+		--brightness 0 \
 		--output - \
 		| "${FFMPEG_BIN_PATH}" \
 			-hide_banner \
