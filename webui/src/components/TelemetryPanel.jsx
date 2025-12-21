@@ -72,16 +72,10 @@ export default function TelemetryPanel() {
           </div>
           <SituationalMap sensors={sensors} variant="full" />
 
-          <div className="surface flex flex-col gap-0.5 text-sm">
-            <div className="flex gap-0.5">
-              <DirtMeter label="Dirt Detect" value={sensors.dirtDetect} />
-              <DirtMeter label="Dirt Left" value={sensors.dirtDetectLeft} />
-            </div>
-            <div className="flex gap-0.5">
-              <IrPill label="IR Omni" value={sensors.infraredCharacterOmni} />
-              <IrPill label="IR Left" value={sensors.infraredCharacterLeft} />
-              <IrPill label="IR Right" value={sensors.infraredCharacterRight} />
-            </div>
+          <div className="surface flex gap-0.5 text-sm">
+            <IrPill label="IR Omni" value={sensors.infraredCharacterOmni} />
+            <IrPill label="IR Left" value={sensors.infraredCharacterLeft} />
+            <IrPill label="IR Right" value={sensors.infraredCharacterRight} />
           </div>
         </>
       )}
@@ -193,13 +187,13 @@ function SituationalMap({ sensors, variant = 'full' }) {
   const size = variant === 'mini' ? 190 : 240;
   const center = size / 2;
   const innerCircle = variant === 'mini' ? 78 : 96;
-  const lightRingInner = variant === 'mini' ? 68 : 82;
-  const lightRingOuter = variant === 'mini' ? 78 : 92;
-  const cliffRingInner = variant === 'mini' ? 58 : 72;
-  const cliffRingOuter = variant === 'mini' ? 68 : 82;
+  const lightRingInner = variant === 'mini' ? 78 : 92;
+  const lightRingOuter = variant === 'mini' ? 86 : 100;
+  const cliffRingInner = variant === 'mini' ? 62 : 76;
+  const cliffRingOuter = variant === 'mini' ? 70 : 84;
   const bumpRingInner = variant === 'mini' ? 82 : 104;
   const bumpRingOuter = variant === 'mini' ? 90 : 114;
-  const wheelLineOffset = variant === 'mini' ? 34 : 42;
+  const wheelLineOffset = variant === 'mini' ? 50 : 68;
 
   const lightSignals = [
     sensors?.lightBumpLeftSignal,
@@ -218,20 +212,42 @@ function SituationalMap({ sensors, variant = 'full' }) {
   const mainBrushCurrent = sensors?.mainBrushCurrentMa ?? 0;
   const wheelOver = sensors?.wheelOvercurrents || {};
 
-  const lightSegments = [
-    { label: 'L', start: -100, end: -70, value: sensors?.lightBumpLeftSignal, active: sensors?.lightBumper?.left },
-    { label: 'FL', start: -70, end: -35, value: sensors?.lightBumpFrontLeftSignal, active: sensors?.lightBumper?.frontLeft },
-    { label: 'CL', start: -35, end: -5, value: sensors?.lightBumpCenterLeftSignal, active: sensors?.lightBumper?.centerLeft },
-    { label: 'CR', start: 5, end: 35, value: sensors?.lightBumpCenterRightSignal, active: sensors?.lightBumper?.centerRight },
-    { label: 'FR', start: 35, end: 70, value: sensors?.lightBumpFrontRightSignal, active: sensors?.lightBumper?.frontRight },
-    { label: 'R', start: 70, end: 100, value: sensors?.lightBumpRightSignal, active: sensors?.lightBumper?.right },
+  const lightAngles = buildSegments({
+    count: 6,
+    totalSpan: 140,
+    gap: 6,
+    startAngle: -70,
+  });
+  const lightLabels = ['L', 'FL', 'CL', 'CR', 'FR', 'R'];
+  const lightValues = [
+    sensors?.lightBumpLeftSignal,
+    sensors?.lightBumpFrontLeftSignal,
+    sensors?.lightBumpCenterLeftSignal,
+    sensors?.lightBumpCenterRightSignal,
+    sensors?.lightBumpFrontRightSignal,
+    sensors?.lightBumpRightSignal,
   ];
+  const lightActive = [
+    sensors?.lightBumper?.left,
+    sensors?.lightBumper?.frontLeft,
+    sensors?.lightBumper?.centerLeft,
+    sensors?.lightBumper?.centerRight,
+    sensors?.lightBumper?.frontRight,
+    sensors?.lightBumper?.right,
+  ];
+  const lightSegments = lightAngles.map((ang, idx) => ({
+    label: lightLabels[idx],
+    start: ang.start,
+    end: ang.end,
+    value: lightValues[idx],
+    active: lightActive[idx],
+  }));
 
   const cliffSegments = [
-    { label: 'Cliff L', start: -95, end: -70, value: sensors?.cliffLeftSignal, active: sensors?.cliffLeft },
-    { label: 'Cliff FL', start: -45, end: -15, value: sensors?.cliffFrontLeftSignal, active: sensors?.cliffFrontLeft },
-    { label: 'Cliff FR', start: 15, end: 45, value: sensors?.cliffFrontRightSignal, active: sensors?.cliffFrontRight },
-    { label: 'Cliff R', start: 70, end: 95, value: sensors?.cliffRightSignal, active: sensors?.cliffRight },
+    { label: 'Cliff L', start: -65, end: -45, value: sensors?.cliffLeftSignal, active: sensors?.cliffLeft },
+    { label: 'Cliff FL', start: -25, end: -5, value: sensors?.cliffFrontLeftSignal, active: sensors?.cliffFrontLeft },
+    { label: 'Cliff FR', start: 5, end: 25, value: sensors?.cliffFrontRightSignal, active: sensors?.cliffFrontRight },
+    { label: 'Cliff R', start: 45, end: 65, value: sensors?.cliffRightSignal, active: sensors?.cliffRight },
   ];
 
   return (
@@ -248,17 +264,31 @@ function SituationalMap({ sensors, variant = 'full' }) {
           overcurrent={wheelOver.leftWheel}
           label="L"
         />
-        <WheelVisual
-          cx={center + wheelLineOffset}
-          cy={center}
-          current={wheelCurrentRight}
-          drop={bumps.wheelDropRight}
+      <WheelVisual
+        cx={center + wheelLineOffset}
+        cy={center}
+        current={wheelCurrentRight}
+        drop={bumps.wheelDropRight}
           overcurrent={wheelOver.rightWheel}
           label="R"
         />
+        <SideBrushVisual
+          cx={center + innerCircle * 0.65}
+          cy={center - innerCircle * 0.55}
+          current={sideBrushCurrent}
+          overcurrent={wheelOver.sideBrush}
+      />
+      <MainBrushVisual
+        cx={center}
+        cy={center}
+        current={mainBrushCurrent}
+          overcurrent={wheelOver.mainBrush}
+          variant={variant}
+          dirtLeft={sensors?.dirtDetectLeft}
+          dirtRight={sensors?.dirtDetect}
+        />
         {lightSegments.map((seg) => {
-          const pct = seg.value == null ? 0 : Math.max(0, Math.min(1, seg.value / effectiveLightMax));
-          const color = pct > 0.75 ? '#f59e0b' : '#22c55e';
+          const color = lightBumpColor(seg.value);
           return (
             <ArcSegment
               key={seg.label}
@@ -268,15 +298,14 @@ function SituationalMap({ sensors, variant = 'full' }) {
               rOuter={lightRingOuter}
               startDeg={seg.start}
               endDeg={seg.end}
-              color={seg.value == null ? '#475569' : color}
-              opacity={seg.value == null ? 0.35 : 0.95}
-              pulse={Boolean(seg.active)}
+              color={color}
+              opacity={1}
+              pulse={false}
             />
           );
         })}
         {cliffSegments.map((seg) => {
-          const pct = seg.value == null ? 0 : Math.max(0, Math.min(1, seg.value / 4095));
-          const color = pct > 0.6 ? '#f59e0b' : '#22c55e';
+          const color = cliffColor(seg.value, seg.active);
           return (
             <ArcSegment
               key={seg.label}
@@ -287,7 +316,7 @@ function SituationalMap({ sensors, variant = 'full' }) {
               startDeg={seg.start}
               endDeg={seg.end}
               color={seg.value == null ? '#475569' : color}
-              opacity={seg.value == null ? 0.35 : 0.9}
+              opacity={1}
               pulse={Boolean(seg.active)}
             />
           );
@@ -295,41 +324,25 @@ function SituationalMap({ sensors, variant = 'full' }) {
         <ArcSegment
           cx={center}
           cy={center}
-          rInner={bumpRingInner}
-          rOuter={bumpRingOuter}
-          startDeg={-80}
-          endDeg={-25}
-          color={bumps.bumpLeft ? '#ef4444' : '#475569'}
-          opacity={bumps.bumpLeft ? 0.9 : 0.7}
-          pulse={Boolean(bumps.bumpLeft)}
-        />
-        <ArcSegment
-          cx={center}
+              rInner={lightRingOuter + 2}
+              rOuter={lightRingOuter + 8}
+              startDeg={-70}
+              endDeg={-6}
+              color={bumps.bumpLeft ? '#ef4444' : '#475569'}
+              opacity={1}
+              pulse={Boolean(bumps.bumpLeft)}
+            />
+            <ArcSegment
+              cx={center}
           cy={center}
-          rInner={bumpRingInner}
-          rOuter={bumpRingOuter}
-          startDeg={25}
-          endDeg={80}
+          rInner={lightRingOuter + 2}
+          rOuter={lightRingOuter + 8}
+          startDeg={6}
+          endDeg={70}
           color={bumps.bumpRight ? '#ef4444' : '#475569'}
-          opacity={bumps.bumpRight ? 0.9 : 0.7}
+          opacity={1}
           pulse={Boolean(bumps.bumpRight)}
         />
-        <SideBrushVisual
-          cx={center + innerCircle * 0.45}
-          cy={center - innerCircle * 0.35}
-          current={sideBrushCurrent}
-          overcurrent={wheelOver.sideBrush}
-        />
-        <MainBrushVisual
-          cx={center}
-          cy={center + innerCircle * 0.25}
-          current={mainBrushCurrent}
-          overcurrent={wheelOver.mainBrush}
-          variant={variant}
-        />
-        <text x={center} y={18} textAnchor="middle" className="fill-slate-500 text-[0.6rem]">
-          N
-        </text>
       </svg>
     </div>
   );
@@ -350,7 +363,7 @@ function ArcSegment({ cx, cy, rInner, rOuter, startDeg, endDeg, color, pulse = f
           strokeLinecap="round"
           fill="none"
           className="animate-pulse"
-          opacity={0.6}
+          opacity={1}
         />
       ) : null}
     </>
@@ -378,39 +391,51 @@ function toRad(angleDeg) {
   return ((angleDeg - 90) * Math.PI) / 180;
 }
 
-function clamp01(value) {
-  return Math.max(0, Math.min(1, value));
-}
-
 function currentColor(value, overcurrent) {
   if (overcurrent) return '#ef4444';
   const mag = Math.abs(value);
   if (mag > 900) return '#f59e0b';
   if (mag > 300) return '#22c55e';
-  return '#94a3b8';
+  return '#64748b'; // unified idle tone for wheels/brushes
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
 }
 
 function WheelVisual({ cx, cy, current, drop, overcurrent, label }) {
   const mag = Math.abs(current);
   const pct = clamp01(mag / 1200);
   const color = currentColor(current, overcurrent);
-  const barH = 30;
-  const currentW = 12;
-  const dropW = 8;
-  const gap = 4;
+  const barH = 56;
+  const currentW = 14;
+  const dropW = 9;
+  const gap = 3;
   const currentFill = barH * pct;
   const sign = label === 'L' ? -1 : 1;
   const currentCenterX = sign * (-dropW / 2 - gap / 2);
   const dropCenterX = sign * (currentW / 2 + gap / 2);
+  const groupWidth = currentW + dropW + gap + 2;
+  const groupHeight = barH + 4;
   return (
     <g transform={`translate(${cx},${cy})`}>
+      <rect
+        x={-groupWidth / 2}
+        y={-groupHeight / 2}
+        width={groupWidth}
+        height={groupHeight}
+        rx="4"
+        fill="none"
+        stroke="#64748b"
+        strokeWidth="1"
+      />
       <rect
         x={currentCenterX - currentW / 2}
         y={-barH / 2}
         width={currentW}
         height={barH}
         fill="#0f172a"
-        stroke="#1f2937"
+        stroke="#0f172a"
         strokeWidth="1"
         rx="2"
       />
@@ -440,10 +465,9 @@ function WheelVisual({ cx, cy, current, drop, overcurrent, label }) {
 
 function SideBrushVisual({ cx, cy, current, overcurrent }) {
   const mag = Math.abs(current);
-  const color = currentColor(current, overcurrent);
-  const opacity = clamp01(mag / 1000) * 0.6 + 0.3;
-  const armLength = 26;
-  const spinDuration = mag > 10 ? Math.max(0.35, 2.2 - mag / 500) : null;
+  const color = currentColor(current * 3, overcurrent); // more sensitive; side brush draws little current
+  const armLength = 42;
+  const spinDuration = mag > 0 ? 0.65 : null; // spin only when drawing current
   return (
     <g
       style={{
@@ -451,27 +475,27 @@ function SideBrushVisual({ cx, cy, current, overcurrent }) {
         animation: spinDuration ? `spin ${spinDuration}s linear infinite` : 'none',
       }}
     >
-      <circle cx={cx} cy={cy} r={10} fill="#0f172a" stroke={color} strokeWidth="2" opacity={opacity} />
+      <circle cx={cx} cy={cy} r={10} fill="#64748b" stroke="#64748b" strokeWidth="1" />
       {[0, 120, 240].map((deg) => {
         const rad = toRad(deg);
         const x2 = cx + armLength * Math.cos(rad);
         const y2 = cy + armLength * Math.sin(rad);
-        return <line key={deg} x1={cx} y1={cy} x2={x2} y2={y2} stroke={color} strokeWidth="4" strokeLinecap="round" opacity={opacity} />;
+        return <line key={deg} x1={cx} y1={cy} x2={x2} y2={y2} stroke={color} strokeWidth="4" strokeLinecap="round" />;
       })}
-      {overcurrent ? <circle cx={cx} cy={cy} r={armLength + 6} stroke="#ef4444" strokeWidth="3" fill="none" className="animate-pulse" opacity={0.6} /> : null}
+      {overcurrent ? <circle cx={cx} cy={cy} r={armLength + 8} stroke="#ef4444" strokeWidth="3" fill="none" className="animate-pulse" /> : null}
     </g>
   );
 }
 
-function MainBrushVisual({ cx, cy, current, overcurrent, variant }) {
+function MainBrushVisual({ cx, cy, current, overcurrent, variant, dirtLeft, dirtRight }) {
   const mag = Math.abs(current);
   const color = currentColor(current, overcurrent);
-  const opacity = clamp01(mag / 1000) * 0.6 + 0.3;
-  const rollerWidth = 44;
-  const rollerHeight = 8;
+  const opacity = 1;
+  const rollerWidth = 96;
+  const rollerHeight = 12;
   const patternA = `main-brush-pattern-a-${variant}`;
   const patternB = `main-brush-pattern-b-${variant}`;
-  const dur = mag > 10 ? Math.max(0.35, 2.4 - mag / 500) : null;
+  const dur = mag > 0 ? 0.6 : null; // only scroll when drawing current
   const dir = current >= 0 ? 1 : -1;
   return (
     <g>
@@ -495,24 +519,26 @@ function MainBrushVisual({ cx, cy, current, overcurrent, variant }) {
       </defs>
       <rect
         x={cx - rollerWidth / 2}
-        y={cy - 12}
+        y={cy - 14}
         width={rollerWidth}
         height={rollerHeight}
         rx="3"
         fill={`url(#${patternA})`}
-        stroke="#0f172a"
+        stroke="#64748b"
         strokeWidth="1"
       />
       <rect
         x={cx - rollerWidth / 2}
-        y={cy + 6}
+        y={cy + 4}
         width={rollerWidth}
         height={rollerHeight}
         rx="3"
         fill={`url(#${patternB})`}
-        stroke="#0f172a"
+        stroke="#64748b"
         strokeWidth="1"
       />
+      <circle cx={cx - rollerWidth / 4} cy={cy - 8} r={3.5} fill="#fbbf24" />
+      <circle cx={cx + rollerWidth / 4} cy={cy + 8} r={3.5} fill="#fbbf24" />
       {overcurrent ? (
         <rect
           x={cx - rollerWidth / 2 - 4}
@@ -529,4 +555,35 @@ function MainBrushVisual({ cx, cy, current, overcurrent, variant }) {
       ) : null}
     </g>
   );
+}
+
+function buildSegments({ count, totalSpan, gap, startAngle }) {
+  const usable = totalSpan - gap * (count - 1);
+  const width = usable / count;
+  const segments = [];
+  let cursor = startAngle;
+  for (let i = 0; i < count; i += 1) {
+    const end = cursor + width;
+    segments.push({ start: cursor, end });
+    cursor = end + gap;
+  }
+  return segments;
+}
+
+const LIGHT_BUMP_MAX = 2000; // easy sensitivity tuning for light bumps
+function lightBumpColor(value) {
+  if (value == null || value <= 0) return '#000000';
+  const t = clamp01(value / LIGHT_BUMP_MAX);
+  const hue = 140 - t * 80; // greenish toward amber
+  const lightness = 15 + t * 55;
+  return `hsl(${hue} 90% ${lightness}%)`;
+}
+
+function cliffColor(value, active) {
+  if (active) return '#ef4444';
+  const t = clamp01(value == null ? 0 : value / 4095);
+  const start = [47, 55, 69]; // #2f3745-ish dark gray
+  const end = [245, 158, 11]; // amber
+  const [r, g, b] = start.map((s, i) => Math.round(s + (end[i] - s) * t));
+  return `rgb(${r}, ${g}, ${b})`;
 }
