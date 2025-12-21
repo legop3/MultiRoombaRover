@@ -35,7 +35,7 @@ export default function DrivePanel() {
       </div> */}
       <div className="space-y-0.5">
         <ActionCard
-          title="Start Driving"
+          title="Startfdsafsdfas Driving"
           description="Press to enable driving mode, then start moving."
           statuses={[{ label: drivingMode ? 'Ready!' : 'Press to enter driving mode!', active: drivingMode }]}
           tone="emerald"
