@@ -6,6 +6,7 @@ import KeymapSettings from './KeymapSettings.jsx';
 import GamepadMappingSettings from './GamepadMappingSettings.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 import SessionSnapshot from './SessionSnapshot.jsx';
+import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -21,6 +22,7 @@ export default function SettingsPanel() {
     actions: { sendOiCommand, setSensorStream },
   } = useControlSystem();
   const canControl = Boolean(roverId);
+  const [hudMapDesktop, setHudMapDesktop] = useHudMapSetting();
 
   const sensorButtons = useMemo(
     () => [
@@ -39,6 +41,7 @@ export default function SettingsPanel() {
       <TabList>
         <Tab id="keybindings">Keybindings</Tab>
         <Tab id="controller">Controller</Tab>
+        <Tab id="page">Page settings</Tab>
         <Tab id="admin">Admin</Tab>
       </TabList>
       <TabPanels>
@@ -50,6 +53,23 @@ export default function SettingsPanel() {
         <TabPanel id="controller">
           <div className="space-y-0.5">
             <GamepadMappingSettings />
+          </div>
+        </TabPanel>
+        <TabPanel id="page">
+          <div className="space-y-0.5">
+            <section className="panel-section space-y-0.5 text-sm">
+              <p className="text-slate-400">HUD</p>
+              <label className="flex items-center gap-0.5 text-slate-200">
+                <input
+                  type="checkbox"
+                  className="accent-emerald-500"
+                  checked={hudMapDesktop}
+                  onChange={(e) => setHudMapDesktop(e.target.checked)}
+                />
+                <span>Show top-down map in HUD (desktop)</span>
+              </label>
+              <p className="text-xs text-slate-500">Mobile HUD keeps the map on by default.</p>
+            </section>
           </div>
         </TabPanel>
         <TabPanel id="admin">

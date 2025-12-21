@@ -1,6 +1,6 @@
 import React from 'react';
 
-function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize }) {
+function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overlay = false }) {
   const size = overrideSize || (variant === 'mini' ? 190 : 260);
   const center = size / 2;
   const innerCircle = center * 0.8; // keep proportions consistent as size changes
@@ -50,9 +50,16 @@ function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize }) {
   const maxLight = lightMaxSamples.length ? Math.max(...lightMaxSamples, 1200) : 1200;
 
   return (
-    <div className="surface relative p-1" style={{ height: '100%', width: '100%', aspectRatio: '1 / 1' }}>
-      <div className="absolute left-1 top-1 text-xs text-slate-400">Top-down</div>
-      <div className="absolute right-1 top-1 text-[0.65rem] text-slate-500">0–{maxLight}</div>
+    <div
+      className={`${overlay ? 'relative' : 'surface relative p-1'}`}
+      style={overlay ? { width: `${size}px`, height: `${size}px` } : { height: '100%', width: '100%', aspectRatio: '1 / 1' }}
+    >
+      {!overlay ? (
+        <>
+          <div className="absolute left-1 top-1 text-xs text-slate-400">Top-down</div>
+          <div className="absolute right-1 top-1 text-[0.65rem] text-slate-500">0–{maxLight}</div>
+        </>
+      ) : null}
       <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} preserveAspectRatio="xMidYMid meet" className="mx-auto block">
         <circle cx={center} cy={center} r={innerCircle} fill="#0f172a" stroke="#334155" strokeWidth="2" />
         <WheelVisual

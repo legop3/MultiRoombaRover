@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { WhepPlayer } from '../lib/whepPlayer.js';
+import TopDownMap from './TopDownMap.jsx';
+import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
@@ -66,6 +68,9 @@ export default function VideoTile({
   const sensors = telemetryFrame?.sensors;
   const batteryCharge = sensors?.batteryChargeMah ?? null;
   const desktopLayout = layoutFormat === 'desktop';
+  const mobileHud = !desktopLayout;
+  const [showHudMapDesktop, setShowHudMapDesktop] = useHudMapSetting();
+  const showHudMap = mobileHud ? true : showHudMapDesktop;
   const batteryVisual = buildBatteryVisual(batteryCharge, batteryConfig);
   // console.log('[BatteryBarDebug]', {
   //   frameSensors: sensors,
@@ -268,6 +273,7 @@ export default function VideoTile({
         <audio ref={audioRef} autoPlay hidden />
         <HudOverlay
           frame={telemetryFrame}
+          sensors={sensors}
           label={label}
           status={renderedStatus}
           audioStatus={renderedAudioStatus}
@@ -276,6 +282,8 @@ export default function VideoTile({
           driverLabel={driverLabel}
           battery={batteryVisual}
           songNote={songNote}
+          showTopDown={showHudMap}
+          mobileHud={mobileHud}
         />
         <OvercurrentOverlay motors={overcurrentMotors} />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />
@@ -329,6 +337,7 @@ function BatteryBarVertical({ visual }) {
 
 function HudOverlay({
   frame,
+  sensors,
   label,
   status,
   audioStatus,
@@ -337,8 +346,9 @@ function HudOverlay({
   driverLabel = null,
   battery,
   songNote = null,
+  showTopDown = false,
+  mobileHud = false,
 }) {
-  const sensors = frame?.sensors;
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const [now, setNow] = useState(() => Date.now());
 
@@ -383,12 +393,20 @@ function HudOverlay({
           {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
         </div>
 
-        <div className="absolute top-0.5 left-1/2 flex -translate-x-1/2 gap-1 bg-black/70 text-[0.6rem] font-medium text-slate-200">
-          <div className={`${desktopLayout ? 'px-1 py-0.5' : 'px-0.5 py-0 text-nowrap'} ${bumps.bumpLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left bump</div>
-          <div className={`${desktopLayout ? 'px-1 py-0.5' : 'px-0.5 py-0 text-nowrap'} ${bumps.wheelDropLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left wheel drop</div>
-          <div className={`${desktopLayout ? 'px-1 py-0.5' : 'px-0.5 py-0 text-nowrap'} ${bumps.wheelDropRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right wheel drop</div>
-          <div className={`${desktopLayout ? 'px-1 py-0.5' : 'px-0.5 py-0 text-nowrap'} ${bumps.bumpRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right bump</div>
+      {showTopDown ? (
+        <div
+          className="pointer-events-none absolute right-1 top-1"
+          style={{
+            width: '240px',
+            height: '240px',
+            opacity: 0.7,
+            transform: `scale(${mobileHud ? 0.55 : 0.7})`,
+            transformOrigin: 'top right',
+          }}
+        >
+          <TopDownMap sensors={sensors} size={240} overlay />
         </div>
+      ) : null}
       </div>
     );
   }
@@ -400,26 +418,32 @@ function HudOverlay({
         {audioStatus ? <div>Audio: {audioStatus}</div> : null}
       </div>
       {songNote != null ? (
-        <div className="absolute right-1 top-1 rounded bg-black/70 px-1 py-0.25 text-[0.65rem] font-semibold text-emerald-200">
+        <div className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.25 text-[0.65rem] font-semibold text-emerald-200">
           Song {formatNoteLabel(songNote)} <span className="text-slate-400">({songNote})</span>
         </div>
       ) : null}
       <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 px-0.5 py-0.5 text-slate-100">
         <span>Rover: "{label || 'Unnamed Rover'}"</span>
         {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}
-      </div>
+        </div>
 
-
-      {/* bump and wheel drops bar */}
-      <div className="absolute top-0.5 left-1/2 flex -translate-x-1/2 gap-1 bg-black/70 text-[0.6rem] font-medium text-slate-200">
-        <div className={`${desktopLayout ? 'px-1 py-0.5':'px-0.5 py-0 text-nowrap'} ${bumps.bumpLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left bump</div>
-        <div className={`${desktopLayout ? 'px-1 py-0.5':'px-0.5 py-0 text-nowrap'} ${bumps.wheelDropLeft ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Left wheel drop</div>
-        <div className={`${desktopLayout ? 'px-1 py-0.5':'px-0.5 py-0 text-nowrap'} ${bumps.wheelDropRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right wheel drop</div>
-        <div className={`${desktopLayout ? 'px-1 py-0.5':'px-0.5 py-0 text-nowrap'} ${bumps.bumpRight ? 'bg-red-600 text-white animate-pulse' : 'text-slate-500'}`}>Right bump</div>
+        {showTopDown ? (
+          <div
+            className="pointer-events-none absolute right-1 top-1"
+            style={{
+              width: '240px',
+              height: '240px',
+              opacity: 0.7,
+              transform: `scale(${mobileHud ? 0.55 : 0.7})`,
+              transformOrigin: 'top right',
+            }}
+          >
+            <TopDownMap sensors={sensors} size={240} overlay />
+          </div>
+        ) : null}
       </div>
-    </div>
-  );
-}
+    );
+  }
 
 const OVERCURRENT_LABELS = {
   leftWheel: 'Left wheel',
