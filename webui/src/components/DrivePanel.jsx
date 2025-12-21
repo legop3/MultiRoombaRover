@@ -1,6 +1,6 @@
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useControlSystem } from '../controls/index.js';
-// import DiscordInviteButton from './DiscordInviteButton.jsx';
+import DiscordInviteButton from './DiscordInviteButton.jsx';
 
 export default function DrivePanel() {
   const {
@@ -55,6 +55,7 @@ export default function DrivePanel() {
         />
       </div>
       {/* <DiscordInviteButton /> */}
+      {/* kjfhdljhdsaflkjf */}
     </section>
   );
 }
