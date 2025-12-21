@@ -32,7 +32,7 @@ function EntityRow({ entity, connected, onToggle }) {
       type="button"
       onClick={() => onToggle(entity.id)}
       disabled={disableToggle}
-      className={`flex w-full items-center justify-between gap-1 rounded  px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
+      className={`flex min-w-[12rem] flex-1 items-center justify-between gap-1 rounded px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-1 text-sm">
@@ -83,7 +83,7 @@ export default function HomeAssistantControls() {
         </div>
         <StatusBadge label={connected ? 'Connected' : 'Offline'} tone={connected ? 'success' : 'warn'} />
       </header>
-      <div className="space-y-0.5">
+      <div className="flex flex-wrap gap-0.5">
         {entities.map((entity) => (
           <EntityRow
             key={entity.id}

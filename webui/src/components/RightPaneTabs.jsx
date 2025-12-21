@@ -12,31 +12,25 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
     <section className="panel text-base">
       <Tabs defaultTab="telemetry">
         <TabList>
-          <Tab id="telemetry">Rover Controls</Tab>
-          <Tab id="room">Room Controls</Tab>
-          <Tab id="settings">Settings</Tab>
+          <Tab id="telemetry">Controls</Tab>
           <Tab id="help">Help</Tab>
+          <Tab id="settings">Settings</Tab>
         </TabList>
         <TabPanels>
           <TabPanel id="telemetry">
             <div className="space-y-0.5">
               <DrivePanel />
               <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
+              <HomeAssistantControls />
               <TelemetryPanel />
               <CameraServoPanel />
             </div>
           </TabPanel>
-          <TabPanel id="room">
-            <div className="space-y-0.5">
-              <RoomCameraPanel defaultOrientation="vertical" panelId="rightpane-room" />
-              <HomeAssistantControls />
-            </div>
+          <TabPanel id="help">
+            <HelpPanel layout={layout} onOpenOverlay={onOpenHelpOverlay} />
           </TabPanel>
           <TabPanel id="settings">
             <SettingsPanel />
-          </TabPanel>
-          <TabPanel id="help">
-            <HelpPanel layout={layout} onOpenOverlay={onOpenHelpOverlay} />
           </TabPanel>
         </TabPanels>
       </Tabs>
