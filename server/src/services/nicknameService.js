@@ -9,7 +9,8 @@ function sanitizeNickname(raw) {
   if (typeof raw !== 'string') return '';
   const trimmed = raw.trim();
   if (!trimmed) return '';
-  return trimmed.slice(0, 32);
+  const sanitized = trimmed.replace(/\*/g, 'nope');
+  return sanitized.slice(0, 32);
 }
 
 function getNickname(socket) {
