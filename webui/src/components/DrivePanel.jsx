@@ -1,6 +1,6 @@
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useControlSystem } from '../controls/index.js';
-import DiscordInviteButton from './DiscordInviteButton.jsx';
+// import DiscordInviteButton from './DiscordInviteButton.jsx';
 
 export default function DrivePanel() {
   const {
@@ -37,14 +37,14 @@ export default function DrivePanel() {
         <ActionCard
           title="Start Driving"
           description="Press to enable driving mode, then start moving."
-          statuses={[{ label: drivingMode ? 'Ready!' : 'Not Ready!', active: drivingMode }]}
+          statuses={[{ label: drivingMode ? 'Ready!' : 'Press to enter driving mode!', active: drivingMode }]}
           tone="emerald"
           onClick={handleStartDrive}
           disabled={!roverId}
         />
         <ActionCard
           title="Dock and Charge"
-          description="Line the rover up about a foot from the dock, then trigger an automatic docking attempt."
+          description="Line the rover up about a foot from the dock, then press to trigger a docking attempt."
           statuses={[
             { label: docked ? 'Docked!' : 'Not Docked!', active: docked },
             { label: charging ? 'Charging!' : 'Not Charging!', active: charging },
