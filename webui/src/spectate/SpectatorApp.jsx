@@ -34,6 +34,8 @@ function RoverSpectatorCard({ rover, frame, videoInfo, audioInfo, session }) {
           batteryConfig={rover.battery}
           hudVariant="spectator"
           driverLabel={driverLabel}
+          hudForceMap
+          hudMapPosition="bottom-left"
         />
       </div>
     </article>
@@ -54,6 +56,8 @@ function RoverRow({ roster, frames, videoSources, session }) {
           videoInfo={videoSources[rover.id]}
           audioInfo={videoSources[`${rover.id}-audio`]}
           session={session}
+          showHudMap
+          hudMapPosition="bottom-left"
         />
       ))}
     </section>

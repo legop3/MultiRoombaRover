@@ -52,6 +52,8 @@ export default function VideoTile({
   hudVariant = 'default',
   driverLabel = null,
   songNote = null,
+  hudForceMap = false,
+  hudMapPosition = 'top-right',
 }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -70,7 +72,7 @@ export default function VideoTile({
   const desktopLayout = layoutFormat === 'desktop';
   const mobileHud = !desktopLayout;
   const [showHudMapDesktop, setShowHudMapDesktop] = useHudMapSetting();
-  const showHudMap = mobileHud ? true : showHudMapDesktop;
+  const showHudMap = hudForceMap ? true : mobileHud ? true : showHudMapDesktop;
   const batteryVisual = buildBatteryVisual(batteryCharge, batteryConfig);
   // console.log('[BatteryBarDebug]', {
   //   frameSensors: sensors,
@@ -284,6 +286,7 @@ export default function VideoTile({
           songNote={songNote}
           showTopDown={showHudMap}
           mobileHud={mobileHud}
+          mapPosition={hudMapPosition}
         />
         <OvercurrentOverlay motors={overcurrentMotors} />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />
@@ -348,6 +351,7 @@ function HudOverlay({
   songNote = null,
   showTopDown = false,
   mobileHud = false,
+  mapPosition = 'top-right',
 }) {
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const [now, setNow] = useState(() => Date.now());
@@ -358,6 +362,16 @@ function HudOverlay({
   }, []);
 
   const pulse = frame?.receivedAt ? now - frame.receivedAt < 200 : false;
+  const mapStyle = {
+    width: '240px',
+    height: '240px',
+    opacity: 0.7,
+    transform: `scale(${mobileHud ? 0.55 : 0.7})`,
+    transformOrigin: mapPosition === 'bottom-left' ? 'bottom left' : 'top right',
+    ...(mapPosition === 'bottom-left'
+      ? { left: '0.25rem', bottom: '0.25rem' }
+      : { right: '0.25rem', top: '0.25rem' }),
+  };
 
   if (variant === 'spectator') {
     const telemetryEntries = [
@@ -378,35 +392,38 @@ function HudOverlay({
           </div>
         ) : null}
 
-        <div className="absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.25 bg-black/70 px-1 py-0.75 text-[0.65rem] text-slate-100">
-          <span className="text-[0.6rem] uppercase tracking-wide text-slate-400">Telemetry</span>
-          {telemetryEntries.map(([labelText, value]) => (
-            <span key={labelText} className="flex items-center justify-between gap-0.5">
-              <span className="text-slate-400">{labelText}</span>
-              <span className="font-semibold text-white">{value}</span>
-            </span>
-          ))}
+        <div className="absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.5 bg-black/70 px-1 py-0.75 text-[0.65rem] text-slate-100">
+          <div className="space-y-0.25">
+            <span className="text-[0.6rem] uppercase tracking-wide text-slate-400">Telemetry</span>
+            {telemetryEntries.map(([labelText, value]) => (
+              <span key={labelText} className="flex items-center justify-between gap-0.5">
+                <span className="text-slate-400">{labelText}</span>
+                <span className="font-semibold text-white">{value}</span>
+              </span>
+            ))}
+          </div>
+          {showTopDown ? (
+            <div className="flex items-center justify-center">
+              <div
+                className="pointer-events-none rounded"
+                style={{
+                  width: '160px',
+                  height: '160px',
+                  opacity: 0.8,
+                  transform: 'scale(0.7)',
+                  transformOrigin: 'top left',
+                }}
+              >
+                <TopDownMap sensors={sensors} size={200} overlay />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-1 bg-black/80 px-1 py-0.5 text-[0.8rem] text-slate-100">
           <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
           {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
         </div>
-
-      {showTopDown ? (
-        <div
-          className="pointer-events-none absolute right-1 top-1"
-          style={{
-            width: '240px',
-            height: '240px',
-            opacity: 0.7,
-            transform: `scale(${mobileHud ? 0.55 : 0.7})`,
-            transformOrigin: 'top right',
-          }}
-        >
-          <TopDownMap sensors={sensors} size={240} overlay />
-        </div>
-      ) : null}
       </div>
     );
   }
@@ -425,22 +442,20 @@ function HudOverlay({
       <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 px-0.5 py-0.5 text-slate-100">
         <span>Rover: "{label || 'Unnamed Rover'}"</span>
         {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}
-        </div>
+      </div>
 
-        {showTopDown ? (
-          <div
-            className="pointer-events-none absolute right-1 top-1"
-            style={{
-              width: '240px',
-              height: '240px',
-              opacity: 0.7,
-              transform: `scale(${mobileHud ? 0.55 : 0.7})`,
-              transformOrigin: 'top right',
-            }}
-          >
-            <TopDownMap sensors={sensors} size={240} overlay />
-          </div>
-        ) : null}
+      {showTopDown && variant !== 'spectator' ? (
+        <div
+          className="pointer-events-none absolute rounded"
+          style={{
+            ...mapStyle,
+            padding: '0.1rem',
+            background: 'rgba(0,0,0,0.6)',
+          }}
+        >
+          <TopDownMap sensors={sensors} size={240} overlay />
+        </div>
+      ) : null}
       </div>
     );
   }
