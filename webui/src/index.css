@@ -19,6 +19,15 @@ body {
   scrollbar-color: #3b82f6 rgba(255, 255, 255, 0.08);
 }
 
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 *::-webkit-scrollbar {
   width: 1px;
   height: 1px;
