@@ -8,6 +8,7 @@ import { SessionProvider } from './context/SessionContext.jsx'
 import { TelemetryProvider } from './context/TelemetryContext.jsx'
 import { ChatProvider } from './context/ChatContext.jsx'
 import SpectatorApp from './spectate/SpectatorApp.jsx'
+import MiniSummaryApp from './mini/MiniSummaryApp.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -19,6 +20,7 @@ createRoot(document.getElementById('root')).render(
               <Routes>
                 <Route path="/" element={<App />} />
                 <Route path="/spectate" element={<SpectatorApp />} />
+                <Route path="/mini" element={<MiniSummaryApp />} />
               </Routes>
             </BrowserRouter>
           </ChatProvider>
