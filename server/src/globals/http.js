@@ -11,6 +11,9 @@ app.use(express.static(config.staticDir));
 app.get('/spectate', (req, res) => {
   res.sendFile(path.join(config.staticDir, 'index.html'));
 });
+app.get('/mini', (req, res) => {
+  res.sendFile(path.join(config.staticDir, 'index.html'));
+});
 
 const httpServer = http.createServer(app);
 
