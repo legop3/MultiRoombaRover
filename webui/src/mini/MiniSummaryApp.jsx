@@ -8,7 +8,7 @@ import { useRoomCameraSnapshots } from '../hooks/useRoomCameraSnapshots.js';
 import VideoTile from '../components/VideoTile.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 
-const ROTATE_MS = 9000;
+const ROTATE_MS = 13000;
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
@@ -98,7 +98,7 @@ function MiniSummaryContent() {
             Switching to spectator…
           </div>
         ) : activeRover ? (
-          <div className="relative h-full w-full">
+          <FitViewportFrame>
             <VideoTile
               sessionInfo={activeVideo}
               audioSessionInfo={activeAudio}
@@ -111,9 +111,11 @@ function MiniSummaryContent() {
               hudForceMap
               hudMapPosition="bottom-left"
             />
-          </div>
+          </FitViewportFrame>
         ) : activeCamera ? (
-          <RoomCameraFrame camera={activeCamera} feed={activeFeed} />
+          <FitViewportFrame>
+            <RoomCameraFrame camera={activeCamera} feed={activeFeed} />
+          </FitViewportFrame>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
             No sources available.
@@ -167,6 +169,16 @@ function ChatOverlay() {
         style={{ width: '50vw', minWidth: '16rem', maxWidth: '24rem', opacity: 0.55, maxHeight: '12rem' }}
       >
         <ChatPanel hideInput hideSpectatorNotice />
+      </div>
+    </div>
+  );
+}
+
+function FitViewportFrame({ children }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center overflow-hidden bg-black">
+      <div className="max-h-full max-w-full w-full h-full flex items-center justify-center">
+        {children}
       </div>
     </div>
   );
