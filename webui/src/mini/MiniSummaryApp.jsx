@@ -177,8 +177,8 @@ function ChatOverlay() {
 function FitViewportFrame({ children }) {
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden bg-black">
-      <div className="max-h-full max-w-full w-full h-full flex items-center justify-center">
-        {children}
+      <div className="relative w-full max-w-full" style={{ maxHeight: '100%', aspectRatio: '16 / 9' }}>
+        <div className="absolute inset-0 flex items-center justify-center">{children}</div>
       </div>
     </div>
   );
