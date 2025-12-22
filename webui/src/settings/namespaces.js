@@ -3,6 +3,8 @@ export const INPUT_SETTINGS_DEFAULTS = {
     baseSpeed: 250,
     turboSpeed: 400,
     precisionSpeed: 125,
+    tiltSpeed: 80,
+    tiltIntervalMs: 110,
   },
   gamepad: {
     driveDeadzone: 0.2,

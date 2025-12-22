@@ -14,14 +14,43 @@ import {
 const SOURCE = 'keyboard';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
 const ZERO_AUX = { main: 0, side: 0, vacuum: 0 };
-const SERVO_REPEAT_MS = 110;
 const NOTE_MIN = SONG_NOTE_RANGE[0];
 const NOTE_MAX = SONG_NOTE_RANGE[1];
+const TILT_INTERVAL_MIN = 5;
+const TILT_INTERVAL_MAX = 500;
+const TILT_SPEED_MIN = 1;
+const TILT_SPEED_MAX = 100;
 
 function clampSpeed(value, fallback) {
   const num = Number(value);
   if (!Number.isFinite(num)) return fallback;
   return Math.max(0, Math.min(500, num));
+}
+
+function clampTiltInterval(value, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(TILT_INTERVAL_MIN, Math.min(TILT_INTERVAL_MAX, num));
+}
+
+function clampTiltSpeed(value, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(TILT_SPEED_MIN, Math.min(TILT_SPEED_MAX, num));
+}
+
+function mapTiltSpeedToInterval(speed) {
+  const clampedSpeed = clampTiltSpeed(speed, speed);
+  const ratio = (clampedSpeed - TILT_SPEED_MIN) / (TILT_SPEED_MAX - TILT_SPEED_MIN);
+  const interval = TILT_INTERVAL_MAX - ratio * (TILT_INTERVAL_MAX - TILT_INTERVAL_MIN);
+  return Math.round(interval);
+}
+
+function mapTiltIntervalToSpeed(interval) {
+  const clampedInterval = clampTiltInterval(interval, interval);
+  const ratio = (TILT_INTERVAL_MAX - clampedInterval) / (TILT_INTERVAL_MAX - TILT_INTERVAL_MIN);
+  const speed = TILT_SPEED_MIN + ratio * (TILT_SPEED_MAX - TILT_SPEED_MIN);
+  return Math.round(speed);
 }
 
 function shouldIgnoreEvent(event) {
@@ -127,6 +156,19 @@ export default function KeyboardInputManager() {
       precisionSpeed: clampSpeed(current.precisionSpeed, defaults.precisionSpeed),
     };
   }, [inputSettings?.keyboard]);
+  const servoRepeatMs = useMemo(() => {
+    const defaults = INPUT_SETTINGS_DEFAULTS.keyboard;
+    const current = inputSettings?.keyboard ?? {};
+    const tiltSpeed = clampTiltSpeed(
+      typeof current.tiltSpeed === 'number'
+        ? current.tiltSpeed
+        : typeof current.tiltIntervalMs === 'number'
+          ? mapTiltIntervalToSpeed(current.tiltIntervalMs)
+          : defaults.tiltSpeed,
+      defaults.tiltSpeed,
+    );
+    return mapTiltSpeedToInterval(tiltSpeed);
+  }, [inputSettings?.keyboard]);
   const servoStep = useMemo(
     () => Math.abs(state.camera?.config?.nudgeDegrees || 1),
     [state.camera?.config?.nudgeDegrees],
@@ -200,10 +242,10 @@ export default function KeyboardInputManager() {
         return;
       }
       nudgeServo(nextDirection * servoStep);
-      servoIntervalRef.current = setTimeout(tick, SERVO_REPEAT_MS);
+      servoIntervalRef.current = setTimeout(tick, servoRepeatMs);
     };
     servoIntervalRef.current = setTimeout(tick, 0);
-  }, [computeServoDirection, nudgeServo, servoStep, stopServoLoop]);
+  }, [computeServoDirection, nudgeServo, servoRepeatMs, servoStep, stopServoLoop]);
 
   const stopSongLoop = useCallback(() => {
     if (songIntervalRef.current) {

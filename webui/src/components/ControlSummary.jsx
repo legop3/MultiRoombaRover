@@ -168,7 +168,6 @@ function InlineCameraTilt({ keymap }) {
         : (min + max) / 2;
 
   const [pendingAngle, setPendingAngle] = useState(value);
-  const throttleRef = useRef(null);
   const draggingRef = useRef(false);
 
   useEffect(() => {
@@ -177,38 +176,16 @@ function InlineCameraTilt({ keymap }) {
     }
   }, [value]);
 
-  useEffect(
-    () => () => {
-      if (throttleRef.current) {
-        clearTimeout(throttleRef.current);
-      }
-    },
-    [],
-  );
-
-  const scheduleSend = (next) => {
-    if (throttleRef.current) {
-      clearTimeout(throttleRef.current);
-    }
-    throttleRef.current = setTimeout(() => {
-      setServoAngle(next);
-    }, 150);
-  };
-
   const handleSlider = (event) => {
     const next = Number.parseFloat(event.target.value);
     if (Number.isNaN(next)) return;
     draggingRef.current = true;
     setPendingAngle(next);
-    scheduleSend(next);
+    setServoAngle(next);
   };
 
   const commitSlider = () => {
     draggingRef.current = false;
-    if (throttleRef.current) {
-      clearTimeout(throttleRef.current);
-    }
-    setServoAngle(pendingAngle);
   };
 
   if (!enabled) return null;

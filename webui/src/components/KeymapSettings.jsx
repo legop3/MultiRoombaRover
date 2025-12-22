@@ -43,6 +43,37 @@ function clampSpeed(value, fallback) {
   return Math.max(0, Math.min(500, num));
 }
 
+const TILT_INTERVAL_MIN = 5;
+const TILT_INTERVAL_MAX = 500;
+const TILT_SPEED_MIN = 1;
+const TILT_SPEED_MAX = 100;
+
+function clampTiltInterval(value, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(TILT_INTERVAL_MIN, Math.min(TILT_INTERVAL_MAX, num));
+}
+
+function clampTiltSpeed(value, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(TILT_SPEED_MIN, Math.min(TILT_SPEED_MAX, num));
+}
+
+function mapTiltSpeedToInterval(speed) {
+  const clampedSpeed = clampTiltSpeed(speed, speed);
+  const ratio = (clampedSpeed - TILT_SPEED_MIN) / (TILT_SPEED_MAX - TILT_SPEED_MIN);
+  const interval = TILT_INTERVAL_MAX - ratio * (TILT_INTERVAL_MAX - TILT_INTERVAL_MIN);
+  return Math.round(interval);
+}
+
+function mapTiltIntervalToSpeed(interval) {
+  const clampedInterval = clampTiltInterval(interval, interval);
+  const ratio = (TILT_INTERVAL_MAX - clampedInterval) / (TILT_INTERVAL_MAX - TILT_INTERVAL_MIN);
+  const speed = TILT_SPEED_MIN + ratio * (TILT_SPEED_MAX - TILT_SPEED_MIN);
+  return Math.round(speed);
+}
+
 function useKeyCapture(onCapture) {
   const [active, setActive] = useState(null);
 
@@ -67,15 +98,15 @@ function useKeyCapture(onCapture) {
   return { active, startCapture: setActive, cancel: () => setActive(null) };
 }
 
-function SpeedField({ label, description, value, onChange }) {
+function SpeedField({ label, description, value, onChange, min = 0, max = 500, step = 5 }) {
   return (
     <label className="surface-muted block p-0.5">
       <div className="flex items-center justify-between text-xs text-slate-300">
         <span className="font-semibold text-slate-100">{label}</span>
         <input
           type="number"
-          min={0}
-          max={500}
+          min={min}
+          max={max}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className="w-16 rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.75rem] font-mono text-slate-100"
@@ -85,9 +116,9 @@ function SpeedField({ label, description, value, onChange }) {
       <div className="mt-0.5 flex items-center gap-0.5">
         <input
           type="range"
-          min={0}
-          max={500}
-          step={5}
+          min={min}
+          max={max}
+          step={step}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className="h-2 flex-1 accent-emerald-400"
@@ -104,7 +135,22 @@ export default function KeymapSettings() {
     actions: { updateKeyBinding, resetKeyBindings },
   } = useControlSystem();
   const { value: inputSettings, save: saveInputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
-  const keyboardSpeeds = inputSettings.keyboard ?? INPUT_SETTINGS_DEFAULTS.keyboard;
+  const keyboardSettings = {
+    ...INPUT_SETTINGS_DEFAULTS.keyboard,
+    ...(inputSettings.keyboard ?? {}),
+  };
+  const tiltSpeed = useMemo(() => {
+    if (typeof keyboardSettings.tiltSpeed === 'number') {
+      return clampTiltSpeed(keyboardSettings.tiltSpeed, INPUT_SETTINGS_DEFAULTS.keyboard.tiltSpeed);
+    }
+    if (typeof keyboardSettings.tiltIntervalMs === 'number') {
+      return clampTiltSpeed(
+        mapTiltIntervalToSpeed(keyboardSettings.tiltIntervalMs),
+        INPUT_SETTINGS_DEFAULTS.keyboard.tiltSpeed,
+      );
+    }
+    return INPUT_SETTINGS_DEFAULTS.keyboard.tiltSpeed;
+  }, [keyboardSettings.tiltIntervalMs, keyboardSettings.tiltSpeed]);
   const grouped = useMemo(() => groupActions(KEY_ACTIONS), []);
   const { active, startCapture, cancel } = useKeyCapture((actionId, value) => {
     updateKeyBinding(actionId, value);
@@ -130,6 +176,23 @@ export default function KeymapSettings() {
     [saveInputSettings],
   );
 
+  const updateTiltInterval = useCallback(
+    (nextValue) => {
+      const defaults = INPUT_SETTINGS_DEFAULTS.keyboard;
+      const clamped = clampTiltSpeed(nextValue, defaults.tiltSpeed);
+      const mappedInterval = mapTiltSpeedToInterval(clamped);
+      saveInputSettings((prev) => ({
+        ...(prev ?? {}),
+        keyboard: {
+          ...(prev?.keyboard ?? defaults),
+          tiltSpeed: clamped,
+          tiltIntervalMs: mappedInterval,
+        },
+      }));
+    },
+    [saveInputSettings],
+  );
+
   return (
     <section className="panel-section space-y-0.5 text-sm">
       <div className="flex items-center justify-between">
@@ -147,22 +210,34 @@ export default function KeymapSettings() {
           <SpeedField
             label="Base speed"
             description="Normal driving speed"
-            value={keyboardSpeeds.baseSpeed}
+            value={keyboardSettings.baseSpeed}
             onChange={(value) => updateKeyboardSpeed('baseSpeed', value)}
           />
           <SpeedField
             label="Turbo speed"
             description="Used when holding the boost modifier"
-            value={keyboardSpeeds.turboSpeed}
+            value={keyboardSettings.turboSpeed}
             onChange={(value) => updateKeyboardSpeed('turboSpeed', value)}
           />
           <SpeedField
             label="Precision speed"
             description="Used when holding the precision modifier"
-            value={keyboardSpeeds.precisionSpeed}
+            value={keyboardSettings.precisionSpeed}
             onChange={(value) => updateKeyboardSpeed('precisionSpeed', value)}
           />
         </div>
+      </div>
+      <div className="space-y-0.5 surface">
+        <p className="text-[0.7rem] text-slate-500">Camera tilt</p>
+        <SpeedField
+          label="Tilt speed"
+          description="Higher = faster when holding tilt keys"
+          value={tiltSpeed}
+          onChange={updateTiltInterval}
+          min={1}
+          max={100}
+          step={1}
+        />
       </div>
       <div className="space-y-0.5">
         {Object.entries(grouped).map(([group, actions]) => (
