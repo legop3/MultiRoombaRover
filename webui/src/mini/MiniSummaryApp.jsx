@@ -8,7 +8,7 @@ import { useRoomCameraSnapshots } from '../hooks/useRoomCameraSnapshots.js';
 import VideoTile from '../components/VideoTile.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 
-const ROTATE_MS = 13000;
+const ROTATE_MS = 20000;
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
