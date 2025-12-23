@@ -172,4 +172,16 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
   }
 }
 
+function handleLockEvent({ roverId, locked, reason }) {
+  const state = getState(roverId);
+  if (!state) return;
+  if (!locked) {
+    state.batteryLocked = false;
+    state.waitingSince = null;
+    return;
+  }
+  state.batteryLocked = reason === 'battery';
+}
+
 managerEvents.on('sensor', handleSensorEvent);
+managerEvents.on('lock', handleLockEvent);
