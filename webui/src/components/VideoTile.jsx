@@ -5,6 +5,7 @@ import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
+const AUDIO_RETRY_MS = 3000;
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -59,6 +60,7 @@ export default function VideoTile({
   const audioRef = useRef(null);
   const restartTimer = useRef(null);
   const audioRestartTimer = useRef(null);
+  const audioPlayInterval = useRef(null);
   const unmuteTimer = useRef(null);
   const [status, setStatus] = useState('idle');
   const [detail, setDetail] = useState(null);
@@ -147,6 +149,7 @@ export default function VideoTile({
       clearTimeout(restartTimer.current);
       clearTimeout(audioRestartTimer.current);
       clearTimeout(unmuteTimer.current);
+      clearInterval(audioPlayInterval.current);
     },
     [],
   );
@@ -212,8 +215,16 @@ export default function VideoTile({
     let player;
     const handleStatus = (nextStatus, info) => {
       if (!active) return;
-      setAudioStatus(nextStatus);
-      setAudioDetail(info || null);
+      setAudioDetail(info || (nextStatus === 'connected' ? 'connected' : null));
+      setAudioStatus((prev) => {
+        if (nextStatus === 'connected' && (prev === 'playing' || prev === 'connecting')) {
+          return prev;
+        }
+        if (nextStatus === 'new') {
+          return prev;
+        }
+        return nextStatus;
+      });
       if (nextStatus === 'playing') {
         audioRef.current?.play().catch(() => {});
       }
@@ -242,6 +253,80 @@ export default function VideoTile({
       player?.stop();
     };
   }, [audioSessionInfo?.url, audioSessionInfo?.token, audioRestartToken, scheduleAudioRestart]);
+
+  // Keep nudging the audio element to play in case autoplay was blocked.
+  useEffect(() => {
+    const audioEl = audioRef.current;
+    if (!audioSessionInfo?.url || !audioEl) {
+      clearInterval(audioPlayInterval.current);
+      return undefined;
+    }
+    const shouldAttempt = ['connecting', 'connected', 'playing', 'paused'].includes(audioStatus);
+    if (!shouldAttempt) {
+      clearInterval(audioPlayInterval.current);
+      return undefined;
+    }
+
+    const attemptPlay = () => {
+      const target = audioRef.current;
+      if (!target) return;
+      if (!target.paused && !target.ended) return;
+      target
+        .play()
+        .then(() => {
+          setAudioStatus((prev) => (prev === 'connected' ? 'playing' : prev));
+          setAudioDetail((prev) => (prev === 'paused' ? null : prev));
+        })
+        .catch((err) => {
+          setAudioDetail((prev) => prev || err?.message || 'autoplay blocked');
+        });
+    };
+
+    attemptPlay();
+    audioPlayInterval.current = setInterval(attemptPlay, AUDIO_RETRY_MS);
+
+    return () => clearInterval(audioPlayInterval.current);
+  }, [audioSessionInfo?.url, audioStatus]);
+
+  // Reflect audio element events back into status/detail so the HUD stays accurate.
+  useEffect(() => {
+    const audioEl = audioRef.current;
+    if (!audioEl) return undefined;
+
+    const handlePlay = () => {
+      setAudioStatus((prev) => (prev === 'error' ? prev : 'playing'));
+      setAudioDetail(null);
+    };
+    const handlePause = () => {
+      setAudioStatus((prev) => {
+        if (['error', 'failed', 'disconnected', 'closed', 'stopped'].includes(prev)) return prev;
+        return 'paused';
+      });
+      setAudioDetail((prev) => prev || 'paused');
+    };
+    const handleEnded = () => {
+      setAudioStatus((prev) => (prev === 'error' ? prev : 'stopped'));
+      setAudioDetail((prev) => prev || 'ended');
+    };
+    const handleError = () => {
+      const { error } = audioEl;
+      const message = error?.message || 'audio error';
+      setAudioStatus('error');
+      setAudioDetail(message);
+    };
+
+    audioEl.addEventListener('play', handlePlay);
+    audioEl.addEventListener('pause', handlePause);
+    audioEl.addEventListener('ended', handleEnded);
+    audioEl.addEventListener('error', handleError);
+
+    return () => {
+      audioEl.removeEventListener('play', handlePlay);
+      audioEl.removeEventListener('pause', handlePause);
+      audioEl.removeEventListener('ended', handleEnded);
+      audioEl.removeEventListener('error', handleError);
+    };
+  }, [audioSessionInfo?.url]);
 
   const renderedStatus = !sessionInfo?.url
     ? 'waiting'

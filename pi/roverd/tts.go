@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func (c *WSClient) handleTTSPayload(payload *ttsPayload) error {
+func (c *WSClient) handleTTSPayload(ctx context.Context, payload *ttsPayload) error {
 	if payload == nil {
 		return fmt.Errorf("tts payload required")
 	}
@@ -44,7 +44,7 @@ func (c *WSClient) handleTTSPayload(payload *ttsPayload) error {
 	}
 	pitch = clampInt(pitch, 0, 99)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	runCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 
 	var cmd *exec.Cmd
@@ -55,14 +55,14 @@ func (c *WSClient) handleTTSPayload(payload *ttsPayload) error {
 			args = append(args, "-p", fmt.Sprintf("%d", pitch))
 		}
 		args = append(args, text)
-		cmd = exec.CommandContext(ctx, "espeak", args...)
+		cmd = exec.CommandContext(runCtx, "espeak", args...)
 	case "flite", "f":
 		args := []string{}
 		if voice != "" {
 			args = append(args, "-voice", voice)
 		}
 		args = append(args, "-t", text)
-		cmd = exec.CommandContext(ctx, "flite", args...)
+		cmd = exec.CommandContext(runCtx, "flite", args...)
 	default:
 		return fmt.Errorf("unsupported tts engine: %s", engine)
 	}

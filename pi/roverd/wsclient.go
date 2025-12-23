@@ -23,9 +23,14 @@ type WSClient struct {
 	log          *log.Logger
 	recoverMu    sync.Mutex
 	recovering   bool
+	ttsQueue     chan *ttsPayload
 }
 
 func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
+	var ttsQueue chan *ttsPayload
+	if cfg.Audio.TTSEnabled {
+		ttsQueue = make(chan *ttsPayload, 2)
+	}
 	return &WSClient{
 		cfg:          cfg,
 		adapter:      adapter,
@@ -35,6 +40,7 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		servo:        servo,
 		nightVision:  nightVision,
 		log:          logger,
+		ttsQueue:     ttsQueue,
 	}
 }
 
@@ -53,6 +59,7 @@ func (c *WSClient) Run(ctx context.Context) error {
 	}
 
 	errCh := make(chan error, 1)
+	c.startTTSWorker(ctx)
 	go func() {
 		errCh <- c.readLoop(ctx, conn)
 	}()
@@ -155,7 +162,7 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		}
 		return c.handleServoCommand(msg.Servo)
 	case msg.TTS != nil:
-		return c.handleTTSPayload(msg.TTS)
+		return c.enqueueTTS(msg.TTS)
 	case msg.NightVision != nil:
 		if c.nightVision == nil {
 			return fmt.Errorf("night vision disabled")
@@ -170,6 +177,40 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
 	}
+}
+
+func (c *WSClient) enqueueTTS(payload *ttsPayload) error {
+	if c.ttsQueue == nil {
+		return fmt.Errorf("tts disabled")
+	}
+	select {
+	case c.ttsQueue <- payload:
+		return nil
+	default:
+		return fmt.Errorf("tts busy")
+	}
+}
+
+func (c *WSClient) startTTSWorker(ctx context.Context) {
+	if c.ttsQueue == nil {
+		return
+	}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case payload := <-c.ttsQueue:
+				if payload == nil {
+					continue
+				}
+				if err := c.handleTTSPayload(ctx, payload); err != nil {
+					c.log.Printf("tts failed: %v", err)
+					c.emitEvent("tts.error", map[string]any{"error": err.Error()})
+				}
+			}
+		}
+	}()
 }
 
 func (c *WSClient) handleServoCommand(payload *servoPayload) error {
