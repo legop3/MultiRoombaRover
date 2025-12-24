@@ -24,6 +24,10 @@ type WSClient struct {
 	recoverMu    sync.Mutex
 	recovering   bool
 	ttsQueue     chan *ttsPayload
+	connMu       sync.Mutex
+	connected    bool
+	disconnectT  *time.Timer
+	seekIssued   bool
 }
 
 func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
@@ -47,9 +51,12 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 func (c *WSClient) Run(ctx context.Context) error {
 	conn, _, err := websocket.Dial(ctx, c.cfg.ServerURL, nil)
 	if err != nil {
+		c.markDisconnected()
 		return err
 	}
+	c.markConnected()
 	defer conn.Close(websocket.StatusInternalError, "closed")
+	defer c.markDisconnected()
 
 	if err := c.sendHello(ctx, conn); err != nil {
 		return err
@@ -342,6 +349,46 @@ func (c *WSClient) ensureSensorStream() error {
 		return err
 	}
 	return nil
+}
+
+const disconnectSeekDelay = time.Minute
+
+func (c *WSClient) markConnected() {
+	c.connMu.Lock()
+	c.connected = true
+	c.seekIssued = false
+	if c.disconnectT != nil {
+		c.disconnectT.Stop()
+		c.disconnectT = nil
+	}
+	c.connMu.Unlock()
+}
+
+func (c *WSClient) markDisconnected() {
+	c.connMu.Lock()
+	if c.connected {
+		c.connected = false
+	}
+	if c.disconnectT == nil {
+		c.disconnectT = time.AfterFunc(disconnectSeekDelay, c.handleDisconnectTimeout)
+	}
+	c.connMu.Unlock()
+}
+
+func (c *WSClient) handleDisconnectTimeout() {
+	c.connMu.Lock()
+	if c.connected || c.seekIssued {
+		c.connMu.Unlock()
+		return
+	}
+	c.seekIssued = true
+	c.connMu.Unlock()
+
+	if err := c.adapter.SeekDock(); err != nil {
+		c.log.Printf("seek dock on disconnect failed: %v", err)
+		return
+	}
+	c.log.Printf("seek dock issued after websocket disconnect")
 }
 
 func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Duration) {
