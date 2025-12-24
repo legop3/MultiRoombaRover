@@ -1,14 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 
-export function useRoomCameraSnapshots(sourceList = []) {
+export function useRoomCameraSnapshots(sourceList = [], options = {}) {
   const socket = useSocket();
+  const { enabled = true, version = null } = options;
   const [feeds, setFeeds] = useState({});
   const objectUrls = useRef(new Map());
   const ids = useMemo(() => sourceList.map((e) => (typeof e === 'string' ? e : e.id)), [sourceList]);
-  const idsKey = useMemo(() => ids.join('|'), [ids]);
+  const idsKey = useMemo(() => {
+    const base = ids.join('|');
+    return version ? `${base}|v:${version}` : base;
+  }, [ids, version]);
   const idsRef = useRef([]);
-  const retryTimer = useRef(null);
+  const [connectionNonce, setConnectionNonce] = useState(0);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const handleConnect = () => setConnectionNonce((prev) => prev + 1);
+    socket.on('connect', handleConnect);
+    return () => socket.off('connect', handleConnect);
+  }, [socket]);
 
   useEffect(() => {
     idsRef.current = ids;
@@ -18,13 +29,15 @@ export function useRoomCameraSnapshots(sourceList = []) {
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.current.clear();
     setFeeds({});
-    if (retryTimer.current) {
-      clearTimeout(retryTimer.current);
-      retryTimer.current = null;
-    }
   }, [idsKey]);
 
   useEffect(() => {
+    if (!enabled) {
+      objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls.current.clear();
+      setFeeds({});
+      return undefined;
+    }
     if (!idsRef.current.length || !socket) {
       return undefined;
     }
@@ -63,34 +76,13 @@ export function useRoomCameraSnapshots(sourceList = []) {
           objectUrl: prev[meta.id]?.objectUrl || null,
         },
       }));
-      if (meta.error && !cancelled) {
-        scheduleRetry();
-      }
-    };
-
-    const scheduleRetry = (delay = 5000) => {
-      if (retryTimer.current) {
-        clearTimeout(retryTimer.current);
-      }
-      retryTimer.current = setTimeout(() => {
-        retryTimer.current = null;
-        if (!cancelled) {
-          socket.emit('roomCamera:subscribe', { ids: currentIds }, (resp = {}) => {
-            if (resp.error && !retryTimer.current) {
-              scheduleRetry();
-            }
-          });
-        }
-      }, delay);
     };
 
     socket.on('roomCamera:frame', handleFrame);
     socket.on('roomCamera:status', handleStatus);
 
     socket.emit('roomCamera:subscribe', { ids: currentIds }, (resp = {}) => {
-      if (resp.error) {
-        scheduleRetry();
-      }
+      if (resp.error) return;
     });
 
     return () => {
@@ -100,12 +92,8 @@ export function useRoomCameraSnapshots(sourceList = []) {
       socket.off('roomCamera:status', handleStatus);
       objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.current.clear();
-      if (retryTimer.current) {
-        clearTimeout(retryTimer.current);
-        retryTimer.current = null;
-      }
     };
-  }, [socket, idsKey]);
+  }, [socket, idsKey, enabled, connectionNonce]);
 
   return feeds;
 }

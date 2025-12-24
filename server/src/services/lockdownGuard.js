@@ -24,12 +24,7 @@ function enforceLockdown() {
 
 io.on('connection', (socket) => {
   if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
-    socket.data.lockdownTimer = setTimeout(() => {
-      if (!isLockdownAdmin(socket)) {
-        disconnectForLockdown(socket);
-      }
-    }, 10000);
-    socket.once('disconnect', () => clearLockdownTimer(socket));
+    disconnectForLockdown(socket);
   }
 });
 

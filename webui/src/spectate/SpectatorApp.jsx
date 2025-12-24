@@ -89,6 +89,7 @@ function LogsRow({ className = '' }) {
 
 export default function SpectatorApp() {
   const { session } = useSession();
+  const inLockdown = session?.mode === 'lockdown';
   useSpectatorMode();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
@@ -99,7 +100,20 @@ export default function SpectatorApp() {
     }
     return [base];
   });
-  const videoSources = useVideoRequests(entries);
+  const videoSources = useVideoRequests(entries, { enabled: !inLockdown, version: session?.mode });
+
+  if (inLockdown) {
+    return (
+      <SettingsProvider>
+        <div className="flex min-h-screen items-center justify-center bg-black text-slate-200">
+          <div className="surface max-w-md space-y-0.5 p-1 text-center text-sm">
+            <p className="text-lg font-semibold text-white">Spectate disabled during lockdown.</p>
+            <p className="text-slate-300">Please wait until the server leaves lockdown to view streams.</p>
+          </div>
+        </div>
+      </SettingsProvider>
+    );
+  }
 
   return (
     <SettingsProvider>

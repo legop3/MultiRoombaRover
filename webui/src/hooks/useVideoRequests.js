@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 
-const RETRY_DELAY_MS = 3000;
-
 function normalizeEntry(entry) {
   if (!entry) return null;
   if (typeof entry === 'string') {
@@ -48,8 +46,9 @@ function dedupeEntries(entries = []) {
   return unique.sort((a, b) => a.key.localeCompare(b.key));
 }
 
-export function useVideoRequests(sourceList = []) {
+export function useVideoRequests(sourceList = [], options = {}) {
   const socket = useSocket();
+  const { enabled = true, version = null } = options;
   const [sources, setSources] = useState({});
   const normalizedEntries = useMemo(() => {
     if (!Array.isArray(sourceList)) {
@@ -57,74 +56,53 @@ export function useVideoRequests(sourceList = []) {
     }
     return dedupeEntries(sourceList.map(normalizeEntry).filter(Boolean));
   }, [sourceList]);
-  const normalizedKey = useMemo(
-    () => normalizedEntries.map((entry) => `${entry.type}:${entry.id}:${entry.key}`).join('|'),
-    [normalizedEntries],
-  );
+  const normalizedKey = useMemo(() => {
+    const base = normalizedEntries.map((entry) => `${entry.type}:${entry.id}:${entry.key}`).join('|');
+    return version ? `${base}|v:${version}` : base;
+  }, [normalizedEntries, version]);
   const entriesRef = useRef([]);
-  const retryTimers = useRef(new Map());
+  const [connectionNonce, setConnectionNonce] = useState(0);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const handleConnect = () => setConnectionNonce((prev) => prev + 1);
+    socket.on('connect', handleConnect);
+    return () => {
+      socket.off('connect', handleConnect);
+    };
+  }, [socket]);
 
   useEffect(() => {
     entriesRef.current = normalizedEntries;
   }, [normalizedEntries]);
 
   useEffect(() => {
-    if (!normalizedKey) {
+    if (!normalizedKey || !enabled) {
+      setSources({});
       return undefined;
     }
     const entries = entriesRef.current;
     let cancelled = false;
-    const timers = retryTimers.current;
-
-    function clearRetry(key) {
-      const timer = timers.get(key);
-      if (timer) {
-        clearTimeout(timer);
-        timers.delete(key);
-      }
-    }
-
-    function scheduleRetry(entry) {
-      clearRetry(entry.key);
-      const timer = setTimeout(() => {
-        timers.delete(entry.key);
-        if (cancelled) return;
-        requestEntry(entry);
-      }, RETRY_DELAY_MS);
-      timers.set(entry.key, timer);
-    }
 
     function requestEntry(entry) {
       const payload = entry.type === 'room' ? { roomCameraId: entry.id } : { roverId: entry.id };
       socket.emit('video:request', payload, (resp = {}) => {
         if (cancelled) return;
-        if (!resp || resp.error || !resp.url || !resp.token) {
-          scheduleRetry(entry);
-          setSources((prev) => ({
-            ...prev,
-            [entry.key]: resp,
-          }));
-          return;
-        }
-        clearRetry(entry.key);
         setSources((prev) => ({ ...prev, [entry.key]: resp }));
       });
     }
 
     entries.forEach((entry) => {
-      clearRetry(entry.key);
       requestEntry(entry);
     });
 
     return () => {
       cancelled = true;
-      timers.forEach((timer) => clearTimeout(timer));
-      timers.clear();
     };
-  }, [socket, normalizedKey]);
+  }, [socket, normalizedKey, enabled, connectionNonce]);
 
   const filtered = useMemo(() => {
-    if (!normalizedKey) return {};
+    if (!normalizedKey || !enabled) return {};
     const next = {};
     normalizedEntries.forEach((entry) => {
       if (sources[entry.key]) {

@@ -22,10 +22,14 @@ function formatDriverLabel({ roverId, session }) {
 function MiniSummaryContent() {
   const { session } = useSession();
   const spectatorReady = useSpectatorMode();
+  const inLockdown = session?.mode === 'lockdown';
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
   const roomCameras = session?.roomCameras || [];
-  const feeds = useRoomCameraSnapshots(roomCameras.map((camera) => ({ id: camera.id })));
+  const feeds = useRoomCameraSnapshots(roomCameras.map((camera) => ({ id: camera.id })), {
+    enabled: !inLockdown,
+    version: session?.mode,
+  });
   const [index, setIndex] = useState(0);
 
   const entries = useMemo(
@@ -42,13 +46,16 @@ function MiniSummaryContent() {
     [roster],
   );
 
-  const videoSources = useVideoRequests(entries);
+  const videoSourcesEnabled = useVideoRequests(entries, {
+    enabled: !inLockdown,
+    version: session?.mode,
+  });
 
   const roverPool = useMemo(() => {
     if (!roster.length) return [];
-    const withVideo = roster.filter((rover) => videoSources[rover.id]?.url);
+    const withVideo = roster.filter((rover) => videoSourcesEnabled[rover.id]?.url);
     return withVideo.length ? withVideo : roster;
-  }, [roster, videoSources]);
+  }, [roster, videoSourcesEnabled]);
 
   const rotationPool = useMemo(() => {
     const items = [];
@@ -83,11 +90,22 @@ function MiniSummaryContent() {
   const activeRover = activeEntry?.type === 'rover' ? activeEntry.rover : null;
   const activeCamera = activeEntry?.type === 'room' ? activeEntry.camera : null;
 
-  const activeVideo = activeRover ? videoSources[activeRover.id] || null : null;
-  const activeAudio = activeRover ? videoSources[`${activeRover.id}-audio`] || null : null;
+  const activeVideo = activeRover ? videoSourcesEnabled[activeRover.id] || null : null;
+  const activeAudio = activeRover ? videoSourcesEnabled[`${activeRover.id}-audio`] || null : null;
   const activeFrame = activeRover ? frames[activeRover.id] || null : null;
   const driverLabel = activeRover ? formatDriverLabel({ roverId: activeRover.id, session }) : null;
   const activeFeed = activeCamera ? feeds[activeCamera.id] || null : null;
+
+  if (inLockdown) {
+    return (
+      <div className="relative flex h-screen w-screen items-center justify-center bg-black text-slate-200">
+        <div className="surface max-w-sm space-y-0.5 p-1 text-center text-sm">
+          <p className="text-lg font-semibold text-white">Mini spectator is disabled in lockdown.</p>
+          <p className="text-slate-300">It will automatically resume once lockdown ends.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black p-0.5 text-slate-100 flex flex-col gap-0.5">
@@ -110,6 +128,7 @@ function MiniSummaryContent() {
               driverLabel={driverLabel}
               hudForceMap
               hudMapPosition="bottom-left"
+              fitParent
             />
           </FitViewportFrame>
         ) : activeCamera ? (

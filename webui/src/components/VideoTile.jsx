@@ -55,6 +55,7 @@ export default function VideoTile({
   songNote = null,
   hudForceMap = false,
   hudMapPosition = 'top-right',
+  fitParent = false,
 }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -347,8 +348,10 @@ export default function VideoTile({
   const showVerticalBattery = hudVariant === 'spectator';
 
   return (
-    <div className="flex flex-col gap-0.5">
-      <div className="relative w-full overflow-hidden bg-black aspect-video">
+    <div className={`flex flex-col gap-0.5 ${fitParent ? 'h-full' : ''}`}>
+      <div
+        className={`relative w-full overflow-hidden bg-black ${fitParent ? 'h-full flex-1' : 'aspect-video'}`}
+      >
         <video
           ref={videoRef}
           muted={forceMute || muted}
