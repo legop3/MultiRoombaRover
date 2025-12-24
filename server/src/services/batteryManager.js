@@ -147,7 +147,8 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
     });
   }
 
-  const waitingHalfOrMore = waitingPercent != null && waitingPercent >= 0.5;
+  // const waitingHalfOrMore = waitingPercent != null && waitingPercent >= 0.5;
+  const waitingHalfOrMore = true;
   const shouldUnlock = state.batteryLocked && waitingLongEnough && waitingHalfOrMore;
 
   if (shouldUnlock) {

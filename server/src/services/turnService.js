@@ -39,6 +39,7 @@ function driverRemoved(roverId, socketId) {
   }
   idleDisarmed.delete(roverId);
   if (queue.current === socketId) {
+    stopRover(roverId);
     advanceTurn(roverId);
   } else {
     scheduleIdleTimer(roverId);
@@ -177,6 +178,7 @@ function advanceTurn(roverId) {
   const queue = driverQueues.get(roverId);
   if (!queue) return;
   if (queue.queue.length === 0) {
+    stopRover(roverId);
     clearTimeout(queue.timer);
     setActiveDriver(roverId, null);
     turnDeadlines.delete(roverId);
