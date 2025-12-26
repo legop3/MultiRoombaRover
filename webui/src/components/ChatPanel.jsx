@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '../context/ChatContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
+import { useSettingsNamespace } from '../settings/index.js';
 
 function roleColors(role, fromDiscord) {
   if (fromDiscord) return 'text-indigo-200';
@@ -31,12 +32,16 @@ const ESPEAK_PITCHES = Array.from({ length: 10 }, (_, idx) => idx * 10);
 export default function ChatPanel({ hideInput = false, hideSpectatorNotice = false, fillHeight = false }) {
   const { session } = useSession();
   const { messages, sendMessage, registerInputRef, onInputFocus, onInputBlur, blurChat } = useChat();
+  const {
+    value: ttsSettings,
+    save: saveTtsSettings,
+  } = useSettingsNamespace('tts', { engine: 'flite', voice: 'rms', pitch: 50 });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [speak, setSpeak] = useState(false);
-  const [engine, setEngine] = useState('flite');
-  const [voice, setVoice] = useState('rms');
-  const [pitch, setPitch] = useState(50);
+  const [engine, setEngine] = useState(() => ttsSettings?.engine || 'flite');
+  const [voice, setVoice] = useState(() => ttsSettings?.voice || 'rms');
+  const [pitch, setPitch] = useState(() => (Number.isFinite(ttsSettings?.pitch) ? ttsSettings.pitch : 50));
   const canChat = session?.role !== 'spectator';
   const listRef = useRef(null);
   const currentRoverId = session?.assignment?.roverId || null;
@@ -53,6 +58,15 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
     if (!listRef.current) return;
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [sorted]);
+
+  useEffect(() => {
+    const nextEngine = ttsSettings?.engine || 'flite';
+    const nextVoice = ttsSettings?.voice || 'rms';
+    const nextPitch = Number.isFinite(ttsSettings?.pitch) ? ttsSettings.pitch : 50;
+    if (engine !== nextEngine) setEngine(nextEngine);
+    if (voice !== nextVoice) setVoice(nextVoice);
+    if (pitch !== nextPitch) setPitch(nextPitch);
+  }, [engine, pitch, ttsSettings?.engine, ttsSettings?.pitch, ttsSettings?.voice, voice]);
 
   useEffect(() => {
     if (ttsSupported) {
@@ -154,7 +168,11 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
               </label>
               <select
                 value={engine}
-                onChange={(e) => setEngine(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setEngine(next);
+                  saveTtsSettings((current) => ({ ...(current || {}), engine: next }));
+                }}
                 className="field-input text-xs"
               >
                 <option value="flite">flite</option>
@@ -163,7 +181,11 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
               {engine === 'flite' ? (
                 <select
                   value={voice}
-                  onChange={(e) => setVoice(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setVoice(next);
+                    saveTtsSettings((current) => ({ ...(current || {}), voice: next }));
+                  }}
                   className="field-input text-xs"
                 >
                   {FLITE_VOICES.map((v) => (
@@ -175,7 +197,11 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
               ) : (
                 <select
                   value={pitch}
-                  onChange={(e) => setPitch(Number(e.target.value))}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setPitch(next);
+                    saveTtsSettings((current) => ({ ...(current || {}), pitch: next }));
+                  }}
                   className="field-input text-xs"
                 >
                   {ESPEAK_PITCHES.map((p) => (
