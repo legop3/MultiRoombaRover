@@ -9,9 +9,9 @@ const ROVER_Y = 86;
 
 function lobePath(side = 'left') {
   if (side === 'left') {
-    return `M ${CX} ${DOCK_Y} C ${CX - 14} ${DOCK_Y + 10} ${CX - 16} ${ROVER_Y - 18} ${CX - 4} ${ROVER_Y - 4} L ${CX} ${ROVER_Y - 6} Z`;
+    return `M ${CX} ${DOCK_Y} C ${CX - 12} ${DOCK_Y + 8} ${CX - 14} ${ROVER_Y - 16} ${CX - 4} ${ROVER_Y - 2} L ${CX} ${ROVER_Y - 4} Z`;
   }
-  return `M ${CX} ${DOCK_Y} C ${CX + 14} ${DOCK_Y + 10} ${CX + 16} ${ROVER_Y - 18} ${CX + 4} ${ROVER_Y - 4} L ${CX} ${ROVER_Y - 6} Z`;
+  return `M ${CX} ${DOCK_Y} C ${CX + 12} ${DOCK_Y + 8} ${CX + 14} ${ROVER_Y - 16} ${CX + 4} ${ROVER_Y - 2} L ${CX} ${ROVER_Y - 4} Z`;
 }
 
 export default function DockAssistHUD({ sensors }) {
@@ -57,9 +57,9 @@ export default function DockAssistHUD({ sensors }) {
         {/* Force field halo */}
         <circle
           cx={CX}
-          cy={DOCK_Y + 2}
-          r={17}
-          fill={state.forceDetected ? 'url(#halo)' : 'rgba(59,130,246,0.1)'}
+          cy={DOCK_Y - 4}
+          r={18}
+          fill={state.forceDetected ? 'url(#halo)' : 'rgba(59,130,246,0.12)'}
           stroke={state.forceDetected ? palette.forceOutline : 'none'}
           strokeWidth={state.forceDetected ? 1.2 : 0}
         />
@@ -77,10 +77,10 @@ export default function DockAssistHUD({ sensors }) {
         {/* Dock icon: simple rounded square with symmetric top corners */}
         <path
           d={`
-            M ${CX - 16} ${DOCK_Y - 8}
-            Q ${CX - 12} ${DOCK_Y - 12} ${CX - 6} ${DOCK_Y - 12}
+            M ${CX - 16} ${DOCK_Y - 10}
+            Q ${CX - 12} ${DOCK_Y - 14} ${CX - 6} ${DOCK_Y - 14}
             H ${CX + 6}
-            Q ${CX + 12} ${DOCK_Y - 12} ${CX + 16} ${DOCK_Y - 8}
+            Q ${CX + 12} ${DOCK_Y - 14} ${CX + 16} ${DOCK_Y - 10}
             L ${CX + 16} ${DOCK_Y + 10}
             Q ${CX + 16} ${DOCK_Y + 22} ${CX} ${DOCK_Y + 24}
             Q ${CX - 16} ${DOCK_Y + 22} ${CX - 16} ${DOCK_Y + 10}
@@ -91,10 +91,10 @@ export default function DockAssistHUD({ sensors }) {
           strokeWidth="0.8"
         />
         {/* Force field emitter dot */}
-        <circle cx={CX} cy={DOCK_Y - 1} r="1.8" fill="#60a5fa" />
+        <circle cx={CX} cy={DOCK_Y - 6} r="2.1" fill="#60a5fa" />
         {/* Contacts */}
-        <rect x={CX - 8} y={DOCK_Y + 8} width="3.2" height="8.5" rx="1" fill="#e2e8f0" />
-        <rect x={CX + 4.5} y={DOCK_Y + 8} width="3.2" height="8.5" rx="1" fill="#e2e8f0" />
+        <rect x={CX - 10} y={DOCK_Y + 8} width="3.2" height="8.5" rx="1" fill="#e2e8f0" />
+        <rect x={CX + 6.5} y={DOCK_Y + 8} width="3.2" height="8.5" rx="1" fill="#e2e8f0" />
 
         {/* Rover cue */}
         <g transform={`translate(${CX + nudge}, ${ROVER_Y})`}>
