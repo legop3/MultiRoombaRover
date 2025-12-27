@@ -1,106 +1,129 @@
 import { useMemo } from 'react';
 import { useDockIr } from '../hooks/useDockIr.js';
 
-const SVG_SIZE = 120;
-const SVG_HEIGHT = 120;
-const CENTER_X = SVG_SIZE / 2;
-const DOCK_Y = 18;
-const ROVER_Y = 90;
+const SVG_W = 120;
+const SVG_H = 110;
+const CX = SVG_W / 2;
+const DOCK_Y = 16;
+const ROVER_Y = 86;
 
 function lobePath(side = 'left') {
   if (side === 'left') {
-    return `M ${CENTER_X} ${DOCK_Y} C ${CENTER_X - 22} ${DOCK_Y + 18} ${CENTER_X - 28} ${ROVER_Y - 16} ${CENTER_X - 8} ${ROVER_Y} L ${CENTER_X} ${ROVER_Y} Z`;
+    return `M ${CX} ${DOCK_Y} C ${CX - 16} ${DOCK_Y + 12} ${CX - 18} ${ROVER_Y - 20} ${CX - 4} ${ROVER_Y - 6} L ${CX} ${ROVER_Y - 10} Z`;
   }
-  return `M ${CENTER_X} ${DOCK_Y} C ${CENTER_X + 22} ${DOCK_Y + 18} ${CENTER_X + 28} ${ROVER_Y - 16} ${CENTER_X + 8} ${ROVER_Y} L ${CENTER_X} ${ROVER_Y} Z`;
+  return `M ${CX} ${DOCK_Y} C ${CX + 16} ${DOCK_Y + 12} ${CX + 18} ${ROVER_Y - 20} ${CX + 4} ${ROVER_Y - 6} L ${CX} ${ROVER_Y - 10} Z`;
 }
 
 export default function DockAssistHUD({ sensors }) {
   const state = useDockIr(sensors);
-  const lobe = useMemo(
+  const palette = useMemo(
     () => ({
-      left: {
-        base: 'rgba(16, 185, 129, 0.15)',
-        active: 'rgba(16, 185, 129, 0.55)',
-        outline: 'rgba(52, 211, 153, 0.9)',
-      },
-      right: {
-        base: 'rgba(239, 68, 68, 0.15)',
-        active: 'rgba(239, 68, 68, 0.55)',
-        outline: 'rgba(248, 113, 113, 0.9)',
-      },
-      force: {
-        halo: 'rgba(59, 130, 246, 0.15)',
-        haloStrong: 'rgba(59, 130, 246, 0.35)',
-        outline: 'rgba(191, 219, 254, 0.8)',
-      },
-      rover: {
-        body: '#111827',
-        fill: '#e5e7eb',
-      },
+      green: ['rgba(16,185,129,0.6)', 'rgba(16,185,129,0.45)', 'rgba(16,185,129,0)'],
+      red: ['rgba(239,68,68,0.6)', 'rgba(239,68,68,0.45)', 'rgba(239,68,68,0)'],
+      forceOutline: 'rgba(191,219,254,0.85)',
+      roverBody: '#0f172a',
+      roverFill: '#e5e7eb',
     }),
     [],
   );
 
-  if (!state.visible) {
-    return null;
-  }
+  if (!state.visible) return null;
 
-  const nudge = state.balance * 6; // pixels to offset rover cue
-  const leftGlow = state.left.red || state.left.green || state.left.force;
-  const rightGlow = state.right.red || state.right.green || state.right.force;
-  const aligned = state.left.red && state.left.green && state.right.red && state.right.green && state.forceDetected;
+  const nudge = state.balance * 6;
+  const leftActive = state.left.red || state.left.green || state.left.force;
+  const rightActive = state.right.red || state.right.green || state.right.force;
+  const allAligned = state.left.red && state.left.green && state.right.red && state.right.green && state.forceDetected;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-0.25">
-      <div className="rounded bg-black/70 px-0.5 py-0.25 shadow-md shadow-black/40 ring-1 ring-white/5">
-        <svg width={SVG_SIZE} height={SVG_HEIGHT} viewBox={`0 0 ${SVG_SIZE} ${SVG_HEIGHT}`} role="img" aria-label="Docking assist">
-          {/* Force field halo */}
-          <circle
-            cx={CENTER_X}
-            cy={DOCK_Y + 6}
-            r={20}
-            fill={state.forceDetected ? lobe.force.haloStrong : lobe.force.halo}
-            stroke={state.forceDetected ? lobe.force.outline : 'none'}
-            strokeWidth={state.forceDetected ? 2 : 0}
+      <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} role="img" aria-label="Docking assist">
+        <defs>
+          <linearGradient id="gradGreen" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={palette.green[0]} />
+            <stop offset="60%" stopColor={palette.green[1]} />
+            <stop offset="100%" stopColor={palette.green[2]} />
+          </linearGradient>
+          <linearGradient id="gradRed" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={palette.red[0]} />
+            <stop offset="60%" stopColor={palette.red[1]} />
+            <stop offset="100%" stopColor={palette.red[2]} />
+          </linearGradient>
+          <radialGradient id="halo" cx="50%" cy="20%" r="60%">
+            <stop offset="0%" stopColor="rgba(59,130,246,0.45)" />
+            <stop offset="100%" stopColor="rgba(59,130,246,0)" />
+          </radialGradient>
+        </defs>
+
+        {/* Force field halo */}
+        <circle
+          cx={CX}
+          cy={DOCK_Y + 4}
+          r={18}
+          fill={state.forceDetected ? 'url(#halo)' : 'rgba(59,130,246,0.1)'}
+          stroke={state.forceDetected ? palette.forceOutline : 'none'}
+          strokeWidth={state.forceDetected ? 1.2 : 0}
+        />
+
+        {/* Lobes */}
+        <path d={lobePath('left')} fill={leftActive ? 'url(#gradGreen)' : 'rgba(16,185,129,0.12)'} />
+        <path d={lobePath('right')} fill={rightActive ? 'url(#gradRed)' : 'rgba(239,68,68,0.12)'} />
+        {leftActive && rightActive ? (
+          <path
+            d={`M ${CX - 6} ${ROVER_Y - 12} Q ${CX} ${ROVER_Y - 4} ${CX + 6} ${ROVER_Y - 12}`}
+            fill="rgba(255,255,255,0.08)"
           />
+        ) : null}
 
-          {/* Left lobe */}
-          <path d={lobePath('left')} fill={leftGlow ? lobe.left.active : lobe.left.base} />
-          {aligned && <path d={lobePath('left')} fill="none" stroke={lobe.left.outline} strokeWidth={1.5} />}
+        {/* Dock icon: sideways D with rounded top corners */}
+        <path
+          d={`
+            M ${CX - 15} ${DOCK_Y - 6}
+            Q ${CX - 13} ${DOCK_Y - 8} ${CX - 11} ${DOCK_Y - 8}
+            H ${CX + 9}
+            Q ${CX + 19} ${DOCK_Y - 6} ${CX + 19} ${DOCK_Y + 6}
+            Q ${CX + 19} ${DOCK_Y + 18} ${CX + 9} ${DOCK_Y + 20}
+            H ${CX - 15}
+            Z
+          `}
+          fill="#0b1220"
+          stroke="#94a3b8"
+          strokeWidth="0.8"
+        />
+        {/* Force field emitter dot */}
+        <circle cx={CX - 4} cy={DOCK_Y - 2} r="1.7" fill="#60a5fa" />
+        {/* Contacts */}
+        <rect x={CX + 1} y={DOCK_Y + 6} width="2.8" height="7" rx="0.8" fill="#e2e8f0" />
+        <rect x={CX + 5.5} y={DOCK_Y + 6} width="2.8" height="7" rx="0.8" fill="#e2e8f0" />
 
-          {/* Right lobe */}
-          <path d={lobePath('right')} fill={rightGlow ? lobe.right.active : lobe.right.base} />
-          {aligned && <path d={lobePath('right')} fill="none" stroke={lobe.right.outline} strokeWidth={1.5} />}
+        {/* Rover cue */}
+        <g transform={`translate(${CX + nudge}, ${ROVER_Y})`}>
+          <circle r="6" fill={palette.roverBody} stroke="#6b7280" strokeWidth="1" />
+          <path d="M 0 -5 L 4 4 L -4 4 Z" fill={palette.roverFill} />
+        </g>
 
-          {/* Dock icon */}
-          <rect x={CENTER_X - 12} y={DOCK_Y - 8} width="24" height="10" rx="2" fill="#1f2937" stroke="#6b7280" strokeWidth="0.8" />
-          <circle cx={CENTER_X - 5} cy={DOCK_Y - 3.5} r="1.5" fill="#9ca3af" />
-          <circle cx={CENTER_X + 5} cy={DOCK_Y - 3.5} r="1.5" fill="#9ca3af" />
+        {/* Nudge arrow */}
+        {state.bias !== 'center' && (
+          <path
+            d={
+              state.bias === 'left'
+                ? `M ${CX - 12} ${ROVER_Y - 5} L ${CX - 18} ${ROVER_Y} L ${CX - 12} ${ROVER_Y + 5}`
+                : `M ${CX + 12} ${ROVER_Y - 5} L ${CX + 18} ${ROVER_Y} L ${CX + 12} ${ROVER_Y + 5}`
+            }
+            fill="none"
+            stroke="#e5e7eb"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
 
-          {/* Rover cue */}
-          <g transform={`translate(${CENTER_X + nudge}, ${ROVER_Y})`}>
-            <circle r="7" fill={lobe.rover.body} stroke="#6b7280" strokeWidth="1.2" />
-            <path d="M 0 -5 L 4 4 L -4 4 Z" fill={lobe.rover.fill} />
-          </g>
-
-          {/* Nudge arrow */}
-          {state.bias !== 'center' && (
-            <path
-              d={
-                state.bias === 'left'
-                  ? `M ${CENTER_X - 14} ${ROVER_Y - 6} L ${CENTER_X - 22} ${ROVER_Y} L ${CENTER_X - 14} ${ROVER_Y + 6}`
-                  : `M ${CENTER_X + 14} ${ROVER_Y - 6} L ${CENTER_X + 22} ${ROVER_Y} L ${CENTER_X + 14} ${ROVER_Y + 6}`
-              }
-              fill="none"
-              stroke="#e5e7eb"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
-
-        </svg>
-      </div>
+        {/* Thumbs up when fully aligned */}
+        {allAligned ? (
+          <text x={CX + 30} y={DOCK_Y + 8} fontSize="12" fill="#fbbf24" fontFamily="sans-serif">
+            👍
+          </text>
+        ) : null}
+      </svg>
     </div>
   );
 }
