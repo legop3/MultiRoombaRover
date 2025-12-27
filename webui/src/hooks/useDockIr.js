@@ -87,8 +87,9 @@ export function useDockIr(sensors, options = {}) {
     const forceDetected = left.force || right.force || omni.force;
     const leftColor = left.red || left.green;
     const rightColor = right.red || right.green;
-    // Require either force field (close range) or both side colors to show the HUD, avoiding single stray hits.
-    const visible = forceDetected || (leftColor && rightColor);
+    const omniColor = omni.red || omni.green;
+    // Show when close (force field), or both sides see buoys, or a side + omni see buoy(s) (to surface sooner without single-stray triggers).
+    const visible = forceDetected || (leftColor && rightColor) || ((leftColor || rightColor) && omniColor);
     const bias =
       left.active && !right.active
         ? 'right'
