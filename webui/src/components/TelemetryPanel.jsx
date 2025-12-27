@@ -115,6 +115,7 @@ function SensorDetails({ sensors }) {
     <div className="grid gap-0.5 md:grid-cols-2">
       <DetailCard title="Dock IR">
         <DockMiniStatus sensors={sensors} />
+        <DockDebug sensors={sensors} />
       </DetailCard>
 
       <DetailCard title="Bumps & drops">
@@ -222,6 +223,26 @@ function DockMiniStatus({ sensors }) {
         <span className="text-slate-400">R</span>
         {badge(right)}
       </div>
+    </div>
+  );
+}
+
+function DockDebug({ sensors }) {
+  if (!sensors) return null;
+  const left = sensors.infraredCharacterLeft;
+  const right = sensors.infraredCharacterRight;
+  const omni = sensors.infraredCharacterOmni;
+  const decode = (code, side) => {
+    const red = code && [161, 169, 173, 168].includes(code);
+    const green = code && [164, 172, 173, 168].includes(code);
+    const force = code && [165, 169, 172, 173].includes(code);
+    return `${side}: ${code ?? '--'} (${red ? 'R' : ''}${green ? 'G' : ''}${force ? 'F' : '' || 'none'})`;
+  };
+  return (
+    <div className="text-[0.7rem] text-slate-400">
+      <div>{decode(left, 'Left')}</div>
+      <div>{decode(omni, 'Omni')}</div>
+      <div>{decode(right, 'Right')}</div>
     </div>
   );
 }
