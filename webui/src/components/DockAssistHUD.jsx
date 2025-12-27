@@ -74,15 +74,16 @@ export default function DockAssistHUD({ sensors }) {
           />
         ) : null}
 
-        {/* Dock icon: rounded pill-square with gentle bottom curve */}
+        {/* Dock icon: simple rounded square with soft bottom curve */}
         <path
           d={`
-            M ${CX - 16} ${DOCK_Y - 4}
-            Q ${CX - 12} ${DOCK_Y - 8} ${CX - 6} ${DOCK_Y - 8}
-            L ${CX + 6} ${DOCK_Y - 8}
-            Q ${CX + 12} ${DOCK_Y - 8} ${CX + 16} ${DOCK_Y - 4}
-            Q ${CX + 18} ${DOCK_Y + 16} ${CX} ${DOCK_Y + 26}
-            Q ${CX - 18} ${DOCK_Y + 16} ${CX - 16} ${DOCK_Y - 4}
+            M ${CX - 16} ${DOCK_Y - 6}
+            Q ${CX - 12} ${DOCK_Y - 10} ${CX - 6} ${DOCK_Y - 10}
+            H ${CX + 6}
+            Q ${CX + 12} ${DOCK_Y - 10} ${CX + 16} ${DOCK_Y - 6}
+            L ${CX + 16} ${DOCK_Y + 12}
+            Q ${CX + 16} ${DOCK_Y + 22} ${CX} ${DOCK_Y + 24}
+            Q ${CX - 16} ${DOCK_Y + 22} ${CX - 16} ${DOCK_Y + 12}
             Z
           `}
           fill="#0b1220"
