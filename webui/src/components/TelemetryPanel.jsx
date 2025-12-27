@@ -113,6 +113,12 @@ function SensorDetails({ sensors }) {
 
   return (
     <div className="grid gap-0.5 md:grid-cols-2">
+      <DetailCard title="Dock IR (raw)">
+        <ValueRow label="Left" value={formatNumber(sensors?.infraredCharacterLeft)} />
+        <ValueRow label="Omni" value={formatNumber(sensors?.infraredCharacterOmni)} />
+        <ValueRow label="Right" value={formatNumber(sensors?.infraredCharacterRight)} />
+      </DetailCard>
+
       <DetailCard title="Bumps & drops">
         <ValueRow label="Bump L" value={<Pill active={bumps.bumpLeft} />} />
         <ValueRow label="Bump R" value={<Pill active={bumps.bumpRight} />} />

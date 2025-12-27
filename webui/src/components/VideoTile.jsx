@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { WhepPlayer } from '../lib/whepPlayer.js';
 import TopDownMap from './TopDownMap.jsx';
+import DockAssistHUD from './DockAssistHUD.jsx';
 import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 
 const RESTART_DELAY_MS = 2000;
@@ -527,6 +528,13 @@ function HudOverlay({
           Song {formatNoteLabel(songNote)} <span className="text-slate-400">({songNote})</span>
         </div>
       ) : null}
+
+      <div className="absolute inset-0 flex items-start justify-center">
+        <DockAssistHUD sensors={sensors} />
+      </div>
+      <div className="absolute inset-0 flex items-start justify-center">
+        <DockAssistHUD sensors={sensors} />
+      </div>
       <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 px-0.5 py-0.5 text-slate-100">
         <span>Rover: "{label || 'Unnamed Rover'}"</span>
         {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}
