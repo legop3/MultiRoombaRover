@@ -2,9 +2,10 @@ import { useMemo } from 'react';
 import { useDockIr } from '../hooks/useDockIr.js';
 
 const SVG_SIZE = 150;
+const SVG_HEIGHT = 150;
 const CENTER_X = SVG_SIZE / 2;
-const DOCK_Y = 26;
-const ROVER_Y = 120;
+const DOCK_Y = 24;
+const ROVER_Y = 110;
 
 function lobePath(side = 'left') {
   if (side === 'left') {
@@ -50,9 +51,9 @@ export default function DockAssistHUD({ sensors }) {
   const aligned = state.left.red && state.left.green && state.right.red && state.right.green && state.forceDetected;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-1">
-      <div className="rounded bg-black/60 px-1 py-0.5 shadow-lg shadow-black/50 ring-1 ring-white/10">
-        <svg width={SVG_SIZE} height={SVG_SIZE * 0.78} viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE * 0.78}`} role="img" aria-label="Docking assist">
+    <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-0.5">
+      <div className="rounded bg-black/60 px-0.75 py-0.5 shadow-lg shadow-black/40 ring-1 ring-white/10">
+        <svg width={SVG_SIZE} height={SVG_HEIGHT} viewBox={`0 0 ${SVG_SIZE} ${SVG_HEIGHT}`} role="img" aria-label="Docking assist">
           {/* Force field halo */}
           <circle
             cx={CENTER_X}
