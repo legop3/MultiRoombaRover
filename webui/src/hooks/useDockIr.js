@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
 const HOLD_MS = 650;
-const RECENT_MS = 400; // how fresh a hit must be to count toward activation
 
 const DOCK_CODES = {
   161: { red: true }, // Red buoy
@@ -88,10 +87,8 @@ export function useDockIr(sensors, options = {}) {
     const forceDetected = left.force || right.force || omni.force;
     const leftColor = left.red || left.green;
     const rightColor = right.red || right.green;
-    const leftFresh = leftColor && left.age != null && left.age <= RECENT_MS;
-    const rightFresh = rightColor && right.age != null && right.age <= RECENT_MS;
-    // Require either force field (close range) or both sides freshly seeing buoys.
-    const visible = forceDetected || (leftFresh && rightFresh);
+    // Require either force field (close range) or both side colors to show the HUD, avoiding single stray hits.
+    const visible = forceDetected || (leftColor && rightColor);
     const bias =
       left.active && !right.active
         ? 'right'
