@@ -5,13 +5,13 @@ const SVG_W = 120;
 const SVG_H = 110;
 const CX = SVG_W / 2;
 const DOCK_Y = 16;
-const ROVER_Y = 86;
+const ROVER_Y = 80;
 
 function lobePath(side = 'left') {
   if (side === 'left') {
-    return `M ${CX} ${DOCK_Y} C ${CX - 12} ${DOCK_Y + 8} ${CX - 14} ${ROVER_Y - 16} ${CX - 4} ${ROVER_Y - 2} L ${CX} ${ROVER_Y - 4} Z`;
+    return `M ${CX} ${DOCK_Y} C ${CX - 10} ${DOCK_Y + 8} ${CX - 12} ${ROVER_Y - 18} ${CX - 4} ${ROVER_Y - 6} L ${CX} ${ROVER_Y - 10} Z`;
   }
-  return `M ${CX} ${DOCK_Y} C ${CX + 12} ${DOCK_Y + 8} ${CX + 14} ${ROVER_Y - 16} ${CX + 4} ${ROVER_Y - 2} L ${CX} ${ROVER_Y - 4} Z`;
+  return `M ${CX} ${DOCK_Y} C ${CX + 10} ${DOCK_Y + 8} ${CX + 12} ${ROVER_Y - 18} ${CX + 4} ${ROVER_Y - 6} L ${CX} ${ROVER_Y - 10} Z`;
 }
 
 export default function DockAssistHUD({ sensors }) {
@@ -54,16 +54,6 @@ export default function DockAssistHUD({ sensors }) {
           </radialGradient>
         </defs>
 
-        {/* Force field halo */}
-        <circle
-          cx={CX}
-          cy={DOCK_Y - 4}
-          r={18}
-          fill={state.forceDetected ? 'url(#halo)' : 'rgba(59,130,246,0.12)'}
-          stroke={state.forceDetected ? palette.forceOutline : 'none'}
-          strokeWidth={state.forceDetected ? 1.2 : 0}
-        />
-
         {/* Lobes */}
         <path d={lobePath('left')} fill={leftActive ? 'url(#gradGreen)' : 'rgba(16,185,129,0.12)'} />
         <path d={lobePath('right')} fill={rightActive ? 'url(#gradRed)' : 'rgba(239,68,68,0.12)'} />
@@ -95,6 +85,16 @@ export default function DockAssistHUD({ sensors }) {
         {/* Contacts */}
         <rect x={CX - 10} y={DOCK_Y + 8} width="3.2" height="8.5" rx="1" fill="#e2e8f0" />
         <rect x={CX + 6.5} y={DOCK_Y + 8} width="3.2" height="8.5" rx="1" fill="#e2e8f0" />
+
+        {/* Force field halo on top */}
+        <circle
+          cx={CX}
+          cy={DOCK_Y - 4}
+          r={18}
+          fill={state.forceDetected ? 'url(#halo)' : 'rgba(59,130,246,0.12)'}
+          stroke={state.forceDetected ? palette.forceOutline : 'none'}
+          strokeWidth={state.forceDetected ? 1.2 : 0}
+        />
 
         {/* Rover cue */}
         <g transform={`translate(${CX + nudge}, ${ROVER_Y})`}>
