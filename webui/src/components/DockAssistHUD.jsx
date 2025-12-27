@@ -32,7 +32,7 @@ export default function DockAssistHUD({ sensors }) {
   const nudge = state.balance * 6;
   const leftActive = state.left.red || state.left.green || state.left.force;
   const rightActive = state.right.red || state.right.green || state.right.force;
-  const allAligned = state.left.red && state.left.green && state.right.red && state.right.green && state.forceDetected;
+  const allAligned = Boolean(state.left.green && state.right.red && state.omni.force);
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-0.25">
