@@ -46,7 +46,7 @@ export default function TelemetryPanel() {
       ) : (
         <>
           <TelemetrySummary sensors={sensors} voltage={voltage} current={current} batteryTemp={batteryTemp} charge={charge} capacity={capacity} />
-          <SensorDetails sensors={sensors} />
+          <SensorDetails sensors={sensors} dockState={dockIr} />
         </>
       )}
       {rawSnippet && (
@@ -86,7 +86,7 @@ function Metric({ label, value }) {
   );
 }
 
-function SensorDetails({ sensors }) {
+function SensorDetails({ sensors, dockState }) {
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const over = sensors?.wheelOvercurrents || {};
 
@@ -117,7 +117,7 @@ function SensorDetails({ sensors }) {
     <div className="grid gap-0.5 md:grid-cols-2">
       <DetailCard title="Dock IR">
         <DockMiniStatus sensors={sensors} />
-        <DockDebug state={dockIr} />
+        <DockDebug state={dockState} />
       </DetailCard>
 
       <DetailCard title="Bumps & drops">
