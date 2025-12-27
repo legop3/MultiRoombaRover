@@ -113,10 +113,8 @@ function SensorDetails({ sensors }) {
 
   return (
     <div className="grid gap-0.5 md:grid-cols-2">
-      <DetailCard title="Dock IR (raw)">
-        <ValueRow label="Left" value={formatNumber(sensors?.infraredCharacterLeft)} />
-        <ValueRow label="Omni" value={formatNumber(sensors?.infraredCharacterOmni)} />
-        <ValueRow label="Right" value={formatNumber(sensors?.infraredCharacterRight)} />
+      <DetailCard title="Dock IR">
+        <DockMiniStatus sensors={sensors} />
       </DetailCard>
 
       <DetailCard title="Bumps & drops">
@@ -199,4 +197,31 @@ function Pill({ active, tone = 'green', label }) {
 function formatNumber(value, unit) {
   if (value == null || Number.isNaN(value)) return '--';
   return unit ? `${value} ${unit}` : value;
+}
+
+function DockMiniStatus({ sensors }) {
+  const left = sensors?.infraredCharacterLeft;
+  const right = sensors?.infraredCharacterRight;
+  const omni = sensors?.infraredCharacterOmni;
+  const badge = (code) => (
+    <span className={`rounded px-1 py-0.25 text-[0.7rem] font-semibold ${code ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
+      {code || '--'}
+    </span>
+  );
+  return (
+    <div className="flex items-center justify-between gap-1 text-xs text-slate-200">
+      <div className="flex items-center gap-1">
+        <span className="text-slate-400">L</span>
+        {badge(left)}
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-slate-400">O</span>
+        {badge(omni)}
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-slate-400">R</span>
+        {badge(right)}
+      </div>
+    </div>
+  );
 }

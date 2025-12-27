@@ -2,16 +2,13 @@ import { useMemo } from 'react';
 import { useDockIr } from '../hooks/useDockIr.js';
 
 const SVG_W = 120;
-const SVG_H = 110;
+const SVG_H = 96;
 const CX = SVG_W / 2;
-const DOCK_Y = 16;
-const ROVER_Y = 80;
+const DOCK_Y = 14;
+const ROVER_Y = 74;
 
-function lobePath(side = 'left') {
-  if (side === 'left') {
-    return `M ${CX} ${DOCK_Y} C ${CX - 10} ${DOCK_Y + 8} ${CX - 12} ${ROVER_Y - 18} ${CX - 4} ${ROVER_Y - 6} L ${CX} ${ROVER_Y - 10} Z`;
-  }
-  return `M ${CX} ${DOCK_Y} C ${CX + 10} ${DOCK_Y + 8} ${CX + 12} ${ROVER_Y - 18} ${CX + 4} ${ROVER_Y - 6} L ${CX} ${ROVER_Y - 10} Z`;
+function alignmentBarPath() {
+  return `M ${CX - 3} ${DOCK_Y + 4} L ${CX - 10} ${ROVER_Y - 6} L ${CX + 10} ${ROVER_Y - 6} Z`;
 }
 
 export default function DockAssistHUD({ sensors }) {
@@ -29,38 +26,29 @@ export default function DockAssistHUD({ sensors }) {
 
   if (!state.visible) return null;
 
-  const nudge = state.balance * 6;
-  const leftActive = state.left.red || state.left.green || state.left.force;
-  const rightActive = state.right.red || state.right.green || state.right.force;
+  const nudge = state.balance * 5;
+  const leftHit = state.left.active;
+  const rightHit = state.right.active;
+  const forceHit = state.omni.force || state.forceDetected;
   const allAligned = Boolean(state.left.green && state.right.red && state.omni.force);
+  const hasAny = leftHit || rightHit || forceHit;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-0.25">
       <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} role="img" aria-label="Docking assist">
         <defs>
-          <linearGradient id="gradGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={palette.green[0]} />
-            <stop offset="60%" stopColor={palette.green[1]} />
-            <stop offset="100%" stopColor={palette.green[2]} />
+          <linearGradient id="alignGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="rgba(148,163,184,0.9)" />
+            <stop offset="100%" stopColor="rgba(148,163,184,0)" />
           </linearGradient>
-          <linearGradient id="gradRed" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={palette.red[0]} />
-            <stop offset="60%" stopColor={palette.red[1]} />
-            <stop offset="100%" stopColor={palette.red[2]} />
-          </linearGradient>
-          <radialGradient id="halo" cx="50%" cy="20%" r="60%">
-            <stop offset="0%" stopColor="rgba(59,130,246,0.45)" />
-            <stop offset="100%" stopColor="rgba(59,130,246,0)" />
-          </radialGradient>
         </defs>
 
-        {/* Lobes */}
-        <path d={lobePath('left')} fill={leftActive ? 'url(#gradGreen)' : 'rgba(16,185,129,0.12)'} />
-        <path d={lobePath('right')} fill={rightActive ? 'url(#gradRed)' : 'rgba(239,68,68,0.12)'} />
-        {leftActive && rightActive ? (
+        {/* Alignment wedge */}
+        {hasAny ? (
           <path
-            d={`M ${CX - 6} ${ROVER_Y - 12} Q ${CX} ${ROVER_Y - 4} ${CX + 6} ${ROVER_Y - 12}`}
-            fill="rgba(255,255,255,0.08)"
+            d={alignmentBarPath()}
+            fill="url(#alignGrad)"
+            transform={`translate(${nudge * 3}, 0) rotate(${state.balance * 8}, ${CX}, ${ROVER_Y - 6})`}
           />
         ) : null}
 
@@ -119,11 +107,7 @@ export default function DockAssistHUD({ sensors }) {
         )}
 
         {/* Thumbs up when fully aligned */}
-        {allAligned ? (
-          <text x={CX + 30} y={DOCK_Y + 8} fontSize="12" fill="#fbbf24" fontFamily="sans-serif">
-            👍
-          </text>
-        ) : null}
+        {allAligned ? <text x={CX + 30} y={DOCK_Y + 8} fontSize="12" fill="#fbbf24" fontFamily="sans-serif">👍</text> : null}
       </svg>
     </div>
   );
