@@ -74,13 +74,15 @@ export default function DockAssistHUD({ sensors }) {
           />
         ) : null}
 
-        {/* Dock icon: rounded capsule/teardrop */}
+        {/* Dock icon: rounded pill-square with gentle bottom curve */}
         <path
           d={`
-            M ${CX - 16} ${DOCK_Y + 3}
-            Q ${CX} ${DOCK_Y - 6} ${CX + 16} ${DOCK_Y + 3}
-            Q ${CX + 16} ${DOCK_Y + 16} ${CX} ${DOCK_Y + 24}
-            Q ${CX - 16} ${DOCK_Y + 16} ${CX - 16} ${DOCK_Y + 3}
+            M ${CX - 16} ${DOCK_Y - 4}
+            Q ${CX - 12} ${DOCK_Y - 8} ${CX - 6} ${DOCK_Y - 8}
+            L ${CX + 6} ${DOCK_Y - 8}
+            Q ${CX + 12} ${DOCK_Y - 8} ${CX + 16} ${DOCK_Y - 4}
+            Q ${CX + 18} ${DOCK_Y + 16} ${CX} ${DOCK_Y + 26}
+            Q ${CX - 18} ${DOCK_Y + 16} ${CX - 16} ${DOCK_Y - 4}
             Z
           `}
           fill="#0b1220"
@@ -88,10 +90,10 @@ export default function DockAssistHUD({ sensors }) {
           strokeWidth="0.8"
         />
         {/* Force field emitter dot */}
-        <circle cx={CX} cy={DOCK_Y + 2} r="1.8" fill="#60a5fa" />
+        <circle cx={CX} cy={DOCK_Y - 1} r="1.8" fill="#60a5fa" />
         {/* Contacts */}
-        <rect x={CX - 3.5} y={DOCK_Y + 9} width="3" height="8" rx="1" fill="#e2e8f0" />
-        <rect x={CX + 1} y={DOCK_Y + 9} width="3" height="8" rx="1" fill="#e2e8f0" />
+        <rect x={CX - 6} y={DOCK_Y + 8} width="3.2" height="8.5" rx="1" fill="#e2e8f0" />
+        <rect x={CX + 2.5} y={DOCK_Y + 8} width="3.2" height="8.5" rx="1" fill="#e2e8f0" />
 
         {/* Rover cue */}
         <g transform={`translate(${CX + nudge}, ${ROVER_Y})`}>
