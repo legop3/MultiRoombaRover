@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import { clampUnit } from '../controls/controlMath.js';
-import DriveModeToggle from './controls/DriveModeToggle.jsx';
+import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
 
 const SOURCE = 'mobile-joystick';
 const JOYSTICK_RADIUS = 80;
@@ -134,8 +134,10 @@ function MobileJoystickPanel({ layout }) {
   const {
     state: { roverId, camera },
     pipeline,
-    actions: { setDriveVector, registerInputState, stopAllMotion, setServoAngle, toggleNightVision },
+    actions: { setDriveVector, registerInputState, setServoAngle, toggleNightVision },
   } = useControlSystem();
+  const driveDockState = useDriveDockState(roverId);
+  const dockedNotDriving = driveDockState.docked && !driveDockState.driving;
   const disabled = !roverId;
   const cameraConfig = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
@@ -196,47 +198,52 @@ function MobileJoystickPanel({ layout }) {
     setServoAngle(next);
   };
 
+  const containerClass = `flex flex-col gap-0.5 text-slate-100 ${
+    dockedNotDriving ? 'h-screen max-h-screen' : ''
+  }`;
+
   return (
-    <div className="flex flex-col gap-0.5 text-slate-100">
-      
-      <DriveModeToggle size="compact" />
-      {nightVisionAvailable && (
-        <button
-          type="button"
-          onClick={() => toggleNightVision()}
-          disabled={disabled}
-          className="bg-amber-600 px-0.5 py-1 text-sm font-semibold text-amber-50 transition hover:bg-amber-500 disabled:opacity-40"
-        >
-          Toggle Night Vision
-        </button>
-      )}
-      {cameraEnabled && (
-        <div className="bg-zinc-950 p-0.5 text-xs">
-          <div className="flex items-center justify-between text-[0.75rem] text-slate-400">
-            <span>Camera Tilt</span>
-            <span className="font-mono text-slate-200">{cameraValue.toFixed(1)}°</span>
-          </div>
-          <input
-            type="range"
-            min={cameraMin}
-            max={cameraMax}
-            step={0.5}
-            value={cameraValue}
-            onChange={handleCameraSlider}
-            className="mt-0.5 w-full accent-cyan-400"
+    <div className={containerClass}>
+      <DriveDockAction layout="mobile" expand={dockedNotDriving} driveDockState={driveDockState} />
+      {!dockedNotDriving ? (
+        <>
+          {nightVisionAvailable && (
+            <button
+              type="button"
+              onClick={() => toggleNightVision()}
+              disabled={disabled}
+              className="bg-amber-600 px-0.5 py-1 text-sm font-semibold text-amber-50 transition hover:bg-amber-500 disabled:opacity-40"
+            >
+              Toggle Night Vision
+            </button>
+          )}
+          {cameraEnabled && (
+            <div className="bg-zinc-950 p-0.5 text-xs">
+              <div className="flex items-center justify-between text-[0.75rem] text-slate-400">
+                <span>Camera Tilt</span>
+                <span className="font-mono text-slate-200">{cameraValue.toFixed(1)}°</span>
+              </div>
+              <input
+                type="range"
+                min={cameraMin}
+                max={cameraMax}
+                step={0.5}
+                value={cameraValue}
+                onChange={handleCameraSlider}
+                className="mt-0.5 w-full accent-cyan-400"
+              />
+            </div>
+          )}
+          <FloatingJoystick
+            disabled={disabled}
+            layout={layout}
+            radius={joystickRadius}
+            onMove={handleMove}
+            onStop={handleStop}
           />
-        </div>
-      )}
-      <FloatingJoystick
-        disabled={disabled}
-        layout={layout}
-        radius={joystickRadius}
-        onMove={handleMove}
-        onStop={handleStop}
-      />
-      {/* <button type="button" onClick={stopAllMotion} disabled={disabled} className="button-danger w-full disabled:opacity-40">
-        Panic Stop
-      </button> */}
+        </>
+      ) : null}
+      {/* Panic stop button can be re-enabled here if needed */}
 
     </div>
   );

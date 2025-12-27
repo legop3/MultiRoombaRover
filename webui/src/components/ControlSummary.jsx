@@ -5,40 +5,22 @@ import { useControlSystem } from '../controls/index.js';
 import { formatKeyLabel } from '../controls/keymapUtils.js';
 import TopDownMap from './TopDownMap.jsx';
 import RoverRoster from './RoverRoster.jsx';
+import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
 
 export default function ControlSummary() {
   const { session, requestControl } = useSession();
   const {
     state: { roverId, keymap },
-    actions,
   } = useControlSystem();
   const frame = useTelemetryFrame(roverId);
   const sensors = frame?.sensors || {};
+  const driveDockState = useDriveDockState(roverId);
   const roster = session?.roster ?? [];
   const [pending, setPending] = useState({});
 
   const canRequest = useMemo(() => session?.role && session.role !== 'spectator', [session?.role]);
 
-  const driving = useMemo(
-    () => (sensors.oiMode?.label || '').toLowerCase() === 'full',
-    [sensors.oiMode?.label],
-  );
-  const docked = Boolean(sensors.chargingSources?.homeBase);
-  const charging = Boolean(
-    sensors.chargingState?.label && sensors.chargingState.label.toLowerCase() !== 'not charging',
-  );
-
-  const handleStartDrive = () => {
-    if (!roverId) return;
-    actions.setMode('drive');
-    actions.runMacro('drive-sequence');
-  };
-
-  const handleDock = () => {
-    if (!roverId) return;
-    actions.setMode('dock');
-    actions.runMacro('seek-dock');
-  };
+  const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
   async function handleRequest(targetRoverId) {
     if (!targetRoverId) return;
@@ -61,30 +43,10 @@ export default function ControlSummary() {
           </div>
         </div>
         <div className="grid h-full grid-rows-[1fr_1fr_auto] gap-0.75">
-          <ActionButton
-            title="Start Driving"
-            description="Enable driving mode, then begin driving."
-            statuses={[{ label: driving ? 'Ready' : 'Press to enter driving mode', active: driving }]}
-            tone="emerald"
-            onClick={handleStartDrive}
-            disabled={!roverId}
-            keyAction="driveMacro"
-            keymap={keymap}
-          />
-          <ActionButton
-            title="Dock and Charge"
-            description="Line up about a foot from the dock, then press to attempt auto-dock."
-            statuses={[
-              { label: docked ? 'Docked' : 'Not docked', active: docked },
-              { label: charging ? 'Charging' : 'Not charging', active: charging },
-            ]}
-            tone="indigo"
-            onClick={handleDock}
-            disabled={!roverId}
-            keyAction="dockMacro"
-            keymap={keymap}
-          />
-          <InlineCameraTilt keymap={keymap} />
+          <div className="row-span-2">
+            <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
+          </div>
+          {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
         </div>
       </div>
       <RoverRoster
@@ -104,49 +66,6 @@ export default function ControlSummary() {
         }
       />
     </section>
-  );
-}
-
-function ActionButton({ title, description, statuses, onClick, disabled, tone, keyAction, keymap }) {
-  const colors =
-    tone === 'indigo'
-      ? 'bg-indigo-700 hover:bg-indigo-600 focus-visible:ring-indigo-400'
-      : 'bg-emerald-700 hover:bg-emerald-600 focus-visible:ring-emerald-400';
-  const keyLabel = keyAction ? formatKeyLabel(keymap?.[keyAction]?.[0]) : '';
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex h-full w-full flex-col items-center justify-center gap-0.5 border border-slate-700 px-1 py-1 text-center text-white transition focus-visible:outline-none focus-visible:ring-1 ${colors} disabled:cursor-not-allowed disabled:opacity-50`}
-    >
-      <div className="flex items-center justify-center gap-1">
-        <span className="text-base font-semibold text-slate-100">{title}</span>
-        {keyLabel ? <KeyPill label={keyLabel} /> : null}
-      </div>
-      <p className="text-sm text-slate-300 text-center">{description}</p>
-      <div className="flex flex-wrap items-center justify-center gap-0.5">
-        {statuses.map((status) => (
-          <StatusPill key={status.label} active={status.active} label={status.label} />
-        ))}
-      </div>
-    </button>
-  );
-}
-
-function KeyPill({ label }) {
-  return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
-}
-
-function StatusPill({ label, active }) {
-  return (
-    <span
-      className={`rounded px-1.5 py-0.5 text-[0.7rem] font-semibold ${
-        active ? 'bg-emerald-600 text-white' : 'bg-red-500 text-white'
-      }`}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -224,6 +143,10 @@ function InlineCameraTilt({ keymap }) {
       </div>
     </div>
   );
+}
+
+function KeyPill({ label }) {
+  return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
 }
 
 function formatDegrees(value) {
