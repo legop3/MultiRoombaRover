@@ -85,11 +85,7 @@ export function useDockIr(sensors, options = {}) {
     const right = withWindow(state.right);
     const omni = withWindow(state.omni);
     const forceDetected = left.force || right.force || omni.force;
-    const leftColor = left.red || left.green;
-    const rightColor = right.red || right.green;
-    const omniColor = omni.red || omni.green;
-    // Show when close (force field), or both sides see buoys, or a side + omni see buoy(s) (to surface sooner without single-stray triggers).
-    const visible = forceDetected || (leftColor && rightColor) || ((leftColor || rightColor) && omniColor);
+    const visible = left.active || right.active || omni.active;
     const bias =
       left.active && !right.active
         ? 'right'
