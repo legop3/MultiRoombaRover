@@ -13,7 +13,7 @@ export default function TelemetryPanel() {
   const roverId = session?.assignment?.roverId;
   const frame = useTelemetryFrame(roverId);
   const sensors = frame?.sensors || {};
-  const dockState = useDockIr(sensors);
+  const dockIr = useDockIr(sensors);
   const voltage = sensors.voltageMv != null ? `${(sensors.voltageMv / 1000).toFixed(2)} V` : null;
   const current = sensors.currentMa != null ? `${sensors.currentMa} mA` : null;
   const batteryTemp = sensors.batteryTemperatureC != null ? `${sensors.batteryTemperatureC} °C` : null;
@@ -117,7 +117,7 @@ function SensorDetails({ sensors }) {
     <div className="grid gap-0.5 md:grid-cols-2">
       <DetailCard title="Dock IR">
         <DockMiniStatus sensors={sensors} />
-        <DockDebug state={dockState} />
+        <DockDebug state={dockIr} />
       </DetailCard>
 
       <DetailCard title="Bumps & drops">
@@ -233,12 +233,12 @@ function DockDebug({ state }) {
   if (!state) return null;
   const label = (entry) => {
     const parts = [];
-    if (entry.red) parts.push('R');
-    if (entry.green) parts.push('G');
-    if (entry.force) parts.push('F');
+    if (entry?.red) parts.push('R');
+    if (entry?.green) parts.push('G');
+    if (entry?.force) parts.push('F');
     return parts.length ? parts.join('') : 'none';
   };
-  const age = (entry) => (entry.age != null ? `${entry.age}ms` : '--');
+  const age = (entry) => (entry?.age != null ? `${entry.age}ms` : '--');
   return (
     <div className="text-[0.7rem] text-slate-400">
       <div>{`Left: ${state.left.code ?? '--'} (${label(state.left)}) · age ${age(state.left)}`}</div>
