@@ -3,6 +3,9 @@ import React from 'react';
 function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overlay = false }) {
   const size = overrideSize || (variant === 'mini' ? 190 : 260);
   const center = size / 2;
+  const offsetY = size * 0.07; // nudge everything downward within the viewBox
+  const centerX = center;
+  const centerY = center + offsetY;
   const innerCircle = center * 0.8; // keep proportions consistent as size changes
   const lightRingInner = innerCircle - 4;
   const lightRingOuter = innerCircle + 4;
@@ -61,32 +64,32 @@ function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overla
         </>
       ) : null}
       <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} preserveAspectRatio="xMidYMid meet" className="mx-auto block">
-        <circle cx={center} cy={center} r={innerCircle} fill="#0f172a" stroke="#334155" strokeWidth="2" />
+        <circle cx={centerX} cy={centerY} r={innerCircle} fill="#0f172a" stroke="#334155" strokeWidth="2" />
         <WheelVisual
-          cx={center - wheelLineOffset}
-          cy={center}
+          cx={centerX - wheelLineOffset}
+          cy={centerY}
           current={wheelCurrentLeft}
           drop={bumps.wheelDropLeft}
           overcurrent={wheelOver.leftWheel}
           label="L"
         />
         <WheelVisual
-          cx={center + wheelLineOffset}
-          cy={center}
+          cx={centerX + wheelLineOffset}
+          cy={centerY}
           current={wheelCurrentRight}
           drop={bumps.wheelDropRight}
           overcurrent={wheelOver.rightWheel}
           label="R"
         />
         <SideBrushVisual
-          cx={center + innerCircle * 0.65}
-          cy={center - innerCircle * 0.55}
+          cx={centerX + innerCircle * 0.65}
+          cy={centerY - innerCircle * 0.55}
           current={sideBrushCurrent}
           overcurrent={wheelOver.sideBrush}
         />
         <MainBrushVisual
-          cx={center}
-          cy={center}
+          cx={centerX}
+          cy={centerY}
           current={mainBrushCurrent}
           overcurrent={wheelOver.mainBrush}
           variant={variant}
@@ -94,19 +97,21 @@ function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overla
           dirtRight={sensors?.dirtDetect}
         />
         {lightSegments.map((seg) => {
-          const color = lightBumpColor(seg.value);
+          const color = lightBumpColor(seg.value, maxLight);
+          const tipR = lightRingOuter + 4; // point starts just outside bump arc
+          const baseR = tipR + 28; // extend starting length for more resolution
           return (
-            <ArcSegment
+            <ConeSegment
               key={seg.label}
-              cx={center}
-              cy={center}
-              rInner={lightRingInner}
-              rOuter={lightRingOuter}
+              cx={centerX}
+              cy={centerY}
+              rBase={baseR}
+              rTip={tipR}
               startDeg={seg.start}
               endDeg={seg.end}
               color={color}
-              opacity={1}
-              pulse={false}
+              value={seg.value}
+              max={maxLight}
             />
           );
         })}
@@ -115,8 +120,8 @@ function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overla
           return (
             <ArcSegment
               key={seg.label}
-              cx={center}
-              cy={center}
+              cx={centerX}
+              cy={centerY}
               rInner={cliffRingInner}
               rOuter={cliffRingOuter}
               startDeg={seg.start}
@@ -128,10 +133,10 @@ function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overla
           );
         })}
         <ArcSegment
-          cx={center}
-          cy={center}
-          rInner={lightRingOuter + 2}
-          rOuter={lightRingOuter + 8}
+          cx={centerX}
+          cy={centerY}
+          rInner={lightRingInner}
+          rOuter={lightRingOuter}
           startDeg={-70}
           endDeg={-6}
           color={bumps.bumpLeft ? '#ef4444' : '#475569'}
@@ -139,10 +144,10 @@ function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overla
           pulse={Boolean(bumps.bumpLeft)}
         />
         <ArcSegment
-          cx={center}
-          cy={center}
-          rInner={lightRingOuter + 2}
-          rOuter={lightRingOuter + 8}
+          cx={centerX}
+          cy={centerY}
+          rInner={lightRingInner}
+          rOuter={lightRingOuter}
           startDeg={6}
           endDeg={70}
           color={bumps.bumpRight ? '#ef4444' : '#475569'}
@@ -174,6 +179,23 @@ function ArcSegment({ cx, cy, rInner, rOuter, startDeg, endDeg, color, pulse = f
       ) : null}
     </>
   );
+}
+
+function ConeSegment({ cx, cy, rBase, rTip, startDeg, endDeg, color, value, max }) {
+  const mid = (startDeg + endDeg) / 2;
+  const baseA = polarToCartesian(cx, cy, rBase, startDeg);
+  const baseB = polarToCartesian(cx, cy, rBase, endDeg);
+  const tip = polarToCartesian(cx, cy, rTip, mid);
+  const norm = clamp01(value != null ? value / (max || 1) : 0);
+  const eased = Math.pow(norm, 0.35); // even more sensitive near the start, softer near the end
+  // higher value = closer obstacle → bar shrinks toward the tip (reverse fill)
+  const filledR = rBase - (rBase - rTip) * eased;
+  const barR = Math.max(rTip, Math.min(filledR, rBase));
+  const filledA = polarToCartesian(cx, cy, filledR, startDeg);
+  const filledB = polarToCartesian(cx, cy, filledR, endDeg);
+  const fg = `M ${tip.x} ${tip.y} L ${filledA.x} ${filledA.y} L ${filledB.x} ${filledB.y} Z`;
+
+  return <path d={fg} fill={color} opacity={1} stroke="none" />;
 }
 
 function describeArc(cx, cy, r, startDeg, endDeg) {
@@ -304,10 +326,14 @@ function MainBrushVisual({ cx, cy, current, overcurrent, variant, dirtLeft, dirt
   );
 }
 
-const LIGHT_BUMP_SENSITIVITY = 0.18;
-function lightBumpColor(value) {
-  if (value == null || value <= 0) return '#000000';
-  const hue = (value * LIGHT_BUMP_SENSITIVITY) % 360;
+function lightBumpColor(value, max) {
+  if (value == null || value <= 0) return 'hsl(200 60% 18%)'; // faint blue instead of black
+  const maxVal = max || 1;
+  const norm = clamp01(value / maxVal);
+  const eased = Math.pow(norm, 0.45); // match cone fill sensitivity
+  // offset the start hue so we don't begin at red, still sweep the full rainbow
+  const startHue = 200; // deep cyan/blue start
+  const hue = (startHue + eased * 360) % 360;
   return `hsl(${hue} 100% 60%)`;
 }
 
