@@ -382,7 +382,12 @@ export default function VideoTile({
           <BatteryBarVertical visual={batteryVisual} />
         ) : null}
       </div>
-      {!showVerticalBattery && <BatteryBar visual={batteryVisual} />}
+      {!showVerticalBattery && (
+        <div className="space-y-0.25">
+          <LightBumpBars sensors={sensors} />
+          <BatteryBar visual={batteryVisual} />
+        </div>
+      )}
     </div>
   );
 }
@@ -422,6 +427,52 @@ function BatteryBarVertical({ visual }) {
         />
       </div>
       <span className="mt-0.5 text-[0.65rem] font-semibold text-slate-100">{percentText}</span>
+    </div>
+  );
+}
+
+function LightBumpBars({ sensors }) {
+  const values = [
+    sensors?.lightBumpLeftSignal,
+    sensors?.lightBumpFrontLeftSignal,
+    sensors?.lightBumpCenterLeftSignal,
+    sensors?.lightBumpCenterRightSignal,
+    sensors?.lightBumpFrontRightSignal,
+    sensors?.lightBumpRightSignal,
+  ];
+  const max = values.filter((v) => v != null).reduce((acc, v) => Math.max(acc, v), 1200);
+  const eased = (v) => Math.pow(Math.max(0, Math.min(1, (v ?? 0) / max)), 0.35);
+  const hueFor = (v) => {
+    if (v == null || v <= 0) return 'hsl(200 60% 18%)';
+    const h = (200 + eased(v) * 360) % 360;
+    return `hsl(${h} 100% 60%)`;
+  };
+  const segments = 6;
+  const gap = 2;
+  const barHeight = 12;
+
+  return (
+    <div className="flex w-full items-center justify-center gap-1">
+      {values.map((v, idx) => {
+        const t = eased(v);
+        const dir = idx < segments / 2 ? -1 : 1; // left bars fill left, right bars fill right
+        const fill = `${t * 100}%`;
+        const color = hueFor(v);
+        return (
+          <div key={idx} className="relative flex-1 min-w-[0]" style={{ height: `${barHeight}px` }}>
+            <div className="h-full w-full overflow-hidden bg-slate-800" style={{ borderRadius: 0 }}>
+              <div
+                className="h-full"
+                style={{
+                  width: fill,
+                  background: color,
+                  float: dir === -1 ? 'right' : 'left',
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -545,9 +596,9 @@ function HudOverlay({
           <TopDownMap sensors={sensors} size={240} overlay />
         </div>
       ) : null}
-      </div>
-    );
-  }
+    </div>
+  );
+}
 
 const OVERCURRENT_LABELS = {
   leftWheel: 'Left wheel',
