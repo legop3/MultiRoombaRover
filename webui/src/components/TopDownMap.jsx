@@ -19,6 +19,9 @@ function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overla
   const wheelCurrentRight = sensors?.wheelRightCurrentMa ?? 0;
   const sideBrushCurrent = sensors?.sideBrushCurrentMa ?? 0;
   const mainBrushCurrent = sensors?.mainBrushCurrentMa ?? 0;
+  const bumpDepress = 6;
+  const bumpLeftOffset = bumps.bumpLeft ? bumpDepress : 0;
+  const bumpRightOffset = bumps.bumpRight ? bumpDepress : 0;
 
   const lightAngles = buildSegments({
     count: 6,
@@ -135,8 +138,8 @@ function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overla
         <ArcSegment
           cx={centerX}
           cy={centerY}
-          rInner={lightRingInner}
-          rOuter={lightRingOuter}
+          rInner={lightRingInner - bumpLeftOffset}
+          rOuter={lightRingOuter - bumpLeftOffset}
           startDeg={-70}
           endDeg={-6}
           color={bumps.bumpLeft ? '#ef4444' : '#475569'}
@@ -146,8 +149,8 @@ function TopDownMap({ sensors = {}, variant = 'full', size: overrideSize, overla
         <ArcSegment
           cx={centerX}
           cy={centerY}
-          rInner={lightRingInner}
-          rOuter={lightRingOuter}
+          rInner={lightRingInner - bumpRightOffset}
+          rOuter={lightRingOuter - bumpRightOffset}
           startDeg={6}
           endDeg={70}
           color={bumps.bumpRight ? '#ef4444' : '#475569'}
