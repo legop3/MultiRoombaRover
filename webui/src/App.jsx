@@ -89,8 +89,8 @@ function MobilePortraitLayout() {
       <TelemetryPanel />
       <AuthPanel />
       <AdminPanel />
-      <RoomCameraPanel panelId="mobile-portrait-room" />
       <HomeAssistantControls />
+      <RoomCameraPanel panelId="mobile-portrait-room" />
       <LogPanel />
     </div>
   );
@@ -119,8 +119,8 @@ function MobileLandscapeLayout() {
             <ChatPanel />
           </div>
         </section>
-        <RoomCameraPanel panelId="mobile-landscape-room" />
         <HomeAssistantControls />
+        <RoomCameraPanel panelId="mobile-landscape-room" />
         {/* <DrivePanel /> */}
       </div>
     </div>

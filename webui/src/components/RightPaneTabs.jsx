@@ -19,8 +19,8 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
           <TabPanel id="telemetry">
             <div className="space-y-0.5">
               <ControlSummary />
-              <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
               <HomeAssistantControls />
+              <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
               <TelemetryPanel />
             </div>
           </TabPanel>

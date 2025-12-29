@@ -198,9 +198,8 @@ function MobileJoystickPanel({ layout }) {
     setServoAngle(next);
   };
 
-  const containerClass = `flex flex-col gap-0.5 text-slate-100 ${
-    dockedNotDriving ? 'h-screen max-h-screen' : ''
-  }`;
+  const fillClass = dockedNotDriving ? 'max-h-screen self-start' : '';
+  const containerClass = `flex h-full flex-col gap-0.5 text-slate-100 ${fillClass}`;
 
   return (
     <div className={containerClass}>
@@ -285,7 +284,7 @@ function AuxMotorPanel({ orientation }) {
   const gridCols = orientation === 'landscape' ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2';
 
   return (
-    <div className="flex flex-col gap-0.5 text-slate-100">
+    <div className="flex h-full flex-col gap-0.5 text-slate-100">
       <p className="text-xs text-slate-400">Aux controls</p>
       <div className={`grid ${gridCols} gap-0.5`}>
         {AUX_BUTTONS.map((button) => (
@@ -330,7 +329,7 @@ export function MobileLandscapeControlColumn() {
 export default function MobilePortraitControls() {
   return (
     <section className="panel">
-      <div className="grid grid-cols-2 gap-0.5">
+      <div className="grid grid-cols-2 gap-0.5 items-stretch">
         <AuxMotorPanel orientation="portrait" />
         <MobileJoystickPanel layout="portrait" />
       </div>
