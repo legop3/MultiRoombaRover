@@ -273,6 +273,9 @@ async function handleCommand(message) {
   const action = (tokens.shift() || '').toLowerCase();
 
   switch (action) {
+    case '':
+      await handleStatusCommand(message, tokens[0]);
+      break;
     case 'help':
       await message.reply(formatHelp());
       break;
