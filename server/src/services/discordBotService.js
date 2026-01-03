@@ -8,7 +8,7 @@ const {
 const logger = require('../globals/logger').child('discordBot');
 const { loadConfig } = require('../helpers/configLoader');
 const { subscribe } = require('./eventBus');
-const { getRoster, lockRover } = require('./roverManager');
+const { getRoster, lockRover, rovers } = require('./roverManager');
 const { MODES, getMode, setMode } = require('./modeManager');
 const { sendExternalMessage } = require('./chatService');
 
@@ -48,12 +48,74 @@ function sanitizeMentions(text) {
     .replace(/@here/gi, '[here]');
 }
 
-function formatRoverStatus(rover) {
-  if (!rover) return 'Unknown rover';
-  const percent = rover.batteryState?.percentDisplay;
-  const battery = percent != null ? `${percent}%` : 'n/a';
-  const lockLabel = rover.locked ? '🔒 locked' : '🔓 unlocked';
-  return `**${rover.name || rover.id}** — ${lockLabel} — battery ${battery}`;
+function formatVoltage(voltageMv) {
+  if (voltageMv == null) return 'n/a';
+  return `${(voltageMv / 1000).toFixed(2)}V`;
+}
+
+function formatCurrent(currentMa) {
+  if (currentMa == null) return 'n/a';
+  const amps = currentMa / 1000;
+  return `${amps.toFixed(2)}A`;
+}
+
+function formatChargeState(batteryState) {
+  if (!batteryState) return 'n/a';
+  const charge = batteryState.charge;
+  const capacity = batteryState.capacity;
+  const percent = batteryState.percentDisplay;
+  const chargeText = charge != null && capacity != null ? `${charge}/${capacity}mAh` : 'n/a';
+  const percentText = percent != null ? `${percent}%` : 'n/a';
+  return `${chargeText} (${percentText})`;
+}
+
+function isCharging(sensors) {
+  const label = sensors?.chargingState?.label?.toLowerCase();
+  const chargingByLabel =
+    label === 'waiting' || label === 'full charging' || label === 'trickle charging';
+  const code = sensors?.chargingState?.code;
+  const chargingByCode = code === 2 || code === 3 || code === 4;
+  return chargingByLabel || chargingByCode;
+}
+
+function buildRoverStatusSnapshot(record) {
+  if (!record) return null;
+  const sensors = record.lastSensor?.decoded || record.lastSensor?.sensors || null;
+  const docked = Boolean(sensors?.chargingSources?.homeBase);
+  const charging = isCharging(sensors);
+  const chargingLabel = sensors?.chargingState?.label || 'unknown';
+  const oiMode = sensors?.oiMode?.label || 'unknown';
+  return {
+    id: record.id,
+    name: record.meta?.name || record.id,
+    locked: record.locked,
+    lockReason: record.lockReason,
+    docked,
+    charging,
+    chargingLabel,
+    voltageMv: sensors?.voltageMv ?? null,
+    currentMa: sensors?.currentMa ?? null,
+    batteryState: record.batteryState,
+    oiMode,
+  };
+}
+
+function formatRoverStatus(snapshot) {
+  if (!snapshot) return 'Unknown rover';
+  const lockLabel = snapshot.locked
+    ? `locked${snapshot.lockReason ? ` (${snapshot.lockReason})` : ''}`
+    : 'unlocked';
+  const dockLabel = snapshot.docked ? 'docked' : 'undocked';
+  const chargingLabel = snapshot.charging ? `charging (${snapshot.chargingLabel})` : 'not charging';
+  return [
+    `**${snapshot.name}** — ${lockLabel}`,
+    `dock: ${dockLabel}`,
+    `charge: ${chargingLabel}`,
+    `battery: ${formatChargeState(snapshot.batteryState)}`,
+    `voltage: ${formatVoltage(snapshot.voltageMv)}`,
+    `current: ${formatCurrent(snapshot.currentMa)}`,
+    `oi: ${snapshot.oiMode}`,
+  ].join(' — ');
 }
 
 function countReady() {
@@ -117,23 +179,28 @@ function formatHelp() {
   ].join('\n');
 }
 
-function findRover(id) {
-  const roster = getRoster();
+function findRoverRecord(id) {
   if (!id) return null;
-  return roster.find((r) => String(r.id) === String(id) || String(r.name) === String(id));
+  for (const record of rovers.values()) {
+    if (String(record.id) === String(id) || String(record.meta?.name) === String(id)) {
+      return record;
+    }
+  }
+  return null;
 }
 
 async function handleStatusCommand(message, roverId) {
-  const roster = getRoster();
   if (!roverId) {
-    const summary = roster.map((r) => formatRoverStatus(r)).join('\n') || 'No rovers online.';
+    const snapshots = Array.from(rovers.values()).map(buildRoverStatusSnapshot).filter(Boolean);
+    const summary = snapshots.map((snapshot) => formatRoverStatus(snapshot)).join('\n') || 'No rovers online.';
     await message.reply({
       content: sanitizeMentions(summary.slice(0, 1900)),
       allowedMentions: { parse: [], repliedUser: false },
     });
     return;
   }
-  const rover = findRover(roverId);
+  const record = findRoverRecord(roverId);
+  const rover = buildRoverStatusSnapshot(record);
   await message.reply({
     content: sanitizeMentions(formatRoverStatus(rover).slice(0, 1900)),
     allowedMentions: { parse: [], repliedUser: false },
@@ -256,15 +323,81 @@ function buildEmbed({ title, description, color }) {
   return embed;
 }
 
-async function announce({ channelId, content, pingRoleId, color, title, description }) {
+function buildBatteryStatusEmbed(color) {
+  const embed = buildEmbed({ title: 'Rover Battery Status', color: color || 0x2196f3 });
+  const snapshots = Array.from(rovers.values()).map(buildRoverStatusSnapshot).filter(Boolean);
+  if (snapshots.length === 0) {
+    embed.setDescription('No rovers online.');
+    return embed;
+  }
+  snapshots.forEach((snapshot) => {
+    const lockLabel = snapshot.locked
+      ? `locked${snapshot.lockReason ? ` (${snapshot.lockReason})` : ''}`
+      : 'unlocked';
+    const dockLabel = snapshot.docked ? 'docked' : 'undocked';
+    const chargingLabel = snapshot.charging ? `charging (${snapshot.chargingLabel})` : 'not charging';
+    const lines = [
+      `Dock: ${dockLabel}`,
+      `Charging: ${chargingLabel}`,
+      `Battery: ${formatChargeState(snapshot.batteryState)}`,
+      `Voltage: ${formatVoltage(snapshot.voltageMv)}`,
+      `Current: ${formatCurrent(snapshot.currentMa)}`,
+      `OI: ${snapshot.oiMode}`,
+      `Lock: ${lockLabel}`,
+    ];
+    embed.addFields({ name: snapshot.name, value: lines.join('\n'), inline: false });
+  });
+  return embed;
+}
+
+function buildBatteryCaption(type, payload) {
+  const roverId = payload?.roverId || 'unknown';
+  const record = rovers.get(roverId) || findRoverRecord(roverId);
+  const snapshot = buildRoverStatusSnapshot(record);
+  const base = snapshot?.name || roverId;
+  const percent = snapshot?.batteryState?.percentDisplay;
+  const percentLabel = percent != null ? `${percent}%` : 'n/a';
+  const dockLabel = snapshot?.docked ? 'docked' : 'undocked';
+  const chargingLabel = snapshot?.charging ? 'charging' : 'not charging';
+  const voltage = formatVoltage(snapshot?.voltageMv ?? null);
+  const current = formatCurrent(snapshot?.currentMa ?? null);
+  const charge = formatChargeState(snapshot?.batteryState ?? null);
+  const detail = `${dockLabel}, ${chargingLabel}, ${voltage}, ${current}, ${charge}`;
+
+  switch (type) {
+    case 'battery.warn':
+      return `Battery warn: ${base} at ${percentLabel}. ${detail}`;
+    case 'battery.urgent':
+      return `Battery urgent: ${base} at ${percentLabel}. ${detail}`;
+    case 'battery.docked':
+      return `Docked: ${base}. ${detail}`;
+    case 'battery.undocked':
+      return `Undocked: ${base}. ${detail}`;
+    case 'battery.charging.start':
+      return `Charging started: ${base}. ${detail}`;
+    case 'battery.charging.stop':
+      return `Charging stopped: ${base}. ${detail}`;
+    case 'battery.locked':
+      return `Locked for charging: ${base}. ${detail}`;
+    case 'battery.unlocked':
+      return `Unlocked after charging: ${base}. ${detail}`;
+    default:
+      return `Battery update: ${base}. ${detail}`;
+  }
+}
+
+async function announce({ channelId, content, pingRoleId, color, title, description, embeds }) {
   if (!channelId) return;
   const prefix = pingRoleId ? `<@&${pingRoleId}> ` : '';
-  const embed = buildEmbed({ title, description, color });
+  const payloadEmbeds =
+    Array.isArray(embeds) && embeds.length > 0
+      ? embeds
+      : [buildEmbed({ title, description, color })];
   const allowedMentions = pingRoleId ? { roles: [pingRoleId], parse: [] } : { parse: [] };
   await sendToChannel(
     channelId,
     `${prefix}${content || ''}`.trim(),
-    { embeds: [embed] },
+    { embeds: payloadEmbeds },
     allowedMentions,
     !pingRoleId, // keep role mention intact when pinging
   );
@@ -334,8 +467,10 @@ function handleBusEvent(event) {
         channelId: channels.adminAlerts,
         pingRoleId: roles.adminPing || null,
         color: 0xf0b651,
-        title: 'Battery Warn',
-        description: `${payload?.roverId} at ${payload?.batteryState?.percentDisplay ?? 'low'}%.`,
+        content: buildBatteryCaption(type, payload),
+        title: 'Battery Status',
+        description: null,
+        embeds: [buildBatteryStatusEmbed(0xf0b651)],
       });
       break;
     case 'battery.urgent':
@@ -343,48 +478,60 @@ function handleBusEvent(event) {
         channelId: channels.adminAlerts,
         pingRoleId: roles.adminPing || null,
         color: 0xe53935,
-        title: 'Battery Urgent',
-        description: `${payload?.roverId} at ${payload?.batteryState?.percentDisplay ?? 'urgent'}%.`,
+        content: buildBatteryCaption(type, payload),
+        title: 'Battery Status',
+        description: null,
+        embeds: [buildBatteryStatusEmbed(0xe53935)],
       });
       break;
     case 'battery.docked':
       announce({
         channelId: channels.adminAlerts,
         color: 0x2196f3,
-        title: 'Docked',
-        description: `${payload?.roverId} docked.`,
+        content: buildBatteryCaption(type, payload),
+        title: 'Battery Status',
+        description: null,
+        embeds: [buildBatteryStatusEmbed(0x2196f3)],
       });
       break;
     case 'battery.undocked':
       announce({
         channelId: channels.adminAlerts,
         color: 0x2196f3,
-        title: 'Undocked',
-        description: `${payload?.roverId} undocked.`,
+        content: buildBatteryCaption(type, payload),
+        title: 'Battery Status',
+        description: null,
+        embeds: [buildBatteryStatusEmbed(0x2196f3)],
       });
       break;
     case 'battery.charging.start':
       announce({
         channelId: channels.adminAlerts,
         color: 0x2196f3,
-        title: 'Charging Started',
-        description: `${payload?.roverId} started charging.`,
+        content: buildBatteryCaption(type, payload),
+        title: 'Battery Status',
+        description: null,
+        embeds: [buildBatteryStatusEmbed(0x2196f3)],
       });
       break;
     case 'battery.charging.stop':
       announce({
         channelId: channels.adminAlerts,
         color: 0xf0b651,
-        title: 'Charging Stopped',
-        description: `${payload?.roverId} stopped charging.`,
+        content: buildBatteryCaption(type, payload),
+        title: 'Battery Status',
+        description: null,
+        embeds: [buildBatteryStatusEmbed(0xf0b651)],
       });
       break;
     case 'battery.locked':
       announce({
         channelId: channels.adminAlerts,
         color: 0xf0b651,
-        title: 'Locked for Charging',
-        description: `${payload?.roverId} locked for charging.`,
+        content: buildBatteryCaption(type, payload),
+        title: 'Battery Status',
+        description: null,
+        embeds: [buildBatteryStatusEmbed(0xf0b651)],
       });
       updatePresence();
       break;
@@ -392,8 +539,10 @@ function handleBusEvent(event) {
       announce({
         channelId: channels.adminAlerts,
         color: 0x4caf50,
-        title: 'Unlocked after Charging',
-        description: `${payload?.roverId} unlocked after charging.`,
+        content: buildBatteryCaption(type, payload),
+        title: 'Battery Status',
+        description: null,
+        embeds: [buildBatteryStatusEmbed(0x4caf50)],
       });
       updatePresence();
       break;
