@@ -136,9 +136,10 @@ function countReady() {
 async function updatePresence() {
   if (!client?.user) return;
   const { ready, total } = countReady();
+  const mode = getMode();
   try {
     await client.user.setPresence({
-      activities: [{ name: `${ready}/${total} Rovers Ready`, type: ActivityType.Watching }],
+      activities: [{ name: `${mode} · ${ready}/${total} Rovers Ready`, type: ActivityType.Watching }],
       status: 'online',
     });
   } catch (err) {
