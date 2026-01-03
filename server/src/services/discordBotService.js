@@ -69,6 +69,32 @@ function formatChargeState(batteryState) {
   return `${chargeText} (${percentText})`;
 }
 
+function formatDockEmoji(docked) {
+  return docked ? '🏠' : '🧭';
+}
+
+function formatChargeEmoji(charging) {
+  return charging ? '⚡' : '🔌';
+}
+
+function formatLockEmoji(locked) {
+  return locked ? '🔒' : '🔓';
+}
+
+function formatBatteryEmoji(batteryState) {
+  if (batteryState?.urgentActive) return '🛑';
+  if (batteryState?.warnActive) return '⚠️';
+  return '🔋';
+}
+
+function formatOiEmoji(oiMode) {
+  if (oiMode === 'full') return '🕹️';
+  if (oiMode === 'safe') return '🧰';
+  if (oiMode === 'passive') return '🟢';
+  if (oiMode === 'off') return '⏹️';
+  return '❔';
+}
+
 function isCharging(sensors) {
   const label = sensors?.chargingState?.label?.toLowerCase();
   const chargingByLabel =
@@ -98,24 +124,6 @@ function buildRoverStatusSnapshot(record) {
     batteryState: record.batteryState,
     oiMode,
   };
-}
-
-function formatRoverStatus(snapshot) {
-  if (!snapshot) return 'Unknown rover';
-  const lockLabel = snapshot.locked
-    ? `locked${snapshot.lockReason ? ` (${snapshot.lockReason})` : ''}`
-    : 'unlocked';
-  const dockLabel = snapshot.docked ? 'docked' : 'undocked';
-  const chargingLabel = snapshot.charging ? `charging (${snapshot.chargingLabel})` : 'not charging';
-  return [
-    `**${snapshot.name}** — ${lockLabel}`,
-    `dock: ${dockLabel}`,
-    `charge: ${chargingLabel}`,
-    `battery: ${formatChargeState(snapshot.batteryState)}`,
-    `voltage: ${formatVoltage(snapshot.voltageMv)}`,
-    `current: ${formatCurrent(snapshot.currentMa)}`,
-    `oi: ${snapshot.oiMode}`,
-  ].join(' — ');
 }
 
 function countReady() {
@@ -190,19 +198,19 @@ function findRoverRecord(id) {
 }
 
 async function handleStatusCommand(message, roverId) {
-  if (!roverId) {
-    const snapshots = Array.from(rovers.values()).map(buildRoverStatusSnapshot).filter(Boolean);
-    const summary = snapshots.map((snapshot) => formatRoverStatus(snapshot)).join('\n') || 'No rovers online.';
+  const record = roverId ? findRoverRecord(roverId) : null;
+  if (roverId && !record) {
+    const embed = buildEmbed({ title: 'Rover Status', description: 'Unknown rover.', color: 0x2196f3 });
     await message.reply({
-      content: sanitizeMentions(summary.slice(0, 1900)),
+      embeds: [embed],
       allowedMentions: { parse: [], repliedUser: false },
     });
     return;
   }
-  const record = findRoverRecord(roverId);
-  const rover = buildRoverStatusSnapshot(record);
+  const records = roverId ? [record] : Array.from(rovers.values());
+  const embed = buildBatteryStatusEmbed(0x2196f3, records);
   await message.reply({
-    content: sanitizeMentions(formatRoverStatus(rover).slice(0, 1900)),
+    embeds: [embed],
     allowedMentions: { parse: [], repliedUser: false },
   });
 }
@@ -323,9 +331,10 @@ function buildEmbed({ title, description, color }) {
   return embed;
 }
 
-function buildBatteryStatusEmbed(color) {
+function buildBatteryStatusEmbed(color, records = null) {
   const embed = buildEmbed({ title: 'Rover Battery Status', color: color || 0x2196f3 });
-  const snapshots = Array.from(rovers.values()).map(buildRoverStatusSnapshot).filter(Boolean);
+  const baseRecords = records || Array.from(rovers.values());
+  const snapshots = baseRecords.map(buildRoverStatusSnapshot).filter(Boolean);
   if (snapshots.length === 0) {
     embed.setDescription('No rovers online.');
     return embed;
@@ -336,16 +345,26 @@ function buildBatteryStatusEmbed(color) {
       : 'unlocked';
     const dockLabel = snapshot.docked ? 'docked' : 'undocked';
     const chargingLabel = snapshot.charging ? `charging (${snapshot.chargingLabel})` : 'not charging';
+    const header = [
+      formatBatteryEmoji(snapshot.batteryState),
+      formatDockEmoji(snapshot.docked),
+      formatChargeEmoji(snapshot.charging),
+      formatLockEmoji(snapshot.locked),
+    ].join(' ');
     const lines = [
       `Dock: ${dockLabel}`,
       `Charging: ${chargingLabel}`,
       `Battery: ${formatChargeState(snapshot.batteryState)}`,
       `Voltage: ${formatVoltage(snapshot.voltageMv)}`,
       `Current: ${formatCurrent(snapshot.currentMa)}`,
-      `OI: ${snapshot.oiMode}`,
+      `OI: ${snapshot.oiMode} ${formatOiEmoji(snapshot.oiMode)}`,
       `Lock: ${lockLabel}`,
     ];
-    embed.addFields({ name: snapshot.name, value: lines.join('\n'), inline: false });
+    embed.addFields({
+      name: `${header} ${snapshot.name}`,
+      value: lines.join('\n'),
+      inline: true,
+    });
   });
   return embed;
 }
