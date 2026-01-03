@@ -55,8 +55,8 @@ function formatVoltage(voltageMv) {
 
 function formatCurrent(currentMa) {
   if (currentMa == null) return 'n/a';
-  const amps = currentMa / 1000;
-  return `${amps.toFixed(2)}A`;
+  // const amps = currentMa / 1000;
+  return `${currentMa}mA`;
 }
 
 function formatChargeState(batteryState) {
