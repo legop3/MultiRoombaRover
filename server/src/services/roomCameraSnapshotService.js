@@ -2,8 +2,8 @@ const EventEmitter = require('events');
 const logger = require('../globals/logger').child('roomCameraSnapshot');
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 
-const POLL_INTERVAL_MS = 100;
-const REPLAY_FRAME_COUNT = 50;
+const POLL_INTERVAL_MS = 67;
+const REPLAY_FRAME_COUNT = 225;
 const FETCH_TIMEOUT_MS = 2000;
 
 const cameraState = new Map(); // id -> {frame, ts, error, failures, fetching}
