@@ -1,13 +1,15 @@
 const EventEmitter = require('events');
 const logger = require('../globals/logger').child('roomCameraSnapshot');
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
+const {
+  recordRoomCameraFrame,
+  clearRoomCameraReplayFrames,
+} = require('./roomCameraReplayService');
 
 const POLL_INTERVAL_MS = 67;
-const REPLAY_FRAME_COUNT = 225;
 const FETCH_TIMEOUT_MS = 2000;
 
 const cameraState = new Map(); // id -> {frame, ts, error, failures, fetching}
-const frameHistory = new Map(); // id -> [{buffer, ts}]
 const events = new EventEmitter(); // frame, status
 let pollTimer = null;
 
@@ -16,15 +18,6 @@ function markState(id, updates = {}) {
   const next = { ...prev, ...updates };
   cameraState.set(id, next);
   return next;
-}
-
-function recordFrame(id, buffer, ts) {
-  const history = frameHistory.get(id) || [];
-  history.push({ buffer, ts });
-  if (history.length > REPLAY_FRAME_COUNT) {
-    history.splice(0, history.length - REPLAY_FRAME_COUNT);
-  }
-  frameHistory.set(id, history);
 }
 
 async function fetchSnapshot(camera) {
@@ -43,7 +36,7 @@ async function fetchSnapshot(camera) {
     const buffer = Buffer.from(arrayBuffer);
     const ts = Date.now();
     markState(id, { frame: buffer, ts, error: null, failures: 0 });
-    recordFrame(id, buffer, ts);
+    recordRoomCameraFrame(id, buffer, ts);
     events.emit('frame', { id, buffer, ts });
   } catch (err) {
     const failures = (state?.failures || 0) + 1;
@@ -62,7 +55,7 @@ function stopAll() {
     pollTimer = null;
   }
   cameraState.clear();
-  frameHistory.clear();
+  clearRoomCameraReplayFrames();
 }
 
 function startAll() {
@@ -84,20 +77,6 @@ function getState(id) {
   };
 }
 
-function getReplayFrames(id, count = REPLAY_FRAME_COUNT) {
-  const history = frameHistory.get(id) || [];
-  if (!history.length) return [];
-  return history.slice(Math.max(0, history.length - count));
-}
-
-function getReplayFrameDelayMs() {
-  return POLL_INTERVAL_MS;
-}
-
-function getReplayFrameCount() {
-  return REPLAY_FRAME_COUNT;
-}
-
 roomCameraEvents.on('update', () => {
   logger.info('Room cameras changed; restarting snapshot pollers');
   startAll();
@@ -108,7 +87,4 @@ startAll();
 module.exports = {
   roomCameraStreamEvents: events,
   getRoomCameraState: getState,
-  getRoomCameraFrames: getReplayFrames,
-  getRoomCameraReplayDelayMs: getReplayFrameDelayMs,
-  getRoomCameraReplayFrameCount: getReplayFrameCount,
 };

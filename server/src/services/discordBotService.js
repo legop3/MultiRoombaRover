@@ -6,11 +6,6 @@ const {
   EmbedBuilder,
   AttachmentBuilder,
 } = require('discord.js');
-const fsp = require('fs/promises');
-const os = require('os');
-const path = require('path');
-const { promisify } = require('util');
-const { execFile } = require('child_process');
 const logger = require('../globals/logger').child('discordBot');
 const io = require('../globals/io');
 const { loadConfig } = require('../helpers/configLoader');
@@ -19,11 +14,7 @@ const { getRoster, lockRover, rovers } = require('./roverManager');
 const { MODES, getMode, setMode } = require('./modeManager');
 const { sendExternalMessage } = require('./chatService');
 const { getRoomCameras, getRoomCamera } = require('./roomCameraService');
-const {
-  getRoomCameraFrames,
-  getRoomCameraReplayDelayMs,
-  getRoomCameraReplayFrameCount,
-} = require('./roomCameraSnapshotService');
+const { buildRoomCameraReplayVideo } = require('./roomCameraReplayService');
 const { getActiveDrivers } = require('./turnService');
 const { getNickname } = require('./nicknameService');
 const { tryTriggerReplay } = require('./replayService');
@@ -53,8 +44,6 @@ const client = new Client({
 
 const channelCache = new Map();
 let skippedFirstModeAnnouncement = false;
-const execFileAsync = promisify(execFile);
-
 function sanitizeMentions(text) {
   if (!text) return '';
   return String(text)
@@ -281,111 +270,6 @@ function resolveReplayCamera(query) {
   return { error: 'Camera not found', matches: [] };
 }
 
-async function buildReplayVideo({ cameraId = null } = {}) {
-  const cameras = cameraId ? [getRoomCamera(cameraId)].filter(Boolean) : getRoomCameras();
-  if (!cameras.length) {
-    throw new Error('No room cameras configured');
-  }
-  const frames = [];
-  cameras.forEach((camera) => {
-    const history = getRoomCameraFrames(camera.id, getRoomCameraReplayFrameCount());
-    history.forEach((entry) => {
-      frames.push({ camera, buffer: entry.buffer });
-    });
-  });
-  if (!frames.length) {
-    throw new Error('No camera frames available yet');
-  }
-  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rover-replay-'));
-  try {
-    const firstFrameByCamera = new Map();
-    for (let i = 0; i < frames.length; i += 1) {
-      const filename = `frame-${String(i + 1).padStart(4, '0')}.jpg`;
-      await fsp.writeFile(path.join(tmpDir, filename), frames[i].buffer);
-      const cameraId = frames[i].camera?.id;
-      if (cameraId && !firstFrameByCamera.has(cameraId)) {
-        firstFrameByCamera.set(cameraId, filename);
-      }
-    }
-    const outPath = path.join(tmpDir, 'replay.mp4');
-    const delayMs = getRoomCameraReplayDelayMs();
-    const fpsValue = 1000 / delayMs;
-    const fps = fpsValue.toFixed(3);
-    let maxWidth = 0;
-    let maxHeight = 0;
-    for (const filename of firstFrameByCamera.values()) {
-      try {
-        const { stdout } = await execFileAsync('ffprobe', [
-          '-v',
-          'error',
-          '-select_streams',
-          'v:0',
-          '-show_entries',
-          'stream=width,height',
-          '-of',
-          'csv=p=0',
-          path.join(tmpDir, filename),
-        ]);
-        const [widthRaw, heightRaw] = stdout.trim().split(',');
-        const width = Number(widthRaw);
-        const height = Number(heightRaw);
-        if (Number.isFinite(width) && Number.isFinite(height)) {
-          maxWidth = Math.max(maxWidth, width);
-          maxHeight = Math.max(maxHeight, height);
-        }
-      } catch (err) {
-        logger.warn('Failed to probe replay frame size', err.message);
-      }
-    }
-    const MAX_REPLAY_WIDTH = 1280;
-    const MAX_REPLAY_HEIGHT = 720;
-    let targetWidth = maxWidth || MAX_REPLAY_WIDTH;
-    let targetHeight = maxHeight || MAX_REPLAY_HEIGHT;
-    if (targetWidth > MAX_REPLAY_WIDTH || targetHeight > MAX_REPLAY_HEIGHT) {
-      const scale = Math.min(MAX_REPLAY_WIDTH / targetWidth, MAX_REPLAY_HEIGHT / targetHeight);
-      targetWidth = Math.max(2, Math.floor((targetWidth * scale) / 2) * 2);
-      targetHeight = Math.max(2, Math.floor((targetHeight * scale) / 2) * 2);
-    }
-    const sizeFilter = `scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
-    const maxBytes = Math.floor(9.5 * 1024 * 1024);
-    const durationSec = Math.max(1, frames.length / fpsValue);
-    const targetBitrateKbps = Math.max(300, Math.floor((maxBytes * 8) / durationSec / 1000));
-    const maxrateKbps = Math.floor(targetBitrateKbps * 1.1);
-    const bufsizeKbps = Math.floor(targetBitrateKbps * 2);
-    await execFileAsync('ffmpeg', [
-      '-y',
-      '-hide_banner',
-      '-loglevel',
-      'error',
-      '-framerate',
-      fps,
-      '-i',
-      'frame-%04d.jpg',
-      '-vf',
-      sizeFilter,
-      '-c:v',
-      'libx264',
-      '-b:v',
-      `${targetBitrateKbps}k`,
-      '-maxrate',
-      `${maxrateKbps}k`,
-      '-bufsize',
-      `${bufsizeKbps}k`,
-      '-pix_fmt',
-      'yuv420p',
-      outPath,
-    ], { cwd: tmpDir });
-    const buffer = await fsp.readFile(outPath);
-    return buffer;
-  } finally {
-    try {
-      await fsp.rm(tmpDir, { recursive: true, force: true });
-    } catch (err) {
-      logger.warn('Failed to cleanup replay temp dir', err.message);
-    }
-  }
-}
-
 function buildReplayCaption(requester, camera) {
   const requesterLabel = requester || 'unknown';
   const cameraLabel = camera ? `Camera: ${camera.name || camera.id}.` : null;
@@ -402,7 +286,7 @@ async function sendReplayToChannel(channelId, requester, cameraId = null) {
   if (!channelId) {
     throw new Error('Replay channel not configured');
   }
-  const buffer = await buildReplayVideo({ cameraId });
+  const buffer = await buildRoomCameraReplayVideo({ cameraId });
   const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
   const camera = cameraId ? getRoomCamera(cameraId) : null;
   const caption = buildReplayCaption(requester, camera);
@@ -445,7 +329,7 @@ async function handleReplayCommand(message, query) {
   const requester =
     message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
   try {
-    const buffer = await buildReplayVideo({ cameraId });
+    const buffer = await buildRoomCameraReplayVideo({ cameraId });
     const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
     const caption = buildReplayCaption(requester, resolved.camera || null);
     await message.reply({
