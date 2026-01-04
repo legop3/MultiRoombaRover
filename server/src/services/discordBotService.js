@@ -300,6 +300,24 @@ async function buildReplayVideo() {
   }
 }
 
+function buildReplayCaption(requester) {
+  const requesterLabel = requester || 'unknown';
+  return [
+    `Replay requested by ${requesterLabel}.`,
+    buildDriverCaption(),
+  ].join(' ');
+}
+
+async function sendReplayToChannel(channelId, requester) {
+  if (!channelId) {
+    throw new Error('Replay channel not configured');
+  }
+  const buffer = await buildReplayVideo();
+  const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
+  const caption = buildReplayCaption(requester);
+  await sendToChannel(channelId, caption, { files: [attachment] }, { parse: [] });
+}
+
 async function handleReplayCommand(message) {
   if (getMode() === MODES.LOCKDOWN) {
     await message.reply({
@@ -325,10 +343,7 @@ async function handleReplayCommand(message) {
   try {
     const buffer = await buildReplayVideo();
     const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
-    const caption = [
-      `Replay requested by ${requester}.`,
-      buildDriverCaption(),
-    ].join(' ');
+    const caption = buildReplayCaption(requester);
     await message.reply({
       content: sanitizeMentions(caption),
       files: [attachment],
@@ -700,6 +715,11 @@ function handleBusEvent(event) {
         embeds: [buildBatteryStatusEmbed(0x4caf50)],
       });
       updatePresence();
+      break;
+    case 'replay.requested':
+      sendReplayToChannel(payload?.channelId, payload?.requester).catch((err) => {
+        logger.warn('Replay send failed', err.message);
+      });
       break;
     default:
       break;
