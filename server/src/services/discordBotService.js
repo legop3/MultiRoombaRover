@@ -272,7 +272,6 @@ async function buildReplayGif() {
       await fsp.writeFile(path.join(tmpDir, filename), frames[i].buffer);
     }
     const outPath = path.join(tmpDir, 'replay.gif');
-    const palettePath = path.join(tmpDir, 'palette.png');
     const delayMs = getRoomCameraReplayDelayMs();
     const fps = (1000 / delayMs).toFixed(3);
     await execFileAsync('ffmpeg', [
@@ -284,23 +283,8 @@ async function buildReplayGif() {
       fps,
       '-i',
       'frame-%04d.jpg',
-      '-vf',
-      'palettegen',
-      palettePath,
-    ], { cwd: tmpDir });
-    await execFileAsync('ffmpeg', [
-      '-y',
-      '-hide_banner',
-      '-loglevel',
-      'error',
-      '-framerate',
-      fps,
-      '-i',
-      'frame-%04d.jpg',
-      '-i',
-      'palette.png',
-      '-lavfi',
-      'paletteuse=dither=bayer:bayer_scale=5',
+      '-filter_complex',
+      '[0:v]palettegen=stats_mode=diff[p];[0:v][p]paletteuse=dither=sierra2_4a',
       '-loop',
       '0',
       outPath,
