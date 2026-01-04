@@ -18,7 +18,7 @@ const { subscribe } = require('./eventBus');
 const { getRoster, lockRover, rovers } = require('./roverManager');
 const { MODES, getMode, setMode } = require('./modeManager');
 const { sendExternalMessage } = require('./chatService');
-const { getRoomCameras } = require('./roomCameraService');
+const { getRoomCameras, getRoomCamera } = require('./roomCameraService');
 const {
   getRoomCameraFrames,
   getRoomCameraReplayDelayMs,
@@ -199,7 +199,7 @@ function formatHelp() {
     '**Rover Bot Commands**',
     '`rs help` — show this help',
     '`rs status [id]` — show rover status (all or one)',
-    '`rs replay` — send room camera instant replay',
+    '`rs replay [camera]` — send room camera instant replay',
     '`rs lock <id>` — lock a rover',
     '`rs unlock <id>` — unlock a rover',
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
@@ -250,8 +250,39 @@ function buildDriverCaption() {
   return `Drivers: ${entries.join(', ')}`;
 }
 
-async function buildReplayVideo() {
+function normalizeCameraQuery(input) {
+  return String(input || '').trim().toLowerCase();
+}
+
+function resolveReplayCamera(query) {
+  const cleaned = normalizeCameraQuery(query);
+  if (!cleaned || cleaned === 'all' || cleaned === '*') return { camera: null };
   const cameras = getRoomCameras();
+  const direct = cameras.find(
+    (camera) =>
+      String(camera.id).toLowerCase() === cleaned ||
+      String(camera.name || '').toLowerCase() === cleaned,
+  );
+  if (direct) return { camera: direct };
+  const starts = cameras.filter(
+    (camera) =>
+      String(camera.id).toLowerCase().startsWith(cleaned) ||
+      String(camera.name || '').toLowerCase().startsWith(cleaned),
+  );
+  if (starts.length === 1) return { camera: starts[0] };
+  if (starts.length > 1) return { error: 'Ambiguous camera name', matches: starts };
+  const includes = cameras.filter(
+    (camera) =>
+      String(camera.id).toLowerCase().includes(cleaned) ||
+      String(camera.name || '').toLowerCase().includes(cleaned),
+  );
+  if (includes.length === 1) return { camera: includes[0] };
+  if (includes.length > 1) return { error: 'Ambiguous camera name', matches: includes };
+  return { error: 'Camera not found', matches: [] };
+}
+
+async function buildReplayVideo({ cameraId = null } = {}) {
+  const cameras = cameraId ? [getRoomCamera(cameraId)].filter(Boolean) : getRoomCameras();
   if (!cameras.length) {
     throw new Error('No room cameras configured');
   }
@@ -300,25 +331,30 @@ async function buildReplayVideo() {
   }
 }
 
-function buildReplayCaption(requester) {
+function buildReplayCaption(requester, camera) {
   const requesterLabel = requester || 'unknown';
+  const cameraLabel = camera ? `Camera: ${camera.name || camera.id}.` : null;
   return [
     `Replay requested by ${requesterLabel}.`,
+    cameraLabel,
     buildDriverCaption(),
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
-async function sendReplayToChannel(channelId, requester) {
+async function sendReplayToChannel(channelId, requester, cameraId = null) {
   if (!channelId) {
     throw new Error('Replay channel not configured');
   }
-  const buffer = await buildReplayVideo();
+  const buffer = await buildReplayVideo({ cameraId });
   const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
-  const caption = buildReplayCaption(requester);
+  const camera = cameraId ? getRoomCamera(cameraId) : null;
+  const caption = buildReplayCaption(requester, camera);
   await sendToChannel(channelId, caption, { files: [attachment] }, { parse: [] });
 }
 
-async function handleReplayCommand(message) {
+async function handleReplayCommand(message, query) {
   if (getMode() === MODES.LOCKDOWN) {
     await message.reply({
       content: 'Replay is disabled while the server is in lockdown.',
@@ -338,12 +374,25 @@ async function handleReplayCommand(message) {
     });
     return;
   }
+  const resolved = resolveReplayCamera(query);
+  if (resolved?.error) {
+    const matches = resolved.matches || [];
+    const list = matches.length
+      ? `Matches: ${matches.map((cam) => cam.name || cam.id).join(', ')}`
+      : 'No matching cameras found.';
+    await message.reply({
+      content: sanitizeMentions(`${resolved.error}. ${list}`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+  const cameraId = resolved.camera?.id || null;
   const requester =
     message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
   try {
-    const buffer = await buildReplayVideo();
+    const buffer = await buildReplayVideo({ cameraId });
     const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
-    const caption = buildReplayCaption(requester);
+    const caption = buildReplayCaption(requester, resolved.camera || null);
     await message.reply({
       content: sanitizeMentions(caption),
       files: [attachment],
@@ -428,7 +477,7 @@ async function handleCommand(message) {
       await handleStatusCommand(message, tokens[0]);
       break;
     case 'replay':
-      await handleReplayCommand(message);
+      await handleReplayCommand(message, tokens.join(' '));
       break;
     case 'lock':
       await handleLockCommand(message, tokens[0], true);
@@ -717,7 +766,7 @@ function handleBusEvent(event) {
       updatePresence();
       break;
     case 'replay.requested':
-      sendReplayToChannel(payload?.channelId, payload?.requester).catch((err) => {
+      sendReplayToChannel(payload?.channelId, payload?.requester, payload?.cameraId || null).catch((err) => {
         logger.warn('Replay send failed', err.message);
       });
       break;

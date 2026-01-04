@@ -5,6 +5,7 @@ const { publishEvent } = require('./eventBus');
 const { tryTriggerReplay } = require('./replayService');
 const { getNickname } = require('./nicknameService');
 const { loadConfig } = require('../helpers/configLoader');
+const { getRoomCamera } = require('./roomCameraService');
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
@@ -24,6 +25,11 @@ io.on('connection', (socket) => {
       cb({ error: 'Replay channel not configured', state: null });
       return;
     }
+    const requestedCameraId = payload?.cameraId ? String(payload.cameraId) : null;
+    if (requestedCameraId && !getRoomCamera(requestedCameraId)) {
+      cb({ error: 'Unknown camera', state: null });
+      return;
+    }
     const requester = buildRequesterLabel(socket);
     const attempt = tryTriggerReplay({ by: { source: 'web', requester } });
     if (!attempt.ok) {
@@ -36,6 +42,7 @@ io.on('connection', (socket) => {
       payload: {
         channelId,
         requester,
+        cameraId: requestedCameraId,
         requestedBy: { socketId: socket.id },
       },
     });

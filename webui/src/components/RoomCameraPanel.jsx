@@ -33,12 +33,17 @@ export default function RoomCameraPanel({
   const cameras = session?.roomCameras || [];
   const feedMap = useRoomCameraSnapshots(cameras.map((camera) => ({ id: camera.id })));
   const { value: orientationSettings, save: saveOrientationSettings } = useSettingsNamespace('roomCameraPanels', {});
+  const { value: replaySettings, save: saveReplaySettings } = useSettingsNamespace('roomCameraReplay', {});
   const [orientation, setOrientation] = useState(() =>
     normalizeOrientation(
       panelId ? orientationSettings?.[panelId] : defaultOrientation,
       'horizontal',
     ),
   );
+  const [selectedReplayCamera, setSelectedReplayCamera] = useState(() => {
+    if (!panelId) return 'all';
+    return replaySettings?.[panelId] || 'all';
+  });
 
   useEffect(() => {
     if (!panelId) return;
@@ -47,6 +52,12 @@ export default function RoomCameraPanel({
     setOrientation(normalizeOrientation(stored, 'horizontal'));
     // only respond to changes for this panel id
   }, [panelId, orientationSettings?.[panelId]]);
+  useEffect(() => {
+    if (!panelId) return;
+    const stored = replaySettings?.[panelId];
+    if (!stored) return;
+    setSelectedReplayCamera(stored);
+  }, [panelId, replaySettings?.[panelId]]);
   const effectiveOrientation = forcedOrientation
     ? normalizeOrientation(forcedOrientation, 'horizontal')
     : orientation;
@@ -82,11 +93,19 @@ export default function RoomCameraPanel({
     setReplayError(null);
     setReplayBusy(true);
     try {
-      await triggerReplay();
+      const cameraId = selectedReplayCamera === 'all' ? null : selectedReplayCamera;
+      await triggerReplay(cameraId);
     } catch (err) {
       setReplayError(err.message);
     } finally {
       setReplayBusy(false);
+    }
+  };
+  const handleReplayCameraChange = (event) => {
+    const value = event.target.value;
+    setSelectedReplayCamera(value);
+    if (panelId) {
+      saveReplaySettings((current) => ({ ...(current || {}), [panelId]: value }));
     }
   };
   const applyOrientation = (next) => {
@@ -109,6 +128,19 @@ export default function RoomCameraPanel({
             <span className="text-xs text-slate-500">{cameras.length}</span>
           </div>
           <div className="flex flex-wrap items-center gap-1 text-xs">
+            <select
+              className="rounded border border-slate-700 bg-black/40 px-1 py-0.5 text-slate-200"
+              value={selectedReplayCamera}
+              onChange={handleReplayCameraChange}
+              aria-label="Replay camera"
+            >
+              <option value="all">All cameras</option>
+              {cameras.map((camera) => (
+                <option key={camera.id} value={camera.id}>
+                  {camera.name || camera.id}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               className={`rounded border px-1.5 py-0.5 ${

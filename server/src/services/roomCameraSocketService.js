@@ -7,6 +7,7 @@ const { roomCameraStreamEvents, getRoomCameraState } = require('./roomCameraSnap
 
 const SUBSCRIBE_LIMIT = 50;
 const SUBSCRIBE_WINDOW_MS = 10000;
+const STREAM_INTERVAL_MS = 800;
 
 function passesMode(socket) {
   const mode = getMode();
@@ -27,6 +28,7 @@ function canViewRoomCamera(socket) {
 const cameraSubscribers = new Map(); // id -> Set(socketId)
 const socketSubscriptions = new Map(); // socketId -> Set(id)
 const subscribeBuckets = new Map(); // socketId -> { start, count }
+const lastSentBySocket = new Map(); // socketId -> Map(cameraId -> ts)
 
 function addSubscription(socket, cameraId) {
   if (!cameraSubscribers.has(cameraId)) {
@@ -88,6 +90,17 @@ roomCameraStreamEvents.on('frame', ({ id, buffer, ts }) => {
   bucket.forEach((socketId) => {
     const socket = io.sockets.sockets.get(socketId);
     if (!socket) return;
+    let lastMap = lastSentBySocket.get(socketId);
+    if (!lastMap) {
+      lastMap = new Map();
+      lastSentBySocket.set(socketId, lastMap);
+    }
+    const lastSent = lastMap.get(id) || 0;
+    const now = ts || Date.now();
+    if (now - lastSent < STREAM_INTERVAL_MS) {
+      return;
+    }
+    lastMap.set(id, now);
     sendFrame(socket, id, { ts }, buffer);
   });
 });
@@ -149,5 +162,6 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     removeAllSubscriptions(socket.id);
     subscribeBuckets.delete(socket.id);
+    lastSentBySocket.delete(socket.id);
   });
 });
