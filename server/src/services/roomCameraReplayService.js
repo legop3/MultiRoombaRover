@@ -196,10 +196,14 @@ async function buildReplayVideo({ cameraId = null } = {}) {
       const y = Math.floor(i / layout.cols) * tileHeight;
       layoutParts.push(`${x}_${y}`);
     }
-    filterParts.push(
-      `${cameraEntries.map((_, i) => `[v${i}]`).join('')}` +
-        `xstack=inputs=${cameraEntries.length}:layout=${layoutParts.join('|')}:fill=black[v]`,
-    );
+    if (cameraEntries.length === 1) {
+      filterParts.push('[v0]null[v]');
+    } else {
+      filterParts.push(
+        `${cameraEntries.map((_, i) => `[v${i}]`).join('')}` +
+          `xstack=inputs=${cameraEntries.length}:layout=${layoutParts.join('|')}:fill=black[v]`,
+      );
+    }
 
     const outPath = path.join(tmpDir, 'replay.mp4');
     await execFileAsync('ffmpeg', [
