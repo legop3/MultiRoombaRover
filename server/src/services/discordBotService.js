@@ -265,13 +265,15 @@ async function handleCommand(message) {
   if (message.author.bot) return;
   const content = (message.content || '').trim();
   if (!content.toLowerCase().startsWith('rs')) return;
-  if (!isAdminUser(message.author.id)) {
-    return; // ignore non-admins
-  }
 
   const tokens = content.split(/\s+/);
   tokens.shift(); // remove prefix
   const action = (tokens.shift() || '').toLowerCase();
+  const isAdmin = isAdminUser(message.author.id);
+
+  if (!isAdmin && action !== '' && action !== 'status' && action !== 'help') {
+    return; // ignore non-admins for privileged commands
+  }
 
   switch (action) {
     case '':
