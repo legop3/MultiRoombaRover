@@ -9,6 +9,7 @@ const { getActiveDrivers, getTurnQueues, turnEvents } = require('./turnService')
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('./homeAssistantService');
 const { getNickname, nicknameEvents } = require('./nicknameService');
+const { getReplayState, replayEvents } = require('./replayService');
 const { loadConfig } = require('../helpers/configLoader');
 
 const discordInvite = loadConfig().discord?.invite || null;
@@ -45,6 +46,7 @@ function buildSession(socket) {
     turnQueues: getTurnQueues(),
     roomCameras: getRoomCameras(),
     homeAssistant: getHomeAssistantState(),
+    replay: getReplayState(),
     users,
     discord: {
       invite: discordInvite,
@@ -153,6 +155,11 @@ homeAssistantEvents.on('update', () => {
 
 homeAssistantEvents.on('status', () => {
   logger.info('Home Assistant status change; syncing all clients');
+  syncAll();
+});
+
+replayEvents.on('update', () => {
+  logger.info('Replay cooldown updated; syncing all clients');
   syncAll();
 });
 

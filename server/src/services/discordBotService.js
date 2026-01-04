@@ -4,13 +4,29 @@ const {
   Partials,
   ActivityType,
   EmbedBuilder,
+  AttachmentBuilder,
 } = require('discord.js');
+const fsp = require('fs/promises');
+const os = require('os');
+const path = require('path');
+const { promisify } = require('util');
+const { execFile } = require('child_process');
 const logger = require('../globals/logger').child('discordBot');
+const io = require('../globals/io');
 const { loadConfig } = require('../helpers/configLoader');
 const { subscribe } = require('./eventBus');
 const { getRoster, lockRover, rovers } = require('./roverManager');
 const { MODES, getMode, setMode } = require('./modeManager');
 const { sendExternalMessage } = require('./chatService');
+const { getRoomCameras } = require('./roomCameraService');
+const {
+  getRoomCameraFrames,
+  getRoomCameraReplayDelayMs,
+  getRoomCameraReplayFrameCount,
+} = require('./roomCameraSnapshotService');
+const { getActiveDrivers } = require('./turnService');
+const { getNickname } = require('./nicknameService');
+const { tryTriggerReplay } = require('./replayService');
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
@@ -37,6 +53,7 @@ const client = new Client({
 
 const channelCache = new Map();
 let skippedFirstModeAnnouncement = false;
+const execFileAsync = promisify(execFile);
 
 function sanitizeMentions(text) {
   if (!text) return '';
@@ -182,6 +199,7 @@ function formatHelp() {
     '**Rover Bot Commands**',
     '`rs help` — show this help',
     '`rs status [id]` — show rover status (all or one)',
+    '`rs replay` — send room camera instant replay',
     '`rs lock <id>` — lock a rover',
     '`rs unlock <id>` — unlock a rover',
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
@@ -214,6 +232,115 @@ async function handleStatusCommand(message, roverId) {
     embeds: [embed],
     allowedMentions: { parse: [], repliedUser: false },
   });
+}
+
+function buildDriverCaption() {
+  const activeDrivers = getActiveDrivers();
+  const roster = Array.from(rovers.values());
+  if (!roster.length) return 'Drivers: no rovers online.';
+  const entries = roster.map((record) => {
+    const driverId = activeDrivers[record.id];
+    if (!driverId) {
+      return `${record.meta?.name || record.id}: none`;
+    }
+    const socket = io.sockets.sockets.get(driverId);
+    const nickname = getNickname(socket) || socket?.data?.user?.username || driverId;
+    return `${record.meta?.name || record.id}: ${nickname}`;
+  });
+  return `Drivers: ${entries.join(', ')}`;
+}
+
+async function buildReplayGif() {
+  const cameras = getRoomCameras();
+  if (!cameras.length) {
+    throw new Error('No room cameras configured');
+  }
+  const frames = [];
+  cameras.forEach((camera) => {
+    const history = getRoomCameraFrames(camera.id, getRoomCameraReplayFrameCount());
+    history.forEach((entry) => {
+      frames.push({ camera, buffer: entry.buffer });
+    });
+  });
+  if (!frames.length) {
+    throw new Error('No camera frames available yet');
+  }
+  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rover-replay-'));
+  try {
+    for (let i = 0; i < frames.length; i += 1) {
+      const filename = `frame-${String(i + 1).padStart(4, '0')}.jpg`;
+      await fsp.writeFile(path.join(tmpDir, filename), frames[i].buffer);
+    }
+    const outPath = path.join(tmpDir, 'replay.gif');
+    const delayMs = getRoomCameraReplayDelayMs();
+    const fps = (1000 / delayMs).toFixed(3);
+    await execFileAsync('ffmpeg', [
+      '-y',
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-framerate',
+      fps,
+      '-i',
+      'frame-%04d.jpg',
+      '-vf',
+      'scale=640:-1:flags=lanczos',
+      '-loop',
+      '0',
+      outPath,
+    ], { cwd: tmpDir });
+    const buffer = await fsp.readFile(outPath);
+    return buffer;
+  } finally {
+    try {
+      await fsp.rm(tmpDir, { recursive: true, force: true });
+    } catch (err) {
+      logger.warn('Failed to cleanup replay temp dir', err.message);
+    }
+  }
+}
+
+async function handleReplayCommand(message) {
+  if (getMode() === MODES.LOCKDOWN) {
+    await message.reply({
+      content: 'Replay is disabled while the server is in lockdown.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+  const attempt = tryTriggerReplay({
+    by: message.author?.id || null,
+    source: 'discord',
+  });
+  if (!attempt.ok) {
+    const remaining = Math.ceil(attempt.remainingMs / 1000);
+    await message.reply({
+      content: `Replay cooldown active. Try again in ${remaining}s.`,
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+  const requester =
+    message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
+  try {
+    const buffer = await buildReplayGif();
+    const attachment = new AttachmentBuilder(buffer, { name: 'replay.gif' });
+    const caption = [
+      `Replay requested by ${requester}.`,
+      buildDriverCaption(),
+    ].join(' ');
+    await message.reply({
+      content: sanitizeMentions(caption),
+      files: [attachment],
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+  } catch (err) {
+    logger.warn('Replay capture failed', err.message);
+    await message.reply({
+      content: sanitizeMentions(`Replay failed: ${err.message}`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+  }
 }
 
 async function handleLockCommand(message, roverId, locked) {
@@ -271,7 +398,7 @@ async function handleCommand(message) {
   const action = (tokens.shift() || '').toLowerCase();
   const isAdmin = isAdminUser(message.author.id);
 
-  if (!isAdmin && action !== '' && action !== 'status' && action !== 'help') {
+  if (!isAdmin && action !== '' && action !== 'status' && action !== 'help' && action !== 'replay') {
     return; // ignore non-admins for privileged commands
   }
 
@@ -284,6 +411,9 @@ async function handleCommand(message) {
       break;
     case 'status':
       await handleStatusCommand(message, tokens[0]);
+      break;
+    case 'replay':
+      await handleReplayCommand(message);
       break;
     case 'lock':
       await handleLockCommand(message, tokens[0], true);
