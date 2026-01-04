@@ -250,7 +250,7 @@ function buildDriverCaption() {
   return `Drivers: ${entries.join(', ')}`;
 }
 
-async function buildReplayGif() {
+async function buildReplayVideo() {
   const cameras = getRoomCameras();
   if (!cameras.length) {
     throw new Error('No room cameras configured');
@@ -271,7 +271,7 @@ async function buildReplayGif() {
       const filename = `frame-${String(i + 1).padStart(4, '0')}.jpg`;
       await fsp.writeFile(path.join(tmpDir, filename), frames[i].buffer);
     }
-    const outPath = path.join(tmpDir, 'replay.gif');
+    const outPath = path.join(tmpDir, 'replay.mp4');
     const delayMs = getRoomCameraReplayDelayMs();
     const fps = (1000 / delayMs).toFixed(3);
     await execFileAsync('ffmpeg', [
@@ -283,10 +283,10 @@ async function buildReplayGif() {
       fps,
       '-i',
       'frame-%04d.jpg',
-      '-filter_complex',
-      '[0:v]palettegen=stats_mode=diff[p];[0:v][p]paletteuse=dither=sierra2_4a',
-      '-loop',
-      '0',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
       outPath,
     ], { cwd: tmpDir });
     const buffer = await fsp.readFile(outPath);
@@ -323,8 +323,8 @@ async function handleReplayCommand(message) {
   const requester =
     message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
   try {
-    const buffer = await buildReplayGif();
-    const attachment = new AttachmentBuilder(buffer, { name: 'replay.gif' });
+    const buffer = await buildReplayVideo();
+    const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
     const caption = [
       `Replay requested by ${requester}.`,
       buildDriverCaption(),
