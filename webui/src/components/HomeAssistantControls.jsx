@@ -37,7 +37,7 @@ function EntityRow({ entity, connected, onToggle }) {
       <div className="min-w-0">
         <div className="flex items-center gap-1 text-sm">
           <span className="truncate font-semibold text-white">{entity.name || entity.id}</span>
-          <StatusBadge label={entity.type === 'light' ? 'Light' : 'Switch'} />
+          {/* <StatusBadge label={entity.type === 'light' ? 'Light' : 'Switch'} /> */}
         </div>
         <div className="flex items-center gap-1 text-xs text-slate-400">
           <StatusBadge label={statusLabel} tone={statusTone} />
