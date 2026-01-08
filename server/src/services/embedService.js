@@ -79,7 +79,7 @@ function buildEmbedCopy(state, camera) {
   } else if (roversOnline === 0) {
     title = 'Rovers offline - check back soon';
   } else if (driverCount > 0) {
-    title = 'Rover action live - take the controls';
+    title = 'Rovers in use - drive a rover';
   } else if (mode === 'turns') {
     title = 'Controls open - jump in';
   } else {

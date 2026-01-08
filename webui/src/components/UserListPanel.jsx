@@ -132,12 +132,12 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
       {!hideNicknameForm && (
         <div className="space-y-0.5">
           <div className="flex items-stretch gap-0.5">
-            <div className="flex min-w-0 flex-1">
+            <div className="flex w-1/2 min-w-0">
               <div className="surface flex w-full items-center">
                 <NicknameForm />
               </div>
             </div>
-            <div className="flex w-1/2 min-w-[8rem] flex-col gap-0.5">
+            <div className="flex w-1/2 flex-col gap-0.5">
               <DiscordInviteButton />
               <KoFiButton />
             </div>

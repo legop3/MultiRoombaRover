@@ -31,7 +31,7 @@ export default function NicknameForm({ compact = false }) {
   }
 
   return (
-    <form className="flex gap-0.5" onSubmit={handleSave}>
+    <form className="flex w-full gap-0.5" onSubmit={handleSave}>
       <input
         className="field-input flex-1"
         value={nicknameInput}
