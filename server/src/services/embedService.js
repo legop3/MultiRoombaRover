@@ -65,11 +65,10 @@ function sumQueueCounts(turnQueues = {}) {
 function buildEmbedCopy(state, camera) {
   const roversOnline = state?.rovers?.length || 0;
   const driverCount = Object.keys(state?.activeDrivers || {}).length;
-  const queueCount = sumQueueCounts(state?.turnQueues || {});
   const mode = state?.mode || 'open';
   const modeLabel = {
     open: 'open drive',
-    turns: 'queue mode',
+    turns: 'turns mode',
     admin: 'admin mode',
     lockdown: 'locked',
   }[mode] || mode;
@@ -77,16 +76,12 @@ function buildEmbedCopy(state, camera) {
   let title = 'Multi Roomba Rover';
   if (mode === 'lockdown') {
     title = 'Private mode is on';
-  } else if (driverCount > 0) {
-    title = 'Rover action live - take the controls';
-  } else if (mode === 'turns' && queueCount > 0) {
-    title = 'Queue moving - claim a turn';
-  } else if (mode === 'turns') {
-    title = 'Queue open - jump in';
   } else if (roversOnline === 0) {
     title = 'Rovers offline - check back soon';
   } else if (driverCount > 0) {
     title = 'Rover action live - take the controls';
+  } else if (mode === 'turns') {
+    title = 'Controls open - jump in';
   } else {
     title = 'Controls open - drive a rover';
   }
@@ -98,9 +93,7 @@ function buildEmbedCopy(state, camera) {
   } else {
     descriptionParts.push('no active drivers');
   }
-  if (mode === 'turns') {
-    descriptionParts.push(`${queueCount} in queue`);
-  } else if (mode === 'lockdown') {
+  if (mode === 'lockdown') {
     descriptionParts.push('privacy mode');
   } else {
     descriptionParts.push(modeLabel);
@@ -111,9 +104,7 @@ function buildEmbedCopy(state, camera) {
     `${roversOnline} online`,
     driverCount > 0 ? `${driverCount} driving` : 'no drivers',
   ];
-  if (mode === 'turns') {
-    statsParts.push(`${queueCount} in queue`);
-  } else if (mode === 'lockdown') {
+  if (mode === 'lockdown') {
     statsParts.push('privacy mode');
   } else {
     statsParts.push(modeLabel);
@@ -125,7 +116,7 @@ function buildEmbedCopy(state, camera) {
     description,
     subtitle: 'Control a live rover from your browser',
     stats: statsParts.join(' | '),
-    cameraLabel: mode === 'lockdown' ? 'Room cameras hidden' : `Room camera: ${cameraLabel}`,
+    cameraLabel: mode === 'lockdown' ? 'Room cams hidden' : `Room cam: ${cameraLabel}`,
   };
 }
 
