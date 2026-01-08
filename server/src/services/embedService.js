@@ -7,6 +7,7 @@ const roverManager = require('./roverManager');
 const { getActiveDrivers, getTurnQueues } = require('./turnService');
 const { getRoomCameras } = require('./roomCameraService');
 const { getRoomCameraState } = require('./roomCameraSnapshotService');
+const { loadConfig } = require('../helpers/configLoader');
 
 const INDEX_HTML_PATH = path.join(__dirname, '..', '..', 'public', 'index.html');
 const BITMAP_PATH = path.join(__dirname, '..', '..', 'public', 'bitmap.png');
@@ -143,7 +144,7 @@ function buildMetaTags({ title, description, imageUrl, pageUrl }) {
     `<meta property="og:image" content="${safeImage}" />`,
     '<meta property="og:image:width" content="1200" />',
     '<meta property="og:image:height" content="630" />',
-    '<meta property="og:site_name" content="Multi Roomba Rover" />',
+    `<meta property="og:site_name" content="${safeTitle}" />`,
     '<meta name="twitter:card" content="summary_large_image" />',
     `<meta name="twitter:title" content="${safeTitle}" />`,
     `<meta name="twitter:description" content="${safeDescription}" />`,
@@ -160,7 +161,8 @@ async function renderIndexHtml(req) {
     activeDrivers: getActiveDrivers(),
     turnQueues: getTurnQueues(),
   };
-  const pageTitle = 'Multi Roomba Rover';
+  const config = loadConfig();
+  const pageTitle = config?.site?.title || 'Roomba Rover';
   const camera = getPrimaryRoomCamera();
   const copy = buildEmbedCopy(state, camera);
   const cacheBust = Math.floor(Date.now() / (5 * 60 * 1000));
