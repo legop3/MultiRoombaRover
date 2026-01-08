@@ -137,13 +137,3 @@ func (s *CameraServo) pulseToAngle(pulse int) float64 {
 	}
 	return s.cfg.MinAngle + norm*(s.cfg.MaxAngle-s.cfg.MinAngle)
 }
-
-func clampInt(value, min, max int) int {
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
-	return value
-}

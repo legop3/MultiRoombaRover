@@ -4,6 +4,7 @@ import { useSettingsNamespace } from '../settings/index.js';
 import { useSocket } from '../context/SocketContext.jsx';
 import NicknameForm from './NicknameForm.jsx';
 import DiscordInviteButton from './DiscordInviteButton.jsx';
+import KoFiButton from './KoFiButton.jsx';
 
 function roleColors(role) {
   switch (role) {
@@ -129,13 +130,17 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
       className={`panel-section space-y-0.5 text-base ${fillHeight ? 'flex h-full min-h-0 flex-col overflow-hidden' : ''} ${className}`}
     >
       {!hideNicknameForm && (
-        <div className="space-y-0.5 flex">
-          <div className='w-1/2'>
-          <NicknameForm />
-
-          </div>
-          <div className='w-1/2'>
-            <DiscordInviteButton />
+        <div className="space-y-0.5">
+          <div className="flex items-stretch gap-0.5">
+            <div className="flex min-w-0 flex-1">
+              <div className="surface flex w-full items-center">
+                <NicknameForm />
+              </div>
+            </div>
+            <div className="flex w-1/2 min-w-[8rem] flex-col gap-0.5">
+              <DiscordInviteButton />
+              <KoFiButton />
+            </div>
           </div>
           {!canSetNickname && <p className="text-xs text-slate-500">Spectators cannot set nicknames.</p>}
         </div>

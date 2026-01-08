@@ -13,7 +13,9 @@ const { getReplayState, replayEvents } = require('./replayService');
 const { loadConfig } = require('../helpers/configLoader');
 
 const discordInvite = loadConfig().discord?.invite || null;
+const kofiLink = loadConfig().kofi?.link || null;
 logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configured');
+logger.info('Ko-fi link loaded:', kofiLink ? 'present' : 'not configured');
 
 const ACTIVITY_SYNC_COOLDOWN_MS = 3000;
 let lastActivitySync = 0;
@@ -50,6 +52,9 @@ function buildSession(socket) {
     users,
     discord: {
       invite: discordInvite,
+    },
+    kofi: {
+      link: kofiLink,
     },
   };
 }

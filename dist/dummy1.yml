@@ -1,6 +1,6 @@
 #configuration for roverd
 name: dummy1
-serverUrl: ws://192.168.0.84:8080/rover
+serverUrl: ws://127.0.0.1:8080/rover
 serial:
   device: /dev/ttyS0
   baud: 115200
@@ -18,3 +18,5 @@ media:
   service: mediamtx.service
   healthUrl: http://127.0.0.1:9997/v3/paths/list
   healthInterval: 30s
+nightVision:
+  enabled: false

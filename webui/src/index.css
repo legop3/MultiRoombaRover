@@ -115,6 +115,18 @@ body {
       background-position: 0% 50%;
     }
   }
+
+  .kofi-animate-bg {
+    background: linear-gradient(
+      270deg,
+      #ff5f5f,
+      #ff9f43,
+      #ffd166,
+      #ff5f5f
+    );
+    background-size: 800% 800%;
+    animation: rainbowBG 240s ease infinite;
+  }
 }
 
 @layer utilities {
