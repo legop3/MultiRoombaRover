@@ -192,6 +192,7 @@ function formatHelp() {
     '`rs lock <id>` — lock a rover',
     '`rs unlock <id>` — unlock a rover',
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
+    '`ts` — show time status',
   ].join('\n');
 }
 
@@ -394,7 +395,12 @@ async function handleModeCommand(message, mode) {
 async function handleCommand(message) {
   if (message.author.bot) return;
   const content = (message.content || '').trim();
-  if (!content.toLowerCase().startsWith('rs')) return;
+  const lower = content.toLowerCase();
+  if (lower === 'ts' || lower.startsWith('ts ')) {
+    await handleTimeStatusCommand(message);
+    return;
+  }
+  if (!lower.startsWith('rs')) return;
 
   const tokens = content.split(/\s+/);
   tokens.shift(); // remove prefix
@@ -447,7 +453,8 @@ async function handleBridgeInbound(message) {
   if (String(message.channelId) !== String(bridgeChannelId)) return;
   if (message.author.bot) return;
   const content = (message.content || '').trim();
-  if (content.toLowerCase().startsWith('rs')) return; // don't echo commands
+  const lower = content.toLowerCase();
+  if (lower.startsWith('rs') || lower === 'ts' || lower.startsWith('ts ')) return; // don't echo commands
   const nickname =
     message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
   const role = isAdminUser(message.author.id) ? 'admin' : 'user';
@@ -468,6 +475,72 @@ function buildEmbed({ title, description, color }) {
   if (description) embed.setDescription(description);
   embed.setTimestamp(new Date());
   return embed;
+}
+
+function getServerTimezone() {
+  return config.timezone || config.server?.timezone || process.env.TZ || 'America/New_York';
+}
+
+function formatTimeInZone(date, timeZone) {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    return formatter.format(date);
+  } catch (err) {
+    return 'n/a';
+  }
+}
+
+function buildTimeStatusEmbed() {
+  const serverTimezone = getServerTimezone();
+  const now = new Date();
+  const zones = [
+    { label: 'UTC', zone: 'UTC' },
+    { label: 'US Pacific', zone: 'America/Los_Angeles' },
+    { label: 'US Mountain', zone: 'America/Denver' },
+    { label: 'US Central', zone: 'America/Chicago' },
+    { label: 'US Eastern', zone: 'America/New_York' },
+    { label: 'Europe London', zone: 'Europe/London' },
+    { label: 'Europe Berlin', zone: 'Europe/Berlin' },
+    { label: 'Asia Kolkata', zone: 'Asia/Kolkata' },
+    { label: 'Asia Shanghai', zone: 'Asia/Shanghai' },
+    { label: 'Asia Tokyo', zone: 'Asia/Tokyo' },
+    { label: 'Australia Sydney', zone: 'Australia/Sydney' },
+  ];
+
+  const entries = zones.map((entry) => {
+    const time = formatTimeInZone(now, entry.zone);
+    const highlight =
+      String(entry.zone).toLowerCase() === String(serverTimezone).toLowerCase()
+        ? ' **(server local timezone)**'
+        : '';
+    return `${entry.label} — ${time}${highlight}`;
+  });
+
+  if (!zones.some((entry) => String(entry.zone).toLowerCase() === String(serverTimezone).toLowerCase())) {
+    const time = formatTimeInZone(now, serverTimezone);
+    entries.push(`Server Local — ${time} **(server local timezone)**`);
+  }
+
+  const embed = buildEmbed({
+    title: 'Time Status',
+    description: entries.join('\n'),
+    color: 0x2196f3,
+  });
+  embed.setFooter({ text: `Server local timezone: ${serverTimezone}` });
+  return embed;
+}
+
+async function handleTimeStatusCommand(message) {
+  const embed = buildTimeStatusEmbed();
+  await message.reply({
+    embeds: [embed],
+    allowedMentions: { parse: [], repliedUser: false },
+  });
 }
 
 function buildBatteryStatusEmbed(color, records = null) {
