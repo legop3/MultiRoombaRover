@@ -501,11 +501,19 @@ function HudOverlay({
   }, []);
 
   const pulse = frame?.receivedAt ? now - frame.receivedAt < 200 : false;
+  const isMobile = mobileHud;
+  const statusTextClass = isMobile ? 'text-[0.55rem]' : 'text-[0.65rem]';
+  const statusPadClass = isMobile ? 'px-0.5 py-0.25' : 'px-1 py-0.5';
+  const labelPadClass = isMobile ? 'px-0.5 py-0.25' : 'px-0.5 py-0.5';
+  const labelTextClass = isMobile ? 'text-[0.7rem]' : 'text-[0.8rem]';
+  const mapSize = isMobile ? '240px' : '240px';
+  const mapScale = isMobile ? 0.45 : 0.7;
+  const mapOpacity = isMobile ? 0.85 : 0.7;
   const mapStyle = {
-    width: '240px',
-    height: '240px',
-    opacity: 0.7,
-    transform: `scale(${mobileHud ? 0.55 : 0.7})`,
+    width: mapSize,
+    height: mapSize,
+    opacity: mapOpacity,
+    transform: `scale(${mapScale})`,
     transformOrigin: mapPosition === 'bottom-left' ? 'bottom left' : 'top right',
     ...(mapPosition === 'bottom-left'
       ? { left: '0.25rem', bottom: '0.25rem' }
@@ -521,19 +529,27 @@ function HudOverlay({
     ];
     return (
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="absolute left-1 top-1 bg-black/70 px-1 py-0.5 text-[0.65rem] font-medium text-slate-100">
+        <div
+          className={`absolute left-1 top-1 bg-black/70 font-medium text-slate-100 ${statusTextClass} ${statusPadClass}`}
+        >
           <span>Status: {status}</span>
           {audioStatus ? <div>Audio: {audioStatus}</div> : null}
         </div>
         {songNote != null ? (
-          <div className="absolute right-1 top-1 rounded bg-black/70 px-1 py-0.25 text-[0.65rem] font-semibold text-emerald-200">
+          <div
+            className={`absolute right-1 top-1 rounded bg-black/70 font-semibold text-emerald-200 ${statusTextClass} ${statusPadClass}`}
+          >
             Song {formatNoteLabel(songNote)} <span className="text-slate-400">({songNote})</span>
           </div>
         ) : null}
 
-        <div className="absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.35 bg-black/70 px-1 py-0.35 text-[0.65rem] text-slate-100">
+        <div
+          className={`absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.35 bg-black/70 text-slate-100 ${statusTextClass} ${statusPadClass}`}
+        >
           <div className="space-y-0.1 leading-tight">
-            <span className="text-[0.6rem] uppercase tracking-wide text-slate-400">Telemetry</span>
+            <span className={`${isMobile ? 'text-[0.55rem]' : 'text-[0.6rem]'} uppercase tracking-wide text-slate-400`}>
+              Telemetry
+            </span>
             {telemetryEntries.map(([labelText, value]) => (
               <span key={labelText} className="flex items-center justify-between gap-0.5">
                 <span className="text-slate-400">{labelText}</span>
@@ -546,20 +562,22 @@ function HudOverlay({
               <div
                 className="pointer-events-none rounded"
                 style={{
-                  width: '130px',
-                  height: '130px',
-                  opacity: 0.9,
-                  transform: 'scale(0.85)',
+                  width: isMobile ? '110px' : '130px',
+                  height: isMobile ? '110px' : '130px',
+                  opacity: isMobile ? 0.85 : 0.9,
+                  transform: isMobile ? 'scale(0.7)' : 'scale(0.85)',
                   transformOrigin: 'top left',
                 }}
               >
-                <TopDownMap sensors={sensors} size={160} overlay />
+                <TopDownMap sensors={sensors} size={isMobile ? 160 : 160} overlay />
               </div>
             </div>
           ) : null}
         </div>
 
-        <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-1 bg-black/80 px-1 py-0.5 text-[0.8rem] text-slate-100">
+        <div
+          className={`absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-1 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
+        >
           <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
           {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
         </div>
@@ -569,17 +587,23 @@ function HudOverlay({
 
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div className="absolute left-1 top-1 bg-black/70 px-1 py-0.5 text-[0.65rem] font-medium text-slate-100">
+      <div
+        className={`absolute left-1 top-1 bg-black/70 font-medium text-slate-100 ${statusTextClass} ${statusPadClass}`}
+      >
         <span>Status: {status}</span>
         {audioStatus ? <div>Audio: {audioStatus}</div> : null}
       </div>
       {songNote != null ? (
-        <div className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.25 text-[0.65rem] font-semibold text-emerald-200">
+        <div
+          className={`absolute bottom-1 right-1 rounded bg-black/70 font-semibold text-emerald-200 ${statusTextClass} ${statusPadClass}`}
+        >
           Song {formatNoteLabel(songNote)} <span className="text-slate-400">({songNote})</span>
         </div>
       ) : null}
 
-      <div className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 px-0.5 py-0.5 text-slate-100">
+      <div
+        className={`absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
+      >
         <span>Rover: "{label || 'Unnamed Rover'}"</span>
         {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}
       </div>
