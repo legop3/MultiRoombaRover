@@ -101,6 +101,15 @@ function formatOiEmoji(oiMode) {
   return '❔';
 }
 
+function formatDuration(ms) {
+  if (ms == null) return 'n/a';
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  if (minutes <= 0) return `${seconds}s`;
+  return remainder > 0 ? `${minutes}m ${remainder}s` : `${minutes}m`;
+}
+
 function isCharging(sensors) {
   const label = sensors?.chargingState?.label?.toLowerCase();
   const chargingByLabel =
@@ -693,6 +702,16 @@ function handleBusEvent(event) {
         description: `${payload?.roverId} went offline.`,
       });
       updatePresence();
+      break;
+    case 'rover.dockGuard':
+      announce({
+        channelId: channels.adminAlerts,
+        color: 0xf0b651,
+        title: 'Dock Guard Triggered',
+        description: `${payload?.roverId} (${payload?.reasonText || 'undocked'}) for ${formatDuration(
+          payload?.idleMs,
+        )}. Seek dock + sensor stream reissued until movement.`,
+      });
       break;
     case 'battery.warn':
       announce({

@@ -9,6 +9,7 @@ import UserListPanel from '../components/UserListPanel.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 import LogPanel from '../components/LogPanel.jsx';
 import RoverRoster from '../components/RoverRoster.jsx';
+import AlertFeed from '../components/AlertFeed.jsx';
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
@@ -138,6 +139,7 @@ export default function SpectatorApp() {
             </div>
           </section>
         </main>
+        <AlertFeed />
       </div>
     </SettingsProvider>
   );

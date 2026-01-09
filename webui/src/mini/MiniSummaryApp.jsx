@@ -7,6 +7,7 @@ import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
 import { useRoomCameraSnapshots } from '../hooks/useRoomCameraSnapshots.js';
 import VideoTile from '../components/VideoTile.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
+import AlertFeed from '../components/AlertFeed.jsx';
 
 const ROTATE_MS = 20000;
 
@@ -148,7 +149,10 @@ function MiniSummaryContent() {
 export default function MiniSummaryApp() {
   return (
     <SettingsProvider>
-      <MiniSummaryContent />
+      <>
+        <MiniSummaryContent />
+        <AlertFeed />
+      </>
     </SettingsProvider>
   );
 }

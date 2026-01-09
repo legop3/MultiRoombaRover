@@ -15,9 +15,14 @@ const spectatorSockets = new Set();
 const turnService = require('./turnService');
 const managerEvents = new EventEmitter();
 const DOCK_GUARD_WINDOW_MS = 2 * 1000;
+const IDLE_UNDOCKED_MS = 2 * 60 * 1000;
+const PASSIVE_UNDOCKED_MS = 60 * 1000;
+const DOCK_GUARD_RETRY_MS = 10 * 1000;
+const DOCK_COMMAND_BASE64 = Buffer.from([143]).toString('base64');
 const BACKOFF_MS = 500;
 const BACKOFF_SPEED = 300;
 const backoffTimers = new Map(); // roverId -> Timeout
+const dockGuardStates = new Map(); // roverId -> guard state
 
 function ensureRecord(id) {
   if (!rovers.has(id)) {
@@ -34,6 +39,7 @@ function ensureRecord(id) {
       batteryState: null,
       room: `rover:${id}`,
       lastSeen: Date.now(),
+      lastMovementAt: Date.now(),
     });
   }
   return rovers.get(id);
@@ -68,6 +74,7 @@ function removeRover(id) {
   const record = rovers.get(id);
   if (!record) return;
   rovers.delete(id);
+  stopDockGuard(id);
   turnService.cleanupRover(id);
   spectatorSockets.forEach((socketId) => {
     const sock = io.sockets.sockets.get(socketId);
@@ -178,6 +185,7 @@ function handleSensorFrame(roverId, frame) {
   const decoded = parseSensorFrame(frame.data);
   record.lastSensor = { raw: frame, decoded };
   record.batteryState = computeBatteryState(record, decoded);
+  updateMovement(record, decoded);
   const hasDockInfo = decoded?.chargingSources != null;
   if (hasDockInfo) {
     const prevDocked = record.docked;
@@ -197,8 +205,131 @@ function handleSensorFrame(roverId, frame) {
     sensors: decoded,
   });
   managerEvents.emit('sensor', { roverId, sensors: decoded, batteryState: record.batteryState });
+  evaluateDockGuard(record, decoded);
 }
 
+function updateMovement(record, sensors) {
+  if (!record || !sensors) return;
+  const distance = Math.abs(sensors.distanceMm ?? 0);
+  const angle = Math.abs(sensors.angleDeg ?? 0);
+  const requested = Math.abs(sensors.requestedVelocity ?? 0);
+  const requestedLeft = Math.abs(sensors.requestedLeftVelocity ?? 0);
+  const requestedRight = Math.abs(sensors.requestedRightVelocity ?? 0);
+  const moving = distance > 0 || angle > 0 || requested > 0 || requestedLeft > 0 || requestedRight > 0;
+  if (moving) {
+    record.lastMovementAt = Date.now();
+  }
+}
+
+function getDockGuardState(roverId) {
+  if (!dockGuardStates.has(roverId)) {
+    dockGuardStates.set(roverId, {
+      idleUndockedSince: null,
+      passiveUndockedSince: null,
+      active: false,
+      reason: null,
+      startedAt: null,
+      timer: null,
+    });
+  }
+  return dockGuardStates.get(roverId);
+}
+
+function evaluateDockGuard(record, sensors) {
+  if (!record || !sensors) return;
+  const state = getDockGuardState(record.id);
+  const now = Date.now();
+  const docked = Boolean(sensors?.chargingSources?.homeBase);
+  const oiMode = sensors?.oiMode?.label || null;
+  const idleMs = record.lastMovementAt ? now - record.lastMovementAt : 0;
+  const isIdle = idleMs >= 1000;
+
+  if (docked || record.drivers.size > 0 || !isIdle) {
+    state.idleUndockedSince = null;
+  } else if (!state.idleUndockedSince) {
+    state.idleUndockedSince = now;
+  }
+
+  if (docked || oiMode !== 'passive' || !isIdle) {
+    state.passiveUndockedSince = null;
+  } else if (!state.passiveUndockedSince) {
+    state.passiveUndockedSince = now;
+  }
+
+  if (state.active) {
+    const shouldStop =
+      docked ||
+      !isIdle ||
+      (state.reason === 'idle' && record.drivers.size > 0) ||
+      (state.reason === 'passive' && oiMode !== 'passive');
+    if (shouldStop) {
+      stopDockGuard(record.id);
+    }
+    return;
+  }
+
+  const idleReady =
+    state.idleUndockedSince && now - state.idleUndockedSince >= IDLE_UNDOCKED_MS;
+  const passiveReady =
+    state.passiveUndockedSince && now - state.passiveUndockedSince >= PASSIVE_UNDOCKED_MS;
+
+  if (passiveReady) {
+    startDockGuard(record, 'passive', idleMs);
+  } else if (idleReady) {
+    startDockGuard(record, 'idle', idleMs);
+  }
+}
+
+function startDockGuard(record, reason, idleMs) {
+  if (!record) return;
+  const state = getDockGuardState(record.id);
+  if (state.active) return;
+  state.active = true;
+  state.reason = reason;
+  state.startedAt = Date.now();
+  const reasonText = reason === 'passive' ? 'passive mode' : 'idle and undocked';
+  publishEvent({
+    source: 'roverManager',
+    type: 'rover.dockGuard',
+    payload: {
+      roverId: record.id,
+      reason,
+      reasonText,
+      idleMs,
+    },
+  });
+  attemptDockGuard(record.id);
+  state.timer = setInterval(() => attemptDockGuard(record.id), DOCK_GUARD_RETRY_MS);
+}
+
+function stopDockGuard(roverId) {
+  const state = dockGuardStates.get(roverId);
+  if (!state) return;
+  if (state.timer) {
+    clearInterval(state.timer);
+  }
+  state.active = false;
+  state.reason = null;
+  state.startedAt = null;
+  state.timer = null;
+  state.idleUndockedSince = null;
+  state.passiveUndockedSince = null;
+}
+
+function attemptDockGuard(roverId) {
+  const record = rovers.get(roverId);
+  if (!record) {
+    stopDockGuard(roverId);
+    return;
+  }
+  const { issueCommand } = require('./commandService');
+  try {
+    issueCommand(roverId, { type: 'sensorStream', sensorStream: { enable: true } });
+    issueCommand(roverId, { type: 'raw', raw: DOCK_COMMAND_BASE64 });
+  } catch (err) {
+    logger.warn('Dock guard command failed', roverId, err.message);
+  }
+}
 function handleIdleUndock(undockedRecord) {
   if (!undockedRecord || undockedRecord.drivers.size > 0) return;
   const now = Date.now();
