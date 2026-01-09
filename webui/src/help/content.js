@@ -88,6 +88,14 @@ export const HELP_CONTENT = {
               { action: 'songNoteDown', label: 'Song note down' },
             ],
           },
+          {
+            id: 'room-controls',
+            title: 'Room Controls',
+            items: [
+              { action: 'homeAssistantOn', label: 'Next room control on' },
+              { action: 'homeAssistantOff', label: 'Next room control off (reverse)' },
+            ],
+          },
         ],
       },
       {

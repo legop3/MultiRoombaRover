@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
+import { useControlSystem } from '../controls/index.js';
+import { formatKeyLabel } from '../controls/keymapUtils.js';
 
 function StatusBadge({ label, tone = 'muted' }) {
   const styles =
@@ -50,9 +52,14 @@ function EntityRow({ entity, connected, onToggle }) {
 }
 
 export default function HomeAssistantControls() {
+  const {
+    state: { keymap },
+  } = useControlSystem();
   const { session, homeAssistantToggle } = useSession();
   const ha = session?.homeAssistant;
   const entities = useMemo(() => ha?.entities || [], [ha?.entities]);
+  const onKeyLabel = formatKeyLabel(keymap?.homeAssistantOn?.[0]);
+  const offKeyLabel = formatKeyLabel(keymap?.homeAssistantOff?.[0]);
 
   if (!ha?.enabled) {
     return (
@@ -80,6 +87,16 @@ export default function HomeAssistantControls() {
         <div className="flex items-center gap-1">
           <p>Light Controls</p>
           <span className="text-xs text-slate-500">{entities.length}</span>
+          <div className="flex items-center gap-1 text-xs text-slate-300 background-black">
+            <span className="flex items-center gap-0.5">
+              <span>On</span>
+              {onKeyLabel ? <KeyPill label={onKeyLabel} /> : null}
+            </span>
+            <span className="flex items-center gap-0.5">
+              <span>Off</span>
+              {offKeyLabel ? <KeyPill label={offKeyLabel} /> : null}
+            </span>
+          </div>
         </div>
         <StatusBadge label={connected ? 'Connected' : 'Offline'} tone={connected ? 'success' : 'warn'} />
       </header>
@@ -95,4 +112,9 @@ export default function HomeAssistantControls() {
       </div>
     </section>
   );
+}
+
+function KeyPill({ label }) {
+  if (!label) return null;
+  return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
 }

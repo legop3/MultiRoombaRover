@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
 import { useChat } from '../../context/ChatContext.jsx';
+import { useSession } from '../../context/SessionContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
@@ -136,6 +137,7 @@ export default function KeyboardInputManager() {
       sendSong,
     },
   } = useControlSystem();
+  const { session, homeAssistantSetState } = useSession();
   const { focusChat, blurChat, isChatFocused } = useChat();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const keymap = useMemo(() => normalizeKeymapEntries(state.keymap), [state.keymap]);
@@ -308,6 +310,38 @@ export default function KeyboardInputManager() {
     registerInputState(SOURCE, { keys: [], vector: ZERO_VECTOR, aux: ZERO_AUX });
   }, [registerInputState, stopAllMotion, stopServoLoop, stopSongLoop]);
 
+  const triggerHomeAssistantCycle = useCallback(
+    (targetState) => {
+      const ha = session?.homeAssistant;
+      if (!ha?.enabled || !ha?.connected) return;
+      const entities = ha.entities || [];
+      const eligible = entities.filter(
+        (ent) =>
+          (ent.type === 'light' || ent.type === 'switch') &&
+          ent.available !== false &&
+          ent.state !== 'unavailable',
+      );
+      if (eligible.length === 0) return;
+      if (targetState === 'on') {
+        const next = eligible.find((ent) => ent.state !== 'on');
+        if (next) {
+          homeAssistantSetState(next.id, 'on').catch(() => {});
+        }
+        return;
+      }
+      if (targetState === 'off') {
+        for (let idx = eligible.length - 1; idx >= 0; idx -= 1) {
+          const ent = eligible[idx];
+          if (ent.state === 'on') {
+            homeAssistantSetState(ent.id, 'off').catch(() => {});
+            break;
+          }
+        }
+      }
+    },
+    [homeAssistantSetState, session?.homeAssistant],
+  );
+
   useEffect(() => {
     function handleKeyDown(event) {
       if (shouldIgnoreEvent(event)) return;
@@ -339,6 +373,10 @@ export default function KeyboardInputManager() {
           runMacro('seek-dock');
         } else if (newlyPressed.some((token) => keymap.nightVisionToggle?.has(token))) {
           toggleNightVision();
+        } else if (newlyPressed.some((token) => keymap.homeAssistantOn?.has(token))) {
+          triggerHomeAssistantCycle('on');
+        } else if (newlyPressed.some((token) => keymap.homeAssistantOff?.has(token))) {
+          triggerHomeAssistantCycle('off');
         }
       }
 
@@ -383,6 +421,7 @@ export default function KeyboardInputManager() {
     setMode,
     stopAllMotion,
     stopSongLoop,
+    triggerHomeAssistantCycle,
   ]);
 
   const latestResetAllRef = useRef(resetAll);

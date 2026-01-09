@@ -47,6 +47,8 @@ export const DEFAULT_KEYMAP = {
   chatFocus: ['enter'],
   songNoteUp: ['ArrowUp'],
   songNoteDown: ['ArrowDown'],
+  homeAssistantOn: ['ArrowRight'],
+  homeAssistantOff: ['ArrowLeft'],
 };
 
 export const DEFAULT_MACROS = [

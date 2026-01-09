@@ -27,6 +27,8 @@ const KEY_ACTIONS = [
   { id: 'chatFocus', label: 'Toggle Chat', group: 'Chat' },
   { id: 'songNoteUp', label: 'Song Note Up', group: 'Audio' },
   { id: 'songNoteDown', label: 'Song Note Down', group: 'Audio' },
+  { id: 'homeAssistantOn', label: 'Room Controls On (Cycle)', group: 'Room Controls' },
+  { id: 'homeAssistantOff', label: 'Room Controls Off (Cycle)', group: 'Room Controls' },
 ];
 
 function groupActions(actions) {
