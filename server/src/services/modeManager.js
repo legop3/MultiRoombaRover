@@ -1,6 +1,7 @@
 const EventEmitter = require('events');
 const io = require('../globals/io');
-const { sendAlert, COLORS } = require('./alertService');
+const { sendAlert } = require('./alertService');
+const ALERT_COLOR = '#ff9800';
 const { isAdmin, isLockdownAdmin } = require('./roleService');
 const { publishEvent } = require('./eventBus');
 
@@ -34,7 +35,7 @@ function setMode(nextMode, socket, options = {}) {
   }
   currentMode = nextMode;
   sendAlert({
-    color: COLORS.info,
+    color: ALERT_COLOR,
     title: 'Mode Changed',
     message: `Server mode set to ${nextMode}`,
   });
@@ -65,7 +66,7 @@ io.on('connection', (socket) => {
     try {
       setMode(mode, socket);
     } catch (err) {
-      sendAlert({ color: COLORS.error, title: 'Mode change failed', message: err.message });
+      sendAlert({ color: ALERT_COLOR, title: 'Mode change failed', message: err.message });
     }
   });
 });

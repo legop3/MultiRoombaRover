@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 
 const LIFETIME_MS = 5000;
+const DEFAULT_COLOR = '#2196f3';
 
 function buildKey(alert) {
   if (alert.id) return alert.id;
@@ -38,15 +39,27 @@ export default function AlertFeed() {
   );
 }
 
+function hexToRgb(hex) {
+  const safe = typeof hex === 'string' ? hex.trim() : '';
+  const match = /^#?([0-9a-fA-F]{6})$/.exec(safe);
+  if (!match) return null;
+  const value = match[1];
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  };
+}
+
 function AlertToast({ alert }) {
-  const colorClasses =
-    alert.color === 'error'
-      ? 'bg-red-500/30 text-red-100'
-      : alert.color === 'warn'
-      ? 'bg-amber-500/30 text-amber-100'
-      : 'bg-emerald-500/30 text-emerald-100';
+  const rgb = hexToRgb(alert.color) || hexToRgb(DEFAULT_COLOR);
+  const backgroundColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)` : 'rgba(33, 150, 243, 0.25)';
+  const borderColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)` : 'rgba(33, 150, 243, 0.7)';
   return (
-    <div className={`pointer-events-auto px-0.5 py-0.5 text-[0.85rem] ${colorClasses}`}>
+    <div
+      className="pointer-events-auto px-0.5 py-0.5 text-[0.85rem] text-slate-100"
+      style={{ backgroundColor, border: `1px solid ${borderColor}` }}
+    >
       <p className="text-xs text-slate-200">{alert.title || 'Alert'}</p>
       <p className="text-sm text-white">{alert.message}</p>
     </div>

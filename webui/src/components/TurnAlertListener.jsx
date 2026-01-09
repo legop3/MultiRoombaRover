@@ -45,7 +45,7 @@ export default function TurnAlertListener() {
       pushAlert({
         title: 'Your turn!',
         message: `You now control ${roverName}.`,
-        color: 'success',
+        color: '#ff5722',
       });
     });
     playSound();

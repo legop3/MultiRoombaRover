@@ -1,20 +1,21 @@
 const roverWSS = require('../globals/ws');
 const logger = require('../globals/logger').child('roverConnection');
 const roverManager = require('./roverManager');
-const { sendAlert, COLORS } = require('./alertService');
+const { sendAlert } = require('./alertService');
+const ALERT_COLOR = '#00bcd4';
 const { handleAck } = require('./commandService');
 
 function handleMessage(roverId, msg) {
   switch (msg.type) {
     case 'hello':
       roverManager.upsertRover(msg, this);
-      sendAlert({ color: COLORS.info, title: 'Rover Connected', message: roverId });
+      sendAlert({ color: ALERT_COLOR, title: 'Rover Connected', message: roverId });
       break;
     case 'sensor':
       roverManager.handleSensorFrame(roverId, msg);
       break;
     case 'event':
-      sendAlert({ color: COLORS.info, title: `${roverId} event`, message: msg.event });
+      sendAlert({ color: ALERT_COLOR, title: `${roverId} event`, message: msg.event });
       break;
     default:
       break;
@@ -40,7 +41,7 @@ roverWSS.on('connection', (ws) => {
       });
       roverManager.upsertRover(msg, ws);
       roverManager.broadcastRoster();
-      sendAlert({ color: COLORS.success, title: 'Rover Online', message: roverId });
+      sendAlert({ color: ALERT_COLOR, title: 'Rover Online', message: roverId });
       return;
     }
     if (!roverId) return;
@@ -49,14 +50,14 @@ roverWSS.on('connection', (ws) => {
     } else if (msg.type === 'ack') {
       handleAck(msg);
     } else if (msg.type === 'event') {
-      sendAlert({ color: COLORS.info, title: `${roverId}`, message: msg.event });
+      sendAlert({ color: ALERT_COLOR, title: `${roverId}`, message: msg.event });
     }
   });
 
   ws.on('close', () => {
     if (roverId) {
       roverManager.removeRover(roverId);
-      sendAlert({ color: COLORS.warn, title: 'Rover Offline', message: roverId });
+      sendAlert({ color: ALERT_COLOR, title: 'Rover Offline', message: roverId });
     }
   });
 });

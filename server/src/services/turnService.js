@@ -1,6 +1,7 @@
 const EventEmitter = require('events');
 const io = require('../globals/io');
-const { sendAlert, COLORS } = require('./alertService');
+const { sendAlert } = require('./alertService');
+const ALERT_COLOR = '#ff5722';
 const { MODES, getMode, modeEvents } = require('./modeManager');
 
 const driverQueues = new Map(); // roverId -> { queue: [], current: socketId, timer: Timeout | null }
@@ -159,7 +160,7 @@ function handleIdleTimeout(roverId, expectedDriver) {
   stopRover(roverId);
   if (skips >= MAX_IDLE_SKIPS) {
     sendAlert({
-      color: COLORS.error,
+      color: ALERT_COLOR,
       title: 'Driver removed',
       message: `${expectedDriver} removed from ${roverId} after ${skips} idle skips`,
     });
@@ -167,7 +168,7 @@ function handleIdleTimeout(roverId, expectedDriver) {
     return;
   }
   sendAlert({
-    color: COLORS.warn,
+    color: ALERT_COLOR,
     title: 'Turn skipped',
     message: `${expectedDriver} skipped on ${roverId} (idle ${skips}/${MAX_IDLE_SKIPS})`,
   });
@@ -207,7 +208,7 @@ function advanceTurn(roverId) {
   queue.current = queue.queue[nextIdx];
   setActiveDriver(roverId, queue.current);
   idleDisarmed.set(roverId, false);
-  sendAlert({ color: COLORS.info, title: 'Turn switch', message: `${queue.current} now controls ${roverId}` });
+  sendAlert({ color: ALERT_COLOR, title: 'Turn switch', message: `${queue.current} now controls ${roverId}` });
   stopRover(roverId);
   scheduleNextTurn(roverId);
   scheduleIdleTimer(roverId);

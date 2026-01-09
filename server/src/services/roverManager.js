@@ -1,7 +1,8 @@
 const EventEmitter = require('events');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('roverManager');
-const { sendAlert, COLORS } = require('./alertService');
+const { sendAlert } = require('./alertService');
+const ALERT_COLOR = '#8bc34a';
 const { parseSensorFrame } = require('../helpers/sensorDecoder');
 const { MODES, getMode } = require('./modeManager');
 const { isAdmin, roleEvents } = require('./roleService');
@@ -89,7 +90,7 @@ function lockRover(id, locked, options = {}) {
     record.lockReason = reason;
     if (!silent) {
       sendAlert({
-        color: COLORS.warn,
+        color: ALERT_COLOR,
         title: 'Rover Locked',
         message: `${id} locked${record.lockReason ? ` (${record.lockReason})` : ''}.`,
       });
@@ -103,7 +104,7 @@ function lockRover(id, locked, options = {}) {
     record.locked = false;
     record.lockReason = null;
     if (!silent) {
-      sendAlert({ color: COLORS.success, title: 'Rover Unlocked', message: `${id} unlocked.` });
+      sendAlert({ color: ALERT_COLOR, title: 'Rover Unlocked', message: `${id} unlocked.` });
     }
     publishEvent({
       source: 'roverManager',
@@ -218,7 +219,7 @@ function handleIdleUndock(undockedRecord) {
   const bumpRecent =
     suspectRecord.lastBumpAt && now - suspectRecord.lastBumpAt <= DOCK_GUARD_WINDOW_MS;
   sendAlert({
-    color: COLORS.warn,
+    color: ALERT_COLOR,
     title: 'Dock protection',
     message: `${undockedRecord.id} undocked while idle; stopping ${suspect.roverId}.`,
   });
@@ -309,7 +310,7 @@ function requestControl(roverId, socket, options = {}) {
   socket.emit('controlGranted', { roverId });
   managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'add' });
   sendAlert({
-    color: COLORS.success,
+    color: ALERT_COLOR,
     title: 'Control Granted',
     message: `${socket.id} now driving ${roverId}`,
   });
@@ -464,7 +465,7 @@ io.on('connection', (socket) => {
       cb({ success: true, roverId: targetId });
     } catch (err) {
       logger.warn('Request control failed', socket.id, err.message);
-      sendAlert({ color: COLORS.warn, title: 'Control denied', message: err.message });
+      sendAlert({ color: ALERT_COLOR, title: 'Control denied', message: err.message });
       cb({ error: err.message });
     }
   }
@@ -490,7 +491,7 @@ io.on('connection', (socket) => {
       cb({ success: true });
     } catch (err) {
       logger.warn('Lock change failed', roverId, err.message);
-      sendAlert({ color: COLORS.error, title: 'Lock failed', message: err.message });
+      sendAlert({ color: ALERT_COLOR, title: 'Lock failed', message: err.message });
       cb({ error: err.message });
     }
   }
