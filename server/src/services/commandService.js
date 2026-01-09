@@ -74,9 +74,8 @@ io.on('connection', (socket) => {
         const left = Number(driveDirect.left);
         const right = Number(driveDirect.right);
         const speed = Math.max(Math.abs(left), Math.abs(right));
-        const isForward = Number.isFinite(left) && Number.isFinite(right) && left > 0 && right > 0;
         const blockedUntil = driveCooldowns.get(roverId);
-        if (blockedUntil && Date.now() < blockedUntil && isForward) {
+        if (blockedUntil && Date.now() < blockedUntil && speed > 0) {
           throw new Error('Drive blocked: dock protection cooldown');
         }
         if (speed > 0) {

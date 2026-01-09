@@ -13,7 +13,7 @@ const socketToRovers = new Map(); // socketId -> Set(roverId)
 const spectatorSockets = new Set();
 const turnService = require('./turnService');
 const managerEvents = new EventEmitter();
-const DOCK_GUARD_WINDOW_MS = 3 * 1000;
+const DOCK_GUARD_WINDOW_MS = 2 * 1000;
 const BACKOFF_MS = 500;
 const BACKOFF_SPEED = 300;
 const backoffTimers = new Map(); // roverId -> Timeout
@@ -230,21 +230,24 @@ function handleIdleUndock(undockedRecord) {
   }
   setDriveCooldown(suspect.roverId, DOCK_GUARD_WINDOW_MS);
   if (bumpRecent) {
-    backoffRover(suspect.roverId);
+    nudgeRover(suspect.roverId, 'backward');
+  } else {
+    nudgeRover(suspect.roverId, 'forward');
   }
 }
 
-function backoffRover(roverId) {
+function nudgeRover(roverId, direction = 'backward') {
   if (!roverId) return;
   const { issueCommand } = require('./commandService');
   clearTimeout(backoffTimers.get(roverId));
+  const speed = direction === 'forward' ? BACKOFF_SPEED : -BACKOFF_SPEED;
   try {
     issueCommand(roverId, {
       type: 'drive',
-      driveDirect: { left: -BACKOFF_SPEED, right: -BACKOFF_SPEED },
+      driveDirect: { left: speed, right: speed },
     });
   } catch (err) {
-    logger.warn('Dock protection backoff failed', roverId, err.message);
+    logger.warn('Dock protection nudge failed', roverId, err.message);
     return;
   }
   backoffTimers.set(
