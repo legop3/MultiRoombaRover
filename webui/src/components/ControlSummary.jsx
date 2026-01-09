@@ -7,20 +7,11 @@ import TopDownMap from './TopDownMap.jsx';
 import RoverRoster from './RoverRoster.jsx';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
 
-export default function ControlSummary() {
+export function RoverRosterPanel({ title = 'Rovers' }) {
   const { session, requestControl } = useSession();
-  const {
-    state: { roverId, keymap },
-  } = useControlSystem();
-  const frame = useTelemetryFrame(roverId);
-  const sensors = frame?.sensors || {};
-  const driveDockState = useDriveDockState(roverId);
-  const roster = session?.roster ?? [];
   const [pending, setPending] = useState({});
 
   const canRequest = useMemo(() => session?.role && session.role !== 'spectator', [session?.role]);
-
-  const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
   async function handleRequest(targetRoverId) {
     if (!targetRoverId) return;
@@ -33,6 +24,35 @@ export default function ControlSummary() {
       setPending((prev) => ({ ...prev, [targetRoverId]: false }));
     }
   }
+
+  return (
+    <RoverRoster
+      title={title}
+      roster={session?.roster ?? []}
+      renderActions={(rover) =>
+        canRequest ? (
+          <button
+            type="button"
+            onClick={() => handleRequest(rover.id)}
+            disabled={pending[rover.id]}
+            className="button-dark disabled:opacity-40"
+          >
+            {pending[rover.id] ? '...' : 'request'}
+          </button>
+        ) : null
+      }
+    />
+  );
+}
+
+export default function ControlSummary({ showRoster = true }) {
+  const {
+    state: { roverId, keymap },
+  } = useControlSystem();
+  const frame = useTelemetryFrame(roverId);
+  const sensors = frame?.sensors || {};
+  const driveDockState = useDriveDockState(roverId);
+  const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
   return (
     <section className="panel-section">
@@ -49,22 +69,7 @@ export default function ControlSummary() {
           {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
         </div>
       </div>
-      <RoverRoster
-        title="Rovers"
-        roster={roster}
-        renderActions={(rover) =>
-          canRequest ? (
-            <button
-              type="button"
-              onClick={() => handleRequest(rover.id)}
-              disabled={pending[rover.id]}
-              className="button-dark disabled:opacity-40"
-            >
-              {pending[rover.id] ? '...' : 'request'}
-            </button>
-          ) : null
-        }
-      />
+      {showRoster ? <RoverRosterPanel /> : null}
     </section>
   );
 }

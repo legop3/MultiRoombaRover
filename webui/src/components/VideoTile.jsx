@@ -368,6 +368,7 @@ export default function VideoTile({
           status={renderedStatus}
           audioStatus={renderedAudioStatus}
           desktopLayout={desktopLayout}
+          layoutFormat={layoutFormat}
           variant={hudVariant}
           driverLabel={driverLabel}
           battery={batteryVisual}
@@ -484,6 +485,7 @@ function HudOverlay({
   status,
   audioStatus,
   desktopLayout = true,
+  layoutFormat = 'desktop',
   variant = 'default',
   driverLabel = null,
   battery,
@@ -502,12 +504,13 @@ function HudOverlay({
 
   const pulse = frame?.receivedAt ? now - frame.receivedAt < 200 : false;
   const isMobile = mobileHud;
+  const portraitMobile = layoutFormat === 'mobile-portrait';
   const statusTextClass = isMobile ? 'text-[0.55rem]' : 'text-[0.65rem]';
   const statusPadClass = isMobile ? 'px-0.5 py-0.25' : 'px-1 py-0.5';
   const labelPadClass = isMobile ? 'px-0.5 py-0.25' : 'px-0.5 py-0.5';
   const labelTextClass = isMobile ? 'text-[0.7rem]' : 'text-[0.8rem]';
-  const mapSize = isMobile ? '240px' : '240px';
-  const mapScale = isMobile ? 0.45 : 0.7;
+  const mapSize = '240px';
+  const mapScale = portraitMobile ? 0.36 : isMobile ? 0.45 : 0.7;
   const mapOpacity = isMobile ? 0.85 : 0.7;
   const mapStyle = {
     width: mapSize,
