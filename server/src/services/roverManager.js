@@ -288,6 +288,11 @@ function startDockGuard(record, reason, idleMs) {
   state.reason = reason;
   state.startedAt = Date.now();
   const reasonText = reason === 'passive' ? 'passive mode' : 'idle and undocked';
+  sendAlert({
+    color: ALERT_COLOR,
+    title: 'Dock Guard Triggered',
+    message: `${record.id} ${reasonText}. Seeking dock and restarting sensors until movement.`,
+  });
   publishEvent({
     source: 'roverManager',
     type: 'rover.dockGuard',
