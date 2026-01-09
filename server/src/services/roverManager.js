@@ -13,6 +13,10 @@ const socketToRovers = new Map(); // socketId -> Set(roverId)
 const spectatorSockets = new Set();
 const turnService = require('./turnService');
 const managerEvents = new EventEmitter();
+const DOCK_GUARD_WINDOW_MS = 3 * 1000;
+const BACKOFF_MS = 500;
+const BACKOFF_SPEED = 120;
+const backoffTimers = new Map(); // roverId -> Timeout
 
 function ensureRecord(id) {
   if (!rovers.has(id)) {
@@ -21,6 +25,8 @@ function ensureRecord(id) {
       meta: null,
       ws: null,
       lastSensor: null,
+      docked: null,
+      lastBumpAt: null,
       drivers: new Set(),
       locked: false,
       lockReason: null,
@@ -171,12 +177,86 @@ function handleSensorFrame(roverId, frame) {
   const decoded = parseSensorFrame(frame.data);
   record.lastSensor = { raw: frame, decoded };
   record.batteryState = computeBatteryState(record, decoded);
+  const hasDockInfo = decoded?.chargingSources != null;
+  if (hasDockInfo) {
+    const prevDocked = record.docked;
+    const docked = Boolean(decoded?.chargingSources?.homeBase);
+    record.docked = docked;
+    if (prevDocked === true && docked === false) {
+      handleIdleUndock(record);
+    }
+  }
+  const bumps = decoded?.bumpsAndWheelDrops;
+  if (bumps?.bumpLeft || bumps?.bumpRight) {
+    record.lastBumpAt = Date.now();
+  }
   io.to(record.room).emit('sensorFrame', {
     roverId,
     frame,
     sensors: decoded,
   });
   managerEvents.emit('sensor', { roverId, sensors: decoded, batteryState: record.batteryState });
+}
+
+function handleIdleUndock(undockedRecord) {
+  if (!undockedRecord || undockedRecord.drivers.size > 0) return;
+  const now = Date.now();
+  const { getRecentDriveActivity, setDriveCooldown, issueCommand } = require('./commandService');
+  const candidates = getRecentDriveActivity(DOCK_GUARD_WINDOW_MS, { excludeAdmins: true })
+    .filter((candidate) => candidate.roverId !== undockedRecord.id);
+  if (candidates.length === 0) return;
+  const candidatesWithBump = candidates.filter((candidate) => {
+    const record = rovers.get(candidate.roverId);
+    return record?.lastBumpAt && now - record.lastBumpAt <= DOCK_GUARD_WINDOW_MS;
+  });
+  const pool = candidatesWithBump.length > 0 ? candidatesWithBump : candidates;
+  pool.sort((a, b) => b.ts - a.ts);
+  const suspect = pool[0];
+  if (!suspect) return;
+  const suspectRecord = rovers.get(suspect.roverId);
+  if (!suspectRecord) return;
+  const bumpRecent =
+    suspectRecord.lastBumpAt && now - suspectRecord.lastBumpAt <= DOCK_GUARD_WINDOW_MS;
+  sendAlert({
+    color: COLORS.warn,
+    title: 'Dock protection',
+    message: `${undockedRecord.id} undocked while idle; stopping ${suspect.roverId}.`,
+  });
+  try {
+    issueCommand(suspect.roverId, { type: 'drive', driveDirect: { left: 0, right: 0 } });
+    issueCommand(suspect.roverId, { type: 'motors', motorPwm: { main: 0, side: 0, vacuum: 0 } });
+  } catch (err) {
+    logger.warn('Dock protection stop failed', suspect.roverId, err.message);
+  }
+  setDriveCooldown(suspect.roverId, DOCK_GUARD_WINDOW_MS);
+  if (bumpRecent) {
+    backoffRover(suspect.roverId);
+  }
+}
+
+function backoffRover(roverId) {
+  if (!roverId) return;
+  const { issueCommand } = require('./commandService');
+  clearTimeout(backoffTimers.get(roverId));
+  try {
+    issueCommand(roverId, {
+      type: 'drive',
+      driveDirect: { left: -BACKOFF_SPEED, right: -BACKOFF_SPEED },
+    });
+  } catch (err) {
+    logger.warn('Dock protection backoff failed', roverId, err.message);
+    return;
+  }
+  backoffTimers.set(
+    roverId,
+    setTimeout(() => {
+      try {
+        issueCommand(roverId, { type: 'drive', driveDirect: { left: 0, right: 0 } });
+      } catch (err) {
+        logger.warn('Dock protection backoff stop failed', roverId, err.message);
+      }
+    }, BACKOFF_MS),
+  );
 }
 
 function removeSocket(socket) {

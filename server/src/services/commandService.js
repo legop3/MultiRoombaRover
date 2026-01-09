@@ -1,9 +1,12 @@
 const { v4: uuidv4 } = require('uuid');
 const io = require('../globals/io');
 const roverManager = require('./roverManager');
+const { isAdmin } = require('./roleService');
 const logger = require('../globals/logger').child('commandService');
 
 const pendingCommands = new Map(); // id -> { roverId }
+const lastDriveActivity = new Map(); // roverId -> { ts, socketId, direction, speed, isAdmin }
+const driveCooldowns = new Map(); // roverId -> blockedUntil
 
 function issueCommand(roverId, payload) {
   const record = roverManager.rovers.get(roverId);
@@ -31,9 +34,27 @@ function handleAck(msg) {
   });
 }
 
+function getRecentDriveActivity(windowMs, options = {}) {
+  const now = Date.now();
+  const results = [];
+  for (const [roverId, info] of lastDriveActivity.entries()) {
+    if (!info || now - info.ts > windowMs) continue;
+    if (options.excludeAdmins && info.isAdmin) continue;
+    results.push({ roverId, ...info });
+  }
+  return results;
+}
+
+function setDriveCooldown(roverId, durationMs) {
+  if (!roverId || !durationMs) return;
+  driveCooldowns.set(roverId, Date.now() + durationMs);
+}
+
 module.exports = {
   issueCommand,
   handleAck,
+  getRecentDriveActivity,
+  setDriveCooldown,
 };
 
 io.on('connection', (socket) => {
@@ -47,6 +68,30 @@ io.on('connection', (socket) => {
         throw new Error('Not your turn or no control');
       }
       const payload = data ? { ...data } : {};
+      const isAdminSocket = isAdmin(socket);
+      const driveDirect = payload?.driveDirect;
+      if (type === 'drive' && driveDirect && !isAdminSocket) {
+        const left = Number(driveDirect.left);
+        const right = Number(driveDirect.right);
+        const speed = Math.max(Math.abs(left), Math.abs(right));
+        const isForward = Number.isFinite(left) && Number.isFinite(right) && left > 0 && right > 0;
+        const blockedUntil = driveCooldowns.get(roverId);
+        if (blockedUntil && Date.now() < blockedUntil && isForward) {
+          throw new Error('Drive blocked: dock protection cooldown');
+        }
+        if (speed > 0) {
+          let direction = 'turn';
+          if (left > 0 && right > 0) direction = 'forward';
+          if (left < 0 && right < 0) direction = 'backward';
+          lastDriveActivity.set(roverId, {
+            ts: Date.now(),
+            socketId: socket.id,
+            direction,
+            speed,
+            isAdmin: isAdminSocket,
+          });
+        }
+      }
       const id = issueCommand(roverId, { type, ...payload });
       logger.info('Queued command', socket.id, roverId, type);
       try {
