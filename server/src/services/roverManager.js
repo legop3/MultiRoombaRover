@@ -15,7 +15,7 @@ const turnService = require('./turnService');
 const managerEvents = new EventEmitter();
 const DOCK_GUARD_WINDOW_MS = 3 * 1000;
 const BACKOFF_MS = 500;
-const BACKOFF_SPEED = 120;
+const BACKOFF_SPEED = 300;
 const backoffTimers = new Map(); // roverId -> Timeout
 
 function ensureRecord(id) {
