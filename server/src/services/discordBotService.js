@@ -396,7 +396,7 @@ async function handleCommand(message) {
   if (message.author.bot) return;
   const content = (message.content || '').trim();
   const lower = content.toLowerCase();
-  if (lower === 'ts' || lower.startsWith('ts ')) {
+  if (lower === 'ts') {
     await handleTimeStatusCommand(message);
     return;
   }
