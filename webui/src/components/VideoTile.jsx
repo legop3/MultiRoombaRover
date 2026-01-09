@@ -614,11 +614,11 @@ function HudOverlay({
       {showTopDown && variant !== 'spectator' ? (
         <div
           className="pointer-events-none absolute rounded"
-          style={{
-            ...mapStyle,
-            padding: '0.1rem',
-            background: 'rgba(0,0,0,0.6)',
-          }}
+          // style={{
+          //   ...mapStyle,
+          //   padding: '0.1rem',
+          //   background: 'rgba(0,0,0,0.6)',
+          // }}
         >
           <TopDownMap sensors={sensors} size={240} overlay />
         </div>

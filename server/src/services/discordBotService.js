@@ -510,6 +510,7 @@ function buildTimeStatusEmbed() {
     { label: 'Asia Shanghai', zone: 'Asia/Shanghai' },
     { label: 'Asia Tokyo', zone: 'Asia/Tokyo' },
     { label: 'Australia Sydney', zone: 'Australia/Sydney' },
+    { label: 'New Zealand Auckland', zone: 'Pacific/Auckland' },
   ];
 
   const entries = zones.map((entry) => {
