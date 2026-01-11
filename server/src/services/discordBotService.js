@@ -5,6 +5,7 @@ const {
   ActivityType,
   EmbedBuilder,
   AttachmentBuilder,
+  PermissionsBitField,
 } = require('discord.js');
 const logger = require('../globals/logger').child('discordBot');
 const io = require('../globals/io');
@@ -18,6 +19,14 @@ const { buildRoomCameraReplayVideo } = require('./roomCameraReplayService');
 const { getActiveDrivers } = require('./turnService');
 const { getNickname } = require('./nicknameService');
 const { tryTriggerReplay } = require('./replayService');
+const {
+  getGuildConfig,
+  listGuildConfigs,
+  removeGuildConfig,
+  setGuildConfig,
+  normalizeMode,
+  VALID_MODES,
+} = require('./discordGuildStore');
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
@@ -198,6 +207,10 @@ function formatHelp() {
     '`rs help` — show this help',
     '`rs status [id]` — show rover status (all or one)',
     '`rs replay [camera]` — send room camera instant replay',
+    '`rs bridge` — show chat bridge status for this server',
+    '`rs bridge here <global|private>` — set chat bridge to this channel',
+    '`rs bridge mode <global|private>` — change chat bridge mode',
+    '`rs bridge off` — disable chat bridge for this server',
     '`rs lock <id>` — lock a rover',
     '`rs unlock <id>` — unlock a rover',
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
@@ -401,6 +414,117 @@ async function handleModeCommand(message, mode) {
   }
 }
 
+function canManageBridge(message) {
+  if (isAdminUser(message.author.id)) return true;
+  if (!message.guild || !message.member) return false;
+  const perms = message.member.permissions;
+  if (!perms) return false;
+  return (
+    perms.has(PermissionsBitField.Flags.ManageGuild) ||
+    perms.has(PermissionsBitField.Flags.Administrator)
+  );
+}
+
+function formatBridgeStatus(entry) {
+  if (!entry) return 'Chat bridge is not configured for this server.';
+  return `Chat bridge is **${entry.mode}** in <#${entry.channelId}>.`;
+}
+
+async function handleBridgeCommand(message, tokens) {
+  if (!message.guild) {
+    await message.reply({
+      content: 'Chat bridge must be configured in a server channel.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+  const guildId = message.guild.id;
+  let action = (tokens.shift() || 'status').toLowerCase();
+  let mode = null;
+  if (action === 'global' || action === 'private') {
+    mode = action;
+    action = 'here';
+  } else if (action === 'here' || action === 'mode') {
+    mode = (tokens.shift() || '').toLowerCase();
+  }
+  if (mode && !VALID_MODES.has(mode)) {
+    await message.reply({
+      content: 'Invalid mode. Use `global` or `private`.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (action === 'status') {
+    const entry = getGuildConfig(guildId);
+    await message.reply({
+      content: formatBridgeStatus(entry),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (action === 'off') {
+    removeGuildConfig(guildId);
+    await message.reply({
+      content: 'Chat bridge disabled for this server.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (!canManageBridge(message)) {
+    await message.reply({
+      content: 'You need Manage Server permissions to change the chat bridge.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (action === 'here') {
+    const channelId = message.channelId;
+    const entry = setGuildConfig(guildId, {
+      channelId,
+      mode: normalizeMode(mode, getGuildConfig(guildId)?.mode || 'global'),
+    });
+    await message.reply({
+      content: `Chat bridge set to **${entry.mode}** in <#${entry.channelId}>.`,
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (action === 'mode') {
+    const current = getGuildConfig(guildId);
+    if (!current?.channelId) {
+      await message.reply({
+        content: 'No chat bridge channel set. Use `rs bridge here <global|private>` first.',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+    const nextMode = normalizeMode(mode, null);
+    if (!VALID_MODES.has(nextMode)) {
+      await message.reply({
+        content: 'Invalid mode. Use `global` or `private`.',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+    const entry = setGuildConfig(guildId, { channelId: current.channelId, mode: nextMode });
+    await message.reply({
+      content: `Chat bridge mode updated to **${entry.mode}** in <#${entry.channelId}>.`,
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  await message.reply({
+    content: 'Unknown bridge command. Try `rs bridge`.',
+    allowedMentions: { parse: [], repliedUser: false },
+  });
+}
+
 async function handleCommand(message) {
   if (message.author.bot) return;
   const content = (message.content || '').trim();
@@ -415,8 +539,17 @@ async function handleCommand(message) {
   tokens.shift(); // remove prefix
   const action = (tokens.shift() || '').toLowerCase();
   const isAdmin = isAdminUser(message.author.id);
+  const isBridgeAdmin = action === 'bridge' ? canManageBridge(message) : false;
 
-  if (!isAdmin && action !== '' && action !== 'status' && action !== 'help' && action !== 'replay') {
+  if (
+    !isAdmin &&
+    !isBridgeAdmin &&
+    action !== '' &&
+    action !== 'status' &&
+    action !== 'help' &&
+    action !== 'replay' &&
+    action !== 'bridge'
+  ) {
     return; // ignore non-admins for privileged commands
   }
 
@@ -432,6 +565,9 @@ async function handleCommand(message) {
       break;
     case 'replay':
       await handleReplayCommand(message, tokens.join(' '));
+      break;
+    case 'bridge':
+      await handleBridgeCommand(message, tokens);
       break;
     case 'lock':
       await handleLockCommand(message, tokens[0], true);
@@ -450,16 +586,26 @@ async function handleCommand(message) {
 
 function formatChatLine(payload) {
   const name = payload.nickname || payload.socketId?.slice(0, 6) || 'unknown';
-  const rover = payload.roverId ? `**[${payload.roverId}]** ` : '';
-  const role =
-    payload.role === 'admin' || payload.role === 'lockdown' ? '**(admin)** ' : '';
-  return `${rover}${role}${name}: ${payload.text}`;
+  const roleTag =
+    payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin'
+      ? '`Admin`'
+      : null;
+  const roverTag = payload.roverId ? `\`Rover: ${payload.roverId}\`` : '`Rover: none`';
+  const record = payload.roverId ? rovers.get(payload.roverId) : null;
+  const percent = record?.batteryState?.percentDisplay;
+  const voltageMv = record?.lastSensor?.decoded?.voltageMv ?? record?.lastSensor?.sensors?.voltageMv;
+  const batteryTag = percent != null ? `\`Battery: ${percent}%\`` : null;
+  const voltageTag = voltageMv != null ? `\`Voltage: ${formatVoltage(voltageMv)}\`` : null;
+  const tags = [roverTag, batteryTag, voltageTag, roleTag].filter(Boolean).join(' ');
+  const header = tags ? `**${name}** ${tags}` : `**${name}**`;
+  return `${header}\n${payload.text}`;
 }
 
 async function handleBridgeInbound(message) {
-  const bridgeChannelId = discordConfig?.channels?.chatBridge;
-  if (!bridgeChannelId) return;
-  if (String(message.channelId) !== String(bridgeChannelId)) return;
+  if (!message.guild) return;
+  const guildConfig = getGuildConfig(message.guild.id);
+  if (!guildConfig?.channelId) return;
+  if (String(message.channelId) !== String(guildConfig.channelId)) return;
   if (message.author.bot) return;
   const content = (message.content || '').trim();
   const lower = content.toLowerCase();
@@ -467,12 +613,21 @@ async function handleBridgeInbound(message) {
   const nickname =
     message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
   const role = isAdminUser(message.author.id) ? 'admin' : 'user';
+  const guildIconUrl = message.guild.iconURL?.({ extension: 'png', size: 64 }) || null;
+  const userAvatarUrl = message.author.displayAvatarURL?.({ extension: 'png', size: 64 }) || null;
   try {
     sendExternalMessage({
       text: content,
       nickname,
       role,
       roverId: null,
+      discordGuildId: message.guild.id,
+      discordGuildName: message.guild.name,
+      discordGuildIconUrl: guildIconUrl,
+      discordChannelId: message.channelId,
+      discordUserId: message.author?.id || null,
+      discordUserName: message.author?.globalName || message.author?.username || null,
+      discordUserAvatarUrl: userAvatarUrl,
     });
   } catch (err) {
     logger.warn('Failed to bridge inbound Discord chat', err.message);
@@ -809,12 +964,21 @@ function handleBusEvent(event) {
 
 function handleChatBridgeOutbound(event) {
   const payload = event?.payload;
-  if (!payload || payload.fromDiscord) return;
-  const bridgeChannelId = discordConfig?.channels?.chatBridge;
-  if (!bridgeChannelId) return;
+  if (!payload) return;
+  const guildConfigs = listGuildConfigs();
+  if (!guildConfigs.length) return;
   const line = formatChatLine(payload);
   const text = line.length > 1900 ? `${line.slice(0, 1897)}...` : line;
-  sendToChannel(bridgeChannelId, text, {}, { parse: [] });
+  guildConfigs.forEach((entry) => {
+    if (!entry?.channelId) return;
+    if (payload.fromDiscord) {
+      if (payload.discordGuildId && String(payload.discordGuildId) === String(entry.guildId)) {
+        return;
+      }
+      if (entry.mode === 'private') return;
+    }
+    sendToChannel(entry.channelId, text, {}, { parse: [] });
+  });
 }
 
 client.on('messageCreate', async (message) => {

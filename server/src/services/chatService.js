@@ -71,6 +71,13 @@ function buildMessage(socket, text, meta = {}) {
     role: meta.role || getRole(socket),
     roverId,
     fromDiscord: Boolean(meta.fromDiscord),
+    discordGuildId: meta.discordGuildId || null,
+    discordGuildName: meta.discordGuildName || null,
+    discordGuildIconUrl: meta.discordGuildIconUrl || null,
+    discordChannelId: meta.discordChannelId || null,
+    discordUserId: meta.discordUserId || null,
+    discordUserName: meta.discordUserName || null,
+    discordUserAvatarUrl: meta.discordUserAvatarUrl || null,
     text,
     tts: meta.tts || null,
   };
@@ -158,7 +165,19 @@ function maybeSpeak(socket, message, ttsOptions) {
   }
 }
 
-function sendExternalMessage({ text, nickname = 'Discord', role = 'admin', roverId = null }) {
+function sendExternalMessage({
+  text,
+  nickname = 'Discord',
+  role = 'admin',
+  roverId = null,
+  discordGuildId = null,
+  discordGuildName = null,
+  discordGuildIconUrl = null,
+  discordChannelId = null,
+  discordUserId = null,
+  discordUserName = null,
+  discordUserAvatarUrl = null,
+}) {
   const normalized = normalizeUserText(text);
   const clean = normalized.trim();
   if (!clean || clean.length > 256) {
@@ -175,6 +194,13 @@ function sendExternalMessage({ text, nickname = 'Discord', role = 'admin', rover
     role,
     roverId,
     fromDiscord: true,
+    discordGuildId,
+    discordGuildName,
+    discordGuildIconUrl,
+    discordChannelId,
+    discordUserId,
+    discordUserName,
+    discordUserAvatarUrl,
   });
   logger.info('External chat message', { roverId, nickname });
   broadcastMessage(message);

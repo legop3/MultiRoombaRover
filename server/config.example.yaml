@@ -39,7 +39,7 @@ discord:
   channels:
     announcements: "123456789012345678"
     adminAlerts: "123456789012345678"
-    chatBridge: "123456789012345678"
+    # chat bridge is configured per guild via `rs bridge` commands
     replay: "123456789012345678"
   roles:
     announcementPing: "123456789012345678"

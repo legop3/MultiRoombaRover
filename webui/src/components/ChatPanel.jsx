@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { FaDiscord } from 'react-icons/fa';
 import { useChat } from '../context/ChatContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 
-function roleColors(role, fromDiscord) {
-  if (fromDiscord) return 'text-indigo-200';
+function roleColors(role) {
   switch (role) {
     case 'admin':
     case 'lockdown':
@@ -24,6 +24,25 @@ function formatTime(ts) {
 
 function displayName(message) {
   return message.nickname || message.socketId?.slice(0, 6) || 'unknown';
+}
+
+function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
+  if (!guildIconUrl && !userAvatarUrl) return null;
+  return (
+    <span
+      className="flex h-4 w-4 overflow-hidden rounded-full border border-slate-700/80"
+      title={label}
+    >
+      <span
+        className={`h-full w-1/2 bg-slate-700/70 ${guildIconUrl ? 'bg-center bg-cover' : ''}`}
+        style={guildIconUrl ? { backgroundImage: `url(${guildIconUrl})` } : undefined}
+      />
+      <span
+        className={`h-full w-1/2 bg-slate-700/70 ${userAvatarUrl ? 'bg-center bg-cover' : ''}`}
+        style={userAvatarUrl ? { backgroundImage: `url(${userAvatarUrl})` } : undefined}
+      />
+    </span>
+  );
 }
 
 const FLITE_VOICES = ['kal', 'rms', 'slt', 'ksp', 'bdl'];
@@ -114,10 +133,13 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
           sorted.map((msg) => {
             const isAdmin =
               msg.role === 'admin' || msg.role === 'lockdown' || msg.role === 'lockdown-admin';
+            const discordLabel = msg.fromDiscord
+              ? `${msg.discordGuildName || 'Discord'} · ${displayName(msg)}`
+              : null;
             return (
               <div
                 key={msg.id}
-                className={`surface-muted text-sm flex items-start gap-1 ${
+                className={`surface-muted relative flex flex-wrap items-start gap-1 text-sm ${
                   isAdmin
                     ? 'border border-amber-400/30'
                     : msg.fromDiscord
@@ -125,19 +147,26 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
                       : ''
                 }`}
               >
-                <span className="text-[0.75rem] text-slate-400">{formatTime(msg.ts)}</span>
-                <span className={`font-semibold text-[0.85rem] ${roleColors(msg.role, msg.fromDiscord)}`}>
+                {msg.fromDiscord ? (
+                  <>
+                    <FaDiscord className="h-3.5 w-3.5 text-indigo-200" />
+                    <DiscordAvatar
+                      guildIconUrl={msg.discordGuildIconUrl}
+                      userAvatarUrl={msg.discordUserAvatarUrl}
+                      label={discordLabel}
+                    />
+                  </>
+                ) : null}
+                <span className={`font-semibold text-[0.85rem] ${roleColors(msg.role)}`}>
                   {displayName(msg)}
                 </span>
-                {msg.fromDiscord && (
-                  <span className="rounded bg-indigo-500/30 px-1 text-[0.7rem] text-indigo-100">
-                    Discord
-                  </span>
-                )}
                 {msg.roverId && (
-                  <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {msg.roverId}</span>
+                  <span className="rounded bg-slate-800 px-1 text-[0.7rem]">{msg.roverId}</span>
                 )}
                 <span className="text-slate-100 break-words leading-tight whitespace-pre-wrap">{msg.text}</span>
+                <span className="absolute bottom-0.5 right-1 text-[0.65rem] text-slate-400/60">
+                  {formatTime(msg.ts)}
+                </span>
               </div>
             );
           })
