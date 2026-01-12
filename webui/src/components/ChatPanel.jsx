@@ -34,12 +34,28 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
       title={label}
     >
       <span
-        className={`h-full w-1/2 bg-slate-700/70 ${guildIconUrl ? 'bg-center bg-cover' : ''}`}
-        style={guildIconUrl ? { backgroundImage: `url(${guildIconUrl})` } : undefined}
+        className={`h-full w-1/2 bg-slate-700/70 ${guildIconUrl ? 'bg-cover' : ''}`}
+        style={
+          guildIconUrl
+            ? {
+                backgroundImage: `url(${guildIconUrl})`,
+                backgroundPosition: 'left center',
+                backgroundSize: '200% 100%',
+              }
+            : undefined
+        }
       />
       <span
-        className={`h-full w-1/2 bg-slate-700/70 ${userAvatarUrl ? 'bg-center bg-cover' : ''}`}
-        style={userAvatarUrl ? { backgroundImage: `url(${userAvatarUrl})` } : undefined}
+        className={`h-full w-1/2 bg-slate-700/70 ${userAvatarUrl ? 'bg-cover' : ''}`}
+        style={
+          userAvatarUrl
+            ? {
+                backgroundImage: `url(${userAvatarUrl})`,
+                backgroundPosition: 'right center',
+                backgroundSize: '200% 100%',
+              }
+            : undefined
+        }
       />
     </span>
   );
