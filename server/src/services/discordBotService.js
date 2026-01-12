@@ -6,6 +6,7 @@ const {
   EmbedBuilder,
   AttachmentBuilder,
   PermissionsBitField,
+  WebhookClient,
 } = require('discord.js');
 const logger = require('../globals/logger').child('discordBot');
 const io = require('../globals/io');
@@ -425,6 +426,43 @@ function canManageBridge(message) {
   );
 }
 
+function canManageWebhooksInChannel(channel) {
+  if (!channel?.guild) return false;
+  const botMember = channel.guild.members?.me;
+  const perms = channel.permissionsFor(botMember);
+  if (!perms) return false;
+  return perms.has(PermissionsBitField.Flags.ManageWebhooks);
+}
+
+async function ensureBridgeWebhook(channel, guildId) {
+  if (!channel?.id || !guildId) return null;
+  if (!canManageWebhooksInChannel(channel)) {
+    throw new Error('Missing Manage Webhooks permission in this channel.');
+  }
+  const existing = getGuildConfig(guildId);
+  if (
+    existing?.channelId &&
+    String(existing.channelId) === String(channel.id) &&
+    existing?.webhookId &&
+    existing?.webhookToken
+  ) {
+    return existing;
+  }
+  const webhook = await channel.createWebhook({
+    name: 'Rover Chat Bridge',
+    reason: 'Rover chat bridge webhook',
+  });
+  if (!webhook?.id || !webhook?.token) {
+    throw new Error('Failed to create webhook.');
+  }
+  return setGuildConfig(guildId, {
+    channelId: channel.id,
+    mode: existing?.mode || 'global',
+    webhookId: webhook.id,
+    webhookToken: webhook.token,
+  });
+}
+
 function formatBridgeStatus(entry) {
   if (!entry) return 'Chat bridge is not configured for this server.';
   return `Chat bridge is **${entry.mode}** in <#${entry.channelId}>.`;
@@ -482,15 +520,22 @@ async function handleBridgeCommand(message, tokens) {
   }
 
   if (action === 'here') {
-    const channelId = message.channelId;
-    const entry = setGuildConfig(guildId, {
-      channelId,
-      mode: normalizeMode(mode, getGuildConfig(guildId)?.mode || 'global'),
-    });
-    await message.reply({
-      content: `Chat bridge set to **${entry.mode}** in <#${entry.channelId}>.`,
-      allowedMentions: { parse: [], repliedUser: false },
-    });
+    try {
+      const entry = await ensureBridgeWebhook(message.channel, guildId);
+      if (mode) {
+        setGuildConfig(guildId, { channelId: entry.channelId, mode, webhookId: entry.webhookId, webhookToken: entry.webhookToken });
+      }
+      const updated = getGuildConfig(guildId);
+      await message.reply({
+        content: `Chat bridge set to **${updated.mode}** in <#${updated.channelId}>.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (err) {
+      await message.reply({
+        content: `Failed to set chat bridge: ${err.message}`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    }
     return;
   }
 
@@ -511,7 +556,12 @@ async function handleBridgeCommand(message, tokens) {
       });
       return;
     }
-    const entry = setGuildConfig(guildId, { channelId: current.channelId, mode: nextMode });
+    const entry = setGuildConfig(guildId, {
+      channelId: current.channelId,
+      mode: nextMode,
+      webhookId: current.webhookId,
+      webhookToken: current.webhookToken,
+    });
     await message.reply({
       content: `Chat bridge mode updated to **${entry.mode}** in <#${entry.channelId}>.`,
       allowedMentions: { parse: [], repliedUser: false },
@@ -584,21 +634,27 @@ async function handleCommand(message) {
   }
 }
 
-function formatChatLine(payload) {
+function formatWebhookUsername(payload) {
   const name = payload.nickname || payload.socketId?.slice(0, 6) || 'unknown';
-  const roleTag =
-    payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin'
-      ? '`Admin`'
-      : null;
-  const roverTag = payload.roverId ? `\`Rover: ${payload.roverId}\`` : '`Rover: none`';
+  if (payload.fromDiscord) {
+    const origin = payload.discordGuildName ? ` (From: ${payload.discordGuildName})` : '';
+    const isAdmin =
+      payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin';
+    const adminTag = isAdmin ? ' [Rover Admin]' : '';
+    return `${name}${origin}${adminTag}`;
+  }
   const record = payload.roverId ? rovers.get(payload.roverId) : null;
   const percent = record?.batteryState?.percentDisplay;
   const voltageMv = record?.lastSensor?.decoded?.voltageMv ?? record?.lastSensor?.sensors?.voltageMv;
-  const batteryTag = percent != null ? `\`Battery: ${percent}%\`` : null;
-  const voltageTag = voltageMv != null ? `\`Voltage: ${formatVoltage(voltageMv)}\`` : null;
-  const tags = [roverTag, batteryTag, voltageTag, roleTag].filter(Boolean).join(' ');
-  const header = tags ? `**${name}** ${tags}` : `**${name}**`;
-  return `${header}\n${payload.text}`;
+  const batteryText = percent != null ? `battery ${percent}%` : null;
+  const voltageText = voltageMv != null ? `voltage ${formatVoltage(voltageMv)}` : null;
+  const roverText = payload.roverId ? `rover ${payload.roverId}` : 'rover none';
+  const roleText =
+    payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin'
+      ? 'admin'
+      : null;
+  const suffix = [roverText, batteryText, voltageText, roleText].filter(Boolean).join(' · ');
+  return suffix ? `${name} · ${suffix}` : name;
 }
 
 async function handleBridgeInbound(message) {
@@ -967,17 +1023,30 @@ function handleChatBridgeOutbound(event) {
   if (!payload) return;
   const guildConfigs = listGuildConfigs();
   if (!guildConfigs.length) return;
-  const line = formatChatLine(payload);
-  const text = line.length > 1900 ? `${line.slice(0, 1897)}...` : line;
+  const text = payload.text?.length > 1900 ? `${payload.text.slice(0, 1897)}...` : payload.text;
+  const username = formatWebhookUsername(payload);
+  const avatarURL = payload.fromDiscord
+    ? payload.discordUserAvatarUrl || null
+    : client.user?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null;
   guildConfigs.forEach((entry) => {
-    if (!entry?.channelId) return;
+    if (!entry?.channelId || !entry?.webhookId || !entry?.webhookToken) return;
     if (payload.fromDiscord) {
       if (payload.discordGuildId && String(payload.discordGuildId) === String(entry.guildId)) {
         return;
       }
       if (entry.mode === 'private') return;
     }
-    sendToChannel(entry.channelId, text, {}, { parse: [] });
+    const webhook = new WebhookClient({ id: entry.webhookId, token: entry.webhookToken });
+    webhook
+      .send({
+        content: text,
+        username,
+        avatarURL,
+        allowedMentions: { parse: [] },
+      })
+      .catch((err) => {
+        logger.warn('Failed to send webhook message', { guildId: entry.guildId, error: err.message });
+      });
   });
 }
 

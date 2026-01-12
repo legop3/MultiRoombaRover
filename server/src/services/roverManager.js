@@ -199,7 +199,7 @@ function handleSensorFrame(roverId, frame) {
   if (bumps?.bumpLeft || bumps?.bumpRight) {
     record.lastBumpAt = Date.now();
   }
-  io.to(record.room).emit('sensorFrame', {
+  io.to(record.room).volatile.emit('sensorFrame', {
     roverId,
     frame,
     sensors: decoded,

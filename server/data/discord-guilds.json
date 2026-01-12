@@ -3,7 +3,18 @@
     "guildId": "700146429359816735",
     "channelId": "1441685291944513566",
     "mode": "global",
+    "webhookId": "1460150998717956309",
+    "webhookToken": "Lq0prLr8rCx73ooYLv5X402s9cD_Kd6HsOJiKs1obvrNwq4KX--9bSNX01zxraXTiZ8S",
     "createdAt": 1768169994193,
-    "updatedAt": 1768169994193
+    "updatedAt": 1768197526600
+  },
+  "800083965666132008": {
+    "guildId": "800083965666132008",
+    "channelId": "870272768334233601",
+    "mode": "global",
+    "webhookId": "1460154683552301066",
+    "webhookToken": "-4mVd50-lnnGXiZp2G8Sg0Y0wgnXKj5QLtRA6igX_PLWfGLsGtuMMmWHl-eVhwt38MFb",
+    "createdAt": 1768198405065,
+    "updatedAt": 1768198405067
   }
 }

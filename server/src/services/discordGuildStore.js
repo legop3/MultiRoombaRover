@@ -45,7 +45,7 @@ function getGuildConfig(guildId) {
   return store[String(guildId)] || null;
 }
 
-function setGuildConfig(guildId, { channelId, mode }) {
+function setGuildConfig(guildId, { channelId, mode, webhookId, webhookToken }) {
   if (!guildId) {
     throw new Error('guildId required');
   }
@@ -57,6 +57,8 @@ function setGuildConfig(guildId, { channelId, mode }) {
     guildId: key,
     channelId: channelId != null ? String(channelId) : prev?.channelId || null,
     mode: normalizeMode(mode, prev?.mode || 'global'),
+    webhookId: webhookId != null ? String(webhookId) : prev?.webhookId || null,
+    webhookToken: webhookToken != null ? String(webhookToken) : prev?.webhookToken || null,
     createdAt: prev?.createdAt || now,
     updatedAt: now,
   };
