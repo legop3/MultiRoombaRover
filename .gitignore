@@ -12,3 +12,4 @@ robots.json
 roverd-dummy
 server/config.yaml
 package-lock.json
+server/data/discord-guilds.json
