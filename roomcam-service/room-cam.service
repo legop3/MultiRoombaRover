@@ -11,8 +11,7 @@ Environment=QUALITY=5
 Environment=PORT=8088
 Environment=WORKDIR=/run/roomcam
 Environment=INPUT_FORMAT=mjpeg
-WorkingDirectory=/home/daniel/gits/MultiRoombaRover/roomcam-service
-ExecStart=/usr/bin/env bash /home/daniel/gits/MultiRoombaRover/roomcam-service/room-cam-snapshot.sh
+ExecStart=/usr/bin/env bash /usr/local/bin/room-cam-snapshot.sh
 Restart=always
 RestartSec=2
 User=root
