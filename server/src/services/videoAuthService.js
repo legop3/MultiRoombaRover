@@ -74,18 +74,28 @@ app.post('/mediamtx/auth', (req, res) => {
   const body = req.body || {};
   const path = (body.path || '').replace(/^\//, '');
   const sessionId = body.user;
-  const action = body.action || '';
-  const protocol = body.protocol || '';
+  const action = (body.action || '').toLowerCase();
+  const protocol = (body.protocol || '').toLowerCase();
   const ip = body.ip || req.ip || '';
   const streamInfo = extractStreamInfo(path);
 
   logger.info('video auth request', { path: body.path, sessionId, stream: streamInfo, action, protocol, ip });
 
+  const normalizedIp = (() => {
+    if (!ip) return '';
+    if (ip.includes('::ffff:')) {
+      return ip.replace(/^::ffff:/, '');
+    }
+    if (ip.includes('.') && ip.includes(':')) {
+      return ip.slice(0, ip.lastIndexOf(':'));
+    }
+    return ip;
+  })();
   const isLocal =
-    ip === '127.0.0.1' ||
-    ip === '::1' ||
-    ip === '::ffff:127.0.0.1';
-  if (!sessionId && action === 'read' && protocol === 'srt' && isLocal && streamInfo?.id) {
+    normalizedIp === '127.0.0.1' ||
+    normalizedIp === '::1' ||
+    normalizedIp === 'localhost';
+  if (action === 'read' && protocol === 'srt' && streamInfo?.id && (isLocal || !normalizedIp)) {
     return res.status(200).end();
   }
 
