@@ -9,6 +9,7 @@ MEDIAMTX_CONFIG="$MEDIAMTX_CONF_DIR/mediamtx.yml"
 MEDIAMTX_SNAPSHOT_SCRIPT="$MEDIAMTX_CONF_DIR/rover-snapshot.sh"
 MEDIAMTX_SERVICE="/etc/systemd/system/mediamtx.service"
 MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
+SNAPSHOT_DIR="/var/lib/rover-snapshots"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This installer must be run with sudo/root." >&2
@@ -83,6 +84,8 @@ install -m 0755 "$MEDIAMTX_SNAPSHOT_TEMPLATE" "$MEDIAMTX_SNAPSHOT_SCRIPT"
 chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
 
 echo "[4/6] Writing systemd units..."
+mkdir -p "$SNAPSHOT_DIR"
+chown "$TARGET_USER":"$TARGET_USER" "$SNAPSHOT_DIR"
 cat > "$MEDIAMTX_SERVICE" <<EOF
 [Unit]
 Description=mediaMTX WebRTC Server
@@ -93,6 +96,7 @@ Wants=network-online.target
 User=$TARGET_USER
 Group=$TARGET_USER
 WorkingDirectory=$MEDIAMTX_CONF_DIR
+Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
 ExecStart=$MEDIAMTX_BIN $MEDIAMTX_CONFIG
 Restart=on-failure
 RestartSec=2
@@ -113,6 +117,7 @@ Group=$TARGET_USER
 WorkingDirectory=$SERVER_DIR
 Environment=NODE_ENV=production
 Environment=SERVER_CONFIG=$CONFIG_PATH
+Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
 Restart=on-failure
 RestartSec=2

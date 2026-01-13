@@ -4,7 +4,7 @@ const path = require('path');
 const logger = require('../globals/logger').child('roverSnapshot');
 const roverManager = require('./roverManager');
 
-const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/run/rover-snapshots';
+const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
 const POLL_INTERVAL_MS = 500;
 
 const roverState = new Map(); // id -> { frame, ts, error, failures, fetching, mtimeMs }
