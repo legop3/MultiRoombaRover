@@ -74,9 +74,20 @@ app.post('/mediamtx/auth', (req, res) => {
   const body = req.body || {};
   const path = (body.path || '').replace(/^\//, '');
   const sessionId = body.user;
+  const action = body.action || '';
+  const protocol = body.protocol || '';
+  const ip = body.ip || req.ip || '';
   const streamInfo = extractStreamInfo(path);
 
-  logger.info('video auth request', { path: body.path, sessionId, stream: streamInfo });
+  logger.info('video auth request', { path: body.path, sessionId, stream: streamInfo, action, protocol, ip });
+
+  const isLocal =
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip === '::ffff:127.0.0.1';
+  if (!sessionId && action === 'read' && protocol === 'srt' && isLocal && streamInfo?.id) {
+    return res.status(200).end();
+  }
 
   if (!sessionId || !streamInfo?.id) {
     logger.warn('auth missing session or stream (session=%s path=%s)', sessionId, path);
