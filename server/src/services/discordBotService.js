@@ -648,12 +648,12 @@ function formatWebhookUsername(payload) {
   const voltageMv = record?.lastSensor?.decoded?.voltageMv ?? record?.lastSensor?.sensors?.voltageMv;
   const batteryText = percent != null ? `battery ${percent}%` : null;
   const voltageText = voltageMv != null ? `voltage ${formatVoltage(voltageMv)}` : null;
-  const roverText = payload.roverId ? `rover ${payload.roverId}` : 'rover none';
+  const roverText = payload.roverId ? `Rover: ${payload.roverId}` : `No rover`;
   const roleText =
     payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin'
-      ? 'admin'
+      ? 'Admin'
       : null;
-  const suffix = [roverText, batteryText, voltageText, roleText].filter(Boolean).join(' · ');
+  const suffix = [roverText, roleText].filter(Boolean).join(' · ');
   return suffix ? `${name} · ${suffix}` : name;
 }
 
