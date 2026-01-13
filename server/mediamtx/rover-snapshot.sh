@@ -19,7 +19,7 @@ QUALITY="${ROVER_SNAPSHOT_QUALITY:-8}"
 mkdir -p "${OUTPUT_DIR}"
 OUTPUT_PATH="${OUTPUT_DIR}/${STREAM_ID}.jpg"
 
-INPUT_URL="${ROVER_SNAPSHOT_INPUT_URL:-srt://127.0.0.1:9000?streamid=#!::r=${STREAM_ID},m=play&latency=20&mode=caller&transtype=live&pkt_size=1316}"
+INPUT_URL="${ROVER_SNAPSHOT_INPUT_URL:-srt://127.0.0.1:9000?streamid=#!::r=${STREAM_ID},m=read&latency=20&mode=caller&transtype=live&pkt_size=1316}"
 
 exec /usr/bin/ffmpeg -hide_banner -loglevel warning \
   -fflags nobuffer \
