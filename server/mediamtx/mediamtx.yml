@@ -42,4 +42,3 @@ paths:
   all:
     source: publisher
     sourceOnDemand: no
-    runOnReady: /etc/mediamtx/rover-snapshot.sh

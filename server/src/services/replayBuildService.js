@@ -62,10 +62,17 @@ async function listLatestSegments(sourceKey, neededCount) {
   const dir = path.join(replaySegmentsDir, sourceKey);
   const entries = await fsp.readdir(dir, { withFileTypes: true });
   const files = [];
+  const now = Date.now();
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith('.mp4')) continue;
     const filePath = path.join(dir, entry.name);
     const stat = await fsp.stat(filePath);
+    if (stat.size < 16 * 1024) {
+      continue;
+    }
+    if (now - stat.mtimeMs < segmentSeconds * 1000) {
+      continue;
+    }
     files.push({ filePath, mtimeMs: stat.mtimeMs });
   }
   files.sort((a, b) => a.mtimeMs - b.mtimeMs);

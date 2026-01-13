@@ -13,6 +13,9 @@ const FPS = 15;
 const SCALE_WIDTH = 640;
 const MAX_BYTES = Number.parseInt(process.env.REPLAY_SEGMENT_MAX_BYTES || '0', 10);
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
+const ROVER_SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
+const ROVER_SNAPSHOT_FPS = 3;
+const roverPreviews = new Map(); // key -> proc
 
 const recorders = new Map(); // key -> { proc, source }
 let cleanupTimer = null;
@@ -50,6 +53,60 @@ function buildInputUrl(source) {
     return source.streamUrl || null;
   }
   return `srt://127.0.0.1:9000?streamid=read:${encodeURIComponent(source.id)}`;
+}
+
+function spawnRoverPreview(source) {
+  const key = sourceKey(source);
+  const inputUrl = buildInputUrl(source);
+  if (!inputUrl) return;
+  const outputPath = path.join(ROVER_SNAPSHOT_DIR, `${source.id}.jpg`);
+  ensureDir(ROVER_SNAPSHOT_DIR)
+    .then(() => {
+      const args = [
+        '-hide_banner',
+        '-loglevel',
+        'warning',
+        '-fflags',
+        'nobuffer',
+        '-i',
+        inputUrl,
+        '-vf',
+        `fps=${ROVER_SNAPSHOT_FPS},scale=${SCALE_WIDTH}:-1`,
+        '-q:v',
+        '8',
+        '-an',
+        '-f',
+        'image2',
+        '-update',
+        '1',
+        outputPath,
+      ];
+      const proc = spawn(FFMPEG_BIN, args, { stdio: 'ignore' });
+      roverPreviews.set(key, proc);
+      proc.on('exit', (code, signal) => {
+        roverPreviews.delete(key);
+        if (!shouldRecord(source)) {
+          return;
+        }
+        const delay = 2000;
+        logger.warn('Rover preview exited; restarting', { key, code, signal });
+        setTimeout(() => {
+          if (!roverPreviews.has(key) && shouldRecord(source)) {
+            spawnRoverPreview(source);
+          }
+        }, delay);
+      });
+    })
+    .catch((err) => {
+      logger.warn('Rover preview setup failed', { key, err: err.message });
+    });
+}
+
+function stopRoverPreview(key) {
+  const proc = roverPreviews.get(key);
+  if (!proc) return;
+  proc.kill('SIGTERM');
+  roverPreviews.delete(key);
 }
 
 async function ensureDir(dir) {
@@ -154,10 +211,18 @@ function syncRecorders() {
     if (!recorders.has(key)) {
       spawnRecorder(source);
     }
+    if (source.type === 'rover' && !roverPreviews.has(key)) {
+      spawnRoverPreview(source);
+    }
   });
   Array.from(recorders.keys()).forEach((key) => {
     if (!desiredKeys.has(key)) {
       stopRecorder(key);
+    }
+  });
+  Array.from(roverPreviews.keys()).forEach((key) => {
+    if (!desiredKeys.has(key)) {
+      stopRoverPreview(key);
     }
   });
 }

@@ -6,7 +6,6 @@ MEDIAMTX_BASE_URL="https://github.com/bluenviron/mediamtx/releases/download/v${M
 MEDIAMTX_BIN="/usr/local/bin/mediamtx"
 MEDIAMTX_CONF_DIR="/etc/mediamtx"
 MEDIAMTX_CONFIG="$MEDIAMTX_CONF_DIR/mediamtx.yml"
-MEDIAMTX_SNAPSHOT_SCRIPT="$MEDIAMTX_CONF_DIR/rover-snapshot.sh"
 MEDIAMTX_SERVICE="/etc/systemd/system/mediamtx.service"
 MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
 SNAPSHOT_DIR="/var/lib/rover-snapshots"
@@ -27,7 +26,6 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 SERVER_DIR="$SCRIPT_DIR"
 CONFIG_PATH="$SERVER_DIR/config.yaml"
 MEDIAMTX_TEMPLATE="$SERVER_DIR/mediamtx/mediamtx.yml"
-MEDIAMTX_SNAPSHOT_TEMPLATE="$SERVER_DIR/mediamtx/rover-snapshot.sh"
 
 echo "[1/6] Installing dependencies..."
 dnf install -y nodejs npm curl tar >/dev/null
@@ -75,13 +73,6 @@ fi
 echo "      Installing mediaMTX config -> $MEDIAMTX_CONFIG"
 rm -f "$MEDIAMTX_CONFIG"
 install -m 0644 "$MEDIAMTX_TEMPLATE" "$MEDIAMTX_CONFIG"
-if [[ ! -f "$MEDIAMTX_SNAPSHOT_TEMPLATE" ]]; then
-  echo "mediaMTX snapshot script missing at $MEDIAMTX_SNAPSHOT_TEMPLATE" >&2
-  exit 1
-fi
-echo "      Installing mediaMTX snapshot script -> $MEDIAMTX_SNAPSHOT_SCRIPT"
-rm -f "$MEDIAMTX_SNAPSHOT_SCRIPT"
-install -m 0755 "$MEDIAMTX_SNAPSHOT_TEMPLATE" "$MEDIAMTX_SNAPSHOT_SCRIPT"
 chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
 
 echo "[4/6] Writing systemd units..."
