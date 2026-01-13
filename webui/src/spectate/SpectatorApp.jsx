@@ -3,6 +3,7 @@ import { useSession } from '../context/SessionContext.jsx';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
 import { useTelemetryFrames } from '../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
+import { useRoverSnapshots } from '../hooks/useRoverSnapshots.js';
 import VideoTile from '../components/VideoTile.jsx';
 import RoomCameraPanel from '../components/RoomCameraPanel.jsx';
 import UserListPanel from '../components/UserListPanel.jsx';
@@ -22,13 +23,15 @@ function formatDriverLabel({ roverId, session }) {
   return driverText;
 }
 
-function RoverSpectatorCard({ rover, frame, videoInfo, audioInfo, session }) {
+function RoverSpectatorCard({ rover, frame, snapshotFeed, audioInfo, session }) {
   const driverLabel = formatDriverLabel({ roverId: rover.id, session });
   return (
     <article className="min-h-[16rem] rounded bg-zinc-900 p-0.5 sm:min-h-[18rem]">
       <div className="min-h-0 overflow-hidden rounded bg-black/20">
         <VideoTile
-          sessionInfo={videoInfo}
+          sessionInfo={null}
+          videoMode="snapshot"
+          snapshotFeed={snapshotFeed}
           audioSessionInfo={audioInfo}
           label={rover.name}
           telemetryFrame={frame}
@@ -43,7 +46,7 @@ function RoverSpectatorCard({ rover, frame, videoInfo, audioInfo, session }) {
   );
 }
 
-function RoverRow({ roster, frames, videoSources, session }) {
+function RoverRow({ roster, frames, snapshotFeeds, audioSources, session }) {
   if (roster.length === 0) {
     return <p className="col-span-full text-slate-400">No rovers registered.</p>;
   }
@@ -54,8 +57,8 @@ function RoverRow({ roster, frames, videoSources, session }) {
           key={rover.id}
           rover={rover}
           frame={frames[rover.id]}
-          videoInfo={videoSources[rover.id]}
-          audioInfo={videoSources[`${rover.id}-audio`]}
+          snapshotFeed={snapshotFeeds[rover.id]}
+          audioInfo={audioSources[`${rover.id}-audio`]}
           session={session}
           showHudMap
           hudMapPosition="bottom-left"
@@ -94,14 +97,16 @@ export default function SpectatorApp() {
   useSpectatorMode();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
-  const entries = roster.flatMap((rover) => {
-    const base = { type: 'rover', id: rover.id, key: rover.id };
-    if (rover.media?.audioPublishUrl) {
-      return [base, { type: 'rover', id: `${rover.id}-audio`, key: `${rover.id}-audio` }];
-    }
-    return [base];
-  });
-  const videoSources = useVideoRequests(entries, { enabled: !inLockdown, version: session?.mode });
+  const snapshotFeeds = useRoverSnapshots(
+    roster.map((rover) => rover.id),
+    { enabled: !inLockdown, version: session?.mode },
+  );
+  const audioEntries = roster.flatMap((rover) =>
+    rover.media?.audioPublishUrl
+      ? [{ type: 'rover', id: `${rover.id}-audio`, key: `${rover.id}-audio` }]
+      : [],
+  );
+  const audioSources = useVideoRequests(audioEntries, { enabled: !inLockdown, version: session?.mode });
 
   if (inLockdown) {
     return (
@@ -121,7 +126,13 @@ export default function SpectatorApp() {
       <div className="min-h-screen bg-black text-slate-100 md:h-screen md:overflow-hidden">
         <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]">
           <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:overflow-y-auto">
-            <RoverRow roster={roster} frames={frames} videoSources={videoSources} session={session} />
+            <RoverRow
+              roster={roster}
+              frames={frames}
+              snapshotFeeds={snapshotFeeds}
+              audioSources={audioSources}
+              session={session}
+            />
             <SecondaryRow />
           </section>
           <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:h-full">

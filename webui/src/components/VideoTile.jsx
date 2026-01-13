@@ -45,6 +45,9 @@ function buildBatteryVisual(charge, config) {
 export default function VideoTile({
   sessionInfo,
   audioSessionInfo,
+  videoMode = 'whep',
+  snapshotFeed = null,
+  qualityNotice = null,
   label,
   forceMute = false,
   telemetryFrame,
@@ -70,6 +73,7 @@ export default function VideoTile({
   const [restartToken, setRestartToken] = useState(0);
   const [audioRestartToken, setAudioRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
+  const usingSnapshot = videoMode === 'snapshot';
   const sensors = telemetryFrame?.sensors;
   const batteryCharge = sensors?.batteryChargeMah ?? null;
   const desktopLayout = layoutFormat === 'desktop';
@@ -162,7 +166,14 @@ export default function VideoTile({
   }, [status, attemptUnmute]);
 
   useEffect(() => {
-    if (!sessionInfo?.url || !videoRef.current) {
+    if (usingSnapshot) {
+      setStatus('snapshot');
+      setDetail(null);
+    }
+  }, [usingSnapshot]);
+
+  useEffect(() => {
+    if (usingSnapshot || !sessionInfo?.url || !videoRef.current) {
       return undefined;
     }
     let active = true;
@@ -199,7 +210,7 @@ export default function VideoTile({
       clearTimeout(resetMuteId);
       player?.stop();
     };
-  }, [sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback]);
+  }, [usingSnapshot, sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback]);
 
   useEffect(() => {
     if (status === 'stopped' && sessionInfo?.url) {
@@ -329,7 +340,14 @@ export default function VideoTile({
     };
   }, [audioSessionInfo?.url]);
 
-  const renderedStatus = !sessionInfo?.url
+  const snapshotStatus = snapshotFeed?.error
+    ? `Error: ${snapshotFeed.error}`
+    : snapshotFeed?.objectUrl
+    ? 'snapshot'
+    : snapshotFeed?.status || 'waiting';
+  const renderedStatus = usingSnapshot
+    ? snapshotStatus
+    : !sessionInfo?.url
     ? 'waiting'
     : status === 'error'
     ? `Error: ${detail || 'unknown'}`
@@ -352,14 +370,29 @@ export default function VideoTile({
       <div
         className={`relative w-full overflow-hidden bg-black ${fitParent ? 'h-full flex-1' : 'aspect-video'}`}
       >
-        <video
-          ref={videoRef}
-          muted={forceMute || muted}
-          playsInline
-          autoPlay
-          controls={false}
-          className="h-full w-full object-contain"
-        />
+        {usingSnapshot ? (
+          snapshotFeed?.objectUrl ? (
+            <img
+              src={snapshotFeed.objectUrl}
+              alt={label}
+              className="h-full w-full object-contain"
+              draggable={false}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-sm text-slate-300">
+              Waiting for frame…
+            </div>
+          )
+        ) : (
+          <video
+            ref={videoRef}
+            muted={forceMute || muted}
+            playsInline
+            autoPlay
+            controls={false}
+            className="h-full w-full object-contain"
+          />
+        )}
         <audio ref={audioRef} autoPlay hidden />
         <HudOverlay
           frame={telemetryFrame}
@@ -381,6 +414,11 @@ export default function VideoTile({
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />
         {showVerticalBattery && batteryVisual.available ? (
           <BatteryBarVertical visual={batteryVisual} />
+        ) : null}
+        {qualityNotice ? (
+          <div className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 py-0.5 text-xs font-semibold text-amber-200">
+            {qualityNotice}
+          </div>
         ) : null}
       </div>
       {!showVerticalBattery && (

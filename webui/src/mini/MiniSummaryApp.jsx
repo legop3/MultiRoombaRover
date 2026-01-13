@@ -3,6 +3,7 @@ import { SettingsProvider } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
 import { useTelemetryFrames } from '../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
+import { useRoverSnapshots } from '../hooks/useRoverSnapshots.js';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
 import { useRoomCameraSnapshots } from '../hooks/useRoomCameraSnapshots.js';
 import VideoTile from '../components/VideoTile.jsx';
@@ -33,30 +34,26 @@ function MiniSummaryContent() {
   });
   const [index, setIndex] = useState(0);
 
-  const entries = useMemo(
+  const snapshotFeeds = useRoverSnapshots(
+    roster.map((rover) => rover.id),
+    { enabled: !inLockdown, version: session?.mode },
+  );
+  const audioEntries = useMemo(
     () =>
       roster.flatMap((rover) => {
-        if (!rover?.id) return [];
+        if (!rover?.id || !rover.media?.audioPublishUrl) return [];
         const id = String(rover.id);
-        const base = [{ type: 'rover', id, key: id }];
-        if (rover.media?.audioPublishUrl) {
-          base.push({ type: 'rover', id: `${id}-audio`, key: `${id}-audio` });
-        }
-        return base;
+        return [{ type: 'rover', id: `${id}-audio`, key: `${id}-audio` }];
       }),
     [roster],
   );
-
-  const videoSourcesEnabled = useVideoRequests(entries, {
-    enabled: !inLockdown,
-    version: session?.mode,
-  });
+  const audioSources = useVideoRequests(audioEntries, { enabled: !inLockdown, version: session?.mode });
 
   const roverPool = useMemo(() => {
     if (!roster.length) return [];
-    const withVideo = roster.filter((rover) => videoSourcesEnabled[rover.id]?.url);
-    return withVideo.length ? withVideo : roster;
-  }, [roster, videoSourcesEnabled]);
+    const withSnapshot = roster.filter((rover) => snapshotFeeds[rover.id]?.objectUrl);
+    return withSnapshot.length ? withSnapshot : roster;
+  }, [roster, snapshotFeeds]);
 
   const rotationPool = useMemo(() => {
     const items = [];
@@ -91,8 +88,8 @@ function MiniSummaryContent() {
   const activeRover = activeEntry?.type === 'rover' ? activeEntry.rover : null;
   const activeCamera = activeEntry?.type === 'room' ? activeEntry.camera : null;
 
-  const activeVideo = activeRover ? videoSourcesEnabled[activeRover.id] || null : null;
-  const activeAudio = activeRover ? videoSourcesEnabled[`${activeRover.id}-audio`] || null : null;
+  const activeSnapshot = activeRover ? snapshotFeeds[activeRover.id] || null : null;
+  const activeAudio = activeRover ? audioSources[`${activeRover.id}-audio`] || null : null;
   const activeFrame = activeRover ? frames[activeRover.id] || null : null;
   const driverLabel = activeRover ? formatDriverLabel({ roverId: activeRover.id, session }) : null;
   const activeFeed = activeCamera ? feeds[activeCamera.id] || null : null;
@@ -119,7 +116,9 @@ function MiniSummaryContent() {
         ) : activeRover ? (
           <FitViewportFrame>
             <VideoTile
-              sessionInfo={activeVideo}
+              sessionInfo={null}
+              videoMode="snapshot"
+              snapshotFeed={activeSnapshot}
               audioSessionInfo={activeAudio}
               label={activeRover.name || activeRover.id}
               telemetryFrame={activeFrame}
