@@ -91,7 +91,7 @@ function startStream(camera) {
       res.on('data', (chunk) => {
         buffer = Buffer.concat([buffer, chunk]);
         while (true) {
-          const start = buffer.indexOf(JPEG_START);
+          let start = buffer.indexOf(JPEG_START);
           if (start === -1) {
             if (buffer.length > 2 * 1024 * 1024) {
               buffer = buffer.slice(-1024 * 1024);
@@ -100,10 +100,11 @@ function startStream(camera) {
           }
           if (start > 0) {
             buffer = buffer.slice(start);
+            start = 0;
           }
           const end = buffer.indexOf(JPEG_END, 2);
           if (end === -1) break;
-          const frame = buffer.slice(start, end + 2);
+          const frame = buffer.slice(0, end + 2);
           buffer = buffer.slice(end + 2);
           const ts = Date.now();
           markState(camera.id, { frame, ts, error: null, failures: 0 });
@@ -111,6 +112,10 @@ function startStream(camera) {
         }
       });
       res.on('end', () => {
+        scheduleStreamReconnect(camera);
+      });
+      res.on('aborted', () => {
+        handleStreamError(camera, new Error('stream aborted'));
         scheduleStreamReconnect(camera);
       });
       res.on('error', (err) => {
