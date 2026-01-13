@@ -12,6 +12,8 @@ const cameraState = new Map(); // id -> {frame, ts, error, failures, fetching}
 const events = new EventEmitter(); // frame, status
 let pollTimer = null;
 const streamState = new Map(); // id -> { req, reconnectTimer }
+const JPEG_START = Buffer.from([0xff, 0xd8]);
+const JPEG_END = Buffer.from([0xff, 0xd9]);
 
 function markState(id, updates = {}) {
   const prev = cameraState.get(id) || {};
@@ -89,14 +91,17 @@ function startStream(camera) {
       res.on('data', (chunk) => {
         buffer = Buffer.concat([buffer, chunk]);
         while (true) {
-          const start = buffer.indexOf(0xffd8);
+          const start = buffer.indexOf(JPEG_START);
           if (start === -1) {
             if (buffer.length > 2 * 1024 * 1024) {
               buffer = buffer.slice(-1024 * 1024);
             }
             break;
           }
-          const end = buffer.indexOf(0xffd9, start + 2);
+          if (start > 0) {
+            buffer = buffer.slice(start);
+          }
+          const end = buffer.indexOf(JPEG_END, 2);
           if (end === -1) break;
           const frame = buffer.slice(start, end + 2);
           buffer = buffer.slice(end + 2);
