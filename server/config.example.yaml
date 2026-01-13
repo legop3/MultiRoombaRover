@@ -28,10 +28,12 @@ roomCameras:
     name: "Lobby Camera"
     description: "Wide shot of the staging area."
     url: "http://192.168.0.50/snapshot.jpg"
+    streamUrl: "http://192.168.0.50/stream.mjpg"
   - id: "workshop"
     name: "Workshop Bench"
     description: "Shows the workbench and charging docks."
     url: "http://192.168.0.51/snapshot.jpg"
+    streamUrl: "http://192.168.0.51/stream.mjpg"
 
 discord:
   token: "DISCORD_BOT_TOKEN"

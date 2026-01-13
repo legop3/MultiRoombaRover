@@ -1,13 +1,10 @@
 ## raspberry pi
-- need to throttle sensor sending, maybe only send one in every 5 packets.
+<!-- - need to throttle sensor sending, maybe only send one in every 5 packets. -->
 
 ## 3d models for camera:
 - https://www.thingiverse.com/thing:2873677
 - https://www.printables.com/model/356894-raspberry-camera-module-with-automatic-ir-cut-swit
 - https://www.thingiverse.com/thing:4514531
-
-## spectator page
-- completely remake it from scratch
 
 ## todo
 <!-- 1. battery manager -->
@@ -22,6 +19,9 @@
 <!-- 9. online user list -->
 <!-- 10. chat -->
 <!-- 9. discord invite button -->
-10. redo both mobile layouts
-11. redo spectator view (last)
-21. finally.. set the favicon and title
+<!-- 10. redo both mobile layouts -->
+<!-- 11. redo spectator view (last) -->
+<!-- 21. finally.. set the favicon and title -->
+22. rover snapshots freezing and never coming back
+23. rover snapshot -> video switching needs to be smoother, no black flash. connect and play before showing.
+24. rover snapshots delayed (not just because of framerate)

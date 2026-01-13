@@ -1,10 +1,6 @@
 const EventEmitter = require('events');
 const logger = require('../globals/logger').child('roomCameraSnapshot');
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
-const {
-  recordRoomCameraFrame,
-  clearRoomCameraReplayFrames,
-} = require('./roomCameraReplayService');
 
 const POLL_INTERVAL_MS = 67;
 const FETCH_TIMEOUT_MS = 2000;
@@ -36,7 +32,6 @@ async function fetchSnapshot(camera) {
     const buffer = Buffer.from(arrayBuffer);
     const ts = Date.now();
     markState(id, { frame: buffer, ts, error: null, failures: 0 });
-    recordRoomCameraFrame(id, buffer, ts);
     events.emit('frame', { id, buffer, ts });
   } catch (err) {
     const failures = (state?.failures || 0) + 1;
@@ -55,7 +50,6 @@ function stopAll() {
     pollTimer = null;
   }
   cameraState.clear();
-  clearRoomCameraReplayFrames();
 }
 
 function startAll() {

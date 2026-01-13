@@ -10,6 +10,7 @@ MEDIAMTX_SNAPSHOT_SCRIPT="$MEDIAMTX_CONF_DIR/rover-snapshot.sh"
 MEDIAMTX_SERVICE="/etc/systemd/system/mediamtx.service"
 MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
 SNAPSHOT_DIR="/var/lib/rover-snapshots"
+REPLAY_SEGMENT_DIR="/var/lib/replay-segments"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This installer must be run with sudo/root." >&2
@@ -86,6 +87,8 @@ chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
 echo "[4/6] Writing systemd units..."
 mkdir -p "$SNAPSHOT_DIR"
 chown "$TARGET_USER":"$TARGET_USER" "$SNAPSHOT_DIR"
+mkdir -p "$REPLAY_SEGMENT_DIR"
+chown "$TARGET_USER":"$TARGET_USER" "$REPLAY_SEGMENT_DIR"
 cat > "$MEDIAMTX_SERVICE" <<EOF
 [Unit]
 Description=mediaMTX WebRTC Server
@@ -118,6 +121,7 @@ WorkingDirectory=$SERVER_DIR
 Environment=NODE_ENV=production
 Environment=SERVER_CONFIG=$CONFIG_PATH
 Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
+Environment=REPLAY_SEGMENT_DIR=$REPLAY_SEGMENT_DIR
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
 Restart=on-failure
 RestartSec=2

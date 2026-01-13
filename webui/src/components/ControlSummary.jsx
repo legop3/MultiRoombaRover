@@ -5,6 +5,7 @@ import { useControlSystem } from '../controls/index.js';
 import { formatKeyLabel } from '../controls/keymapUtils.js';
 import TopDownMap from './TopDownMap.jsx';
 import RoverRoster from './RoverRoster.jsx';
+import ReplaySourcesPanel from './ReplaySourcesPanel.jsx';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
 
 export function RoverRosterPanel({ title = 'Rovers' }) {
@@ -69,7 +70,14 @@ export default function ControlSummary({ showRoster = true }) {
           {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
         </div>
       </div>
-      {showRoster ? <RoverRosterPanel /> : null}
+      {showRoster ? (
+        <div className="grid gap-0.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div className="aspect-square">
+            <ReplaySourcesPanel />
+          </div>
+          <RoverRosterPanel />
+        </div>
+      ) : null}
     </section>
   );
 }

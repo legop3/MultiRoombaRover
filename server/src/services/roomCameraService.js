@@ -23,6 +23,7 @@ function normalizeCamera(camera) {
     name: camera.name || camera.id || String(id),
     description: camera.description || null,
     url: camera.url,
+    streamUrl: camera.streamUrl || camera.mjpegUrl || null,
   };
 }
 

@@ -97,7 +97,7 @@ export function SessionProvider({ children }) {
       homeAssistantSetState: (entityId, state) =>
         emitWithAck('homeAssistant:setState', { entityId, state }),
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
-      triggerReplay: (cameraId = null) => emitWithAck('replay:trigger', { cameraId }),
+      triggerReplay: (sources = []) => emitWithAck('replay:trigger', { sources }),
       pushAlert: (alert) =>
         setAlerts((prev) => [
           ...prev.slice(-49),

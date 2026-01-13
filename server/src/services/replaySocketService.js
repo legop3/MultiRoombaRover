@@ -3,9 +3,10 @@ const logger = require('../globals/logger').child('replaySocket');
 const { getMode, MODES } = require('./modeManager');
 const { publishEvent } = require('./eventBus');
 const { tryTriggerReplay } = require('./replayService');
+const { validateSources, getDefaultWebSources } = require('./replaySourceService');
+const assignmentService = require('./assignmentService');
 const { getNickname } = require('./nicknameService');
 const { loadConfig } = require('../helpers/configLoader');
-const { getRoomCamera } = require('./roomCameraService');
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
@@ -25,9 +26,14 @@ io.on('connection', (socket) => {
       cb({ error: 'Replay channel not configured', state: null });
       return;
     }
-    const requestedCameraId = payload?.cameraId ? String(payload.cameraId) : null;
-    if (requestedCameraId && !getRoomCamera(requestedCameraId)) {
-      cb({ error: 'Unknown camera', state: null });
+    const requestedSources = Array.isArray(payload?.sources) ? payload.sources : null;
+    let sources = requestedSources ? validateSources(requestedSources) : [];
+    if (!sources.length) {
+      const assignment = assignmentService.describeAssignment(socket.id);
+      sources = getDefaultWebSources(assignment);
+    }
+    if (!sources.length) {
+      cb({ error: 'No replay sources selected', state: null });
       return;
     }
     const requester = buildRequesterLabel(socket);
@@ -42,7 +48,7 @@ io.on('connection', (socket) => {
       payload: {
         channelId,
         requester,
-        cameraId: requestedCameraId,
+        sources,
         requestedBy: { socketId: socket.id },
       },
     });

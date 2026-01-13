@@ -12,7 +12,7 @@ if [[ "${STREAM_ID}" == *-audio ]]; then
 fi
 
 OUTPUT_DIR="${ROVER_SNAPSHOT_DIR:-/var/lib/rover-snapshots}"
-FPS="${ROVER_SNAPSHOT_FPS:-1}"
+FPS="${ROVER_SNAPSHOT_FPS:-3}"
 WIDTH="${ROVER_SNAPSHOT_WIDTH:-640}"
 QUALITY="${ROVER_SNAPSHOT_QUALITY:-8}"
 

@@ -10,6 +10,7 @@ const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('./homeAssistantService');
 const { getNickname, nicknameEvents } = require('./nicknameService');
 const { getReplayState, replayEvents } = require('./replayService');
+const { getReplaySources } = require('./replaySourceService');
 const { loadConfig } = require('../helpers/configLoader');
 
 const discordInvite = loadConfig().discord?.invite || null;
@@ -49,6 +50,7 @@ function buildSession(socket) {
     roomCameras: getRoomCameras(),
     homeAssistant: getHomeAssistantState(),
     replay: getReplayState(),
+    replaySources: getReplaySources(),
     users,
     discord: {
       invite: discordInvite,
