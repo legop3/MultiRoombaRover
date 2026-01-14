@@ -72,7 +72,7 @@ export default function ControlSummary({ showRoster = true }) {
       </div>
       {showRoster ? (
         <div className="grid gap-0.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-          <div className="aspect-square">
+          <div>
             <ReplaySourcesPanel />
           </div>
           <RoverRosterPanel />

@@ -97,31 +97,25 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources' }) {
   };
 
   return (
-    <section className="panel h-full w-full">
-      <div className="flex h-full flex-col gap-0.5 p-0.75 text-sm">
-        <header className="flex items-center justify-between text-slate-300">
-          <span className="text-xs uppercase tracking-wide text-slate-400">Replay Sources</span>
-          <span className="text-xs text-slate-500">{sources.length}</span>
-        </header>
-        <div className="flex-1 overflow-auto pr-0.5">
-          <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />
-          <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
-        </div>
-        <div className="space-y-0.25">
-          <button
-            type="button"
-            className={`w-full rounded border px-1 py-0.5 text-xs ${
-              replayDisabled
-                ? 'border-slate-700 text-slate-500'
-                : 'border-slate-500 text-slate-200 hover:border-slate-300 hover:text-white'
-            }`}
-            onClick={handleReplay}
-            disabled={replayDisabled}
-          >
-            {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
-          </button>
-          {error ? <div className="text-xs text-amber-400">{error}</div> : null}
-        </div>
+    <section className="panel-section p-0.75 text-sm">
+      <header className="panel-muted flex items-center justify-between text-xs uppercase tracking-wide">
+        <span>Replay Sources</span>
+        <span>{sources.length}</span>
+      </header>
+      <div className="space-y-0.5">
+        <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />
+        <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
+      </div>
+      <div className="space-y-0.25">
+        <button
+          type="button"
+          className="button-dark w-full text-xs disabled:opacity-40"
+          onClick={handleReplay}
+          disabled={replayDisabled}
+        >
+          {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
+        </button>
+        {error ? <div className="text-xs text-amber-400">{error}</div> : null}
       </div>
     </section>
   );
@@ -130,11 +124,11 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources' }) {
 function GroupList({ title, items, selected, onToggle }) {
   if (!items.length) return null;
   return (
-    <div className="mb-0.5 space-y-0.25">
-      <div className="text-xs uppercase text-slate-500">{title}</div>
+    <div className="space-y-0.25">
+      <div className="panel-muted text-xs uppercase">{title}</div>
       <div className="space-y-0.25">
         {items.map((item) => (
-          <label key={item.key} className="flex items-center gap-0.5 text-xs text-slate-200">
+          <label key={item.key} className="surface flex items-center gap-0.5 text-xs">
             <input
               type="checkbox"
               checked={selected.includes(item.key)}
