@@ -163,10 +163,23 @@ function spawnRecorder(source) {
           outPattern,
         );
       }
-      const proc = spawn(FFMPEG_BIN, args, { stdio: 'ignore' });
+      const proc = spawn(FFMPEG_BIN, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+      const stderrChunks = [];
+      let stderrSize = 0;
+      proc.stderr.on('data', (chunk) => {
+        if (!chunk || stderrSize > 8192) return;
+        stderrChunks.push(chunk);
+        stderrSize += chunk.length;
+      });
       recorders.set(key, { proc, source });
       proc.on('exit', (code, signal) => {
         recorders.delete(key);
+        if (stderrChunks.length) {
+          const stderrText = Buffer.concat(stderrChunks).toString('utf8').trim();
+          if (stderrText) {
+            logger.warn('Replay recorder stderr', { key, stderr: stderrText });
+          }
+        }
         if (!shouldRecord(source)) {
           return;
         }
