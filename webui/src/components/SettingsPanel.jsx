@@ -6,6 +6,7 @@ import KeymapSettings from './KeymapSettings.jsx';
 import GamepadMappingSettings from './GamepadMappingSettings.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 import SessionSnapshot from './SessionSnapshot.jsx';
+import SocketLogPanel from './SocketLogPanel.jsx';
 import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 
 const manualTabs = [
@@ -110,6 +111,7 @@ export default function SettingsPanel() {
             <AuthPanel />
             <AdminPanel />
             <SessionSnapshot />
+            <SocketLogPanel />
           </div>
         </TabPanel>
       </TabPanels>
