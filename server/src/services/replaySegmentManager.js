@@ -81,7 +81,7 @@ function spawnRecorder(source) {
       const args = [
         '-hide_banner',
         '-loglevel',
-        'warning',
+        'info',
         '-fflags',
         'nobuffer',
         '-flags',
@@ -174,11 +174,16 @@ function spawnRecorder(source) {
       recorders.set(key, { proc, source });
       proc.on('exit', (code, signal) => {
         recorders.delete(key);
-        if (stderrChunks.length) {
-          const stderrText = Buffer.concat(stderrChunks).toString('utf8').trim();
-          if (stderrText) {
-            logger.warn('Replay recorder stderr', { key, stderr: stderrText });
-          }
+        const stderrBuffer = stderrChunks.length ? Buffer.concat(stderrChunks) : null;
+        if (stderrBuffer && stderrBuffer.length) {
+          const preview = stderrBuffer.toString('utf8', 0, 600).trim();
+          logger.warn('Replay recorder stderr', {
+            key,
+            stderrBytes: stderrBuffer.length,
+            stderrPreview: preview || '<non-utf8>',
+          });
+        } else {
+          logger.warn('Replay recorder stderr', { key, stderrBytes: 0 });
         }
         if (!shouldRecord(source)) {
           return;
