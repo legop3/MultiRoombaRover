@@ -23,6 +23,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources' }) {
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const replayState = session?.replay || null;
   const [remainingMs, setRemainingMs] = useState(0);
 
@@ -77,18 +78,21 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources' }) {
       saveSettings((current) => ({ ...(current || {}), [panelId]: next }));
       return next;
     });
+    setSuccess(null);
   };
 
   const handleReplay = async () => {
     if (replayDisabled) return;
     setBusy(true);
     setError(null);
+    setSuccess(null);
     try {
       const payload = selected.map((key) => {
         const [type, id] = key.split(':');
         return { type, id };
       });
       await triggerReplay(payload);
+      setSuccess('Replay sent. Check the Discord replay channel.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -116,6 +120,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources' }) {
           {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
         </button>
         {error ? <div className="text-xs text-amber-400">{error}</div> : null}
+        {success ? <div className="text-xs text-emerald-300">{success}</div> : null}
       </div>
     </section>
   );
