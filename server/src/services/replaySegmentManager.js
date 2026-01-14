@@ -82,6 +82,7 @@ function spawnRecorder(source) {
         '-hide_banner',
         '-loglevel',
         'info',
+        '-y',
         '-fflags',
         'nobuffer',
         '-flags',
