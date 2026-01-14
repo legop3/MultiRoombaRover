@@ -15,7 +15,6 @@ const MAX_BYTES = Number.parseInt(process.env.REPLAY_SEGMENT_MAX_BYTES || '0', 1
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
 const ROVER_SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
 const ROVER_SNAPSHOT_FPS = 3;
-const roverPreviews = new Map(); // key -> proc
 
 const recorders = new Map(); // key -> { proc, source }
 let cleanupTimer = null;
@@ -55,60 +54,6 @@ function buildInputUrl(source) {
   return `srt://127.0.0.1:9000?streamid=read:${encodeURIComponent(source.id)}`;
 }
 
-function spawnRoverPreview(source) {
-  const key = sourceKey(source);
-  const inputUrl = buildInputUrl(source);
-  if (!inputUrl) return;
-  const outputPath = path.join(ROVER_SNAPSHOT_DIR, `${source.id}.jpg`);
-  ensureDir(ROVER_SNAPSHOT_DIR)
-    .then(() => {
-      const args = [
-        '-hide_banner',
-        '-loglevel',
-        'warning',
-        '-fflags',
-        'nobuffer',
-        '-i',
-        inputUrl,
-        '-vf',
-        `fps=${ROVER_SNAPSHOT_FPS},scale=${SCALE_WIDTH}:-1`,
-        '-q:v',
-        '8',
-        '-an',
-        '-f',
-        'image2',
-        '-update',
-        '1',
-        outputPath,
-      ];
-      const proc = spawn(FFMPEG_BIN, args, { stdio: 'ignore' });
-      roverPreviews.set(key, proc);
-      proc.on('exit', (code, signal) => {
-        roverPreviews.delete(key);
-        if (!shouldRecord(source)) {
-          return;
-        }
-        const delay = 2000;
-        logger.warn('Rover preview exited; restarting', { key, code, signal });
-        setTimeout(() => {
-          if (!roverPreviews.has(key) && shouldRecord(source)) {
-            spawnRoverPreview(source);
-          }
-        }, delay);
-      });
-    })
-    .catch((err) => {
-      logger.warn('Rover preview setup failed', { key, err: err.message });
-    });
-}
-
-function stopRoverPreview(key) {
-  const proc = roverPreviews.get(key);
-  if (!proc) return;
-  proc.kill('SIGTERM');
-  roverPreviews.delete(key);
-}
-
 async function ensureDir(dir) {
   await fsp.mkdir(dir, { recursive: true });
 }
@@ -125,8 +70,14 @@ function spawnRecorder(source) {
     return;
   }
   const outPattern = buildOutputPattern(key);
+  const outputSnapshot = source.type === 'rover'
+    ? path.join(ROVER_SNAPSHOT_DIR, `${source.id}.jpg`)
+    : null;
   ensureDir(path.dirname(outPattern))
-    .then(() => {
+    .then(async () => {
+      if (outputSnapshot) {
+        await ensureDir(ROVER_SNAPSHOT_DIR);
+      }
       const args = [
         '-hide_banner',
         '-loglevel',
@@ -137,35 +88,81 @@ function spawnRecorder(source) {
         'low_delay',
         '-i',
         inputUrl,
-        '-r',
-        String(FPS),
-        '-vf',
-        `fps=${FPS},scale=${SCALE_WIDTH}:-1`,
-        '-an',
-        '-c:v',
-        'libx264',
-        '-preset',
-        'veryfast',
-        '-tune',
-        'zerolatency',
-        '-g',
-        String(FPS),
-        '-keyint_min',
-        String(FPS),
-        '-sc_threshold',
-        '0',
-        '-f',
-        'segment',
-        '-segment_time',
-        String(SEGMENT_SECONDS),
-        '-segment_format',
-        'mp4',
-        '-reset_timestamps',
-        '1',
-        '-strftime',
-        '1',
-        outPattern,
       ];
+      if (outputSnapshot) {
+        args.push(
+          '-filter_complex',
+          `[0:v]fps=${FPS},scale=${SCALE_WIDTH}:-1[vseg];` +
+            `[0:v]fps=${ROVER_SNAPSHOT_FPS},scale=${SCALE_WIDTH}:-1[vjpg]`,
+          '-map',
+          '[vseg]',
+          '-an',
+          '-c:v:0',
+          'libx264',
+          '-preset',
+          'veryfast',
+          '-tune',
+          'zerolatency',
+          '-g',
+          String(FPS),
+          '-keyint_min',
+          String(FPS),
+          '-sc_threshold',
+          '0',
+          '-f',
+          'segment',
+          '-segment_time',
+          String(SEGMENT_SECONDS),
+          '-segment_format',
+          'mp4',
+          '-reset_timestamps',
+          '1',
+          '-strftime',
+          '1',
+          outPattern,
+          '-map',
+          '[vjpg]',
+          '-an',
+          '-q:v:1',
+          '8',
+          '-f',
+          'image2',
+          '-update',
+          '1',
+          outputSnapshot,
+        );
+      } else {
+        args.push(
+          '-r',
+          String(FPS),
+          '-vf',
+          `fps=${FPS},scale=${SCALE_WIDTH}:-1`,
+          '-an',
+          '-c:v',
+          'libx264',
+          '-preset',
+          'veryfast',
+          '-tune',
+          'zerolatency',
+          '-g',
+          String(FPS),
+          '-keyint_min',
+          String(FPS),
+          '-sc_threshold',
+          '0',
+          '-f',
+          'segment',
+          '-segment_time',
+          String(SEGMENT_SECONDS),
+          '-segment_format',
+          'mp4',
+          '-reset_timestamps',
+          '1',
+          '-strftime',
+          '1',
+          outPattern,
+        );
+      }
       const proc = spawn(FFMPEG_BIN, args, { stdio: 'ignore' });
       recorders.set(key, { proc, source });
       proc.on('exit', (code, signal) => {
@@ -211,18 +208,10 @@ function syncRecorders() {
     if (!recorders.has(key)) {
       spawnRecorder(source);
     }
-    if (source.type === 'rover' && !roverPreviews.has(key)) {
-      spawnRoverPreview(source);
-    }
   });
   Array.from(recorders.keys()).forEach((key) => {
     if (!desiredKeys.has(key)) {
       stopRecorder(key);
-    }
-  });
-  Array.from(roverPreviews.keys()).forEach((key) => {
-    if (!desiredKeys.has(key)) {
-      stopRoverPreview(key);
     }
   });
 }
