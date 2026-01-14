@@ -87,22 +87,29 @@ async function buildReplayVideo({ sources = [] } = {}) {
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rover-replay-'));
   try {
     const clipPaths = [];
+    const usedSources = [];
+    const missingSources = [];
     for (let i = 0; i < sources.length; i += 1) {
       const source = sources[i];
       const key = `${source.type}__${source.id}`;
       let segmentPaths;
       try {
         segmentPaths = await listLatestSegments(key, segmentCount);
-      } catch {
-        throw new Error(`Missing replay segments for ${source.type}:${source.id}`);
+      } catch (err) {
+        missingSources.push({ ...source, reason: err.message || 'missing segments' });
+        continue;
       }
       if (segmentPaths.length < segmentCount) {
-        throw new Error(`Not enough replay segments for ${source.type}:${source.id}`);
+        missingSources.push({
+          ...source,
+          reason: `only ${segmentPaths.length}/${segmentCount} segments available`,
+        });
+        continue;
       }
-      const concatPath = path.join(tmpDir, `concat-${i}.txt`);
+      const concatPath = path.join(tmpDir, `concat-${clipPaths.length}.txt`);
       const concatBody = segmentPaths.map((file) => `file '${file}'`).join('\n');
       await fsp.writeFile(concatPath, concatBody);
-      const clipPath = path.join(tmpDir, `clip-${i}.mp4`);
+      const clipPath = path.join(tmpDir, `clip-${clipPaths.length}.mp4`);
       await execFileAsync('ffmpeg', [
         '-hide_banner',
         '-loglevel',
@@ -118,6 +125,15 @@ async function buildReplayVideo({ sources = [] } = {}) {
         clipPath,
       ]);
       clipPaths.push(clipPath);
+      usedSources.push(source);
+    }
+    if (!clipPaths.length) {
+      throw new Error('No replay segments available for selected sources');
+    }
+    if (missingSources.length) {
+      logger.warn('Replay sources missing segments', {
+        missing: missingSources.map((source) => `${source.type}:${source.id}`),
+      });
     }
 
     const { maxWidth, maxHeight } = await probeMaxFrameSize(clipPaths);
@@ -188,7 +204,7 @@ async function buildReplayVideo({ sources = [] } = {}) {
       outPath,
     ]);
     const buffer = await fsp.readFile(outPath);
-    return buffer;
+    return { buffer, usedSources, missingSources };
   } finally {
     try {
       await fsp.rm(tmpDir, { recursive: true, force: true });

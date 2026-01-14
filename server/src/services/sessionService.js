@@ -11,6 +11,7 @@ const { getState: getHomeAssistantState, homeAssistantEvents } = require('./home
 const { getNickname, nicknameEvents } = require('./nicknameService');
 const { getReplayState, replayEvents } = require('./replayService');
 const { getReplaySources } = require('./replaySourceService');
+const { getHealthSnapshot } = require('./healthService');
 const { loadConfig } = require('../helpers/configLoader');
 
 const discordInvite = loadConfig().discord?.invite || null;
@@ -51,6 +52,7 @@ function buildSession(socket) {
     homeAssistant: getHomeAssistantState(),
     replay: getReplayState(),
     replaySources: getReplaySources(),
+    health: getHealthSnapshot(),
     users,
     discord: {
       invite: discordInvite,

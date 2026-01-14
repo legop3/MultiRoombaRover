@@ -295,14 +295,18 @@ function resolveReplaySources(query) {
   return { sources };
 }
 
-function buildReplayCaption(requester, sources = []) {
+function buildReplayCaption(requester, sources = [], missingSources = []) {
   const requesterLabel = requester || 'unknown';
   const sourceLabel = sources.length
     ? `Sources: ${sources.map((source) => source.label || `${source.type}:${source.id}`).join(', ')}.`
     : 'No sources.';
+  const missingLabel = missingSources.length
+    ? `Missing: ${missingSources.map((source) => source.label || `${source.type}:${source.id}`).join(', ')}.`
+    : null;
   return [
     `Replay requested by ${requesterLabel}.`,
     sourceLabel,
+    missingLabel,
     buildDriverCaption(),
   ]
     .filter(Boolean)
@@ -313,9 +317,9 @@ async function sendReplayToChannel(channelId, requester, sources = []) {
   if (!channelId) {
     throw new Error('Replay channel not configured');
   }
-  const buffer = await buildReplayVideo({ sources });
+  const { buffer, usedSources, missingSources } = await buildReplayVideo({ sources });
   const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
-  const caption = buildReplayCaption(requester, sources);
+  const caption = buildReplayCaption(requester, usedSources, missingSources);
   await sendToChannel(channelId, caption, { files: [attachment] }, { parse: [] });
 }
 
@@ -351,9 +355,9 @@ async function handleReplayCommand(message, query) {
   const requester =
     message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
   try {
-    const buffer = await buildReplayVideo({ sources });
+    const { buffer, usedSources, missingSources } = await buildReplayVideo({ sources });
     const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
-    const caption = buildReplayCaption(requester, sources);
+    const caption = buildReplayCaption(requester, usedSources, missingSources);
     await message.reply({
       content: sanitizeMentions(caption),
       files: [attachment],
