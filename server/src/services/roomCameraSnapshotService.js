@@ -59,6 +59,14 @@ function scheduleStreamReconnect(camera) {
   streamState.set(id, entry);
 }
 
+function clearStreamRequest(id, req) {
+  const entry = streamState.get(id);
+  if (!entry) return;
+  if (entry.req !== req) return;
+  entry.req = null;
+  streamState.set(id, entry);
+}
+
 function handleStreamError(camera, err) {
   const state = cameraState.get(camera.id) || {};
   const failures = (state.failures || 0) + 1;
@@ -83,6 +91,7 @@ function startStream(camera) {
     (res) => {
       if (res.statusCode !== 200) {
         res.resume();
+        clearStreamRequest(camera.id, req);
         handleStreamError(camera, new Error(`HTTP ${res.statusCode}`));
         scheduleStreamReconnect(camera);
         return;
@@ -112,19 +121,23 @@ function startStream(camera) {
         }
       });
       res.on('end', () => {
+        clearStreamRequest(camera.id, req);
         scheduleStreamReconnect(camera);
       });
       res.on('aborted', () => {
+        clearStreamRequest(camera.id, req);
         handleStreamError(camera, new Error('stream aborted'));
         scheduleStreamReconnect(camera);
       });
       res.on('error', (err) => {
+        clearStreamRequest(camera.id, req);
         handleStreamError(camera, err);
         scheduleStreamReconnect(camera);
       });
     },
   );
   req.on('error', (err) => {
+    clearStreamRequest(camera.id, req);
     handleStreamError(camera, err);
     scheduleStreamReconnect(camera);
   });
