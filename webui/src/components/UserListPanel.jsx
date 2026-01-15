@@ -207,7 +207,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
                                 {formatLabel(user, selfId)}
                               </span>
                               {isAdmin && <span className="text-[0.7rem] text-amber-200">★</span>}
-                              {isSelf && <span className="text-[0.7rem] text-white">YOU</span>}
+                              {/* {isSelf && <span className="text-[0.7rem] text-white">YOU</span>} */}
                               {isCurrent && <span className="text-[0.7rem] text-slate-200">now</span>}
                               {isNext && <span className="text-[0.7rem] text-emerald-100">next</span>}
                             </span>
