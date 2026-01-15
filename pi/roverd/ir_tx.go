@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	pigpioAddr           = "127.0.0.1:8888"
 	piCmdSetMode         = 0
 	piCmdWrite           = 4
 	piCmdWaveClear       = 27
@@ -104,7 +103,11 @@ func NewIRTransmitter(cfg IRConfig, logger *log.Logger) (*IRTransmitter, error) 
 		return nil, fmt.Errorf("ir disabled")
 	}
 
-	client, err := connectPigpioWithRetry(pigpioAddr, logger)
+	addr := cfg.PigpioAddr
+	if addr == "" {
+		addr = "localhost:8888"
+	}
+	client, err := connectPigpioWithRetry(addr, logger)
 	if err != nil {
 		return nil, fmt.Errorf("connect pigpio: %w", err)
 	}

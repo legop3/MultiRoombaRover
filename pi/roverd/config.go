@@ -115,6 +115,7 @@ type IRConfig struct {
 	Repeat      int  `yaml:"repeat" json:"repeat"`
 	GapMs       int  `yaml:"gapMs" json:"gapMs"`
 	ActiveLow   bool `yaml:"activeLow" json:"activeLow"`
+	PigpioAddr  string `yaml:"pigpioAddr" json:"pigpioAddr"`
 }
 
 type Config struct {
@@ -196,6 +197,7 @@ func LoadConfig(path string) (*Config, error) {
 			Repeat:      3,
 			GapMs:       100,
 			ActiveLow:   true,
+			PigpioAddr:  "localhost:8888",
 		},
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -353,6 +355,9 @@ func validateIRConfig(cfg *IRConfig) error {
 	}
 	if cfg.Pin <= 0 {
 		return errors.New("pin must be > 0")
+	}
+	if cfg.PigpioAddr == "" {
+		cfg.PigpioAddr = "localhost:8888"
 	}
 	if cfg.CarrierHz <= 0 {
 		return errors.New("carrierHz must be > 0")

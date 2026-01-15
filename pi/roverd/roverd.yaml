@@ -43,3 +43,4 @@ ir:
   repeat: 3
   gapMs: 100
   activeLow: true
+  pigpioAddr: localhost:8888
