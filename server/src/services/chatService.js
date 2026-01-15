@@ -12,6 +12,9 @@ const RATE_LIMIT_WINDOW_MS = 8000;
 const RATE_LIMIT_MAX = 5;
 const rateBuckets = new Map(); // socketId -> [timestamps]
 
+const MAX_HISTORY = 100;
+const history = [];
+
 const PROFANITY_LIST = ['bitch', 'cunt', 'nigger', 'nigga', 'asshole', 'dick'];
 const DUPLICATE_WINDOW_MS = 15000;
 const lastMessageBySocket = new Map(); // socketId -> { text, ts }
@@ -83,7 +86,15 @@ function buildMessage(socket, text, meta = {}) {
   };
 }
 
+function pushHistory(message) {
+  history.push(message);
+  if (history.length > MAX_HISTORY) {
+    history.shift();
+  }
+}
+
 function broadcastMessage(message) {
+  pushHistory(message);
   publishEvent({ source: 'chat', type: 'chat:message', payload: message });
 }
 
@@ -208,6 +219,7 @@ function sendExternalMessage({
 }
 
 io.on('connection', (socket) => {
+  socket.emit('chat:init', history);
   socket.on('chat:send', (payload = {}, cb = () => {}) => handleIncoming(payload, socket, cb));
 });
 

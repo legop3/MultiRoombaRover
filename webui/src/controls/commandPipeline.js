@@ -32,9 +32,10 @@ export function useCommandPipeline() {
   }, [rosterEntry]);
 
   const emitCommand = useCallback(
-    (payload, cb) => {
-      if (!roverId) return;
-      socket.emit('command', { roverId, ...payload }, cb);
+    (payload, cb, targetRoverId) => {
+      const roverTarget = targetRoverId ?? roverId;
+      if (!roverTarget) return;
+      socket.emit('command', { roverId: roverTarget, ...payload }, cb);
     },
     [socket, roverId],
   );

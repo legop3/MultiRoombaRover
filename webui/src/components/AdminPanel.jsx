@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useCommandPipeline } from '../controls/commandPipeline.js';
 import { useSession } from '../context/SessionContext.jsx';
 import RoverRoster from './RoverRoster.jsx';
 
@@ -9,8 +10,11 @@ const MODES = [
   { key: 'lockdown', label: 'Lockdown' },
 ];
 
+const IR_SHOT_CODE = 200;
+
 export default function AdminPanel() {
   const { session, lockRover, setMode, requestControl } = useSession();
+  const pipeline = useCommandPipeline();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
   const health = session?.health || null;
@@ -48,6 +52,17 @@ export default function AdminPanel() {
     }
   };
 
+  const handleIrShot = (roverId) => {
+    pipeline.emitCommand(
+      {
+        type: 'ir',
+        data: { ir: { code: IR_SHOT_CODE } },
+      },
+      null,
+      roverId,
+    );
+  };
+
   const lockMap = useMemo(() => {
     const map = {};
     roster.forEach((rover) => {
@@ -56,39 +71,51 @@ export default function AdminPanel() {
     return map;
   }, [roster, lockStates]);
 
-  if (!isAdmin) return null;
-
   return (
     <section className="panel-section space-y-0.5 text-base">
-      <div className="flex items-center justify-between gap-0.5 text-sm">
-        <span>Admin controls</span>
-        <select value={currentMode} onChange={handleModeChange} className="field-input text-sm">
-          {MODES.map((mode) => (
-            <option key={mode.key} value={mode.key}>
-              {mode.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {isAdmin ? (
+        <div className="flex items-center justify-between gap-0.5 text-sm">
+          <span>Admin controls</span>
+          <select value={currentMode} onChange={handleModeChange} className="field-input text-sm">
+            {MODES.map((mode) => (
+              <option key={mode.key} value={mode.key}>
+                {mode.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-0.5 text-sm">
+          <span>Rover controls</span>
+          <span className="panel-muted text-xs">Limited access</span>
+        </div>
+      )}
 
       <RoverRoster
         roster={roster}
         renderActions={(rover) => (
           <div className="flex flex-wrap gap-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
-              className="button-dark"
-            >
-              {lockMap[rover.id] ? 'Unlock' : 'Lock'}
-            </button>
-            <button type="button" onClick={() => handleForceControl(rover.id)} className="button-dark">
-              Force
+            {isAdmin ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
+                  className="button-dark"
+                >
+                  {lockMap[rover.id] ? 'Unlock' : 'Lock'}
+                </button>
+                <button type="button" onClick={() => handleForceControl(rover.id)} className="button-dark">
+                  Force
+                </button>
+              </>
+            ) : null}
+            <button type="button" onClick={() => handleIrShot(rover.id)} className="button-dark">
+              IR Shot
             </button>
           </div>
         )}
       />
-      <ReplaySnapshotHealth health={health} />
+      {isAdmin ? <ReplaySnapshotHealth health={health} /> : null}
     </section>
   );
 }

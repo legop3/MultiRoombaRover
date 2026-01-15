@@ -103,6 +103,20 @@ type NightVisionConfig struct {
 	InitialOn bool   `yaml:"initialOn" json:"initialOn"`
 }
 
+type IRConfig struct {
+	Enabled     bool `yaml:"enabled" json:"enabled"`
+	Pin         int  `yaml:"pin" json:"pin"`
+	CarrierHz   int  `yaml:"carrierHz" json:"carrierHz"`
+	CycleLen    int  `yaml:"cycleLen" json:"cycleLen"`
+	DutyPercent int  `yaml:"dutyPercent" json:"dutyPercent"`
+	Bit0OnMs    int  `yaml:"bit0OnMs" json:"bit0OnMs"`
+	Bit1OnMs    int  `yaml:"bit1OnMs" json:"bit1OnMs"`
+	BitTotalMs  int  `yaml:"bitTotalMs" json:"bitTotalMs"`
+	Repeat      int  `yaml:"repeat" json:"repeat"`
+	GapMs       int  `yaml:"gapMs" json:"gapMs"`
+	ActiveLow   bool `yaml:"activeLow" json:"activeLow"`
+}
+
 type Config struct {
 	Name        string            `yaml:"name"`
 	ServerURL   string            `yaml:"serverUrl"`
@@ -114,6 +128,7 @@ type Config struct {
 	CameraServo CameraServoConfig `yaml:"cameraServo"`
 	Audio       AudioConfig       `yaml:"audio"`
 	NightVision NightVisionConfig `yaml:"nightVision" json:"nightVision"`
+	IR          IRConfig          `yaml:"ir" json:"ir"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -168,6 +183,19 @@ func LoadConfig(path string) (*Config, error) {
 			GPIOPin:   22,
 			GPIOChip:  "gpiochip0",
 			InitialOn: true,
+		},
+		IR: IRConfig{
+			Enabled:     false,
+			Pin:         17,
+			CarrierHz:   38000,
+			CycleLen:    100,
+			DutyPercent: 50,
+			Bit0OnMs:    1,
+			Bit1OnMs:    3,
+			BitTotalMs:  4,
+			Repeat:      3,
+			GapMs:       100,
+			ActiveLow:   true,
 		},
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -231,6 +259,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if err := validateNightVisionConfig(&cfg.NightVision); err != nil {
 		return nil, fmt.Errorf("nightVision: %w", err)
+	}
+	if err := validateIRConfig(&cfg.IR); err != nil {
+		return nil, fmt.Errorf("ir: %w", err)
 	}
 	validateAudioConfig(&cfg.Audio)
 	return &cfg, nil
@@ -312,6 +343,37 @@ func validateNightVisionConfig(cfg *NightVisionConfig) error {
 	}
 	if cfg.GPIOChip == "" {
 		cfg.GPIOChip = "gpiochip0"
+	}
+	return nil
+}
+
+func validateIRConfig(cfg *IRConfig) error {
+	if !cfg.Enabled {
+		return nil
+	}
+	if cfg.Pin <= 0 {
+		return errors.New("pin must be > 0")
+	}
+	if cfg.CarrierHz <= 0 {
+		return errors.New("carrierHz must be > 0")
+	}
+	if cfg.CycleLen <= 0 {
+		return errors.New("cycleLen must be > 0")
+	}
+	if cfg.DutyPercent <= 0 || cfg.DutyPercent >= 100 {
+		return errors.New("dutyPercent must be 1-99")
+	}
+	if cfg.Bit0OnMs <= 0 || cfg.Bit1OnMs <= 0 {
+		return errors.New("bit0OnMs/bit1OnMs must be > 0")
+	}
+	if cfg.BitTotalMs < cfg.Bit0OnMs || cfg.BitTotalMs < cfg.Bit1OnMs {
+		return errors.New("bitTotalMs must be >= bit on durations")
+	}
+	if cfg.Repeat <= 0 {
+		cfg.Repeat = 1
+	}
+	if cfg.GapMs < 0 {
+		cfg.GapMs = 0
 	}
 	return nil
 }

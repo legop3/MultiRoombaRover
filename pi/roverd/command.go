@@ -29,6 +29,7 @@ type inboundMessage struct {
 	TTS          *ttsPayload          `json:"tts,omitempty"`
 	NightVision  *nightVisionPayload  `json:"nightVision,omitempty"`
 	Song         *songPayload         `json:"song,omitempty"`
+	IR           *irPayload           `json:"ir,omitempty"`
 }
 
 type driveDirectPayload struct {
@@ -77,6 +78,11 @@ type songPayload struct {
 type songNote struct {
 	Note     int `json:"note"`
 	Duration int `json:"duration"`
+}
+
+type irPayload struct {
+	Code   int `json:"code"`
+	Repeat int `json:"repeat,omitempty"`
 }
 
 type ackMessage struct {

@@ -9,8 +9,6 @@ httpServer.on('upgrade', (req, socket, head) => {
     roverWSS.handleUpgrade(req, socket, head, (ws) => {
       roverWSS.emit('connection', ws, req);
     });
-  } else {
-    socket.destroy();
   }
 });
 

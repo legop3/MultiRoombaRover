@@ -50,6 +50,24 @@ export function ChatProvider({ children }) {
     };
   }, [playSound, session?.socketId, socket]);
 
+  useEffect(() => {
+    function handleInit(payload = []) {
+      if (!Array.isArray(payload)) return;
+      setMessages((prev) => {
+        if (prev.length === 0) {
+          return payload.slice(-100);
+        }
+        const seen = new Set(payload.map((entry) => entry?.id));
+        const merged = [...payload, ...prev.filter((entry) => entry?.id && !seen.has(entry.id))];
+        return merged.slice(-100);
+      });
+    }
+    socket.on('chat:init', handleInit);
+    return () => {
+      socket.off('chat:init', handleInit);
+    };
+  }, [socket]);
+
   const sendMessage = useCallback(
     (text, tts = null) =>
       new Promise((resolve, reject) => {

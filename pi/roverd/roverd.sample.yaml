@@ -53,3 +53,15 @@ nightVision:
   gpioPin: 22
   gpioChip: gpiochip0
   initialOn: true
+ir:
+  enabled: false
+  pin: 17
+  carrierHz: 38000
+  cycleLen: 100
+  dutyPercent: 50
+  bit0OnMs: 1
+  bit1OnMs: 3
+  bitTotalMs: 4
+  repeat: 3
+  gapMs: 100
+  activeLow: true

@@ -9,6 +9,7 @@ const activeDrivers = new Map();
 const TURN_DURATION_MS = 60 * 1000;
 const IDLE_TIMEOUT_MS = 7 * 1000;
 const MAX_IDLE_SKIPS = 3;
+const STALE_REAPER_MS = 5000;
 const turnEvents = new EventEmitter();
 const turnDeadlines = new Map(); // roverId -> timestamp when current driver expires
 const idleDeadlines = new Map(); // roverId -> timestamp when idle skip will happen
@@ -268,15 +269,43 @@ function removeDriverCompletely(roverId, socketId) {
 function recordActivity(roverId, socketId) {
   const queue = driverQueues.get(roverId);
   if (!queue || queue.current !== socketId) return;
+  if (idleDisarmed.get(roverId)) return;
   idleDisarmed.set(roverId, true);
+  const hadDeadline = idleDeadlines.has(roverId);
   clearTimeout(idleTimers.get(roverId));
   idleDeadlines.delete(roverId);
-  turnEvents.emit('queue', { roverId, reason: 'activity' });
+  if (hadDeadline) {
+    turnEvents.emit('queue', { roverId, reason: 'activity' });
+  }
 }
 
 modeEvents.on('change', (mode) => {
   driverQueues.forEach((_, roverId) => syncState(roverId));
 });
+
+function reapStaleDrivers() {
+  const staleIds = new Set();
+  driverQueues.forEach((queue) => {
+    queue.queue.forEach((socketId) => {
+      if (!io.sockets.sockets.has(socketId)) {
+        staleIds.add(socketId);
+      }
+    });
+    if (queue.current && !io.sockets.sockets.has(queue.current)) {
+      staleIds.add(queue.current);
+    }
+  });
+  if (staleIds.size === 0) return;
+  driverQueues.forEach((queue, roverId) => {
+    staleIds.forEach((socketId) => {
+      if (queue.current === socketId || queue.queue.includes(socketId)) {
+        driverRemoved(roverId, socketId);
+      }
+    });
+  });
+}
+
+setInterval(reapStaleDrivers, STALE_REAPER_MS);
 
 module.exports = {
   driverAdded,

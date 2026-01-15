@@ -657,6 +657,10 @@ io.on('connection', (socket) => {
   socket.on('subscribeAll', handleSubscribeAll);
   socket.on('session:subscribeAll', handleSubscribeAll);
 
+  socket.on('disconnecting', () => {
+    logger.info('Socket disconnecting', socket.id);
+    removeSocket(socket);
+  });
   socket.on('disconnect', () => {
     logger.info('Socket disconnected', socket.id);
     removeSocket(socket);
