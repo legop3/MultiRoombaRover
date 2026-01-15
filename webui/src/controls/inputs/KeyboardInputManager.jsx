@@ -351,9 +351,7 @@ export default function KeyboardInputManager() {
       if (bindingActive(keymap.chatFocus, tokenSet)) {
         event.preventDefault();
         resetAll();
-        if (isChatFocused) {
-          blurChat();
-        } else {
+        if (!isChatFocused) {
           focusChat();
         }
         return;

@@ -102,7 +102,7 @@ function MobileFeatureTabs({
           </TabPanel>
           <TabPanel id="roomcontrols">
             <div className="space-y-0.5">
-              {showTelemetry ? <TelemetryPanel /> : null}
+              {/* {showTelemetry ? <TelemetryPanel /> : null} */}
               <HomeAssistantControls />
               <RoomCameraPanel panelId={roomPanelId} />
             </div>

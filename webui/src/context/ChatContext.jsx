@@ -18,10 +18,11 @@ const ChatContext = createContext({
 
 export function ChatProvider({ children }) {
   const socket = useSocket();
-  const { session } = useSession();
+  const { session, pushAlert } = useSession();
   const [messages, setMessages] = useState([]);
   const [isChatFocused, setIsChatFocused] = useState(false);
-  const inputRef = useRef(null);
+  const panelInputRef = useRef(null);
+  const hudInputRef = useRef(null);
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -43,6 +44,12 @@ export function ChatProvider({ children }) {
         return;
       }
       playSound();
+      pushAlert?.({
+        kind: 'chat',
+        payload,
+        id: `chat-${payload.id || Math.random().toString(36).slice(2)}`,
+        receivedAt: Date.now(),
+      });
     }
     socket.on('chat:message', handleMessage);
     return () => {
@@ -82,18 +89,24 @@ export function ChatProvider({ children }) {
     [socket],
   );
 
-  const registerInputRef = useCallback((el) => {
-    inputRef.current = el;
+  const registerInputRef = useCallback((el, options = {}) => {
+    const target = options?.target === 'hud' ? 'hud' : 'panel';
+    if (target === 'hud') {
+      hudInputRef.current = el;
+    } else {
+      panelInputRef.current = el;
+    }
   }, []);
 
   const focusChat = useCallback(() => {
     setIsChatFocused(true);
-    inputRef.current?.focus();
+    (hudInputRef.current || panelInputRef.current)?.focus();
   }, []);
 
   const blurChat = useCallback(() => {
     setIsChatFocused(false);
-    inputRef.current?.blur();
+    hudInputRef.current?.blur();
+    panelInputRef.current?.blur();
   }, []);
 
   const onInputFocus = useCallback(() => setIsChatFocused(true), []);

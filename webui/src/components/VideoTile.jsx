@@ -2,19 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { WhepPlayer } from '../lib/whepPlayer.js';
 import TopDownMap from './TopDownMap.jsx';
 import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
+import { useChat } from '../context/ChatContext.jsx';
+import { useSession } from '../context/SessionContext.jsx';
 
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 const AUDIO_RETRY_MS = 3000;
-
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-function formatNoteLabel(note) {
-  if (typeof note !== 'number' || !Number.isFinite(note)) return '--';
-  const name = NOTE_NAMES[note % 12] || '?';
-  const octave = Math.floor(note / 12) - 1;
-  return `${name}${octave}`;
-}
 
 function buildBatteryVisual(charge, config) {
   const full = config?.Full;
@@ -55,7 +48,6 @@ export default function VideoTile({
   layoutFormat = 'desktop',
   hudVariant = 'default',
   driverLabel = null,
-  songNote = null,
   hudForceMap = false,
   hudMapPosition = 'top-right',
   fitParent = false,
@@ -405,18 +397,22 @@ export default function VideoTile({
           variant={hudVariant}
           driverLabel={driverLabel}
           battery={batteryVisual}
-          songNote={songNote}
           showTopDown={showHudMap}
           mobileHud={mobileHud}
           mapPosition={hudMapPosition}
         />
-        <OvercurrentOverlay motors={overcurrentMotors} />
-        <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} />
+        <HudChatInput compact={mobileHud} />
+        <OvercurrentOverlay motors={overcurrentMotors} compact={mobileHud} />
+        <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} />
         {showVerticalBattery && batteryVisual.available ? (
           <BatteryBarVertical visual={batteryVisual} />
         ) : null}
         {qualityNotice ? (
-          <div className="pointer-events-none absolute left-1 top-1 rounded bg-black/70 px-1 py-0.5 text-xs font-semibold text-amber-200">
+          <div
+            className={`pointer-events-none absolute rounded bg-black/70 font-semibold text-amber-200 ${
+              mobileHud ? 'left-0.5 top-0.5 px-0.5 py-0.25 text-[0.55rem]' : 'left-1 top-1 px-1 py-0.5 text-xs'
+            }`}
+          >
             {qualityNotice}
           </div>
         ) : null}
@@ -527,7 +523,6 @@ function HudOverlay({
   variant = 'default',
   driverLabel = null,
   battery,
-  songNote = null,
   showTopDown = false,
   mobileHud = false,
   mapPosition = 'top-right',
@@ -543,10 +538,13 @@ function HudOverlay({
   const pulse = frame?.receivedAt ? now - frame.receivedAt < 200 : false;
   const isMobile = mobileHud;
   const portraitMobile = layoutFormat === 'mobile-portrait';
-  const statusTextClass = isMobile ? 'text-[0.55rem]' : 'text-[0.65rem]';
-  const statusPadClass = isMobile ? 'px-0.5 py-0.25' : 'px-1 py-0.5';
-  const labelPadClass = isMobile ? 'px-0.5 py-0.25' : 'px-0.5 py-0.5';
-  const labelTextClass = isMobile ? 'text-[0.7rem]' : 'text-[0.8rem]';
+  const statusTextClass = isMobile ? 'text-[0.45rem]' : 'text-[0.65rem]';
+  const statusPadClass = isMobile ? 'px-0.25 py-0.25' : 'px-1 py-0.5';
+  const labelPadClass = isMobile ? 'px-0.25 py-0.25' : 'px-0.5 py-0.5';
+  const labelTextClass = isMobile ? 'text-[0.55rem]' : 'text-[0.8rem]';
+  const statusPosClass = isMobile ? 'left-0.5 top-0.5' : 'left-1 top-1';
+  const telemetryPosClass = isMobile ? 'left-0.5 top-1/2' : 'left-1 top-1/2';
+  const labelPosClass = isMobile ? 'bottom-0.5' : 'bottom-0.5';
   const mapSize = '240px';
   const mapScale = portraitMobile ? 0.36 : isMobile ? 0.45 : 0.7;
   const mapOpacity = isMobile ? 0.85 : 0.7;
@@ -570,25 +568,17 @@ function HudOverlay({
     ];
     return (
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div
-          className={`absolute left-1 top-1 bg-black/70 font-medium text-slate-100 ${statusTextClass} ${statusPadClass}`}
-        >
-          <span>Status: {status}</span>
-          {audioStatus ? <div>Audio: {audioStatus}</div> : null}
-        </div>
-        {songNote != null ? (
-          <div
-            className={`absolute right-1 top-1 rounded bg-black/70 font-semibold text-emerald-200 ${statusTextClass} ${statusPadClass}`}
-          >
-            Song {formatNoteLabel(songNote)} <span className="text-slate-400">({songNote})</span>
+        <div className={`absolute ${statusPosClass} font-medium text-slate-100 ${statusTextClass}`}>
+          <div className="flex flex-col gap-[1px] leading-none">
+            <span>Status: {status}</span>
+            {audioStatus ? <span>Audio: {audioStatus}</span> : null}
           </div>
-        ) : null}
-
+        </div>
         <div
-          className={`absolute left-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.35 bg-black/70 text-slate-100 ${statusTextClass} ${statusPadClass}`}
+          className={`absolute ${telemetryPosClass} flex -translate-y-1/2 flex-col gap-0.35 bg-black/70 text-slate-100 ${statusTextClass} ${statusPadClass}`}
         >
           <div className="space-y-0.1 leading-tight">
-            <span className={`${isMobile ? 'text-[0.55rem]' : 'text-[0.6rem]'} uppercase tracking-wide text-slate-400`}>
+            <span className={`${isMobile ? 'text-[0.45rem]' : 'text-[0.6rem]'} uppercase tracking-wide text-slate-400`}>
               Telemetry
             </span>
             {telemetryEntries.map(([labelText, value]) => (
@@ -617,7 +607,7 @@ function HudOverlay({
         </div>
 
         <div
-          className={`absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-1 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
+          className={`absolute ${labelPosClass} left-1/2 flex -translate-x-1/2 items-center gap-1 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
         >
           <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
           {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
@@ -628,22 +618,14 @@ function HudOverlay({
 
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div
-        className={`absolute left-1 top-1 bg-black/70 font-medium text-slate-100 ${statusTextClass} ${statusPadClass}`}
-      >
-        <span>Status: {status}</span>
-        {audioStatus ? <div>Audio: {audioStatus}</div> : null}
-      </div>
-      {songNote != null ? (
-        <div
-          className={`absolute bottom-1 right-1 rounded bg-black/70 font-semibold text-emerald-200 ${statusTextClass} ${statusPadClass}`}
-        >
-          Song {formatNoteLabel(songNote)} <span className="text-slate-400">({songNote})</span>
+      <div className={`absolute ${statusPosClass} font-medium text-slate-100 ${statusTextClass}`}>
+        <div className="flex flex-col gap-[1px] leading-none">
+          <span>Status: {status}</span>
+          {audioStatus ? <span>Audio: {audioStatus}</span> : null}
         </div>
-      ) : null}
-
+      </div>
       <div
-        className={`absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
+        className={`absolute ${labelPosClass} left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
       >
         <span>Rover: "{label || 'Unnamed Rover'}"</span>
         {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}
@@ -672,21 +654,26 @@ const OVERCURRENT_LABELS = {
   sideBrush: 'Side brush',
 };
 
-function OvercurrentOverlay({ motors }) {
+function OvercurrentOverlay({ motors, compact = false }) {
   if (!motors?.length) return null;
   const labels = motors.map((name) => OVERCURRENT_LABELS[name] || name);
+  const containerClass = compact ? 'p-2' : 'p-4';
+  const textClass = compact ? 'text-lg' : 'text-4xl';
+  const subTextClass = compact ? 'text-xs' : 'text-xl';
   return (
-    <div className="pointer-events-none absolute flex items-center justify-center bg-red-900/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-4">
-      <div className="text-center text-4xl font-semibold text-white animate-pulse">
+    <div
+      className={`pointer-events-none absolute flex items-center justify-center bg-red-900/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${containerClass}`}
+    >
+      <div className={`text-center font-semibold text-white animate-pulse ${textClass}`}>
         <div>OVERCURRENT</div>
-        <div className="mt-0.5 text-xl font-medium text-white">{labels.join(', ')}</div>
+        <div className={`mt-0.5 font-medium text-white ${subTextClass}`}>{labels.join(', ')}</div>
       </div>
     </div>
   );
 }
 
 // low battery overlay, change text based on warn / urgent. use percentage calculated same as BatteryBar. change text based on warn or urgent.
-function LowBatteryOverlay({ charge, config }) {
+function LowBatteryOverlay({ charge, config, compact = false }) {
   if (charge == null || config == null) return null;
   const full = config.Full;
   const warn = config.Warn;
@@ -701,11 +688,78 @@ function LowBatteryOverlay({ charge, config }) {
 
   const message = depleted ? 'Battery low! please dock and charge the rover soon.' : 'BATTERY VERY LOW, PLEASE DOCK THE ROVER AND CHARGE IMMEDIATELY!!';
 
+  const containerClass = compact ? 'p-2 top-6' : 'p-4 top-10';
+  const textClass = compact ? 'text-sm' : 'text-2xl';
+
   return (
-    <div className="pointer-events-none absolute flex items-center justify-center bg-amber-900/60 top-10 left-1/2 -translate-x-1/2 p-4">
-      <div className="text-center text-2xl font-semibold text-white animate-pulse">
+    <div
+      className={`pointer-events-none absolute flex items-center justify-center bg-amber-900/60 left-1/2 -translate-x-1/2 ${containerClass}`}
+    >
+      <div className={`text-center font-semibold text-white animate-pulse ${textClass}`}>
         <div>{message}</div>
       </div>
     </div>
+  );
+}
+
+function HudChatInput({ compact = false }) {
+  const { session } = useSession();
+  const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef } = useChat();
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const canChat = session?.role !== 'spectator';
+  const containerClass = compact
+    ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-[9rem] max-w-[70vw] items-center gap-0.25 rounded bg-black/70 px-0.4 py-0.2'
+    : 'pointer-events-auto absolute bottom-1 right-1 flex w-[12rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.5 py-0.25';
+  const inputClass = compact
+    ? 'min-w-0 flex-1 bg-transparent text-[0.55rem] text-slate-100 placeholder:text-slate-400 focus:outline-none'
+    : 'min-w-0 flex-1 bg-transparent text-[0.7rem] text-slate-100 placeholder:text-slate-400 focus:outline-none';
+  const buttonClass = compact
+    ? 'rounded bg-cyan-500/80 px-0.35 py-0.2 text-[0.55rem] font-semibold text-black disabled:opacity-50'
+    : 'rounded bg-cyan-500/80 px-0.5 py-0.25 text-[0.7rem] font-semibold text-black disabled:opacity-50';
+
+  async function handleSend(event) {
+    event.preventDefault();
+    if (!canChat) return;
+    const clean = draft.trim();
+    if (!clean) return;
+    setSending(true);
+    try {
+      await sendMessage(clean, null);
+      setDraft('');
+      blurChat();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSend} className={containerClass}>
+      <input
+        className={inputClass}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onFocus={onInputFocus}
+        onBlur={onInputBlur}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !draft.trim()) {
+            event.preventDefault();
+            blurChat();
+          }
+        }}
+        ref={(el) => registerInputRef(el, { target: 'hud' })}
+        placeholder={canChat ? 'Chat…' : 'Spectator'}
+        disabled={!canChat}
+      />
+      <button
+        type="submit"
+        disabled={!canChat || sending}
+        className={buttonClass}
+      >
+        Send
+      </button>
+    </form>
   );
 }

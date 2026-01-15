@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
+import ChatMessageRow from './ChatMessageRow.jsx';
 
 const LIFETIME_MS = 5000;
 const DEFAULT_COLOR = '#2196f3';
@@ -52,6 +53,9 @@ function hexToRgb(hex) {
 }
 
 function AlertToast({ alert }) {
+  if (alert.kind === 'chat' && alert.payload) {
+    return <ChatMessageRow message={alert.payload} />;
+  }
   const rgb = hexToRgb(alert.color) || hexToRgb(DEFAULT_COLOR);
   const backgroundColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)` : 'rgba(33, 150, 243, 0.25)';
   const borderColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)` : 'rgba(33, 150, 243, 0.7)';
