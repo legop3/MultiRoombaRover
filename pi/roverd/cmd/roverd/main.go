@@ -78,19 +78,10 @@ func main() {
 		defer nightVision.Close()
 	}
 
-	var irTx *roverd.IRTransmitter
-	if cfg.IR.Enabled {
-		irTx, err = roverd.NewIRTransmitter(cfg.IR, logger)
-		if err != nil {
-			logger.Fatalf("init ir tx: %v", err)
-		}
-		defer irTx.Close()
-	}
-
 	autoCharge := roverd.NewAutoChargeController(adapter, eventStream, logger)
 	go autoCharge.Run(ctx, sensorSamples)
 
-	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, nightVision, irTx, logger)
+	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, nightVision, logger)
 
 	retryDelay := time.Second
 	for ctx.Err() == nil {

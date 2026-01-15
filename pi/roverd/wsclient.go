@@ -20,7 +20,6 @@ type WSClient struct {
 	media        *MediaSupervisor
 	servo        *CameraServo
 	nightVision  *NightVisionLight
-	ir           *IRTransmitter
 	log          *log.Logger
 	recoverMu    sync.Mutex
 	recovering   bool
@@ -31,7 +30,7 @@ type WSClient struct {
 	seekIssued   bool
 }
 
-func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, ir *IRTransmitter, logger *log.Logger) *WSClient {
+func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
 	var ttsQueue chan *ttsPayload
 	if cfg.Audio.TTSEnabled {
 		ttsQueue = make(chan *ttsPayload, 2)
@@ -44,7 +43,6 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		media:        media,
 		servo:        servo,
 		nightVision:  nightVision,
-		ir:           ir,
 		log:          logger,
 		ttsQueue:     ttsQueue,
 	}
@@ -183,13 +181,6 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 			slot = clampInt(*msg.Song.Slot, 0, 4)
 		}
 		return c.adapter.PlaySong(slot, msg.Song.Notes)
-	case msg.IR != nil:
-		if c.ir == nil {
-			return fmt.Errorf("ir disabled")
-		}
-		code := clampInt(msg.IR.Code, 0, 255)
-		repeat := clampInt(msg.IR.Repeat, 0, 10)
-		return c.ir.Send(byte(code), repeat)
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
 	}

@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useCommandPipeline } from '../controls/commandPipeline.js';
+import { useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
-import { useSocket } from '../context/SocketContext.jsx';
 import RoverRoster from './RoverRoster.jsx';
 
 const MODES = [
@@ -11,16 +9,11 @@ const MODES = [
   { key: 'lockdown', label: 'Lockdown' },
 ];
 
-const IR_SHOT_CODE = 200;
-
 export default function AdminPanel() {
   const { session, lockRover, setMode, requestControl } = useSession();
-  const socket = useSocket();
-  const pipeline = useCommandPipeline();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
   const health = session?.health || null;
-  const [transport, setTransport] = useState(null);
 
   const isAdmin =
     session?.role === 'admin' ||
@@ -55,17 +48,6 @@ export default function AdminPanel() {
     }
   };
 
-  const handleIrShot = (roverId) => {
-    pipeline.emitCommand(
-      {
-        type: 'ir',
-        data: { ir: { code: IR_SHOT_CODE } },
-      },
-      null,
-      roverId,
-    );
-  };
-
   const lockMap = useMemo(() => {
     const map = {};
     roster.forEach((rover) => {
@@ -74,71 +56,39 @@ export default function AdminPanel() {
     return map;
   }, [roster, lockStates]);
 
-  useEffect(() => {
-    if (!socket) return undefined;
-    const updateTransport = () => {
-      const name = socket.io?.engine?.transport?.name || null;
-      setTransport(name);
-    };
-    updateTransport();
-    socket.on('connect', updateTransport);
-    socket.on('disconnect', () => setTransport(null));
-    socket.io?.engine?.on('upgrade', updateTransport);
-    return () => {
-      socket.off('connect', updateTransport);
-      socket.off('disconnect');
-      socket.io?.engine?.off('upgrade', updateTransport);
-    };
-  }, [socket]);
+  if (!isAdmin) return null;
 
   return (
     <section className="panel-section space-y-0.5 text-base">
-      {isAdmin ? (
-        <div className="flex items-center justify-between gap-0.5 text-sm">
-          <span>Admin controls</span>
-          <div className="flex items-center gap-0.5">
-            <span className="panel-muted text-xs">{transport ? `Conn: ${transport}` : 'Conn: —'}</span>
-            <select value={currentMode} onChange={handleModeChange} className="field-input text-sm">
-              {MODES.map((mode) => (
-                <option key={mode.key} value={mode.key}>
-                  {mode.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between gap-0.5 text-sm">
-          <span>Rover controls</span>
-          <span className="panel-muted text-xs">Limited access</span>
-        </div>
-      )}
+      <div className="flex items-center justify-between gap-0.5 text-sm">
+        <span>Admin controls</span>
+        <select value={currentMode} onChange={handleModeChange} className="field-input text-sm">
+          {MODES.map((mode) => (
+            <option key={mode.key} value={mode.key}>
+              {mode.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <RoverRoster
         roster={roster}
         renderActions={(rover) => (
           <div className="flex flex-wrap gap-0.5 text-xs">
-            {isAdmin ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
-                  className="button-dark"
-                >
-                  {lockMap[rover.id] ? 'Unlock' : 'Lock'}
-                </button>
-                <button type="button" onClick={() => handleForceControl(rover.id)} className="button-dark">
-                  Force
-                </button>
-              </>
-            ) : null}
-            <button type="button" onClick={() => handleIrShot(rover.id)} className="button-dark">
-              IR Shot
+            <button
+              type="button"
+              onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
+              className="button-dark"
+            >
+              {lockMap[rover.id] ? 'Unlock' : 'Lock'}
+            </button>
+            <button type="button" onClick={() => handleForceControl(rover.id)} className="button-dark">
+              Force
             </button>
           </div>
         )}
       />
-      {isAdmin ? <ReplaySnapshotHealth health={health} /> : null}
+      <ReplaySnapshotHealth health={health} />
     </section>
   );
 }

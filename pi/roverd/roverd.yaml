@@ -31,16 +31,3 @@ cameraServo:
   homeAngle: 0
   nudgeDegrees: 2
   allowRawPulse: false
-ir:
-  enabled: false
-  pin: 17
-  carrierHz: 38000
-  cycleLen: 100
-  dutyPercent: 50
-  bit0OnMs: 1
-  bit1OnMs: 3
-  bitTotalMs: 4
-  repeat: 3
-  gapMs: 100
-  activeLow: true
-  pigpioAddr: localhost:8888
