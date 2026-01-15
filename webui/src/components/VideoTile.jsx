@@ -710,6 +710,7 @@ function HudChatInput({ compact = false }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const canChat = session?.role !== 'spectator';
+  const hideHudChat = session?.role === 'spectator';
   const currentRoverId = session?.assignment?.roverId || null;
   const rover = useMemo(
     () => session?.roster?.find((entry) => String(entry.id) === String(currentRoverId)) || null,
@@ -755,6 +756,8 @@ function HudChatInput({ compact = false }) {
       setSending(false);
     }
   }
+
+  if (hideHudChat) return null;
 
   return (
     <form onSubmit={handleSend} className={containerClass}>

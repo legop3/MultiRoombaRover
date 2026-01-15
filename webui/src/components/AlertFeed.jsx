@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import ChatMessageRow from './ChatMessageRow.jsx';
 
-const LIFETIME_MS = 5000;
+const LIFETIME_MS = 3000;
 const DEFAULT_COLOR = '#2196f3';
 
 function buildKey(alert) {
@@ -14,7 +14,7 @@ function buildKey(alert) {
 export default function AlertFeed() {
   const { alerts } = useSession();
   const [now, setNow] = useState(() => Date.now());
-  const latest = useMemo(() => alerts.slice(-5).map((alert) => ({ alert, key: buildKey(alert) })), [alerts]);
+  const latest = useMemo(() => alerts.slice(-3).map((alert) => ({ alert, key: buildKey(alert) })), [alerts]);
 
   useEffect(() => {
     if (!latest.length) return undefined;
@@ -57,15 +57,18 @@ function AlertToast({ alert }) {
     return <ChatMessageRow message={alert.payload} />;
   }
   const rgb = hexToRgb(alert.color) || hexToRgb(DEFAULT_COLOR);
-  const backgroundColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)` : 'rgba(33, 150, 243, 0.25)';
-  const borderColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)` : 'rgba(33, 150, 243, 0.7)';
+  const backgroundColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)` : 'rgba(33, 150, 243, 0.18)';
+  const borderColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.45)` : 'rgba(33, 150, 243, 0.45)';
   return (
     <div
-      className="pointer-events-auto px-0.5 py-0.5 text-[0.85rem] text-slate-100"
+      className="pointer-events-auto max-w-[80vw] rounded-full border px-2 py-0.5 text-[0.7rem] leading-tight text-slate-100 shadow-sm shadow-black/30"
       style={{ backgroundColor, border: `1px solid ${borderColor}` }}
     >
-      <p className="text-xs text-slate-200">{alert.title || 'Alert'}</p>
-      <p className="text-sm text-white">{alert.message}</p>
+      <p className="truncate text-slate-100">
+        <span className="text-slate-300">{alert.title || 'Alert'}</span>
+        <span className="text-slate-500"> · </span>
+        <span className="text-white">{alert.message}</span>
+      </p>
     </div>
   );
 }
