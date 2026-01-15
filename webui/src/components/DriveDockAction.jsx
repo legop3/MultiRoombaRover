@@ -24,7 +24,7 @@ export function useDriveDockState(roverId) {
 function StatusPill({ label, active }) {
   return (
     <span
-      className={`rounded px-1.5 py-0.5 text-[0.75rem] font-semibold ${
+      className={`rounded-xl px-1.5 py-0.5 text-[0.75rem] font-semibold ${
         active ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
       }`}
     >
@@ -36,6 +36,22 @@ function StatusPill({ label, active }) {
 function KeyPill({ label }) {
   if (!label) return null;
   return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
+}
+
+function ActionPill({ label, tone }) {
+  const toneClasses =
+    tone === 'emerald'
+      ? 'border-emerald-200/70 bg-emerald-600/70 text-emerald-50'
+      : tone === 'amber'
+        ? 'border-amber-200/70 bg-amber-600/70 text-amber-50'
+        : 'border-indigo-200/70 bg-indigo-600/70 text-indigo-50';
+  return (
+    <span
+      className={`rounded-full border px-0.5 py-0.15 text-[0.7rem] font-semibold ${toneClasses}`}
+    >
+      {label}
+    </span>
+  );
 }
 
 function DockModal({ instructions, onConfirm, onCancel, pending }) {
@@ -149,7 +165,17 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
   };
 
   const baseCardClasses =
-    'flex w-full flex-col gap-0.5 border border-slate-700 px-0.75 py-0.75 text-slate-100 shadow';
+    'flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-0.75 py-0.75 text-slate-100 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60';
+  const ctaText = 'text-center';
+  const ctaLayout = 'items-center justify-between';
+  const ctaTextAndLayout = `${ctaText} ${ctaLayout}`;
+  const ctaSize = isMobile ? 'text-sm font-semibold' : '';
+  const emeraldCta =
+    'border-emerald-300/70 bg-emerald-800 text-emerald-50 hover:bg-emerald-700 focus-visible:ring-emerald-300';
+  const amberCta =
+    'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800 focus-visible:ring-amber-300';
+  const indigoCta =
+    'border-indigo-300/70 bg-indigo-900 text-indigo-50 hover:bg-indigo-800 focus-visible:ring-indigo-300';
   const filledHeight = expand ? 'h-full flex-1' : '';
 
   if (!driving && !dockingInProgress) {
@@ -158,12 +184,13 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
         type="button"
         onClick={handleStartDrive}
         disabled={driveDisabled}
-        className={`${baseCardClasses} ${filledHeight} items-center justify-between bg-emerald-800 hover:bg-emerald-700 text-center transition disabled:cursor-not-allowed disabled:opacity-60`}
+        className={`${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${emeraldCta}`}
       >
         <div className="space-y-0.25 w-full">
-          <div className="flex items-center justify-center gap-0.5">
+          <div className="flex flex-wrap items-center justify-center gap-0.5">
             <span className="text-base font-semibold text-emerald-50">Start Driving</span>
             {!isMobile && driveKeyLabel ? <KeyPill label={driveKeyLabel} /> : null}
+            {!isMobile ? <ActionPill label="Click to start" tone="emerald" /> : null}
           </div>
           <p className="text-sm text-emerald-50/90">{startDriveInstructions.summary}</p>
           <StepList steps={startDriveInstructions.steps} tone="emerald" />
@@ -188,11 +215,12 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
         type="button"
         disabled={driveDisabled}
         onClick={handleReturnToDrive}
-        className={`${baseCardClasses} ${filledHeight} items-center bg-amber-900 text-center transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50`}
+        className={`${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${amberCta}`}
       >
         <div className="space-y-0.25 w-full">
-          <div className="flex items-center justify-center gap-0.5">
+          <div className="flex flex-wrap items-center justify-center gap-0.5">
             <span className="text-base font-semibold text-amber-50">Docking in Progress</span>
+            {!isMobile ? <ActionPill label="Click to return to driving mode" tone="amber" /> : null}
           </div>
           <p className="text-sm text-amber-50/90">{inProgressCopy.summary}</p>
         </div>
@@ -213,13 +241,14 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
         onClick={handleOpenDock}
         className={
           isMobile
-            ? 'flex w-full items-center justify-center border border-slate-700 bg-indigo-900 px-0.75 py-0.75 text-sm font-semibold text-indigo-50 shadow transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-50'
-            : `${baseCardClasses} ${filledHeight} items-center bg-indigo-900 text-center transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-50`
+            ? `flex w-full items-center justify-center ${baseCardClasses} ${ctaTextAndLayout} ${ctaSize} ${indigoCta}`
+            : `${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${indigoCta}`
         }
       >
-        <div className="flex items-center justify-center gap-0.5 w-full">
+        <div className="flex flex-wrap items-center justify-center gap-0.5 w-full">
           <span className="text-base font-semibold text-indigo-50">Dock and Charge</span>
           {!isMobile && dockKeyLabel ? <KeyPill label={dockKeyLabel} /> : null}
+          {!isMobile ? <ActionPill label="Click to begin docking" tone="indigo" /> : null}
         </div>
         {!isMobile && (
           <>

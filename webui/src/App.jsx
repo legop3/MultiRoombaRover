@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TelemetryPanel from './components/TelemetryPanel.jsx';
 import ControlSummary, { RoverRosterPanel } from './components/ControlSummary.jsx';
+import ReplaySourcesPanel from './components/ReplaySourcesPanel.jsx';
 import AlertFeed from './components/AlertFeed.jsx';
 import MobileControls, {
   MobileLandscapeAuxColumn,
@@ -128,7 +129,10 @@ function MobilePortraitLayout({ onOpenHelpOverlay }) {
     <div className="flex flex-col gap-0.5">
       <DriverVideoPanel layoutFormat="mobile-portrait" />
       <MobileControls />
-      <RoverRosterPanel />
+      <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <ReplaySourcesPanel panelId="replay-sources-mobile-portrait" />
+        <RoverRosterPanel />
+      </div>
       {/* <ControlSummary /> */}
       <MobileFeatureTabs
         layout="mobile-portrait"
@@ -146,7 +150,10 @@ function MobileLandscapeLayout({ onOpenHelpOverlay }) {
         <MobileLandscapeAuxColumn />
         <div>
           <DriverVideoPanel layoutFormat="mobile-landscape" />
-          <RoverRosterPanel />
+          <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+            <ReplaySourcesPanel panelId="replay-sources-mobile-landscape" />
+            <RoverRosterPanel />
+          </div>
           {/* <TelemetryPanel /> */}
         </div>
         <MobileLandscapeControlColumn />
