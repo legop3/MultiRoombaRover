@@ -24,6 +24,7 @@ import HelpOverlay from './components/HelpOverlay.jsx';
 import HelpPanel from './components/HelpPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs.jsx';
+import useDefaultNickname from './hooks/useDefaultNickname.js';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -177,6 +178,7 @@ function App() {
 }
 
 function AppWithProviders({ layout, isDesktop, fullscreen }) {
+  useDefaultNickname();
   const {
     visible: fullscreenVisible,
     mode: fullscreenMode,

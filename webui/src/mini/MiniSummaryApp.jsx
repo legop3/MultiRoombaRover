@@ -9,6 +9,7 @@ import { useRoomCameraSnapshots } from '../hooks/useRoomCameraSnapshots.js';
 import VideoTile from '../components/VideoTile.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
+import useDefaultNickname from '../hooks/useDefaultNickname.js';
 
 const ROTATE_MS = 20000;
 
@@ -24,6 +25,7 @@ function formatDriverLabel({ roverId, session }) {
 function MiniSummaryContent() {
   const { session } = useSession();
   const spectatorReady = useSpectatorMode();
+  useDefaultNickname();
   const inLockdown = session?.mode === 'lockdown';
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];

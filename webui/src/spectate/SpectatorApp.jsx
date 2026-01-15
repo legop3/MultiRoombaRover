@@ -11,6 +11,7 @@ import ChatPanel from '../components/ChatPanel.jsx';
 import LogPanel from '../components/LogPanel.jsx';
 import RoverRoster from '../components/RoverRoster.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
+import useDefaultNickname from '../hooks/useDefaultNickname.js';
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
@@ -91,9 +92,10 @@ function LogsRow({ className = '' }) {
   );
 }
 
-export default function SpectatorApp() {
+function SpectatorContent() {
   const { session } = useSession();
   const inLockdown = session?.mode === 'lockdown';
+  useDefaultNickname();
   useSpectatorMode();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
@@ -110,48 +112,52 @@ export default function SpectatorApp() {
 
   if (inLockdown) {
     return (
-      <SettingsProvider>
-        <div className="flex min-h-screen items-center justify-center bg-black text-slate-200">
-          <div className="surface max-w-md space-y-0.5 p-1 text-center text-sm">
-            <p className="text-lg font-semibold text-white">Spectate disabled during lockdown.</p>
-            <p className="text-slate-300">Please wait until the server leaves lockdown to view streams.</p>
-          </div>
+      <div className="flex min-h-screen items-center justify-center bg-black text-slate-200">
+        <div className="surface max-w-md space-y-0.5 p-1 text-center text-sm">
+          <p className="text-lg font-semibold text-white">Spectate disabled during lockdown.</p>
+          <p className="text-slate-300">Please wait until the server leaves lockdown to view streams.</p>
         </div>
-      </SettingsProvider>
+      </div>
     );
   }
 
   return (
+    <div className="min-h-screen bg-black text-slate-100 md:h-screen md:overflow-hidden">
+      <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:overflow-y-auto">
+          <RoverRow
+            roster={roster}
+            frames={frames}
+            snapshotFeeds={snapshotFeeds}
+            audioSources={audioSources}
+            session={session}
+          />
+          <SecondaryRow />
+        </section>
+        <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:h-full">
+          <div className="panel">
+            <RoverRoster roster={roster} title="Rovers" emptyText="No rovers registered." />
+          </div>
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            <UserListPanel hideNicknameForm hideHeader fillHeight className="h-full" />
+          </div>
+          <div className="min-h-0 min-w-0 flex-[1.1] overflow-hidden">
+            <ChatPanel hideInput hideSpectatorNotice fillHeight />
+          </div>
+          <div className="min-h-0 min-w-0">
+            <LogsRow className="h-40 overflow-hidden" />
+          </div>
+        </section>
+      </main>
+      <AlertFeed />
+    </div>
+  );
+}
+
+export default function SpectatorApp() {
+  return (
     <SettingsProvider>
-      <div className="min-h-screen bg-black text-slate-100 md:h-screen md:overflow-hidden">
-        <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:overflow-y-auto">
-            <RoverRow
-              roster={roster}
-              frames={frames}
-              snapshotFeeds={snapshotFeeds}
-              audioSources={audioSources}
-              session={session}
-            />
-            <SecondaryRow />
-          </section>
-          <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:h-full">
-            <div className="panel">
-              <RoverRoster roster={roster} title="Rovers" emptyText="No rovers registered." />
-            </div>
-            <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-              <UserListPanel hideNicknameForm hideHeader fillHeight className="h-full" />
-            </div>
-            <div className="min-h-0 min-w-0 flex-[1.1] overflow-hidden">
-              <ChatPanel hideInput hideSpectatorNotice fillHeight />
-            </div>
-            <div className="min-h-0 min-w-0">
-              <LogsRow className="h-40 overflow-hidden" />
-            </div>
-          </section>
-        </main>
-        <AlertFeed />
-      </div>
+      <SpectatorContent />
     </SettingsProvider>
   );
 }
