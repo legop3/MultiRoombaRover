@@ -6,86 +6,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
-	"net"
 	"sync"
 	"time"
 )
-
-const (
-	piCmdSetMode         = 0
-	piCmdWrite           = 4
-	piCmdWaveClear       = 27
-	piCmdWaveAddGeneric  = 28
-	piCmdWaveTxBusy      = 32
-	piCmdWaveCreate      = 49
-	piCmdWaveDelete      = 50
-	piCmdWaveTxSend      = 51
-	piOutput             = 1
-	pigpioConnectRetries = 20
-	pigpioConnectDelay   = 250 * time.Millisecond
-)
-
-type pigpioCmd struct {
-	Cmd uint32
-	P1  uint32
-	P2  uint32
-	P3  uint32
-}
 
 type gpioPulse struct {
 	GpioOn  uint32
 	GpioOff uint32
 	DelayUs uint32
-}
-
-type pigpioClient struct {
-	conn net.Conn
-	mu   sync.Mutex
-}
-
-func newPigpioClient(addr string) (*pigpioClient, error) {
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-	if tcpConn, ok := conn.(*net.TCPConn); ok {
-		_ = tcpConn.SetNoDelay(true)
-	}
-	return &pigpioClient{conn: conn}, nil
-}
-
-func (c *pigpioClient) Close() error {
-	if c.conn == nil {
-		return nil
-	}
-	return c.conn.Close()
-}
-
-func (c *pigpioClient) command(cmd, p1, p2, p3 uint32, ext []byte) (int32, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	var buf [16]byte
-	binary.LittleEndian.PutUint32(buf[0:], cmd)
-	binary.LittleEndian.PutUint32(buf[4:], p1)
-	binary.LittleEndian.PutUint32(buf[8:], p2)
-	binary.LittleEndian.PutUint32(buf[12:], p3)
-
-	if _, err := c.conn.Write(buf[:]); err != nil {
-		return -1, err
-	}
-	if len(ext) > 0 {
-		if _, err := c.conn.Write(ext); err != nil {
-			return -1, err
-		}
-	}
-	if _, err := io.ReadFull(c.conn, buf[:]); err != nil {
-		return -1, err
-	}
-	res := int32(binary.LittleEndian.Uint32(buf[12:]))
-	return res, nil
 }
 
 type IRTransmitter struct {
@@ -103,10 +32,7 @@ func NewIRTransmitter(cfg IRConfig, logger *log.Logger) (*IRTransmitter, error) 
 		return nil, fmt.Errorf("ir disabled")
 	}
 
-	addr := cfg.PigpioAddr
-	if addr == "" {
-		addr = "localhost:8888"
-	}
+	addr := ensurePigpioAddr(cfg.PigpioAddr)
 	client, err := connectPigpioWithRetry(addr, logger)
 	if err != nil {
 		return nil, fmt.Errorf("connect pigpio: %w", err)
@@ -127,22 +53,6 @@ func NewIRTransmitter(cfg IRConfig, logger *log.Logger) (*IRTransmitter, error) 
 
 	logger.Printf("ir tx initialized on GPIO %d (%d Hz carrier, activeLow=%v)", cfg.Pin, cfg.CarrierHz, tx.activeLow)
 	return tx, nil
-}
-
-func connectPigpioWithRetry(addr string, logger *log.Logger) (*pigpioClient, error) {
-	var lastErr error
-	for attempt := 1; attempt <= pigpioConnectRetries; attempt++ {
-		client, err := newPigpioClient(addr)
-		if err == nil {
-			return client, nil
-		}
-		lastErr = err
-		if attempt == 1 || attempt%4 == 0 {
-			logger.Printf("pigpio connect attempt %d/%d failed: %v", attempt, pigpioConnectRetries, err)
-		}
-		time.Sleep(pigpioConnectDelay)
-	}
-	return nil, lastErr
 }
 
 func (t *IRTransmitter) Close() {
@@ -169,17 +79,12 @@ func (t *IRTransmitter) Send(code byte, repeat int) error {
 	if len(pulses) == 0 {
 		return nil
 	}
-	if err := t.writeWave(pulses, time.Duration(totalUs)*time.Microsecond); err != nil {
-		return err
-	}
-	return nil
+	return t.writeWave(pulses, time.Duration(totalUs)*time.Microsecond)
 }
 
 func (t *IRTransmitter) configureLine() error {
-	if res, err := t.pigpio.command(piCmdSetMode, uint32(t.cfg.Pin), piOutput, 0, nil); err != nil {
-		return fmt.Errorf("pigpio set mode: %w", err)
-	} else if res < 0 {
-		return fmt.Errorf("pigpio set mode: %d", res)
+	if err := setPigpioMode(t.pigpio, t.cfg.Pin, piOutput); err != nil {
+		return err
 	}
 	return t.setInactive()
 }
@@ -189,14 +94,7 @@ func (t *IRTransmitter) setInactive() error {
 	if t.activeLow {
 		level = 1
 	}
-	res, err := t.pigpio.command(piCmdWrite, uint32(t.cfg.Pin), level, 0, nil)
-	if err != nil {
-		return fmt.Errorf("pigpio write: %w", err)
-	}
-	if res < 0 {
-		return fmt.Errorf("pigpio write: %d", res)
-	}
-	return nil
+	return writePigpio(t.pigpio, t.cfg.Pin, level)
 }
 
 func (t *IRTransmitter) buildWaveform(code byte, repeat int) ([]gpioPulse, int) {
@@ -303,7 +201,7 @@ func (t *IRTransmitter) writeWave(pulses []gpioPulse, duration time.Duration) er
 		_ = binary.Write(buf, binary.LittleEndian, pulse.DelayUs)
 	}
 	data := buf.Bytes()
-	if res, err := t.pigpio.command(piCmdWaveAddGeneric, 0, 0, uint32(len(data)), data); err != nil {
+	if res, err := t.pigpio.command(piCmdWaveAdd, 0, 0, uint32(len(data)), data); err != nil {
 		return fmt.Errorf("pigpio wave add: %w", err)
 	} else if res < 0 {
 		return fmt.Errorf("pigpio wave add: %d", res)
