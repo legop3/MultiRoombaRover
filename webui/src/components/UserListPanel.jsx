@@ -164,6 +164,14 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
                 const queue = info?.queue || [];
                 const deadline = info?.idleDeadline || info?.deadline || null;
                 const remaining = secondsRemaining(deadline);
+                const currentId = info?.current || null;
+                const currentIdx = currentId ? queue.findIndex((id) => id === currentId) : -1;
+                const nextId =
+                  queue.length > 1
+                    ? currentIdx >= 0
+                      ? queue[(currentIdx + 1) % queue.length]
+                      : queue[0]
+                    : null;
                 return (
                   <div key={roverId} className="surface-muted flex flex-col gap-0.25 text-sm">
                     <div className="flex items-center gap-1">
@@ -180,21 +188,28 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
                       <div className="flex flex-wrap items-center gap-1">
                         {queue.map((socketId, idx) => {
                           const user = lookupUser(socketId);
-                          const isCurrent = socketId === info?.current;
+                          const isCurrent = socketId === currentId;
+                          const isNext = Boolean(nextId && socketId === nextId && !isCurrent);
+                          const isSelf = Boolean(selfId && socketId === selfId);
                           const isAdmin =
                             user.role === 'admin' || user.role === 'lockdown' || user.role === 'lockdown-admin';
+                          const highlightClass = isCurrent
+                            ? 'bg-sky-600 text-white ring-2 ring-amber-300 animate-pulse'
+                            : isNext
+                            ? 'bg-emerald-700/60 text-emerald-100 ring-1 ring-emerald-300/70'
+                            : 'bg-slate-800 text-slate-200';
                           return (
                             <span
                               key={`${roverId}-${socketId}-${idx}`}
-                              className={`flex items-center gap-0.5 rounded px-1 text-[0.8rem] ${
-                                isCurrent ? 'bg-sky-700 text-white' : 'bg-slate-800 text-slate-200'
-                              }`}
+                              className={`flex items-center gap-0.5 rounded px-1 text-[0.8rem] ${highlightClass}`}
                             >
                               <span className={`${roleColors(user.role)} font-semibold`}>
                                 {formatLabel(user, selfId)}
                               </span>
                               {isAdmin && <span className="text-[0.7rem] text-amber-200">★</span>}
+                              {isSelf && <span className="text-[0.7rem] text-white">YOU</span>}
                               {isCurrent && <span className="text-[0.7rem] text-slate-200">now</span>}
+                              {isNext && <span className="text-[0.7rem] text-emerald-100">next</span>}
                             </span>
                           );
                         })}

@@ -120,6 +120,10 @@ export function ControlSystemProvider({ children }) {
     [],
   );
 
+  const recordControlIntent = useCallback(() => {
+    dispatch({ type: 'control/record-intent' });
+  }, []);
+
   const setDriveVector = useCallback(
     (vector, meta = {}) => {
       const computed = computeDifferentialSpeeds(vector, meta.speedOptions);
@@ -127,9 +131,10 @@ export function ControlSystemProvider({ children }) {
         type: 'control/update-drive',
         payload: { ...computed, source: meta.source ?? null },
       });
+      recordControlIntent();
       pipeline.sendDriveDirect(computed.speeds);
     },
-    [pipeline],
+    [pipeline, recordControlIntent],
   );
 
   const setAuxMotors = useCallback(
@@ -139,8 +144,9 @@ export function ControlSystemProvider({ children }) {
         type: 'control/set-aux-motors',
         payload,
       });
+      recordControlIntent();
     },
-    [pipeline],
+    [pipeline, recordControlIntent],
   );
 
   const updateKeyBinding = useCallback(
@@ -176,8 +182,9 @@ export function ControlSystemProvider({ children }) {
       dispatch({ type: 'control/set-camera-angle', payload: clamped });
       pipeline.sendServoAngle(clamped);
       servoAngleRef.current = clamped;
+      recordControlIntent();
     },
-    [pipeline],
+    [pipeline, recordControlIntent],
   );
 
   const nudgeServo = useCallback(
@@ -217,10 +224,13 @@ export function ControlSystemProvider({ children }) {
         if (!session?.homeAssistant?.entities) {
           pendingLightsRef.current = true;
         }
+        recordControlIntent();
+      } else if (macroId === 'seek-dock') {
+        recordControlIntent();
       }
       await pipeline.runMacroSteps(macro);
     },
-    [pipeline, state.macros, session?.homeAssistant?.entities, turnOnAllLights],
+    [pipeline, recordControlIntent, session?.homeAssistant?.entities, state.macros, turnOnAllLights],
   );
 
   const stopAllMotion = useCallback(() => {
@@ -256,7 +266,8 @@ export function ControlSystemProvider({ children }) {
 
   const toggleNightVision = useCallback(() => {
     pipeline.sendNightVision('toggle');
-  }, [pipeline]);
+    recordControlIntent();
+  }, [pipeline, recordControlIntent]);
 
   const setSongNote = useCallback(
     (note) => {

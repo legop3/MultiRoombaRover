@@ -34,6 +34,7 @@ export const initialControlState = {
   aux: createAuxState(),
   camera: createCameraState(),
   song: createSongState(),
+  lastControlIntentAt: 0,
   macros: DEFAULT_MACROS,
   keymap: DEFAULT_KEYMAP,
   inputs: {},
@@ -48,6 +49,7 @@ export function controlReducer(state, action) {
         drive: action.payload ? state.drive : createDriveState(),
         aux: action.payload ? state.aux : createAuxState(),
         song: action.payload ? state.song : createSongState(),
+        lastControlIntentAt: action.payload ? state.lastControlIntentAt : 0,
       };
     case 'control/set-mode':
       return state.mode === action.payload
@@ -123,6 +125,12 @@ export function controlReducer(state, action) {
         drive: createDriveState(),
         aux: createAuxState(),
         song: createSongState(),
+        lastControlIntentAt: 0,
+      };
+    case 'control/record-intent':
+      return {
+        ...state,
+        lastControlIntentAt: Date.now(),
       };
     case 'control/set-song-note':
       return {

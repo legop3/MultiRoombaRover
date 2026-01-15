@@ -52,6 +52,11 @@ export default function VideoTile({
   hudForceMap = false,
   hudMapPosition = 'top-right',
   fitParent = false,
+  showTurnCue = false,
+  turnTimerText = null,
+  turnSeconds = null,
+  isActiveDriver = false,
+  idleSkipSeconds = null,
 }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -387,6 +392,14 @@ export default function VideoTile({
           />
         )}
         <audio ref={audioRef} autoPlay hidden />
+        {showTurnCue ? (
+          <TurnCueOverlay
+            mobileHud={mobileHud}
+            turnSeconds={turnSeconds}
+            isActiveDriver={isActiveDriver}
+            idleSkipSeconds={idleSkipSeconds}
+          />
+        ) : null}
         <HudOverlay
           frame={telemetryFrame}
           sensors={sensors}
@@ -401,6 +414,7 @@ export default function VideoTile({
           showTopDown={showHudMap}
           mobileHud={mobileHud}
           mapPosition={hudMapPosition}
+          turnTimerText={turnTimerText}
         />
         <HudChatInput compact={mobileHud} />
         <OvercurrentOverlay motors={overcurrentMotors} compact={mobileHud} />
@@ -409,12 +423,14 @@ export default function VideoTile({
           <BatteryBarVertical visual={batteryVisual} />
         ) : null}
         {qualityNotice ? (
-          <div
-            className={`pointer-events-none absolute rounded bg-black/70 font-semibold text-amber-200 ${
-              mobileHud ? 'left-0.5 top-0.5 px-0.5 py-0.25 text-[0.55rem]' : 'left-1 top-1 px-1 py-0.5 text-xs'
-            }`}
-          >
-            {qualityNotice}
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2">
+            <div
+              className={`mx-auto w-fit rounded border border-amber-300/80 bg-black/75 text-amber-200 ${
+                mobileHud ? 'px-2 py-1 text-[0.6rem]' : 'px-3 py-1.5 text-sm'
+              }`}
+            >
+              {qualityNotice}
+            </div>
           </div>
         ) : null}
       </div>
@@ -527,6 +543,7 @@ function HudOverlay({
   showTopDown = false,
   mobileHud = false,
   mapPosition = 'top-right',
+  turnTimerText = null,
 }) {
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const [now, setNow] = useState(() => Date.now());
@@ -544,6 +561,8 @@ function HudOverlay({
   const labelPadClass = isMobile ? 'px-0.25 py-0.25' : 'px-0.5 py-0.5';
   const labelTextClass = isMobile ? 'text-[0.55rem]' : 'text-[0.8rem]';
   const statusPosClass = isMobile ? 'left-0.5 top-0.5' : 'left-1 top-1';
+  const timerTextClass = isMobile ? 'text-[0.5rem]' : 'text-[0.7rem]';
+  const timerPadClass = isMobile ? 'px-0.5 py-0.25' : 'px-1 py-0.5';
   const telemetryPosClass = isMobile ? 'left-0.5 top-1/2' : 'left-1 top-1/2';
   const labelPosClass = isMobile ? 'bottom-0.5' : 'bottom-0.5';
   const mapSize = '240px';
@@ -625,6 +644,13 @@ function HudOverlay({
           {audioStatus ? <span>Audio: {audioStatus}</span> : null}
         </div>
       </div>
+      {turnTimerText ? (
+        <div
+          className={`absolute left-1/2 top-0.5 -translate-x-1/2 rounded bg-black/70 text-slate-100 ${timerPadClass} ${timerTextClass}`}
+        >
+          {turnTimerText}
+        </div>
+      ) : null}
       <div
         className={`absolute ${labelPosClass} left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
       >
@@ -644,6 +670,32 @@ function HudOverlay({
           <TopDownMap sensors={sensors} size={240} overlay />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function TurnCueOverlay({
+  mobileHud = false,
+  turnSeconds = null,
+  isActiveDriver = false,
+  idleSkipSeconds = null,
+}) {
+  const titleClass = mobileHud ? 'text-3xl' : 'text-5xl';
+  const subClass = mobileHud ? 'text-xs' : 'text-sm';
+  const timerClass = mobileHud ? 'text-[0.55rem]' : 'text-[0.75rem]';
+  const padClass = mobileHud ? 'px-4 py-3' : 'px-6 py-4';
+  const showCountdown = isActiveDriver && typeof idleSkipSeconds === 'number';
+  return (
+    <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/55">
+      <div className={`flex flex-col items-center gap-1 rounded border border-amber-300/80 bg-black/70 ${padClass}`}>
+        <div className={`font-semibold text-amber-200 ${titleClass}`}>IT IS YOUR TURN!</div>
+        <div className={`text-amber-200/80 ${subClass}`}>Start driving!</div>
+        {showCountdown ? (
+          <div className={`text-red-100/90 ${timerClass}`}>
+            Idle skip in {idleSkipSeconds}s
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
