@@ -57,6 +57,7 @@ export const DEFAULT_MACROS = [
     label: 'Drive',
     description: 'Start, dock, and full command sequence used by the drive button.',
     steps: [
+      { type: 'servo', angle: 0 },
       { type: 'oi', command: 'start' },
       { type: 'pause', duration: COMMAND_DELAY_MS },
       { type: 'oi', command: 'dock' },
