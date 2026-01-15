@@ -1,7 +1,7 @@
 [Unit]
 Description=Multi-Roomba rover control agent
-After=network-online.target mediamtx.service
-Wants=network-online.target
+After=network-online.target mediamtx.service pigpiod.service
+Wants=network-online.target pigpiod.service
 
 [Service]
 Type=simple

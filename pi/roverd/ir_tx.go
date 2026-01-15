@@ -24,6 +24,8 @@ const (
 	piCmdWaveDelete      = 50
 	piCmdWaveTxSend      = 51
 	piOutput             = 1
+	pigpioConnectRetries = 20
+	pigpioConnectDelay   = 250 * time.Millisecond
 )
 
 type pigpioCmd struct {
@@ -102,7 +104,7 @@ func NewIRTransmitter(cfg IRConfig, logger *log.Logger) (*IRTransmitter, error) 
 		return nil, fmt.Errorf("ir disabled")
 	}
 
-	client, err := newPigpioClient(pigpioAddr)
+	client, err := connectPigpioWithRetry(pigpioAddr, logger)
 	if err != nil {
 		return nil, fmt.Errorf("connect pigpio: %w", err)
 	}
@@ -122,6 +124,22 @@ func NewIRTransmitter(cfg IRConfig, logger *log.Logger) (*IRTransmitter, error) 
 
 	logger.Printf("ir tx initialized on GPIO %d (%d Hz carrier, activeLow=%v)", cfg.Pin, cfg.CarrierHz, tx.activeLow)
 	return tx, nil
+}
+
+func connectPigpioWithRetry(addr string, logger *log.Logger) (*pigpioClient, error) {
+	var lastErr error
+	for attempt := 1; attempt <= pigpioConnectRetries; attempt++ {
+		client, err := newPigpioClient(addr)
+		if err == nil {
+			return client, nil
+		}
+		lastErr = err
+		if attempt == 1 || attempt%4 == 0 {
+			logger.Printf("pigpio connect attempt %d/%d failed: %v", attempt, pigpioConnectRetries, err)
+		}
+		time.Sleep(pigpioConnectDelay)
+	}
+	return nil, lastErr
 }
 
 func (t *IRTransmitter) Close() {
