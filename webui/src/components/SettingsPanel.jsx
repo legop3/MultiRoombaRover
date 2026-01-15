@@ -8,6 +8,8 @@ import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 import SessionSnapshot from './SessionSnapshot.jsx';
 import SocketLogPanel from './SocketLogPanel.jsx';
 import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
+import { useSettingsNamespace } from '../settings/index.js';
+import { useSocket } from '../context/SocketContext.jsx';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -24,6 +26,12 @@ export default function SettingsPanel() {
   } = useControlSystem();
   const canControl = Boolean(roverId);
   const [hudMapDesktop, setHudMapDesktop] = useHudMapSetting();
+  const socket = useSocket();
+  const { value: pageSettings, save: savePageSettings } = useSettingsNamespace('page', {
+    hudMapDesktop: false,
+    connectionTransport: 'websocket',
+  });
+  const connectionTransport = pageSettings?.connectionTransport || 'websocket';
 
   const sensorButtons = useMemo(
     () => [
@@ -36,6 +44,15 @@ export default function SettingsPanel() {
   const handleSensorToggle = (enable) => {
     if (!roverId) return;
     setSensorStream(enable);
+  };
+
+  const handleTransportChange = (event) => {
+    const next = event.target.value;
+    savePageSettings((current) => ({ ...(current ?? {}), connectionTransport: next }));
+    if (!socket?.io?.opts) return;
+    socket.io.opts.transports = next === 'polling' ? ['polling'] : ['websocket', 'polling'];
+    socket.disconnect();
+    socket.connect();
   };
   return (
     <Tabs defaultTab="keybindings">
@@ -70,6 +87,21 @@ export default function SettingsPanel() {
                 <span>Show top-down map in HUD (desktop)</span>
               </label>
               <p className="text-xs text-slate-500">Mobile HUD keeps the map on by default.</p>
+            </section>
+            <section className="panel-section space-y-0.5 text-sm">
+              <p className="text-slate-400">Connection</p>
+              <label className="flex items-center justify-between gap-0.5 text-slate-200">
+                <span>Transport</span>
+                <select
+                  value={connectionTransport}
+                  onChange={handleTransportChange}
+                  className="field-input text-sm"
+                >
+                  <option value="websocket">WebSocket</option>
+                  <option value="polling">Polling</option>
+                </select>
+              </label>
+              <p className="text-xs text-slate-500">Switching reconnects your session.</p>
             </section>
           </div>
         </TabPanel>
