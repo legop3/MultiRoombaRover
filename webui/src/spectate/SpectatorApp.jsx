@@ -12,6 +12,7 @@ import LogPanel from '../components/LogPanel.jsx';
 import RoverRoster from '../components/RoverRoster.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
+import CommunityGoalBanner from '../components/CommunityGoalBanner.jsx';
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
@@ -135,6 +136,7 @@ function SpectatorContent() {
           <SecondaryRow />
         </section>
         <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:h-full">
+          <CommunityGoalBanner layout="desktop" />
           <div className="panel">
             <RoverRoster roster={roster} title="Rovers" emptyText="No rovers registered." />
           </div>

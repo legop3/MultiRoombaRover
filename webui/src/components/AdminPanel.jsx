@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import RoverRoster from './RoverRoster.jsx';
 
@@ -10,10 +10,13 @@ const MODES = [
 ];
 
 export default function AdminPanel() {
-  const { session, lockRover, setMode, requestControl } = useSession();
+  const { session, lockRover, setMode, requestControl, setCommunityGoal } = useSession();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
   const health = session?.health || null;
+  const currentGoal = session?.communityGoal?.text || '';
+  const goalUpdatedAt = session?.communityGoal?.updatedAt || null;
+  const [goalDraft, setGoalDraft] = useState(currentGoal);
 
   const isAdmin =
     session?.role === 'admin' ||
@@ -48,6 +51,26 @@ export default function AdminPanel() {
     }
   };
 
+  const handleGoalSave = async () => {
+    try {
+      await setCommunityGoal(goalDraft);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleGoalClear = async () => {
+    try {
+      await setCommunityGoal(null);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  useEffect(() => {
+    setGoalDraft(currentGoal);
+  }, [currentGoal]);
+
   const lockMap = useMemo(() => {
     const map = {};
     roster.forEach((rover) => {
@@ -69,6 +92,29 @@ export default function AdminPanel() {
             </option>
           ))}
         </select>
+      </div>
+      <div className="space-y-0.5">
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>Community goal</span>
+          {goalUpdatedAt ? (
+            <span>Updated {new Date(goalUpdatedAt).toLocaleString()}</span>
+          ) : null}
+        </div>
+        <input
+          type="text"
+          value={goalDraft}
+          onChange={(event) => setGoalDraft(event.target.value)}
+          placeholder="Set a community goal"
+          className="field-input text-sm"
+        />
+        <div className="flex gap-0.5 text-xs">
+          <button type="button" onClick={handleGoalSave} className="button-dark">
+            Set goal
+          </button>
+          <button type="button" onClick={handleGoalClear} className="button-danger">
+            Clear
+          </button>
+        </div>
       </div>
 
       <RoverRoster

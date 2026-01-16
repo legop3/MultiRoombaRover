@@ -20,6 +20,7 @@ const { getReplaySources, getDefaultDiscordSources, validateSources } = require(
 const { getActiveDrivers } = require('./turnService');
 const { getNickname } = require('./nicknameService');
 const { tryTriggerReplay } = require('./replayService');
+const { getCommunityGoal, setCommunityGoal, clearCommunityGoal } = require('./communityGoalService');
 const {
   getGuildConfig,
   listGuildConfigs,
@@ -54,6 +55,9 @@ const client = new Client({
 
 const channelCache = new Map();
 let skippedFirstModeAnnouncement = false;
+const PRESENCE_ROTATE_MS = 20000;
+let presenceInterval = null;
+let presenceShowGoal = false;
 function sanitizeMentions(text) {
   if (!text) return '';
   return String(text)
@@ -158,18 +162,54 @@ function countReady() {
   return { ready, total };
 }
 
-async function updatePresence() {
-  if (!client?.user) return;
+function truncatePresenceText(text, maxLength) {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  if (maxLength <= 3) return text.slice(0, maxLength);
+  return `${text.slice(0, maxLength - 3)}...`;
+}
+
+function buildPresenceName() {
   const { ready, total } = countReady();
   const mode = getMode();
+  const goal = getCommunityGoal();
+  const goalText = goal?.text ? String(goal.text).trim() : '';
+  if (presenceShowGoal && goalText) {
+    const trimmed = truncatePresenceText(goalText, 110);
+    return `Goal: ${trimmed}`;
+  }
+  return `${mode} · ${ready}/${total} Rovers Ready`;
+}
+
+async function updatePresence() {
+  if (!client?.user) return;
   try {
     await client.user.setPresence({
-      activities: [{ name: `${mode} · ${ready}/${total} Rovers Ready`, type: ActivityType.Watching }],
+      activities: [{ name: buildPresenceName(), type: ActivityType.Watching }],
       status: 'online',
     });
   } catch (err) {
     logger.warn('Failed to update Discord presence', err.message);
   }
+}
+
+function schedulePresenceRotation() {
+  if (presenceInterval) {
+    clearInterval(presenceInterval);
+    presenceInterval = null;
+  }
+  const goal = getCommunityGoal();
+  if (!goal?.text) {
+    presenceShowGoal = false;
+    updatePresence();
+    return;
+  }
+  presenceShowGoal = false;
+  updatePresence();
+  presenceInterval = setInterval(() => {
+    presenceShowGoal = !presenceShowGoal;
+    updatePresence();
+  }, PRESENCE_ROTATE_MS);
 }
 
 async function fetchChannel(id) {
@@ -215,6 +255,7 @@ function formatHelp() {
     '`rs lock <id>` — lock a rover',
     '`rs unlock <id>` — unlock a rover',
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
+    '`rs goal [text|clear]` — show or set community goal',
     '`ts` — show time status',
   ].join('\n');
 }
@@ -417,6 +458,57 @@ async function handleModeCommand(message, mode) {
   }
 }
 
+async function handleGoalCommand(message, tokens) {
+  const query = tokens.join(' ').trim();
+  const lower = query.toLowerCase();
+  if (!query) {
+    const goal = getCommunityGoal();
+    const text = goal?.text ? goal.text : null;
+    await message.reply({
+      content: text ? `Community goal: ${sanitizeMentions(text)}` : 'No community goal set.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (!isAdminUser(message.author.id)) {
+    await message.reply({
+      content: 'Only admins can update the community goal.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (lower === 'clear') {
+    try {
+      clearCommunityGoal({ by: message.author?.id || null });
+      await message.reply({
+        content: 'Community goal cleared.',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (err) {
+      await message.reply({
+        content: sanitizeMentions(`Failed to clear goal: ${err.message}`),
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    }
+    return;
+  }
+
+  try {
+    setCommunityGoal(query, { by: message.author?.id || null });
+    await message.reply({
+      content: sanitizeMentions(`Community goal set: ${query}`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+  } catch (err) {
+    await message.reply({
+      content: sanitizeMentions(`Failed to set goal: ${err.message}`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+  }
+}
+
 function canManageBridge(message) {
   if (isAdminUser(message.author.id)) return true;
   if (!message.guild || !message.member) return false;
@@ -600,7 +692,8 @@ async function handleCommand(message) {
     action !== 'status' &&
     action !== 'help' &&
     action !== 'replay' &&
-    action !== 'bridge'
+    action !== 'bridge' &&
+    action !== 'goal'
   ) {
     return; // ignore non-admins for privileged commands
   }
@@ -629,6 +722,9 @@ async function handleCommand(message) {
       break;
     case 'mode':
       await handleModeCommand(message, tokens[0]);
+      break;
+    case 'goal':
+      await handleGoalCommand(message, tokens);
       break;
     default:
       await message.reply(formatHelp());
@@ -865,7 +961,7 @@ function handleBusEvent(event) {
     case 'mode.changed':
       if (!skippedFirstModeAnnouncement) {
         skippedFirstModeAnnouncement = true;
-        updatePresence();
+        schedulePresenceRotation();
         break;
       }
       announce({
@@ -875,8 +971,19 @@ function handleBusEvent(event) {
         title: 'Mode Changed',
         description: `Server mode set to **${payload?.mode}**`,
       });
-      updatePresence();
+      schedulePresenceRotation();
       break;
+    case 'communityGoal.updated': {
+      const goalText = payload?.text ? sanitizeMentions(String(payload.text)) : null;
+      announce({
+        channelId: channels.announcements,
+        color: 0x8bc34a,
+        title: 'Community Goal',
+        description: goalText ? goalText : 'Community goal cleared.',
+      });
+      schedulePresenceRotation();
+      break;
+    }
     case 'rover.locked':
       announce({
         channelId: channels.announcements,
@@ -884,7 +991,7 @@ function handleBusEvent(event) {
         title: 'Rover Locked',
         description: `${payload?.roverId} locked${payload?.reason ? ` (${payload.reason})` : ''}.`,
       });
-      updatePresence();
+      schedulePresenceRotation();
       break;
     case 'rover.unlocked':
       announce({
@@ -894,7 +1001,7 @@ function handleBusEvent(event) {
         title: 'Rover Unlocked',
         description: `${payload?.roverId} unlocked.`,
       });
-      updatePresence();
+      schedulePresenceRotation();
       break;
     case 'rover.online':
       announce({
@@ -904,7 +1011,7 @@ function handleBusEvent(event) {
         title: 'Rover Online',
         description: `${payload?.roverId} is online.`,
       });
-      updatePresence();
+      schedulePresenceRotation();
       break;
     case 'rover.offline':
       announce({
@@ -914,7 +1021,7 @@ function handleBusEvent(event) {
         title: 'Rover Offline',
         description: `${payload?.roverId} went offline.`,
       });
-      updatePresence();
+      schedulePresenceRotation();
       break;
     case 'rover.dockGuard':
       announce({
@@ -997,7 +1104,7 @@ function handleBusEvent(event) {
         description: null,
         embeds: [buildBatteryStatusEmbed(0xf0b651)],
       });
-      updatePresence();
+      schedulePresenceRotation();
       break;
     case 'battery.unlocked':
       announce({
@@ -1008,7 +1115,7 @@ function handleBusEvent(event) {
         description: null,
         embeds: [buildBatteryStatusEmbed(0x4caf50)],
       });
-      updatePresence();
+      schedulePresenceRotation();
       break;
     case 'replay.requested':
       sendReplayToChannel(payload?.channelId, payload?.requester, payload?.sources || []).catch((err) => {
@@ -1063,7 +1170,7 @@ client.on('messageCreate', async (message) => {
 
 client.once('ready', () => {
   logger.info('Discord bot logged in', { tag: client.user?.tag });
-  updatePresence();
+  schedulePresenceRotation();
 });
 
 subscribe('*', handleBusEvent);

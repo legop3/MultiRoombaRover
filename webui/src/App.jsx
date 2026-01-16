@@ -26,6 +26,7 @@ import HelpPanel from './components/HelpPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs.jsx';
 import useDefaultNickname from './hooks/useDefaultNickname.js';
+import CommunityGoalBanner from './components/CommunityGoalBanner.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -73,6 +74,7 @@ function DesktopLayout({ layout, onOpenHelpOverlay }) {
         <LogPanel />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+        <CommunityGoalBanner layout={layout} />
         <RightPaneTabs layout={layout} onOpenHelpOverlay={onOpenHelpOverlay} />
         {/* <SessionSnapshot /> */}
       </div>
@@ -234,6 +236,7 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
       <KeyboardInputManager />
       <GamepadInputManager />
       <main className={`flex w-full flex-col gap-0.5 text-base ${isDesktop ? 'h-full overflow-hidden' : ''}`}>
+        {!isDesktop ? <CommunityGoalBanner layout={layout} /> : null}
         {renderedLayout}
       </main>
       <AlertFeed />

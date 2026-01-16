@@ -16,6 +16,7 @@ const SessionContext = createContext({
   homeAssistantSetState: async () => {},
   setNickname: async () => {},
   triggerReplay: async () => {},
+  setCommunityGoal: async () => {},
 });
 
 function useAckEmitter(socket) {
@@ -98,6 +99,7 @@ export function SessionProvider({ children }) {
         emitWithAck('homeAssistant:setState', { entityId, state }),
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
       triggerReplay: (sources = []) => emitWithAck('replay:trigger', { sources }),
+      setCommunityGoal: (text) => emitWithAck('communityGoal:set', { text }),
       pushAlert: (alert) =>
         setAlerts((prev) => [
           ...prev.slice(-49),

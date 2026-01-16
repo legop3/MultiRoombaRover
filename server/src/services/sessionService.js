@@ -13,6 +13,8 @@ const { getReplayState, replayEvents } = require('./replayService');
 const { getReplaySources } = require('./replaySourceService');
 const { getHealthSnapshot } = require('./healthService');
 const { loadConfig } = require('../helpers/configLoader');
+const { getCommunityGoal } = require('./communityGoalService');
+const { subscribe } = require('./eventBus');
 
 const discordInvite = loadConfig().discord?.invite || null;
 const kofiLink = loadConfig().kofi?.link || null;
@@ -53,6 +55,7 @@ function buildSession(socket) {
     replay: getReplayState(),
     replaySources: getReplaySources(),
     health: getHealthSnapshot(),
+    communityGoal: getCommunityGoal(),
     users,
     discord: {
       invite: discordInvite,
@@ -180,6 +183,11 @@ nicknameEvents.on('change', ({ socketId }) => {
   } else {
     syncAll();
   }
+});
+
+subscribe('communityGoal.updated', () => {
+  logger.info('Community goal updated; syncing all clients');
+  syncAll();
 });
 
 // sync all sockets 20 seconds
