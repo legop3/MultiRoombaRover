@@ -13,3 +13,5 @@ roverd-dummy
 server/config.yaml
 package-lock.json
 server/data/discord-guilds.json
+server/data/community-goal.json
+server/data
