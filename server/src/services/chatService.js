@@ -15,7 +15,7 @@ const rateBuckets = new Map(); // socketId -> [timestamps]
 const MAX_HISTORY = 100;
 const history = [];
 
-const PROFANITY_LIST = ['bitch', 'cunt', 'nigger', 'nigga', 'asshole', 'dick'];
+const PROFANITY_LIST = ['bitch', 'cunt', 'nigger', 'nigga', 'asshole', 'dick', 'faggot', 'fag', 'whore'];
 const DUPLICATE_WINDOW_MS = 15000;
 const lastMessageBySocket = new Map(); // socketId -> { text, ts }
 
@@ -127,7 +127,7 @@ function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
     cb({ error: 'Slow down' });
     return;
   }
-  if (clean.length > 256) {
+  if (clean.length > 150) {
     cb({ error: 'Message too long' });
     return;
   }
@@ -139,10 +139,10 @@ function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
   //   cb({ error: 'Duplicate message' });
   //   return;
   // }
-  if (isKeymash(clean)) {
-    cb({ error: 'Message looks like spam' });
-    return;
-  }
+  // if (isKeymash(clean)) {
+  //   cb({ error: 'Message looks like spam' });
+  //   return;
+  // }
   const roverId = resolveRoverId(socket?.id);
   const ttsOptions = normalizeTtsOptions(tts);
   const message = buildMessage(socket, clean, { fromDiscord: false, roverId, tts: ttsOptions });
