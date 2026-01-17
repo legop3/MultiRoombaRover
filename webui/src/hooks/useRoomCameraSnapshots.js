@@ -13,6 +13,7 @@ export function useRoomCameraSnapshots(sourceList = [], options = {}) {
   }, [ids, version]);
   const idsRef = useRef([]);
   const [connectionNonce, setConnectionNonce] = useState(0);
+  const statsRef = useRef(new Map());
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -46,6 +47,30 @@ export function useRoomCameraSnapshots(sourceList = [], options = {}) {
 
     const handleFrame = (meta = {}, buffer) => {
       if (cancelled || !meta.id || !buffer) return;
+      const sizeBytes = buffer.byteLength ?? buffer.length ?? 0;
+      const now = Date.now();
+      const prevStats = statsRef.current.get(meta.id) || {
+        count: 0,
+        totalBytes: 0,
+        lastLogAt: 0,
+      };
+      const nextStats = {
+        count: prevStats.count + 1,
+        totalBytes: prevStats.totalBytes + sizeBytes,
+        lastLogAt: prevStats.lastLogAt,
+      };
+      if (!nextStats.lastLogAt || now - nextStats.lastLogAt >= 10000) {
+        const avgBytes = nextStats.count ? nextStats.totalBytes / nextStats.count : 0;
+        console.log(
+          '[roomCamera]',
+          meta.id,
+          `frame=${sizeBytes}B`,
+          `avg=${Math.round(avgBytes)}B`,
+          `count=${nextStats.count}`,
+        );
+        nextStats.lastLogAt = now;
+      }
+      statsRef.current.set(meta.id, nextStats);
       const blob = new Blob([buffer], { type: 'image/jpeg' });
       const url = URL.createObjectURL(blob);
       const prevUrl = objectUrls.current.get(meta.id);
