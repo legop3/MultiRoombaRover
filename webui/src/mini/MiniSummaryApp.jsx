@@ -152,7 +152,7 @@ export default function MiniSummaryApp() {
     <SettingsProvider>
       <>
         <MiniSummaryContent />
-        <AlertFeed scale={5} />
+        <AlertFeed scale={3} />
       </>
     </SettingsProvider>
   );
