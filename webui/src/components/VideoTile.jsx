@@ -5,6 +5,7 @@ import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 import { useChat } from '../context/ChatContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
+import DiscordInviteButton from './DiscordInviteButton.jsx';
 
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
@@ -429,7 +430,10 @@ export default function VideoTile({
                 mobileHud ? 'px-2 py-1 text-[0.6rem]' : 'px-3 py-1.5 text-sm'
               }`}
             >
-              {qualityNotice}
+              <div className="text-center">{qualityNotice}</div>
+              <div className="pointer-events-auto mt-1">
+                <DiscordInviteButton text={'Join Discord server while you wait!'} />
+              </div>
             </div>
           </div>
         ) : null}
