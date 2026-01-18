@@ -121,7 +121,7 @@ function MiniSummaryContent() {
               layoutFormat="mobile"
               hudVariant="spectator"
               driverLabel={driverLabel}
-              hudLabelScale={3}
+              hudLabelScale={5}
               hudForceMap
               hudMapPosition="bottom-left"
               fitParent
@@ -152,7 +152,7 @@ export default function MiniSummaryApp() {
     <SettingsProvider>
       <>
         <MiniSummaryContent />
-        <AlertFeed scale={3} />
+        <AlertFeed scale={5} />
       </>
     </SettingsProvider>
   );
