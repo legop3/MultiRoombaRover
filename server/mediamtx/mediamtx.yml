@@ -8,7 +8,7 @@ metricsAddress: 0.0.0.0:9998
 pprof: no
 pprofAddress: 127.0.0.1:9999
 
-rtsp: no
+rtsp: yes
 rtmp: no
 hls: no
 

@@ -118,7 +118,7 @@ export default function RoomCameraPanel({
                 feed={feed}
                 label={camera.name || camera.id}
                 videoSession={previewSession}
-                preferVideo={av1Supported}
+                preferVideo={Boolean(previewSession?.url)}
               />
             </article>
           );

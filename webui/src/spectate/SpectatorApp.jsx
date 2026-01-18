@@ -103,11 +103,11 @@ function SpectatorContent() {
   useSpectatorMode();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
-  const av1Supported = supportsAv1WebRtc();
   const snapshotFeeds = useRoverSnapshots(
     roster.map((rover) => rover.id),
     { enabled: !inLockdown, version: session?.mode },
   );
+  const av1Supported = supportsAv1WebRtc();
   const previewEntries = roster.map((rover) => ({
     type: 'rover',
     id: rover.id,

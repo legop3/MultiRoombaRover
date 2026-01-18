@@ -36,13 +36,13 @@ function MiniSummaryContent() {
     enabled: !inLockdown,
     version: session?.mode,
   });
-  const av1Supported = supportsAv1WebRtc();
   const [index, setIndex] = useState(0);
 
   const snapshotFeeds = useRoverSnapshots(
     roster.map((rover) => rover.id),
     { enabled: !inLockdown, version: session?.mode },
   );
+  const av1Supported = supportsAv1WebRtc();
   const previewEntries = roster.map((rover) => ({
     type: 'rover',
     id: rover.id,
@@ -162,7 +162,12 @@ function MiniSummaryContent() {
           </FitViewportFrame>
         ) : activeCamera ? (
           <FitViewportFrame>
-            <RoomCameraFrame camera={activeCamera} feed={activeFeed} videoSession={activeRoomPreview} preferVideo={av1Supported} />
+            <RoomCameraFrame
+              camera={activeCamera}
+              feed={activeFeed}
+              videoSession={activeRoomPreview}
+              preferVideo={Boolean(activeRoomPreview?.url)}
+            />
           </FitViewportFrame>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">

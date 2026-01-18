@@ -12,6 +12,7 @@ const previewConfig = mediaConfig.preview || {};
 
 const ENABLED = Boolean(previewConfig.enabled);
 const PREVIEW_CODEC = String(previewConfig.codec || 'av1').toLowerCase();
+const PREVIEW_TRANSPORT = String(previewConfig.transport || 'rtsp').toLowerCase();
 const PREVIEW_FPS = Number(previewConfig.fps || 10);
 const PREVIEW_WIDTH = Number(previewConfig.width || 640);
 const ROOM_BITRATE_KBPS = Number(previewConfig.roomBitrateKbps || 200);
@@ -34,6 +35,10 @@ function buildSrtReadUrl(streamId) {
 function buildSrtPublishUrl(streamId) {
   const encoded = encodeStreamId(streamId);
   return `srt://127.0.0.1:9000?streamid=#!::r=${encoded},m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316`;
+}
+
+function buildRtspPublishUrl(streamId) {
+  return `rtsp://127.0.0.1:8554/${streamId}`;
 }
 
 function sanitizeCodec(codec) {
@@ -91,6 +96,17 @@ function buildArgs(source) {
   const gop = Math.max(1, Math.round(GOP_SECONDS * PREVIEW_FPS));
   const maxrate = Math.floor(source.bitrateKbps * 1.1);
   const bufsize = Math.max(1, source.bitrateKbps * 2);
+  const codec = PREVIEW_CODEC === 'av1' ? 'libsvtav1' : 'libx264';
+  const extraCodecArgs =
+    codec === 'libx264'
+      ? ['-tune', 'zerolatency', '-profile:v', 'baseline', '-sc_threshold', '0']
+      : [];
+  const outputUrl =
+    PREVIEW_TRANSPORT === 'rtsp' ? buildRtspPublishUrl(source.outputId) : buildSrtPublishUrl(source.outputId);
+  const outputArgs =
+    PREVIEW_TRANSPORT === 'rtsp'
+      ? ['-f', 'rtsp', '-rtsp_transport', 'tcp']
+      : ['-f', 'mpegts'];
   return [
     '-hide_banner',
     '-loglevel',
@@ -105,9 +121,10 @@ function buildArgs(source) {
     '-vf',
     `fps=${PREVIEW_FPS},scale=${PREVIEW_WIDTH}:-1`,
     '-c:v',
-    PREVIEW_CODEC === 'av1' ? 'libsvtav1' : 'libx264',
+    codec,
     '-preset',
     PRESET,
+    ...extraCodecArgs,
     '-g',
     String(gop),
     '-keyint_min',
@@ -120,9 +137,8 @@ function buildArgs(source) {
     `${bufsize}k`,
     '-pix_fmt',
     'yuv420p',
-    '-f',
-    'mpegts',
-    buildSrtPublishUrl(source.outputId),
+    ...outputArgs,
+    outputUrl,
   ];
 }
 

@@ -24,7 +24,6 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
     return () => clearInterval(timer);
   }, [session?.mode]);
   const roverId = session?.assignment?.roverId;
-  const av1Supported = supportsAv1WebRtc();
   const rosterEntry =
     roverId && session?.roster ? session.roster.find((item) => String(item.id) === String(roverId)) : null;
   const hasAudio = Boolean(rosterEntry?.media?.audioPublishUrl);
@@ -71,6 +70,7 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const sources = useVideoRequests(entries);
   const info = roverId && shouldShowVideo ? sources[roverId] : null;
   const audioInfo = roverId && hasAudio ? sources[`${roverId}-audio`] : null;
+  const av1Supported = supportsAv1WebRtc();
   const previewEntries = roverId
     ? [
         {

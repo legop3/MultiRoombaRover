@@ -16,6 +16,7 @@ media:
   preview:
     enabled: false
     codec: "av1"
+    transport: "rtsp"
     fps: 10
     width: 640
     roomBitrateKbps: 200
