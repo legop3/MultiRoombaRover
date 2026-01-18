@@ -52,6 +52,7 @@ export default function VideoTile({
   driverLabel = null,
   hudForceMap = false,
   hudMapPosition = 'top-right',
+  hudLabelScale = 1,
   fitParent = false,
   showTurnCue = false,
   turnTimerText = null,
@@ -416,6 +417,7 @@ export default function VideoTile({
           mobileHud={mobileHud}
           mapPosition={hudMapPosition}
           turnTimerText={turnTimerText}
+          labelScale={hudLabelScale}
         />
         <HudChatInput compact={mobileHud} />
         <OvercurrentOverlay motors={overcurrentMotors} compact={mobileHud} />
@@ -548,6 +550,7 @@ function HudOverlay({
   mobileHud = false,
   mapPosition = 'top-right',
   turnTimerText = null,
+  labelScale = 1,
 }) {
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const [now, setNow] = useState(() => Date.now());
@@ -569,6 +572,10 @@ function HudOverlay({
   const timerPadClass = isMobile ? 'px-0.5 py-0.25' : 'px-1 py-0.5';
   const telemetryPosClass = isMobile ? 'left-0.5 top-1/2' : 'left-1 top-1/2';
   const labelPosClass = isMobile ? 'bottom-0.5' : 'bottom-0.5';
+  const labelWrapperStyle = {
+    transform: `translateX(-50%) scale(${labelScale})`,
+    transformOrigin: 'center bottom',
+  };
   const mapSize = '240px';
   const mapScale = portraitMobile ? 0.36 : isMobile ? 0.45 : 0.7;
   const mapOpacity = isMobile ? 0.85 : 0.7;
@@ -630,11 +637,13 @@ function HudOverlay({
           ) : null}
         </div>
 
-        <div
-          className={`absolute ${labelPosClass} left-1/2 flex -translate-x-1/2 items-center gap-1 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
-        >
-          <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
-          {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
+        <div className={`absolute ${labelPosClass} left-1/2`} style={labelWrapperStyle}>
+          <div
+            className={`flex items-center gap-1 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
+          >
+            <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
+            {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
+          </div>
         </div>
       </div>
     );
@@ -655,11 +664,11 @@ function HudOverlay({
           {turnTimerText}
         </div>
       ) : null}
-      <div
-        className={`absolute ${labelPosClass} left-1/2 flex -translate-x-1/2 gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
-      >
-        <span>Rover: "{label || 'Unnamed Rover'}"</span>
-        {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}
+      <div className={`absolute ${labelPosClass} left-1/2`} style={labelWrapperStyle}>
+        <div className={`flex gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}>
+          <span>Rover: "{label || 'Unnamed Rover'}"</span>
+          {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}
+        </div>
       </div>
 
       {showTopDown && variant !== 'spectator' ? (

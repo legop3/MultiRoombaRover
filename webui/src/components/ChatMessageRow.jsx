@@ -88,7 +88,7 @@ export default function ChatMessageRow({ message }) {
         {displayName(message)}
       </span>
       {message.roverId && (
-        <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {message.roverId}</span>
+        <span className="rounded bg-slate-800 px-1 text-[0.7rem]">{message.roverId}</span>
       )}
       <span className="text-slate-100 break-words leading-tight whitespace-pre-wrap">{message.text}</span>
       <span className="absolute bottom-0.5 right-1 text-[0.65rem] text-slate-400/60">

@@ -5,13 +5,13 @@ import { useTelemetryFrames } from '../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../hooks/useRoverSnapshots.js';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
-import { useRoomCameraSnapshots } from '../hooks/useRoomCameraSnapshots.js';
 import VideoTile from '../components/VideoTile.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
 
 const ROTATE_MS = 20000;
+const HARD_REFRESH_MS = 3 * 60 * 60 * 1000;
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
@@ -29,47 +29,42 @@ function MiniSummaryContent() {
   const inLockdown = session?.mode === 'lockdown';
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
-  const roomCameras = session?.roomCameras || [];
-  const feeds = useRoomCameraSnapshots(roomCameras.map((camera) => ({ id: camera.id })), {
-    enabled: !inLockdown,
-    version: session?.mode,
-  });
   const [index, setIndex] = useState(0);
+  const activeDrivers = session?.activeDrivers || {};
+  const driverRoster = useMemo(
+    () => roster.filter((rover) => activeDrivers[rover.id]),
+    [roster, activeDrivers],
+  );
 
   const snapshotFeeds = useRoverSnapshots(
-    roster.map((rover) => rover.id),
+    driverRoster.map((rover) => rover.id),
     { enabled: !inLockdown, version: session?.mode },
   );
   const audioEntries = useMemo(
     () =>
-      roster.flatMap((rover) => {
+      driverRoster.flatMap((rover) => {
         if (!rover?.id || !rover.media?.audioPublishUrl) return [];
         const id = String(rover.id);
         return [{ type: 'rover', id: `${id}-audio`, key: `${id}-audio` }];
       }),
-    [roster],
+    [driverRoster],
   );
   const audioSources = useVideoRequests(audioEntries, { enabled: !inLockdown, version: session?.mode });
 
   const roverPool = useMemo(() => {
-    if (!roster.length) return [];
-    const withSnapshot = roster.filter((rover) => snapshotFeeds[rover.id]?.objectUrl);
-    return withSnapshot.length ? withSnapshot : roster;
-  }, [roster, snapshotFeeds]);
+    if (!driverRoster.length) return [];
+    const withSnapshot = driverRoster.filter((rover) => snapshotFeeds[rover.id]?.objectUrl);
+    return withSnapshot.length ? withSnapshot : driverRoster;
+  }, [driverRoster, snapshotFeeds]);
 
   const rotationPool = useMemo(() => {
-    const items = [];
-    roverPool.forEach((rover) => items.push({ type: 'rover', rover }));
-    roomCameras.forEach((camera) => items.push({ type: 'room', camera }));
-    return items;
-  }, [roverPool, roomCameras]);
+    return roverPool.map((rover) => ({ type: 'rover', rover }));
+  }, [roverPool]);
 
   const rotationKey = useMemo(
     () =>
       rotationPool
-        .map((entry) =>
-          entry.type === 'rover' ? `r:${entry.rover.id}` : `room:${entry.camera.id}`,
-        )
+        .map((entry) => `r:${entry.rover.id}`)
         .join('|'),
     [rotationPool],
   );
@@ -88,13 +83,11 @@ function MiniSummaryContent() {
 
   const activeEntry = rotationPool.length ? rotationPool[index % rotationPool.length] : null;
   const activeRover = activeEntry?.type === 'rover' ? activeEntry.rover : null;
-  const activeCamera = activeEntry?.type === 'room' ? activeEntry.camera : null;
 
   const activeSnapshot = activeRover ? snapshotFeeds[activeRover.id] || null : null;
   const activeAudio = activeRover ? audioSources[`${activeRover.id}-audio`] || null : null;
   const activeFrame = activeRover ? frames[activeRover.id] || null : null;
   const driverLabel = activeRover ? formatDriverLabel({ roverId: activeRover.id, session }) : null;
-  const activeFeed = activeCamera ? feeds[activeCamera.id] || null : null;
 
   if (inLockdown) {
     return (
@@ -128,18 +121,15 @@ function MiniSummaryContent() {
               layoutFormat="mobile"
               hudVariant="spectator"
               driverLabel={driverLabel}
+              hudLabelScale={3}
               hudForceMap
               hudMapPosition="bottom-left"
               fitParent
             />
           </FitViewportFrame>
-        ) : activeCamera ? (
-          <FitViewportFrame>
-            <RoomCameraFrame camera={activeCamera} feed={activeFeed} />
-          </FitViewportFrame>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-            No sources available.
+            {driverRoster.length ? 'No sources available.' : 'No active drivers.'}
           </div>
         )}
       </section>
@@ -148,37 +138,23 @@ function MiniSummaryContent() {
 }
 
 export default function MiniSummaryApp() {
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const timer = setTimeout(() => {
+      const url = new URL(window.location.href);
+      url.searchParams.set('refresh', Date.now().toString());
+      window.location.replace(url.toString());
+    }, HARD_REFRESH_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <SettingsProvider>
       <>
         <MiniSummaryContent />
-        <AlertFeed />
+        <AlertFeed scale={3} />
       </>
     </SettingsProvider>
-  );
-}
-
-function RoomCameraFrame({ camera, feed }) {
-  const hasImage = feed?.objectUrl;
-  const connecting = feed && feed.status === 'connecting';
-  return (
-    <div className="relative h-full w-full bg-zinc-950">
-      {hasImage ? (
-        <img
-          src={feed.objectUrl}
-          alt={camera.name || camera.id}
-          className="h-full w-full object-cover"
-          draggable={false}
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-          {connecting ? `Connecting to ${camera.name || camera.id}…` : 'No frame yet'}
-        </div>
-      )}
-      <div className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.25 text-xs text-slate-200">
-        {camera.name || camera.id}
-      </div>
-    </div>
   );
 }
 

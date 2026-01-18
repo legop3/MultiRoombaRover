@@ -11,7 +11,7 @@ function buildKey(alert) {
   return `${alert.title || 'alert'}-${alert.message}`;
 }
 
-export default function AlertFeed() {
+export default function AlertFeed({ scale = 1 }) {
   const { alerts } = useSession();
   const [now, setNow] = useState(() => Date.now());
   const latest = useMemo(() => alerts.slice(-3).map((alert) => ({ alert, key: buildKey(alert) })), [alerts]);
@@ -31,8 +31,20 @@ export default function AlertFeed() {
 
   if (!visible.length) return null;
 
+  const containerStyle =
+    scale === 1
+      ? undefined
+      : {
+          transform: `translateX(-50%) scale(${scale})`,
+          transformOrigin: 'top center',
+        };
+  const containerClass =
+    scale === 1
+      ? 'pointer-events-none fixed top-0.5 left-1/2 z-50 flex -translate-x-1/2 flex-col gap-0.5'
+      : 'pointer-events-none fixed top-0.5 left-1/2 z-50 flex flex-col gap-0.5';
+
   return (
-    <div className="pointer-events-none fixed top-0.5 left-1/2 z-50 flex -translate-x-1/2 flex-col gap-0.5">
+    <div className={containerClass} style={containerStyle}>
       {visible.map((toast) => (
         <AlertToast key={toast.key} alert={toast.alert} />
       ))}
