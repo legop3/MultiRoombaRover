@@ -13,6 +13,7 @@ import RoverRoster from '../components/RoverRoster.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
 import CommunityGoalBanner from '../components/CommunityGoalBanner.jsx';
+import { supportsAv1WebRtc } from '../lib/mediaSupport.js';
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
@@ -25,14 +26,15 @@ function formatDriverLabel({ roverId, session }) {
   return driverText;
 }
 
-function RoverSpectatorCard({ rover, frame, snapshotFeed, audioInfo, session }) {
+function RoverSpectatorCard({ rover, frame, snapshotFeed, previewSession, audioInfo, session }) {
   const driverLabel = formatDriverLabel({ roverId: rover.id, session });
+  const hasPreview = Boolean(previewSession?.url);
   return (
     <article className="min-h-[16rem] rounded bg-zinc-900 p-0.5 sm:min-h-[18rem]">
       <div className="min-h-0 overflow-hidden rounded bg-black/20">
         <VideoTile
-          sessionInfo={null}
-          videoMode="snapshot"
+          sessionInfo={hasPreview ? previewSession : null}
+          videoMode={hasPreview ? 'whep' : 'snapshot'}
           snapshotFeed={snapshotFeed}
           audioSessionInfo={audioInfo}
           label={rover.name}
@@ -48,7 +50,7 @@ function RoverSpectatorCard({ rover, frame, snapshotFeed, audioInfo, session }) 
   );
 }
 
-function RoverRow({ roster, frames, snapshotFeeds, audioSources, session }) {
+function RoverRow({ roster, frames, snapshotFeeds, previewSources, audioSources, session }) {
   if (roster.length === 0) {
     return <p className="col-span-full text-slate-400">No rovers registered.</p>;
   }
@@ -60,6 +62,7 @@ function RoverRow({ roster, frames, snapshotFeeds, audioSources, session }) {
           rover={rover}
           frame={frames[rover.id]}
           snapshotFeed={snapshotFeeds[rover.id]}
+          previewSession={previewSources[`rover:${rover.id}:preview:av1`] || null}
           audioInfo={audioSources[`${rover.id}-audio`]}
           session={session}
           showHudMap
@@ -100,10 +103,19 @@ function SpectatorContent() {
   useSpectatorMode();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
+  const av1Supported = supportsAv1WebRtc();
   const snapshotFeeds = useRoverSnapshots(
     roster.map((rover) => rover.id),
     { enabled: !inLockdown, version: session?.mode },
   );
+  const previewEntries = roster.map((rover) => ({
+    type: 'rover',
+    id: rover.id,
+    key: `rover:${rover.id}:preview:av1`,
+    preview: true,
+    codec: 'av1',
+  }));
+  const previewSources = useVideoRequests(previewEntries, { enabled: !inLockdown && av1Supported, version: session?.mode });
   const audioEntries = roster.flatMap((rover) =>
     rover.media?.audioPublishUrl
       ? [{ type: 'rover', id: `${rover.id}-audio`, key: `${rover.id}-audio` }]
@@ -130,6 +142,7 @@ function SpectatorContent() {
             roster={roster}
             frames={frames}
             snapshotFeeds={snapshotFeeds}
+            previewSources={previewSources}
             audioSources={audioSources}
             session={session}
           />

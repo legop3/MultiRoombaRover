@@ -13,6 +13,14 @@ media:
   #   http://<base>/<roverId>/whep
   # Example: http://192.168.0.86:8889/video
   whepBaseUrl: "http://192.168.0.86:8889/video"
+  preview:
+    enabled: false
+    codec: "av1"
+    fps: 10
+    width: 640
+    roomBitrateKbps: 200
+    roverBitrateKbps: 350
+    gopSeconds: 2
 
 homeAssistant:
   url: "http://homeassistant.local:8123"

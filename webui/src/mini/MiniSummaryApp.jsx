@@ -10,6 +10,8 @@ import VideoTile from '../components/VideoTile.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
+import RoomCameraFeed from '../components/RoomCameraFeed.jsx';
+import { supportsAv1WebRtc } from '../lib/mediaSupport.js';
 
 const ROTATE_MS = 20000;
 
@@ -34,12 +36,29 @@ function MiniSummaryContent() {
     enabled: !inLockdown,
     version: session?.mode,
   });
+  const av1Supported = supportsAv1WebRtc();
   const [index, setIndex] = useState(0);
 
   const snapshotFeeds = useRoverSnapshots(
     roster.map((rover) => rover.id),
     { enabled: !inLockdown, version: session?.mode },
   );
+  const previewEntries = roster.map((rover) => ({
+    type: 'rover',
+    id: rover.id,
+    key: `rover:${rover.id}:preview:av1`,
+    preview: true,
+    codec: 'av1',
+  }));
+  const roomPreviewEntries = roomCameras.map((camera) => ({
+    type: 'room',
+    id: camera.id,
+    key: `room:${camera.id}:preview:av1`,
+    preview: true,
+    codec: 'av1',
+  }));
+  const previewSources = useVideoRequests(previewEntries, { enabled: !inLockdown && av1Supported });
+  const roomPreviewSources = useVideoRequests(roomPreviewEntries, { enabled: !inLockdown && av1Supported });
   const audioEntries = useMemo(
     () =>
       roster.flatMap((rover) => {
@@ -91,10 +110,18 @@ function MiniSummaryContent() {
   const activeCamera = activeEntry?.type === 'room' ? activeEntry.camera : null;
 
   const activeSnapshot = activeRover ? snapshotFeeds[activeRover.id] || null : null;
+  const activePreview =
+    activeRover && previewSources[`rover:${activeRover.id}:preview:av1`]
+      ? previewSources[`rover:${activeRover.id}:preview:av1`]
+      : null;
   const activeAudio = activeRover ? audioSources[`${activeRover.id}-audio`] || null : null;
   const activeFrame = activeRover ? frames[activeRover.id] || null : null;
   const driverLabel = activeRover ? formatDriverLabel({ roverId: activeRover.id, session }) : null;
   const activeFeed = activeCamera ? feeds[activeCamera.id] || null : null;
+  const activeRoomPreview =
+    activeCamera && roomPreviewSources[`room:${activeCamera.id}:preview:av1`]
+      ? roomPreviewSources[`room:${activeCamera.id}:preview:av1`]
+      : null;
 
   if (inLockdown) {
     return (
@@ -118,8 +145,8 @@ function MiniSummaryContent() {
         ) : activeRover ? (
           <FitViewportFrame>
             <VideoTile
-              sessionInfo={null}
-              videoMode="snapshot"
+              sessionInfo={activePreview?.url ? activePreview : null}
+              videoMode={activePreview?.url ? 'whep' : 'snapshot'}
               snapshotFeed={activeSnapshot}
               audioSessionInfo={activeAudio}
               label={activeRover.name || activeRover.id}
@@ -135,7 +162,7 @@ function MiniSummaryContent() {
           </FitViewportFrame>
         ) : activeCamera ? (
           <FitViewportFrame>
-            <RoomCameraFrame camera={activeCamera} feed={activeFeed} />
+            <RoomCameraFrame camera={activeCamera} feed={activeFeed} videoSession={activeRoomPreview} preferVideo={av1Supported} />
           </FitViewportFrame>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
@@ -158,26 +185,15 @@ export default function MiniSummaryApp() {
   );
 }
 
-function RoomCameraFrame({ camera, feed }) {
-  const hasImage = feed?.objectUrl;
-  const connecting = feed && feed.status === 'connecting';
+function RoomCameraFrame({ camera, feed, videoSession, preferVideo }) {
   return (
     <div className="relative h-full w-full bg-zinc-950">
-      {hasImage ? (
-        <img
-          src={feed.objectUrl}
-          alt={camera.name || camera.id}
-          className="h-full w-full object-cover"
-          draggable={false}
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-          {connecting ? `Connecting to ${camera.name || camera.id}…` : 'No frame yet'}
-        </div>
-      )}
-      <div className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.25 text-xs text-slate-200">
-        {camera.name || camera.id}
-      </div>
+      <RoomCameraFeed
+        feed={feed}
+        label={camera.name || camera.id}
+        videoSession={videoSession}
+        preferVideo={preferVideo}
+      />
     </div>
   );
 }

@@ -30,5 +30,6 @@ require('./src/services/sessionService');
 require('./src/services/batteryManager');
 require('./src/services/replaySocketService');
 require('./src/services/replaySegmentManager');
+require('./src/services/media/previewTranscoderService');
 require('./src/services/discordBotService');
 require('./src/services/httpServer');

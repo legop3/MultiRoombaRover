@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useRoomCameraSnapshots } from '../hooks/useRoomCameraSnapshots.js';
+import { useVideoRequests } from '../hooks/useVideoRequests.js';
+import { supportsAv1WebRtc } from '../lib/mediaSupport.js';
 import RoomCameraFeed from './RoomCameraFeed.jsx';
 
 function EmptyState() {
@@ -32,6 +34,15 @@ export default function RoomCameraPanel({
   const { session } = useSession();
   const cameras = session?.roomCameras || [];
   const feedMap = useRoomCameraSnapshots(cameras.map((camera) => ({ id: camera.id })));
+  const av1Supported = supportsAv1WebRtc();
+  const previewEntries = cameras.map((camera) => ({
+    type: 'room',
+    id: camera.id,
+    key: `room:${camera.id}:preview:av1`,
+    preview: true,
+    codec: 'av1',
+  }));
+  const previewSources = useVideoRequests(previewEntries, { enabled: av1Supported });
   const { value: orientationSettings, save: saveOrientationSettings } = useSettingsNamespace('roomCameraPanels', {});
   const [orientation, setOrientation] = useState(() =>
     normalizeOrientation(
@@ -96,13 +107,19 @@ export default function RoomCameraPanel({
       <div className={containerClass}>
         {cameras.map((camera) => {
           const feed = feedMap[camera.id] || null;
+          const previewSession = previewSources[`room:${camera.id}:preview:av1`] || null;
           return (
             <article key={camera.id} className="w-full space-y-0.5 rounded bg-zinc-950 p-0.5 shadow-inner shadow-black/40">
               {/* <header className="space-y-0.5">
                 <p className="text-lg font-semibold text-white">{camera.name || camera.id}</p>
                 {camera.description && <p className="text-xs text-slate-500">{camera.description}</p>}
               </header> */}
-              <RoomCameraFeed feed={feed} label={camera.name || camera.id} />
+              <RoomCameraFeed
+                feed={feed}
+                label={camera.name || camera.id}
+                videoSession={previewSession}
+                preferVideo={av1Supported}
+              />
             </article>
           );
         })}

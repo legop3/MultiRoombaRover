@@ -4,6 +4,7 @@ const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const videoSessions = require('./videoSessions');
 const roverManager = require('./roverManager');
+const { getRoomCamera } = require('./roomCameraService');
 const { loadConfig } = require('../helpers/configLoader');
 
 const config = loadConfig();
@@ -36,6 +37,17 @@ function buildWhepUrlForSource(source) {
   return `${cleanBase}/${segments.join('/')}/whep`;
 }
 
+function sanitizeCodec(codec) {
+  return String(codec || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function buildPreviewId(id, codec) {
+  const cleanCodec = sanitizeCodec(codec) || 'av1';
+  return `${id}-preview-${cleanCodec}`;
+}
+
 function passesMode(socket) {
   const mode = getMode();
   if (mode === MODES.LOCKDOWN) {
@@ -65,14 +77,21 @@ function canViewRoomCamera(socket) {
 
 function normalizeRequest(payload = {}) {
   if (!payload) return null;
+  const preview = Boolean(payload.preview || payload.mode === 'preview');
+  const codec = payload.codec ? String(payload.codec) : null;
   if (payload.type && payload.id) {
-    return { type: payload.type, id: String(payload.id) };
+    return {
+      type: payload.type,
+      id: String(payload.id),
+      preview,
+      codec,
+    };
   }
   if (payload.roverId) {
-    return { type: 'rover', id: String(payload.roverId) };
+    return { type: 'rover', id: String(payload.roverId), preview, codec };
   }
   if (payload.roomCameraId) {
-    return { type: 'room', id: String(payload.roomCameraId) };
+    return { type: 'room', id: String(payload.roomCameraId), preview, codec };
   }
   return null;
 }
@@ -93,16 +112,30 @@ io.on('connection', (socket) => {
           throw new Error('Not authorized for video');
         }
       } else if (target.type === 'room') {
-        throw new Error('Room cameras now use the snapshot feed');
+        if (!target.preview) {
+          throw new Error('Room cameras now use the snapshot feed');
+        }
+        if (!getRoomCamera(target.id)) {
+          throw new Error('Room camera not found');
+        }
       } else {
         throw new Error('Unsupported video source');
       }
-      const url = buildWhepUrlForSource(target);
+      const requestId = target.preview ? buildPreviewId(target.id, target.codec) : target.id;
+      const requestTarget = { ...target, id: requestId };
+      const url = buildWhepUrlForSource(requestTarget);
       if (!url) {
         throw new Error('Server video base URL missing');
       }
-      const sessionId = videoSessions.createSession(socket, target);
-      cb({ url, token: sessionId, type: target.type, id: target.id });
+      const sessionId = videoSessions.createSession(socket, requestTarget);
+      cb({
+        url,
+        token: sessionId,
+        type: requestTarget.type,
+        id: requestTarget.id,
+        preview: Boolean(target.preview),
+        codec: target.codec || null,
+      });
     } catch (err) {
       logger.warn('video request failed: %s', err.message);
       cb({ error: err.message });

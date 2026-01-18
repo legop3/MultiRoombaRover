@@ -46,7 +46,11 @@ function extractStreamInfo(path) {
   const remaining = segments.slice(start, end);
   if (remaining.length === 1) {
     const rawId = remaining[0] || '';
-    const baseId = rawId.endsWith('-audio') ? rawId.slice(0, -6) : rawId;
+    let baseId = rawId.endsWith('-audio') ? rawId.slice(0, -6) : rawId;
+    const previewMatch = baseId.match(/^(.*)-preview-[a-z0-9]+$/);
+    if (previewMatch) {
+      baseId = previewMatch[1];
+    }
     return { type: 'rover', id: rawId, baseId };
   }
   if (remaining.length === 2 && remaining[0] === 'room') {

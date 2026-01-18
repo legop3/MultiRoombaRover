@@ -11,23 +11,42 @@ function normalizeEntry(entry) {
   if (typeof entry === 'object') {
     if (entry.type && entry.id) {
       const id = String(entry.id);
+      const preview = Boolean(entry.preview);
+      const codec = entry.codec ? String(entry.codec) : null;
       let key = entry.key;
       if (!key) {
         key = entry.type === 'room' ? `room:${id}` : id;
+        if (preview) {
+          key = `${key}:preview${codec ? `:${codec}` : ''}`;
+        }
       }
       return {
         type: entry.type,
         id,
         key,
+        preview,
+        codec,
       };
     }
     if (entry.roverId) {
       const id = String(entry.roverId);
-      return { type: 'rover', id, key: entry.key || id };
+      return {
+        type: 'rover',
+        id,
+        key: entry.key || id,
+        preview: Boolean(entry.preview),
+        codec: entry.codec ? String(entry.codec) : null,
+      };
     }
     if (entry.roomCameraId) {
       const id = String(entry.roomCameraId);
-      return { type: 'room', id, key: entry.key || `room:${id}` };
+      return {
+        type: 'room',
+        id,
+        key: entry.key || `room:${id}`,
+        preview: Boolean(entry.preview),
+        codec: entry.codec ? String(entry.codec) : null,
+      };
     }
   }
   return null;
@@ -86,6 +105,12 @@ export function useVideoRequests(sourceList = [], options = {}) {
 
     function requestEntry(entry) {
       const payload = entry.type === 'room' ? { roomCameraId: entry.id } : { roverId: entry.id };
+      if (entry.preview) {
+        payload.preview = true;
+        if (entry.codec) {
+          payload.codec = entry.codec;
+        }
+      }
       socket.emit('video:request', payload, (resp = {}) => {
         if (cancelled) return;
         setSources((prev) => ({ ...prev, [entry.key]: resp }));

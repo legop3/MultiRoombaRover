@@ -5,6 +5,7 @@ import { useVideoRequests } from '../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../hooks/useRoverSnapshots.js';
 import { useControlSystem } from '../controls/index.js';
 import VideoTile from './VideoTile.jsx';
+import { supportsAv1WebRtc } from '../lib/mediaSupport.js';
 
 export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const { session } = useSession();
@@ -23,6 +24,7 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
     return () => clearInterval(timer);
   }, [session?.mode]);
   const roverId = session?.assignment?.roverId;
+  const av1Supported = supportsAv1WebRtc();
   const rosterEntry =
     roverId && session?.roster ? session.roster.find((item) => String(item.id) === String(roverId)) : null;
   const hasAudio = Boolean(rosterEntry?.media?.audioPublishUrl);
@@ -69,6 +71,19 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const sources = useVideoRequests(entries);
   const info = roverId && shouldShowVideo ? sources[roverId] : null;
   const audioInfo = roverId && hasAudio ? sources[`${roverId}-audio`] : null;
+  const previewEntries = roverId
+    ? [
+        {
+          type: 'rover',
+          id: roverId,
+          key: `rover:${roverId}:preview:av1`,
+          preview: true,
+          codec: 'av1',
+        },
+      ]
+    : [];
+  const previewSources = useVideoRequests(previewEntries, { enabled: Boolean(roverId) && av1Supported });
+  const previewSession = roverId ? previewSources[`rover:${roverId}:preview:av1`] || null : null;
   const snapshotFeeds = useRoverSnapshots(roverId ? [roverId] : [], {
     enabled: Boolean(roverId),
     version: session?.mode,
@@ -114,8 +129,8 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
     <section className="panel">
       {roverId ? (
         <VideoTile
-          sessionInfo={info}
-          videoMode={shouldShowVideo ? 'whep' : 'snapshot'}
+          sessionInfo={shouldShowVideo ? info : previewSession?.url ? previewSession : null}
+          videoMode={shouldShowVideo ? 'whep' : previewSession?.url ? 'whep' : 'snapshot'}
           snapshotFeed={snapshotFeed}
           audioSessionInfo={audioInfo}
           label={roverLabel}
@@ -123,7 +138,13 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
           batteryConfig={batteryConfig}
           layoutFormat={layoutFormat}
           songNote={song?.note}
-          qualityNotice={!shouldShowVideo ? 'Preview feed (low FPS) until your turn.' : null}
+          qualityNotice={
+            !shouldShowVideo
+              ? previewSession?.url
+                ? 'Preview feed (AV1) until your turn.'
+                : 'Preview feed (snapshots) until your turn.'
+              : null
+          }
           showTurnCue={turnCueVisible}
           turnTimerText={turnTimerText}
           turnSeconds={turnSeconds}
