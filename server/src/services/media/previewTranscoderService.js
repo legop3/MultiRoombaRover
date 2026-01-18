@@ -107,10 +107,12 @@ function buildArgs(source) {
     PREVIEW_TRANSPORT === 'rtsp'
       ? ['-f', 'rtsp', '-rtsp_transport', 'tcp']
       : ['-f', 'mpegts'];
-  return [
-    '-hide_banner',
-    '-loglevel',
-    'info',
+  return {
+    outputUrl,
+    args: [
+      '-hide_banner',
+      '-loglevel',
+      'info',
     '-fflags',
     'nobuffer',
     '-flags',
@@ -137,15 +139,23 @@ function buildArgs(source) {
     `${bufsize}k`,
     '-pix_fmt',
     'yuv420p',
-    ...outputArgs,
-    outputUrl,
-  ];
+      ...outputArgs,
+      outputUrl,
+    ],
+  };
 }
 
 function spawnRecorder(source) {
   const key = buildKey(source);
   if (recorders.has(key)) return;
-  const args = buildArgs(source);
+  const { args, outputUrl } = buildArgs(source);
+  logger.info('Preview transcoder starting', {
+    key,
+    transport: PREVIEW_TRANSPORT,
+    codec: PREVIEW_CODEC,
+    inputUrl: source.inputUrl,
+    outputUrl,
+  });
   const proc = spawn(FFMPEG_BIN, args, { stdio: ['ignore', 'ignore', 'pipe'] });
   const stderrChunks = [];
   let stderrSize = 0;
