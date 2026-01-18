@@ -830,7 +830,7 @@ function HudChatInput({ compact = false }) {
           }
         }}
         ref={(el) => registerInputRef(el, { target: 'hud' })}
-        placeholder={canChat ? 'Chat…' : 'Spectator'}
+        placeholder={canChat ? 'Chat (TTS)' : 'Spectator'}
         disabled={!canChat}
       />
       <button
@@ -838,7 +838,7 @@ function HudChatInput({ compact = false }) {
         disabled={!canChat || sending}
         className={buttonClass}
       >
-        Send
+        Speak
       </button>
     </form>
   );
