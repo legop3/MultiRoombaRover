@@ -16,7 +16,7 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	if media.AudioPublishURL == "" && audio.CaptureEnabled {
 		return fmt.Errorf("audio publishUrl missing")
 	}
-	if media.VideoWidth <= 0 || media.VideoHeight <= 0 || media.VideoFPS <= 0 || media.VideoBitrate <= 0 {
+	if media.VideoWidth < 0 || media.VideoHeight < 0 || media.VideoFPS < 0 || media.VideoBitrate <= 0 {
 		return fmt.Errorf("invalid media dimensions/bitrate")
 	}
 	if err := os.MkdirAll(filepath.Dir(publisherEnvPath), 0o755); err != nil {
@@ -27,9 +27,15 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	if audio.CaptureEnabled && media.AudioPublishURL != "" {
 		fmt.Fprintf(&buf, "AUDIO_PUBLISH_URL=%s\n", media.AudioPublishURL)
 	}
-	fmt.Fprintf(&buf, "VIDEO_WIDTH=%d\n", media.VideoWidth)
-	fmt.Fprintf(&buf, "VIDEO_HEIGHT=%d\n", media.VideoHeight)
-	fmt.Fprintf(&buf, "VIDEO_FPS=%d\n", media.VideoFPS)
+	if media.VideoWidth > 0 {
+		fmt.Fprintf(&buf, "VIDEO_WIDTH=%d\n", media.VideoWidth)
+	}
+	if media.VideoHeight > 0 {
+		fmt.Fprintf(&buf, "VIDEO_HEIGHT=%d\n", media.VideoHeight)
+	}
+	if media.VideoFPS > 0 {
+		fmt.Fprintf(&buf, "VIDEO_FPS=%d\n", media.VideoFPS)
+	}
 	fmt.Fprintf(&buf, "VIDEO_BITRATE=%d\n", media.VideoBitrate)
 	audioDevice := audio.CaptureDevice
 	if audioDevice == "" || audioDevice == "rovermic" {

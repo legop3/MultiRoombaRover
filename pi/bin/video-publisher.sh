@@ -67,9 +67,9 @@ load_env_file
 : "${PUBLISH_URL:?PUBLISH_URL not set in ${ENV_FILE}}"
 
 # Defaults tuned for OV5647: use 4:3 output and force the common 2x2 binned full-FOV mode.
-VIDEO_WIDTH="${VIDEO_WIDTH:-640}"
-VIDEO_HEIGHT="${VIDEO_HEIGHT:-480}"
-VIDEO_FPS="${VIDEO_FPS:-30}"
+VIDEO_WIDTH="640"
+VIDEO_HEIGHT="480"
+VIDEO_FPS="30"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
 VIDEO_SENSOR_MODE="${VIDEO_SENSOR_MODE:-1296:972}"
 

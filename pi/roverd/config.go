@@ -136,9 +136,6 @@ func LoadConfig(path string) (*Config, error) {
 		Media: MediaConfig{
 			PublishPort:    9000,
 			HealthInterval: Duration{Duration: 30 * time.Second},
-			VideoWidth:     1280,
-			VideoHeight:    720,
-			VideoFPS:       30,
 			VideoBitrate:   2000000,
 		},
 		CameraServo: CameraServoConfig{
@@ -196,15 +193,6 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if cfg.Media.Manage && cfg.Media.HealthInterval.Duration <= 0 {
 		cfg.Media.HealthInterval = Duration{Duration: 30 * time.Second}
-	}
-	if cfg.Media.VideoWidth <= 0 {
-		cfg.Media.VideoWidth = 1280
-	}
-	if cfg.Media.VideoHeight <= 0 {
-		cfg.Media.VideoHeight = 720
-	}
-	if cfg.Media.VideoFPS <= 0 {
-		cfg.Media.VideoFPS = 30
 	}
 	if cfg.Media.VideoBitrate <= 0 {
 		cfg.Media.VideoBitrate = 3000000
