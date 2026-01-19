@@ -476,7 +476,13 @@ function isDriver(roverId, socket) {
 }
 
 function canDrive(roverId, socket) {
-  return turnService.canDrive(roverId, socket) || isAdmin(socket);
+  if (isAdmin(socket)) {
+    return true;
+  }
+  if (!socket || !isDriver(roverId, socket)) {
+    return false;
+  }
+  return turnService.canDrive(roverId, socket);
 }
 
 function getRoversForSocket(socketId) {
@@ -571,6 +577,9 @@ io.on('connection', (socket) => {
       if (socket.data?.role === 'spectator') {
         throw new Error('Spectators cannot drive');
       }
+      if ((getMode() === MODES.ADMIN || getMode() === MODES.LOCKDOWN) && !isAdmin(socket)) {
+        throw new Error('Admins only');
+      }
       const targetId = roverId || Array.from(rovers.keys())[0];
       if (!targetId) {
         throw new Error('No rovers available');
@@ -582,8 +591,9 @@ io.on('connection', (socket) => {
           throw new Error(message || 'Switch denied');
         }
       }
-      logger.info('Request control', socket.id, targetId, { force });
-      requestControl(targetId, socket, { force: Boolean(force), allowUser: true });
+      const forceAllowed = Boolean(force) && isAdmin(socket);
+      logger.info('Request control', socket.id, targetId, { force: forceAllowed });
+      requestControl(targetId, socket, { force: forceAllowed, allowUser: true });
       previousJoined.forEach((rid) => {
         if (rid !== targetId) {
           releaseControl(rid, socket);
