@@ -1,5 +1,5 @@
 #configuration for roverd
-name: dummy2
+name: dummy3
 serverUrl: ws://127.0.0.1:8080/rover
 serial:
   device: /dev/ttyS0

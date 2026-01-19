@@ -5,7 +5,6 @@ import { useControlSystem } from '../controls/index.js';
 import { formatKeyLabel } from '../controls/keymapUtils.js';
 import TopDownMap from './TopDownMap.jsx';
 import RoverRoster from './RoverRoster.jsx';
-import ReplaySourcesPanel from './ReplaySourcesPanel.jsx';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
 
 export function RoverRosterPanel({ title = 'Rovers' }) {
@@ -46,7 +45,7 @@ export function RoverRosterPanel({ title = 'Rovers' }) {
   );
 }
 
-export default function ControlSummary({ showRoster = true }) {
+export default function ControlSummary() {
   const {
     state: { roverId, keymap },
   } = useControlSystem();
@@ -57,7 +56,7 @@ export default function ControlSummary({ showRoster = true }) {
 
   return (
     <section className="panel-section">
-      <div className="grid items-stretch gap-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:min-h-[22rem]">
+      <div className="grid items-stretch gap-1 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:min-h-[18rem]">
         <div className="flex h-full w-full items-stretch justify-center">
           <div className="aspect-square h-full w-full">
             <TopDownMap sensors={sensors} />
@@ -70,14 +69,6 @@ export default function ControlSummary({ showRoster = true }) {
           {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
         </div>
       </div>
-      {showRoster ? (
-        <div className="grid gap-0.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-          <div>
-            <ReplaySourcesPanel />
-          </div>
-          <RoverRosterPanel />
-        </div>
-      ) : null}
     </section>
   );
 }

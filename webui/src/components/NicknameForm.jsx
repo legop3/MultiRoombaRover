@@ -31,16 +31,20 @@ export default function NicknameForm({ compact = false }) {
   }
 
   return (
-    <form className="flex w-full gap-0.5" onSubmit={handleSave}>
+    <form className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-0.5" onSubmit={handleSave}>
       <input
-        className="field-input flex-1"
+        className="field-input flex-1 min-w-0"
         value={nicknameInput}
         onChange={(e) => setNicknameInput(e.target.value)}
         maxLength={32}
         placeholder="Enter a nickname"
         disabled={!canSetNickname}
       />
-      <button type="submit" disabled={!canSetNickname || saving} className="button-dark disabled:opacity-50">
+      <button
+        type="submit"
+        disabled={!canSetNickname || saving}
+        className="button-dark shrink-0 whitespace-nowrap disabled:opacity-50"
+      >
         {saving ? 'Saving…' : compact ? 'Set' : 'Save'}
       </button>
     </form>

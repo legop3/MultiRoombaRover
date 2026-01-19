@@ -34,7 +34,7 @@ function EntityRow({ entity, connected, onToggle }) {
       type="button"
       onClick={() => onToggle(entity.id)}
       disabled={disableToggle}
-      className={`flex min-w-[12rem] flex-1 items-center justify-between gap-1 rounded px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
+      className={`flex min-w-[10rem] flex-1 items-center justify-between gap-1 rounded px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-1 text-sm">
@@ -83,11 +83,11 @@ export default function HomeAssistantControls() {
 
   return (
     <section className="panel-section space-y-0.5 text-base">
-      <header className="flex items-center justify-between gap-0.5 text-sm text-slate-400">
-        <div className="flex items-center gap-1">
+      <header className="flex flex-wrap items-start justify-between gap-0.5 text-sm text-slate-400">
+        <div className="flex flex-wrap items-center gap-1">
           <p>Light Controls</p>
           <span className="text-xs text-slate-500">{entities.length}</span>
-          <div className="flex items-center gap-1 text-xs text-slate-300 background-black">
+          <div className="flex w-full flex-wrap items-center gap-1 text-xs text-slate-300">
             <span className="flex items-center gap-0.5">
               <span>On</span>
               {onKeyLabel ? <KeyPill label={onKeyLabel} /> : null}

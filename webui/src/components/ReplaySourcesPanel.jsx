@@ -16,7 +16,7 @@ function normalizeSources(list = []) {
     .filter(Boolean);
 }
 
-export default function ReplaySourcesPanel({ panelId = 'replay-sources' }) {
+export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHeight = false }) {
   const { session, triggerReplay } = useSession();
   const sources = normalizeSources(session?.replaySources || []);
   const { value: settings, save: saveSettings } = useSettingsNamespace('replaySources', {});
@@ -100,13 +100,16 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources' }) {
     }
   };
 
+  const containerClass = fillHeight ? 'h-full flex flex-col' : '';
+  const listWrapClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : '';
+
   return (
-    <section className="panel-section p-0.75 text-sm">
+    <section className={`panel-section p-0.75 text-sm ${containerClass}`}>
       <header className="panel-muted flex items-center justify-between text-xs">
         <span>Replay Sources</span>
         <span>{sources.length}</span>
       </header>
-      <div className="grid gap-0.5 md:grid-cols-2">
+      <div className={`grid gap-0.5 md:grid-cols-2 ${listWrapClass}`}>
         <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />
         <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
       </div>

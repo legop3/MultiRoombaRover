@@ -180,11 +180,11 @@ function FitViewportFrame({ children }) {
       <div
         className="relative flex items-center justify-center overflow-hidden bg-black"
         style={{
-          width: 'min(100%, calc(100vh * 16 / 9))',
-          height: 'min(100%, calc(100vw * 9 / 16))',
+          width: 'min(100%, calc(100vh * 4 / 3))',
+          height: 'min(100%, calc(100vw * 3 / 4))',
           maxWidth: '100%',
           maxHeight: '100%',
-          aspectRatio: '16 / 9',
+          aspectRatio: '4 / 3',
         }}
       >
         <div className="flex h-full w-full items-center justify-center overflow-hidden">{children}</div>

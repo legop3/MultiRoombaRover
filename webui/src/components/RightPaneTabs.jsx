@@ -1,10 +1,45 @@
-import TelemetryPanel from './TelemetryPanel.jsx';
-import ControlSummary from './ControlSummary.jsx';
+import { RoverRosterPanel } from './ControlSummary.jsx';
 import RoomCameraPanel from './RoomCameraPanel.jsx';
 import HomeAssistantControls from './HomeAssistantControls.jsx';
 import SettingsPanel from './SettingsPanel.jsx';
 import HelpPanel from './HelpPanel.jsx';
+import ChatPanel from './ChatPanel.jsx';
+import UserListPanel, { NicknameLinksPanel } from './UserListPanel.jsx';
+import ReplaySourcesPanel from './ReplaySourcesPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
+import TopDownMap from './TopDownMap.jsx';
+import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
+import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
+import { useControlSystem } from '../controls/index.js';
+
+function TopDownMapPanel() {
+  const {
+    state: { roverId },
+  } = useControlSystem();
+  const frame = useTelemetryFrame(roverId);
+  const sensors = frame?.sensors || {};
+
+  return (
+    <section className="panel-section">
+      <div className="aspect-square w-full">
+        <TopDownMap sensors={sensors} />
+      </div>
+    </section>
+  );
+}
+
+function DriveDockPanel() {
+  const {
+    state: { roverId },
+  } = useControlSystem();
+  const driveDockState = useDriveDockState(roverId);
+
+  return (
+    <section className="panel-section flex h-full flex-col">
+      <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
+    </section>
+  );
+}
 
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   return (
@@ -18,10 +53,21 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
         <TabPanels>
           <TabPanel id="telemetry">
             <div className="space-y-0.5">
-              <ControlSummary />
+              <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]">
+                <TopDownMapPanel />
+                <DriveDockPanel />
+              </div>
+              <div className="grid gap-0.5 grid-cols-[minmax(0,0.6fr)_minmax(0,1.1fr)_minmax(0,0.9fr)]">
+                <NicknameLinksPanel compact />
+                <RoverRosterPanel />
+                <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
+              </div>
+              <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] h-[14rem]">
+                <ChatPanel fillHeight />
+                <UserListPanel compact hideNicknameForm fillHeight />
+              </div>
               <HomeAssistantControls />
               <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
-              <TelemetryPanel />
             </div>
           </TabPanel>
           <TabPanel id="help">

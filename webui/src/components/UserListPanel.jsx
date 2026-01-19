@@ -6,6 +6,20 @@ import NicknameForm from './NicknameForm.jsx';
 import DiscordInviteButton from './DiscordInviteButton.jsx';
 import KoFiButton from './KoFiButton.jsx';
 
+export function NicknameLinksPanel({ compact = false }) {
+  return (
+    <section className="panel-section flex h-full min-h-0 flex-col gap-0.5 text-base">
+      <div className="surface flex w-full items-center">
+        <NicknameForm compact={compact} />
+      </div>
+      <div className="grid flex-1 min-h-0 gap-0.5 grid-rows-2">
+        <DiscordInviteButton className="h-full" />
+        <KoFiButton className="h-full" />
+      </div>
+    </section>
+  );
+}
+
 function roleColors(role) {
   switch (role) {
     case 'admin':
@@ -28,7 +42,13 @@ function formatLabel(user, selfId) {
   return base;
 }
 
-export default function UserListPanel({ hideNicknameForm = false, hideHeader = false, className = '', fillHeight = false }) {
+export default function UserListPanel({
+  hideNicknameForm = false,
+  hideHeader = false,
+  className = '',
+  fillHeight = false,
+  compact = false,
+}) {
   const { session, setNickname } = useSession();
   const { value } = useSettingsNamespace('profile', { nickname: '' });
   const lastSyncedSocketRef = useRef(null);
@@ -93,9 +113,19 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
     return Math.ceil(ms / 1000);
   }, []);
 
-  const baseListClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : 'h-48 overflow-y-auto';
-  const turnsListClass = isTurnsMode && fillHeight ? 'max-h-40 overflow-y-auto' : baseListClass;
-  const usersListClass = isTurnsMode && fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : baseListClass;
+  const baseListClass = fillHeight
+    ? 'flex-1 min-h-0 overflow-y-auto'
+    : compact
+      ? 'h-28 overflow-y-auto'
+      : 'h-48 overflow-y-auto';
+  const turnsListClass =
+    isTurnsMode && fillHeight
+      ? 'max-h-40 overflow-y-auto'
+      : isTurnsMode && compact
+        ? 'max-h-32 overflow-y-auto'
+        : baseListClass;
+  const usersListClass =
+    isTurnsMode && fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : baseListClass;
 
   const renderUserList = () =>
     sorted.length === 0 ? (
@@ -107,7 +137,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
         return (
           <div
             key={user.socketId}
-            className="surface-muted flex items-center gap-1 text-sm"
+            className={`surface-muted flex items-center gap-1 ${compact ? 'py-0.25 text-[0.8rem]' : 'text-sm'}`}
           >
             <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
             {user.roverId ? (
@@ -131,13 +161,13 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
     >
       {!hideNicknameForm && (
         <div className="space-y-0.5">
-          <div className="flex items-stretch gap-0.5">
-            <div className="flex w-1/2 min-w-0">
+          <div className="grid gap-0.5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <div className="min-w-0">
               <div className="surface flex w-full items-center">
-                <NicknameForm />
+                <NicknameForm compact={compact} />
               </div>
             </div>
-            <div className="flex w-1/2 flex-col gap-0.5">
+            <div className="grid gap-0.5 sm:grid-cols-2 md:grid-cols-1">
               <DiscordInviteButton />
               <KoFiButton />
             </div>
@@ -148,14 +178,14 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
 
       <div className={`space-y-0.5 ${fillHeight ? 'flex flex-1 min-h-0 flex-col' : ''}`}>
         {!hideHeader && (
-          <div className="flex items-center justify-between text-sm text-slate-400">
+          <div className={`flex items-center justify-between text-sm text-slate-400 ${compact ? 'text-xs' : ''}`}>
             <span>{isTurnsMode ? 'Turn queues' : 'Users'}</span>
             <span className="text-xs text-slate-500">
               {isTurnsMode ? Object.keys(turnQueues || {}).length : sorted.length}
             </span>
           </div>
         )}
-        <div className={`surface space-y-0.25 ${isTurnsMode ? turnsListClass : baseListClass}`}>
+        <div className={`surface space-y-0.25 ${isTurnsMode ? turnsListClass : baseListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
           {isTurnsMode ? (
             Object.keys(turnQueues || {}).length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>
@@ -173,7 +203,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
                       : queue[0]
                     : null;
                 return (
-                  <div key={roverId} className="surface-muted flex flex-col gap-0.25 text-sm">
+                  <div key={roverId} className={`surface-muted flex flex-col gap-0.25 ${compact ? 'text-[0.8rem] py-0.25' : 'text-sm'}`}>
                     <div className="flex items-center gap-1">
                       <p className="font-semibold text-slate-200">{rosterName(roverId)}</p>
                       {remaining != null && (
@@ -201,7 +231,7 @@ export default function UserListPanel({ hideNicknameForm = false, hideHeader = f
                           return (
                             <span
                               key={`${roverId}-${socketId}-${idx}`}
-                              className={`flex items-center gap-0.5 rounded px-1 text-[0.8rem] ${highlightClass}`}
+                              className={`flex items-center gap-0.5 rounded px-1 ${compact ? 'text-[0.7rem]' : 'text-[0.8rem]'} ${highlightClass}`}
                             >
                               <span className={`${roleColors(user.role)} font-semibold`}>
                                 {formatLabel(user, selfId)}

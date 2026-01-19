@@ -368,7 +368,7 @@ export default function VideoTile({
   return (
     <div className={`flex flex-col gap-0.5 ${fitParent ? 'h-full' : ''}`}>
       <div
-        className={`relative w-full overflow-hidden bg-black ${fitParent ? 'h-full flex-1' : 'aspect-video'}`}
+        className={`relative w-full overflow-hidden bg-black ${fitParent ? 'h-full flex-1' : 'aspect-[4/3]'}`}
       >
         {usingSnapshot ? (
           snapshotFeed?.objectUrl ? (

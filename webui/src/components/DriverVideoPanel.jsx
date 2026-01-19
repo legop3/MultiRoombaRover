@@ -131,7 +131,7 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
           idleSkipSeconds={idleSkipSeconds}
         />
       ) : (
-        <div className="panel-muted content-center text-center text-sm text-slate-400 aspect-video">
+        <div className="panel-muted content-center text-center text-sm text-slate-400 aspect-[4/3]">
           <p>You are not assigned to a rover.</p>
           {/* colored button to visit the spectator page */}
           <p className="mt-2">
