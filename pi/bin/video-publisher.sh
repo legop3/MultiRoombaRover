@@ -30,11 +30,9 @@ load_env_file() {
 
   local line key val
   while IFS= read -r line || [[ -n "$line" ]]; do
-    # Skip blank lines and full-line comments.
     [[ "$line" =~ ^[[:space:]]*$ ]] && continue
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
-    # Support optional leading 'export '
     if [[ "$line" =~ ^[[:space:]]*export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
       key="${BASH_REMATCH[1]}"
       val="${BASH_REMATCH[2]}"
@@ -42,22 +40,18 @@ load_env_file() {
       key="${BASH_REMATCH[1]}"
       val="${BASH_REMATCH[2]}"
     else
-      # Ignore anything that isn't a simple assignment.
       continue
     fi
 
-    # Trim leading/trailing whitespace in value.
     val="${val#${val%%[![:space:]]*}}"
     val="${val%${val##*[![:space:]]}}"
 
-    # If value is wrapped in matching single or double quotes, unwrap.
     if [[ "$val" =~ ^\".*\"$ ]]; then
       val="${val:1:${#val}-2}"
     elif [[ "$val" =~ ^\'.*\'$ ]]; then
       val="${val:1:${#val}-2}"
     fi
 
-    # Assign without evaluation.
     printf -v "$key" '%s' "$val"
     export "$key"
   done <<< "$content"
@@ -66,20 +60,22 @@ load_env_file() {
 load_env_file
 : "${PUBLISH_URL:?PUBLISH_URL not set in ${ENV_FILE}}"
 
-# Defaults tuned for OV5647: use 4:3 output and force the common 2x2 binned full-FOV mode.
-VIDEO_WIDTH="640"
-VIDEO_HEIGHT="480"
+# OV5647: 1296x972 is the common 2x2 binned mode, and it's 4:3.
+# Hard-coded output size & FPS (matching your "no env inputs for res/fps" approach).
+VIDEO_WIDTH="1296"
+VIDEO_HEIGHT="972"
 VIDEO_FPS="30"
+
+# Keep bitrate configurable via env (or default).
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
-VIDEO_SENSOR_MODE="${VIDEO_SENSOR_MODE:-1296:972}"
+
+# Force the sensor mode to match the output (avoids libcamera picking a different/cropped mode).
+VIDEO_SENSOR_MODE="1296:972"
 
 # Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
 FLIP_ARGS=(--rotation 180)
 
-MODE_ARGS=()
-if [[ -n "${VIDEO_SENSOR_MODE}" ]]; then
-  MODE_ARGS=(--mode "${VIDEO_SENSOR_MODE}")
-fi
+MODE_ARGS=(--mode "${VIDEO_SENSOR_MODE}")
 
 if [[ -n "${LIBCAMERA_BIN:-}" ]]; then
   LIBCAMERA_BIN_PATH="$LIBCAMERA_BIN"
