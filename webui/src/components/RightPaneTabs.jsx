@@ -1,4 +1,4 @@
-import { RoverRosterPanel } from './ControlSummary.jsx';
+import { InlineCameraTilt, RoverRosterPanel } from './ControlSummary.jsx';
 import RoomCameraPanel from './RoomCameraPanel.jsx';
 import HomeAssistantControls from './HomeAssistantControls.jsx';
 import SettingsPanel from './SettingsPanel.jsx';
@@ -30,13 +30,15 @@ function TopDownMapPanel() {
 
 function DriveDockPanel() {
   const {
-    state: { roverId },
+    state: { roverId, keymap },
   } = useControlSystem();
   const driveDockState = useDriveDockState(roverId);
+  const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
   return (
-    <section className="panel-section flex h-full flex-col">
+    <section className="panel-section flex h-full flex-col gap-0.5">
       <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
+      {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
     </section>
   );
 }

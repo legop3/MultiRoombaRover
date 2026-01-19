@@ -73,7 +73,7 @@ export default function ControlSummary() {
   );
 }
 
-function InlineCameraTilt({ keymap }) {
+export function InlineCameraTilt({ keymap }) {
   const {
     state: { roverId, camera },
     actions: { setServoAngle },
