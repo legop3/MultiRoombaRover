@@ -17,7 +17,7 @@ export default function HelpOverlay({ visible, layout, onClose, showOnLoad, onTo
         <div className="flex items-center justify-between border-b border-slate-700 px-0.5 py-0.25 text-sm text-slate-200">
           <span className="font-semibold">Help & controls</span>
           <div className="flex items-center gap-0.5 text-[0.8rem] text-slate-300">
-            <label className="flex items-center gap-0.25">
+            <label className="flex items-center gap-0.5">
               <input
                 type="checkbox"
                 checked={!showOnLoad}

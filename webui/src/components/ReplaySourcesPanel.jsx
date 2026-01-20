@@ -113,7 +113,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
         <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />
         <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
       </div>
-      <div className="space-y-0.25">
+      <div className="space-y-0.5">
         <button
           type="button"
           className="button-dark w-full text-xs disabled:opacity-40"
@@ -132,9 +132,9 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
 function GroupList({ title, items, selected, onToggle }) {
   if (!items.length) return null;
   return (
-    <div className="space-y-0.25">
+    <div className="space-y-0.5">
       <div className="panel-muted text-xs">{title}</div>
-      <div className="space-y-0.25">
+      <div className="space-y-0.5">
         {items.map((item) => (
           <label key={item.key} className="surface flex items-center gap-0.5 text-xs">
             <input

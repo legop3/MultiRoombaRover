@@ -173,7 +173,7 @@ function DetailCard({ title, children }) {
 
 function ValueRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between gap-1">
+    <div className="flex items-center justify-between gap-0.5">
       <span className="text-slate-300">{label}</span>
       <span className="text-slate-100">{value}</span>
     </div>
@@ -212,16 +212,16 @@ function DockMiniStatus({ sensors }) {
     </span>
   );
   return (
-    <div className="flex items-center justify-between gap-1 text-xs text-slate-200">
-      <div className="flex items-center gap-1">
+    <div className="flex items-center justify-between gap-0.5 text-xs text-slate-200">
+      <div className="flex items-center gap-0.5">
         <span className="text-slate-400">L</span>
         {badge(left)}
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         <span className="text-slate-400">O</span>
         {badge(omni)}
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         <span className="text-slate-400">R</span>
         {badge(right)}
       </div>

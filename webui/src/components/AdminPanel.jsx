@@ -167,7 +167,7 @@ function ReplaySnapshotHealth({ health }) {
           </span>
         </div>
       </div>
-      <div className="space-y-0.25 text-xs text-slate-300">
+      <div className="space-y-0.5 text-xs text-slate-300">
         {replay.sources.map((source) => (
           <div key={`${source.type}:${source.id}`} className="flex items-center justify-between">
             <span>{source.label}</span>
@@ -177,7 +177,7 @@ function ReplaySnapshotHealth({ health }) {
           </div>
         ))}
       </div>
-      <div className="space-y-0.25 text-xs text-slate-300">
+      <div className="space-y-0.5 text-xs text-slate-300">
         {snapshots.rovers.map((entry) => (
           <div key={`rover:${entry.id}`} className="flex items-center justify-between">
             <span>{entry.name}</span>
@@ -187,7 +187,7 @@ function ReplaySnapshotHealth({ health }) {
           </div>
         ))}
       </div>
-      <div className="space-y-0.25 text-xs text-slate-300">
+      <div className="space-y-0.5 text-xs text-slate-300">
         {snapshots.rooms.map((entry) => (
           <div key={`room:${entry.id}`} className="flex items-center justify-between">
             <span>{entry.name}</span>

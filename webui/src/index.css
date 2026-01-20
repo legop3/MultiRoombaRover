@@ -44,11 +44,11 @@ body {
 
 @layer components {
   .panel {
-    @apply bg-black text-white p-0.5;
+    @apply bg-black text-white p-0;
   }
 
   .panel-section {
-    @apply bg-neutral-900 text-white p-0.5;
+    @apply bg-neutral-900 text-white p-0;
   }
 
   .panel-muted {

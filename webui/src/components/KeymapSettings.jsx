@@ -115,7 +115,7 @@ function SpeedField({ label, description, value, onChange, min = 0, max = 500, s
         />
       </div>
       {description && <p className="text-[0.65rem] text-slate-500">{description}</p>}
-      <div className="mt-0.5 flex items-center gap-0.5">
+      <div className="mt-0 flex items-center gap-0.5">
         <input
           type="range"
           min={min}

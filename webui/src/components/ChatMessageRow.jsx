@@ -66,7 +66,7 @@ export default function ChatMessageRow({ message }) {
 
   return (
     <div
-      className={`surface-muted relative flex flex-wrap items-start gap-1 text-sm ${
+      className={`surface-muted relative flex flex-wrap items-start gap-0.5 text-sm ${
         isAdmin
           ? 'border border-amber-400/30'
           : message.fromDiscord

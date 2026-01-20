@@ -68,11 +68,11 @@ export default function RoomCameraPanel({
     <section className="panel-section space-y-0.5 text-base">
       {!hideHeader && (
         <header className="flex flex-wrap items-center justify-between gap-0.5 text-sm text-slate-400">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <p>Room cameras</p>
             <span className="text-xs text-slate-500">{cameras.length}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-1 text-xs">
+          <div className="flex flex-wrap items-center gap-0.5 text-xs">
             {showLayoutToggle && (
               <div className="flex items-center gap-0.5">
                 <span className="text-slate-500">Layout:</span>

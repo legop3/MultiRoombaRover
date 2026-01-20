@@ -1,16 +1,18 @@
-import { InlineCameraTilt, RoverRosterPanel } from './ControlSummary.jsx';
+import { InlineCameraTilt } from './ControlSummary.jsx';
 import RoomCameraPanel from './RoomCameraPanel.jsx';
 import HomeAssistantControls from './HomeAssistantControls.jsx';
 import SettingsPanel from './SettingsPanel.jsx';
 import HelpPanel from './HelpPanel.jsx';
 import ChatPanel from './ChatPanel.jsx';
-import UserListPanel, { LinkButtonsPanel, NicknameEntryPanel } from './UserListPanel.jsx';
+import { LinkButtonsPanel, NicknameEntryPanel } from './UserListPanel.jsx';
 import ReplaySourcesPanel from './ReplaySourcesPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 import TopDownMap from './TopDownMap.jsx';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useControlSystem } from '../controls/index.js';
+import RoverQueuesPanel from './RoverQueuesPanel.jsx';
+import RawUserPilePanel from './RawUserPilePanel.jsx';
 
 function TopDownMapPanel() {
   const {
@@ -60,15 +62,15 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
                 <DriveDockPanel />
               </div>
               <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.75fr)]">
-                <RoverRosterPanel />
+                <RoverQueuesPanel />
                 <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
                 <LinkButtonsPanel />
               </div>
-              <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] h-[14rem]">
+              <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.3fr)_minmax(0,0.22fr)] h-[14rem]">
                 <ChatPanel fillHeight />
-                <div className="grid min-h-0 gap-0.5 grid-rows-[auto_minmax(0,1fr)]">
+                <div className="grid min-h-0 gap-0.5 grid-rows-[minmax(0,1fr)_auto]">
+                  <RawUserPilePanel compact hideNicknameForm fillHeight />
                   <NicknameEntryPanel compact />
-                  <UserListPanel compact hideNicknameForm fillHeight />
                 </div>
               </div>
               <HomeAssistantControls />

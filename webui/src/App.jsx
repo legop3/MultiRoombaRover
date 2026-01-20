@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TelemetryPanel from './components/TelemetryPanel.jsx';
-import ControlSummary, { RoverRosterPanel } from './components/ControlSummary.jsx';
 import ReplaySourcesPanel from './components/ReplaySourcesPanel.jsx';
 import AlertFeed from './components/AlertFeed.jsx';
 import MobileControls, {
@@ -16,7 +15,7 @@ import RightPaneTabs from './components/RightPaneTabs.jsx';
 import ModeGateOverlay from './components/ModeGateOverlay.jsx';
 import HomeAssistantControls from './components/HomeAssistantControls.jsx';
 import TurnAlertListener from './components/TurnAlertListener.jsx';
-import UserListPanel from './components/UserListPanel.jsx';
+import RawUserPilePanel from './components/RawUserPilePanel.jsx';
 import ChatPanel from './components/ChatPanel.jsx';
 import FullscreenPrompt from './components/FullscreenPrompt.jsx';
 import { useFullscreenPrompt } from './hooks/useFullscreenPrompt.js';
@@ -27,6 +26,7 @@ import SettingsPanel from './components/SettingsPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs.jsx';
 import useDefaultNickname from './hooks/useDefaultNickname.js';
 import CommunityGoalBanner from './components/CommunityGoalBanner.jsx';
+import RoverQueuesPanel from './components/RoverQueuesPanel.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -61,7 +61,7 @@ function useLayoutMode() {
 function DesktopLayout({ layout, onOpenHelpOverlay }) {
   return (
     <div className="flex h-full gap-0.5 overflow-hidden">
-      <div className="flex min-w-0 flex-[1.22] flex-col gap-0.5 overflow-y-auto pr-0.5">
+      <div className="flex min-w-0 flex-[1.22] flex-col gap-0.5 overflow-y-auto pr-0">
         <DriverVideoPanel />
         <TelemetryPanel />
         <LogPanel />
@@ -94,7 +94,7 @@ function MobileFeatureTabs({
           <TabPanel id="chat">
             <div className="space-y-0.5">
               <ChatPanel />
-              <UserListPanel />
+              <RawUserPilePanel />
             </div>
           </TabPanel>
           <TabPanel id="roomcontrols">
@@ -126,7 +126,7 @@ function MobilePortraitLayout({ onOpenHelpOverlay }) {
       <MobileControls />
       <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <ReplaySourcesPanel panelId="replay-sources-mobile-portrait" />
-        <RoverRosterPanel />
+        <RoverQueuesPanel />
       </div>
       {/* <ControlSummary /> */}
       <MobileFeatureTabs
@@ -147,13 +147,13 @@ function MobileLandscapeLayout({ onOpenHelpOverlay }) {
           <DriverVideoPanel layoutFormat="mobile-landscape" />
           <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
             <ReplaySourcesPanel panelId="replay-sources-mobile-landscape" />
-            <RoverRosterPanel />
+            <RoverQueuesPanel />
           </div>
           {/* <TelemetryPanel /> */}
         </div>
         <MobileLandscapeControlColumn />
       </section>
-      <div className="flex flex-col gap-0.5 pb-0.5">
+      <div className="flex flex-col gap-0.5 pb-0">
         <MobileFeatureTabs
           layout="mobile-landscape"
           onOpenHelpOverlay={onOpenHelpOverlay}

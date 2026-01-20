@@ -229,7 +229,7 @@ function MobileJoystickPanel({ layout }) {
                 step={0.5}
                 value={cameraValue}
                 onChange={handleCameraSlider}
-                className="mt-0.5 w-full accent-cyan-400"
+                className="mt-0 w-full accent-cyan-400"
               />
             </div>
           )}

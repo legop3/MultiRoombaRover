@@ -34,14 +34,14 @@ function EntityRow({ entity, connected, onToggle }) {
       type="button"
       onClick={() => onToggle(entity.id)}
       disabled={disableToggle}
-      className={`flex min-w-[10rem] flex-1 items-center justify-between gap-1 rounded px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
+      className={`flex min-w-[10rem] flex-1 items-center justify-between gap-0.5 rounded px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
     >
       <div className="min-w-0">
-        <div className="flex items-center gap-1 text-sm">
+        <div className="flex items-center gap-0.5 text-sm">
           <span className="truncate font-semibold text-white">{entity.name || entity.id}</span>
           {/* <StatusBadge label={entity.type === 'light' ? 'Light' : 'Switch'} /> */}
         </div>
-        <div className="flex items-center gap-1 text-xs text-slate-400">
+        <div className="flex items-center gap-0.5 text-xs text-slate-400">
           <StatusBadge label={statusLabel} tone={statusTone} />
           {!connected && <span className="text-amber-200"> · Offline</span>}
         </div>
@@ -84,10 +84,10 @@ export default function HomeAssistantControls() {
   return (
     <section className="panel-section space-y-0.5 text-base">
       <header className="flex items-center justify-between gap-0.5 text-sm text-slate-400">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <p>Light Controls</p>
           <span className="text-xs text-slate-500">{entities.length}</span>
-          <div className="flex items-center gap-1 text-xs text-slate-300 background-black">
+          <div className="flex items-center gap-0.5 text-xs text-slate-300 background-black">
             <span className="flex items-center gap-0.5">
               <span>On</span>
               {onKeyLabel ? <KeyPill label={onKeyLabel} /> : null}

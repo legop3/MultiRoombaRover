@@ -134,7 +134,7 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
         <div className="panel-muted content-center text-center text-sm text-slate-400 aspect-[4/3]">
           <p>You are not assigned to a rover.</p>
           {/* colored button to visit the spectator page */}
-          <p className="mt-2">
+          <p className="mt-0">
             <a href="/spectate" className="text-blue-400 underline hover:text-blue-500">
               Click here to visit the spectator page.
             </a>

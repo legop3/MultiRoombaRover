@@ -56,13 +56,13 @@ export default function ControlSummary() {
 
   return (
     <section className="panel-section">
-      <div className="grid items-stretch gap-1 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:min-h-[18rem]">
+      <div className="grid items-stretch gap-0.5 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:min-h-[18rem]">
         <div className="flex h-full w-full items-stretch justify-center">
           <div className="aspect-square h-full w-full">
             <TopDownMap sensors={sensors} />
           </div>
         </div>
-        <div className="grid h-full grid-rows-[1fr_1fr_auto] gap-0.75">
+        <div className="grid h-full grid-rows-[1fr_1fr_auto] gap-0.5">
           <div className="row-span-2">
             <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
           </div>
@@ -134,12 +134,12 @@ export function InlineCameraTilt({ keymap }) {
           onTouchEnd={commitSlider}
           onPointerUp={commitSlider}
         />
-        <div className="mt-0.25 flex items-center justify-between text-[0.7rem] text-slate-400">
-          <span className="flex items-center gap-0.25">
+        <div className="mt-0 flex items-center justify-between text-[0.7rem] text-slate-400">
+          <span className="flex items-center gap-0.5">
             {downLabel ? <KeyPill label={downLabel} /> : null}
             {formatDegrees(min)}
           </span>
-          <span className="flex items-center gap-0.25">
+          <span className="flex items-center gap-0.5">
             {formatDegrees(max)}
             {upLabel ? <KeyPill label={upLabel} /> : null}
           </span>

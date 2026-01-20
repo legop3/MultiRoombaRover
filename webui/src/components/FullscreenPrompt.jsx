@@ -5,7 +5,7 @@ export default function FullscreenPrompt({ visible, mode, onEnterFullscreen, onD
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center p-2 pointer-events-none sm:items-center">
       <div className="pointer-events-auto w-full max-w-sm rounded-lg border border-cyan-500/40 bg-zinc-950/95 shadow-xl">
-        <div className="space-y-2 p-4 text-sm text-slate-100">
+        <div className="space-y-0.5 p-4 text-sm text-slate-100">
           <h2 className="text-base font-semibold text-white">Better in fullscreen</h2>
           {isIOSMode ? (
             <p className="text-slate-300">
@@ -18,7 +18,7 @@ export default function FullscreenPrompt({ visible, mode, onEnterFullscreen, onD
               via the system back or home gesture.
             </p>
           )}
-          <div className="flex justify-end gap-2 pt-1 text-sm">
+          <div className="flex justify-end gap-0.5 pt-1 text-sm">
             <button type="button" className="rounded border border-slate-600 px-3 py-1 text-slate-200" onClick={onDismiss}>
               {isIOSMode ? 'Got it' : 'Not now'}
             </button>

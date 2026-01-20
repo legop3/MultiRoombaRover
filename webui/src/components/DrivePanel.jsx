@@ -75,7 +75,7 @@ function ActionCard({ title, description, statuses, tone, onClick, disabled, foo
       <p className="text-base font-semibold">{title}</p>
       <p className="text-sm text-white/90">{description}</p>
       {/* center statuses in button */}
-      <div className="mt-0.5 flex flex-wrap gap-0.5 items-center w-full justify-center">
+      <div className="mt-0 flex flex-wrap gap-0.5 items-center w-full justify-center">
         {statuses.map((status) => (
           <span
             key={status.label}
@@ -87,7 +87,7 @@ function ActionCard({ title, description, statuses, tone, onClick, disabled, foo
           </span>
         ))}
       </div>
-      {footnote && <p className="mt-0.5 text-xs text-emerald-50/80">{footnote}</p>}
+      {footnote && <p className="mt-0 text-xs text-emerald-50/80">{footnote}</p>}
     </button>
   );
 }

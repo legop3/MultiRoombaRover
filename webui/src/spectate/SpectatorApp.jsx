@@ -6,13 +6,13 @@ import { useVideoRequests } from '../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../hooks/useRoverSnapshots.js';
 import VideoTile from '../components/VideoTile.jsx';
 import RoomCameraPanel from '../components/RoomCameraPanel.jsx';
-import UserListPanel from '../components/UserListPanel.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 import LogPanel from '../components/LogPanel.jsx';
-import RoverRoster from '../components/RoverRoster.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
 import CommunityGoalBanner from '../components/CommunityGoalBanner.jsx';
+import RoverQueuesPanel from '../components/RoverQueuesPanel.jsx';
+import RawUserPilePanel from '../components/RawUserPilePanel.jsx';
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
@@ -28,7 +28,7 @@ function formatDriverLabel({ roverId, session }) {
 function RoverSpectatorCard({ rover, frame, snapshotFeed, audioInfo, session }) {
   const driverLabel = formatDriverLabel({ roverId: rover.id, session });
   return (
-    <article className="min-h-[16rem] rounded bg-zinc-900 p-0.5 sm:min-h-[18rem]">
+    <article className="min-h-[16rem] rounded bg-zinc-900 p-0 sm:min-h-[18rem]">
       <div className="min-h-0 overflow-hidden rounded bg-black/20">
         <VideoTile
           sessionInfo={null}
@@ -124,7 +124,7 @@ function SpectatorContent() {
 
   return (
     <div className="min-h-screen bg-black text-slate-100 md:h-screen md:overflow-hidden">
-      <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0.5 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:overflow-y-auto">
           <RoverRow
             roster={roster}
@@ -138,10 +138,10 @@ function SpectatorContent() {
         <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:h-full">
           <CommunityGoalBanner layout="desktop" />
           <div className="panel">
-            <RoverRoster roster={roster} title="Rovers" emptyText="No rovers registered." />
+            <RoverQueuesPanel title="Rovers" />
           </div>
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <UserListPanel hideNicknameForm hideHeader fillHeight className="h-full" showBothTurnsAndUsers />
+            <RawUserPilePanel hideNicknameForm hideHeader fillHeight className="h-full" />
           </div>
           <div className="min-h-0 min-w-0 flex-[1.1] overflow-hidden">
             <ChatPanel hideInput hideSpectatorNotice fillHeight />

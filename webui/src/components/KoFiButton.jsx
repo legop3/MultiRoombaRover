@@ -12,9 +12,9 @@ export default function KoFiButton({ text = "Support me on Ko-fi!", className = 
       href={kofiLink}
       target="_blank"
       rel="noopener noreferrer"
-      className={`inline-flex items-center w-full px-0.5 py-0.5 text-sm font-medium text-white kofi-animate-bg transition justify-center ${className}`}
+      className={`inline-flex items-center w-full px-0.5 py-0.5 text-sm font-medium text-white kofi-animate-bg transition justify-center gap-1 ${className}`}
     >
-      <FaCoffee className="mr-1" />
+      <FaCoffee className="mr-0" />
       {text}
     </a>
   );

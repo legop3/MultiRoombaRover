@@ -85,7 +85,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
 
   return (
     <section className={`panel-section space-y-0.5 text-base ${fillHeight ? 'flex h-full flex-col overflow-hidden' : ''}`}>
-      <div className={`surface overflow-y-auto space-y-0.25 ${listClass}`} ref={listRef}>
+      <div className={`surface overflow-y-auto space-y-0.5 px-0 ${listClass}`} ref={listRef}>
         {sorted.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet.</p>
         ) : (
@@ -93,7 +93,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
         )}
       </div>
       {!hideInput && (
-        <form className="flex flex-wrap items-start gap-0.5" onSubmit={handleSend}>
+        <form className="flex flex-wrap items-stretch gap-0.5" onSubmit={handleSend}>
           <input
             className="field-input flex-1 min-w-[10rem]"
             value={draft}
@@ -112,7 +112,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
           />
           {ttsSupported && (
             <div className="flex flex-wrap items-center gap-0.5 basis-full sm:basis-auto">
-              <label className="flex items-center gap-0.25 text-xs text-slate-300">
+              <label className="flex items-center gap-0.5 text-xs text-slate-300">
                 <input
                   type="checkbox"
                   checked={speak}
@@ -171,7 +171,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
           <button
             type="submit"
             disabled={!canChat || sending}
-            className="button-dark disabled:opacity-50 self-start"
+            className="button-dark h-full disabled:opacity-50 self-stretch"
           >
             {sending ? '...' : 'Send'}
           </button>

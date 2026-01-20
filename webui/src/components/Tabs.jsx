@@ -118,7 +118,7 @@ export function Tab({ id, children, className = '', disabled = false }) {
 }
 
 export function TabPanels({ children, className = '' }) {
-  return <div className={classNames('mt-0.5 space-y-0.5', className)}>{children}</div>;
+  return <div className={classNames('mt-0 space-y-0.5', className)}>{children}</div>;
 }
 
 export function TabPanel({ id, children, keepMounted = false }) {

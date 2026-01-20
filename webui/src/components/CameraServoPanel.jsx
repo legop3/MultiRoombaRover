@@ -99,7 +99,7 @@ export default function CameraServoPanel() {
           onTouchEnd={commitSlider}
           onPointerUp={commitSlider}
         />
-        <div className="mt-0.5 flex justify-between text-xs text-slate-400">
+        <div className="mt-0 flex justify-between text-xs text-slate-400">
           <span>{formatDegrees(min)}</span>
           <span>{formatDegrees(max)}</span>
         </div>

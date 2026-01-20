@@ -433,7 +433,7 @@ export default function VideoTile({
               }`}
             >
               <div className="text-center">{qualityNotice}</div>
-              <div className="pointer-events-auto mt-1">
+              <div className="pointer-events-auto mt-0">
                 <DiscordInviteButton text={'Join our Discord server while you wait!'} />
               </div>
             </div>
@@ -441,7 +441,7 @@ export default function VideoTile({
         ) : null}
       </div>
       {!showVerticalBattery && (
-        <div className="space-y-0.25">
+        <div className="space-y-0.5">
           <LightBumpBars sensors={sensors} />
           <BatteryBar visual={batteryVisual} />
         </div>
@@ -484,7 +484,7 @@ function BatteryBarVertical({ visual }) {
           style={{ height: `${visual.percentDisplay}%` }}
         />
       </div>
-      <span className="mt-0.5 text-[0.65rem] font-semibold text-slate-100">{percentText}</span>
+      <span className="mt-0 text-[0.65rem] font-semibold text-slate-100">{percentText}</span>
     </div>
   );
 }
@@ -510,7 +510,7 @@ function LightBumpBars({ sensors }) {
   const barHeight = 12;
 
   return (
-    <div className="flex w-full items-center justify-center gap-1">
+    <div className="flex w-full items-center justify-center gap-0.5">
       {values.map((v, idx) => {
         const t = eased(v);
         const dir = idx < segments / 2 ? -1 : 1; // left bars fill left, right bars fill right
@@ -600,15 +600,15 @@ function HudOverlay({
     return (
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div className={`absolute ${statusPosClass} font-medium text-slate-100 ${statusTextClass}`}>
-          <div className="flex flex-col gap-[1px] leading-none">
+          <div className="flex flex-col gap-0.5 leading-none">
             <span>Status: {status}</span>
             {audioStatus ? <span>Audio: {audioStatus}</span> : null}
           </div>
         </div>
         <div
-          className={`absolute ${telemetryPosClass} flex -translate-y-1/2 flex-col gap-0.35 bg-black/70 text-slate-100 ${statusTextClass} ${statusPadClass}`}
+          className={`absolute ${telemetryPosClass} flex -translate-y-1/2 flex-col gap-0.5 bg-black/70 text-slate-100 ${statusTextClass} ${statusPadClass}`}
         >
-          <div className="space-y-0.1 leading-tight">
+          <div className="space-y-0.5 leading-tight">
             <span className={`${isMobile ? 'text-[0.45rem]' : 'text-[0.6rem]'} uppercase tracking-wide text-slate-400`}>
               Telemetry
             </span>
@@ -639,7 +639,7 @@ function HudOverlay({
 
         <div className={`absolute ${labelPosClass} left-1/2`} style={labelWrapperStyle}>
           <div
-            className={`flex items-center gap-1 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
+            className={`flex items-center gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
           >
             <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
             {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
@@ -652,7 +652,7 @@ function HudOverlay({
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
       <div className={`absolute ${statusPosClass} font-medium text-slate-100 ${statusTextClass}`}>
-        <div className="flex flex-col gap-[1px] leading-none">
+        <div className="flex flex-col gap-0.5 leading-none">
           <span>Status: {status}</span>
           {audioStatus ? <span>Audio: {audioStatus}</span> : null}
         </div>
@@ -700,7 +700,7 @@ function TurnCueOverlay({
   const showCountdown = isActiveDriver && typeof idleSkipSeconds === 'number';
   return (
     <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/55">
-      <div className={`flex flex-col items-center gap-1 rounded border border-amber-300/80 bg-black/70 ${padClass}`}>
+      <div className={`flex flex-col items-center gap-0.5 rounded border border-amber-300/80 bg-black/70 ${padClass}`}>
         <div className={`font-semibold text-amber-200 ${titleClass}`}>IT IS YOUR TURN!</div>
         <div className={`text-amber-200/80 ${subClass}`}>Start driving!</div>
         {showCountdown ? (
@@ -732,7 +732,7 @@ function OvercurrentOverlay({ motors, compact = false }) {
     >
       <div className={`text-center font-semibold text-white animate-pulse ${textClass}`}>
         <div>OVERCURRENT</div>
-        <div className={`mt-0.5 font-medium text-white ${subTextClass}`}>{labels.join(', ')}</div>
+        <div className={`mt-0 font-medium text-white ${subTextClass}`}>{labels.join(', ')}</div>
       </div>
     </div>
   );
@@ -796,7 +796,7 @@ function HudChatInput({ compact = false }) {
     return { speak: true, engine, voice };
   }, [ttsSettings?.engine, ttsSettings?.pitch, ttsSettings?.voice, ttsSupported]);
   const containerClass = compact
-    ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-[9rem] max-w-[70vw] items-center gap-0.25 rounded bg-black/70 px-0.4 py-0.2'
+    ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-[9rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.4 py-0.2'
     : 'pointer-events-auto absolute bottom-1 right-1 flex w-[12rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.5 py-0.25';
   const inputClass = compact
     ? 'min-w-0 flex-1 bg-transparent text-[0.55rem] text-slate-100 placeholder:text-slate-400 focus:outline-none'

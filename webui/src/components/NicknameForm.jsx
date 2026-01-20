@@ -31,7 +31,7 @@ export default function NicknameForm({ compact = false }) {
   }
 
   return (
-    <form className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-0.5" onSubmit={handleSave}>
+    <form className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-stretch gap-0.5" onSubmit={handleSave}>
       <input
         className="field-input flex-1 min-w-0"
         value={nicknameInput}
@@ -43,7 +43,7 @@ export default function NicknameForm({ compact = false }) {
       <button
         type="submit"
         disabled={!canSetNickname || saving}
-        className="button-dark shrink-0 whitespace-nowrap disabled:opacity-50"
+        className="button-dark h-full shrink-0 whitespace-nowrap px-0.5 py-0 disabled:opacity-50"
       >
         {saving ? 'Saving…' : compact ? 'Set' : 'Save'}
       </button>

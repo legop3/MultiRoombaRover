@@ -9,7 +9,7 @@ import KoFiButton from './KoFiButton.jsx';
 export function NicknameEntryPanel({ compact = false }) {
   return (
     <section className="panel-section flex h-full min-h-0 flex-col gap-0.5 text-base">
-      <div className="surface flex w-full items-center">
+      <div className="surface flex w-full items-center px-0 py-0">
         <NicknameForm compact={compact} />
       </div>
     </section>
@@ -155,7 +155,7 @@ export default function UserListPanel({
         return (
           <div
             key={user.socketId}
-            className={`surface-muted flex items-center gap-1 ${compact ? 'py-0.25 text-[0.8rem]' : 'text-sm'}`}
+            className={`surface-muted flex items-center gap-0.5 ${compact ? 'py-0.25 text-[0.8rem]' : 'text-sm'}`}
           >
             <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
             {user.roverId ? (
@@ -181,7 +181,7 @@ export default function UserListPanel({
         <div className="space-y-0.5">
           <div className="grid gap-0.5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <div className="min-w-0">
-              <div className="surface flex w-full items-center">
+              <div className="surface flex w-full items-center px-0 py-0">
                 <NicknameForm compact={compact} />
               </div>
             </div>
@@ -230,7 +230,7 @@ export default function UserListPanel({
           </div>
         )}
         {showQueuesSection ? (
-          <div className={`surface space-y-0.25 ${turnsListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
+          <div className={`surface space-y-0.5 px-0 pb-0 ${turnsListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
             {Object.keys(turnQueues || {}).length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>
             ) : (
@@ -247,8 +247,8 @@ export default function UserListPanel({
                       : queue[0]
                     : null;
                 return (
-                  <div key={roverId} className={`surface-muted flex flex-col gap-0.25 ${compact ? 'text-[0.8rem] py-0.25' : 'text-sm'}`}>
-                    <div className="flex items-center gap-1">
+                  <div key={roverId} className={`surface-muted flex flex-col gap-0.5 ${compact ? 'text-[0.8rem] py-0.25' : 'text-sm'}`}>
+                    <div className="flex items-center gap-0.5">
                       <p className="font-semibold text-slate-200">{rosterName(roverId)}</p>
                       {remaining != null && (
                         <span className="rounded bg-slate-800 px-1 text-[0.7rem]">
@@ -259,7 +259,7 @@ export default function UserListPanel({
                     {queue.length === 0 ? (
                       <p className="text-[0.75rem] text-slate-500">No drivers queued.</p>
                     ) : (
-                      <div className="flex flex-wrap items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-0.5">
                         {queue.map((socketId, idx) => {
                           const user = lookupUser(socketId);
                           const isCurrent = socketId === currentId;
@@ -297,18 +297,18 @@ export default function UserListPanel({
         ) : null}
 
         {showUsersSection ? (
-          <div className={`surface space-y-0.25 ${usersListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
+          <div className={`surface space-y-0.5 px-0 pb-0 ${usersListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
             {renderUserList()}
           </div>
         ) : null}
 
         {showUsersSecondary ? (
-          <div className={`space-y-0.25 ${fillHeight ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
+          <div className={`space-y-0.5 ${fillHeight ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span>Users</span>
               <span className="text-[0.7rem] text-slate-500">{sorted.length}</span>
             </div>
-            <div className={`surface space-y-0.25 ${usersListClass}`}>{renderUserList()}</div>
+            <div className={`surface space-y-0.5 px-0 pb-0 ${usersListClass}`}>{renderUserList()}</div>
           </div>
         ) : null}
       </div>

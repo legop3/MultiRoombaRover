@@ -58,7 +58,7 @@ function DockModal({ instructions, onConfirm, onCancel, pending }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-1">
       <div className="surface w-full max-w-md space-y-0.5 border border-indigo-700 bg-indigo-950/90 p-1 text-slate-100 shadow-2xl">
-        <div className="space-y-0.25">
+        <div className="space-y-0.5">
           <p className="text-lg font-semibold text-indigo-50">Dock Rover</p>
           <p className="text-sm text-slate-200">{instructions.summary}</p>
           <StepList steps={instructions.steps} tone="indigo" />
@@ -186,7 +186,7 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
         disabled={driveDisabled}
         className={`${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${emeraldCta}`}
       >
-        <div className="space-y-0.25 w-full">
+        <div className="space-y-0.5 w-full">
           <div className="flex flex-wrap items-center justify-center gap-0.5">
             <span className="text-base font-semibold text-emerald-50">Start Driving</span>
             {!isMobile && driveKeyLabel ? <KeyPill label={driveKeyLabel} /> : null}
@@ -217,7 +217,7 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
         onClick={handleReturnToDrive}
         className={`${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${amberCta}`}
       >
-        <div className="space-y-0.25 w-full">
+        <div className="space-y-0.5 w-full">
           <div className="flex flex-wrap items-center justify-center gap-0.5">
             <span className="text-base font-semibold text-amber-50">Docking in Progress</span>
             {!isMobile ? <ActionPill label="Click to return to driving mode" tone="amber" /> : null}
@@ -299,10 +299,10 @@ function StepList({ steps, tone = 'emerald' }) {
       {steps.map((step, idx) => (
         <div key={step} className="text-[0.85rem] leading-snug break-words">
           <div className="flex items-start">
-            <span className={`mr-0.35 align-top text-[0.75rem] font-semibold ${numberColor}`}>{idx + 1}.</span>
+            <span className={`mr-0 align-top text-[0.75rem] font-semibold ${numberColor}`}>{idx + 1}.</span>
             <span className="align-top">{step}</span>
           </div>
-          {idx < steps.length - 1 ? <div className="mt-0.35 h-px bg-white/10" /> : null}
+          {idx < steps.length - 1 ? <div className="mt-0 h-px bg-white/10" /> : null}
         </div>
       ))}
     </div>

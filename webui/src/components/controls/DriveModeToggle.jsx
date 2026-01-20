@@ -46,7 +46,7 @@ export default function DriveModeToggle({ size = 'default' }) {
           {currentLabel}
         </span>
       </div>
-      <div className="mt-0.5 grid grid-cols-2 gap-0.5 text-xs">
+      <div className="mt-0 grid grid-cols-2 gap-0.5 text-xs">
         <button
           type="button"
           onClick={handleDrive}

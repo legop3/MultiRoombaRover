@@ -55,7 +55,7 @@ function SliderField({ label, description, min, max, step, value, onChange }) {
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-0.5 w-full accent-emerald-400"
+        className="mt-0 w-full accent-emerald-400"
       />
     </label>
   );
@@ -187,7 +187,7 @@ export default function GamepadMappingSettings() {
               : 'Connect a controller to configure.'}
           </p>
           {capture && (
-            <p className="mt-0.5 text-[0.7rem] text-emerald-400">Capturing {capture.label}…</p>
+            <p className="mt-0 text-[0.7rem] text-emerald-400">Capturing {capture.label}…</p>
           )}
         </div>
         <button type="button" onClick={() => reset()} className="button-dark text-xs">

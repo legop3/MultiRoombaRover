@@ -101,7 +101,7 @@ function MiniSummaryContent() {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-black p-0.5 text-slate-100 flex flex-col gap-0.5">
+    <div className="relative h-screen w-screen overflow-hidden bg-black p-0 text-slate-100 flex flex-col gap-0.5">
       <ChatOverlay />
       <section className="panel relative flex min-h-0 flex-1 overflow-hidden">
         {!spectatorReady ? (
