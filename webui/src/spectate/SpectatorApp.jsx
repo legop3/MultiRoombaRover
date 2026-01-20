@@ -141,7 +141,7 @@ function SpectatorContent() {
             <RoverRoster roster={roster} title="Rovers" emptyText="No rovers registered." />
           </div>
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <UserListPanel hideNicknameForm hideHeader fillHeight className="h-full" />
+            <UserListPanel hideNicknameForm hideHeader fillHeight className="h-full" showBothTurnsAndUsers />
           </div>
           <div className="min-h-0 min-w-0 flex-[1.1] overflow-hidden">
             <ChatPanel hideInput hideSpectatorNotice fillHeight />

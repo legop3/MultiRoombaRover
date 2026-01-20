@@ -434,7 +434,7 @@ export default function VideoTile({
             >
               <div className="text-center">{qualityNotice}</div>
               <div className="pointer-events-auto mt-1">
-                <DiscordInviteButton text={'Join Discord server while you wait!'} />
+                <DiscordInviteButton text={'Join our Discord server while you wait!'} />
               </div>
             </div>
           </div>

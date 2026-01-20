@@ -6,12 +6,19 @@ import NicknameForm from './NicknameForm.jsx';
 import DiscordInviteButton from './DiscordInviteButton.jsx';
 import KoFiButton from './KoFiButton.jsx';
 
-export function NicknameLinksPanel({ compact = false }) {
+export function NicknameEntryPanel({ compact = false }) {
   return (
     <section className="panel-section flex h-full min-h-0 flex-col gap-0.5 text-base">
       <div className="surface flex w-full items-center">
         <NicknameForm compact={compact} />
       </div>
+    </section>
+  );
+}
+
+export function LinkButtonsPanel() {
+  return (
+    <section className="panel-section flex h-full min-h-0 flex-col gap-0.5 text-base">
       <div className="grid flex-1 min-h-0 gap-0.5 grid-rows-2">
         <DiscordInviteButton className="h-full" />
         <KoFiButton className="h-full" />
@@ -48,6 +55,7 @@ export default function UserListPanel({
   className = '',
   fillHeight = false,
   compact = false,
+  showBothTurnsAndUsers = false,
 }) {
   const { session, setNickname } = useSession();
   const { value } = useSettingsNamespace('profile', { nickname: '' });
@@ -59,6 +67,12 @@ export default function UserListPanel({
   const isTurnsMode = session?.mode === 'turns';
   const turnQueues = session?.turnQueues || {};
   const roster = session?.roster || [];
+  const [turnView, setTurnView] = useState('queues');
+
+  useEffect(() => {
+    if (!isTurnsMode) return;
+    setTurnView('queues');
+  }, [isTurnsMode]);
 
   useEffect(() => {
     if (!canSetNickname) return;
@@ -126,6 +140,10 @@ export default function UserListPanel({
         : baseListClass;
   const usersListClass =
     isTurnsMode && fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : baseListClass;
+  const showToggle = isTurnsMode && !showBothTurnsAndUsers;
+  const showQueuesSection = isTurnsMode && (showBothTurnsAndUsers || turnView === 'queues');
+  const showUsersSection = !isTurnsMode || (showToggle && turnView === 'users');
+  const showUsersSecondary = isTurnsMode && showBothTurnsAndUsers;
 
   const renderUserList = () =>
     sorted.length === 0 ? (
@@ -179,15 +197,41 @@ export default function UserListPanel({
       <div className={`space-y-0.5 ${fillHeight ? 'flex flex-1 min-h-0 flex-col' : ''}`}>
         {!hideHeader && (
           <div className={`flex items-center justify-between text-sm text-slate-400 ${compact ? 'text-xs' : ''}`}>
-            <span>{isTurnsMode ? 'Turn queues' : 'Users'}</span>
-            <span className="text-xs text-slate-500">
-              {isTurnsMode ? Object.keys(turnQueues || {}).length : sorted.length}
-            </span>
+            <div className="flex items-center gap-0.5">
+              <span>
+                {isTurnsMode
+                  ? showQueuesSection
+                    ? 'Turn queues'
+                    : 'Users'
+                  : 'Users'}
+              </span>
+              <span className="text-xs text-slate-500">
+                {showQueuesSection && isTurnsMode ? Object.keys(turnQueues || {}).length : sorted.length}
+              </span>
+            </div>
+            {showToggle ? (
+              <div className="inline-flex overflow-hidden rounded border border-slate-700 text-[0.7rem]">
+                <button
+                  type="button"
+                  className={`px-1 py-0.5 ${turnView === 'queues' ? 'bg-slate-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`}
+                  onClick={() => setTurnView('queues')}
+                >
+                  Queues
+                </button>
+                <button
+                  type="button"
+                  className={`px-1 py-0.5 ${turnView === 'users' ? 'bg-slate-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`}
+                  onClick={() => setTurnView('users')}
+                >
+                  Users
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
-        <div className={`surface space-y-0.25 ${isTurnsMode ? turnsListClass : baseListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
-          {isTurnsMode ? (
-            Object.keys(turnQueues || {}).length === 0 ? (
+        {showQueuesSection ? (
+          <div className={`surface space-y-0.25 ${turnsListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
+            {Object.keys(turnQueues || {}).length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>
             ) : (
               Object.entries(turnQueues).map(([roverId, info]) => {
@@ -248,21 +292,23 @@ export default function UserListPanel({
                   </div>
                 );
               })
-            )
-          ) : (
-            renderUserList()
-          )}
-        </div>
+            )}
+          </div>
+        ) : null}
 
-        {isTurnsMode ? (
+        {showUsersSection ? (
+          <div className={`surface space-y-0.25 ${usersListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
+            {renderUserList()}
+          </div>
+        ) : null}
+
+        {showUsersSecondary ? (
           <div className={`space-y-0.25 ${fillHeight ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span>Users</span>
               <span className="text-[0.7rem] text-slate-500">{sorted.length}</span>
             </div>
-            <div className={`surface space-y-0.25 ${usersListClass}`}>
-              {renderUserList()}
-            </div>
+            <div className={`surface space-y-0.25 ${usersListClass}`}>{renderUserList()}</div>
           </div>
         ) : null}
       </div>

@@ -4,7 +4,7 @@ import HomeAssistantControls from './HomeAssistantControls.jsx';
 import SettingsPanel from './SettingsPanel.jsx';
 import HelpPanel from './HelpPanel.jsx';
 import ChatPanel from './ChatPanel.jsx';
-import UserListPanel, { NicknameLinksPanel } from './UserListPanel.jsx';
+import UserListPanel, { LinkButtonsPanel, NicknameEntryPanel } from './UserListPanel.jsx';
 import ReplaySourcesPanel from './ReplaySourcesPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 import TopDownMap from './TopDownMap.jsx';
@@ -59,14 +59,17 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
                 <TopDownMapPanel />
                 <DriveDockPanel />
               </div>
-              <div className="grid gap-0.5 grid-cols-[minmax(0,0.6fr)_minmax(0,1.1fr)_minmax(0,0.9fr)]">
-                <NicknameLinksPanel compact />
+              <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.75fr)]">
                 <RoverRosterPanel />
                 <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
+                <LinkButtonsPanel />
               </div>
               <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] h-[14rem]">
                 <ChatPanel fillHeight />
-                <UserListPanel compact hideNicknameForm fillHeight />
+                <div className="grid min-h-0 gap-0.5 grid-rows-[auto_minmax(0,1fr)]">
+                  <NicknameEntryPanel compact />
+                  <UserListPanel compact hideNicknameForm fillHeight />
+                </div>
               </div>
               <HomeAssistantControls />
               <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />

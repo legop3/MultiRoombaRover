@@ -83,11 +83,11 @@ export default function HomeAssistantControls() {
 
   return (
     <section className="panel-section space-y-0.5 text-base">
-      <header className="flex flex-wrap items-start justify-between gap-0.5 text-sm text-slate-400">
-        <div className="flex flex-wrap items-center gap-1">
+      <header className="flex items-center justify-between gap-0.5 text-sm text-slate-400">
+        <div className="flex items-center gap-1">
           <p>Light Controls</p>
           <span className="text-xs text-slate-500">{entities.length}</span>
-          <div className="flex w-full flex-wrap items-center gap-1 text-xs text-slate-300">
+          <div className="flex items-center gap-1 text-xs text-slate-300 background-black">
             <span className="flex items-center gap-0.5">
               <span>On</span>
               {onKeyLabel ? <KeyPill label={onKeyLabel} /> : null}
