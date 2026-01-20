@@ -32,13 +32,13 @@ export default function TelemetryPanel() {
 
   return (
     <section className="panel-section space-y-0.5 text-base text-slate-100">
-      <div className="text-sm text-slate-400">
+      {/* <div className="text-sm text-slate-400">
         <span>{connected ? 'online' : 'offline'}</span>
         <span> · role {session?.role || 'unknown'}</span>
         <span> · mode {session?.mode || '--'}</span>
         {updated && <span> · sensors {updated}</span>}
         <span> · driver {driverLabel}</span>
-      </div>
+      </div> */}
       {!roverId ? (
         <p className="text-sm text-slate-500">Assign a rover to view sensors.</p>
       ) : !frame ? (
@@ -57,7 +57,7 @@ export default function TelemetryPanel() {
 }
 
 function TelemetrySummary({ sensors, voltage, current, batteryTemp, charge, capacity }) {
-  const chargePct = charge != null && capacity ? `${Math.round((charge / capacity) * 100)}%` : '--';
+  const chargePct = charge != null && capacity ? `${Math.round((charge / capacity) * 100)}` : '--';
   const oiMode = sensors?.oiMode?.label || '--';
   const docked = sensors?.chargingSources?.homeBase ? 'Yes' : 'No';
   const charging = sensors?.chargingState?.label || '--';
@@ -69,7 +69,7 @@ function TelemetrySummary({ sensors, voltage, current, batteryTemp, charge, capa
       <Metric label="Battery temp" value={batteryTemp ?? '--'} />
       <Metric label="Charge" value={charge != null ? `${charge} mAh` : '--'} />
       <Metric label="Capacity" value={capacity != null ? `${capacity} mAh` : '--'} />
-      <Metric label="Charge %" value={chargePct} />
+      <Metric label="Charge" value={chargePct} />
       <Metric label="OI mode" value={oiMode} />
       <Metric label="Docked" value={docked} />
       <Metric label="Charging state" value={charging} />
