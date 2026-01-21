@@ -120,8 +120,9 @@ export default function VideoTile({
     : overcurrentMotors.length
     ? 1
     : 0;
+  const overlayVisible = overcurrentActive || overlayFill > 0.01;
   const overlayOpacity = clampUnit(
-    overcurrentActive ? Math.max(overlayFill * 1.2, 0.25) : overlayFill * 1.2,
+    overlayVisible ? Math.max(overlayFill * 1.2, overcurrentActive ? 0.25 : 0.2) : 0,
   );
   const overcurrentLabels = useMemo(() => {
     if (!overcurrentLimiter) {
@@ -776,7 +777,7 @@ function OvercurrentOverlay({ labels, fill = 0, opacity = 1, compact = false }) 
   const resolvedOpacity = clampUnit(opacity);
   return (
     <div
-      className={`pointer-events-none absolute flex items-center justify-center bg-red-900/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${containerClass} relative`}
+      className={`pointer-events-none absolute z-30 flex items-center justify-center bg-red-900/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${containerClass} relative`}
       style={{ opacity: resolvedOpacity }}
     >
       <div className="absolute inset-0 overflow-hidden">
