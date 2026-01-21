@@ -64,7 +64,8 @@ io.on('connection', (socket) => {
       if (!roverId) {
         throw new Error('roverId required');
       }
-      if (!roverManager.canDrive(roverId, socket)) {
+      const isSongCommand = type === 'song';
+      if (!isSongCommand && !roverManager.canDrive(roverId, socket)) {
         throw new Error('Not your turn or no control');
       }
       const payload = data ? { ...data } : {};
