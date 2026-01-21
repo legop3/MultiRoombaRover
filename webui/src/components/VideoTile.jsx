@@ -108,11 +108,15 @@ export default function VideoTile({
     const auxCap = Number.isFinite(limiterCaps?.aux?.cap) ? limiterCaps.aux.cap : 1;
     return Math.max(0, Math.min(1, 1 - Math.min(driveCap, auxCap)));
   }, [limiterCaps]);
+  const fallbackLabels = useMemo(
+    () => overcurrentMotors.map((name) => OVERCURRENT_LABELS[name] || name),
+    [overcurrentMotors],
+  );
   const overcurrentActive = Boolean(
     (limiterGroups?.drive || limiterGroups?.aux) || overcurrentMotors.length,
   );
   const overlayFill = overcurrentLimiter
-    ? limiterFill ?? 0
+    ? limiterFill ?? (overcurrentMotors.length ? 1 : 0)
     : overcurrentMotors.length
     ? 1
     : 0;
@@ -121,7 +125,7 @@ export default function VideoTile({
   );
   const overcurrentLabels = useMemo(() => {
     if (!overcurrentLimiter) {
-      return overcurrentMotors.map((name) => OVERCURRENT_LABELS[name] || name);
+      return fallbackLabels;
     }
     const labels = [];
     const driveCap = Number.isFinite(limiterCaps?.drive?.cap) ? limiterCaps.drive.cap : 1;
@@ -130,8 +134,8 @@ export default function VideoTile({
     const auxActive = Boolean(limiterGroups?.aux) || auxCap < 0.999;
     if (driveActive) labels.push('Drive wheels');
     if (auxActive) labels.push('Aux motors');
-    return labels;
-  }, [limiterCaps, limiterGroups, overcurrentLimiter, overcurrentMotors]);
+    return labels.length ? labels : fallbackLabels;
+  }, [fallbackLabels, limiterCaps, limiterGroups, overcurrentLimiter]);
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
