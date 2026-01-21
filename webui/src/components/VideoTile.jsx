@@ -37,6 +37,11 @@ function buildBatteryVisual(charge, config) {
   };
 }
 
+function clampUnit(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
 export default function VideoTile({
   sessionInfo,
   audioSessionInfo,
@@ -54,6 +59,7 @@ export default function VideoTile({
   hudMapPosition = 'top-right',
   hudLabelScale = 1,
   fitParent = false,
+  overcurrentLimiter = null,
   showTurnCue = false,
   turnTimerText = null,
   turnSeconds = null,
@@ -94,6 +100,27 @@ export default function VideoTile({
       : Object.entries(wheelOvercurrents)
           .filter(([, active]) => Boolean(active))
           .map(([key]) => key);
+  const limiterCaps = overcurrentLimiter?.caps || null;
+  const limiterGroups = overcurrentLimiter?.overcurrent?.groups || null;
+  const limiterFill = useMemo(() => {
+    if (!limiterCaps) return null;
+    const driveCap = Number.isFinite(limiterCaps?.drive?.cap) ? limiterCaps.drive.cap : 1;
+    const auxCap = Number.isFinite(limiterCaps?.aux?.cap) ? limiterCaps.aux.cap : 1;
+    return Math.max(0, Math.min(1, 1 - Math.min(driveCap, auxCap)));
+  }, [limiterCaps]);
+  const overcurrentLabels = useMemo(() => {
+    if (!overcurrentLimiter) {
+      return overcurrentMotors.map((name) => OVERCURRENT_LABELS[name] || name);
+    }
+    const labels = [];
+    const driveCap = Number.isFinite(limiterCaps?.drive?.cap) ? limiterCaps.drive.cap : 1;
+    const auxCap = Number.isFinite(limiterCaps?.aux?.cap) ? limiterCaps.aux.cap : 1;
+    const driveActive = Boolean(limiterGroups?.drive) || driveCap < 0.999;
+    const auxActive = Boolean(limiterGroups?.aux) || auxCap < 0.999;
+    if (driveActive) labels.push('Drive wheels');
+    if (auxActive) labels.push('Aux motors');
+    return labels;
+  }, [limiterCaps, limiterGroups, overcurrentLimiter, overcurrentMotors]);
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
@@ -420,7 +447,11 @@ export default function VideoTile({
           labelScale={hudLabelScale}
         />
         <HudChatInput compact={mobileHud} />
-        <OvercurrentOverlay motors={overcurrentMotors} compact={mobileHud} />
+        <OvercurrentOverlay
+          labels={overcurrentLabels}
+          fill={overcurrentLimiter ? limiterFill ?? 0 : overcurrentMotors.length ? 1 : 0}
+          compact={mobileHud}
+        />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} />
         {showVerticalBattery && batteryVisual.available ? (
           <BatteryBarVertical visual={batteryVisual} />
@@ -720,17 +751,22 @@ const OVERCURRENT_LABELS = {
   sideBrush: 'Side brush',
 };
 
-function OvercurrentOverlay({ motors, compact = false }) {
-  if (!motors?.length) return null;
-  const labels = motors.map((name) => OVERCURRENT_LABELS[name] || name);
+function OvercurrentOverlay({ labels, fill = 0, compact = false }) {
+  if (!labels?.length) return null;
   const containerClass = compact ? 'p-2' : 'p-4';
   const textClass = compact ? 'text-lg' : 'text-4xl';
   const subTextClass = compact ? 'text-xs' : 'text-xl';
+  const fillWidth = `${Math.round(clampUnit(fill) * 100)}%`;
+  const opacity = clampUnit(fill * 1.2);
   return (
     <div
-      className={`pointer-events-none absolute flex items-center justify-center bg-red-900/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${containerClass}`}
+      className={`pointer-events-none absolute flex items-center justify-center bg-red-900/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${containerClass} relative`}
+      style={{ opacity }}
     >
-      <div className={`text-center font-semibold text-white animate-pulse ${textClass}`}>
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="h-full bg-red-700/60" style={{ width: fillWidth }} />
+      </div>
+      <div className={`relative z-10 text-center font-semibold text-white animate-pulse ${textClass}`}>
         <div>OVERCURRENT</div>
         <div className={`mt-0 font-medium text-white ${subTextClass}`}>{labels.join(', ')}</div>
       </div>
