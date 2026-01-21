@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 
-export const OVERCURRENT_MOTORS = ['leftWheel', 'rightWheel', 'mainBrush', 'sideBrush'];
+export const OVERCURRENT_GROUPS = [
+  { key: 'drive', motors: ['leftWheel', 'rightWheel'] },
+  { key: 'aux', motors: ['mainBrush', 'sideBrush'] },
+];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
   meterAChargeSec: 4,
@@ -12,8 +15,8 @@ export const DEFAULT_OVERCURRENT_LIMITS = {
 };
 
 function createInitialMeters() {
-  return OVERCURRENT_MOTORS.reduce((acc, key) => {
-    acc[key] = { a: 0, b: 0 };
+  return OVERCURRENT_GROUPS.reduce((acc, group) => {
+    acc[group.key] = { a: 0, b: 0 };
     return acc;
   }, {});
 }
@@ -62,9 +65,9 @@ export function useOvercurrentLimiter(roverId, options = {}) {
       setMeters((prev) => {
         let changed = false;
         const next = {};
-        OVERCURRENT_MOTORS.forEach((key) => {
-          const prevEntry = prev[key] || { a: 0, b: 0 };
-          const over = Boolean(flagsRef.current?.[key]);
+        OVERCURRENT_GROUPS.forEach((group) => {
+          const prevEntry = prev[group.key] || { a: 0, b: 0 };
+          const over = group.motors.some((motor) => Boolean(flagsRef.current?.[motor]));
           const nextA = clampUnit(
             stepValue(
               prevEntry.a,
@@ -85,7 +88,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
           if (Math.abs(nextA - prevEntry.a) > 0.0001 || Math.abs(nextB - prevEntry.b) > 0.0001) {
             changed = true;
           }
-          next[key] = { a: nextA, b: nextB };
+          next[group.key] = { a: nextA, b: nextB };
         });
         return changed ? next : prev;
       });
@@ -94,32 +97,37 @@ export function useOvercurrentLimiter(roverId, options = {}) {
   }, [config.meterAChargeSec, config.meterADecaySec, config.meterBChargeSec, config.meterBDecaySec]);
 
   const scales = useMemo(() => {
-    const perMotor = OVERCURRENT_MOTORS.reduce((acc, key) => {
-      acc[key] = clampUnit(1 - (meters?.[key]?.b ?? 0));
+    const perGroup = OVERCURRENT_GROUPS.reduce((acc, group) => {
+      acc[group.key] = clampUnit(1 - (meters?.[group.key]?.b ?? 0));
       return acc;
     }, {});
     return {
-      perMotor,
+      perGroup,
       drive: {
-        left: perMotor.leftWheel ?? 1,
-        right: perMotor.rightWheel ?? 1,
+        left: perGroup.drive ?? 1,
+        right: perGroup.drive ?? 1,
       },
       aux: {
-        main: perMotor.mainBrush ?? 1,
-        side: perMotor.sideBrush ?? 1,
+        main: perGroup.aux ?? 1,
+        side: perGroup.aux ?? 1,
         vacuum: 1,
       },
     };
   }, [meters]);
 
-  const overcurrent = useMemo(
-    () =>
-      OVERCURRENT_MOTORS.reduce((acc, key) => {
-        acc[key] = Boolean(overcurrentFlags?.[key]);
-        return acc;
-      }, {}),
-    [overcurrentFlags],
-  );
+  const overcurrent = useMemo(() => {
+    const motors = {};
+    OVERCURRENT_GROUPS.forEach((group) => {
+      group.motors.forEach((motor) => {
+        motors[motor] = Boolean(overcurrentFlags?.[motor]);
+      });
+    });
+    const groups = OVERCURRENT_GROUPS.reduce((acc, group) => {
+      acc[group.key] = group.motors.some((motor) => Boolean(overcurrentFlags?.[motor]));
+      return acc;
+    }, {});
+    return { motors, groups };
+  }, [overcurrentFlags]);
 
   const adminImmune =
     session?.role === 'admin' ||

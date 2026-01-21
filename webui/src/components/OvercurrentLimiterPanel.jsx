@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
 import { useControlSystem } from '../controls/index.js';
+import { OVERCURRENT_GROUPS } from '../controls/overcurrentLimiter.js';
 
-const MOTOR_LABELS = {
-  leftWheel: 'Left wheel',
-  rightWheel: 'Right wheel',
-  mainBrush: 'Main brush',
-  sideBrush: 'Side brush',
+const GROUP_LABELS = {
+  drive: 'Drive wheels',
+  aux: 'Aux motors',
 };
 
 function formatPct(value) {
@@ -27,7 +26,7 @@ export default function OvercurrentLimiterPanel() {
     state: { roverId },
     overcurrentLimiter,
   } = useControlSystem();
-  const motors = useMemo(() => Object.keys(MOTOR_LABELS), []);
+  const groups = useMemo(() => OVERCURRENT_GROUPS.map((group) => group.key), []);
 
   return (
     <section className="panel-section space-y-0.5 text-sm">
@@ -39,15 +38,15 @@ export default function OvercurrentLimiterPanel() {
         <p className="text-xs text-slate-500">Assign a rover to view limiter status.</p>
       ) : (
         <div className="space-y-0.5">
-          {motors.map((key) => {
+          {groups.map((key) => {
             const meterA = overcurrentLimiter?.meters?.[key]?.a ?? 0;
             const meterB = overcurrentLimiter?.meters?.[key]?.b ?? 0;
-            const over = overcurrentLimiter?.overcurrent?.[key] ?? false;
-            const scale = overcurrentLimiter?.scales?.perMotor?.[key] ?? 1;
+            const over = overcurrentLimiter?.overcurrent?.groups?.[key] ?? false;
+            const scale = overcurrentLimiter?.scales?.perGroup?.[key] ?? 1;
             return (
               <div key={key} className="surface space-y-0.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-200">{MOTOR_LABELS[key] || key}</span>
+                  <span className="text-slate-200">{GROUP_LABELS[key] || key}</span>
                   <span className={over ? 'text-red-300' : 'text-slate-400'}>
                     {over ? 'overcurrent' : 'ok'}
                   </span>
