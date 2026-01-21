@@ -91,9 +91,10 @@ export default function VideoTile({
   const limiterOvercurrentMotors = useMemo(() => {
     const motors = overcurrentLimiter?.overcurrent?.motors;
     if (!motors) return null;
-    return Object.entries(motors)
-      .filter(([, active]) => Boolean(active))
+    const active = Object.entries(motors)
+      .filter(([, flag]) => Boolean(flag))
       .map(([key]) => key);
+    return active.length ? active : null;
   }, [overcurrentLimiter]);
   const wheelOvercurrents = sensors?.wheelOvercurrents || null;
   const overcurrentMotors = limiterOvercurrentMotors ?? (
