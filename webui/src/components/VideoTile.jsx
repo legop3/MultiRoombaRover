@@ -450,6 +450,7 @@ export default function VideoTile({
           fill={overlayFill}
           visible={overlayVisible}
           compact={mobileHud}
+          debug={overcurrentLimiter ? { active: limiterActive, count: overcurrentMotors.length, fill: overlayFill } : null}
         />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} />
         {showVerticalBattery && batteryVisual.available ? (
@@ -750,7 +751,7 @@ const OVERCURRENT_LABELS = {
   sideBrush: 'Side brush',
 };
 
-function OvercurrentOverlay({ labels, fill = 0, visible = false, compact = false }) {
+function OvercurrentOverlay({ labels, fill = 0, visible = false, compact = false, debug = null }) {
   if (!visible) return null;
   const safeLabels = Array.isArray(labels) && labels.length ? labels : ['Overcurrent'];
   const containerClass = compact ? 'p-2' : 'p-4';
@@ -768,6 +769,11 @@ function OvercurrentOverlay({ labels, fill = 0, visible = false, compact = false
       <div className={`relative z-10 text-center font-semibold text-white animate-pulse ${textClass}`}>
         <div>OVERCURRENT</div>
         <div className={`mt-0 font-medium text-white ${subTextClass}`}>{safeLabels.join(', ')}</div>
+        {debug ? (
+          <div className="mt-0 text-[0.55rem] font-normal text-red-100">
+            {`dbg a:${debug.active ? 1 : 0} m:${debug.count} f:${Math.round(debug.fill * 100)}%`}
+          </div>
+        ) : null}
       </div>
     </div>
   );
