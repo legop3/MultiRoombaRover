@@ -8,15 +8,14 @@ export const OVERCURRENT_GROUPS = [
 ];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
-  heatUpSec: 2,
-  coolDownSec: 12,
-  kneeSec: 0,
+  downRatePerSec: 0.25,
+  upRatePerSec: 0.1,
   outputRateMs: 250,
 };
 
-function createInitialTemperatures() {
+function createInitialCaps() {
   return OVERCURRENT_GROUPS.reduce((acc, group) => {
-    acc[group.key] = 0;
+    acc[group.key] = 1;
     return acc;
   }, {});
 }
@@ -24,14 +23,6 @@ function createInitialTemperatures() {
 function clampUnit(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
-}
-
-function stepValue(current, delta, seconds, direction) {
-  if (!Number.isFinite(seconds) || seconds <= 0) {
-    return direction === 'up' ? 1 : 0;
-  }
-  const amount = delta / seconds;
-  return direction === 'up' ? current + amount : current - amount;
 }
 
 export function useOvercurrentLimiter(roverId, options = {}) {
@@ -43,7 +34,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
     () => ({ ...DEFAULT_OVERCURRENT_LIMITS, ...(options.config || {}) }),
     [options.config],
   );
-  const [temperatures, setTemperatures] = useState(() => createInitialTemperatures());
+  const [caps, setCaps] = useState(() => createInitialCaps());
   const lastTickRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const flagsRef = useRef(overcurrentFlags);
 
@@ -52,7 +43,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
   }, [overcurrentFlags]);
 
   useEffect(() => {
-    setTemperatures(createInitialTemperatures());
+    setCaps(createInitialCaps());
   }, [roverId]);
 
   useEffect(() => {
@@ -62,39 +53,32 @@ export function useOvercurrentLimiter(roverId, options = {}) {
       lastTickRef.current = now;
       const deltaSec = deltaMs / 1000;
       if (deltaSec <= 0) return;
-      setTemperatures((prev) => {
+      setCaps((prev) => {
         let changed = false;
         const next = {};
+        const downRate = Number.isFinite(config.downRatePerSec) ? Math.max(0, config.downRatePerSec) : 0;
+        const upRate = Number.isFinite(config.upRatePerSec) ? Math.max(0, config.upRatePerSec) : 0;
         OVERCURRENT_GROUPS.forEach((group) => {
-          const prevEntry = Number.isFinite(prev[group.key]) ? prev[group.key] : 0;
+          const prevEntry = Number.isFinite(prev[group.key]) ? prev[group.key] : 1;
           const over = group.motors.some((motor) => Boolean(flagsRef.current?.[motor]));
-          const nextTemp = clampUnit(
-            stepValue(
-              prevEntry,
-              deltaSec,
-              over ? config.heatUpSec : config.coolDownSec,
-              over ? 'up' : 'down',
-            ),
+          const nextCap = clampUnit(
+            over ? prevEntry - downRate * deltaSec : prevEntry + upRate * deltaSec,
           );
-          if (Math.abs(nextTemp - prevEntry) > 0.0001) {
+          if (Math.abs(nextCap - prevEntry) > 0.0001) {
             changed = true;
           }
-          next[group.key] = nextTemp;
+          next[group.key] = nextCap;
         });
         return changed ? next : prev;
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [config.heatUpSec, config.coolDownSec]);
+  }, [config.downRatePerSec, config.upRatePerSec]);
 
   const scales = useMemo(() => {
-    const kneeSec = Number.isFinite(config.kneeSec) ? Math.max(0, config.kneeSec) : 0;
-    const heatUpSec = Number.isFinite(config.heatUpSec) ? Math.max(0.001, config.heatUpSec) : 0.001;
-    const kneeTemp = clampUnit(kneeSec / heatUpSec);
     const perGroup = OVERCURRENT_GROUPS.reduce((acc, group) => {
-      const temp = Number.isFinite(temperatures?.[group.key]) ? temperatures[group.key] : 0;
-      const normalized = kneeTemp >= 1 ? 0 : clampUnit((temp - kneeTemp) / (1 - kneeTemp));
-      acc[group.key] = clampUnit(1 - normalized);
+      const cap = Number.isFinite(caps?.[group.key]) ? caps[group.key] : 1;
+      acc[group.key] = clampUnit(cap);
       return acc;
     }, {});
     return {
@@ -109,7 +93,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
         vacuum: 1,
       },
     };
-  }, [config.heatUpSec, config.kneeSec, temperatures]);
+  }, [caps]);
 
   const overcurrent = useMemo(() => {
     const motors = {};
@@ -132,14 +116,14 @@ export function useOvercurrentLimiter(roverId, options = {}) {
 
   return useMemo(
     () => ({
-      temperatures,
+      caps,
       overcurrent,
       scales,
       isActive: (scales?.drive?.left ?? 1) < 1 || (scales?.drive?.right ?? 1) < 1 || (scales?.aux?.main ?? 1) < 1 || (scales?.aux?.side ?? 1) < 1,
       config,
       adminImmune,
     }),
-    [temperatures, overcurrent, scales, config, adminImmune],
+    [caps, overcurrent, scales, config, adminImmune],
   );
 }
 

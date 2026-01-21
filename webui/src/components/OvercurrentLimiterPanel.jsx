@@ -39,7 +39,7 @@ export default function OvercurrentLimiterPanel() {
       ) : (
         <div className="space-y-0.5">
           {groups.map((key) => {
-            const temperature = overcurrentLimiter?.temperatures?.[key] ?? 0;
+            const cap = overcurrentLimiter?.caps?.[key] ?? 0;
             const over = overcurrentLimiter?.overcurrent?.groups?.[key] ?? false;
             const scale = overcurrentLimiter?.scales?.perGroup?.[key] ?? 1;
             return (
@@ -52,10 +52,10 @@ export default function OvercurrentLimiterPanel() {
                 </div>
                 <div className="space-y-0.5">
                   <div className="flex items-center justify-between text-[0.7rem] text-slate-400">
-                    <span>Temperature</span>
-                    <span>{formatPct(temperature)}</span>
+                    <span>Cap</span>
+                    <span>{formatPct(cap)}</span>
                   </div>
-                  <ProgressBar value={temperature} color="bg-amber-500" />
+                  <ProgressBar value={cap} color="bg-amber-500" />
                   <div className="flex items-center justify-between text-[0.7rem] text-slate-400">
                     <span>Scale</span>
                     <span>{formatPct(scale)}</span>
@@ -65,8 +65,7 @@ export default function OvercurrentLimiterPanel() {
             );
           })}
           <div className="surface text-[0.7rem] text-slate-400">
-            <div>{`Heat up ${overcurrentLimiter?.config?.heatUpSec}s · Cool down ${overcurrentLimiter?.config?.coolDownSec}s`}</div>
-            <div>{`Knee ${overcurrentLimiter?.config?.kneeSec}s`}</div>
+            <div>{`Down rate ${overcurrentLimiter?.config?.downRatePerSec}/s · Up rate ${overcurrentLimiter?.config?.upRatePerSec}/s`}</div>
             <div>{`Output rate ${overcurrentLimiter?.config?.outputRateMs}ms`}</div>
           </div>
         </div>
