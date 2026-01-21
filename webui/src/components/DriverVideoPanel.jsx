@@ -10,7 +10,6 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const { session } = useSession();
   const {
     state: { song, lastControlIntentAt },
-    overcurrentLimiter,
   } = useControlSystem();
   const [now, setNow] = useState(() => Date.now());
   const [turnCueVisible, setTurnCueVisible] = useState(false);
@@ -123,7 +122,6 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
           telemetryFrame={frame}
           batteryConfig={batteryConfig}
           layoutFormat={layoutFormat}
-          overcurrentLimiter={overcurrentLimiter}
           songNote={song?.note}
           qualityNotice={!shouldShowVideo ? 'Preview feed (low FPS) until your turn.' : null}
           showTurnCue={turnCueVisible}
