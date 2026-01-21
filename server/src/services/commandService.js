@@ -64,11 +64,11 @@ io.on('connection', (socket) => {
       if (!roverId) {
         throw new Error('roverId required');
       }
-      const isSongCommand = type === 'song';
+      const payload = data ? { ...data } : {};
+      const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));
       if (!isSongCommand && !roverManager.canDrive(roverId, socket)) {
         throw new Error('Not your turn or no control');
       }
-      const payload = data ? { ...data } : {};
       const isAdminSocket = isAdmin(socket);
       const driveDirect = payload?.driveDirect;
       if (type === 'drive' && driveDirect && !isAdminSocket) {
@@ -110,3 +110,20 @@ io.on('connection', (socket) => {
   socket.on('command', handleCommand);
   socket.on('command:issue', handleCommand);
 });
+
+function isSongRawPayload(payload) {
+  if (!payload) return false;
+  const raw = payload.raw;
+  if (!raw) return false;
+  let bytes = null;
+  if (Buffer.isBuffer(raw)) {
+    bytes = raw;
+  } else if (Array.isArray(raw)) {
+    bytes = Buffer.from(raw);
+  } else if (typeof raw === 'string') {
+    bytes = Buffer.from(raw, 'base64');
+  }
+  if (!bytes || bytes.length === 0) return false;
+  const opcode = bytes[0];
+  return opcode === 140 || opcode === 141;
+}
