@@ -11,6 +11,7 @@ config.h
 robots.json
 roverd-dummy
 server/config.yaml
+server/package-lock.json
 package-lock.json
 server/data/discord-guilds.json
 server/data/community-goal.json
