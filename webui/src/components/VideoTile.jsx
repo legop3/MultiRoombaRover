@@ -103,6 +103,11 @@ export default function VideoTile({
     const auxCap = Number.isFinite(limiterCaps?.aux?.cap) ? limiterCaps.aux.cap : 1;
     return Math.max(0, Math.min(1, 1 - Math.min(driveCap, auxCap)));
   }, [limiterCaps]);
+  const limiterActive = Boolean(
+    Number.isFinite(limiterCaps?.drive?.cap) ? limiterCaps.drive.cap < 0.999 : false,
+  ) || Boolean(
+    Number.isFinite(limiterCaps?.aux?.cap) ? limiterCaps.aux.cap < 0.999 : false,
+  );
   const limiterLabels = useMemo(() => {
     if (!limiterCaps) return [];
     const labels = [];
@@ -112,12 +117,13 @@ export default function VideoTile({
     if (Boolean(limiterGroups?.aux) || auxCap < 0.999) labels.push('Aux motors');
     return labels;
   }, [limiterCaps, limiterGroups]);
-  const overlayActive = Boolean(overcurrentMotors.length || (limiterFill != null && limiterFill > 0.001));
-  const overlayLabels = overcurrentMotors.length
+  const overlayActive = Boolean(overcurrentMotors.length || limiterActive);
+  const overlayLabelsRaw = overcurrentMotors.length
     ? overcurrentMotors.map((name) => OVERCURRENT_LABELS[name] || name)
     : limiterLabels.length
     ? limiterLabels
-    : ['Overcurrent'];
+    : [];
+  const overlayLabels = overlayLabelsRaw.length ? overlayLabelsRaw : ['Overcurrent'];
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
@@ -751,6 +757,7 @@ const OVERCURRENT_LABELS = {
 
 function OvercurrentOverlay({ labels, fill = 0, visible = false, compact = false }) {
   if (!visible) return null;
+  const safeLabels = Array.isArray(labels) && labels.length ? labels : ['Overcurrent'];
   const containerClass = compact ? 'p-2' : 'p-4';
   const textClass = compact ? 'text-lg' : 'text-4xl';
   const subTextClass = compact ? 'text-xs' : 'text-xl';
@@ -765,7 +772,7 @@ function OvercurrentOverlay({ labels, fill = 0, visible = false, compact = false
       </div>
       <div className={`relative z-10 text-center font-semibold text-white animate-pulse ${textClass}`}>
         <div>OVERCURRENT</div>
-        <div className={`mt-0 font-medium text-white ${subTextClass}`}>{labels.join(', ')}</div>
+        <div className={`mt-0 font-medium text-white ${subTextClass}`}>{safeLabels.join(', ')}</div>
       </div>
     </div>
   );
