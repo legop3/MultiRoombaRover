@@ -73,6 +73,7 @@ export default function OvercurrentLimiterPanel() {
           <div className="surface text-[0.7rem] text-slate-400">
             <div>{`A charge ${overcurrentLimiter?.config?.meterAChargeSec}s · A decay ${overcurrentLimiter?.config?.meterADecaySec}s`}</div>
             <div>{`B charge ${overcurrentLimiter?.config?.meterBChargeSec}s · B decay ${overcurrentLimiter?.config?.meterBDecaySec}s`}</div>
+            <div>{`Output rate ${overcurrentLimiter?.config?.outputRateMs}ms`}</div>
           </div>
         </div>
       )}

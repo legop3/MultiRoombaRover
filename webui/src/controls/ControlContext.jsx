@@ -142,6 +142,8 @@ export function ControlSystemProvider({ children }) {
   const driveSpeedsRef = useRef(state.drive.speeds);
   const auxValuesRef = useRef(state.aux);
   const limiterScaleToken = useMemo(() => JSON.stringify(overcurrentLimiter.scales), [overcurrentLimiter.scales]);
+  const limiterDriveSentAtRef = useRef(0);
+  const limiterAuxSentAtRef = useRef(0);
 
   useEffect(() => {
     driveSpeedsRef.current = state.drive.speeds;
@@ -152,19 +154,23 @@ export function ControlSystemProvider({ children }) {
   }, [state.aux]);
 
   useEffect(() => {
-    if (!pipeline.roverId || overcurrentLimiter.adminImmune) return;
+    if (!pipeline.roverId || overcurrentLimiter.adminImmune || !overcurrentLimiter.isActive) return;
+    const outputRateMs = Math.max(0, Number(overcurrentLimiter?.config?.outputRateMs) || 0);
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const drive = driveSpeedsRef.current || { left: 0, right: 0 };
     const aux = auxValuesRef.current || { main: 0, side: 0, vacuum: 0 };
     const driveActive = Boolean(drive.left || drive.right);
     const auxActive = Boolean(aux.main || aux.side || aux.vacuum);
     if (!driveActive && !auxActive) return;
-    if (driveActive) {
+    if (driveActive && now - limiterDriveSentAtRef.current >= outputRateMs) {
+      limiterDriveSentAtRef.current = now;
       pipeline.sendDriveDirect(drive);
     }
-    if (auxActive) {
+    if (auxActive && now - limiterAuxSentAtRef.current >= outputRateMs) {
+      limiterAuxSentAtRef.current = now;
       pipeline.sendAuxMotors(aux);
     }
-  }, [limiterScaleToken, overcurrentLimiter.adminImmune, pipeline]);
+  }, [limiterScaleToken, overcurrentLimiter.adminImmune, overcurrentLimiter.config, overcurrentLimiter.isActive, pipeline]);
 
   const setDriveVector = useCallback(
     (vector, meta = {}) => {

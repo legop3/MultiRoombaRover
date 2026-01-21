@@ -8,10 +8,11 @@ export const OVERCURRENT_GROUPS = [
 ];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
-  meterAChargeSec: 3,
+  meterAChargeSec: 9,
   meterADecaySec: 9,
-  meterBChargeSec: 1,
-  meterBDecaySec: 10,
+  meterBChargeSec: 5,
+  meterBDecaySec: 5,
+  outputRateMs: 250,
 };
 
 function createInitialMeters() {
@@ -139,6 +140,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
       meters,
       overcurrent,
       scales,
+      isActive: (scales?.drive?.left ?? 1) < 1 || (scales?.drive?.right ?? 1) < 1 || (scales?.aux?.main ?? 1) < 1 || (scales?.aux?.side ?? 1) < 1,
       config,
       adminImmune,
     }),
@@ -150,6 +152,7 @@ export function applyDriveOvercurrentScale(speeds = {}, scales, adminImmune = fa
   if (adminImmune || !scales?.drive) return speeds;
   const leftScale = typeof scales.drive.left === 'number' ? scales.drive.left : 1;
   const rightScale = typeof scales.drive.right === 'number' ? scales.drive.right : 1;
+  if (leftScale >= 0.999 && rightScale >= 0.999) return speeds;
   return {
     left: Math.round((speeds.left ?? 0) * leftScale),
     right: Math.round((speeds.right ?? 0) * rightScale),
@@ -161,6 +164,7 @@ export function applyAuxOvercurrentScale(values = {}, scales, adminImmune = fals
   const mainScale = typeof scales.aux.main === 'number' ? scales.aux.main : 1;
   const sideScale = typeof scales.aux.side === 'number' ? scales.aux.side : 1;
   const vacuumScale = typeof scales.aux.vacuum === 'number' ? scales.aux.vacuum : 1;
+  if (mainScale >= 0.999 && sideScale >= 0.999 && vacuumScale >= 0.999) return values;
   return {
     main: Math.round((values.main ?? 0) * mainScale),
     side: Math.round((values.side ?? 0) * sideScale),
