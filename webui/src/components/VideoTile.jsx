@@ -88,22 +88,13 @@ export default function VideoTile({
   //   batteryCapacity,
   //   config: batteryConfig,
   // });
-  const limiterOvercurrentMotors = useMemo(() => {
-    const motors = overcurrentLimiter?.overcurrent?.motors;
-    if (!motors) return null;
-    const active = Object.entries(motors)
-      .filter(([, flag]) => Boolean(flag))
-      .map(([key]) => key);
-    return active.length ? active : null;
-  }, [overcurrentLimiter]);
   const wheelOvercurrents = sensors?.wheelOvercurrents || null;
-  const overcurrentMotors = limiterOvercurrentMotors ?? (
+  const overcurrentMotors =
     wheelOvercurrents == null
       ? []
       : Object.entries(wheelOvercurrents)
           .filter(([, active]) => Boolean(active))
-          .map(([key]) => key)
-  );
+          .map(([key]) => key);
   const limiterCaps = overcurrentLimiter?.caps || null;
   const limiterGroups = overcurrentLimiter?.overcurrent?.groups || null;
   const limiterFill = useMemo(() => {
@@ -113,12 +104,7 @@ export default function VideoTile({
     return Math.max(0, Math.min(1, 1 - Math.min(driveCap, auxCap)));
   }, [limiterCaps]);
   const limiterActive = Boolean(overcurrentLimiter?.isActive);
-  const overlayVisible = Boolean(overcurrentMotors.length || limiterActive);
-  const overlayLabels = overcurrentMotors.length
-    ? overcurrentMotors.map((name) => OVERCURRENT_LABELS[name] || name)
-    : limiterActive
-    ? ['Overcurrent limit']
-    : [];
+  const overlayMotors = overcurrentMotors.length ? overcurrentMotors : limiterActive ? ['limiter'] : [];
   const overlayFill = limiterFill ?? (overcurrentMotors.length ? 1 : 0);
 
   const scheduleRestart = useCallback(() => {
@@ -446,13 +432,7 @@ export default function VideoTile({
           labelScale={hudLabelScale}
         />
         <HudChatInput compact={mobileHud} />
-        <OvercurrentOverlay
-          labels={overlayLabels}
-          fill={overlayFill}
-          visible={overlayVisible}
-          compact={mobileHud}
-          debug={overcurrentLimiter ? { active: limiterActive, count: overcurrentMotors.length, fill: overlayFill } : null}
-        />
+        <OvercurrentOverlay motors={overlayMotors} fill={overlayFill} compact={mobileHud} />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} />
         {showVerticalBattery && batteryVisual.available ? (
           <BatteryBarVertical visual={batteryVisual} />
@@ -750,11 +730,12 @@ const OVERCURRENT_LABELS = {
   rightWheel: 'Right wheel',
   mainBrush: 'Main brush',
   sideBrush: 'Side brush',
+  limiter: 'Overcurrent limit',
 };
 
-function OvercurrentOverlay({ labels, fill = 0, visible = false, compact = false, debug = null }) {
-  if (!visible) return null;
-  const safeLabels = Array.isArray(labels) && labels.length ? labels : ['Overcurrent'];
+function OvercurrentOverlay({ motors, fill = 0, compact = false }) {
+  if (!motors?.length) return null;
+  const safeLabels = motors.map((name) => OVERCURRENT_LABELS[name] || name);
   const containerClass = compact ? 'p-2' : 'p-4';
   const textClass = compact ? 'text-lg' : 'text-4xl';
   const subTextClass = compact ? 'text-xs' : 'text-xl';
@@ -770,11 +751,6 @@ function OvercurrentOverlay({ labels, fill = 0, visible = false, compact = false
       <div className={`relative z-10 text-center font-semibold text-white animate-pulse ${textClass}`}>
         <div>OVERCURRENT</div>
         <div className={`mt-0 font-medium text-white ${subTextClass}`}>{safeLabels.join(', ')}</div>
-        {debug ? (
-          <div className="mt-0 text-[0.55rem] font-normal text-red-100">
-            {`dbg a:${debug.active ? 1 : 0} m:${debug.count} f:${Math.round(debug.fill * 100)}%`}
-          </div>
-        ) : null}
       </div>
     </div>
   );
