@@ -39,8 +39,7 @@ export default function OvercurrentLimiterPanel() {
       ) : (
         <div className="space-y-0.5">
           {groups.map((key) => {
-            const meterA = overcurrentLimiter?.meters?.[key]?.a ?? 0;
-            const meterB = overcurrentLimiter?.meters?.[key]?.b ?? 0;
+            const temperature = overcurrentLimiter?.temperatures?.[key] ?? 0;
             const over = overcurrentLimiter?.overcurrent?.groups?.[key] ?? false;
             const scale = overcurrentLimiter?.scales?.perGroup?.[key] ?? 1;
             return (
@@ -53,15 +52,10 @@ export default function OvercurrentLimiterPanel() {
                 </div>
                 <div className="space-y-0.5">
                   <div className="flex items-center justify-between text-[0.7rem] text-slate-400">
-                    <span>Meter A</span>
-                    <span>{formatPct(meterA)}</span>
+                    <span>Temperature</span>
+                    <span>{formatPct(temperature)}</span>
                   </div>
-                  <ProgressBar value={meterA} color="bg-amber-500" />
-                  <div className="flex items-center justify-between text-[0.7rem] text-slate-400">
-                    <span>Meter B</span>
-                    <span>{formatPct(meterB)}</span>
-                  </div>
-                  <ProgressBar value={meterB} color="bg-red-500" />
+                  <ProgressBar value={temperature} color="bg-amber-500" />
                   <div className="flex items-center justify-between text-[0.7rem] text-slate-400">
                     <span>Scale</span>
                     <span>{formatPct(scale)}</span>
@@ -71,8 +65,8 @@ export default function OvercurrentLimiterPanel() {
             );
           })}
           <div className="surface text-[0.7rem] text-slate-400">
-            <div>{`A charge ${overcurrentLimiter?.config?.meterAChargeSec}s · A decay ${overcurrentLimiter?.config?.meterADecaySec}s`}</div>
-            <div>{`B charge ${overcurrentLimiter?.config?.meterBChargeSec}s · B decay ${overcurrentLimiter?.config?.meterBDecaySec}s`}</div>
+            <div>{`Heat up ${overcurrentLimiter?.config?.heatUpSec}s · Cool down ${overcurrentLimiter?.config?.coolDownSec}s`}</div>
+            <div>{`Curve k ${overcurrentLimiter?.config?.curveK}`}</div>
             <div>{`Output rate ${overcurrentLimiter?.config?.outputRateMs}ms`}</div>
           </div>
         </div>

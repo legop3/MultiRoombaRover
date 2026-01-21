@@ -8,16 +8,15 @@ export const OVERCURRENT_GROUPS = [
 ];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
-  meterAChargeSec: 9,
-  meterADecaySec: 9,
-  meterBChargeSec: 5,
-  meterBDecaySec: 5,
+  heatUpSec: 5,
+  coolDownSec: 12,
+  curveK: 6,
   outputRateMs: 250,
 };
 
-function createInitialMeters() {
+function createInitialTemperatures() {
   return OVERCURRENT_GROUPS.reduce((acc, group) => {
-    acc[group.key] = { a: 0, b: 0 };
+    acc[group.key] = 0;
     return acc;
   }, {});
 }
@@ -44,7 +43,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
     () => ({ ...DEFAULT_OVERCURRENT_LIMITS, ...(options.config || {}) }),
     [options.config],
   );
-  const [meters, setMeters] = useState(() => createInitialMeters());
+  const [temperatures, setTemperatures] = useState(() => createInitialTemperatures());
   const lastTickRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const flagsRef = useRef(overcurrentFlags);
 
@@ -53,7 +52,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
   }, [overcurrentFlags]);
 
   useEffect(() => {
-    setMeters(createInitialMeters());
+    setTemperatures(createInitialTemperatures());
   }, [roverId]);
 
   useEffect(() => {
@@ -63,43 +62,36 @@ export function useOvercurrentLimiter(roverId, options = {}) {
       lastTickRef.current = now;
       const deltaSec = deltaMs / 1000;
       if (deltaSec <= 0) return;
-      setMeters((prev) => {
+      setTemperatures((prev) => {
         let changed = false;
         const next = {};
         OVERCURRENT_GROUPS.forEach((group) => {
-          const prevEntry = prev[group.key] || { a: 0, b: 0 };
+          const prevEntry = Number.isFinite(prev[group.key]) ? prev[group.key] : 0;
           const over = group.motors.some((motor) => Boolean(flagsRef.current?.[motor]));
-          const nextA = clampUnit(
+          const nextTemp = clampUnit(
             stepValue(
-              prevEntry.a,
+              prevEntry,
               deltaSec,
-              over ? config.meterAChargeSec : config.meterADecaySec,
+              over ? config.heatUpSec : config.coolDownSec,
               over ? 'up' : 'down',
             ),
           );
-          const shouldFillB = over && nextA >= 1;
-          const nextB = clampUnit(
-            stepValue(
-              prevEntry.b,
-              deltaSec,
-              shouldFillB ? config.meterBChargeSec : config.meterBDecaySec,
-              shouldFillB ? 'up' : 'down',
-            ),
-          );
-          if (Math.abs(nextA - prevEntry.a) > 0.0001 || Math.abs(nextB - prevEntry.b) > 0.0001) {
+          if (Math.abs(nextTemp - prevEntry) > 0.0001) {
             changed = true;
           }
-          next[group.key] = { a: nextA, b: nextB };
+          next[group.key] = nextTemp;
         });
         return changed ? next : prev;
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [config.meterAChargeSec, config.meterADecaySec, config.meterBChargeSec, config.meterBDecaySec]);
+  }, [config.heatUpSec, config.coolDownSec]);
 
   const scales = useMemo(() => {
+    const curveK = Number.isFinite(config.curveK) ? Math.max(0, config.curveK) : 0;
     const perGroup = OVERCURRENT_GROUPS.reduce((acc, group) => {
-      acc[group.key] = clampUnit(1 - (meters?.[group.key]?.b ?? 0));
+      const temp = Number.isFinite(temperatures?.[group.key]) ? temperatures[group.key] : 0;
+      acc[group.key] = clampUnit(Math.exp(-curveK * temp));
       return acc;
     }, {});
     return {
@@ -114,7 +106,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
         vacuum: 1,
       },
     };
-  }, [meters]);
+  }, [config.curveK, temperatures]);
 
   const overcurrent = useMemo(() => {
     const motors = {};
@@ -137,14 +129,14 @@ export function useOvercurrentLimiter(roverId, options = {}) {
 
   return useMemo(
     () => ({
-      meters,
+      temperatures,
       overcurrent,
       scales,
       isActive: (scales?.drive?.left ?? 1) < 1 || (scales?.drive?.right ?? 1) < 1 || (scales?.aux?.main ?? 1) < 1 || (scales?.aux?.side ?? 1) < 1,
       config,
       adminImmune,
     }),
-    [meters, overcurrent, scales, config, adminImmune],
+    [temperatures, overcurrent, scales, config, adminImmune],
   );
 }
 
