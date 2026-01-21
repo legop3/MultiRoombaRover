@@ -8,11 +8,9 @@ export const OVERCURRENT_GROUPS = [
 ];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
-  heatUpSec: 7,
+  heatUpSec: 4,
   coolDownSec: 12,
-  kneeSec: 4,
-  curveK: 4,
-  curvePower: 2,
+  kneeSec: 1.5,
   outputRateMs: 250,
 };
 
@@ -90,16 +88,13 @@ export function useOvercurrentLimiter(roverId, options = {}) {
   }, [config.heatUpSec, config.coolDownSec]);
 
   const scales = useMemo(() => {
-    const curveK = Number.isFinite(config.curveK) ? Math.max(0, config.curveK) : 0;
-    const curvePower = Number.isFinite(config.curvePower) ? Math.max(0.1, config.curvePower) : 1;
     const kneeSec = Number.isFinite(config.kneeSec) ? Math.max(0, config.kneeSec) : 0;
     const heatUpSec = Number.isFinite(config.heatUpSec) ? Math.max(0.001, config.heatUpSec) : 0.001;
     const kneeTemp = clampUnit(kneeSec / heatUpSec);
     const perGroup = OVERCURRENT_GROUPS.reduce((acc, group) => {
       const temp = Number.isFinite(temperatures?.[group.key]) ? temperatures[group.key] : 0;
       const normalized = kneeTemp >= 1 ? 0 : clampUnit((temp - kneeTemp) / (1 - kneeTemp));
-      const scaled = Math.exp(-curveK * Math.pow(normalized, curvePower));
-      acc[group.key] = clampUnit(scaled);
+      acc[group.key] = clampUnit(1 - normalized);
       return acc;
     }, {});
     return {
@@ -114,7 +109,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
         vacuum: 1,
       },
     };
-  }, [config.curveK, config.curvePower, config.heatUpSec, config.kneeSec, temperatures]);
+  }, [config.heatUpSec, config.kneeSec, temperatures]);
 
   const overcurrent = useMemo(() => {
     const motors = {};

@@ -66,7 +66,7 @@ export default function OvercurrentLimiterPanel() {
           })}
           <div className="surface text-[0.7rem] text-slate-400">
             <div>{`Heat up ${overcurrentLimiter?.config?.heatUpSec}s · Cool down ${overcurrentLimiter?.config?.coolDownSec}s`}</div>
-            <div>{`Knee ${overcurrentLimiter?.config?.kneeSec}s · Curve k ${overcurrentLimiter?.config?.curveK} · Power ${overcurrentLimiter?.config?.curvePower}`}</div>
+            <div>{`Knee ${overcurrentLimiter?.config?.kneeSec}s`}</div>
             <div>{`Output rate ${overcurrentLimiter?.config?.outputRateMs}ms`}</div>
           </div>
         </div>
