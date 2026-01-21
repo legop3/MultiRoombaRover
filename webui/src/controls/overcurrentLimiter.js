@@ -8,9 +8,9 @@ export const OVERCURRENT_GROUPS = [
 ];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
-  meterAChargeSec: 4,
+  meterAChargeSec: 3,
   meterADecaySec: 9,
-  meterBChargeSec: 5,
+  meterBChargeSec: 1,
   meterBDecaySec: 10,
 };
 
