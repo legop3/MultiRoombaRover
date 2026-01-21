@@ -8,8 +8,8 @@ export const OVERCURRENT_GROUPS = [
 ];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
-  downRatePerSec: 0.25,
-  upRatePerSec: 0.1,
+  downRatePerSec: 0.15,
+  upRatePerSec: 0.9,
   releaseDelaySec: 1,
   outputRateMs: 250,
 };
