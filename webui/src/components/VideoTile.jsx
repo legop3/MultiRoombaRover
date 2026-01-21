@@ -764,16 +764,14 @@ function OvercurrentOverlay({ motors, fill = 0, compact = false }) {
   const fillWidth = `${Math.round(safeFill * 100)}%`;
   return (
     <div
-      className={`pointer-events-none absolute flex items-center justify-center bg-red-900/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${containerClass}`}
+      className={`pointer-events-none absolute flex items-center justify-center bg-red-900/50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${containerClass} relative`}
     >
-      <div className="relative w-full h-full flex items-center justify-center">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="h-full bg-red-700/60" style={{ width: fillWidth }} />
-        </div>
-        <div className={`relative z-10 text-center font-semibold text-white animate-pulse ${textClass}`}>
-          <div>OVERCURRENT</div>
-          <div className={`mt-0 font-medium text-white ${subTextClass}`}>{safeLabels.join(', ')}</div>
-        </div>
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="h-full bg-red-700/60" style={{ width: fillWidth }} />
+      </div>
+      <div className={`relative z-10 text-center font-semibold text-white animate-pulse ${textClass}`}>
+        <div>OVERCURRENT</div>
+        <div className={`mt-0 font-medium text-white ${subTextClass}`}>{safeLabels.join(', ')}</div>
       </div>
     </div>
   );
