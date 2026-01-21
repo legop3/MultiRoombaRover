@@ -108,6 +108,17 @@ export default function VideoTile({
     const auxCap = Number.isFinite(limiterCaps?.aux?.cap) ? limiterCaps.aux.cap : 1;
     return Math.max(0, Math.min(1, 1 - Math.min(driveCap, auxCap)));
   }, [limiterCaps]);
+  const overcurrentActive = Boolean(
+    (limiterGroups?.drive || limiterGroups?.aux) || overcurrentMotors.length,
+  );
+  const overlayFill = overcurrentLimiter
+    ? limiterFill ?? 0
+    : overcurrentMotors.length
+    ? 1
+    : 0;
+  const overlayOpacity = clampUnit(
+    overcurrentActive ? Math.max(overlayFill * 1.2, 0.25) : overlayFill * 1.2,
+  );
   const overcurrentLabels = useMemo(() => {
     if (!overcurrentLimiter) {
       return overcurrentMotors.map((name) => OVERCURRENT_LABELS[name] || name);
@@ -449,7 +460,8 @@ export default function VideoTile({
         <HudChatInput compact={mobileHud} />
         <OvercurrentOverlay
           labels={overcurrentLabels}
-          fill={overcurrentLimiter ? limiterFill ?? 0 : overcurrentMotors.length ? 1 : 0}
+          fill={overlayFill}
+          opacity={overlayOpacity}
           compact={mobileHud}
         />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} />
@@ -751,17 +763,17 @@ const OVERCURRENT_LABELS = {
   sideBrush: 'Side brush',
 };
 
-function OvercurrentOverlay({ labels, fill = 0, compact = false }) {
+function OvercurrentOverlay({ labels, fill = 0, opacity = 1, compact = false }) {
   if (!labels?.length) return null;
   const containerClass = compact ? 'p-2' : 'p-4';
   const textClass = compact ? 'text-lg' : 'text-4xl';
   const subTextClass = compact ? 'text-xs' : 'text-xl';
   const fillWidth = `${Math.round(clampUnit(fill) * 100)}%`;
-  const opacity = clampUnit(fill * 1.2);
+  const resolvedOpacity = clampUnit(opacity);
   return (
     <div
       className={`pointer-events-none absolute flex items-center justify-center bg-red-900/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${containerClass} relative`}
-      style={{ opacity }}
+      style={{ opacity: resolvedOpacity }}
     >
       <div className="absolute inset-0 overflow-hidden">
         <div className="h-full bg-red-700/60" style={{ width: fillWidth }} />
