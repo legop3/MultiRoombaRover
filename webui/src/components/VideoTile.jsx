@@ -88,13 +88,21 @@ export default function VideoTile({
   //   batteryCapacity,
   //   config: batteryConfig,
   // });
+  const limiterOvercurrentMotors = useMemo(() => {
+    const motors = overcurrentLimiter?.overcurrent?.motors;
+    if (!motors) return null;
+    return Object.entries(motors)
+      .filter(([, active]) => Boolean(active))
+      .map(([key]) => key);
+  }, [overcurrentLimiter]);
   const wheelOvercurrents = sensors?.wheelOvercurrents || null;
-  const overcurrentMotors =
+  const overcurrentMotors = limiterOvercurrentMotors ?? (
     wheelOvercurrents == null
       ? []
       : Object.entries(wheelOvercurrents)
           .filter(([, active]) => Boolean(active))
-          .map(([key]) => key);
+          .map(([key]) => key)
+  );
   const limiterCaps = overcurrentLimiter?.caps || null;
   const limiterGroups = overcurrentLimiter?.overcurrent?.groups || null;
   const limiterFill = useMemo(() => {
