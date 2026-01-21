@@ -6,6 +6,11 @@ import { DEFAULT_KEYMAP, DEFAULT_MACROS, SONG_DEFAULT_NOTE } from './constants.j
 import { canonicalizeKeyInput } from './keymapUtils.js';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
+import {
+  applyAuxOvercurrentScale,
+  applyDriveOvercurrentScale,
+  useOvercurrentLimiter,
+} from './overcurrentLimiter.js';
 
 const ControlSystemContext = createContext(null);
 
@@ -23,7 +28,6 @@ function clampServoAngle(config, value) {
 }
 
 export function ControlSystemProvider({ children }) {
-  const pipeline = useCommandPipeline();
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
   const prevModeRef = useRef(null);
   const pendingLightsRef = useRef(false);
@@ -33,6 +37,17 @@ export function ControlSystemProvider({ children }) {
     save: saveControlSettings,
   } = useSettingsNamespace('controls', { keymap: DEFAULT_KEYMAP, macros: DEFAULT_MACROS });
   const { session, homeAssistantSetState } = useSession();
+  const roverId = session?.assignment?.roverId ?? null;
+  const overcurrentLimiter = useOvercurrentLimiter(roverId);
+  const driveTransform = useCallback(
+    (speeds) => applyDriveOvercurrentScale(speeds, overcurrentLimiter.scales, overcurrentLimiter.adminImmune),
+    [overcurrentLimiter.adminImmune, overcurrentLimiter.scales],
+  );
+  const auxTransform = useCallback(
+    (values) => applyAuxOvercurrentScale(values, overcurrentLimiter.scales, overcurrentLimiter.adminImmune),
+    [overcurrentLimiter.adminImmune, overcurrentLimiter.scales],
+  );
+  const pipeline = useCommandPipeline({ driveTransform, auxTransform });
 
   const turnOnAllLights = useCallback(() => {
     const entities = session?.homeAssistant?.entities || [];
@@ -123,6 +138,33 @@ export function ControlSystemProvider({ children }) {
   const recordControlIntent = useCallback(() => {
     dispatch({ type: 'control/record-intent' });
   }, []);
+
+  const driveSpeedsRef = useRef(state.drive.speeds);
+  const auxValuesRef = useRef(state.aux);
+  const limiterScaleToken = useMemo(() => JSON.stringify(overcurrentLimiter.scales), [overcurrentLimiter.scales]);
+
+  useEffect(() => {
+    driveSpeedsRef.current = state.drive.speeds;
+  }, [state.drive.speeds]);
+
+  useEffect(() => {
+    auxValuesRef.current = state.aux;
+  }, [state.aux]);
+
+  useEffect(() => {
+    if (!pipeline.roverId || overcurrentLimiter.adminImmune) return;
+    const drive = driveSpeedsRef.current || { left: 0, right: 0 };
+    const aux = auxValuesRef.current || { main: 0, side: 0, vacuum: 0 };
+    const driveActive = Boolean(drive.left || drive.right);
+    const auxActive = Boolean(aux.main || aux.side || aux.vacuum);
+    if (!driveActive && !auxActive) return;
+    if (driveActive) {
+      pipeline.sendDriveDirect(drive);
+    }
+    if (auxActive) {
+      pipeline.sendAuxMotors(aux);
+    }
+  }, [limiterScaleToken, overcurrentLimiter.adminImmune, pipeline]);
 
   const setDriveVector = useCallback(
     (vector, meta = {}) => {
@@ -294,6 +336,7 @@ export function ControlSystemProvider({ children }) {
       state,
       dispatch,
       pipeline,
+      overcurrentLimiter,
       actions: {
         setMode,
         setDriveVector,
@@ -316,6 +359,7 @@ export function ControlSystemProvider({ children }) {
     [
       state,
       pipeline,
+      overcurrentLimiter,
       setMode,
       setDriveVector,
       setAuxMotors,

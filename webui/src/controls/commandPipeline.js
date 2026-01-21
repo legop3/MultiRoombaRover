@@ -11,7 +11,8 @@ import {
 } from './constants.js';
 import { bytesToBase64, clampRange, sleep } from './controlMath.js';
 
-export function useCommandPipeline() {
+export function useCommandPipeline(options = {}) {
+  const { driveTransform, auxTransform } = options;
   const socket = useSocket();
   const { session } = useSession();
   const roverId = session?.assignment?.roverId;
@@ -50,9 +51,14 @@ export function useCommandPipeline() {
   const sendDriveDirect = useCallback(
     (speeds) => {
       if (!roverId) return null;
-      const payload = {
+      const rawPayload = {
         left: clampRange(speeds?.left ?? 0, [-500, 500]),
         right: clampRange(speeds?.right ?? 0, [-500, 500]),
+      };
+      const transformed = driveTransform ? driveTransform(rawPayload) : rawPayload;
+      const payload = {
+        left: clampRange(transformed?.left ?? 0, [-500, 500]),
+        right: clampRange(transformed?.right ?? 0, [-500, 500]),
       };
       emitCommand({
         type: 'drive',
@@ -60,16 +66,22 @@ export function useCommandPipeline() {
       });
       return payload;
     },
-    [emitCommand, roverId],
+    [driveTransform, emitCommand, roverId],
   );
 
   const sendAuxMotors = useCallback(
     ({ main = 0, side = 0, vacuum = 0 } = {}) => {
       if (!roverId) return null;
-      const payload = {
+      const rawPayload = {
         main: clampRange(main, AUX_LIMITS.main),
         side: clampRange(side, AUX_LIMITS.side),
         vacuum: clampRange(vacuum, AUX_LIMITS.vacuum),
+      };
+      const transformed = auxTransform ? auxTransform(rawPayload) : rawPayload;
+      const payload = {
+        main: clampRange(transformed?.main ?? 0, AUX_LIMITS.main),
+        side: clampRange(transformed?.side ?? 0, AUX_LIMITS.side),
+        vacuum: clampRange(transformed?.vacuum ?? 0, AUX_LIMITS.vacuum),
       };
       emitCommand({
         type: 'motors',
@@ -77,7 +89,7 @@ export function useCommandPipeline() {
       });
       return payload;
     },
-    [emitCommand, roverId],
+    [auxTransform, emitCommand, roverId],
   );
 
   const sendServoAngle = useCallback(
