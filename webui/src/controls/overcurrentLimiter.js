@@ -10,12 +10,13 @@ export const OVERCURRENT_GROUPS = [
 export const DEFAULT_OVERCURRENT_LIMITS = {
   downRatePerSec: 0.25,
   upRatePerSec: 0.1,
+  releaseDelaySec: 1.5,
   outputRateMs: 250,
 };
 
 function createInitialCaps() {
   return OVERCURRENT_GROUPS.reduce((acc, group) => {
-    acc[group.key] = 1;
+    acc[group.key] = { cap: 1, clearSec: 0 };
     return acc;
   }, {});
 }
@@ -58,26 +59,32 @@ export function useOvercurrentLimiter(roverId, options = {}) {
         const next = {};
         const downRate = Number.isFinite(config.downRatePerSec) ? Math.max(0, config.downRatePerSec) : 0;
         const upRate = Number.isFinite(config.upRatePerSec) ? Math.max(0, config.upRatePerSec) : 0;
+        const releaseDelay = Number.isFinite(config.releaseDelaySec) ? Math.max(0, config.releaseDelaySec) : 0;
         OVERCURRENT_GROUPS.forEach((group) => {
-          const prevEntry = Number.isFinite(prev[group.key]) ? prev[group.key] : 1;
+          const prevEntry = prev[group.key] || { cap: 1, clearSec: 0 };
+          const prevCap = Number.isFinite(prevEntry.cap) ? prevEntry.cap : 1;
+          const prevClear = Number.isFinite(prevEntry.clearSec) ? prevEntry.clearSec : 0;
           const over = group.motors.some((motor) => Boolean(flagsRef.current?.[motor]));
+          const nextClear = over ? 0 : prevClear + deltaSec;
+          const allowRecover = !over && nextClear >= releaseDelay;
           const nextCap = clampUnit(
-            over ? prevEntry - downRate * deltaSec : prevEntry + upRate * deltaSec,
+            over ? prevCap - downRate * deltaSec : allowRecover ? prevCap + upRate * deltaSec : prevCap,
           );
-          if (Math.abs(nextCap - prevEntry) > 0.0001) {
+          if (Math.abs(nextCap - prevCap) > 0.0001 || Math.abs(nextClear - prevClear) > 0.0001) {
             changed = true;
           }
-          next[group.key] = nextCap;
+          next[group.key] = { cap: nextCap, clearSec: nextClear };
         });
         return changed ? next : prev;
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [config.downRatePerSec, config.upRatePerSec]);
+  }, [config.downRatePerSec, config.releaseDelaySec, config.upRatePerSec]);
 
   const scales = useMemo(() => {
     const perGroup = OVERCURRENT_GROUPS.reduce((acc, group) => {
-      const cap = Number.isFinite(caps?.[group.key]) ? caps[group.key] : 1;
+      const entry = caps?.[group.key];
+      const cap = Number.isFinite(entry?.cap) ? entry.cap : 1;
       acc[group.key] = clampUnit(cap);
       return acc;
     }, {});
