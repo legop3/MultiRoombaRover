@@ -5,10 +5,10 @@ import { useSession } from '../context/SessionContext.jsx';
 export const OVERCURRENT_MOTORS = ['leftWheel', 'rightWheel', 'mainBrush', 'sideBrush'];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
-  meterAChargeSec: 9,
+  meterAChargeSec: 4,
   meterADecaySec: 9,
   meterBChargeSec: 5,
-  meterBDecaySec: 5,
+  meterBDecaySec: 10,
 };
 
 function createInitialMeters() {
