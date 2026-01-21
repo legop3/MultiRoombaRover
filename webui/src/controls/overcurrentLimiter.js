@@ -8,9 +8,9 @@ export const OVERCURRENT_GROUPS = [
 ];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
-  heatUpSec: 4,
+  heatUpSec: 2,
   coolDownSec: 12,
-  kneeSec: 1.5,
+  kneeSec: 0,
   outputRateMs: 250,
 };
 
