@@ -104,10 +104,11 @@ export default function VideoTile({
     return Math.max(0, Math.min(1, 1 - Math.min(driveCap, auxCap)));
   }, [limiterCaps]);
   const limiterActive = Boolean(overcurrentLimiter?.isActive);
-  const overlayMotors = overcurrentMotors.length
-    ? overcurrentMotors
+  const overlayVisible = Boolean(overcurrentMotors.length || limiterActive);
+  const overlayLabels = overcurrentMotors.length
+    ? overcurrentMotors.map((name) => OVERCURRENT_LABELS[name] || name)
     : limiterActive
-    ? ['limiter']
+    ? ['Overcurrent limit']
     : [];
   const overlayFill = limiterFill ?? (overcurrentMotors.length ? 1 : 0);
 
@@ -436,7 +437,12 @@ export default function VideoTile({
           labelScale={hudLabelScale}
         />
         <HudChatInput compact={mobileHud} />
-        <OvercurrentOverlay motors={overlayMotors} fill={overlayFill} compact={mobileHud} />
+        <OvercurrentOverlay
+          labels={overlayLabels}
+          fill={overlayFill}
+          visible={overlayVisible}
+          compact={mobileHud}
+        />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} />
         {showVerticalBattery && batteryVisual.available ? (
           <BatteryBarVertical visual={batteryVisual} />
@@ -734,12 +740,11 @@ const OVERCURRENT_LABELS = {
   rightWheel: 'Right wheel',
   mainBrush: 'Main brush',
   sideBrush: 'Side brush',
-  limiter: 'Overcurrent limit',
 };
 
-function OvercurrentOverlay({ motors, fill = 0, compact = false }) {
-  if (!motors?.length) return null;
-  const safeLabels = motors.map((name) => OVERCURRENT_LABELS[name] || name);
+function OvercurrentOverlay({ labels, fill = 0, visible = false, compact = false }) {
+  if (!visible) return null;
+  const safeLabels = Array.isArray(labels) && labels.length ? labels : ['Overcurrent'];
   const containerClass = compact ? 'p-2' : 'p-4';
   const textClass = compact ? 'text-lg' : 'text-4xl';
   const subTextClass = compact ? 'text-xs' : 'text-xl';
