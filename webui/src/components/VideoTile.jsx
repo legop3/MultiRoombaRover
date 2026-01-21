@@ -468,6 +468,11 @@ export default function VideoTile({
           labelScale={hudLabelScale}
         />
         <HudChatInput compact={mobileHud} />
+        {overcurrentLimiter ? (
+          <div className="pointer-events-none absolute right-1 top-1 z-40 rounded bg-black/70 px-1 py-0.5 text-[0.6rem] text-red-200">
+            {`OC HUD ${overlayVisible ? 'on' : 'off'} · fill ${Math.round(overlayFill * 100)}%`}
+          </div>
+        ) : null}
         <OvercurrentOverlay
           labels={overlayLabels}
           fill={overlayFill}
