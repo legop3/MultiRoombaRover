@@ -97,6 +97,8 @@ export default function VideoTile({
           .map(([key]) => key);
   const limiterCaps = overcurrentLimiter?.caps || null;
   const limiterGroups = overcurrentLimiter?.overcurrent?.groups || null;
+  const debugHud =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debugHud');
   const limiterFill = useMemo(() => {
     if (!limiterCaps) return null;
     const driveCap = Number.isFinite(limiterCaps?.drive?.cap) ? limiterCaps.drive.cap : 1;
@@ -106,6 +108,20 @@ export default function VideoTile({
   const limiterActive = Boolean(overcurrentLimiter?.isActive);
   const overlayMotors = overcurrentMotors.length ? overcurrentMotors : limiterActive ? ['limiter'] : [];
   const overlayFill = limiterFill ?? (overcurrentMotors.length ? 1 : 0);
+  const overlayVisible = Boolean(overlayMotors.length);
+
+  useEffect(() => {
+    if (!debugHud) return;
+    console.log('[OvercurrentHUD]', {
+      overlayVisible,
+      overlayMotors,
+      overlayFill,
+      limiterActive,
+      limiterCaps,
+      limiterGroups,
+      wheelOvercurrents,
+    });
+  }, [debugHud, overlayFill, overlayMotors, overlayVisible, limiterActive, limiterCaps, limiterGroups, wheelOvercurrents]);
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
@@ -432,6 +448,11 @@ export default function VideoTile({
           labelScale={hudLabelScale}
         />
         <HudChatInput compact={mobileHud} />
+        {debugHud ? (
+          <div className="pointer-events-none absolute left-1 top-1 z-40 rounded bg-black/80 px-1 py-0.5 text-[0.6rem] text-lime-200">
+            {`OC vis:${overlayVisible ? 1 : 0} motors:${overlayMotors.length} fill:${Math.round(overlayFill * 100)}%`}
+          </div>
+        ) : null}
         <OvercurrentOverlay motors={overlayMotors} fill={overlayFill} compact={mobileHud} />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} />
         {showVerticalBattery && batteryVisual.available ? (
