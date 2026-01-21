@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
+const { DataSet, RegExpMatcher, englishDataset, englishRecommendedTransformers } = require('obscenity');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('chatService');
 const { publishEvent, subscribe } = require('./eventBus');
@@ -15,7 +16,21 @@ const rateBuckets = new Map(); // socketId -> [timestamps]
 const MAX_HISTORY = 100;
 const history = [];
 
-const PROFANITY_LIST = ['bitch', 'cunt', 'nigger', 'nigga', 'asshole', 'dick', 'faggot', 'fag', 'whore'];
+// Words in this list are removed from the profanity dataset entirely.
+const PROFANITY_ALLOWLIST = ['fuck', 'ass', 'shit'];
+const normalizedProfanityAllowlist = new Set(PROFANITY_ALLOWLIST
+  .filter((term) => typeof term === 'string')
+  .map((term) => term.trim().toLowerCase())
+  .filter(Boolean));
+const profanityDataset = new DataSet()
+  .addAll(englishDataset)
+  .removePhrasesIf((phrase) => normalizedProfanityAllowlist.has(phrase.metadata?.originalWord))
+  .build();
+const profanityMatcher = new RegExpMatcher({
+  ...profanityDataset,
+  ...englishRecommendedTransformers,
+  whitelistedTerms: profanityDataset.whitelistedTerms,
+});
 const DUPLICATE_WINDOW_MS = 15000;
 const lastMessageBySocket = new Map(); // socketId -> { text, ts }
 
@@ -29,8 +44,8 @@ function withinRateLimit(socketId) {
 }
 
 function hasProfanity(text) {
-  const lower = text.toLowerCase();
-  return PROFANITY_LIST.some((word) => lower.includes(word));
+  if (typeof text !== 'string' || !text) return false;
+  return profanityMatcher.hasMatch(text);
 }
 
 function isDuplicate(socketId, text) {
