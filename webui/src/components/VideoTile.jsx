@@ -103,11 +103,7 @@ export default function VideoTile({
     const auxCap = Number.isFinite(limiterCaps?.aux?.cap) ? limiterCaps.aux.cap : 1;
     return Math.max(0, Math.min(1, 1 - Math.min(driveCap, auxCap)));
   }, [limiterCaps]);
-  const limiterActive = Boolean(
-    Number.isFinite(limiterCaps?.drive?.cap) ? limiterCaps.drive.cap < 0.999 : false,
-  ) || Boolean(
-    Number.isFinite(limiterCaps?.aux?.cap) ? limiterCaps.aux.cap < 0.999 : false,
-  );
+  const limiterActive = Boolean(overcurrentLimiter?.isActive);
   const limiterLabels = useMemo(() => {
     if (!limiterCaps) return [];
     const labels = [];
