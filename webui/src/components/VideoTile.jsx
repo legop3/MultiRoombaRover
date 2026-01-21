@@ -137,6 +137,11 @@ export default function VideoTile({
     if (auxActive) labels.push('Aux motors');
     return labels.length ? labels : fallbackLabels;
   }, [fallbackLabels, limiterCaps, limiterGroups, overcurrentLimiter]);
+  const overlayLabels = useMemo(() => {
+    if (overcurrentLabels?.length) return overcurrentLabels;
+    if (overlayVisible) return ['Overcurrent'];
+    return [];
+  }, [overcurrentLabels, overlayVisible]);
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
@@ -464,9 +469,10 @@ export default function VideoTile({
         />
         <HudChatInput compact={mobileHud} />
         <OvercurrentOverlay
-          labels={overcurrentLabels}
+          labels={overlayLabels}
           fill={overlayFill}
           opacity={overlayOpacity}
+          visible={overlayVisible}
           compact={mobileHud}
         />
         <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} />
@@ -768,8 +774,9 @@ const OVERCURRENT_LABELS = {
   sideBrush: 'Side brush',
 };
 
-function OvercurrentOverlay({ labels, fill = 0, opacity = 1, compact = false }) {
-  if (!labels?.length) return null;
+function OvercurrentOverlay({ labels, fill = 0, opacity = 1, visible = false, compact = false }) {
+  if (!visible && !labels?.length) return null;
+  const displayLabels = labels?.length ? labels : ['Overcurrent'];
   const containerClass = compact ? 'p-2' : 'p-4';
   const textClass = compact ? 'text-lg' : 'text-4xl';
   const subTextClass = compact ? 'text-xs' : 'text-xl';
@@ -785,7 +792,7 @@ function OvercurrentOverlay({ labels, fill = 0, opacity = 1, compact = false }) 
       </div>
       <div className={`relative z-10 text-center font-semibold text-white animate-pulse ${textClass}`}>
         <div>OVERCURRENT</div>
-        <div className={`mt-0 font-medium text-white ${subTextClass}`}>{labels.join(', ')}</div>
+        <div className={`mt-0 font-medium text-white ${subTextClass}`}>{displayLabels.join(', ')}</div>
       </div>
     </div>
   );
