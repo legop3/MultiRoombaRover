@@ -44,6 +44,7 @@ if (!enabled) {
 
 const intents = [
   GatewayIntentBits.Guilds,
+  GatewayIntentBits.GuildMembers,
   GatewayIntentBits.GuildMessages,
   GatewayIntentBits.MessageContent,
 ];
@@ -788,9 +789,15 @@ async function handleBridgeInbound(message) {
   }
 }
 
-function buildEmbed({ title, description, color }) {
+function buildEmbed({ title, description, color, includeSiteUrl = true }) {
   const embed = new EmbedBuilder().setTitle(title || 'Update').setColor(color || 0x2196f3);
-  if (description) embed.setDescription(description);
+  const siteUrl =
+    includeSiteUrl && discordConfig.siteUrl ? String(discordConfig.siteUrl) : '';
+  if (description) {
+    embed.setDescription(siteUrl ? `${description}\n\n${siteUrl}` : description);
+  } else if (siteUrl) {
+    embed.setDescription(siteUrl);
+  }
   embed.setTimestamp(new Date());
   return embed;
 }
@@ -900,6 +907,41 @@ function buildBatteryStatusEmbed(color, records = null) {
   return embed;
 }
 
+function buildAllUnlockedEmbed(color, records = null) {
+  const embed = buildEmbed({ title: 'All Rovers Unlocked', color: color || 0x4caf50 });
+  const baseRecords = records || Array.from(rovers.values());
+  const snapshots = baseRecords.map(buildRoverStatusSnapshot).filter(Boolean);
+  if (snapshots.length === 0) {
+    embed.setDescription('No rovers online.');
+    return embed;
+  }
+  snapshots.forEach((snapshot) => {
+    const percent = snapshot?.batteryState?.percentDisplay;
+    const percentLabel = percent != null ? `${percent}%` : 'n/a';
+    embed.addFields({
+      name: snapshot.name,
+      value: `Battery: ${percentLabel}`,
+      inline: true,
+    });
+  });
+  return embed;
+}
+
+function buildAllUnlockedCaption(records = null) {
+  return 'All rovers unlocked.';
+}
+
+function buildAccessModeEmbed(mode, color) {
+  const total = rovers.size;
+  const unlocked = Array.from(rovers.values()).filter((entry) => !entry.locked).length;
+  const embed = buildEmbed({
+    title: 'Access Mode Updated',
+    description: `Access mode set to **${mode}**\nUnlocked rovers: **${unlocked}/${total}**`,
+    color: color || 0x2196f3,
+  });
+  return embed;
+}
+
 function buildBatteryCaption(type, payload) {
   const roverId = payload?.roverId || 'unknown';
   const record = rovers.get(roverId) || findRoverRecord(roverId);
@@ -936,21 +978,91 @@ function buildBatteryCaption(type, payload) {
   }
 }
 
-async function announce({ channelId, content, pingRoleId, color, title, description, embeds }) {
+async function getRoleMemberIds(channelId, roleId) {
+  if (!channelId || !roleId) return [];
+  const channel = await fetchChannel(channelId);
+  if (!channel?.guild) return [];
+  const guild = channel.guild;
+  let role = guild.roles.cache.get(roleId) || null;
+  if (!role) {
+    try {
+      role = await guild.roles.fetch(roleId);
+    } catch (err) {
+      logger.warn('Failed to fetch Discord role', { roleId, error: err.message });
+      return [];
+    }
+  }
+  if (!role) return [];
+  if (!role.members || role.members.size === 0) {
+    try {
+      await guild.members.fetch();
+    } catch (err) {
+      logger.warn('Failed to fetch guild members', { guildId: guild.id, error: err.message });
+    }
+  }
+  return Array.from(role.members?.keys?.() || []);
+}
+
+async function announce({
+  channelId,
+  content,
+  pingRoleId,
+  pingUserIds,
+  prefixMentions = true,
+  includeSiteUrl = true,
+  color,
+  title,
+  description,
+  embeds,
+}) {
   if (!channelId) return;
-  const prefix = pingRoleId ? `<@&${pingRoleId}> ` : '';
+  const mentionChunks = [];
+  if (pingRoleId) mentionChunks.push(`<@&${pingRoleId}>`);
+  if (Array.isArray(pingUserIds)) {
+    pingUserIds.forEach((id) => {
+      if (id) mentionChunks.push(`<@${id}>`);
+    });
+  }
+  const prefix = prefixMentions && mentionChunks.length ? `${mentionChunks.join(' ')} ` : '';
   const payloadEmbeds =
     Array.isArray(embeds) && embeds.length > 0
       ? embeds
-      : [buildEmbed({ title, description, color })];
-  const allowedMentions = pingRoleId ? { roles: [pingRoleId], parse: [] } : { parse: [] };
+      : [buildEmbed({ title, description, color, includeSiteUrl })];
+  const allowedMentions = {
+    parse: [],
+    roles: pingRoleId ? [pingRoleId] : [],
+    users: Array.isArray(pingUserIds) ? pingUserIds : [],
+  };
   await sendToChannel(
     channelId,
     `${prefix}${content || ''}`.trim(),
     { embeds: payloadEmbeds },
     allowedMentions,
-    !pingRoleId, // keep role mention intact when pinging
+    !(pingRoleId || (Array.isArray(pingUserIds) && pingUserIds.length > 0)), // keep mentions intact when pinging
   );
+}
+
+async function announceUserStatus({ channelId, content, color, title, description, embeds }) {
+  const roles = discordConfig.roles || {};
+  const pingRoleId = roles.announcementPing || null;
+  const pingUserIds = await getRoleMemberIds(channelId, roles.stalker || null);
+  const mainLine = pingRoleId ? `<@&${pingRoleId}> ${content}`.trim() : content;
+  const stalkerMentions =
+    Array.isArray(pingUserIds) && pingUserIds.length > 0
+      ? pingUserIds.map((id) => `<@${id}>`).join(' ')
+      : '';
+  const message = [mainLine, stalkerMentions].filter(Boolean).join('\n');
+  await announce({
+    channelId,
+    content: message,
+    pingRoleId,
+    pingUserIds,
+    prefixMentions: false,
+    color,
+    title,
+    description,
+    embeds,
+  });
 }
 
 function handleBusEvent(event) {
@@ -964,19 +1076,23 @@ function handleBusEvent(event) {
         schedulePresenceRotation();
         break;
       }
-      announce({
-        channelId: channels.announcements,
-        pingRoleId: roles.announcementPing || null,
-        color: 0x2196f3,
-        title: 'Mode Changed',
-        description: `Server mode set to **${payload?.mode}**`,
-      });
+      if (payload?.mode === MODES.OPEN || payload?.mode === MODES.TURNS) {
+        const caption = `Access mode set to ${payload?.mode}.`;
+        announceUserStatus({
+          channelId: channels.announcements,
+          content: caption,
+          color: 0x2196f3,
+          embeds: [buildAccessModeEmbed(payload?.mode, 0x2196f3)],
+        });
+      }
       schedulePresenceRotation();
       break;
     case 'communityGoal.updated': {
       const goalText = payload?.text ? sanitizeMentions(String(payload.text)) : null;
-      announce({
+      const caption = goalText ? `Community goal: ${goalText}` : 'Community goal cleared.';
+      announceUserStatus({
         channelId: channels.announcements,
+        content: caption,
         color: 0x8bc34a,
         title: 'Community Goal',
         description: goalText ? goalText : 'Community goal cleared.',
@@ -990,16 +1106,19 @@ function handleBusEvent(event) {
         color: 0xf0b651,
         title: 'Rover Locked',
         description: `${payload?.roverId} locked${payload?.reason ? ` (${payload.reason})` : ''}.`,
+        includeSiteUrl: false,
       });
       schedulePresenceRotation();
       break;
     case 'rover.unlocked':
-      announce({
+      schedulePresenceRotation();
+      break;
+    case 'rovers.allUnlocked':
+      announceUserStatus({
         channelId: channels.announcements,
-        pingRoleId: roles.announcementPing || null,
+        content: buildAllUnlockedCaption(),
         color: 0x4caf50,
-        title: 'Rover Unlocked',
-        description: `${payload?.roverId} unlocked.`,
+        embeds: [buildAllUnlockedEmbed(0x4caf50)],
       });
       schedulePresenceRotation();
       break;

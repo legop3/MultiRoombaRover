@@ -90,6 +90,7 @@ function lockRover(id, locked, options = {}) {
   if (!record) {
     throw new Error('Unknown rover');
   }
+  const wasAllUnlocked = Array.from(rovers.values()).every((entry) => !entry.locked);
   const reason = locked ? options.reason || 'manual' : null;
   const silent = Boolean(options.silent);
   if (locked) {
@@ -118,6 +119,14 @@ function lockRover(id, locked, options = {}) {
       type: 'rover.unlocked',
       payload: { roverId: id },
     });
+    const isAllUnlocked = Array.from(rovers.values()).every((entry) => !entry.locked);
+    if (!wasAllUnlocked && isAllUnlocked) {
+      publishEvent({
+        source: 'roverManager',
+        type: 'rovers.allUnlocked',
+        payload: { roverId: id },
+      });
+    }
   }
   broadcastRoster();
   managerEvents.emit('lock', { roverId: id, locked: record.locked, reason: record.lockReason });

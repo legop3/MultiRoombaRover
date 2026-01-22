@@ -38,6 +38,7 @@ roomCameras:
 discord:
   token: "DISCORD_BOT_TOKEN"
   guildId: "123456789012345678" # optional; bot works in any guild it's invited to
+  siteUrl: "https://rover.example.com"
   channels:
     announcements: "123456789012345678"
     adminAlerts: "123456789012345678"
@@ -46,3 +47,4 @@ discord:
   roles:
     announcementPing: "123456789012345678"
     adminPing: "123456789012345678"
+    stalker: "123456789012345678"
