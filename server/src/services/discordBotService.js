@@ -14,7 +14,7 @@ const { loadConfig } = require('../helpers/configLoader');
 const { subscribe } = require('./eventBus');
 const { getRoster, lockRover, rovers } = require('./roverManager');
 const { MODES, getMode, setMode } = require('./modeManager');
-const { sendExternalMessage } = require('./chatService');
+const { sendExternalMessage, sendExternalTyping } = require('./chatService');
 const { buildReplayVideo } = require('./replayBuildService');
 const { getReplaySources, getDefaultDiscordSources, validateSources } = require('./replaySourceService');
 const { getActiveDrivers } = require('./turnService');
@@ -45,6 +45,7 @@ if (!enabled) {
 const intents = [
   GatewayIntentBits.Guilds,
   GatewayIntentBits.GuildMessages,
+  GatewayIntentBits.GuildMessageTyping,
   GatewayIntentBits.MessageContent,
 ];
 
@@ -54,6 +55,7 @@ const client = new Client({
 });
 
 const channelCache = new Map();
+const typingMessageCache = new Map();
 let skippedFirstModeAnnouncement = false;
 const PRESENCE_ROTATE_MS = 20000;
 let presenceInterval = null;
@@ -755,6 +757,60 @@ function formatWebhookUsername(payload) {
   return suffix ? `${name} · ${suffix}` : name;
 }
 
+function getTypingId(payload = {}) {
+  if (payload.typingId) return payload.typingId;
+  if (payload.fromDiscord) {
+    if (payload.discordUserId) return `discord:${payload.discordUserId}`;
+    if (payload.discordUserName) return `discord:${payload.discordUserName}`;
+    if (payload.nickname) return `discord:${payload.nickname}`;
+    return 'discord:unknown';
+  }
+  if (payload.socketId) return `socket:${payload.socketId}`;
+  if (payload.nickname) return `socket:${payload.nickname}`;
+  return 'socket:unknown';
+}
+
+function typingCacheKey(guildId, typingId) {
+  return `${guildId}:${typingId}`;
+}
+
+async function clearTypingMessage(guildId, typingId) {
+  const key = typingCacheKey(guildId, typingId);
+  const record = typingMessageCache.get(key);
+  if (!record) return;
+  typingMessageCache.delete(key);
+  if (record.timeoutId) clearTimeout(record.timeoutId);
+  const channel = await fetchChannel(record.channelId);
+  if (!channel?.messages?.fetch) return;
+  try {
+    const msg = await channel.messages.fetch(record.messageId);
+    await msg.delete();
+  } catch (err) {
+    if (err?.code !== 10008) {
+      logger.warn('Failed to delete typing message', { guildId, error: err.message });
+    }
+  }
+}
+
+async function sendTypingMessage(entry, payload) {
+  const typingId = getTypingId(payload);
+  const key = typingCacheKey(entry.guildId, typingId);
+  if (typingMessageCache.has(key)) return;
+  const channel = await fetchChannel(entry.channelId);
+  if (!channel?.send) return;
+  const username = formatWebhookUsername(payload);
+  const content = `-# *${username} is typing...*`;
+  try {
+    const message = await channel.send({ content, allowedMentions: { parse: [] } });
+    const timeoutId = setTimeout(() => {
+      clearTypingMessage(entry.guildId, typingId);
+    }, 20000);
+    typingMessageCache.set(key, { channelId: entry.channelId, messageId: message.id, timeoutId });
+  } catch (err) {
+    logger.warn('Failed to send typing message', { guildId: entry.guildId, error: err.message });
+  }
+}
+
 async function handleBridgeInbound(message) {
   if (!message.guild) return;
   const guildConfig = getGuildConfig(message.guild.id);
@@ -1218,6 +1274,7 @@ function handleChatBridgeOutbound(event) {
   const avatarURL = payload.fromDiscord
     ? payload.discordUserAvatarUrl || null
     : client.user?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null;
+  const typingId = getTypingId(payload);
   guildConfigs.forEach((entry) => {
     if (!entry?.channelId || !entry?.webhookId || !entry?.webhookToken) return;
     if (payload.fromDiscord) {
@@ -1234,9 +1291,58 @@ function handleChatBridgeOutbound(event) {
         avatarURL,
         allowedMentions: { parse: [] },
       })
+      .then(() => {
+        if (!payload.fromDiscord) {
+          clearTypingMessage(entry.guildId, typingId);
+        }
+      })
       .catch((err) => {
         logger.warn('Failed to send webhook message', { guildId: entry.guildId, error: err.message });
       });
+  });
+}
+
+function handleChatTypingOutbound(event) {
+  const payload = event?.payload;
+  if (!payload || payload.fromDiscord) return;
+  const guildConfigs = listGuildConfigs();
+  if (!guildConfigs.length) return;
+  guildConfigs.forEach((entry) => {
+    if (!entry?.channelId) return;
+    if (payload.isTyping) {
+      sendTypingMessage(entry, payload);
+    } else {
+      clearTypingMessage(entry.guildId, getTypingId(payload));
+    }
+  });
+}
+
+async function handleDiscordTypingStart(typing) {
+  const channelId = typing?.channelId || typing?.channel?.id || null;
+  const guildId = typing?.guild?.id || typing?.channel?.guild?.id || null;
+  if (!guildId || !channelId) return;
+  const guildConfig = getGuildConfig(guildId);
+  if (!guildConfig?.channelId) return;
+  if (String(channelId) !== String(guildConfig.channelId)) return;
+  const user = typing?.user || null;
+  if (user?.bot) return;
+  const member = typing?.member || null;
+  const nickname = member?.nickname || user?.globalName || user?.username || 'Discord';
+  const role = isAdminUser(user?.id) ? 'admin' : 'user';
+  const guildIconUrl = typing?.guild?.iconURL?.({ extension: 'png', size: 64 }) || null;
+  const userAvatarUrl = user?.displayAvatarURL?.({ extension: 'png', size: 64 }) || null;
+  sendExternalTyping({
+    nickname,
+    role,
+    roverId: null,
+    discordGuildId: guildId,
+    discordGuildName: typing?.guild?.name || null,
+    discordGuildIconUrl: guildIconUrl,
+    discordChannelId: channelId,
+    discordUserId: user?.id || null,
+    discordUserName: user?.globalName || user?.username || null,
+    discordUserAvatarUrl: userAvatarUrl,
+    isTyping: true,
   });
 }
 
@@ -1249,6 +1355,12 @@ client.on('messageCreate', async (message) => {
   }
 });
 
+client.on('typingStart', (typing) => {
+  handleDiscordTypingStart(typing).catch((err) => {
+    logger.warn('Error handling Discord typing', err.message);
+  });
+});
+
 client.once('ready', () => {
   logger.info('Discord bot logged in', { tag: client.user?.tag });
   schedulePresenceRotation();
@@ -1256,6 +1368,7 @@ client.once('ready', () => {
 
 subscribe('*', handleBusEvent);
 subscribe('chat:message', handleChatBridgeOutbound);
+subscribe('chat:typing', handleChatTypingOutbound);
 
 client.login(discordConfig.token).catch((err) => {
   logger.error('Discord login failed', err.message);

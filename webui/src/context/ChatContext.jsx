@@ -7,12 +7,14 @@ import messageSound from '../assets/message.mp3';
 
 const ChatContext = createContext({
   messages: [],
+  typing: [],
   sendMessage: async () => {},
   focusChat: () => {},
   blurChat: () => {},
   registerInputRef: () => {},
   onInputFocus: () => {},
   onInputBlur: () => {},
+  setTypingActive: () => {},
   isChatFocused: false,
 });
 
@@ -20,10 +22,30 @@ export function ChatProvider({ children }) {
   const socket = useSocket();
   const { session, pushAlert } = useSession();
   const [messages, setMessages] = useState([]);
+  const [typing, setTyping] = useState([]);
   const [isChatFocused, setIsChatFocused] = useState(false);
   const panelInputRef = useRef(null);
   const hudInputRef = useRef(null);
   const audioRef = useRef(null);
+  const typingRef = useRef(new Map());
+  const typingAlertRef = useRef(new Map());
+  const typingStateRef = useRef({ isTyping: false, lastSent: 0 });
+
+  const rebuildTyping = useCallback(() => {
+    const entries = Array.from(typingRef.current.values())
+      .sort((a, b) => a.lastUpdate - b.lastUpdate)
+      .map((entry) => entry.payload);
+    setTyping(entries);
+  }, []);
+
+  const resolveTypingKey = useCallback((payload) => {
+    if (!payload || typeof payload !== 'object') return null;
+    if (payload.typingId) return payload.typingId;
+    if (payload.fromDiscord) {
+      return `discord:${payload.discordUserId || payload.discordUserName || payload.nickname || 'unknown'}`;
+    }
+    return `socket:${payload.socketId || payload.nickname || 'unknown'}`;
+  }, []);
 
   useEffect(() => {
     audioRef.current = new Audio(messageSound);
@@ -58,6 +80,62 @@ export function ChatProvider({ children }) {
   }, [playSound, session?.socketId, socket]);
 
   useEffect(() => {
+    function handleTyping(payload = {}) {
+      const key = resolveTypingKey(payload);
+      if (!key) return;
+      const now = Date.now();
+      if (payload?.socketId && session?.socketId && payload.socketId === session.socketId) {
+        if (!payload.isTyping) {
+          typingRef.current.delete(key);
+          rebuildTyping();
+        }
+        return;
+      }
+      if (payload.isTyping) {
+        typingRef.current.set(key, {
+          payload,
+          expiresAt: now + 6000,
+          lastUpdate: now,
+        });
+        const lastAlertAt = typingAlertRef.current.get(key) || 0;
+        if (now - lastAlertAt >= 2500) {
+          typingAlertRef.current.set(key, now);
+          pushAlert?.({
+            kind: 'chat-typing',
+            payload,
+            id: `chat-typing-${key}-${payload.id || Math.random().toString(36).slice(2)}`,
+            receivedAt: now,
+          });
+        }
+      } else {
+        typingRef.current.delete(key);
+      }
+      rebuildTyping();
+    }
+    socket.on('chat:typing', handleTyping);
+    return () => {
+      socket.off('chat:typing', handleTyping);
+    };
+  }, [pushAlert, rebuildTyping, resolveTypingKey, session?.socketId, socket]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      typingRef.current.forEach((entry, key) => {
+        if (entry.expiresAt <= now) {
+          typingRef.current.delete(key);
+          changed = true;
+        }
+      });
+      if (changed) {
+        rebuildTyping();
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [rebuildTyping]);
+
+  useEffect(() => {
     function handleInit(payload = []) {
       if (!Array.isArray(payload)) return;
       setMessages((prev) => {
@@ -74,6 +152,21 @@ export function ChatProvider({ children }) {
       socket.off('chat:init', handleInit);
     };
   }, [socket]);
+
+  const setTypingActive = useCallback(
+    (next) => {
+      const isTyping = Boolean(next);
+      const now = Date.now();
+      const last = typingStateRef.current;
+      const shouldSendStop = !isTyping && last.isTyping;
+      const shouldSendStart =
+        isTyping && (!last.isTyping || now - last.lastSent >= 3500);
+      if (!shouldSendStart && !shouldSendStop) return;
+      typingStateRef.current = { isTyping, lastSent: now };
+      socket.emit('chat:typing', { isTyping });
+    },
+    [socket],
+  );
 
   const sendMessage = useCallback(
     (text, tts = null) =>
@@ -121,10 +214,12 @@ export function ChatProvider({ children }) {
       registerInputRef,
       onInputFocus,
       onInputBlur,
+      setTypingActive,
+      typing,
       isChatFocused,
       selfSocketId: session?.socketId || null,
     }),
-    [blurChat, focusChat, isChatFocused, messages, onInputBlur, onInputFocus, registerInputRef, sendMessage, session?.socketId],
+    [blurChat, focusChat, isChatFocused, messages, onInputBlur, onInputFocus, registerInputRef, sendMessage, session?.socketId, setTypingActive, typing],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

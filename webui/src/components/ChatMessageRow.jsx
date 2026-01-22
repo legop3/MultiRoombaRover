@@ -57,23 +57,12 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
   );
 }
 
-export default function ChatMessageRow({ message }) {
-  const isAdmin =
-    message.role === 'admin' || message.role === 'lockdown' || message.role === 'lockdown-admin';
+export function ChatIdentity({ message }) {
   const discordLabel = message.fromDiscord
     ? `${message.discordGuildName || 'Discord'} · ${displayName(message)}`
     : null;
-
   return (
-    <div
-      className={`surface-muted relative flex flex-wrap items-start gap-0.5 text-sm ${
-        isAdmin
-          ? 'border border-amber-400/30'
-          : message.fromDiscord
-            ? 'border border-indigo-400/30 bg-indigo-900/20'
-            : ''
-      }`}
-    >
+    <>
       {message.fromDiscord ? (
         <>
           <FaDiscord className="h-3.5 w-3.5 text-indigo-200" />
@@ -90,6 +79,26 @@ export default function ChatMessageRow({ message }) {
       {message.roverId && (
         <span className="rounded bg-slate-800 px-1 text-[0.7rem]">{message.roverId}</span>
       )}
+    </>
+  );
+}
+
+function chatRowClass(message) {
+  const isAdmin =
+    message.role === 'admin' || message.role === 'lockdown' || message.role === 'lockdown-admin';
+  return `surface-muted relative flex flex-wrap items-start gap-0.5 text-sm ${
+    isAdmin
+      ? 'border border-amber-400/30'
+      : message.fromDiscord
+        ? 'border border-indigo-400/30 bg-indigo-900/20'
+        : ''
+  }`;
+}
+
+export default function ChatMessageRow({ message }) {
+  return (
+    <div className={chatRowClass(message)}>
+      <ChatIdentity message={message} />
       <span className="text-slate-100 break-words leading-tight whitespace-pre-wrap">{message.text}</span>
       <span className="absolute bottom-0.5 right-1 text-[0.65rem] text-slate-400/60">
         {formatTime(message.ts)}
@@ -97,3 +106,5 @@ export default function ChatMessageRow({ message }) {
     </div>
   );
 }
+
+export { chatRowClass };

@@ -33,6 +33,10 @@ const profanityMatcher = new RegExpMatcher({
 });
 const DUPLICATE_WINDOW_MS = 15000;
 const lastMessageBySocket = new Map(); // socketId -> { text, ts }
+const typingBySocket = new Map(); // socketId -> boolean
+const TYPING_START_NOTE = 72;
+const TYPING_SEND_NOTE = 79;
+const TYPING_NOTE_DURATION = 8;
 
 function withinRateLimit(socketId) {
   const now = Date.now();
@@ -101,6 +105,50 @@ function buildMessage(socket, text, meta = {}) {
   };
 }
 
+function buildTypingPayload(socket, meta = {}) {
+  const roverId = meta.roverId || resolveRoverId(socket?.id);
+  const socketId = socket?.id || null;
+  const fromDiscord = Boolean(meta.fromDiscord);
+  let typingId = meta.typingId || null;
+  if (!typingId) {
+    if (fromDiscord) {
+      if (meta.discordUserId) {
+        typingId = `discord:${meta.discordUserId}`;
+      } else if (meta.discordUserName) {
+        typingId = `discord:${meta.discordUserName}`;
+      } else if (meta.nickname) {
+        typingId = `discord:${meta.nickname}`;
+      } else {
+        typingId = 'discord:unknown';
+      }
+    } else if (socketId) {
+      typingId = `socket:${socketId}`;
+    } else if (meta.nickname) {
+      typingId = `socket:${meta.nickname}`;
+    } else {
+      typingId = 'socket:unknown';
+    }
+  }
+  return {
+    id: uuidv4(),
+    ts: Date.now(),
+    typingId,
+    isTyping: Boolean(meta.isTyping),
+    socketId,
+    nickname: meta.nickname || getNickname(socket) || null,
+    role: meta.role || getRole(socket),
+    roverId,
+    fromDiscord,
+    discordGuildId: meta.discordGuildId || null,
+    discordGuildName: meta.discordGuildName || null,
+    discordGuildIconUrl: meta.discordGuildIconUrl || null,
+    discordChannelId: meta.discordChannelId || null,
+    discordUserId: meta.discordUserId || null,
+    discordUserName: meta.discordUserName || null,
+    discordUserAvatarUrl: meta.discordUserAvatarUrl || null,
+  };
+}
+
 function pushHistory(message) {
   history.push(message);
   if (history.length > MAX_HISTORY) {
@@ -111,6 +159,27 @@ function pushHistory(message) {
 function broadcastMessage(message) {
   pushHistory(message);
   publishEvent({ source: 'chat', type: 'chat:message', payload: message });
+}
+
+function broadcastTyping(payload) {
+  publishEvent({ source: 'chat', type: 'chat:typing', payload });
+}
+
+function playTypingNote(roverId, note, socketId) {
+  if (!roverId) return;
+  try {
+    issueCommand(roverId, {
+      type: 'song',
+      song: {
+        notes: [{ note, duration: TYPING_NOTE_DURATION }],
+      },
+    });
+    const log = typeof logger.debug === 'function' ? logger.debug.bind(logger) : logger.info.bind(logger);
+    log('Typing tone sent', { roverId, note, socketId });
+  } catch (err) {
+    const log = typeof logger.debug === 'function' ? logger.debug.bind(logger) : logger.info.bind(logger);
+    log('Typing tone failed', { roverId, note, socketId, error: err.message });
+  }
 }
 
 function normalizeTtsOptions(raw = {}) {
@@ -162,6 +231,7 @@ function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
   const ttsOptions = normalizeTtsOptions(tts);
   const message = buildMessage(socket, clean, { fromDiscord: false, roverId, tts: ttsOptions });
   logger.info('Chat message', { socket: socket.id, roverId: message.roverId });
+  playTypingNote(roverId, TYPING_SEND_NOTE, socket?.id);
   broadcastMessage(message);
   maybeSpeak(socket, message, ttsOptions);
   cb({ success: true });
@@ -233,9 +303,63 @@ function sendExternalMessage({
   return message;
 }
 
+function sendExternalTyping({
+  nickname = 'Discord',
+  role = 'user',
+  roverId = null,
+  discordGuildId = null,
+  discordGuildName = null,
+  discordGuildIconUrl = null,
+  discordChannelId = null,
+  discordUserId = null,
+  discordUserName = null,
+  discordUserAvatarUrl = null,
+  isTyping = true,
+}) {
+  const payload = buildTypingPayload(null, {
+    nickname,
+    role,
+    roverId,
+    fromDiscord: true,
+    discordGuildId,
+    discordGuildName,
+    discordGuildIconUrl,
+    discordChannelId,
+    discordUserId,
+    discordUserName,
+    discordUserAvatarUrl,
+    isTyping,
+  });
+  broadcastTyping(payload);
+  return payload;
+}
+
 io.on('connection', (socket) => {
   socket.emit('chat:init', history);
   socket.on('chat:send', (payload = {}, cb = () => {}) => handleIncoming(payload, socket, cb));
+  socket.on('chat:typing', (payload = {}) => {
+    const isTyping = Boolean(payload?.isTyping);
+    const wasTyping = typingBySocket.get(socket.id);
+    if (isTyping) {
+      typingBySocket.set(socket.id, true);
+      if (!wasTyping) {
+        const roverId = resolveRoverId(socket?.id);
+        playTypingNote(roverId, TYPING_START_NOTE, socket?.id);
+      }
+    } else {
+      typingBySocket.delete(socket.id);
+    }
+    const roverId = resolveRoverId(socket?.id);
+    const typingPayload = buildTypingPayload(socket, { roverId, fromDiscord: false, isTyping });
+    broadcastTyping(typingPayload);
+  });
+  socket.on('disconnect', () => {
+    if (!typingBySocket.has(socket.id)) return;
+    typingBySocket.delete(socket.id);
+    const roverId = resolveRoverId(socket?.id);
+    const typingPayload = buildTypingPayload(socket, { roverId, fromDiscord: false, isTyping: false });
+    broadcastTyping(typingPayload);
+  });
 });
 
 subscribe('chat:message', ({ payload }) => {
@@ -243,7 +367,14 @@ subscribe('chat:message', ({ payload }) => {
   io.emit('chat:message', payload);
 });
 
+subscribe('chat:typing', ({ payload }) => {
+  if (!payload) return;
+  io.emit('chat:typing', payload);
+});
+
 module.exports = {
   handleIncoming,
   sendExternalMessage,
+  sendExternalTyping,
+  buildTypingPayload,
 };

@@ -812,7 +812,7 @@ function LowBatteryOverlay({ charge, config, compact = false }) {
 
 function HudChatInput({ compact = false }) {
   const { session } = useSession();
-  const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef } = useChat();
+  const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef, setTypingActive } = useChat();
   const { value: ttsSettings } = useSettingsNamespace('tts', { engine: 'flite', voice: 'rms', pitch: 50 });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -857,6 +857,7 @@ function HudChatInput({ compact = false }) {
       await sendMessage(clean, ttsPayload);
       setDraft('');
       blurChat();
+      setTypingActive(false);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -871,13 +872,24 @@ function HudChatInput({ compact = false }) {
       <input
         className={inputClass}
         value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onFocus={onInputFocus}
-        onBlur={onInputBlur}
+        onChange={(event) => {
+          const next = event.target.value;
+          setDraft(next);
+          setTypingActive(Boolean(next.trim()));
+        }}
+        onFocus={(event) => {
+          onInputFocus(event);
+          setTypingActive(Boolean(draft.trim()));
+        }}
+        onBlur={(event) => {
+          onInputBlur(event);
+          setTypingActive(false);
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !draft.trim()) {
             event.preventDefault();
             blurChat();
+            setTypingActive(false);
           }
         }}
         ref={(el) => registerInputRef(el, { target: 'hud' })}

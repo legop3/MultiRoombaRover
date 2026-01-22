@@ -3,13 +3,23 @@ import { useChat } from '../context/ChatContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import ChatMessageRow from './ChatMessageRow.jsx';
+import ChatTypingRow from './ChatTypingRow.jsx';
 
 const FLITE_VOICES = ['kal', 'rms', 'slt', 'ksp', 'bdl'];
 const ESPEAK_PITCHES = Array.from({ length: 10 }, (_, idx) => idx * 10);
 
 export default function ChatPanel({ hideInput = false, hideSpectatorNotice = false, fillHeight = false }) {
   const { session } = useSession();
-  const { messages, sendMessage, registerInputRef, onInputFocus, onInputBlur, blurChat } = useChat();
+  const {
+    messages,
+    typing,
+    sendMessage,
+    registerInputRef,
+    onInputFocus,
+    onInputBlur,
+    blurChat,
+    setTypingActive,
+  } = useChat();
   const {
     value: ttsSettings,
     save: saveTtsSettings,
@@ -31,11 +41,12 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
   const ttsSupported = Boolean(rover?.audio?.ttsEnabled);
 
   const sorted = useMemo(() => messages.slice(-200), [messages]);
+  const typingRows = useMemo(() => typing || [], [typing]);
 
   useEffect(() => {
     if (!listRef.current) return;
     listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [sorted]);
+  }, [sorted, typingRows]);
 
   useEffect(() => {
     const nextEngine = ttsSettings?.engine || 'flite';
@@ -74,6 +85,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
       await sendMessage(clean, ttsPayload);
       setDraft('');
       blurChat();
+      setTypingActive(false);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -86,24 +98,38 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
   return (
     <section className={`panel-section space-y-0.5 text-base ${fillHeight ? 'flex h-full flex-col overflow-hidden' : ''}`}>
       <div className={`surface overflow-y-auto space-y-0.5 px-0 ${listClass}`} ref={listRef}>
-        {sorted.length === 0 ? (
+        {sorted.length === 0 && typingRows.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet.</p>
         ) : (
           sorted.map((msg) => <ChatMessageRow key={msg.id} message={msg} />)
         )}
+        {typingRows.map((entry) => (
+          <ChatTypingRow key={`typing-${entry.typingId || entry.id}`} message={entry} />
+        ))}
       </div>
       {!hideInput && (
         <form className="flex flex-wrap items-stretch gap-0.5" onSubmit={handleSend}>
           <input
             className="field-input flex-1 min-w-[10rem]"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onFocus={onInputFocus}
-            onBlur={onInputBlur}
+            onChange={(e) => {
+              const next = e.target.value;
+              setDraft(next);
+              setTypingActive(Boolean(next.trim()));
+            }}
+            onFocus={(event) => {
+              onInputFocus(event);
+              setTypingActive(Boolean(draft.trim()));
+            }}
+            onBlur={(event) => {
+              onInputBlur(event);
+              setTypingActive(false);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !draft.trim()) {
                 event.preventDefault();
                 blurChat();
+                setTypingActive(false);
               }
             }}
             ref={(el) => registerInputRef(el, { target: 'panel' })}
