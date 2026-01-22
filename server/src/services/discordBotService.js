@@ -44,7 +44,6 @@ if (!enabled) {
 
 const intents = [
   GatewayIntentBits.Guilds,
-  GatewayIntentBits.GuildMembers,
   GatewayIntentBits.GuildMessages,
   GatewayIntentBits.MessageContent,
 ];
@@ -978,36 +977,10 @@ function buildBatteryCaption(type, payload) {
   }
 }
 
-async function getRoleMemberIds(channelId, roleId) {
-  if (!channelId || !roleId) return [];
-  const channel = await fetchChannel(channelId);
-  if (!channel?.guild) return [];
-  const guild = channel.guild;
-  let role = guild.roles.cache.get(roleId) || null;
-  if (!role) {
-    try {
-      role = await guild.roles.fetch(roleId);
-    } catch (err) {
-      logger.warn('Failed to fetch Discord role', { roleId, error: err.message });
-      return [];
-    }
-  }
-  if (!role) return [];
-  if (!role.members || role.members.size === 0) {
-    try {
-      await guild.members.fetch();
-    } catch (err) {
-      logger.warn('Failed to fetch guild members', { guildId: guild.id, error: err.message });
-    }
-  }
-  return Array.from(role.members?.keys?.() || []);
-}
-
 async function announce({
   channelId,
   content,
   pingRoleId,
-  pingUserIds,
   prefixMentions = true,
   includeSiteUrl = true,
   color,
@@ -1018,11 +991,6 @@ async function announce({
   if (!channelId) return;
   const mentionChunks = [];
   if (pingRoleId) mentionChunks.push(`<@&${pingRoleId}>`);
-  if (Array.isArray(pingUserIds)) {
-    pingUserIds.forEach((id) => {
-      if (id) mentionChunks.push(`<@${id}>`);
-    });
-  }
   const prefix = prefixMentions && mentionChunks.length ? `${mentionChunks.join(' ')} ` : '';
   const payloadEmbeds =
     Array.isArray(embeds) && embeds.length > 0
@@ -1031,32 +999,26 @@ async function announce({
   const allowedMentions = {
     parse: [],
     roles: pingRoleId ? [pingRoleId] : [],
-    users: Array.isArray(pingUserIds) ? pingUserIds : [],
   };
   await sendToChannel(
     channelId,
     `${prefix}${content || ''}`.trim(),
     { embeds: payloadEmbeds },
     allowedMentions,
-    !(pingRoleId || (Array.isArray(pingUserIds) && pingUserIds.length > 0)), // keep mentions intact when pinging
+    !pingRoleId, // keep mention intact when pinging
   );
 }
 
 async function announceUserStatus({ channelId, content, color, title, description, embeds }) {
   const roles = discordConfig.roles || {};
-  const pingRoleId = roles.announcementPing || null;
-  const pingUserIds = await getRoleMemberIds(channelId, roles.stalker || null);
+  const mode = getMode();
+  const allowPing = mode !== MODES.ADMIN && mode !== MODES.LOCKDOWN;
+  const pingRoleId = allowPing ? roles.announcementPing || null : null;
   const mainLine = pingRoleId ? `<@&${pingRoleId}> ${content}`.trim() : content;
-  const stalkerMentions =
-    Array.isArray(pingUserIds) && pingUserIds.length > 0
-      ? pingUserIds.map((id) => `<@${id}>`).join(' ')
-      : '';
-  const message = [mainLine, stalkerMentions].filter(Boolean).join('\n');
   await announce({
     channelId,
-    content: message,
+    content: mainLine,
     pingRoleId,
-    pingUserIds,
     prefixMentions: false,
     color,
     title,
