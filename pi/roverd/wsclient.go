@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os/exec"
 	"sync"
 	"time"
 
@@ -27,7 +28,9 @@ type WSClient struct {
 	connMu       sync.Mutex
 	connected    bool
 	disconnectT  *time.Timer
+	rebootT      *time.Timer
 	seekIssued   bool
+	rebootIssued bool
 }
 
 func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
@@ -359,6 +362,7 @@ func (c *WSClient) ensureSensorStream() error {
 }
 
 const disconnectSeekDelay = time.Minute
+const disconnectRebootDelay = 6 * time.Minute
 const dialTimeout = 10 * time.Second
 const pingInterval = 15 * time.Second
 const pingTimeout = 5 * time.Second
@@ -386,9 +390,14 @@ func (c *WSClient) markConnected() {
 	c.connMu.Lock()
 	c.connected = true
 	c.seekIssued = false
+	c.rebootIssued = false
 	if c.disconnectT != nil {
 		c.disconnectT.Stop()
 		c.disconnectT = nil
+	}
+	if c.rebootT != nil {
+		c.rebootT.Stop()
+		c.rebootT = nil
 	}
 	c.connMu.Unlock()
 }
@@ -400,6 +409,9 @@ func (c *WSClient) markDisconnected() {
 	}
 	if c.disconnectT == nil {
 		c.disconnectT = time.AfterFunc(disconnectSeekDelay, c.handleDisconnectTimeout)
+	}
+	if c.rebootT == nil {
+		c.rebootT = time.AfterFunc(disconnectRebootDelay, c.handleRebootTimeout)
 	}
 	c.connMu.Unlock()
 }
@@ -418,6 +430,22 @@ func (c *WSClient) handleDisconnectTimeout() {
 		return
 	}
 	c.log.Printf("seek dock issued after websocket disconnect")
+}
+
+func (c *WSClient) handleRebootTimeout() {
+	c.connMu.Lock()
+	if c.connected || c.rebootIssued {
+		c.connMu.Unlock()
+		return
+	}
+	c.rebootIssued = true
+	c.connMu.Unlock()
+
+	c.log.Printf("rebooting pi after prolonged websocket disconnect")
+	cmd := exec.Command("systemctl", "reboot")
+	if err := cmd.Start(); err != nil {
+		c.log.Printf("reboot command failed: %v", err)
+	}
 }
 
 func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Duration) {
