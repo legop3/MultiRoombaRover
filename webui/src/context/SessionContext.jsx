@@ -7,6 +7,7 @@ const SessionContext = createContext({
   connected: false,
   session: null,
   logs: [],
+  adminLogs: [],
   login: async () => {},
   setRole: async () => {},
   requestControl: async () => {},
@@ -40,6 +41,7 @@ export function SessionProvider({ children }) {
   const emitWithAck = useAckEmitter(socket);
   const [session, setSession] = useState(null);
   const [logs, setLogs] = useState([]);
+  const [adminLogs, setAdminLogs] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [connected, setConnected] = useState(socket.connected);
 
@@ -64,9 +66,17 @@ export function SessionProvider({ children }) {
     function handleLogEntry(entry) {
       setLogs((prev) => [...prev.slice(-199), entry]);
     }
+    function handleAdminLogInit(entries = []) {
+      setAdminLogs(entries);
+    }
+    function handleAdminLogEntry(entry) {
+      setAdminLogs((prev) => [...prev.slice(-199), entry]);
+    }
     socket.on('session:sync', handleSession);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
+    socket.on('adminlog:init', handleAdminLogInit);
+    socket.on('adminlog:entry', handleAdminLogEntry);
     socket.on('alert:new', (payload = {}) => {
       setAlerts((prev) => [
         ...prev.slice(-49),
@@ -80,6 +90,8 @@ export function SessionProvider({ children }) {
       socket.off('session:sync', handleSession);
       socket.off('log:init', handleLogInit);
       socket.off('log:entry', handleLogEntry);
+      socket.off('adminlog:init', handleAdminLogInit);
+      socket.off('adminlog:entry', handleAdminLogEntry);
       socket.off('alert:new');
     };
   }, [socket]);
@@ -114,10 +126,11 @@ export function SessionProvider({ children }) {
       connected,
       session,
       logs,
+      adminLogs,
       alerts,
       ...actions,
     }),
-    [actions, alerts, connected, logs, session],
+    [actions, adminLogs, alerts, connected, logs, session],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

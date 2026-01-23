@@ -6,6 +6,8 @@ const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const roverManager = require('./roverManager');
 const { loadConfig } = require('../helpers/configLoader');
+const { getRequestIp } = require('../helpers/ipResolver');
+const { logAdminEvent } = require('./adminLogService');
 
 const config = loadConfig();
 const mediaConfig = config.media || {};
@@ -76,10 +78,18 @@ app.post('/mediamtx/auth', (req, res) => {
   const sessionId = body.user;
   const action = (body.action || '').toLowerCase();
   const protocol = (body.protocol || '').toLowerCase();
-  const ip = body.ip || req.ip || '';
+  const ip = getRequestIp(req, body.ip);
   const streamInfo = extractStreamInfo(path);
 
-  logger.info('video auth request', { path: body.path, sessionId, stream: streamInfo, action, protocol, ip });
+  logger.info('video auth request', { path: body.path, sessionId, stream: streamInfo, action, protocol });
+  if (ip) {
+    logAdminEvent({
+      label: 'mediamtx',
+      message: 'Media auth request',
+      ip,
+      meta: { path: body.path, sessionId, stream: streamInfo, action, protocol },
+    });
+  }
 
   if (action === 'read' && protocol === 'srt' && streamInfo?.id) {
     return res.status(200).end();
