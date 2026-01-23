@@ -15,6 +15,7 @@ const { getHealthSnapshot } = require('./healthService');
 const { loadConfig } = require('../helpers/configLoader');
 const { getCommunityGoal } = require('./communityGoalService');
 const { subscribe } = require('./eventBus');
+const { isBannedSocket } = require('./moderationService');
 
 const discordInvite = loadConfig().discord?.invite || null;
 const kofiLink = loadConfig().kofi?.link || null;
@@ -68,6 +69,7 @@ function buildSession(socket) {
 
 function syncSocket(socket) {
   if (!socket) return;
+  if (isBannedSocket(socket)) return;
   const payload = buildSession(socket);
   logger.info('Syncing session', socket.id, payload.role, payload.assignment);
   socket.emit('session:sync', payload);

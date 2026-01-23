@@ -21,6 +21,7 @@ const { getActiveDrivers } = require('./turnService');
 const { getNickname } = require('./nicknameService');
 const { tryTriggerReplay } = require('./replayService');
 const { getCommunityGoal, setCommunityGoal, clearCommunityGoal } = require('./communityGoalService');
+const { getModerationSnapshot, applyBan, applyUnban } = require('./moderationService');
 const {
   getGuildConfig,
   listGuildConfigs,
@@ -258,8 +259,136 @@ function formatHelp() {
     '`rs unlock <id>` — unlock a rover',
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
     '`rs goal [text|clear]` — show or set community goal',
+    '`rs ban <id> [reason]` — ban a user',
+    '`rs timeout <id> <duration> [reason]` — timeout a user',
+    '`rs unban <id>` — remove a ban/timeout',
+    '`rs users` — list recent users',
+    '`rs bans` — list active bans/timeouts',
     '`ts` — show time status',
   ].join('\n');
+}
+
+function parseDuration(input) {
+  if (!input) return null;
+  const match = String(input).trim().match(/^(\d+)(s|m|h|d)?$/i);
+  if (!match) return null;
+  const value = Number(match[1]);
+  const unit = (match[2] || 'm').toLowerCase();
+  const multipliers = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
+  const ms = value * (multipliers[unit] || 0);
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
+}
+
+function formatModerationDuration(ms) {
+  if (!ms) return 'permanent';
+  const seconds = Math.ceil(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.ceil(hours / 24);
+  return `${days}d`;
+}
+
+async function handleBanCommand(message, tokens) {
+  const target = tokens.shift();
+  if (!target) {
+    await message.reply('Usage: `rs ban <id> [reason]`');
+    return;
+  }
+  const reason = tokens.join(' ').trim() || null;
+  try {
+    const ban = applyBan(target, {
+      reason,
+      createdBy: `discord:${message.author.id}`,
+    });
+    await message.reply(
+      `Banned **${sanitizeMentions(target)}**${reason ? ` — ${sanitizeMentions(reason)}` : ''} (id: ${ban.id}).`,
+    );
+  } catch (err) {
+    await message.reply(`Ban failed: ${sanitizeMentions(err.message)}`);
+  }
+}
+
+async function handleTimeoutCommand(message, tokens) {
+  const target = tokens.shift();
+  const durationRaw = tokens.shift();
+  if (!target || !durationRaw) {
+    await message.reply('Usage: `rs timeout <id> <duration> [reason]`');
+    return;
+  }
+  const durationMs = parseDuration(durationRaw);
+  if (!durationMs) {
+    await message.reply('Invalid duration. Use formats like `30m`, `2h`, or `1d`.');
+    return;
+  }
+  const reason = tokens.join(' ').trim() || null;
+  try {
+    const ban = applyBan(target, {
+      durationMs,
+      reason,
+      createdBy: `discord:${message.author.id}`,
+    });
+    await message.reply(
+      `Timed out **${sanitizeMentions(target)}** for ${formatModerationDuration(durationMs)}${reason ? ` — ${sanitizeMentions(reason)}` : ''} (id: ${ban.id}).`,
+    );
+  } catch (err) {
+    await message.reply(`Timeout failed: ${sanitizeMentions(err.message)}`);
+  }
+}
+
+async function handleUnbanCommand(message, tokens) {
+  const target = tokens.shift();
+  if (!target) {
+    await message.reply('Usage: `rs unban <id>`');
+    return;
+  }
+  try {
+    const removed = applyUnban(target);
+    if (removed) {
+      await message.reply(`Unbanned **${sanitizeMentions(target)}**.`);
+    } else {
+      await message.reply(`No ban found for **${sanitizeMentions(target)}**.`);
+    }
+  } catch (err) {
+    await message.reply(`Unban failed: ${sanitizeMentions(err.message)}`);
+  }
+}
+
+async function handleUsersCommand(message) {
+  const snapshot = getModerationSnapshot();
+  const users = snapshot.users || [];
+  const recent = users
+    .filter((user) => user.lastSeen)
+    .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))
+    .slice(0, 10);
+  if (!recent.length) {
+    await message.reply('No recent users.');
+    return;
+  }
+  const lines = recent.map((user) => {
+    const name = user.nicknames?.[user.nicknames.length - 1] || user.id.slice(0, 6);
+    const status = user.ban ? 'BANNED' : 'ok';
+    return `• ${sanitizeMentions(name)} (${user.id.slice(0, 6)}) — ${status}`;
+  });
+  await message.reply(lines.join('\n'));
+}
+
+async function handleBansCommand(message) {
+  const snapshot = getModerationSnapshot();
+  const bans = snapshot.bans || [];
+  if (!bans.length) {
+    await message.reply('No active bans/timeouts.');
+    return;
+  }
+  const lines = bans.slice(0, 10).map((ban) => {
+    const expiresIn = ban.expiresAt ? Math.max(0, ban.expiresAt - Date.now()) : null;
+    return `• ${ban.id.slice(0, 6)} ${ban.userId ? `user ${ban.userId.slice(0, 6)}` : 'target'} — ${
+      expiresIn ? `timeout ${formatModerationDuration(expiresIn)}` : 'ban'
+    }`;
+  });
+  await message.reply(lines.join('\n'));
 }
 
 function findRoverRecord(id) {
@@ -695,7 +824,12 @@ async function handleCommand(message) {
     action !== 'help' &&
     action !== 'replay' &&
     action !== 'bridge' &&
-    action !== 'goal'
+    action !== 'goal' &&
+    action !== 'ban' &&
+    action !== 'timeout' &&
+    action !== 'unban' &&
+    action !== 'users' &&
+    action !== 'bans'
   ) {
     return; // ignore non-admins for privileged commands
   }
@@ -727,6 +861,21 @@ async function handleCommand(message) {
       break;
     case 'goal':
       await handleGoalCommand(message, tokens);
+      break;
+    case 'ban':
+      await handleBanCommand(message, tokens);
+      break;
+    case 'timeout':
+      await handleTimeoutCommand(message, tokens);
+      break;
+    case 'unban':
+      await handleUnbanCommand(message, tokens);
+      break;
+    case 'users':
+      await handleUsersCommand(message);
+      break;
+    case 'bans':
+      await handleBansCommand(message);
       break;
     default:
       await message.reply(formatHelp());

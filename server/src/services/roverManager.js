@@ -6,6 +6,7 @@ const ALERT_COLOR = '#8bc34a';
 const { parseSensorFrame } = require('../helpers/sensorDecoder');
 const { MODES, getMode } = require('./modeManager');
 const { isAdmin, roleEvents } = require('./roleService');
+const { isBannedSocket } = require('./moderationService');
 const { publishEvent } = require('./eventBus');
 const videoSessions = require('./videoSessions');
 
@@ -576,9 +577,11 @@ roleEvents.on('change', ({ socket, role }) => {
 });
 
 io.on('connection', (socket) => {
-  socket.emit('rovers', getRoster());
-  if (socket.data?.role === 'spectator') {
-    enableSpectator(socket);
+  if (!isBannedSocket(socket)) {
+    socket.emit('rovers', getRoster());
+    if (socket.data?.role === 'spectator') {
+      enableSpectator(socket);
+    }
   }
 
   function handleRequestControl({ roverId, force } = {}, cb = () => {}) {

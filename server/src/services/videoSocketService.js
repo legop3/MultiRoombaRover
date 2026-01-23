@@ -5,6 +5,7 @@ const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const videoSessions = require('./videoSessions');
 const roverManager = require('./roverManager');
 const { loadConfig } = require('../helpers/configLoader');
+const { isBannedSocket } = require('./moderationService');
 
 const config = loadConfig();
 const mediaConfig = config.media || {};
@@ -80,6 +81,9 @@ function normalizeRequest(payload = {}) {
 io.on('connection', (socket) => {
   socket.on('video:request', (payload = {}, cb = () => {}) => {
     try {
+      if (isBannedSocket(socket)) {
+        throw new Error('Banned');
+      }
       const target = normalizeRequest(payload);
       if (!target) {
         throw new Error('video source required');

@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const io = require('../globals/io');
 const loggerRoot = require('../globals/logger');
 const logger = loggerRoot.child('logStream');
+const { isBannedSocket } = require('./moderationService');
 
 const MAX_HISTORY = 200;
 const history = [];
@@ -14,11 +15,16 @@ function pushEntry(entry) {
 }
 
 function broadcast(entry) {
-  io.emit('log:entry', entry);
+  io.sockets.sockets.forEach((socket) => {
+    if (!isBannedSocket(socket)) {
+      socket.emit('log:entry', entry);
+    }
+  });
 }
 
 function hydrateSocket(socket) {
   if (!socket) return;
+  if (isBannedSocket(socket)) return;
   socket.emit('log:init', history);
 }
 

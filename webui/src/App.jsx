@@ -27,6 +27,7 @@ import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs.jsx';
 import useDefaultNickname from './hooks/useDefaultNickname.js';
 import CommunityGoalBanner from './components/CommunityGoalBanner.jsx';
 import RoverQueuesPanel from './components/RoverQueuesPanel.jsx';
+import BannedOverlay from './components/BannedOverlay.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -235,6 +236,7 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
       <AlertFeed />
       <TurnAlertListener />
       <ModeGateOverlay />
+      <BannedOverlay />
       <HelpOverlay
         visible={helpVisible}
         layout={layout}

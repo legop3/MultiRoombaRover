@@ -8,6 +8,7 @@ const { describeAssignment } = require('./assignmentService');
 const roverManager = require('./roverManager');
 const { getNickname } = require('./nicknameService');
 const { issueCommand } = require('./commandService');
+const { isBannedSocket } = require('./moderationService');
 
 const RATE_LIMIT_WINDOW_MS = 8000;
 const RATE_LIMIT_MAX = 5;
@@ -335,7 +336,9 @@ function sendExternalTyping({
 }
 
 io.on('connection', (socket) => {
-  socket.emit('chat:init', history);
+  if (!isBannedSocket(socket)) {
+    socket.emit('chat:init', history);
+  }
   socket.on('chat:send', (payload = {}, cb = () => {}) => handleIncoming(payload, socket, cb));
   socket.on('chat:typing', (payload = {}) => {
     const isTyping = Boolean(payload?.isTyping);
@@ -364,12 +367,20 @@ io.on('connection', (socket) => {
 
 subscribe('chat:message', ({ payload }) => {
   if (!payload) return;
-  io.emit('chat:message', payload);
+  io.sockets.sockets.forEach((socket) => {
+    if (!isBannedSocket(socket)) {
+      socket.emit('chat:message', payload);
+    }
+  });
 });
 
 subscribe('chat:typing', ({ payload }) => {
   if (!payload) return;
-  io.emit('chat:typing', payload);
+  io.sockets.sockets.forEach((socket) => {
+    if (!isBannedSocket(socket)) {
+      socket.emit('chat:typing', payload);
+    }
+  });
 });
 
 module.exports = {

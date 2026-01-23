@@ -9,6 +9,7 @@ import VideoTile from '../components/VideoTile.jsx';
 import ChatPanel from '../components/ChatPanel.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
+import BannedOverlay from '../components/BannedOverlay.jsx';
 
 const ROTATE_MS = 20000;
 const HARD_REFRESH_MS = 3 * 60 * 60 * 1000;
@@ -153,6 +154,7 @@ export default function MiniSummaryApp() {
       <>
         <MiniSummaryContent />
         <AlertFeed scale={3} />
+        <BannedOverlay />
       </>
     </SettingsProvider>
   );

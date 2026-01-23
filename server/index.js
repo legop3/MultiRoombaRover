@@ -28,6 +28,7 @@ require('./src/services/logStreamService');
 require('./src/services/adminLogService');
 require('./src/services/homeAssistantService');
 require('./src/services/sessionService');
+require('./src/services/moderationService');
 require('./src/services/batteryManager');
 require('./src/services/replaySocketService');
 require('./src/services/replaySegmentManager');

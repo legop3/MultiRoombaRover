@@ -8,6 +8,7 @@ const roverManager = require('./roverManager');
 const { loadConfig } = require('../helpers/configLoader');
 const { getRequestIp } = require('../helpers/ipResolver');
 const { logAdminEvent } = require('./adminLogService');
+const { isBannedSocket } = require('./moderationService');
 
 const config = loadConfig();
 const mediaConfig = config.media || {};
@@ -108,6 +109,9 @@ app.post('/mediamtx/auth', (req, res) => {
   const socket = io.sockets.sockets.get(info.socketId);
   if (!socket) {
     videoSessions.revokeSession(sessionId);
+    return res.status(401).end();
+  }
+  if (isBannedSocket(socket)) {
     return res.status(401).end();
   }
   if (!canView(socket)) {

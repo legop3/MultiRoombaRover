@@ -13,6 +13,7 @@ import useDefaultNickname from '../hooks/useDefaultNickname.js';
 import CommunityGoalBanner from '../components/CommunityGoalBanner.jsx';
 import RoverQueuesPanel from '../components/RoverQueuesPanel.jsx';
 import RawUserPilePanel from '../components/RawUserPilePanel.jsx';
+import BannedOverlay from '../components/BannedOverlay.jsx';
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
@@ -159,7 +160,10 @@ function SpectatorContent() {
 export default function SpectatorApp() {
   return (
     <SettingsProvider>
-      <SpectatorContent />
+      <>
+        <SpectatorContent />
+        <BannedOverlay />
+      </>
     </SettingsProvider>
   );
 }
