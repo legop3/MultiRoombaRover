@@ -5,6 +5,8 @@ const { sendAlert } = require('./alertService');
 const ALERT_COLOR = '#00bcd4';
 const { handleAck } = require('./commandService');
 
+const HEARTBEAT_INTERVAL_MS = 15000;
+
 function handleMessage(roverId, msg) {
   switch (msg.type) {
     case 'hello':
@@ -24,7 +26,24 @@ function handleMessage(roverId, msg) {
 
 roverWSS.on('connection', (ws) => {
   let roverId = null;
+  ws.isAlive = true;
+
+  const heartbeat = setInterval(() => {
+    if (!ws.isAlive) {
+      logger.warn('Rover websocket unresponsive', roverId || 'unknown');
+      ws.terminate();
+      return;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }, HEARTBEAT_INTERVAL_MS);
+
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
+
   ws.on('message', (raw) => {
+    ws.isAlive = true;
     let msg;
     try {
       msg = JSON.parse(raw.toString());
@@ -55,6 +74,7 @@ roverWSS.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    clearInterval(heartbeat);
     if (roverId) {
       roverManager.removeRover(roverId);
       sendAlert({ color: ALERT_COLOR, title: 'Rover Offline', message: roverId });
