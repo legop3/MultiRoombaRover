@@ -22,33 +22,10 @@ logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configure
 logger.info('Ko-fi link loaded:', kofiLink ? 'present' : 'not configured');
 
 const ACTIVITY_SYNC_COOLDOWN_MS = 3000;
-const ADMIN_ROLES = new Set(['admin', 'lockdown', 'lockdown-admin']);
 let lastActivitySync = 0;
 let pendingActivitySync = null;
 
-function extractSocketIp(socket) {
-  if (!socket) return null;
-  const headers = socket.handshake?.headers || {};
-  const forwardedFor = headers['x-forwarded-for'];
-  if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
-    return forwardedFor.split(',')[0].trim();
-  }
-  if (Array.isArray(forwardedFor) && forwardedFor.length) {
-    return String(forwardedFor[0]).trim();
-  }
-  const realIp = headers['x-real-ip'];
-  if (typeof realIp === 'string' && realIp.trim()) {
-    return realIp.trim();
-  }
-  return (
-    socket.handshake?.address ||
-    socket.conn?.remoteAddress ||
-    socket.request?.connection?.remoteAddress ||
-    null
-  );
-}
-
-function buildUserEntry(socket, includeIp = false) {
+function buildUserEntry(socket) {
   if (!socket) return null;
   const role = getRole(socket);
   const assignment = assignmentService.describeAssignment(socket.id);
@@ -58,14 +35,12 @@ function buildUserEntry(socket, includeIp = false) {
     nickname: getNickname(socket) || null,
     role,
     roverId: primaryRover || assignment?.roverId || null,
-    ip: includeIp ? extractSocketIp(socket) : null,
   };
 }
 
 function buildSession(socket) {
-  const includeIps = ADMIN_ROLES.has(getRole(socket));
   const users = Array.from(io.sockets.sockets.values())
-    .map((sock) => buildUserEntry(sock, includeIps))
+    .map((sock) => buildUserEntry(sock))
     .filter(Boolean);
   return {
     socketId: socket?.id || null,
