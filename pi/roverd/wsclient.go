@@ -49,7 +49,9 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 }
 
 func (c *WSClient) Run(ctx context.Context) error {
-	conn, _, err := websocket.Dial(ctx, c.cfg.ServerURL, nil)
+	dialCtx, cancel := context.WithTimeout(ctx, dialTimeout)
+	conn, _, err := websocket.Dial(dialCtx, c.cfg.ServerURL, nil)
+	cancel()
 	if err != nil {
 		c.markDisconnected()
 		return err
@@ -65,10 +67,15 @@ func (c *WSClient) Run(ctx context.Context) error {
 		c.log.Printf("sensor stream init failed: %v", err)
 	}
 
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
 	c.startTTSWorker(ctx)
 	go func() {
 		errCh <- c.readLoop(ctx, conn)
+	}()
+	go func() {
+		if err := c.keepalive(ctx, conn); err != nil {
+			errCh <- err
+		}
 	}()
 	go c.forwardSensors(ctx, conn)
 	go c.forwardEvents(ctx, conn)
@@ -352,6 +359,28 @@ func (c *WSClient) ensureSensorStream() error {
 }
 
 const disconnectSeekDelay = time.Minute
+const dialTimeout = 10 * time.Second
+const pingInterval = 15 * time.Second
+const pingTimeout = 5 * time.Second
+
+func (c *WSClient) keepalive(ctx context.Context, conn *websocket.Conn) error {
+	ticker := time.NewTicker(pingInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
+			err := conn.Ping(pingCtx)
+			cancel()
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
 
 func (c *WSClient) markConnected() {
 	c.connMu.Lock()
