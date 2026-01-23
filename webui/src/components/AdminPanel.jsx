@@ -17,6 +17,16 @@ export default function AdminPanel() {
   const currentGoal = session?.communityGoal?.text || '';
   const goalUpdatedAt = session?.communityGoal?.updatedAt || null;
   const [goalDraft, setGoalDraft] = useState(currentGoal);
+  const socketIps = useMemo(() => {
+    const users = session?.users ?? [];
+    return users
+      .map((user) => ({
+        socketId: user.socketId,
+        label: user.nickname || user.socketId?.slice(0, 6) || 'unknown',
+        ip: user.ip || null,
+      }))
+      .filter((entry) => entry.ip);
+  }, [session?.users]);
 
   const isAdmin =
     session?.role === 'admin' ||
@@ -135,6 +145,7 @@ export default function AdminPanel() {
         )}
       />
       <ReplaySnapshotHealth health={health} />
+      <WebsocketIpPanel entries={socketIps} />
     </section>
   );
 }
@@ -196,6 +207,33 @@ function ReplaySnapshotHealth({ health }) {
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function WebsocketIpPanel({ entries }) {
+  const total = entries?.length || 0;
+  const uniqueCount = useMemo(() => new Set((entries || []).map((entry) => entry.ip)).size, [entries]);
+  return (
+    <div className="space-y-0.5">
+      <div className="flex items-center justify-between text-xs text-slate-400">
+        <span className="panel-muted text-xs uppercase">Websocket IPs</span>
+        <span className="text-slate-500">
+          {uniqueCount} unique / {total} sockets
+        </span>
+      </div>
+      <div className="surface space-y-0.5 text-xs text-slate-200">
+        {total === 0 ? (
+          <p className="text-xs text-slate-500">No IPs reported yet.</p>
+        ) : (
+          entries.map((entry) => (
+            <div key={entry.socketId} className="flex items-center justify-between">
+              <span className="text-slate-300">{entry.label}</span>
+              <span className="rounded bg-slate-800 px-1 text-[0.7rem] text-slate-200">{entry.ip}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

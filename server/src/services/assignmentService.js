@@ -165,7 +165,31 @@ function pickRover() {
   if (candidates.length === 0) {
     return null;
   }
-  candidates.sort((a, b) => a.drivers.size - b.drivers.size);
+  const dockedRank = (rover) => {
+    if (!rover) return 0;
+    if (rover.docked === true) return -1;
+    if (rover.docked === false) return 1;
+    const sensors = rover.lastSensor?.decoded || rover.lastSensor?.sensors || null;
+    const docked = sensors?.chargingSources?.homeBase;
+    if (docked === true) return -1;
+    if (docked === false) return 1;
+    return 0;
+  };
+  const idleRank = (rover) => (rover?.drivers?.size === 0 ? 1 : 0);
+  candidates.sort((a, b) => {
+    const aEmpty = idleRank(a);
+    const bEmpty = idleRank(b);
+    if (aEmpty !== bEmpty) return bEmpty - aEmpty;
+    const aDockRank = dockedRank(a);
+    const bDockRank = dockedRank(b);
+    if (aEmpty === 1 && aDockRank !== bDockRank) {
+      return bDockRank - aDockRank;
+    }
+    if (a.drivers.size !== b.drivers.size) {
+      return a.drivers.size - b.drivers.size;
+    }
+    return bDockRank - aDockRank;
+  });
   return candidates[0];
 }
 
