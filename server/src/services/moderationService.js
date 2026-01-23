@@ -164,11 +164,6 @@ function updateUserFromSocket(user, socket, identity) {
     user.socketIds.push(socket.id);
     changed = true;
   }
-  if (ADMIN_ROLES.has(role) && !user.admin) {
-    user.admin = true;
-    user.adminName = socket?.data?.user?.username || null;
-    changed = true;
-  }
   return changed;
 }
 
@@ -189,17 +184,12 @@ function ensureUserForSocket(socket) {
       lastRole: null,
       lastSocketId: null,
       lastIp: identity.ip || null,
-      admin: false,
-      adminName: null,
     };
     store.users[user.id] = user;
   }
   const changed = updateUserFromSocket(user, socket, identity);
   socket.data.moderation = { userId: user.id, ...identity };
   if (changed) {
-    if (user.admin) {
-      clearBansForUser(user, { reason: 'Admin role applied' });
-    }
     saveStore(store);
     emitModerationSnapshot();
   }
@@ -295,8 +285,6 @@ function serializeUser(user) {
     firstSeen: user.firstSeen || null,
     lastRole: user.lastRole || null,
     lastSocketId: user.lastSocketId || null,
-    admin: Boolean(user.admin),
-    adminName: user.adminName || null,
     ban: activeBan
       ? {
           id: activeBan.id,
@@ -380,15 +368,11 @@ function createBan(target, { durationMs = null, reason = null, createdBy = null 
   const query = resolved.query || null;
   const user =
     resolved.userId ? store.users[resolved.userId] || null : findUserByQuery(query || resolved.socketId || resolved.nickname || resolved.clientId || resolved.visitorToken || resolved.ip);
-  if (user && user.admin) {
-    throw new Error('Admins cannot be banned.');
-  }
-  if (resolved.ip) {
-    const adminMatch = Object.values(store.users || {}).some(
-      (entry) => entry.admin && Array.isArray(entry.ips) && entry.ips.includes(resolved.ip),
-    );
-    if (adminMatch) {
-      throw new Error('Admins cannot be banned.');
+  const targetSocketId = resolved.socketId || user?.lastSocketId || null;
+  if (targetSocketId) {
+    const targetSocket = io.sockets.sockets.get(targetSocketId);
+    if (targetSocket && isAdminSocket(targetSocket)) {
+      throw new Error('Active admins cannot be banned.');
     }
   }
   const identity = {
@@ -560,12 +544,8 @@ io.on('connection', (socket) => {
 roleEvents.on('change', ({ socket, role }) => {
   if (!socket) return;
   if (ADMIN_ROLES.has(role)) {
-    const user = ensureUserForSocket(socket);
-    if (user.admin) {
-      clearBansForUser(user, { reason: 'Admin role applied', by: socket?.data?.user?.username || socket.id });
-      emitModerationSnapshot();
-      refreshSocketStatus(socket);
-    }
+    ensureUserForSocket(socket);
+    refreshSocketStatus(socket);
     socket.emit('moderation:init', getModerationSnapshot());
   }
 });

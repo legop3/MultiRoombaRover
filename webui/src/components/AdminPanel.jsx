@@ -301,7 +301,6 @@ function ModerationPanel({ moderation, onBan, onTimeout, onUnban }) {
             .map((user) => {
               const label = user.nicknames?.[user.nicknames.length - 1] || user.id.slice(0, 6);
               const ban = user.ban || null;
-              const isAdmin = Boolean(user.admin);
               return (
                 <div key={user.id} className="surface-muted space-y-0.25 text-xs">
                   <div className="flex flex-wrap items-center justify-between gap-0.5">
@@ -310,11 +309,6 @@ function ModerationPanel({ moderation, onBan, onTimeout, onUnban }) {
                       <span className="rounded bg-slate-800 px-1 text-[0.7rem] text-slate-300">
                         {user.id.slice(0, 6)}
                       </span>
-                      {isAdmin && (
-                        <span className="rounded bg-amber-500/30 px-1 text-[0.7rem] text-amber-200">
-                          Admin
-                        </span>
-                      )}
                       {ban && (
                         <span className="rounded bg-red-500/30 px-1 text-[0.7rem] text-red-200">
                           {ban.expiresAt ? 'Timeout' : 'Banned'}
@@ -326,7 +320,6 @@ function ModerationPanel({ moderation, onBan, onTimeout, onUnban }) {
                         type="button"
                         className="button-dark text-[0.7rem]"
                         onClick={() => handleBan(user)}
-                        disabled={isAdmin}
                       >
                         Ban
                       </button>
@@ -334,7 +327,6 @@ function ModerationPanel({ moderation, onBan, onTimeout, onUnban }) {
                         type="button"
                         className="button-dark text-[0.7rem]"
                         onClick={() => handleTimeout(user)}
-                        disabled={isAdmin}
                       >
                         Timeout
                       </button>
