@@ -51,7 +51,7 @@ export default function VideoTile({
   hudVariant = 'default',
   driverLabel = null,
   hudForceMap = false,
-  hudMapPosition = 'top-right',
+  hudMapPosition = 'top-center',
   hudLabelScale = 1,
   fitParent = false,
   overcurrentLimiter = null,
@@ -581,7 +581,7 @@ function HudOverlay({
   battery,
   showTopDown = false,
   mobileHud = false,
-  mapPosition = 'top-right',
+  mapPosition = 'top-center',
   turnTimerText = null,
   labelScale = 1,
 }) {
@@ -616,11 +616,14 @@ function HudOverlay({
     width: mapSize,
     height: mapSize,
     opacity: mapOpacity,
-    transform: `scale(${mapScale})`,
-    transformOrigin: mapPosition === 'bottom-left' ? 'bottom left' : 'top right',
+    transform: mapPosition === 'top-center' ? `translateX(-50%) scale(${mapScale})` : `scale(${mapScale})`,
+    transformOrigin:
+      mapPosition === 'bottom-left' ? 'bottom left' : mapPosition === 'top-center' ? 'top center' : 'top right',
     ...(mapPosition === 'bottom-left'
       ? { left: '0.25rem', bottom: '0.25rem' }
-      : { right: '0.25rem', top: '0.25rem' }),
+      : mapPosition === 'top-center'
+        ? { left: '50%', top: '0.25rem' }
+        : { right: '0.25rem', top: '0.25rem' }),
   };
 
   if (variant === 'spectator') {
