@@ -90,7 +90,7 @@ export default function CommunityGoalBanner({ layout = 'desktop', className = ''
       role="button"
       tabIndex={0}
     >
-      <span className="flex w-full items-stretch gap-0.5 whitespace-nowrap">
+      <span className="flex w-full items-stretch gap-0.5 whitespace-nowrap rounded-md">
         <span className="flex flex-col justify-center border-r border-slate-700/60 px-0.5 text-[0.55em] font-semibold leading-tight text-slate-400">
           <span>Community</span>
           <span>Goal</span>

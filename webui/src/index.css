@@ -44,35 +44,35 @@ body {
 
 @layer components {
   .panel {
-    @apply bg-black text-white p-0;
+    @apply bg-black text-white p-0 rounded-md;
   }
 
   .panel-section {
-    @apply bg-neutral-900 text-white p-0;
+    @apply bg-neutral-900 text-white p-0 rounded-md;
   }
 
   .panel-muted {
-    @apply text-sm text-slate-400;
+    @apply text-sm text-slate-400 rounded-md;
   }
 
   .surface {
-    @apply bg-neutral-800 text-white px-0.5 py-0.5;
+    @apply bg-neutral-800 text-white px-0.5 py-0.5 rounded-md;
   }
 
   .surface-muted {
-    @apply bg-neutral-700 text-neutral-100 px-0.5 py-0.5;
+    @apply bg-neutral-700 text-neutral-100 px-0.5 py-0.5 rounded-md;
   }
 
   .field-input {
-    @apply bg-neutral-800 text-white px-0.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-sky-500;
+    @apply bg-neutral-800 text-white px-0.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-sky-500 rounded-md;
   }
 
   .button-dark {
-    @apply px-0.5 py-0.5 text-sm font-medium text-white transition-colors bg-sky-600 hover:bg-sky-500;
+    @apply px-0.5 py-0.5 text-sm font-medium text-white transition-colors bg-sky-600 hover:bg-sky-500 rounded-md;
   }
 
   .button-danger {
-    @apply px-0.5 py-0.5 text-sm font-medium text-white transition-colors bg-rose-600 hover:bg-rose-500;
+    @apply px-0.5 py-0.5 text-sm font-medium text-white transition-colors bg-rose-600 hover:bg-rose-500 rounded-md;
   }
 
   .rainbow-animate-bg {
