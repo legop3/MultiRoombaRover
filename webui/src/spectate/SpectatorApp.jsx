@@ -161,32 +161,38 @@ function SpectatorContent() {
     ? 'order-1 flex min-h-0 w-full items-stretch gap-0.5 overflow-x-auto border-b border-slate-800/60 bg-slate-950/90 p-0.5'
     : 'order-2 flex min-h-0 min-w-0 flex-col gap-0.5 border-l border-slate-800/60 bg-slate-950/90 md:h-full md:overflow-y-auto';
   const topBarItemClass = isPortraitLayout ? 'min-w-[16rem] max-w-[22rem] flex-1' : '';
+  const portraitItemHeight = isPortraitLayout ? 'h-64' : '';
 
   return (
     <div className="min-h-screen bg-black text-slate-100 md:h-screen md:overflow-hidden">
       <main className={mainClass}>
         <section className={sidebarClass}>
-          <div className={topBarItemClass}>
-            <CommunityGoalBanner layout="desktop" dismissable={false} className="text-sm" />
-          </div>
-          <div className={`${topBarItemClass} ${isPortraitLayout ? 'h-32 overflow-y-auto' : ''}`}>
+          {isPortraitLayout ? (
+            <div className={`${topBarItemClass} ${portraitItemHeight} flex flex-col gap-0.5`}>
+              <CommunityGoalBanner layout="desktop" dismissable={false} className="text-sm" />
+              <div className="min-h-0 flex-1">
+                <RawUserPilePanel hideNicknameForm hideHeader compact fillHeight className="h-full" />
+              </div>
+            </div>
+          ) : (
+            <div className={topBarItemClass}>
+              <CommunityGoalBanner layout="desktop" dismissable={false} className="text-sm" />
+            </div>
+          )}
+          <div className={`${topBarItemClass} ${isPortraitLayout ? `${portraitItemHeight} overflow-y-auto` : ''}`}>
             <div className="panel h-full">
               <RoverQueuesPanel title="Rovers" />
             </div>
           </div>
-          <div className={`${topBarItemClass} ${isPortraitLayout ? 'h-32' : 'flex-1 min-h-0'}`}>
-            <RawUserPilePanel
-              hideNicknameForm
-              hideHeader
-              compact
-              fillHeight
-              className="h-full"
-            />
-          </div>
-          <div className={`${topBarItemClass} ${isPortraitLayout ? 'h-32' : 'flex-[1.1] min-h-0'}`}>
+          {!isPortraitLayout ? (
+            <div className={`${topBarItemClass} flex-1 min-h-0`}>
+              <RawUserPilePanel hideNicknameForm hideHeader compact fillHeight className="h-full" />
+            </div>
+          ) : null}
+          <div className={`${topBarItemClass} ${isPortraitLayout ? portraitItemHeight : 'flex-[1.1] min-h-0'}`}>
             <ChatPanel hideInput hideSpectatorNotice fillHeight />
           </div>
-          <div className={`${topBarItemClass} ${isPortraitLayout ? 'h-32' : ''}`}>
+          <div className={`${topBarItemClass} ${isPortraitLayout ? portraitItemHeight : ''}`}>
             <LogsRow className={`${isPortraitLayout ? 'h-full' : 'h-40'} overflow-hidden`} />
           </div>
         </section>
