@@ -6,7 +6,6 @@ import { useVideoRequests } from '../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../hooks/useRoverSnapshots.js';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
 import VideoTile from '../components/VideoTile.jsx';
-import ChatPanel from '../components/ChatPanel.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
 
@@ -19,7 +18,40 @@ function formatDriverLabel({ roverId, session }) {
   const label = user?.nickname || (activeDriverId ? activeDriverId.slice(0, 6) : 'No driver');
   const mode = session?.mode;
   const turnInfo = session?.turnQueues?.[roverId];
-  return mode === 'turns' && turnInfo?.current ? `${label} (turns)` : label;
+  return mode === 'turns' && turnInfo?.current ? `${label}` : label;
+}
+
+function getBatteryVisual({ rover, frame }) {
+  const percentDisplay = rover?.batteryState?.percentDisplay;
+  const urgentActive = rover?.batteryState?.urgentActive ?? false;
+  const warnActive = rover?.batteryState?.warnActive ?? false;
+  const config = rover?.battery ?? null;
+  const charge = frame?.sensors?.batteryChargeMah ?? null;
+  const full = config?.Full ?? null;
+  const warn = config?.Warn ?? null;
+  const urgent = config?.Urgent ?? null;
+
+  if (percentDisplay != null && Number.isFinite(percentDisplay)) {
+    const percent = Math.max(0, Math.min(1, percentDisplay / 100));
+    const barClass = urgentActive ? 'bg-red-500/40' : warnActive ? 'bg-amber-400/40' : 'bg-emerald-400/40';
+    return { percent, barClass };
+  }
+
+  if (charge == null || full == null || warn == null) {
+    return { percent: 0, barClass: 'bg-slate-700/40' };
+  }
+
+  const span = full - warn;
+  if (span <= 0) {
+    return { percent: 0, barClass: 'bg-slate-700/40' };
+  }
+
+  const normalized = (charge - warn) / span;
+  const percent = Math.max(0, Math.min(1, normalized));
+  const depleted = normalized <= 0;
+  const warnTriggered = urgent != null && charge <= urgent;
+  const barClass = depleted ? 'bg-red-500/40' : warnTriggered ? 'bg-amber-400/40' : 'bg-emerald-400/40';
+  return { percent, barClass };
 }
 
 function MiniSummaryContent() {
@@ -101,9 +133,11 @@ function MiniSummaryContent() {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-black p-0 text-slate-100 flex flex-col gap-0.5">
-      <ChatOverlay />
-      <section className="panel relative flex min-h-0 flex-1 overflow-hidden">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-black text-slate-100">
+      <section
+        className="relative flex h-full shrink-0 items-center justify-start overflow-hidden bg-black"
+        style={{ width: 'min(100vw, calc(100vh * 4 / 3))' }}
+      >
         {!spectatorReady ? (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
             Switching to spectator…
@@ -121,7 +155,7 @@ function MiniSummaryContent() {
               layoutFormat="mobile"
               hudVariant="spectator"
               driverLabel={driverLabel}
-              hudLabelScale={5}
+              hudLabelScale={7}
               hudForceMap
               hudMapPosition="bottom-left"
               fitParent
@@ -133,6 +167,41 @@ function MiniSummaryContent() {
           </div>
         )}
       </section>
+      <aside className="flex h-full min-w-0 flex-1 flex-col border-l border-slate-800/60 bg-slate-950/90">
+        {roster.length ? (
+          roster.map((rover) => {
+            const frame = frames[rover.id] || null;
+            const driverText = formatDriverLabel({ roverId: rover.id, session });
+            const batteryVisual = getBatteryVisual({ rover, frame });
+            const isActive = activeRover?.id === rover.id;
+            return (
+              <div
+                key={rover.id}
+                className={`relative flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-hidden px-6 py-4 ${
+                  isActive ? 'border-4 border-emerald-300/90 bg-emerald-300/10' : 'opacity-60'
+                }`}
+              >
+                <div
+                  className={`absolute inset-y-0 left-0 ${batteryVisual.barClass}`}
+                  style={{ width: `${batteryVisual.percent * 100}%` }}
+                />
+                <div className="relative flex flex-col gap-1">
+                  <div className={`text-6xl font-semibold tracking-wide ${isActive ? 'text-white' : 'text-slate-200'}`}>
+                    {rover.name || rover.id}
+                  </div>
+                  <div className={`text-5xl font-semibold ${isActive ? 'text-white' : 'text-slate-300'}`}>
+                    {driverText}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
+            No rovers available.
+          </div>
+        )}
+      </aside>
     </div>
   );
 }
@@ -158,25 +227,9 @@ export default function MiniSummaryApp() {
   );
 }
 
-function ChatOverlay() {
-  return (
-    <div
-      className="pointer-events-none absolute left-1/2 top-1 z-30"
-      style={{ transform: 'translate(-50%, 0) scale(0.7)', transformOrigin: 'top center' }}
-    >
-      <div
-        className="pointer-events-none overflow-hidden rounded-md"
-        style={{ width: '50vw', minWidth: '16rem', maxWidth: '24rem', opacity: 0.55, maxHeight: '12rem' }}
-      >
-        <ChatPanel hideInput hideSpectatorNotice />
-      </div>
-    </div>
-  );
-}
-
 function FitViewportFrame({ children }) {
   return (
-    <div className="flex h-full w-full items-center justify-center overflow-hidden bg-black">
+    <div className="flex h-full w-full items-center justify-start overflow-hidden bg-black">
       <div
         className="relative flex items-center justify-center overflow-hidden bg-black"
         style={{
