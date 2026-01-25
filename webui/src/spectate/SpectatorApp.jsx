@@ -158,9 +158,9 @@ function SpectatorContent() {
     ? 'order-2 flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto'
     : 'order-1 flex min-h-0 min-w-0 flex-col gap-0.5 md:overflow-y-auto';
   const sidebarClass = isPortraitLayout
-    ? 'order-1 flex min-h-0 w-full items-stretch gap-0.5 overflow-x-auto border-b border-slate-800/60 bg-slate-950/90 p-0.5'
+    ? 'order-1 grid w-full min-h-0 items-stretch gap-0.5 border-b border-slate-800/60 bg-slate-950/90 p-0.5 grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,1.9fr)_minmax(0,0.7fr)]'
     : 'order-2 flex min-h-0 min-w-0 flex-col gap-0.5 border-l border-slate-800/60 bg-slate-950/90 md:h-full md:overflow-y-auto';
-  const topBarItemClass = isPortraitLayout ? 'min-w-[16rem] max-w-[22rem] flex-1' : '';
+  const topBarItemClass = isPortraitLayout ? '' : '';
   const portraitItemHeight = isPortraitLayout ? 'h-64' : '';
 
   return (
