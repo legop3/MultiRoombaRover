@@ -5,7 +5,7 @@ const MOBILE_DISMISS_MS = 10000;
 const MAX_FONT_PX = 28;
 const MIN_FONT_PX = 14;
 
-export default function CommunityGoalBanner({ layout = 'desktop', className = '' }) {
+export default function CommunityGoalBanner({ layout = 'desktop', className = '', dismissable = true }) {
   const { session } = useSession();
   const goalText = session?.communityGoal?.text ? String(session.communityGoal.text).trim() : '';
   const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape' || layout === 'mobile';
@@ -22,7 +22,7 @@ export default function CommunityGoalBanner({ layout = 'desktop', className = ''
       return undefined;
     }
     setVisible(true);
-    if (!isMobile) return undefined;
+    if (!isMobile || !dismissable) return undefined;
     const startedAt = Date.now();
     setRemainingMs(MOBILE_DISMISS_MS);
     const timer = setTimeout(() => setVisible(false), MOBILE_DISMISS_MS);
@@ -81,14 +81,16 @@ export default function CommunityGoalBanner({ layout = 'desktop', className = ''
 
   const remainingSeconds = isMobile ? Math.ceil(remainingMs / 1000) : null;
 
+  const dismissProps = dismissable
+    ? { onClick: () => setVisible(false), role: 'button', tabIndex: 0 }
+    : {};
+
   return (
     <div
       ref={containerRef}
       className={containerClass}
       style={{ fontSize: `${fontSize}px`, lineHeight: 1.1 }}
-      onClick={() => setVisible(false)}
-      role="button"
-      tabIndex={0}
+      {...dismissProps}
     >
       <span className="flex w-full items-stretch gap-0.5 whitespace-nowrap rounded-md">
         <span className="flex flex-col justify-center border-r border-slate-700/60 px-0.5 text-[0.55em] font-semibold leading-tight text-slate-400">

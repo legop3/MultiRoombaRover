@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { SettingsProvider } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
@@ -13,6 +14,33 @@ import useDefaultNickname from '../hooks/useDefaultNickname.js';
 import CommunityGoalBanner from '../components/CommunityGoalBanner.jsx';
 import RoverQueuesPanel from '../components/RoverQueuesPanel.jsx';
 import RawUserPilePanel from '../components/RawUserPilePanel.jsx';
+
+function usePortraitLayout() {
+  const [isPortrait, setIsPortrait] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-aspect-ratio: 4/3)').matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const media = window.matchMedia('(max-aspect-ratio: 4/3)');
+    const handleChange = (event) => setIsPortrait(event.matches);
+    if (media.addEventListener) {
+      media.addEventListener('change', handleChange);
+    } else {
+      media.addListener(handleChange);
+    }
+    return () => {
+      if (media.removeEventListener) {
+        media.removeEventListener('change', handleChange);
+      } else {
+        media.removeListener(handleChange);
+      }
+    };
+  }, []);
+
+  return isPortrait;
+}
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
@@ -98,6 +126,7 @@ function SpectatorContent() {
   const inLockdown = session?.mode === 'lockdown';
   useDefaultNickname();
   useSpectatorMode();
+  const isPortraitLayout = usePortraitLayout();
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
   const snapshotFeeds = useRoverSnapshots(
@@ -122,10 +151,46 @@ function SpectatorContent() {
     );
   }
 
+  const mainClass = isPortraitLayout
+    ? 'flex min-h-screen flex-col bg-black text-slate-100 md:h-screen md:overflow-hidden'
+    : 'grid min-h-screen grid-cols-1 gap-0.5 bg-black text-slate-100 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]';
+  const contentClass = isPortraitLayout
+    ? 'order-2 flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto'
+    : 'order-1 flex min-h-0 min-w-0 flex-col gap-0.5 md:overflow-y-auto';
+  const sidebarClass = isPortraitLayout
+    ? 'order-1 flex min-h-0 w-full items-stretch gap-0.5 overflow-x-auto border-b border-slate-800/60 bg-slate-950/90 p-0.5'
+    : 'order-2 flex min-h-0 min-w-0 flex-col gap-0.5 border-l border-slate-800/60 bg-slate-950/90 md:h-full md:overflow-y-auto';
+  const topBarItemClass = isPortraitLayout ? 'min-w-[16rem] max-w-[22rem] flex-1' : '';
+
   return (
     <div className="min-h-screen bg-black text-slate-100 md:h-screen md:overflow-hidden">
-      <main className="grid min-h-screen grid-cols-1 gap-0.5 p-0 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:overflow-y-auto">
+      <main className={mainClass}>
+        <section className={sidebarClass}>
+          <div className={topBarItemClass}>
+            <CommunityGoalBanner layout="desktop" dismissable={false} className="text-sm" />
+          </div>
+          <div className={`${topBarItemClass} ${isPortraitLayout ? 'h-32 overflow-y-auto' : ''}`}>
+            <div className="panel h-full">
+              <RoverQueuesPanel title="Rovers" />
+            </div>
+          </div>
+          <div className={`${topBarItemClass} ${isPortraitLayout ? 'h-32' : 'flex-1 min-h-0'}`}>
+            <RawUserPilePanel
+              hideNicknameForm
+              hideHeader
+              compact
+              fillHeight
+              className="h-full"
+            />
+          </div>
+          <div className={`${topBarItemClass} ${isPortraitLayout ? 'h-32' : 'flex-[1.1] min-h-0'}`}>
+            <ChatPanel hideInput hideSpectatorNotice fillHeight />
+          </div>
+          <div className={`${topBarItemClass} ${isPortraitLayout ? 'h-32' : ''}`}>
+            <LogsRow className={`${isPortraitLayout ? 'h-full' : 'h-40'} overflow-hidden`} />
+          </div>
+        </section>
+        <section className={contentClass}>
           <RoverRow
             roster={roster}
             frames={frames}
@@ -134,21 +199,6 @@ function SpectatorContent() {
             session={session}
           />
           <SecondaryRow />
-        </section>
-        <section className="flex min-h-0 min-w-0 flex-col gap-0.5 md:h-full">
-          <CommunityGoalBanner layout="desktop" />
-          <div className="panel">
-            <RoverQueuesPanel title="Rovers" />
-          </div>
-          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <RawUserPilePanel hideNicknameForm hideHeader fillHeight className="h-full" />
-          </div>
-          <div className="min-h-0 min-w-0 flex-[1.1] overflow-hidden">
-            <ChatPanel hideInput hideSpectatorNotice fillHeight />
-          </div>
-          <div className="min-h-0 min-w-0">
-            <LogsRow className="h-40 overflow-hidden" />
-          </div>
         </section>
       </main>
       <AlertFeed />
