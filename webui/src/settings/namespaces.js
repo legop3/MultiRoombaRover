@@ -6,32 +6,78 @@ export const INPUT_SETTINGS_DEFAULTS = {
     tiltSpeed: 80,
     tiltIntervalMs: 110,
   },
-  gamepad: {
-    driveDeadzone: 0.2,
-    cameraDeadzone: 0.25,
-    servoStep: 2,
-    auxReverseScale: 0.55,
+};
+
+export const GAMEPAD_PROFILE_DEFAULT = {
+  label: 'Default',
+  calibration: {
+    driveDeadzone: 0.18,
+    cameraDeadzone: 0.08,
+    auxDeadzone: 0.05,
+    driveCurve: 'linear',
+    cameraCurve: 'linear',
+    auxCurve: 'linear',
+    cameraMode: 'absolute',
+    cameraSensitivity: 60,
+    auxSideScale: 0.55,
+  },
+  bindings: {
+    drive: {
+      kind: 'axisPair',
+      sources: [{ kind: 'axisPair', x: 0, y: 1, invertX: false, invertY: true }],
+    },
+    cameraTilt: {
+      kind: 'axis',
+      sources: [
+        { kind: 'axis', index: 3, invert: true },
+        { kind: 'axis', index: 1, invert: true },
+      ],
+    },
+    mainBrush: {
+      kind: 'axis',
+      sources: [
+        { kind: 'buttonAxis', index: 6 },
+        { kind: 'axis', index: 2, invert: false },
+      ],
+    },
+    sideBrush: {
+      kind: 'axis',
+      sources: [
+        { kind: 'buttonAxis', index: 7 },
+        { kind: 'axis', index: 5, invert: false },
+      ],
+    },
+    vacuum: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 0 }],
+    },
+    allAux: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 1 }],
+    },
+    mainReverse: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 4 }],
+    },
+    sideReverse: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 5 }],
+    },
+    driveMacro: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 2 }],
+    },
+    dockMacro: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 3 }],
+    },
   },
 };
 
-export const GAMEPAD_MAPPING_DEFAULT = {
-  drive: {
-    horizontal: null,
-    vertical: null,
-  },
-  camera: {
-    vertical: null,
-  },
-  brushes: {
-    mainAxis: null,
-    sideAxis: null,
-  },
-  buttons: {
-    allAux: null,
-    vacuum: null,
-    mainReverse: null,
-    sideReverse: null,
-    dock: null,
-    drive: null,
+export const GAMEPAD_SETTINGS_DEFAULTS = {
+  activeSignature: null,
+  profiles: {},
+  defaults: {
+    profile: GAMEPAD_PROFILE_DEFAULT,
   },
 };

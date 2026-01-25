@@ -102,9 +102,9 @@ export const HELP_CONTENT = {
         type: 'gamepad',
         title: 'Gamepad / joystick',
         items: [
-          'Gamepad controls are not mapped by default, this is because of how terribly inconsistent gamepad implementations are across browsers and devices.',
-          'You can map gamepad controls in Settings → Controller.',
-          'Use at your own risk, it may not be perfect depending on your setup.'
+          'Gamepad controls are fully configurable to handle inconsistent browser mappings.',
+          'Use Settings → Controller to bind inputs, calibrate deadzones, and view diagnostics.',
+          'If inputs behave oddly, the diagnostics panel will show raw axis/button values.'
         ],
       },
     ],

@@ -1,48 +1,57 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsNamespace } from '../settings/index.js';
-import { GAMEPAD_MAPPING_DEFAULT, INPUT_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
-
-function useGamepad() {
-  const [connected, setConnected] = useState(false);
-
-  useEffect(() => {
-    function updateStatus() {
-      const pads = navigator.getGamepads?.();
-      setConnected(Boolean(pads && Array.from(pads).some(Boolean)));
-    }
-    updateStatus();
-    window.addEventListener('gamepadconnected', updateStatus);
-    window.addEventListener('gamepaddisconnected', updateStatus);
-    const id = setInterval(updateStatus, 2000);
-    return () => {
-      window.removeEventListener('gamepadconnected', updateStatus);
-      window.removeEventListener('gamepaddisconnected', updateStatus);
-      clearInterval(id);
-    };
-  }, []);
-
-  return connected;
-}
+import { GAMEPAD_PROFILE_DEFAULT, GAMEPAD_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
+import {
+  computeGamepadOutputs,
+  createProfileForPad,
+} from '../controls/inputs/gamepadBindings.js';
+import { useGamepadHubState } from '../controls/inputs/gamepadHub.js';
 
 const NUMBER_FORMAT = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
 const ACTIONS = [
-  { id: 'driveHorizontal', label: 'Drive horizontal', type: 'axis', section: 'Drive joystick', path: ['drive', 'horizontal'] },
-  { id: 'driveVertical', label: 'Drive vertical', type: 'axis', section: 'Drive joystick', path: ['drive', 'vertical'] },
-  { id: 'cameraVertical', label: 'Camera vertical', type: 'axis', section: 'Camera joystick', path: ['camera', 'vertical'] },
-  { id: 'mainAxis', label: 'Main brush axis', type: 'axis', section: 'Brush analog', path: ['brushes', 'mainAxis'] },
-  { id: 'sideAxis', label: 'Side brush axis', type: 'axis', section: 'Brush analog', path: ['brushes', 'sideAxis'] },
-  { id: 'mainReverse', label: 'Toggle main reverse', type: 'button', section: 'Brush toggles', path: ['buttons', 'mainReverse'] },
-  { id: 'sideReverse', label: 'Toggle side reverse', type: 'button', section: 'Brush toggles', path: ['buttons', 'sideReverse'] },
-  { id: 'vacuum', label: 'Vacuum button', type: 'button', section: 'Auxiliary buttons', path: ['buttons', 'vacuum'] },
-  { id: 'allAux', label: 'All aux button', type: 'button', section: 'Auxiliary buttons', path: ['buttons', 'allAux'] },
-  { id: 'drive', label: 'Drive macro button', type: 'button', section: 'Mode buttons', path: ['buttons', 'drive'] },
-  { id: 'dock', label: 'Dock macro button', type: 'button', section: 'Mode buttons', path: ['buttons', 'dock'] },
+  {
+    id: 'drive',
+    label: 'Drive stick',
+    kind: 'axisPair',
+    section: 'Driving',
+    invertDefaults: { invertX: false, invertY: true },
+  },
+  {
+    id: 'cameraTilt',
+    label: 'Camera tilt',
+    kind: 'axis',
+    section: 'Camera',
+    invertDefaults: { invert: true },
+  },
+  {
+    id: 'mainBrush',
+    label: 'Main brush',
+    kind: 'axis',
+    section: 'Brushes',
+    invertDefaults: { invert: false },
+  },
+  {
+    id: 'sideBrush',
+    label: 'Side brush',
+    kind: 'axis',
+    section: 'Brushes',
+    invertDefaults: { invert: false },
+  },
+  { id: 'vacuum', label: 'Vacuum', kind: 'button', section: 'Aux buttons' },
+  { id: 'allAux', label: 'All aux', kind: 'button', section: 'Aux buttons' },
+  { id: 'mainReverse', label: 'Main reverse toggle', kind: 'button', section: 'Brush toggles' },
+  { id: 'sideReverse', label: 'Side reverse toggle', kind: 'button', section: 'Brush toggles' },
+  { id: 'driveMacro', label: 'Drive macro', kind: 'button', section: 'Mode macros' },
+  { id: 'dockMacro', label: 'Dock macro', kind: 'button', section: 'Mode macros' },
 ];
+
+const CAPTURE_AXIS_THRESHOLD = 0.45;
+const CAPTURE_BUTTON_THRESHOLD = 0.6;
 
 function SliderField({ label, description, min, max, step, value, onChange }) {
   return (
-    <label className="surface block">
+    <label className="surface-muted block p-0.5">
       <div className="flex items-center justify-between text-xs text-slate-300">
         <span className="font-semibold text-slate-100">{label}</span>
         <span className="font-mono text-slate-400">{NUMBER_FORMAT.format(value)}</span>
@@ -61,222 +70,531 @@ function SliderField({ label, description, min, max, step, value, onChange }) {
   );
 }
 
-function formatAxis(value) {
-  if (!value) return 'Unassigned';
-  return `Axis ${value.index}${value.invert ? ' (invert)' : ''}`;
+function formatSource(source) {
+  if (!source) return 'Unassigned';
+  if (source.kind === 'axisPair') {
+    const invert = `${source.invertX ? 'X inv ' : ''}${source.invertY ? 'Y inv' : ''}`.trim();
+    return `Axes ${source.x}/${source.y}${invert ? ` (${invert})` : ''}`;
+  }
+  if (source.kind === 'axis') {
+    return `Axis ${source.index}${source.invert ? ' (inv)' : ''}`;
+  }
+  if (source.kind === 'button') {
+    return `Button ${source.index}`;
+  }
+  if (source.kind === 'buttonAxis') {
+    return `Button ${source.index} (analog)`;
+  }
+  if (source.kind === 'axisButton') {
+    const dir = source.direction < 0 ? '<' : '>';
+    return `Axis ${source.index} ${dir} ${NUMBER_FORMAT.format(source.threshold ?? 0.6)}`;
+  }
+  return 'Unassigned';
 }
 
-function formatButton(value) {
-  if (!value) return 'Unassigned';
-  return `Button ${value.index}`;
+function groupActions(actions) {
+  return actions.reduce((acc, action) => {
+    const list = acc[action.section] || (acc[action.section] = []);
+    list.push(action);
+    return acc;
+  }, {});
 }
 
-function updatePath(mapping, path, updater) {
-  const [group, key] = path;
-  const next = { ...(mapping ?? GAMEPAD_MAPPING_DEFAULT) };
-  next[group] = { ...(next[group] ?? GAMEPAD_MAPPING_DEFAULT[group]) };
-  next[group][key] = updater(next[group][key]);
-  return next;
+function pickActivePad(pads, activeSignature) {
+  if (!pads || pads.length === 0) return null;
+  if (activeSignature) {
+    const match = pads.find((pad) => pad.signature === activeSignature);
+    if (match) return match;
+  }
+  return pads[0];
+}
+
+function snapshotBaseline(pad) {
+  return {
+    axes: Array.from(pad.axes ?? []),
+    buttons: (pad.buttons ?? []).map((btn) => ({
+      pressed: Boolean(btn?.pressed),
+      value: typeof btn?.value === 'number' ? btn.value : btn?.pressed ? 1 : 0,
+    })),
+  };
+}
+
+function detectAxisCapture(pad, baseline, action) {
+  const deltas = (pad.axes ?? []).map((value, index) => ({
+    index,
+    delta: Math.abs((value ?? 0) - (baseline.axes?.[index] ?? 0)),
+    value,
+  }));
+  deltas.sort((a, b) => b.delta - a.delta);
+  if (action.kind === 'axisPair') {
+    const top = deltas.filter((entry) => entry.delta > CAPTURE_AXIS_THRESHOLD).slice(0, 2);
+    if (top.length < 2) return null;
+    return {
+      kind: 'axisPair',
+      x: top[0].index,
+      y: top[1].index,
+      ...(action.invertDefaults ?? {}),
+    };
+  }
+  const match = deltas.find((entry) => entry.delta > CAPTURE_AXIS_THRESHOLD);
+  if (!match) return null;
+  return {
+    kind: 'axis',
+    index: match.index,
+    ...(action.invertDefaults ?? {}),
+  };
+}
+
+function detectButtonCapture(pad, baseline, action) {
+  const buttons = pad.buttons ?? [];
+  for (let i = 0; i < buttons.length; i += 1) {
+    const btn = buttons[i];
+    const value = typeof btn?.value === 'number' ? btn.value : btn?.pressed ? 1 : 0;
+    if (btn?.pressed || value > CAPTURE_BUTTON_THRESHOLD) {
+      if (action.kind === 'axis') {
+        return { kind: 'buttonAxis', index: i };
+      }
+      return { kind: 'button', index: i };
+    }
+  }
+  const axes = pad.axes ?? [];
+  for (let i = 0; i < axes.length; i += 1) {
+    const value = axes[i] ?? 0;
+    const delta = Math.abs(value - (baseline.axes?.[i] ?? 0));
+    if (Math.abs(value) > 0.7 && delta > 0.5) {
+      if (action.kind === 'axis') {
+        return { kind: 'axis', index: i, ...(action.invertDefaults ?? {}) };
+      }
+      return { kind: 'axisButton', index: i, direction: value >= 0 ? 1 : -1, threshold: 0.6 };
+    }
+  }
+  return null;
+}
+
+function buildDescriptorFromCapture(pad, baseline, action) {
+  if (!pad) return null;
+  if (action.kind === 'axis' || action.kind === 'axisPair') {
+    const axisDescriptor = detectAxisCapture(pad, baseline, action);
+    if (axisDescriptor) return axisDescriptor;
+  }
+  return detectButtonCapture(pad, baseline, action);
 }
 
 export default function GamepadMappingSettings() {
-  const gamepadConnected = useGamepad();
-  const { value: mapping, save, reset } = useSettingsNamespace('gamepadMapping', GAMEPAD_MAPPING_DEFAULT);
-  const { value: inputSettings, save: saveInputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
-  const gamepadTuning = inputSettings.gamepad ?? INPUT_SETTINGS_DEFAULTS.gamepad;
-  const [capture, setCapture] = useState(null);
-  const axisBaselineRef = useRef(null);
+  const hubState = useGamepadHubState();
+  const { value: gamepadSettings, save: saveGamepadSettings } = useSettingsNamespace(
+    'gamepad',
+    GAMEPAD_SETTINGS_DEFAULTS,
+  );
+  const [captureAction, setCaptureAction] = useState(null);
+  const baselineRef = useRef(null);
+  const grouped = useMemo(() => groupActions(ACTIONS), []);
 
-  const updateTuning = (patch) => {
-    saveInputSettings((prev) => ({
-      ...prev,
-      gamepad: { ...(prev.gamepad ?? INPUT_SETTINGS_DEFAULTS.gamepad), ...patch },
-    }));
-  };
+  const activePad = useMemo(
+    () => pickActivePad(hubState.pads, gamepadSettings.activeSignature),
+    [hubState.pads, gamepadSettings.activeSignature],
+  );
 
-  useEffect(() => {
-    axisBaselineRef.current = null;
-  }, [capture]);
-
-  useEffect(() => {
-    if (!capture) return undefined;
-    let raf;
-    const scan = () => {
-      const pads = navigator.getGamepads?.();
-      const pad = pads && Array.from(pads).find(Boolean);
-      if (pad) {
-        if (capture.type === 'axis') {
-          if (!axisBaselineRef.current) {
-            axisBaselineRef.current = Array.from(pad.axes ?? []).map((value) => value ?? 0);
-          }
-          for (let i = 0; i < pad.axes.length; i += 1) {
-            const value = pad.axes[i];
-            const baseline = axisBaselineRef.current?.[i] ?? 0;
-            const delta = Math.abs(value - baseline);
-            if (Math.abs(value) > 0.65 && delta > 0.5) {
-              save((prev) =>
-                updatePath(prev, capture.path, () => ({
-                  index: i,
-                  invert: value < 0,
-                })),
-              );
-              setCapture(null);
-              return;
-            }
-          }
-        } else if (capture.type === 'button') {
-          for (let i = 0; i < pad.buttons.length; i += 1) {
-            const btn = pad.buttons[i];
-            if (btn && (btn.pressed || btn.value > 0.6)) {
-              save((prev) => updatePath(prev, capture.path, () => ({ index: i })));
-              setCapture(null);
-              return;
-            }
-          }
-        }
-      }
-      raf = requestAnimationFrame(scan);
-    };
-    raf = requestAnimationFrame(scan);
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [capture, save]);
-
-  const grouped = useMemo(() => {
-    return ACTIONS.reduce((acc, action) => {
-      const list = acc[action.section] || (acc[action.section] = []);
-      list.push(action);
-      return acc;
-    }, {});
-  }, []);
-
-  const getStored = (action) => {
-    const [group, key] = action.path;
-    return mapping?.[group]?.[key] ?? null;
-  };
-
-  const getValueLabel = (action) => {
-    const stored = getStored(action);
-    return action.type === 'axis' ? formatAxis(stored) : formatButton(stored);
-  };
-
-  const handleClear = (action) => {
-    save((prev) => updatePath(prev, action.path, () => null));
-  };
-
-  const handleInvert = (action) => {
-    const stored = getStored(action);
-    if (!stored) return;
-    save((prev) =>
-      updatePath(prev, action.path, (current) => ({
-        ...current,
-        invert: !current?.invert,
-      })),
+  const activeSignature = activePad?.signature ?? null;
+  const activeProfile = useMemo(() => {
+    if (!activeSignature) {
+      return gamepadSettings?.defaults?.profile ?? GAMEPAD_PROFILE_DEFAULT;
+    }
+    return (
+      gamepadSettings?.profiles?.[activeSignature] ??
+      gamepadSettings?.defaults?.profile ??
+      GAMEPAD_PROFILE_DEFAULT
     );
-  };
+  }, [activeSignature, gamepadSettings?.defaults?.profile, gamepadSettings?.profiles]);
+
+  useEffect(() => {
+    if (!activePad || !activeSignature) return;
+    if (gamepadSettings?.profiles?.[activeSignature]) return;
+    saveGamepadSettings((prev) => {
+      const current = prev ?? GAMEPAD_SETTINGS_DEFAULTS;
+      if (current.profiles?.[activeSignature]) return current;
+      const base = current?.defaults?.profile ?? GAMEPAD_PROFILE_DEFAULT;
+      const nextProfile = createProfileForPad(activePad, base);
+      return {
+        ...current,
+        profiles: {
+          ...(current.profiles ?? {}),
+          [activeSignature]: nextProfile,
+        },
+      };
+    });
+  }, [activePad, activeSignature, gamepadSettings?.profiles, saveGamepadSettings]);
+
+  useEffect(() => {
+    baselineRef.current = null;
+  }, [captureAction, activeSignature]);
+
+  useEffect(() => {
+    if (!captureAction || !activePad) return;
+    if (!baselineRef.current) {
+      baselineRef.current = snapshotBaseline(activePad);
+      return;
+    }
+    const descriptor = buildDescriptorFromCapture(activePad, baselineRef.current, captureAction);
+    if (!descriptor) return;
+    saveGamepadSettings((prev) => {
+      const current = prev ?? GAMEPAD_SETTINGS_DEFAULTS;
+      const baseProfile =
+        current.profiles?.[activeSignature] ?? current?.defaults?.profile ?? GAMEPAD_PROFILE_DEFAULT;
+      const nextProfile = {
+        ...baseProfile,
+        bindings: {
+          ...(baseProfile.bindings ?? {}),
+          [captureAction.id]: {
+            ...(baseProfile.bindings?.[captureAction.id] ?? {}),
+            kind: captureAction.kind,
+            sources: [descriptor],
+          },
+        },
+      };
+      return {
+        ...current,
+        profiles: {
+          ...(current.profiles ?? {}),
+          [activeSignature]: nextProfile,
+        },
+      };
+    });
+    setCaptureAction(null);
+  }, [activePad, activeSignature, captureAction, saveGamepadSettings]);
+
+  const setActiveSignature = useCallback(
+    (signature) => {
+      saveGamepadSettings((prev) => ({
+        ...(prev ?? GAMEPAD_SETTINGS_DEFAULTS),
+        activeSignature: signature || null,
+      }));
+    },
+    [saveGamepadSettings],
+  );
+
+  const updateCalibration = useCallback(
+    (patch) => {
+      saveGamepadSettings((prev) => {
+        const current = prev ?? GAMEPAD_SETTINGS_DEFAULTS;
+        const baseProfile =
+          (activeSignature && current.profiles?.[activeSignature]) ??
+          current?.defaults?.profile ??
+          GAMEPAD_PROFILE_DEFAULT;
+        const nextProfile = {
+          ...baseProfile,
+          calibration: {
+            ...(baseProfile.calibration ?? {}),
+            ...patch,
+          },
+        };
+        if (!activeSignature) {
+          return {
+            ...current,
+            defaults: {
+              ...(current.defaults ?? {}),
+              profile: nextProfile,
+            },
+          };
+        }
+        return {
+          ...current,
+          profiles: {
+            ...(current.profiles ?? {}),
+            [activeSignature]: nextProfile,
+          },
+        };
+      });
+    },
+    [activeSignature, saveGamepadSettings],
+  );
+
+  const updateBinding = useCallback(
+    (actionId, updater) => {
+      saveGamepadSettings((prev) => {
+        const current = prev ?? GAMEPAD_SETTINGS_DEFAULTS;
+        const baseProfile =
+          (activeSignature && current.profiles?.[activeSignature]) ??
+          current?.defaults?.profile ??
+          GAMEPAD_PROFILE_DEFAULT;
+        const nextBinding = updater(baseProfile.bindings?.[actionId] ?? {});
+        const nextProfile = {
+          ...baseProfile,
+          bindings: {
+            ...(baseProfile.bindings ?? {}),
+            [actionId]: nextBinding,
+          },
+        };
+        if (!activeSignature) {
+          return {
+            ...current,
+            defaults: {
+              ...(current.defaults ?? {}),
+              profile: nextProfile,
+            },
+          };
+        }
+        return {
+          ...current,
+          profiles: {
+            ...(current.profiles ?? {}),
+            [activeSignature]: nextProfile,
+          },
+        };
+      });
+    },
+    [activeSignature, saveGamepadSettings],
+  );
+
+  const handleClear = useCallback(
+    (action) => {
+      updateBinding(action.id, (binding) => ({
+        ...binding,
+        sources: [],
+      }));
+    },
+    [updateBinding],
+  );
+
+  const handleInvert = useCallback(
+    (action, axisKey) => {
+      updateBinding(action.id, (binding) => {
+        const sources = Array.isArray(binding.sources) ? [...binding.sources] : [];
+        if (!sources[0]) return binding;
+        const next = { ...sources[0] };
+        if (axisKey === 'invertX') {
+          next.invertX = !next.invertX;
+        } else if (axisKey === 'invertY') {
+          next.invertY = !next.invertY;
+        } else {
+          next.invert = !next.invert;
+        }
+        sources[0] = next;
+        return { ...binding, sources };
+      });
+    },
+    [updateBinding],
+  );
+
+  const diagnostics = useMemo(() => {
+    if (!activePad) return null;
+    const outputs = computeGamepadOutputs(activePad, activeProfile);
+    return { outputs };
+  }, [activePad, activeProfile]);
 
   return (
     <section className="panel-section space-y-0.5 text-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-slate-400">Gamepad mapping</p>
+          <p className="text-xs text-slate-400">Controller</p>
           <p className="text-[0.65rem] text-slate-500">
-            {gamepadConnected
-              ? 'Move sticks/axes with a big sweep or press buttons when capturing.'
-              : 'Connect a controller to configure.'}
+            {activePad ? 'Move sticks or press buttons to bind' : 'Connect a controller to configure.'}
           </p>
-          {capture && (
-            <p className="mt-0 text-[0.7rem] text-emerald-400">Capturing {capture.label}…</p>
+          {captureAction && (
+            <p className="mt-0 text-[0.7rem] text-emerald-400">Capturing {captureAction.label}…</p>
           )}
         </div>
-        <button type="button" onClick={() => reset()} className="button-dark text-xs">
-          Clear all
-        </button>
       </div>
-      <div className="space-y-0.5">
-        <div className="space-y-0.5 surface">
-          <p className="text-[0.7rem] text-slate-500">Sensitivity &amp; feel</p>
-          <div className="space-y-0.5">
-            <SliderField
-              label="Drive deadzone"
-              description="Ignore small drive stick movement"
-              min={0}
-              max={0.6}
-              step={0.01}
-              value={gamepadTuning.driveDeadzone ?? 0.2}
-              onChange={(driveDeadzone) => updateTuning({ driveDeadzone })}
-            />
-            <SliderField
-              label="Camera deadzone"
-              description="Tilt stick sensitivity"
-              min={0}
-              max={0.6}
-              step={0.01}
-              value={gamepadTuning.cameraDeadzone ?? 0.25}
-              onChange={(cameraDeadzone) => updateTuning({ cameraDeadzone })}
-            />
-            <SliderField
-              label="Servo step (deg)"
-              description="Degrees per camera tick"
-              min={0.5}
-              max={6}
-              step={0.25}
-              value={gamepadTuning.servoStep ?? 2}
-              onChange={(servoStep) => updateTuning({ servoStep })}
-            />
-            <SliderField
-              label="Side reverse multiplier"
-              description="Scale when reversing the side brush"
-              min={0.3}
-              max={1}
-              step={0.05}
-              value={gamepadTuning.auxReverseScale ?? 0.55}
-              onChange={(auxReverseScale) => updateTuning({ auxReverseScale })}
-            />
+
+      <div className="space-y-0.5 surface">
+        <p className="text-[0.7rem] text-slate-500">Connected controller</p>
+        {hubState.pads.length === 0 ? (
+          <p className="text-[0.7rem] text-slate-400">No controller detected.</p>
+        ) : (
+          <div className="flex items-center justify-between gap-0.5 text-xs">
+            <select
+              value={activeSignature ?? ''}
+              onChange={(event) => setActiveSignature(event.target.value)}
+              className="flex-1 rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-[0.75rem] text-slate-100"
+            >
+              {hubState.pads.map((pad) => (
+                <option key={pad.signature} value={pad.signature}>
+                  {pad.id || 'Unknown controller'}
+                </option>
+              ))}
+            </select>
+            <span className="text-[0.7rem] text-slate-400">{activePad?.mapping ?? 'unknown'}</span>
           </div>
+        )}
+      </div>
+
+      <div className="space-y-0.5 surface">
+        <p className="text-[0.7rem] text-slate-500">Calibration</p>
+        <div className="space-y-0.5">
+          <SliderField
+            label="Drive deadzone"
+            description="Ignore small drive stick drift"
+            min={0}
+            max={0.6}
+            step={0.01}
+            value={activeProfile.calibration?.driveDeadzone ?? 0.18}
+            onChange={(value) => updateCalibration({ driveDeadzone: value })}
+          />
+          <SliderField
+            label="Camera deadzone"
+            description="Ignore small camera tilt drift"
+            min={0}
+            max={0.4}
+            step={0.01}
+            value={activeProfile.calibration?.cameraDeadzone ?? 0.08}
+            onChange={(value) => updateCalibration({ cameraDeadzone: value })}
+          />
+          <SliderField
+            label="Aux deadzone"
+            description="Ignore small trigger noise"
+            min={0}
+            max={0.4}
+            step={0.01}
+            value={activeProfile.calibration?.auxDeadzone ?? 0.05}
+            onChange={(value) => updateCalibration({ auxDeadzone: value })}
+          />
+          <SliderField
+            label="Side brush scale"
+            description="Scale side brush output"
+            min={0.3}
+            max={1}
+            step={0.05}
+            value={activeProfile.calibration?.auxSideScale ?? 0.55}
+            onChange={(value) => updateCalibration({ auxSideScale: value })}
+          />
+          <label className="surface-muted block p-0.5">
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span className="font-semibold text-slate-100">Camera mode</span>
+              <select
+                value={activeProfile.calibration?.cameraMode ?? 'absolute'}
+                onChange={(event) => updateCalibration({ cameraMode: event.target.value })}
+                className="rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-[0.75rem] text-slate-100"
+              >
+                <option value="absolute">Absolute</option>
+                <option value="velocity">Velocity</option>
+              </select>
+            </div>
+            <p className="text-[0.65rem] text-slate-500">Absolute maps stick to angle; velocity moves over time.</p>
+          </label>
+          <SliderField
+            label="Camera sensitivity"
+            description="Velocity mode degrees per second"
+            min={10}
+            max={180}
+            step={5}
+            value={activeProfile.calibration?.cameraSensitivity ?? 60}
+            onChange={(value) => updateCalibration({ cameraSensitivity: value })}
+          />
         </div>
+      </div>
+
+      <div className="space-y-0.5">
         {Object.entries(grouped).map(([section, actions]) => (
           <div key={section} className="space-y-0.5 surface">
             <p className="text-[0.7rem] text-slate-500">{section}</p>
             <div className="space-y-0.5">
-              {actions.map((action) => (
-                <div key={action.id} className="surface-muted flex items-center justify-between text-xs">
-                  <div>
-                    <p className="font-semibold text-slate-100">{action.label}</p>
-                    <p className="text-[0.65rem] text-slate-400">{getValueLabel(action)}</p>
-                  </div>
-                  <div className="flex items-center gap-0.5">
-                    {action.type === 'axis' && (
+              {actions.map((action) => {
+                const binding = activeProfile.bindings?.[action.id];
+                const source = binding?.sources?.[0] ?? null;
+                return (
+                  <div key={action.id} className="surface-muted flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-100">{action.label}</p>
+                      <p className="text-[0.65rem] text-slate-400">{formatSource(source)}</p>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      {action.kind === 'axisPair' && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={!source}
+                            onClick={() => handleInvert(action, 'invertX')}
+                            className="button-dark text-[0.7rem] font-medium disabled:opacity-50"
+                          >
+                            Invert X
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!source}
+                            onClick={() => handleInvert(action, 'invertY')}
+                            className="button-dark text-[0.7rem] font-medium disabled:opacity-50"
+                          >
+                            Invert Y
+                          </button>
+                        </>
+                      )}
+                      {action.kind === 'axis' && (
+                        <button
+                          type="button"
+                          disabled={!source}
+                          onClick={() => handleInvert(action)}
+                          className="button-dark text-[0.7rem] font-medium disabled:opacity-50"
+                        >
+                          Invert
+                        </button>
+                      )}
+                      <button type="button" onClick={() => handleClear(action)} className="button-dark text-[0.7rem]">
+                        Clear
+                      </button>
                       <button
                         type="button"
-                        disabled={!getStored(action)}
-                        onClick={() => handleInvert(action)}
+                        onClick={() => setCaptureAction(action)}
                         className={`${
-                          getStored(action)?.invert
-                            ? 'px-0.5 py-0.5 bg-amber-400 text-amber-900 hover:bg-amber-300'
+                          captureAction?.id === action.id
+                            ? 'px-0.5 py-0.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400'
                             : 'button-dark'
-                        } text-[0.7rem] font-medium disabled:opacity-50 disabled:cursor-not-allowed`}
+                        } text-[0.7rem] font-medium`}
                       >
-                        Invert
+                        {captureAction?.id === action.id ? 'Waiting…' : 'Capture'}
                       </button>
-                    )}
-                    <button type="button" onClick={() => handleClear(action)} className="button-dark text-[0.7rem]">
-                      Clear
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCapture(action)}
-                      className={`${capture?.id === action.id ? 'px-0.5 py-0.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400' : 'button-dark'} text-[0.7rem] font-medium`}
-                    >
-                      {capture?.id === action.id ? 'Waiting…' : 'Capture'}
-                    </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="space-y-0.5 surface">
+        <p className="text-[0.7rem] text-slate-500">Diagnostics</p>
+        {!activePad ? (
+          <p className="text-[0.7rem] text-slate-400">No controller detected.</p>
+        ) : (
+          <div className="space-y-0.5 text-[0.7rem] text-slate-300">
+            <p className="text-slate-400">Raw axes</p>
+            <div className="grid grid-cols-2 gap-0.5">
+              {activePad.axes.map((value, index) => (
+                <span key={`axis-${index}`} className="font-mono text-slate-300">
+                  A{index}: {NUMBER_FORMAT.format(value)}
+                </span>
+              ))}
+            </div>
+            <p className="text-slate-400">Raw buttons</p>
+            <div className="grid grid-cols-2 gap-0.5">
+              {activePad.buttons.map((btn, index) => (
+                <span key={`btn-${index}`} className="font-mono text-slate-300">
+                  B{index}: {NUMBER_FORMAT.format(btn.value)} {btn.pressed ? '●' : ''}
+                </span>
+              ))}
+            </div>
+            {diagnostics?.outputs && (
+              <>
+                <p className="text-slate-400">Mapped outputs</p>
+                <div className="grid grid-cols-2 gap-0.5">
+                  <span className="font-mono text-slate-300">
+                    Drive: {NUMBER_FORMAT.format(diagnostics.outputs.driveVector.x)},{' '}
+                    {NUMBER_FORMAT.format(diagnostics.outputs.driveVector.y)}
+                  </span>
+                  <span className="font-mono text-slate-300">
+                    Camera: {NUMBER_FORMAT.format(diagnostics.outputs.cameraAxis)}
+                  </span>
+                  <span className="font-mono text-slate-300">
+                    Main: {NUMBER_FORMAT.format(diagnostics.outputs.auxAxis.main)}
+                  </span>
+                  <span className="font-mono text-slate-300">
+                    Side: {NUMBER_FORMAT.format(diagnostics.outputs.auxAxis.side)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );
