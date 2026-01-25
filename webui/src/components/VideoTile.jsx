@@ -633,55 +633,79 @@ function HudOverlay({
       ['Charge', sensors?.batteryChargeMah != null ? `${sensors.batteryChargeMah}` : '--'],
       ['OI', sensors?.oiMode?.label || '--'],
     ];
+    const docked = Boolean(sensors?.chargingSources?.homeBase);
+    const chargingLabel = sensors?.chargingState?.label || '';
+    const charging = Boolean(chargingLabel && chargingLabel.toLowerCase() !== 'not charging');
+    const oiLabel = sensors?.oiMode?.label || 'Unknown';
+    const oiNormalized = oiLabel.toLowerCase();
+    const oiTone =
+      oiNormalized === 'full'
+        ? 'bg-emerald-500/80 text-emerald-50'
+        : oiNormalized === 'safe'
+          ? 'bg-amber-400/80 text-amber-950'
+          : oiNormalized === 'passive'
+            ? 'bg-slate-700/80 text-slate-100'
+            : 'bg-slate-700/60 text-slate-200';
+    const dockTone = docked ? 'bg-emerald-500/80 text-emerald-50' : 'bg-slate-700/70 text-slate-200';
+    const chargingTone = charging
+      ? 'bg-emerald-500/80 text-emerald-50'
+      : docked
+        ? 'bg-amber-400/80 text-amber-950'
+        : 'bg-slate-700/70 text-slate-200';
     return (
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      <>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div className={`absolute ${statusPosClass} font-medium text-slate-100 ${statusTextClass}`}>
           <div className="flex flex-col gap-0.5 leading-none">
             <span>Status: {status}</span>
             {audioStatus ? <span>Audio: {audioStatus}</span> : null}
           </div>
         </div>
-        <div
-          className={`absolute ${telemetryPosClass} flex -translate-y-1/2 flex-col gap-0.5 bg-black/70 text-slate-100 ${statusTextClass} ${statusPadClass}`}
-        >
-          <div className="space-y-0.5 leading-tight">
-            <span className={`${isMobile ? 'text-[0.45rem]' : 'text-[0.6rem]'} uppercase tracking-wide text-slate-400`}>
-              Telemetry
-            </span>
-            {telemetryEntries.map(([labelText, value]) => (
-              <span key={labelText} className="flex items-center justify-between gap-0.5">
-                <span className="text-slate-400">{labelText}</span>
-                <span className="font-semibold text-white">{value}</span>
-              </span>
-            ))}
-          </div>
-          {showTopDown ? (
-            <div className="flex items-center justify-center pt-0.25">
-              <div
-                className="pointer-events-none rounded"
-                style={{
-                  width: isMobile ? '110px' : '130px',
-                  height: isMobile ? '110px' : '130px',
-                  opacity: isMobile ? 0.85 : 0.9,
-                  transform: isMobile ? 'scale(0.7)' : 'scale(0.85)',
-                  transformOrigin: 'top left',
-                }}
-              >
-                <TopDownMap sensors={sensors} size={isMobile ? 160 : 160} overlay />
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <div className={`absolute ${labelPosClass} left-1/2`} style={labelWrapperStyle}>
           <div
-            className={`flex items-center gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
+            className={`absolute ${telemetryPosClass} flex -translate-y-1/2 flex-col gap-0.5 bg-black/70 text-slate-100 ${statusTextClass} ${statusPadClass}`}
           >
-            <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
-            {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
+            <div className="space-y-0.5 leading-tight">
+              <div className="flex flex-col gap-0.5 text-[0.75rem] font-semibold uppercase tracking-wide">
+                <span className={`rounded px-1.5 py-0.5 ${dockTone}`}>{docked ? 'Docked' : 'Undocked'}</span>
+                <span className={`rounded px-1.5 py-0.5 ${chargingTone}`}>
+                  {charging ? 'Charging' : docked ? 'Not charging' : 'Not charging'}
+                </span>
+                <span className={`rounded px-1.5 py-0.5 ${oiTone}`}>OI: {oiLabel}</span>
+              </div>
+              {/* <span
+                className={`${isMobile ? 'text-[0.45rem]' : 'text-[0.6rem]'} uppercase tracking-wide text-slate-400`}
+              >
+                Telemetry
+              </span> */}
+              {telemetryEntries.map(([labelText, value]) => (
+                <span key={labelText} className="flex items-center justify-between gap-0.5">
+                  <span className="text-slate-400">{labelText}</span>
+                  <span className="font-semibold text-white">{value}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className={`absolute ${labelPosClass} left-1/2`} style={labelWrapperStyle}>
+            <div
+              className={`flex items-center gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
+            >
+              <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
+              {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
+            </div>
           </div>
         </div>
-      </div>
+        {showTopDown ? (
+          <div
+            className="pointer-events-none absolute rounded"
+            style={{
+              ...mapStyle,
+            }}
+          >
+            <TopDownMap sensors={sensors} size={240} overlay />
+          </div>
+        ) : null}
+      </>
     );
   }
 

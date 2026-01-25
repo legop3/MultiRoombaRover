@@ -69,7 +69,7 @@ function RoverSpectatorCard({ rover, frame, snapshotFeed, audioInfo, session }) 
           hudVariant="spectator"
           driverLabel={driverLabel}
           hudForceMap
-          hudMapPosition="bottom-left"
+          hudMapPosition="top-center"
         />
       </div>
     </article>
