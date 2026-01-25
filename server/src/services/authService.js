@@ -3,6 +3,7 @@ const io = require('../globals/io');
 const logger = require('../globals/logger').child('authService');
 const { loadConfig } = require('../helpers/configLoader');
 const { clearLockdownTimer } = require('./lockdownGuard');
+const { getMode, MODES } = require('./modeManager');
 const { setRole } = require('./roleService');
 
 const config = loadConfig();
@@ -41,6 +42,9 @@ io.on('connection', (socket) => {
   socket.on('auth:login', async ({ username, password }, cb = () => {}) => {
     try {
       const admin = await authenticate(username, password);
+      if (getMode() === MODES.LOCKDOWN && !admin.lockdown) {
+        throw new Error('Lockdown admins only');
+      }
       const role = admin.lockdown ? 'lockdown' : 'admin';
       socket.data.user = { username: admin.username, discordId: admin.discord_id };
       setRole(socket, role);

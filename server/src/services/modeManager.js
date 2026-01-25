@@ -16,8 +16,11 @@ let currentMode = MODES.ADMIN;
 const modeEvents = new EventEmitter();
 
 function canChangeMode(socket, nextMode) {
-  if (nextMode === MODES.LOCKDOWN) {
+  if (currentMode === MODES.LOCKDOWN && nextMode !== MODES.LOCKDOWN) {
     return isLockdownAdmin(socket);
+  }
+  if (nextMode === MODES.LOCKDOWN) {
+    return isAdmin(socket);
   }
   return isAdmin(socket);
 }

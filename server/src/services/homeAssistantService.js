@@ -5,7 +5,7 @@ const io = require('../globals/io');
 const logger = require('../globals/logger').child('homeAssistantService');
 const { loadConfig } = require('../helpers/configLoader');
 const { getMode } = require('./modeManager');
-const { isAdmin } = require('./roleService');
+const { isAdmin, isLockdownAdmin } = require('./roleService');
 
 // home-assistant-js-websocket expects a global WebSocket in Node.
 if (!global.WebSocket) {
@@ -231,7 +231,11 @@ connect();
 
 io.on('connection', (socket) => {
   socket.on('homeAssistant:toggle', async ({ entityId } = {}, cb = () => {}) => {
-    if ((getMode() === 'admin' || getMode() === 'lockdown') && isAdmin(socket) !== true) {
+    const mode = getMode();
+    if (
+      (mode === 'admin' && isAdmin(socket) !== true) ||
+      (mode === 'lockdown' && isLockdownAdmin(socket) !== true)
+    ) {
       return cb({ error: 'Insufficient permissions to control Home Assistant' });
     }
     
@@ -245,7 +249,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('homeAssistant:setState', async ({ entityId, state } = {}, cb = () => {}) => {
-    if ((getMode() === 'admin' || getMode() === 'lockdown') && isAdmin(socket) !== true) {
+    const mode = getMode();
+    if (
+      (mode === 'admin' && isAdmin(socket) !== true) ||
+      (mode === 'lockdown' && isLockdownAdmin(socket) !== true)
+    ) {
       return cb({ error: 'Insufficient permissions to control Home Assistant' });
     }
 

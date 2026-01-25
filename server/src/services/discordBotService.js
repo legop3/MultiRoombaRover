@@ -36,6 +36,12 @@ const enabled = Boolean(discordConfig.token);
 const adminIds = new Set(
   (config.admins || []).map((a) => String(a.discord_id || '').trim()).filter(Boolean),
 );
+const lockdownAdminIds = new Set(
+  (config.admins || [])
+    .filter((admin) => admin.lockdown)
+    .map((admin) => String(admin.discord_id || '').trim())
+    .filter(Boolean),
+);
 
 if (!enabled) {
   logger.info('Discord bot disabled; missing token in config.discord.token');
@@ -244,6 +250,10 @@ function isAdminUser(discordId) {
   return adminIds.has(String(discordId || '').trim());
 }
 
+function isLockdownAdminUser(discordId) {
+  return lockdownAdminIds.has(String(discordId || '').trim());
+}
+
 function formatHelp() {
   return [
     '**Rover Bot Commands**',
@@ -447,7 +457,8 @@ async function handleModeCommand(message, mode) {
     return;
   }
   try {
-    setMode(next, null, { force: true });
+    const role = isLockdownAdminUser(message.author?.id) ? 'lockdown' : 'admin';
+    setMode(next, { data: { role, user: { username: `discord:${message.author?.username || 'unknown'}` } } });
     await message.reply({
       content: sanitizeMentions(`Mode set to ${next}.`),
       allowedMentions: { parse: [], repliedUser: false },
@@ -685,7 +696,10 @@ async function handleCommand(message) {
   tokens.shift(); // remove prefix
   const action = (tokens.shift() || '').toLowerCase();
   const isAdmin = isAdminUser(message.author.id);
+  const isLockdownAdmin = isLockdownAdminUser(message.author.id);
   const isBridgeAdmin = action === 'bridge' ? canManageBridge(message) : false;
+  const mode = getMode();
+  const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal']);
 
   if (
     !isAdmin &&
@@ -698,6 +712,14 @@ async function handleCommand(message) {
     action !== 'goal'
   ) {
     return; // ignore non-admins for privileged commands
+  }
+
+  if (mode === MODES.LOCKDOWN && moderationActions.has(action) && !isLockdownAdmin) {
+    await message.reply({
+      content: 'Lockdown mode: only lockdown admins can run that command.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
   }
 
   switch (action) {

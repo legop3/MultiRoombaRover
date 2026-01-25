@@ -22,12 +22,6 @@ function enforceLockdown() {
   }
 }
 
-io.on('connection', (socket) => {
-  if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
-    disconnectForLockdown(socket);
-  }
-});
-
 module.exports = {
   enforceLockdown,
   disconnectForLockdown,

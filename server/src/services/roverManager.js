@@ -5,7 +5,7 @@ const { sendAlert } = require('./alertService');
 const ALERT_COLOR = '#8bc34a';
 const { parseSensorFrame } = require('../helpers/sensorDecoder');
 const { MODES, getMode } = require('./modeManager');
-const { isAdmin, roleEvents } = require('./roleService');
+const { isAdmin, isLockdownAdmin, roleEvents } = require('./roleService');
 const { publishEvent } = require('./eventBus');
 const videoSessions = require('./videoSessions');
 
@@ -442,7 +442,7 @@ function requestControl(roverId, socket, options = {}) {
   if (!allowUser && mode === MODES.ADMIN && !isAdmin(socket)) {
     throw new Error('Admins only');
   }
-  if (!allowUser && mode === MODES.LOCKDOWN && !isAdmin(socket)) {
+  if (!allowUser && mode === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
     throw new Error('Server in lockdown');
   }
   record.drivers.add(socket.id);
@@ -485,6 +485,10 @@ function isDriver(roverId, socket) {
 }
 
 function canDrive(roverId, socket) {
+  const mode = getMode();
+  if (mode === MODES.LOCKDOWN) {
+    return isLockdownAdmin(socket);
+  }
   if (isAdmin(socket)) {
     return true;
   }
@@ -586,7 +590,11 @@ io.on('connection', (socket) => {
       if (socket.data?.role === 'spectator') {
         throw new Error('Spectators cannot drive');
       }
-      if ((getMode() === MODES.ADMIN || getMode() === MODES.LOCKDOWN) && !isAdmin(socket)) {
+      const mode = getMode();
+      if (
+        (mode === MODES.ADMIN && !isAdmin(socket)) ||
+        (mode === MODES.LOCKDOWN && !isLockdownAdmin(socket))
+      ) {
         throw new Error('Admins only');
       }
       const targetId = roverId || Array.from(rovers.keys())[0];

@@ -2,7 +2,7 @@ const EventEmitter = require('events');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('assignment');
 const { MODES, getMode, modeEvents } = require('./modeManager');
-const { roleEvents, getRole, isAdmin } = require('./roleService');
+const { roleEvents, getRole, isAdmin, isLockdownAdmin } = require('./roleService');
 const roverManager = require('./roverManager');
 
 const socketRefs = new Map(); // socketId -> socket
@@ -28,11 +28,17 @@ roleEvents.on('change', ({ socket, role }) => {
 });
 
 modeEvents.on('change', (mode) => {
-  if (mode === MODES.ADMIN || mode === MODES.LOCKDOWN) {
-    // release non-admin drivers
+  if (mode === MODES.ADMIN) {
     for (const [socketId, roverId] of assignments.entries()) {
       const socket = socketRefs.get(socketId);
       if (socket && !isAdmin(socket)) {
+        releaseAssignment(socket, roverId);
+      }
+    }
+  } else if (mode === MODES.LOCKDOWN) {
+    for (const [socketId, roverId] of assignments.entries()) {
+      const socket = socketRefs.get(socketId);
+      if (socket && !isLockdownAdmin(socket)) {
         releaseAssignment(socket, roverId);
       }
     }

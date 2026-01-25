@@ -5,6 +5,7 @@ import ChatPanel from './ChatPanel.jsx';
 import NicknameForm from './NicknameForm.jsx';
 
 const PRIVILEGED_ROLES = new Set(['admin', 'lockdown', 'lockdown-admin']);
+const LOCKDOWN_ROLES = new Set(['lockdown', 'lockdown-admin']);
 const RESTRICTED_MODES = new Set(['admin', 'lockdown']);
 
 function getModeDetails(mode = 'admin') {
@@ -27,7 +28,7 @@ export default function ModeGateOverlay() {
   const mode = session?.mode;
   const role = session?.role;
   const restricted = RESTRICTED_MODES.has(mode);
-  const privileged = PRIVILEGED_ROLES.has(role);
+  const privileged = mode === 'lockdown' ? LOCKDOWN_ROLES.has(role) : PRIVILEGED_ROLES.has(role);
 
   if (!restricted || privileged) {
     return null;
