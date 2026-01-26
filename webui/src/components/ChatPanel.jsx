@@ -8,7 +8,12 @@ import ChatTypingRow from './ChatTypingRow.jsx';
 const FLITE_VOICES = ['kal', 'rms', 'slt', 'ksp', 'bdl'];
 const ESPEAK_PITCHES = Array.from({ length: 10 }, (_, idx) => idx * 10);
 
-export default function ChatPanel({ hideInput = false, hideSpectatorNotice = false, fillHeight = false }) {
+export default function ChatPanel({
+  hideInput = false,
+  hideSpectatorNotice = false,
+  fillHeight = false,
+  allowSpectatorInput = false,
+}) {
   const { session } = useSession();
   const {
     messages,
@@ -30,7 +35,7 @@ export default function ChatPanel({ hideInput = false, hideSpectatorNotice = fal
   const [engine, setEngine] = useState(() => ttsSettings?.engine || 'flite');
   const [voice, setVoice] = useState(() => ttsSettings?.voice || 'rms');
   const [pitch, setPitch] = useState(() => (Number.isFinite(ttsSettings?.pitch) ? ttsSettings.pitch : 50));
-  const canChat = session?.role !== 'spectator';
+  const canChat = session?.role !== 'spectator' || allowSpectatorInput;
   const listRef = useRef(null);
   const currentRoverId = session?.assignment?.roverId || null;
 

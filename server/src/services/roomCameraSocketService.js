@@ -7,7 +7,7 @@ const { roomCameraStreamEvents, getRoomCameraState } = require('./roomCameraSnap
 
 const SUBSCRIBE_LIMIT = 50;
 const SUBSCRIBE_WINDOW_MS = 10000;
-const STREAM_INTERVAL_MS = 800;
+const STREAM_INTERVAL_MS = 1000;
 
 function passesMode(socket) {
   const mode = getMode();

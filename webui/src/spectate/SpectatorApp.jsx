@@ -190,7 +190,7 @@ function SpectatorContent() {
             </div>
           ) : null}
           <div className={`${topBarItemClass} ${isPortraitLayout ? portraitItemHeight : 'flex-[1.1] min-h-0'}`}>
-            <ChatPanel hideInput hideSpectatorNotice fillHeight />
+            <ChatPanel allowSpectatorInput hideSpectatorNotice fillHeight />
           </div>
           <div className={`${topBarItemClass} ${isPortraitLayout ? portraitItemHeight : ''}`}>
             <LogsRow className={`${isPortraitLayout ? 'h-full' : 'h-40'} overflow-hidden`} />
