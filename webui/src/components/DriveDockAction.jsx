@@ -122,7 +122,7 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
   };
   const dockValue = docked ? 'Docked' : 'Undocked';
   const dockTone = docked ? 'good' : 'bad';
-  const chargeValue = charging ? 'Charging' : docked ? 'Not charging yet' : '—';
+  const chargeValue = charging ? 'Charging' : docked ? 'Charging in 5s' : '—';
   const chargeTone = charging ? 'good' : docked ? 'warn' : 'bad';
 
   const handleReturnToDrive = async () => {
