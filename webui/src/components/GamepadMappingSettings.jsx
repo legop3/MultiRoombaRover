@@ -44,6 +44,7 @@ const ACTIONS = [
   { id: 'sideReverse', label: 'Side reverse toggle', kind: 'button', section: 'Brush toggles' },
   { id: 'driveMacro', label: 'Drive macro', kind: 'button', section: 'Mode macros' },
   { id: 'dockMacro', label: 'Dock macro', kind: 'button', section: 'Mode macros' },
+  { id: 'nightVisionToggle', label: 'Night vision toggle', kind: 'button', section: 'Camera' },
 ];
 
 const CAPTURE_AXIS_THRESHOLD = 0.45;

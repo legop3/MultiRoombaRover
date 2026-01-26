@@ -161,6 +161,7 @@ export function computeGamepadOutputs(padState, profile) {
   const sideReverseSource = resolveButtonSource(padState, bindings.sideReverse?.sources);
   const driveMacroSource = resolveButtonSource(padState, bindings.driveMacro?.sources);
   const dockMacroSource = resolveButtonSource(padState, bindings.dockMacro?.sources);
+  const nightVisionSource = resolveButtonSource(padState, bindings.nightVisionToggle?.sources);
 
   return {
     driveVector: { x: driveX, y: driveY, boost: false },
@@ -173,6 +174,7 @@ export function computeGamepadOutputs(padState, profile) {
       sideReverse: sideReverseSource.pressed,
       driveMacro: driveMacroSource.pressed,
       dockMacro: dockMacroSource.pressed,
+      nightVisionToggle: nightVisionSource.pressed,
     },
     sources: {
       drive: driveSource.source,
@@ -185,6 +187,7 @@ export function computeGamepadOutputs(padState, profile) {
       sideReverse: sideReverseSource.source,
       driveMacro: driveMacroSource.source,
       dockMacro: dockMacroSource.source,
+      nightVisionToggle: nightVisionSource.source,
     },
   };
 }

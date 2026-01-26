@@ -71,6 +71,10 @@ export const GAMEPAD_PROFILE_DEFAULT = {
       kind: 'button',
       sources: [{ kind: 'button', index: 3 }],
     },
+    nightVisionToggle: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 9 }],
+    },
   },
 };
 

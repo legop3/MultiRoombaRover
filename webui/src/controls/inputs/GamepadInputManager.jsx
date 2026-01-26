@@ -39,6 +39,7 @@ export default function GamepadInputManager() {
       setAuxMotors,
       setServoAngle,
       runMacro,
+      toggleNightVision,
       registerInputState,
     },
   } = useControlSystem();
@@ -212,6 +213,12 @@ export default function GamepadInputManager() {
         handleButtonEdge('dockMacro', false);
       }
 
+      if (outputs.buttons.nightVisionToggle && handleButtonEdge('nightVisionToggle', true)) {
+        toggleNightVision();
+      } else if (!outputs.buttons.nightVisionToggle) {
+        handleButtonEdge('nightVisionToggle', false);
+      }
+
       if (Math.abs(outputs.cameraAxis) > 0.001) {
         handleCameraAxis(outputs.cameraAxis, profile.calibration);
       }
@@ -241,6 +248,7 @@ export default function GamepadInputManager() {
     setAuxMotors,
     setDriveVector,
     setMode,
+    toggleNightVision,
   ]);
 
   return null;

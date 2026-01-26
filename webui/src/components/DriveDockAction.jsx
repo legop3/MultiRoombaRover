@@ -21,15 +21,21 @@ export function useDriveDockState(roverId) {
   return useMemo(() => deriveDriveDockState(frame), [frame]);
 }
 
-function StatusPill({ label, active }) {
+function StatusRow({ label, value, tone = 'neutral' }) {
+  const toneClasses =
+    tone === 'good'
+      ? 'border-emerald-200 bg-emerald-600 text-white'
+      : tone === 'warn'
+        ? 'border-amber-200 bg-amber-600 text-white'
+        : tone === 'bad'
+          ? 'border-red-200 bg-red-600 text-white'
+          : 'border-slate-200/30 bg-slate-700 text-slate-100';
   return (
-    <span
-      className={`rounded-xl px-1.5 py-0.5 text-[0.75rem] font-semibold ${
-        active ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
-      }`}
+    <div
+      className={`flex flex-1 flex-col items-center justify-center rounded-lg border px-0.75 py-0.5 text-center ${toneClasses}`}
     >
-      {label}
-    </span>
+      <span className="text-base font-semibold md:text-lg">{value}</span>
+    </div>
   );
 }
 
@@ -93,7 +99,7 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
   } = useControlSystem();
   const frame = useTelemetryFrame(roverId);
   const state = driveDockState ?? deriveDriveDockState(frame);
-  const { driving, docked, charging, dockedNotCharging, dockingInProgress, oiLabel } = state;
+  const { driving, docked, charging, dockingInProgress } = state;
   const [pending, setPending] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -114,6 +120,10 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
     summary: 'You must enable driving mode before you can move the rover.',
     steps: ['Press the keybind or tap this button to enable driving mode', 'Once ready (should be instant), this dialog will change, and you will be able to move'],
   };
+  const dockValue = docked ? 'Docked' : 'Undocked';
+  const dockTone = docked ? 'good' : 'bad';
+  const chargeValue = charging ? 'Charging' : docked ? 'Not charging yet' : '—';
+  const chargeTone = charging ? 'good' : docked ? 'warn' : 'bad';
 
   const handleReturnToDrive = async () => {
     if (!roverId || pending) return;
@@ -187,18 +197,21 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
         className={`${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${emeraldCta}`}
       >
         <div className="space-y-0.5 w-full">
-          <div className="flex flex-wrap items-center justify-center gap-0.5">
-            <span className="text-base font-semibold text-emerald-50">Start Driving</span>
-            {!isMobile && driveKeyLabel ? <KeyPill label={driveKeyLabel} /> : null}
-            {!isMobile ? <ActionPill label="Click to start" tone="emerald" /> : null}
+          <div className="flex w-full flex-col items-center gap-0.25">
+            <span className="text-base font-semibold text-emerald-50 md:text-lg">Start Driving</span>
+            {!isMobile ? (
+              <div className="flex flex-wrap items-center justify-center gap-0.5">
+                {driveKeyLabel ? <KeyPill label={driveKeyLabel} /> : null}
+                <ActionPill label="Click to start" tone="emerald" />
+              </div>
+            ) : null}
           </div>
           <p className="text-sm text-emerald-50/90">{startDriveInstructions.summary}</p>
           <StepList steps={startDriveInstructions.steps} tone="emerald" />
         </div>
-        <div className="flex w-full flex-col gap-0.5">
-          <StatusPill label={`OI: ${oiLabel}`} active={oiLabel.toLowerCase() === 'full'} />
-          <StatusPill label={docked ? 'Docked!' : 'Not docked'} active={docked} />
-          <StatusPill label={charging ? 'Charging!' : 'Not charging'} active={charging} />
+        <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
+          <StatusRow label="Dock" value={dockValue} tone={dockTone} />
+          <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
         </div>
       </button>
     );
@@ -218,15 +231,19 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
         className={`${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${amberCta}`}
       >
         <div className="space-y-0.5 w-full">
-          <div className="flex flex-wrap items-center justify-center gap-0.5">
-            <span className="text-base font-semibold text-amber-50">Docking in Progress</span>
-            {!isMobile ? <ActionPill label="Click to return to driving mode" tone="amber" /> : null}
+          <div className="flex w-full flex-col items-center gap-0.25">
+            <span className="text-base font-semibold text-amber-50 md:text-lg">Docking in Progress</span>
+            {!isMobile ? (
+              <div className="flex flex-wrap items-center justify-center gap-0.5">
+                <ActionPill label="Click to return to driving mode" tone="amber" />
+              </div>
+            ) : null}
           </div>
           <p className="text-sm text-amber-50/90">{inProgressCopy.summary}</p>
         </div>
-        <div className="flex w-full flex-col gap-0.5">
-          <StatusPill label={docked ? 'Docked' : 'Not docked'} active={docked} />
-          <StatusPill label={charging ? 'Charging' : 'Not charging'} active={charging} />
+        <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
+          <StatusRow label="Dock" value={dockValue} tone={dockTone} />
+          <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
         </div>
         <StepList steps={inProgressCopy.steps} tone="amber" />
       </button>
@@ -245,20 +262,21 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
             : `${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${indigoCta}`
         }
       >
-        <div className="flex flex-wrap items-center justify-center gap-0.5 w-full">
-          <span className="text-base font-semibold text-indigo-50">Dock and Charge</span>
-          {!isMobile && dockKeyLabel ? <KeyPill label={dockKeyLabel} /> : null}
-          {!isMobile ? <ActionPill label="Click to begin docking" tone="indigo" /> : null}
+        <div className="flex w-full flex-col items-center gap-0.25">
+          <span className="text-base font-semibold text-indigo-50 md:text-lg">Dock and Charge</span>
+          {!isMobile ? (
+            <div className="flex flex-wrap items-center justify-center gap-0.5">
+              {dockKeyLabel ? <KeyPill label={dockKeyLabel} /> : null}
+              <ActionPill label="Click to begin docking" tone="indigo" />
+            </div>
+          ) : null}
         </div>
         {!isMobile && (
           <>
             <p className="text-sm text-indigo-50/90">{dockButtonCaption}</p>
-            <div className="flex w-full flex-col gap-0.5">
-              <StatusPill label={docked ? 'Docked' : 'Not docked'} active={docked} />
-              <StatusPill label={charging ? 'Charging' : 'Not charging'} active={charging} />
-              {dockedNotCharging ? (
-                <StatusPill label="Not charging yet" active={false} />
-              ) : null}
+            <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
+              <StatusRow label="Dock" value={dockValue} tone={dockTone} />
+              <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
             </div>
             <div className="text-xs text-indigo-100/80">
               Line up straight, about 1 foot away, before docking.
