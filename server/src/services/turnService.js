@@ -72,6 +72,13 @@ function canDrive(roverId, socket) {
   return activeDrivers.get(roverId) === socket.id;
 }
 
+function isQueuedDriver(roverId, socketId) {
+  if (!socketId) return false;
+  const queue = driverQueues.get(roverId);
+  if (!queue) return false;
+  return queue.queue.includes(socketId);
+}
+
 function ensureQueue(roverId) {
   if (!driverQueues.has(roverId)) {
     driverQueues.set(roverId, { queue: [], current: null, timer: null });
@@ -312,6 +319,7 @@ module.exports = {
   driverRemoved,
   cleanupRover,
   canDrive,
+  isQueuedDriver,
   getActiveDrivers,
   turnEvents,
   getTurnQueues,

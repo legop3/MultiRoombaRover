@@ -243,7 +243,13 @@ function maybeSpeak(socket, message, ttsOptions) {
   const audio = record?.meta?.audio || {};
   const ttsEnabled = Boolean(audio.ttsEnabled);
   if (!ttsEnabled) return;
-  if (!roverManager.canDrive(message.roverId, socket)) return;
+  const { isQueuedDriver } = require('./turnService');
+  if (
+    !roverManager.canDrive(message.roverId, socket) &&
+    !isQueuedDriver(message.roverId, socket?.id)
+  ) {
+    return;
+  }
   try {
     issueCommand(message.roverId, {
       type: 'tts',
