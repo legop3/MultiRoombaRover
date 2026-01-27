@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"sync"
+	"time"
 
 	rpio "github.com/stianeikeland/go-rpio/v4"
 )
@@ -17,8 +18,11 @@ type CameraServo struct {
 	pin          rpio.Pin
 	mu           sync.Mutex
 	currentAngle float64
+	lastMove     time.Time
 	closed       bool
 }
+
+const maxServoDegPerSec = 10.0
 
 func NewCameraServo(cfg CameraServoConfig, logger *log.Logger) (*CameraServo, error) {
 	if !cfg.Enabled {
@@ -68,8 +72,9 @@ func (s *CameraServo) setAngleLocked(angle float64) error {
 		return fmt.Errorf("servo closed")
 	}
 	clamped := clampFloat(angle, s.cfg.MinAngle, s.cfg.MaxAngle)
-	s.applyPulseLocked(s.angleToPulse(clamped))
-	s.currentAngle = clamped
+	limited := s.rateLimitAngleLocked(clamped)
+	s.applyPulseLocked(s.angleToPulse(limited))
+	s.currentAngle = limited
 	return nil
 }
 
@@ -95,8 +100,11 @@ func (s *CameraServo) SetPulseWidth(micros int) error {
 	if micros <= 0 {
 		return fmt.Errorf("pulse width must be > 0")
 	}
-	s.applyPulseLocked(micros)
-	s.currentAngle = s.pulseToAngle(micros)
+	clampedPulse := clampInt(micros, s.cfg.MinPulseUs, s.cfg.MaxPulseUs)
+	targetAngle := s.pulseToAngle(clampedPulse)
+	limited := s.rateLimitAngleLocked(targetAngle)
+	s.applyPulseLocked(s.angleToPulse(limited))
+	s.currentAngle = limited
 	return nil
 }
 
@@ -109,6 +117,32 @@ func (s *CameraServo) CurrentAngle() float64 {
 func (s *CameraServo) applyPulseLocked(micros int) {
 	micros = clampInt(micros, s.cfg.MinPulseUs, s.cfg.MaxPulseUs)
 	s.pin.DutyCycle(uint32(micros), uint32(s.cfg.CycleLen))
+}
+
+func (s *CameraServo) rateLimitAngleLocked(target float64) float64 {
+	now := time.Now()
+	if s.lastMove.IsZero() {
+		s.lastMove = now
+		return target
+	}
+	elapsed := now.Sub(s.lastMove).Seconds()
+	if elapsed <= 0 {
+		s.lastMove = now
+		return s.currentAngle
+	}
+	maxDelta := maxServoDegPerSec * elapsed
+	delta := target - s.currentAngle
+	if math.Abs(delta) <= maxDelta {
+		s.lastMove = now
+		return target
+	}
+	if delta > 0 {
+		target = s.currentAngle + maxDelta
+	} else {
+		target = s.currentAngle - maxDelta
+	}
+	s.lastMove = now
+	return target
 }
 
 func (s *CameraServo) angleToPulse(angle float64) int {
