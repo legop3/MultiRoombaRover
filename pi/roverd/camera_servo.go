@@ -174,12 +174,15 @@ func (s *CameraServo) rateLimitAngleLocked(target float64) float64 {
 	now := time.Now()
 	if s.lastMove.IsZero() {
 		s.lastMove = now
-		return target
 	}
 	elapsed := now.Sub(s.lastMove).Seconds()
 	if elapsed <= 0 {
 		s.lastMove = now
 		return s.currentAngle
+	}
+	maxElapsed := servoStepInterval.Seconds()
+	if elapsed > maxElapsed {
+		elapsed = maxElapsed
 	}
 	maxDelta := maxServoDegPerSec * elapsed
 	delta := target - s.currentAngle
