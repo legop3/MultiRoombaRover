@@ -18,11 +18,16 @@ type CameraServo struct {
 	pin          rpio.Pin
 	mu           sync.Mutex
 	currentAngle float64
+	desiredAngle float64
 	lastMove     time.Time
+	moving       bool
+	stopCh       chan struct{}
 	closed       bool
 }
 
-const maxServoDegPerSec = 10.0
+const maxServoDegPerSec = 60.0
+const servoStepInterval = 20 * time.Millisecond
+const servoAngleEpsilon = 0.01
 
 func NewCameraServo(cfg CameraServoConfig, logger *log.Logger) (*CameraServo, error) {
 	if !cfg.Enabled {
@@ -41,6 +46,7 @@ func NewCameraServo(cfg CameraServoConfig, logger *log.Logger) (*CameraServo, er
 		cfg:    cfg,
 		logger: logger,
 		pin:    pin,
+		stopCh: make(chan struct{}),
 	}
 	if err := servo.setAngleLocked(cfg.HomeAngle); err != nil {
 		rpio.Close()
@@ -58,6 +64,10 @@ func (s *CameraServo) Close() {
 	}
 	s.applyPulseLocked(s.angleToPulse(s.cfg.HomeAngle))
 	rpio.Close()
+	if s.stopCh != nil {
+		close(s.stopCh)
+		s.stopCh = nil
+	}
 	s.closed = true
 }
 
@@ -72,9 +82,13 @@ func (s *CameraServo) setAngleLocked(angle float64) error {
 		return fmt.Errorf("servo closed")
 	}
 	clamped := clampFloat(angle, s.cfg.MinAngle, s.cfg.MaxAngle)
+	s.desiredAngle = clamped
 	limited := s.rateLimitAngleLocked(clamped)
 	s.applyPulseLocked(s.angleToPulse(limited))
 	s.currentAngle = limited
+	if math.Abs(limited-s.desiredAngle) > servoAngleEpsilon {
+		s.startMoveLoopLocked()
+	}
 	return nil
 }
 
@@ -102,9 +116,13 @@ func (s *CameraServo) SetPulseWidth(micros int) error {
 	}
 	clampedPulse := clampInt(micros, s.cfg.MinPulseUs, s.cfg.MaxPulseUs)
 	targetAngle := s.pulseToAngle(clampedPulse)
+	s.desiredAngle = targetAngle
 	limited := s.rateLimitAngleLocked(targetAngle)
 	s.applyPulseLocked(s.angleToPulse(limited))
 	s.currentAngle = limited
+	if math.Abs(limited-s.desiredAngle) > servoAngleEpsilon {
+		s.startMoveLoopLocked()
+	}
 	return nil
 }
 
@@ -117,6 +135,39 @@ func (s *CameraServo) CurrentAngle() float64 {
 func (s *CameraServo) applyPulseLocked(micros int) {
 	micros = clampInt(micros, s.cfg.MinPulseUs, s.cfg.MaxPulseUs)
 	s.pin.DutyCycle(uint32(micros), uint32(s.cfg.CycleLen))
+}
+
+func (s *CameraServo) startMoveLoopLocked() {
+	if s.moving || s.stopCh == nil {
+		return
+	}
+	s.moving = true
+	go func() {
+		ticker := time.NewTicker(servoStepInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.mu.Lock()
+				if s.closed {
+					s.moving = false
+					s.mu.Unlock()
+					return
+				}
+				if math.Abs(s.currentAngle-s.desiredAngle) <= servoAngleEpsilon {
+					s.moving = false
+					s.mu.Unlock()
+					return
+				}
+				limited := s.rateLimitAngleLocked(s.desiredAngle)
+				s.applyPulseLocked(s.angleToPulse(limited))
+				s.currentAngle = limited
+				s.mu.Unlock()
+			case <-s.stopCh:
+				return
+			}
+		}
+	}()
 }
 
 func (s *CameraServo) rateLimitAngleLocked(target float64) float64 {
