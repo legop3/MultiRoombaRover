@@ -39,7 +39,7 @@ function DriveDockPanel() {
 
   return (
     <section className="panel-section flex h-full flex-col gap-0.5">
-      <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
+      <DriveDockAction layout="desktop" expand={hideInlineControls} driveDockState={driveDockState} />
       {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
     </section>
   );

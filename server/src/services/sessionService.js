@@ -22,8 +22,11 @@ logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configure
 logger.info('Ko-fi link loaded:', kofiLink ? 'present' : 'not configured');
 
 const ACTIVITY_SYNC_COOLDOWN_MS = 3000;
+const NIGHT_VISION_SYNC_COOLDOWN_MS = 1000;
 let lastActivitySync = 0;
 let pendingActivitySync = null;
+let lastNightVisionSync = 0;
+let pendingNightVisionSync = null;
 
 function buildUserEntry(socket) {
   if (!socket) return null;
@@ -103,8 +106,33 @@ modeEvents.on('change', () => {
 });
 
 managerEvents.on('rover', () => {
+  if (pendingNightVisionSync) {
+    clearTimeout(pendingNightVisionSync);
+    pendingNightVisionSync = null;
+  }
   logger.info('Rover roster change; syncing all clients');
   syncAll();
+});
+
+managerEvents.on('rover', (event = {}) => {
+  if (event.action !== 'nightVision') return;
+  const now = Date.now();
+  const elapsed = now - lastNightVisionSync;
+  if (elapsed >= NIGHT_VISION_SYNC_COOLDOWN_MS) {
+    lastNightVisionSync = now;
+    logger.info('Night vision update; syncing all clients (immediate)');
+    syncAll();
+    return;
+  }
+  if (!pendingNightVisionSync) {
+    const delay = NIGHT_VISION_SYNC_COOLDOWN_MS - elapsed;
+    pendingNightVisionSync = setTimeout(() => {
+      lastNightVisionSync = Date.now();
+      pendingNightVisionSync = null;
+      logger.info('Night vision update; syncing all clients (delayed)');
+      syncAll();
+    }, delay);
+  }
 });
 
 managerEvents.on('lock', ({ roverId, locked }) => {
