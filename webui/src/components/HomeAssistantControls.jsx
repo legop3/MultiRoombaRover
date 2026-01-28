@@ -131,7 +131,7 @@ function EntityRow({ entity, connected, onToggle, onSetColor }) {
       type="button"
       onClick={() => onToggle(entity.id)}
       disabled={disableToggle}
-      className={`relative flex min-w-[10rem] flex-1 items-start justify-between gap-0.5 rounded px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
+      className={`relative flex min-w-[12rem] flex-[1_1_12rem] items-start justify-between gap-0.5 rounded px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-0.5 text-sm leading-normal">
@@ -216,7 +216,7 @@ export default function HomeAssistantControls() {
   if (!ha?.enabled) {
     return (
       <section className="panel-section space-y-0.5 text-sm text-slate-400">
-        <p className="text-slate-300">Light Controls</p>
+        <p className="text-slate-300">Room Controls</p>
         <p className="text-slate-500">Not configured on the server.</p>
       </section>
     );
@@ -225,7 +225,7 @@ export default function HomeAssistantControls() {
   if (entities.length === 0) {
     return (
       <section className="panel-section space-y-0.5 text-sm text-slate-400">
-        <p className="text-slate-300">Light Controls</p>
+        <p className="text-slate-300">Room Controls</p>
         <p className="text-slate-500">No lights or switches configured.</p>
       </section>
     );
@@ -237,7 +237,7 @@ export default function HomeAssistantControls() {
     <section className="panel-section space-y-0.5 text-base">
       <header className="flex items-center justify-between gap-0.5 text-sm text-slate-400">
         <div className="flex items-center gap-0.5">
-          <p>Light Controls</p>
+          <p>Room Controls</p>
           <span className="text-xs text-slate-500">{entities.length}</span>
           <div className="flex items-center gap-0.5 text-xs text-slate-300 background-black">
             <span className="flex items-center gap-0.5">
