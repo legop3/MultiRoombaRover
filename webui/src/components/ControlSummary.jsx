@@ -63,15 +63,8 @@ export default function ControlSummary() {
             <TopDownMap sensors={sensors} />
           </div>
         </div>
-        <div className="grid h-full grid-rows-[1fr_1fr_auto] gap-0.5">
-          <div className="row-span-2">
-            <DriveDockAction
-              layout="desktop"
-              expand={hideInlineControls}
-              fill={!hideInlineControls}
-              driveDockState={driveDockState}
-            />
-          </div>
+        <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-0.5">
+          <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
           {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
         </div>
       </div>

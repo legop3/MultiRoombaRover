@@ -38,13 +38,8 @@ function DriveDockPanel() {
   const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
   return (
-    <section className="panel-section flex h-full flex-col gap-0.5">
-      <DriveDockAction
-        layout="desktop"
-        expand={hideInlineControls}
-        fill={!hideInlineControls}
-        driveDockState={driveDockState}
-      />
+    <section className="panel-section grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-0.5">
+      <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
       {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
     </section>
   );
