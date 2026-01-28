@@ -15,6 +15,7 @@ const SessionContext = createContext({
   subscribeAll: async () => {},
   homeAssistantToggle: async () => {},
   homeAssistantSetState: async () => {},
+  homeAssistantSetLightColor: async () => {},
   setNickname: async () => {},
   triggerReplay: async () => {},
   setCommunityGoal: async () => {},
@@ -109,6 +110,8 @@ export function SessionProvider({ children }) {
       homeAssistantToggle: (entityId) => emitWithAck('homeAssistant:toggle', { entityId }),
       homeAssistantSetState: (entityId, state) =>
         emitWithAck('homeAssistant:setState', { entityId, state }),
+      homeAssistantSetLightColor: (entityId, rgbColor) =>
+        emitWithAck('homeAssistant:lightColor', { entityId, rgbColor }),
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
       triggerReplay: (sources = []) => emitWithAck('replay:trigger', { sources }),
       setCommunityGoal: (text) => emitWithAck('communityGoal:set', { text }),

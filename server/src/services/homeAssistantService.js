@@ -81,6 +81,16 @@ function loadEntityConfig() {
 function buildState(meta, raw) {
   if (!meta) return null;
   const name = meta.name || raw?.attributes?.friendly_name || meta.id;
+  const supportedColorModes = Array.isArray(raw?.attributes?.supported_color_modes)
+    ? raw.attributes.supported_color_modes.map((mode) => String(mode))
+    : [];
+  const rgbColor = Array.isArray(raw?.attributes?.rgb_color) ? raw.attributes.rgb_color : null;
+  const hsColor = Array.isArray(raw?.attributes?.hs_color) ? raw.attributes.hs_color : null;
+  const supportsColor =
+    meta.type === 'light' &&
+    (rgbColor ||
+      hsColor ||
+      supportedColorModes.some((mode) => mode === 'hs' || mode === 'rgb' || mode === 'xy'));
   if (!raw) {
     return {
       id: meta.id,
@@ -90,6 +100,11 @@ function buildState(meta, raw) {
       available: false,
       lastChanged: null,
       lastUpdated: null,
+      supportedColorModes,
+      colorMode: null,
+      rgbColor: null,
+      hsColor: null,
+      supportsColor,
     };
   }
   const rawState = raw.state;
@@ -103,6 +118,11 @@ function buildState(meta, raw) {
     available: !unavailable,
     lastChanged: raw.last_changed || null,
     lastUpdated: raw.last_updated || null,
+    supportedColorModes,
+    colorMode: raw?.attributes?.color_mode || null,
+    rgbColor,
+    hsColor,
+    supportsColor,
   };
 }
 
@@ -219,6 +239,29 @@ async function toggleEntity(entityId) {
   return setEntityState(entityId, nextState);
 }
 
+async function setLightColor(entityId, rgbColor) {
+  if (!enabled) {
+    throw new Error('Home Assistant not configured');
+  }
+  const meta = entityConfig.get(entityId);
+  if (!meta || meta.type !== 'light') {
+    throw new Error('Home Assistant light required');
+  }
+  if (!connection) {
+    throw new Error('Home Assistant not connected');
+  }
+  if (!Array.isArray(rgbColor) || rgbColor.length !== 3) {
+    throw new Error('rgbColor required');
+  }
+  const normalized = rgbColor.map((value) => {
+    const next = Number(value);
+    if (Number.isNaN(next)) return 0;
+    return Math.max(0, Math.min(255, Math.round(next)));
+  });
+  await callService(connection, 'light', 'turn_on', { entity_id: entityId, rgb_color: normalized });
+  logger.info('Issued Home Assistant color command', { entityId, rgbColor: normalized });
+}
+
 function getState() {
   const entities = Array.from(entityConfig.values()).map(
     (meta) => entityState.get(meta.id) || buildState(meta, null),
@@ -265,11 +308,30 @@ io.on('connection', (socket) => {
       cb({ error: err.message });
     }
   });
+
+  socket.on('homeAssistant:lightColor', async ({ entityId, rgbColor } = {}, cb = () => {}) => {
+    const mode = getMode();
+    if (
+      (mode === 'admin' && isAdmin(socket) !== true) ||
+      (mode === 'lockdown' && isLockdownAdmin(socket) !== true)
+    ) {
+      return cb({ error: 'Insufficient permissions to control Home Assistant' });
+    }
+
+    try {
+      if (!entityId) throw new Error('entityId required');
+      await setLightColor(entityId, rgbColor);
+      cb({ success: true });
+    } catch (err) {
+      cb({ error: err.message });
+    }
+  });
 });
 
 module.exports = {
   getState,
   toggleEntity,
   setEntityState,
+  setLightColor,
   homeAssistantEvents: events,
 };
