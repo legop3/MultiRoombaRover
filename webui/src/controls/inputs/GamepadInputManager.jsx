@@ -13,6 +13,8 @@ import { isTextEntryActive } from './inputFocusUtils.js';
 const SOURCE = 'gamepad';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
 const ZERO_AUX = { main: 0, side: 0, vacuum: 0 };
+const DRIVE_RATE_MS = 100;
+const AUX_RATE_MS = 100;
 
 function areVectorsEqual(a, b) {
   return a && b && a.x === b.x && a.y === b.y && a.boost === b.boost;
@@ -20,6 +22,16 @@ function areVectorsEqual(a, b) {
 
 function areAuxEqual(a, b) {
   return a && b && a.main === b.main && a.side === b.side && a.vacuum === b.vacuum;
+}
+
+function vectorMagnitude(vector) {
+  if (!vector) return 0;
+  return Math.hypot(vector.x || 0, vector.y || 0);
+}
+
+function isAuxIdle(aux) {
+  if (!aux) return true;
+  return !aux.main && !aux.side && !aux.vacuum;
 }
 
 function pickActivePad(pads, activeSignature) {
@@ -53,6 +65,8 @@ export default function GamepadInputManager() {
   const lastAuxRef = useRef(ZERO_AUX);
   const reverseStateRef = useRef({ main: false, side: false });
   const buttonStateRef = useRef(new Map());
+  const lastDriveSentAtRef = useRef(0);
+  const lastAuxSentAtRef = useRef(0);
   const lastServoAtRef = useRef(0);
   const lastServoAngleRef = useRef(null);
 
@@ -151,6 +165,8 @@ export default function GamepadInputManager() {
         }
         buttonStateRef.current = new Map();
         reverseStateRef.current = { main: false, side: false };
+        lastDriveSentAtRef.current = 0;
+        lastAuxSentAtRef.current = 0;
         registerInputState(SOURCE, { connected: false });
         return;
       }
@@ -179,8 +195,13 @@ export default function GamepadInputManager() {
       const outputs = computeGamepadOutputs(activePad, profile);
 
       if (!areVectorsEqual(outputs.driveVector, lastVectorRef.current)) {
-        lastVectorRef.current = outputs.driveVector;
-        setDriveVector(outputs.driveVector, { source: SOURCE });
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const idle = vectorMagnitude(outputs.driveVector) < 0.02;
+        if (idle || now - lastDriveSentAtRef.current >= DRIVE_RATE_MS) {
+          lastVectorRef.current = outputs.driveVector;
+          lastDriveSentAtRef.current = now;
+          setDriveVector(outputs.driveVector, { source: SOURCE });
+        }
       }
 
       const auxSideScale = profile.calibration?.auxSideScale ?? 0.55;
@@ -199,8 +220,12 @@ export default function GamepadInputManager() {
         aux = { main: 127, side: 127, vacuum: 127 };
       }
       if (!areAuxEqual(aux, lastAuxRef.current)) {
-        lastAuxRef.current = aux;
-        setAuxMotors(aux);
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (isAuxIdle(aux) || now - lastAuxSentAtRef.current >= AUX_RATE_MS) {
+          lastAuxRef.current = aux;
+          lastAuxSentAtRef.current = now;
+          setAuxMotors(aux);
+        }
       }
 
       if (outputs.buttons.mainReverse && handleButtonEdge('mainReverse', true)) {
