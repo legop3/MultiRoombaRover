@@ -6,6 +6,7 @@ import { formatKeyLabel } from '../controls/keymapUtils.js';
 import TopDownMap from './TopDownMap.jsx';
 import RoverRoster from './RoverRoster.jsx';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
+import NightVisionControl from './NightVisionControl.jsx';
 
 export function RoverRosterPanel({ title = 'Rovers' }) {
   const { session, requestControl } = useSession();
@@ -76,11 +77,14 @@ export default function ControlSummary() {
 export function InlineCameraTilt({ keymap }) {
   const {
     state: { roverId, camera },
-    actions: { setServoAngle },
+    pipeline,
+    actions: { setServoAngle, setNightVision },
   } = useControlSystem();
 
   const config = camera?.config;
   const enabled = Boolean(roverId && camera?.enabled && config);
+  const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
+  const nightVisionState = pipeline?.nightVisionState;
   const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
   const max = typeof config?.maxAngle === 'number' ? config.maxAngle : 30;
   const value =
@@ -111,40 +115,54 @@ export function InlineCameraTilt({ keymap }) {
     draggingRef.current = false;
   };
 
-  if (!enabled) return null;
+  if (!enabled && !nightVisionAvailable) return null;
   const upLabel = formatKeyLabel(keymap?.cameraUp?.[0]);
   const downLabel = formatKeyLabel(keymap?.cameraDown?.[0]);
+  const nightVisionLabel = formatKeyLabel(keymap?.nightVisionToggle?.[0]);
 
   return (
     <div className="surface space-y-0.5 px-1 py-1 text-sm text-slate-200">
-      <div className="flex items-center justify-between text-xs text-slate-300">
-        <span>Camera tilt</span>
-        <span className="font-mono text-slate-100">{formatDegrees(value)}</span>
-      </div>
-      <div>
-        <input
-          type="range"
-          className="w-full accent-emerald-400"
-          min={min}
-          max={max}
-          step={0.5}
-          value={pendingAngle}
-          onChange={handleSlider}
-          onMouseUp={commitSlider}
-          onTouchEnd={commitSlider}
-          onPointerUp={commitSlider}
+      {enabled && (
+        <>
+          <div className="flex items-center justify-between text-xs text-slate-300">
+            <span>Camera tilt</span>
+            <span className="font-mono text-slate-100">{formatDegrees(value)}</span>
+          </div>
+          <div>
+            <input
+              type="range"
+              className="w-full accent-emerald-400"
+              min={min}
+              max={max}
+              step={0.5}
+              value={pendingAngle}
+              onChange={handleSlider}
+              onMouseUp={commitSlider}
+              onTouchEnd={commitSlider}
+              onPointerUp={commitSlider}
+            />
+            <div className="mt-0 flex items-center justify-between text-[0.7rem] text-slate-400">
+              <span className="flex items-center gap-0.5">
+                {downLabel ? <KeyPill label={downLabel} /> : null}
+                {formatDegrees(min)}
+              </span>
+              <span className="flex items-center gap-0.5">
+                {formatDegrees(max)}
+                {upLabel ? <KeyPill label={upLabel} /> : null}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
+      {nightVisionAvailable && (
+        <NightVisionControl
+          nightVisionOn={nightVisionState?.nightVisionOn}
+          disabled={!roverId}
+          onToggle={setNightVision}
+          keyLabel={nightVisionLabel}
+          className={enabled ? 'mt-1' : ''}
         />
-        <div className="mt-0 flex items-center justify-between text-[0.7rem] text-slate-400">
-          <span className="flex items-center gap-0.5">
-            {downLabel ? <KeyPill label={downLabel} /> : null}
-            {formatDegrees(min)}
-          </span>
-          <span className="flex items-center gap-0.5">
-            {formatDegrees(max)}
-            {upLabel ? <KeyPill label={upLabel} /> : null}
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

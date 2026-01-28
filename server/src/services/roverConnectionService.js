@@ -5,6 +5,19 @@ const { sendAlert } = require('./alertService');
 const ALERT_COLOR = '#00bcd4';
 const { handleAck } = require('./commandService');
 
+function coerceBool(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+    if (normalized === '1') return true;
+    if (normalized === '0') return false;
+  }
+  return null;
+}
+
 const HEARTBEAT_INTERVAL_MS = 15000;
 
 function handleMessage(roverId, msg) {
@@ -16,13 +29,15 @@ function handleMessage(roverId, msg) {
     case 'sensor':
       roverManager.handleSensorFrame(roverId, msg);
       break;
-    case 'event':
-      if (msg.event === 'nightVision.state' && typeof msg.data?.nightVisionOn === 'boolean') {
-        roverManager.setNightVisionState(roverId, msg.data.nightVisionOn);
+    case 'event': {
+      const nightVisionOn = coerceBool(msg.data?.nightVisionOn);
+      if (msg.event === 'nightVision.state' && nightVisionOn != null) {
+        roverManager.setNightVisionState(roverId, nightVisionOn);
         break;
       }
       sendAlert({ color: ALERT_COLOR, title: `${roverId} event`, message: msg.event });
       break;
+    }
     default:
       break;
   }
@@ -73,8 +88,9 @@ roverWSS.on('connection', (ws) => {
     } else if (msg.type === 'ack') {
       handleAck(msg);
     } else if (msg.type === 'event') {
-      if (msg.event === 'nightVision.state' && typeof msg.data?.nightVisionOn === 'boolean') {
-        roverManager.setNightVisionState(roverId, msg.data.nightVisionOn);
+      const nightVisionOn = coerceBool(msg.data?.nightVisionOn);
+      if (msg.event === 'nightVision.state' && nightVisionOn != null) {
+        roverManager.setNightVisionState(roverId, nightVisionOn);
       } else {
         sendAlert({ color: ALERT_COLOR, title: `${roverId}`, message: msg.event });
       }
