@@ -93,6 +93,14 @@ export default function CameraServoPanel() {
 
   return (
     <section className="panel-section space-y-0.5 text-base">
+      {nightVisionAvailable && (
+        <NightVisionControl
+          nightVisionOn={nightVisionState?.nightVisionOn}
+          disabled={!roverId}
+          onToggle={handleNightVisionToggle}
+          keyLabel={nightVisionKey}
+        />
+      )}
       {enabled && (
         <>
           <div className="flex items-center justify-between text-sm text-slate-300">
@@ -118,15 +126,6 @@ export default function CameraServoPanel() {
             </div>
           </div>
         </>
-      )}
-      {nightVisionAvailable && (
-        <NightVisionControl
-          nightVisionOn={nightVisionState?.nightVisionOn}
-          disabled={!roverId}
-          onToggle={handleNightVisionToggle}
-          keyLabel={nightVisionKey}
-          className={enabled ? 'mt-1' : ''}
-        />
       )}
       {/* <div className="flex gap-0.5 text-sm">
         <button type="button" className="flex-1 button-dark" onClick={() => handleNudge(-1)}>

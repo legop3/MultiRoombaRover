@@ -216,6 +216,13 @@ function MobileJoystickPanel({ layout }) {
       <DriveDockAction layout="mobile" expand={dockedNotDriving} driveDockState={driveDockState} />
       {!dockedNotDriving ? (
         <>
+          {nightVisionAvailable && (
+            <NightVisionControl
+              nightVisionOn={nightVisionState?.nightVisionOn}
+              disabled={disabled}
+              onToggle={handleNightVisionToggle}
+            />
+          )}
           {cameraEnabled && (
             <div className="bg-zinc-950 p-0.5 text-xs">
               <div className="flex items-center justify-between text-[0.75rem] text-slate-400">
@@ -232,14 +239,6 @@ function MobileJoystickPanel({ layout }) {
                 className="mt-0 w-full accent-cyan-400"
               />
             </div>
-          )}
-          {nightVisionAvailable && (
-            <NightVisionControl
-              nightVisionOn={nightVisionState?.nightVisionOn}
-              disabled={disabled}
-              onToggle={handleNightVisionToggle}
-              className="mt-0.5"
-            />
           )}
           <FloatingJoystick
             disabled={disabled}

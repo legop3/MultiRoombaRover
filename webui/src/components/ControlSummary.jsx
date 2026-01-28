@@ -120,6 +120,14 @@ export function InlineCameraTilt({ keymap }) {
 
   return (
     <div className="surface space-y-0.5 px-1 py-1 text-sm text-slate-200">
+      {nightVisionAvailable && (
+        <NightVisionControl
+          nightVisionOn={nightVisionState?.nightVisionOn}
+          disabled={!roverId}
+          onToggle={setNightVision}
+          keyLabel={nightVisionLabel}
+        />
+      )}
       {enabled && (
         <>
           <div className="flex items-center justify-between text-xs text-slate-300">
@@ -151,15 +159,6 @@ export function InlineCameraTilt({ keymap }) {
             </div>
           </div>
         </>
-      )}
-      {nightVisionAvailable && (
-        <NightVisionControl
-          nightVisionOn={nightVisionState?.nightVisionOn}
-          disabled={!roverId}
-          onToggle={setNightVision}
-          keyLabel={nightVisionLabel}
-          className={enabled ? 'mt-1' : ''}
-        />
       )}
     </div>
   );
