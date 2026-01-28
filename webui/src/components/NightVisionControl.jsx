@@ -40,7 +40,7 @@ export default function NightVisionControl({
       'group flex w-full items-center justify-between rounded-xl border-2 px-1 py-0.75 text-xs font-semibold';
     const active = 'border-emerald-300/70 bg-emerald-800 text-emerald-50 hover:bg-emerald-700';
     const inactive = 'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800';
-    return [base, displayOn ? active : inactive, 'transition disabled:opacity-50', className]
+    return [base, displayOn ? active : inactive, 'disabled:opacity-50', className]
       .filter(Boolean)
       .join(' ');
   }, [className, displayOn]);

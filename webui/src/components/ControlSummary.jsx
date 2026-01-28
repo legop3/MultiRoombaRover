@@ -119,7 +119,7 @@ export function InlineCameraTilt({ keymap }) {
   const nightVisionLabel = formatKeyLabel(keymap?.nightVisionToggle?.[0]);
 
   return (
-    <div className="surface space-y-0.5 px-1 py-1 text-sm text-slate-200">
+    <div className="surface space-y-0.5 p-0 text-sm text-slate-200">
       {nightVisionAvailable && (
         <NightVisionControl
           nightVisionOn={nightVisionState?.nightVisionOn}
@@ -129,7 +129,7 @@ export function InlineCameraTilt({ keymap }) {
         />
       )}
       {enabled && (
-        <>
+        <div className="space-y-0.5 px-1 py-1">
           <div className="flex items-center justify-between text-xs text-slate-300">
             <span>Camera tilt</span>
             <span className="font-mono text-slate-100">{formatDegrees(value)}</span>
@@ -158,7 +158,7 @@ export function InlineCameraTilt({ keymap }) {
               </span>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
