@@ -312,10 +312,23 @@ export function ControlSystemProvider({ children }) {
     [pipeline],
   );
 
+  const setNightVision = useCallback(
+    (nightVisionOn) => {
+      if (!pipeline.nightVision) return;
+      if (typeof nightVisionOn === 'boolean') {
+        const action = nightVisionOn ? 'off' : 'on';
+        pipeline.sendNightVision(action);
+      } else {
+        pipeline.sendNightVision('toggle');
+      }
+      recordControlIntent();
+    },
+    [pipeline, recordControlIntent],
+  );
+
   const toggleNightVision = useCallback(() => {
-    pipeline.sendNightVision('toggle');
-    recordControlIntent();
-  }, [pipeline, recordControlIntent]);
+    setNightVision();
+  }, [setNightVision]);
 
   const setSongNote = useCallback(
     (note) => {
@@ -354,6 +367,7 @@ export function ControlSystemProvider({ children }) {
         stopAllMotion,
         sendOiCommand,
         setSensorStream,
+        setNightVision,
         toggleNightVision,
         updateKeyBinding,
         resetKeyBindings,
@@ -376,6 +390,7 @@ export function ControlSystemProvider({ children }) {
       stopAllMotion,
       sendOiCommand,
       setSensorStream,
+      setNightVision,
       toggleNightVision,
       updateKeyBinding,
       resetKeyBindings,

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useControlSystem } from '../controls/index.js';
+import { formatKeyLabel } from '../controls/keymapUtils.js';
+import NightVisionControl from './NightVisionControl.jsx';
 
 const SLIDER_THROTTLE_MS = 150;
 
@@ -10,11 +12,15 @@ function formatDegrees(value) {
 
 export default function CameraServoPanel() {
   const {
-    state: { roverId, camera },
-    actions: { setServoAngle, nudgeServo, goServoHome },
+    state: { roverId, camera, keymap },
+    pipeline,
+    actions: { setServoAngle, nudgeServo, goServoHome, setNightVision },
   } = useControlSystem();
   const config = camera?.config;
   const enabled = Boolean(roverId && camera?.enabled && config);
+  const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
+  const nightVisionState = pipeline?.nightVisionState;
+  const nightVisionKey = formatKeyLabel(keymap?.nightVisionToggle?.[0]);
   const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
   const max = typeof config?.maxAngle === 'number' ? config.maxAngle : 30;
   const value =
@@ -24,7 +30,7 @@ export default function CameraServoPanel() {
         ? config.homeAngle
         : (min + max) / 2;
 
-  if (!enabled) return null;
+  if (!enabled && !nightVisionAvailable) return null;
 
   const [pendingAngle, setPendingAngle] = useState(value);
   const throttleRef = useRef(null);
@@ -80,30 +86,48 @@ export default function CameraServoPanel() {
     nudgeServo(delta);
   };
 
+  const handleNightVisionToggle = (nextOn) => {
+    if (!nightVisionAvailable) return;
+    setNightVision(nextOn);
+  };
+
   return (
     <section className="panel-section space-y-0.5 text-base">
-      <div className="flex items-center justify-between text-sm text-slate-300">
-        <span>Camera Tilt</span>
-        <span className="font-mono text-sm text-slate-100">{formatDegrees(value)}</span>
-      </div>
-      <div>
-        <input
-          type="range"
-          className="w-full accent-emerald-400"
-          min={min}
-          max={max}
-          step={0.5}
-          value={pendingAngle}
-          onChange={handleSlider}
-          onMouseUp={commitSlider}
-          onTouchEnd={commitSlider}
-          onPointerUp={commitSlider}
+      {enabled && (
+        <>
+          <div className="flex items-center justify-between text-sm text-slate-300">
+            <span>Camera Tilt</span>
+            <span className="font-mono text-sm text-slate-100">{formatDegrees(value)}</span>
+          </div>
+          <div>
+            <input
+              type="range"
+              className="w-full accent-emerald-400"
+              min={min}
+              max={max}
+              step={0.5}
+              value={pendingAngle}
+              onChange={handleSlider}
+              onMouseUp={commitSlider}
+              onTouchEnd={commitSlider}
+              onPointerUp={commitSlider}
+            />
+            <div className="mt-0 flex justify-between text-xs text-slate-400">
+              <span>{formatDegrees(min)}</span>
+              <span>{formatDegrees(max)}</span>
+            </div>
+          </div>
+        </>
+      )}
+      {nightVisionAvailable && (
+        <NightVisionControl
+          nightVisionOn={nightVisionState?.nightVisionOn}
+          disabled={!roverId}
+          onToggle={handleNightVisionToggle}
+          keyLabel={nightVisionKey}
+          className={enabled ? 'mt-1' : ''}
         />
-        <div className="mt-0 flex justify-between text-xs text-slate-400">
-          <span>{formatDegrees(min)}</span>
-          <span>{formatDegrees(max)}</span>
-        </div>
-      </div>
+      )}
       {/* <div className="flex gap-0.5 text-sm">
         <button type="button" className="flex-1 button-dark" onClick={() => handleNudge(-1)}>
           Tilt Down

@@ -37,6 +37,7 @@ function ensureRecord(id) {
       locked: false,
       lockReason: null,
       batteryState: null,
+      nightVisionState: null,
       room: `rover:${id}`,
       lastSeen: Date.now(),
       lastMovementAt: Date.now(),
@@ -57,6 +58,13 @@ function upsertRover(meta, ws) {
   record.meta = meta;
   record.ws = ws;
   record.lastSeen = Date.now();
+  if (record.nightVisionState == null && meta?.nightVision?.enabled) {
+    const ledOn = Boolean(meta.nightVision.initialOn);
+    record.nightVisionState = {
+      nightVisionOn: !ledOn,
+      updatedAt: Date.now(),
+    };
+  }
   rovers.set(id, record);
   spectatorSockets.forEach((socketId) => {
     const sock = io.sockets.sockets.get(socketId);
@@ -143,7 +151,9 @@ function getRoster() {
     media: record.meta?.media,
     cameraServo: record.meta?.cameraServo,
     audio: record.meta?.audio,
-    nightVision: record.meta?.nightVision,
+    nightVision: record.meta?.nightVision
+      ? { ...record.meta.nightVision, state: record.nightVisionState }
+      : record.meta?.nightVision,
     locked: record.locked,
     lockReason: record.lockReason,
     lastSeen: record.lastSeen,
@@ -152,6 +162,18 @@ function getRoster() {
 
 function broadcastRoster() {
   io.emit('rovers', getRoster());
+}
+
+function setNightVisionState(roverId, nightVisionOn) {
+  const record = rovers.get(roverId);
+  if (!record) return;
+  if (typeof nightVisionOn !== 'boolean') return;
+  record.nightVisionState = {
+    nightVisionOn,
+    updatedAt: Date.now(),
+  };
+  broadcastRoster();
+  managerEvents.emit('rover', { roverId, action: 'nightVision', record });
 }
 
 function computeBatteryState(record, sensors) {
@@ -557,6 +579,7 @@ module.exports = {
   lockRover,
   getRoster,
   broadcastRoster,
+  setNightVisionState,
   handleSensorFrame,
   requestControl,
   releaseControl,

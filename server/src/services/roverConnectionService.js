@@ -17,6 +17,10 @@ function handleMessage(roverId, msg) {
       roverManager.handleSensorFrame(roverId, msg);
       break;
     case 'event':
+      if (msg.event === 'nightVision.state' && typeof msg.data?.nightVisionOn === 'boolean') {
+        roverManager.setNightVisionState(roverId, msg.data.nightVisionOn);
+        break;
+      }
       sendAlert({ color: ALERT_COLOR, title: `${roverId} event`, message: msg.event });
       break;
     default:
@@ -69,7 +73,11 @@ roverWSS.on('connection', (ws) => {
     } else if (msg.type === 'ack') {
       handleAck(msg);
     } else if (msg.type === 'event') {
-      sendAlert({ color: ALERT_COLOR, title: `${roverId}`, message: msg.event });
+      if (msg.event === 'nightVision.state' && typeof msg.data?.nightVisionOn === 'boolean') {
+        roverManager.setNightVisionState(roverId, msg.data.nightVisionOn);
+      } else {
+        sendAlert({ color: ALERT_COLOR, title: `${roverId}`, message: msg.event });
+      }
     }
   });
 

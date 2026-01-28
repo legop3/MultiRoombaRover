@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import { clampUnit } from '../controls/controlMath.js';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
+import NightVisionControl from './NightVisionControl.jsx';
 
 const SOURCE = 'mobile-joystick';
 const JOYSTICK_RADIUS = 80;
@@ -134,7 +135,7 @@ function MobileJoystickPanel({ layout }) {
   const {
     state: { roverId, camera },
     pipeline,
-    actions: { setDriveVector, registerInputState, setServoAngle, toggleNightVision },
+    actions: { setDriveVector, registerInputState, setServoAngle, setNightVision },
   } = useControlSystem();
   const driveDockState = useDriveDockState(roverId);
   const dockedNotDriving = driveDockState.docked && !driveDockState.driving;
@@ -142,6 +143,7 @@ function MobileJoystickPanel({ layout }) {
   const cameraConfig = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
   const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
+  const nightVisionState = pipeline?.nightVisionState;
   const cameraMin = typeof cameraConfig?.minAngle === 'number' ? cameraConfig.minAngle : -45;
   const cameraMax = typeof cameraConfig?.maxAngle === 'number' ? cameraConfig.maxAngle : 45;
   const cameraValue =
@@ -198,6 +200,14 @@ function MobileJoystickPanel({ layout }) {
     setServoAngle(next);
   };
 
+  const handleNightVisionToggle = useCallback(
+    (nextOn) => {
+      if (!nightVisionAvailable) return;
+      setNightVision(nextOn);
+    },
+    [nightVisionAvailable, setNightVision],
+  );
+
   const fillClass = dockedNotDriving ? 'max-h-screen self-start' : '';
   const containerClass = `flex h-full flex-col gap-0.5 text-slate-100 ${fillClass}`;
 
@@ -206,16 +216,6 @@ function MobileJoystickPanel({ layout }) {
       <DriveDockAction layout="mobile" expand={dockedNotDriving} driveDockState={driveDockState} />
       {!dockedNotDriving ? (
         <>
-          {nightVisionAvailable && (
-            <button
-              type="button"
-              onClick={() => toggleNightVision()}
-              disabled={disabled}
-              className="bg-amber-600 px-0.5 py-1 text-sm font-semibold text-amber-50 transition hover:bg-amber-500 disabled:opacity-40"
-            >
-              Toggle Night Vision
-            </button>
-          )}
           {cameraEnabled && (
             <div className="bg-zinc-950 p-0.5 text-xs">
               <div className="flex items-center justify-between text-[0.75rem] text-slate-400">
@@ -232,6 +232,14 @@ function MobileJoystickPanel({ layout }) {
                 className="mt-0 w-full accent-cyan-400"
               />
             </div>
+          )}
+          {nightVisionAvailable && (
+            <NightVisionControl
+              nightVisionOn={nightVisionState?.nightVisionOn}
+              disabled={disabled}
+              onToggle={handleNightVisionToggle}
+              className="mt-0.5"
+            />
           )}
           <FloatingJoystick
             disabled={disabled}

@@ -81,6 +81,12 @@ func (n *NightVisionLight) HandleAction(action string) error {
 	}
 }
 
+func (n *NightVisionLight) NightVisionOn() bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return !n.on
+}
+
 func (n *NightVisionLight) setLocked(on bool) error {
 	if err := n.line.SetValue(boolToGPIO(on)); err != nil {
 		return err

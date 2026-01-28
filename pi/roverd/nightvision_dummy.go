@@ -18,3 +18,7 @@ func (n *NightVisionLight) Close() {}
 func (n *NightVisionLight) HandleAction(action string) error {
 	return fmt.Errorf("night vision not supported in dummy build")
 }
+
+func (n *NightVisionLight) NightVisionOn() bool {
+	return false
+}

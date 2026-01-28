@@ -8,6 +8,7 @@ import {
   getPadSignature,
 } from './gamepadBindings.js';
 import { subscribeGamepadHub } from './gamepadHub.js';
+import { isTextEntryActive } from './inputFocusUtils.js';
 
 const SOURCE = 'gamepad';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
@@ -151,6 +152,21 @@ export default function GamepadInputManager() {
         buttonStateRef.current = new Map();
         reverseStateRef.current = { main: false, side: false };
         registerInputState(SOURCE, { connected: false });
+        return;
+      }
+
+      if (isTextEntryActive()) {
+        if (!areVectorsEqual(lastVectorRef.current, ZERO_VECTOR)) {
+          lastVectorRef.current = ZERO_VECTOR;
+          setDriveVector(ZERO_VECTOR, { source: SOURCE });
+        }
+        if (!areAuxEqual(lastAuxRef.current, ZERO_AUX)) {
+          lastAuxRef.current = ZERO_AUX;
+          setAuxMotors(ZERO_AUX);
+        }
+        buttonStateRef.current = new Map();
+        reverseStateRef.current = { main: false, side: false };
+        registerInputState(SOURCE, { connected: true, blocked: true });
         return;
       }
 

@@ -3,6 +3,7 @@ import { useControlSystem } from '../ControlContext.jsx';
 import { useChat } from '../../context/ChatContext.jsx';
 import { useSession } from '../../context/SessionContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
+import { isTextInputElement } from './inputFocusUtils.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import {
@@ -55,15 +56,7 @@ function mapTiltIntervalToSpeed(interval) {
 }
 
 function shouldIgnoreEvent(event) {
-  const target = event.target;
-  if (!target) return false;
-  const tag = target.tagName;
-  return (
-    tag === 'INPUT' ||
-    tag === 'TEXTAREA' ||
-    target.isContentEditable ||
-    tag === 'SELECT'
-  );
+  return isTextInputElement(event?.target);
 }
 
 function bindingActive(bindingSet, keys) {
@@ -395,12 +388,12 @@ export default function KeyboardInputManager() {
       resetAll();
     }
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    window.addEventListener('keyup', handleKeyUp, { capture: true });
     window.addEventListener('blur', handleBlur);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      window.removeEventListener('keyup', handleKeyUp, { capture: true });
       window.removeEventListener('blur', handleBlur);
     };
   }, [

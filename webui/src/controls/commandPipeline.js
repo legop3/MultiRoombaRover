@@ -32,6 +32,8 @@ export function useCommandPipeline(options = {}) {
     return rosterEntry.nightVision;
   }, [rosterEntry]);
 
+  const nightVisionState = useMemo(() => rosterEntry?.nightVision?.state ?? null, [rosterEntry]);
+
   const emitCommand = useCallback(
     (payload, cb) => {
       if (!roverId) return;
@@ -202,6 +204,7 @@ export function useCommandPipeline(options = {}) {
       rosterEntry,
       servoConfig,
       nightVision,
+      nightVisionState,
       emitCommand,
       enableSensorStream,
       sendDriveDirect,
@@ -217,6 +220,7 @@ export function useCommandPipeline(options = {}) {
       rosterEntry,
       servoConfig,
       nightVision,
+      nightVisionState,
       emitCommand,
       enableSensorStream,
       sendDriveDirect,

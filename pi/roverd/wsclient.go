@@ -184,7 +184,13 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		if c.nightVision == nil {
 			return fmt.Errorf("night vision disabled")
 		}
-		return c.nightVision.HandleAction(msg.NightVision.Action)
+		if err := c.nightVision.HandleAction(msg.NightVision.Action); err != nil {
+			return err
+		}
+		c.emitEvent("nightVision.state", map[string]any{
+			"nightVisionOn": c.nightVision.NightVisionOn(),
+		})
+		return nil
 	case msg.Song != nil:
 		slot := 0
 		if msg.Song.Slot != nil {
