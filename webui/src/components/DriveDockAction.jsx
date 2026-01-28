@@ -91,7 +91,7 @@ function DockModal({ instructions, onConfirm, onCancel, pending }) {
   );
 }
 
-export default function DriveDockAction({ layout = 'desktop', expand = false, driveDockState }) {
+export default function DriveDockAction({ layout = 'desktop', expand = false, fill = false, driveDockState }) {
   const isMobile = layout === 'mobile';
   const {
     state: { roverId, keymap },
@@ -186,7 +186,7 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, dr
     'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800 focus-visible:ring-amber-300';
   const indigoCta =
     'border-indigo-300/70 bg-indigo-900 text-indigo-50 hover:bg-indigo-800 focus-visible:ring-indigo-300';
-  const filledHeight = expand ? 'h-full flex-1' : '';
+  const filledHeight = expand ? 'h-full flex-1' : fill ? 'flex-1' : '';
 
   if (!driving && !dockingInProgress) {
     return (

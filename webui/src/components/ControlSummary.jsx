@@ -65,7 +65,12 @@ export default function ControlSummary() {
         </div>
         <div className="grid h-full grid-rows-[1fr_1fr_auto] gap-0.5">
           <div className="row-span-2">
-            <DriveDockAction layout="desktop" expand={hideInlineControls} driveDockState={driveDockState} />
+            <DriveDockAction
+              layout="desktop"
+              expand={hideInlineControls}
+              fill={!hideInlineControls}
+              driveDockState={driveDockState}
+            />
           </div>
           {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
         </div>

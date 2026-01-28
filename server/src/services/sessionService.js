@@ -105,34 +105,33 @@ modeEvents.on('change', () => {
   syncAll();
 });
 
-managerEvents.on('rover', () => {
+managerEvents.on('rover', (event = {}) => {
+  if (event.action === 'nightVision') {
+    const now = Date.now();
+    const elapsed = now - lastNightVisionSync;
+    if (elapsed >= NIGHT_VISION_SYNC_COOLDOWN_MS) {
+      lastNightVisionSync = now;
+      logger.info('Night vision update; syncing all clients (immediate)');
+      syncAll();
+      return;
+    }
+    if (!pendingNightVisionSync) {
+      const delay = NIGHT_VISION_SYNC_COOLDOWN_MS - elapsed;
+      pendingNightVisionSync = setTimeout(() => {
+        lastNightVisionSync = Date.now();
+        pendingNightVisionSync = null;
+        logger.info('Night vision update; syncing all clients (delayed)');
+        syncAll();
+      }, delay);
+    }
+    return;
+  }
   if (pendingNightVisionSync) {
     clearTimeout(pendingNightVisionSync);
     pendingNightVisionSync = null;
   }
   logger.info('Rover roster change; syncing all clients');
   syncAll();
-});
-
-managerEvents.on('rover', (event = {}) => {
-  if (event.action !== 'nightVision') return;
-  const now = Date.now();
-  const elapsed = now - lastNightVisionSync;
-  if (elapsed >= NIGHT_VISION_SYNC_COOLDOWN_MS) {
-    lastNightVisionSync = now;
-    logger.info('Night vision update; syncing all clients (immediate)');
-    syncAll();
-    return;
-  }
-  if (!pendingNightVisionSync) {
-    const delay = NIGHT_VISION_SYNC_COOLDOWN_MS - elapsed;
-    pendingNightVisionSync = setTimeout(() => {
-      lastNightVisionSync = Date.now();
-      pendingNightVisionSync = null;
-      logger.info('Night vision update; syncing all clients (delayed)');
-      syncAll();
-    }, delay);
-  }
 });
 
 managerEvents.on('lock', ({ roverId, locked }) => {
