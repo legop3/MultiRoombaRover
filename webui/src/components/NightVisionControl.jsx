@@ -25,7 +25,7 @@ export default function NightVisionControl({
   const displayOn = hasState ? optimistic : false;
   const statusLabel = hasState ? (displayOn ? 'On' : 'Off') : '—';
   const statusClasses = displayOn
-    ? 'bg-emerald-600 text-emerald-50'
+    ? 'bg-emerald-500 text-emerald-950'
     : 'bg-slate-700 text-slate-200';
 
   const handleToggle = () => {
@@ -35,17 +35,17 @@ export default function NightVisionControl({
     onToggle?.(next);
   };
 
-  const buttonClasses = useMemo(
-    () =>
-      [
-        'flex w-full items-center justify-between rounded bg-zinc-950 px-1 py-0.5 text-xs text-slate-300',
-        'transition hover:bg-zinc-900 disabled:opacity-50',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' '),
-    [className],
-  );
+  const buttonClasses = useMemo(() => {
+    const base =
+      'group flex w-full items-center justify-between rounded-md border px-1 py-0.75 text-xs font-semibold uppercase tracking-wide';
+    const active =
+      'border-emerald-400/80 bg-emerald-600/30 text-emerald-50 shadow-[0_0_12px_rgba(16,185,129,0.45)]';
+    const inactive =
+      'border-amber-300/80 bg-amber-500/30 text-amber-50 shadow-[0_0_10px_rgba(251,191,36,0.35)]';
+    return [base, displayOn ? active : inactive, 'transition hover:brightness-110 disabled:opacity-50', className]
+      .filter(Boolean)
+      .join(' ');
+  }, [className, displayOn]);
 
   return (
     <button
@@ -55,7 +55,10 @@ export default function NightVisionControl({
       aria-pressed={displayOn}
       className={buttonClasses}
     >
-      <span className="text-slate-400">Night Vision</span>
+      <span className="flex items-center gap-1">
+        <span className="inline-flex h-2 w-2 rounded-full bg-current opacity-90" />
+        <span>Night Vision</span>
+      </span>
       <span className="flex items-center gap-1">
         <span className={`rounded px-1 py-0.5 text-[0.65rem] font-semibold ${statusClasses}`}>
           {statusLabel}
