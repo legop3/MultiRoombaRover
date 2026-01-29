@@ -72,11 +72,11 @@ export default function ModeGateOverlay() {
             {reason ? reason : 'No reason set.'}
           </p>
           <p className="text-center text-sm text-slate-300">Server time: {serverTime}</p>
-          {reasonUpdatedAt ? (
+          {/* {reasonUpdatedAt ? (
             <p className="text-[0.7rem] text-slate-500">
               Updated {new Date(reasonUpdatedAt).toLocaleString()}
             </p>
-          ) : null}
+          ) : null} */}
         </div>
         <div className="surface-muted">
           <AuthPanel />
