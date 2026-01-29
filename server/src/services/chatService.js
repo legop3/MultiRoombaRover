@@ -4,10 +4,12 @@ const io = require('../globals/io');
 const logger = require('../globals/logger').child('chatService');
 const { publishEvent, subscribe } = require('./eventBus');
 const { getRole } = require('./roleService');
+const { getMode, MODES } = require('./modeManager');
 const { describeAssignment } = require('./assignmentService');
 const roverManager = require('./roverManager');
 const { getNickname } = require('./nicknameService');
 const { issueCommand } = require('./commandService');
+const { getAdminReason } = require('./adminReasonService');
 
 const RATE_LIMIT_WINDOW_MS = 8000;
 const RATE_LIMIT_MAX = 5;
@@ -37,6 +39,9 @@ const typingBySocket = new Map(); // socketId -> boolean
 const TYPING_START_NOTE = 72;
 const TYPING_SEND_NOTE = 79;
 const TYPING_NOTE_DURATION = 8;
+const ACCESS_NOTICE_COOLDOWN_MS = 60000;
+const ACCESS_KEYWORD_RE = /\b(drive|roomba)\b/i;
+let lastAccessNoticeAt = 0;
 
 function withinRateLimit(socketId) {
   const now = Date.now();
@@ -102,6 +107,7 @@ function buildMessage(socket, text, meta = {}) {
     discordUserAvatarUrl: meta.discordUserAvatarUrl || null,
     text,
     tts: meta.tts || null,
+    system: Boolean(meta.system),
   };
 }
 
@@ -195,6 +201,46 @@ function normalizeTtsOptions(raw = {}) {
   return { speak, engine, voice, pitch };
 }
 
+function buildAccessNoticeText(mode, reasonText) {
+  const label = mode === MODES.LOCKDOWN ? 'lockdown' : 'admin';
+  const reason = reasonText ? ` Reason: ${reasonText}` : '';
+  return `Heads up: the server is in ${label} mode.${reason}`;
+}
+
+function shouldSendAccessNotice(message) {
+  if (!message?.text || message.system) return false;
+  const mode = getMode();
+  if (mode !== MODES.ADMIN && mode !== MODES.LOCKDOWN) return false;
+  if (!ACCESS_KEYWORD_RE.test(message.text)) return false;
+  const now = Date.now();
+  if (now - lastAccessNoticeAt < ACCESS_NOTICE_COOLDOWN_MS) return false;
+  lastAccessNoticeAt = now;
+  return true;
+}
+
+function sendSystemMessage(text) {
+  const normalized = normalizeUserText(text);
+  const clean = normalized.trim();
+  if (!clean) return null;
+  const safe = clean.length > 256 ? `${clean.slice(0, 253)}...` : clean;
+  const message = buildMessage(null, safe, {
+    nickname: 'Rover Bot',
+    role: 'user',
+    fromDiscord: false,
+    system: true,
+  });
+  broadcastMessage(message);
+  return message;
+}
+
+function maybeSendAccessNotice(message) {
+  if (!shouldSendAccessNotice(message)) return;
+  const reason = getAdminReason()?.text || '';
+  const mode = getMode();
+  const notice = buildAccessNoticeText(mode, reason);
+  sendSystemMessage(notice);
+}
+
 function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
   const role = getRole(socket);
   // if (role === 'spectator') {
@@ -233,6 +279,7 @@ function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
   logger.info('Chat message', { socket: socket.id, roverId: message.roverId });
   playTypingNote(roverId, TYPING_SEND_NOTE, socket?.id);
   broadcastMessage(message);
+  maybeSendAccessNotice(message);
   maybeSpeak(socket, message, ttsOptions);
   cb({ success: true });
 }
@@ -306,6 +353,7 @@ function sendExternalMessage({
   });
   logger.info('External chat message', { roverId, nickname });
   broadcastMessage(message);
+  maybeSendAccessNotice(message);
   return message;
 }
 
@@ -383,4 +431,5 @@ module.exports = {
   sendExternalMessage,
   sendExternalTyping,
   buildTypingPayload,
+  sendSystemMessage,
 };

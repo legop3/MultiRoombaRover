@@ -14,10 +14,13 @@ const { getReplaySources } = require('./replaySourceService');
 const { getHealthSnapshot } = require('./healthService');
 const { loadConfig } = require('../helpers/configLoader');
 const { getCommunityGoal } = require('./communityGoalService');
+const { getAdminReason } = require('./adminReasonService');
 const { subscribe } = require('./eventBus');
 
-const discordInvite = loadConfig().discord?.invite || null;
-const kofiLink = loadConfig().kofi?.link || null;
+const config = loadConfig();
+const discordInvite = config.discord?.invite || null;
+const kofiLink = config.kofi?.link || null;
+const serverTimezone = config.timezone || null;
 logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configured');
 logger.info('Ko-fi link loaded:', kofiLink ? 'present' : 'not configured');
 
@@ -59,10 +62,12 @@ function buildSession(socket) {
     replaySources: getReplaySources(),
     health: getHealthSnapshot(),
     communityGoal: getCommunityGoal(),
+    adminReason: getAdminReason(),
     users,
     discord: {
       invite: discordInvite,
     },
+    timezone: serverTimezone,
     kofi: {
       link: kofiLink,
     },
@@ -214,6 +219,11 @@ nicknameEvents.on('change', ({ socketId }) => {
 
 subscribe('communityGoal.updated', () => {
   logger.info('Community goal updated; syncing all clients');
+  syncAll();
+});
+
+subscribe('adminReason.updated', () => {
+  logger.info('Admin reason updated; syncing all clients');
   syncAll();
 });
 

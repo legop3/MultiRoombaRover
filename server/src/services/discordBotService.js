@@ -21,6 +21,7 @@ const { getActiveDrivers } = require('./turnService');
 const { getNickname } = require('./nicknameService');
 const { tryTriggerReplay } = require('./replayService');
 const { getCommunityGoal, setCommunityGoal, clearCommunityGoal } = require('./communityGoalService');
+const { getAdminReason, setAdminReason, clearAdminReason } = require('./adminReasonService');
 const {
   getGuildConfig,
   listGuildConfigs,
@@ -267,6 +268,7 @@ function formatHelp() {
     '`rs lock <id>` — lock a rover',
     '`rs unlock <id>` — unlock a rover',
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
+    '`rs reason [text|clear]` — show or set admin mode reason',
     '`rs goal [text|clear]` — show or set community goal',
     '`ts` — show time status',
   ].join('\n');
@@ -447,8 +449,9 @@ async function handleLockCommand(message, roverId, locked) {
   }
 }
 
-async function handleModeCommand(message, mode) {
-  const next = String(mode || '').toLowerCase();
+async function handleModeCommand(message, tokens = []) {
+  const next = String(tokens.shift() || '').toLowerCase();
+  const reasonText = tokens.join(' ').trim();
   if (!Object.values(MODES).includes(next)) {
     await message.reply({
       content: 'Invalid mode. Use one of: open, turns, admin, lockdown.',
@@ -459,6 +462,9 @@ async function handleModeCommand(message, mode) {
   try {
     const role = isLockdownAdminUser(message.author?.id) ? 'lockdown' : 'admin';
     setMode(next, { data: { role, user: { username: `discord:${message.author?.username || 'unknown'}` } } });
+    if (reasonText) {
+      setAdminReason(reasonText, { by: message.author?.id || null });
+    }
     await message.reply({
       content: sanitizeMentions(`Mode set to ${next}.`),
       allowedMentions: { parse: [], repliedUser: false },
@@ -466,6 +472,57 @@ async function handleModeCommand(message, mode) {
   } catch (err) {
     await message.reply({
       content: sanitizeMentions(`Failed to set mode: ${err.message}`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+  }
+}
+
+async function handleReasonCommand(message, tokens) {
+  const query = tokens.join(' ').trim();
+  const lower = query.toLowerCase();
+  if (!query) {
+    const reason = getAdminReason();
+    const text = reason?.text ? reason.text : null;
+    await message.reply({
+      content: text ? `Admin mode reason: ${sanitizeMentions(text)}` : 'No admin mode reason set.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (!isAdminUser(message.author.id)) {
+    await message.reply({
+      content: 'Only admins can update the admin mode reason.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (lower === 'clear') {
+    try {
+      clearAdminReason({ by: message.author?.id || null });
+      await message.reply({
+        content: 'Admin mode reason cleared.',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (err) {
+      await message.reply({
+        content: sanitizeMentions(`Failed to clear reason: ${err.message}`),
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    }
+    return;
+  }
+
+  try {
+    setAdminReason(query, { by: message.author?.id || null });
+    await message.reply({
+      content: sanitizeMentions(`Admin mode reason set: ${query}`),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+  } catch (err) {
+    await message.reply({
+      content: sanitizeMentions(`Failed to set reason: ${err.message}`),
       allowedMentions: { parse: [], repliedUser: false },
     });
   }
@@ -699,7 +756,7 @@ async function handleCommand(message) {
   const isLockdownAdmin = isLockdownAdminUser(message.author.id);
   const isBridgeAdmin = action === 'bridge' ? canManageBridge(message) : false;
   const mode = getMode();
-  const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal']);
+  const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason']);
 
   if (
     !isAdmin &&
@@ -709,7 +766,8 @@ async function handleCommand(message) {
     action !== 'help' &&
     action !== 'replay' &&
     action !== 'bridge' &&
-    action !== 'goal'
+    action !== 'goal' &&
+    action !== 'reason'
   ) {
     return; // ignore non-admins for privileged commands
   }
@@ -745,10 +803,13 @@ async function handleCommand(message) {
       await handleLockCommand(message, tokens[0], false);
       break;
     case 'mode':
-      await handleModeCommand(message, tokens[0]);
+      await handleModeCommand(message, tokens);
       break;
     case 'goal':
       await handleGoalCommand(message, tokens);
+      break;
+    case 'reason':
+      await handleReasonCommand(message, tokens);
       break;
     default:
       await message.reply(formatHelp());

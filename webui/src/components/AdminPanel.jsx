@@ -10,13 +10,16 @@ const MODES = [
 ];
 
 export default function AdminPanel() {
-  const { session, lockRover, setMode, requestControl, setCommunityGoal, adminLogs } = useSession();
+  const { session, lockRover, setMode, requestControl, setCommunityGoal, setAdminReason, adminLogs } = useSession();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
   const health = session?.health || null;
   const currentGoal = session?.communityGoal?.text || '';
   const goalUpdatedAt = session?.communityGoal?.updatedAt || null;
   const [goalDraft, setGoalDraft] = useState(currentGoal);
+  const currentReason = session?.adminReason?.text || '';
+  const reasonUpdatedAt = session?.adminReason?.updatedAt || null;
+  const [reasonDraft, setReasonDraft] = useState(currentReason);
 
   const isAdmin =
     session?.role === 'admin' ||
@@ -67,9 +70,29 @@ export default function AdminPanel() {
     }
   };
 
+  const handleReasonSave = async () => {
+    try {
+      await setAdminReason(reasonDraft);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleReasonClear = async () => {
+    try {
+      await setAdminReason(null);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   useEffect(() => {
     setGoalDraft(currentGoal);
   }, [currentGoal]);
+
+  useEffect(() => {
+    setReasonDraft(currentReason);
+  }, [currentReason]);
 
   const lockMap = useMemo(() => {
     const map = {};
@@ -112,6 +135,28 @@ export default function AdminPanel() {
             Set goal
           </button>
           <button type="button" onClick={handleGoalClear} className="button-danger">
+            Clear
+          </button>
+        </div>
+      </div>
+      <div className="space-y-0.5">
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>Admin mode reason</span>
+          {reasonUpdatedAt ? (
+            <span>Updated {new Date(reasonUpdatedAt).toLocaleString()}</span>
+          ) : null}
+        </div>
+        <textarea
+          value={reasonDraft}
+          onChange={(event) => setReasonDraft(event.target.value)}
+          placeholder="Set an admin mode reason"
+          className="field-input text-sm min-h-[3.5rem]"
+        />
+        <div className="flex gap-0.5 text-xs">
+          <button type="button" onClick={handleReasonSave} className="button-dark">
+            Set reason
+          </button>
+          <button type="button" onClick={handleReasonClear} className="button-danger">
             Clear
           </button>
         </div>

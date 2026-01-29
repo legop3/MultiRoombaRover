@@ -19,6 +19,7 @@ const SessionContext = createContext({
   setNickname: async () => {},
   triggerReplay: async () => {},
   setCommunityGoal: async () => {},
+  setAdminReason: async () => {},
 });
 
 function useAckEmitter(socket) {
@@ -115,6 +116,7 @@ export function SessionProvider({ children }) {
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
       triggerReplay: (sources = []) => emitWithAck('replay:trigger', { sources }),
       setCommunityGoal: (text) => emitWithAck('communityGoal:set', { text }),
+      setAdminReason: (text) => emitWithAck('adminReason:set', { text }),
       pushAlert: (alert) =>
         setAlerts((prev) => [
           ...prev.slice(-49),

@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import AuthPanel from './AuthPanel.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import DiscordInviteButton from './DiscordInviteButton.jsx';
@@ -18,8 +19,8 @@ function getModeDetails(mode = 'admin') {
   }
   return {
     title: 'Admin mode active',
-    description:
-      'The server is currently in admin mode. Only admins can access the interface.',
+    // description:
+    //   'The server is currently in admin mode. Only admins can access the interface.',
   };
 }
 
@@ -27,8 +28,30 @@ export default function ModeGateOverlay() {
   const { session } = useSession();
   const mode = session?.mode;
   const role = session?.role;
+  const reason = session?.adminReason?.text || '';
+  const reasonUpdatedAt = session?.adminReason?.updatedAt || null;
+  const timezone = session?.timezone || 'UTC';
   const restricted = RESTRICTED_MODES.has(mode);
   const privileged = mode === 'lockdown' ? LOCKDOWN_ROLES.has(role) : PRIVILEGED_ROLES.has(role);
+  const [now, setNow] = useState(() => new Date());
+
+  const serverTime = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+      }).format(now);
+    } catch (err) {
+      return now.toLocaleTimeString();
+    }
+  }, [now, timezone]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (!restricted || privileged) {
     return null;
@@ -43,13 +66,25 @@ export default function ModeGateOverlay() {
           <p className="text-lg font-semibold">{details.title}</p>
           <p className="text-sm text-slate-300">{details.description}</p>
         </div>
+        <div className="surface-muted space-y-0.5">
+          <p className="text-[0.7rem] tracking-wide text-slate-400">Reason for locking:</p>
+          <p className="text-lg font-semibold text-slate-100">
+            {reason ? reason : 'No reason set.'}
+          </p>
+          <p className="text-center text-sm text-slate-300">Server time: {serverTime}</p>
+          {reasonUpdatedAt ? (
+            <p className="text-[0.7rem] text-slate-500">
+              Updated {new Date(reasonUpdatedAt).toLocaleString()}
+            </p>
+          ) : null}
+        </div>
         <div className="surface-muted">
           <AuthPanel />
         </div>
         <div className='w-full justify-center items-center'>
           <DiscordInviteButton text='Join our Discord server for updates!'/>
         </div>
-        You can use the chat from here though :3
+        You can still use the chat while the server is locked:
         {/* set max height of this box */}
         <div className='max-h-80 overflow-y-auto'>
           <ChatPanel />
