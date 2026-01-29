@@ -89,70 +89,38 @@ function InfoColumn({
   const batteryFillClass = getBatteryFillClass({ rover });
   const dockStatus = getDockChargeStatus(frame);
   const isActiveView = variant === 'active';
-  const mapWrapRef = useRef(null);
-  const [mapScale, setMapScale] = useState(1);
-
-  useLayoutEffect(() => {
-    if (!isActiveView) return undefined;
-    const el = mapWrapRef.current;
-    if (!el) return undefined;
-    const baseSize = 240;
-    let raf = null;
-
-    const fit = () => {
-      const width = el.clientWidth;
-      if (!width) {
-        raf = requestAnimationFrame(fit);
-        return;
-      }
-      setMapScale(width / baseSize);
-    };
-
-    const scheduleFit = () => {
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(fit);
-    };
-
-    scheduleFit();
-    const ro = new ResizeObserver(scheduleFit);
-    ro.observe(el);
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      ro.disconnect();
-    };
-  }, [isActiveView]);
   return (
     <div
       className={`flex min-w-0 flex-1 flex-col gap-4 px-0 py-0 ${withDivider ? 'border-r border-slate-700/60' : ''}`}
     >
-      <div className="flex min-w-0 flex-col gap-3 text-center">
-        <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-3 py-2">
-          <AutoFitText className="font-semibold leading-tight text-white" maxSize={64} minSize={18}>
+      <div className="flex min-w-0 flex-col gap-1 text-center">
+        <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-0 py-0 leading-none">
+          <AutoFitText className="font-semibold leading-none text-white" maxSize={1000} minSize={18}>
             {rover.name || rover.id}
           </AutoFitText>
         </div>
         {driverLabel ? (
-          <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-3 py-2">
-            <AutoFitText className="font-semibold leading-tight text-slate-200" maxSize={52} minSize={16}>
+          <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-0 py-0 leading-none">
+            <AutoFitText className="font-semibold leading-none text-slate-200" maxSize={1000} minSize={16}>
               {driverLabel}
             </AutoFitText>
           </div>
         ) : null}
-        <div className="relative min-w-0 overflow-hidden rounded-lg border border-slate-800/80 bg-slate-900/70 px-3 py-2">
+        <div className="relative min-w-0 overflow-hidden rounded-lg border border-slate-800/80 bg-slate-900/70 px-0 py-0 leading-none">
           <div
             className={`absolute inset-y-0 left-0 ${batteryFillClass}`}
             style={{ width: `${batteryPercent == null ? 0 : batteryPercent}%` }}
           />
           <div className="relative">
-            <AutoFitText className="font-semibold leading-tight text-slate-200" maxSize={48} minSize={16}>
+            <AutoFitText className="font-semibold leading-none text-slate-200" maxSize={1000} minSize={16}>
               {batteryPercent == null ? 'Battery --%' : `Battery ${batteryPercent}%`}
             </AutoFitText>
           </div>
         </div>
         <div className="overflow-hidden rounded-lg border border-slate-800/80">
-          <div className="grid grid-cols-2 text-center text-[clamp(0.85rem,2.4vw,2rem)] font-semibold uppercase tracking-wide">
-            <div className={`${dockStatus.dockTone} px-2 py-2`}>{dockStatus.dockLabel}</div>
-            <div className={`${dockStatus.chargeTone} px-2 py-2`}>{dockStatus.chargeLabel}</div>
+          <div className="grid grid-cols-2 text-center text-[clamp(0.85rem,2.4vw,2rem)] font-semibold uppercase tracking-wide leading-none">
+            <div className={`${dockStatus.dockTone} px-0 py-0 leading-none`}>{dockStatus.dockLabel}</div>
+            <div className={`${dockStatus.chargeTone} px-0 py-0 leading-none`}>{dockStatus.chargeLabel}</div>
           </div>
         </div>
       </div>
@@ -160,31 +128,18 @@ function InfoColumn({
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         {isActiveView ? (
           <div className="relative mt-auto w-full min-w-0">
-            <div ref={mapWrapRef} className="flex w-full items-end justify-center">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '240px',
-                  height: '240px',
-                  transformOrigin: 'bottom center',
-                  transform: `scale(${mapScale})`,
-                }}
-              >
-                <TopDownMap sensors={frame?.sensors} size={240} overlay />
-              </div>
-            </div>
             {showCountdown ? (
               <div className="absolute bottom-0 right-0 pb-1 pr-1 text-right">
-                <AutoFitText className="font-semibold leading-tight text-slate-200" maxSize={72} minSize={18}>
+                <AutoFitText className="font-semibold leading-none text-slate-200" maxSize={1000} minSize={18}>
                   {countdownText}
                 </AutoFitText>
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="flex w-full min-w-0 flex-col items-center gap-4">
+          <div className="flex w-full min-w-0 flex-1 flex-col items-center gap-4">
             {showPreview ? (
-              <div className="w-full">
+              <div className="mt-auto w-full">
                 <div className="w-full aspect-[4/3]">
                   <VideoTile
                     sessionInfo={null}
@@ -201,14 +156,9 @@ function InfoColumn({
                 </div>
               </div>
             ) : null}
-            <div className="flex w-full items-center justify-center">
-              <div style={{ width: '240px', height: '240px', transform: 'scale(0.78)', transformOrigin: 'center' }}>
-                <TopDownMap sensors={frame?.sensors} size={240} overlay />
-              </div>
-            </div>
             {showCountdown ? (
               <div className="flex min-w-0 items-center justify-center text-center">
-                <AutoFitText className="font-semibold leading-tight text-slate-200" maxSize={72} minSize={18}>
+                <AutoFitText className="font-semibold leading-none text-slate-200" maxSize={1000} minSize={18}>
                   {countdownText}
                 </AutoFitText>
               </div>
@@ -220,7 +170,7 @@ function InfoColumn({
   );
 }
 
-function AutoFitText({ children, className = '', maxSize = 64, minSize = 14 }) {
+function AutoFitText({ children, className = '', maxSize = 1000, minSize = 14 }) {
   const containerRef = useRef(null);
   const textRef = useRef(null);
   const [fontSize, setFontSize] = useState(maxSize);
@@ -270,7 +220,11 @@ function AutoFitText({ children, className = '', maxSize = 64, minSize = 14 }) {
 
   return (
     <div ref={containerRef} className="w-full min-w-0">
-      <div ref={textRef} className={`whitespace-nowrap ${className}`} style={{ fontSize: `${fontSize}px` }}>
+      <div
+        ref={textRef}
+        className={`whitespace-nowrap ${className}`}
+        style={{ fontSize: `${fontSize}px`, lineHeight: 1.1 }}
+      >
         {children}
       </div>
     </div>
