@@ -392,6 +392,7 @@ export default function VideoTile({
     ? `${audioStatus} (${audioDetail})`
     : audioStatus;
   const showVerticalBattery = hudVariant === 'spectator';
+  const noHud = hudVariant === 'none';
 
   return (
     <div className={`flex flex-col gap-0.5 ${fitParent ? 'h-full' : ''}`}>
@@ -422,7 +423,7 @@ export default function VideoTile({
           />
         )}
         <audio ref={audioRef} autoPlay hidden />
-        {showTurnCue ? (
+        {!noHud && showTurnCue ? (
           <TurnCueOverlay
             mobileHud={mobileHud}
             turnSeconds={turnSeconds}
@@ -430,35 +431,37 @@ export default function VideoTile({
             idleSkipSeconds={idleSkipSeconds}
           />
         ) : null}
-        <HudOverlay
-          frame={telemetryFrame}
-          sensors={sensors}
-          label={label}
-          status={renderedStatus}
-          audioStatus={renderedAudioStatus}
-          desktopLayout={desktopLayout}
-          layoutFormat={layoutFormat}
-          variant={hudVariant}
-          driverLabel={driverLabel}
-          battery={batteryVisual}
-          showTopDown={showHudMap}
-          mobileHud={mobileHud}
-          mapPosition={hudMapPosition}
-          turnTimerText={turnTimerText}
-          labelScale={hudLabelScale}
-        />
-        <HudChatInput compact={mobileHud} />
-        {debugHud ? (
+        {!noHud ? (
+          <HudOverlay
+            frame={telemetryFrame}
+            sensors={sensors}
+            label={label}
+            status={renderedStatus}
+            audioStatus={renderedAudioStatus}
+            desktopLayout={desktopLayout}
+            layoutFormat={layoutFormat}
+            variant={hudVariant}
+            driverLabel={driverLabel}
+            battery={batteryVisual}
+            showTopDown={showHudMap}
+            mobileHud={mobileHud}
+            mapPosition={hudMapPosition}
+            turnTimerText={turnTimerText}
+            labelScale={hudLabelScale}
+          />
+        ) : null}
+        {!noHud ? <HudChatInput compact={mobileHud} /> : null}
+        {!noHud && debugHud ? (
           <div className="pointer-events-none absolute left-1 top-1 z-40 rounded bg-black/80 px-1 py-0.5 text-[0.6rem] text-lime-200">
             {`OC vis:${overlayVisible ? 1 : 0} motors:${overlayMotors.length} fill:${Math.round(overlayFill * 100)}%`}
           </div>
         ) : null}
-        <OvercurrentOverlay motors={overlayMotors} fill={overlayFill} compact={mobileHud} />
-        <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} />
-        {showVerticalBattery && batteryVisual.available ? (
+        {!noHud ? <OvercurrentOverlay motors={overlayMotors} fill={overlayFill} compact={mobileHud} /> : null}
+        {!noHud ? <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} /> : null}
+        {!noHud && showVerticalBattery && batteryVisual.available ? (
           <BatteryBarVertical visual={batteryVisual} />
         ) : null}
-        {qualityNotice ? (
+        {!noHud && qualityNotice ? (
           <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2">
             <div
               className={`mx-auto w-fit rounded border border-amber-300/80 bg-black/75 text-amber-200 ${
@@ -473,7 +476,7 @@ export default function VideoTile({
           </div>
         ) : null}
       </div>
-      {!showVerticalBattery && (
+      {!noHud && !showVerticalBattery && (
         <div className="space-y-0.5">
           <LightBumpBars sensors={sensors} />
           <BatteryBar visual={batteryVisual} />
@@ -625,6 +628,10 @@ function HudOverlay({
         ? { left: '50%', top: '0.25rem' }
         : { right: '0.25rem', top: '0.25rem' }),
   };
+
+  if (variant === 'none') {
+    return null;
+  }
 
   if (variant === 'spectator') {
     const telemetryEntries = [

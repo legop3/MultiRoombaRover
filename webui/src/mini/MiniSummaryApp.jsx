@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SettingsProvider } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
 import { useTelemetryFrames } from '../context/TelemetryContext.jsx';
@@ -6,6 +6,7 @@ import { useVideoRequests } from '../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../hooks/useRoverSnapshots.js';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
 import VideoTile from '../components/VideoTile.jsx';
+import TopDownMap from '../components/TopDownMap.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
 
@@ -21,37 +22,259 @@ function formatDriverLabel({ roverId, session }) {
   return mode === 'turns' && turnInfo?.current ? `${label}` : label;
 }
 
-function getBatteryVisual({ rover, frame }) {
+function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return '0:00';
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function getBatteryPercent({ rover, frame }) {
   const percentDisplay = rover?.batteryState?.percentDisplay;
-  const urgentActive = rover?.batteryState?.urgentActive ?? false;
-  const warnActive = rover?.batteryState?.warnActive ?? false;
+  if (percentDisplay != null && Number.isFinite(percentDisplay)) {
+    return Math.round(percentDisplay);
+  }
   const config = rover?.battery ?? null;
   const charge = frame?.sensors?.batteryChargeMah ?? null;
   const full = config?.Full ?? null;
   const warn = config?.Warn ?? null;
-  const urgent = config?.Urgent ?? null;
-
-  if (percentDisplay != null && Number.isFinite(percentDisplay)) {
-    const percent = Math.max(0, Math.min(1, percentDisplay / 100));
-    const barClass = urgentActive ? 'bg-red-500/40' : warnActive ? 'bg-amber-400/40' : 'bg-emerald-400/40';
-    return { percent, barClass };
-  }
-
-  if (charge == null || full == null || warn == null) {
-    return { percent: 0, barClass: 'bg-slate-700/40' };
-  }
-
+  if (charge == null || full == null || warn == null) return null;
   const span = full - warn;
-  if (span <= 0) {
-    return { percent: 0, barClass: 'bg-slate-700/40' };
-  }
-
+  if (span <= 0) return null;
   const normalized = (charge - warn) / span;
-  const percent = Math.max(0, Math.min(1, normalized));
-  const depleted = normalized <= 0;
-  const warnTriggered = urgent != null && charge <= urgent;
-  const barClass = depleted ? 'bg-red-500/40' : warnTriggered ? 'bg-amber-400/40' : 'bg-emerald-400/40';
-  return { percent, barClass };
+  return Math.round(Math.max(0, Math.min(1, normalized)) * 100);
+}
+
+function getDockChargeStatus(frame) {
+  const docked = Boolean(frame?.sensors?.chargingSources?.homeBase);
+  const chargingLabel = frame?.sensors?.chargingState?.label || '';
+  const charging = Boolean(chargingLabel && chargingLabel.toLowerCase() !== 'not charging');
+  const dockTone = docked ? 'bg-emerald-500/80 text-emerald-50' : 'bg-slate-700/80 text-slate-200';
+  const chargeTone = charging
+    ? 'bg-emerald-500/80 text-emerald-50'
+    : docked
+      ? 'bg-amber-400/80 text-amber-950'
+      : 'bg-slate-700/80 text-slate-200';
+  return {
+    docked,
+    charging,
+    dockLabel: docked ? 'Docked' : 'Undocked',
+    chargeLabel: charging ? 'Charging' : 'Not charging',
+    dockTone,
+    chargeTone,
+  };
+}
+
+function getBatteryFillClass({ rover }) {
+  const urgentActive = rover?.batteryState?.urgentActive ?? false;
+  const warnActive = rover?.batteryState?.warnActive ?? false;
+  if (urgentActive) return 'bg-red-500/40';
+  if (warnActive) return 'bg-amber-400/40';
+  return 'bg-emerald-400/40';
+}
+
+function InfoColumn({
+  rover,
+  frame,
+  driverLabel,
+  snapshotFeed,
+  showCountdown = false,
+  countdownText = '—',
+  withDivider = false,
+  showPreview = true,
+  variant = 'stacked',
+}) {
+  const batteryPercent = getBatteryPercent({ rover, frame });
+  const batteryFillClass = getBatteryFillClass({ rover });
+  const dockStatus = getDockChargeStatus(frame);
+  const isActiveView = variant === 'active';
+  const mapWrapRef = useRef(null);
+  const [mapScale, setMapScale] = useState(1);
+
+  useLayoutEffect(() => {
+    if (!isActiveView) return undefined;
+    const el = mapWrapRef.current;
+    if (!el) return undefined;
+    const baseSize = 240;
+    let raf = null;
+
+    const fit = () => {
+      const width = el.clientWidth;
+      if (!width) {
+        raf = requestAnimationFrame(fit);
+        return;
+      }
+      setMapScale(width / baseSize);
+    };
+
+    const scheduleFit = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(fit);
+    };
+
+    scheduleFit();
+    const ro = new ResizeObserver(scheduleFit);
+    ro.observe(el);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [isActiveView]);
+  return (
+    <div
+      className={`flex min-w-0 flex-1 flex-col gap-4 px-0 py-0 ${withDivider ? 'border-r border-slate-700/60' : ''}`}
+    >
+      <div className="flex min-w-0 flex-col gap-3 text-center">
+        <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-3 py-2">
+          <AutoFitText className="font-semibold leading-tight text-white" maxSize={64} minSize={18}>
+            {rover.name || rover.id}
+          </AutoFitText>
+        </div>
+        {driverLabel ? (
+          <div className="min-w-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-3 py-2">
+            <AutoFitText className="font-semibold leading-tight text-slate-200" maxSize={52} minSize={16}>
+              {driverLabel}
+            </AutoFitText>
+          </div>
+        ) : null}
+        <div className="relative min-w-0 overflow-hidden rounded-lg border border-slate-800/80 bg-slate-900/70 px-3 py-2">
+          <div
+            className={`absolute inset-y-0 left-0 ${batteryFillClass}`}
+            style={{ width: `${batteryPercent == null ? 0 : batteryPercent}%` }}
+          />
+          <div className="relative">
+            <AutoFitText className="font-semibold leading-tight text-slate-200" maxSize={48} minSize={16}>
+              {batteryPercent == null ? 'Battery --%' : `Battery ${batteryPercent}%`}
+            </AutoFitText>
+          </div>
+        </div>
+        <div className="overflow-hidden rounded-lg border border-slate-800/80">
+          <div className="grid grid-cols-2 text-center text-[clamp(0.85rem,2.4vw,2rem)] font-semibold uppercase tracking-wide">
+            <div className={`${dockStatus.dockTone} px-2 py-2`}>{dockStatus.dockLabel}</div>
+            <div className={`${dockStatus.chargeTone} px-2 py-2`}>{dockStatus.chargeLabel}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        {isActiveView ? (
+          <div className="relative mt-auto w-full min-w-0">
+            <div ref={mapWrapRef} className="flex w-full items-end justify-center">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '240px',
+                  height: '240px',
+                  transformOrigin: 'bottom center',
+                  transform: `scale(${mapScale})`,
+                }}
+              >
+                <TopDownMap sensors={frame?.sensors} size={240} overlay />
+              </div>
+            </div>
+            {showCountdown ? (
+              <div className="absolute bottom-0 right-0 pb-1 pr-1 text-right">
+                <AutoFitText className="font-semibold leading-tight text-slate-200" maxSize={72} minSize={18}>
+                  {countdownText}
+                </AutoFitText>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex w-full min-w-0 flex-col items-center gap-4">
+            {showPreview ? (
+              <div className="w-full">
+                <div className="w-full aspect-[4/3]">
+                  <VideoTile
+                    sessionInfo={null}
+                    videoMode="snapshot"
+                    snapshotFeed={snapshotFeed}
+                    audioSessionInfo={null}
+                    label={rover.name || rover.id}
+                    telemetryFrame={frame}
+                    batteryConfig={rover.battery}
+                    layoutFormat="mobile"
+                    hudVariant="none"
+                    fitParent
+                  />
+                </div>
+              </div>
+            ) : null}
+            <div className="flex w-full items-center justify-center">
+              <div style={{ width: '240px', height: '240px', transform: 'scale(0.78)', transformOrigin: 'center' }}>
+                <TopDownMap sensors={frame?.sensors} size={240} overlay />
+              </div>
+            </div>
+            {showCountdown ? (
+              <div className="flex min-w-0 items-center justify-center text-center">
+                <AutoFitText className="font-semibold leading-tight text-slate-200" maxSize={72} minSize={18}>
+                  {countdownText}
+                </AutoFitText>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AutoFitText({ children, className = '', maxSize = 64, minSize = 14 }) {
+  const containerRef = useRef(null);
+  const textRef = useRef(null);
+  const [fontSize, setFontSize] = useState(maxSize);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const textEl = textRef.current;
+    if (!container || !textEl) return undefined;
+
+    let raf = null;
+    const fit = () => {
+      const width = container.clientWidth;
+      if (!width) {
+        scheduleFit();
+        return;
+      }
+      let low = minSize;
+      let high = maxSize;
+      let best = minSize;
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        textEl.style.fontSize = `${mid}px`;
+        const fits = textEl.scrollWidth <= width;
+        if (fits) {
+          best = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+      setFontSize(best);
+    };
+
+    const scheduleFit = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(fit);
+    };
+
+    scheduleFit();
+    const ro = new ResizeObserver(scheduleFit);
+    ro.observe(container);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [children, maxSize, minSize]);
+
+  return (
+    <div ref={containerRef} className="w-full min-w-0">
+      <div ref={textRef} className={`whitespace-nowrap ${className}`} style={{ fontSize: `${fontSize}px` }}>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 function MiniSummaryContent() {
@@ -62,14 +285,17 @@ function MiniSummaryContent() {
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
   const [index, setIndex] = useState(0);
+  const [rotationBase, setRotationBase] = useState(Date.now());
+  const [nowTick, setNowTick] = useState(Date.now());
   const activeDrivers = session?.activeDrivers || {};
   const driverRoster = useMemo(
     () => roster.filter((rover) => activeDrivers[rover.id]),
     [roster, activeDrivers],
   );
+  const snapshotRoster = driverRoster.length ? driverRoster : roster;
 
   const snapshotFeeds = useRoverSnapshots(
-    driverRoster.map((rover) => rover.id),
+    snapshotRoster.map((rover) => rover.id),
     { enabled: !inLockdown, version: session?.mode },
   );
   const audioEntries = useMemo(
@@ -103,15 +329,24 @@ function MiniSummaryContent() {
 
   useEffect(() => {
     setIndex(0);
+    setRotationBase(Date.now());
   }, [rotationKey]);
 
   useEffect(() => {
     if (!rotationPool.length) return undefined;
     const timer = setInterval(() => {
+      setRotationBase(Date.now());
       setIndex((prev) => (prev + 1) % rotationPool.length);
     }, ROTATE_MS);
     return () => clearInterval(timer);
   }, [rotationPool.length, rotationKey]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const activeEntry = rotationPool.length ? rotationPool[index % rotationPool.length] : null;
   const activeRover = activeEntry?.type === 'rover' ? activeEntry.rover : null;
@@ -120,6 +355,9 @@ function MiniSummaryContent() {
   const activeAudio = activeRover ? audioSources[`${activeRover.id}-audio`] || null : null;
   const activeFrame = activeRover ? frames[activeRover.id] || null : null;
   const driverLabel = activeRover ? formatDriverLabel({ roverId: activeRover.id, session }) : null;
+  const rotationRemainingMs =
+    rotationPool.length > 1 ? Math.max(0, rotationBase + ROTATE_MS - nowTick) : null;
+  const rotationCountdown = rotationRemainingMs != null ? formatDuration(rotationRemainingMs) : '—';
 
   if (inLockdown) {
     return (
@@ -128,6 +366,33 @@ function MiniSummaryContent() {
           <p className="text-lg font-semibold text-white">Mini spectator is disabled in lockdown.</p>
           <p className="text-slate-300">It will automatically resume once lockdown ends.</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!driverRoster.length) {
+    return (
+      <div className="relative flex h-screen w-screen overflow-hidden bg-black text-slate-100">
+        <section className="flex h-full w-full gap-x-1">
+          {roster.length ? (
+            roster.map((rover, idx) => (
+              <InfoColumn
+                key={rover.id}
+                rover={rover}
+                frame={frames[rover.id] || null}
+                driverLabel={null}
+                snapshotFeed={snapshotFeeds[rover.id] || null}
+                showCountdown={false}
+                showPreview={true}
+                withDivider={false}
+              />
+            ))
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
+              No rovers available.
+            </div>
+          )}
+        </section>
       </div>
     );
   }
@@ -153,11 +418,7 @@ function MiniSummaryContent() {
               telemetryFrame={activeFrame}
               batteryConfig={activeRover.battery}
               layoutFormat="mobile"
-              hudVariant="spectator"
-              driverLabel={driverLabel}
-              hudLabelScale={7}
-              hudForceMap
-              hudMapPosition="bottom-left"
+              hudVariant="none"
               fitParent
             />
           </FitViewportFrame>
@@ -167,38 +428,21 @@ function MiniSummaryContent() {
           </div>
         )}
       </section>
-      <aside className="flex h-full min-w-0 flex-1 flex-col border-l border-slate-800/60 bg-slate-950/90">
-        {roster.length ? (
-          roster.map((rover) => {
-            const frame = frames[rover.id] || null;
-            const driverText = formatDriverLabel({ roverId: rover.id, session });
-            const batteryVisual = getBatteryVisual({ rover, frame });
-            const isActive = activeRover?.id === rover.id;
-            return (
-              <div
-                key={rover.id}
-                className={`relative flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-hidden px-6 py-4 ${
-                  isActive ? 'border-4 border-emerald-300/90 bg-emerald-300/10' : 'opacity-60'
-                }`}
-              >
-                <div
-                  className={`absolute inset-y-0 left-0 ${batteryVisual.barClass}`}
-                  style={{ width: `${batteryVisual.percent * 100}%` }}
-                />
-                <div className="relative flex flex-col gap-1">
-                  <div className={`text-6xl font-semibold tracking-wide ${isActive ? 'text-white' : 'text-slate-200'}`}>
-                    {rover.name || rover.id}
-                  </div>
-                  <div className={`text-5xl font-semibold ${isActive ? 'text-white' : 'text-slate-300'}`}>
-                    {driverText}
-                  </div>
-                </div>
-              </div>
-            );
-          })
+      <aside className="flex h-full min-w-0 flex-1 flex-col border-l border-slate-800/60 bg-black">
+        {activeRover ? (
+          <InfoColumn
+            rover={activeRover}
+            frame={activeFrame}
+            driverLabel={driverLabel}
+            snapshotFeed={snapshotFeeds[activeRover.id] || null}
+            showCountdown={true}
+            countdownText={rotationCountdown}
+            showPreview={false}
+            variant="active"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-            No rovers available.
+            No active rover.
           </div>
         )}
       </aside>
