@@ -146,6 +146,7 @@ function MobileJoystickPanel({ layout }) {
   const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
   const nightVisionState = pipeline?.nightVisionState;
   const hornAvailable = Boolean(roverId && pipeline?.horn);
+  const hornCooldownActive = (horn?.cooldownUntil ?? 0) > Date.now();
   const cameraMin = typeof cameraConfig?.minAngle === 'number' ? cameraConfig.minAngle : -45;
   const cameraMax = typeof cameraConfig?.maxAngle === 'number' ? cameraConfig.maxAngle : 45;
   const cameraValue =
@@ -226,7 +227,12 @@ function MobileJoystickPanel({ layout }) {
             />
           )}
           {hornAvailable && (
-            <HornControl disabled={disabled} onStart={startHorn} onStop={stopHorn} active={horn?.active} />
+            <HornControl
+              disabled={disabled || hornCooldownActive}
+              onStart={startHorn}
+              onStop={stopHorn}
+              active={horn?.active}
+            />
           )}
           {cameraEnabled && (
             <div className="bg-zinc-950 p-0.5 text-xs">

@@ -17,6 +17,9 @@ export const SONG_DEFAULT_NOTE = 60;
 export const SONG_DEFAULT_DURATION = 8;
 export const SONG_REPEAT_MS = 250;
 
+export const HORN_MAX_MS = 1200;
+export const HORN_COOLDOWN_MS = 2500;
+
 export const OI_COMMANDS = {
   start: [128],
   safe: [131],

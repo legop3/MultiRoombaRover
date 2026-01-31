@@ -135,7 +135,11 @@ func (h *HornSynth) run(waveform string, freqs []float64, stop <-chan struct{}) 
 	h.mu.Unlock()
 
 	writer := bufio.NewWriterSize(stdin, 32*1024)
-	if err := h.synthLoop(writer, waveform, freqs, rate, channels, volume, stop); err != nil {
+	maxFrames := 0
+	if h.cfg.MaxDuration.Duration > 0 {
+		maxFrames = int(float64(rate) * h.cfg.MaxDuration.Duration.Seconds())
+	}
+	if err := h.synthLoop(writer, waveform, freqs, rate, channels, volume, maxFrames, stop); err != nil {
 		h.log.Printf("horn: synth failed: %v", err)
 	}
 	_ = writer.Flush()
@@ -151,7 +155,7 @@ func (h *HornSynth) run(waveform string, freqs []float64, stop <-chan struct{}) 
 	h.mu.Unlock()
 }
 
-func (h *HornSynth) synthLoop(writer *bufio.Writer, waveform string, freqs []float64, rate, channels int, volume float64, stop <-chan struct{}) error {
+func (h *HornSynth) synthLoop(writer *bufio.Writer, waveform string, freqs []float64, rate, channels int, volume float64, maxFrames int, stop <-chan struct{}) error {
 	phase := make([]float64, len(freqs))
 	increment := make([]float64, len(freqs))
 	for i, f := range freqs {
@@ -182,6 +186,10 @@ func (h *HornSynth) synthLoop(writer *bufio.Writer, waveform string, freqs []flo
 			}
 		}
 		for i := 0; i < framesPerChunk; i++ {
+			if maxFrames > 0 && sampleIndex >= maxFrames && !stopRequested {
+				stopRequested = true
+				releaseStart = sampleIndex
+			}
 			env := 1.0
 			if attackFrames > 0 && sampleIndex < attackFrames {
 				env = float64(sampleIndex) / float64(attackFrames)

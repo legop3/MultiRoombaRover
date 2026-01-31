@@ -24,6 +24,7 @@ export default function CameraServoPanel() {
   const hornAvailable = Boolean(roverId && pipeline?.horn);
   const nightVisionKey = formatKeyLabel(keymap?.nightVisionToggle?.[0]);
   const hornKey = formatKeyLabel(keymap?.hornHonk?.[0]);
+  const hornCooldownActive = (horn?.cooldownUntil ?? 0) > Date.now();
   const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
   const max = typeof config?.maxAngle === 'number' ? config.maxAngle : 30;
   const value =
@@ -106,7 +107,7 @@ export default function CameraServoPanel() {
       )}
       {hornAvailable && (
         <HornControl
-          disabled={!roverId}
+          disabled={!roverId || hornCooldownActive}
           onStart={startHorn}
           onStop={stopHorn}
           keyLabel={hornKey}

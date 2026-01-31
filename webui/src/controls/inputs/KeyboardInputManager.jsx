@@ -373,8 +373,8 @@ export default function KeyboardInputManager() {
           toggleNightVision();
         } else if (newlyPressed.some((token) => keymap.hornHonk?.has(token))) {
           if (!hornActiveRef.current) {
-            hornActiveRef.current = true;
-            startHorn();
+            const started = startHorn();
+            hornActiveRef.current = Boolean(started);
           }
         } else if (newlyPressed.some((token) => keymap.homeAssistantOn?.has(token))) {
           triggerHomeAssistantCycle('on');

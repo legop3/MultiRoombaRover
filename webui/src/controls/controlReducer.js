@@ -30,6 +30,7 @@ function createSongState() {
 function createHornState() {
   return {
     active: false,
+    cooldownUntil: 0,
   };
 }
 
@@ -142,6 +143,14 @@ export function controlReducer(state, action) {
         horn: {
           ...(state.horn || createHornState()),
           active: Boolean(action.payload),
+        },
+      };
+    case 'control/set-horn-cooldown':
+      return {
+        ...state,
+        horn: {
+          ...(state.horn || createHornState()),
+          cooldownUntil: typeof action.payload === 'number' ? action.payload : 0,
         },
       };
     case 'control/record-intent':

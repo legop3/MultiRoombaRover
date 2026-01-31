@@ -66,13 +66,14 @@ type AudioConfig struct {
 }
 
 type HornConfig struct {
-	Enabled    bool    `yaml:"enabled" json:"enabled"`
-	Volume     float64 `yaml:"volume" json:"-"`
-	SampleRate int     `yaml:"sampleRate" json:"-"`
-	Channels   int     `yaml:"channels" json:"-"`
-	Device     string  `yaml:"device" json:"-"`
-	SineGain   float64 `yaml:"sineGain" json:"-"`
-	SawGain    float64 `yaml:"sawGain" json:"-"`
+	Enabled     bool     `yaml:"enabled" json:"enabled"`
+	Volume      float64  `yaml:"volume" json:"-"`
+	SampleRate  int      `yaml:"sampleRate" json:"-"`
+	Channels    int      `yaml:"channels" json:"-"`
+	Device      string   `yaml:"device" json:"-"`
+	SineGain    float64  `yaml:"sineGain" json:"-"`
+	SawGain     float64  `yaml:"sawGain" json:"-"`
+	MaxDuration Duration `yaml:"maxDuration" json:"-"`
 }
 
 type MediaConfig struct {
@@ -172,12 +173,13 @@ func LoadConfig(path string) (*Config, error) {
 			DefaultPitch:   50,
 		},
 		Horn: HornConfig{
-			Enabled:    false,
-			Volume:     0.25,
-			SampleRate: 48000,
-			Channels:   1,
-			SineGain:   1.0,
-			SawGain:    0.7,
+			Enabled:     false,
+			Volume:      0.25,
+			SampleRate:  48000,
+			Channels:    1,
+			SineGain:    1.0,
+			SawGain:     0.7,
+			MaxDuration: Duration{Duration: 1200 * time.Millisecond},
 		},
 		NightVision: NightVisionConfig{
 			Enabled:   true,
@@ -329,6 +331,9 @@ func validateHornConfig(cfg *HornConfig) {
 	}
 	if cfg.SawGain <= 0 {
 		cfg.SawGain = 0.7
+	}
+	if cfg.MaxDuration.Duration <= 0 {
+		cfg.MaxDuration = Duration{Duration: 1200 * time.Millisecond}
 	}
 }
 

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { controlReducer, initialControlState } from './controlReducer.js';
 import { computeDifferentialSpeeds, clamp } from './controlMath.js';
 import { useCommandPipeline } from './commandPipeline.js';
-import { DEFAULT_KEYMAP, DEFAULT_MACROS, SONG_DEFAULT_NOTE } from './constants.js';
+import { DEFAULT_KEYMAP, DEFAULT_MACROS, HORN_COOLDOWN_MS, HORN_MAX_MS, SONG_DEFAULT_NOTE } from './constants.js';
 import { canonicalizeKeyInput } from './keymapUtils.js';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
@@ -33,6 +33,8 @@ export function ControlSystemProvider({ children }) {
   const prevModeRef = useRef(null);
   const pendingLightsRef = useRef(false);
   const servoAngleRef = useRef(initialControlState.camera.angle);
+  const hornAutoStopRef = useRef(null);
+  const hornCooldownRef = useRef(null);
   const {
     value: controlSettings,
     save: saveControlSettings,
@@ -364,15 +366,40 @@ export function ControlSystemProvider({ children }) {
 
   const startHorn = useCallback(() => {
     if (!pipeline.horn) return;
+    const now = Date.now();
+    const cooldownUntil = state.horn?.cooldownUntil ?? 0;
+    if (cooldownUntil && now < cooldownUntil) return false;
+    if (state.horn?.active) return false;
     pipeline.sendHorn({ action: 'start', ...normalizedHornSettings });
     dispatch({ type: 'control/set-horn-active', payload: true });
+    if (hornAutoStopRef.current) {
+      clearTimeout(hornAutoStopRef.current);
+      hornAutoStopRef.current = null;
+    }
+    hornAutoStopRef.current = setTimeout(() => {
+      stopHorn();
+    }, HORN_MAX_MS);
     recordControlIntent();
-  }, [dispatch, normalizedHornSettings, pipeline, recordControlIntent]);
+    return true;
+  }, [dispatch, normalizedHornSettings, pipeline, recordControlIntent, state.horn?.active, state.horn?.cooldownUntil]);
 
   const stopHorn = useCallback(() => {
     if (!pipeline.horn) return;
     pipeline.sendHorn({ action: 'stop' });
     dispatch({ type: 'control/set-horn-active', payload: false });
+    if (hornAutoStopRef.current) {
+      clearTimeout(hornAutoStopRef.current);
+      hornAutoStopRef.current = null;
+    }
+    const cooldownUntil = Date.now() + HORN_COOLDOWN_MS;
+    dispatch({ type: 'control/set-horn-cooldown', payload: cooldownUntil });
+    if (hornCooldownRef.current) {
+      clearTimeout(hornCooldownRef.current);
+    }
+    hornCooldownRef.current = setTimeout(() => {
+      dispatch({ type: 'control/set-horn-cooldown', payload: 0 });
+      hornCooldownRef.current = null;
+    }, HORN_COOLDOWN_MS);
   }, [dispatch, pipeline]);
 
   const registerInputState = useCallback((source, data) => {
