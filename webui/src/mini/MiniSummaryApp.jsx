@@ -114,7 +114,7 @@ function InfoColumn({
             ) : null}
             <div className="relative min-w-0 overflow-hidden bg-transparent px-0 py-0 leading-none">
               <div className="relative">
-                <AutoFitText className="font-semibold leading-none text-white" maxSize={1000} minSize={16}>
+                <AutoFitText className="font-semibold leading-none text-white" maxSize={80} minSize={16}>
                   {batteryPercent == null ? '--%' : `${batteryPercent}%`}
                 </AutoFitText>
               </div>
@@ -309,7 +309,7 @@ function MiniSummaryContent() {
   if (!driverRoster.length) {
     return (
       <div className="relative flex h-screen w-screen overflow-hidden bg-black text-slate-100">
-        <section className="flex h-full w-full gap-x-1">
+        <section className="flex h-full w-full gap-x-3 bg-slate-900 px-0">
           {roster.length ? (
             roster.map((rover, idx) => (
               <InfoColumn
