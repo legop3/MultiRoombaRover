@@ -5,6 +5,7 @@ const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const videoSessions = require('./videoSessions');
 const roverManager = require('./roverManager');
 const { loadConfig } = require('../helpers/configLoader');
+const { getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
 
 const config = loadConfig();
 const mediaConfig = config.media || {};
@@ -86,11 +87,19 @@ io.on('connection', (socket) => {
       }
       if (target.type === 'rover') {
         const baseId = target.id.endsWith('-audio') ? target.id.slice(0, -6) : target.id;
+        const isAudio = target.id.endsWith('-audio');
         if (!roverManager.rovers.has(baseId)) {
           throw new Error('Rover offline');
         }
         if (!canViewRover(socket, baseId)) {
           throw new Error('Not authorized for video');
+        }
+        const role = getRole(socket);
+        if (role === 'spectator' && !isAdmin(socket) && !isAudio) {
+          const ip = getSocketIp(socket);
+          if (!isLocalNetwork(ip)) {
+            throw new Error('Not authorized for video');
+          }
         }
       } else if (target.type === 'room') {
         throw new Error('Room cameras now use the snapshot feed');

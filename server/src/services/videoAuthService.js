@@ -6,7 +6,7 @@ const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
 const roverManager = require('./roverManager');
 const { loadConfig } = require('../helpers/configLoader');
-const { getRequestIp } = require('../helpers/ipResolver');
+const { getRequestIp, getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
 const { logAdminEvent } = require('./adminLogService');
 
 const config = loadConfig();
@@ -114,6 +114,13 @@ app.post('/mediamtx/auth', (req, res) => {
     return res.status(401).end();
   }
   const role = getRole(socket);
+  const isAudio = streamInfo.id?.endsWith('-audio');
+  if (role === 'spectator' && !isAdmin(socket) && !isAudio) {
+    const socketIp = getSocketIp(socket);
+    if (!isLocalNetwork(socketIp)) {
+      return res.status(401).end();
+    }
+  }
   if (streamInfo.type === 'rover' && role !== 'spectator' && !isAdmin(socket)) {
     const roverId = streamInfo.baseId || streamInfo.id;
     if (!roverManager.isDriver(roverId, socket)) {

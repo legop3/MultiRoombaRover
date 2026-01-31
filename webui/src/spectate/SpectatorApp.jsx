@@ -53,14 +53,14 @@ function formatDriverLabel({ roverId, session }) {
   return driverText;
 }
 
-function RoverSpectatorCard({ rover, frame, snapshotFeed, audioInfo, session }) {
+function RoverSpectatorCard({ rover, frame, sessionInfo, videoMode, snapshotFeed, audioInfo, session }) {
   const driverLabel = formatDriverLabel({ roverId: rover.id, session });
   return (
     <article className="min-h-[16rem] rounded bg-zinc-900 p-0 sm:min-h-[18rem]">
       <div className="min-h-0 overflow-hidden rounded bg-black/20">
         <VideoTile
-          sessionInfo={null}
-          videoMode="snapshot"
+          sessionInfo={sessionInfo}
+          videoMode={videoMode}
           snapshotFeed={snapshotFeed}
           audioSessionInfo={audioInfo}
           label={rover.name}
@@ -76,7 +76,7 @@ function RoverSpectatorCard({ rover, frame, snapshotFeed, audioInfo, session }) 
   );
 }
 
-function RoverRow({ roster, frames, snapshotFeeds, audioSources, session }) {
+function RoverRow({ roster, frames, videoSources, snapshotFeeds, audioSources, session, canSpectateVideo }) {
   if (roster.length === 0) {
     return <p className="col-span-full text-slate-400">No rovers registered.</p>;
   }
@@ -87,7 +87,9 @@ function RoverRow({ roster, frames, snapshotFeeds, audioSources, session }) {
           key={rover.id}
           rover={rover}
           frame={frames[rover.id]}
-          snapshotFeed={snapshotFeeds[rover.id]}
+          sessionInfo={canSpectateVideo ? videoSources[rover.id] || null : null}
+          videoMode={canSpectateVideo ? 'whep' : 'snapshot'}
+          snapshotFeed={canSpectateVideo ? null : snapshotFeeds[rover.id]}
           audioInfo={audioSources[`${rover.id}-audio`]}
           session={session}
           showHudMap
@@ -124,6 +126,7 @@ function LogsRow({ className = '' }) {
 function SpectatorContent() {
   const { session } = useSession();
   const inLockdown = session?.mode === 'lockdown';
+  const canSpectateVideo = Boolean(session?.isLocalNetwork);
   useDefaultNickname();
   useSpectatorMode();
   const isPortraitLayout = usePortraitLayout();
@@ -131,8 +134,12 @@ function SpectatorContent() {
   const roster = session?.roster ?? [];
   const snapshotFeeds = useRoverSnapshots(
     roster.map((rover) => rover.id),
-    { enabled: !inLockdown, version: session?.mode },
+    { enabled: !inLockdown && !canSpectateVideo, version: session?.mode },
   );
+  const videoEntries = canSpectateVideo
+    ? roster.map((rover) => ({ type: 'rover', id: rover.id, key: rover.id }))
+    : [];
+  const videoSources = useVideoRequests(videoEntries, { enabled: !inLockdown && canSpectateVideo, version: session?.mode });
   const audioEntries = roster.flatMap((rover) =>
     rover.media?.audioPublishUrl
       ? [{ type: 'rover', id: `${rover.id}-audio`, key: `${rover.id}-audio` }]
@@ -200,9 +207,11 @@ function SpectatorContent() {
           <RoverRow
             roster={roster}
             frames={frames}
+            videoSources={videoSources}
             snapshotFeeds={snapshotFeeds}
             audioSources={audioSources}
             session={session}
+            canSpectateVideo={canSpectateVideo}
           />
           <SecondaryRow />
         </section>

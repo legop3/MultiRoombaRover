@@ -16,6 +16,7 @@ const { loadConfig } = require('../helpers/configLoader');
 const { getCommunityGoal } = require('./communityGoalService');
 const { getAdminReason } = require('./adminReasonService');
 const { subscribe } = require('./eventBus');
+const { getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
 
 const config = loadConfig();
 const discordInvite = config.discord?.invite || null;
@@ -52,6 +53,7 @@ function buildSession(socket) {
     socketId: socket?.id || null,
     role: getRole(socket),
     mode: getMode(),
+    isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
     roster: roverManager.getRoster(),
     assignment: assignmentService.describeAssignment(socket?.id || ''),
     activeDrivers: getActiveDrivers(),

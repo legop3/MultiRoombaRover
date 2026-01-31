@@ -50,6 +50,8 @@ function InfoColumn({
   rover,
   frame,
   driverLabel,
+  sessionInfo,
+  videoMode = 'snapshot',
   snapshotFeed,
   withDivider = false,
   showPreview = true,
@@ -125,8 +127,8 @@ function InfoColumn({
                 <div className="mt-auto w-full">
                   <div className="w-full aspect-[4/3]">
                     <VideoTile
-                      sessionInfo={null}
-                      videoMode="snapshot"
+                      sessionInfo={sessionInfo}
+                      videoMode={videoMode}
                       snapshotFeed={snapshotFeed}
                       audioSessionInfo={null}
                       label={rover.name || rover.id}
@@ -213,6 +215,7 @@ function MiniSummaryContent() {
   const spectatorReady = useSpectatorMode();
   useDefaultNickname();
   const inLockdown = session?.mode === 'lockdown';
+  const canSpectateVideo = Boolean(session?.isLocalNetwork);
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
   const [index, setIndex] = useState(0);
@@ -225,8 +228,16 @@ function MiniSummaryContent() {
 
   const snapshotFeeds = useRoverSnapshots(
     snapshotRoster.map((rover) => rover.id),
-    { enabled: !inLockdown, version: session?.mode },
+    { enabled: !inLockdown && !canSpectateVideo, version: session?.mode },
   );
+  const videoEntries = useMemo(
+    () =>
+      canSpectateVideo
+        ? snapshotRoster.map((rover) => ({ type: 'rover', id: rover.id, key: rover.id }))
+        : [],
+    [canSpectateVideo, snapshotRoster],
+  );
+  const videoSources = useVideoRequests(videoEntries, { enabled: !inLockdown && canSpectateVideo, version: session?.mode });
   const audioEntries = useMemo(
     () =>
       driverRoster.flatMap((rover) => {
@@ -240,9 +251,16 @@ function MiniSummaryContent() {
 
   const roverPool = useMemo(() => {
     if (!driverRoster.length) return [];
-    const withSnapshot = driverRoster.filter((rover) => snapshotFeeds[rover.id]?.objectUrl);
-    return withSnapshot.length ? withSnapshot : driverRoster;
-  }, [driverRoster, snapshotFeeds]);
+    if (!canSpectateVideo) {
+      const withSnapshot = driverRoster.filter((rover) => snapshotFeeds[rover.id]?.objectUrl);
+      return withSnapshot.length ? withSnapshot : driverRoster;
+    }
+    const withVideo = driverRoster.filter((rover) => {
+      const sessionInfo = videoSources[rover.id];
+      return sessionInfo?.url && !sessionInfo?.error;
+    });
+    return withVideo.length ? withVideo : driverRoster;
+  }, [driverRoster, snapshotFeeds, videoSources, canSpectateVideo]);
 
   const rotationPool = useMemo(() => {
     return roverPool.map((rover) => ({ type: 'rover', rover }));
@@ -271,7 +289,8 @@ function MiniSummaryContent() {
   const activeEntry = rotationPool.length ? rotationPool[index % rotationPool.length] : null;
   const activeRover = activeEntry?.type === 'rover' ? activeEntry.rover : null;
 
-  const activeSnapshot = activeRover ? snapshotFeeds[activeRover.id] || null : null;
+  const activeSnapshot = !canSpectateVideo && activeRover ? snapshotFeeds[activeRover.id] || null : null;
+  const activeVideo = canSpectateVideo && activeRover ? videoSources[activeRover.id] || null : null;
   const activeAudio = activeRover ? audioSources[`${activeRover.id}-audio`] || null : null;
   const activeFrame = activeRover ? frames[activeRover.id] || null : null;
   const driverLabel = activeRover ? formatDriverLabel({ roverId: activeRover.id, session }) : null;
@@ -298,7 +317,9 @@ function MiniSummaryContent() {
                 rover={rover}
                 frame={frames[rover.id] || null}
                 driverLabel={null}
-                snapshotFeed={snapshotFeeds[rover.id] || null}
+                sessionInfo={canSpectateVideo ? videoSources[rover.id] || null : null}
+                videoMode={canSpectateVideo ? 'whep' : 'snapshot'}
+                snapshotFeed={canSpectateVideo ? null : snapshotFeeds[rover.id] || null}
                 showPreview={true}
                 withDivider={false}
               />
@@ -326,8 +347,8 @@ function MiniSummaryContent() {
         ) : activeRover ? (
           <FitViewportFrame>
             <VideoTile
-              sessionInfo={null}
-              videoMode="snapshot"
+              sessionInfo={activeVideo}
+              videoMode={canSpectateVideo ? 'whep' : 'snapshot'}
               snapshotFeed={activeSnapshot}
               audioSessionInfo={activeAudio}
               label={activeRover.name || activeRover.id}
@@ -350,7 +371,9 @@ function MiniSummaryContent() {
             rover={activeRover}
             frame={activeFrame}
             driverLabel={driverLabel}
-            snapshotFeed={snapshotFeeds[activeRover.id] || null}
+            sessionInfo={canSpectateVideo ? activeVideo : null}
+            videoMode={canSpectateVideo ? 'whep' : 'snapshot'}
+            snapshotFeed={canSpectateVideo ? null : snapshotFeeds[activeRover.id] || null}
             showPreview={false}
             variant="active"
           />
