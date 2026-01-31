@@ -162,6 +162,11 @@ func (h *HornSynth) synthLoop(writer *bufio.Writer, waveform string, freqs []flo
 	framesPerChunk := 512
 	buf := make([]byte, framesPerChunk*channels*2)
 	scale := volume / float64(len(freqs))
+	if waveform == "sine" {
+		scale *= h.cfg.SineGain
+	} else {
+		scale *= h.cfg.SawGain
+	}
 
 	stopRequested := false
 	releaseStart := -1

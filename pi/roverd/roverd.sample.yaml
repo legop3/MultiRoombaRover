@@ -50,6 +50,8 @@ horn:
   volume: 0.25
   sampleRate: 48000
   channels: 1
+  sineGain: 1.0
+  sawGain: 0.7
 nightVision:
   enabled: true
   gpioPin: 22

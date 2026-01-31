@@ -71,6 +71,8 @@ type HornConfig struct {
 	SampleRate int     `yaml:"sampleRate" json:"-"`
 	Channels   int     `yaml:"channels" json:"-"`
 	Device     string  `yaml:"device" json:"-"`
+	SineGain   float64 `yaml:"sineGain" json:"-"`
+	SawGain    float64 `yaml:"sawGain" json:"-"`
 }
 
 type MediaConfig struct {
@@ -174,6 +176,8 @@ func LoadConfig(path string) (*Config, error) {
 			Volume:     0.25,
 			SampleRate: 48000,
 			Channels:   1,
+			SineGain:   1.0,
+			SawGain:    0.7,
 		},
 		NightVision: NightVisionConfig{
 			Enabled:   true,
@@ -319,6 +323,12 @@ func validateHornConfig(cfg *HornConfig) {
 	}
 	if cfg.Channels <= 0 {
 		cfg.Channels = 1
+	}
+	if cfg.SineGain <= 0 {
+		cfg.SineGain = 1.0
+	}
+	if cfg.SawGain <= 0 {
+		cfg.SawGain = 0.7
 	}
 }
 
