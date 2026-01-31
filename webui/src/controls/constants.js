@@ -42,6 +42,7 @@ export const DEFAULT_KEYMAP = {
   cameraUp: ['u'],
   cameraDown: ['j'],
   nightVisionToggle: ['e'],
+  hornHonk: ['h'],
   driveMacro: ['f'],
   dockMacro: ['g'],
   chatFocus: ['enter'],

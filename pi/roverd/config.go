@@ -65,6 +65,14 @@ type AudioConfig struct {
 	DefaultPitch   int    `yaml:"defaultPitch" json:"defaultPitch,omitempty"`
 }
 
+type HornConfig struct {
+	Enabled    bool    `yaml:"enabled" json:"enabled"`
+	Volume     float64 `yaml:"volume" json:"-"`
+	SampleRate int     `yaml:"sampleRate" json:"-"`
+	Channels   int     `yaml:"channels" json:"-"`
+	Device     string  `yaml:"device" json:"-"`
+}
+
 type MediaConfig struct {
 	PublishURL      string   `yaml:"publishUrl" json:"publishUrl,omitempty"`
 	AudioPublishURL string   `yaml:"audioPublishUrl" json:"audioPublishUrl,omitempty"`
@@ -113,6 +121,7 @@ type Config struct {
 	Media       MediaConfig       `yaml:"media"`
 	CameraServo CameraServoConfig `yaml:"cameraServo"`
 	Audio       AudioConfig       `yaml:"audio"`
+	Horn        HornConfig        `yaml:"horn"`
 	NightVision NightVisionConfig `yaml:"nightVision" json:"nightVision"`
 }
 
@@ -159,6 +168,12 @@ func LoadConfig(path string) (*Config, error) {
 			DefaultEngine:  "flite",
 			DefaultVoice:   "rms",
 			DefaultPitch:   50,
+		},
+		Horn: HornConfig{
+			Enabled:    false,
+			Volume:     0.25,
+			SampleRate: 48000,
+			Channels:   1,
 		},
 		NightVision: NightVisionConfig{
 			Enabled:   true,
@@ -221,6 +236,7 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("nightVision: %w", err)
 	}
 	validateAudioConfig(&cfg.Audio)
+	validateHornConfig(&cfg.Horn)
 	return &cfg, nil
 }
 
@@ -288,6 +304,21 @@ func validateAudioConfig(cfg *AudioConfig) {
 	}
 	if cfg.DefaultPitch <= 0 {
 		cfg.DefaultPitch = 50
+	}
+}
+
+func validateHornConfig(cfg *HornConfig) {
+	if cfg.Volume <= 0 {
+		cfg.Volume = 0.25
+	}
+	if cfg.Volume > 1 {
+		cfg.Volume = 1
+	}
+	if cfg.SampleRate <= 0 {
+		cfg.SampleRate = 48000
+	}
+	if cfg.Channels <= 0 {
+		cfg.Channels = 1
 	}
 }
 

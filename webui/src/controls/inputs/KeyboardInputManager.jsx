@@ -126,6 +126,8 @@ export default function KeyboardInputManager() {
       stopAllMotion,
       registerInputState,
       toggleNightVision,
+      startHorn,
+      stopHorn,
       setSongNote,
       sendSong,
     },
@@ -174,6 +176,7 @@ export default function KeyboardInputManager() {
   const lastAuxRef = useRef(ZERO_AUX);
   const servoIntervalRef = useRef(null);
   const songIntervalRef = useRef(null);
+  const hornActiveRef = useRef(false);
 
   const driveFromKeys = useCallback(() => {
     const tokensSnapshot = new Set(activeTokensRef.current);
@@ -299,9 +302,13 @@ export default function KeyboardInputManager() {
     lastAuxRef.current = ZERO_AUX;
     stopServoLoop();
     stopSongLoop();
+    if (hornActiveRef.current) {
+      hornActiveRef.current = false;
+      stopHorn();
+    }
     stopAllMotion();
     registerInputState(SOURCE, { keys: [], vector: ZERO_VECTOR, aux: ZERO_AUX });
-  }, [registerInputState, stopAllMotion, stopServoLoop, stopSongLoop]);
+  }, [registerInputState, stopAllMotion, stopHorn, stopServoLoop, stopSongLoop]);
 
   const triggerHomeAssistantCycle = useCallback(
     (targetState) => {
@@ -364,6 +371,11 @@ export default function KeyboardInputManager() {
           runMacro('seek-dock');
         } else if (newlyPressed.some((token) => keymap.nightVisionToggle?.has(token))) {
           toggleNightVision();
+        } else if (newlyPressed.some((token) => keymap.hornHonk?.has(token))) {
+          if (!hornActiveRef.current) {
+            hornActiveRef.current = true;
+            startHorn();
+          }
         } else if (newlyPressed.some((token) => keymap.homeAssistantOn?.has(token))) {
           triggerHomeAssistantCycle('on');
         } else if (newlyPressed.some((token) => keymap.homeAssistantOff?.has(token))) {
@@ -379,6 +391,10 @@ export default function KeyboardInputManager() {
     function handleKeyUp(event) {
       const tokens = tokensForEvent(event);
       tokens.forEach((token) => activeTokensRef.current.delete(token));
+      if (hornActiveRef.current && !bindingActive(keymap.hornHonk, activeTokensRef.current)) {
+        hornActiveRef.current = false;
+        stopHorn();
+      }
       ensureServoLoop();
       ensureSongLoop();
       driveFromKeys();
@@ -407,11 +423,14 @@ export default function KeyboardInputManager() {
     keymap.chatFocus,
     keymap.dockMacro,
     keymap.driveMacro,
+    keymap.hornHonk,
     resetAll,
     runMacro,
     setMode,
     stopAllMotion,
     stopSongLoop,
+    startHorn,
+    stopHorn,
     triggerHomeAssistantCycle,
   ]);
 

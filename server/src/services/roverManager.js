@@ -151,6 +151,7 @@ function getRoster() {
     media: record.meta?.media,
     cameraServo: record.meta?.cameraServo,
     audio: record.meta?.audio,
+    horn: record.meta?.horn,
     nightVision: record.meta?.nightVision
       ? { ...record.meta.nightVision, state: record.nightVisionState }
       : record.meta?.nightVision,

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import { formatKeyLabel } from '../controls/keymapUtils.js';
 import NightVisionControl from './NightVisionControl.jsx';
+import HornControl from './HornControl.jsx';
 
 const SLIDER_THROTTLE_MS = 150;
 
@@ -14,13 +15,15 @@ export default function CameraServoPanel() {
   const {
     state: { roverId, camera, keymap },
     pipeline,
-    actions: { setServoAngle, nudgeServo, goServoHome, setNightVision },
+    actions: { setServoAngle, nudgeServo, goServoHome, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
   const config = camera?.config;
   const enabled = Boolean(roverId && camera?.enabled && config);
   const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
   const nightVisionState = pipeline?.nightVisionState;
+  const hornAvailable = Boolean(roverId && pipeline?.horn);
   const nightVisionKey = formatKeyLabel(keymap?.nightVisionToggle?.[0]);
+  const hornKey = formatKeyLabel(keymap?.hornHonk?.[0]);
   const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
   const max = typeof config?.maxAngle === 'number' ? config.maxAngle : 30;
   const value =
@@ -30,7 +33,7 @@ export default function CameraServoPanel() {
         ? config.homeAngle
         : (min + max) / 2;
 
-  if (!enabled && !nightVisionAvailable) return null;
+  if (!enabled && !nightVisionAvailable && !hornAvailable) return null;
 
   const [pendingAngle, setPendingAngle] = useState(value);
   const throttleRef = useRef(null);
@@ -99,6 +102,14 @@ export default function CameraServoPanel() {
           disabled={!roverId}
           onToggle={handleNightVisionToggle}
           keyLabel={nightVisionKey}
+        />
+      )}
+      {hornAvailable && (
+        <HornControl
+          disabled={!roverId}
+          onStart={startHorn}
+          onStop={stopHorn}
+          keyLabel={hornKey}
         />
       )}
       {enabled && (

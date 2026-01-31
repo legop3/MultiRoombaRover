@@ -45,6 +45,11 @@ audio:
   defaultEngine: flite
   defaultVoice: rms
   defaultPitch: 50
+horn:
+  enabled: false
+  volume: 0.25
+  sampleRate: 48000
+  channels: 1
 nightVision:
   enabled: true
   gpioPin: 22

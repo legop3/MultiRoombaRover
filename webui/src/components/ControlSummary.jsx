@@ -7,6 +7,7 @@ import TopDownMap from './TopDownMap.jsx';
 import RoverRoster from './RoverRoster.jsx';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
 import NightVisionControl from './NightVisionControl.jsx';
+import HornControl from './HornControl.jsx';
 
 export function RoverRosterPanel({ title = 'Rovers' }) {
   const { session, requestControl } = useSession();
@@ -76,13 +77,14 @@ export function InlineCameraTilt({ keymap }) {
   const {
     state: { roverId, camera },
     pipeline,
-    actions: { setServoAngle, setNightVision },
+    actions: { setServoAngle, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
 
   const config = camera?.config;
   const enabled = Boolean(roverId && camera?.enabled && config);
   const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
   const nightVisionState = pipeline?.nightVisionState;
+  const hornAvailable = Boolean(roverId && pipeline?.horn);
   const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
   const max = typeof config?.maxAngle === 'number' ? config.maxAngle : 30;
   const value =
@@ -113,10 +115,11 @@ export function InlineCameraTilt({ keymap }) {
     draggingRef.current = false;
   };
 
-  if (!enabled && !nightVisionAvailable) return null;
+  if (!enabled && !nightVisionAvailable && !hornAvailable) return null;
   const upLabel = formatKeyLabel(keymap?.cameraUp?.[0]);
   const downLabel = formatKeyLabel(keymap?.cameraDown?.[0]);
   const nightVisionLabel = formatKeyLabel(keymap?.nightVisionToggle?.[0]);
+  const hornLabel = formatKeyLabel(keymap?.hornHonk?.[0]);
 
   return (
     <div className="surface space-y-0.5 p-0 text-sm text-slate-200">
@@ -127,6 +130,9 @@ export function InlineCameraTilt({ keymap }) {
           onToggle={setNightVision}
           keyLabel={nightVisionLabel}
         />
+      )}
+      {hornAvailable && (
+        <HornControl disabled={!roverId} onStart={startHorn} onStop={stopHorn} keyLabel={hornLabel} />
       )}
       {enabled && (
         <div className="space-y-0.5 px-1 py-1">

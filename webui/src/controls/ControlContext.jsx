@@ -6,6 +6,7 @@ import { DEFAULT_KEYMAP, DEFAULT_MACROS, SONG_DEFAULT_NOTE } from './constants.j
 import { canonicalizeKeyInput } from './keymapUtils.js';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
+import { HORN_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 import {
   applyAuxOvercurrentScale,
   applyDriveOvercurrentScale,
@@ -36,6 +37,7 @@ export function ControlSystemProvider({ children }) {
     value: controlSettings,
     save: saveControlSettings,
   } = useSettingsNamespace('controls', { keymap: DEFAULT_KEYMAP, macros: DEFAULT_MACROS });
+  const { value: hornSettings } = useSettingsNamespace('horn', HORN_SETTINGS_DEFAULTS);
   const { session, homeAssistantSetState } = useSession();
   const roverId = session?.assignment?.roverId ?? null;
   const overcurrentLimiter = useOvercurrentLimiter(roverId);
@@ -346,6 +348,31 @@ export function ControlSystemProvider({ children }) {
     [pipeline],
   );
 
+  const normalizedHornSettings = useMemo(() => {
+    const base = hornSettings ?? HORN_SETTINGS_DEFAULTS;
+    const waveform = base.waveform === 'sine' ? 'sine' : 'saw';
+    const freqs = Array.isArray(base.freqs) ? base.freqs : HORN_SETTINGS_DEFAULTS.freqs;
+    const normalized = [...freqs, 0, 0, 0, 0]
+      .slice(0, 4)
+      .map((value) => {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return 0;
+        return num <= 0 ? 0 : Math.min(5000, Math.round(num));
+      });
+    return { waveform, freqs: normalized };
+  }, [hornSettings]);
+
+  const startHorn = useCallback(() => {
+    if (!pipeline.horn) return;
+    pipeline.sendHorn({ action: 'start', ...normalizedHornSettings });
+    recordControlIntent();
+  }, [normalizedHornSettings, pipeline, recordControlIntent]);
+
+  const stopHorn = useCallback(() => {
+    if (!pipeline.horn) return;
+    pipeline.sendHorn({ action: 'stop' });
+  }, [pipeline]);
+
   const registerInputState = useCallback((source, data) => {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });
   }, []);
@@ -374,6 +401,8 @@ export function ControlSystemProvider({ children }) {
         registerInputState,
         setSongNote,
         sendSong,
+        startHorn,
+        stopHorn,
       },
     }),
     [
@@ -397,6 +426,8 @@ export function ControlSystemProvider({ children }) {
       registerInputState,
       setSongNote,
       sendSong,
+      startHorn,
+      stopHorn,
     ],
   );
 

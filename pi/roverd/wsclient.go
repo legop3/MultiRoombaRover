@@ -20,6 +20,7 @@ type WSClient struct {
 	events       chan RoverEvent
 	media        *MediaSupervisor
 	servo        *CameraServo
+	horn         *HornSynth
 	nightVision  *NightVisionLight
 	log          *log.Logger
 	recoverMu    sync.Mutex
@@ -38,6 +39,10 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 	if cfg.Audio.TTSEnabled {
 		ttsQueue = make(chan *ttsPayload, 2)
 	}
+	var horn *HornSynth
+	if cfg.Horn.Enabled {
+		horn = NewHornSynth(cfg.Horn, logger)
+	}
 	return &WSClient{
 		cfg:          cfg,
 		adapter:      adapter,
@@ -45,6 +50,7 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		events:       events,
 		media:        media,
 		servo:        servo,
+		horn:         horn,
 		nightVision:  nightVision,
 		log:          logger,
 		ttsQueue:     ttsQueue,
@@ -101,6 +107,7 @@ func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
 		Media:         c.cfg.Media,
 		CameraServo:   c.cfg.CameraServo,
 		Audio:         c.cfg.Audio,
+		Horn:          c.cfg.Horn,
 		NightVision:   c.cfg.NightVision,
 	}
 	c.log.Printf("sending hello (camera servo enabled=%v pin=%d)", msg.CameraServo.Enabled, msg.CameraServo.Pin)
@@ -180,6 +187,11 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		return c.handleServoCommand(msg.Servo)
 	case msg.TTS != nil:
 		return c.enqueueTTS(msg.TTS)
+	case msg.Horn != nil:
+		if c.horn == nil {
+			return fmt.Errorf("horn disabled")
+		}
+		return c.horn.HandlePayload(msg.Horn)
 	case msg.NightVision != nil:
 		if c.nightVision == nil {
 			return fmt.Errorf("night vision disabled")

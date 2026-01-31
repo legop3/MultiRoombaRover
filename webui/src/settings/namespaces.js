@@ -85,3 +85,8 @@ export const GAMEPAD_SETTINGS_DEFAULTS = {
     profile: GAMEPAD_PROFILE_DEFAULT,
   },
 };
+
+export const HORN_SETTINGS_DEFAULTS = {
+  waveform: 'saw',
+  freqs: [440, 550, 660, 0],
+};

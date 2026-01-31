@@ -32,6 +32,11 @@ export function useCommandPipeline(options = {}) {
     return rosterEntry.nightVision;
   }, [rosterEntry]);
 
+  const horn = useMemo(() => {
+    if (!rosterEntry?.horn || !rosterEntry.horn.enabled) return null;
+    return rosterEntry.horn;
+  }, [rosterEntry]);
+
   const nightVisionState = useMemo(() => rosterEntry?.nightVision?.state ?? null, [rosterEntry]);
 
   const emitCommand = useCallback(
@@ -172,6 +177,18 @@ export function useCommandPipeline(options = {}) {
     [emitCommand, nightVision, roverId],
   );
 
+  const sendHorn = useCallback(
+    (payload) => {
+      if (!roverId) return null;
+      emitCommand({
+        type: 'horn',
+        data: { horn: payload },
+      });
+      return payload;
+    },
+    [emitCommand, roverId],
+  );
+
   const sendSong = useCallback(
     (notes = [], options = {}) => {
       if (!roverId) return null;
@@ -205,6 +222,7 @@ export function useCommandPipeline(options = {}) {
       servoConfig,
       nightVision,
       nightVisionState,
+      horn,
       emitCommand,
       enableSensorStream,
       sendDriveDirect,
@@ -212,6 +230,7 @@ export function useCommandPipeline(options = {}) {
       sendServoAngle,
       sendOiCommand,
       sendNightVision,
+      sendHorn,
       sendSong,
       runMacroSteps,
     }),
@@ -221,6 +240,7 @@ export function useCommandPipeline(options = {}) {
       servoConfig,
       nightVision,
       nightVisionState,
+      horn,
       emitCommand,
       enableSensorStream,
       sendDriveDirect,
@@ -228,6 +248,7 @@ export function useCommandPipeline(options = {}) {
       sendServoAngle,
       sendOiCommand,
       sendNightVision,
+      sendHorn,
       runMacroSteps,
     ],
   );

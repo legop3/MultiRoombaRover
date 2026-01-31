@@ -3,6 +3,7 @@ import { useControlSystem } from '../controls/index.js';
 import { clampUnit } from '../controls/controlMath.js';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
 import NightVisionControl from './NightVisionControl.jsx';
+import HornControl from './HornControl.jsx';
 
 const SOURCE = 'mobile-joystick';
 const JOYSTICK_RADIUS = 80;
@@ -135,7 +136,7 @@ function MobileJoystickPanel({ layout }) {
   const {
     state: { roverId, camera },
     pipeline,
-    actions: { setDriveVector, registerInputState, setServoAngle, setNightVision },
+    actions: { setDriveVector, registerInputState, setServoAngle, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
   const driveDockState = useDriveDockState(roverId);
   const dockedNotDriving = driveDockState.docked && !driveDockState.driving;
@@ -144,6 +145,7 @@ function MobileJoystickPanel({ layout }) {
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
   const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
   const nightVisionState = pipeline?.nightVisionState;
+  const hornAvailable = Boolean(roverId && pipeline?.horn);
   const cameraMin = typeof cameraConfig?.minAngle === 'number' ? cameraConfig.minAngle : -45;
   const cameraMax = typeof cameraConfig?.maxAngle === 'number' ? cameraConfig.maxAngle : 45;
   const cameraValue =
@@ -222,6 +224,9 @@ function MobileJoystickPanel({ layout }) {
               disabled={disabled}
               onToggle={handleNightVisionToggle}
             />
+          )}
+          {hornAvailable && (
+            <HornControl disabled={disabled} onStart={startHorn} onStop={stopHorn} />
           )}
           {cameraEnabled && (
             <div className="bg-zinc-950 p-0.5 text-xs">
