@@ -144,7 +144,7 @@ func synthChord(writer *bufio.Writer, freqs []float64, rate, channels int, durat
 			env := envelope(sampleIndex, attackFrames, steadyFrames, releaseFrames)
 			sample := 0.0
 			for j := range freqs {
-				sample += math.Sin(phase[j])
+				sample += sawFromPhase(phase[j])
 				phase[j] += increment[j]
 				if phase[j] > twoPi {
 					phase[j] -= twoPi
@@ -180,4 +180,8 @@ func envelope(sampleIndex, attackFrames, steadyFrames, releaseFrames int) float6
 		return float64(releaseFrames-relIndex) / float64(releaseFrames)
 	}
 	return 1.0
+}
+
+func sawFromPhase(phase float64) float64 {
+	return 2.0*(phase/twoPi) - 1.0
 }
