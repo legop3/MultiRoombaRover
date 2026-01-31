@@ -11,7 +11,7 @@ import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
 
 const ROTATE_MS = 20000;
-const HARD_REFRESH_MS = 3 * 60 * 60 * 1000;
+const HARD_REFRESH_MS = 1 * 60 * 60 * 1000;
 
 function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
