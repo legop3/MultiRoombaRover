@@ -36,7 +36,7 @@ export default function HornControl({
 
   const buttonClasses = useMemo(() => {
     const base =
-      'group flex w-full items-center justify-between rounded-xl border-2 px-1 py-1.5 text-xs font-semibold';
+      'group flex w-full flex-col gap-0.5 rounded-xl border-2 px-1 py-1.5 text-xs font-semibold';
     const active = 'border-fuchsia-300/70 bg-fuchsia-700 text-fuchsia-50';
     const inactive = 'border-cyan-300/70 bg-cyan-900 text-cyan-50 hover:bg-cyan-800';
     return [base, pressed ? active : inactive, 'disabled:opacity-50', className]
@@ -82,27 +82,36 @@ export default function HornControl({
     [saveHornSettings],
   );
 
+  const handlePointerDown = (event) => {
+    if (disabled) return;
+    const tag = event.target?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'option' || tag === 'label') return;
+    event.preventDefault();
+    start();
+  };
+
+  const handlePointerUp = (event) => {
+    const tag = event.target?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'option' || tag === 'label') return;
+    event.preventDefault();
+    stop();
+  };
+
   return (
-    <div className="space-y-0.5">
-      <button
-        type="button"
-        onPointerDown={(event) => {
-          event.preventDefault();
-          start();
-        }}
-        onPointerUp={(event) => {
-          event.preventDefault();
-          stop();
-        }}
-        onPointerLeave={stop}
-        onPointerCancel={stop}
-        onBlur={stop}
-        disabled={disabled}
-        aria-pressed={pressed}
-        className={buttonClasses}
-      >
-        <span className="flex flex-1 items-center justify-center gap-0.5">
-          <span className="text-sm font-semibold tracking-[0.2em]">HORN</span>
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={pressed}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      onBlur={stop}
+      className={buttonClasses}
+    >
+      <div className="flex items-center justify-between gap-0.5">
+        <span className="flex items-center gap-0.5 text-sm font-semibold">
+          <span>Horn</span>
           {keyLabel ? (
             <span className="rounded bg-black/40 px-1 py-0.5 text-[0.6rem] font-semibold text-white">
               {keyLabel}
@@ -114,12 +123,12 @@ export default function HornControl({
             pressed ? 'bg-fuchsia-200 text-fuchsia-900' : 'bg-slate-800 text-slate-200'
           }`}
         >
-          {pressed ? 'HONK' : 'HOLD'}
+          {pressed ? 'Honk' : 'Hold'}
         </span>
-      </button>
+      </div>
       <div className="grid grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))] items-center gap-0.5 text-[0.65rem]">
-        <label className="flex items-center gap-0.5 text-slate-300">
-          <span className="uppercase tracking-wide text-slate-400">Wave</span>
+        <label className="flex items-center gap-0.5 text-slate-200">
+          <span className="text-slate-300">Wave</span>
           <select
             value={formattedWaveform}
             onChange={updateWaveform}
@@ -130,8 +139,8 @@ export default function HornControl({
           </select>
         </label>
         {freqs.map((freq, idx) => (
-          <label key={`horn-freq-${idx}`} className="flex items-center gap-0.5 text-slate-300">
-            <span className="text-[0.6rem] text-slate-500">{idx + 1}</span>
+          <label key={`horn-freq-${idx}`} className="flex items-center gap-0.5 text-slate-200">
+            <span className="text-[0.6rem] text-slate-400">{idx + 1}</span>
             <input
               type="number"
               min={0}
