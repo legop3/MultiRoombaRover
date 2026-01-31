@@ -15,6 +15,7 @@ export default function HornControl({
   onStop,
   keyLabel,
   active,
+  heat = 0,
   className = '',
 }) {
   const [pressed, setPressed] = useState(false);
@@ -36,9 +37,10 @@ export default function HornControl({
   }, [hornSettings?.freqs, hornSettings?.waveform]);
 
   const isActive = Boolean(active);
+  const clampedHeat = Math.max(0, Math.min(1, Number(heat) || 0));
   const buttonClasses = useMemo(() => {
     const base =
-      'group flex w-full flex-col gap-0.5 rounded-xl border-2 px-1 py-1.5 text-xs font-semibold';
+      'group relative flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-1 py-1.5 text-xs font-semibold';
     const active = 'border-fuchsia-300/70 bg-fuchsia-700 text-fuchsia-50';
     const inactive = 'border-cyan-300/70 bg-cyan-900 text-cyan-50 hover:bg-cyan-800';
     return [base, isActive ? active : inactive, 'disabled:opacity-50', className]
@@ -60,6 +62,12 @@ export default function HornControl({
       onStop?.();
     }
   };
+
+  useEffect(() => {
+    if (!isActive && pressed) {
+      setPressed(false);
+    }
+  }, [isActive, pressed]);
 
   const formattedWaveform = waveform === 'sine' ? 'sine' : 'saw';
 
@@ -111,7 +119,23 @@ export default function HornControl({
       onBlur={stop}
       className={buttonClasses}
     >
-      <div className="flex items-center justify-between gap-0.5">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-70"
+        style={{
+          background: `linear-gradient(90deg, rgba(14,116,144,0.7) ${clampedHeat * 100}%, rgba(0,0,0,0) ${
+            clampedHeat * 100
+          }%)`,
+        }}
+      />
+      <div
+        className={`pointer-events-none absolute inset-0 transition-opacity ${
+          isActive ? 'opacity-40' : 'opacity-0'
+        }`}
+        style={{
+          background: 'linear-gradient(90deg, rgba(217,70,239,0.75), rgba(244,114,182,0.35))',
+        }}
+      />
+      <div className="relative z-10 flex items-center justify-between gap-0.5">
         <span className="flex items-center gap-0.5 text-sm font-semibold">
           <span>Horn</span>
           {keyLabel ? (
@@ -128,7 +152,7 @@ export default function HornControl({
           {isActive ? 'Honk' : 'Hold'}
         </span>
       </div>
-      <div className="grid grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))] items-center gap-0.5 text-[0.65rem]">
+      <div className="relative z-10 grid grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))] items-center gap-0.5 text-[0.65rem]">
         <label className="flex items-center gap-0.5 text-slate-200">
           <span className="text-slate-300">Wave</span>
           <select

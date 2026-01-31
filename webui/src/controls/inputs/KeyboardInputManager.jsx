@@ -443,6 +443,10 @@ export default function KeyboardInputManager() {
     latestResetAllRef.current();
   }, [state.roverId]);
 
+  useEffect(() => {
+    hornActiveRef.current = Boolean(state.horn?.active);
+  }, [state.horn?.active]);
+
   useEffect(
     () => () => {
       stopServoLoop();

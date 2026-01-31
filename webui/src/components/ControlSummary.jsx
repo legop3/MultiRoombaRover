@@ -85,7 +85,7 @@ export function InlineCameraTilt({ keymap }) {
   const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
   const nightVisionState = pipeline?.nightVisionState;
   const hornAvailable = Boolean(roverId && pipeline?.horn);
-  const hornCooldownActive = (horn?.cooldownUntil ?? 0) > Date.now();
+  const hornBlocked = horn?.overheated;
   const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
   const max = typeof config?.maxAngle === 'number' ? config.maxAngle : 30;
   const value =
@@ -134,11 +134,12 @@ export function InlineCameraTilt({ keymap }) {
       )}
       {hornAvailable && (
         <HornControl
-          disabled={!roverId || hornCooldownActive}
+          disabled={!roverId || hornBlocked}
           onStart={startHorn}
           onStop={stopHorn}
           keyLabel={hornLabel}
           active={horn?.active}
+          heat={horn?.heat}
         />
       )}
       {enabled && (

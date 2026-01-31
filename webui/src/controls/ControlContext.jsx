@@ -2,7 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { controlReducer, initialControlState } from './controlReducer.js';
 import { computeDifferentialSpeeds, clamp } from './controlMath.js';
 import { useCommandPipeline } from './commandPipeline.js';
-import { DEFAULT_KEYMAP, DEFAULT_MACROS, HORN_COOLDOWN_RATIO, HORN_MAX_MS, SONG_DEFAULT_NOTE } from './constants.js';
+import {
+  DEFAULT_KEYMAP,
+  DEFAULT_MACROS,
+  HORN_HEAT_COOL_PER_SEC,
+  HORN_HEAT_RESUME_THRESHOLD,
+  HORN_HEAT_UP_PER_SEC,
+  HORN_MAX_MS,
+  SONG_DEFAULT_NOTE,
+} from './constants.js';
 import { canonicalizeKeyInput } from './keymapUtils.js';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
@@ -34,8 +42,8 @@ export function ControlSystemProvider({ children }) {
   const pendingLightsRef = useRef(false);
   const servoAngleRef = useRef(initialControlState.camera.angle);
   const hornAutoStopRef = useRef(null);
-  const hornCooldownRef = useRef(null);
   const hornStartAtRef = useRef(0);
+  const hornHeatTickRef = useRef(0);
   const {
     value: controlSettings,
     save: saveControlSettings,
@@ -367,10 +375,10 @@ export function ControlSystemProvider({ children }) {
 
   const startHorn = useCallback(() => {
     if (!pipeline.horn) return;
-    const now = Date.now();
-    const cooldownUntil = state.horn?.cooldownUntil ?? 0;
-    if (cooldownUntil && now < cooldownUntil) return false;
+    if (state.horn?.overheated) return false;
+    if ((state.horn?.heat ?? 0) >= 1) return false;
     if (state.horn?.active) return false;
+    const now = Date.now();
     pipeline.sendHorn({ action: 'start', ...normalizedHornSettings });
     dispatch({ type: 'control/set-horn-active', payload: true });
     hornStartAtRef.current = now;
@@ -383,7 +391,7 @@ export function ControlSystemProvider({ children }) {
     }, HORN_MAX_MS);
     recordControlIntent();
     return true;
-  }, [dispatch, normalizedHornSettings, pipeline, recordControlIntent, state.horn?.active, state.horn?.cooldownUntil]);
+  }, [dispatch, normalizedHornSettings, pipeline, recordControlIntent, state.horn?.active, state.horn?.heat, state.horn?.overheated]);
 
   const stopHorn = useCallback(() => {
     if (!pipeline.horn) return;
@@ -393,25 +401,37 @@ export function ControlSystemProvider({ children }) {
       clearTimeout(hornAutoStopRef.current);
       hornAutoStopRef.current = null;
     }
-    const now = Date.now();
-    const holdMs = Math.max(0, now - (hornStartAtRef.current || now));
     hornStartAtRef.current = 0;
-    const cooldownMs = Math.max(0, Math.round(holdMs * HORN_COOLDOWN_RATIO));
-    const cooldownUntil = cooldownMs > 0 ? now + cooldownMs : 0;
-    dispatch({ type: 'control/set-horn-cooldown', payload: cooldownUntil });
-    if (hornCooldownRef.current) {
-      clearTimeout(hornCooldownRef.current);
-    }
-    if (cooldownMs > 0) {
-      hornCooldownRef.current = setTimeout(() => {
-        dispatch({ type: 'control/set-horn-cooldown', payload: 0 });
-        hornCooldownRef.current = null;
-      }, cooldownMs);
-    } else {
-      dispatch({ type: 'control/set-horn-cooldown', payload: 0 });
-      hornCooldownRef.current = null;
-    }
   }, [dispatch, pipeline]);
+
+  useEffect(() => {
+    const tickMs = 100;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const last = hornHeatTickRef.current || now;
+      hornHeatTickRef.current = now;
+      const dt = Math.min(1000, Math.max(0, now - last)) / 1000;
+      const currentHeat = state.horn?.heat ?? 0;
+      const active = Boolean(state.horn?.active);
+      const overheated = Boolean(state.horn?.overheated);
+      const delta = dt * (active ? HORN_HEAT_UP_PER_SEC : -HORN_HEAT_COOL_PER_SEC);
+      let nextHeat = Math.max(0, Math.min(1, currentHeat + delta));
+      let nextOverheated = overheated;
+      if (nextHeat >= 1) {
+        nextHeat = 1;
+        nextOverheated = true;
+        if (active) {
+          stopHorn();
+        }
+      } else if (nextOverheated && nextHeat <= HORN_HEAT_RESUME_THRESHOLD) {
+        nextOverheated = false;
+      }
+      if (nextHeat !== currentHeat || nextOverheated !== overheated) {
+        dispatch({ type: 'control/set-horn-heat', payload: { heat: nextHeat, overheated: nextOverheated } });
+      }
+    }, tickMs);
+    return () => clearInterval(interval);
+  }, [dispatch, state.horn?.active, state.horn?.heat, state.horn?.overheated, stopHorn]);
 
   const registerInputState = useCallback((source, data) => {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });

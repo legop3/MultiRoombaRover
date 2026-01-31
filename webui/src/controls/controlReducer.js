@@ -30,7 +30,8 @@ function createSongState() {
 function createHornState() {
   return {
     active: false,
-    cooldownUntil: 0,
+    heat: 0,
+    overheated: false,
   };
 }
 
@@ -145,12 +146,13 @@ export function controlReducer(state, action) {
           active: Boolean(action.payload),
         },
       };
-    case 'control/set-horn-cooldown':
+    case 'control/set-horn-heat':
       return {
         ...state,
         horn: {
           ...(state.horn || createHornState()),
-          cooldownUntil: typeof action.payload === 'number' ? action.payload : 0,
+          heat: typeof action.payload?.heat === 'number' ? action.payload.heat : 0,
+          overheated: Boolean(action.payload?.overheated),
         },
       };
     case 'control/record-intent':
