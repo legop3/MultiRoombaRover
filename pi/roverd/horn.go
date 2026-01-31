@@ -23,8 +23,8 @@ type HornSynth struct {
 
 	mu     sync.Mutex
 	stop   chan struct{}
-	done   chan struct{}
 	active bool
+	proc   *exec.Cmd
 }
 
 func NewHornSynth(cfg HornConfig, logger *log.Logger) *HornSynth {
@@ -61,41 +61,41 @@ func (h *HornSynth) HandlePayload(payload *hornPayload) error {
 
 func (h *HornSynth) Start(waveform string, freqs []float64) error {
 	h.mu.Lock()
-	h.stopLocked()
+	if h.active {
+		h.mu.Unlock()
+		return nil
+	}
 	stop := make(chan struct{})
-	done := make(chan struct{})
 	h.stop = stop
-	h.done = done
 	h.active = true
 	h.mu.Unlock()
 
-	go h.run(waveform, freqs, stop, done)
+	go h.run(waveform, freqs, stop)
 	return nil
 }
 
 func (h *HornSynth) Stop() {
 	h.mu.Lock()
-	h.stopLocked()
-	h.mu.Unlock()
-}
-
-func (h *HornSynth) stopLocked() {
 	if !h.active {
+		h.mu.Unlock()
 		return
 	}
-	if h.stop != nil {
-		close(h.stop)
-	}
-	if h.done != nil {
-		<-h.done
-	}
+	stop := h.stop
+	proc := h.proc
 	h.stop = nil
-	h.done = nil
+	h.proc = nil
 	h.active = false
+	h.mu.Unlock()
+
+	if stop != nil {
+		close(stop)
+	}
+	if proc != nil && proc.Process != nil {
+		_ = proc.Process.Kill()
+	}
 }
 
-func (h *HornSynth) run(waveform string, freqs []float64, stop <-chan struct{}, done chan<- struct{}) {
-	defer close(done)
+func (h *HornSynth) run(waveform string, freqs []float64, stop <-chan struct{}) {
 	rate := h.cfg.SampleRate
 	if rate <= 0 {
 		rate = 48000
@@ -128,6 +128,12 @@ func (h *HornSynth) run(waveform string, freqs []float64, stop <-chan struct{}, 
 		return
 	}
 
+	h.mu.Lock()
+	if h.active {
+		h.proc = cmd
+	}
+	h.mu.Unlock()
+
 	writer := bufio.NewWriterSize(stdin, 32*1024)
 	if err := h.synthLoop(writer, waveform, freqs, rate, channels, volume, stop); err != nil {
 		h.log.Printf("horn: synth failed: %v", err)
@@ -137,6 +143,12 @@ func (h *HornSynth) run(waveform string, freqs []float64, stop <-chan struct{}, 
 	if err := cmd.Wait(); err != nil {
 		h.log.Printf("horn: aplay exit: %v", err)
 	}
+
+	h.mu.Lock()
+	if h.proc == cmd {
+		h.proc = nil
+	}
+	h.mu.Unlock()
 }
 
 func (h *HornSynth) synthLoop(writer *bufio.Writer, waveform string, freqs []float64, rate, channels int, volume float64, stop <-chan struct{}) error {
