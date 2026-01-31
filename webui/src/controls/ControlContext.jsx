@@ -382,6 +382,7 @@ export function ControlSystemProvider({ children }) {
     pipeline.sendHorn({ action: 'start', ...normalizedHornSettings });
     dispatch({ type: 'control/set-horn-active', payload: true });
     hornStartAtRef.current = now;
+    hornHeatTickRef.current = now;
     if (hornAutoStopRef.current) {
       clearTimeout(hornAutoStopRef.current);
       hornAutoStopRef.current = null;
@@ -401,8 +402,22 @@ export function ControlSystemProvider({ children }) {
       clearTimeout(hornAutoStopRef.current);
       hornAutoStopRef.current = null;
     }
+    const now = Date.now();
+    const startedAt = hornStartAtRef.current || now;
+    const holdMs = Math.max(0, now - startedAt);
     hornStartAtRef.current = 0;
-  }, [dispatch, pipeline]);
+    if (holdMs > 0) {
+      const currentHeat = state.horn?.heat ?? 0;
+      const added = (holdMs / 1000) * HORN_HEAT_UP_PER_SEC;
+      let nextHeat = Math.max(0, Math.min(1, currentHeat + added));
+      let nextOverheated = state.horn?.overheated ?? false;
+      if (nextHeat >= 1) {
+        nextHeat = 1;
+        nextOverheated = true;
+      }
+      dispatch({ type: 'control/set-horn-heat', payload: { heat: nextHeat, overheated: nextOverheated } });
+    }
+  }, [dispatch, pipeline, state.horn?.heat, state.horn?.overheated, HORN_HEAT_UP_PER_SEC]);
 
   useEffect(() => {
     const tickMs = 100;
