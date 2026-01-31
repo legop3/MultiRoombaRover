@@ -1,4 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSettingsNamespace } from '../settings/index.js';
+import { HORN_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
+
+function clampFreq(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  if (num <= 0) return 0;
+  return Math.min(5000, Math.round(num));
+}
 
 export default function HornControl({
   disabled,
@@ -8,12 +17,28 @@ export default function HornControl({
   className = '',
 }) {
   const [pressed, setPressed] = useState(false);
+  const { value: hornSettings, save: saveHornSettings } = useSettingsNamespace(
+    'horn',
+    HORN_SETTINGS_DEFAULTS,
+  );
+  const [waveform, setWaveform] = useState(hornSettings?.waveform || HORN_SETTINGS_DEFAULTS.waveform);
+  const [freqs, setFreqs] = useState(() => {
+    const base = Array.isArray(hornSettings?.freqs) ? hornSettings.freqs : HORN_SETTINGS_DEFAULTS.freqs;
+    return [...base, 0, 0, 0, 0].slice(0, 4).map((f) => clampFreq(f));
+  });
+
+  useEffect(() => {
+    setWaveform(hornSettings?.waveform || HORN_SETTINGS_DEFAULTS.waveform);
+    if (Array.isArray(hornSettings?.freqs)) {
+      setFreqs([...hornSettings.freqs, 0, 0, 0, 0].slice(0, 4).map((f) => clampFreq(f)));
+    }
+  }, [hornSettings?.freqs, hornSettings?.waveform]);
 
   const buttonClasses = useMemo(() => {
     const base =
-      'group flex w-full items-center justify-between rounded-xl border-2 px-1 py-0.75 text-xs font-semibold';
-    const active = 'border-rose-300/70 bg-rose-800 text-rose-50 hover:bg-rose-700';
-    const inactive = 'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800';
+      'group flex w-full items-center justify-between rounded-xl border-2 px-1 py-1.5 text-xs font-semibold';
+    const active = 'border-fuchsia-300/70 bg-fuchsia-700 text-fuchsia-50';
+    const inactive = 'border-cyan-300/70 bg-cyan-900 text-cyan-50 hover:bg-cyan-800';
     return [base, pressed ? active : inactive, 'disabled:opacity-50', className]
       .filter(Boolean)
       .join(' ');
@@ -34,39 +59,91 @@ export default function HornControl({
     }
   };
 
+  const formattedWaveform = waveform === 'sine' ? 'sine' : 'saw';
+
+  const updateWaveform = useCallback(
+    (event) => {
+      const next = event.target.value === 'sine' ? 'sine' : 'saw';
+      setWaveform(next);
+      saveHornSettings((current) => ({ ...(current ?? {}), waveform: next }));
+    },
+    [saveHornSettings],
+  );
+
+  const updateFreq = useCallback(
+    (index, value) => {
+      setFreqs((prev) => {
+        const next = [...prev];
+        next[index] = clampFreq(value);
+        saveHornSettings((current) => ({ ...(current ?? {}), freqs: next }));
+        return next;
+      });
+    },
+    [saveHornSettings],
+  );
+
   return (
-    <button
-      type="button"
-      onPointerDown={(event) => {
-        event.preventDefault();
-        start();
-      }}
-      onPointerUp={(event) => {
-        event.preventDefault();
-        stop();
-      }}
-      onPointerLeave={stop}
-      onPointerCancel={stop}
-      onBlur={stop}
-      disabled={disabled}
-      aria-pressed={pressed}
-      className={buttonClasses}
-    >
-      <span className="flex items-center gap-0.5">
-        <span>Horn</span>
-        {keyLabel ? (
-          <span className="rounded bg-slate-800 px-1 py-0.5 text-[0.6rem] font-semibold text-slate-200">
-            {keyLabel}
-          </span>
-        ) : null}
-      </span>
-      <span
-        className={`rounded px-1 py-0.5 text-[0.65rem] font-semibold ${
-          pressed ? 'bg-rose-400 text-rose-950' : 'bg-slate-700 text-slate-200'
-        }`}
+    <div className="space-y-0.5">
+      <button
+        type="button"
+        onPointerDown={(event) => {
+          event.preventDefault();
+          start();
+        }}
+        onPointerUp={(event) => {
+          event.preventDefault();
+          stop();
+        }}
+        onPointerLeave={stop}
+        onPointerCancel={stop}
+        onBlur={stop}
+        disabled={disabled}
+        aria-pressed={pressed}
+        className={buttonClasses}
       >
-        {pressed ? 'HONK' : 'Hold'}
-      </span>
-    </button>
+        <span className="flex flex-1 items-center justify-center gap-0.5">
+          <span className="text-sm font-semibold tracking-[0.2em]">HORN</span>
+          {keyLabel ? (
+            <span className="rounded bg-black/40 px-1 py-0.5 text-[0.6rem] font-semibold text-white">
+              {keyLabel}
+            </span>
+          ) : null}
+        </span>
+        <span
+          className={`rounded px-1 py-0.5 text-[0.65rem] font-semibold ${
+            pressed ? 'bg-fuchsia-200 text-fuchsia-900' : 'bg-slate-800 text-slate-200'
+          }`}
+        >
+          {pressed ? 'HONK' : 'HOLD'}
+        </span>
+      </button>
+      <div className="grid grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))] items-center gap-0.5 text-[0.65rem]">
+        <label className="flex items-center gap-0.5 text-slate-300">
+          <span className="uppercase tracking-wide text-slate-400">Wave</span>
+          <select
+            value={formattedWaveform}
+            onChange={updateWaveform}
+            className="rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-[0.65rem] text-slate-100"
+          >
+            <option value="saw">Saw</option>
+            <option value="sine">Sine</option>
+          </select>
+        </label>
+        {freqs.map((freq, idx) => (
+          <label key={`horn-freq-${idx}`} className="flex items-center gap-0.5 text-slate-300">
+            <span className="text-[0.6rem] text-slate-500">{idx + 1}</span>
+            <input
+              type="number"
+              min={0}
+              max={5000}
+              step={1}
+              value={freq}
+              onChange={(event) => updateFreq(idx, event.target.value)}
+              className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
+            />
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -8,7 +8,6 @@ import OvercurrentLimiterPanel from './OvercurrentLimiterPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 import SessionSnapshot from './SessionSnapshot.jsx';
 import SocketLogPanel from './SocketLogPanel.jsx';
-import HornSettings from './HornSettings.jsx';
 import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSocket } from '../context/SocketContext.jsx';
@@ -68,7 +67,6 @@ export default function SettingsPanel() {
         <TabPanel id="keybindings">
           <div className="space-y-0.5">
             <KeymapSettings />
-            <HornSettings />
           </div>
         </TabPanel>
         <TabPanel id="controller">
