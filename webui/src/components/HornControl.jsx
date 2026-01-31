@@ -14,6 +14,7 @@ export default function HornControl({
   onStart,
   onStop,
   keyLabel,
+  active,
   className = '',
 }) {
   const [pressed, setPressed] = useState(false);
@@ -34,15 +35,16 @@ export default function HornControl({
     }
   }, [hornSettings?.freqs, hornSettings?.waveform]);
 
+  const isActive = Boolean(active);
   const buttonClasses = useMemo(() => {
     const base =
       'group flex w-full flex-col gap-0.5 rounded-xl border-2 px-1 py-1.5 text-xs font-semibold';
     const active = 'border-fuchsia-300/70 bg-fuchsia-700 text-fuchsia-50';
     const inactive = 'border-cyan-300/70 bg-cyan-900 text-cyan-50 hover:bg-cyan-800';
-    return [base, pressed ? active : inactive, 'disabled:opacity-50', className]
+    return [base, isActive ? active : inactive, 'disabled:opacity-50', className]
       .filter(Boolean)
       .join(' ');
-  }, [className, pressed]);
+  }, [className, isActive]);
 
   const start = () => {
     if (disabled) return;
@@ -120,10 +122,10 @@ export default function HornControl({
         </span>
         <span
           className={`rounded px-1 py-0.5 text-[0.65rem] font-semibold ${
-            pressed ? 'bg-fuchsia-200 text-fuchsia-900' : 'bg-slate-800 text-slate-200'
+            isActive ? 'bg-fuchsia-200 text-fuchsia-900' : 'bg-slate-800 text-slate-200'
           }`}
         >
-          {pressed ? 'Honk' : 'Hold'}
+          {isActive ? 'Honk' : 'Hold'}
         </span>
       </div>
       <div className="grid grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))] items-center gap-0.5 text-[0.65rem]">

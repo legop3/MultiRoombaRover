@@ -75,7 +75,7 @@ export default function ControlSummary() {
 
 export function InlineCameraTilt({ keymap }) {
   const {
-    state: { roverId, camera },
+    state: { roverId, camera, horn },
     pipeline,
     actions: { setServoAngle, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
@@ -132,7 +132,13 @@ export function InlineCameraTilt({ keymap }) {
         />
       )}
       {hornAvailable && (
-        <HornControl disabled={!roverId} onStart={startHorn} onStop={stopHorn} keyLabel={hornLabel} />
+        <HornControl
+          disabled={!roverId}
+          onStart={startHorn}
+          onStop={stopHorn}
+          keyLabel={hornLabel}
+          active={horn?.active}
+        />
       )}
       {enabled && (
         <div className="space-y-0.5 px-1 py-1">

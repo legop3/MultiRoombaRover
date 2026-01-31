@@ -134,7 +134,7 @@ function FloatingJoystick({ disabled, layout, radius, onMove, onStop }) {
 
 function MobileJoystickPanel({ layout }) {
   const {
-    state: { roverId, camera },
+    state: { roverId, camera, horn },
     pipeline,
     actions: { setDriveVector, registerInputState, setServoAngle, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
@@ -226,7 +226,7 @@ function MobileJoystickPanel({ layout }) {
             />
           )}
           {hornAvailable && (
-            <HornControl disabled={disabled} onStart={startHorn} onStop={stopHorn} />
+            <HornControl disabled={disabled} onStart={startHorn} onStop={stopHorn} active={horn?.active} />
           )}
           {cameraEnabled && (
             <div className="bg-zinc-950 p-0.5 text-xs">

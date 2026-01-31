@@ -27,6 +27,12 @@ function createSongState() {
   };
 }
 
+function createHornState() {
+  return {
+    active: false,
+  };
+}
+
 export const initialControlState = {
   roverId: null,
   mode: 'drive',
@@ -34,6 +40,7 @@ export const initialControlState = {
   aux: createAuxState(),
   camera: createCameraState(),
   song: createSongState(),
+  horn: createHornState(),
   lastControlIntentAt: 0,
   macros: DEFAULT_MACROS,
   keymap: DEFAULT_KEYMAP,
@@ -49,6 +56,7 @@ export function controlReducer(state, action) {
         drive: action.payload ? state.drive : createDriveState(),
         aux: action.payload ? state.aux : createAuxState(),
         song: action.payload ? state.song : createSongState(),
+        horn: action.payload ? state.horn : createHornState(),
         lastControlIntentAt: action.payload ? state.lastControlIntentAt : 0,
       };
     case 'control/set-mode':
@@ -125,7 +133,16 @@ export function controlReducer(state, action) {
         drive: createDriveState(),
         aux: createAuxState(),
         song: createSongState(),
+        horn: createHornState(),
         lastControlIntentAt: 0,
+      };
+    case 'control/set-horn-active':
+      return {
+        ...state,
+        horn: {
+          ...(state.horn || createHornState()),
+          active: Boolean(action.payload),
+        },
       };
     case 'control/record-intent':
       return {

@@ -13,7 +13,7 @@ function formatDegrees(value) {
 
 export default function CameraServoPanel() {
   const {
-    state: { roverId, camera, keymap },
+    state: { roverId, camera, keymap, horn },
     pipeline,
     actions: { setServoAngle, nudgeServo, goServoHome, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
@@ -110,6 +110,7 @@ export default function CameraServoPanel() {
           onStart={startHorn}
           onStop={stopHorn}
           keyLabel={hornKey}
+          active={horn?.active}
         />
       )}
       {enabled && (

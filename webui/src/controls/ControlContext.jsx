@@ -365,13 +365,15 @@ export function ControlSystemProvider({ children }) {
   const startHorn = useCallback(() => {
     if (!pipeline.horn) return;
     pipeline.sendHorn({ action: 'start', ...normalizedHornSettings });
+    dispatch({ type: 'control/set-horn-active', payload: true });
     recordControlIntent();
-  }, [normalizedHornSettings, pipeline, recordControlIntent]);
+  }, [dispatch, normalizedHornSettings, pipeline, recordControlIntent]);
 
   const stopHorn = useCallback(() => {
     if (!pipeline.horn) return;
     pipeline.sendHorn({ action: 'stop' });
-  }, [pipeline]);
+    dispatch({ type: 'control/set-horn-active', payload: false });
+  }, [dispatch, pipeline]);
 
   const registerInputState = useCallback((source, data) => {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });
