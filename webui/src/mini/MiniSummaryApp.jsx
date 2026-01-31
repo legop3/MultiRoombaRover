@@ -220,7 +220,9 @@ function MiniSummaryContent() {
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
   const [index, setIndex] = useState(0);
-  const [prewarmRoverId, setPrewarmRoverId] = useState(null);
+  const [primaryRoverId, setPrimaryRoverId] = useState(null);
+  const [secondaryRoverId, setSecondaryRoverId] = useState(null);
+  const [visibleSlot, setVisibleSlot] = useState('primary');
   const prewarmTimer = useRef(null);
   const activeDrivers = session?.activeDrivers || {};
   const driverRoster = useMemo(
@@ -282,6 +284,12 @@ function MiniSummaryContent() {
   }, [rotationKey]);
 
   useEffect(() => {
+    setPrimaryRoverId(rotationPool[0]?.rover?.id || null);
+    setSecondaryRoverId(null);
+    setVisibleSlot('primary');
+  }, [rotationKey, rotationPool]);
+
+  useEffect(() => {
     if (!rotationPool.length) return undefined;
     const timer = setInterval(() => {
       setIndex((prev) => (prev + 1) % rotationPool.length);
@@ -290,36 +298,62 @@ function MiniSummaryContent() {
   }, [rotationPool.length, rotationKey]);
 
   useEffect(() => {
-    setPrewarmRoverId(null);
-  }, [rotationKey]);
-
-  useEffect(() => {
     clearTimeout(prewarmTimer.current);
     if (!canSpectateVideo || rotationPool.length < 2) {
-      setPrewarmRoverId(null);
+      setSecondaryRoverId(null);
       return undefined;
     }
     const nextIndex = (index + 1) % rotationPool.length;
     const delay = Math.max(0, ROTATE_MS - PREWARM_MS);
     prewarmTimer.current = setTimeout(() => {
       const nextEntry = rotationPool[nextIndex];
-      setPrewarmRoverId(nextEntry?.rover?.id || null);
+      const nextId = nextEntry?.rover?.id || null;
+      if (!nextId) {
+        setSecondaryRoverId(null);
+        return;
+      }
+      if (visibleSlot === 'primary') {
+        setSecondaryRoverId(nextId);
+      } else {
+        setPrimaryRoverId(nextId);
+      }
     }, delay);
     return () => clearTimeout(prewarmTimer.current);
-  }, [index, rotationPool, canSpectateVideo]);
+  }, [index, rotationPool, canSpectateVideo, visibleSlot]);
 
   const activeEntry = rotationPool.length ? rotationPool[index % rotationPool.length] : null;
   const activeRover = activeEntry?.type === 'rover' ? activeEntry.rover : null;
-  const prewarmRover = prewarmRoverId
-    ? rotationPool.find((entry) => entry.rover?.id === prewarmRoverId)?.rover || null
+  const activeRoverId = activeRover?.id || null;
+
+  useEffect(() => {
+    if (!activeRoverId) return;
+    if (activeRoverId === primaryRoverId) {
+      setVisibleSlot('primary');
+      return;
+    }
+    if (activeRoverId === secondaryRoverId) {
+      setVisibleSlot('secondary');
+      return;
+    }
+    setPrimaryRoverId(activeRoverId);
+    setVisibleSlot('primary');
+  }, [activeRoverId, primaryRoverId, secondaryRoverId]);
+
+  const primaryRover = primaryRoverId
+    ? rotationPool.find((entry) => entry.rover?.id === primaryRoverId)?.rover || null
+    : null;
+  const secondaryRover = secondaryRoverId
+    ? rotationPool.find((entry) => entry.rover?.id === secondaryRoverId)?.rover || null
     : null;
 
   const activeSnapshot = !canSpectateVideo && activeRover ? snapshotFeeds[activeRover.id] || null : null;
   const activeVideo = canSpectateVideo && activeRover ? videoSources[activeRover.id] || null : null;
-  const prewarmVideo = canSpectateVideo && prewarmRover ? videoSources[prewarmRover.id] || null : null;
+  const primaryVideo = canSpectateVideo && primaryRover ? videoSources[primaryRover.id] || null : null;
+  const secondaryVideo = canSpectateVideo && secondaryRover ? videoSources[secondaryRover.id] || null : null;
   const activeAudio = activeRover ? audioSources[`${activeRover.id}-audio`] || null : null;
   const activeFrame = activeRover ? frames[activeRover.id] || null : null;
-  const prewarmFrame = prewarmRover ? frames[prewarmRover.id] || null : null;
+  const primaryFrame = primaryRover ? frames[primaryRover.id] || null : null;
+  const secondaryFrame = secondaryRover ? frames[secondaryRover.id] || null : null;
   const driverLabel = activeRover ? formatDriverLabel({ roverId: activeRover.id, session }) : null;
 
   if (inLockdown) {
@@ -375,31 +409,38 @@ function MiniSummaryContent() {
           <FitViewportFrame>
             {canSpectateVideo ? (
               <div className="relative h-full w-full">
-                <div className="absolute inset-0">
-                  <VideoTile
-                    sessionInfo={activeVideo}
-                    videoMode="whep"
-                    snapshotFeed={null}
-                    audioSessionInfo={activeAudio}
-                    label={activeRover.name || activeRover.id}
-                    telemetryFrame={activeFrame}
-                    batteryConfig={activeRover.battery}
-                    layoutFormat="mobile"
-                    hudVariant="none"
-                    fitParent
-                  />
-                </div>
-                {prewarmRover && prewarmRover.id !== activeRover.id ? (
-                  <div className="absolute inset-0 opacity-0 pointer-events-none">
+                {primaryRover ? (
+                  <div
+                    className={`absolute inset-0 ${visibleSlot === 'primary' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                  >
                     <VideoTile
-                      sessionInfo={prewarmVideo}
+                      sessionInfo={primaryVideo}
                       videoMode="whep"
                       snapshotFeed={null}
-                      audioSessionInfo={null}
-                      forceMute
-                      label={prewarmRover.name || prewarmRover.id}
-                      telemetryFrame={prewarmFrame}
-                      batteryConfig={prewarmRover.battery}
+                      audioSessionInfo={visibleSlot === 'primary' ? activeAudio : null}
+                      forceMute={visibleSlot !== 'primary'}
+                      label={primaryRover.name || primaryRover.id}
+                      telemetryFrame={primaryFrame}
+                      batteryConfig={primaryRover.battery}
+                      layoutFormat="mobile"
+                      hudVariant="none"
+                      fitParent
+                    />
+                  </div>
+                ) : null}
+                {secondaryRover ? (
+                  <div
+                    className={`absolute inset-0 ${visibleSlot === 'secondary' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                  >
+                    <VideoTile
+                      sessionInfo={secondaryVideo}
+                      videoMode="whep"
+                      snapshotFeed={null}
+                      audioSessionInfo={visibleSlot === 'secondary' ? activeAudio : null}
+                      forceMute={visibleSlot !== 'secondary'}
+                      label={secondaryRover.name || secondaryRover.id}
+                      telemetryFrame={secondaryFrame}
+                      batteryConfig={secondaryRover.battery}
                       layoutFormat="mobile"
                       hudVariant="none"
                       fitParent
