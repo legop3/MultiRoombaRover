@@ -11,6 +11,7 @@ import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
 
 const ROTATE_MS = 20000;
+const PREWARM_MS = 5000;
 const HARD_REFRESH_MS = 3 * 60 * 60 * 1000;
 
 function formatDriverLabel({ roverId, session }) {
@@ -219,6 +220,8 @@ function MiniSummaryContent() {
   const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
   const [index, setIndex] = useState(0);
+  const [prewarmRoverId, setPrewarmRoverId] = useState(null);
+  const prewarmTimer = useRef(null);
   const activeDrivers = session?.activeDrivers || {};
   const driverRoster = useMemo(
     () => roster.filter((rover) => activeDrivers[rover.id]),
@@ -286,13 +289,37 @@ function MiniSummaryContent() {
     return () => clearInterval(timer);
   }, [rotationPool.length, rotationKey]);
 
+  useEffect(() => {
+    setPrewarmRoverId(null);
+  }, [rotationKey]);
+
+  useEffect(() => {
+    clearTimeout(prewarmTimer.current);
+    if (!canSpectateVideo || rotationPool.length < 2) {
+      setPrewarmRoverId(null);
+      return undefined;
+    }
+    const nextIndex = (index + 1) % rotationPool.length;
+    const delay = Math.max(0, ROTATE_MS - PREWARM_MS);
+    prewarmTimer.current = setTimeout(() => {
+      const nextEntry = rotationPool[nextIndex];
+      setPrewarmRoverId(nextEntry?.rover?.id || null);
+    }, delay);
+    return () => clearTimeout(prewarmTimer.current);
+  }, [index, rotationPool, canSpectateVideo]);
+
   const activeEntry = rotationPool.length ? rotationPool[index % rotationPool.length] : null;
   const activeRover = activeEntry?.type === 'rover' ? activeEntry.rover : null;
+  const prewarmRover = prewarmRoverId
+    ? rotationPool.find((entry) => entry.rover?.id === prewarmRoverId)?.rover || null
+    : null;
 
   const activeSnapshot = !canSpectateVideo && activeRover ? snapshotFeeds[activeRover.id] || null : null;
   const activeVideo = canSpectateVideo && activeRover ? videoSources[activeRover.id] || null : null;
+  const prewarmVideo = canSpectateVideo && prewarmRover ? videoSources[prewarmRover.id] || null : null;
   const activeAudio = activeRover ? audioSources[`${activeRover.id}-audio`] || null : null;
   const activeFrame = activeRover ? frames[activeRover.id] || null : null;
+  const prewarmFrame = prewarmRover ? frames[prewarmRover.id] || null : null;
   const driverLabel = activeRover ? formatDriverLabel({ roverId: activeRover.id, session }) : null;
 
   if (inLockdown) {
@@ -346,18 +373,54 @@ function MiniSummaryContent() {
           </div>
         ) : activeRover ? (
           <FitViewportFrame>
-            <VideoTile
-              sessionInfo={activeVideo}
-              videoMode={canSpectateVideo ? 'whep' : 'snapshot'}
-              snapshotFeed={activeSnapshot}
-              audioSessionInfo={activeAudio}
-              label={activeRover.name || activeRover.id}
-              telemetryFrame={activeFrame}
-              batteryConfig={activeRover.battery}
-              layoutFormat="mobile"
-              hudVariant="none"
-              fitParent
-            />
+            {canSpectateVideo ? (
+              <div className="relative h-full w-full">
+                <div className="absolute inset-0">
+                  <VideoTile
+                    sessionInfo={activeVideo}
+                    videoMode="whep"
+                    snapshotFeed={null}
+                    audioSessionInfo={activeAudio}
+                    label={activeRover.name || activeRover.id}
+                    telemetryFrame={activeFrame}
+                    batteryConfig={activeRover.battery}
+                    layoutFormat="mobile"
+                    hudVariant="none"
+                    fitParent
+                  />
+                </div>
+                {prewarmRover && prewarmRover.id !== activeRover.id ? (
+                  <div className="absolute inset-0 opacity-0 pointer-events-none">
+                    <VideoTile
+                      sessionInfo={prewarmVideo}
+                      videoMode="whep"
+                      snapshotFeed={null}
+                      audioSessionInfo={null}
+                      forceMute
+                      label={prewarmRover.name || prewarmRover.id}
+                      telemetryFrame={prewarmFrame}
+                      batteryConfig={prewarmRover.battery}
+                      layoutFormat="mobile"
+                      hudVariant="none"
+                      fitParent
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <VideoTile
+                sessionInfo={null}
+                videoMode="snapshot"
+                snapshotFeed={activeSnapshot}
+                audioSessionInfo={activeAudio}
+                label={activeRover.name || activeRover.id}
+                telemetryFrame={activeFrame}
+                batteryConfig={activeRover.battery}
+                layoutFormat="mobile"
+                hudVariant="none"
+                fitParent
+              />
+            )}
           </FitViewportFrame>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
