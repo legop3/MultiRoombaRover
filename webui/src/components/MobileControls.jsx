@@ -277,13 +277,29 @@ function MobileLeftColumnContent({ layout }) {
 
   return (
     <div className="grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0.5 text-slate-100">
+      <div className="grid min-h-0 grid-rows-2 gap-0.5">
+        <MobileAuxButton
+          id="aux-vac-forward"
+          label="Vacuum Forward"
+          values={AUX_ALL_FORWARD}
+          color="bg-fuchsia-600"
+          disabled={disabled}
+          onPress={handleAuxPress}
+          onRelease={handleAuxRelease}
+        />
+        <MobileAuxButton
+          id="aux-vac-backward"
+          label="Vacuum Backward"
+          values={AUX_ALL_BACKWARD}
+          color="bg-fuchsia-800"
+          disabled={disabled}
+          onPress={handleAuxPress}
+          onRelease={handleAuxRelease}
+        />
+      </div>
       <div className="flex min-h-0 items-stretch gap-0.5">
         {cameraEnabled ? (
-          <div
-            className={`flex-1 min-h-0 rounded bg-zinc-950 p-0.25 ${
-              layout === 'landscape' ? 'pt-3' : ''
-            }`.trim()}
-          >
+          <div className="flex-1 min-h-0 rounded bg-zinc-950 p-0.25">
             <CameraTiltControl
               value={cameraValue}
               min={cameraMin}
@@ -311,26 +327,6 @@ function MobileLeftColumnContent({ layout }) {
             heightClass="h-full"
           />
         ) : null}
-      </div>
-      <div className="grid min-h-0 grid-rows-2 gap-0.5">
-        <MobileAuxButton
-          id="aux-vac-forward"
-          label="Vacuum Forward"
-          values={AUX_ALL_FORWARD}
-          color="bg-fuchsia-600"
-          disabled={disabled}
-          onPress={handleAuxPress}
-          onRelease={handleAuxRelease}
-        />
-        <MobileAuxButton
-          id="aux-vac-backward"
-          label="Vacuum Backward"
-          values={AUX_ALL_BACKWARD}
-          color="bg-fuchsia-800"
-          disabled={disabled}
-          onPress={handleAuxPress}
-          onRelease={handleAuxRelease}
-        />
       </div>
       <div className="min-h-0">
         {hornAvailable ? (
