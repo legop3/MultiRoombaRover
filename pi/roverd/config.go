@@ -179,7 +179,7 @@ func LoadConfig(path string) (*Config, error) {
 			Channels:    1,
 			SineGain:    1.0,
 			SawGain:     0.7,
-			MaxDuration: Duration{Duration: 1200 * time.Millisecond},
+			MaxDuration: Duration{Duration: 10000 * time.Millisecond},
 		},
 		NightVision: NightVisionConfig{
 			Enabled:   true,
