@@ -91,7 +91,13 @@ function DockModal({ instructions, onConfirm, onCancel, pending }) {
   );
 }
 
-export default function DriveDockAction({ layout = 'desktop', expand = false, fill = false, driveDockState }) {
+export default function DriveDockAction({
+  layout = 'desktop',
+  expand = false,
+  fill = false,
+  driveDockState,
+  compactHeightClass = '',
+}) {
   const isMobile = layout === 'mobile';
   const {
     state: { roverId, keymap },
@@ -175,9 +181,10 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, fi
   };
 
   const baseCardClasses =
-    'flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-0.75 py-0.75 text-slate-100 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60';
+    'flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-0.75 py-0.75 text-slate-100 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 select-none no-touch-select';
   const ctaText = 'text-center';
   const ctaLayout = 'items-center justify-between';
+  const compactLayout = 'items-center justify-center';
   const ctaTextAndLayout = `${ctaText} ${ctaLayout}`;
   const ctaSize = isMobile ? 'text-sm font-semibold' : '';
   const emeraldCta =
@@ -187,32 +194,41 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, fi
   const indigoCta =
     'border-indigo-300/70 bg-indigo-900 text-indigo-50 hover:bg-indigo-800 focus-visible:ring-indigo-300';
   const filledHeight = expand ? 'h-full flex-1' : fill ? 'flex-1' : '';
+  const compactHeight = isMobile && !expand ? compactHeightClass : '';
+  const layoutClass = isMobile && !expand ? compactLayout : ctaLayout;
 
   if (!driving && !dockingInProgress) {
     return (
       <button
         type="button"
         onClick={handleStartDrive}
+        onContextMenu={(event) => event.preventDefault()}
         disabled={driveDisabled}
-        className={`${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${emeraldCta}`}
+        className={`${baseCardClasses} ${filledHeight} ${compactHeight} ${ctaText} ${layoutClass} ${ctaSize} ${emeraldCta}`}
       >
         <div className="space-y-0.5 w-full">
           <div className="flex w-full flex-col items-center gap-0.25">
             <span className="text-base font-semibold text-emerald-50 md:text-lg">Start Driving</span>
-            {!isMobile ? (
+            {!isMobile && expand ? (
               <div className="flex flex-wrap items-center justify-center gap-0.5">
                 {driveKeyLabel ? <KeyPill label={driveKeyLabel} /> : null}
                 <ActionPill label="Click to start" tone="emerald" />
               </div>
             ) : null}
           </div>
-          <p className="text-sm text-emerald-50/90">{startDriveInstructions.summary}</p>
-          <StepList steps={startDriveInstructions.steps} tone="emerald" />
+          {expand ? (
+            <>
+              <p className="text-sm text-emerald-50/90">{startDriveInstructions.summary}</p>
+              <StepList steps={startDriveInstructions.steps} tone="emerald" />
+            </>
+          ) : null}
         </div>
-        <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
-          <StatusRow label="Dock" value={dockValue} tone={dockTone} />
-          <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
-        </div>
+        {expand ? (
+          <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
+            <StatusRow label="Dock" value={dockValue} tone={dockTone} />
+            <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
+          </div>
+        ) : null}
       </button>
     );
   }
@@ -228,24 +244,29 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, fi
         type="button"
         disabled={driveDisabled}
         onClick={handleReturnToDrive}
-        className={`${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${amberCta}`}
+        onContextMenu={(event) => event.preventDefault()}
+        className={`${baseCardClasses} ${filledHeight} ${compactHeight} ${ctaText} ${layoutClass} ${ctaSize} ${amberCta}`}
       >
         <div className="space-y-0.5 w-full">
           <div className="flex w-full flex-col items-center gap-0.25">
             <span className="text-base font-semibold text-amber-50 md:text-lg">Docking in Progress</span>
-            {!isMobile ? (
+            {!isMobile && expand ? (
               <div className="flex flex-wrap items-center justify-center gap-0.5">
                 <ActionPill label="Click to return to driving mode" tone="amber" />
               </div>
             ) : null}
           </div>
-          <p className="text-sm text-amber-50/90">{inProgressCopy.summary}</p>
+          {expand ? <p className="text-sm text-amber-50/90">{inProgressCopy.summary}</p> : null}
         </div>
-        <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
-          <StatusRow label="Dock" value={dockValue} tone={dockTone} />
-          <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
-        </div>
-        <StepList steps={inProgressCopy.steps} tone="amber" />
+        {expand ? (
+          <>
+            <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
+              <StatusRow label="Dock" value={dockValue} tone={dockTone} />
+              <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
+            </div>
+            <StepList steps={inProgressCopy.steps} tone="amber" />
+          </>
+        ) : null}
       </button>
     );
   }
@@ -256,22 +277,23 @@ export default function DriveDockAction({ layout = 'desktop', expand = false, fi
         type="button"
         disabled={dockDisabled}
         onClick={handleOpenDock}
+        onContextMenu={(event) => event.preventDefault()}
         className={
           isMobile
-            ? `flex w-full items-center justify-center ${baseCardClasses} ${ctaTextAndLayout} ${ctaSize} ${indigoCta}`
-            : `${baseCardClasses} ${filledHeight} ${ctaTextAndLayout} ${ctaSize} ${indigoCta}`
+            ? `flex w-full ${baseCardClasses} ${compactHeight} ${ctaText} ${layoutClass} ${ctaSize} ${indigoCta}`
+            : `${baseCardClasses} ${filledHeight} ${ctaText} ${ctaLayout} ${ctaSize} ${indigoCta}`
         }
       >
         <div className="flex w-full flex-col items-center gap-0.25">
           <span className="text-base font-semibold text-indigo-50 md:text-lg">Dock and Charge</span>
-          {!isMobile ? (
+          {!isMobile && expand ? (
             <div className="flex flex-wrap items-center justify-center gap-0.5">
               {dockKeyLabel ? <KeyPill label={dockKeyLabel} /> : null}
               <ActionPill label="Click to begin docking" tone="indigo" />
             </div>
           ) : null}
         </div>
-        {!isMobile && (
+        {!isMobile && expand && (
           <>
             <p className="text-sm text-indigo-50/90">{dockButtonCaption}</p>
             <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">

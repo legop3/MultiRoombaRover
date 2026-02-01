@@ -3,8 +3,8 @@ import TelemetryPanel from './components/TelemetryPanel.jsx';
 import ReplaySourcesPanel from './components/ReplaySourcesPanel.jsx';
 import AlertFeed from './components/AlertFeed.jsx';
 import MobileControls, {
-  MobileLandscapeAuxColumn,
-  MobileLandscapeControlColumn,
+  MobileLeftColumn,
+  MobileRightColumn,
 } from './components/MobileControls.jsx';
 import { ControlSystemProvider, KeyboardInputManager, GamepadInputManager } from './controls/index.js';
 import { SettingsProvider } from './settings/index.js';
@@ -139,10 +139,11 @@ function MobilePortraitLayout({ onOpenHelpOverlay }) {
 }
 
 function MobileLandscapeLayout({ onOpenHelpOverlay }) {
+  const columnClass = 'self-start h-[min(100svh,32rem)]';
   return (
     <div className="flex flex-col gap-0.5">
       <section className="grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-0.5">
-        <MobileLandscapeAuxColumn />
+        <MobileLeftColumn layout="landscape" className={columnClass} />
         <div>
           <DriverVideoPanel layoutFormat="mobile-landscape" />
           <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -151,7 +152,7 @@ function MobileLandscapeLayout({ onOpenHelpOverlay }) {
           </div>
           {/* <TelemetryPanel /> */}
         </div>
-        <MobileLandscapeControlColumn />
+        <MobileRightColumn layout="landscape" className={columnClass} />
       </section>
       <div className="flex flex-col gap-0.5 pb-0">
         <MobileFeatureTabs

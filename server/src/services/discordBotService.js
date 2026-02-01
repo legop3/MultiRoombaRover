@@ -7,6 +7,7 @@ const {
   AttachmentBuilder,
   PermissionsBitField,
   WebhookClient,
+  MessageFlags,
 } = require('discord.js');
 const logger = require('../globals/logger').child('discordBot');
 const io = require('../globals/io');
@@ -884,7 +885,7 @@ async function sendTypingMessage(entry, payload) {
   const username = formatWebhookUsername(payload);
   const content = `-# *${username} is typing...*`;
   try {
-    const message = await channel.send({ content, allowedMentions: { parse: [] } });
+    const message = await channel.send({ content, allowedMentions: { parse: [] }, flags: [MessageFlags.SuppressNotifications]});
     const timeoutId = setTimeout(() => {
       clearTypingMessage(entry.guildId, typingId);
     }, 20000);

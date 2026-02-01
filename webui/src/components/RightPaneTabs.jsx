@@ -1,4 +1,3 @@
-import { InlineCameraTilt } from './ControlSummary.jsx';
 import RoomCameraPanel from './RoomCameraPanel.jsx';
 import HomeAssistantControls from './HomeAssistantControls.jsx';
 import SettingsPanel from './SettingsPanel.jsx';
@@ -13,6 +12,10 @@ import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useControlSystem } from '../controls/index.js';
 import RoverQueuesPanel from './RoverQueuesPanel.jsx';
 import RawUserPilePanel from './RawUserPilePanel.jsx';
+import { formatKeyLabel } from '../controls/keymapUtils.js';
+import NightVisionControl from './NightVisionControl.jsx';
+import HornControl from './HornControl.jsx';
+import CameraTiltControl from './CameraTiltControl.jsx';
 
 function TopDownMapPanel() {
   const {
@@ -32,15 +35,74 @@ function TopDownMapPanel() {
 
 function DriveDockPanel() {
   const {
-    state: { roverId, keymap },
+    state: { roverId, keymap, camera, horn },
+    pipeline,
+    actions: { setServoAngle, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
   const driveDockState = useDriveDockState(roverId);
   const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
+  const config = camera?.config;
+  const cameraEnabled = Boolean(roverId && camera?.enabled && config);
+  const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
+  const nightVisionState = pipeline?.nightVisionState;
+  const hornAvailable = Boolean(roverId && pipeline?.horn);
+  const hornBlocked = horn?.overheated;
+  const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
+  const max = typeof config?.maxAngle === 'number' ? config.maxAngle : 30;
+  const value =
+    typeof camera?.angle === 'number'
+      ? camera.angle
+      : typeof config?.homeAngle === 'number'
+        ? config.homeAngle
+        : (min + max) / 2;
+  const nightVisionLabel = formatKeyLabel(keymap?.nightVisionToggle?.[0]);
+  const hornLabel = formatKeyLabel(keymap?.hornHonk?.[0]);
+  const upLabel = formatKeyLabel(keymap?.cameraUp?.[0]);
+  const downLabel = formatKeyLabel(keymap?.cameraDown?.[0]);
+
   return (
     <section className="panel-section grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-0.5">
       <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
-      {!hideInlineControls ? <InlineCameraTilt keymap={keymap} /> : null}
+      {!hideInlineControls ? (
+        <div className="surface space-y-0.5 p-0 text-sm text-slate-200">
+          {nightVisionAvailable && (
+            <NightVisionControl
+              nightVisionOn={nightVisionState?.nightVisionOn}
+              disabled={!roverId}
+              onToggle={setNightVision}
+              keyLabel={nightVisionLabel}
+            />
+          )}
+          {hornAvailable && (
+            <HornControl
+              disabled={!roverId || hornBlocked}
+              onStart={startHorn}
+              onStop={stopHorn}
+              keyLabel={hornLabel}
+              active={horn?.active}
+              heat={horn?.heat}
+            />
+          )}
+          {cameraEnabled && (
+            <CameraTiltControl
+              value={value}
+              min={min}
+              max={max}
+              onChange={setServoAngle}
+              keyDownLabel={downLabel}
+              keyUpLabel={upLabel}
+              className="space-y-0.5 px-1 py-1"
+              labelRowClass="text-xs text-slate-300"
+              labelClass=""
+              valueClass="font-mono text-slate-100"
+              sliderClass="w-full"
+              accentClass="accent-emerald-400"
+              endpointClass="text-[0.7rem] text-slate-400"
+            />
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

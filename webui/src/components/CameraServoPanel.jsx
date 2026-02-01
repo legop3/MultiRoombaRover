@@ -1,21 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import { formatKeyLabel } from '../controls/keymapUtils.js';
 import NightVisionControl from './NightVisionControl.jsx';
 import HornControl from './HornControl.jsx';
+import CameraTiltControl from './CameraTiltControl.jsx';
 
 const SLIDER_THROTTLE_MS = 150;
-
-function formatDegrees(value) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return '—';
-  return `${value > 0 ? '+' : ''}${value.toFixed(1)}°`;
-}
 
 export default function CameraServoPanel() {
   const {
     state: { roverId, camera, keymap, horn },
     pipeline,
-    actions: { setServoAngle, nudgeServo, goServoHome, setNightVision, startHorn, stopHorn },
+    actions: { setServoAngle, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
   const config = camera?.config;
   const enabled = Boolean(roverId && camera?.enabled && config);
@@ -35,60 +30,6 @@ export default function CameraServoPanel() {
         : (min + max) / 2;
 
   if (!enabled && !nightVisionAvailable && !hornAvailable) return null;
-
-  const [pendingAngle, setPendingAngle] = useState(value);
-  const throttleRef = useRef(null);
-  const draggingRef = useRef(false);
-
-  useEffect(() => {
-    if (!draggingRef.current) {
-      setPendingAngle(value);
-    }
-  }, [value]);
-
-  useEffect(
-    () => () => {
-      if (throttleRef.current) {
-        clearTimeout(throttleRef.current);
-      }
-    },
-    [],
-  );
-
-  const step =
-    typeof config?.nudgeDegrees === 'number' && config.nudgeDegrees > 0
-      ? config.nudgeDegrees
-      : 1;
-
-  const scheduleSend = (next) => {
-    if (throttleRef.current) {
-      clearTimeout(throttleRef.current);
-    }
-    throttleRef.current = setTimeout(() => {
-      setServoAngle(next);
-    }, SLIDER_THROTTLE_MS);
-  };
-
-  const handleSlider = (event) => {
-    const next = Number.parseFloat(event.target.value);
-    if (Number.isNaN(next)) return;
-    draggingRef.current = true;
-    setPendingAngle(next);
-    scheduleSend(next);
-  };
-
-  const commitSlider = () => {
-    draggingRef.current = false;
-    if (throttleRef.current) {
-      clearTimeout(throttleRef.current);
-    }
-    setServoAngle(pendingAngle);
-  };
-
-  const handleNudge = (direction) => {
-    const delta = step * direction;
-    nudgeServo(delta);
-  };
 
   const handleNightVisionToggle = (nextOn) => {
     if (!nightVisionAvailable) return;
@@ -116,30 +57,21 @@ export default function CameraServoPanel() {
         />
       )}
       {enabled && (
-        <>
-          <div className="flex items-center justify-between text-sm text-slate-300">
-            <span>Camera Tilt</span>
-            <span className="font-mono text-sm text-slate-100">{formatDegrees(value)}</span>
-          </div>
-          <div>
-            <input
-              type="range"
-              className="w-full accent-emerald-400"
-              min={min}
-              max={max}
-              step={0.5}
-              value={pendingAngle}
-              onChange={handleSlider}
-              onMouseUp={commitSlider}
-              onTouchEnd={commitSlider}
-              onPointerUp={commitSlider}
-            />
-            <div className="mt-0 flex justify-between text-xs text-slate-400">
-              <span>{formatDegrees(min)}</span>
-              <span>{formatDegrees(max)}</span>
-            </div>
-          </div>
-        </>
+        <CameraTiltControl
+          value={value}
+          min={min}
+          max={max}
+          step={0.5}
+          onChange={setServoAngle}
+          throttleMs={SLIDER_THROTTLE_MS}
+          className="space-y-0.5"
+          labelRowClass="text-sm text-slate-300"
+          valueClass="font-mono text-sm text-slate-100"
+          sliderClass="w-full"
+          accentClass="accent-emerald-400"
+          endpointClass="text-xs text-slate-400"
+          endpointLabelClass=""
+        />
       )}
       {/* <div className="flex gap-0.5 text-sm">
         <button type="button" className="flex-1 button-dark" onClick={() => handleNudge(-1)}>
