@@ -193,11 +193,14 @@ export default function DriveDockAction({
     'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800 focus-visible:ring-amber-300';
   const indigoCta =
     'border-indigo-300/70 bg-indigo-900 text-indigo-50 hover:bg-indigo-800 focus-visible:ring-indigo-300';
+  const orangeCta =
+    'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800 focus-visible:ring-amber-300';
   const forceExpanded = dockingInProgress;
   const expanded = expand || forceExpanded;
   const filledHeight = expanded ? 'h-full flex-1' : fill ? 'flex-1' : '';
   const compactHeight = isMobile && !expanded ? compactHeightClass : '';
   const layoutClass = isMobile && !expanded ? compactLayout : ctaLayout;
+  const compactDockedDriving = isMobile && !expanded && driving && docked;
 
   if (!driving && !dockingInProgress) {
     return (
@@ -237,7 +240,7 @@ export default function DriveDockAction({
 
   if (dockingInProgress) {
     const inProgressCopy = {
-      summary: 'if the rover is not docking, click to drive and try again.',
+      summary: 'If the rover is failing to dock, click to drive and try again.',
       steps: ['The rover should be slowly wiggling towards the dock', 'If it is obviously not working, press this button to enter driving mode and try again'],
     };
 
@@ -285,12 +288,16 @@ export default function DriveDockAction({
         onContextMenu={(event) => event.preventDefault()}
         className={
           isMobile
-            ? `flex w-full ${baseCardClasses} ${compactHeight} ${ctaText} ${layoutClass} ${ctaSize} ${indigoCta}`
+            ? `flex w-full ${baseCardClasses} ${compactHeight} ${ctaText} ${layoutClass} ${ctaSize} ${
+                compactDockedDriving ? orangeCta : indigoCta
+              }`
             : `${baseCardClasses} ${filledHeight} ${ctaText} ${ctaLayout} ${ctaSize} ${indigoCta}`
         }
       >
         <div className="flex w-full flex-col items-center gap-0.25">
-          <span className="text-base font-semibold text-indigo-50 md:text-lg">Dock and Charge</span>
+          <span className="text-base font-semibold text-indigo-50 md:text-lg">
+            {compactDockedDriving ? 'Docked!' : 'Dock and Charge'}
+          </span>
           {!isMobile && expanded ? (
             <div className="flex flex-wrap items-center justify-center gap-0.5">
               {dockKeyLabel ? <KeyPill label={dockKeyLabel} /> : null}

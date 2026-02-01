@@ -86,13 +86,13 @@ function FloatingJoystick({ disabled, layout, radius, onMove, onStop }) {
     }
   }, [disabled, stopTracking]);
 
-  const heightClass = layout === 'landscape' ? 'h-[260px]' : 'h-[220px]';
+  const heightClass = 'h-full';
 
   return (
     <div
       ref={containerRef}
       role="presentation"
-      className={`relative w-full ${heightClass} select-none overflow-hidden bg-zinc-950`}
+      className={`relative w-full ${heightClass} select-none overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-100 shadow-md`}
       style={{ touchAction: 'none' }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -102,9 +102,9 @@ function FloatingJoystick({ disabled, layout, radius, onMove, onStop }) {
       onContextMenu={(event) => event.preventDefault()}
     >
       {!visual.active && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-xs text-slate-400">
-          <p>Touch and hold anywhere</p>
-          <p>Joystick will follow your thumb</p>
+        <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-0 text-center pt-0.5">
+          <span className="font-semibold text-slate-200">Joystick area</span>
+          <span className="text-sm text-slate-300">Touch and hold to use the joystick</span>
         </div>
       )}
       {visual.active && (
@@ -176,7 +176,6 @@ function MobileJoystickPanel({ layout }) {
     registerInputState(SOURCE, { vector: zero, lastEvent: 'stop' });
   }, [disabled, registerInputState, setDriveVector]);
 
-
   const fillClass = dockedNotDriving ? 'max-h-screen self-start' : '';
   const containerClass = `flex h-full flex-col gap-0.5 text-slate-100 ${fillClass}`;
 
@@ -189,7 +188,7 @@ function MobileJoystickPanel({ layout }) {
         compactHeightClass="min-h-[5rem]"
       />
       {!expandAction ? (
-        <>
+        <div className="flex-1 min-h-0">
           <FloatingJoystick
             disabled={disabled}
             layout={layout}
@@ -197,7 +196,7 @@ function MobileJoystickPanel({ layout }) {
             onMove={handleMove}
             onStop={handleStop}
           />
-        </>
+        </div>
       ) : null}
       {/* Panic stop button can be re-enabled here if needed */}
 
