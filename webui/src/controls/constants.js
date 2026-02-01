@@ -18,7 +18,7 @@ export const SONG_DEFAULT_DURATION = 8;
 export const SONG_REPEAT_MS = 250;
 
 export const HORN_MAX_MS = 4000;
-export const HORN_HEAT_UP_PER_SEC = 0.8;
+export const HORN_HEAT_UP_PER_SEC = 0.4;
 export const HORN_HEAT_COOL_PER_SEC = 0.2;
 export const HORN_HEAT_RESUME_THRESHOLD = 0.8;
 
