@@ -193,9 +193,11 @@ export default function DriveDockAction({
     'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800 focus-visible:ring-amber-300';
   const indigoCta =
     'border-indigo-300/70 bg-indigo-900 text-indigo-50 hover:bg-indigo-800 focus-visible:ring-indigo-300';
-  const filledHeight = expand ? 'h-full flex-1' : fill ? 'flex-1' : '';
-  const compactHeight = isMobile && !expand ? compactHeightClass : '';
-  const layoutClass = isMobile && !expand ? compactLayout : ctaLayout;
+  const forceExpanded = dockingInProgress;
+  const expanded = expand || forceExpanded;
+  const filledHeight = expanded ? 'h-full flex-1' : fill ? 'flex-1' : '';
+  const compactHeight = isMobile && !expanded ? compactHeightClass : '';
+  const layoutClass = isMobile && !expanded ? compactLayout : ctaLayout;
 
   if (!driving && !dockingInProgress) {
     return (
@@ -209,21 +211,21 @@ export default function DriveDockAction({
         <div className="space-y-0.5 w-full">
           <div className="flex w-full flex-col items-center gap-0.25">
             <span className="text-base font-semibold text-emerald-50 md:text-lg">Start Driving</span>
-            {!isMobile && expand ? (
+            {!isMobile && expanded ? (
               <div className="flex flex-wrap items-center justify-center gap-0.5">
                 {driveKeyLabel ? <KeyPill label={driveKeyLabel} /> : null}
                 <ActionPill label="Click to start" tone="emerald" />
               </div>
             ) : null}
           </div>
-          {expand ? (
+          {expanded ? (
             <>
               <p className="text-sm text-emerald-50/90">{startDriveInstructions.summary}</p>
               <StepList steps={startDriveInstructions.steps} tone="emerald" />
             </>
           ) : null}
         </div>
-        {expand ? (
+        {expanded ? (
           <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
             <StatusRow label="Dock" value={dockValue} tone={dockTone} />
             <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
@@ -235,7 +237,7 @@ export default function DriveDockAction({
 
   if (dockingInProgress) {
     const inProgressCopy = {
-      summary: 'Docking attempt in progress.',
+      summary: 'if the rover is not docking, click to drive and try again.',
       steps: ['The rover should be slowly wiggling towards the dock', 'If it is obviously not working, press this button to enter driving mode and try again'],
     };
 
@@ -250,21 +252,24 @@ export default function DriveDockAction({
         <div className="space-y-0.5 w-full">
           <div className="flex w-full flex-col items-center gap-0.25">
             <span className="text-base font-semibold text-amber-50 md:text-lg">Docking in Progress</span>
-            {!isMobile && expand ? (
+            {/* {!isMobile && expanded ? ( */}
+            {expanded ? (
               <div className="flex flex-wrap items-center justify-center gap-0.5">
-                <ActionPill label="Click to return to driving mode" tone="amber" />
+                <ActionPill label="Return to driving mode" tone="emerald" />
               </div>
             ) : null}
           </div>
-          {expand ? <p className="text-sm text-amber-50/90">{inProgressCopy.summary}</p> : null}
+          {expanded ? <p className="text-sm text-amber-50/90">{inProgressCopy.summary}</p> : null}
         </div>
-        {expand ? (
+        {expanded ? (
           <>
             <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
               <StatusRow label="Dock" value={dockValue} tone={dockTone} />
               <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
             </div>
-            <StepList steps={inProgressCopy.steps} tone="amber" />
+            {!isMobile ? (
+              <StepList steps={inProgressCopy.steps} tone="amber" />
+            ) : null}
           </>
         ) : null}
       </button>
@@ -286,14 +291,14 @@ export default function DriveDockAction({
       >
         <div className="flex w-full flex-col items-center gap-0.25">
           <span className="text-base font-semibold text-indigo-50 md:text-lg">Dock and Charge</span>
-          {!isMobile && expand ? (
+          {!isMobile && expanded ? (
             <div className="flex flex-wrap items-center justify-center gap-0.5">
               {dockKeyLabel ? <KeyPill label={dockKeyLabel} /> : null}
               <ActionPill label="Click to begin docking" tone="indigo" />
             </div>
           ) : null}
         </div>
-        {!isMobile && expand && (
+        {!isMobile && expanded && (
           <>
             <p className="text-sm text-indigo-50/90">{dockButtonCaption}</p>
             <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">

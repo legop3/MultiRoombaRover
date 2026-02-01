@@ -133,6 +133,7 @@ function MobileJoystickPanel({ layout }) {
   } = useControlSystem();
   const driveDockState = useDriveDockState(roverId);
   const dockedNotDriving = driveDockState.docked && !driveDockState.driving;
+  const expandAction = dockedNotDriving || driveDockState.dockingInProgress;
   const disabled = !roverId;
   const joystickRadius = JOYSTICK_RADIUS;
   const smoothing = JOYSTICK_SMOOTHING;
@@ -183,11 +184,11 @@ function MobileJoystickPanel({ layout }) {
     <div className={containerClass}>
       <DriveDockAction
         layout="mobile"
-        expand={dockedNotDriving}
+        expand={expandAction}
         driveDockState={driveDockState}
         compactHeightClass="min-h-[5rem]"
       />
-      {!dockedNotDriving ? (
+      {!expandAction ? (
         <>
           <FloatingJoystick
             disabled={disabled}
