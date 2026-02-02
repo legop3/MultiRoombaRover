@@ -79,6 +79,7 @@ export default function VideoTile({
   const batteryCharge = sensors?.batteryChargeMah ?? null;
   const desktopLayout = layoutFormat === 'desktop';
   const mobileHud = !desktopLayout;
+  const effectiveHudMapPosition = mobileHud ? 'top-right' : hudMapPosition;
   const [showHudMapDesktop, setShowHudMapDesktop] = useHudMapSetting();
   const showHudMap = hudForceMap ? true : mobileHud ? true : showHudMapDesktop;
   const batteryVisual = buildBatteryVisual(batteryCharge, batteryConfig);
@@ -445,7 +446,7 @@ export default function VideoTile({
             battery={batteryVisual}
             showTopDown={showHudMap}
             mobileHud={mobileHud}
-            mapPosition={hudMapPosition}
+            mapPosition={effectiveHudMapPosition}
             turnTimerText={turnTimerText}
             labelScale={hudLabelScale}
           />
@@ -613,8 +614,8 @@ function HudOverlay({
     transformOrigin: 'center bottom',
   };
   const mapSize = '240px';
-  const mapScale = portraitMobile ? 0.36 : isMobile ? 0.45 : 0.7;
-  const mapOpacity = isMobile ? 0.85 : 0.7;
+  const mapScale = portraitMobile ? 0.3 : isMobile ? 0.33 : 0.7;
+  const mapOpacity = isMobile ? 0.6 : 0.7;
   const mapStyle = {
     width: mapSize,
     height: mapSize,
