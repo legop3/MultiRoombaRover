@@ -69,6 +69,10 @@ export const DEFAULT_MACROS = [
       { type: 'oi', command: 'dock' },
       { type: 'pause', duration: COMMAND_DELAY_MS },
       { type: 'oi', command: 'full' },
+      { type: 'pause', duration: 300 },
+      { type: 'drive', speeds: { left: -500, right: -500 } },
+      { type: 'pause', duration: 400 },
+      { type: 'drive', speeds: { left: 0, right: 0 } },
     ],
   },
   {
