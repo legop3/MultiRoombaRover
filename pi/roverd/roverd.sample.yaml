@@ -58,3 +58,6 @@ nightVision:
   gpioPin: 22
   gpioChip: gpiochip0
   initialOn: true
+autoSideBrush:
+  enabled: true
+  speed: 20

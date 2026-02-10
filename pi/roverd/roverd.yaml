@@ -31,3 +31,6 @@ cameraServo:
   homeAngle: 0
   nudgeDegrees: 2
   allowRawPulse: false
+autoSideBrush:
+  enabled: true
+  speed: 20

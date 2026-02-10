@@ -26,6 +26,8 @@ type WSClient struct {
 	recoverMu    sync.Mutex
 	recovering   bool
 	ttsQueue     chan *ttsPayload
+	lastAux      motorPWMPayload
+	autoSideOn   bool
 	connMu       sync.Mutex
 	connected    bool
 	disconnectT  *time.Timer
@@ -152,11 +154,17 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	case msg.DriveDirect != nil:
 		left := clamp(msg.DriveDirect.Left, -c.cfg.MaxWheelMMs, c.cfg.MaxWheelMMs)
 		right := clamp(msg.DriveDirect.Right, -c.cfg.MaxWheelMMs, c.cfg.MaxWheelMMs)
-		return c.adapter.DriveDirect(left, right)
+		if err := c.adapter.DriveDirect(left, right); err != nil {
+			return err
+		}
+		c.applyAutoSideBrush(left, right)
+		return nil
 	case msg.MotorPWM != nil:
 		main := clamp(msg.MotorPWM.Main, -127, 127)
 		side := clamp(msg.MotorPWM.Side, -127, 127)
 		vac := clamp(msg.MotorPWM.Vacuum, 0, 127)
+		c.lastAux = motorPWMPayload{Main: main, Side: side, Vacuum: vac}
+		c.autoSideOn = false
 		return c.adapter.MotorPWM(main, side, vac)
 	case msg.SensorStream != nil:
 		if msg.SensorStream.Enable {
@@ -212,6 +220,49 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
 	}
+}
+
+func (c *WSClient) applyAutoSideBrush(left, right int) {
+	if c.cfg == nil || !c.cfg.AutoSideBrush.Enabled {
+		if c.autoSideOn {
+			c.autoSideOn = false
+			if err := c.adapter.MotorPWM(c.lastAux.Main, c.lastAux.Side, c.lastAux.Vacuum); err != nil {
+				c.log.Printf("auto side brush stop failed: %v", err)
+			}
+		}
+		return
+	}
+
+	moving := left != 0 || right != 0
+	if !moving {
+		if c.autoSideOn {
+			c.autoSideOn = false
+			if err := c.adapter.MotorPWM(c.lastAux.Main, c.lastAux.Side, c.lastAux.Vacuum); err != nil {
+				c.log.Printf("auto side brush stop failed: %v", err)
+			}
+		}
+		return
+	}
+
+	if c.lastAux.Side != 0 {
+		c.autoSideOn = false
+		return
+	}
+
+	autoSpeed := clampInt(c.cfg.AutoSideBrush.Speed, -127, 127)
+	if autoSpeed == 0 {
+		c.autoSideOn = false
+		return
+	}
+	if c.autoSideOn {
+		return
+	}
+
+	if err := c.adapter.MotorPWM(c.lastAux.Main, autoSpeed, c.lastAux.Vacuum); err != nil {
+		c.log.Printf("auto side brush start failed: %v", err)
+		return
+	}
+	c.autoSideOn = true
 }
 
 func (c *WSClient) enqueueTTS(payload *ttsPayload) error {

@@ -114,18 +114,24 @@ type NightVisionConfig struct {
 	InitialOn bool   `yaml:"initialOn" json:"initialOn"`
 }
 
+type AutoSideBrushConfig struct {
+	Enabled bool `yaml:"enabled"`
+	Speed   int  `yaml:"speed"`
+}
+
 type Config struct {
-	Name        string            `yaml:"name"`
-	ServerURL   string            `yaml:"serverUrl"`
-	Serial      SerialConfig      `yaml:"serial"`
-	BRC         BRCConfig         `yaml:"brc"`
-	Battery     BatteryConfig     `yaml:"battery"`
-	MaxWheelMMs int               `yaml:"maxWheelSpeed"`
-	Media       MediaConfig       `yaml:"media"`
-	CameraServo CameraServoConfig `yaml:"cameraServo"`
-	Audio       AudioConfig       `yaml:"audio"`
-	Horn        HornConfig        `yaml:"horn"`
-	NightVision NightVisionConfig `yaml:"nightVision" json:"nightVision"`
+	Name          string              `yaml:"name"`
+	ServerURL     string              `yaml:"serverUrl"`
+	Serial        SerialConfig        `yaml:"serial"`
+	BRC           BRCConfig           `yaml:"brc"`
+	Battery       BatteryConfig       `yaml:"battery"`
+	MaxWheelMMs   int                 `yaml:"maxWheelSpeed"`
+	Media         MediaConfig         `yaml:"media"`
+	CameraServo   CameraServoConfig   `yaml:"cameraServo"`
+	Audio         AudioConfig         `yaml:"audio"`
+	Horn          HornConfig          `yaml:"horn"`
+	NightVision   NightVisionConfig   `yaml:"nightVision" json:"nightVision"`
+	AutoSideBrush AutoSideBrushConfig `yaml:"autoSideBrush"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -187,6 +193,10 @@ func LoadConfig(path string) (*Config, error) {
 			GPIOChip:  "gpiochip0",
 			InitialOn: true,
 		},
+		AutoSideBrush: AutoSideBrushConfig{
+			Enabled: true,
+			Speed:   20,
+		},
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
@@ -243,6 +253,7 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	validateAudioConfig(&cfg.Audio)
 	validateHornConfig(&cfg.Horn)
+	validateAutoSideBrushConfig(&cfg.AutoSideBrush)
 	return &cfg, nil
 }
 
@@ -348,6 +359,13 @@ func validateNightVisionConfig(cfg *NightVisionConfig) error {
 		cfg.GPIOChip = "gpiochip0"
 	}
 	return nil
+}
+
+func validateAutoSideBrushConfig(cfg *AutoSideBrushConfig) {
+	if cfg.Speed == 0 {
+		return
+	}
+	cfg.Speed = clampInt(cfg.Speed, -127, 127)
 }
 
 func derivePublishURL(serverURL, streamName string, port int) (string, error) {
