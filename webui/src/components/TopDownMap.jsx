@@ -262,17 +262,51 @@ function WheelVisual({ cx, cy, current, drop, overcurrent, label }) {
 }
 
 function SideBrushVisual({ cx, cy, current, overcurrent }) {
-  const mag = Math.abs(current);
+  var mag = Math.abs(current);
+  if (mag < 10) mag = 0;
   const color = currentColor(current * 3, overcurrent);
-  const armLength = 42;
-  const spinDuration = mag > 0 ? 0.65 : null;
+  const armLength = 43;
+  const groupRef = React.useRef(null);
+  const speedRef = React.useRef(0);
+  const targetSpeedRef = React.useRef(0);
+  const angleRef = React.useRef(0);
+  const lastTimeRef = React.useRef(null);
+  const direction = -1;
+
+  React.useEffect(() => {
+    const baseSpeed = mag > 0 ? (2 * Math.PI) / 0.65 : 0;
+    targetSpeedRef.current = direction * baseSpeed;
+  }, [mag, direction]);
+
+  React.useEffect(() => {
+    let rafId = null;
+    const tick = (time) => {
+      if (lastTimeRef.current == null) {
+        lastTimeRef.current = time;
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+      const dt = (time - lastTimeRef.current) / 1000;
+      lastTimeRef.current = time;
+      const tau = 0.2; // smooth start/stop time constant
+      const alpha = 1 - Math.exp(-dt / tau);
+      speedRef.current += (targetSpeedRef.current - speedRef.current) * alpha;
+      angleRef.current += speedRef.current * dt;
+      if (groupRef.current) {
+        const deg = ((angleRef.current * 180) / Math.PI) % 360;
+        groupRef.current.setAttribute('transform', `rotate(${deg} ${cx} ${cy})`);
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      lastTimeRef.current = null;
+    };
+  }, [cx, cy]);
+
   return (
-    <g
-      style={{
-        transformOrigin: `${cx}px ${cy}px`,
-        animation: spinDuration ? `spin ${spinDuration}s linear infinite` : 'none',
-      }}
-    >
+    <g ref={groupRef}>
       <circle cx={cx} cy={cy} r={10} fill="#64748b" stroke="#64748b" strokeWidth="1" />
       {[0, 120, 240].map((deg) => {
         const rad = toRad(deg);
