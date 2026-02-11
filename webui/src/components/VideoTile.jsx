@@ -5,7 +5,7 @@ import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 import { useChat } from '../context/ChatContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
-import DiscordInviteButton from './DiscordInviteButton.jsx';
+import SocialButton from './SocialButton.jsx';
 
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
@@ -61,6 +61,7 @@ export default function VideoTile({
   isActiveDriver = false,
   idleSkipSeconds = null,
 }) {
+  const { session } = useSession();
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const restartTimer = useRef(null);
@@ -110,6 +111,13 @@ export default function VideoTile({
   const overlayMotors = overcurrentMotors.length ? overcurrentMotors : limiterActive ? ['limiter'] : [];
   const overlayFill = limiterFill ?? (overcurrentMotors.length ? 1 : 0);
   const overlayVisible = Boolean(overlayMotors.length);
+  const discordUrl =
+    session?.socials?.find((entry) => {
+      const key = String(entry?.id || entry?.label || '').toLowerCase();
+      return key === 'discord';
+    })?.url ||
+    session?.discord?.invite ||
+    null;
 
   useEffect(() => {
     if (!debugHud) return;
@@ -471,7 +479,11 @@ export default function VideoTile({
             >
               <div className="text-center">{qualityNotice}</div>
               <div className="pointer-events-auto mt-0">
-                <DiscordInviteButton text={'Join our Discord server while you wait!'} />
+                <SocialButton
+                  id="discord"
+                  label="Join our Discord server while you wait!"
+                  url={discordUrl}
+                />
               </div>
             </div>
           </div>

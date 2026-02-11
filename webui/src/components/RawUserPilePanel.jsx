@@ -3,8 +3,7 @@ import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSocket } from '../context/SocketContext.jsx';
 import NicknameForm from './NicknameForm.jsx';
-import DiscordInviteButton from './DiscordInviteButton.jsx';
-import KoFiButton from './KoFiButton.jsx';
+import SocialButtonsGrid from './SocialButtonsGrid.jsx';
 
 function roleColors(role) {
   switch (role) {
@@ -97,10 +96,7 @@ export default function RawUserPilePanel({
                 <NicknameForm compact={compact} />
               </div>
             </div>
-            <div className="grid gap-0.5 sm:grid-cols-2 md:grid-cols-1">
-              <DiscordInviteButton />
-              <KoFiButton />
-            </div>
+            <SocialButtonsGrid />
           </div>
           {!canSetNickname && <p className="text-xs text-slate-500">Spectators cannot set nicknames.</p>}
         </div>

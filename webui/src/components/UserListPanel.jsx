@@ -3,8 +3,7 @@ import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSocket } from '../context/SocketContext.jsx';
 import NicknameForm from './NicknameForm.jsx';
-import DiscordInviteButton from './DiscordInviteButton.jsx';
-import KoFiButton from './KoFiButton.jsx';
+import SocialButtonsGrid from './SocialButtonsGrid.jsx';
 
 export function NicknameEntryPanel({ compact = false }) {
   return (
@@ -19,10 +18,7 @@ export function NicknameEntryPanel({ compact = false }) {
 export function LinkButtonsPanel() {
   return (
     <section className="panel-section flex h-full min-h-0 flex-col gap-0.5 text-base">
-      <div className="grid flex-1 min-h-0 gap-0.5 grid-rows-2">
-        <DiscordInviteButton className="h-full" />
-        <KoFiButton className="h-full" />
-      </div>
+      <SocialButtonsGrid className="flex-1 min-h-0" />
     </section>
   );
 }
@@ -185,10 +181,7 @@ export default function UserListPanel({
                 <NicknameForm compact={compact} />
               </div>
             </div>
-            <div className="grid gap-0.5 sm:grid-cols-2 md:grid-cols-1">
-              <DiscordInviteButton />
-              <KoFiButton />
-            </div>
+            <SocialButtonsGrid />
           </div>
           {!canSetNickname && <p className="text-xs text-slate-500">Spectators cannot set nicknames.</p>}
         </div>

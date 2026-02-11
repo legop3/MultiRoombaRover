@@ -127,6 +127,30 @@ body {
     background-size: 800% 800%;
     animation: rainbowBG 240s ease infinite;
   }
+
+  .wiki-animate-bg {
+    background: linear-gradient(
+      270deg,
+      #14b8a6,
+      #38bdf8,
+      #22d3ee,
+      #14b8a6
+    );
+    background-size: 700% 700%;
+    animation: rainbowBG 240s ease infinite;
+  }
+
+  .throne-animate-bg {
+    background: linear-gradient(
+      270deg,
+      #f59e0b,
+      #fbbf24,
+      #fde68a,
+      #f59e0b
+    );
+    background-size: 700% 700%;
+    animation: rainbowBG 240s ease infinite;
+  }
 }
 
 @layer utilities {

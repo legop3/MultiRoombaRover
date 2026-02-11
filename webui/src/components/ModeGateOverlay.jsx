@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import AuthPanel from './AuthPanel.jsx';
 import { useSession } from '../context/SessionContext.jsx';
-import DiscordInviteButton from './DiscordInviteButton.jsx';
+import SocialButton from './SocialButton.jsx';
 import ChatPanel from './ChatPanel.jsx';
 import NicknameForm from './NicknameForm.jsx';
 
@@ -31,6 +31,13 @@ export default function ModeGateOverlay() {
   const reason = session?.adminReason?.text || '';
   const reasonUpdatedAt = session?.adminReason?.updatedAt || null;
   const timezone = session?.timezone || 'UTC';
+  const discordUrl =
+    session?.socials?.find((entry) => {
+      const key = String(entry?.id || entry?.label || '').toLowerCase();
+      return key === 'discord';
+    })?.url ||
+    session?.discord?.invite ||
+    null;
   const restricted = RESTRICTED_MODES.has(mode);
   const privileged = mode === 'lockdown' ? LOCKDOWN_ROLES.has(role) : PRIVILEGED_ROLES.has(role);
   const [now, setNow] = useState(() => new Date());
@@ -81,8 +88,12 @@ export default function ModeGateOverlay() {
         <div className="surface-muted">
           <AuthPanel />
         </div>
-        <div className='w-full justify-center items-center'>
-          <DiscordInviteButton text='Join our Discord server for updates!'/>
+        <div className="w-full justify-center items-center">
+          <SocialButton
+            id="discord"
+            label="Join our Discord server for updates!"
+            url={discordUrl}
+          />
         </div>
         You can still use the chat while the server is locked:
         {/* set max height of this box */}

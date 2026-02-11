@@ -47,3 +47,17 @@ discord:
   roles:
     announcementPing: "123456789012345678"
     adminPing: "123456789012345678"
+
+socials:
+  - id: "discord"
+    label: "Discord"
+    url: "https://discord.gg/your-invite"
+  - id: "kofi"
+    label: "Ko-fi"
+    url: "https://ko-fi.com/your-handle"
+  - id: "wiki"
+    label: "Wiki"
+    url: "https://wiki.example.com"
+  - id: "throne"
+    label: "Throne"
+    url: "https://throne.me/yourname"

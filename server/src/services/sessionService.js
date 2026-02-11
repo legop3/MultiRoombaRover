@@ -22,8 +22,10 @@ const config = loadConfig();
 const discordInvite = config.discord?.invite || null;
 const kofiLink = config.kofi?.link || null;
 const serverTimezone = config.timezone || null;
+const configuredSocials = Array.isArray(config.socials) ? config.socials : null;
 logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configured');
 logger.info('Ko-fi link loaded:', kofiLink ? 'present' : 'not configured');
+logger.info('Socials config loaded:', configuredSocials?.length ? `${configuredSocials.length} entries` : 'not configured');
 
 const ACTIVITY_SYNC_COOLDOWN_MS = 3000;
 const NIGHT_VISION_SYNC_COOLDOWN_MS = 1000;
@@ -49,6 +51,13 @@ function buildSession(socket) {
   const users = Array.from(io.sockets.sockets.values())
     .map((sock) => buildUserEntry(sock))
     .filter(Boolean);
+  const socials =
+    configuredSocials?.length
+      ? configuredSocials
+      : [
+          ...(discordInvite ? [{ id: 'discord', label: 'Discord', url: discordInvite }] : []),
+          ...(kofiLink ? [{ id: 'kofi', label: 'Ko-fi', url: kofiLink }] : []),
+        ];
   return {
     socketId: socket?.id || null,
     role: getRole(socket),
@@ -66,6 +75,7 @@ function buildSession(socket) {
     communityGoal: getCommunityGoal(),
     adminReason: getAdminReason(),
     users,
+    socials,
     discord: {
       invite: discordInvite,
     },
