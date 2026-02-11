@@ -52,7 +52,7 @@ function InfoColumn({
     >
       <BatteryBar
         visual={batteryVisual}
-        orientation="vertical"
+        orientation={isActiveView ? 'vertical' : 'horizontal'}
         variant="background"
       />
       {isActiveView ? (
