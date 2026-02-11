@@ -9,6 +9,8 @@ import VideoTile from '../components/VideoTile.jsx';
 import TopDownMap from '../components/TopDownMap.jsx';
 import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
+import BatteryBar from '../components/BatteryBar.jsx';
+import { buildBatteryVisual } from '../lib/battery.js';
 
 const ROTATE_MS = 20000;
 const HARD_REFRESH_MS = 1 * 60 * 60 * 1000;
@@ -22,28 +24,10 @@ function formatDriverLabel({ roverId, session }) {
   return mode === 'turns' && turnInfo?.current ? `${label}` : label;
 }
 
-function getBatteryPercent({ rover, frame }) {
-  const percentDisplay = rover?.batteryState?.percentDisplay;
-  if (percentDisplay != null && Number.isFinite(percentDisplay)) {
-    return Math.round(percentDisplay);
-  }
-  const config = rover?.battery ?? null;
+function getBatteryVisual({ rover, frame }) {
   const charge = frame?.sensors?.batteryChargeMah ?? null;
-  const full = config?.Full ?? null;
-  const warn = config?.Warn ?? null;
-  if (charge == null || full == null || warn == null) return null;
-  const span = full - warn;
-  if (span <= 0) return null;
-  const normalized = (charge - warn) / span;
-  return Math.round(Math.max(0, Math.min(1, normalized)) * 100);
-}
-
-function getBatteryFillClass({ rover }) {
-  const urgentActive = rover?.batteryState?.urgentActive ?? false;
-  const warnActive = rover?.batteryState?.warnActive ?? false;
-  if (urgentActive) return 'bg-red-500/40';
-  if (warnActive) return 'bg-amber-400/40';
-  return 'bg-emerald-400/40';
+  const config = rover?.battery ?? null;
+  return buildBatteryVisual({ batteryState: rover?.batteryState ?? null, charge, config });
 }
 
 function InfoColumn({
@@ -57,22 +41,20 @@ function InfoColumn({
   showPreview = true,
   variant = 'stacked',
 }) {
-  const batteryPercent = getBatteryPercent({ rover, frame });
-  const batteryFillClass = getBatteryFillClass({ rover });
+  const batteryVisual = getBatteryVisual({ rover, frame });
+  const batteryPercent = batteryVisual?.available ? batteryVisual.percentDisplay : null;
   const isActiveView = variant === 'active';
-  const batteryFillStyle = isActiveView
-    ? { height: `${batteryPercent == null ? 0 : batteryPercent}%`, bottom: 0, top: 'auto' }
-    : { width: `${batteryPercent == null ? 0 : batteryPercent}%` };
-  const batteryFillClassName = isActiveView
-    ? `pointer-events-none absolute bottom-0 left-0 right-0 ${batteryFillClass}`
-    : `pointer-events-none absolute left-0 top-0 bottom-0 ${batteryFillClass}`;
   return (
     <div
       className={`relative flex min-w-0 flex-1 flex-col gap-4 overflow-hidden bg-black px-0 py-0 ${
         withDivider ? 'border-r border-slate-700/60' : ''
       }`}
     >
-      <div className={batteryFillClassName} style={batteryFillStyle} />
+      <BatteryBar
+        visual={batteryVisual}
+        orientation="vertical"
+        variant="background"
+      />
       {isActiveView ? (
         <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-between text-center">
           <div className="min-w-0 bg-transparent px-0 py-0 leading-none">

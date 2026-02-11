@@ -196,6 +196,14 @@ function computeBatteryState(record, sensors) {
   if (percent != null) {
     percent = Math.max(0, Math.min(1, percent));
   }
+  const percentDisplay = computeBatteryDisplayPercent({
+    charge,
+    full,
+    warn,
+    urgent,
+    percent,
+    capacity,
+  });
   return {
     charge,
     capacity,
@@ -203,11 +211,39 @@ function computeBatteryState(record, sensors) {
     warn,
     urgent,
     percent,
-    percentDisplay: percent == null ? null : Math.round(percent * 100),
+    percentDisplay,
     warnActive: Boolean(warn != null && charge != null && charge <= warn),
     urgentActive: Boolean(urgent != null && charge != null && charge <= urgent),
     updatedAt: Date.now(),
   };
+}
+
+function computeBatteryDisplayPercent({ charge, full, warn, urgent, percent, capacity }) {
+  if (
+    charge != null &&
+    full != null &&
+    warn != null &&
+    urgent != null &&
+    full > warn &&
+    warn > urgent
+  ) {
+    if (charge <= urgent) return 0;
+    if (charge <= warn) {
+      const t = (charge - urgent) / (warn - urgent);
+      return Math.round(Math.max(0, Math.min(1, t)) * 10);
+    }
+    if (charge >= full) return 100;
+    const t = (charge - warn) / (full - warn);
+    return Math.round((0.1 + Math.max(0, Math.min(1, t)) * 0.9) * 100);
+  }
+  if (percent != null && Number.isFinite(percent)) {
+    return Math.round(Math.max(0, Math.min(1, percent)) * 100);
+  }
+  if (charge != null && capacity != null && capacity > 0) {
+    const fallback = charge / capacity;
+    return Math.round(Math.max(0, Math.min(1, fallback)) * 100);
+  }
+  return null;
 }
 
 function handleSensorFrame(roverId, frame) {

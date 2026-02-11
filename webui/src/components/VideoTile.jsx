@@ -6,36 +6,12 @@ import { useChat } from '../context/ChatContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import SocialButton from './SocialButton.jsx';
+import BatteryBar from './BatteryBar.jsx';
+import { buildBatteryVisual } from '../lib/battery.js';
 
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 const AUDIO_RETRY_MS = 3000;
-
-function buildBatteryVisual(charge, config) {
-  const full = config?.Full;
-  const warn = config?.Warn;
-  const urgent = config?.Urgent ?? null;
-  if (charge == null || full == null || warn == null) {
-    return { available: false };
-  }
-
-  const span = full - warn;
-  if (span <= 0) return { available: false };
-  const normalized = (charge - warn) / span;
-  const percent = Math.min(1, Math.max(0, normalized));
-  const percentDisplay = Math.round(percent * 100);
-  const depleted = normalized <= 0;
-  const warnTriggered = urgent != null && charge <= urgent;
-  const barClass = depleted ? 'bg-red-500 animate-pulse' : warnTriggered ? 'bg-amber-400' : 'bg-emerald-500';
-
-  return {
-    available: true,
-    percentDisplay,
-    depleted,
-    warnTriggered,
-    barClass,
-  };
-}
 
 export default function VideoTile({
   sessionInfo,
@@ -83,7 +59,7 @@ export default function VideoTile({
   const effectiveHudMapPosition = mobileHud ? 'top-right' : hudMapPosition;
   const [showHudMapDesktop, setShowHudMapDesktop] = useHudMapSetting();
   const showHudMap = hudForceMap ? true : mobileHud ? true : showHudMapDesktop;
-  const batteryVisual = buildBatteryVisual(batteryCharge, batteryConfig);
+  const batteryVisual = buildBatteryVisual({ charge: batteryCharge, config: batteryConfig });
   // console.log('[BatteryBarDebug]', {
   //   frameSensors: sensors,
   //   batteryCharge,
@@ -466,9 +442,17 @@ export default function VideoTile({
           </div>
         ) : null}
         {!noHud ? <OvercurrentOverlay motors={overlayMotors} fill={overlayFill} compact={mobileHud} /> : null}
-        {!noHud ? <LowBatteryOverlay charge={batteryCharge} config={batteryConfig} compact={mobileHud} /> : null}
+        {!noHud ? <LowBatteryOverlay battery={batteryVisual} compact={mobileHud} /> : null}
         {!noHud && showVerticalBattery && batteryVisual.available ? (
-          <BatteryBarVertical visual={batteryVisual} />
+          <div className="pointer-events-none absolute right-1 top-1/2 flex h-[70%] -translate-y-1/2 flex-col items-center justify-center rounded bg-black/60 px-0.5 pb-1 pt-1">
+            <BatteryBar
+              visual={batteryVisual}
+              orientation="vertical"
+              variant="inline"
+              compact={mobileHud}
+              className="h-full w-4"
+            />
+          </div>
         ) : null}
         {!noHud && qualityNotice ? (
           <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2">
@@ -492,48 +476,11 @@ export default function VideoTile({
       {!noHud && !showVerticalBattery && (
         <div className="space-y-0.5">
           <LightBumpBars sensors={sensors} />
-          <BatteryBar visual={batteryVisual} />
+          <div className="panel-section space-y-0.5 text-sm">
+            <BatteryBar visual={batteryVisual} compact={mobileHud} />
+          </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function BatteryBar({ visual }) {
-  if (!visual?.available) {
-    return (
-      <div className="panel-section space-y-0.5 text-sm">
-        <p className="text-xs text-slate-500">Battery telemetry unavailable</p>
-      </div>
-    );
-  }
-  const percentText = `${visual.percentDisplay}%`;
-  const barClass = visual.barClass;
-  return (
-    <div className="panel-section space-y-0.5 text-sm">
-      <div className="relative h-4 w-full bg-zinc-900 flex">
-        <div className={`h-full transition-[width] ${barClass}`} style={{ width: `${visual.percentDisplay}%` }}>
-          <span className="inset-0 flex items-center justify-center text-xs font-semibold text-black/80">
-            Battery {percentText}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BatteryBarVertical({ visual }) {
-  if (!visual?.available) return null;
-  const percentText = `${visual.percentDisplay}%`;
-  return (
-    <div className="pointer-events-none absolute right-1 top-1/2 flex h-[70%] -translate-y-1/2 flex-col items-center justify-end rounded bg-black/60 px-0.5 pb-1 pt-1">
-      <div className="flex h-full w-4 items-end overflow-hidden rounded bg-zinc-900">
-        <div
-          className={`${visual.barClass} w-full transition-[height]`}
-          style={{ height: `${visual.percentDisplay}%` }}
-        />
-      </div>
-      <span className="mt-0 text-[0.65rem] font-semibold text-slate-100">{percentText}</span>
     </div>
   );
 }
@@ -828,20 +775,13 @@ function OvercurrentOverlay({ motors, fill = 0, compact = false }) {
 }
 
 // low battery overlay, change text based on warn / urgent. use percentage calculated same as BatteryBar. change text based on warn or urgent.
-function LowBatteryOverlay({ charge, config, compact = false }) {
-  if (charge == null || config == null) return null;
-  const full = config.Full;
-  const warn = config.Warn;
-  const urgent = config.Urgent ?? null;
-  const span = full - warn;
-  if (span <= 0) return null;
-  const normalized = (charge - warn) / span;
-  const percent = Math.min(1, Math.max(0, normalized));
-  const depleted = normalized <= 0;
-  const warnTriggered = urgent != null && charge <= urgent;
-  if (!warnTriggered && !depleted) return null;
+function LowBatteryOverlay({ battery, compact = false }) {
+  if (!battery?.available) return null;
+  if (!battery.warnActive && !battery.urgentActive) return null;
 
-  const message = depleted ? 'Battery low! please dock and charge the rover soon.' : 'BATTERY VERY LOW, PLEASE DOCK THE ROVER AND CHARGE IMMEDIATELY!!';
+  const message = battery.urgentActive
+    ? 'BATTERY VERY LOW, DOCK THE ROVER AND CHARGE IMMEDIATELY!!'
+    : 'Battery low! please dock and charge the rover soon.';
 
   const containerClass = compact ? 'p-2 top-6' : 'p-4 top-10';
   const textClass = compact ? 'text-sm' : 'text-2xl';

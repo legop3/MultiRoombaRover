@@ -78,6 +78,36 @@ body {
 }
 
 @layer utilities {
+  @keyframes batteryTickWarn {
+    0%,
+    49% {
+      background-color: rgba(255, 255, 255, 0.95);
+    }
+    50%,
+    100% {
+      background-color: rgba(239, 68, 68, 0.95);
+    }
+  }
+
+  .battery-tick-warn {
+    animation: batteryTickWarn 0.4s steps(2, end) infinite;
+  }
+
+  @keyframes batteryUrgentFlash {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0.25;
+    }
+  }
+
+  .battery-urgent-flash {
+    animation: batteryUrgentFlash 0.4s steps(2, end) infinite;
+  }
+
   .no-touch-select {
     user-select: none;
     -webkit-user-select: none;
