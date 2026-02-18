@@ -21,6 +21,7 @@ const SessionContext = createContext({
   setCommunityGoal: async () => {},
   setAdminReason: async () => {},
   rebootRover: async () => {},
+  rebootServer: async () => {},
 });
 
 function useAckEmitter(socket) {
@@ -120,6 +121,7 @@ export function SessionProvider({ children }) {
       setAdminReason: (text) => emitWithAck('adminReason:set', { text }),
       rebootRover: (roverId) =>
         emitWithAck('command', { roverId, type: 'reboot', data: { reboot: {} } }),
+      rebootServer: () => emitWithAck('server:reboot'),
       pushAlert: (alert) =>
         setAlerts((prev) => [
           ...prev.slice(-49),

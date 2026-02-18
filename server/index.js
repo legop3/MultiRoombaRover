@@ -18,6 +18,7 @@ require('./src/services/assignmentService');
 require('./src/services/nicknameService');
 require('./src/services/chatService');
 require('./src/services/communityGoalService');
+require('./src/services/serverControlService');
 require('./src/services/videoSessions');
 require('./src/services/videoAuthService');
 require('./src/services/videoSocketService');

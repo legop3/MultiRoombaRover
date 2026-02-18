@@ -10,11 +10,21 @@ const MODES = [
 ];
 
 export default function AdminPanel() {
-  const { session, lockRover, setMode, requestControl, setCommunityGoal, setAdminReason, rebootRover, adminLogs } =
-    useSession();
+  const {
+    session,
+    lockRover,
+    setMode,
+    requestControl,
+    setCommunityGoal,
+    setAdminReason,
+    rebootRover,
+    rebootServer,
+    adminLogs,
+  } = useSession();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
   const [rebootStates, setRebootStates] = useState({});
+  const [serverRebooting, setServerRebooting] = useState(false);
   const health = session?.health || null;
   const currentGoal = session?.communityGoal?.text || '';
   const goalUpdatedAt = session?.communityGoal?.updatedAt || null;
@@ -67,6 +77,18 @@ export default function AdminPanel() {
       alert(err.message);
     } finally {
       setRebootStates((prev) => ({ ...prev, [rover.id]: false }));
+    }
+  };
+
+  const handleServerReboot = async () => {
+    const ok = window.confirm('Reboot the server host now? This will disconnect all users.');
+    if (!ok) return;
+    setServerRebooting(true);
+    try {
+      await rebootServer();
+    } catch (err) {
+      alert(err.message);
+      setServerRebooting(false);
     }
   };
 
@@ -131,6 +153,16 @@ export default function AdminPanel() {
             </option>
           ))}
         </select>
+      </div>
+      <div className="flex gap-0.5 text-xs">
+        <button
+          type="button"
+          onClick={handleServerReboot}
+          disabled={serverRebooting}
+          className="button-danger disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {serverRebooting ? 'Server rebooting...' : 'Reboot Server'}
+        </button>
       </div>
       <div className="space-y-0.5">
         <div className="flex items-center justify-between text-xs text-slate-400">
