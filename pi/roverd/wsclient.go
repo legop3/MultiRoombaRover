@@ -217,9 +217,52 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 			slot = clampInt(*msg.Song.Slot, 0, 4)
 		}
 		return c.adapter.PlaySong(slot, msg.Song.Notes)
+	case msg.Reboot != nil || msg.Type == "reboot":
+		return c.handleRebootCommand(msg.Reboot)
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
 	}
+}
+
+func (c *WSClient) handleRebootCommand(payload *rebootPayload) error {
+	if err := c.adapter.DriveDirect(0, 0); err != nil {
+		return fmt.Errorf("stop drive before reboot: %w", err)
+	}
+	if err := c.adapter.MotorPWM(0, 0, 0); err != nil {
+		return fmt.Errorf("stop aux motors before reboot: %w", err)
+	}
+	if err := c.adapter.StartOI(); err != nil {
+		return fmt.Errorf("enter passive mode before reboot: %w", err)
+	}
+
+	delay := 300 * time.Millisecond
+	if payload != nil && payload.DelayMs > 0 {
+		delay = time.Duration(clampInt(payload.DelayMs, 50, 5000)) * time.Millisecond
+	}
+
+	c.connMu.Lock()
+	if c.rebootIssued {
+		c.connMu.Unlock()
+		return fmt.Errorf("reboot already pending")
+	}
+	c.rebootIssued = true
+	c.connMu.Unlock()
+
+	c.emitEvent("system.rebooting", map[string]any{
+		"source":  "remoteCommand",
+		"delayMs": delay.Milliseconds(),
+	})
+
+	go func() {
+		time.Sleep(delay)
+		c.log.Printf("rebooting pi after remote reboot command")
+		cmd := exec.Command("systemctl", "reboot")
+		if err := cmd.Start(); err != nil {
+			c.log.Printf("reboot command failed: %v", err)
+		}
+	}()
+
+	return nil
 }
 
 func (c *WSClient) applyAutoSideBrush(left, right int) {

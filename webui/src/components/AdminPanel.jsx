@@ -10,9 +10,11 @@ const MODES = [
 ];
 
 export default function AdminPanel() {
-  const { session, lockRover, setMode, requestControl, setCommunityGoal, setAdminReason, adminLogs } = useSession();
+  const { session, lockRover, setMode, requestControl, setCommunityGoal, setAdminReason, rebootRover, adminLogs } =
+    useSession();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
+  const [rebootStates, setRebootStates] = useState({});
   const health = session?.health || null;
   const currentGoal = session?.communityGoal?.text || '';
   const goalUpdatedAt = session?.communityGoal?.updatedAt || null;
@@ -51,6 +53,20 @@ export default function AdminPanel() {
       await requestControl(roverId, { force: true });
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  const handleReboot = async (rover) => {
+    if (!rover?.id) return;
+    const ok = window.confirm(`Reboot rover "${rover.name || rover.id}" now?`);
+    if (!ok) return;
+    setRebootStates((prev) => ({ ...prev, [rover.id]: true }));
+    try {
+      await rebootRover(rover.id);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRebootStates((prev) => ({ ...prev, [rover.id]: false }));
     }
   };
 
@@ -175,6 +191,14 @@ export default function AdminPanel() {
             </button>
             <button type="button" onClick={() => handleForceControl(rover.id)} className="button-dark">
               Force
+            </button>
+            <button
+              type="button"
+              onClick={() => handleReboot(rover)}
+              disabled={Boolean(rebootStates[rover.id])}
+              className="button-danger disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {rebootStates[rover.id] ? 'Rebooting...' : 'Reboot'}
             </button>
           </div>
         )}

@@ -20,6 +20,7 @@ const SessionContext = createContext({
   triggerReplay: async () => {},
   setCommunityGoal: async () => {},
   setAdminReason: async () => {},
+  rebootRover: async () => {},
 });
 
 function useAckEmitter(socket) {
@@ -117,6 +118,8 @@ export function SessionProvider({ children }) {
       triggerReplay: (sources = []) => emitWithAck('replay:trigger', { sources }),
       setCommunityGoal: (text) => emitWithAck('communityGoal:set', { text }),
       setAdminReason: (text) => emitWithAck('adminReason:set', { text }),
+      rebootRover: (roverId) =>
+        emitWithAck('command', { roverId, type: 'reboot', data: { reboot: {} } }),
       pushAlert: (alert) =>
         setAlerts((prev) => [
           ...prev.slice(-49),

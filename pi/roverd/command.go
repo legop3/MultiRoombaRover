@@ -31,6 +31,7 @@ type inboundMessage struct {
 	Horn         *hornPayload         `json:"horn,omitempty"`
 	NightVision  *nightVisionPayload  `json:"nightVision,omitempty"`
 	Song         *songPayload         `json:"song,omitempty"`
+	Reboot       *rebootPayload       `json:"reboot,omitempty"`
 }
 
 type driveDirectPayload struct {
@@ -85,6 +86,10 @@ type songPayload struct {
 type songNote struct {
 	Note     int `json:"note"`
 	Duration int `json:"duration"`
+}
+
+type rebootPayload struct {
+	DelayMs int `json:"delayMs,omitempty"`
 }
 
 type ackMessage struct {

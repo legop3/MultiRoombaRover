@@ -64,12 +64,19 @@ io.on('connection', (socket) => {
       if (!roverId) {
         throw new Error('roverId required');
       }
+      if (!type) {
+        throw new Error('type required');
+      }
       const payload = data ? { ...data } : {};
+      const isRebootCommand = type === 'reboot';
       const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));
-      if (!isSongCommand && !roverManager.canDrive(roverId, socket)) {
+      const isAdminSocket = isAdmin(socket);
+      if (isRebootCommand && !isAdminSocket) {
+        throw new Error('Not authorized');
+      }
+      if (!isSongCommand && !isRebootCommand && !roverManager.canDrive(roverId, socket)) {
         throw new Error('Not your turn or no control');
       }
-      const isAdminSocket = isAdmin(socket);
       const driveDirect = payload?.driveDirect;
       if (type === 'drive' && driveDirect && !isAdminSocket) {
         const left = Number(driveDirect.left);
