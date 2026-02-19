@@ -7,7 +7,6 @@ import MobileControls, {
   MobileRightColumn,
 } from './components/MobileControls.jsx';
 import { ControlSystemProvider, KeyboardInputManager, GamepadInputManager } from './controls/index.js';
-import { SettingsProvider } from './settings/index.js';
 import RoomCameraPanel from './components/RoomCameraPanel.jsx';
 import LogPanel from './components/LogPanel.jsx';
 import DriverVideoPanel from './components/DriverVideoPanel.jsx';
@@ -173,9 +172,7 @@ function App() {
 
   return (
     <div className={`bg-black text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
-      <SettingsProvider>
-        <AppWithProviders layout={layout} isDesktop={isDesktop} fullscreen={fullscreen} />
-      </SettingsProvider>
+      <AppWithProviders layout={layout} isDesktop={isDesktop} fullscreen={fullscreen} />
     </div>
   );
 }

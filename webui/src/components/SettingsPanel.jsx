@@ -11,6 +11,7 @@ import SocketLogPanel from './SocketLogPanel.jsx';
 import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSocket } from '../context/SocketContext.jsx';
+import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -32,7 +33,16 @@ export default function SettingsPanel() {
     hudMapDesktop: false,
     connectionTransport: 'websocket',
   });
+  const { value: audioSettings, save: saveAudioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const connectionTransport = pageSettings?.connectionTransport || 'websocket';
+  const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
+  const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
+  const roverVolume = Number.isFinite(audioSettings?.roverVolume) ? audioSettings.roverVolume : AUDIO_SETTINGS_DEFAULTS.roverVolume;
+  const autoLevelEnabled =
+    typeof audioSettings?.autoLevelEnabled === 'boolean'
+      ? audioSettings.autoLevelEnabled
+      : AUDIO_SETTINGS_DEFAULTS.autoLevelEnabled;
+  const autoLevelMode = audioSettings?.autoLevelMode === 'duck' ? 'duck' : 'compressor';
 
   const sensorButtons = useMemo(
     () => [
@@ -54,6 +64,22 @@ export default function SettingsPanel() {
     socket.io.opts.transports = next === 'polling' ? ['polling'] : ['websocket', 'polling'];
     socket.disconnect();
     socket.connect();
+  };
+
+  const handleAudioRange = (key) => (event) => {
+    const raw = Number(event.target.value);
+    const next = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0;
+    saveAudioSettings((current) => ({ ...(current ?? {}), [key]: next }));
+  };
+
+  const handleAutoLevelEnabled = (event) => {
+    const checked = Boolean(event.target.checked);
+    saveAudioSettings((current) => ({ ...(current ?? {}), autoLevelEnabled: checked }));
+  };
+
+  const handleAutoLevelMode = (event) => {
+    const next = event.target.value === 'duck' ? 'duck' : 'compressor';
+    saveAudioSettings((current) => ({ ...(current ?? {}), autoLevelMode: next }));
   };
   return (
     <Tabs defaultTab="keybindings">
@@ -88,6 +114,78 @@ export default function SettingsPanel() {
                 <span>Show top-down map in HUD (desktop)</span>
               </label>
               <p className="text-xs text-slate-500">Mobile HUD keeps the map on by default.</p>
+            </section>
+            <section className="panel-section space-y-0.5 text-sm">
+              <p className="text-slate-400">Audio</p>
+              <label className="grid gap-0.5 text-slate-200">
+                <div className="flex items-center justify-between gap-0.5">
+                  <span>Master volume</span>
+                  <span className="text-xs text-slate-400">{Math.round(masterVolume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={masterVolume}
+                  onChange={handleAudioRange('masterVolume')}
+                  className="w-full accent-emerald-500"
+                />
+              </label>
+              <label className="grid gap-0.5 text-slate-200">
+                <div className="flex items-center justify-between gap-0.5">
+                  <span>Alert/page sounds</span>
+                  <span className="text-xs text-slate-400">{Math.round(alertVolume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={alertVolume}
+                  onChange={handleAudioRange('alertVolume')}
+                  className="w-full accent-emerald-500"
+                />
+              </label>
+              <label className="grid gap-0.5 text-slate-200">
+                <div className="flex items-center justify-between gap-0.5">
+                  <span>Rover audio</span>
+                  <span className="text-xs text-slate-400">{Math.round(roverVolume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={roverVolume}
+                  onChange={handleAudioRange('roverVolume')}
+                  className="w-full accent-emerald-500"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-0.5 text-slate-200">
+                <span>Auto-level rover audio</span>
+                <input
+                  type="checkbox"
+                  className="accent-emerald-500"
+                  checked={autoLevelEnabled}
+                  onChange={handleAutoLevelEnabled}
+                />
+              </label>
+              <label className="flex items-center justify-between gap-0.5 text-slate-200">
+                <span>Auto-level mode</span>
+                <select
+                  value={autoLevelMode}
+                  onChange={handleAutoLevelMode}
+                  className="field-input text-sm"
+                  disabled={!autoLevelEnabled}
+                >
+                  <option value="compressor">Compressor (preferred)</option>
+                  <option value="duck">Brush/vacuum ducking</option>
+                </select>
+              </label>
+              <p className="text-xs text-slate-500">
+                Compressor evens out incoming audio; ducking lowers volume when cleaning motors are active.
+              </p>
             </section>
             <section className="panel-section space-y-0.5 text-sm">
               <p className="text-slate-400">Connection</p>

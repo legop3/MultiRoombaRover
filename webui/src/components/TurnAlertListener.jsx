@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useRef } from 'react';
 import turnSound from '../assets/turn_alert.mp3';
 import { useSession } from '../context/SessionContext.jsx';
+import { useSettingsNamespace } from '../settings/index.js';
+import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 
-function useAudio(src) {
+function useAudio(src, volume = 1) {
   const audioRef = useRef(null);
   useEffect(() => {
     audioRef.current = new Audio(src);
+    audioRef.current.volume = volume;
     audioRef.current.load();
-  }, [src]);
+  }, [src, volume]);
   const play = () => {
     if (!audioRef.current) return;
+    audioRef.current.volume = volume;
     audioRef.current.currentTime = 0;
     audioRef.current.play().catch(() => {});
   };
@@ -18,7 +22,11 @@ function useAudio(src) {
 
 export default function TurnAlertListener() {
   const { session, pushAlert } = useSession();
-  const playSound = useAudio(turnSound);
+  const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
+  const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
+  const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
+  const effectiveAlertVolume = Math.max(0, Math.min(1, masterVolume * alertVolume));
+  const playSound = useAudio(turnSound, effectiveAlertVolume);
   const seenRoversRef = useRef(new Set());
 
   const assignments = useMemo(() => session?.turnQueues || {}, [session?.turnQueues]);

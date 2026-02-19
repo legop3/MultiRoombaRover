@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { SettingsProvider } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
 import { useTelemetryFrames } from '../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
@@ -410,12 +409,10 @@ export default function MiniSummaryApp() {
   }, []);
 
   return (
-    <SettingsProvider>
-      <>
-        <MiniSummaryContent />
-        <AlertFeed scale={3} />
-      </>
-    </SettingsProvider>
+    <>
+      <MiniSummaryContent />
+      <AlertFeed scale={3} />
+    </>
   );
 }
 

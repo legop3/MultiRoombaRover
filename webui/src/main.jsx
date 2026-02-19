@@ -9,21 +9,24 @@ import { TelemetryProvider } from './context/TelemetryContext.jsx'
 import { ChatProvider } from './context/ChatContext.jsx'
 import SpectatorApp from './spectate/SpectatorApp.jsx'
 import MiniSummaryApp from './mini/MiniSummaryApp.jsx'
+import { SettingsProvider } from './settings/index.js'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <SocketProvider>
       <SessionProvider>
         <TelemetryProvider>
-          <ChatProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<App />} />
-                <Route path="/spectate" element={<SpectatorApp />} />
-                <Route path="/mini" element={<MiniSummaryApp />} />
-              </Routes>
-            </BrowserRouter>
-          </ChatProvider>
+          <SettingsProvider>
+            <ChatProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<App />} />
+                  <Route path="/spectate" element={<SpectatorApp />} />
+                  <Route path="/mini" element={<MiniSummaryApp />} />
+                </Routes>
+              </BrowserRouter>
+            </ChatProvider>
+          </SettingsProvider>
         </TelemetryProvider>
       </SessionProvider>
     </SocketProvider>

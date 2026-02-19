@@ -5,6 +5,7 @@ import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 import { useChat } from '../context/ChatContext.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
+import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 import SocialButton from './SocialButton.jsx';
 import BatteryBar from './BatteryBar.jsx';
 import { buildBatteryVisual } from '../lib/battery.js';
@@ -12,6 +13,9 @@ import { buildBatteryVisual } from '../lib/battery.js';
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 const AUDIO_RETRY_MS = 3000;
+const AUDIO_DUCK_FACTOR = 0.55;
+const BRUSH_CURRENT_THRESHOLD_MA = 40;
+const COMPRESSOR_REDUCTION_ACTIVE_DB = -0.75;
 
 export default function VideoTile({
   sessionInfo,
@@ -44,15 +48,34 @@ export default function VideoTile({
   const audioRestartTimer = useRef(null);
   const audioPlayInterval = useRef(null);
   const unmuteTimer = useRef(null);
+  const audioContextRef = useRef(null);
+  const audioSourceNodeRef = useRef(null);
+  const audioCompressorRef = useRef(null);
+  const audioGainRef = useRef(null);
+  const reductionPollRef = useRef(null);
+  const graphFailedRef = useRef(false);
   const [status, setStatus] = useState('idle');
   const [detail, setDetail] = useState(null);
   const [audioStatus, setAudioStatus] = useState('idle');
   const [audioDetail, setAudioDetail] = useState(null);
+  const [levelIndicator, setLevelIndicator] = useState(null);
   const [restartToken, setRestartToken] = useState(0);
   const [audioRestartToken, setAudioRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
   const usingSnapshot = videoMode === 'snapshot';
   const sensors = telemetryFrame?.sensors;
+  const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
+  const masterVolume = Number.isFinite(audioSettings?.masterVolume)
+    ? audioSettings.masterVolume
+    : AUDIO_SETTINGS_DEFAULTS.masterVolume;
+  const roverVolume = Number.isFinite(audioSettings?.roverVolume)
+    ? audioSettings.roverVolume
+    : AUDIO_SETTINGS_DEFAULTS.roverVolume;
+  const autoLevelEnabled = typeof audioSettings?.autoLevelEnabled === 'boolean'
+    ? audioSettings.autoLevelEnabled
+    : AUDIO_SETTINGS_DEFAULTS.autoLevelEnabled;
+  const autoLevelMode = audioSettings?.autoLevelMode === 'duck' ? 'duck' : 'compressor';
+  const baseRoverGain = Math.max(0, Math.min(1, masterVolume * roverVolume));
   const batteryCharge = sensors?.batteryChargeMah ?? null;
   const desktopLayout = layoutFormat === 'desktop';
   const mobileHud = !desktopLayout;
@@ -87,6 +110,14 @@ export default function VideoTile({
   const overlayMotors = overcurrentMotors.length ? overcurrentMotors : limiterActive ? ['limiter'] : [];
   const overlayFill = limiterFill ?? (overcurrentMotors.length ? 1 : 0);
   const overlayVisible = Boolean(overlayMotors.length);
+  const brushOrVacuumActive = Boolean(
+    (Number(sensors?.mainBrushCurrentMa) || 0) > BRUSH_CURRENT_THRESHOLD_MA ||
+      (Number(sensors?.sideBrushCurrentMa) || 0) > BRUSH_CURRENT_THRESHOLD_MA ||
+      sensors?.wheelOvercurrents?.mainBrush ||
+      sensors?.wheelOvercurrents?.sideBrush,
+  );
+  const duckGain = autoLevelEnabled && autoLevelMode === 'duck' && brushOrVacuumActive ? AUDIO_DUCK_FACTOR : 1;
+  const effectiveRoverGain = Math.max(0, Math.min(1, baseRoverGain * duckGain));
   const discordUrl =
     session?.socials?.find((entry) => {
       const key = String(entry?.id || entry?.label || '').toLowerCase();
@@ -115,6 +146,50 @@ export default function VideoTile({
   const scheduleAudioRestart = useCallback(() => {
     clearTimeout(audioRestartTimer.current);
     audioRestartTimer.current = setTimeout(() => setAudioRestartToken(Date.now()), RESTART_DELAY_MS);
+  }, []);
+  const ensureAudioGraph = useCallback(() => {
+    if (graphFailedRef.current) return false;
+    const audioEl = audioRef.current;
+    if (!audioEl || typeof window === 'undefined' || typeof window.AudioContext !== 'function') {
+      return false;
+    }
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new window.AudioContext();
+      }
+      const ctx = audioContextRef.current;
+      if (!audioSourceNodeRef.current) {
+        audioSourceNodeRef.current = ctx.createMediaElementSource(audioEl);
+      }
+      if (!audioCompressorRef.current) {
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.value = -25;
+        compressor.knee.value = 20;
+        compressor.ratio.value = 5;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.25;
+        audioCompressorRef.current = compressor;
+      }
+      if (!audioGainRef.current) {
+        audioGainRef.current = ctx.createGain();
+      }
+      audioSourceNodeRef.current.disconnect();
+      audioCompressorRef.current.disconnect();
+      audioGainRef.current.disconnect();
+      audioSourceNodeRef.current.connect(audioCompressorRef.current);
+      audioCompressorRef.current.connect(audioGainRef.current);
+      audioGainRef.current.connect(ctx.destination);
+      return true;
+    } catch {
+      graphFailedRef.current = true;
+      return false;
+    }
+  }, []);
+
+  const resumeAudioContext = useCallback(async () => {
+    const ctx = audioContextRef.current;
+    if (!ctx || ctx.state !== 'suspended') return;
+    await ctx.resume().catch(() => {});
   }, []);
 
   const ensurePlayback = useCallback(async () => {
@@ -168,6 +243,13 @@ export default function VideoTile({
       clearTimeout(audioRestartTimer.current);
       clearTimeout(unmuteTimer.current);
       clearInterval(audioPlayInterval.current);
+      clearInterval(reductionPollRef.current);
+      audioSourceNodeRef.current?.disconnect?.();
+      audioCompressorRef.current?.disconnect?.();
+      audioGainRef.current?.disconnect?.();
+      if (audioContextRef.current?.state && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+      }
     },
     [],
   );
@@ -231,6 +313,72 @@ export default function VideoTile({
     }
   }, [status, sessionInfo?.url, scheduleRestart]);
 
+  useEffect(() => {
+    const audioEl = audioRef.current;
+    clearInterval(reductionPollRef.current);
+    reductionPollRef.current = null;
+    if (!audioEl || !audioSessionInfo?.url) {
+      setLevelIndicator(null);
+      return;
+    }
+
+    const compressorMode = autoLevelEnabled && autoLevelMode === 'compressor';
+    const duckMode = autoLevelEnabled && autoLevelMode === 'duck';
+    const graphReady = compressorMode && ensureAudioGraph();
+
+    if (graphReady) {
+      const compressor = audioCompressorRef.current;
+      const gainNode = audioGainRef.current;
+      audioEl.volume = 1;
+      if (gainNode) {
+        gainNode.gain.value = effectiveRoverGain;
+      }
+      if (compressor) {
+        compressor.threshold.value = -25;
+        compressor.knee.value = 20;
+        compressor.ratio.value = 5;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.25;
+      }
+      resumeAudioContext();
+      reductionPollRef.current = setInterval(() => {
+        const reduction = compressor?.reduction;
+        if (typeof reduction === 'number' && reduction <= COMPRESSOR_REDUCTION_ACTIVE_DB) {
+          setLevelIndicator(`Level: ${Math.round(Math.abs(reduction))}dB`);
+        } else {
+          setLevelIndicator(null);
+        }
+      }, 180);
+      return;
+    }
+
+    const hasGraph = Boolean(audioSourceNodeRef.current && audioGainRef.current);
+    audioEl.volume = hasGraph ? 1 : effectiveRoverGain;
+    if (audioCompressorRef.current) {
+      audioCompressorRef.current.threshold.value = 0;
+      audioCompressorRef.current.knee.value = 0;
+      audioCompressorRef.current.ratio.value = 1;
+      audioCompressorRef.current.attack.value = 0.003;
+      audioCompressorRef.current.release.value = 0.25;
+    }
+    if (audioGainRef.current) {
+      audioGainRef.current.gain.value = effectiveRoverGain;
+    }
+    if (duckMode && brushOrVacuumActive) {
+      setLevelIndicator('Level: ducking');
+    } else {
+      setLevelIndicator(null);
+    }
+  }, [
+    audioSessionInfo?.url,
+    autoLevelEnabled,
+    autoLevelMode,
+    brushOrVacuumActive,
+    effectiveRoverGain,
+    ensureAudioGraph,
+    resumeAudioContext,
+  ]);
+
   // Audio-only WHEP (no pausing/muting; keeps trying to play)
   useEffect(() => {
     if (!audioSessionInfo?.url || !audioRef.current) {
@@ -251,6 +399,7 @@ export default function VideoTile({
         return nextStatus;
       });
       if (nextStatus === 'playing') {
+        resumeAudioContext();
         audioRef.current?.play().catch(() => {});
       }
       if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
@@ -277,7 +426,7 @@ export default function VideoTile({
       active = false;
       player?.stop();
     };
-  }, [audioSessionInfo?.url, audioSessionInfo?.token, audioRestartToken, scheduleAudioRestart]);
+  }, [audioSessionInfo?.url, audioSessionInfo?.token, audioRestartToken, scheduleAudioRestart, resumeAudioContext]);
 
   // Keep nudging the audio element to play in case autoplay was blocked.
   useEffect(() => {
@@ -292,10 +441,11 @@ export default function VideoTile({
       return undefined;
     }
 
-    const attemptPlay = () => {
+    const attemptPlay = async () => {
       const target = audioRef.current;
       if (!target) return;
       if (!target.paused && !target.ended) return;
+      await resumeAudioContext();
       target
         .play()
         .then(() => {
@@ -311,7 +461,7 @@ export default function VideoTile({
     audioPlayInterval.current = setInterval(attemptPlay, AUDIO_RETRY_MS);
 
     return () => clearInterval(audioPlayInterval.current);
-  }, [audioSessionInfo?.url, audioStatus]);
+  }, [audioSessionInfo?.url, audioStatus, resumeAudioContext]);
 
   // Reflect audio element events back into status/detail so the HUD stays accurate.
   useEffect(() => {
@@ -423,6 +573,7 @@ export default function VideoTile({
             label={label}
             status={renderedStatus}
             audioStatus={renderedAudioStatus}
+            levelStatus={levelIndicator}
             desktopLayout={desktopLayout}
             layoutFormat={layoutFormat}
             variant={hudVariant}
@@ -537,6 +688,7 @@ function HudOverlay({
   label,
   status,
   audioStatus,
+  levelStatus,
   desktopLayout = true,
   layoutFormat = 'desktop',
   variant = 'default',
@@ -626,6 +778,7 @@ function HudOverlay({
           <div className="flex flex-col gap-0.5 leading-none">
             <span>Status: {status}</span>
             {audioStatus ? <span>Audio: {audioStatus}</span> : null}
+            {levelStatus ? <span className="text-cyan-300">{levelStatus}</span> : null}
           </div>
         </div>
           <div
@@ -682,6 +835,7 @@ function HudOverlay({
         <div className="flex flex-col gap-0.5 leading-none">
           <span>Status: {status}</span>
           {audioStatus ? <span>Audio: {audioStatus}</span> : null}
+          {levelStatus ? <span className="text-cyan-300">{levelStatus}</span> : null}
         </div>
       </div>
       {turnTimerText ? (

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { SettingsProvider } from '../settings/index.js';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSpectatorMode } from '../hooks/useSpectatorMode.js';
 import { useTelemetryFrames } from '../context/TelemetryContext.jsx';
@@ -222,9 +221,5 @@ function SpectatorContent() {
 }
 
 export default function SpectatorApp() {
-  return (
-    <SettingsProvider>
-      <SpectatorContent />
-    </SettingsProvider>
-  );
+  return <SpectatorContent />;
 }

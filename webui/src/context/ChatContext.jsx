@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useSocket } from './SocketContext.jsx';
 import { useSession } from './SessionContext.jsx';
 import messageSound from '../assets/message.mp3';
+import { useSettingsNamespace } from '../settings/index.js';
+import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 
 const ChatContext = createContext({
   messages: [],
@@ -21,6 +23,7 @@ const ChatContext = createContext({
 export function ChatProvider({ children }) {
   const socket = useSocket();
   const { session, pushAlert } = useSession();
+  const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const [messages, setMessages] = useState([]);
   const [typing, setTyping] = useState([]);
   const [isChatFocused, setIsChatFocused] = useState(false);
@@ -30,6 +33,9 @@ export function ChatProvider({ children }) {
   const typingRef = useRef(new Map());
   const typingAlertRef = useRef(new Map());
   const typingStateRef = useRef({ isTyping: false, lastSent: 0 });
+  const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
+  const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
+  const effectiveAlertVolume = Math.max(0, Math.min(1, masterVolume * alertVolume));
 
   const rebuildTyping = useCallback(() => {
     const entries = Array.from(typingRef.current.values())
@@ -49,15 +55,17 @@ export function ChatProvider({ children }) {
 
   useEffect(() => {
     audioRef.current = new Audio(messageSound);
+    audioRef.current.volume = effectiveAlertVolume;
     audioRef.current.load();
-  }, []);
+  }, [effectiveAlertVolume]);
 
   const playSound = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    audio.volume = effectiveAlertVolume;
     audio.currentTime = 0;
     audio.play().catch(() => {});
-  }, []);
+  }, [effectiveAlertVolume]);
 
   useEffect(() => {
     function handleMessage(payload = {}) {
