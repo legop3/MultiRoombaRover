@@ -291,6 +291,7 @@ export default function VideoTile({
       url: sessionInfo.url,
       token: sessionInfo.token,
       video: videoRef.current,
+      receiveAudio: !hasDedicatedAudio,
       onStatus: handleStatus,
     });
 
@@ -306,7 +307,7 @@ export default function VideoTile({
       clearTimeout(resetMuteId);
       player?.stop();
     };
-  }, [usingSnapshot, sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback]);
+  }, [usingSnapshot, sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback, hasDedicatedAudio]);
 
   useEffect(() => {
     if (status === 'stopped' && sessionInfo?.url) {
@@ -330,7 +331,8 @@ export default function VideoTile({
     if (graphReady) {
       const compressor = audioCompressorRef.current;
       const gainNode = audioGainRef.current;
-      audioEl.volume = 1;
+      // Keep element output at zero; audio should come only from WebAudio graph.
+      audioEl.volume = 0;
       if (gainNode) {
         gainNode.gain.value = effectiveRoverGain;
       }
@@ -354,7 +356,7 @@ export default function VideoTile({
     }
 
     const hasGraph = Boolean(audioSourceNodeRef.current && audioGainRef.current);
-    audioEl.volume = hasGraph ? 1 : effectiveRoverGain;
+    audioEl.volume = hasGraph ? 0 : effectiveRoverGain;
     if (audioCompressorRef.current) {
       audioCompressorRef.current.threshold.value = 0;
       audioCompressorRef.current.knee.value = 0;

@@ -27,11 +27,12 @@ function buildAuthHeader(token) {
 }
 
 export class WhepPlayer {
-  constructor({ url, token, video, onStatus, audioOnly = false }) {
+  constructor({ url, token, video, onStatus, audioOnly = false, receiveAudio = true }) {
     this.url = url;
     this.token = token;
     this.video = video;
     this.audioOnly = audioOnly;
+    this.receiveAudio = receiveAudio;
     this.pc = null;
     this.abortController = null;
     this.onStatus = onStatus;
@@ -78,7 +79,9 @@ export class WhepPlayer {
       pc.addTransceiver('audio', { direction: 'recvonly' });
     } else {
       pc.addTransceiver('video', { direction: 'recvonly' });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
+      if (this.receiveAudio) {
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+      }
     }
 
     pc.onconnectionstatechange = () => {
@@ -93,7 +96,7 @@ export class WhepPlayer {
 
     try {
       const offer = await pc.createOffer({
-        offerToReceiveAudio: true,
+        offerToReceiveAudio: this.audioOnly ? true : this.receiveAudio,
         offerToReceiveVideo: !this.audioOnly,
       });
       await pc.setLocalDescription(offer);
