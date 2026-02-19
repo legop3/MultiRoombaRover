@@ -62,6 +62,7 @@ export default function VideoTile({
   const [restartToken, setRestartToken] = useState(0);
   const [audioRestartToken, setAudioRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
+  const hasDedicatedAudio = Boolean(audioSessionInfo?.url);
   const usingSnapshot = videoMode === 'snapshot';
   const sensors = telemetryFrame?.sensors;
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
@@ -205,7 +206,7 @@ export default function VideoTile({
 
   const attemptUnmute = useCallback(
     (delay = 0) => {
-      if (forceMute) return;
+      if (forceMute || hasDedicatedAudio) return;
       clearTimeout(unmuteTimer.current);
 
       const scheduleRetry = () => {
@@ -234,7 +235,7 @@ export default function VideoTile({
 
       unmuteTimer.current = setTimeout(tryPlay, delay);
     },
-    [ensurePlayback, forceMute],
+    [ensurePlayback, forceMute, hasDedicatedAudio],
   );
 
   useEffect(
@@ -400,7 +401,11 @@ export default function VideoTile({
       });
       if (nextStatus === 'playing') {
         resumeAudioContext();
-        audioRef.current?.play().catch(() => {});
+        const target = audioRef.current;
+        if (target) {
+          target.muted = false;
+          target.play().catch(() => {});
+        }
       }
       if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
         scheduleAudioRestart();
@@ -444,6 +449,7 @@ export default function VideoTile({
     const attemptPlay = async () => {
       const target = audioRef.current;
       if (!target) return;
+      target.muted = false;
       if (!target.paused && !target.ended) return;
       await resumeAudioContext();
       target
@@ -550,7 +556,7 @@ export default function VideoTile({
         ) : (
           <video
             ref={videoRef}
-            muted={forceMute || muted}
+            muted={forceMute || muted || hasDedicatedAudio}
             playsInline
             autoPlay
             controls={false}

@@ -93,7 +93,7 @@ export const HORN_SETTINGS_DEFAULTS = {
 
 export const AUDIO_SETTINGS_DEFAULTS = {
   masterVolume: 1,
-  alertVolume: 0.3,
+  alertVolume: 0.5,
   roverVolume: 1,
   autoLevelEnabled: true,
   autoLevelMode: 'compressor',
