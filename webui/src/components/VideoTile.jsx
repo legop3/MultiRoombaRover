@@ -16,6 +16,13 @@ const AUDIO_RETRY_MS = 3000;
 const AUDIO_DUCK_FACTOR = 0.55;
 const BRUSH_CURRENT_THRESHOLD_MA = 40;
 const COMPRESSOR_REDUCTION_ACTIVE_DB = -0.75;
+const COMPRESSOR_SETTINGS = {
+  threshold: -30,
+  knee: 10,
+  ratio: 8,
+  attack: 0.002,
+  release: 0.18,
+};
 
 export default function VideoTile({
   sessionInfo,
@@ -164,11 +171,11 @@ export default function VideoTile({
       }
       if (!audioCompressorRef.current) {
         const compressor = ctx.createDynamicsCompressor();
-        compressor.threshold.value = -25;
-        compressor.knee.value = 20;
-        compressor.ratio.value = 5;
-        compressor.attack.value = 0.003;
-        compressor.release.value = 0.25;
+        compressor.threshold.value = COMPRESSOR_SETTINGS.threshold;
+        compressor.knee.value = COMPRESSOR_SETTINGS.knee;
+        compressor.ratio.value = COMPRESSOR_SETTINGS.ratio;
+        compressor.attack.value = COMPRESSOR_SETTINGS.attack;
+        compressor.release.value = COMPRESSOR_SETTINGS.release;
         audioCompressorRef.current = compressor;
       }
       if (!audioGainRef.current) {
@@ -337,17 +344,19 @@ export default function VideoTile({
         gainNode.gain.value = effectiveRoverGain;
       }
       if (compressor) {
-        compressor.threshold.value = -25;
-        compressor.knee.value = 20;
-        compressor.ratio.value = 5;
-        compressor.attack.value = 0.003;
-        compressor.release.value = 0.25;
+        compressor.threshold.value = COMPRESSOR_SETTINGS.threshold;
+        compressor.knee.value = COMPRESSOR_SETTINGS.knee;
+        compressor.ratio.value = COMPRESSOR_SETTINGS.ratio;
+        compressor.attack.value = COMPRESSOR_SETTINGS.attack;
+        compressor.release.value = COMPRESSOR_SETTINGS.release;
       }
       resumeAudioContext();
       reductionPollRef.current = setInterval(() => {
         const reduction = compressor?.reduction;
         if (typeof reduction === 'number' && reduction <= COMPRESSOR_REDUCTION_ACTIVE_DB) {
-          setLevelIndicator(`Level: ${Math.round(Math.abs(reduction))}dB`);
+          const amount = Math.round(Math.abs(reduction) * 10) / 10;
+          const formatted = Number.isInteger(amount) ? amount.toFixed(0) : amount.toFixed(1);
+          setLevelIndicator(`Level: ${formatted}dB`);
         } else {
           setLevelIndicator(null);
         }
