@@ -420,7 +420,9 @@ export default function VideoTile({
       return;
     }
 
-    const compressorMode = autoLevelEnabled && autoLevelMode === 'compressor';
+    // Phase 1 stabilization: bypass WebAudio compressor path and use plain media element audio.
+    // This restores the known-good autoplay/retry behavior while we isolate Chrome-specific issues.
+    const compressorMode = false;
     const duckMode = autoLevelEnabled && autoLevelMode === 'duck';
     const graphReady = compressorMode && ensureAudioGraph();
 
