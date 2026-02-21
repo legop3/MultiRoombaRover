@@ -68,6 +68,7 @@ export default function VideoTile({
   const [audioStatus, setAudioStatus] = useState('idle');
   const [audioDetail, setAudioDetail] = useState(null);
   const [levelIndicator, setLevelIndicator] = useState(null);
+  const [compressorActive, setCompressorActive] = useState(false);
   const [restartToken, setRestartToken] = useState(0);
   const [audioRestartToken, setAudioRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
@@ -415,26 +416,26 @@ export default function VideoTile({
     clearInterval(reductionPollRef.current);
     reductionPollRef.current = null;
     if (!audioEl || !audioSessionInfo?.url) {
+      setCompressorActive(false);
       setLevelIndicator(null);
       logAudio('route/no-audio-url');
       return;
     }
 
-    // Phase 1 stabilization: bypass WebAudio compressor path and use plain media element audio.
-    // This restores the known-good autoplay/retry behavior while we isolate Chrome-specific issues.
-    const compressorMode = false;
+    const compressorMode = autoLevelEnabled && autoLevelMode === 'compressor';
     const duckMode = autoLevelEnabled && autoLevelMode === 'duck';
-    const graphReady = compressorMode && ensureAudioGraph();
+    const graphReady = compressorMode ? ensureAudioGraph() : false;
 
     if (graphReady) {
       const compressor = audioCompressorRef.current;
       const gainNode = audioGainRef.current;
       const contextRunning = audioContextRef.current?.state === 'running';
-      // Keep direct element audio until WebAudio is actually running in Chrome.
-      audioEl.volume = contextRunning ? 0 : effectiveRoverGain;
-      logAudio('route/graph', { contextRunning, elementVolume: audioEl.volume });
+      const canActivate = Boolean(contextRunning && compressorActive);
+      // Strict gating: graph-only output only after context is running and compressor is explicitly activated.
+      audioEl.volume = canActivate ? 0 : effectiveRoverGain;
+      logAudio('route/graph', { contextRunning, canActivate, elementVolume: audioEl.volume });
       if (gainNode) {
-        const graphGain = contextRunning
+        const graphGain = canActivate
           ? Math.max(0, Math.min(4, effectiveRoverGain * COMPRESSOR_MAKEUP_GAIN))
           : 0;
         gainNode.gain.value = graphGain;
@@ -447,25 +448,29 @@ export default function VideoTile({
         compressor.attack.value = COMPRESSOR_SETTINGS.attack;
         compressor.release.value = COMPRESSOR_SETTINGS.release;
       }
-      resumeAudioContext();
-      reductionPollRef.current = setInterval(() => {
-        if (audioContextRef.current?.state !== 'running') {
-          setLevelIndicator(null);
-          return;
-        }
-        const reduction = compressor?.reduction;
-        if (typeof reduction === 'number' && reduction <= COMPRESSOR_REDUCTION_ACTIVE_DB) {
-          const amount = Math.round(Math.abs(reduction) * 10) / 10;
-          const formatted = Number.isInteger(amount) ? amount.toFixed(0) : amount.toFixed(1);
-          setLevelIndicator(`Level: ${formatted}dB`);
-          logAudio('compressor/reduction', { reduction, formatted });
-        } else {
-          setLevelIndicator(null);
-        }
-      }, 180);
+      if (canActivate) {
+        reductionPollRef.current = setInterval(() => {
+          if (audioContextRef.current?.state !== 'running') {
+            setLevelIndicator(null);
+            return;
+          }
+          const reduction = compressor?.reduction;
+          if (typeof reduction === 'number' && reduction <= COMPRESSOR_REDUCTION_ACTIVE_DB) {
+            const amount = Math.round(Math.abs(reduction) * 10) / 10;
+            const formatted = Number.isInteger(amount) ? amount.toFixed(0) : amount.toFixed(1);
+            setLevelIndicator(`Level: ${formatted}dB`);
+            logAudio('compressor/reduction', { reduction, formatted });
+          } else {
+            setLevelIndicator(null);
+          }
+        }, 180);
+      } else {
+        setLevelIndicator(null);
+      }
       return;
     }
 
+    setCompressorActive(false);
     audioEl.volume = effectiveRoverGain;
     logAudio('route/direct', { elementVolume: audioEl.volume, duckMode, brushOrVacuumActive });
     if (audioCompressorRef.current) {
@@ -489,9 +494,9 @@ export default function VideoTile({
     autoLevelEnabled,
     autoLevelMode,
     brushOrVacuumActive,
+    compressorActive,
     effectiveRoverGain,
     ensureAudioGraph,
-    resumeAudioContext,
     logAudio,
   ]);
 
@@ -517,11 +522,6 @@ export default function VideoTile({
       });
       if (nextStatus === 'playing') {
         resumeAudioContext();
-        const target = audioRef.current;
-        if (target) {
-          target.muted = false;
-          target.play().then(() => logAudio('audio/play-ok')).catch((err) => logAudio('audio/play-fail', { error: err?.message }));
-        }
       }
       if (['error', 'failed'].includes(nextStatus)) {
         scheduleAudioRestart();
@@ -573,9 +573,18 @@ export default function VideoTile({
       const target = audioRef.current;
       if (!target) return;
       target.muted = false;
+      const wantCompressor = autoLevelEnabled && autoLevelMode === 'compressor';
+      if (wantCompressor) {
+        ensureAudioGraph();
+        await resumeAudioContext();
+        const running = audioContextRef.current?.state === 'running';
+        if (running && !compressorActive) {
+          setCompressorActive(true);
+          logAudio('compressor/activated');
+        }
+      }
       if (!target.paused && !target.ended) return;
       logAudio('retry/play-attempt');
-      await resumeAudioContext();
       target
         .play()
         .then(() => {
@@ -593,7 +602,16 @@ export default function VideoTile({
     audioPlayInterval.current = setInterval(attemptPlay, AUDIO_RETRY_MS);
 
     return () => clearInterval(audioPlayInterval.current);
-  }, [audioSessionInfo?.url, audioStatus, resumeAudioContext, logAudio]);
+  }, [
+    audioSessionInfo?.url,
+    audioStatus,
+    autoLevelEnabled,
+    autoLevelMode,
+    compressorActive,
+    ensureAudioGraph,
+    resumeAudioContext,
+    logAudio,
+  ]);
 
   // Reflect audio element events back into status/detail so the HUD stays accurate.
   useEffect(() => {
