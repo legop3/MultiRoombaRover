@@ -323,6 +323,7 @@ export default function VideoTile({
       return undefined;
     }
     const unlock = () => {
+      if (audioContextRef.current?.state === 'running') return;
       logAudio('unlock/gesture');
       forceUnlockCompressorAudio();
     };
@@ -586,7 +587,7 @@ export default function VideoTile({
           target.play().then(() => logAudio('audio/play-ok')).catch((err) => logAudio('audio/play-fail', { error: err?.message }));
         }
       }
-      if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
+      if (['error', 'failed'].includes(nextStatus)) {
         scheduleAudioRestart();
       }
     };
