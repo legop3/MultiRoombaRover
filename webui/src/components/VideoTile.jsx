@@ -14,6 +14,7 @@ const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 const AUDIO_RETRY_MS = 3000;
 const BRUSH_CURRENT_THRESHOLD_MA = 40;
+const DUCK_RELEASE_FADE_MS = 1000;
 
 export default function VideoTile({
   sessionInfo,
@@ -46,6 +47,8 @@ export default function VideoTile({
   const audioRestartTimer = useRef(null);
   const audioPlayInterval = useRef(null);
   const unmuteTimer = useRef(null);
+  const volumeFadeFrameRef = useRef(null);
+  const appliedVolumeRef = useRef(null);
   const [status, setStatus] = useState('idle');
   const [detail, setDetail] = useState(null);
   const [audioStatus, setAudioStatus] = useState('idle');
@@ -268,6 +271,10 @@ export default function VideoTile({
       clearTimeout(audioRestartTimer.current);
       clearTimeout(unmuteTimer.current);
       clearInterval(audioPlayInterval.current);
+      if (volumeFadeFrameRef.current) {
+        cancelAnimationFrame(volumeFadeFrameRef.current);
+        volumeFadeFrameRef.current = null;
+      }
     },
     [],
   );
@@ -337,11 +344,40 @@ export default function VideoTile({
     const audioEl = audioRef.current;
     if (!audioEl || !audioSessionInfo?.url) {
       logAudio('route/no-audio-url');
+      appliedVolumeRef.current = null;
       return;
     }
-    audioEl.volume = effectiveRoverGain;
+    const targetVolume = Math.max(0, Math.min(1, effectiveRoverGain));
+    const currentVolume =
+      appliedVolumeRef.current == null
+        ? Math.max(0, Math.min(1, audioEl.volume))
+        : appliedVolumeRef.current;
+    if (volumeFadeFrameRef.current) {
+      cancelAnimationFrame(volumeFadeFrameRef.current);
+      volumeFadeFrameRef.current = null;
+    }
+    if (targetVolume > currentVolume) {
+      const startedAt = performance.now();
+      const from = currentVolume;
+      const delta = targetVolume - from;
+      const tick = (ts) => {
+        const progress = Math.min(1, (ts - startedAt) / DUCK_RELEASE_FADE_MS);
+        const next = from + delta * progress;
+        audioEl.volume = next;
+        appliedVolumeRef.current = next;
+        if (progress < 1) {
+          volumeFadeFrameRef.current = requestAnimationFrame(tick);
+        } else {
+          volumeFadeFrameRef.current = null;
+        }
+      };
+      volumeFadeFrameRef.current = requestAnimationFrame(tick);
+    } else {
+      audioEl.volume = targetVolume;
+      appliedVolumeRef.current = targetVolume;
+    }
     logAudio('route/direct', {
-      elementVolume: audioEl.volume,
+      elementVolume: targetVolume,
       duckEnabled: mainBrushDuckEnabled,
       mainBrushActive,
       duckAmount: mainBrushDuckAmount,
