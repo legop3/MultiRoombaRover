@@ -38,11 +38,15 @@ export default function SettingsPanel() {
   const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
   const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
   const roverVolume = Number.isFinite(audioSettings?.roverVolume) ? audioSettings.roverVolume : AUDIO_SETTINGS_DEFAULTS.roverVolume;
-  const autoLevelEnabled =
-    typeof audioSettings?.autoLevelEnabled === 'boolean'
+  const mainBrushDuckEnabled =
+    typeof audioSettings?.mainBrushDuckEnabled === 'boolean'
+      ? audioSettings.mainBrushDuckEnabled
+      : typeof audioSettings?.autoLevelEnabled === 'boolean'
       ? audioSettings.autoLevelEnabled
-      : AUDIO_SETTINGS_DEFAULTS.autoLevelEnabled;
-  const autoLevelMode = audioSettings?.autoLevelMode === 'duck' ? 'duck' : 'compressor';
+      : AUDIO_SETTINGS_DEFAULTS.mainBrushDuckEnabled;
+  const mainBrushDuckAmount = Number.isFinite(audioSettings?.mainBrushDuckAmount)
+    ? Math.max(0, Math.min(1, audioSettings.mainBrushDuckAmount))
+    : AUDIO_SETTINGS_DEFAULTS.mainBrushDuckAmount;
 
   const sensorButtons = useMemo(
     () => [
@@ -72,14 +76,9 @@ export default function SettingsPanel() {
     saveAudioSettings((current) => ({ ...(current ?? {}), [key]: next }));
   };
 
-  const handleAutoLevelEnabled = (event) => {
+  const handleMainBrushDuckEnabled = (event) => {
     const checked = Boolean(event.target.checked);
-    saveAudioSettings((current) => ({ ...(current ?? {}), autoLevelEnabled: checked }));
-  };
-
-  const handleAutoLevelMode = (event) => {
-    const next = event.target.value === 'duck' ? 'duck' : 'compressor';
-    saveAudioSettings((current) => ({ ...(current ?? {}), autoLevelMode: next }));
+    saveAudioSettings((current) => ({ ...(current ?? {}), mainBrushDuckEnabled: checked }));
   };
   return (
     <Tabs defaultTab="keybindings">
@@ -163,28 +162,32 @@ export default function SettingsPanel() {
                 />
               </label>
               <label className="flex items-center justify-between gap-0.5 text-slate-200">
-                <span>Auto-level rover audio</span>
+                <span>Main brush ducking</span>
                 <input
                   type="checkbox"
                   className="accent-emerald-500"
-                  checked={autoLevelEnabled}
-                  onChange={handleAutoLevelEnabled}
+                  checked={mainBrushDuckEnabled}
+                  onChange={handleMainBrushDuckEnabled}
                 />
               </label>
-              <label className="flex items-center justify-between gap-0.5 text-slate-200">
-                <span>Auto-level mode</span>
-                <select
-                  value={autoLevelMode}
-                  onChange={handleAutoLevelMode}
-                  className="field-input text-sm"
-                  disabled={!autoLevelEnabled}
-                >
-                  <option value="compressor">Compressor (preferred)</option>
-                  <option value="duck">Brush/vacuum ducking</option>
-                </select>
+              <label className="grid gap-0.5 text-slate-200">
+                <div className="flex items-center justify-between gap-0.5">
+                  <span>Main brush duck amount</span>
+                  <span className="text-xs text-slate-400">{Math.round(mainBrushDuckAmount * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={mainBrushDuckAmount}
+                  onChange={handleAudioRange('mainBrushDuckAmount')}
+                  className="w-full accent-emerald-500"
+                  disabled={!mainBrushDuckEnabled}
+                />
               </label>
               <p className="text-xs text-slate-500">
-                Compressor evens out incoming audio; ducking lowers volume when cleaning motors are active.
+                Lowers rover audio only while the main brush is running.
               </p>
             </section>
             <section className="panel-section space-y-0.5 text-sm">

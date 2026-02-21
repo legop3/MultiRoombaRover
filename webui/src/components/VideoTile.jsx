@@ -13,17 +13,7 @@ import { buildBatteryVisual } from '../lib/battery.js';
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
 const AUDIO_RETRY_MS = 3000;
-const AUDIO_DUCK_FACTOR = 0.55;
 const BRUSH_CURRENT_THRESHOLD_MA = 40;
-const COMPRESSOR_REDUCTION_ACTIVE_DB = -0.75;
-const COMPRESSOR_SETTINGS = {
-  threshold: -30,
-  knee: 10,
-  ratio: 8,
-  attack: 0.002,
-  release: 0.18,
-};
-const COMPRESSOR_MAKEUP_GAIN = 2.25;
 
 export default function VideoTile({
   sessionInfo,
@@ -56,21 +46,10 @@ export default function VideoTile({
   const audioRestartTimer = useRef(null);
   const audioPlayInterval = useRef(null);
   const unmuteTimer = useRef(null);
-  const audioContextRef = useRef(null);
-  const audioSourceNodeRef = useRef(null);
-  const audioCompressorRef = useRef(null);
-  const audioGainRef = useRef(null);
-  const audioGraphConnectedRef = useRef(false);
-  const reductionPollRef = useRef(null);
-  const graphFailedRef = useRef(false);
-  const audioInteractionSeenRef = useRef(false);
-  const lastResumeAttemptAtRef = useRef(0);
   const [status, setStatus] = useState('idle');
   const [detail, setDetail] = useState(null);
   const [audioStatus, setAudioStatus] = useState('idle');
   const [audioDetail, setAudioDetail] = useState(null);
-  const [levelIndicator, setLevelIndicator] = useState(null);
-  const [compressorActive, setCompressorActive] = useState(false);
   const [restartToken, setRestartToken] = useState(0);
   const [audioRestartToken, setAudioRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
@@ -84,10 +63,15 @@ export default function VideoTile({
   const roverVolume = Number.isFinite(audioSettings?.roverVolume)
     ? audioSettings.roverVolume
     : AUDIO_SETTINGS_DEFAULTS.roverVolume;
-  const autoLevelEnabled = typeof audioSettings?.autoLevelEnabled === 'boolean'
-    ? audioSettings.autoLevelEnabled
-    : AUDIO_SETTINGS_DEFAULTS.autoLevelEnabled;
-  const autoLevelMode = audioSettings?.autoLevelMode === 'duck' ? 'duck' : 'compressor';
+  const mainBrushDuckEnabled =
+    typeof audioSettings?.mainBrushDuckEnabled === 'boolean'
+      ? audioSettings.mainBrushDuckEnabled
+      : typeof audioSettings?.autoLevelEnabled === 'boolean'
+      ? audioSettings.autoLevelEnabled
+      : AUDIO_SETTINGS_DEFAULTS.mainBrushDuckEnabled;
+  const mainBrushDuckAmount = Number.isFinite(audioSettings?.mainBrushDuckAmount)
+    ? Math.max(0, Math.min(1, audioSettings.mainBrushDuckAmount))
+    : AUDIO_SETTINGS_DEFAULTS.mainBrushDuckAmount;
   const baseRoverGain = Math.max(0, Math.min(1, masterVolume * roverVolume));
   const batteryCharge = sensors?.batteryChargeMah ?? null;
   const desktopLayout = layoutFormat === 'desktop';
@@ -125,27 +109,29 @@ export default function VideoTile({
   const overlayMotors = overcurrentMotors.length ? overcurrentMotors : limiterActive ? ['limiter'] : [];
   const overlayFill = limiterFill ?? (overcurrentMotors.length ? 1 : 0);
   const overlayVisible = Boolean(overlayMotors.length);
-  const brushOrVacuumActive = Boolean(
+  const mainBrushActive = Boolean(
     (Number(sensors?.mainBrushCurrentMa) || 0) > BRUSH_CURRENT_THRESHOLD_MA ||
-      (Number(sensors?.sideBrushCurrentMa) || 0) > BRUSH_CURRENT_THRESHOLD_MA ||
-      sensors?.wheelOvercurrents?.mainBrush ||
-      sensors?.wheelOvercurrents?.sideBrush,
+      sensors?.wheelOvercurrents?.mainBrush,
   );
-  const duckGain = autoLevelEnabled && autoLevelMode === 'duck' && brushOrVacuumActive ? AUDIO_DUCK_FACTOR : 1;
+  const duckGain = mainBrushDuckEnabled && mainBrushActive ? 1 - mainBrushDuckAmount : 1;
   const effectiveRoverGain = Math.max(0, Math.min(1, baseRoverGain * duckGain));
+  const levelIndicator =
+    mainBrushDuckEnabled && mainBrushActive && mainBrushDuckAmount > 0
+      ? `Volume decreased ${Math.round(mainBrushDuckAmount * 1000) / 10}%`
+      : null;
   const logAudio = useCallback(
     (event, meta = {}) => {
       if (!debugAudio) return;
       const audioEl = audioRef.current;
-      const ctx = audioContextRef.current;
       const payload = {
         event,
         ts: Date.now(),
         roverLabel: label || null,
         hasDedicatedAudio,
         audioUrl: audioSessionInfo?.url || null,
-        autoLevelEnabled,
-        autoLevelMode,
+        mainBrushDuckEnabled,
+        mainBrushDuckAmount,
+        mainBrushActive,
         baseRoverGain,
         effectiveRoverGain,
         element: audioEl
@@ -156,12 +142,6 @@ export default function VideoTile({
               ended: audioEl.ended,
               readyState: audioEl.readyState,
               networkState: audioEl.networkState,
-            }
-          : null,
-        context: ctx
-          ? {
-              state: ctx.state,
-              sampleRate: ctx.sampleRate,
             }
           : null,
         ...meta,
@@ -177,8 +157,9 @@ export default function VideoTile({
       label,
       hasDedicatedAudio,
       audioSessionInfo?.url,
-      autoLevelEnabled,
-      autoLevelMode,
+      mainBrushDuckEnabled,
+      mainBrushDuckAmount,
+      mainBrushActive,
       baseRoverGain,
       effectiveRoverGain,
     ],
@@ -216,103 +197,6 @@ export default function VideoTile({
     clearTimeout(audioRestartTimer.current);
     audioRestartTimer.current = setTimeout(() => setAudioRestartToken(Date.now()), RESTART_DELAY_MS);
   }, []);
-  const ensureAudioGraph = useCallback(() => {
-    if (graphFailedRef.current) return false;
-    const audioEl = audioRef.current;
-    if (!audioEl || typeof window === 'undefined') {
-      return false;
-    }
-    try {
-      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
-      if (typeof AudioContextCtor !== 'function') {
-        return false;
-      }
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContextCtor();
-      }
-      const ctx = audioContextRef.current;
-      if (!audioSourceNodeRef.current) {
-        audioSourceNodeRef.current = ctx.createMediaElementSource(audioEl);
-      }
-      if (!audioCompressorRef.current) {
-        const compressor = ctx.createDynamicsCompressor();
-        compressor.threshold.value = COMPRESSOR_SETTINGS.threshold;
-        compressor.knee.value = COMPRESSOR_SETTINGS.knee;
-        compressor.ratio.value = COMPRESSOR_SETTINGS.ratio;
-        compressor.attack.value = COMPRESSOR_SETTINGS.attack;
-        compressor.release.value = COMPRESSOR_SETTINGS.release;
-        audioCompressorRef.current = compressor;
-        logAudio('graph/compressor-created', {
-          threshold: compressor.threshold.value,
-          knee: compressor.knee.value,
-          ratio: compressor.ratio.value,
-          attack: compressor.attack.value,
-          release: compressor.release.value,
-        });
-      }
-      if (!audioGainRef.current) {
-        audioGainRef.current = ctx.createGain();
-      }
-      if (!audioGraphConnectedRef.current) {
-        audioSourceNodeRef.current.disconnect();
-        audioCompressorRef.current.disconnect();
-        audioGainRef.current.disconnect();
-        audioSourceNodeRef.current.connect(audioCompressorRef.current);
-        audioCompressorRef.current.connect(audioGainRef.current);
-        audioGainRef.current.connect(ctx.destination);
-        audioGraphConnectedRef.current = true;
-        logAudio('graph/connected');
-      }
-      return true;
-    } catch {
-      graphFailedRef.current = true;
-      logAudio('graph/failed');
-      return false;
-    }
-  }, [logAudio]);
-
-  const resumeAudioContext = useCallback(async () => {
-    const ctx = audioContextRef.current;
-    if (!ctx || ctx.state !== 'suspended') return;
-    if (!audioInteractionSeenRef.current) {
-      logAudio('context/resume-skipped-no-interaction');
-      return;
-    }
-    const now = Date.now();
-    if (now - lastResumeAttemptAtRef.current < 800) return;
-    lastResumeAttemptAtRef.current = now;
-    logAudio('context/resume-attempt');
-    await ctx.resume().catch(() => {});
-    if (
-      ctx.state === 'running' &&
-      autoLevelEnabled &&
-      autoLevelMode === 'compressor' &&
-      audioGainRef.current
-    ) {
-      const graphGain = Math.max(0, Math.min(4, effectiveRoverGain * COMPRESSOR_MAKEUP_GAIN));
-      audioGainRef.current.gain.value = graphGain;
-      logAudio('context/gain-restored', { gain: graphGain, baseGain: effectiveRoverGain });
-    }
-    logAudio('context/resume-result');
-  }, [logAudio, autoLevelEnabled, autoLevelMode, effectiveRoverGain]);
-
-  useEffect(() => {
-    if (!audioSessionInfo?.url) return undefined;
-    const markInteraction = () => {
-      if (audioInteractionSeenRef.current) return;
-      audioInteractionSeenRef.current = true;
-      logAudio('interaction/first-user-gesture');
-      resumeAudioContext();
-    };
-    window.addEventListener('pointerdown', markInteraction, { passive: true, capture: true });
-    window.addEventListener('keydown', markInteraction, { capture: true });
-    window.addEventListener('touchstart', markInteraction, { passive: true, capture: true });
-    return () => {
-      window.removeEventListener('pointerdown', markInteraction);
-      window.removeEventListener('keydown', markInteraction);
-      window.removeEventListener('touchstart', markInteraction);
-    };
-  }, [audioSessionInfo?.url, logAudio, resumeAudioContext]);
 
   const ensurePlayback = useCallback(async () => {
     const video = videoRef.current;
@@ -365,14 +249,6 @@ export default function VideoTile({
       clearTimeout(audioRestartTimer.current);
       clearTimeout(unmuteTimer.current);
       clearInterval(audioPlayInterval.current);
-      clearInterval(reductionPollRef.current);
-      audioGraphConnectedRef.current = false;
-      audioSourceNodeRef.current?.disconnect?.();
-      audioCompressorRef.current?.disconnect?.();
-      audioGainRef.current?.disconnect?.();
-      if (audioContextRef.current?.state && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(() => {});
-      }
     },
     [],
   );
@@ -440,90 +316,23 @@ export default function VideoTile({
 
   useEffect(() => {
     const audioEl = audioRef.current;
-    clearInterval(reductionPollRef.current);
-    reductionPollRef.current = null;
     if (!audioEl || !audioSessionInfo?.url) {
-      setCompressorActive(false);
-      setLevelIndicator(null);
       logAudio('route/no-audio-url');
       return;
     }
-
-    const compressorMode = autoLevelEnabled && autoLevelMode === 'compressor';
-    const duckMode = autoLevelEnabled && autoLevelMode === 'duck';
-    const graphReady = compressorMode ? ensureAudioGraph() : false;
-
-    if (graphReady) {
-      const compressor = audioCompressorRef.current;
-      const gainNode = audioGainRef.current;
-      const contextRunning = audioContextRef.current?.state === 'running';
-      const canActivate = Boolean(contextRunning && compressorActive);
-      // Strict gating: graph-only output only after context is running and compressor is explicitly activated.
-      audioEl.volume = canActivate ? 0 : effectiveRoverGain;
-      logAudio('route/graph', { contextRunning, canActivate, elementVolume: audioEl.volume });
-      if (gainNode) {
-        const graphGain = canActivate
-          ? Math.max(0, Math.min(4, effectiveRoverGain * COMPRESSOR_MAKEUP_GAIN))
-          : 0;
-        gainNode.gain.value = graphGain;
-        logAudio('route/graph-gain', { graphGain, baseGain: effectiveRoverGain });
-      }
-      if (compressor) {
-        compressor.threshold.value = COMPRESSOR_SETTINGS.threshold;
-        compressor.knee.value = COMPRESSOR_SETTINGS.knee;
-        compressor.ratio.value = COMPRESSOR_SETTINGS.ratio;
-        compressor.attack.value = COMPRESSOR_SETTINGS.attack;
-        compressor.release.value = COMPRESSOR_SETTINGS.release;
-      }
-      if (canActivate) {
-        reductionPollRef.current = setInterval(() => {
-          if (audioContextRef.current?.state !== 'running') {
-            setLevelIndicator(null);
-            return;
-          }
-          const reduction = compressor?.reduction;
-          if (typeof reduction === 'number' && reduction <= COMPRESSOR_REDUCTION_ACTIVE_DB) {
-            const amount = Math.round(Math.abs(reduction) * 10) / 10;
-            const formatted = Number.isInteger(amount) ? amount.toFixed(0) : amount.toFixed(1);
-            setLevelIndicator(`Level: ${formatted}dB`);
-            logAudio('compressor/reduction', { reduction, formatted });
-          } else {
-            setLevelIndicator(null);
-          }
-        }, 180);
-      } else {
-        setLevelIndicator(null);
-      }
-      return;
-    }
-
-    setCompressorActive(false);
     audioEl.volume = effectiveRoverGain;
-    logAudio('route/direct', { elementVolume: audioEl.volume, duckMode, brushOrVacuumActive });
-    if (audioCompressorRef.current) {
-      audioCompressorRef.current.threshold.value = 0;
-      audioCompressorRef.current.knee.value = 0;
-      audioCompressorRef.current.ratio.value = 1;
-      audioCompressorRef.current.attack.value = 0.003;
-      audioCompressorRef.current.release.value = 0.25;
-    }
-    if (audioGainRef.current) {
-      // In direct route, silence graph output to avoid duplicate path.
-      audioGainRef.current.gain.value = 0;
-    }
-    if (duckMode && brushOrVacuumActive) {
-      setLevelIndicator('Level: ducking');
-    } else {
-      setLevelIndicator(null);
-    }
+    logAudio('route/direct', {
+      elementVolume: audioEl.volume,
+      duckEnabled: mainBrushDuckEnabled,
+      mainBrushActive,
+      duckAmount: mainBrushDuckAmount,
+    });
   }, [
     audioSessionInfo?.url,
-    autoLevelEnabled,
-    autoLevelMode,
-    brushOrVacuumActive,
-    compressorActive,
     effectiveRoverGain,
-    ensureAudioGraph,
+    mainBrushDuckEnabled,
+    mainBrushActive,
+    mainBrushDuckAmount,
     logAudio,
   ]);
 
@@ -547,9 +356,6 @@ export default function VideoTile({
         }
         return nextStatus;
       });
-      if (nextStatus === 'playing') {
-        resumeAudioContext();
-      }
       if (['error', 'failed'].includes(nextStatus)) {
         scheduleAudioRestart();
       }
@@ -579,7 +385,6 @@ export default function VideoTile({
     audioSessionInfo?.token,
     audioRestartToken,
     scheduleAudioRestart,
-    resumeAudioContext,
     logAudio,
   ]);
 
@@ -600,16 +405,6 @@ export default function VideoTile({
       const target = audioRef.current;
       if (!target) return;
       target.muted = false;
-      const wantCompressor = autoLevelEnabled && autoLevelMode === 'compressor';
-      if (wantCompressor) {
-        ensureAudioGraph();
-        await resumeAudioContext();
-        const running = audioContextRef.current?.state === 'running';
-        if (running && !compressorActive) {
-          setCompressorActive(true);
-          logAudio('compressor/activated');
-        }
-      }
       if (!target.paused && !target.ended) return;
       logAudio('retry/play-attempt');
       target
@@ -632,11 +427,6 @@ export default function VideoTile({
   }, [
     audioSessionInfo?.url,
     audioStatus,
-    autoLevelEnabled,
-    autoLevelMode,
-    compressorActive,
-    ensureAudioGraph,
-    resumeAudioContext,
     logAudio,
   ]);
 
