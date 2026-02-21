@@ -322,27 +322,6 @@ export default function VideoTile({
     if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') {
       return undefined;
     }
-    const unlock = () => {
-      if (audioContextRef.current?.state === 'running') return;
-      logAudio('unlock/gesture');
-      forceUnlockCompressorAudio();
-    };
-    window.addEventListener('pointerdown', unlock, { passive: true, capture: true });
-    window.addEventListener('touchstart', unlock, { passive: true, capture: true });
-    window.addEventListener('click', unlock, { passive: true, capture: true });
-    window.addEventListener('keydown', unlock);
-    return () => {
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('touchstart', unlock);
-      window.removeEventListener('click', unlock);
-      window.removeEventListener('keydown', unlock);
-    };
-  }, [audioSessionInfo?.url, autoLevelEnabled, autoLevelMode, forceUnlockCompressorAudio, logAudio]);
-
-  useEffect(() => {
-    if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') {
-      return undefined;
-    }
     const interval = setInterval(() => {
       const ctx = audioContextRef.current;
       const statusActive = ['connecting', 'connected', 'playing', 'paused'].includes(audioStatus);
@@ -580,7 +559,6 @@ export default function VideoTile({
       });
       if (nextStatus === 'playing') {
         resumeAudioContext();
-        forceUnlockCompressorAudio();
         const target = audioRef.current;
         if (target) {
           target.muted = false;
@@ -617,7 +595,6 @@ export default function VideoTile({
     audioRestartToken,
     scheduleAudioRestart,
     resumeAudioContext,
-    forceUnlockCompressorAudio,
     logAudio,
   ]);
 
