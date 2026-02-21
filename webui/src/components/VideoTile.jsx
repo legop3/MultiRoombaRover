@@ -158,12 +158,16 @@ export default function VideoTile({
   const ensureAudioGraph = useCallback(() => {
     if (graphFailedRef.current) return false;
     const audioEl = audioRef.current;
-    if (!audioEl || typeof window === 'undefined' || typeof window.AudioContext !== 'function') {
+    if (!audioEl || typeof window === 'undefined') {
       return false;
     }
     try {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (typeof AudioContextCtor !== 'function') {
+        return false;
+      }
       if (!audioContextRef.current) {
-        audioContextRef.current = new window.AudioContext();
+        audioContextRef.current = new AudioContextCtor();
       }
       const ctx = audioContextRef.current;
       if (!audioSourceNodeRef.current) {
@@ -199,6 +203,25 @@ export default function VideoTile({
     if (!ctx || ctx.state !== 'suspended') return;
     await ctx.resume().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') {
+      return undefined;
+    }
+    const unlock = () => {
+      resumeAudioContext();
+      const target = audioRef.current;
+      if (!target) return;
+      target.muted = false;
+      target.play().catch(() => {});
+    };
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, [audioSessionInfo?.url, autoLevelEnabled, autoLevelMode, resumeAudioContext]);
 
   const ensurePlayback = useCallback(async () => {
     const video = videoRef.current;
@@ -338,8 +361,9 @@ export default function VideoTile({
     if (graphReady) {
       const compressor = audioCompressorRef.current;
       const gainNode = audioGainRef.current;
-      // Keep element output at zero; audio should come only from WebAudio graph.
-      audioEl.volume = 0;
+      const contextRunning = audioContextRef.current?.state === 'running';
+      // If Chrome has not unlocked WebAudio yet, keep direct element volume so audio still works.
+      audioEl.volume = contextRunning ? 0 : effectiveRoverGain;
       if (gainNode) {
         gainNode.gain.value = effectiveRoverGain;
       }
@@ -352,6 +376,10 @@ export default function VideoTile({
       }
       resumeAudioContext();
       reductionPollRef.current = setInterval(() => {
+        if (audioContextRef.current?.state !== 'running') {
+          setLevelIndicator(null);
+          return;
+        }
         const reduction = compressor?.reduction;
         if (typeof reduction === 'number' && reduction <= COMPRESSOR_REDUCTION_ACTIVE_DB) {
           const amount = Math.round(Math.abs(reduction) * 10) / 10;
