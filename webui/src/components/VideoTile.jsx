@@ -133,8 +133,9 @@ export default function VideoTile({
       if (!debugAudio) return;
       const audioEl = audioRef.current;
       const ctx = audioContextRef.current;
-      console.log('[AudioDebug]', {
+      const payload = {
         event,
+        ts: Date.now(),
         roverLabel: label || null,
         hasDedicatedAudio,
         audioUrl: audioSessionInfo?.url || null,
@@ -159,7 +160,12 @@ export default function VideoTile({
             }
           : null,
         ...meta,
-      });
+      };
+      try {
+        console.log(`[AudioDebug] ${event} ${JSON.stringify(payload)}`);
+      } catch {
+        console.log('[AudioDebug]', event, payload);
+      }
     },
     [
       debugAudio,
@@ -265,25 +271,75 @@ export default function VideoTile({
     logAudio('context/resume-result');
   }, [logAudio]);
 
+  const forceUnlockCompressorAudio = useCallback(async () => {
+    if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') return;
+    const graphReady = ensureAudioGraph();
+    if (!graphReady) {
+      logAudio('unlock/no-graph');
+      return;
+    }
+    await resumeAudioContext();
+    const target = audioRef.current;
+    const gainNode = audioGainRef.current;
+    if (gainNode) {
+      gainNode.gain.value = effectiveRoverGain;
+    }
+    if (!target) {
+      logAudio('unlock/no-audio-element');
+      return;
+    }
+    // Compressor mode uses graph-only output.
+    target.volume = 0;
+    target.muted = false;
+    target
+      .play()
+      .then(() => logAudio('unlock/force-play-ok'))
+      .catch((err) => logAudio('unlock/force-play-fail', { error: err?.message }));
+  }, [
+    audioSessionInfo?.url,
+    autoLevelEnabled,
+    autoLevelMode,
+    ensureAudioGraph,
+    resumeAudioContext,
+    effectiveRoverGain,
+    logAudio,
+  ]);
+
   useEffect(() => {
     if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') {
       return undefined;
     }
     const unlock = () => {
       logAudio('unlock/gesture');
-      resumeAudioContext();
-      const target = audioRef.current;
-      if (!target) return;
-      target.muted = false;
-      target.play().then(() => logAudio('unlock/play-ok')).catch((err) => logAudio('unlock/play-fail', { error: err?.message }));
+      forceUnlockCompressorAudio();
     };
-    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('pointerdown', unlock, { passive: true, capture: true });
+    window.addEventListener('touchstart', unlock, { passive: true, capture: true });
+    window.addEventListener('click', unlock, { passive: true, capture: true });
     window.addEventListener('keydown', unlock);
     return () => {
       window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
     };
-  }, [audioSessionInfo?.url, autoLevelEnabled, autoLevelMode, resumeAudioContext, logAudio]);
+  }, [audioSessionInfo?.url, autoLevelEnabled, autoLevelMode, forceUnlockCompressorAudio, logAudio]);
+
+  useEffect(() => {
+    if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') {
+      return undefined;
+    }
+    const interval = setInterval(() => {
+      const ctx = audioContextRef.current;
+      const statusActive = ['connecting', 'connected', 'playing', 'paused'].includes(audioStatus);
+      if (!statusActive) return;
+      if (!ctx || ctx.state !== 'running') {
+        logAudio('unlock/interval');
+        forceUnlockCompressorAudio();
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [audioSessionInfo?.url, autoLevelEnabled, autoLevelMode, audioStatus, forceUnlockCompressorAudio, logAudio]);
 
   const ensurePlayback = useCallback(async () => {
     const video = videoRef.current;
@@ -426,11 +482,11 @@ export default function VideoTile({
       const compressor = audioCompressorRef.current;
       const gainNode = audioGainRef.current;
       const contextRunning = audioContextRef.current?.state === 'running';
-      // If Chrome has not unlocked WebAudio yet, keep direct element volume so audio still works.
-      audioEl.volume = contextRunning ? 0 : effectiveRoverGain;
+      // Compressor mode is graph-only: do not route direct element output.
+      audioEl.volume = 0;
       logAudio('route/graph', { contextRunning, elementVolume: audioEl.volume });
       if (gainNode) {
-        gainNode.gain.value = effectiveRoverGain;
+        gainNode.gain.value = contextRunning ? effectiveRoverGain : 0;
       }
       if (compressor) {
         compressor.threshold.value = COMPRESSOR_SETTINGS.threshold;
@@ -458,9 +514,8 @@ export default function VideoTile({
       return;
     }
 
-    const hasGraph = Boolean(audioSourceNodeRef.current && audioGainRef.current);
-    audioEl.volume = hasGraph ? 0 : effectiveRoverGain;
-    logAudio('route/direct', { hasGraph, elementVolume: audioEl.volume, duckMode, brushOrVacuumActive });
+    audioEl.volume = effectiveRoverGain;
+    logAudio('route/direct', { elementVolume: audioEl.volume, duckMode, brushOrVacuumActive });
     if (audioCompressorRef.current) {
       audioCompressorRef.current.threshold.value = 0;
       audioCompressorRef.current.knee.value = 0;
@@ -469,7 +524,8 @@ export default function VideoTile({
       audioCompressorRef.current.release.value = 0.25;
     }
     if (audioGainRef.current) {
-      audioGainRef.current.gain.value = effectiveRoverGain;
+      // In direct route, silence graph output to avoid duplicate path.
+      audioGainRef.current.gain.value = 0;
     }
     if (duckMode && brushOrVacuumActive) {
       setLevelIndicator('Level: ducking');
@@ -509,6 +565,7 @@ export default function VideoTile({
       });
       if (nextStatus === 'playing') {
         resumeAudioContext();
+        forceUnlockCompressorAudio();
         const target = audioRef.current;
         if (target) {
           target.muted = false;
@@ -539,7 +596,15 @@ export default function VideoTile({
       active = false;
       player?.stop();
     };
-  }, [audioSessionInfo?.url, audioSessionInfo?.token, audioRestartToken, scheduleAudioRestart, resumeAudioContext, logAudio]);
+  }, [
+    audioSessionInfo?.url,
+    audioSessionInfo?.token,
+    audioRestartToken,
+    scheduleAudioRestart,
+    resumeAudioContext,
+    forceUnlockCompressorAudio,
+    logAudio,
+  ]);
 
   // Keep nudging the audio element to play in case autoplay was blocked.
   useEffect(() => {
