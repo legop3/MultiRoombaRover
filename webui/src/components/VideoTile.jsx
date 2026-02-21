@@ -286,56 +286,6 @@ export default function VideoTile({
     logAudio('context/resume-result');
   }, [logAudio, autoLevelEnabled, autoLevelMode, effectiveRoverGain]);
 
-  const forceUnlockCompressorAudio = useCallback(async () => {
-    if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') return;
-    const graphReady = ensureAudioGraph();
-    if (!graphReady) {
-      logAudio('unlock/no-graph');
-      return;
-    }
-    await resumeAudioContext();
-    const target = audioRef.current;
-    const gainNode = audioGainRef.current;
-    if (gainNode) {
-      gainNode.gain.value = effectiveRoverGain;
-    }
-    if (!target) {
-      logAudio('unlock/no-audio-element');
-      return;
-    }
-    // Compressor mode uses graph-only output.
-    target.volume = 0;
-    target.muted = false;
-    target
-      .play()
-      .then(() => logAudio('unlock/force-play-ok'))
-      .catch((err) => logAudio('unlock/force-play-fail', { error: err?.message }));
-  }, [
-    audioSessionInfo?.url,
-    autoLevelEnabled,
-    autoLevelMode,
-    ensureAudioGraph,
-    resumeAudioContext,
-    effectiveRoverGain,
-    logAudio,
-  ]);
-
-  useEffect(() => {
-    if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') {
-      return undefined;
-    }
-    const interval = setInterval(() => {
-      const ctx = audioContextRef.current;
-      const statusActive = ['connecting', 'connected', 'playing', 'paused'].includes(audioStatus);
-      if (!statusActive) return;
-      if (!ctx || ctx.state !== 'running') {
-        logAudio('unlock/interval');
-        forceUnlockCompressorAudio();
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [audioSessionInfo?.url, autoLevelEnabled, autoLevelMode, audioStatus, forceUnlockCompressorAudio, logAudio]);
-
   const ensurePlayback = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -478,8 +428,8 @@ export default function VideoTile({
       const compressor = audioCompressorRef.current;
       const gainNode = audioGainRef.current;
       const contextRunning = audioContextRef.current?.state === 'running';
-      // Compressor mode is graph-only: do not route direct element output.
-      audioEl.volume = 0;
+      // Keep direct element audio until WebAudio is actually running in Chrome.
+      audioEl.volume = contextRunning ? 0 : effectiveRoverGain;
       logAudio('route/graph', { contextRunning, elementVolume: audioEl.volume });
       if (gainNode) {
         const graphGain = contextRunning
