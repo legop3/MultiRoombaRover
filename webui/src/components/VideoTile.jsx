@@ -119,21 +119,50 @@ export default function VideoTile({
     mainBrushDuckEnabled && mainBrushActive && mainBrushDuckAmount > 0
       ? `Volume decreased ${Math.round(mainBrushDuckAmount * 1000) / 10}%`
       : null;
+  const audioDebugStateRef = useRef({
+    hasDedicatedAudio: false,
+    audioUrl: null,
+    mainBrushDuckEnabled: false,
+    mainBrushDuckAmount: 0,
+    mainBrushActive: false,
+    baseRoverGain: 0,
+    effectiveRoverGain: 0,
+  });
+  useEffect(() => {
+    audioDebugStateRef.current = {
+      hasDedicatedAudio,
+      audioUrl: audioSessionInfo?.url || null,
+      mainBrushDuckEnabled,
+      mainBrushDuckAmount,
+      mainBrushActive,
+      baseRoverGain,
+      effectiveRoverGain,
+    };
+  }, [
+    hasDedicatedAudio,
+    audioSessionInfo?.url,
+    mainBrushDuckEnabled,
+    mainBrushDuckAmount,
+    mainBrushActive,
+    baseRoverGain,
+    effectiveRoverGain,
+  ]);
   const logAudio = useCallback(
     (event, meta = {}) => {
       if (!debugAudio) return;
       const audioEl = audioRef.current;
+      const state = audioDebugStateRef.current;
       const payload = {
         event,
         ts: Date.now(),
         roverLabel: label || null,
-        hasDedicatedAudio,
-        audioUrl: audioSessionInfo?.url || null,
-        mainBrushDuckEnabled,
-        mainBrushDuckAmount,
-        mainBrushActive,
-        baseRoverGain,
-        effectiveRoverGain,
+        hasDedicatedAudio: state.hasDedicatedAudio,
+        audioUrl: state.audioUrl,
+        mainBrushDuckEnabled: state.mainBrushDuckEnabled,
+        mainBrushDuckAmount: state.mainBrushDuckAmount,
+        mainBrushActive: state.mainBrushActive,
+        baseRoverGain: state.baseRoverGain,
+        effectiveRoverGain: state.effectiveRoverGain,
         element: audioEl
           ? {
               muted: audioEl.muted,
@@ -152,17 +181,7 @@ export default function VideoTile({
         console.log('[AudioDebug]', event, payload);
       }
     },
-    [
-      debugAudio,
-      label,
-      hasDedicatedAudio,
-      audioSessionInfo?.url,
-      mainBrushDuckEnabled,
-      mainBrushDuckAmount,
-      mainBrushActive,
-      baseRoverGain,
-      effectiveRoverGain,
-    ],
+    [debugAudio, label],
   );
   const discordUrl =
     session?.socials?.find((entry) => {
