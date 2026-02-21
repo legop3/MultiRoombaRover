@@ -23,6 +23,7 @@ const COMPRESSOR_SETTINGS = {
   attack: 0.002,
   release: 0.18,
 };
+const COMPRESSOR_MAKEUP_GAIN = 2.25;
 
 export default function VideoTile({
   sessionInfo,
@@ -278,8 +279,9 @@ export default function VideoTile({
       autoLevelMode === 'compressor' &&
       audioGainRef.current
     ) {
-      audioGainRef.current.gain.value = effectiveRoverGain;
-      logAudio('context/gain-restored', { gain: effectiveRoverGain });
+      const graphGain = Math.max(0, Math.min(4, effectiveRoverGain * COMPRESSOR_MAKEUP_GAIN));
+      audioGainRef.current.gain.value = graphGain;
+      logAudio('context/gain-restored', { gain: graphGain, baseGain: effectiveRoverGain });
     }
     logAudio('context/resume-result');
   }, [logAudio, autoLevelEnabled, autoLevelMode, effectiveRoverGain]);
@@ -480,7 +482,11 @@ export default function VideoTile({
       audioEl.volume = 0;
       logAudio('route/graph', { contextRunning, elementVolume: audioEl.volume });
       if (gainNode) {
-        gainNode.gain.value = contextRunning ? effectiveRoverGain : 0;
+        const graphGain = contextRunning
+          ? Math.max(0, Math.min(4, effectiveRoverGain * COMPRESSOR_MAKEUP_GAIN))
+          : 0;
+        gainNode.gain.value = graphGain;
+        logAudio('route/graph-gain', { graphGain, baseGain: effectiveRoverGain });
       }
       if (compressor) {
         compressor.threshold.value = COMPRESSOR_SETTINGS.threshold;
