@@ -59,6 +59,7 @@ export default function VideoTile({
   const audioSourceNodeRef = useRef(null);
   const audioCompressorRef = useRef(null);
   const audioGainRef = useRef(null);
+  const audioGraphConnectedRef = useRef(false);
   const reductionPollRef = useRef(null);
   const graphFailedRef = useRef(false);
   const [status, setStatus] = useState('idle');
@@ -248,13 +249,16 @@ export default function VideoTile({
       if (!audioGainRef.current) {
         audioGainRef.current = ctx.createGain();
       }
-      audioSourceNodeRef.current.disconnect();
-      audioCompressorRef.current.disconnect();
-      audioGainRef.current.disconnect();
-      audioSourceNodeRef.current.connect(audioCompressorRef.current);
-      audioCompressorRef.current.connect(audioGainRef.current);
-      audioGainRef.current.connect(ctx.destination);
-      logAudio('graph/connected');
+      if (!audioGraphConnectedRef.current) {
+        audioSourceNodeRef.current.disconnect();
+        audioCompressorRef.current.disconnect();
+        audioGainRef.current.disconnect();
+        audioSourceNodeRef.current.connect(audioCompressorRef.current);
+        audioCompressorRef.current.connect(audioGainRef.current);
+        audioGainRef.current.connect(ctx.destination);
+        audioGraphConnectedRef.current = true;
+        logAudio('graph/connected');
+      }
       return true;
     } catch {
       graphFailedRef.current = true;
@@ -268,8 +272,17 @@ export default function VideoTile({
     if (!ctx || ctx.state !== 'suspended') return;
     logAudio('context/resume-attempt');
     await ctx.resume().catch(() => {});
+    if (
+      ctx.state === 'running' &&
+      autoLevelEnabled &&
+      autoLevelMode === 'compressor' &&
+      audioGainRef.current
+    ) {
+      audioGainRef.current.gain.value = effectiveRoverGain;
+      logAudio('context/gain-restored', { gain: effectiveRoverGain });
+    }
     logAudio('context/resume-result');
-  }, [logAudio]);
+  }, [logAudio, autoLevelEnabled, autoLevelMode, effectiveRoverGain]);
 
   const forceUnlockCompressorAudio = useCallback(async () => {
     if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') return;
@@ -393,6 +406,7 @@ export default function VideoTile({
       clearTimeout(unmuteTimer.current);
       clearInterval(audioPlayInterval.current);
       clearInterval(reductionPollRef.current);
+      audioGraphConnectedRef.current = false;
       audioSourceNodeRef.current?.disconnect?.();
       audioCompressorRef.current?.disconnect?.();
       audioGainRef.current?.disconnect?.();
