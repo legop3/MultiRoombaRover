@@ -106,6 +106,8 @@ export default function VideoTile({
           .map(([key]) => key);
   const limiterCaps = overcurrentLimiter?.caps || null;
   const limiterGroups = overcurrentLimiter?.overcurrent?.groups || null;
+  const debugAudio =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debugAudio');
   const debugHud =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debugHud');
   const limiterFill = useMemo(() => {
@@ -126,6 +128,50 @@ export default function VideoTile({
   );
   const duckGain = autoLevelEnabled && autoLevelMode === 'duck' && brushOrVacuumActive ? AUDIO_DUCK_FACTOR : 1;
   const effectiveRoverGain = Math.max(0, Math.min(1, baseRoverGain * duckGain));
+  const logAudio = useCallback(
+    (event, meta = {}) => {
+      if (!debugAudio) return;
+      const audioEl = audioRef.current;
+      const ctx = audioContextRef.current;
+      console.log('[AudioDebug]', {
+        event,
+        roverLabel: label || null,
+        hasDedicatedAudio,
+        audioUrl: audioSessionInfo?.url || null,
+        autoLevelEnabled,
+        autoLevelMode,
+        baseRoverGain,
+        effectiveRoverGain,
+        element: audioEl
+          ? {
+              muted: audioEl.muted,
+              volume: audioEl.volume,
+              paused: audioEl.paused,
+              ended: audioEl.ended,
+              readyState: audioEl.readyState,
+              networkState: audioEl.networkState,
+            }
+          : null,
+        context: ctx
+          ? {
+              state: ctx.state,
+              sampleRate: ctx.sampleRate,
+            }
+          : null,
+        ...meta,
+      });
+    },
+    [
+      debugAudio,
+      label,
+      hasDedicatedAudio,
+      audioSessionInfo?.url,
+      autoLevelEnabled,
+      autoLevelMode,
+      baseRoverGain,
+      effectiveRoverGain,
+    ],
+  );
   const discordUrl =
     session?.socials?.find((entry) => {
       const key = String(entry?.id || entry?.label || '').toLowerCase();
@@ -146,6 +192,10 @@ export default function VideoTile({
       wheelOvercurrents,
     });
   }, [debugHud, overlayFill, overlayMotors, overlayVisible, limiterActive, limiterCaps, limiterGroups, wheelOvercurrents]);
+
+  useEffect(() => {
+    logAudio('settings/update');
+  }, [logAudio]);
 
   const scheduleRestart = useCallback(() => {
     clearTimeout(restartTimer.current);
@@ -181,6 +231,13 @@ export default function VideoTile({
         compressor.attack.value = COMPRESSOR_SETTINGS.attack;
         compressor.release.value = COMPRESSOR_SETTINGS.release;
         audioCompressorRef.current = compressor;
+        logAudio('graph/compressor-created', {
+          threshold: compressor.threshold.value,
+          knee: compressor.knee.value,
+          ratio: compressor.ratio.value,
+          attack: compressor.attack.value,
+          release: compressor.release.value,
+        });
       }
       if (!audioGainRef.current) {
         audioGainRef.current = ctx.createGain();
@@ -191,29 +248,34 @@ export default function VideoTile({
       audioSourceNodeRef.current.connect(audioCompressorRef.current);
       audioCompressorRef.current.connect(audioGainRef.current);
       audioGainRef.current.connect(ctx.destination);
+      logAudio('graph/connected');
       return true;
     } catch {
       graphFailedRef.current = true;
+      logAudio('graph/failed');
       return false;
     }
-  }, []);
+  }, [logAudio]);
 
   const resumeAudioContext = useCallback(async () => {
     const ctx = audioContextRef.current;
     if (!ctx || ctx.state !== 'suspended') return;
+    logAudio('context/resume-attempt');
     await ctx.resume().catch(() => {});
-  }, []);
+    logAudio('context/resume-result');
+  }, [logAudio]);
 
   useEffect(() => {
     if (!audioSessionInfo?.url || !autoLevelEnabled || autoLevelMode !== 'compressor') {
       return undefined;
     }
     const unlock = () => {
+      logAudio('unlock/gesture');
       resumeAudioContext();
       const target = audioRef.current;
       if (!target) return;
       target.muted = false;
-      target.play().catch(() => {});
+      target.play().then(() => logAudio('unlock/play-ok')).catch((err) => logAudio('unlock/play-fail', { error: err?.message }));
     };
     window.addEventListener('pointerdown', unlock, { passive: true });
     window.addEventListener('keydown', unlock);
@@ -221,7 +283,7 @@ export default function VideoTile({
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('keydown', unlock);
     };
-  }, [audioSessionInfo?.url, autoLevelEnabled, autoLevelMode, resumeAudioContext]);
+  }, [audioSessionInfo?.url, autoLevelEnabled, autoLevelMode, resumeAudioContext, logAudio]);
 
   const ensurePlayback = useCallback(async () => {
     const video = videoRef.current;
@@ -305,9 +367,10 @@ export default function VideoTile({
     let active = true;
     let player;
     const resetMuteId = setTimeout(() => setMuted(true), 0);
-    const handleStatus = (nextStatus, info) => {
-      if (!active) return;
-      setStatus(nextStatus);
+      const handleStatus = (nextStatus, info) => {
+        if (!active) return;
+        logAudio('video/status', { nextStatus, info: info || null });
+        setStatus(nextStatus);
       setDetail(info || null);
       if (nextStatus === 'playing') {
         ensurePlayback();
@@ -337,7 +400,7 @@ export default function VideoTile({
       clearTimeout(resetMuteId);
       player?.stop();
     };
-  }, [usingSnapshot, sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback, hasDedicatedAudio]);
+  }, [usingSnapshot, sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback, hasDedicatedAudio, logAudio]);
 
   useEffect(() => {
     if (status === 'stopped' && sessionInfo?.url) {
@@ -351,6 +414,7 @@ export default function VideoTile({
     reductionPollRef.current = null;
     if (!audioEl || !audioSessionInfo?.url) {
       setLevelIndicator(null);
+      logAudio('route/no-audio-url');
       return;
     }
 
@@ -364,6 +428,7 @@ export default function VideoTile({
       const contextRunning = audioContextRef.current?.state === 'running';
       // If Chrome has not unlocked WebAudio yet, keep direct element volume so audio still works.
       audioEl.volume = contextRunning ? 0 : effectiveRoverGain;
+      logAudio('route/graph', { contextRunning, elementVolume: audioEl.volume });
       if (gainNode) {
         gainNode.gain.value = effectiveRoverGain;
       }
@@ -385,6 +450,7 @@ export default function VideoTile({
           const amount = Math.round(Math.abs(reduction) * 10) / 10;
           const formatted = Number.isInteger(amount) ? amount.toFixed(0) : amount.toFixed(1);
           setLevelIndicator(`Level: ${formatted}dB`);
+          logAudio('compressor/reduction', { reduction, formatted });
         } else {
           setLevelIndicator(null);
         }
@@ -394,6 +460,7 @@ export default function VideoTile({
 
     const hasGraph = Boolean(audioSourceNodeRef.current && audioGainRef.current);
     audioEl.volume = hasGraph ? 0 : effectiveRoverGain;
+    logAudio('route/direct', { hasGraph, elementVolume: audioEl.volume, duckMode, brushOrVacuumActive });
     if (audioCompressorRef.current) {
       audioCompressorRef.current.threshold.value = 0;
       audioCompressorRef.current.knee.value = 0;
@@ -417,6 +484,7 @@ export default function VideoTile({
     effectiveRoverGain,
     ensureAudioGraph,
     resumeAudioContext,
+    logAudio,
   ]);
 
   // Audio-only WHEP (no pausing/muting; keeps trying to play)
@@ -428,6 +496,7 @@ export default function VideoTile({
     let player;
     const handleStatus = (nextStatus, info) => {
       if (!active) return;
+      logAudio('audio/status', { nextStatus, info: info || null });
       setAudioDetail(info || (nextStatus === 'connected' ? 'connected' : null));
       setAudioStatus((prev) => {
         if (nextStatus === 'connected' && (prev === 'playing' || prev === 'connecting')) {
@@ -443,7 +512,7 @@ export default function VideoTile({
         const target = audioRef.current;
         if (target) {
           target.muted = false;
-          target.play().catch(() => {});
+          target.play().then(() => logAudio('audio/play-ok')).catch((err) => logAudio('audio/play-fail', { error: err?.message }));
         }
       }
       if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
@@ -470,7 +539,7 @@ export default function VideoTile({
       active = false;
       player?.stop();
     };
-  }, [audioSessionInfo?.url, audioSessionInfo?.token, audioRestartToken, scheduleAudioRestart, resumeAudioContext]);
+  }, [audioSessionInfo?.url, audioSessionInfo?.token, audioRestartToken, scheduleAudioRestart, resumeAudioContext, logAudio]);
 
   // Keep nudging the audio element to play in case autoplay was blocked.
   useEffect(() => {
@@ -490,14 +559,17 @@ export default function VideoTile({
       if (!target) return;
       target.muted = false;
       if (!target.paused && !target.ended) return;
+      logAudio('retry/play-attempt');
       await resumeAudioContext();
       target
         .play()
         .then(() => {
+          logAudio('retry/play-ok');
           setAudioStatus((prev) => (prev === 'connected' ? 'playing' : prev));
           setAudioDetail((prev) => (prev === 'paused' ? null : prev));
         })
         .catch((err) => {
+          logAudio('retry/play-fail', { error: err?.message });
           setAudioDetail((prev) => prev || err?.message || 'autoplay blocked');
         });
     };
@@ -506,7 +578,7 @@ export default function VideoTile({
     audioPlayInterval.current = setInterval(attemptPlay, AUDIO_RETRY_MS);
 
     return () => clearInterval(audioPlayInterval.current);
-  }, [audioSessionInfo?.url, audioStatus, resumeAudioContext]);
+  }, [audioSessionInfo?.url, audioStatus, resumeAudioContext, logAudio]);
 
   // Reflect audio element events back into status/detail so the HUD stays accurate.
   useEffect(() => {
@@ -514,10 +586,12 @@ export default function VideoTile({
     if (!audioEl) return undefined;
 
     const handlePlay = () => {
+      logAudio('element/play');
       setAudioStatus((prev) => (prev === 'error' ? prev : 'playing'));
       setAudioDetail(null);
     };
     const handlePause = () => {
+      logAudio('element/pause');
       setAudioStatus((prev) => {
         if (['error', 'failed', 'disconnected', 'closed', 'stopped'].includes(prev)) return prev;
         return 'paused';
@@ -525,28 +599,39 @@ export default function VideoTile({
       setAudioDetail((prev) => prev || 'paused');
     };
     const handleEnded = () => {
+      logAudio('element/ended');
       setAudioStatus((prev) => (prev === 'error' ? prev : 'stopped'));
       setAudioDetail((prev) => prev || 'ended');
     };
     const handleError = () => {
       const { error } = audioEl;
       const message = error?.message || 'audio error';
+      logAudio('element/error', { error: message });
       setAudioStatus('error');
       setAudioDetail(message);
     };
+    const handleWaiting = () => logAudio('element/waiting');
+    const handleCanPlay = () => logAudio('element/canplay');
+    const handleStalled = () => logAudio('element/stalled');
 
     audioEl.addEventListener('play', handlePlay);
     audioEl.addEventListener('pause', handlePause);
     audioEl.addEventListener('ended', handleEnded);
     audioEl.addEventListener('error', handleError);
+    audioEl.addEventListener('waiting', handleWaiting);
+    audioEl.addEventListener('canplay', handleCanPlay);
+    audioEl.addEventListener('stalled', handleStalled);
 
     return () => {
       audioEl.removeEventListener('play', handlePlay);
       audioEl.removeEventListener('pause', handlePause);
       audioEl.removeEventListener('ended', handleEnded);
       audioEl.removeEventListener('error', handleError);
+      audioEl.removeEventListener('waiting', handleWaiting);
+      audioEl.removeEventListener('canplay', handleCanPlay);
+      audioEl.removeEventListener('stalled', handleStalled);
     };
-  }, [audioSessionInfo?.url]);
+  }, [audioSessionInfo?.url, logAudio]);
 
   const snapshotStatus = snapshotFeed?.error
     ? `Error: ${snapshotFeed.error}`
