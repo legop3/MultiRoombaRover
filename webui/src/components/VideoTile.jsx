@@ -63,6 +63,8 @@ export default function VideoTile({
   const audioGraphConnectedRef = useRef(false);
   const reductionPollRef = useRef(null);
   const graphFailedRef = useRef(false);
+  const audioInteractionSeenRef = useRef(false);
+  const lastResumeAttemptAtRef = useRef(0);
   const [status, setStatus] = useState('idle');
   const [detail, setDetail] = useState(null);
   const [audioStatus, setAudioStatus] = useState('idle');
@@ -272,6 +274,13 @@ export default function VideoTile({
   const resumeAudioContext = useCallback(async () => {
     const ctx = audioContextRef.current;
     if (!ctx || ctx.state !== 'suspended') return;
+    if (!audioInteractionSeenRef.current) {
+      logAudio('context/resume-skipped-no-interaction');
+      return;
+    }
+    const now = Date.now();
+    if (now - lastResumeAttemptAtRef.current < 800) return;
+    lastResumeAttemptAtRef.current = now;
     logAudio('context/resume-attempt');
     await ctx.resume().catch(() => {});
     if (
@@ -286,6 +295,24 @@ export default function VideoTile({
     }
     logAudio('context/resume-result');
   }, [logAudio, autoLevelEnabled, autoLevelMode, effectiveRoverGain]);
+
+  useEffect(() => {
+    if (!audioSessionInfo?.url) return undefined;
+    const markInteraction = () => {
+      if (audioInteractionSeenRef.current) return;
+      audioInteractionSeenRef.current = true;
+      logAudio('interaction/first-user-gesture');
+      resumeAudioContext();
+    };
+    window.addEventListener('pointerdown', markInteraction, { passive: true, capture: true });
+    window.addEventListener('keydown', markInteraction, { capture: true });
+    window.addEventListener('touchstart', markInteraction, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', markInteraction);
+      window.removeEventListener('keydown', markInteraction);
+      window.removeEventListener('touchstart', markInteraction);
+    };
+  }, [audioSessionInfo?.url, logAudio, resumeAudioContext]);
 
   const ensurePlayback = useCallback(async () => {
     const video = videoRef.current;
