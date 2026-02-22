@@ -3,7 +3,7 @@ export const INPUT_SETTINGS_DEFAULTS = {
     baseSpeed: 250,
     turboSpeed: 400,
     precisionSpeed: 125,
-    tiltSpeed: 80,
+    tiltSpeed: 90,
     tiltIntervalMs: 110,
   },
 };
@@ -96,5 +96,5 @@ export const AUDIO_SETTINGS_DEFAULTS = {
   alertVolume: 0.5,
   roverVolume: 1,
   mainBrushDuckEnabled: true,
-  mainBrushDuckAmount: 0.45,
+  mainBrushDuckAmount: 0.75,
 };
