@@ -239,6 +239,7 @@ function collectActiveDriverEntries() {
 
 function buildSnapshot() {
   const now = new Date();
+  const nowMs = now.getTime();
   const activeDrivers = getActiveDrivers();
   const driverEntries = collectActiveDriverEntries();
   if (driverEntries.length === 0) {
@@ -255,7 +256,7 @@ function buildSnapshot() {
     const wheelsOffGround = Boolean(
       sensors?.bumpsAndWheelDrops?.wheelDropLeft && sensors?.bumpsAndWheelDrops?.wheelDropRight,
     );
-    const activity30s = getActivity30s(roverId, now.getTime());
+    const activity30s = getActivity30s(roverId, nowMs);
     const charging = isChargingFromSensors(sensors);
     const docked = Boolean(sensors?.chargingSources?.homeBase);
     const isMoving = activity30s.distance_m > 0.1 || activity30s.turn_deg > 20;
@@ -299,6 +300,13 @@ function buildSnapshot() {
       ts_iso: new Date(entry.ts).toISOString(),
       text: entry.text || '',
     }));
+  const botRecentWindow = getRecentMessages(200, { includeSystem: true })
+    .filter((entry) => Number(entry?.ts) >= contextResetAt)
+    .filter((entry) => entry?.system);
+  const botRecent5m = botRecentWindow.filter((entry) => nowMs - Number(entry?.ts || 0) <= 5 * 60 * 1000);
+  const lastBotTs = botRecentWindow.length ? Number(botRecentWindow[botRecentWindow.length - 1]?.ts || 0) : null;
+  const secondsSinceLastBotMessage =
+    lastBotTs && nowMs > lastBotTs ? Math.floor((nowMs - lastBotTs) / 1000) : null;
 
   return {
     now: {
@@ -311,6 +319,8 @@ function buildSnapshot() {
       active_driver_count: driverEntries.length,
       driving_rovers: driverEntries.map(([roverId]) => String(roverId)),
     },
+    self_talk_recent_5m: botRecent5m.length,
+    seconds_since_last_bot_message: secondsSinceLastBotMessage,
     rovers,
     chat_recent: chatRecent,
     your_last_message: botRecent,
