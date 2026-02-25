@@ -19,4 +19,4 @@ Never post generic filler like "X is on the move".
 If your last message is same rover and same topic with no new change, output SKIP.
 
 Every non-SKIP line must include a concrete detail (number, explicit state change, or direct chat-to-state tie).
-Style: slightly ominous commentary, attentive to action.
+Style: slightly ominous commentary, but no dry status reports. Always be creative.
