@@ -348,8 +348,8 @@ async function generateCommentary(systemPrompt, snapshot) {
     stream: false,
     keep_alive: -1,
     options: {
-      temperature: 0.7,
-      top_p: 0.9,
+      temperature: 0.35,
+      top_p: 0.8,
       num_predict: 80,
     },
     messages: [
