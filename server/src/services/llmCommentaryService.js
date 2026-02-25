@@ -59,6 +59,8 @@ let status = {
   lastError: null,
   lastPromptReadAt: null,
   lastPromptChars: 0,
+  lastSystemPrompt: null,
+  lastInfoSnapshot: null,
   lastSnapshotSummary: null,
   lastGeneratedText: null,
   lastPostedText: null,
@@ -241,6 +243,7 @@ async function readSystemPrompt() {
   updateStatus({
     lastPromptReadAt: Date.now(),
     lastPromptChars: trimmed.length,
+    lastSystemPrompt: trimmed,
   });
   return trimmed;
 }
@@ -322,6 +325,7 @@ async function runTick() {
     });
     updateStatus({
       lastSnapshotSummary: snapshotSummary,
+      lastInfoSnapshot: snapshot,
     });
     const systemPrompt = await readSystemPrompt();
     const text = await generateCommentary(systemPrompt, snapshot);

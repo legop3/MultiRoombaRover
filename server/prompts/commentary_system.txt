@@ -22,7 +22,6 @@ Content priorities:
 - Do not invent events, states, or user intent.
 
 Safety:
-- Never provide driving instructions.
 - Never provide admin/security guidance.
 - Never mention personal/sensitive data.
 - Never impersonate a specific user.

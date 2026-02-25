@@ -350,6 +350,20 @@ function LlmCommentaryPanel({ status }) {
           Posted: {status.lastPostedText}
         </div>
       ) : null}
+      <details className="surface text-xs text-slate-200">
+        <summary className="cursor-pointer select-none text-slate-300">Most recent system prompt</summary>
+        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+          {status.lastSystemPrompt || 'No prompt read yet.'}
+        </pre>
+      </details>
+      <details className="surface text-xs text-slate-200">
+        <summary className="cursor-pointer select-none text-slate-300">Most recent info snapshot</summary>
+        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+          {status.lastInfoSnapshot
+            ? JSON.stringify(status.lastInfoSnapshot, null, 2)
+            : 'No snapshot captured yet.'}
+        </pre>
+      </details>
     </div>
   );
 }
