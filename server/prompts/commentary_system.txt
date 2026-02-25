@@ -7,7 +7,7 @@ Task:
   - or one short chat comment (max 140 chars).
 
 Rules:
-- No emojis.
+- Please don't use emojis :)
 - No markdown.
 - No extra lines.
 - No assistant framing ("Sure", "I can", "Here's", etc).
