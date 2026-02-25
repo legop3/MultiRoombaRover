@@ -281,14 +281,15 @@ function buildSnapshot() {
     text: entry.text || '',
     }));
 
-  const botRecent = getRecentMessages(80, { includeSystem: true })
-    .filter((entry) => Number(entry?.ts) >= contextResetAt)
-    .filter((entry) => entry?.system)
-    .slice(-MAX_BOT_MESSAGES)
-    .map((entry) => ({
-      ts_iso: new Date(entry.ts).toISOString(),
-      text: entry.text || '',
-    }));
+  // Temporarily disabled: do not feed prior bot/system messages into the LLM snapshot.
+  // const botRecent = getRecentMessages(80, { includeSystem: true })
+  //   .filter((entry) => Number(entry?.ts) >= contextResetAt)
+  //   .filter((entry) => entry?.system)
+  //   .slice(-MAX_BOT_MESSAGES)
+  //   .map((entry) => ({
+  //     ts_iso: new Date(entry.ts).toISOString(),
+  //     text: entry.text || '',
+  //   }));
 
   return {
     now: {
@@ -303,7 +304,7 @@ function buildSnapshot() {
     },
     rovers,
     chat_recent: chatRecent,
-    bot_recent_messages: botRecent,
+    // bot_recent_messages: botRecent,
   };
 }
 
@@ -431,7 +432,10 @@ async function runTick() {
     updateStatus({
       lastGeneratedText: text,
     });
-    const recentBotMessages = snapshot.bot_recent_messages || [];
+    const recentBotMessages = getRecentMessages(80, { includeSystem: true })
+      .filter((entry) => Number(entry?.ts) >= contextResetAt)
+      .filter((entry) => entry?.system)
+      .slice(-MAX_BOT_MESSAGES);
     const duplicate = recentBotMessages.some(
       (entry) => String(entry?.text || '').trim().toLowerCase() === text.toLowerCase(),
     );
