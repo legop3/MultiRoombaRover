@@ -285,6 +285,7 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
       : status.lastOutcome === 'posted'
       ? 'text-emerald-300'
       : 'text-slate-300';
+  const largeIndicator = buildLlmLargeIndicator(status);
   const conversationRows = buildLlmConversationRows(status);
 
   return (
@@ -299,6 +300,10 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
         >
           {clearingHistory ? 'Clearing...' : 'Clear LLM History'}
         </button>
+      </div>
+      <div className={`surface border text-center ${largeIndicator.className}`}>
+        <div className="text-[1.1rem] font-bold tracking-wide">{largeIndicator.label}</div>
+        <div className="text-xs text-slate-200">{largeIndicator.detail}</div>
       </div>
       <div className="surface space-y-0.5 text-xs text-slate-200">
         <div className="flex items-center justify-between">
@@ -419,6 +424,42 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
       </div>
     </div>
   );
+}
+
+function buildLlmLargeIndicator(status) {
+  if (status?.inFlight) {
+    return {
+      label: 'IN FLIGHT',
+      detail: 'Generating commentary now',
+      className: 'border-amber-400/60 bg-amber-700/20 text-amber-200',
+    };
+  }
+  if (status?.lastOutcome === 'posted') {
+    return {
+      label: 'POSTED',
+      detail: status?.lastPostedText ? `Last: ${status.lastPostedText}` : 'Commentary posted',
+      className: 'border-emerald-400/60 bg-emerald-700/20 text-emerald-200',
+    };
+  }
+  if (status?.lastOutcome === 'skipped') {
+    return {
+      label: 'SKIPPED',
+      detail: status?.lastReason || 'Model chose to skip',
+      className: 'border-slate-400/60 bg-slate-700/30 text-slate-200',
+    };
+  }
+  if (status?.lastOutcome === 'failed') {
+    return {
+      label: 'FAILED',
+      detail: status?.lastError || status?.lastReason || 'Tick failed',
+      className: 'border-red-400/60 bg-red-700/20 text-red-200',
+    };
+  }
+  return {
+    label: status?.running ? 'IDLE' : 'STOPPED',
+    detail: status?.lastReason || 'Waiting for next tick',
+    className: 'border-sky-400/50 bg-sky-700/20 text-sky-200',
+  };
 }
 
 function buildLlmConversationRows(status) {
