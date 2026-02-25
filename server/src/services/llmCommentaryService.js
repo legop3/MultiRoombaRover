@@ -37,7 +37,7 @@ let inFlight = false;
 let tickCount = 0;
 let contextResetAt = Date.now();
 let clearCount = 0;
-const roverActivity = new Map(); // roverId -> { buckets: Map(bucketTs -> { distanceMm, turnDeg, bumps }), bumpActive }
+const roverActivity = new Map(); // roverId -> { buckets: Map(bucketTs -> { distanceMm, turnDeg, bumps }), bumpLeftActive, bumpRightActive }
 
 function normalizeFrequencyMs(value) {
   if (!Number.isFinite(value)) return DEFAULT_FREQUENCY_MS;
@@ -137,7 +137,8 @@ function upsertActivityState(roverId) {
   if (!roverActivity.has(roverId)) {
     roverActivity.set(roverId, {
       buckets: new Map(),
-      bumpActive: false,
+      bumpLeftActive: false,
+      bumpRightActive: false,
     });
   }
   return roverActivity.get(roverId);
@@ -155,11 +156,16 @@ function onSensorEvent({ roverId, sensors } = {}) {
   const bucket = state.buckets.get(bucketTs);
   bucket.distanceMm += Math.abs(Number(sensors.distanceMm) || 0);
   bucket.turnDeg += Math.abs(Number(sensors.angleDeg) || 0);
-  const bumpNow = Boolean(sensors?.bumpsAndWheelDrops?.bumpLeft || sensors?.bumpsAndWheelDrops?.bumpRight);
-  if (bumpNow && !state.bumpActive) {
-    bucket.bumps += 1;
+  const bumpLeftNow = Boolean(sensors?.bumpsAndWheelDrops?.bumpLeft);
+  const bumpRightNow = Boolean(sensors?.bumpsAndWheelDrops?.bumpRight);
+  if (bumpLeftNow && !state.bumpLeftActive) {
+    bucket.bumps += 0.5;
   }
-  state.bumpActive = bumpNow;
+  if (bumpRightNow && !state.bumpRightActive) {
+    bucket.bumps += 0.5;
+  }
+  state.bumpLeftActive = bumpLeftNow;
+  state.bumpRightActive = bumpRightNow;
 }
 
 function getActivity30s(roverId, nowMs = Date.now()) {
@@ -179,7 +185,7 @@ function getActivity30s(roverId, nowMs = Date.now()) {
   return {
     distance_m: Math.round((distanceMm / 1000) * 10) / 10,
     turn_deg: Math.round(turnDeg),
-    bumps,
+    bumps: Math.round(bumps * 10) / 10,
   };
 }
 
