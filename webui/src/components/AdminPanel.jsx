@@ -335,6 +335,10 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
           <span>{status.tickCount ?? 0}</span>
         </div>
         <div className="flex items-center justify-between">
+          <span>Skip streak</span>
+          <span>{status.skipStreak ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
           <span>Last outcome</span>
           <span className={statusColor}>{status.lastOutcome || '--'}</span>
         </div>

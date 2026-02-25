@@ -23,8 +23,6 @@ const ACTIVITY_WINDOW_MS = 30000;
 const ACTIVITY_BUCKET_MS = 1000;
 const SELF_TALK_WINDOW_MS = 30 * 60 * 1000;
 const MAX_CONTEXT_EVENTS = 10;
-const NO_ACTIVE_DRIVER_DELAY_MS = 5000;
-const NO_ACTIVE_DRIVER_LOG_COOLDOWN_MS = 30000;
 
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
@@ -38,7 +36,7 @@ const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 let timer = null;
 let inFlight = false;
 let tickCount = 0;
-let lastNoDriverLogAt = 0;
+let skipStreak = 0;
 let contextResetAt = Date.now();
 let clearCount = 0;
 const roverActivity = new Map(); // roverId -> { buckets: Map(bucketTs -> { distanceMm, turnDeg, bumps }), bumpLeftActive, bumpRightActive }
@@ -76,6 +74,7 @@ let status = {
   lastSnapshotSummary: null,
   lastClearedAt: contextResetAt,
   clearCount,
+  skipStreak: 0,
   lastGeneratedText: null,
   lastPostedText: null,
   lastPostedAt: null,
@@ -182,11 +181,13 @@ function getActivity30s(roverId, nowMs = Date.now()) {
 function clearRuntimeHistory() {
   contextResetAt = Date.now();
   clearCount += 1;
+  skipStreak = 0;
   roverActivity.clear();
   lastRoverStateById.clear();
   updateStatus({
     lastClearedAt: contextResetAt,
     clearCount,
+    skipStreak,
     lastInfoSnapshot: null,
     lastModelMessages: null,
     lastModelRawOutput: null,
@@ -279,9 +280,6 @@ function buildSnapshot() {
   const nowMs = now.getTime();
   const activeDrivers = getActiveDrivers();
   const driverEntries = collectActiveDriverEntries();
-  if (driverEntries.length === 0) {
-    return null;
-  }
 
   const roster = roverManager.getRoster().slice(0, MAX_ROVERS);
   const nextRoverStateById = new Map();
@@ -394,6 +392,7 @@ function buildSnapshot() {
     run_meta: {
       version: 'commentary_v2',
       self_talk_recent_30m: botRecent30m.length,
+      skip_streak: skipStreak,
       last_message_focus: buildLastMessageFocus(lastBotMessage, rovers),
       active_driver_count: driverEntries.length,
       driving_rovers: driverEntries.map(([roverId]) => String(roverId)),
@@ -444,6 +443,7 @@ function formatRunMetaMessage(runMeta = {}) {
     `- active drivers: ${Number(runMeta?.active_driver_count) || 0}`,
     `- driving rovers: ${drivingRovers}`,
     `- bot posts last 30m: ${Number(runMeta?.self_talk_recent_30m) || 0}`,
+    `- current skip streak: ${Number(runMeta?.skip_streak) || 0}`,
     `- last bot focus: ${focusText}`,
   ].join('\n');
 }
@@ -607,26 +607,6 @@ async function runTick() {
   inFlight = true;
   try {
     const snapshot = buildSnapshot();
-    if (!snapshot) {
-      const nowMs = Date.now();
-      if (nowMs - lastNoDriverLogAt >= NO_ACTIVE_DRIVER_LOG_COOLDOWN_MS) {
-        logger.info('Commentary tick skipped; no active drivers', { tickId });
-        lastNoDriverLogAt = nowMs;
-      }
-      updateStatus({
-        lastOutcome: 'skipped',
-        lastReason: 'no active drivers',
-        inFlight: false,
-        lastSnapshotSummary: {
-          activeDrivers: 0,
-          rovers: roverManager.getRoster().length,
-          chatMessages: 0,
-        },
-      });
-      // Slow polling while no drivers are present to avoid log spam / hot loops.
-      nextDelayMs = NO_ACTIVE_DRIVER_DELAY_MS;
-      return;
-    }
     const snapshotSummary = {
       activeDrivers: snapshot?.run_meta?.active_driver_count || 0,
       rovers: snapshot?.current_snapshot?.rovers?.length || 0,
@@ -650,9 +630,11 @@ async function runTick() {
     const text = modelResult?.normalized;
     if (!text) {
       logger.info('Commentary tick produced SKIP/empty output', { tickId });
+      skipStreak += 1;
       updateStatus({
         lastOutcome: 'skipped',
         lastReason: modelResult?.raw?.trim() ? 'model returned SKIP' : 'model returned empty',
+        skipStreak,
         lastGeneratedText: null,
       });
       // Immediate retry after model skip.
@@ -671,9 +653,11 @@ async function runTick() {
     );
     if (duplicate) {
       logger.info('Commentary tick skipped duplicate output', { tickId, text });
+      skipStreak += 1;
       updateStatus({
         lastOutcome: 'skipped',
         lastReason: 'duplicate text',
+        skipStreak,
       });
       // Immediate retry after a skip outcome.
       nextDelayMs = 0;
@@ -681,9 +665,11 @@ async function runTick() {
     }
     sendSystemMessage(text);
     logger.info('Commentary message posted', { tickId, text });
+    skipStreak = 0;
     updateStatus({
       lastOutcome: 'posted',
       lastReason: null,
+      skipStreak,
       lastPostedText: text,
       lastPostedAt: Date.now(),
     });
