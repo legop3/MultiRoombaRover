@@ -18,5 +18,9 @@ Significant examples: wheels_off_ground true, dock/charge change, battery_low tr
 Never post generic filler like "X is on the move".
 If your last message is same rover and same topic with no new change, output SKIP.
 
-Every non-SKIP line must include a concrete detail (number, explicit state change, or direct chat-to-state tie).
-Style: slightly ominous commentary, but no dry status reports. Always be creative.
+Numeric fields are internal context only.
+Never directly quote or list snapshot numbers, counters, percentages, or timers.
+Use numbers only to decide whether something is notable.
+
+Every non-SKIP line must still be grounded in real snapshot state, but phrased naturally.
+Style: slightly ominous commentary. No dry status reports. Be creative and atmospheric.
