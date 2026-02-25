@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import RoverRoster from './RoverRoster.jsx';
+import ChatMessageRow from './ChatMessageRow.jsx';
 
 const MODES = [
   { key: 'open', label: 'Open' },
@@ -284,6 +285,7 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
       : status.lastOutcome === 'posted'
       ? 'text-emerald-300'
       : 'text-slate-300';
+  const conversationRows = buildLlmConversationRows(status);
 
   return (
     <div className="space-y-0.5">
@@ -405,8 +407,60 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
             : 'No snapshot captured yet.'}
         </pre>
       </details>
+      <div className="space-y-0.5">
+        <div className="panel-muted text-xs uppercase">Most recent LLM conversation</div>
+        <div className="surface max-h-72 space-y-0.5 overflow-y-auto">
+          {conversationRows.length ? (
+            conversationRows.map((row) => <ChatMessageRow key={row.id} message={row.message} />)
+          ) : (
+            <div className="text-xs text-slate-300">No model conversation captured yet.</div>
+          )}
+        </div>
+      </div>
     </div>
   );
+}
+
+function buildLlmConversationRows(status) {
+  const now = Date.now();
+  const modelMessages = Array.isArray(status?.lastModelMessages) ? status.lastModelMessages : [];
+  const rows = modelMessages.map((entry, index) => {
+    const role = String(entry?.role || '').toLowerCase();
+    const content =
+      typeof entry?.content === 'string' ? entry.content : JSON.stringify(entry?.content ?? null, null, 2);
+    const nickname =
+      role === 'system'
+        ? 'LLM System'
+        : role === 'assistant'
+        ? 'LLM Context'
+        : role === 'user'
+        ? 'LLM Input'
+        : 'LLM Message';
+    return {
+      id: `llm-msg-${index}`,
+      message: {
+        ts: now + index,
+        nickname,
+        text: content,
+        role: 'spectator',
+        system: role === 'system',
+      },
+    };
+  });
+  if (status?.lastModelRawOutput != null) {
+    const raw = String(status.lastModelRawOutput);
+    rows.push({
+      id: 'llm-output',
+      message: {
+        ts: now + rows.length + 1,
+        nickname: 'LLM Output',
+        text: raw.trim() ? raw : '<empty>',
+        role: 'spectator',
+        system: true,
+      },
+    });
+  }
+  return rows;
 }
 
 function ReplaySnapshotHealth({ health }) {

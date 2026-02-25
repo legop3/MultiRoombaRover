@@ -71,6 +71,8 @@ let status = {
   lastPromptChars: 0,
   lastSystemPrompt: null,
   lastInfoSnapshot: null,
+  lastModelMessages: null,
+  lastModelRawOutput: null,
   lastSnapshotSummary: null,
   lastClearedAt: contextResetAt,
   clearCount,
@@ -186,6 +188,8 @@ function clearRuntimeHistory() {
     lastClearedAt: contextResetAt,
     clearCount,
     lastInfoSnapshot: null,
+    lastModelMessages: null,
+    lastModelRawOutput: null,
     lastSnapshotSummary: null,
     lastGeneratedText: null,
     lastPostedText: null,
@@ -413,6 +417,16 @@ function normalizeCommentary(rawText) {
   return `${normalized.slice(0, MAX_OUTPUT_CHARS - 3)}...`;
 }
 
+function parseModelOutput(rawContent) {
+  const raw = typeof rawContent === 'string' ? rawContent : '';
+  const normalized = normalizeCommentary(raw);
+  return {
+    raw,
+    normalized,
+    skipped: normalized == null,
+  };
+}
+
 async function readSystemPrompt() {
   const prompt = await fsp.readFile(PROMPT_PATH, 'utf8');
   const trimmed = prompt.trim();
@@ -482,6 +496,9 @@ async function generateCommentary(systemPrompt, snapshot) {
       current_snapshot: snapshot?.current_snapshot || {},
     }),
   });
+  updateStatus({
+    lastModelMessages: messages,
+  });
 
   const payload = await ollamaClient.chat({
     model,
@@ -494,7 +511,7 @@ async function generateCommentary(systemPrompt, snapshot) {
     },
     messages,
   });
-  return normalizeCommentary(payload?.message?.content);
+  return parseModelOutput(payload?.message?.content);
 }
 
 function defaultTickDelayMs() {
@@ -576,12 +593,16 @@ async function runTick() {
       lastInfoSnapshot: snapshot,
     });
     const systemPrompt = await readSystemPrompt();
-    const text = await generateCommentary(systemPrompt, snapshot);
+    const modelResult = await generateCommentary(systemPrompt, snapshot);
+    updateStatus({
+      lastModelRawOutput: modelResult?.raw || '',
+    });
+    const text = modelResult?.normalized;
     if (!text) {
       logger.info('Commentary tick produced SKIP/empty output', { tickId });
       updateStatus({
         lastOutcome: 'skipped',
-        lastReason: 'model returned SKIP/empty',
+        lastReason: modelResult?.raw?.trim() ? 'model returned SKIP' : 'model returned empty',
         lastGeneratedText: null,
       });
       // Immediate retry after model skip.
