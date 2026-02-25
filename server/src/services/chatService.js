@@ -264,7 +264,7 @@ function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
     cb({ error: 'Slow down' });
     return;
   }
-  if (clean.length > 150) {
+  if (clean.length > 400) {
     cb({ error: 'Message too long' });
     return;
   }
@@ -336,7 +336,7 @@ function sendExternalMessage({
 }) {
   const normalized = normalizeUserText(text);
   const clean = normalized.trim();
-  if (!clean || clean.length > 256) {
+  if (!clean || clean.length > 400) {
     throw new Error('Message invalid');
   }
   if (hasProfanity(clean)) {

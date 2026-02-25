@@ -11,7 +11,7 @@ If chat is not clearly tied to rover state, output SKIP.
 Do not invent facts.
 
 Use self-quieting:
-- If self_talk_recent_5m >= 3, strongly prefer SKIP.
+- If self_talk_recent_5m >= 1, strongly prefer SKIP.
 - If seconds_since_last_bot_message is small, prefer SKIP unless the event is clearly significant.
 
 Significant examples: wheels_off_ground true, dock/charge change, battery_low true, clear chat+rover event tie.
