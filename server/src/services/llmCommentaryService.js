@@ -23,6 +23,8 @@ const ACTIVITY_WINDOW_MS = 30000;
 const ACTIVITY_BUCKET_MS = 1000;
 const SELF_TALK_WINDOW_MS = 30 * 60 * 1000;
 const MAX_CONTEXT_EVENTS = 100;
+const NO_ACTIVE_DRIVER_DELAY_MS = 5000;
+const NO_ACTIVE_DRIVER_LOG_COOLDOWN_MS = 30000;
 
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
@@ -36,6 +38,7 @@ const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 let timer = null;
 let inFlight = false;
 let tickCount = 0;
+let lastNoDriverLogAt = 0;
 let contextResetAt = Date.now();
 let clearCount = 0;
 const roverActivity = new Map(); // roverId -> { buckets: Map(bucketTs -> { distanceMm, turnDeg, bumps }), bumpLeftActive, bumpRightActive }
@@ -505,6 +508,15 @@ function scheduleNextTick(delayMs = defaultTickDelayMs()) {
   timer = setTimeout(runTick, safeDelay);
 }
 
+function wakeForDriverActivity() {
+  if (inFlight) return;
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
+  scheduleNextTick(0);
+}
+
 async function runTick() {
   let nextDelayMs = defaultTickDelayMs();
   tickCount += 1;
@@ -529,7 +541,11 @@ async function runTick() {
   try {
     const snapshot = buildSnapshot();
     if (!snapshot) {
-      logger.info('Commentary tick skipped; no active drivers', { tickId });
+      const nowMs = Date.now();
+      if (nowMs - lastNoDriverLogAt >= NO_ACTIVE_DRIVER_LOG_COOLDOWN_MS) {
+        logger.info('Commentary tick skipped; no active drivers', { tickId });
+        lastNoDriverLogAt = nowMs;
+      }
       updateStatus({
         lastOutcome: 'skipped',
         lastReason: 'no active drivers',
@@ -540,8 +556,8 @@ async function runTick() {
           chatMessages: 0,
         },
       });
-      // Keep delayed cadence when nobody is driving.
-      nextDelayMs = defaultTickDelayMs();
+      // Slow polling while no drivers are present to avoid log spam / hot loops.
+      nextDelayMs = NO_ACTIVE_DRIVER_DELAY_MS;
       return;
     }
     const snapshotSummary = {
@@ -668,6 +684,11 @@ roverManager.managerEvents.on('sensor', onSensorEvent);
 roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
   if (action === 'removed' && roverId) {
     roverActivity.delete(String(roverId));
+  }
+});
+roverManager.managerEvents.on('driver', ({ action } = {}) => {
+  if (action === 'add') {
+    wakeForDriverActivity();
   }
 });
 
