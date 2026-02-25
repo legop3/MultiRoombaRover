@@ -22,7 +22,9 @@ const SKIP_TOKEN = 'SKIP';
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
 const enabled = Boolean(commentaryConfig.enabled);
-const ollamaUrl = String(commentaryConfig.ollamaUrl || '').trim();
+const ollamaUrl = String(
+  commentaryConfig.ollamaUrl || commentaryConfig.ollamaServer || '',
+).trim();
 const model = String(commentaryConfig.model || '').trim();
 const timezone = String(config.timezone || 'UTC');
 
@@ -31,10 +33,12 @@ let inFlight = false;
 
 function normalizeFrequencyMs(value) {
   if (!Number.isFinite(value)) return DEFAULT_FREQUENCY_MS;
-  return Math.max(MIN_FREQUENCY_MS, Math.floor(value));
+  // If frequency is configured as a small integer, treat it as seconds for convenience.
+  const parsed = value > 0 && value < 1000 ? value * 1000 : value;
+  return Math.max(MIN_FREQUENCY_MS, Math.floor(parsed));
 }
 
-const frequencyMs = normalizeFrequencyMs(Number(commentaryConfig.frequencyMs));
+const frequencyMs = normalizeFrequencyMs(Number(commentaryConfig.frequency ?? commentaryConfig.frequencyMs));
 
 function localTimeString(date, tz) {
   try {
@@ -241,7 +245,7 @@ function start() {
     return;
   }
   logger.info('LLM commentary enabled', { model, ollamaUrl, frequencyMs, promptPath: PROMPT_PATH });
-  scheduleNextTick();
+  runTick();
 }
 
 start();
