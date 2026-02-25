@@ -4,6 +4,7 @@ const { Ollama } = require('ollama');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('llmCommentary');
 const { loadConfig } = require('../helpers/configLoader');
+const { getRole, roleEvents } = require('./roleService');
 const roverManager = require('./roverManager');
 const { getActiveDrivers } = require('./turnService');
 const { getNickname } = require('./nicknameService');
@@ -31,6 +32,7 @@ const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 
 let timer = null;
 let inFlight = false;
+let tickCount = 0;
 
 function normalizeFrequencyMs(value) {
   if (!Number.isFinite(value)) return DEFAULT_FREQUENCY_MS;
@@ -40,6 +42,60 @@ function normalizeFrequencyMs(value) {
 }
 
 const frequencyMs = normalizeFrequencyMs(Number(commentaryConfig.frequency ?? commentaryConfig.frequencyMs));
+let status = {
+  enabled,
+  model,
+  ollamaUrl,
+  frequencyMs,
+  jitterMs: JITTER_MS,
+  promptPath: PROMPT_PATH,
+  running: false,
+  inFlight: false,
+  tickCount: 0,
+  nextRunAt: null,
+  lastTickAt: null,
+  lastOutcome: null,
+  lastReason: null,
+  lastError: null,
+  lastPromptReadAt: null,
+  lastPromptChars: 0,
+  lastSnapshotSummary: null,
+  lastGeneratedText: null,
+  lastPostedText: null,
+  lastPostedAt: null,
+  updatedAt: Date.now(),
+};
+
+function isAdminSocket(socket) {
+  if (!socket) return false;
+  const role = getRole(socket);
+  return role === 'admin' || role === 'lockdown' || role === 'lockdown-admin';
+}
+
+function emitStatusToSocket(socket) {
+  if (!socket || !isAdminSocket(socket)) return;
+  socket.emit('llmCommentary:status', status);
+}
+
+function emitStatusToAdmins() {
+  io.sockets.sockets.forEach((socket) => {
+    if (!isAdminSocket(socket)) return;
+    socket.emit('llmCommentary:status', status);
+  });
+}
+
+function updateStatus(patch = {}) {
+  const next = {
+    ...status,
+    ...patch,
+    updatedAt: Date.now(),
+  };
+  if (JSON.stringify(next) === JSON.stringify(status)) {
+    return;
+  }
+  status = next;
+  emitStatusToAdmins();
+}
 
 function localTimeString(date, tz) {
   try {
@@ -73,10 +129,25 @@ function resolveDriverNickname(socketId) {
   return getNickname(socket) || socket?.data?.user?.username || socketId.slice(0, 6);
 }
 
+function collectActiveDriverEntries() {
+  const fromTurns = Object.entries(getActiveDrivers()).filter(([, socketId]) => Boolean(socketId));
+  if (fromTurns.length > 0) {
+    return fromTurns;
+  }
+  const fallback = [];
+  roverManager.rovers.forEach((record, roverId) => {
+    const socketId = record?.drivers?.values?.().next?.().value || null;
+    if (socketId) {
+      fallback.push([String(roverId), socketId]);
+    }
+  });
+  return fallback;
+}
+
 function buildSnapshot() {
   const now = new Date();
   const activeDrivers = getActiveDrivers();
-  const driverEntries = Object.entries(activeDrivers).filter(([, socketId]) => Boolean(socketId));
+  const driverEntries = collectActiveDriverEntries();
   if (driverEntries.length === 0) {
     return null;
   }
@@ -167,6 +238,10 @@ async function readSystemPrompt() {
   if (!trimmed) {
     throw new Error(`Prompt file empty: ${PROMPT_PATH}`);
   }
+  updateStatus({
+    lastPromptReadAt: Date.now(),
+    lastPromptChars: trimmed.length,
+  });
   return trimmed;
 }
 
@@ -193,31 +268,107 @@ async function generateCommentary(systemPrompt, snapshot) {
 
 function scheduleNextTick() {
   const delay = frequencyMs + Math.floor(Math.random() * (JITTER_MS + 1));
+  const nextRunAt = Date.now() + delay;
+  updateStatus({ nextRunAt });
   timer = setTimeout(runTick, delay);
 }
 
 async function runTick() {
+  tickCount += 1;
+  const tickId = tickCount;
+  updateStatus({
+    tickCount,
+    inFlight: true,
+    lastTickAt: Date.now(),
+    lastError: null,
+  });
   if (inFlight) {
+    logger.info('Commentary tick skipped; previous tick still running', { tickId });
+    updateStatus({
+      inFlight: false,
+      lastOutcome: 'skipped',
+      lastReason: 'previous tick still running',
+    });
     scheduleNextTick();
     return;
   }
   inFlight = true;
   try {
     const snapshot = buildSnapshot();
-    if (!snapshot) return;
+    if (!snapshot) {
+      logger.info('Commentary tick skipped; no active drivers', { tickId });
+      updateStatus({
+        lastOutcome: 'skipped',
+        lastReason: 'no active drivers',
+        inFlight: false,
+        lastSnapshotSummary: {
+          activeDrivers: 0,
+          rovers: roverManager.getRoster().length,
+          chatMessages: 0,
+        },
+      });
+      return;
+    }
+    const snapshotSummary = {
+      activeDrivers: snapshot.activity.active_driver_count,
+      rovers: snapshot.rovers.length,
+      chatMessages: snapshot.chat_recent.length,
+      drivingRovers: snapshot.activity.driving_rovers,
+      drivers: snapshot.drivers,
+    };
+    logger.info('Commentary tick started', {
+      tickId,
+      ...snapshotSummary,
+    });
+    updateStatus({
+      lastSnapshotSummary: snapshotSummary,
+    });
     const systemPrompt = await readSystemPrompt();
     const text = await generateCommentary(systemPrompt, snapshot);
-    if (!text) return;
+    if (!text) {
+      logger.info('Commentary tick produced SKIP/empty output', { tickId });
+      updateStatus({
+        lastOutcome: 'skipped',
+        lastReason: 'model returned SKIP/empty',
+        lastGeneratedText: null,
+      });
+      return;
+    }
+    updateStatus({
+      lastGeneratedText: text,
+    });
     const recentBotMessages = snapshot.bot_recent_messages || [];
     const duplicate = recentBotMessages.some(
       (entry) => String(entry?.text || '').trim().toLowerCase() === text.toLowerCase(),
     );
-    if (duplicate) return;
+    if (duplicate) {
+      logger.info('Commentary tick skipped duplicate output', { tickId, text });
+      updateStatus({
+        lastOutcome: 'skipped',
+        lastReason: 'duplicate text',
+      });
+      return;
+    }
     sendSystemMessage(text);
+    logger.info('Commentary message posted', { tickId, text });
+    updateStatus({
+      lastOutcome: 'posted',
+      lastReason: null,
+      lastPostedText: text,
+      lastPostedAt: Date.now(),
+    });
   } catch (err) {
-    logger.warn('Commentary tick failed', err.message);
+    logger.warn('Commentary tick failed', { tickId, error: err.message });
+    updateStatus({
+      lastOutcome: 'failed',
+      lastReason: 'exception',
+      lastError: err.message,
+    });
   } finally {
     inFlight = false;
+    updateStatus({
+      inFlight: false,
+    });
     scheduleNextTick();
   }
 }
@@ -225,14 +376,37 @@ async function runTick() {
 function start() {
   if (!enabled) {
     logger.info('LLM commentary disabled');
+    updateStatus({
+      running: false,
+      lastOutcome: 'disabled',
+      lastReason: 'llmCommentary.enabled is false',
+    });
     return;
   }
   if (!model || !ollamaUrl) {
     logger.warn('LLM commentary disabled; model or ollamaUrl missing');
+    updateStatus({
+      running: false,
+      lastOutcome: 'disabled',
+      lastReason: 'model or ollama server missing',
+    });
     return;
   }
   logger.info('LLM commentary enabled', { model, ollamaUrl, frequencyMs, promptPath: PROMPT_PATH });
+  updateStatus({
+    running: true,
+    lastOutcome: 'running',
+    lastReason: null,
+  });
   runTick();
 }
+
+io.on('connection', (socket) => {
+  emitStatusToSocket(socket);
+});
+
+roleEvents.on('change', ({ socket }) => {
+  emitStatusToSocket(socket);
+});
 
 start();

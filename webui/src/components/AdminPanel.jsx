@@ -20,6 +20,7 @@ export default function AdminPanel() {
     rebootRover,
     rebootServer,
     adminLogs,
+    llmCommentaryStatus,
   } = useSession();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
@@ -236,8 +237,120 @@ export default function AdminPanel() {
         )}
       />
       <ReplaySnapshotHealth health={health} />
+      <LlmCommentaryPanel status={llmCommentaryStatus} />
       <AdminIpLogPanel entries={adminLogs} />
     </section>
+  );
+}
+
+function LlmCommentaryPanel({ status }) {
+  if (!status) {
+    return (
+      <div className="space-y-0.5">
+        <div className="panel-muted text-xs uppercase">LLM Commentary</div>
+        <div className="surface text-xs text-slate-300">No status received yet.</div>
+      </div>
+    );
+  }
+
+  const lastTickAt = status.lastTickAt ? new Date(status.lastTickAt).toLocaleString() : 'never';
+  const nextRunAt = status.nextRunAt ? new Date(status.nextRunAt).toLocaleString() : 'n/a';
+  const lastPostedAt = status.lastPostedAt ? new Date(status.lastPostedAt).toLocaleString() : 'never';
+  const summary = status.lastSnapshotSummary || {};
+  const statusColor =
+    status.lastOutcome === 'failed'
+      ? 'text-red-300'
+      : status.lastOutcome === 'posted'
+      ? 'text-emerald-300'
+      : 'text-slate-300';
+
+  return (
+    <div className="space-y-0.5">
+      <div className="panel-muted text-xs uppercase">LLM Commentary</div>
+      <div className="surface space-y-0.5 text-xs text-slate-200">
+        <div className="flex items-center justify-between">
+          <span>Enabled</span>
+          <span>{status.enabled ? 'yes' : 'no'}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Running</span>
+          <span>{status.running ? 'yes' : 'no'}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>In flight</span>
+          <span>{status.inFlight ? 'yes' : 'no'}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Model</span>
+          <span className="text-slate-300">{status.model || '--'}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Server</span>
+          <span className="text-slate-300">{status.ollamaUrl || '--'}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Frequency</span>
+          <span>{status.frequencyMs} ms</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Tick count</span>
+          <span>{status.tickCount ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Last outcome</span>
+          <span className={statusColor}>{status.lastOutcome || '--'}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Last reason</span>
+          <span className="text-slate-300">{status.lastReason || '--'}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Last tick</span>
+          <span className="text-slate-300">{lastTickAt}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Next run</span>
+          <span className="text-slate-300">{nextRunAt}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Last posted</span>
+          <span className="text-slate-300">{lastPostedAt}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Prompt chars</span>
+          <span>{status.lastPromptChars ?? 0}</span>
+        </div>
+      </div>
+      <div className="surface space-y-0.5 text-xs text-slate-300">
+        <div className="flex items-center justify-between">
+          <span>Snapshot active drivers</span>
+          <span>{summary.activeDrivers ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Snapshot rovers</span>
+          <span>{summary.rovers ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Snapshot chat msgs</span>
+          <span>{summary.chatMessages ?? 0}</span>
+        </div>
+      </div>
+      {status.lastError ? (
+        <div className="surface text-xs text-red-300 break-words">
+          Error: {status.lastError}
+        </div>
+      ) : null}
+      {status.lastGeneratedText ? (
+        <div className="surface text-xs text-slate-200 break-words">
+          Generated: {status.lastGeneratedText}
+        </div>
+      ) : null}
+      {status.lastPostedText ? (
+        <div className="surface text-xs text-emerald-200 break-words">
+          Posted: {status.lastPostedText}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

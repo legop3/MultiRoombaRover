@@ -8,6 +8,7 @@ const SessionContext = createContext({
   session: null,
   logs: [],
   adminLogs: [],
+  llmCommentaryStatus: null,
   login: async () => {},
   setRole: async () => {},
   requestControl: async () => {},
@@ -46,6 +47,7 @@ export function SessionProvider({ children }) {
   const [session, setSession] = useState(null);
   const [logs, setLogs] = useState([]);
   const [adminLogs, setAdminLogs] = useState([]);
+  const [llmCommentaryStatus, setLlmCommentaryStatus] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [connected, setConnected] = useState(socket.connected);
 
@@ -76,11 +78,15 @@ export function SessionProvider({ children }) {
     function handleAdminLogEntry(entry) {
       setAdminLogs((prev) => [...prev.slice(-199), entry]);
     }
+    function handleLlmCommentaryStatus(payload = null) {
+      setLlmCommentaryStatus(payload && typeof payload === 'object' ? payload : null);
+    }
     socket.on('session:sync', handleSession);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
     socket.on('adminlog:init', handleAdminLogInit);
     socket.on('adminlog:entry', handleAdminLogEntry);
+    socket.on('llmCommentary:status', handleLlmCommentaryStatus);
     socket.on('alert:new', (payload = {}) => {
       setAlerts((prev) => [
         ...prev.slice(-49),
@@ -96,6 +102,7 @@ export function SessionProvider({ children }) {
       socket.off('log:entry', handleLogEntry);
       socket.off('adminlog:init', handleAdminLogInit);
       socket.off('adminlog:entry', handleAdminLogEntry);
+      socket.off('llmCommentary:status', handleLlmCommentaryStatus);
       socket.off('alert:new');
     };
   }, [socket]);
@@ -137,10 +144,11 @@ export function SessionProvider({ children }) {
       session,
       logs,
       adminLogs,
+      llmCommentaryStatus,
       alerts,
       ...actions,
     }),
-    [actions, adminLogs, alerts, connected, logs, session],
+    [actions, adminLogs, alerts, connected, llmCommentaryStatus, logs, session],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
