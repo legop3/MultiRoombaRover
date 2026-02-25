@@ -287,6 +287,30 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
       : 'text-slate-300';
   const largeIndicator = buildLlmLargeIndicator(status);
   const conversationRows = buildLlmConversationRows(status);
+  const statPills = [
+    { label: 'enabled', value: status.enabled ? 'yes' : 'no' },
+    { label: 'running', value: status.running ? 'yes' : 'no' },
+    { label: 'in flight', value: status.inFlight ? 'yes' : 'no' },
+    { label: 'model', value: status.model || '--' },
+    { label: 'server', value: status.ollamaUrl || '--' },
+    { label: 'frequency', value: `${status.frequencyMs} ms` },
+    { label: 'tick count', value: status.tickCount ?? 0 },
+    { label: 'skip streak', value: status.skipStreak ?? 0 },
+    { label: 'last outcome', value: status.lastOutcome || '--' },
+    { label: 'last reason', value: status.lastReason || '--' },
+    { label: 'last tick', value: lastTickAt },
+    { label: 'next run', value: nextRunAt },
+    { label: 'last posted', value: lastPostedAt },
+    { label: 'prompt chars', value: status.lastPromptChars ?? 0 },
+    { label: 'cleared count', value: status.clearCount ?? 0 },
+    {
+      label: 'last cleared',
+      value: status.lastClearedAt ? new Date(status.lastClearedAt).toLocaleString() : 'never',
+    },
+    { label: 'snapshot active drivers', value: summary.activeDrivers ?? 0 },
+    { label: 'snapshot rovers', value: summary.rovers ?? 0 },
+    { label: 'snapshot chat msgs', value: summary.chatMessages ?? 0 },
+  ];
 
   return (
     <div className="space-y-0.5">
@@ -305,87 +329,19 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
         <div className="text-[1.1rem] font-bold tracking-wide">{largeIndicator.label}</div>
         <div className="text-xs text-slate-200">{largeIndicator.detail}</div>
       </div>
-      <div className="surface space-y-0.5 text-xs text-slate-200">
-        <div className="flex items-center justify-between">
-          <span>Enabled</span>
-          <span>{status.enabled ? 'yes' : 'no'}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Running</span>
-          <span>{status.running ? 'yes' : 'no'}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>In flight</span>
-          <span>{status.inFlight ? 'yes' : 'no'}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Model</span>
-          <span className="text-slate-300">{status.model || '--'}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Server</span>
-          <span className="text-slate-300">{status.ollamaUrl || '--'}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Frequency</span>
-          <span>{status.frequencyMs} ms</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Tick count</span>
-          <span>{status.tickCount ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Skip streak</span>
-          <span>{status.skipStreak ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Last outcome</span>
-          <span className={statusColor}>{status.lastOutcome || '--'}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Last reason</span>
-          <span className="text-slate-300">{status.lastReason || '--'}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Last tick</span>
-          <span className="text-slate-300">{lastTickAt}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Next run</span>
-          <span className="text-slate-300">{nextRunAt}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Last posted</span>
-          <span className="text-slate-300">{lastPostedAt}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Prompt chars</span>
-          <span>{status.lastPromptChars ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Cleared count</span>
-          <span>{status.clearCount ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Last cleared</span>
-          <span className="text-slate-300">
-            {status.lastClearedAt ? new Date(status.lastClearedAt).toLocaleString() : 'never'}
+      <div className="surface flex flex-wrap gap-0.5 text-xs">
+        {statPills.map((pill) => (
+          <span
+            key={pill.label}
+            className={`rounded border px-0.5 py-0.25 text-[0.72rem] leading-tight ${
+              pill.label === 'last outcome'
+                ? `${statusColor} border-slate-500/40 bg-slate-800/70`
+                : 'border-slate-600/60 bg-slate-800/70 text-slate-200'
+            }`}
+          >
+            {pill.label}: {pill.value}
           </span>
-        </div>
-      </div>
-      <div className="surface space-y-0.5 text-xs text-slate-300">
-        <div className="flex items-center justify-between">
-          <span>Snapshot active drivers</span>
-          <span>{summary.activeDrivers ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Snapshot rovers</span>
-          <span>{summary.rovers ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Snapshot chat msgs</span>
-          <span>{summary.chatMessages ?? 0}</span>
-        </div>
+        ))}
       </div>
       {status.lastError ? (
         <div className="surface text-xs text-red-300 break-words">
