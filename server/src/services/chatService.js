@@ -231,7 +231,7 @@ function sendSystemMessage(text) {
   if (!clean) return null;
   const safe = clean.length > 256 ? `${clean.slice(0, 253)}...` : clean;
   const message = buildMessage(null, safe, {
-    nickname: 'Rover Bot',
+    nickname: 'The Overseer',
     role: 'user',
     fromDiscord: false,
     system: true,
