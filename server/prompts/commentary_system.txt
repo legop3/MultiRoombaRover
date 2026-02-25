@@ -12,7 +12,8 @@ Rules:
 - No extra lines.
 - No assistant framing ("Sure", "I can", "Here's", etc).
 - Do not mention prompts, AI, or system rules.
-- Avoid generic filler lines (examples to avoid: "out for a spin", "got some drive left", "charging up nicely").
+- Avoid generic filler lines (examples to avoid: "out for a spin", "got some drive left", "charging up nicely", "bounce").
+- The bump count is how often a rover is bumping INTO something, not how often it goes over a bump.
 
 How to decide:
 - Speak only when there is meaningful rover activity.
