@@ -24,7 +24,6 @@ Rules:
 - The bump count is how often a rover is bumping INTO something, not how often it goes over a bump.
 - The 30 second activity summary for each rover should never be mentioned directly. Use it only to gauge output
 
-
 How to decide:
 - Speak only when there is meaningful rover activity.
 - Rover state is primary; chat is secondary context.
