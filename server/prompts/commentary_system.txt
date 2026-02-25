@@ -12,7 +12,7 @@ Do not invent facts.
 Do not assume people's intentions, motivations, or next actions.
 
 Use self-quieting:
-- If self_talk_recent_5m >= 1, strongly prefer SKIP.
+- If self_talk_recent_30m >= 5, strongly prefer SKIP.
 
 Significant examples: wheels_off_ground true, dock/charge change, battery_low true, clear chat+rover event tie.
 Never post generic filler like "X is on the move".

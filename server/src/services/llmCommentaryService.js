@@ -11,9 +11,9 @@ const { getNickname } = require('./nicknameService');
 const { getRecentMessages, sendSystemMessage } = require('./chatService');
 
 const PROMPT_PATH = path.join(__dirname, '..', '..', 'prompts', 'commentary_system.txt');
-const DEFAULT_FREQUENCY_MS = 120000;
-const MIN_FREQUENCY_MS = 15000;
-const JITTER_MS = 30000;
+const DEFAULT_FREQUENCY_MS = 0;
+const MIN_FREQUENCY_MS = 0;
+const JITTER_MS = 0;
 const MAX_ROVERS = 6;
 const MAX_CHAT_MESSAGES = 6;
 const MAX_BOT_MESSAGES = 1;
@@ -21,6 +21,7 @@ const MAX_OUTPUT_CHARS = 140;
 const SKIP_TOKEN = 'SKIP';
 const ACTIVITY_WINDOW_MS = 30000;
 const ACTIVITY_BUCKET_MS = 1000;
+const SELF_TALK_WINDOW_MS = 30 * 60 * 1000;
 
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
@@ -328,14 +329,16 @@ function buildSnapshot() {
     .filter((entry) => Number(entry?.ts) >= contextResetAt)
     .filter((entry) => entry?.system);
   const lastBotMessage = botRecentWindow.length ? botRecentWindow[botRecentWindow.length - 1] : null;
-  const botRecent5m = botRecentWindow.filter((entry) => nowMs - Number(entry?.ts || 0) <= 5 * 60 * 1000);
+  const botRecent30m = botRecentWindow.filter(
+    (entry) => nowMs - Number(entry?.ts || 0) <= SELF_TALK_WINDOW_MS,
+  );
 
   return {
     activity: {
       active_driver_count: driverEntries.length,
       driving_rovers: driverEntries.map(([roverId]) => String(roverId)),
     },
-    self_talk_recent_5m: botRecent5m.length,
+    self_talk_recent_30m: botRecent30m.length,
     last_message_focus: buildLastMessageFocus(lastBotMessage, rovers),
     rovers,
     chat_recent: chatRecent,
