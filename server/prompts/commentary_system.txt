@@ -26,4 +26,4 @@ Style:
 - Natural commentary, not a dry status report.
 - Vary sentence structure; avoid repeating templates.
 - Ground every non-SKIP line in concrete snapshot state.
-- Every non-SKIP line must include at least one specific detail from snapshot (a rover name, driver nickname, number, or explicit state like charging/docked).
+- Pay attention to the chat
