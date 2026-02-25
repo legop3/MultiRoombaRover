@@ -22,6 +22,7 @@ const SKIP_TOKEN = 'SKIP';
 const ACTIVITY_WINDOW_MS = 30000;
 const ACTIVITY_BUCKET_MS = 1000;
 const SELF_TALK_WINDOW_MS = 30 * 60 * 1000;
+const MAX_CONTEXT_EVENTS = 100;
 
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
@@ -253,6 +254,19 @@ function buildLastMessageFocus(lastBotMessage, rovers = []) {
   };
 }
 
+function compactRoverForContext(rover) {
+  if (!rover) return null;
+  return {
+    id: rover.id,
+    status_tag: rover.status_tag,
+    battery_low: rover.battery_low,
+    docked: rover.docked,
+    charging: rover.charging,
+    wheels_off_ground: rover.wheels_off_ground,
+    activity_30s: rover.activity_30s,
+  };
+}
+
 function buildSnapshot() {
   const now = new Date();
   const nowMs = now.getTime();
@@ -316,16 +330,18 @@ function buildSnapshot() {
   nextRoverStateById.forEach((value, roverId) => {
     lastRoverStateById.set(roverId, value);
   });
-
-  const chatRecent = getRecentMessages(60, { includeSystem: false })
-    .filter((entry) => Number(entry?.ts) >= contextResetAt)
+  const roverById = new Map(rovers.map((rover) => [String(rover.id), rover]));
+  const allRecentMessages = getRecentMessages(300, { includeSystem: true })
+    .filter((entry) => Number(entry?.ts) >= contextResetAt);
+  const chatRecent = allRecentMessages
+    .filter((entry) => !entry?.system)
     .slice(-MAX_CHAT_MESSAGES)
     .map((entry) => ({
-    nickname: entry.nickname || entry.socketId?.slice(0, 6) || 'unknown',
-    text: entry.text || '',
+      nickname: entry.nickname || entry.socketId?.slice(0, 6) || 'unknown',
+      text: entry.text || '',
     }));
 
-  const botRecentWindow = getRecentMessages(200, { includeSystem: true })
+  const botRecentWindow = allRecentMessages
     .filter((entry) => Number(entry?.ts) >= contextResetAt)
     .filter((entry) => entry?.system);
   const lastBotMessage = botRecentWindow.length ? botRecentWindow[botRecentWindow.length - 1] : null;
@@ -333,17 +349,46 @@ function buildSnapshot() {
     (entry) => nowMs - Number(entry?.ts || 0) <= SELF_TALK_WINDOW_MS,
   );
 
+  const eventStream = allRecentMessages.slice(-MAX_CONTEXT_EVENTS).map((entry) => {
+    if (entry?.system) {
+      return {
+        type: 'bot',
+        nickname: entry.nickname || 'Rover Bot',
+        text: entry.text || '',
+      };
+    }
+    const roverId = entry?.roverId ? String(entry.roverId) : null;
+    const rover = roverId ? roverById.get(roverId) : null;
+    return {
+      type: 'chat',
+      nickname: entry.nickname || entry.socketId?.slice(0, 6) || 'unknown',
+      text: entry.text || '',
+      rover_id: roverId,
+      rover_ctx: compactRoverForContext(rover),
+    };
+  });
+  const hasRecentChat = eventStream.some((event) => event.type === 'chat');
+  if (!hasRecentChat) {
+    eventStream.push({
+      type: 'snapshot',
+      reason: 'chat_quiet',
+      rovers,
+    });
+  }
+
   return {
-    activity: {
+    run_meta: {
+      version: 'commentary_v2',
+      self_talk_recent_30m: botRecent30m.length,
+      last_message_focus: buildLastMessageFocus(lastBotMessage, rovers),
       active_driver_count: driverEntries.length,
       driving_rovers: driverEntries.map(([roverId]) => String(roverId)),
     },
-    self_talk_recent_30m: botRecent30m.length,
-    last_message_focus: buildLastMessageFocus(lastBotMessage, rovers),
-    rovers,
-    chat_recent: chatRecent,
-    // Keep this compact: expose only one previous bot message summary via last_message_focus.
-    // your_last_message: botRecent,
+    event_stream: eventStream,
+    current_snapshot: {
+      rovers,
+      chat_recent: chatRecent,
+    },
   };
 }
 
@@ -383,19 +428,68 @@ async function generateCommentary(systemPrompt, snapshot) {
   if (!ollamaClient) {
     throw new Error('Ollama client unavailable');
   }
+  const messages = [];
+  messages.push({ role: 'system', content: systemPrompt });
+  messages.push({
+    role: 'user',
+    content: JSON.stringify({
+      type: 'run_meta',
+      run_meta: snapshot?.run_meta || {},
+    }),
+  });
+  const timeline = Array.isArray(snapshot?.event_stream) ? snapshot.event_stream : [];
+  timeline.forEach((event) => {
+    if (!event || typeof event !== 'object') return;
+    if (event.type === 'bot') {
+      const text = String(event.text || '').trim();
+      if (text) {
+        messages.push({ role: 'assistant', content: text });
+      }
+      return;
+    }
+    if (event.type === 'chat') {
+      messages.push({
+        role: 'user',
+        content: JSON.stringify({
+          type: 'chat',
+          nickname: event.nickname || 'unknown',
+          text: event.text || '',
+          rover_id: event.rover_id || null,
+          rover_ctx: event.rover_ctx || null,
+        }),
+      });
+      return;
+    }
+    if (event.type === 'snapshot') {
+      messages.push({
+        role: 'user',
+        content: JSON.stringify({
+          type: 'snapshot',
+          reason: event.reason || null,
+          rovers: event.rovers || [],
+        }),
+      });
+    }
+  });
+  // Always end with a full rover snapshot user message.
+  messages.push({
+    role: 'user',
+    content: JSON.stringify({
+      type: 'snapshot_final',
+      current_snapshot: snapshot?.current_snapshot || {},
+    }),
+  });
+
   const payload = await ollamaClient.chat({
     model,
     stream: false,
     keep_alive: -1,
     options: {
-      temperature: 0.35,
-      top_p: 0.8,
-      num_predict: 80,
+      temperature: 0.45,
+      top_p: 0.9,
+      num_predict: 128,
     },
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: JSON.stringify(snapshot) },
-    ],
+    messages,
   });
   return normalizeCommentary(payload?.message?.content);
 }
@@ -451,10 +545,11 @@ async function runTick() {
       return;
     }
     const snapshotSummary = {
-      activeDrivers: snapshot.activity.active_driver_count,
-      rovers: snapshot.rovers.length,
-      chatMessages: snapshot.chat_recent.length,
-      drivingRovers: snapshot.activity.driving_rovers,
+      activeDrivers: snapshot?.run_meta?.active_driver_count || 0,
+      rovers: snapshot?.current_snapshot?.rovers?.length || 0,
+      chatMessages: snapshot?.current_snapshot?.chat_recent?.length || 0,
+      drivingRovers: snapshot?.run_meta?.driving_rovers || [],
+      eventCount: snapshot?.event_stream?.length || 0,
     };
     logger.info('Commentary tick started', {
       tickId,
