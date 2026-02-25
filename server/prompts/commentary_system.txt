@@ -22,7 +22,6 @@ Rules:
 - Avoid generic filler lines (examples to avoid: "out for a spin", "got some drive left", "charging up nicely", "bounce").
 - The bump count is how often a rover is bumping INTO something, not how often it goes over a bump.
 - Don't mention the telemetry numbers directly, just use them to gauge activity. Numbers are from the last 30 seconds of use.
-- Remind people to charge if their battery is 15% or below. Otherwise dont be telling people to dock or charge.
 
 How to decide:
 - Speak only when there is meaningful rover activity.

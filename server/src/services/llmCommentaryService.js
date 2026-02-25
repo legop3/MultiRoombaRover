@@ -16,7 +16,7 @@ const MIN_FREQUENCY_MS = 15000;
 const JITTER_MS = 30000;
 const MAX_ROVERS = 6;
 const MAX_CHAT_MESSAGES = 6;
-const MAX_BOT_MESSAGES = 6;
+const MAX_BOT_MESSAGES = 1;
 const MAX_OUTPUT_CHARS = 140;
 const SKIP_TOKEN = 'SKIP';
 const ACTIVITY_WINDOW_MS = 30000;
@@ -272,7 +272,7 @@ function buildSnapshot() {
       driver_nickname: driverSocketId ? resolveDriverNickname(driverSocketId) : null,
       docked,
       charging,
-      battery_percent: batteryState?.percentDisplay ?? null,
+      battery_low: Boolean(batteryState?.warnActive || batteryState?.urgentActive),
       activity_30s: activity30s,
       status_tag: statusTag,
     };
@@ -287,15 +287,14 @@ function buildSnapshot() {
     text: entry.text || '',
     }));
 
-  // Temporarily disabled: do not feed prior bot/system messages into the LLM snapshot.
-  // const botRecent = getRecentMessages(80, { includeSystem: true })
-  //   .filter((entry) => Number(entry?.ts) >= contextResetAt)
-  //   .filter((entry) => entry?.system)
-  //   .slice(-MAX_BOT_MESSAGES)
-  //   .map((entry) => ({
-  //     ts_iso: new Date(entry.ts).toISOString(),
-  //     text: entry.text || '',
-  //   }));
+  const botRecent = getRecentMessages(80, { includeSystem: true })
+    .filter((entry) => Number(entry?.ts) >= contextResetAt)
+    .filter((entry) => entry?.system)
+    .slice(-MAX_BOT_MESSAGES)
+    .map((entry) => ({
+      ts_iso: new Date(entry.ts).toISOString(),
+      text: entry.text || '',
+    }));
 
   return {
     now: {
@@ -310,7 +309,7 @@ function buildSnapshot() {
     },
     rovers,
     chat_recent: chatRecent,
-    // bot_recent_messages: botRecent,
+    bot_recent_messages: botRecent,
   };
 }
 
