@@ -1,5 +1,6 @@
 const fsp = require('fs/promises');
 const path = require('path');
+const { Ollama } = require('ollama');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('llmCommentary');
 const { loadConfig } = require('../helpers/configLoader');
@@ -15,7 +16,6 @@ const JITTER_MS = 30000;
 const MAX_ROVERS = 8;
 const MAX_CHAT_MESSAGES = 12;
 const MAX_BOT_MESSAGES = 6;
-const REQUEST_TIMEOUT_MS = 12000;
 const MAX_OUTPUT_CHARS = 140;
 const SKIP_TOKEN = 'SKIP';
 
@@ -27,6 +27,7 @@ const ollamaUrl = String(
 ).trim();
 const model = String(commentaryConfig.model || '').trim();
 const timezone = String(config.timezone || 'UTC');
+const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 
 let timer = null;
 let inFlight = false;
@@ -170,38 +171,24 @@ async function readSystemPrompt() {
 }
 
 async function generateCommentary(systemPrompt, snapshot) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  const url = `${ollamaUrl.replace(/\/+$/, '')}/api/chat`;
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        stream: false,
-        keep_alive: -1,
-        options: {
-          temperature: 0.7,
-          top_p: 0.9,
-          num_predict: 80,
-        },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: JSON.stringify(snapshot) },
-        ],
-      }),
-    });
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Ollama error ${response.status}: ${body.slice(0, 200)}`);
-    }
-    const payload = await response.json();
-    return normalizeCommentary(payload?.message?.content);
-  } finally {
-    clearTimeout(timeout);
+  if (!ollamaClient) {
+    throw new Error('Ollama client unavailable');
   }
+  const payload = await ollamaClient.chat({
+    model,
+    stream: false,
+    keep_alive: -1,
+    options: {
+      temperature: 0.7,
+      top_p: 0.9,
+      num_predict: 80,
+    },
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: JSON.stringify(snapshot) },
+    ],
+  });
+  return normalizeCommentary(payload?.message?.content);
 }
 
 function scheduleNextTick() {
