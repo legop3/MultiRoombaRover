@@ -252,6 +252,9 @@ function buildSnapshot() {
     const sensors = record?.lastSensor?.decoded || {};
     const batteryState = entry.batteryState || null;
     const driverSocketId = activeDrivers[roverId] || null;
+    const wheelsOffGround = Boolean(
+      sensors?.bumpsAndWheelDrops?.wheelDropLeft && sensors?.bumpsAndWheelDrops?.wheelDropRight,
+    );
     const activity30s = getActivity30s(roverId, now.getTime());
     const charging = isChargingFromSensors(sensors);
     const docked = Boolean(sensors?.chargingSources?.homeBase);
@@ -272,6 +275,7 @@ function buildSnapshot() {
       driver_nickname: driverSocketId ? resolveDriverNickname(driverSocketId) : null,
       docked,
       charging,
+      wheels_off_ground: wheelsOffGround,
       battery_low: Boolean(batteryState?.warnActive || batteryState?.urgentActive),
       activity_30s: activity30s,
       status_tag: statusTag,
