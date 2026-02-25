@@ -29,7 +29,6 @@ const ollamaUrl = String(
   commentaryConfig.ollamaUrl || commentaryConfig.ollamaServer || '',
 ).trim();
 const model = String(commentaryConfig.model || '').trim();
-const timezone = String(config.timezone || 'UTC');
 const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 
 let timer = null;
@@ -38,6 +37,7 @@ let tickCount = 0;
 let contextResetAt = Date.now();
 let clearCount = 0;
 const roverActivity = new Map(); // roverId -> { buckets: Map(bucketTs -> { distanceMm, turnDeg, bumps }), bumpLeftActive, bumpRightActive }
+const lastRoverStateById = new Map(); // roverId -> compact rover state used as prev_state
 
 function normalizeFrequencyMs(value) {
   if (!Number.isFinite(value)) return DEFAULT_FREQUENCY_MS;
@@ -104,23 +104,6 @@ function updateStatus(patch = {}) {
   }
   status = next;
   emitStatusToAdmins();
-}
-
-function localTimeString(date, tz) {
-  try {
-    return new Intl.DateTimeFormat('sv-SE', {
-      timeZone: tz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(date);
-  } catch {
-    return date.toISOString();
-  }
 }
 
 function pruneActivityBuckets(state, nowMs) {
@@ -193,6 +176,7 @@ function clearRuntimeHistory() {
   contextResetAt = Date.now();
   clearCount += 1;
   roverActivity.clear();
+  lastRoverStateById.clear();
   updateStatus({
     lastClearedAt: contextResetAt,
     clearCount,
@@ -237,6 +221,37 @@ function collectActiveDriverEntries() {
   return fallback;
 }
 
+function detectMessageTopic(text = '') {
+  const value = String(text).toLowerCase();
+  if (!value.trim()) return 'none';
+  if (/\b(bump|hit|bonk|crash|slam|collision)\b/.test(value)) return 'bumps';
+  if (/\b(wheel.?drop|wheels?.*off.?ground|picked up|lifted)\b/.test(value)) return 'wheels_off_ground';
+  if (/\b(dock|docked|undock|charger|charging)\b/.test(value)) return 'dock_charge';
+  if (/\b(battery|low power|power)\b/.test(value)) return 'battery';
+  if (/\b(chat|everyone|people|crowd)\b/.test(value)) return 'chat';
+  if (/\b(move|driv|turn|spin|rolling)\b/.test(value)) return 'movement';
+  return 'general';
+}
+
+function buildLastMessageFocus(lastBotMessage, rovers = []) {
+  if (!lastBotMessage) return null;
+  const text = String(lastBotMessage.text || '');
+  const textLower = text.toLowerCase();
+  let roverId = null;
+  for (const rover of rovers) {
+    const id = String(rover?.id || '').toLowerCase();
+    const name = String(rover?.name || '').toLowerCase();
+    if ((id && textLower.includes(id)) || (name && textLower.includes(name))) {
+      roverId = rover.id;
+      break;
+    }
+  }
+  return {
+    rover_id: roverId,
+    topic: detectMessageTopic(text),
+  };
+}
+
 function buildSnapshot() {
   const now = new Date();
   const nowMs = now.getTime();
@@ -247,6 +262,7 @@ function buildSnapshot() {
   }
 
   const roster = roverManager.getRoster().slice(0, MAX_ROVERS);
+  const nextRoverStateById = new Map();
   const rovers = roster.map((entry) => {
     const roverId = String(entry.id);
     const record = roverManager.rovers.get(roverId);
@@ -270,7 +286,7 @@ function buildSnapshot() {
     } else if (driverSocketId) {
       statusTag = 'active-idle';
     }
-    return {
+    const rover = {
       id: roverId,
       name: entry.name || roverId,
       driver_nickname: driverSocketId ? resolveDriverNickname(driverSocketId) : null,
@@ -281,49 +297,50 @@ function buildSnapshot() {
       activity_30s: activity30s,
       status_tag: statusTag,
     };
+    const prev = lastRoverStateById.get(roverId) || null;
+    const nextState = {
+      driver_nickname: rover.driver_nickname,
+      docked: rover.docked,
+      charging: rover.charging,
+      wheels_off_ground: rover.wheels_off_ground,
+      battery_low: rover.battery_low,
+      activity_30s: rover.activity_30s,
+      status_tag: rover.status_tag,
+    };
+    nextRoverStateById.set(roverId, nextState);
+    rover.prev_state = prev;
+    return rover;
+  });
+  lastRoverStateById.clear();
+  nextRoverStateById.forEach((value, roverId) => {
+    lastRoverStateById.set(roverId, value);
   });
 
   const chatRecent = getRecentMessages(60, { includeSystem: false })
     .filter((entry) => Number(entry?.ts) >= contextResetAt)
     .slice(-MAX_CHAT_MESSAGES)
     .map((entry) => ({
-    ts_iso: new Date(entry.ts).toISOString(),
     nickname: entry.nickname || entry.socketId?.slice(0, 6) || 'unknown',
     text: entry.text || '',
     }));
 
-  const botRecent = getRecentMessages(80, { includeSystem: true })
-    .filter((entry) => Number(entry?.ts) >= contextResetAt)
-    .filter((entry) => entry?.system)
-    .slice(-MAX_BOT_MESSAGES)
-    .map((entry) => ({
-      ts_iso: new Date(entry.ts).toISOString(),
-      text: entry.text || '',
-    }));
   const botRecentWindow = getRecentMessages(200, { includeSystem: true })
     .filter((entry) => Number(entry?.ts) >= contextResetAt)
     .filter((entry) => entry?.system);
+  const lastBotMessage = botRecentWindow.length ? botRecentWindow[botRecentWindow.length - 1] : null;
   const botRecent5m = botRecentWindow.filter((entry) => nowMs - Number(entry?.ts || 0) <= 5 * 60 * 1000);
-  const lastBotTs = botRecentWindow.length ? Number(botRecentWindow[botRecentWindow.length - 1]?.ts || 0) : null;
-  const secondsSinceLastBotMessage =
-    lastBotTs && nowMs > lastBotTs ? Math.floor((nowMs - lastBotTs) / 1000) : null;
 
   return {
-    now: {
-      iso: now.toISOString(),
-      local: localTimeString(now, timezone),
-      timezone,
-      unix_ms: now.getTime(),
-    },
     activity: {
       active_driver_count: driverEntries.length,
       driving_rovers: driverEntries.map(([roverId]) => String(roverId)),
     },
     self_talk_recent_5m: botRecent5m.length,
-    seconds_since_last_bot_message: secondsSinceLastBotMessage,
+    last_message_focus: buildLastMessageFocus(lastBotMessage, rovers),
     rovers,
     chat_recent: chatRecent,
-    your_last_message: botRecent,
+    // Keep this compact: expose only one previous bot message summary via last_message_focus.
+    // your_last_message: botRecent,
   };
 }
 
@@ -380,14 +397,19 @@ async function generateCommentary(systemPrompt, snapshot) {
   return normalizeCommentary(payload?.message?.content);
 }
 
-function scheduleNextTick() {
-  const delay = frequencyMs + Math.floor(Math.random() * (JITTER_MS + 1));
-  const nextRunAt = Date.now() + delay;
+function defaultTickDelayMs() {
+  return frequencyMs + Math.floor(Math.random() * (JITTER_MS + 1));
+}
+
+function scheduleNextTick(delayMs = defaultTickDelayMs()) {
+  const safeDelay = Math.max(0, Number.isFinite(delayMs) ? Math.floor(delayMs) : defaultTickDelayMs());
+  const nextRunAt = Date.now() + safeDelay;
   updateStatus({ nextRunAt });
-  timer = setTimeout(runTick, delay);
+  timer = setTimeout(runTick, safeDelay);
 }
 
 async function runTick() {
+  let nextDelayMs = defaultTickDelayMs();
   tickCount += 1;
   const tickId = tickCount;
   updateStatus({
@@ -403,7 +425,7 @@ async function runTick() {
       lastOutcome: 'skipped',
       lastReason: 'previous tick still running',
     });
-    scheduleNextTick();
+    scheduleNextTick(nextDelayMs);
     return;
   }
   inFlight = true;
@@ -421,6 +443,8 @@ async function runTick() {
           chatMessages: 0,
         },
       });
+      // Keep delayed cadence when nobody is driving.
+      nextDelayMs = defaultTickDelayMs();
       return;
     }
     const snapshotSummary = {
@@ -446,6 +470,8 @@ async function runTick() {
         lastReason: 'model returned SKIP/empty',
         lastGeneratedText: null,
       });
+      // Immediate retry after model skip.
+      nextDelayMs = 0;
       return;
     }
     updateStatus({
@@ -464,6 +490,8 @@ async function runTick() {
         lastOutcome: 'skipped',
         lastReason: 'duplicate text',
       });
+      // Immediate retry after a skip outcome.
+      nextDelayMs = 0;
       return;
     }
     sendSystemMessage(text);
@@ -486,7 +514,7 @@ async function runTick() {
     updateStatus({
       inFlight: false,
     });
-    scheduleNextTick();
+    scheduleNextTick(nextDelayMs);
   }
 }
 
