@@ -19,6 +19,7 @@ export default function AdminPanel() {
     setAdminReason,
     rebootRover,
     rebootServer,
+    llmControl,
     adminLogs,
     llmCommentaryStatus,
   } = useSession();
@@ -26,6 +27,7 @@ export default function AdminPanel() {
   const [lockStates, setLockStates] = useState({});
   const [rebootStates, setRebootStates] = useState({});
   const [serverRebooting, setServerRebooting] = useState(false);
+  const [clearingLlmHistory, setClearingLlmHistory] = useState(false);
   const health = session?.health || null;
   const currentGoal = session?.communityGoal?.text || '';
   const goalUpdatedAt = session?.communityGoal?.updatedAt || null;
@@ -90,6 +92,21 @@ export default function AdminPanel() {
     } catch (err) {
       alert(err.message);
       setServerRebooting(false);
+    }
+  };
+
+  const handleClearLlmHistory = async () => {
+    const ok = window.confirm(
+      'Clear LLM commentary history now? This resets chat context, bot memory, and rover activity metrics for narration.',
+    );
+    if (!ok) return;
+    setClearingLlmHistory(true);
+    try {
+      await llmControl('clearHistory');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setClearingLlmHistory(false);
     }
   };
 
@@ -237,13 +254,17 @@ export default function AdminPanel() {
         )}
       />
       <ReplaySnapshotHealth health={health} />
-      <LlmCommentaryPanel status={llmCommentaryStatus} />
+      <LlmCommentaryPanel
+        status={llmCommentaryStatus}
+        onClearHistory={handleClearLlmHistory}
+        clearingHistory={clearingLlmHistory}
+      />
       <AdminIpLogPanel entries={adminLogs} />
     </section>
   );
 }
 
-function LlmCommentaryPanel({ status }) {
+function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
   if (!status) {
     return (
       <div className="space-y-0.5">
@@ -267,6 +288,16 @@ function LlmCommentaryPanel({ status }) {
   return (
     <div className="space-y-0.5">
       <div className="panel-muted text-xs uppercase">LLM Commentary</div>
+      <div className="flex gap-0.5 text-xs">
+        <button
+          type="button"
+          onClick={onClearHistory}
+          disabled={Boolean(clearingHistory)}
+          className="button-danger disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {clearingHistory ? 'Clearing...' : 'Clear LLM History'}
+        </button>
+      </div>
       <div className="surface space-y-0.5 text-xs text-slate-200">
         <div className="flex items-center justify-between">
           <span>Enabled</span>
@@ -319,6 +350,16 @@ function LlmCommentaryPanel({ status }) {
         <div className="flex items-center justify-between">
           <span>Prompt chars</span>
           <span>{status.lastPromptChars ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Cleared count</span>
+          <span>{status.clearCount ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Last cleared</span>
+          <span className="text-slate-300">
+            {status.lastClearedAt ? new Date(status.lastClearedAt).toLocaleString() : 'never'}
+          </span>
         </div>
       </div>
       <div className="surface space-y-0.5 text-xs text-slate-300">

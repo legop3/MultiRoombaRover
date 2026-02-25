@@ -23,6 +23,7 @@ const SessionContext = createContext({
   setAdminReason: async () => {},
   rebootRover: async () => {},
   rebootServer: async () => {},
+  llmControl: async () => {},
 });
 
 function useAckEmitter(socket) {
@@ -129,6 +130,7 @@ export function SessionProvider({ children }) {
       rebootRover: (roverId) =>
         emitWithAck('command', { roverId, type: 'reboot', data: { reboot: {} } }),
       rebootServer: () => emitWithAck('server:reboot'),
+      llmControl: (action, payload = {}) => emitWithAck('llm:control', { action, ...payload }),
       pushAlert: (alert) =>
         setAlerts((prev) => [
           ...prev.slice(-49),
