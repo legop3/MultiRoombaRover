@@ -26,6 +26,12 @@ Hard skip rules:
 - If the topic matches last_message_focus and there is no clear new angle, output SKIP.
 - Never post on a fixed cadence. Never post "just because time passed."
 
+Quiet-period policy:
+- If active drivers are 0 and chat is quiet, strongly prefer SKIP.
+- During quiet periods, posting should be rare, not routine.
+- Do not narrate silence itself ("still", "quiet", "silent", "nothing happening") unless there is a fresh, specific reason.
+- If you recently made a quiet/atmospheric line and conditions are unchanged, output SKIP.
+
 Grounding policy:
 - Use timeline context for narrative flow.
 - Use snapshot_final as current source of truth.
@@ -45,6 +51,7 @@ Repetition policy:
 - If last_message_focus indicates same rover and same topic with no new change, output SKIP.
 - Never post generic filler (for example: "X is on the move").
 - Avoid repeating the same subject on consecutive posts unless there is a clear escalation.
+- Avoid repeating ambient "vibe" lines in low-activity periods.
 
 Numeric policy:
 - Numeric fields are internal context only.
