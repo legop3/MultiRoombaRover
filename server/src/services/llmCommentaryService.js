@@ -15,14 +15,14 @@ const DEFAULT_FREQUENCY_MS = 0;
 const MIN_FREQUENCY_MS = 0;
 const JITTER_MS = 0;
 const MAX_ROVERS = 6;
-const MAX_CHAT_MESSAGES = 6;
+const MAX_CHAT_MESSAGES = 4;
 const MAX_BOT_MESSAGES = 1;
 const MAX_OUTPUT_CHARS = 140;
 const SKIP_TOKEN = 'SKIP';
 const ACTIVITY_WINDOW_MS = 30000;
 const ACTIVITY_BUCKET_MS = 1000;
 const SELF_TALK_WINDOW_MS = 30 * 60 * 1000;
-const MAX_CONTEXT_EVENTS = 100;
+const MAX_CONTEXT_EVENTS = 10;
 const NO_ACTIVE_DRIVER_DELAY_MS = 5000;
 const NO_ACTIVE_DRIVER_LOG_COOLDOWN_MS = 30000;
 
@@ -383,6 +383,13 @@ function buildSnapshot() {
     });
   }
 
+  const currentSnapshot = {
+    rovers,
+  };
+  if (!hasRecentChat) {
+    currentSnapshot.chat_recent = chatRecent;
+  }
+
   return {
     run_meta: {
       version: 'commentary_v2',
@@ -392,10 +399,7 @@ function buildSnapshot() {
       driving_rovers: driverEntries.map(([roverId]) => String(roverId)),
     },
     event_stream: eventStream,
-    current_snapshot: {
-      rovers,
-      chat_recent: chatRecent,
-    },
+    current_snapshot: currentSnapshot,
   };
 }
 
@@ -427,6 +431,68 @@ function parseModelOutput(rawContent) {
   };
 }
 
+function formatRunMetaMessage(runMeta = {}) {
+  const focus = runMeta?.last_message_focus || null;
+  const focusText = focus
+    ? `topic=${focus.topic || 'none'} rover=${focus.rover_id || 'none'}`
+    : 'none';
+  const drivingRovers = Array.isArray(runMeta?.driving_rovers) && runMeta.driving_rovers.length
+    ? runMeta.driving_rovers.join(', ')
+    : 'none';
+  return [
+    'RUN META',
+    `- active drivers: ${Number(runMeta?.active_driver_count) || 0}`,
+    `- driving rovers: ${drivingRovers}`,
+    `- bot posts last 30m: ${Number(runMeta?.self_talk_recent_30m) || 0}`,
+    `- last bot focus: ${focusText}`,
+  ].join('\n');
+}
+
+function formatRoverCtx(ctx) {
+  if (!ctx || typeof ctx !== 'object') return 'none';
+  const activity = ctx.activity_30s || {};
+  return `status=${ctx.status_tag || 'unknown'} battery_low=${Boolean(ctx.battery_low)} wheels_off_ground=${Boolean(ctx.wheels_off_ground)} docked=${Boolean(ctx.docked)} charging=${Boolean(ctx.charging)} move30=${Number(activity.distance_m) || 0}m turn30=${Number(activity.turn_deg) || 0}deg bumps30=${Number(activity.bumps) || 0}`;
+}
+
+function formatChatEventMessage(event) {
+  return [
+    'CHAT',
+    `nick: ${event.nickname || 'unknown'}`,
+    `text: ${event.text || ''}`,
+    `rover: ${event.rover_id || 'none'}`,
+    `rover_now: ${formatRoverCtx(event.rover_ctx)}`,
+  ].join('\n');
+}
+
+function formatRoverSnapshotLine(rover = {}) {
+  const activity = rover.activity_30s || {};
+  return `${rover.id || 'unknown'}: driver=${rover.driver_nickname || 'none'} status=${rover.status_tag || 'unknown'} battery_low=${Boolean(rover.battery_low)} wheels_off_ground=${Boolean(rover.wheels_off_ground)} docked=${Boolean(rover.docked)} charging=${Boolean(rover.charging)} move30=${Number(activity.distance_m) || 0}m turn30=${Number(activity.turn_deg) || 0}deg bumps30=${Number(activity.bumps) || 0}`;
+}
+
+function formatSnapshotMessage(event) {
+  const rovers = Array.isArray(event?.rovers) ? event.rovers : [];
+  const lines = ['SNAPSHOT', `reason: ${event?.reason || 'none'}`];
+  rovers.forEach((rover) => {
+    lines.push(formatRoverSnapshotLine(rover));
+  });
+  return lines.join('\n');
+}
+
+function formatSnapshotFinalMessage(currentSnapshot = {}) {
+  const rovers = Array.isArray(currentSnapshot?.rovers) ? currentSnapshot.rovers : [];
+  const lines = ['SNAPSHOT FINAL'];
+  rovers.forEach((rover) => {
+    lines.push(formatRoverSnapshotLine(rover));
+  });
+  if (Array.isArray(currentSnapshot?.chat_recent) && currentSnapshot.chat_recent.length) {
+    lines.push('chat_recent:');
+    currentSnapshot.chat_recent.forEach((entry) => {
+      lines.push(`- ${entry.nickname || 'unknown'}: ${entry.text || ''}`);
+    });
+  }
+  return lines.join('\n');
+}
+
 async function readSystemPrompt() {
   const prompt = await fsp.readFile(PROMPT_PATH, 'utf8');
   const trimmed = prompt.trim();
@@ -449,10 +515,7 @@ async function generateCommentary(systemPrompt, snapshot) {
   messages.push({ role: 'system', content: systemPrompt });
   messages.push({
     role: 'user',
-    content: JSON.stringify({
-      type: 'run_meta',
-      run_meta: snapshot?.run_meta || {},
-    }),
+    content: formatRunMetaMessage(snapshot?.run_meta || {}),
   });
   const timeline = Array.isArray(snapshot?.event_stream) ? snapshot.event_stream : [];
   timeline.forEach((event) => {
@@ -467,34 +530,21 @@ async function generateCommentary(systemPrompt, snapshot) {
     if (event.type === 'chat') {
       messages.push({
         role: 'user',
-        content: JSON.stringify({
-          type: 'chat',
-          nickname: event.nickname || 'unknown',
-          text: event.text || '',
-          rover_id: event.rover_id || null,
-          rover_ctx: event.rover_ctx || null,
-        }),
+        content: formatChatEventMessage(event),
       });
       return;
     }
     if (event.type === 'snapshot') {
       messages.push({
         role: 'user',
-        content: JSON.stringify({
-          type: 'snapshot',
-          reason: event.reason || null,
-          rovers: event.rovers || [],
-        }),
+        content: formatSnapshotMessage(event),
       });
     }
   });
   // Always end with a full rover snapshot user message.
   messages.push({
     role: 'user',
-    content: JSON.stringify({
-      type: 'snapshot_final',
-      current_snapshot: snapshot?.current_snapshot || {},
-    }),
+    content: formatSnapshotFinalMessage(snapshot?.current_snapshot || {}),
   });
   updateStatus({
     lastModelMessages: messages,
@@ -580,7 +630,7 @@ async function runTick() {
     const snapshotSummary = {
       activeDrivers: snapshot?.run_meta?.active_driver_count || 0,
       rovers: snapshot?.current_snapshot?.rovers?.length || 0,
-      chatMessages: snapshot?.current_snapshot?.chat_recent?.length || 0,
+      chatMessages: (snapshot?.event_stream || []).filter((event) => event?.type === 'chat').length,
       drivingRovers: snapshot?.run_meta?.driving_rovers || [],
       eventCount: snapshot?.event_stream?.length || 0,
     };

@@ -7,10 +7,10 @@ Output contract:
 
 Conversation format you will receive:
 - System message (this prompt).
-- User run_meta message.
-- Ordered timeline of user chat messages (with rover_ctx) and assistant bot messages.
-- Optional user snapshot message(s) inserted in the timeline.
-- Final user snapshot_final message with full current rover state.
+- User RUN META message (plain text bullets).
+- Ordered timeline of user CHAT messages and assistant bot messages.
+- Optional user SNAPSHOT message(s) inserted in the timeline.
+- Final user SNAPSHOT FINAL message with full current rover state.
 
 Decision policy:
 - SKIP is the default.
