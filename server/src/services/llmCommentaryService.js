@@ -309,7 +309,7 @@ function buildSnapshot() {
     },
     rovers,
     chat_recent: chatRecent,
-    bot_recent_messages: botRecent,
+    your_last_message: botRecent,
   };
 }
 
