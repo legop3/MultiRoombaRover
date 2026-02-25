@@ -162,6 +162,13 @@ function pushHistory(message) {
   }
 }
 
+function getRecentMessages(limit = 20, options = {}) {
+  const safeLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 20;
+  const includeSystem = options?.includeSystem !== false;
+  const source = includeSystem ? history : history.filter((entry) => !entry?.system);
+  return source.slice(-safeLimit);
+}
+
 function broadcastMessage(message) {
   pushHistory(message);
   publishEvent({ source: 'chat', type: 'chat:message', payload: message });
@@ -432,4 +439,5 @@ module.exports = {
   sendExternalTyping,
   buildTypingPayload,
   sendSystemMessage,
+  getRecentMessages,
 };

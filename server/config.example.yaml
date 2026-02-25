@@ -8,6 +8,11 @@ admins:
     discord_id: "0987654321"
     lockdown: true
 timezone: "America/New_York"
+llmCommentary:
+  enabled: false
+  model: "qwen2.5:7b-instruct"
+  ollamaUrl: "http://127.0.0.1:11434"
+  frequencyMs: 120000
 media:
   # Base address for mediaMTX (scheme + host + optional port/path). The UI will always request
   #   http://<base>/<roverId>/whep

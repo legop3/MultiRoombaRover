@@ -13,6 +13,10 @@ function roleColors(role) {
   }
 }
 
+function isBotSystemMessage(message) {
+  return Boolean(message?.system);
+}
+
 function formatTime(ts) {
   const date = new Date(ts);
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
@@ -61,6 +65,8 @@ export function ChatIdentity({ message }) {
   const discordLabel = message.fromDiscord
     ? `${message.discordGuildName || 'Discord'} · ${displayName(message)}`
     : null;
+  const isBot = isBotSystemMessage(message);
+  const nameClass = isBot ? 'text-emerald-300' : roleColors(message.role);
   return (
     <>
       {message.fromDiscord ? (
@@ -73,9 +79,14 @@ export function ChatIdentity({ message }) {
           />
         </>
       ) : null}
-      <span className={`font-semibold text-[0.85rem] ${roleColors(message.role)}`}>
+      <span className={`font-semibold text-[0.85rem] ${nameClass}`}>
         {displayName(message)}
       </span>
+      {isBot ? (
+        <span className="rounded bg-emerald-900/60 px-1 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-200">
+          bot
+        </span>
+      ) : null}
       {message.roverId && (
         <span className="rounded bg-slate-800 px-1 text-[0.7rem]">{message.roverId}</span>
       )}
@@ -84,6 +95,9 @@ export function ChatIdentity({ message }) {
 }
 
 function chatRowClass(message) {
+  if (isBotSystemMessage(message)) {
+    return 'surface-muted relative flex flex-wrap items-start gap-0.5 border border-emerald-500/40 bg-emerald-900/15 text-sm';
+  }
   const isAdmin =
     message.role === 'admin' || message.role === 'lockdown' || message.role === 'lockdown-admin';
   return `surface-muted relative flex flex-wrap items-start gap-0.5 text-sm ${
@@ -96,10 +110,15 @@ function chatRowClass(message) {
 }
 
 export default function ChatMessageRow({ message }) {
+  const isBot = isBotSystemMessage(message);
   return (
     <div className={chatRowClass(message)}>
       <ChatIdentity message={message} />
-      <span className="text-slate-100 break-words leading-tight whitespace-pre-wrap">{message.text}</span>
+      <span
+        className={`break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
+      >
+        {message.text}
+      </span>
       <span className="absolute bottom-0.5 right-1 text-[0.65rem] text-slate-400/60">
         {formatTime(message.ts)}
       </span>
