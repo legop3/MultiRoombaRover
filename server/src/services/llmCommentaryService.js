@@ -17,7 +17,6 @@ const JITTER_MS = 0;
 const MAX_ROVERS = 6;
 const MAX_CHAT_MESSAGES = 4;
 const MAX_BOT_MESSAGES = 1;
-const MAX_OUTPUT_CHARS = 140;
 const SKIP_TOKEN = 'SKIP';
 const ACTIVITY_WINDOW_MS = 30000;
 const ACTIVITY_BUCKET_MS = 1000;
@@ -423,11 +422,7 @@ function normalizeCommentary(rawText) {
     .find(Boolean);
   if (!firstLine) return null;
   if (firstLine.toUpperCase() === SKIP_TOKEN) return null;
-  const normalized = firstLine.replace(/\s+/g, ' ');
-  if (normalized.length <= MAX_OUTPUT_CHARS) {
-    return normalized;
-  }
-  return `${normalized.slice(0, MAX_OUTPUT_CHARS - 3)}...`;
+  return firstLine.replace(/\s+/g, ' ');
 }
 
 function parseModelOutput(rawContent) {
@@ -567,7 +562,6 @@ async function generateCommentary(systemPrompt, snapshot) {
     options: {
       temperature: 0.45,
       top_p: 0.9,
-      num_predict: 128,
     },
     messages,
   });
