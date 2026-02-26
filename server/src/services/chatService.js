@@ -141,6 +141,42 @@ function buildRoverCtxSnapshot(roverId) {
   const latestBumps =
     (sensors?.bumpsAndWheelDrops?.bumpLeft ? 0.5 : 0) +
     (sensors?.bumpsAndWheelDrops?.bumpRight ? 0.5 : 0);
+  const light = sensors?.lightBumper || {};
+  const contactState =
+    latestBumps >= 0.5
+      ? 'bumps_recent'
+      : sensors?.wall || light.left || light.frontLeft || light.centerLeft || light.centerRight || light.frontRight || light.right
+      ? 'wall_brush'
+      : 'clear';
+  const hazardState =
+    sensors?.virtualWall
+      ? 'virtual_wall_seen'
+      : sensors?.cliffLeft || sensors?.cliffFrontLeft || sensors?.cliffFrontRight || sensors?.cliffRight
+      ? 'cliff_alert'
+      : 'normal';
+  const mobilityState = wheelsOffGround ? 'wheels_off_ground' : 'normal';
+  const baseScore = Math.min(100, Math.round(Math.min(45, latestDistanceM * 25) + Math.min(30, latestTurnDeg / 12) + Math.min(25, latestBumps * 12)));
+  const activityScore = Math.max(
+    0,
+    Math.min(
+      100,
+      baseScore +
+        (contactState === 'wall_brush' ? 6 : 0) +
+        (contactState === 'bumps_recent' ? 12 : 0) +
+        (hazardState !== 'normal' ? 8 : 0) +
+        (wheelsOffGround ? -20 : 0),
+    ),
+  );
+  const activityBand =
+    activityScore >= 75
+      ? 'intense'
+      : activityScore >= 50
+      ? 'high'
+      : activityScore >= 25
+      ? 'medium'
+      : activityScore >= 8
+      ? 'low'
+      : 'idle';
   const moving = latestDistanceM > 0.05 || latestTurnDeg > 10;
   let statusTag = 'idle';
   if (charging) {
@@ -159,6 +195,12 @@ function buildRoverCtxSnapshot(roverId) {
     docked,
     charging,
     wheels_off_ground: wheelsOffGround,
+    contact_state: contactState,
+    hazard_state: hazardState,
+    mobility_state: mobilityState,
+    activity_score: activityScore,
+    activity_band: activityBand,
+    activity_trend: 'steady',
     activity_30s: {
       distance_m: latestDistanceM,
       turn_deg: latestTurnDeg,

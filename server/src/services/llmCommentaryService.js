@@ -18,11 +18,13 @@ const MAX_ROVERS = 6;
 const MAX_CHAT_MESSAGES = 4;
 const MAX_BOT_MESSAGES = 1;
 const SKIP_TOKEN = 'SKIP';
-const ACTIVITY_WINDOW_MS = 30000;
+const ACTIVITY_WINDOW_MS = 60000;
 const ACTIVITY_BUCKET_MS = 1000;
+const ACTIVITY_SCORE_WINDOW_MS = 30000;
 const SELF_TALK_WINDOW_MS = 30 * 60 * 1000;
 const MAX_CONTEXT_EVENTS = 10;
 const MAX_RUN_HISTORY = 30;
+const MAX_ROVER_EVENTS = 400;
 
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
@@ -44,6 +46,8 @@ let clearCount = 0;
 let runHistory = [];
 let currentRun = null;
 const roverActivity = new Map(); // roverId -> { buckets: Map(bucketTs -> { distanceMm, turnDeg, bumps }), bumpLeftActive, bumpRightActive }
+const roverMajorEvents = []; // [{ ts, type: 'event', event_type, rover_id, driver_nickname, summary }]
+const lastSensorFlagsByRover = new Map(); // roverId -> { docked, charging, battery_low, wheels_off_ground }
 const lastRoverStateById = new Map(); // roverId -> compact rover state used as prev_state
 
 function normalizeFrequencyMs(value) {
@@ -243,6 +247,13 @@ function updateStatus(patch = {}) {
   emitStatusToAdmins();
 }
 
+function pushRoverMajorEvent(event) {
+  roverMajorEvents.push(event);
+  if (roverMajorEvents.length > MAX_ROVER_EVENTS) {
+    roverMajorEvents.shift();
+  }
+}
+
 function pruneActivityBuckets(state, nowMs) {
   if (!state?.buckets) return;
   const minTs = nowMs - ACTIVITY_WINDOW_MS;
@@ -264,7 +275,7 @@ function upsertActivityState(roverId) {
   return roverActivity.get(roverId);
 }
 
-function onSensorEvent({ roverId, sensors } = {}) {
+function onSensorEvent({ roverId, sensors, batteryState } = {}) {
   if (!roverId || !sensors) return;
   const nowMs = Date.now();
   const bucketTs = Math.floor(nowMs / ACTIVITY_BUCKET_MS) * ACTIVITY_BUCKET_MS;
@@ -286,18 +297,78 @@ function onSensorEvent({ roverId, sensors } = {}) {
   }
   state.bumpLeftActive = bumpLeftNow;
   state.bumpRightActive = bumpRightNow;
+
+  const roverKey = String(roverId);
+  const activeDrivers = getActiveDrivers();
+  const driverSocketId = activeDrivers[roverKey] || null;
+  const driverNickname = driverSocketId ? resolveDriverNickname(driverSocketId) : null;
+  const docked = Boolean(sensors?.chargingSources?.homeBase);
+  const charging = isChargingFromSensors(sensors);
+  const wheelsOffGround = Boolean(
+    sensors?.bumpsAndWheelDrops?.wheelDropLeft && sensors?.bumpsAndWheelDrops?.wheelDropRight,
+  );
+  const batteryLow = Boolean(batteryState?.warnActive || batteryState?.urgentActive);
+  const prevFlags = lastSensorFlagsByRover.get(roverKey) || null;
+  const nextFlags = {
+    docked,
+    charging,
+    battery_low: batteryLow,
+    wheels_off_ground: wheelsOffGround,
+  };
+  if (prevFlags) {
+    if (prevFlags.docked !== nextFlags.docked) {
+      pushRoverMajorEvent({
+        ts: nowMs,
+        type: 'event',
+        event_type: nextFlags.docked ? 'rover_docked' : 'rover_undocked',
+        rover_id: roverKey,
+        driver_nickname: driverNickname,
+        summary: nextFlags.docked ? 'transitioned to docked' : 'transitioned to undocked',
+      });
+    }
+    if (prevFlags.battery_low !== nextFlags.battery_low) {
+      pushRoverMajorEvent({
+        ts: nowMs,
+        type: 'event',
+        event_type: 'battery_low_changed',
+        rover_id: roverKey,
+        driver_nickname: driverNickname,
+        summary: nextFlags.battery_low ? 'battery_low became true' : 'battery_low became false',
+      });
+    }
+    if (prevFlags.wheels_off_ground !== nextFlags.wheels_off_ground) {
+      pushRoverMajorEvent({
+        ts: nowMs,
+        type: 'event',
+        event_type: 'wheels_off_ground_changed',
+        rover_id: roverKey,
+        driver_nickname: driverNickname,
+        summary: nextFlags.wheels_off_ground
+          ? 'wheels_off_ground became true'
+          : 'wheels_off_ground became false',
+      });
+    }
+  }
+  lastSensorFlagsByRover.set(roverKey, nextFlags);
 }
 
 function getActivity30s(roverId, nowMs = Date.now()) {
+  return getActivityWindow(roverId, ACTIVITY_SCORE_WINDOW_MS, 0, nowMs);
+}
+
+function getActivityWindow(roverId, windowMs, offsetMs = 0, nowMs = Date.now()) {
   const state = roverActivity.get(String(roverId));
   if (!state) {
     return { distance_m: 0, turn_deg: 0, bumps: 0 };
   }
   pruneActivityBuckets(state, nowMs);
+  const windowStart = nowMs - offsetMs - windowMs;
+  const windowEnd = nowMs - offsetMs;
   let distanceMm = 0;
   let turnDeg = 0;
   let bumps = 0;
-  state.buckets.forEach((bucket) => {
+  state.buckets.forEach((bucket, bucketTs) => {
+    if (bucketTs < windowStart || bucketTs > windowEnd) return;
     distanceMm += bucket.distanceMm;
     turnDeg += bucket.turnDeg;
     bumps += bucket.bumps;
@@ -309,6 +380,28 @@ function getActivity30s(roverId, nowMs = Date.now()) {
   };
 }
 
+function computeBaseActivityScore(activity = {}) {
+  const distanceScore = Math.min(45, Math.max(0, Number(activity.distance_m) || 0) * 25);
+  const turnScore = Math.min(30, Math.max(0, Number(activity.turn_deg) || 0) / 12);
+  const bumpScore = Math.min(25, Math.max(0, Number(activity.bumps) || 0) * 12);
+  return Math.round(Math.min(100, distanceScore + turnScore + bumpScore));
+}
+
+function computeActivityBand(score) {
+  if (score >= 75) return 'intense';
+  if (score >= 50) return 'high';
+  if (score >= 25) return 'medium';
+  if (score >= 8) return 'low';
+  return 'idle';
+}
+
+function computeActivityTrend(currentBaseScore, previousBaseScore) {
+  const delta = Number(currentBaseScore || 0) - Number(previousBaseScore || 0);
+  if (delta >= 12) return 'rising';
+  if (delta <= -12) return 'falling';
+  return 'steady';
+}
+
 function clearRuntimeHistory() {
   contextResetAt = Date.now();
   clearCount += 1;
@@ -317,6 +410,8 @@ function clearRuntimeHistory() {
   generationTotalMs = 0;
   runHistory = [];
   currentRun = null;
+  roverMajorEvents.length = 0;
+  lastSensorFlagsByRover.clear();
   roverActivity.clear();
   lastRoverStateById.clear();
   updateStatus({
@@ -473,8 +568,43 @@ function compactRoverForContext(rover) {
     docked: rover.docked,
     charging: rover.charging,
     wheels_off_ground: rover.wheels_off_ground,
-    activity_30s: rover.activity_30s,
+    contact_state: rover.contact_state || 'clear',
+    hazard_state: rover.hazard_state || 'normal',
+    mobility_state: rover.mobility_state || 'normal',
+    activity_score: rover.activity_score ?? 0,
+    activity_band: rover.activity_band || 'idle',
+    activity_trend: rover.activity_trend || 'steady',
   };
+}
+
+function deriveContactState(sensors = {}, activity30s = {}) {
+  const bumps = Number(activity30s?.bumps) || 0;
+  const hasBump = bumps >= 0.5 || sensors?.bumpsAndWheelDrops?.bumpLeft || sensors?.bumpsAndWheelDrops?.bumpRight;
+  if (hasBump) return 'bumps_recent';
+  const light = sensors?.lightBumper || {};
+  const wallBrush =
+    Boolean(sensors?.wall) ||
+    Boolean(light.left || light.frontLeft || light.centerLeft || light.centerRight || light.frontRight || light.right);
+  if (wallBrush) return 'wall_brush';
+  return 'clear';
+}
+
+function deriveHazardState(sensors = {}) {
+  if (Boolean(sensors?.virtualWall)) return 'virtual_wall_seen';
+  if (
+    Boolean(sensors?.cliffLeft) ||
+    Boolean(sensors?.cliffFrontLeft) ||
+    Boolean(sensors?.cliffFrontRight) ||
+    Boolean(sensors?.cliffRight)
+  ) {
+    return 'cliff_alert';
+  }
+  return 'normal';
+}
+
+function deriveMobilityState(sensors = {}, wheelsOffGround = false) {
+  if (wheelsOffGround) return 'wheels_off_ground';
+  return 'normal';
 }
 
 function buildRoversNow(nowMs = Date.now()) {
@@ -491,6 +621,12 @@ function buildRoversNow(nowMs = Date.now()) {
       sensors?.bumpsAndWheelDrops?.wheelDropLeft && sensors?.bumpsAndWheelDrops?.wheelDropRight,
     );
     const activity30s = getActivity30s(roverId, nowMs);
+    const previousActivity30s = getActivityWindow(
+      roverId,
+      ACTIVITY_SCORE_WINDOW_MS,
+      ACTIVITY_SCORE_WINDOW_MS,
+      nowMs,
+    );
     const charging = isChargingFromSensors(sensors);
     const docked = Boolean(sensors?.chargingSources?.homeBase);
     const isMoving = activity30s.distance_m > 0.1 || activity30s.turn_deg > 20;
@@ -514,7 +650,24 @@ function buildRoversNow(nowMs = Date.now()) {
       battery_low: Boolean(batteryState?.warnActive || batteryState?.urgentActive),
       activity_30s: activity30s,
       status_tag: statusTag,
+      contact_state: deriveContactState(sensors, activity30s),
+      hazard_state: deriveHazardState(sensors),
+      mobility_state: deriveMobilityState(sensors, wheelsOffGround),
     };
+    const currentBaseScore = computeBaseActivityScore(activity30s);
+    const previousBaseScore = computeBaseActivityScore(previousActivity30s);
+    let activityScore = currentBaseScore;
+    if (rover.contact_state === 'wall_brush') activityScore += 6;
+    if (rover.contact_state === 'bumps_recent') activityScore += 12;
+    if (rover.hazard_state !== 'normal') activityScore += 8;
+    if (rover.status_tag === 'driving') activityScore += 8;
+    if (rover.status_tag === 'active-idle') activityScore += 4;
+    if (rover.charging || rover.docked) activityScore -= 25;
+    if (rover.wheels_off_ground) activityScore -= 20;
+    activityScore = Math.max(0, Math.min(100, Math.round(activityScore)));
+    rover.activity_score = activityScore;
+    rover.activity_band = computeActivityBand(activityScore);
+    rover.activity_trend = computeActivityTrend(currentBaseScore, previousBaseScore);
     const prev = lastRoverStateById.get(roverId) || null;
     const nextState = {
       driver_nickname: rover.driver_nickname,
@@ -524,6 +677,9 @@ function buildRoversNow(nowMs = Date.now()) {
       battery_low: rover.battery_low,
       activity_30s: rover.activity_30s,
       status_tag: rover.status_tag,
+      activity_score: rover.activity_score,
+      activity_band: rover.activity_band,
+      activity_trend: rover.activity_trend,
     };
     nextRoverStateById.set(roverId, nextState);
     rover.prev_state = prev;
@@ -560,7 +716,24 @@ function buildSnapshot() {
     (entry) => nowMs - Number(entry?.ts || 0) <= SELF_TALK_WINDOW_MS,
   );
 
-  const eventStream = allRecentMessages.slice(-MAX_CONTEXT_EVENTS).map((entry) => {
+  const roverEvents = roverMajorEvents.filter((entry) => Number(entry?.ts) >= contextResetAt);
+  const timelineEntries = [
+    ...allRecentMessages.map((entry) => ({ ts: Number(entry?.ts || 0), source: 'chat', entry })),
+    ...roverEvents.map((entry) => ({ ts: Number(entry?.ts || 0), source: 'event', entry })),
+  ]
+    .sort((a, b) => a.ts - b.ts)
+    .slice(-MAX_CONTEXT_EVENTS);
+
+  const eventStream = timelineEntries.map(({ source, entry }) => {
+    if (source === 'event') {
+      return {
+        type: 'event',
+        event_type: entry.event_type || 'rover_event',
+        rover_id: entry.rover_id || null,
+        driver_nickname: entry.driver_nickname || null,
+        summary: entry.summary || '',
+      };
+    }
     if (entry?.system) {
       return {
         type: 'bot',
@@ -570,12 +743,14 @@ function buildSnapshot() {
     }
     const roverId = entry?.roverId ? String(entry.roverId) : null;
     const rover = roverId ? roverById.get(roverId) : null;
+    const baseCtx = compactRoverForContext(rover) || {};
+    const storedCtx = entry?.roverCtx || entry?.rover_ctx || {};
     return {
       type: 'chat',
       nickname: entry.nickname || entry.socketId?.slice(0, 6) || 'unknown',
       text: entry.text || '',
       rover_id: roverId,
-      rover_ctx: entry?.roverCtx || entry?.rover_ctx || compactRoverForContext(rover),
+      rover_ctx: { ...baseCtx, ...storedCtx },
     };
   });
   const hasRecentChat = eventStream.some((event) => event.type === 'chat');
@@ -663,8 +838,7 @@ function formatRunMetaMessage(runMeta = {}) {
 
 function formatRoverCtx(ctx) {
   if (!ctx || typeof ctx !== 'object') return 'none';
-  const activity = ctx.activity_30s || {};
-  return `status=${ctx.status_tag || 'unknown'} battery_low=${Boolean(ctx.battery_low)} wheels_off_ground=${Boolean(ctx.wheels_off_ground)} docked=${Boolean(ctx.docked)} charging=${Boolean(ctx.charging)} move30=${Number(activity.distance_m) || 0}m turn30=${Number(activity.turn_deg) || 0}deg bumps30=${Number(activity.bumps) || 0}`;
+  return `status=${ctx.status_tag || 'unknown'} battery_low=${Boolean(ctx.battery_low)} docked=${Boolean(ctx.docked)} charging=${Boolean(ctx.charging)} wheels_off_ground=${Boolean(ctx.wheels_off_ground)} contact=${ctx.contact_state || 'clear'} hazard=${ctx.hazard_state || 'normal'} mobility=${ctx.mobility_state || 'normal'} activity_score=${Number(ctx.activity_score) || 0} activity_band=${ctx.activity_band || 'idle'} activity_trend=${ctx.activity_trend || 'steady'}`;
 }
 
 function formatChatEventMessage(event) {
@@ -678,8 +852,17 @@ function formatChatEventMessage(event) {
 }
 
 function formatRoverSnapshotLine(rover = {}) {
-  const activity = rover.activity_30s || {};
-  return `${rover.id || 'unknown'}: driver=${rover.driver_nickname || 'none'} status=${rover.status_tag || 'unknown'} battery_low=${Boolean(rover.battery_low)} wheels_off_ground=${Boolean(rover.wheels_off_ground)} docked=${Boolean(rover.docked)} charging=${Boolean(rover.charging)} move30=${Number(activity.distance_m) || 0}m turn30=${Number(activity.turn_deg) || 0}deg bumps30=${Number(activity.bumps) || 0}`;
+  return `${rover.id || 'unknown'}: driver=${rover.driver_nickname || 'none'} status=${rover.status_tag || 'unknown'} battery_low=${Boolean(rover.battery_low)} docked=${Boolean(rover.docked)} charging=${Boolean(rover.charging)} wheels_off_ground=${Boolean(rover.wheels_off_ground)} contact=${rover.contact_state || 'clear'} hazard=${rover.hazard_state || 'normal'} mobility=${rover.mobility_state || 'normal'} activity_score=${Number(rover.activity_score) || 0} activity_band=${rover.activity_band || 'idle'} activity_trend=${rover.activity_trend || 'steady'}`;
+}
+
+function formatEventMessage(event) {
+  return [
+    'EVENT',
+    `type: ${event.event_type || 'rover_event'}`,
+    `rover: ${event.rover_id || 'unknown'}`,
+    `driver: ${event.driver_nickname || 'none'}`,
+    `summary: ${event.summary || ''}`,
+  ].join('\n');
 }
 
 function formatSnapshotMessage(event) {
@@ -741,6 +924,13 @@ function buildModelMessages(systemPrompt, snapshot) {
       messages.push({
         role: 'user',
         content: formatChatEventMessage(event),
+      });
+      return;
+    }
+    if (event.type === 'event') {
+      messages.push({
+        role: 'user',
+        content: formatEventMessage(event),
       });
       return;
     }
