@@ -22,6 +22,7 @@ const ACTIVITY_WINDOW_MS = 30000;
 const ACTIVITY_BUCKET_MS = 1000;
 const SELF_TALK_WINDOW_MS = 30 * 60 * 1000;
 const MAX_CONTEXT_EVENTS = 10;
+const MAX_RUN_HISTORY = 30;
 
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
@@ -40,6 +41,8 @@ let generationCount = 0;
 let generationTotalMs = 0;
 let contextResetAt = Date.now();
 let clearCount = 0;
+let runHistory = [];
+let currentRun = null;
 const roverActivity = new Map(); // roverId -> { buckets: Map(bucketTs -> { distanceMm, turnDeg, bumps }), bumpLeftActive, bumpRightActive }
 const lastRoverStateById = new Map(); // roverId -> compact rover state used as prev_state
 
@@ -65,14 +68,22 @@ let status = {
   lastTickAt: null,
   lastOutcome: null,
   lastReason: null,
+  phase: 'idle',
+  phaseAt: Date.now(),
+  currentRunId: null,
   lastError: null,
   lastErrorDetails: null,
+  lastFailedAt: null,
   lastPromptReadAt: null,
   lastPromptChars: 0,
   lastSystemPrompt: null,
   lastInfoSnapshot: null,
   lastModelMessages: null,
+  lastModelInputAt: null,
+  lastModelInputTickId: null,
   lastModelRawOutput: null,
+  lastModelOutputAt: null,
+  lastModelOutputTickId: null,
   lastSnapshotSummary: null,
   lastClearedAt: contextResetAt,
   clearCount,
@@ -86,6 +97,120 @@ let status = {
   updatedAt: Date.now(),
 };
 
+function buildAdminState() {
+  return {
+    runtime: {
+      running: status.running,
+      inFlight: status.inFlight,
+      phase: status.phase,
+      phaseAt: status.phaseAt,
+      currentRunId: status.currentRunId,
+      tickCount: status.tickCount,
+      lastTickAt: status.lastTickAt,
+      nextRunAt: status.nextRunAt,
+      outcome: status.lastOutcome,
+      reason: status.lastReason,
+    },
+    counters: {
+      clearCount: status.clearCount,
+      skipStreak: status.skipStreak,
+      promptChars: status.lastPromptChars,
+      snapshotSummary: status.lastSnapshotSummary,
+    },
+    timings: {
+      lastGenerationMs: status.lastGenerationMs,
+      avgGenerationMs: status.avgGenerationMs,
+      generationCount: status.generationCount,
+    },
+    input: {
+      promptPath: status.promptPath,
+      systemPrompt: status.lastSystemPrompt,
+      infoSnapshot: status.lastInfoSnapshot,
+      modelMessages: status.lastModelMessages,
+      modelInputAt: status.lastModelInputAt,
+      modelInputTickId: status.lastModelInputTickId,
+    },
+    output: {
+      raw: status.lastModelRawOutput,
+      generated: status.lastGeneratedText,
+      posted: status.lastPostedText,
+      postedAt: status.lastPostedAt,
+      modelOutputAt: status.lastModelOutputAt,
+      modelOutputTickId: status.lastModelOutputTickId,
+    },
+    errors: {
+      message: status.lastError,
+      details: status.lastErrorDetails,
+      failedAt: status.lastFailedAt,
+    },
+    history: runHistory,
+    debug: {
+      status,
+    },
+    controls: {
+      supportedActions: ['clearHistory'],
+    },
+  };
+}
+
+function updatePhase(phase, patch = {}) {
+  updateStatus({
+    phase,
+    phaseAt: Date.now(),
+    ...patch,
+  });
+}
+
+function startRunRecord(tickId, snapshotSummary) {
+  currentRun = {
+    runId: tickId,
+    startedAt: Date.now(),
+    endedAt: null,
+    phase: 'tick_started',
+    outcome: null,
+    reason: null,
+    durationMs: null,
+    summary: snapshotSummary || {},
+    input: {
+      systemPrompt: null,
+      infoSnapshot: null,
+      modelMessages: null,
+      modelInputAt: null,
+    },
+    output: {
+      raw: null,
+      normalized: null,
+      posted: null,
+      postedAt: null,
+      modelOutputAt: null,
+    },
+    errors: null,
+  };
+}
+
+function patchCurrentRun(patch = {}) {
+  if (!currentRun) return;
+  currentRun = {
+    ...currentRun,
+    ...patch,
+  };
+}
+
+function finalizeRunRecord({ outcome, reason, errors } = {}) {
+  if (!currentRun) return;
+  const endedAt = Date.now();
+  const finalized = {
+    ...currentRun,
+    outcome: outcome ?? currentRun.outcome,
+    reason: reason ?? currentRun.reason,
+    errors: errors ?? currentRun.errors ?? null,
+    endedAt,
+    durationMs: Math.max(0, endedAt - Number(currentRun.startedAt || endedAt)),
+  };
+  runHistory = [...runHistory.slice(-(MAX_RUN_HISTORY - 1)), finalized];
+  currentRun = null;
+}
+
 function isAdminSocket(socket) {
   if (!socket) return false;
   const role = getRole(socket);
@@ -94,13 +219,14 @@ function isAdminSocket(socket) {
 
 function emitStatusToSocket(socket) {
   if (!socket || !isAdminSocket(socket)) return;
-  socket.emit('llmCommentary:status', status);
+  socket.emit('llm:state', buildAdminState());
 }
 
 function emitStatusToAdmins() {
+  const payload = buildAdminState();
   io.sockets.sockets.forEach((socket) => {
     if (!isAdminSocket(socket)) return;
-    socket.emit('llmCommentary:status', status);
+    socket.emit('llm:state', payload);
   });
 }
 
@@ -189,24 +315,34 @@ function clearRuntimeHistory() {
   skipStreak = 0;
   generationCount = 0;
   generationTotalMs = 0;
+  runHistory = [];
+  currentRun = null;
   roverActivity.clear();
   lastRoverStateById.clear();
   updateStatus({
     lastClearedAt: contextResetAt,
     clearCount,
     skipStreak,
+    phase: 'idle',
+    phaseAt: Date.now(),
+    currentRunId: null,
     lastGenerationMs: null,
     avgGenerationMs: null,
     generationCount,
     lastInfoSnapshot: null,
     lastModelMessages: null,
+    lastModelInputAt: null,
+    lastModelInputTickId: null,
     lastModelRawOutput: null,
+    lastModelOutputAt: null,
+    lastModelOutputTickId: null,
     lastSnapshotSummary: null,
     lastGeneratedText: null,
     lastPostedText: null,
     lastPostedAt: null,
     lastError: null,
     lastErrorDetails: null,
+    lastFailedAt: null,
     lastOutcome: 'cleared',
     lastReason: 'admin requested clear history',
   });
@@ -569,10 +705,7 @@ async function readSystemPrompt() {
   return trimmed;
 }
 
-async function generateCommentary(systemPrompt, snapshot) {
-  if (!ollamaClient) {
-    throw new Error('Ollama client unavailable');
-  }
+function buildModelMessages(systemPrompt, snapshot) {
   const messages = [];
   messages.push({ role: 'system', content: systemPrompt });
   messages.push({
@@ -608,10 +741,13 @@ async function generateCommentary(systemPrompt, snapshot) {
     role: 'user',
     content: formatSnapshotFinalMessage(snapshot?.current_snapshot || {}),
   });
-  updateStatus({
-    lastModelMessages: messages,
-  });
+  return messages;
+}
 
+async function generateCommentary(messages) {
+  if (!ollamaClient) {
+    throw new Error('Ollama client unavailable');
+  }
   const payload = await ollamaClient.chat({
     model,
     stream: false,
@@ -649,16 +785,19 @@ async function runTick() {
   let nextDelayMs = defaultTickDelayMs();
   tickCount += 1;
   const tickId = tickCount;
-  updateStatus({
+  updatePhase('tick_started', {
     tickCount,
     inFlight: true,
+    currentRunId: tickId,
     lastTickAt: Date.now(),
     lastError: null,
+    lastErrorDetails: null,
   });
   if (inFlight) {
     logger.info('Commentary tick skipped; previous tick still running', { tickId });
-    updateStatus({
+    updatePhase('idle', {
       inFlight: false,
+      currentRunId: null,
       lastOutcome: 'skipped',
       lastReason: 'previous tick still running',
     });
@@ -679,19 +818,61 @@ async function runTick() {
       tickId,
       ...snapshotSummary,
     });
-    updateStatus({
+    startRunRecord(tickId, snapshotSummary);
+    patchCurrentRun({
+      phase: 'snapshot_ready',
+      summary: snapshotSummary,
+      input: {
+        ...(currentRun?.input || {}),
+        infoSnapshot: snapshot,
+      },
+    });
+    updatePhase('snapshot_ready', {
       lastSnapshotSummary: snapshotSummary,
       lastInfoSnapshot: snapshot,
     });
     const systemPrompt = await readSystemPrompt();
+    const modelMessages = buildModelMessages(systemPrompt, snapshot);
+    const modelInputAt = Date.now();
+    patchCurrentRun({
+      phase: 'input_ready',
+      input: {
+        ...(currentRun?.input || {}),
+        systemPrompt,
+        infoSnapshot: snapshot,
+        modelMessages,
+        modelInputAt,
+      },
+    });
+    updatePhase('awaiting_model_output', {
+      lastModelMessages: modelMessages,
+      lastModelInputAt: modelInputAt,
+      lastModelInputTickId: tickId,
+      lastModelRawOutput: null,
+      lastModelOutputAt: null,
+      lastModelOutputTickId: null,
+      lastReason: 'awaiting model output',
+    });
     const generationStartMs = Date.now();
-    const modelResult = await generateCommentary(systemPrompt, snapshot);
+    const modelResult = await generateCommentary(modelMessages);
     const generationMs = Math.max(0, Date.now() - generationStartMs);
     generationCount += 1;
     generationTotalMs += generationMs;
     const avgGenerationMs = Math.round(generationTotalMs / generationCount);
-    updateStatus({
+    const modelOutputAt = Date.now();
+    patchCurrentRun({
+      phase: 'output_received',
+      output: {
+        ...(currentRun?.output || {}),
+        raw: modelResult?.raw || '',
+        normalized: modelResult?.normalized || null,
+        modelOutputAt,
+      },
+    });
+    updatePhase('output_received', {
       lastModelRawOutput: modelResult?.raw || '',
+      lastModelOutputAt: modelOutputAt,
+      lastModelOutputTickId: tickId,
       lastGenerationMs: generationMs,
       avgGenerationMs,
       generationCount,
@@ -700,17 +881,26 @@ async function runTick() {
     if (!text) {
       logger.info('Commentary tick produced SKIP/empty output', { tickId });
       skipStreak += 1;
-      updateStatus({
+      patchCurrentRun({
+        phase: 'decision_skip',
+        outcome: 'skipped',
+        reason: modelResult?.raw?.trim() ? 'model returned SKIP' : 'model returned empty',
+      });
+      updatePhase('decision_skip', {
         lastOutcome: 'skipped',
         lastReason: modelResult?.raw?.trim() ? 'model returned SKIP' : 'model returned empty',
         skipStreak,
         lastGeneratedText: null,
       });
+      finalizeRunRecord({
+        outcome: 'skipped',
+        reason: modelResult?.raw?.trim() ? 'model returned SKIP' : 'model returned empty',
+      });
       // Immediate retry after model skip.
       nextDelayMs = 0;
       return;
     }
-    updateStatus({
+    updatePhase('decision_post', {
       lastGeneratedText: text,
     });
     const recentBotMessages = getRecentMessages(80, { includeSystem: true })
@@ -723,10 +913,19 @@ async function runTick() {
     if (duplicate) {
       logger.info('Commentary tick skipped duplicate output', { tickId, text });
       skipStreak += 1;
-      updateStatus({
+      patchCurrentRun({
+        phase: 'decision_skip',
+        outcome: 'skipped',
+        reason: 'duplicate text',
+      });
+      updatePhase('decision_skip', {
         lastOutcome: 'skipped',
         lastReason: 'duplicate text',
         skipStreak,
+      });
+      finalizeRunRecord({
+        outcome: 'skipped',
+        reason: 'duplicate text',
       });
       // Immediate retry after a skip outcome.
       nextDelayMs = 0;
@@ -735,12 +934,26 @@ async function runTick() {
     sendSystemMessage(text);
     logger.info('Commentary message posted', { tickId, text });
     skipStreak = 0;
-    updateStatus({
+    patchCurrentRun({
+      phase: 'posted',
+      outcome: 'posted',
+      reason: null,
+      output: {
+        ...(currentRun?.output || {}),
+        posted: text,
+        postedAt: Date.now(),
+      },
+    });
+    updatePhase('posted', {
       lastOutcome: 'posted',
       lastReason: null,
       skipStreak,
       lastPostedText: text,
       lastPostedAt: Date.now(),
+    });
+    finalizeRunRecord({
+      outcome: 'posted',
+      reason: null,
     });
   } catch (err) {
     const failure = buildFailureInfo(err);
@@ -750,16 +963,35 @@ async function runTick() {
       error: failure.message,
       details: failure.details,
     });
-    updateStatus({
+    patchCurrentRun({
+      phase: 'failed',
+      outcome: 'failed',
+      reason: failure.reason,
+      errors: {
+        message: failure.message,
+        details: failure.details,
+      },
+    });
+    updatePhase('failed', {
       lastOutcome: 'failed',
       lastReason: failure.reason,
       lastError: failure.message,
       lastErrorDetails: failure.details,
+      lastFailedAt: Date.now(),
+    });
+    finalizeRunRecord({
+      outcome: 'failed',
+      reason: failure.reason,
+      errors: {
+        message: failure.message,
+        details: failure.details,
+      },
     });
   } finally {
     inFlight = false;
-    updateStatus({
+    updatePhase('idle', {
       inFlight: false,
+      currentRunId: null,
     });
     scheduleNextTick(nextDelayMs);
   }
@@ -768,7 +1000,7 @@ async function runTick() {
 function start() {
   if (!enabled) {
     logger.info('LLM commentary disabled');
-    updateStatus({
+    updatePhase('disabled', {
       running: false,
       lastOutcome: 'disabled',
       lastReason: 'llmCommentary.enabled is false',
@@ -777,7 +1009,7 @@ function start() {
   }
   if (!model || !ollamaUrl) {
     logger.warn('LLM commentary disabled; model or ollamaUrl missing');
-    updateStatus({
+    updatePhase('disabled', {
       running: false,
       lastOutcome: 'disabled',
       lastReason: 'model or ollama server missing',
@@ -785,7 +1017,7 @@ function start() {
     return;
   }
   logger.info('LLM commentary enabled', { model, ollamaUrl, frequencyMs, promptPath: PROMPT_PATH });
-  updateStatus({
+  updatePhase('idle', {
     running: true,
     lastOutcome: 'running',
     lastReason: null,
@@ -795,14 +1027,15 @@ function start() {
 
 io.on('connection', (socket) => {
   emitStatusToSocket(socket);
-  socket.on('llm:control', ({ action } = {}, cb = () => {}) => {
+  socket.on('llm:control', ({ controls } = {}, cb = () => {}) => {
     if (!isAdminSocket(socket)) {
       cb({ error: 'Not authorized' });
       return;
     }
-    if (action === 'clearHistory') {
+    const command = controls?.action || null;
+    if (command === 'clearHistory') {
       clearRuntimeHistory();
-      cb({ success: true, status });
+      cb({ success: true, state: buildAdminState() });
       return;
     }
     cb({ error: 'Unknown llm control action' });

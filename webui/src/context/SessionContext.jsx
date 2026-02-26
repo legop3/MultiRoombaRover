@@ -8,6 +8,7 @@ const SessionContext = createContext({
   session: null,
   logs: [],
   adminLogs: [],
+  llmCommentaryState: null,
   llmCommentaryStatus: null,
   login: async () => {},
   setRole: async () => {},
@@ -48,6 +49,7 @@ export function SessionProvider({ children }) {
   const [session, setSession] = useState(null);
   const [logs, setLogs] = useState([]);
   const [adminLogs, setAdminLogs] = useState([]);
+  const [llmCommentaryState, setLlmCommentaryState] = useState(null);
   const [llmCommentaryStatus, setLlmCommentaryStatus] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [connected, setConnected] = useState(socket.connected);
@@ -79,15 +81,19 @@ export function SessionProvider({ children }) {
     function handleAdminLogEntry(entry) {
       setAdminLogs((prev) => [...prev.slice(-199), entry]);
     }
-    function handleLlmCommentaryStatus(payload = null) {
-      setLlmCommentaryStatus(payload && typeof payload === 'object' ? payload : null);
+    function handleLlmState(payload = null) {
+      const state = payload && typeof payload === 'object' ? payload : null;
+      const nextStatus =
+        state?.debug?.status && typeof state.debug.status === 'object' ? state.debug.status : null;
+      setLlmCommentaryState(state);
+      setLlmCommentaryStatus(nextStatus);
     }
     socket.on('session:sync', handleSession);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
     socket.on('adminlog:init', handleAdminLogInit);
     socket.on('adminlog:entry', handleAdminLogEntry);
-    socket.on('llmCommentary:status', handleLlmCommentaryStatus);
+    socket.on('llm:state', handleLlmState);
     socket.on('alert:new', (payload = {}) => {
       setAlerts((prev) => [
         ...prev.slice(-49),
@@ -103,7 +109,7 @@ export function SessionProvider({ children }) {
       socket.off('log:entry', handleLogEntry);
       socket.off('adminlog:init', handleAdminLogInit);
       socket.off('adminlog:entry', handleAdminLogEntry);
-      socket.off('llmCommentary:status', handleLlmCommentaryStatus);
+      socket.off('llm:state', handleLlmState);
       socket.off('alert:new');
     };
   }, [socket]);
@@ -130,7 +136,8 @@ export function SessionProvider({ children }) {
       rebootRover: (roverId) =>
         emitWithAck('command', { roverId, type: 'reboot', data: { reboot: {} } }),
       rebootServer: () => emitWithAck('server:reboot'),
-      llmControl: (action, payload = {}) => emitWithAck('llm:control', { action, ...payload }),
+      llmControl: (action, controls = {}) =>
+        emitWithAck('llm:control', { controls: { action, ...controls } }),
       pushAlert: (alert) =>
         setAlerts((prev) => [
           ...prev.slice(-49),
@@ -146,11 +153,12 @@ export function SessionProvider({ children }) {
       session,
       logs,
       adminLogs,
+      llmCommentaryState,
       llmCommentaryStatus,
       alerts,
       ...actions,
     }),
-    [actions, adminLogs, alerts, connected, llmCommentaryStatus, logs, session],
+    [actions, adminLogs, alerts, connected, llmCommentaryState, llmCommentaryStatus, logs, session],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

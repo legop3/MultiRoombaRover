@@ -22,7 +22,7 @@ export default function AdminPanel() {
     rebootServer,
     llmControl,
     adminLogs,
-    llmCommentaryStatus,
+    llmCommentaryState,
   } = useSession();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
@@ -256,7 +256,7 @@ export default function AdminPanel() {
       />
       <ReplaySnapshotHealth health={health} />
       <LlmCommentaryPanel
-        status={llmCommentaryStatus}
+        state={llmCommentaryState}
         onClearHistory={handleClearLlmHistory}
         clearingHistory={clearingLlmHistory}
       />
@@ -265,8 +265,9 @@ export default function AdminPanel() {
   );
 }
 
-function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
-  if (!status) {
+function LlmCommentaryPanel({ state, onClearHistory, clearingHistory }) {
+  const [selectedRunId, setSelectedRunId] = useState(null);
+  if (!state) {
     return (
       <div className="space-y-0.5">
         <div className="panel-muted text-xs uppercase">LLM Commentary</div>
@@ -274,45 +275,42 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
       </div>
     );
   }
-
-  const lastTickAt = status.lastTickAt ? new Date(status.lastTickAt).toLocaleString() : 'never';
-  const nextRunAt = status.nextRunAt ? new Date(status.nextRunAt).toLocaleString() : 'n/a';
-  const lastPostedAt = status.lastPostedAt ? new Date(status.lastPostedAt).toLocaleString() : 'never';
-  const summary = status.lastSnapshotSummary || {};
-  const statusColor =
-    status.lastOutcome === 'failed'
-      ? 'text-red-300'
-      : status.lastOutcome === 'posted'
-      ? 'text-emerald-300'
-      : 'text-slate-300';
-  const largeIndicator = buildLlmLargeIndicator(status);
-  const conversationRows = buildLlmConversationRows(status);
+  const runtime = state.runtime || {};
+  const counters = state.counters || {};
+  const timings = state.timings || {};
+  const input = state.input || {};
+  const output = state.output || {};
+  const errors = state.errors || {};
+  const history = Array.isArray(state.history) ? state.history : [];
+  const selectedRun =
+    history.find((run) => run.runId === selectedRunId) || (history.length ? history[history.length - 1] : null);
+  const largeIndicator = buildLlmLargeIndicatorFromState(state);
+  const conversationRows = buildLlmConversationRowsFromMessages(input.modelMessages, output.raw);
   const statPills = [
-    { label: 'enabled', value: status.enabled ? 'yes' : 'no' },
-    { label: 'running', value: status.running ? 'yes' : 'no' },
-    { label: 'in flight', value: status.inFlight ? 'yes' : 'no' },
-    { label: 'model', value: status.model || '--' },
-    { label: 'server', value: status.ollamaUrl || '--' },
-    { label: 'frequency', value: `${status.frequencyMs} ms` },
-    { label: 'tick count', value: status.tickCount ?? 0 },
-    { label: 'skip streak', value: status.skipStreak ?? 0 },
-    { label: 'last gen', value: status.lastGenerationMs != null ? `${status.lastGenerationMs} ms` : '--' },
-    { label: 'avg gen', value: status.avgGenerationMs != null ? `${status.avgGenerationMs} ms` : '--' },
-    { label: 'gen count', value: status.generationCount ?? 0 },
-    { label: 'last outcome', value: status.lastOutcome || '--' },
-    { label: 'last reason', value: status.lastReason || '--' },
-    { label: 'last tick', value: lastTickAt },
-    { label: 'next run', value: nextRunAt },
-    { label: 'last posted', value: lastPostedAt },
-    { label: 'prompt chars', value: status.lastPromptChars ?? 0 },
-    { label: 'cleared count', value: status.clearCount ?? 0 },
+    { label: 'running', value: runtime.running ? 'yes' : 'no' },
+    { label: 'in flight', value: runtime.inFlight ? 'yes' : 'no' },
+    { label: 'phase', value: runtime.phase || '--' },
+    { label: 'run id', value: runtime.currentRunId ?? '--' },
+    { label: 'tick count', value: runtime.tickCount ?? 0 },
     {
-      label: 'last cleared',
-      value: status.lastClearedAt ? new Date(status.lastClearedAt).toLocaleString() : 'never',
+      label: 'last tick',
+      value: runtime.lastTickAt ? new Date(runtime.lastTickAt).toLocaleString() : 'never',
     },
-    { label: 'snapshot active drivers', value: summary.activeDrivers ?? 0 },
-    { label: 'snapshot rovers', value: summary.rovers ?? 0 },
-    { label: 'snapshot chat msgs', value: summary.chatMessages ?? 0 },
+    {
+      label: 'next run',
+      value: runtime.nextRunAt ? new Date(runtime.nextRunAt).toLocaleString() : 'n/a',
+    },
+    { label: 'outcome', value: runtime.outcome || '--' },
+    { label: 'reason', value: runtime.reason || '--' },
+    { label: 'skip streak', value: counters.skipStreak ?? 0 },
+    { label: 'clear count', value: counters.clearCount ?? 0 },
+    { label: 'last gen', value: timings.lastGenerationMs != null ? `${timings.lastGenerationMs} ms` : '--' },
+    { label: 'avg gen', value: timings.avgGenerationMs != null ? `${timings.avgGenerationMs} ms` : '--' },
+    { label: 'gen count', value: timings.generationCount ?? 0 },
+    { label: 'prompt chars', value: counters.promptChars ?? 0 },
+    { label: 'active drivers', value: counters.snapshotSummary?.activeDrivers ?? 0 },
+    { label: 'snapshot rovers', value: counters.snapshotSummary?.rovers ?? 0 },
+    { label: 'snapshot chat', value: counters.snapshotSummary?.chatMessages ?? 0 },
   ];
 
   return (
@@ -336,107 +334,151 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
         {statPills.map((pill) => (
           <span
             key={pill.label}
-            className={`rounded border px-0.5 py-0.25 text-[0.72rem] leading-tight ${
-              pill.label === 'last outcome'
-                ? `${statusColor} border-slate-500/40 bg-slate-800/70`
-                : 'border-slate-600/60 bg-slate-800/70 text-slate-200'
-            }`}
+            className="rounded border border-slate-600/60 bg-slate-800/70 px-0.5 py-0.25 text-[0.72rem] leading-tight text-slate-200"
           >
             {pill.label}: {pill.value}
           </span>
         ))}
       </div>
-      {status.lastError ? (
+      {errors.message ? (
         <div className="surface text-xs text-red-300 break-words">
-          Error: {status.lastError}
+          Error: {errors.message}
         </div>
       ) : null}
-      {status.lastErrorDetails ? (
+      {errors.details ? (
         <details className="surface text-xs text-red-200">
           <summary className="cursor-pointer select-none text-red-300">Failure details</summary>
           <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-red-200">
-            {JSON.stringify(status.lastErrorDetails, null, 2)}
+            {JSON.stringify(errors.details, null, 2)}
           </pre>
         </details>
       ) : null}
-      {status.lastGeneratedText ? (
+      {output.generated ? (
         <div className="surface text-xs text-slate-200 break-words">
-          Generated: {status.lastGeneratedText}
+          Generated: {output.generated}
         </div>
       ) : null}
-      {status.lastPostedText ? (
+      {output.posted ? (
         <div className="surface text-xs text-emerald-200 break-words">
-          Posted: {status.lastPostedText}
+          Posted: {output.posted}
         </div>
       ) : null}
+      <div className="grid gap-0.5 md:grid-cols-2">
+        <div className="space-y-0.5">
+          <div className="panel-muted text-xs uppercase">Live Input Conversation</div>
+          <div className="surface max-h-72 space-y-0.5 overflow-y-auto">
+            {conversationRows.length ? (
+              conversationRows.map((row) => <ChatMessageRow key={row.id} message={row.message} />)
+            ) : (
+              <div className="text-xs text-slate-300">No model conversation captured yet.</div>
+            )}
+          </div>
+        </div>
+        <div className="space-y-0.5">
+          <div className="panel-muted text-xs uppercase">Output + Error</div>
+          <div className="surface space-y-0.5 text-xs text-slate-200">
+            <div>Raw output: {output.raw?.trim() ? output.raw : '<none>'}</div>
+            <div>Posted: {output.posted || '<none>'}</div>
+            <div>
+              Output at:{' '}
+              {output.modelOutputAt ? new Date(output.modelOutputAt).toLocaleString() : 'n/a'}
+            </div>
+            <div>
+              Failed at: {errors.failedAt ? new Date(errors.failedAt).toLocaleString() : 'n/a'}
+            </div>
+          </div>
+        </div>
+      </div>
       <details className="surface text-xs text-slate-200">
-        <summary className="cursor-pointer select-none text-slate-300">Most recent system prompt</summary>
+        <summary className="cursor-pointer select-none text-slate-300">Full Monitor Payload</summary>
         <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
-          {status.lastSystemPrompt || 'No prompt read yet.'}
-        </pre>
-      </details>
-      <details className="surface text-xs text-slate-200">
-        <summary className="cursor-pointer select-none text-slate-300">Most recent info snapshot</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
-          {status.lastInfoSnapshot
-            ? JSON.stringify(status.lastInfoSnapshot, null, 2)
-            : 'No snapshot captured yet.'}
+          {JSON.stringify(state, null, 2)}
         </pre>
       </details>
       <div className="space-y-0.5">
-        <div className="panel-muted text-xs uppercase">Most recent LLM conversation</div>
-        <div className="surface max-h-72 space-y-0.5 overflow-y-auto">
-          {conversationRows.length ? (
-            conversationRows.map((row) => <ChatMessageRow key={row.id} message={row.message} />)
+        <div className="panel-muted text-xs uppercase">Recent Runs</div>
+        <div className="surface max-h-52 space-y-0.5 overflow-y-auto text-xs">
+          {history.length ? (
+            history
+              .slice()
+              .reverse()
+              .map((run) => (
+                <button
+                  key={run.runId}
+                  type="button"
+                  onClick={() => setSelectedRunId(run.runId)}
+                  className={`w-full text-left surface ${
+                    selectedRun?.runId === run.runId ? 'border border-sky-400/50' : ''
+                  }`}
+                >
+                  <span className="text-slate-300">#{run.runId}</span>{' '}
+                  <span className="text-slate-200">{run.outcome || run.phase || '--'}</span>{' '}
+                  <span className="text-slate-400">{run.durationMs != null ? `${run.durationMs}ms` : '--'}</span>{' '}
+                  <span className="text-slate-500">{run.reason || ''}</span>
+                </button>
+              ))
           ) : (
-            <div className="text-xs text-slate-300">No model conversation captured yet.</div>
+            <div className="text-slate-300">No runs recorded yet.</div>
           )}
         </div>
       </div>
+      {selectedRun ? (
+        <details className="surface text-xs text-slate-200" open>
+          <summary className="cursor-pointer select-none text-slate-300">
+            Run #{selectedRun.runId} details
+          </summary>
+          <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+            {JSON.stringify(selectedRun, null, 2)}
+          </pre>
+        </details>
+      ) : null}
     </div>
   );
 }
 
-function buildLlmLargeIndicator(status) {
-  if (status?.inFlight) {
+function buildLlmLargeIndicatorFromState(state) {
+  const runtime = state?.runtime || {};
+  const output = state?.output || {};
+  const errors = state?.errors || {};
+  if (runtime.inFlight) {
     return {
       label: 'IN FLIGHT',
-      detail: 'Generating commentary now',
+      detail: runtime.reason || 'Generating commentary now',
       className: 'border-amber-400/60 bg-amber-700/20 text-amber-200',
     };
   }
-  if (status?.lastOutcome === 'posted') {
+  if (runtime.outcome === 'posted') {
     return {
       label: 'POSTED',
-      detail: status?.lastPostedText ? `Last: ${status.lastPostedText}` : 'Commentary posted',
+      detail: output.posted ? `Last: ${output.posted}` : 'Commentary posted',
       className: 'border-emerald-400/60 bg-emerald-700/20 text-emerald-200',
     };
   }
-  if (status?.lastOutcome === 'skipped') {
+  if (runtime.outcome === 'skipped') {
     return {
       label: 'SKIPPED',
-      detail: status?.lastReason || 'Model chose to skip',
+      detail: runtime.reason || 'Model chose to skip',
       className: 'border-slate-400/60 bg-slate-700/30 text-slate-200',
     };
   }
-  if (status?.lastOutcome === 'failed') {
+  if (runtime.outcome === 'failed') {
     return {
       label: 'FAILED',
-      detail: status?.lastError || status?.lastReason || 'Tick failed',
+      detail: errors.message || runtime.reason || 'Tick failed',
       className: 'border-red-400/60 bg-red-700/20 text-red-200',
     };
   }
   return {
-    label: status?.running ? 'IDLE' : 'STOPPED',
-    detail: status?.lastReason || 'Waiting for next tick',
+    label: runtime.running ? 'IDLE' : 'STOPPED',
+    detail: runtime.reason || 'Waiting for next tick',
     className: 'border-sky-400/50 bg-sky-700/20 text-sky-200',
   };
 }
 
-function buildLlmConversationRows(status) {
+function buildLlmConversationRowsFromMessages(modelMessages, rawOutput) {
   const now = Date.now();
-  const modelMessages = Array.isArray(status?.lastModelMessages) ? status.lastModelMessages : [];
-  const rows = modelMessages.map((entry, index) => {
+  const messages = Array.isArray(modelMessages) ? modelMessages : [];
+  const rows = messages.map((entry, index) => {
     const role = String(entry?.role || '').toLowerCase();
     const content =
       typeof entry?.content === 'string' ? entry.content : JSON.stringify(entry?.content ?? null, null, 2);
@@ -459,8 +501,8 @@ function buildLlmConversationRows(status) {
       },
     };
   });
-  if (status?.lastModelRawOutput != null) {
-    const raw = String(status.lastModelRawOutput);
+  if (rawOutput != null) {
+    const raw = String(rawOutput);
     rows.push({
       id: 'llm-output',
       message: {
