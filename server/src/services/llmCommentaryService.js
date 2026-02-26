@@ -25,6 +25,7 @@ const SELF_TALK_WINDOW_MS = 30 * 60 * 1000;
 const MAX_CONTEXT_EVENTS = 10;
 const MAX_RUN_HISTORY = 30;
 const MAX_ROVER_EVENTS = 400;
+const POST_COOLDOWN_MS = 10000;
 
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
@@ -1158,6 +1159,7 @@ async function runTick() {
       lastPostedText: text,
       lastPostedAt: Date.now(),
     });
+    nextDelayMs = Math.max(nextDelayMs, POST_COOLDOWN_MS);
     finalizeRunRecord({
       outcome: 'posted',
       reason: null,
