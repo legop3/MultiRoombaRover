@@ -477,12 +477,8 @@ function compactRoverForContext(rover) {
   };
 }
 
-function buildSnapshot() {
-  const now = new Date();
-  const nowMs = now.getTime();
+function buildRoversNow(nowMs = Date.now()) {
   const activeDrivers = getActiveDrivers();
-  const driverEntries = collectActiveDriverEntries();
-
   const roster = roverManager.getRoster().slice(0, MAX_ROVERS);
   const nextRoverStateById = new Map();
   const rovers = roster.map((entry) => {
@@ -537,6 +533,14 @@ function buildSnapshot() {
   nextRoverStateById.forEach((value, roverId) => {
     lastRoverStateById.set(roverId, value);
   });
+  return { rovers, activeDrivers, roster };
+}
+
+function buildSnapshot() {
+  const now = new Date();
+  const nowMs = now.getTime();
+  const driverEntries = collectActiveDriverEntries();
+  const { rovers } = buildRoversNow(nowMs);
   const roverById = new Map(rovers.map((rover) => [String(rover.id), rover]));
   const allRecentMessages = getRecentMessages(300, { includeSystem: true })
     .filter((entry) => Number(entry?.ts) >= contextResetAt);
@@ -571,7 +575,7 @@ function buildSnapshot() {
       nickname: entry.nickname || entry.socketId?.slice(0, 6) || 'unknown',
       text: entry.text || '',
       rover_id: roverId,
-      rover_ctx: compactRoverForContext(rover),
+      rover_ctx: entry?.roverCtx || entry?.rover_ctx || compactRoverForContext(rover),
     };
   });
   const hasRecentChat = eventStream.some((event) => event.type === 'chat');
@@ -601,6 +605,17 @@ function buildSnapshot() {
     },
     event_stream: eventStream,
     current_snapshot: currentSnapshot,
+  };
+}
+
+function refreshFinalSnapshotForSend(snapshot) {
+  const { rovers } = buildRoversNow(Date.now());
+  return {
+    ...(snapshot || {}),
+    current_snapshot: {
+      ...(snapshot?.current_snapshot || {}),
+      rovers,
+    },
   };
 }
 
@@ -832,14 +847,15 @@ async function runTick() {
       lastInfoSnapshot: snapshot,
     });
     const systemPrompt = await readSystemPrompt();
-    const modelMessages = buildModelMessages(systemPrompt, snapshot);
+    const snapshotForSend = refreshFinalSnapshotForSend(snapshot);
+    const modelMessages = buildModelMessages(systemPrompt, snapshotForSend);
     const modelInputAt = Date.now();
     patchCurrentRun({
       phase: 'input_ready',
       input: {
         ...(currentRun?.input || {}),
         systemPrompt,
-        infoSnapshot: snapshot,
+        infoSnapshot: snapshotForSend,
         modelMessages,
         modelInputAt,
       },
@@ -848,6 +864,7 @@ async function runTick() {
       lastModelMessages: modelMessages,
       lastModelInputAt: modelInputAt,
       lastModelInputTickId: tickId,
+      lastInfoSnapshot: snapshotForSend,
       lastModelRawOutput: null,
       lastModelOutputAt: null,
       lastModelOutputTickId: null,

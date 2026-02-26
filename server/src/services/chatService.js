@@ -105,9 +105,65 @@ function buildMessage(socket, text, meta = {}) {
     discordUserId: meta.discordUserId || null,
     discordUserName: meta.discordUserName || null,
     discordUserAvatarUrl: meta.discordUserAvatarUrl || null,
+    roverCtx: meta.roverCtx || null,
     text,
     tts: meta.tts || null,
     system: Boolean(meta.system),
+  };
+}
+
+function isChargingFromSensors(sensors = {}) {
+  const label = String(sensors?.chargingState?.label || '').toLowerCase();
+  if (label === 'waiting' || label === 'full charging' || label === 'trickle charging') {
+    return true;
+  }
+  const code = sensors?.chargingState?.code;
+  return code === 2 || code === 3 || code === 4;
+}
+
+function buildRoverCtxSnapshot(roverId) {
+  if (!roverId) return null;
+  const key = String(roverId);
+  const record = roverManager.rovers.get(key);
+  if (!record) return null;
+  const sensors = record?.lastSensor?.decoded || {};
+  const batteryState = record?.batteryState || null;
+  const { getActiveDrivers } = require('./turnService');
+  const activeDrivers = getActiveDrivers();
+  const driverSocketId = activeDrivers[key] || record?.drivers?.values?.().next?.().value || null;
+  const charging = isChargingFromSensors(sensors);
+  const docked = Boolean(sensors?.chargingSources?.homeBase);
+  const wheelsOffGround = Boolean(
+    sensors?.bumpsAndWheelDrops?.wheelDropLeft && sensors?.bumpsAndWheelDrops?.wheelDropRight,
+  );
+  const latestDistanceM = Math.round((Math.abs(Number(sensors?.distanceMm) || 0) / 1000) * 10) / 10;
+  const latestTurnDeg = Math.round(Math.abs(Number(sensors?.angleDeg) || 0));
+  const latestBumps =
+    (sensors?.bumpsAndWheelDrops?.bumpLeft ? 0.5 : 0) +
+    (sensors?.bumpsAndWheelDrops?.bumpRight ? 0.5 : 0);
+  const moving = latestDistanceM > 0.05 || latestTurnDeg > 10;
+  let statusTag = 'idle';
+  if (charging) {
+    statusTag = 'charging';
+  } else if (docked) {
+    statusTag = 'docked';
+  } else if (driverSocketId && moving) {
+    statusTag = 'driving';
+  } else if (driverSocketId) {
+    statusTag = 'active-idle';
+  }
+  return {
+    id: key,
+    status_tag: statusTag,
+    battery_low: Boolean(batteryState?.warnActive || batteryState?.urgentActive),
+    docked,
+    charging,
+    wheels_off_ground: wheelsOffGround,
+    activity_30s: {
+      distance_m: latestDistanceM,
+      turn_deg: latestTurnDeg,
+      bumps: latestBumps,
+    },
   };
 }
 
@@ -282,7 +338,12 @@ function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
   // }
   const roverId = resolveRoverId(socket?.id);
   const ttsOptions = normalizeTtsOptions(tts);
-  const message = buildMessage(socket, clean, { fromDiscord: false, roverId, tts: ttsOptions });
+  const message = buildMessage(socket, clean, {
+    fromDiscord: false,
+    roverId,
+    roverCtx: buildRoverCtxSnapshot(roverId),
+    tts: ttsOptions,
+  });
   logger.info('Chat message', { socket: socket.id, roverId: message.roverId });
   playTypingNote(roverId, TYPING_SEND_NOTE, socket?.id);
   broadcastMessage(message);
@@ -349,6 +410,7 @@ function sendExternalMessage({
     nickname,
     role,
     roverId,
+    roverCtx: buildRoverCtxSnapshot(roverId),
     fromDiscord: true,
     discordGuildId,
     discordGuildName,
