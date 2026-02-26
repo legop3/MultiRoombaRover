@@ -37,6 +37,8 @@ let timer = null;
 let inFlight = false;
 let tickCount = 0;
 let skipStreak = 0;
+let generationCount = 0;
+let generationTotalMs = 0;
 let contextResetAt = Date.now();
 let clearCount = 0;
 const roverActivity = new Map(); // roverId -> { buckets: Map(bucketTs -> { distanceMm, turnDeg, bumps }), bumpLeftActive, bumpRightActive }
@@ -75,6 +77,9 @@ let status = {
   lastClearedAt: contextResetAt,
   clearCount,
   skipStreak: 0,
+  lastGenerationMs: null,
+  avgGenerationMs: null,
+  generationCount: 0,
   lastGeneratedText: null,
   lastPostedText: null,
   lastPostedAt: null,
@@ -182,12 +187,17 @@ function clearRuntimeHistory() {
   contextResetAt = Date.now();
   clearCount += 1;
   skipStreak = 0;
+  generationCount = 0;
+  generationTotalMs = 0;
   roverActivity.clear();
   lastRoverStateById.clear();
   updateStatus({
     lastClearedAt: contextResetAt,
     clearCount,
     skipStreak,
+    lastGenerationMs: null,
+    avgGenerationMs: null,
+    generationCount,
     lastInfoSnapshot: null,
     lastModelMessages: null,
     lastModelRawOutput: null,
@@ -623,9 +633,17 @@ async function runTick() {
       lastInfoSnapshot: snapshot,
     });
     const systemPrompt = await readSystemPrompt();
+    const generationStartMs = Date.now();
     const modelResult = await generateCommentary(systemPrompt, snapshot);
+    const generationMs = Math.max(0, Date.now() - generationStartMs);
+    generationCount += 1;
+    generationTotalMs += generationMs;
+    const avgGenerationMs = Math.round(generationTotalMs / generationCount);
     updateStatus({
       lastModelRawOutput: modelResult?.raw || '',
+      lastGenerationMs: generationMs,
+      avgGenerationMs,
+      generationCount,
     });
     const text = modelResult?.normalized;
     if (!text) {
