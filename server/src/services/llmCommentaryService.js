@@ -66,6 +66,7 @@ let status = {
   lastOutcome: null,
   lastReason: null,
   lastError: null,
+  lastErrorDetails: null,
   lastPromptReadAt: null,
   lastPromptChars: 0,
   lastSystemPrompt: null,
@@ -205,9 +206,65 @@ function clearRuntimeHistory() {
     lastPostedText: null,
     lastPostedAt: null,
     lastError: null,
+    lastErrorDetails: null,
     lastOutcome: 'cleared',
     lastReason: 'admin requested clear history',
   });
+}
+
+function buildFailureInfo(err) {
+  const details = {};
+  if (err && typeof err === 'object') {
+    if (err.name) details.name = String(err.name);
+    if (err.code != null) details.code = String(err.code);
+    if (err.errno != null) details.errno = String(err.errno);
+    if (err.type) details.type = String(err.type);
+    if (err.status != null) details.status = Number(err.status);
+    if (err.statusCode != null) details.statusCode = Number(err.statusCode);
+    if (err.status_code != null) details.status_code = Number(err.status_code);
+    if (err.error) details.error = typeof err.error === 'string' ? err.error : JSON.stringify(err.error);
+    if (err.cause) {
+      if (typeof err.cause === 'string') {
+        details.cause = err.cause;
+      } else if (typeof err.cause === 'object') {
+        details.cause = {
+          name: err.cause.name || null,
+          message: err.cause.message || null,
+          code: err.cause.code || null,
+          status: err.cause.status ?? err.cause.statusCode ?? null,
+        };
+      }
+    }
+    if (err.response && typeof err.response === 'object') {
+      const response = {};
+      if (err.response.status != null) response.status = Number(err.response.status);
+      if (err.response.statusText) response.statusText = String(err.response.statusText);
+      if (err.response.url) response.url = String(err.response.url);
+      if (Object.keys(response).length) {
+        details.response = response;
+      }
+    }
+  }
+
+  const message =
+    (err && typeof err === 'object' && typeof err.message === 'string' && err.message.trim()) ||
+    details.error ||
+    String(err || 'Unknown error');
+
+  const reasonParts = [];
+  if (details.name) reasonParts.push(details.name);
+  const code = details.code || details.errno || details.type;
+  if (code) reasonParts.push(String(code));
+  const status =
+    details.status ??
+    details.statusCode ??
+    details.status_code ??
+    details.response?.status ??
+    null;
+  if (status != null) reasonParts.push(`status ${status}`);
+  const reason = reasonParts.length ? reasonParts.join(' | ') : 'exception';
+
+  return { reason, message, details: Object.keys(details).length ? details : null };
 }
 
 function isChargingFromSensors(sensors = {}) {
@@ -686,11 +743,18 @@ async function runTick() {
       lastPostedAt: Date.now(),
     });
   } catch (err) {
-    logger.warn('Commentary tick failed', { tickId, error: err.message });
+    const failure = buildFailureInfo(err);
+    logger.warn('Commentary tick failed', {
+      tickId,
+      reason: failure.reason,
+      error: failure.message,
+      details: failure.details,
+    });
     updateStatus({
       lastOutcome: 'failed',
-      lastReason: 'exception',
-      lastError: err.message,
+      lastReason: failure.reason,
+      lastError: failure.message,
+      lastErrorDetails: failure.details,
     });
   } finally {
     inFlight = false;

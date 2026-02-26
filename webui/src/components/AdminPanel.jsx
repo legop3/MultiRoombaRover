@@ -351,6 +351,14 @@ function LlmCommentaryPanel({ status, onClearHistory, clearingHistory }) {
           Error: {status.lastError}
         </div>
       ) : null}
+      {status.lastErrorDetails ? (
+        <details className="surface text-xs text-red-200">
+          <summary className="cursor-pointer select-none text-red-300">Failure details</summary>
+          <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-red-200">
+            {JSON.stringify(status.lastErrorDetails, null, 2)}
+          </pre>
+        </details>
+      ) : null}
       {status.lastGeneratedText ? (
         <div className="surface text-xs text-slate-200 break-words">
           Generated: {status.lastGeneratedText}
