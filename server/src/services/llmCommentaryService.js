@@ -279,6 +279,7 @@ function upsertActivityState(roverId) {
 function onSensorEvent({ roverId, sensors, batteryState } = {}) {
   if (!roverId || !sensors) return;
   const nowMs = Date.now();
+  const dockedNow = Boolean(sensors?.chargingSources?.homeBase);
   const bucketTs = Math.floor(nowMs / ACTIVITY_BUCKET_MS) * ACTIVITY_BUCKET_MS;
   const state = upsertActivityState(String(roverId));
   pruneActivityBuckets(state, nowMs);
@@ -290,11 +291,13 @@ function onSensorEvent({ roverId, sensors, batteryState } = {}) {
   bucket.turnDeg += Math.abs(Number(sensors.angleDeg) || 0);
   const bumpLeftNow = Boolean(sensors?.bumpsAndWheelDrops?.bumpLeft);
   const bumpRightNow = Boolean(sensors?.bumpsAndWheelDrops?.bumpRight);
-  if (bumpLeftNow && !state.bumpLeftActive) {
-    bucket.bumps += 0.5;
-  }
-  if (bumpRightNow && !state.bumpRightActive) {
-    bucket.bumps += 0.5;
+  if (!dockedNow) {
+    if (bumpLeftNow && !state.bumpLeftActive) {
+      bucket.bumps += 0.5;
+    }
+    if (bumpRightNow && !state.bumpRightActive) {
+      bucket.bumps += 0.5;
+    }
   }
   state.bumpLeftActive = bumpLeftNow;
   state.bumpRightActive = bumpRightNow;
@@ -303,7 +306,7 @@ function onSensorEvent({ roverId, sensors, batteryState } = {}) {
   const activeDrivers = getActiveDrivers();
   const driverSocketId = activeDrivers[roverKey] || null;
   const driverNickname = driverSocketId ? resolveDriverNickname(driverSocketId) : null;
-  const docked = Boolean(sensors?.chargingSources?.homeBase);
+  const docked = dockedNow;
   const charging = isChargingFromSensors(sensors);
   const wheelsOffGround = Boolean(
     sensors?.bumpsAndWheelDrops?.wheelDropLeft && sensors?.bumpsAndWheelDrops?.wheelDropRight,
@@ -578,7 +581,8 @@ function compactRoverForContext(rover) {
   };
 }
 
-function deriveContactState(sensors = {}, activity30s = {}) {
+function deriveContactState(sensors = {}, activity30s = {}, docked = false) {
+  if (docked) return 'clear';
   const bumps = Number(activity30s?.bumps) || 0;
   const hasBump = bumps >= 0.5 || sensors?.bumpsAndWheelDrops?.bumpLeft || sensors?.bumpsAndWheelDrops?.bumpRight;
   if (hasBump) return 'bumps_recent';
@@ -590,7 +594,8 @@ function deriveContactState(sensors = {}, activity30s = {}) {
   return 'clear';
 }
 
-function deriveHazardState(sensors = {}) {
+function deriveHazardState(sensors = {}, docked = false) {
+  if (docked) return 'normal';
   if (Boolean(sensors?.virtualWall)) return 'virtual_wall_seen';
   if (
     Boolean(sensors?.cliffLeft) ||
@@ -651,8 +656,8 @@ function buildRoversNow(nowMs = Date.now()) {
       battery_low: Boolean(batteryState?.warnActive || batteryState?.urgentActive),
       activity_30s: activity30s,
       status_tag: statusTag,
-      contact_state: deriveContactState(sensors, activity30s),
-      hazard_state: deriveHazardState(sensors),
+      contact_state: deriveContactState(sensors, activity30s, docked),
+      hazard_state: deriveHazardState(sensors, docked),
       mobility_state: deriveMobilityState(sensors, wheelsOffGround),
     };
     const currentBaseScore = computeBaseActivityScore(activity30s);

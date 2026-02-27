@@ -142,18 +142,26 @@ function buildRoverCtxSnapshot(roverId) {
     (sensors?.bumpsAndWheelDrops?.bumpLeft ? 0.5 : 0) +
     (sensors?.bumpsAndWheelDrops?.bumpRight ? 0.5 : 0);
   const light = sensors?.lightBumper || {};
-  const contactState =
-    latestBumps >= 0.5
+  const contactState = docked
+    ? 'clear'
+    : latestBumps >= 0.5
       ? 'bumps_recent'
-      : sensors?.wall || light.left || light.frontLeft || light.centerLeft || light.centerRight || light.frontRight || light.right
-      ? 'wall_brush'
-      : 'clear';
-  const hazardState =
-    sensors?.virtualWall
+      : sensors?.wall ||
+          light.left ||
+          light.frontLeft ||
+          light.centerLeft ||
+          light.centerRight ||
+          light.frontRight ||
+          light.right
+        ? 'wall_brush'
+        : 'clear';
+  const hazardState = docked
+    ? 'normal'
+    : sensors?.virtualWall
       ? 'virtual_wall_seen'
       : sensors?.cliffLeft || sensors?.cliffFrontLeft || sensors?.cliffFrontRight || sensors?.cliffRight
-      ? 'cliff_alert'
-      : 'normal';
+        ? 'cliff_alert'
+        : 'normal';
   const mobilityState = wheelsOffGround ? 'wheels_off_ground' : 'normal';
   const baseScore = Math.min(100, Math.round(Math.min(45, latestDistanceM * 25) + Math.min(30, latestTurnDeg / 12) + Math.min(25, latestBumps * 12)));
   const activityScore = Math.max(
