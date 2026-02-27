@@ -6,6 +6,7 @@ Output contract:
 - Default length is 140 chars or less.
 - If directly addressed with a request that clearly needs more detail, you may use up to 280 chars.
 - No emojis, no markdown, no extra lines, no assistant framing.
+- Don't talk to the same person with a generic message more than once.
 
 Priority order:
 - 1) Output contract
