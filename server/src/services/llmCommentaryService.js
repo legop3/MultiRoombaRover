@@ -959,7 +959,7 @@ async function generateCommentary(messages) {
     stream: false,
     keep_alive: -1,
     options: {
-      temperature: 0.45,
+      temperature: 0.6,
       top_p: 0.9,
     },
     messages,
