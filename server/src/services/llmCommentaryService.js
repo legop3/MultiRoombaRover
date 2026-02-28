@@ -852,33 +852,6 @@ function encStatus(value) {
   return map[String(value || 'unknown')] || 'unknown';
 }
 
-function encHazard(value) {
-  const map = {
-    normal: 'normal',
-    cliff: 'cliff',
-    hot_left: 'hot_left',
-    hot_right: 'hot_right',
-  };
-  return map[String(value || 'normal')] || 'normal';
-}
-
-function encContact(value) {
-  const map = {
-    clear: 'clear',
-    wall_brush: 'wall_brush',
-    bumps_recent: 'bumps_recent',
-  };
-  return map[String(value || 'clear')] || 'clear';
-}
-
-function encMobility(value) {
-  const map = {
-    normal: 'normal',
-    lifted: 'lifted',
-  };
-  return map[String(value || 'normal')] || 'normal';
-}
-
 function encActivityBand(value) {
   const map = {
     idle: 'idle',
@@ -901,20 +874,28 @@ function encActivityTrend(value) {
 
 function formatChatRoverCtx(ctx) {
   if (!ctx || typeof ctx !== 'object') return 'none';
-  return `st=${encStatus(ctx.status_tag)} bl=${encBool(Boolean(ctx.battery_low))} dk=${encBool(Boolean(ctx.docked))} ch=${encBool(Boolean(ctx.charging))} wg=${encBool(Boolean(ctx.wheels_off_ground))} hz=${encHazard(ctx.hazard_state)} ab=${encActivityBand(ctx.activity_band)} at=${encActivityTrend(ctx.activity_trend)}`;
+  return `st=${encStatus(ctx.status_tag)} bl=${encBool(Boolean(ctx.battery_low))} dk=${encBool(Boolean(ctx.docked))} ab=${encActivityBand(ctx.activity_band)} at=${encActivityTrend(ctx.activity_trend)}`;
 }
 
 function formatChatEventMessage(event) {
+  const roverId = event.rover_id || 'none';
+  if (roverId === 'none') {
+    return [
+      'CHAT',
+      `n=${event.nickname || 'unknown'} r=none driver=none`,
+      `txt: ${event.text || ''}`,
+    ].join('\n');
+  }
   return [
     'CHAT',
-    `n=${event.nickname || 'unknown'} r=${event.rover_id || 'none'}`,
+    `n=${event.nickname || 'unknown'} r=${roverId}`,
     `txt: ${event.text || ''}`,
     `rn: ${formatChatRoverCtx(event.rover_ctx)}`,
   ].join('\n');
 }
 
 function formatRoverSnapshotLine(rover = {}) {
-  return `id=${rover.id || 'unknown'} drv=${rover.driver_nickname || 'none'} st=${encStatus(rover.status_tag)} bl=${encBool(Boolean(rover.battery_low))} dk=${encBool(Boolean(rover.docked))} ch=${encBool(Boolean(rover.charging))} wg=${encBool(Boolean(rover.wheels_off_ground))} ct=${encContact(rover.contact_state)} hz=${encHazard(rover.hazard_state)} mb=${encMobility(rover.mobility_state)} as=${Number(rover.activity_score) || 0} ab=${encActivityBand(rover.activity_band)} at=${encActivityTrend(rover.activity_trend)}`;
+  return `id=${rover.id || 'unknown'} drv=${rover.driver_nickname || 'none'} st=${encStatus(rover.status_tag)} bl=${encBool(Boolean(rover.battery_low))} dk=${encBool(Boolean(rover.docked))} as=${Number(rover.activity_score) || 0} ab=${encActivityBand(rover.activity_band)} at=${encActivityTrend(rover.activity_trend)}`;
 }
 
 function formatEventMessage(event) {
