@@ -797,13 +797,13 @@ function normalizeCommentary(rawText) {
   if (typeof rawText !== 'string') return null;
   const trimmed = rawText.trim();
   if (!trimmed) return null;
-  if (trimmed.toUpperCase() === SKIP_TOKEN) return null;
+  if (/\bSKIP\b/i.test(trimmed)) return null;
   const firstLine = trimmed
     .split(/\r?\n/)
     .map((line) => line.trim())
     .find(Boolean);
   if (!firstLine) return null;
-  if (firstLine.toUpperCase() === SKIP_TOKEN) return null;
+  if (/\bSKIP\b/i.test(firstLine)) return null;
   return firstLine.replace(/\s+/g, ' ');
 }
 
