@@ -892,9 +892,10 @@ function formatSnapshotMessage(event) {
   return lines.join('\n');
 }
 
-function formatSnapshotFinalMessage(currentSnapshot = {}) {
+function formatSnapshotFinalMessage(currentSnapshot = {}, runMeta = {}) {
   const rovers = Array.isArray(currentSnapshot?.rovers) ? currentSnapshot.rovers : [];
   const lines = ['SNAPSHOT FINAL'];
+  lines.push(`skip_streak=${Number(runMeta?.skip_streak) || 0}`);
   rovers.forEach((rover) => {
     lines.push(formatRoverSnapshotLine(rover));
   });
@@ -958,7 +959,7 @@ function buildModelMessages(systemPrompt, snapshot) {
   // Always end with a full rover snapshot user message.
   messages.push({
     role: 'user',
-    content: formatSnapshotFinalMessage(snapshot?.current_snapshot || {}),
+    content: formatSnapshotFinalMessage(snapshot?.current_snapshot || {}, snapshot?.run_meta || {}),
   });
   return messages;
 }
