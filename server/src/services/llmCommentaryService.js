@@ -835,56 +835,98 @@ function parseModelOutput(rawContent) {
   };
 }
 
-function formatRunMetaMessage(runMeta = {}) {
-  const focus = runMeta?.last_message_focus || null;
-  const focusText = focus
-    ? `topic=${focus.topic || 'none'} rover=${focus.rover_id || 'none'}`
-    : 'none';
-  const drivingRovers = Array.isArray(runMeta?.driving_rovers) && runMeta.driving_rovers.length
-    ? runMeta.driving_rovers.join(', ')
-    : 'none';
-  return [
-    'RUN META',
-    `- active drivers: ${Number(runMeta?.active_driver_count) || 0}`,
-    `- driving rovers: ${drivingRovers}`,
-    `- bot posts last 30m: ${Number(runMeta?.self_talk_recent_30m) || 0}`,
-    `- current skip streak: ${Number(runMeta?.skip_streak) || 0}`,
-    `- last bot focus: ${focusText}`,
-  ].join('\n');
+function encBool(value) {
+  return value ? '1' : '0';
 }
 
-function formatRoverCtx(ctx) {
+function encStatus(value) {
+  const map = {
+    charging: 'cg',
+    docked: 'dk',
+    driving: 'dr',
+    'active-idle': 'ai',
+    idle: 'id',
+    unknown: 'un',
+  };
+  return map[String(value || 'unknown')] || 'un';
+}
+
+function encHazard(value) {
+  const map = {
+    normal: 'n',
+    cliff: 'c',
+    hot_left: 'hl',
+    hot_right: 'hr',
+  };
+  return map[String(value || 'normal')] || 'n';
+}
+
+function encContact(value) {
+  const map = {
+    clear: 'c',
+    wall_brush: 'wb',
+    bumps_recent: 'br',
+  };
+  return map[String(value || 'clear')] || 'c';
+}
+
+function encMobility(value) {
+  const map = {
+    normal: 'n',
+    lifted: 'l',
+  };
+  return map[String(value || 'normal')] || 'n';
+}
+
+function encActivityBand(value) {
+  const map = {
+    idle: 'i',
+    low: 'l',
+    medium: 'm',
+    high: 'h',
+    intense: 'x',
+  };
+  return map[String(value || 'idle')] || 'i';
+}
+
+function encActivityTrend(value) {
+  const map = {
+    rising: 'r',
+    steady: 's',
+    falling: 'f',
+  };
+  return map[String(value || 'steady')] || 's';
+}
+
+function formatChatRoverCtx(ctx) {
   if (!ctx || typeof ctx !== 'object') return 'none';
-  return `status=${ctx.status_tag || 'unknown'} battery_low=${Boolean(ctx.battery_low)} docked=${Boolean(ctx.docked)} charging=${Boolean(ctx.charging)} wheels_off_ground=${Boolean(ctx.wheels_off_ground)} contact=${ctx.contact_state || 'clear'} hazard=${ctx.hazard_state || 'normal'} mobility=${ctx.mobility_state || 'normal'} activity_score=${Number(ctx.activity_score) || 0} activity_band=${ctx.activity_band || 'idle'} activity_trend=${ctx.activity_trend || 'steady'}`;
+  return `st=${encStatus(ctx.status_tag)} bl=${encBool(Boolean(ctx.battery_low))} dk=${encBool(Boolean(ctx.docked))} ch=${encBool(Boolean(ctx.charging))} wg=${encBool(Boolean(ctx.wheels_off_ground))} hz=${encHazard(ctx.hazard_state)} ab=${encActivityBand(ctx.activity_band)} at=${encActivityTrend(ctx.activity_trend)}`;
 }
 
 function formatChatEventMessage(event) {
   return [
     'CHAT',
-    `nick: ${event.nickname || 'unknown'}`,
-    `text: ${event.text || ''}`,
-    `rover: ${event.rover_id || 'none'}`,
-    `rover_now: ${formatRoverCtx(event.rover_ctx)}`,
+    `n=${event.nickname || 'unknown'} r=${event.rover_id || 'none'}`,
+    `txt: ${event.text || ''}`,
+    `rn: ${formatChatRoverCtx(event.rover_ctx)}`,
   ].join('\n');
 }
 
 function formatRoverSnapshotLine(rover = {}) {
-  return `${rover.id || 'unknown'}: driver=${rover.driver_nickname || 'none'} status=${rover.status_tag || 'unknown'} battery_low=${Boolean(rover.battery_low)} docked=${Boolean(rover.docked)} charging=${Boolean(rover.charging)} wheels_off_ground=${Boolean(rover.wheels_off_ground)} contact=${rover.contact_state || 'clear'} hazard=${rover.hazard_state || 'normal'} mobility=${rover.mobility_state || 'normal'} activity_score=${Number(rover.activity_score) || 0} activity_band=${rover.activity_band || 'idle'} activity_trend=${rover.activity_trend || 'steady'}`;
+  return `id=${rover.id || 'unknown'} drv=${rover.driver_nickname || 'none'} st=${encStatus(rover.status_tag)} bl=${encBool(Boolean(rover.battery_low))} dk=${encBool(Boolean(rover.docked))} ch=${encBool(Boolean(rover.charging))} wg=${encBool(Boolean(rover.wheels_off_ground))} ct=${encContact(rover.contact_state)} hz=${encHazard(rover.hazard_state)} mb=${encMobility(rover.mobility_state)} as=${Number(rover.activity_score) || 0} ab=${encActivityBand(rover.activity_band)} at=${encActivityTrend(rover.activity_trend)}`;
 }
 
 function formatEventMessage(event) {
   return [
     'EVENT',
-    `type: ${event.event_type || 'rover_event'}`,
-    `rover: ${event.rover_id || 'unknown'}`,
-    `driver: ${event.driver_nickname || 'none'}`,
-    `summary: ${event.summary || ''}`,
+    `e=${event.event_type || 'rover_event'} r=${event.rover_id || 'unknown'} d=${event.driver_nickname || 'none'}`,
+    `s: ${event.summary || ''}`,
   ].join('\n');
 }
 
 function formatSnapshotMessage(event) {
   const rovers = Array.isArray(event?.rovers) ? event.rovers : [];
-  const lines = ['SNAPSHOT', `reason: ${event?.reason || 'none'}`];
+  const lines = ['SNAPSHOT', `reason=${event?.reason || 'none'}`];
   rovers.forEach((rover) => {
     lines.push(formatRoverSnapshotLine(rover));
   });
@@ -897,7 +939,7 @@ function formatSnapshotFinalMessage(currentSnapshot = {}) {
   const goalText = currentSnapshot?.community_goal
     ? String(currentSnapshot.community_goal).trim()
     : '';
-  lines.push(`community_goal: ${goalText || 'none'}`);
+  lines.push(`goal: ${goalText || 'none'}`);
   rovers.forEach((rover) => {
     lines.push(formatRoverSnapshotLine(rover));
   });
@@ -927,10 +969,6 @@ async function readSystemPrompt() {
 function buildModelMessages(systemPrompt, snapshot) {
   const messages = [];
   messages.push({ role: 'system', content: systemPrompt });
-  messages.push({
-    role: 'user',
-    content: formatRunMetaMessage(snapshot?.run_meta || {}),
-  });
   const timeline = Array.isArray(snapshot?.event_stream) ? snapshot.event_stream : [];
   timeline.forEach((event) => {
     if (!event || typeof event !== 'object') return;
