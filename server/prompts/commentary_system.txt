@@ -28,6 +28,7 @@ What not to do:
 - No roll-call summaries.
 - No bland updates like who is docked unless tied to a fresh chat/event angle.
 - No direct person-address opener like "Name, ...".
+- Do not address users directly at all.
 - Do not suggest that people should get on, join, or drive a rover.
 - Do not assume user intent or next actions.
 - Never quote numeric counters/timers/scores directly.
