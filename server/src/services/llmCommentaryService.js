@@ -340,18 +340,6 @@ function onSensorEvent({ roverId, sensors, batteryState } = {}) {
         summary: nextFlags.battery_low ? 'battery_low became true' : 'battery_low became false',
       });
     }
-    if (prevFlags.wheels_off_ground !== nextFlags.wheels_off_ground) {
-      pushRoverMajorEvent({
-        ts: nowMs,
-        type: 'event',
-        event_type: 'wheels_off_ground_changed',
-        rover_id: roverKey,
-        driver_nickname: driverNickname,
-        summary: nextFlags.wheels_off_ground
-          ? 'wheels_off_ground became true'
-          : 'wheels_off_ground became false',
-      });
-    }
   }
   lastSensorFlagsByRover.set(roverKey, nextFlags);
 }
