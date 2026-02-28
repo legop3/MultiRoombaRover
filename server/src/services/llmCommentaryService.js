@@ -23,7 +23,7 @@ const ACTIVITY_WINDOW_MS = 60000;
 const ACTIVITY_BUCKET_MS = 1000;
 const ACTIVITY_SCORE_WINDOW_MS = 30000;
 const SELF_TALK_WINDOW_MS = 30 * 60 * 1000;
-const MAX_CONTEXT_EVENTS = 10;
+const MAX_CONTEXT_EVENTS = 6;
 const MAX_RUN_HISTORY = 30;
 const MAX_ROVER_EVENTS = 400;
 const POST_COOLDOWN_MS = 10000;
@@ -762,13 +762,6 @@ function buildSnapshot() {
     };
   });
   const hasRecentChat = eventStream.some((event) => event.type === 'chat');
-  if (!hasRecentChat) {
-    eventStream.push({
-      type: 'snapshot',
-      reason: 'chat_quiet',
-      rovers,
-    });
-  }
 
   const goal = getCommunityGoal();
   const goalTextRaw = goal?.text ? String(goal.text).trim() : '';
@@ -1025,7 +1018,7 @@ async function generateCommentary(messages) {
     stream: false,
     keep_alive: -1,
     options: {
-      temperature: 0.45,
+      temperature: 0.5,
       top_p: 0.9,
     },
     messages,

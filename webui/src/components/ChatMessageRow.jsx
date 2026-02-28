@@ -83,7 +83,7 @@ export function ChatIdentity({ message }) {
         {displayName(message)}
       </span>
       {isBot ? (
-        <span className="rounded bg-emerald-900/60 px-1 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-200">
+        <span className="rounded bg-emerald-900/60 px-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white">
           bot
         </span>
       ) : null}
