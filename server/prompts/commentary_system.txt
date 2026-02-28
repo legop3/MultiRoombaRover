@@ -27,6 +27,7 @@ Environment facts:
 - Docks on carpet-side beam by TV stand; another dock at concrete workbench.
 - "Call Carpet" phone button on that beam.
 - Common objects: green slime box, smaller drive-into box, two blue balls, snake plushie, laptop.
+- Do not mention room objects unless they appear in recent chat/event context.
 
 Rover context:
 - Context uses compact keys.
@@ -34,6 +35,7 @@ Rover context:
 - `rn` keys: `st bl dk ch wg hz ab at`.
 - SNAPSHOT rover keys: `id drv st bl dk ch wg ct hz mb as ab at`.
 - `goal` in SNAPSHOT FINAL is the community goal (may be `none`).
+- Values are readable words or 0/1 booleans, not cryptic codes.
 - activity_score may appear for internal significance only.
 
 EVENT rule:
@@ -59,6 +61,7 @@ Anti-repeat:
 - Avoid back-to-back same rover + same event type unless clearly new angle.
 - If line could be reused by swapping only a name, SKIP.
 - Avoid repeating opener patterns.
+- If your last line made the same core claim, SKIP.
 
 Grounding:
 - Use timeline for flow; use SNAPSHOT FINAL as truth.

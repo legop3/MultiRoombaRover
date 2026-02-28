@@ -835,67 +835,75 @@ function parseModelOutput(rawContent) {
   };
 }
 
+function normalizeDuplicateKey(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function encBool(value) {
   return value ? '1' : '0';
 }
 
 function encStatus(value) {
   const map = {
-    charging: 'cg',
-    docked: 'dk',
-    driving: 'dr',
-    'active-idle': 'ai',
-    idle: 'id',
-    unknown: 'un',
+    charging: 'charging',
+    docked: 'docked',
+    driving: 'driving',
+    'active-idle': 'active_idle',
+    idle: 'idle',
+    unknown: 'unknown',
   };
-  return map[String(value || 'unknown')] || 'un';
+  return map[String(value || 'unknown')] || 'unknown';
 }
 
 function encHazard(value) {
   const map = {
-    normal: 'n',
-    cliff: 'c',
-    hot_left: 'hl',
-    hot_right: 'hr',
+    normal: 'normal',
+    cliff: 'cliff',
+    hot_left: 'hot_left',
+    hot_right: 'hot_right',
   };
-  return map[String(value || 'normal')] || 'n';
+  return map[String(value || 'normal')] || 'normal';
 }
 
 function encContact(value) {
   const map = {
-    clear: 'c',
-    wall_brush: 'wb',
-    bumps_recent: 'br',
+    clear: 'clear',
+    wall_brush: 'wall_brush',
+    bumps_recent: 'bumps_recent',
   };
-  return map[String(value || 'clear')] || 'c';
+  return map[String(value || 'clear')] || 'clear';
 }
 
 function encMobility(value) {
   const map = {
-    normal: 'n',
-    lifted: 'l',
+    normal: 'normal',
+    lifted: 'lifted',
   };
-  return map[String(value || 'normal')] || 'n';
+  return map[String(value || 'normal')] || 'normal';
 }
 
 function encActivityBand(value) {
   const map = {
-    idle: 'i',
-    low: 'l',
-    medium: 'm',
-    high: 'h',
-    intense: 'x',
+    idle: 'idle',
+    low: 'low',
+    medium: 'medium',
+    high: 'high',
+    intense: 'intense',
   };
-  return map[String(value || 'idle')] || 'i';
+  return map[String(value || 'idle')] || 'idle';
 }
 
 function encActivityTrend(value) {
   const map = {
-    rising: 'r',
-    steady: 's',
-    falling: 'f',
+    rising: 'rising',
+    steady: 'steady',
+    falling: 'falling',
   };
-  return map[String(value || 'steady')] || 's';
+  return map[String(value || 'steady')] || 'steady';
 }
 
 function formatChatRoverCtx(ctx) {
@@ -1169,12 +1177,13 @@ async function runTick() {
     updatePhase('decision_post', {
       lastGeneratedText: text,
     });
-    const recentBotMessages = getRecentMessages(80, { includeSystem: true })
+    const recentBotMessages = getRecentMessages(120, { includeSystem: true })
       .filter((entry) => Number(entry?.ts) >= contextResetAt)
       .filter((entry) => entry?.system)
-      .slice(-MAX_BOT_MESSAGES);
+      .slice(-Math.max(3, MAX_BOT_MESSAGES));
+    const duplicateKey = normalizeDuplicateKey(text);
     const duplicate = recentBotMessages.some(
-      (entry) => String(entry?.text || '').trim().toLowerCase() === text.toLowerCase(),
+      (entry) => normalizeDuplicateKey(entry?.text) === duplicateKey,
     );
     if (duplicate) {
       logger.info('Commentary tick skipped duplicate output', { tickId, text });
