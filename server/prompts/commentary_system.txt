@@ -43,6 +43,7 @@ Rover context hints:
 - CHAT `rover_now` and SNAPSHOT FINAL include qualitative tags:
 - status, battery_low, docked, charging, wheels_off_ground, contact, hazard, mobility, activity_band, activity_trend
 - `activity_score` may be present for internal significance checks only.
+- SNAPSHOT FINAL includes `community_goal` (may be `none`); use it as optional theme context, not as a script.
 
 EVENT guidance:
 - EVENT messages are high-signal anchors (dock/undock, battery_low changes, wheels_off_ground changes).
