@@ -43,5 +43,4 @@ Key legend:
 - CHAT keys: `n` nickname, `r` rover_id, `txt` chat text, `rn` rover_now.
 - `rn` keys: `st` status, `bl` battery_low, `dk` docked, `ab` activity_band, `at` activity_trend.
 - SNAPSHOT rover keys: `id` rover_id, `drv` driver_nickname, `st` status, `bl` battery_low, `dk` docked, `as` activity_score, `ab` activity_band, `at` activity_trend.
-- `goal` in `SNAPSHOT FINAL` is community goal.
 - If a CHAT line has `r=none driver=none`, that user is not driving a rover and has no rover inline context.

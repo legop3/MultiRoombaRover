@@ -9,7 +9,6 @@ const roverManager = require('./roverManager');
 const { getActiveDrivers } = require('./turnService');
 const { getNickname } = require('./nicknameService');
 const { getRecentMessages, sendSystemMessage } = require('./chatService');
-const { getCommunityGoal } = require('./communityGoalService');
 
 const PROMPT_PATH = path.join(__dirname, '..', '..', 'prompts', 'commentary_system.txt');
 const DEFAULT_FREQUENCY_MS = 0;
@@ -27,7 +26,6 @@ const MAX_CONTEXT_EVENTS = 6;
 const MAX_RUN_HISTORY = 30;
 const MAX_ROVER_EVENTS = 400;
 const POST_COOLDOWN_MS = 10000;
-const MAX_GOAL_CONTEXT_CHARS = 220;
 
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
@@ -763,13 +761,8 @@ function buildSnapshot() {
   });
   const hasRecentChat = eventStream.some((event) => event.type === 'chat');
 
-  const goal = getCommunityGoal();
-  const goalTextRaw = goal?.text ? String(goal.text).trim() : '';
-  const goalText = goalTextRaw ? goalTextRaw.slice(0, MAX_GOAL_CONTEXT_CHARS) : null;
-
   const currentSnapshot = {
     rovers,
-    community_goal: goalText,
   };
   if (!hasRecentChat) {
     currentSnapshot.chat_recent = chatRecent;
@@ -790,16 +783,12 @@ function buildSnapshot() {
 }
 
 function refreshFinalSnapshotForSend(snapshot) {
-  const goal = getCommunityGoal();
-  const goalTextRaw = goal?.text ? String(goal.text).trim() : '';
-  const goalText = goalTextRaw ? goalTextRaw.slice(0, MAX_GOAL_CONTEXT_CHARS) : null;
   const { rovers } = buildRoversNow(Date.now());
   return {
     ...(snapshot || {}),
     current_snapshot: {
       ...(snapshot?.current_snapshot || {}),
       rovers,
-      community_goal: goalText,
     },
   };
 }
@@ -918,10 +907,6 @@ function formatSnapshotMessage(event) {
 function formatSnapshotFinalMessage(currentSnapshot = {}) {
   const rovers = Array.isArray(currentSnapshot?.rovers) ? currentSnapshot.rovers : [];
   const lines = ['SNAPSHOT FINAL'];
-  const goalText = currentSnapshot?.community_goal
-    ? String(currentSnapshot.community_goal).trim()
-    : '';
-  lines.push(`goal: ${goalText || 'none'}`);
   rovers.forEach((rover) => {
     lines.push(formatRoverSnapshotLine(rover));
   });
