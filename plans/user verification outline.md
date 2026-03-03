@@ -2,6 +2,7 @@
 ## main idea
 - a relatively simple system to verify trusted users and allow them to use special features
 - uses IP, a cookie user ID, and nickname to verify people
+- expose internally similar to socket.isAdmin: socket.isVerified.
 
 ## on-connect system to send user info to the server
 - a new system in the web UI (and server a little bit probably)
