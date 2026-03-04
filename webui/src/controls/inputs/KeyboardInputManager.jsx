@@ -3,6 +3,7 @@ import { useControlSystem } from '../ControlContext.jsx';
 import { useChat } from '../../context/ChatContext.jsx';
 import { useSession } from '../../context/SessionContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
+import { isKeyboardCaptureLocked } from './keyboardCaptureLock.js';
 import { isTextInputElement } from './inputFocusUtils.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
@@ -344,6 +345,7 @@ export default function KeyboardInputManager() {
 
   useEffect(() => {
     function handleKeyDown(event) {
+      if (isKeyboardCaptureLocked()) return;
       if (shouldIgnoreEvent(event)) return;
       const tokens = tokensForEvent(event);
       if (tokens.length === 0) return;
@@ -389,6 +391,7 @@ export default function KeyboardInputManager() {
     }
 
     function handleKeyUp(event) {
+      if (isKeyboardCaptureLocked()) return;
       const tokens = tokensForEvent(event);
       tokens.forEach((token) => activeTokensRef.current.delete(token));
       if (hornActiveRef.current && !bindingActive(keymap.hornHonk, activeTokensRef.current)) {

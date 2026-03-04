@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import { DEFAULT_KEYMAP } from '../controls/constants.js';
 import { canonicalizeKeyInput, formatKeyLabel } from '../controls/keymapUtils.js';
+import { setKeyboardCaptureLocked } from '../controls/inputs/keyboardCaptureLock.js';
 import { useSettingsNamespace } from '../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 
@@ -80,25 +81,35 @@ function mapTiltIntervalToSpeed(interval) {
 function useKeyCapture(onCapture) {
   const [active, setActive] = useState(null);
 
-  useEffect(() => {
-    if (!active) return undefined;
-    function handle(event) {
+  const startCapture = useCallback((actionId) => {
+    setKeyboardCaptureLocked(true);
+    setActive(actionId);
+  }, []);
+
+  const cancel = useCallback(() => {
+    setKeyboardCaptureLocked(false);
+    setActive(null);
+  }, []);
+
+  const captureFromEvent = useCallback(
+    (actionId, event) => {
       event.preventDefault();
+      event.stopPropagation();
       if (event.key === 'Escape') {
-        setActive(null);
+        cancel();
         return;
       }
       const canonical = canonicalizeKeyInput(event.key ?? '');
-      if (canonical) {
-        onCapture(active, canonical, event);
-        setActive(null);
-      }
-    }
-    window.addEventListener('keydown', handle, { capture: true });
-    return () => window.removeEventListener('keydown', handle, { capture: true });
-  }, [active, onCapture]);
+      if (!canonical) return;
+      onCapture(actionId, canonical, event);
+      cancel();
+    },
+    [cancel, onCapture],
+  );
 
-  return { active, startCapture: setActive, cancel: () => setActive(null) };
+  useEffect(() => () => setKeyboardCaptureLocked(false), []);
+
+  return { active, startCapture, cancel, captureFromEvent };
 }
 
 function SpeedField({ label, description, value, onChange, min = 0, max = 500, step = 5 }) {
@@ -155,7 +166,7 @@ export default function KeymapSettings() {
     return INPUT_SETTINGS_DEFAULTS.keyboard.tiltSpeed;
   }, [keyboardSettings.tiltIntervalMs, keyboardSettings.tiltSpeed]);
   const grouped = useMemo(() => groupActions(KEY_ACTIONS), []);
-  const { active, startCapture, cancel } = useKeyCapture((actionId, value) => {
+  const { active, startCapture, cancel, captureFromEvent } = useKeyCapture((actionId, value) => {
     updateKeyBinding(actionId, value);
   });
 
@@ -265,6 +276,8 @@ export default function KeymapSettings() {
                       <button
                         type="button"
                         onClick={() => startCapture(action.id)}
+                        onKeyDown={isActive ? (event) => captureFromEvent(action.id, event) : undefined}
+                        autoFocus={isActive}
                         className={`${isActive ? 'px-0.5 py-0.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400' : 'button-dark'} text-[0.7rem] font-medium transition-colors`}
                       >
                         {isActive ? 'Press a key…' : 'Change'}
