@@ -1,13 +1,15 @@
-1. trusted user system
-2. private rovers
-3. color coding with colored names and tape
-4. audio forwarding
+1. fix controls remapping
+2. trusted user system
+3. private rovers
+4. home assistant switch that tells the server to force the lights on
+5. color coding with colored names and tape
+6. audio forwarding
    - streaming from server to rovers
    - audio files first
    - then voice chat
-5. mobile controls column swapping (optional joystick on left)
+7. mobile controls column swapping (optional joystick on left)
 
-# pipe dreams:
+# relative pipe dreams:
 1. VPS video forwarding
    1. get forwarding working with the VPS for in-queue users and spectators
    2. bandwidth testing
