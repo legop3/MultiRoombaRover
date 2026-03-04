@@ -1,4 +1,4 @@
-1. fix controls remapping
+1. fix controls remapping [X]
 2. trusted user system
 3. private rovers
 4. home assistant switch that tells the server to force the lights on
