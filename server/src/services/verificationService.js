@@ -7,7 +7,7 @@ const logger = require('../globals/logger').child('verificationService');
 const { publishEvent } = require('./eventBus');
 const { getSocketIp, normalizeIp } = require('../helpers/ipResolver');
 const { getNickname, setNickname } = require('./nicknameService');
-const { getRole } = require('./roleService');
+const { getRole, roleEvents } = require('./roleService');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'verified-users.json');
@@ -500,6 +500,16 @@ io.on('connection', (socket) => {
       cb({ error: err.message });
     }
   });
+});
+
+roleEvents.on('change', ({ socket }) => {
+  if (!socket) return;
+  try {
+    reevaluateSocketVerification(socket);
+    emitChange('role_change', { socketId: socket.id });
+  } catch (err) {
+    logger.warn('Failed to reevaluate verification on role change', err.message);
+  }
 });
 
 module.exports = {
