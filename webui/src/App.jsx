@@ -24,8 +24,11 @@ import HelpPanel from './components/HelpPanel.jsx';
 import SettingsPanel from './components/SettingsPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs.jsx';
 import useDefaultNickname from './hooks/useDefaultNickname.js';
+import useUserIdentitySync from './hooks/useUserIdentitySync.js';
 import CommunityGoalBanner from './components/CommunityGoalBanner.jsx';
 import RoverQueuesPanel from './components/RoverQueuesPanel.jsx';
+import VipPanel from './components/VipPanel.jsx';
+import { useSession } from './context/SessionContext.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -80,11 +83,23 @@ function MobileFeatureTabs({
   roomPanelId,
   showTelemetry = true,
 }) {
+  const { session } = useSession();
+  const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-amber-400';
   return (
     <section className="panel text-base">
       <Tabs defaultTab="chat">
         <TabList>
           <Tab id="chat">Chat</Tab>
+          <Tab id="vip">
+            <span className="inline-flex items-center gap-0.5">
+              <span>VIP</span>
+              <span
+                className={`inline-block h-1.5 w-1.5 rounded-full ${vipDotClass}`}
+                aria-hidden="true"
+                title={session?.isVerified ? 'Verified' : 'Not verified'}
+              />
+            </span>
+          </Tab>
           <Tab id="roomcontrols">Room Controls</Tab>
           <Tab id="help">Help</Tab>
           <Tab id="settings">Settings</Tab>
@@ -95,6 +110,9 @@ function MobileFeatureTabs({
               <ChatPanel />
               <RawUserPilePanel />
             </div>
+          </TabPanel>
+          <TabPanel id="vip">
+            <VipPanel />
           </TabPanel>
           <TabPanel id="roomcontrols">
             <div className="space-y-0.5">
@@ -179,6 +197,7 @@ function App() {
 
 function AppWithProviders({ layout, isDesktop, fullscreen }) {
   useDefaultNickname();
+  useUserIdentitySync();
   const {
     visible: fullscreenVisible,
     mode: fullscreenMode,

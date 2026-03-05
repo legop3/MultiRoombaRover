@@ -31,6 +31,14 @@ const {
   normalizeMode,
   VALID_MODES,
 } = require('./discordGuildStore');
+const {
+  attachDmMessage,
+  getRequestByMessageId,
+  approveRequest,
+  denyRequest,
+  listVerifiedUsers,
+  removeVerifiedUser,
+} = require('./verificationService');
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
@@ -53,13 +61,16 @@ if (!enabled) {
 const intents = [
   GatewayIntentBits.Guilds,
   GatewayIntentBits.GuildMessages,
+  GatewayIntentBits.GuildMessageReactions,
   GatewayIntentBits.GuildMessageTyping,
+  GatewayIntentBits.DirectMessages,
+  GatewayIntentBits.DirectMessageReactions,
   GatewayIntentBits.MessageContent,
 ];
 
 const client = new Client({
   intents,
-  partials: [Partials.Channel],
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User],
 });
 
 const channelCache = new Map();
@@ -68,6 +79,8 @@ let skippedFirstModeAnnouncement = false;
 const PRESENCE_ROTATE_MS = 20000;
 let presenceInterval = null;
 let presenceShowGoal = false;
+const VERIFY_APPROVE_EMOJI = '✅';
+const VERIFY_DENY_EMOJI = '❌';
 function sanitizeMentions(text) {
   if (!text) return '';
   return String(text)
@@ -271,6 +284,8 @@ function formatHelp() {
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
     '`rs reason [text|clear]` — show or set admin mode reason',
     '`rs goal [text|clear]` — show or set community goal',
+    '`rs verify list` — list verified users (lockdown admins)',
+    '`rs verify remove <cookieUserId|nickname>` — remove verified user (lockdown admins)',
     '`ts` — show time status',
   ].join('\n');
 }
@@ -580,6 +595,74 @@ async function handleGoalCommand(message, tokens) {
   }
 }
 
+function formatMaskedCookieKey(value) {
+  const key = String(value || '').trim();
+  if (!key) return 'n/a';
+  if (key.length <= 10) return `${key.slice(0, 2)}***${key.slice(-2)}`;
+  return `${key.slice(0, 6)}...${key.slice(-6)}`;
+}
+
+async function handleVerifyCommand(message, tokens) {
+  if (!isLockdownAdminUser(message.author?.id)) {
+    await message.reply({
+      content: 'Only lockdown admins can manage verified users.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  const action = (tokens.shift() || 'list').toLowerCase();
+  if (action === 'list') {
+    const users = listVerifiedUsers();
+    if (!users.length) {
+      await message.reply({
+        content: 'No verified users.',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+    const lines = users.map((entry, idx) => {
+      const updated = entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : 'unknown';
+      const ipCount = Array.isArray(entry.knownIps) ? entry.knownIps.length : 0;
+      return `${idx + 1}. ${entry.nickname || 'unknown'} | ${formatMaskedCookieKey(entry.cookieUserId)} | ips:${ipCount} | updated:${updated}`;
+    });
+    await message.reply({
+      content: ['Verified users:', ...lines].join('\n').slice(0, 1900),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (action === 'remove') {
+    const selector = tokens.join(' ').trim();
+    if (!selector) {
+      await message.reply({
+        content: 'Usage: `rs verify remove <cookieUserId|nickname>`',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+    try {
+      const removed = removeVerifiedUser(selector, message.author?.id || null);
+      await message.reply({
+        content: `Removed verified user ${sanitizeMentions(removed.nickname || 'unknown')} (${formatMaskedCookieKey(removed.cookieUserId)}).`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (err) {
+      await message.reply({
+        content: sanitizeMentions(`Failed to remove verified user: ${err.message}`),
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    }
+    return;
+  }
+
+  await message.reply({
+    content: 'Unknown verify command. Use `rs verify list` or `rs verify remove <cookieUserId|nickname>`.',
+    allowedMentions: { parse: [], repliedUser: false },
+  });
+}
+
 function canManageBridge(message) {
   if (isAdminUser(message.author.id)) return true;
   if (!message.guild || !message.member) return false;
@@ -757,7 +840,7 @@ async function handleCommand(message) {
   const isLockdownAdmin = isLockdownAdminUser(message.author.id);
   const isBridgeAdmin = action === 'bridge' ? canManageBridge(message) : false;
   const mode = getMode();
-  const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason']);
+  const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify']);
 
   if (
     !isAdmin &&
@@ -768,7 +851,8 @@ async function handleCommand(message) {
     action !== 'replay' &&
     action !== 'bridge' &&
     action !== 'goal' &&
-    action !== 'reason'
+    action !== 'reason' &&
+    action !== 'verify'
   ) {
     return; // ignore non-admins for privileged commands
   }
@@ -811,6 +895,9 @@ async function handleCommand(message) {
       break;
     case 'reason':
       await handleReasonCommand(message, tokens);
+      break;
+    case 'verify':
+      await handleVerifyCommand(message, tokens);
       break;
     default:
       await message.reply(formatHelp());
@@ -1348,6 +1435,96 @@ function handleBusEvent(event) {
   }
 }
 
+async function sendVerificationRequestDms(event) {
+  const payload = event?.payload || {};
+  const requestId = payload.id;
+  if (!requestId) return;
+  const adminIdsToNotify = Array.from(lockdownAdminIds);
+  if (!adminIdsToNotify.length) {
+    logger.warn('No lockdown admins configured for verification request DM', { requestId });
+    return;
+  }
+
+  const createdAt = payload.createdAt ? new Date(payload.createdAt).toLocaleString() : 'unknown';
+  const content = [
+    '**Verification Request**',
+    `Request ID: \`${requestId}\``,
+    `Nickname: ${sanitizeMentions(payload.nickname || 'unknown')}`,
+    `Identity key: \`${payload.cookieUserId || 'unknown'}\``,
+    `IP: \`${payload.ip || 'unknown'}\``,
+    `Created: ${createdAt}`,
+    '',
+    `React with ${VERIFY_APPROVE_EMOJI} to approve or ${VERIFY_DENY_EMOJI} to deny.`,
+  ].join('\n');
+
+  await Promise.all(
+    adminIdsToNotify.map(async (adminId) => {
+      try {
+        const user = await client.users.fetch(String(adminId));
+        if (!user) return;
+        const dm = await user.createDM();
+        const message = await dm.send({ content, allowedMentions: { parse: [] } });
+        try {
+          await message.react(VERIFY_APPROVE_EMOJI);
+          await message.react(VERIFY_DENY_EMOJI);
+        } catch (err) {
+          logger.warn('Failed to add verification reactions', { requestId, adminId, error: err.message });
+        }
+        attachDmMessage(requestId, message.id, adminId);
+      } catch (err) {
+        logger.warn('Failed to DM lockdown admin for verification request', {
+          requestId,
+          adminId,
+          error: err.message,
+        });
+      }
+    }),
+  );
+}
+
+async function handleVerificationReaction(reaction, user) {
+  if (!reaction || !user || user.bot) return;
+  const emoji = reaction.emoji?.name;
+  if (emoji !== VERIFY_APPROVE_EMOJI && emoji !== VERIFY_DENY_EMOJI) return;
+  if (!isLockdownAdminUser(user.id)) return;
+
+  const maybePartial = reaction.message?.partial || reaction.partial;
+  if (maybePartial) {
+    try {
+      await reaction.fetch();
+    } catch (err) {
+      logger.warn('Failed to fetch partial reaction', err.message);
+      return;
+    }
+  }
+
+  const messageId = reaction.message?.id;
+  if (!messageId) return;
+  const linked = getRequestByMessageId(messageId);
+  if (!linked?.request || linked.request.status !== 'pending') return;
+
+  try {
+    if (emoji === VERIFY_APPROVE_EMOJI) {
+      approveRequest(linked.request.id, user.id);
+      await reaction.message.reply({
+        content: `Approved request \`${linked.request.id}\`.`,
+        allowedMentions: { parse: [] },
+      });
+    } else {
+      denyRequest(linked.request.id, user.id);
+      await reaction.message.reply({
+        content: `Denied request \`${linked.request.id}\`.`,
+        allowedMentions: { parse: [] },
+      });
+    }
+  } catch (err) {
+    logger.warn('Failed to resolve verification request from reaction', {
+      requestId: linked.request.id,
+      error: err.message,
+    });
+  }
+}
+
 function handleChatBridgeOutbound(event) {
   const payload = event?.payload;
   if (!payload) return;
@@ -1445,12 +1622,19 @@ client.on('typingStart', (typing) => {
   });
 });
 
+client.on('messageReactionAdd', (reaction, user) => {
+  handleVerificationReaction(reaction, user).catch((err) => {
+    logger.warn('Error handling verification reaction', err.message);
+  });
+});
+
 client.once('ready', () => {
   logger.info('Discord bot logged in', { tag: client.user?.tag });
   schedulePresenceRotation();
 });
 
 subscribe('*', handleBusEvent);
+subscribe('verification.requested', sendVerificationRequestDms);
 subscribe('chat:message', handleChatBridgeOutbound);
 subscribe('chat:typing', handleChatTypingOutbound);
 

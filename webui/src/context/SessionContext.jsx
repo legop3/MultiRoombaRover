@@ -10,6 +10,7 @@ const SessionContext = createContext({
   adminLogs: [],
   llmCommentaryState: null,
   llmCommentaryStatus: null,
+  identifySession: async () => {},
   login: async () => {},
   setRole: async () => {},
   requestControl: async () => {},
@@ -19,6 +20,7 @@ const SessionContext = createContext({
   homeAssistantSetState: async () => {},
   homeAssistantSetLightColor: async () => {},
   setNickname: async () => {},
+  requestVerification: async () => {},
   triggerReplay: async () => {},
   setCommunityGoal: async () => {},
   setAdminReason: async () => {},
@@ -117,6 +119,8 @@ export function SessionProvider({ children }) {
   const actions = useMemo(
     () => ({
       login: (username, password) => emitWithAck('auth:login', { username, password }),
+      identifySession: ({ cookieUserId, nickname } = {}) =>
+        emitWithAck('session:identify', { cookieUserId, nickname }),
       setRole: (role) => emitWithAck('session:setRole', { role }),
       requestControl: (roverId, options = {}) =>
         emitWithAck('session:requestControl', { roverId, ...options }),
@@ -130,6 +134,7 @@ export function SessionProvider({ children }) {
       homeAssistantSetLightColor: (entityId, rgbColor) =>
         emitWithAck('homeAssistant:lightColor', { entityId, rgbColor }),
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
+      requestVerification: () => emitWithAck('verification:request'),
       triggerReplay: (sources = []) => emitWithAck('replay:trigger', { sources }),
       setCommunityGoal: (text) => emitWithAck('communityGoal:set', { text }),
       setAdminReason: (text) => emitWithAck('adminReason:set', { text }),

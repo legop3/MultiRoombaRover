@@ -16,6 +16,7 @@ require('./src/services/commandService');
 require('./src/services/roverConnectionService');
 require('./src/services/assignmentService');
 require('./src/services/nicknameService');
+require('./src/services/verificationService');
 require('./src/services/chatService');
 require('./src/services/llmCommentaryService');
 require('./src/services/communityGoalService');

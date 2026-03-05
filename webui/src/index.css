@@ -64,11 +64,11 @@ body {
   }
 
   .field-input {
-    @apply bg-neutral-800 text-white px-0.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-sky-500 rounded-md;
+    @apply bg-neutral-700 border border-neutral-600 text-white placeholder:text-slate-400 px-0.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-sky-500 rounded-md;
   }
 
   .button-dark {
-    @apply px-0.5 py-0.5 text-sm font-medium text-white transition-colors bg-sky-600 hover:bg-sky-500 rounded-md;
+    @apply px-0.5 py-0.5 text-sm font-medium text-white transition-colors bg-sky-600 hover:bg-sky-500 rounded-md border border-sky-300 hover:border-sky-500;
   }
 
   .button-danger {

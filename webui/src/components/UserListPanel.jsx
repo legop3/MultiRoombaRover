@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
-import { useSettingsNamespace } from '../settings/index.js';
-import { useSocket } from '../context/SocketContext.jsx';
 import NicknameForm from './NicknameForm.jsx';
 import SocialButtonsGrid from './SocialButtonsGrid.jsx';
 
@@ -53,10 +51,7 @@ export default function UserListPanel({
   compact = false,
   showBothTurnsAndUsers = false,
 }) {
-  const { session, setNickname } = useSession();
-  const { value } = useSettingsNamespace('profile', { nickname: '' });
-  const lastSyncedSocketRef = useRef(null);
-  const socket = useSocket();
+  const { session } = useSession();
   const canSetNickname = session?.role !== 'spectator';
   const users = session?.users ?? [];
   const selfId = session?.socketId || null;
@@ -69,32 +64,6 @@ export default function UserListPanel({
     if (!isTurnsMode) return;
     setTurnView('queues');
   }, [isTurnsMode]);
-
-  useEffect(() => {
-    if (!canSetNickname) return;
-    if (!session?.socketId) return;
-    const nicknameInput = value.nickname || '';
-    if (!nicknameInput) return;
-    if (session.socketId === lastSyncedSocketRef.current) return;
-    const currentId = session.socketId;
-    setNickname(nicknameInput).then(() => {
-      lastSyncedSocketRef.current = currentId;
-    }).catch(() => {});
-  }, [canSetNickname, session?.socketId, setNickname, value.nickname]);
-
-  useEffect(() => {
-    if (!socket) return undefined;
-    const handleConnect = () => {
-      if (!canSetNickname) return;
-      const nick = (value.nickname || '').trim();
-      if (!nick) return;
-      setNickname(nick).then(() => {
-        lastSyncedSocketRef.current = session?.socketId || null;
-      }).catch(() => {});
-    };
-    socket.on('connect', handleConnect);
-    return () => socket.off('connect', handleConnect);
-  }, [canSetNickname, setNickname, socket, value.nickname, session?.socketId]);
 
   const sorted = useMemo(
     () =>

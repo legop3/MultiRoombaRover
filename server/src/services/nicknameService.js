@@ -1,7 +1,6 @@
 const EventEmitter = require('events');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('nicknameService');
-const { getRole } = require('./roleService');
 
 const nicknameEvents = new EventEmitter();
 
@@ -19,15 +18,14 @@ function getNickname(socket) {
 
 function setNickname(socket, nickname) {
   if (!socket) return null;
-  const role = getRole(socket);
-  // if (role === 'spectator') {
-  //   throw new Error('Spectators cannot set nicknames');
-  // }
   const value = sanitizeNickname(nickname);
   if (!value) {
     throw new Error('Nickname required');
   }
   socket.data = socket.data || {};
+  if (socket.data.nickname === value) {
+    return value;
+  }
   socket.data.nickname = value;
   nicknameEvents.emit('change', { socketId: socket.id, nickname: value });
   logger.info('Nickname set', { socketId: socket.id, nickname: value });

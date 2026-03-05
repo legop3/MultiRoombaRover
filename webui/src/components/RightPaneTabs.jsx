@@ -16,6 +16,8 @@ import { formatKeyLabel } from '../controls/keymapUtils.js';
 import NightVisionControl from './NightVisionControl.jsx';
 import HornControl from './HornControl.jsx';
 import CameraTiltControl from './CameraTiltControl.jsx';
+import VipPanel from './VipPanel.jsx';
+import { useSession } from '../context/SessionContext.jsx';
 
 function TopDownMapPanel() {
   const {
@@ -108,11 +110,23 @@ function DriveDockPanel() {
 }
 
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
+  const { session } = useSession();
+  const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-red-600';
   return (
     <section className="panel text-base">
       <Tabs defaultTab="telemetry">
         <TabList>
           <Tab id="telemetry">Controls</Tab>
+          <Tab id="vip">
+            <span className="inline-flex items-center gap-2">
+              <span>VIP</span>
+              <span
+                className={`inline-block h-3 w-3 rounded-full ${vipDotClass}`}
+                aria-hidden="true"
+                title={session?.isVerified ? 'Verified' : 'Not verified'}
+              />
+            </span>
+          </Tab>
           <Tab id="help">Help</Tab>
           <Tab id="settings">Settings</Tab>
         </TabList>
@@ -138,6 +152,9 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
               <HomeAssistantControls />
               <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
             </div>
+          </TabPanel>
+          <TabPanel id="vip">
+            <VipPanel />
           </TabPanel>
           <TabPanel id="help">
             <HelpPanel layout={layout} onOpenOverlay={onOpenHelpOverlay} />

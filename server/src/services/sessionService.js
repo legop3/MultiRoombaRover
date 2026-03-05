@@ -9,6 +9,11 @@ const { getActiveDrivers, getTurnQueues, turnEvents } = require('./turnService')
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('./homeAssistantService');
 const { getNickname, nicknameEvents } = require('./nicknameService');
+const {
+  getVerificationStateForSocket,
+  getIdentitySummary,
+  verificationEvents,
+} = require('./verificationService');
 const { getReplayState, replayEvents } = require('./replayService');
 const { getReplaySources } = require('./replaySourceService');
 const { getHealthSnapshot } = require('./healthService');
@@ -83,6 +88,9 @@ function buildSession(socket) {
     kofi: {
       link: kofiLink,
     },
+    identity: getIdentitySummary(socket),
+    verification: getVerificationStateForSocket(socket),
+    isVerified: Boolean(socket?.data?.isVerified),
   };
 }
 
@@ -227,6 +235,17 @@ nicknameEvents.on('change', ({ socketId }) => {
   } else {
     syncAll();
   }
+});
+
+verificationEvents.on('change', ({ socketId } = {}) => {
+  if (socketId) {
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket) {
+      syncSocket(socket);
+      return;
+    }
+  }
+  syncAll();
 });
 
 subscribe('communityGoal.updated', () => {
