@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const EventEmitter = require('events');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('audioForwardService');
@@ -14,6 +14,7 @@ const audioForwardConfig = config.audioForward || {};
 const serviceEnabled = audioForwardConfig.enabled !== false;
 const ffmpegBin = audioForwardConfig.ffmpegBin || 'ffmpeg';
 const streamSuffix = typeof audioForwardConfig.streamSuffix === 'string' ? audioForwardConfig.streamSuffix : '-fwd';
+const runtimeDir = path.resolve(audioForwardConfig.runtimeDir || '/tmp/mrr-audio-forward');
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const defaultAudioPath = path.join(__dirname, '..', '..', 'assets', 'test-audio.mp3');
 const configuredAudioPath = audioForwardConfig.testAudioPath;
@@ -24,10 +25,8 @@ const testAudioPath =
     ? path.resolve(repoRoot, configuredAudioPath)
     : defaultAudioPath;
 
-const processes = new Map(); // roverId -> ChildProcess
-const processErrors = new Map(); // roverId -> last stderr text
-const states = new Map(); // roverId -> { state, error, startedAt, updatedAt }
-const stopping = new Set();
+const states = new Map(); // roverId -> { state, source, error, startedAt, updatedAt }
+const workers = new Map(); // roverId -> worker
 
 function publishStateChange(roverId) {
   audioForwardEvents.emit('change', { roverId, state: states.get(roverId) || null });
@@ -37,6 +36,7 @@ function setState(roverId, next) {
   const prev = states.get(roverId) || {};
   const merged = {
     state: next.state || prev.state || 'idle',
+    source: Object.prototype.hasOwnProperty.call(next, 'source') ? next.source : prev.source || 'silence',
     error: Object.prototype.hasOwnProperty.call(next, 'error') ? next.error : prev.error || null,
     startedAt: Object.prototype.hasOwnProperty.call(next, 'startedAt') ? next.startedAt : prev.startedAt || null,
     updatedAt: Date.now(),
@@ -53,12 +53,36 @@ function getAudioForwardState() {
   return payload;
 }
 
-function ensureReady() {
+function ensureServiceEnabled() {
   if (!serviceEnabled) {
     throw new Error('Audio forward disabled');
   }
-  if (!fs.existsSync(testAudioPath)) {
-    throw new Error(`Test audio missing: ${testAudioPath}`);
+}
+
+function ensureRuntimeDir() {
+  fs.mkdirSync(runtimeDir, { recursive: true });
+}
+
+function sanitizeRoverId(roverId) {
+  return String(roverId || '').replace(/[^a-zA-Z0-9_-]+/g, '_');
+}
+
+function ensureFifo(fifoPath) {
+  try {
+    const stat = fs.statSync(fifoPath);
+    if (stat.isFIFO()) {
+      return;
+    }
+    fs.unlinkSync(fifoPath);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      throw err;
+    }
+  }
+
+  const result = spawnSync('mkfifo', [fifoPath], { encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(`mkfifo failed: ${result.stderr || result.stdout || 'unknown error'}`);
   }
 }
 
@@ -77,7 +101,6 @@ function forcePublishStreamMode(rawUrl) {
     return value.replace(/,m=[a-zA-Z]+\b/, ',m=publish');
   }
 
-  // If streamid exists but mode is omitted, default it to publish.
   return value.replace(/([?&]streamid=#!::[^&]*)/, '$1,m=publish');
 }
 
@@ -87,23 +110,55 @@ function resolveForwardUrl(roverId) {
   if (configured) {
     return forcePublishStreamMode(configured);
   }
-  const fallback = `srt://127.0.0.1:9000?streamid=#!::r=${encodeURIComponent(roverId + streamSuffix)},m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316`;
-  return fallback;
+  return `srt://127.0.0.1:9000?streamid=#!::r=${encodeURIComponent(roverId + streamSuffix)},m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316`;
 }
 
-function buildFfmpegArgs(outputUrl) {
+function spawnProcess(roverId, tag, args, options = {}) {
+  const proc = spawn(ffmpegBin, args, {
+    stdio: ['ignore', options.captureStdout ? 'pipe' : 'ignore', 'pipe'],
+  });
+  proc.stderr?.on('data', (chunk) => {
+    const text = String(chunk || '').trim();
+    if (!text) return;
+    logger.warn(`${tag} stderr`, { roverId, text });
+  });
+  proc.on('error', (err) => {
+    logger.warn(`${tag} spawn error`, { roverId, message: err?.message || String(err) });
+  });
+  return proc;
+}
+
+function stopProc(proc, graceMs = 1200) {
+  if (!proc || proc.killed) return;
+  try {
+    proc.kill('SIGTERM');
+  } catch {
+    return;
+  }
+  setTimeout(() => {
+    if (!proc.killed) {
+      try {
+        proc.kill('SIGKILL');
+      } catch {
+        // noop
+      }
+    }
+  }, graceMs);
+}
+
+function buildPublisherArgs(fifoPath, outputUrl) {
   return [
     '-hide_banner',
     '-loglevel',
     'warning',
-    '-stream_loop',
-    '-1',
-    '-re',
+    '-f',
+    's16le',
+    '-ar',
+    '16000',
+    '-ac',
+    '1',
     '-i',
-    testAudioPath,
-    '-vn',
-    '-af',
-    'aresample=16000,volume=12dB',
+    fifoPath,
     '-c:a',
     'libopus',
     '-b:a',
@@ -124,26 +179,120 @@ function buildFfmpegArgs(outputUrl) {
   ];
 }
 
-function stopPlayback(roverId, options = {}) {
-  const proc = processes.get(roverId);
-  if (!proc) {
-    setState(roverId, { state: 'idle', error: null, startedAt: null });
-    return;
-  }
-
-  stopping.add(roverId);
-  setState(roverId, { state: 'stopping', error: null });
-  proc.kill('SIGTERM');
-
-  setTimeout(() => {
-    const active = processes.get(roverId);
-    if (active && active.pid === proc.pid) {
-      active.kill('SIGKILL');
-    }
-  }, options.killAfterMs || 2000);
+function buildSilenceWriterArgs() {
+  return [
+    '-hide_banner',
+    '-loglevel',
+    'warning',
+    '-re',
+    '-f',
+    'lavfi',
+    '-i',
+    'anullsrc=channel_layout=mono:sample_rate=16000',
+    '-f',
+    's16le',
+    '-ac',
+    '1',
+    '-ar',
+    '16000',
+    'pipe:1',
+  ];
 }
 
-function playTestAudio(roverId) {
+function buildClipWriterArgs(filePath) {
+  return [
+    '-hide_banner',
+    '-loglevel',
+    'warning',
+    '-re',
+    '-i',
+    filePath,
+    '-vn',
+    '-af',
+    'aresample=16000,volume=12dB',
+    '-f',
+    's16le',
+    '-ac',
+    '1',
+    '-ar',
+    '16000',
+    'pipe:1',
+  ];
+}
+
+function attachWriterPipe(worker, proc) {
+  const writer = fs.createWriteStream(worker.fifoPath, { flags: 'w' });
+  proc.stdout.pipe(writer);
+  proc.on('exit', () => {
+    writer.end();
+  });
+}
+
+function stopContentWriter(worker) {
+  if (!worker?.contentProc) return;
+  stopProc(worker.contentProc);
+  worker.contentProc = null;
+  worker.contentKind = null;
+}
+
+function startSilenceWriter(roverId) {
+  const worker = workers.get(roverId);
+  if (!worker || worker.stopping) return;
+
+  stopContentWriter(worker);
+  const proc = spawnProcess(roverId, 'silence-writer', buildSilenceWriterArgs(), { captureStdout: true });
+  worker.contentProc = proc;
+  worker.contentKind = 'silence';
+  const seq = ++worker.writerSeq;
+  attachWriterPipe(worker, proc);
+
+  proc.on('exit', (code, signal) => {
+    const current = workers.get(roverId);
+    if (!current || current.stopping) return;
+    if (current.writerSeq !== seq || current.contentProc !== proc) return;
+    current.contentProc = null;
+    current.contentKind = null;
+    if (code === 0 || signal === 'SIGTERM') {
+      return;
+    }
+    setState(roverId, { state: 'error', source: 'silence', error: `silence writer exited code=${code} signal=${signal || 'none'}` });
+    setTimeout(() => {
+      if (workers.has(roverId)) startSilenceWriter(roverId);
+    }, 300);
+  });
+
+  setState(roverId, { state: 'idle', source: 'silence', error: null, startedAt: null });
+}
+
+function startClipWriter(roverId, filePath) {
+  const worker = workers.get(roverId);
+  if (!worker || worker.stopping) return;
+
+  stopContentWriter(worker);
+  const proc = spawnProcess(roverId, 'clip-writer', buildClipWriterArgs(filePath), { captureStdout: true });
+  worker.contentProc = proc;
+  worker.contentKind = 'clip';
+  const seq = ++worker.writerSeq;
+  attachWriterPipe(worker, proc);
+
+  setState(roverId, { state: 'playing', source: 'clip', error: null, startedAt: Date.now() });
+
+  proc.on('exit', (code, signal) => {
+    const current = workers.get(roverId);
+    if (!current || current.stopping) return;
+    if (current.writerSeq !== seq || current.contentProc !== proc) return;
+    current.contentProc = null;
+    current.contentKind = null;
+
+    if (code != null && code !== 0 && signal !== 'SIGTERM') {
+      setState(roverId, { state: 'error', source: 'clip', error: `clip writer exited code=${code} signal=${signal || 'none'}` });
+    }
+    startSilenceWriter(roverId);
+  });
+}
+
+function ensureWorker(roverId) {
+  ensureServiceEnabled();
   if (!roverId) {
     throw new Error('roverId required');
   }
@@ -151,57 +300,98 @@ function playTestAudio(roverId) {
   if (!record || !record.ws) {
     throw new Error('Rover offline');
   }
+  if (workers.has(roverId)) {
+    return workers.get(roverId);
+  }
 
-  ensureReady();
-  stopPlayback(roverId, { killAfterMs: 1000 });
-
+  ensureRuntimeDir();
+  const fifoPath = path.join(runtimeDir, `${sanitizeRoverId(roverId)}.pcm`);
+  ensureFifo(fifoPath);
   const outputUrl = resolveForwardUrl(roverId);
-  const args = buildFfmpegArgs(outputUrl);
-  const proc = spawn(ffmpegBin, args, { stdio: ['ignore', 'ignore', 'pipe'] });
 
-  processes.set(roverId, proc);
-  processErrors.set(roverId, '');
-  setState(roverId, { state: 'playing', error: null, startedAt: Date.now() });
+  // Keep FIFO open so reader/writer open calls don't block when switching writers.
+  const keepaliveFd = fs.openSync(fifoPath, 'r+');
+  const publisher = spawnProcess(roverId, 'publisher', buildPublisherArgs(fifoPath, outputUrl));
 
-  proc.stderr.on('data', (chunk) => {
-    const text = String(chunk || '').trim();
-    if (!text) return;
-    processErrors.set(roverId, text);
+  const worker = {
+    roverId,
+    fifoPath,
+    keepaliveFd,
+    outputUrl,
+    publisherProc: publisher,
+    contentProc: null,
+    contentKind: null,
+    writerSeq: 0,
+    stopping: false,
+  };
+  workers.set(roverId, worker);
+
+  publisher.on('exit', (code, signal) => {
+    const current = workers.get(roverId);
+    if (!current || current.publisherProc !== publisher) return;
+    if (current.stopping) return;
+    setState(roverId, {
+      state: 'error',
+      source: current.contentKind || 'silence',
+      error: `publisher exited code=${code} signal=${signal || 'none'}`,
+      startedAt: null,
+    });
   });
 
-  proc.on('error', (err) => {
-    const message = err?.message || 'ffmpeg spawn failed';
-    logger.warn('audio forward process error', { roverId, message });
-    if (processes.get(roverId)?.pid === proc.pid) {
-      processes.delete(roverId);
-      stopping.delete(roverId);
-      setState(roverId, { state: 'error', error: message, startedAt: null });
-    }
-  });
+  startSilenceWriter(roverId);
+  logger.info('Audio forward worker ready', { roverId, outputUrl, fifoPath });
+  return worker;
+}
 
-  proc.on('exit', (code, signal) => {
-    if (processes.get(roverId)?.pid === proc.pid) {
-      processes.delete(roverId);
-    }
+function playTestAudio(roverId) {
+  if (!fs.existsSync(testAudioPath)) {
+    throw new Error(`Test audio missing: ${testAudioPath}`);
+  }
+  ensureWorker(roverId);
+  startClipWriter(roverId, testAudioPath);
+}
 
-    if (stopping.has(roverId)) {
-      stopping.delete(roverId);
-      setState(roverId, { state: 'idle', error: null, startedAt: null });
-      return;
-    }
+function stopPlayback(roverId) {
+  ensureWorker(roverId);
+  startSilenceWriter(roverId);
+}
 
-    const stderr = processErrors.get(roverId) || null;
-    const message = stderr || `ffmpeg exited code=${code} signal=${signal || 'none'}`;
-    setState(roverId, { state: 'error', error: message, startedAt: null });
-    logger.warn('audio forward exited unexpectedly', { roverId, code, signal, message });
-  });
+function stopWorker(roverId) {
+  const worker = workers.get(roverId);
+  if (!worker) return;
+  worker.stopping = true;
 
-  logger.info('Started test audio playback', { roverId, outputUrl, testAudioPath });
+  stopContentWriter(worker);
+  stopProc(worker.publisherProc);
+
+  try {
+    fs.closeSync(worker.keepaliveFd);
+  } catch {
+    // noop
+  }
+  try {
+    fs.unlinkSync(worker.fifoPath);
+  } catch {
+    // noop
+  }
+
+  workers.delete(roverId);
+  setState(roverId, { state: 'offline', source: 'none', error: null, startedAt: null });
 }
 
 roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
-  if (!roverId || action !== 'removed') return;
-  stopPlayback(roverId);
+  if (!roverId) return;
+  if (action === 'removed') {
+    stopWorker(roverId);
+    return;
+  }
+  if (action === 'upsert' && serviceEnabled) {
+    try {
+      ensureWorker(roverId);
+    } catch (err) {
+      setState(roverId, { state: 'error', source: 'init', error: err.message, startedAt: null });
+    }
+  }
 });
 
 io.on('connection', (socket) => {
@@ -210,8 +400,9 @@ io.on('connection', (socket) => {
       if (!isAdmin(socket)) {
         throw new Error('Not authorized');
       }
-      playTestAudio(String(roverId || '').trim());
-      cb({ success: true, roverId });
+      const normalized = String(roverId || '').trim();
+      playTestAudio(normalized);
+      cb({ success: true, roverId: normalized });
     } catch (err) {
       cb({ error: err.message });
     }
@@ -223,9 +414,6 @@ io.on('connection', (socket) => {
         throw new Error('Not authorized');
       }
       const normalized = String(roverId || '').trim();
-      if (!normalized) {
-        throw new Error('roverId required');
-      }
       stopPlayback(normalized);
       cb({ success: true, roverId: normalized });
     } catch (err) {
