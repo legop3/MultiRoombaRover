@@ -27,6 +27,9 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	if audio.CaptureEnabled && media.AudioPublishURL != "" {
 		fmt.Fprintf(&buf, "AUDIO_PUBLISH_URL=%s\n", media.AudioPublishURL)
 	}
+	if media.AudioForwardURL != "" {
+		fmt.Fprintf(&buf, "AUDIO_FORWARD_URL=%s\n", media.AudioForwardURL)
+	}
 	if media.VideoWidth > 0 {
 		fmt.Fprintf(&buf, "VIDEO_WIDTH=%d\n", media.VideoWidth)
 	}
@@ -49,6 +52,11 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	}
 	fmt.Fprintf(&buf, "AUDIO_ENABLE=%d\n", boolToInt(audio.CaptureEnabled))
 	fmt.Fprintf(&buf, "AUDIO_DEVICE=%s\n", audioDevice)
+	playbackDevice := audio.PlaybackDevice
+	if playbackDevice == "" {
+		playbackDevice = "default"
+	}
+	fmt.Fprintf(&buf, "AUDIO_PLAYBACK_DEVICE=%s\n", playbackDevice)
 	fmt.Fprintf(&buf, "AUDIO_RATE=%d\n", audio.SampleRate)
 	fmt.Fprintf(&buf, "AUDIO_CHANNELS=%d\n", audio.Channels)
 	if err := os.WriteFile(publisherEnvPath, buf.Bytes(), 0o640); err != nil {

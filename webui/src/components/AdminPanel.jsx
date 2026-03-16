@@ -20,6 +20,8 @@ export default function AdminPanel() {
     setAdminReason,
     rebootRover,
     rebootServer,
+    playTestAudio,
+    stopTestAudio,
     llmControl,
     adminLogs,
     llmCommentaryState,
@@ -27,6 +29,7 @@ export default function AdminPanel() {
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
   const [rebootStates, setRebootStates] = useState({});
+  const [audioStates, setAudioStates] = useState({});
   const [serverRebooting, setServerRebooting] = useState(false);
   const [clearingLlmHistory, setClearingLlmHistory] = useState(false);
   const health = session?.health || null;
@@ -81,6 +84,30 @@ export default function AdminPanel() {
       alert(err.message);
     } finally {
       setRebootStates((prev) => ({ ...prev, [rover.id]: false }));
+    }
+  };
+
+  const handlePlayTestAudio = async (roverId) => {
+    if (!roverId) return;
+    setAudioStates((prev) => ({ ...prev, [roverId]: true }));
+    try {
+      await playTestAudio(roverId);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAudioStates((prev) => ({ ...prev, [roverId]: false }));
+    }
+  };
+
+  const handleStopTestAudio = async (roverId) => {
+    if (!roverId) return;
+    setAudioStates((prev) => ({ ...prev, [roverId]: true }));
+    try {
+      await stopTestAudio(roverId);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAudioStates((prev) => ({ ...prev, [roverId]: false }));
     }
   };
 
@@ -232,7 +259,7 @@ export default function AdminPanel() {
       <RoverRoster
         roster={roster}
         renderActions={(rover) => (
-          <div className="flex flex-wrap gap-0.5 text-xs">
+          <div className="flex flex-wrap items-center gap-0.5 text-xs">
             <button
               type="button"
               onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
@@ -251,6 +278,30 @@ export default function AdminPanel() {
             >
               {rebootStates[rover.id] ? 'Rebooting...' : 'Reboot'}
             </button>
+            <button
+              type="button"
+              onClick={() => handlePlayTestAudio(rover.id)}
+              disabled={Boolean(audioStates[rover.id])}
+              className="button-dark disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Play Test Audio
+            </button>
+            <button
+              type="button"
+              onClick={() => handleStopTestAudio(rover.id)}
+              disabled={Boolean(audioStates[rover.id])}
+              className="button-dark disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Stop Test Audio
+            </button>
+            <span className="surface-muted">
+              audio: {session?.audioForward?.[rover.id]?.state || 'idle'}
+            </span>
+            {session?.audioForward?.[rover.id]?.error ? (
+              <span className="surface-muted text-rose-300">
+                {String(session.audioForward[rover.id].error)}
+              </span>
+            ) : null}
           </div>
         )}
       />

@@ -26,6 +26,8 @@ const SessionContext = createContext({
   setAdminReason: async () => {},
   rebootRover: async () => {},
   rebootServer: async () => {},
+  playTestAudio: async () => {},
+  stopTestAudio: async () => {},
   llmControl: async () => {},
 });
 
@@ -141,6 +143,8 @@ export function SessionProvider({ children }) {
       rebootRover: (roverId) =>
         emitWithAck('command', { roverId, type: 'reboot', data: { reboot: {} } }),
       rebootServer: () => emitWithAck('server:reboot'),
+      playTestAudio: (roverId) => emitWithAck('audio:testPlay', { roverId }),
+      stopTestAudio: (roverId) => emitWithAck('audio:testStop', { roverId }),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),
       pushAlert: (alert) =>

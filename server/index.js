@@ -30,6 +30,7 @@ require('./src/services/embedHttpService');
 require('./src/services/logStreamService');
 require('./src/services/adminLogService');
 require('./src/services/homeAssistantService');
+require('./src/services/audioForwardService');
 require('./src/services/sessionService');
 require('./src/services/batteryManager');
 require('./src/services/replaySocketService');

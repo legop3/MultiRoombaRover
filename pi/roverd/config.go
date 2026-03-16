@@ -56,6 +56,7 @@ type BatteryConfig struct {
 type AudioConfig struct {
 	CaptureEnabled bool   `yaml:"captureEnabled" json:"captureEnabled"`
 	CaptureDevice  string `yaml:"captureDevice" json:"captureDevice,omitempty"`
+	PlaybackDevice string `yaml:"playbackDevice" json:"playbackDevice,omitempty"`
 	SampleRate     int    `yaml:"sampleRate" json:"sampleRate,omitempty"`
 	Channels       int    `yaml:"channels" json:"channels,omitempty"`
 	Bitrate        int    `yaml:"bitrate" json:"bitrate,omitempty"`
@@ -79,6 +80,7 @@ type HornConfig struct {
 type MediaConfig struct {
 	PublishURL      string   `yaml:"publishUrl" json:"publishUrl,omitempty"`
 	AudioPublishURL string   `yaml:"audioPublishUrl" json:"audioPublishUrl,omitempty"`
+	AudioForwardURL string   `yaml:"audioForwardUrl" json:"audioForwardUrl,omitempty"`
 	PublishPort     int      `yaml:"publishPort" json:"-"`
 	Manage          bool     `yaml:"manage"`
 	ManageAudio     bool     `yaml:"manageAudio"`
@@ -170,6 +172,7 @@ func LoadConfig(path string) (*Config, error) {
 		Audio: AudioConfig{
 			CaptureEnabled: false,
 			CaptureDevice:  "rovermic",
+			PlaybackDevice: "default",
 			SampleRate:     48000,
 			Channels:       2,
 			Bitrate:        24000,
@@ -245,6 +248,13 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		cfg.Media.AudioPublishURL = derived
 	}
+	if cfg.Media.AudioForwardURL == "" {
+		derived, err := deriveReadURL(cfg.ServerURL, cfg.Name+"-fwd", cfg.Media.PublishPort)
+		if err != nil {
+			return nil, fmt.Errorf("derive audioForwardUrl: %w", err)
+		}
+		cfg.Media.AudioForwardURL = derived
+	}
 	if err := validateServoConfig(&cfg.CameraServo); err != nil {
 		return nil, fmt.Errorf("cameraServo: %w", err)
 	}
@@ -303,6 +313,9 @@ func clampFloat(value, min, max float64) float64 {
 func validateAudioConfig(cfg *AudioConfig) {
 	if cfg.CaptureEnabled && cfg.CaptureDevice == "" {
 		cfg.CaptureDevice = "hw:0,0"
+	}
+	if cfg.PlaybackDevice == "" {
+		cfg.PlaybackDevice = "default"
 	}
 	if cfg.SampleRate <= 0 {
 		cfg.SampleRate = 48000
@@ -369,8 +382,19 @@ func validateAutoSideBrushConfig(cfg *AutoSideBrushConfig) {
 }
 
 func derivePublishURL(serverURL, streamName string, port int) (string, error) {
+	return deriveSRTURL(serverURL, streamName, port, "publish")
+}
+
+func deriveReadURL(serverURL, streamName string, port int) (string, error) {
+	return deriveSRTURL(serverURL, streamName, port, "read")
+}
+
+func deriveSRTURL(serverURL, streamName string, port int, mode string) (string, error) {
 	if streamName == "" {
 		return "", errors.New("missing stream name for publishUrl")
+	}
+	if mode == "" {
+		mode = "publish"
 	}
 	parsed, err := url.Parse(serverURL)
 	if err != nil {
@@ -384,5 +408,5 @@ func derivePublishURL(serverURL, streamName string, port int) (string, error) {
 		port = 9000
 	}
 	escaped := url.PathEscape(streamName)
-	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316", host, port, escaped), nil
+	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=%s&latency=10&mode=caller&transtype=live&pkt_size=1316", host, port, escaped, mode), nil
 }
