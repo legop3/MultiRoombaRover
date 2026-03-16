@@ -386,7 +386,7 @@ func derivePublishURL(serverURL, streamName string, port int) (string, error) {
 }
 
 func deriveReadURL(serverURL, streamName string, port int) (string, error) {
-	return deriveSRTURL(serverURL, streamName, port, "read")
+	return deriveSRTURL(serverURL, streamName, port, "request")
 }
 
 func deriveSRTURL(serverURL, streamName string, port int, mode string) (string, error) {

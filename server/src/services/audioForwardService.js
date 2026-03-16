@@ -73,8 +73,8 @@ function forcePublishStreamMode(rawUrl) {
     return value;
   }
 
-  if (/,m=read\b/.test(value)) {
-    return value.replace(/,m=read\b/, ',m=publish');
+  if (/,m=[a-zA-Z]+\b/.test(value)) {
+    return value.replace(/,m=[a-zA-Z]+\b/, ',m=publish');
   }
 
   // If streamid exists but mode is omitted, default it to publish.

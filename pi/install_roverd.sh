@@ -219,7 +219,7 @@ cat > /var/lib/roverd/video.env <<'ENV'
 # Managed by roverd; placeholder values will be overwritten at runtime.
 PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
 AUDIO_PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-audio,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
-AUDIO_FORWARD_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-fwd,m=read&latency=10&mode=caller&transtype=live&pkt_size=1316
+AUDIO_FORWARD_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-fwd,m=request&latency=10&mode=caller&transtype=live&pkt_size=1316
 VIDEO_BITRATE=2000000
 AUDIO_ENABLE=0
 AUDIO_DEVICE=hw:0,0
