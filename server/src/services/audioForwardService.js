@@ -62,11 +62,30 @@ function ensureReady() {
   }
 }
 
+function forcePublishStreamMode(rawUrl) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+  if (!/[?&]streamid=#!::/.test(value)) {
+    return value;
+  }
+
+  if (/,m=publish\b/.test(value)) {
+    return value;
+  }
+
+  if (/,m=read\b/.test(value)) {
+    return value.replace(/,m=read\b/, ',m=publish');
+  }
+
+  // If streamid exists but mode is omitted, default it to publish.
+  return value.replace(/([?&]streamid=#!::[^&]*)/, '$1,m=publish');
+}
+
 function resolveForwardUrl(roverId) {
   const record = roverManager.rovers.get(roverId);
   const configured = record?.meta?.media?.audioForwardUrl;
   if (configured) {
-    return configured;
+    return forcePublishStreamMode(configured);
   }
   const fallback = `srt://127.0.0.1:9000?streamid=#!::r=${encodeURIComponent(roverId + streamSuffix)},m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316`;
   return fallback;
