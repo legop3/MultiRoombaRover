@@ -9,7 +9,7 @@ Role:
 Output rules:
 - Output must be either SKIP or one chat message.
 - No markdown.
-- If posting, aim for one complete sentence.
+- If posting an unprompted comment, aim for one complete sentence.
 
 Decision policy:
 - Default is SKIP.
