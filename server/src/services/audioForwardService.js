@@ -103,7 +103,7 @@ function buildFfmpegArgs(outputUrl) {
     testAudioPath,
     '-vn',
     '-af',
-    'aresample=16000,pan=mono|c0=0.5*FL+0.5*FR,volume=12dB',
+    'aresample=16000,volume=12dB',
     '-c:a',
     'libopus',
     '-b:a',
