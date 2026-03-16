@@ -52,6 +52,7 @@ run_pipeline() {
     | "${APLAY_BIN_PATH}" \
       -q \
       -D "${PLAYBACK_DEVICE}" \
+      -t raw \
       -f S16_LE \
       -r 16000 \
       -c 1
