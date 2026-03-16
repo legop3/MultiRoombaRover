@@ -57,6 +57,37 @@ function extractStreamInfo(path) {
   return null;
 }
 
+function extractSrtStreamId(rawValue) {
+  const value = decodeURIComponent(String(rawValue || '').trim());
+  if (!value) return '';
+
+  // streamid may be passed as the full value or as query text.
+  const match = value.match(/(?:^|[?&]|,|#!::)r=([^,&]+)/);
+  if (match?.[1]) {
+    return match[1];
+  }
+
+  // Fallback: treat plain token as stream id when no separators are present.
+  if (!/[?&=,:]/.test(value)) {
+    return value;
+  }
+  return '';
+}
+
+function extractStreamInfoFromBody(body = {}) {
+  const fromPath = extractStreamInfo((body.path || '').replace(/^\//, ''));
+  if (fromPath) return fromPath;
+
+  const srtId =
+    extractSrtStreamId(body.streamid) ||
+    extractSrtStreamId(body.streamId) ||
+    extractSrtStreamId(body.query);
+  if (!srtId) return null;
+
+  const baseId = srtId.endsWith('-audio') ? srtId.slice(0, -6) : srtId;
+  return { type: 'rover', id: srtId, baseId };
+}
+
 function canView(socket) {
   const mode = getMode();
   if (!socket) {
@@ -79,7 +110,7 @@ app.post('/mediamtx/auth', (req, res) => {
   const action = (body.action || '').toLowerCase();
   const protocol = (body.protocol || '').toLowerCase();
   const ip = getRequestIp(req, body.ip);
-  const streamInfo = extractStreamInfo(path);
+  const streamInfo = extractStreamInfoFromBody(body);
 
   logger.info('video auth request', { path: body.path, sessionId, stream: streamInfo, action, protocol });
   if (ip) {

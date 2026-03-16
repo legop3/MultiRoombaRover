@@ -31,7 +31,11 @@ else
   exit 1
 fi
 
+LAST_FFMPEG_STATUS="unknown"
+LAST_APLAY_STATUS="unknown"
+
 run_pipeline() {
+  set +e
   "${FFMPEG_BIN_PATH}" \
     -hide_banner \
     -loglevel warning \
@@ -51,6 +55,12 @@ run_pipeline() {
       -f S16_LE \
       -r 16000 \
       -c 1
+  local rc=$?
+  local -a statuses=("${PIPESTATUS[@]}")
+  LAST_FFMPEG_STATUS="${statuses[0]:-unknown}"
+  LAST_APLAY_STATUS="${statuses[1]:-unknown}"
+  set -e
+  return "${rc}"
 }
 
 trap 'kill 0 2>/dev/null' EXIT INT TERM
@@ -59,6 +69,6 @@ while true; do
   if run_pipeline; then
     exit 0
   fi
-  echo "Audio forward listener exited ffmpeg=${PIPESTATUS[0]} aplay=${PIPESTATUS[1]}, restarting in 2s..." >&2
+  echo "Audio forward listener exited ffmpeg=${LAST_FFMPEG_STATUS:-unknown} aplay=${LAST_APLAY_STATUS:-unknown}, restarting in 2s..." >&2
   sleep 2
 done
