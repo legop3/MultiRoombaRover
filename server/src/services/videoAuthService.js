@@ -122,8 +122,10 @@ app.post('/mediamtx/auth', (req, res) => {
     });
   }
 
+  const isSrtLikeProtocol = protocol === 'srt' || protocol === 'srtconn' || protocol.startsWith('srt');
+  const isForwardAudioRead = action === 'read' && streamInfo?.id?.endsWith('-fwd');
   // Rover forward-listener uses SRT read without session tokens; allow these reads.
-  if (action === 'read' && protocol === 'srt') {
+  if ((action === 'read' && isSrtLikeProtocol) || isForwardAudioRead) {
     return res.status(200).end();
   }
 
