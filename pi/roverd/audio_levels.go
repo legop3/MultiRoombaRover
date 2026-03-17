@@ -70,9 +70,8 @@ func (c *WSClient) applyAudioLevelsToMixer(levels AudioLevels) {
 func (c *WSClient) applyMixerGain(control string, gain float64) {
 	normalized := clampAudioGain(gain)
 	if normalized <= 0 {
-		out, err := exec.Command("amixer", "-q", "-c", "0", "sset", control, "0%").CombinedOutput()
-		if err != nil {
-			c.log.Printf("audio-levels: amixer mute %s failed: %v (%s)", control, err, string(out))
+		if err := c.trySetMixerControl(control, "0%"); err != nil {
+			c.log.Printf("audio-levels: amixer mute %s failed: %v", control, err)
 		}
 		return
 	}
@@ -87,8 +86,24 @@ func (c *WSClient) applyMixerGain(control string, gain float64) {
 	}
 
 	dbArg := fmt.Sprintf("%.2fdB", db)
-	out, err := exec.Command("amixer", "-q", "-c", "0", "sset", control, dbArg).CombinedOutput()
-	if err != nil {
-		c.log.Printf("audio-levels: amixer set %s=%s failed: %v (%s)", control, dbArg, err, string(out))
+	if err := c.trySetMixerControl(control, dbArg); err != nil {
+		c.log.Printf("audio-levels: amixer set %s=%s failed: %v", control, dbArg, err)
 	}
+}
+
+func (c *WSClient) trySetMixerControl(control, value string) error {
+	// Prefer the active ALSA default route; fall back to card index for compatibility.
+	candidates := [][]string{
+		{"-q", "-D", "default", "sset", control, value},
+		{"-q", "-c", "0", "sset", control, value},
+	}
+	var lastErr error
+	for _, args := range candidates {
+		out, err := exec.Command("amixer", args...).CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		lastErr = fmt.Errorf("%w (%s)", err, string(out))
+	}
+	return lastErr
 }
