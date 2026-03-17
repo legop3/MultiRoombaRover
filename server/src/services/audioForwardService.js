@@ -200,7 +200,7 @@ function buildPublisherArgs(fifoPath, outputUrl) {
     '-application',
     'lowdelay',
     '-frame_duration',
-    '20',
+    '10',
     '-compression_level',
     '0',
     '-fflags',
@@ -258,30 +258,6 @@ function buildUploadWriterArgs(filePath) {
   ];
 }
 
-function buildMicWriterArgs() {
-  return [
-    '-hide_banner',
-    '-loglevel',
-    'warning',
-    '-fflags',
-    'nobuffer',
-    '-flags',
-    'low_delay',
-    '-i',
-    'pipe:0',
-    '-vn',
-    '-af',
-    'aresample=16000',
-    '-f',
-    's16le',
-    '-ac',
-    '1',
-    '-ar',
-    '16000',
-    'pipe:1',
-  ];
-}
-
 function attachWriterPipe(worker, proc) {
   const writer = fs.createWriteStream(worker.fifoPath, { flags: 'w' });
   writer.on('error', (err) => {
@@ -315,20 +291,36 @@ function cleanupUploadFile(worker) {
 }
 
 function stopContentWriter(worker) {
-  if (!worker?.contentProc) return;
+  if (!worker) return;
   if (worker.micIdleTimer) {
     clearTimeout(worker.micIdleTimer);
     worker.micIdleTimer = null;
   }
   worker.micLastChunkAt = 0;
-  if (worker.contentProc.stdin && !worker.contentProc.stdin.destroyed) {
+  worker.micBackpressured = false;
+  if (worker.micWriter && !worker.micWriter.destroyed) {
+    try {
+      worker.micWriter.end();
+    } catch {
+      // noop
+    }
+    try {
+      worker.micWriter.destroy();
+    } catch {
+      // noop
+    }
+  }
+  worker.micWriter = null;
+  if (worker.contentProc && worker.contentProc.stdin && !worker.contentProc.stdin.destroyed) {
     try {
       worker.contentProc.stdin.destroy();
     } catch {
       // noop
     }
   }
-  stopProc(worker.contentProc);
+  if (worker.contentProc) {
+    stopProc(worker.contentProc);
+  }
   worker.contentProc = null;
   worker.contentKind = null;
   worker.activeOwnerSocketId = null;
@@ -423,68 +415,80 @@ function startMicWriter(roverId, ownerSocketId = null) {
 
   stopContentWriter(worker);
   cleanupUploadFile(worker);
-  const proc = spawnProcess(roverId, 'mic-writer', buildMicWriterArgs(), {
-    captureStdout: true,
-    captureStdin: true,
+  const writer = fs.createWriteStream(worker.fifoPath, { flags: 'w' });
+  writer.on('error', (err) => {
+    const code = err?.code || 'unknown';
+    if (code !== 'EPIPE') {
+      logger.warn('mic fifo writer error', { roverId, code, message: err?.message || String(err) });
+    }
   });
-  worker.contentProc = proc;
+  writer.on('drain', () => {
+    const current = workers.get(roverId);
+    if (!current || current.contentKind !== 'mic') return;
+    current.micBackpressured = false;
+  });
+  writer.on('close', () => {
+    const current = workers.get(roverId);
+    if (!current || current.contentKind !== 'mic') return;
+    current.micWriter = null;
+    current.micBackpressured = false;
+  });
+
+  worker.micWriter = writer;
+  worker.micBackpressured = false;
+  worker.contentProc = null;
   worker.contentKind = 'mic';
   worker.activeOwnerSocketId = ownerSocketId;
   worker.micLastChunkAt = Date.now();
   scheduleMicIdleTimeout(roverId);
-  const seq = ++worker.writerSeq;
-  attachWriterPipe(worker, proc);
-
-  proc.stdin?.on('error', (err) => {
-    const code = err?.code || 'unknown';
-    if (code !== 'EPIPE') {
-      logger.warn('mic writer stdin error', { roverId, code, message: err?.message || String(err) });
-    }
-  });
 
   setState(roverId, { state: 'playing', source: 'mic', error: null, startedAt: Date.now() });
-
-  proc.on('exit', (code, signal) => {
-    const current = workers.get(roverId);
-    if (!current || current.stopping) return;
-    if (current.writerSeq !== seq || current.contentProc !== proc) return;
-    current.contentProc = null;
-    current.contentKind = null;
-    current.activeOwnerSocketId = null;
-    if (current.micIdleTimer) {
-      clearTimeout(current.micIdleTimer);
-      current.micIdleTimer = null;
-    }
-    current.micLastChunkAt = 0;
-
-    if (code != null && code !== 0 && signal !== 'SIGTERM') {
-      setState(roverId, { state: 'error', source: 'mic', error: `mic writer exited code=${code} signal=${signal || 'none'}` });
-    }
-    startSilenceWriter(roverId);
-  });
 }
 
-function pushMicChunk(roverId, ownerSocketId, dataBase64) {
+function decodeMicChunk(payload = {}) {
+  const binary = payload?.data;
+  if (Buffer.isBuffer(binary)) {
+    return binary;
+  }
+  if (binary instanceof Uint8Array) {
+    return Buffer.from(binary.buffer, binary.byteOffset, binary.byteLength);
+  }
+  if (binary instanceof ArrayBuffer) {
+    return Buffer.from(binary);
+  }
+  if (typeof payload?.dataBase64 === 'string' && payload.dataBase64.trim()) {
+    return Buffer.from(payload.dataBase64.trim(), 'base64');
+  }
+  return Buffer.alloc(0);
+}
+
+function pushMicChunk(roverId, ownerSocketId, payload = {}) {
   const worker = workers.get(roverId);
   if (!worker) {
     throw new Error('Audio forward worker unavailable');
   }
-  if (worker.contentKind !== 'mic' || !worker.contentProc || worker.activeOwnerSocketId !== ownerSocketId) {
+  if (worker.contentKind !== 'mic' || !worker.micWriter || worker.activeOwnerSocketId !== ownerSocketId) {
     throw new Error('Mic forwarding is not active');
   }
-  const encoded = typeof dataBase64 === 'string' ? dataBase64.trim() : '';
-  if (!encoded) {
+  const bytes = decodeMicChunk(payload);
+  if (!bytes.length) {
     throw new Error('Mic chunk missing');
   }
-  const bytes = Buffer.from(encoded, 'base64');
-  if (!bytes.length) {
-    throw new Error('Mic chunk decode failed');
+  if (bytes.length > 64 * 1024) {
+    throw new Error('Mic chunk too large');
   }
-  if (worker.contentProc.stdin?.writable !== true) {
+  if (worker.micWriter.writable !== true) {
     throw new Error('Mic writer input is not writable');
   }
+  if (worker.micBackpressured || worker.micWriter.writableNeedDrain) {
+    // Preserve low latency by dropping stale mic packets instead of queueing.
+    return;
+  }
   worker.micLastChunkAt = Date.now();
-  worker.contentProc.stdin.write(bytes);
+  const wrote = worker.micWriter.write(bytes);
+  if (!wrote) {
+    worker.micBackpressured = true;
+  }
   scheduleMicIdleTimeout(roverId);
 }
 
@@ -520,8 +524,10 @@ function ensureWorker(roverId) {
     contentKind: null,
     activeOwnerSocketId: null,
     activeUploadPath: null,
+    micWriter: null,
     micLastChunkAt: 0,
     micIdleTimer: null,
+    micBackpressured: false,
     writerSeq: 0,
     stopping: false,
   };
@@ -691,7 +697,7 @@ io.on('connection', (socket) => {
     try {
       const normalized = String(payload?.roverId || '').trim();
       ensureAudioForwardPermission(socket, normalized);
-      pushMicChunk(normalized, socket.id, payload?.dataBase64);
+      pushMicChunk(normalized, socket.id, payload);
       if (typeof cb === 'function') cb({ success: true });
     } catch (err) {
       if (typeof cb === 'function') cb({ error: err.message });

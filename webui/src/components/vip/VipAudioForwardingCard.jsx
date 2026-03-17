@@ -8,6 +8,41 @@ import {
 } from './constants.js';
 import { useControlSystem } from '../../controls/index.js';
 
+const TARGET_SAMPLE_RATE = 16000;
+
+function downsampleTo16k(input, sampleRate) {
+  if (!input || !input.length) return new Float32Array(0);
+  if (sampleRate === TARGET_SAMPLE_RATE) return input;
+  if (!Number.isFinite(sampleRate) || sampleRate < TARGET_SAMPLE_RATE) return input;
+  const ratio = sampleRate / TARGET_SAMPLE_RATE;
+  const outputLength = Math.max(1, Math.round(input.length / ratio));
+  const output = new Float32Array(outputLength);
+  let inOffset = 0;
+  for (let outIdx = 0; outIdx < outputLength; outIdx += 1) {
+    const nextOffset = Math.min(input.length, Math.round((outIdx + 1) * ratio));
+    let sum = 0;
+    let count = 0;
+    for (let i = inOffset; i < nextOffset; i += 1) {
+      sum += input[i];
+      count += 1;
+    }
+    output[outIdx] = count > 0 ? sum / count : 0;
+    inOffset = nextOffset;
+  }
+  return output;
+}
+
+function floatToInt16Bytes(floatSamples) {
+  const bytes = new Uint8Array(floatSamples.length * 2);
+  const view = new DataView(bytes.buffer);
+  for (let i = 0; i < floatSamples.length; i += 1) {
+    const sample = Math.max(-1, Math.min(1, floatSamples[i]));
+    const int16 = sample < 0 ? Math.round(sample * 0x8000) : Math.round(sample * 0x7fff);
+    view.setInt16(i * 2, int16, true);
+  }
+  return bytes;
+}
+
 export default function VipAudioForwardingCard({
   roster = [],
   ownRoverId = '',
@@ -24,8 +59,11 @@ export default function VipAudioForwardingCard({
   const [openMicEnabled, setOpenMicEnabled] = useState(false);
   const [micState, setMicState] = useState('idle');
   const [message, setMessage] = useState('');
-  const recorderRef = useRef(null);
   const streamRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const mediaSourceRef = useRef(null);
+  const processorRef = useRef(null);
+  const sinkRef = useRef(null);
   const micActiveRef = useRef(false);
   const activeRoverRef = useRef('');
   const singleRoverId = roster.length === 1 ? roster[0].id : '';
@@ -93,14 +131,37 @@ export default function VipAudioForwardingCard({
       micActiveRef.current = false;
       setMicState('idle');
       try {
-        const recorder = recorderRef.current;
-        if (recorder && recorder.state !== 'inactive') {
-          recorder.stop();
+        if (processorRef.current && mediaSourceRef.current) {
+          mediaSourceRef.current.disconnect(processorRef.current);
         }
       } catch {
         // noop
       }
-      recorderRef.current = null;
+      try {
+        if (processorRef.current && sinkRef.current) {
+          processorRef.current.disconnect(sinkRef.current);
+        }
+      } catch {
+        // noop
+      }
+      try {
+        if (sinkRef.current && audioContextRef.current?.destination) {
+          sinkRef.current.disconnect(audioContextRef.current.destination);
+        }
+      } catch {
+        // noop
+      }
+      if (audioContextRef.current) {
+        try {
+          await audioContextRef.current.close();
+        } catch {
+          // noop
+        }
+      }
+      processorRef.current = null;
+      mediaSourceRef.current = null;
+      sinkRef.current = null;
+      audioContextRef.current = null;
       if (streamRef.current) {
         try {
           streamRef.current.getTracks().forEach((track) => track.stop());
@@ -130,12 +191,10 @@ export default function VipAudioForwardingCard({
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('Microphone capture is not supported in this browser.');
       }
-      if (typeof MediaRecorder === 'undefined') {
-        throw new Error('MediaRecorder is not supported in this browser.');
-      }
       await stopMicCapture(target);
       setMicState('starting');
       let stream = null;
+      let audioContext = null;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -147,29 +206,38 @@ export default function VipAudioForwardingCard({
         });
         streamRef.current = stream;
         await startMicForward?.(target);
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : 'audio/webm';
-        const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64000 });
-        recorderRef.current = recorder;
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextCtor) {
+          throw new Error('Web Audio API is not supported in this browser.');
+        }
+        audioContext = new AudioContextCtor({ latencyHint: 'interactive' });
+        audioContextRef.current = audioContext;
+        const source = audioContext.createMediaStreamSource(stream);
+        mediaSourceRef.current = source;
+        const processor = audioContext.createScriptProcessor(1024, 1, 1);
+        processorRef.current = processor;
+        const sink = audioContext.createGain();
+        sink.gain.value = 0;
+        sinkRef.current = sink;
+
         micActiveRef.current = true;
         activeRoverRef.current = target;
-        recorder.ondataavailable = async (event) => {
-          try {
-            if (!micActiveRef.current || !event.data || event.data.size <= 0) return;
-            const buffer = await event.data.arrayBuffer();
-            const base64 = bytesToBase64(new Uint8Array(buffer));
-            sendMicChunk?.({ roverId: target, dataBase64: base64 });
-          } catch {
-            // noop
-          }
-        };
-        recorder.onstop = () => {
+        processor.onaudioprocess = (event) => {
           if (!micActiveRef.current) return;
-          micActiveRef.current = false;
-          setMicState('idle');
+          const input = event.inputBuffer?.getChannelData(0);
+          if (!input || input.length === 0) return;
+          const downsampled = downsampleTo16k(input, audioContext.sampleRate);
+          if (!downsampled.length) return;
+          const pcmBytes = floatToInt16Bytes(downsampled);
+          sendMicChunk?.({ roverId: target, data: pcmBytes.buffer });
         };
-        recorder.start(120);
+
+        source.connect(processor);
+        processor.connect(sink);
+        sink.connect(audioContext.destination);
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
         setMicState('live');
       } catch (err) {
         if (stream) {
@@ -179,7 +247,18 @@ export default function VipAudioForwardingCard({
             // noop
           }
         }
+        if (audioContext) {
+          try {
+            await audioContext.close();
+          } catch {
+            // noop
+          }
+        }
         streamRef.current = null;
+        audioContextRef.current = null;
+        mediaSourceRef.current = null;
+        processorRef.current = null;
+        sinkRef.current = null;
         throw err;
       }
     },

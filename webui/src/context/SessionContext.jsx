@@ -152,8 +152,8 @@ export function SessionProvider({ children }) {
       stopUploadedAudio: (roverId) => emitWithAck('audio:uploadStop', { roverId }),
       startMicForward: (roverId) => emitWithAck('audio:micStart', { roverId }),
       stopMicForward: (roverId) => emitWithAck('audio:micStop', { roverId }),
-      sendMicChunk: ({ roverId, dataBase64 }) => {
-        socket.emit('audio:micChunk', { roverId, dataBase64 });
+      sendMicChunk: ({ roverId, dataBase64, data }) => {
+        socket.emit('audio:micChunk', { roverId, dataBase64, data });
       },
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
       llmControl: (action, controls = {}) =>
