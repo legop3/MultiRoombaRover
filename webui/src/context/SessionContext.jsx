@@ -153,7 +153,13 @@ export function SessionProvider({ children }) {
       startMicForward: (roverId) => emitWithAck('audio:micStart', { roverId }),
       stopMicForward: (roverId) => emitWithAck('audio:micStop', { roverId }),
       sendMicChunk: ({ roverId, dataBase64, data }) => {
+        if (!socket.connected) return false;
+        const ws = socket.io?.engine?.transport?.ws;
+        if (ws && typeof ws.bufferedAmount === 'number' && ws.bufferedAmount > 256 * 1024) {
+          return false;
+        }
         socket.emit('audio:micChunk', { roverId, dataBase64, data });
+        return true;
       },
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
       llmControl: (action, controls = {}) =>

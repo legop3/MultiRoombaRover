@@ -9,25 +9,24 @@ import {
 import { useControlSystem } from '../../controls/index.js';
 
 const TARGET_SAMPLE_RATE = 16000;
+const MIC_PACKET_MS = 40;
+const MIC_PACKET_BYTES = (TARGET_SAMPLE_RATE * 2 * MIC_PACKET_MS) / 1000; // s16le mono
 
-function downsampleTo16k(input, sampleRate) {
+function resampleTo16k(input, sampleRate) {
   if (!input || !input.length) return new Float32Array(0);
   if (sampleRate === TARGET_SAMPLE_RATE) return input;
-  if (!Number.isFinite(sampleRate) || sampleRate < TARGET_SAMPLE_RATE) return input;
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0) return input;
   const ratio = sampleRate / TARGET_SAMPLE_RATE;
   const outputLength = Math.max(1, Math.round(input.length / ratio));
   const output = new Float32Array(outputLength);
-  let inOffset = 0;
   for (let outIdx = 0; outIdx < outputLength; outIdx += 1) {
-    const nextOffset = Math.min(input.length, Math.round((outIdx + 1) * ratio));
-    let sum = 0;
-    let count = 0;
-    for (let i = inOffset; i < nextOffset; i += 1) {
-      sum += input[i];
-      count += 1;
-    }
-    output[outIdx] = count > 0 ? sum / count : 0;
-    inOffset = nextOffset;
+    const src = outIdx * ratio;
+    const srcFloor = Math.floor(src);
+    const srcCeil = Math.min(input.length - 1, srcFloor + 1);
+    const frac = src - srcFloor;
+    const a = input[srcFloor] ?? 0;
+    const b = input[srcCeil] ?? a;
+    output[outIdx] = a + (b - a) * frac;
   }
   return output;
 }
@@ -41,6 +40,16 @@ function floatToInt16Bytes(floatSamples) {
     view.setInt16(i * 2, int16, true);
   }
   return bytes;
+}
+
+function concatUint8(chunks = [], totalLength = 0) {
+  const out = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
 }
 
 export default function VipAudioForwardingCard({
@@ -64,6 +73,8 @@ export default function VipAudioForwardingCard({
   const mediaSourceRef = useRef(null);
   const processorRef = useRef(null);
   const sinkRef = useRef(null);
+  const pendingPcmChunksRef = useRef([]);
+  const pendingPcmBytesRef = useRef(0);
   const micActiveRef = useRef(false);
   const activeRoverRef = useRef('');
   const singleRoverId = roster.length === 1 ? roster[0].id : '';
@@ -162,6 +173,8 @@ export default function VipAudioForwardingCard({
       mediaSourceRef.current = null;
       sinkRef.current = null;
       audioContextRef.current = null;
+      pendingPcmChunksRef.current = [];
+      pendingPcmBytesRef.current = 0;
       if (streamRef.current) {
         try {
           streamRef.current.getTracks().forEach((track) => track.stop());
@@ -199,6 +212,7 @@ export default function VipAudioForwardingCard({
         stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             channelCount: 1,
+            sampleRate: TARGET_SAMPLE_RATE,
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
@@ -219,6 +233,8 @@ export default function VipAudioForwardingCard({
         const sink = audioContext.createGain();
         sink.gain.value = 0;
         sinkRef.current = sink;
+        pendingPcmChunksRef.current = [];
+        pendingPcmBytesRef.current = 0;
 
         micActiveRef.current = true;
         activeRoverRef.current = target;
@@ -226,10 +242,20 @@ export default function VipAudioForwardingCard({
           if (!micActiveRef.current) return;
           const input = event.inputBuffer?.getChannelData(0);
           if (!input || input.length === 0) return;
-          const downsampled = downsampleTo16k(input, audioContext.sampleRate);
-          if (!downsampled.length) return;
-          const pcmBytes = floatToInt16Bytes(downsampled);
-          sendMicChunk?.({ roverId: target, data: pcmBytes.buffer });
+          const resampled = resampleTo16k(input, audioContext.sampleRate);
+          if (!resampled.length) return;
+          const pcmBytes = floatToInt16Bytes(resampled);
+          pendingPcmChunksRef.current.push(pcmBytes);
+          pendingPcmBytesRef.current += pcmBytes.length;
+
+          while (pendingPcmBytesRef.current >= MIC_PACKET_BYTES) {
+            const merged = concatUint8(pendingPcmChunksRef.current, pendingPcmBytesRef.current);
+            const packet = merged.slice(0, MIC_PACKET_BYTES);
+            const rest = merged.slice(MIC_PACKET_BYTES);
+            pendingPcmChunksRef.current = rest.length ? [rest] : [];
+            pendingPcmBytesRef.current = rest.length;
+            sendMicChunk?.({ roverId: target, data: packet });
+          }
         };
 
         source.connect(processor);

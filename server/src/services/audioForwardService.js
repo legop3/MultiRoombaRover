@@ -450,6 +450,9 @@ function decodeMicChunk(payload = {}) {
   if (Buffer.isBuffer(binary)) {
     return binary;
   }
+  if (binary && typeof binary === 'object' && binary.type === 'Buffer' && Array.isArray(binary.data)) {
+    return Buffer.from(binary.data);
+  }
   if (binary instanceof Uint8Array) {
     return Buffer.from(binary.buffer, binary.byteOffset, binary.byteLength);
   }
@@ -473,6 +476,9 @@ function pushMicChunk(roverId, ownerSocketId, payload = {}) {
   const bytes = decodeMicChunk(payload);
   if (!bytes.length) {
     throw new Error('Mic chunk missing');
+  }
+  if (bytes.length % 2 !== 0) {
+    throw new Error('Mic chunk has invalid PCM byte length');
   }
   if (bytes.length > 64 * 1024) {
     throw new Error('Mic chunk too large');

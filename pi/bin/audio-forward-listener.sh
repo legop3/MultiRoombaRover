@@ -41,8 +41,6 @@ run_pipeline() {
     -loglevel warning \
     -fflags nobuffer \
     -flags low_delay \
-    -max_delay 0 \
-    -reorder_queue_size 0 \
     -analyzeduration 0 \
     -probesize 32 \
     -i "${AUDIO_FORWARD_URL}" \
@@ -57,9 +55,7 @@ run_pipeline() {
       -t raw \
       -f S16_LE \
       -r 16000 \
-      -c 1 \
-      -B 40000 \
-      -F 10000
+      -c 1
   local rc=$?
   local -a statuses=("${PIPESTATUS[@]}")
   LAST_FFMPEG_STATUS="${statuses[0]:-unknown}"
