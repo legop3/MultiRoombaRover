@@ -7,7 +7,7 @@ const logger = require('../globals/logger').child('audioForwardService');
 const { loadConfig } = require('../helpers/configLoader');
 const roverManager = require('./roverManager');
 const { isAdmin } = require('./roleService');
-const { audioLevelsEvents } = require('./audioLevelsService');
+const { isVerified } = require('./verificationService');
 
 const audioForwardEvents = new EventEmitter();
 const config = loadConfig();
@@ -16,15 +16,13 @@ const serviceEnabled = audioForwardConfig.enabled !== false;
 const ffmpegBin = audioForwardConfig.ffmpegBin || 'ffmpeg';
 const streamSuffix = typeof audioForwardConfig.streamSuffix === 'string' ? audioForwardConfig.streamSuffix : '-fwd';
 const runtimeDir = path.resolve(audioForwardConfig.runtimeDir || '/tmp/mrr-audio-forward');
-const repoRoot = path.resolve(__dirname, '..', '..', '..');
-const defaultAudioPath = path.join(__dirname, '..', '..', 'assets', 'test-audio.mp3');
-const configuredAudioPath = audioForwardConfig.testAudioPath;
-const testAudioPath =
-  configuredAudioPath && path.isAbsolute(configuredAudioPath)
-    ? configuredAudioPath
-    : configuredAudioPath
-    ? path.resolve(repoRoot, configuredAudioPath)
-    : defaultAudioPath;
+const uploadsDir = path.join(runtimeDir, 'uploads');
+const maxUploadBytes = Number.isFinite(audioForwardConfig.maxUploadBytes)
+  ? Math.max(256 * 1024, Math.floor(audioForwardConfig.maxUploadBytes))
+  : 8 * 1024 * 1024;
+const maxUploadSeconds = Number.isFinite(audioForwardConfig.maxUploadSeconds)
+  ? Math.max(1, Math.floor(audioForwardConfig.maxUploadSeconds))
+  : 45;
 
 const states = new Map(); // roverId -> { state, source, error, startedAt, updatedAt }
 const workers = new Map(); // roverId -> worker
@@ -62,10 +60,41 @@ function ensureServiceEnabled() {
 
 function ensureRuntimeDir() {
   fs.mkdirSync(runtimeDir, { recursive: true });
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
 function sanitizeRoverId(roverId) {
   return String(roverId || '').replace(/[^a-zA-Z0-9_-]+/g, '_');
+}
+
+function sanitizeFileStem(name) {
+  return String(name || 'upload')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
+}
+
+function extFromUpload(name, mime) {
+  const lowerName = String(name || '').toLowerCase();
+  const lowerMime = String(mime || '').toLowerCase();
+  if (lowerName.endsWith('.mp3') || lowerMime === 'audio/mpeg' || lowerMime === 'audio/mp3') return '.mp3';
+  if (lowerName.endsWith('.wav') || lowerMime === 'audio/wav' || lowerMime === 'audio/x-wav') return '.wav';
+  if (lowerName.endsWith('.ogg') || lowerMime === 'audio/ogg') return '.ogg';
+  throw new Error('Unsupported upload format (allowed: mp3, wav, ogg)');
+}
+
+function ensureVipVerified(socket) {
+  if (!isVerified(socket)) {
+    throw new Error('VIP verification required');
+  }
+}
+
+function ensureAudioForwardPermission(socket, roverId) {
+  ensureVipVerified(socket);
+  if (!isAdmin(socket) && !roverManager.canDrive(roverId, socket)) {
+    throw new Error('Not your turn or no control');
+  }
 }
 
 function ensureFifo(fifoPath) {
@@ -208,7 +237,7 @@ function buildSilenceWriterArgs() {
   ];
 }
 
-function buildClipWriterArgs(filePath) {
+function buildUploadWriterArgs(filePath) {
   return [
     '-hide_banner',
     '-loglevel',
@@ -219,6 +248,8 @@ function buildClipWriterArgs(filePath) {
     '-vn',
     '-af',
     'aresample=16000',
+    '-t',
+    String(maxUploadSeconds),
     '-f',
     's16le',
     '-ac',
@@ -251,6 +282,16 @@ function attachWriterPipe(worker, proc) {
   });
 }
 
+function cleanupUploadFile(worker) {
+  if (!worker?.activeUploadPath) return;
+  try {
+    fs.unlinkSync(worker.activeUploadPath);
+  } catch {
+    // noop
+  }
+  worker.activeUploadPath = null;
+}
+
 function stopContentWriter(worker) {
   if (!worker?.contentProc) return;
   stopProc(worker.contentProc);
@@ -263,6 +304,7 @@ function startSilenceWriter(roverId) {
   if (!worker || worker.stopping) return;
 
   stopContentWriter(worker);
+  cleanupUploadFile(worker);
   const proc = spawnProcess(roverId, 'silence-writer', buildSilenceWriterArgs(), { captureStdout: true });
   worker.contentProc = proc;
   worker.contentKind = 'silence';
@@ -287,18 +329,20 @@ function startSilenceWriter(roverId) {
   setState(roverId, { state: 'idle', source: 'silence', error: null, startedAt: null });
 }
 
-function startClipWriter(roverId, filePath) {
+function startUploadWriter(roverId, filePath) {
   const worker = workers.get(roverId);
   if (!worker || worker.stopping) return;
 
   stopContentWriter(worker);
-  const proc = spawnProcess(roverId, 'clip-writer', buildClipWriterArgs(filePath), { captureStdout: true });
+  cleanupUploadFile(worker);
+  worker.activeUploadPath = filePath;
+  const proc = spawnProcess(roverId, 'upload-writer', buildUploadWriterArgs(filePath), { captureStdout: true });
   worker.contentProc = proc;
-  worker.contentKind = 'clip';
+  worker.contentKind = 'upload';
   const seq = ++worker.writerSeq;
   attachWriterPipe(worker, proc);
 
-  setState(roverId, { state: 'playing', source: 'clip', error: null, startedAt: Date.now() });
+  setState(roverId, { state: 'playing', source: 'upload', error: null, startedAt: Date.now() });
 
   proc.on('exit', (code, signal) => {
     const current = workers.get(roverId);
@@ -308,7 +352,7 @@ function startClipWriter(roverId, filePath) {
     current.contentKind = null;
 
     if (code != null && code !== 0 && signal !== 'SIGTERM') {
-      setState(roverId, { state: 'error', source: 'clip', error: `clip writer exited code=${code} signal=${signal || 'none'}` });
+      setState(roverId, { state: 'error', source: 'upload', error: `upload writer exited code=${code} signal=${signal || 'none'}` });
     }
     startSilenceWriter(roverId);
   });
@@ -344,6 +388,7 @@ function ensureWorker(roverId) {
     publisherProc: publisher,
     contentProc: null,
     contentKind: null,
+    activeUploadPath: null,
     writerSeq: 0,
     stopping: false,
   };
@@ -366,12 +411,31 @@ function ensureWorker(roverId) {
   return worker;
 }
 
-function playTestAudio(roverId) {
-  if (!fs.existsSync(testAudioPath)) {
-    throw new Error(`Test audio missing: ${testAudioPath}`);
+function writeUploadFile(roverId, payload = {}) {
+  const { name, mime, dataBase64 } = payload || {};
+  const ext = extFromUpload(name, mime);
+  const encoded = typeof dataBase64 === 'string' ? dataBase64.trim() : '';
+  if (!encoded) {
+    throw new Error('Upload payload missing');
   }
+  const bytes = Buffer.from(encoded, 'base64');
+  if (!bytes.length) {
+    throw new Error('Upload decode failed');
+  }
+  if (bytes.length > maxUploadBytes) {
+    throw new Error(`Upload too large (max ${maxUploadBytes} bytes)`);
+  }
+  ensureRuntimeDir();
+  const stem = sanitizeFileStem(name || `upload-${Date.now()}`);
+  const filePath = path.join(uploadsDir, `${sanitizeRoverId(roverId)}-${Date.now()}-${stem}${ext}`);
+  fs.writeFileSync(filePath, bytes);
+  return filePath;
+}
+
+function playUploadedAudio(roverId, payload = {}) {
+  const uploadPath = writeUploadFile(roverId, payload);
   ensureWorker(roverId);
-  startClipWriter(roverId, testAudioPath);
+  startUploadWriter(roverId, uploadPath);
 }
 
 function stopPlayback(roverId) {
@@ -385,6 +449,7 @@ function stopWorker(roverId) {
   worker.stopping = true;
 
   stopContentWriter(worker);
+  cleanupUploadFile(worker);
   stopProc(worker.publisherProc);
 
   try {
@@ -417,30 +482,23 @@ roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
   }
 });
 
-audioLevelsEvents.on('change', () => {
-  // Forward gain now applies at rover ALSA mixer (ForwardMaster), so no writer restart is needed.
-});
-
 io.on('connection', (socket) => {
-  socket.on('audio:testPlay', ({ roverId } = {}, cb = () => {}) => {
+  socket.on('audio:uploadPlay', (payload = {}, cb = () => {}) => {
     try {
-      if (!isAdmin(socket)) {
-        throw new Error('Not authorized');
-      }
+      const roverId = String(payload?.roverId || '').trim();
+      ensureAudioForwardPermission(socket, roverId);
       const normalized = String(roverId || '').trim();
-      playTestAudio(normalized);
+      playUploadedAudio(normalized, payload);
       cb({ success: true, roverId: normalized });
     } catch (err) {
       cb({ error: err.message });
     }
   });
 
-  socket.on('audio:testStop', ({ roverId } = {}, cb = () => {}) => {
+  socket.on('audio:uploadStop', ({ roverId } = {}, cb = () => {}) => {
     try {
-      if (!isAdmin(socket)) {
-        throw new Error('Not authorized');
-      }
       const normalized = String(roverId || '').trim();
+      ensureAudioForwardPermission(socket, normalized);
       stopPlayback(normalized);
       cb({ success: true, roverId: normalized });
     } catch (err) {
@@ -452,6 +510,6 @@ io.on('connection', (socket) => {
 module.exports = {
   getAudioForwardState,
   audioForwardEvents,
-  playTestAudio,
+  playUploadedAudio,
   stopPlayback,
 };
