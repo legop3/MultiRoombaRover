@@ -45,7 +45,6 @@ export default function VipPanel() {
           audioForwardByRover={session?.audioForward || {}}
           playUploadedAudio={playUploadedAudio}
           stopUploadedAudio={stopUploadedAudio}
-          onMessage={setMessage}
         />
       ) : (
         <VipVerificationCard

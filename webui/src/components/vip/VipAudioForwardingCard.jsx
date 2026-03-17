@@ -1,5 +1,11 @@
 import { useMemo, useState } from 'react';
-import { MAX_UPLOAD_BYTES, bytesToBase64, fieldClass } from './constants.js';
+import {
+  MAX_UPLOAD_BYTES,
+  bytesToBase64,
+  fieldClass,
+  flowWrapClass,
+  innerFlowClass,
+} from './constants.js';
 
 export default function VipAudioForwardingCard({
   roster = [],
@@ -7,13 +13,12 @@ export default function VipAudioForwardingCard({
   audioForwardByRover = {},
   playUploadedAudio,
   stopUploadedAudio,
-  onMessage,
 }) {
-  const [selectedRoverId, setSelectedRoverId] = useState('');
   const [selectedUpload, setSelectedUpload] = useState(null);
   const [working, setWorking] = useState(false);
+  const [message, setMessage] = useState('');
   const singleRoverId = roster.length === 1 ? roster[0].id : '';
-  const targetRoverId = String(selectedRoverId || singleRoverId || ownRoverId || '').trim();
+  const targetRoverId = String(singleRoverId || ownRoverId || '').trim();
   const selectedForwardState = useMemo(
     () => (targetRoverId ? audioForwardByRover?.[targetRoverId] || null : null),
     [audioForwardByRover, targetRoverId],
@@ -22,19 +27,19 @@ export default function VipAudioForwardingCard({
   const handleUploadPlay = async () => {
     const roverId = targetRoverId;
     if (!roverId) {
-      onMessage?.('Take control of a rover first.');
+      setMessage('Take control of a rover first.');
       return;
     }
     if (!selectedUpload) {
-      onMessage?.('Select an audio file first.');
+      setMessage('Select an audio file first.');
       return;
     }
     if (selectedUpload.size > MAX_UPLOAD_BYTES) {
-      onMessage?.(`File too large (max ${MAX_UPLOAD_BYTES} bytes).`);
+      setMessage(`File too large (max ${MAX_UPLOAD_BYTES} bytes).`);
       return;
     }
     setWorking(true);
-    onMessage?.('');
+    setMessage('');
     try {
       const buffer = await selectedUpload.arrayBuffer();
       const base64 = bytesToBase64(new Uint8Array(buffer));
@@ -44,9 +49,9 @@ export default function VipAudioForwardingCard({
         mime: selectedUpload.type || '',
         dataBase64: base64,
       });
-      onMessage?.(`Playing upload on ${roverId}.`);
+      setMessage(`Playing upload on ${roverId}.`);
     } catch (err) {
-      onMessage?.(err.message || 'Failed to play upload.');
+      setMessage(err.message || 'Failed to play upload.');
     } finally {
       setWorking(false);
     }
@@ -55,75 +60,56 @@ export default function VipAudioForwardingCard({
   const handleUploadStop = async () => {
     const roverId = targetRoverId;
     if (!roverId) {
-      onMessage?.('Take control of a rover first.');
+      setMessage('Take control of a rover first.');
       return;
     }
     setWorking(true);
-    onMessage?.('');
+    setMessage('');
     try {
       await stopUploadedAudio?.(roverId);
-      onMessage?.(`Stopped upload on ${roverId}.`);
+      setMessage(`Stopped upload on ${roverId}.`);
     } catch (err) {
-      onMessage?.(err.message || 'Failed to stop upload.');
+      setMessage(err.message || 'Failed to stop upload.');
     } finally {
       setWorking(false);
     }
   };
 
   return (
-    <section className="surface space-y-0.5 text-sm text-slate-200">
-      <p className="text-slate-300">VIP Audio Forwarding</p>
-      {roster.length > 1 ? (
-        <label className="grid gap-0.5 text-xs text-slate-300">
-          <span>Target rover</span>
-          <select
+    <section className={`surface ${flowWrapClass}`}>
+      <div className={innerFlowClass}>
+        <p className="text-sm text-slate-300">VIP Audio Forwarding</p>
+        <label className="grid w-full gap-0.5 text-xs text-slate-300">
+          <span>Audio file (mp3 / wav / ogg)</span>
+          <input
             className={fieldClass}
-            value={selectedRoverId}
-            onChange={(event) => setSelectedRoverId(event.target.value)}
-            disabled={working}
-          >
-            <option value="">Select rover</option>
-            {roster.map((rover) => (
-              <option key={rover.id} value={rover.id}>
-                {rover.name || rover.id}
-              </option>
-            ))}
-          </select>
+            type="file"
+            accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg"
+            disabled={working || !targetRoverId}
+            onChange={(event) => setSelectedUpload(event.target.files?.[0] || null)}
+          />
         </label>
-      ) : (
-        <div className="surface-muted text-xs text-slate-300 text-center">
-          Rover: {roster[0]?.name || roster[0]?.id || 'none selected'}
+        {selectedUpload ? (
+          <div className="surface-muted mx-auto w-full max-w-sm text-xs text-slate-300 text-center">
+            {selectedUpload.name} ({selectedUpload.size} bytes)
+          </div>
+        ) : null}
+        <div className="flex justify-center gap-0.5">
+          <button type="button" className="button-dark text-sm" disabled={working || !targetRoverId} onClick={handleUploadPlay}>
+            {working ? 'Working...' : 'Play Upload'}
+          </button>
+          <button type="button" className="button-dark text-sm" disabled={working || !targetRoverId} onClick={handleUploadStop}>
+            Stop
+          </button>
         </div>
-      )}
-      <label className="grid gap-0.5 text-xs text-slate-300">
-        <span>Audio file (mp3 / wav / ogg)</span>
-        <input
-          className={fieldClass}
-          type="file"
-          accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg"
-          disabled={working || !targetRoverId}
-          onChange={(event) => setSelectedUpload(event.target.files?.[0] || null)}
-        />
-      </label>
-      {selectedUpload ? (
-        <div className="surface-muted text-xs text-slate-300 text-center">
-          {selectedUpload.name} ({selectedUpload.size} bytes)
-        </div>
-      ) : null}
-      <div className="flex justify-center gap-0.5">
-        <button type="button" className="button-dark text-sm" disabled={working || !targetRoverId} onClick={handleUploadPlay}>
-          {working ? 'Working...' : 'Play Upload'}
-        </button>
-        <button type="button" className="button-dark text-sm" disabled={working || !targetRoverId} onClick={handleUploadStop}>
-          Stop
-        </button>
+        {selectedForwardState ? (
+          <div className="surface-muted mx-auto w-full max-w-sm text-xs text-slate-300 text-center">
+            state: {selectedForwardState.state || 'idle'}
+            {selectedForwardState.error ? ` | error: ${selectedForwardState.error}` : ''}
+          </div>
+        ) : null}
+        {message ? <div className="text-xs text-slate-400 text-center">{message}</div> : null}
       </div>
-      {selectedForwardState ? (
-        <div className="surface-muted text-xs text-slate-300 text-center">
-          state: {selectedForwardState.state || 'idle'}
-          {selectedForwardState.error ? ` | error: ${selectedForwardState.error}` : ''}
-        </div>
-      ) : null}
     </section>
   );
 }
