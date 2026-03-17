@@ -27,8 +27,6 @@ audioForward:
   streamSuffix: "-fwd"
   # Max upload payload accepted via VIP forward upload
   maxUploadBytes: 8388608
-  # Maximum playback duration per upload (seconds)
-  maxUploadSeconds: 45
 
 audioLevels:
   # Gains are multipliers (0.0 - 4.0) applied globally to all rovers.

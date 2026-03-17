@@ -7,6 +7,7 @@ const logger = require('../globals/logger').child('audioForwardService');
 const { loadConfig } = require('../helpers/configLoader');
 const roverManager = require('./roverManager');
 const { isVerified } = require('./verificationService');
+const turnService = require('./turnService');
 
 const audioForwardEvents = new EventEmitter();
 const config = loadConfig();
@@ -19,9 +20,6 @@ const uploadsDir = path.join(runtimeDir, 'uploads');
 const maxUploadBytes = Number.isFinite(audioForwardConfig.maxUploadBytes)
   ? Math.max(256 * 1024, Math.floor(audioForwardConfig.maxUploadBytes))
   : 8 * 1024 * 1024;
-const maxUploadSeconds = Number.isFinite(audioForwardConfig.maxUploadSeconds)
-  ? Math.max(1, Math.floor(audioForwardConfig.maxUploadSeconds))
-  : 45;
 
 const states = new Map(); // roverId -> { state, source, error, startedAt, updatedAt }
 const workers = new Map(); // roverId -> worker
@@ -93,6 +91,9 @@ function ensureAudioForwardPermission(socket, roverId) {
   ensureVipVerified(socket);
   if (!roverManager.isDriver(roverId, socket)) {
     throw new Error('Audio forwarding is only allowed on your own rover');
+  }
+  if (!turnService.canDrive(roverId, socket)) {
+    throw new Error('Only the current driver can play audio');
   }
 }
 
@@ -247,8 +248,6 @@ function buildUploadWriterArgs(filePath) {
     '-vn',
     '-af',
     'aresample=16000',
-    '-t',
-    String(maxUploadSeconds),
     '-f',
     's16le',
     '-ac',
@@ -296,6 +295,7 @@ function stopContentWriter(worker) {
   stopProc(worker.contentProc);
   worker.contentProc = null;
   worker.contentKind = null;
+  worker.activeOwnerSocketId = null;
 }
 
 function startSilenceWriter(roverId) {
@@ -335,6 +335,7 @@ function startUploadWriter(roverId, filePath) {
   stopContentWriter(worker);
   cleanupUploadFile(worker);
   worker.activeUploadPath = filePath;
+  worker.activeOwnerSocketId = null;
   const proc = spawnProcess(roverId, 'upload-writer', buildUploadWriterArgs(filePath), { captureStdout: true });
   worker.contentProc = proc;
   worker.contentKind = 'upload';
@@ -432,9 +433,17 @@ function writeUploadFile(roverId, payload = {}) {
 }
 
 function playUploadedAudio(roverId, payload = {}) {
+  const ownerSocketId = typeof payload?.ownerSocketId === 'string' ? payload.ownerSocketId : null;
   const uploadPath = writeUploadFile(roverId, payload);
   ensureWorker(roverId);
+  const worker = workers.get(roverId);
+  if (worker) {
+    worker.activeOwnerSocketId = ownerSocketId;
+  }
   startUploadWriter(roverId, uploadPath);
+  if (worker) {
+    worker.activeOwnerSocketId = ownerSocketId;
+  }
 }
 
 function stopPlayback(roverId) {
@@ -481,13 +490,40 @@ roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
   }
 });
 
+function stopOwnedUploadIfUnauthorized(roverId, ownerSocketId, reason = 'driver_change') {
+  if (!roverId || !ownerSocketId) return;
+  const worker = workers.get(roverId);
+  if (!worker || worker.contentKind !== 'upload') return;
+  if (worker.activeOwnerSocketId !== ownerSocketId) return;
+  const ownerSocket = io.sockets.sockets.get(ownerSocketId);
+  const ownerIsDriver = ownerSocket ? roverManager.isDriver(roverId, ownerSocket) : false;
+  const ownerCanDrive = ownerSocket ? turnService.canDrive(roverId, ownerSocket) : false;
+  if (ownerIsDriver && ownerCanDrive) return;
+  logger.info('Stopping upload due to ownership/driver change', { roverId, ownerSocketId, reason });
+  startSilenceWriter(roverId);
+}
+
+roverManager.managerEvents.on('driver', ({ socketId, roverId, action } = {}) => {
+  if (!socketId || !roverId) return;
+  if (action === 'remove' || action === 'add') {
+    stopOwnedUploadIfUnauthorized(roverId, socketId, action);
+  }
+});
+
+turnService.turnEvents.on('activeDriver', ({ roverId } = {}) => {
+  if (!roverId) return;
+  const worker = workers.get(roverId);
+  if (!worker || worker.contentKind !== 'upload') return;
+  stopOwnedUploadIfUnauthorized(roverId, worker.activeOwnerSocketId, 'turn_change');
+});
+
 io.on('connection', (socket) => {
   socket.on('audio:uploadPlay', (payload = {}, cb = () => {}) => {
     try {
       const roverId = String(payload?.roverId || '').trim();
       ensureAudioForwardPermission(socket, roverId);
       const normalized = String(roverId || '').trim();
-      playUploadedAudio(normalized, payload);
+      playUploadedAudio(normalized, { ...(payload || {}), ownerSocketId: socket.id });
       cb({ success: true, roverId: normalized });
     } catch (err) {
       cb({ error: err.message });
