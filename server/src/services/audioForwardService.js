@@ -7,7 +7,7 @@ const logger = require('../globals/logger').child('audioForwardService');
 const { loadConfig } = require('../helpers/configLoader');
 const roverManager = require('./roverManager');
 const { isAdmin } = require('./roleService');
-const { getAudioLevels, audioLevelsEvents } = require('./audioLevelsService');
+const { audioLevelsEvents } = require('./audioLevelsService');
 
 const audioForwardEvents = new EventEmitter();
 const config = loadConfig();
@@ -174,6 +174,14 @@ function buildPublisherArgs(fifoPath, outputUrl) {
     '20',
     '-compression_level',
     '0',
+    '-fflags',
+    'nobuffer',
+    '-flush_packets',
+    '1',
+    '-muxdelay',
+    '0',
+    '-muxpreload',
+    '0',
     '-f',
     'mpegts',
     outputUrl,
@@ -201,7 +209,6 @@ function buildSilenceWriterArgs() {
 }
 
 function buildClipWriterArgs(filePath) {
-  const forwardGain = Math.max(0, Number(getAudioLevels()?.forwardGain) || 1);
   return [
     '-hide_banner',
     '-loglevel',
@@ -211,7 +218,7 @@ function buildClipWriterArgs(filePath) {
     filePath,
     '-vn',
     '-af',
-    `aresample=16000,volume=${forwardGain}`,
+    'aresample=16000',
     '-f',
     's16le',
     '-ac',
@@ -397,12 +404,7 @@ roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
 });
 
 audioLevelsEvents.on('change', () => {
-  workers.forEach((worker, roverId) => {
-    if (worker?.contentKind === 'clip') {
-      // Restart clip writer so forward gain changes are immediately reflected.
-      startClipWriter(roverId, testAudioPath);
-    }
-  });
+  // Forward gain now applies at rover ALSA mixer (ForwardMaster), so no writer restart is needed.
 });
 
 io.on('connection', (socket) => {
