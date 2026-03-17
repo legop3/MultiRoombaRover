@@ -16,6 +16,11 @@ export default function VipPanel() {
   const isVerified = Boolean(session?.isVerified);
   const pendingRequestId = session?.verification?.pendingRequestId || null;
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
+  const ownRoverId = String(session?.assignment?.roverId || '').trim();
+  const ownRoverRoster = useMemo(
+    () => (ownRoverId ? roster.filter((rover) => rover.id === ownRoverId) : []),
+    [ownRoverId, roster],
+  );
   const [message, setMessage] = useState('');
 
   const applyIdentityKey = async (nextRaw) => {
@@ -35,7 +40,8 @@ export default function VipPanel() {
     <section className="panel-section space-y-0.5 text-base">
       {isVerified ? (
         <VipAudioForwardingCard
-          roster={roster}
+          roster={ownRoverRoster}
+          ownRoverId={ownRoverId}
           audioForwardByRover={session?.audioForward || {}}
           playUploadedAudio={playUploadedAudio}
           stopUploadedAudio={stopUploadedAudio}

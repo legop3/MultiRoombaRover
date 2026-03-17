@@ -6,7 +6,6 @@ const io = require('../globals/io');
 const logger = require('../globals/logger').child('audioForwardService');
 const { loadConfig } = require('../helpers/configLoader');
 const roverManager = require('./roverManager');
-const { isAdmin } = require('./roleService');
 const { isVerified } = require('./verificationService');
 
 const audioForwardEvents = new EventEmitter();
@@ -92,8 +91,8 @@ function ensureVipVerified(socket) {
 
 function ensureAudioForwardPermission(socket, roverId) {
   ensureVipVerified(socket);
-  if (!isAdmin(socket) && !roverManager.canDrive(roverId, socket)) {
-    throw new Error('Not your turn or no control');
+  if (!roverManager.isDriver(roverId, socket)) {
+    throw new Error('Audio forwarding is only allowed on your own rover');
   }
 }
 
