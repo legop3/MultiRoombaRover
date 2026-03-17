@@ -7,7 +7,16 @@ import VipVerificationCard from './vip/VipVerificationCard.jsx';
 import VipIdentityCard from './vip/VipIdentityCard.jsx';
 
 export default function VipPanel() {
-  const { session, identifySession, requestVerification, playUploadedAudio, stopUploadedAudio } = useSession();
+  const {
+    session,
+    identifySession,
+    requestVerification,
+    playUploadedAudio,
+    stopUploadedAudio,
+    startMicForward,
+    stopMicForward,
+    sendMicChunk,
+  } = useSession();
   const { value: identity, save: saveIdentity } = useSettingsNamespace('identity', { cookieUserId: '' });
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
 
@@ -45,6 +54,9 @@ export default function VipPanel() {
           audioForwardByRover={session?.audioForward || {}}
           playUploadedAudio={playUploadedAudio}
           stopUploadedAudio={stopUploadedAudio}
+          startMicForward={startMicForward}
+          stopMicForward={stopMicForward}
+          sendMicChunk={sendMicChunk}
         />
       ) : (
         <VipVerificationCard

@@ -28,6 +28,9 @@ const SessionContext = createContext({
   rebootServer: async () => {},
   playUploadedAudio: async () => {},
   stopUploadedAudio: async () => {},
+  startMicForward: async () => {},
+  stopMicForward: async () => {},
+  sendMicChunk: async () => {},
   setAudioLevels: async () => {},
   llmControl: async () => {},
 });
@@ -147,6 +150,11 @@ export function SessionProvider({ children }) {
       playUploadedAudio: ({ roverId, name, mime, dataBase64 }) =>
         emitWithAck('audio:uploadPlay', { roverId, name, mime, dataBase64 }),
       stopUploadedAudio: (roverId) => emitWithAck('audio:uploadStop', { roverId }),
+      startMicForward: (roverId) => emitWithAck('audio:micStart', { roverId }),
+      stopMicForward: (roverId) => emitWithAck('audio:micStop', { roverId }),
+      sendMicChunk: ({ roverId, dataBase64 }) => {
+        socket.emit('audio:micChunk', { roverId, dataBase64 });
+      },
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),
@@ -156,7 +164,7 @@ export function SessionProvider({ children }) {
           { ...alert, receivedAt: Date.now(), id: alert.id || Math.random().toString(36).slice(2) },
         ]),
     }),
-    [emitWithAck],
+    [emitWithAck, socket],
   );
 
   const value = useMemo(

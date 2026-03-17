@@ -35,6 +35,12 @@ function createHornState() {
   };
 }
 
+function createMicState() {
+  return {
+    pttActive: false,
+  };
+}
+
 export const initialControlState = {
   roverId: null,
   mode: 'drive',
@@ -43,6 +49,7 @@ export const initialControlState = {
   camera: createCameraState(),
   song: createSongState(),
   horn: createHornState(),
+  mic: createMicState(),
   lastControlIntentAt: 0,
   macros: DEFAULT_MACROS,
   keymap: DEFAULT_KEYMAP,
@@ -59,6 +66,7 @@ export function controlReducer(state, action) {
         aux: action.payload ? state.aux : createAuxState(),
         song: action.payload ? state.song : createSongState(),
         horn: action.payload ? state.horn : createHornState(),
+        mic: action.payload ? state.mic : createMicState(),
         lastControlIntentAt: action.payload ? state.lastControlIntentAt : 0,
       };
     case 'control/set-mode':
@@ -136,6 +144,7 @@ export function controlReducer(state, action) {
         aux: createAuxState(),
         song: createSongState(),
         horn: createHornState(),
+        mic: createMicState(),
         lastControlIntentAt: 0,
       };
     case 'control/set-horn-active':
@@ -166,6 +175,14 @@ export function controlReducer(state, action) {
         song: {
           ...(state.song || createSongState()),
           note: action.payload ?? SONG_DEFAULT_NOTE,
+        },
+      };
+    case 'control/set-mic-ptt':
+      return {
+        ...state,
+        mic: {
+          ...(state.mic || createMicState()),
+          pttActive: Boolean(action.payload),
         },
       };
     default:
