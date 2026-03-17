@@ -23,6 +23,7 @@ const { getAdminReason } = require('./adminReasonService');
 const { subscribe } = require('./eventBus');
 const { getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
 const { getAudioForwardState, audioForwardEvents } = require('./audioForwardService');
+const { getAudioLevels, audioLevelsEvents } = require('./audioLevelsService');
 
 const config = loadConfig();
 const discordInvite = config.discord?.invite || null;
@@ -93,6 +94,7 @@ function buildSession(socket) {
     verification: getVerificationStateForSocket(socket),
     isVerified: Boolean(socket?.data?.isVerified),
     audioForward: getAudioForwardState(),
+    audioLevels: getAudioLevels(),
   };
 }
 
@@ -261,6 +263,10 @@ subscribe('adminReason.updated', () => {
 });
 
 audioForwardEvents.on('change', () => {
+  syncAll();
+});
+
+audioLevelsEvents.on('change', () => {
   syncAll();
 });
 

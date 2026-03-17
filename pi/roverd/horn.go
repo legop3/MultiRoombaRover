@@ -18,8 +18,9 @@ const (
 )
 
 type HornSynth struct {
-	cfg HornConfig
-	log *log.Logger
+	cfg  HornConfig
+	log  *log.Logger
+	gain float64
 
 	mu     sync.Mutex
 	stop   chan struct{}
@@ -29,9 +30,16 @@ type HornSynth struct {
 
 func NewHornSynth(cfg HornConfig, logger *log.Logger) *HornSynth {
 	return &HornSynth{
-		cfg: cfg,
-		log: logger,
+		cfg:  cfg,
+		log:  logger,
+		gain: 1.0,
 	}
+}
+
+func (h *HornSynth) SetGlobalGain(gain float64) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.gain = clampAudioGain(gain)
 }
 
 func (h *HornSynth) HandlePayload(payload *hornPayload) error {
@@ -111,6 +119,10 @@ func (h *HornSynth) run(waveform string, freqs []float64, stop <-chan struct{}) 
 	if volume > 1 {
 		volume = 1
 	}
+	h.mu.Lock()
+	gain := h.gain
+	h.mu.Unlock()
+	volume *= gain
 
 	args := []string{"-q", "-f", "S16_LE", "-c", fmt.Sprintf("%d", channels), "-r", fmt.Sprintf("%d", rate), "-t", "raw"}
 	if h.cfg.Device != "" {

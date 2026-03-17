@@ -29,6 +29,7 @@ type inboundMessage struct {
 	Servo        *servoPayload        `json:"servo,omitempty"`
 	TTS          *ttsPayload          `json:"tts,omitempty"`
 	Horn         *hornPayload         `json:"horn,omitempty"`
+	AudioLevels  *audioLevelsPayload  `json:"audioLevels,omitempty"`
 	NightVision  *nightVisionPayload  `json:"nightVision,omitempty"`
 	Song         *songPayload         `json:"song,omitempty"`
 	Reboot       *rebootPayload       `json:"reboot,omitempty"`
@@ -71,6 +72,12 @@ type hornPayload struct {
 	Action   string    `json:"action"`
 	Waveform string    `json:"waveform,omitempty"`
 	Freqs    []float64 `json:"freqs,omitempty"`
+}
+
+type audioLevelsPayload struct {
+	HornGain    *float64 `json:"hornGain,omitempty"`
+	TTSGain     *float64 `json:"ttsGain,omitempty"`
+	ForwardGain *float64 `json:"forwardGain,omitempty"`
 }
 
 type nightVisionPayload struct {

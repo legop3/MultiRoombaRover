@@ -34,6 +34,8 @@ type WSClient struct {
 	rebootT      *time.Timer
 	seekIssued   bool
 	rebootIssued bool
+	audioLevels  AudioLevels
+	audioMu      sync.RWMutex
 }
 
 func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
@@ -45,7 +47,7 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 	if cfg.Horn.Enabled {
 		horn = NewHornSynth(cfg.Horn, logger)
 	}
-	return &WSClient{
+	client := &WSClient{
 		cfg:          cfg,
 		adapter:      adapter,
 		sensorFrames: frames,
@@ -56,7 +58,16 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		nightVision:  nightVision,
 		log:          logger,
 		ttsQueue:     ttsQueue,
+		audioLevels: AudioLevels{
+			HornGain:    1.0,
+			TTSGain:     1.0,
+			ForwardGain: 1.0,
+		},
 	}
+	if client.horn != nil {
+		client.horn.SetGlobalGain(client.audioLevels.HornGain)
+	}
+	return client
 }
 
 func (c *WSClient) Run(ctx context.Context) error {
@@ -200,6 +211,8 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 			return fmt.Errorf("horn disabled")
 		}
 		return c.horn.HandlePayload(msg.Horn)
+	case msg.AudioLevels != nil:
+		return c.handleAudioLevels(msg.AudioLevels)
 	case msg.NightVision != nil:
 		if c.nightVision == nil {
 			return fmt.Errorf("night vision disabled")

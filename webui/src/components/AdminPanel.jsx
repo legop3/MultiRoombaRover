@@ -22,6 +22,7 @@ export default function AdminPanel() {
     rebootServer,
     playTestAudio,
     stopTestAudio,
+    setAudioLevels,
     llmControl,
     adminLogs,
     llmCommentaryState,
@@ -39,6 +40,12 @@ export default function AdminPanel() {
   const currentReason = session?.adminReason?.text || '';
   const reasonUpdatedAt = session?.adminReason?.updatedAt || null;
   const [reasonDraft, setReasonDraft] = useState(currentReason);
+  const currentAudioLevels = session?.audioLevels || {};
+  const [audioLevelDraft, setAudioLevelDraft] = useState({
+    hornGain: Number.isFinite(currentAudioLevels.hornGain) ? currentAudioLevels.hornGain : 1,
+    ttsGain: Number.isFinite(currentAudioLevels.ttsGain) ? currentAudioLevels.ttsGain : 1,
+    forwardGain: Number.isFinite(currentAudioLevels.forwardGain) ? currentAudioLevels.forwardGain : 1,
+  });
 
   const isAdmin =
     session?.role === 'admin' ||
@@ -170,6 +177,19 @@ export default function AdminPanel() {
     }
   };
 
+  const handleAudioLevelDraft = (key) => (event) => {
+    const next = Number(event.target.value);
+    setAudioLevelDraft((current) => ({ ...(current || {}), [key]: Number.isFinite(next) ? next : 1 }));
+  };
+
+  const handleAudioLevelsSave = async () => {
+    try {
+      await setAudioLevels(audioLevelDraft);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   useEffect(() => {
     setGoalDraft(currentGoal);
   }, [currentGoal]);
@@ -177,6 +197,14 @@ export default function AdminPanel() {
   useEffect(() => {
     setReasonDraft(currentReason);
   }, [currentReason]);
+
+  useEffect(() => {
+    setAudioLevelDraft({
+      hornGain: Number.isFinite(currentAudioLevels.hornGain) ? currentAudioLevels.hornGain : 1,
+      ttsGain: Number.isFinite(currentAudioLevels.ttsGain) ? currentAudioLevels.ttsGain : 1,
+      forwardGain: Number.isFinite(currentAudioLevels.forwardGain) ? currentAudioLevels.forwardGain : 1,
+    });
+  }, [currentAudioLevels.forwardGain, currentAudioLevels.hornGain, currentAudioLevels.ttsGain]);
 
   const lockMap = useMemo(() => {
     const map = {};
@@ -209,6 +237,64 @@ export default function AdminPanel() {
         >
           {serverRebooting ? 'Server rebooting...' : 'Reboot Server'}
         </button>
+      </div>
+      <div className="space-y-0.5">
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>Global audio levels</span>
+          {session?.audioLevels?.updatedAt ? (
+            <span>Updated {new Date(session.audioLevels.updatedAt).toLocaleString()}</span>
+          ) : null}
+        </div>
+        <label className="grid gap-0.5 text-xs text-slate-200">
+          <div className="flex items-center justify-between gap-0.5">
+            <span>Horn gain</span>
+            <span>{audioLevelDraft.hornGain.toFixed(2)}x</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="4"
+            step="0.01"
+            value={audioLevelDraft.hornGain}
+            onChange={handleAudioLevelDraft('hornGain')}
+            className="w-full accent-emerald-500"
+          />
+        </label>
+        <label className="grid gap-0.5 text-xs text-slate-200">
+          <div className="flex items-center justify-between gap-0.5">
+            <span>TTS gain</span>
+            <span>{audioLevelDraft.ttsGain.toFixed(2)}x</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="4"
+            step="0.01"
+            value={audioLevelDraft.ttsGain}
+            onChange={handleAudioLevelDraft('ttsGain')}
+            className="w-full accent-emerald-500"
+          />
+        </label>
+        <label className="grid gap-0.5 text-xs text-slate-200">
+          <div className="flex items-center justify-between gap-0.5">
+            <span>Forward gain</span>
+            <span>{audioLevelDraft.forwardGain.toFixed(2)}x</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="4"
+            step="0.01"
+            value={audioLevelDraft.forwardGain}
+            onChange={handleAudioLevelDraft('forwardGain')}
+            className="w-full accent-emerald-500"
+          />
+        </label>
+        <div className="flex gap-0.5 text-xs">
+          <button type="button" onClick={handleAudioLevelsSave} className="button-dark">
+            Apply audio levels
+          </button>
+        </div>
       </div>
       <div className="space-y-0.5">
         <div className="flex items-center justify-between text-xs text-slate-400">

@@ -28,6 +28,12 @@ audioForward:
   # Optional stream suffix for fallback URL generation
   streamSuffix: "-fwd"
 
+audioLevels:
+  # Gains are multipliers (0.0 - 4.0) applied globally to all rovers.
+  hornGain: 1.0
+  ttsGain: 1.0
+  forwardGain: 1.0
+
 homeAssistant:
   url: "http://homeassistant.local:8123"
   token: "REPLACE_WITH_LONG_LIVED_TOKEN"

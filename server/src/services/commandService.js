@@ -67,6 +67,9 @@ io.on('connection', (socket) => {
       if (!type) {
         throw new Error('type required');
       }
+      if (type === 'audioLevels') {
+        throw new Error('audioLevels command is service-managed');
+      }
       const payload = data ? { ...data } : {};
       const isRebootCommand = type === 'reboot';
       const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));

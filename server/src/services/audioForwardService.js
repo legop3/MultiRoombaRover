@@ -7,6 +7,7 @@ const logger = require('../globals/logger').child('audioForwardService');
 const { loadConfig } = require('../helpers/configLoader');
 const roverManager = require('./roverManager');
 const { isAdmin } = require('./roleService');
+const { getAudioLevels, audioLevelsEvents } = require('./audioLevelsService');
 
 const audioForwardEvents = new EventEmitter();
 const config = loadConfig();
@@ -200,6 +201,7 @@ function buildSilenceWriterArgs() {
 }
 
 function buildClipWriterArgs(filePath) {
+  const forwardGain = Math.max(0, Number(getAudioLevels()?.forwardGain) || 1);
   return [
     '-hide_banner',
     '-loglevel',
@@ -209,7 +211,7 @@ function buildClipWriterArgs(filePath) {
     filePath,
     '-vn',
     '-af',
-    'aresample=16000,volume=12dB',
+    `aresample=16000,volume=${forwardGain}`,
     '-f',
     's16le',
     '-ac',
@@ -392,6 +394,15 @@ roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
       setState(roverId, { state: 'error', source: 'init', error: err.message, startedAt: null });
     }
   }
+});
+
+audioLevelsEvents.on('change', () => {
+  workers.forEach((worker, roverId) => {
+    if (worker?.contentKind === 'clip') {
+      // Restart clip writer so forward gain changes are immediately reflected.
+      startClipWriter(roverId, testAudioPath);
+    }
+  });
 });
 
 io.on('connection', (socket) => {
