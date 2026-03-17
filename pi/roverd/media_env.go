@@ -54,7 +54,7 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	fmt.Fprintf(&buf, "AUDIO_DEVICE=%s\n", audioDevice)
 	playbackDevice := audio.PlaybackDevice
 	if playbackDevice == "" {
-		playbackDevice = "default"
+		playbackDevice = "forward"
 	}
 	fmt.Fprintf(&buf, "AUDIO_PLAYBACK_DEVICE=%s\n", playbackDevice)
 	fmt.Fprintf(&buf, "AUDIO_RATE=%d\n", audio.SampleRate)

@@ -64,9 +64,7 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 			ForwardGain: 1.0,
 		},
 	}
-	if client.horn != nil {
-		client.horn.SetGlobalGain(client.audioLevels.HornGain)
-	}
+	client.applyAudioLevelsToMixer(client.audioLevels)
 	return client
 }
 

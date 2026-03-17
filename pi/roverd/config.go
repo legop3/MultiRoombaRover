@@ -172,7 +172,7 @@ func LoadConfig(path string) (*Config, error) {
 		Audio: AudioConfig{
 			CaptureEnabled: false,
 			CaptureDevice:  "rovermic",
-			PlaybackDevice: "default",
+			PlaybackDevice: "forward",
 			SampleRate:     48000,
 			Channels:       2,
 			Bitrate:        24000,
@@ -314,8 +314,8 @@ func validateAudioConfig(cfg *AudioConfig) {
 	if cfg.CaptureEnabled && cfg.CaptureDevice == "" {
 		cfg.CaptureDevice = "hw:0,0"
 	}
-	if cfg.PlaybackDevice == "" {
-		cfg.PlaybackDevice = "default"
+	if cfg.PlaybackDevice == "" || cfg.PlaybackDevice == "default" {
+		cfg.PlaybackDevice = "forward"
 	}
 	if cfg.SampleRate <= 0 {
 		cfg.SampleRate = 48000

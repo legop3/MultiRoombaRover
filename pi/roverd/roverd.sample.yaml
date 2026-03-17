@@ -39,7 +39,7 @@ cameraServo:
 audio:
   captureEnabled: false
   captureDevice: hw:0,0
-  playbackDevice: default
+  playbackDevice: forward
   sampleRate: 48000
   channels: 2
   bitrate: 24000
