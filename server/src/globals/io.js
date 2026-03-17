@@ -6,6 +6,9 @@ const io = new SocketIOServer(httpServer, {
   transports: ['websocket', 'polling'],
   pingInterval: 5000,
   pingTimeout: 7000,
+  // Upload forwarding sends base64 audio payloads over socket events.
+  // Default max payload (~1MB) causes disconnect/reconnect on larger files.
+  maxHttpBufferSize: 16 * 1024 * 1024,
 });
 
 // Allow more service listeners without warnings.
