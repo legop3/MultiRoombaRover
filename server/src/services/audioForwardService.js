@@ -231,9 +231,23 @@ function buildClipWriterArgs(filePath) {
 
 function attachWriterPipe(worker, proc) {
   const writer = fs.createWriteStream(worker.fifoPath, { flags: 'w' });
+  writer.on('error', (err) => {
+    const code = err?.code || 'unknown';
+    // Broken pipe is expected when FIFO reader (publisher) restarts/exits.
+    if (code !== 'EPIPE') {
+      logger.warn('writer pipe error', { roverId: worker?.roverId, code, message: err?.message || String(err) });
+    }
+  });
+  proc.stdout.on('error', (err) => {
+    logger.warn('writer stdout error', {
+      roverId: worker?.roverId,
+      code: err?.code || 'unknown',
+      message: err?.message || String(err),
+    });
+  });
   proc.stdout.pipe(writer);
   proc.on('exit', () => {
-    writer.end();
+    writer.destroy();
   });
 }
 
