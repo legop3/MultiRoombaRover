@@ -85,9 +85,17 @@ func (c *WSClient) applyMixerGain(control string, gain float64) {
 		db = -60.0
 	}
 
-	dbArg := fmt.Sprintf("%.2fdB", db)
-	if err := c.trySetMixerControl(control, dbArg); err != nil {
-		c.log.Printf("audio-levels: amixer set %s=%s failed: %v", control, dbArg, err)
+	// amixer treats a leading "-" value as an option; set via percent to avoid getopt ambiguity.
+	percent := int(math.Round((db + 60.0) / 72.0 * 100.0))
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 100 {
+		percent = 100
+	}
+	percentArg := fmt.Sprintf("%d%%", percent)
+	if err := c.trySetMixerControl(control, percentArg); err != nil {
+		c.log.Printf("audio-levels: amixer set %s=%s failed: %v", control, percentArg, err)
 	}
 }
 
