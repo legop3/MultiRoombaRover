@@ -351,6 +351,10 @@ function cleanupUploadFile(worker) {
 
 function stopContentWriter(worker) {
   if (!worker) return;
+  if (worker.micWhipRestartTimer) {
+    clearTimeout(worker.micWhipRestartTimer);
+    worker.micWhipRestartTimer = null;
+  }
   if (worker.micIdleTimer) {
     clearTimeout(worker.micIdleTimer);
     worker.micIdleTimer = null;
@@ -516,37 +520,55 @@ function startMicWhipRelay(roverId, ownerSocketId = null) {
     return;
   }
 
-  stopContentWriter(worker);
-  cleanupUploadFile(worker);
-  const inputUrl = resolveMicReadUrl(roverId);
-  const proc = spawnProcess(roverId, 'mic-whip-reader', buildWhipRelayReaderArgs(inputUrl), {
-    captureStdout: true,
-  });
-  worker.contentProc = proc;
   worker.contentKind = 'mic_whip';
   worker.activeOwnerSocketId = ownerSocketId;
   worker.micWhipPathId = resolveMicPathId(roverId);
-  const seq = ++worker.writerSeq;
-  attachWriterPipe(worker, proc);
-  setState(roverId, { state: 'playing', source: 'mic-whip', error: null, startedAt: Date.now() });
+  if (worker.micWhipRestartTimer) {
+    clearTimeout(worker.micWhipRestartTimer);
+    worker.micWhipRestartTimer = null;
+  }
+  stopContentWriter(worker);
+  worker.contentKind = 'mic_whip';
+  worker.activeOwnerSocketId = ownerSocketId;
+  worker.micWhipPathId = resolveMicPathId(roverId);
+  setState(roverId, { state: 'starting', source: 'mic-whip', error: null, startedAt: Date.now() });
 
-  proc.on('exit', (code, signal) => {
+  const launch = () => {
     const current = workers.get(roverId);
     if (!current || current.stopping) return;
-    if (current.writerSeq !== seq || current.contentProc !== proc) return;
-    current.contentProc = null;
-    current.contentKind = null;
-    current.activeOwnerSocketId = null;
-    current.micWhipPathId = null;
-    if (code != null && code !== 0 && signal !== 'SIGTERM') {
+    if (current.contentKind !== 'mic_whip' || current.activeOwnerSocketId !== ownerSocketId) return;
+
+    const inputUrl = resolveMicReadUrl(roverId);
+    const proc = spawnProcess(roverId, 'mic-whip-reader', buildWhipRelayReaderArgs(inputUrl), {
+      captureStdout: true,
+    });
+    current.contentProc = proc;
+    const seq = ++current.writerSeq;
+    attachWriterPipe(current, proc);
+    setState(roverId, { state: 'playing', source: 'mic-whip', error: null, startedAt: Date.now() });
+
+    proc.on('exit', (code, signal) => {
+      const next = workers.get(roverId);
+      if (!next || next.stopping) return;
+      if (next.writerSeq !== seq || next.contentProc !== proc) return;
+      next.contentProc = null;
+      if (next.contentKind !== 'mic_whip' || next.activeOwnerSocketId !== ownerSocketId) return;
+      if (signal === 'SIGTERM') return;
+
       setState(roverId, {
-        state: 'error',
+        state: 'starting',
         source: 'mic-whip',
-        error: `mic whip reader exited code=${code} signal=${signal || 'none'}`,
+        error: code != null && code !== 0 ? `relay reconnecting (last code=${code})` : null,
+        startedAt: Date.now(),
       });
-    }
-    startSilenceWriter(roverId);
-  });
+      next.micWhipRestartTimer = setTimeout(() => {
+        next.micWhipRestartTimer = null;
+        launch();
+      }, 300);
+    });
+  };
+
+  launch();
 }
 
 function decodeMicChunk(payload = {}) {
@@ -636,6 +658,7 @@ function ensureWorker(roverId) {
     activeUploadPath: null,
     micWriter: null,
     micWhipPathId: null,
+    micWhipRestartTimer: null,
     micLastChunkAt: 0,
     micIdleTimer: null,
     micBackpressured: false,
