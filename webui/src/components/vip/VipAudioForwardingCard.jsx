@@ -49,6 +49,43 @@ function waitForIceGatheringComplete(pc, timeoutMs = 1500) {
   });
 }
 
+function waitForPeerConnected(pc, timeoutMs = 4000) {
+  return new Promise((resolve, reject) => {
+    if (!pc) {
+      reject(new Error('Peer connection missing'));
+      return;
+    }
+    const state = pc.connectionState;
+    if (state === 'connected') {
+      resolve();
+      return;
+    }
+    if (state === 'failed' || state === 'closed') {
+      reject(new Error(`Peer connection ${state}`));
+      return;
+    }
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Peer connection timeout'));
+    }, timeoutMs);
+    const onState = () => {
+      const next = pc.connectionState;
+      if (next === 'connected') {
+        cleanup();
+        resolve();
+      } else if (next === 'failed' || next === 'closed') {
+        cleanup();
+        reject(new Error(`Peer connection ${next}`));
+      }
+    };
+    function cleanup() {
+      clearTimeout(timer);
+      pc.removeEventListener('connectionstatechange', onState);
+    }
+    pc.addEventListener('connectionstatechange', onState);
+  });
+}
+
 function resampleTo16k(input, sampleRate) {
   if (!input || !input.length) return new Float32Array(0);
   if (sampleRate === TARGET_SAMPLE_RATE) return input;
@@ -368,6 +405,7 @@ export default function VipAudioForwardingCard({
         }
         const answerSdp = await response.text();
         await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+        await waitForPeerConnected(pc, 4500);
         await readyMicWhip?.(target);
         setMicState('live');
       } catch (err) {
