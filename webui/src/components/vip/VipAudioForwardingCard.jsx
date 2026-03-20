@@ -49,19 +49,31 @@ function waitForIceGatheringComplete(pc, timeoutMs = 1500) {
   });
 }
 
-function waitForPeerConnected(pc, timeoutMs = 4000) {
+function isPeerTransportReady(pc) {
+  if (!pc) return false;
+  const conn = pc.connectionState;
+  const ice = pc.iceConnectionState;
+  if (conn === 'connected') return true;
+  if (ice === 'connected' || ice === 'completed') return true;
+  return false;
+}
+
+function waitForPeerConnected(pc, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
     if (!pc) {
       reject(new Error('Peer connection missing'));
       return;
     }
-    const state = pc.connectionState;
-    if (state === 'connected') {
+    if (isPeerTransportReady(pc)) {
       resolve();
       return;
     }
-    if (state === 'failed' || state === 'closed') {
-      reject(new Error(`Peer connection ${state}`));
+    if (
+      pc.connectionState === 'failed' ||
+      pc.connectionState === 'closed' ||
+      pc.iceConnectionState === 'failed'
+    ) {
+      reject(new Error(`Peer connection ${pc.connectionState || pc.iceConnectionState}`));
       return;
     }
     const timer = setTimeout(() => {
@@ -69,20 +81,25 @@ function waitForPeerConnected(pc, timeoutMs = 4000) {
       reject(new Error('Peer connection timeout'));
     }, timeoutMs);
     const onState = () => {
-      const next = pc.connectionState;
-      if (next === 'connected') {
+      if (isPeerTransportReady(pc)) {
         cleanup();
         resolve();
-      } else if (next === 'failed' || next === 'closed') {
+      } else if (
+        pc.connectionState === 'failed' ||
+        pc.connectionState === 'closed' ||
+        pc.iceConnectionState === 'failed'
+      ) {
         cleanup();
-        reject(new Error(`Peer connection ${next}`));
+        reject(new Error(`Peer connection ${pc.connectionState || pc.iceConnectionState}`));
       }
     };
     function cleanup() {
       clearTimeout(timer);
       pc.removeEventListener('connectionstatechange', onState);
+      pc.removeEventListener('iceconnectionstatechange', onState);
     }
     pc.addEventListener('connectionstatechange', onState);
+    pc.addEventListener('iceconnectionstatechange', onState);
   });
 }
 
@@ -405,7 +422,7 @@ export default function VipAudioForwardingCard({
         }
         const answerSdp = await response.text();
         await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-        await waitForPeerConnected(pc, 4500);
+        await waitForPeerConnected(pc, 10000);
         await readyMicWhip?.(target);
         setMicState('live');
       } catch (err) {
