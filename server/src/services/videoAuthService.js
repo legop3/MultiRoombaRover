@@ -43,7 +43,7 @@ function extractStreamInfo(path) {
   }
 
   let end = segments.length;
-  if (segments[end - 1] === 'whep') {
+  if (segments[end - 1] === 'whep' || segments[end - 1] === 'whip') {
     end -= 1;
   }
 
