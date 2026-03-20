@@ -845,10 +845,20 @@ io.on('connection', (socket) => {
       videoSessions.revokeWhere(
         (info) => info?.socketId === socket.id && info?.sourceType === 'roverMic' && info?.sourceId === pathId,
       );
-      startMicWhipRelay(normalized, socket.id);
       const token = videoSessions.createSession(socket, { type: 'roverMic', id: pathId });
       const whipUrl = buildWhipUrl(pathId);
       cb({ success: true, roverId: normalized, pathId, token, whipUrl });
+    } catch (err) {
+      cb({ error: err.message });
+    }
+  });
+
+  socket.on('audio:micWhipReady', ({ roverId } = {}, cb = () => {}) => {
+    try {
+      const normalized = String(roverId || '').trim();
+      ensureAudioForwardPermission(socket, normalized);
+      startMicWhipRelay(normalized, socket.id);
+      cb({ success: true, roverId: normalized });
     } catch (err) {
       cb({ error: err.message });
     }

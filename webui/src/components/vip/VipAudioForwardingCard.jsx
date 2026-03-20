@@ -99,6 +99,7 @@ export default function VipAudioForwardingCard({
   stopMicForward,
   sendMicChunk,
   startMicWhip,
+  readyMicWhip,
   stopMicWhip,
 }) {
   const { state: controlState } = useControlSystem();
@@ -367,6 +368,7 @@ export default function VipAudioForwardingCard({
         }
         const answerSdp = await response.text();
         await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+        await readyMicWhip?.(target);
         setMicState('live');
       } catch (err) {
         try {
@@ -381,7 +383,7 @@ export default function VipAudioForwardingCard({
         throw err;
       }
     },
-    [startMicWhip, startSocketBridge, stopMicWhip],
+    [readyMicWhip, startMicWhip, startSocketBridge, stopMicWhip],
   );
 
   const startMicCapture = useCallback(
