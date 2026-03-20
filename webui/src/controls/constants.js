@@ -62,7 +62,7 @@ export const DEFAULT_MACROS = [
   {
     id: 'drive-sequence',
     label: 'Drive',
-    description: 'Start, dock, and full command sequence used by the drive button.',
+    description: 'Start, undock, and full command sequence used by the drive button.',
     steps: [
       { type: 'servo', angle: 0 },
       { type: 'oi', command: 'start' },

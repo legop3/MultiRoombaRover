@@ -25,6 +25,11 @@ audioForward:
   ffmpegBin: "ffmpeg"
   # Optional stream suffix for fallback URL generation
   streamSuffix: "-fwd"
+  # Browser mic ingress path suffix (WHIP publish target)
+  micSuffix: "-mic"
+  # Client should prefer WHIP and fall back to socket chunk streaming
+  micDefaultTransport: "whip"
+  micSocketFallback: true
   # Max upload payload accepted via VIP forward upload
   maxUploadBytes: 8388608
 

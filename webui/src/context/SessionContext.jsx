@@ -31,6 +31,8 @@ const SessionContext = createContext({
   startMicForward: async () => {},
   stopMicForward: async () => {},
   sendMicChunk: async () => {},
+  startMicWhip: async () => {},
+  stopMicWhip: async () => {},
   setAudioLevels: async () => {},
   llmControl: async () => {},
 });
@@ -161,6 +163,8 @@ export function SessionProvider({ children }) {
         socket.emit('audio:micChunk', { roverId, dataBase64, data });
         return true;
       },
+      startMicWhip: (roverId) => emitWithAck('audio:micWhipStart', { roverId }),
+      stopMicWhip: (roverId) => emitWithAck('audio:micWhipStop', { roverId }),
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),

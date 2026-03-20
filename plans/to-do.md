@@ -1,12 +1,12 @@
 1. fix controls remapping [X]
-2. trusted user system
+2. trusted user system [X]
 3. private rovers
 4. home assistant switch that tells the server to force the lights on
 5. color coding with colored names and tape
 6. light force-on switch
 7. audio forwarding
-   - streaming from server to rovers
-   - audio files first
+   - streaming from server to rovers [X]
+   - audio files first [X]
    - then voice chat
 8. mobile controls column swapping (optional joystick on left)
 

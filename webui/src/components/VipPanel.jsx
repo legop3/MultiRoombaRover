@@ -16,6 +16,8 @@ export default function VipPanel() {
     startMicForward,
     stopMicForward,
     sendMicChunk,
+    startMicWhip,
+    stopMicWhip,
   } = useSession();
   const { value: identity, save: saveIdentity } = useSettingsNamespace('identity', { cookieUserId: '' });
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
@@ -57,6 +59,8 @@ export default function VipPanel() {
           startMicForward={startMicForward}
           stopMicForward={stopMicForward}
           sendMicChunk={sendMicChunk}
+          startMicWhip={startMicWhip}
+          stopMicWhip={stopMicWhip}
         />
       ) : (
         <VipVerificationCard

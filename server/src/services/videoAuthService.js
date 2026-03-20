@@ -4,6 +4,8 @@ const logger = require('../globals/logger').child('videoAuth');
 const videoSessions = require('./videoSessions');
 const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
+const { isVerified } = require('./verificationService');
+const turnService = require('./turnService');
 const roverManager = require('./roverManager');
 const { loadConfig } = require('../helpers/configLoader');
 const { getRequestIp, getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
@@ -48,6 +50,9 @@ function extractStreamInfo(path) {
   const remaining = segments.slice(start, end);
   if (remaining.length === 1) {
     const rawId = remaining[0] || '';
+    if (rawId.endsWith('-mic')) {
+      return { type: 'roverMic', id: rawId, baseId: rawId.slice(0, -4) };
+    }
     const baseId = rawId.endsWith('-audio') ? rawId.slice(0, -6) : rawId;
     return { type: 'rover', id: rawId, baseId };
   }
@@ -84,6 +89,9 @@ function extractStreamInfoFromBody(body = {}) {
     extractSrtStreamId(body.query);
   if (!srtId) return null;
 
+  if (srtId.endsWith('-mic')) {
+    return { type: 'roverMic', id: srtId, baseId: srtId.slice(0, -4) };
+  }
   const baseId = srtId.endsWith('-audio') ? srtId.slice(0, -6) : srtId;
   return { type: 'rover', id: srtId, baseId };
 }
@@ -128,6 +136,10 @@ app.post('/mediamtx/auth', (req, res) => {
   if ((action === 'read' && isSrtLikeProtocol) || isForwardAudioRead) {
     return res.status(200).end();
   }
+  // Existing rover/media publishers use SRT without per-session tokens.
+  if (action === 'publish' && isSrtLikeProtocol) {
+    return res.status(200).end();
+  }
 
   if (!sessionId || !streamInfo?.id) {
     logger.warn('auth missing session or stream (session=%s path=%s)', sessionId, path);
@@ -146,6 +158,19 @@ app.post('/mediamtx/auth', (req, res) => {
   }
   if (!canView(socket)) {
     return res.status(401).end();
+  }
+  if (streamInfo.type === 'roverMic' && action === 'publish') {
+    const roverId = streamInfo.baseId || streamInfo.id;
+    if (!isVerified(socket)) {
+      return res.status(401).end();
+    }
+    if (!roverManager.isDriver(roverId, socket)) {
+      return res.status(401).end();
+    }
+    if (!turnService.canDrive(roverId, socket)) {
+      return res.status(401).end();
+    }
+    return res.status(200).end();
   }
   const role = getRole(socket);
   const isAudio = streamInfo.id?.endsWith('-audio');
