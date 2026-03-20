@@ -152,7 +152,7 @@ function resolveMicPathId(roverId) {
 
 function resolveMicReadUrl(roverId) {
   const pathId = resolveMicPathId(roverId);
-  return `srt://127.0.0.1:9000?streamid=#!::r=${encodeURIComponent(pathId)},m=request&latency=10&mode=caller&transtype=live&pkt_size=1316`;
+  return `srt://127.0.0.1:9000?streamid=#!::r=${encodeURIComponent(pathId)},m=read&latency=10&mode=caller&transtype=live&pkt_size=1316`;
 }
 
 function getMediaPrefix() {
