@@ -171,6 +171,7 @@ export default function VipAudioUploadCard({
   const [micState, setMicState] = useState('idle');
   const [message, setMessage] = useState('');
   const streamRef = useRef(null);
+  const audioTrackRef = useRef(null);
   const whipPcRef = useRef(null);
   const micActiveRef = useRef(false);
   const activeRoverRef = useRef('');
@@ -258,6 +259,7 @@ export default function VipAudioUploadCard({
         }
       }
       streamRef.current = null;
+      audioTrackRef.current = null;
       if (target) {
         try {
           await stopMicWhip?.(target);
@@ -291,6 +293,10 @@ export default function VipAudioUploadCard({
       streamRef.current = stream;
 
       const track = stream.getAudioTracks()?.[0];
+      audioTrackRef.current = track || null;
+      if (track) {
+        track.enabled = Boolean(openMicEnabled || pttActive);
+      }
       if (track?.applyConstraints) {
         try {
           await track.applyConstraints({
@@ -307,6 +313,18 @@ export default function VipAudioUploadCard({
 
       const pc = new RTCPeerConnection(RTC_CONFIG);
       whipPcRef.current = pc;
+      pc.onconnectionstatechange = () => {
+        if (!micActiveRef.current) return;
+        const state = pc.connectionState;
+        if (state === 'connected') {
+          setMicState('live');
+          return;
+        }
+        if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+          setMicState('error');
+          setMessage(`WHIP transport ${state}.`);
+        }
+      };
       stream.getAudioTracks().forEach((audioTrack) => {
         const sender = pc.addTrack(audioTrack, stream);
         configureSenderForLowLatency(sender);
@@ -333,19 +351,19 @@ export default function VipAudioUploadCard({
       await waitForOutboundAudioFlow(pc, 6000);
       await readyMicWhip?.(target);
     },
-    [readyMicWhip, startMicWhip],
+    [openMicEnabled, pttActive, readyMicWhip, startMicWhip],
   );
 
   useEffect(() => {
-    const desiredActive = Boolean(openMicEnabled || pttActive);
     let cancelled = false;
 
     async function syncMicState() {
-      if (!roverId || !desiredActive) {
-        await stopMicCapture(roverId);
+      if (!roverId) {
+        await stopMicCapture(activeRoverRef.current);
         return;
       }
       if (micActiveRef.current && activeRoverRef.current === roverId) return;
+      if (!openMicEnabled && !pttActive) return;
 
       try {
         setMicState('starting');
@@ -370,6 +388,12 @@ export default function VipAudioUploadCard({
       cancelled = true;
     };
   }, [openMicEnabled, pttActive, roverId, startWhipMic, stopMicCapture]);
+
+  useEffect(() => {
+    const track = audioTrackRef.current;
+    if (!track) return;
+    track.enabled = Boolean(openMicEnabled || pttActive);
+  }, [openMicEnabled, pttActive]);
 
   useEffect(
     () => () => {
