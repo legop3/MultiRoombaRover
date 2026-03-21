@@ -23,6 +23,7 @@ audioForward:
   enabled: true
   ffmpegBin: "ffmpeg"
   streamSuffix: "-fwd"
+  maxUploadBytes: 8388608
 
 audioLevels:
   # Gains are multipliers (0.0 - 4.0) applied globally to all rovers.
