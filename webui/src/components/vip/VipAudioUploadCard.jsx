@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fieldClass } from './constants.js';
 import { useControlSystem } from '../../controls/index.js';
+import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -168,6 +169,11 @@ function StatusIndicator({ label, active, detail = '' }) {
   );
 }
 
+function KeyPill({ label }) {
+  if (!label) return null;
+  return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
+}
+
 function mergeFloatChunks(chunks) {
   const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const merged = new Float32Array(total);
@@ -284,6 +290,7 @@ export default function VipAudioUploadCard({
   const whipLinkActive = !clipMode && (micState === 'live' || micState === 'starting');
   const clipRecording = clipMode && clipState === 'recording';
   const clipSending = clipMode && clipState === 'sending';
+  const pttKeyLabel = formatKeyLabel(controlState?.keymap?.micPtt?.[0]) || 'M';
 
   const setPttMode = useCallback(
     (nextMode) => {
@@ -733,12 +740,19 @@ export default function VipAudioUploadCard({
 
   return (
     <div className="grid gap-0.5">
+      <section className="surface">
+        <div className="flex items-center justify-center gap-0.5 py-0.25 text-xs text-slate-300">
+          <span>Push-to-Talk Key</span>
+          <KeyPill label={pttKeyLabel} />
+        </div>
+      </section>
+
       <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
         <section className="surface h-full">
           <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr]">
             <p className="text-sm text-slate-200 text-center">PTT Mode</p>
             <p className="text-xs text-slate-400 text-center">
-              Choose how holding your PTT key behaves: live mic stream, or record-and-send clip.
+              Choose how holding your PTT key behaves: live mic stream, or record-and-send clip. If the live stream doesn't work, switch to clip mode.
             </p>
             <div className="grid grid-cols-2 gap-0.5">
               <button
@@ -826,7 +840,7 @@ export default function VipAudioUploadCard({
             <div className="grid gap-0.5 content-start">
               <StatusIndicator label="WHIP link" active={whipLinkActive} detail={micState} />
               <StatusIndicator label="Mic hot" active={micHot} detail={micHot ? 'transmitting' : 'muted'} />
-              <div className="surface-muted text-center text-xs text-slate-400">PTT key: {controlState?.keymap?.micPtt?.[0] || 'm'} (hold)</div>
+              <div className="surface-muted text-center text-xs text-slate-400">Hold <KeyPill label={pttKeyLabel} /> to talk</div>
             </div>
           </div>
         </section>
