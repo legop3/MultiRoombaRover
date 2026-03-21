@@ -3,12 +3,11 @@
 3. private rovers
 4. home assistant switch that tells the server to force the lights on
 5. color coding with colored names and tape
-6. light force-on switch
-7. audio forwarding
-   - streaming from server to rovers [X]
-   - audio files first [X]
+6. audio forwarding
+   - streaming from server to rovers
+   - audio files first
    - then voice chat
-8. mobile controls column swapping (optional joystick on left)
+7. mobile controls column swapping (optional joystick on left)
 
 # relative pipe dreams:
 1. VPS video forwarding
