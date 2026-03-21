@@ -1,13 +1,15 @@
 1. fix controls remapping [X]
 2. trusted user system [X]
 3. private rovers
-4. home assistant switch that tells the server to force the lights on
-5. color coding with colored names and tape
-6. audio forwarding
-   - streaming from server to rovers
-   - audio files first
-   - then voice chat
-7. mobile controls column swapping (optional joystick on left)
+4. custom webhook profile pictures for chat bridge in discord
+5. home assistant switch that tells the server to force the lights on
+6. color coding with colored names and tape
+7. audio forwarding [x]
+   - streaming from server to rovers [x]
+   - audio files first [x]
+   - then voice chat [x]
+8. mobile controls column swapping (optional joystick on left)
+9. home assistant rover mute switch
 
 # relative pipe dreams:
 1. VPS video forwarding
