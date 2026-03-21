@@ -16,6 +16,7 @@ battery:
 maxWheelSpeed: 350
 media:
   publishUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
+  audioForwardUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha-fwd,m=request&latency=10&mode=caller&transtype=live&pkt_size=1316
   publishPort: 9000
   videoBitrate: 2000000
   manage: true

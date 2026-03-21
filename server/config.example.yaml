@@ -19,6 +19,11 @@ media:
   # Example: http://192.168.0.86:8889/video
   whepBaseUrl: "http://192.168.0.86:8889/video"
 
+audioForward:
+  enabled: true
+  ffmpegBin: "ffmpeg"
+  streamSuffix: "-fwd"
+
 audioLevels:
   # Gains are multipliers (0.0 - 4.0) applied globally to all rovers.
   hornGain: 1.0

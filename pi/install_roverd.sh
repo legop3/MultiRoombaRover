@@ -210,11 +210,16 @@ log "Installed video-publisher systemd unit"
 install -D -o root -g root -m 0755 pi/bin/audio-only-publisher.sh /usr/local/bin/audio-only-publisher
 install -m 0644 pi/systemd/audio-only-publisher.service /etc/systemd/system/audio-only-publisher.service
 log "Installed audio-only publisher helper + systemd unit"
+# Install audio-forward listener assets
+install -D -o root -g root -m 0755 pi/bin/audio-forward-listener.sh /usr/local/bin/audio-forward-listener
+install -m 0644 pi/systemd/audio-forward-listener.service /etc/systemd/system/audio-forward-listener.service
+log "Installed audio-forward listener helper + systemd unit"
 install -d -o roverd -g roverd /var/lib/roverd
 cat > /var/lib/roverd/video.env <<'ENV'
 # Managed by roverd; placeholder values will be overwritten at runtime.
 PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
 AUDIO_PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-audio,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
+AUDIO_FORWARD_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-fwd,m=request&latency=10&mode=caller&transtype=live&pkt_size=1316
 VIDEO_BITRATE=2000000
 AUDIO_ENABLE=0
 AUDIO_DEVICE=hw:0,0
@@ -245,13 +250,15 @@ systemctl daemon-reload
 systemctl enable roverd.service
 systemctl enable video-publisher.service
 systemctl enable audio-only-publisher.service
+systemctl enable audio-forward-listener.service
 if [[ $CONFIG_EXISTS -eq 1 ]]; then
 	systemctl restart roverd.service
 	systemctl restart video-publisher.service
 	systemctl restart audio-only-publisher.service
-	log "Restarted roverd + media publishers"
+	systemctl restart audio-forward-listener.service
+	log "Restarted roverd + media publishers/listener"
 else
-	log "Skipped auto-start because config is the sample; edit $CONFIG_DEST then run: sudo systemctl restart roverd video-publisher audio-only-publisher"
+	log "Skipped auto-start because config is the sample; edit $CONFIG_DEST then run: sudo systemctl restart roverd video-publisher audio-only-publisher audio-forward-listener"
 fi
 
 log "Install complete"
