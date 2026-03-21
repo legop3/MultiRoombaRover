@@ -530,7 +530,7 @@ export default function VipAudioUploadCard({
       },
     });
 
-    const context = new AudioContext({ latencyHint: 'interactive', sampleRate: TARGET_SAMPLE_RATE });
+    const context = new AudioContext({ latencyHint: 'interactive' });
     const source = context.createMediaStreamSource(stream);
     const processor = context.createScriptProcessor(1024, 1, 1);
     const muteGain = context.createGain();
