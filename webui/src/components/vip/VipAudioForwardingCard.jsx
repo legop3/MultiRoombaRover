@@ -103,6 +103,62 @@ function waitForPeerConnected(pc, timeoutMs = 10000) {
   });
 }
 
+async function configureSenderForLowLatency(sender) {
+  if (!sender?.getParameters || !sender?.setParameters) return;
+  const params = sender.getParameters() || {};
+  const first = (params.encodings && params.encodings[0]) || {};
+  params.encodings = [
+    {
+      ...first,
+      maxBitrate: 64000,
+      dtx: 'disabled',
+    },
+  ];
+  try {
+    await sender.setParameters(params);
+  } catch {
+    // Some browsers reject unsupported combinations; keep defaults.
+  }
+}
+
+function waitForOutboundAudioFlow(pc, timeoutMs = 6000) {
+  return new Promise((resolve, reject) => {
+    if (!pc) {
+      reject(new Error('Peer connection missing'));
+      return;
+    }
+    const start = Date.now();
+    let baseline = -1;
+    const timer = setInterval(async () => {
+      if (Date.now() - start > timeoutMs) {
+        clearInterval(timer);
+        reject(new Error('WHIP connected but no outbound audio flow'));
+        return;
+      }
+      try {
+        const senders = pc.getSenders().filter((s) => s.track?.kind === 'audio');
+        for (const sender of senders) {
+          const stats = await sender.getStats();
+          for (const report of stats.values()) {
+            if (report.type !== 'outbound-rtp' || report.kind !== 'audio') continue;
+            const sent = Number(report.bytesSent || 0);
+            const packets = Number(report.packetsSent || 0);
+            if (baseline < 0) {
+              baseline = sent;
+            } else if (sent > baseline + 200 || packets > 5) {
+              clearInterval(timer);
+              resolve();
+              return;
+            }
+          }
+        }
+      } catch {
+        // Keep polling until timeout.
+      }
+    }, 250);
+  });
+}
+
 function resampleTo16k(input, sampleRate) {
   if (!input || !input.length) return new Float32Array(0);
   if (sampleRate === TARGET_SAMPLE_RATE) return input;
@@ -374,9 +430,9 @@ export default function VipAudioForwardingCard({
       const pc = new RTCPeerConnection(RTC_CONFIG);
       whipPcRef.current = pc;
       micTransportRef.current = 'whip';
-      whipFailoverRef.current = false;
       try {
-        stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream));
+        const senders = stream.getAudioTracks().map((track) => pc.addTrack(track, stream));
+        await Promise.all(senders.map((sender) => configureSenderForLowLatency(sender)));
         pc.onconnectionstatechange = () => {
           const state = pc.connectionState;
           if (!micActiveRef.current) return;
@@ -384,24 +440,9 @@ export default function VipAudioForwardingCard({
             setMicState('live');
             return;
           }
-          if ((state === 'failed' || state === 'disconnected') && !whipFailoverRef.current) {
-            whipFailoverRef.current = true;
-            const roverId = activeRoverRef.current;
-            if (!roverId || !streamRef.current) return;
-            (async () => {
-              try {
-                await stopMicWhip?.(roverId);
-              } catch {
-                // noop
-              }
-              if (!micActiveRef.current || micTransportRef.current !== 'whip') return;
-              try {
-                await startSocketBridge(roverId, streamRef.current);
-              } catch (err) {
-                setMicState('error');
-                setMessage(err?.message || 'Mic fallback failed.');
-              }
-            })();
+          if (state === 'failed' || state === 'disconnected') {
+            setMicState('error');
+            setMessage(`WHIP transport ${state}.`);
           }
         };
 
@@ -423,6 +464,7 @@ export default function VipAudioForwardingCard({
         const answerSdp = await response.text();
         await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
         await waitForPeerConnected(pc, 10000);
+        await waitForOutboundAudioFlow(pc, 6000);
         await readyMicWhip?.(target);
         setMicState('live');
       } catch (err) {
@@ -438,7 +480,7 @@ export default function VipAudioForwardingCard({
         throw err;
       }
     },
-    [readyMicWhip, startMicWhip, startSocketBridge, stopMicWhip],
+    [readyMicWhip, startMicWhip],
   );
 
   const startMicCapture = useCallback(
@@ -458,30 +500,29 @@ export default function VipAudioForwardingCard({
           audio: {
             channelCount: 1,
             sampleRate: TARGET_SAMPLE_RATE,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
           },
         });
+        const [track] = stream.getAudioTracks();
+        if (track?.applyConstraints) {
+          try {
+            await track.applyConstraints({
+              channelCount: 1,
+              sampleRate: TARGET_SAMPLE_RATE,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            });
+          } catch {
+            // Constraint support varies by browser; use acquired track as-is.
+          }
+        }
         streamRef.current = stream;
         micActiveRef.current = true;
         activeRoverRef.current = target;
-        let whipErr = null;
-        try {
-          await startWhipBridge(target, stream);
-          return;
-        } catch (err) {
-          whipErr = err;
-          try {
-            await stopMicWhip?.(target);
-          } catch {
-            // noop
-          }
-        }
-        await startSocketBridge(target, stream);
-        if (whipErr) {
-          setMessage(`WHIP unavailable, using socket fallback: ${whipErr.message || 'unknown error'}`);
-        }
+        await startWhipBridge(target, stream);
       } catch (err) {
         if (stream) {
           try {
@@ -500,7 +541,7 @@ export default function VipAudioForwardingCard({
         throw err;
       }
     },
-    [startSocketBridge, startWhipBridge, stopMicCapture, stopMicWhip],
+    [startWhipBridge, stopMicCapture],
   );
 
   useEffect(() => {

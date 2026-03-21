@@ -679,6 +679,10 @@ roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
     return;
   }
   if (action === 'upsert' && serviceEnabled) {
+    if (whipOwners.has(roverId)) {
+      // WHIP publishes directly to the forward path; avoid recreating local publisher mid-session.
+      return;
+    }
     try {
       ensureWorker(roverId);
     } catch (err) {

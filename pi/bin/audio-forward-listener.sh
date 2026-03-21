@@ -41,8 +41,8 @@ run_pipeline() {
     -loglevel warning \
     -fflags nobuffer \
     -flags low_delay \
-    -analyzeduration 0 \
-    -probesize 32 \
+    -analyzeduration 200k \
+    -probesize 32k \
     -i "${AUDIO_FORWARD_URL}" \
     -vn \
     -ac 1 \
