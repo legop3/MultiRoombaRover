@@ -337,14 +337,6 @@ export default function AdminPanel() {
             >
               {rebootStates[rover.id] ? 'Rebooting...' : 'Reboot'}
             </button>
-            <span className="surface-muted">
-              audio: {session?.audioForward?.[rover.id]?.state || 'idle'}
-            </span>
-            {session?.audioForward?.[rover.id]?.error ? (
-              <span className="surface-muted text-rose-300">
-                {String(session.audioForward[rover.id].error)}
-              </span>
-            ) : null}
           </div>
         )}
       />

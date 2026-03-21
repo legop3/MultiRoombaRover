@@ -27,9 +27,6 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	if audio.CaptureEnabled && media.AudioPublishURL != "" {
 		fmt.Fprintf(&buf, "AUDIO_PUBLISH_URL=%s\n", media.AudioPublishURL)
 	}
-	if media.AudioForwardURL != "" {
-		fmt.Fprintf(&buf, "AUDIO_FORWARD_URL=%s\n", media.AudioForwardURL)
-	}
 	if media.VideoWidth > 0 {
 		fmt.Fprintf(&buf, "VIDEO_WIDTH=%d\n", media.VideoWidth)
 	}

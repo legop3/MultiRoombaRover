@@ -2,24 +2,11 @@ import { useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import { COOKIE_KEY_REGEX, flowWrapClass } from './vip/constants.js';
-import VipAudioForwardingCard from './vip/VipAudioForwardingCard.jsx';
 import VipVerificationCard from './vip/VipVerificationCard.jsx';
 import VipIdentityCard from './vip/VipIdentityCard.jsx';
 
 export default function VipPanel() {
-  const {
-    session,
-    identifySession,
-    requestVerification,
-    playUploadedAudio,
-    stopUploadedAudio,
-    startMicForward,
-    stopMicForward,
-    sendMicChunk,
-    startMicWhip,
-    readyMicWhip,
-    stopMicWhip,
-  } = useSession();
+  const { session, identifySession, requestVerification } = useSession();
   const { value: identity, save: saveIdentity } = useSettingsNamespace('identity', { cookieUserId: '' });
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
 
@@ -27,12 +14,6 @@ export default function VipPanel() {
   const nickname = (profile?.nickname || '').trim();
   const isVerified = Boolean(session?.isVerified);
   const pendingRequestId = session?.verification?.pendingRequestId || null;
-  const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
-  const ownRoverId = String(session?.assignment?.roverId || '').trim();
-  const ownRoverRoster = useMemo(
-    () => (ownRoverId ? roster.filter((rover) => rover.id === ownRoverId) : []),
-    [ownRoverId, roster],
-  );
   const [message, setMessage] = useState('');
 
   const applyIdentityKey = async (nextRaw) => {
@@ -51,19 +32,12 @@ export default function VipPanel() {
   return (
     <section className="panel-section space-y-0.5 text-base">
       {isVerified ? (
-        <VipAudioForwardingCard
-          roster={ownRoverRoster}
-          ownRoverId={ownRoverId}
-          audioForwardByRover={session?.audioForward || {}}
-          playUploadedAudio={playUploadedAudio}
-          stopUploadedAudio={stopUploadedAudio}
-          startMicForward={startMicForward}
-          stopMicForward={stopMicForward}
-          sendMicChunk={sendMicChunk}
-          startMicWhip={startMicWhip}
-          readyMicWhip={readyMicWhip}
-          stopMicWhip={stopMicWhip}
-        />
+        <div className={`surface ${flowWrapClass}`}>
+          <div className="mx-auto flex w-full max-w-md flex-col items-center space-y-0.5 text-center">
+            <p className="text-sm text-slate-300">VIP verified.</p>
+            <p className="text-xs text-slate-500">Audio forwarding is disabled while this stack is being rebuilt.</p>
+          </div>
+        </div>
       ) : (
         <VipVerificationCard
           pendingRequestId={pendingRequestId}

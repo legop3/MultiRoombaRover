@@ -80,7 +80,6 @@ type HornConfig struct {
 type MediaConfig struct {
 	PublishURL      string   `yaml:"publishUrl" json:"publishUrl,omitempty"`
 	AudioPublishURL string   `yaml:"audioPublishUrl" json:"audioPublishUrl,omitempty"`
-	AudioForwardURL string   `yaml:"audioForwardUrl" json:"audioForwardUrl,omitempty"`
 	PublishPort     int      `yaml:"publishPort" json:"-"`
 	Manage          bool     `yaml:"manage"`
 	ManageAudio     bool     `yaml:"manageAudio"`
@@ -248,13 +247,6 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		cfg.Media.AudioPublishURL = derived
 	}
-	if cfg.Media.AudioForwardURL == "" {
-		derived, err := deriveReadURL(cfg.ServerURL, cfg.Name+"-fwd", cfg.Media.PublishPort)
-		if err != nil {
-			return nil, fmt.Errorf("derive audioForwardUrl: %w", err)
-		}
-		cfg.Media.AudioForwardURL = derived
-	}
 	if err := validateServoConfig(&cfg.CameraServo); err != nil {
 		return nil, fmt.Errorf("cameraServo: %w", err)
 	}
@@ -383,10 +375,6 @@ func validateAutoSideBrushConfig(cfg *AutoSideBrushConfig) {
 
 func derivePublishURL(serverURL, streamName string, port int) (string, error) {
 	return deriveSRTURL(serverURL, streamName, port, "publish")
-}
-
-func deriveReadURL(serverURL, streamName string, port int) (string, error) {
-	return deriveSRTURL(serverURL, streamName, port, "request")
 }
 
 func deriveSRTURL(serverURL, streamName string, port int, mode string) (string, error) {

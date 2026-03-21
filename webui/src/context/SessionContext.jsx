@@ -26,14 +26,6 @@ const SessionContext = createContext({
   setAdminReason: async () => {},
   rebootRover: async () => {},
   rebootServer: async () => {},
-  playUploadedAudio: async () => {},
-  stopUploadedAudio: async () => {},
-  startMicForward: async () => {},
-  stopMicForward: async () => {},
-  sendMicChunk: async () => {},
-  startMicWhip: async () => {},
-  readyMicWhip: async () => {},
-  stopMicWhip: async () => {},
   setAudioLevels: async () => {},
   llmControl: async () => {},
 });
@@ -150,23 +142,6 @@ export function SessionProvider({ children }) {
       rebootRover: (roverId) =>
         emitWithAck('command', { roverId, type: 'reboot', data: { reboot: {} } }),
       rebootServer: () => emitWithAck('server:reboot'),
-      playUploadedAudio: ({ roverId, name, mime, dataBase64 }) =>
-        emitWithAck('audio:uploadPlay', { roverId, name, mime, dataBase64 }),
-      stopUploadedAudio: (roverId) => emitWithAck('audio:uploadStop', { roverId }),
-      startMicForward: (roverId) => emitWithAck('audio:micStart', { roverId }),
-      stopMicForward: (roverId) => emitWithAck('audio:micStop', { roverId }),
-      sendMicChunk: ({ roverId, dataBase64, data }) => {
-        if (!socket.connected) return false;
-        const ws = socket.io?.engine?.transport?.ws;
-        if (ws && typeof ws.bufferedAmount === 'number' && ws.bufferedAmount > 256 * 1024) {
-          return false;
-        }
-        socket.emit('audio:micChunk', { roverId, dataBase64, data });
-        return true;
-      },
-      startMicWhip: (roverId) => emitWithAck('audio:micWhipStart', { roverId }),
-      readyMicWhip: (roverId) => emitWithAck('audio:micWhipReady', { roverId }),
-      stopMicWhip: (roverId) => emitWithAck('audio:micWhipStop', { roverId }),
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),
@@ -176,7 +151,7 @@ export function SessionProvider({ children }) {
           { ...alert, receivedAt: Date.now(), id: alert.id || Math.random().toString(36).slice(2) },
         ]),
     }),
-    [emitWithAck, socket],
+    [emitWithAck],
   );
 
   const value = useMemo(

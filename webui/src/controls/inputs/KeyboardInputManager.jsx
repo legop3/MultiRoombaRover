@@ -129,7 +129,6 @@ export default function KeyboardInputManager() {
       toggleNightVision,
       startHorn,
       stopHorn,
-      setMicPttActive,
       setSongNote,
       sendSong,
     },
@@ -308,10 +307,9 @@ export default function KeyboardInputManager() {
       hornActiveRef.current = false;
       stopHorn();
     }
-    setMicPttActive(false);
     stopAllMotion();
     registerInputState(SOURCE, { keys: [], vector: ZERO_VECTOR, aux: ZERO_AUX });
-  }, [registerInputState, setMicPttActive, stopAllMotion, stopHorn, stopServoLoop, stopSongLoop]);
+  }, [registerInputState, stopAllMotion, stopHorn, stopServoLoop, stopSongLoop]);
 
   const triggerHomeAssistantCycle = useCallback(
     (targetState) => {
@@ -380,8 +378,6 @@ export default function KeyboardInputManager() {
             const started = startHorn();
             hornActiveRef.current = Boolean(started);
           }
-        } else if (newlyPressed.some((token) => keymap.micPtt?.has(token))) {
-          setMicPttActive(true);
         } else if (newlyPressed.some((token) => keymap.homeAssistantOn?.has(token))) {
           triggerHomeAssistantCycle('on');
         } else if (newlyPressed.some((token) => keymap.homeAssistantOff?.has(token))) {
@@ -401,9 +397,6 @@ export default function KeyboardInputManager() {
       if (hornActiveRef.current && !bindingActive(keymap.hornHonk, activeTokensRef.current)) {
         hornActiveRef.current = false;
         stopHorn();
-      }
-      if (!bindingActive(keymap.micPtt, activeTokensRef.current)) {
-        setMicPttActive(false);
       }
       ensureServoLoop();
       ensureSongLoop();
@@ -434,10 +427,8 @@ export default function KeyboardInputManager() {
     keymap.dockMacro,
     keymap.driveMacro,
     keymap.hornHonk,
-    keymap.micPtt,
     resetAll,
     runMacro,
-    setMicPttActive,
     setMode,
     stopAllMotion,
     stopSongLoop,

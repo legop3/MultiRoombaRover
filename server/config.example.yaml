@@ -19,20 +19,6 @@ media:
   # Example: http://192.168.0.86:8889/video
   whepBaseUrl: "http://192.168.0.86:8889/video"
 
-audioForward:
-  enabled: true
-  # Optional override; defaults to "ffmpeg"
-  ffmpegBin: "ffmpeg"
-  # Optional stream suffix for fallback URL generation
-  streamSuffix: "-fwd"
-  # Browser mic ingress path suffix (WHIP publish target)
-  micSuffix: "-mic"
-  # Client should prefer WHIP and fall back to socket chunk streaming
-  micDefaultTransport: "whip"
-  micSocketFallback: true
-  # Max upload payload accepted via VIP forward upload
-  maxUploadBytes: 8388608
-
 audioLevels:
   # Gains are multipliers (0.0 - 4.0) applied globally to all rovers.
   hornGain: 1.0

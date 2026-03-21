@@ -22,7 +22,6 @@ const { getCommunityGoal } = require('./communityGoalService');
 const { getAdminReason } = require('./adminReasonService');
 const { subscribe } = require('./eventBus');
 const { getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
-const { getAudioForwardState, audioForwardEvents } = require('./audioForwardService');
 const { getAudioLevels, audioLevelsEvents } = require('./audioLevelsService');
 
 const config = loadConfig();
@@ -93,7 +92,6 @@ function buildSession(socket) {
     identity: getIdentitySummary(socket),
     verification: getVerificationStateForSocket(socket),
     isVerified: Boolean(socket?.data?.isVerified),
-    audioForward: getAudioForwardState(),
     audioLevels: getAudioLevels(),
   };
 }
@@ -259,10 +257,6 @@ subscribe('communityGoal.updated', () => {
 
 subscribe('adminReason.updated', () => {
   logger.info('Admin reason updated; syncing all clients');
-  syncAll();
-});
-
-audioForwardEvents.on('change', () => {
   syncAll();
 });
 

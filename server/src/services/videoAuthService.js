@@ -4,8 +4,6 @@ const logger = require('../globals/logger').child('videoAuth');
 const videoSessions = require('./videoSessions');
 const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
-const { isVerified } = require('./verificationService');
-const turnService = require('./turnService');
 const roverManager = require('./roverManager');
 const { loadConfig } = require('../helpers/configLoader');
 const { getRequestIp, getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
@@ -53,9 +51,6 @@ function extractStreamInfo(path) {
     if (rawId.endsWith('-fwd')) {
       return { type: 'rover', id: rawId, baseId: rawId.slice(0, -4) };
     }
-    if (rawId.endsWith('-mic')) {
-      return { type: 'roverMic', id: rawId, baseId: rawId.slice(0, -4) };
-    }
     const baseId = rawId.endsWith('-audio') ? rawId.slice(0, -6) : rawId;
     return { type: 'rover', id: rawId, baseId };
   }
@@ -92,9 +87,6 @@ function extractStreamInfoFromBody(body = {}) {
     extractSrtStreamId(body.query);
   if (!srtId) return null;
 
-  if (srtId.endsWith('-mic')) {
-    return { type: 'roverMic', id: srtId, baseId: srtId.slice(0, -4) };
-  }
   if (srtId.endsWith('-fwd')) {
     return { type: 'rover', id: srtId, baseId: srtId.slice(0, -4) };
   }
@@ -153,9 +145,7 @@ app.post('/mediamtx/auth', (req, res) => {
   }
 
   const info = videoSessions.getSession(sessionId);
-  const streamTypeMatches =
-    info &&
-    (info.sourceType === streamInfo.type || (info.sourceType === 'roverMic' && streamInfo.type === 'rover'));
+  const streamTypeMatches = info && info.sourceType === streamInfo.type;
   if (!info || !streamTypeMatches || info.sourceId !== streamInfo.id) {
     logger.warn('invalid session %s for stream %s:%s', sessionId, streamInfo.type, streamInfo.id);
     return res.status(401).end();
@@ -167,19 +157,6 @@ app.post('/mediamtx/auth', (req, res) => {
   }
   if (!canView(socket)) {
     return res.status(401).end();
-  }
-  if (info.sourceType === 'roverMic' && action === 'publish') {
-    const roverId = streamInfo.baseId || streamInfo.id;
-    if (!isVerified(socket)) {
-      return res.status(401).end();
-    }
-    if (!roverManager.isDriver(roverId, socket)) {
-      return res.status(401).end();
-    }
-    if (!turnService.canDrive(roverId, socket)) {
-      return res.status(401).end();
-    }
-    return res.status(200).end();
   }
   const role = getRole(socket);
   const isAudio = streamInfo.id?.endsWith('-audio');
