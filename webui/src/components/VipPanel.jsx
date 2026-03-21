@@ -48,7 +48,7 @@ export default function VipPanel() {
             <section className="surface w-full">
               <div className="mx-auto flex w-full max-w-md flex-col items-center space-y-0.5 text-center">
                 <p className="text-sm text-emerald-300">Verification complete</p>
-                <p className="text-xs text-slate-400">VIP audio controls are unlocked for your assigned rover.</p>
+                <p className="text-xs text-slate-400">VIP controls are unlocked for your assigned rover.</p>
               </div>
             </section>
           ) : (
@@ -64,34 +64,25 @@ export default function VipPanel() {
           )}
         </div>
 
-        {isVerified ? (
-          <VipAudioUploadCard
-            ownRoverId={ownRoverId}
-            audioForwardByRover={session?.audioForward || {}}
-            playUploadedAudio={playUploadedAudio}
-            stopUploadedAudio={stopUploadedAudio}
-            startMicWhip={startMicWhip}
-            readyMicWhip={readyMicWhip}
-            stopMicWhip={stopMicWhip}
-          />
-        ) : (
-          <section className="surface h-full">
-            <div className="flex h-full flex-col items-center justify-center text-center text-xs text-slate-400">
-              Verify your account to unlock audio upload and microphone forwarding.
-            </div>
-          </section>
-        )}
-
-        <section className="surface h-full">
-          <div className="space-y-0.5">
-            <p className="text-sm text-slate-200">VIP Notes</p>
-            <ul className="space-y-0.25 text-xs text-slate-400">
-              <li>Audio forwarding is locked to your currently assigned rover.</li>
-              <li>Losing control or turn ownership stops active forwarding.</li>
-              <li>PTT works page-wide using your keybind (default: m).</li>
-            </ul>
-          </div>
-        </section>
+        <div className="lg:col-span-2">
+          {isVerified ? (
+            <VipAudioUploadCard
+              ownRoverId={ownRoverId}
+              audioForwardByRover={session?.audioForward || {}}
+              playUploadedAudio={playUploadedAudio}
+              stopUploadedAudio={stopUploadedAudio}
+              startMicWhip={startMicWhip}
+              readyMicWhip={readyMicWhip}
+              stopMicWhip={stopMicWhip}
+            />
+          ) : (
+            <section className="surface h-full">
+              <div className="flex h-full flex-col items-center justify-center text-center text-xs text-slate-400">
+                Verify your account to unlock VIP controls.
+              </div>
+            </section>
+          )}
+        </div>
 
         <div className="lg:col-span-2">
           <VipIdentityCard

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fieldClass } from './constants.js';
 import { useControlSystem } from '../../controls/index.js';
+import { useSettingsNamespace } from '../../settings/index.js';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const TARGET_SAMPLE_RATE = 16000;
@@ -154,14 +155,17 @@ function waitForOutboundAudioFlow(pc, timeoutMs = 6000) {
   });
 }
 
-function StatusLight({ label, active, detail = '' }) {
+function StatusIndicator({ label, active, detail = '' }) {
   return (
-    <div className="surface-muted flex items-center justify-between px-0.5 py-0.25 text-xs">
-      <span className="text-slate-300">{label}</span>
-      <span className="inline-flex items-center gap-0.5">
-        <span className={`h-2 w-2 rounded-full ${active ? 'bg-emerald-400' : 'bg-slate-600'}`} aria-hidden="true" />
-        <span className={active ? 'text-emerald-300' : 'text-slate-500'}>{detail || (active ? 'on' : 'off')}</span>
-      </span>
+    <div
+      className={`rounded-md border px-0.5 py-0.5 text-xs transition-colors ${
+        active
+          ? 'border-emerald-300/80 bg-emerald-500/20 text-emerald-200'
+          : 'border-slate-700 bg-slate-900/50 text-slate-400'
+      }`}
+    >
+      <div className="font-medium">{label}</div>
+      <div className="text-[0.72rem] opacity-90">{detail || (active ? 'active' : 'idle')}</div>
     </div>
   );
 }
@@ -176,10 +180,12 @@ export default function VipAudioUploadCard({
   stopMicWhip,
 }) {
   const { state: controlState } = useControlSystem();
+  const { value: vipAudio, save: saveVipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false });
+
   const roverId = String(ownRoverId || '').trim();
   const [selectedUpload, setSelectedUpload] = useState(null);
   const [working, setWorking] = useState(false);
-  const [openMicEnabled, setOpenMicEnabled] = useState(false);
+  const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
   const [micState, setMicState] = useState('idle');
   const [message, setMessage] = useState('');
   const streamRef = useRef(null);
@@ -204,7 +210,8 @@ export default function VipAudioUploadCard({
     selectedForwardState?.source === 'mic-whip' &&
       (selectedForwardState?.state === 'starting' || selectedForwardState?.state === 'playing'),
   );
-  const micTalking = Boolean(audioTrackRef.current && (openMicEnabled || pttActive));
+  const micHot = Boolean(audioTrackRef.current && (openMicEnabled || pttActive));
+  const whipLinkActive = micState === 'live' || micState === 'starting';
 
   const handleUploadPlay = async () => {
     if (!roverId) {
@@ -427,63 +434,76 @@ export default function VipAudioUploadCard({
   );
 
   return (
-    <section className="surface h-full">
-      <div className="grid h-full gap-0.5 grid-rows-[auto_auto_auto_1fr_auto]">
-        <p className="text-sm text-slate-200 text-center">VIP Audio Forwarding</p>
+    <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
+      <section className="surface h-full">
+        <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr_auto]">
+          <p className="text-sm text-slate-200 text-center">Audio Upload</p>
 
-        <label className="mx-auto grid w-full max-w-sm gap-0.5 text-xs text-slate-300 text-center">
-          <span>Audio file (mp3 / wav / ogg)</span>
-          <input
-            className={`${fieldClass} text-center`}
-            type="file"
-            accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg"
-            disabled={working || !roverId}
-            onChange={(event) => setSelectedUpload(event.target.files?.[0] || null)}
-          />
-        </label>
+          <label className="mx-auto grid w-full max-w-sm gap-0.5 text-xs text-slate-300 text-center">
+            <span>Audio file (mp3 / wav / ogg)</span>
+            <input
+              className={`${fieldClass} text-center`}
+              type="file"
+              accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg"
+              disabled={working || !roverId}
+              onChange={(event) => setSelectedUpload(event.target.files?.[0] || null)}
+            />
+          </label>
 
-        {selectedUpload ? (
-          <div className="surface-muted mx-auto w-full max-w-sm text-xs text-slate-300 text-center">
-            {selectedUpload.name} ({selectedUpload.size} bytes)
+          <div className="mx-auto w-full max-w-sm text-center">
+            {selectedUpload ? (
+              <div className="surface-muted text-xs text-slate-300">
+                {selectedUpload.name} ({selectedUpload.size} bytes)
+              </div>
+            ) : (
+              <div className="surface-muted text-xs text-slate-500">No file selected</div>
+            )}
           </div>
-        ) : null}
 
-        <div className="flex justify-center gap-0.5">
-          <button type="button" className="button-dark text-sm" disabled={working || !roverId} onClick={handleUploadPlay}>
-            {working ? 'Working...' : 'Play Upload'}
-          </button>
-          <button type="button" className="button-dark text-sm" disabled={working || !roverId} onClick={handleUploadStop}>
-            Stop
-          </button>
+          <div className="flex justify-center gap-0.5">
+            <button type="button" className="button-dark text-sm" disabled={working || !roverId} onClick={handleUploadPlay}>
+              {working ? 'Working...' : 'Play Upload'}
+            </button>
+            <button type="button" className="button-dark text-sm" disabled={working || !roverId} onClick={handleUploadStop}>
+              Stop
+            </button>
+          </div>
         </div>
+      </section>
 
-        <div className="grid gap-0.5 lg:grid-cols-2">
-          <div className="space-y-0.5">
-            <p className="text-xs text-slate-300 text-center">Audio Path Status</p>
-            <StatusLight label="Forward pipe" active={pipelineConnected} detail={pipelineConnected ? 'connected' : 'offline'} />
-            <StatusLight label="Upload playing" active={uploadPlaying} detail={uploadPlaying ? 'active' : 'idle'} />
-            <StatusLight label="Mic relay" active={micRelayActive} detail={micRelayActive ? 'active' : 'idle'} />
-          </div>
-
-          <div className="space-y-0.5">
-            <p className="text-xs text-slate-300 text-center">Microphone</p>
-            <label className="surface-muted flex items-center justify-center gap-0.5 px-0.5 py-0.25 text-xs text-slate-300">
-              <input
-                type="checkbox"
-                checked={openMicEnabled}
-                disabled={!roverId}
-                onChange={(event) => setOpenMicEnabled(Boolean(event.target.checked))}
-              />
-              <span>Open mic</span>
-            </label>
-            <StatusLight label="WHIP link" active={micState === 'live' || micState === 'starting'} detail={micState} />
-            <StatusLight label="PTT transmit" active={micTalking} detail={micTalking ? 'talking' : 'muted'} />
+      <section className="surface h-full">
+        <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr]">
+          <p className="text-sm text-slate-200 text-center">Live Microphone</p>
+          <label className="surface-muted mx-auto flex w-full max-w-sm items-center justify-center gap-0.5 px-0.5 py-0.5 text-xs text-slate-300">
+            <input
+              type="checkbox"
+              checked={openMicEnabled}
+              disabled={!roverId}
+              onChange={(event) => saveVipAudio((current) => ({ ...(current || {}), openMicEnabled: Boolean(event.target.checked) }))}
+            />
+            <span>Open mic</span>
+          </label>
+          <div className="grid gap-0.5 content-start">
+            <StatusIndicator label="WHIP link" active={whipLinkActive} detail={micState} />
+            <StatusIndicator label="Mic hot" active={micHot} detail={micHot ? 'transmitting' : 'muted'} />
             <div className="surface-muted text-center text-xs text-slate-400">PTT key: {controlState?.keymap?.micPtt?.[0] || 'm'} (hold)</div>
           </div>
         </div>
+      </section>
 
-        {message ? <div className="text-xs text-slate-400 text-center">{message}</div> : null}
-      </div>
-    </section>
+      <section className="surface lg:col-span-2">
+        <div className="space-y-0.5">
+          <p className="text-sm text-slate-200 text-center">Audio Status</p>
+          <div className="grid gap-0.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+            <StatusIndicator label="Forward pipe" active={pipelineConnected} detail={pipelineConnected ? 'connected' : 'offline'} />
+            <StatusIndicator label="Upload playback" active={uploadPlaying} detail={uploadPlaying ? 'playing' : 'idle'} />
+            <StatusIndicator label="Mic relay" active={micRelayActive} detail={micRelayActive ? 'active' : 'idle'} />
+            <StatusIndicator label="WHIP transport" active={whipLinkActive} detail={micState} />
+            <StatusIndicator label="Mic transmit" active={micHot} detail={micHot ? 'hot' : 'muted'} />
+          </div>
+          {message ? <div className="text-xs text-slate-400 text-center">{message}</div> : null}
+        </div>
+      </section>
+    </div>
   );
 }

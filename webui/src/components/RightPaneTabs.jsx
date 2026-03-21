@@ -18,6 +18,7 @@ import HornControl from './HornControl.jsx';
 import CameraTiltControl from './CameraTiltControl.jsx';
 import VipPanel from './VipPanel.jsx';
 import { useSession } from '../context/SessionContext.jsx';
+import { useSettingsNamespace } from '../settings/index.js';
 
 function TopDownMapPanel() {
   const {
@@ -111,12 +112,14 @@ function DriveDockPanel() {
 
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   const { session } = useSession();
+  const { state: controlState } = useControlSystem();
+  const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false });
   const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-red-600';
   const ownRoverId = String(session?.assignment?.roverId || '').trim();
-  const ownAudioForward = ownRoverId ? session?.audioForward?.[ownRoverId] : null;
+  const pttActive = Boolean(controlState?.mic?.pttActive);
+  const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
   const vipMicActive = Boolean(
-    ownAudioForward?.source === 'mic-whip' &&
-      (ownAudioForward?.state === 'starting' || ownAudioForward?.state === 'playing'),
+    ownRoverId && session?.isVerified && (openMicEnabled || pttActive),
   );
   return (
     <section className="panel text-base">

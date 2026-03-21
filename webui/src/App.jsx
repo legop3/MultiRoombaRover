@@ -6,7 +6,12 @@ import MobileControls, {
   MobileLeftColumn,
   MobileRightColumn,
 } from './components/MobileControls.jsx';
-import { ControlSystemProvider, KeyboardInputManager, GamepadInputManager } from './controls/index.js';
+import {
+  ControlSystemProvider,
+  KeyboardInputManager,
+  GamepadInputManager,
+  useControlSystem,
+} from './controls/index.js';
 import RoomCameraPanel from './components/RoomCameraPanel.jsx';
 import LogPanel from './components/LogPanel.jsx';
 import DriverVideoPanel from './components/DriverVideoPanel.jsx';
@@ -84,12 +89,14 @@ function MobileFeatureTabs({
   showTelemetry = true,
 }) {
   const { session } = useSession();
+  const { state: controlState } = useControlSystem();
+  const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false });
   const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-amber-400';
   const ownRoverId = String(session?.assignment?.roverId || '').trim();
-  const ownAudioForward = ownRoverId ? session?.audioForward?.[ownRoverId] : null;
+  const pttActive = Boolean(controlState?.mic?.pttActive);
+  const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
   const vipMicActive = Boolean(
-    ownAudioForward?.source === 'mic-whip' &&
-      (ownAudioForward?.state === 'starting' || ownAudioForward?.state === 'playing'),
+    ownRoverId && session?.isVerified && (openMicEnabled || pttActive),
   );
   return (
     <section className="panel text-base">
