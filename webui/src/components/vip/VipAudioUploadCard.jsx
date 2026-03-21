@@ -158,14 +158,12 @@ function waitForOutboundAudioFlow(pc, timeoutMs = 6000) {
 function StatusIndicator({ label, active, detail = '' }) {
   return (
     <div
-      className={`rounded-md border px-0.5 py-0.5 text-xs transition-colors ${
-        active
-          ? 'border-emerald-300/80 bg-emerald-500/20 text-emerald-200'
-          : 'border-slate-700 bg-slate-900/50 text-slate-400'
+      className={`rounded-md px-0.5 py-0.5 text-xs text-slate-100 ${
+        active ? 'bg-emerald-500' : 'bg-slate-700'
       }`}
     >
-      <div className="font-medium">{label}</div>
-      <div className="text-[0.72rem] opacity-90">{detail || (active ? 'active' : 'idle')}</div>
+      <div className="text-center font-medium">{label}</div>
+      <div className="text-center text-[0.72rem] opacity-90">{detail || (active ? 'active' : 'idle')}</div>
     </div>
   );
 }
