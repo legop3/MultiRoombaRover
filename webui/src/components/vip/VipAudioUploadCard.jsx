@@ -1,7 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fieldClass, flowWrapClass, innerFlowClass } from './constants.js';
+import { useControlSystem } from '../../controls/index.js';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const TARGET_SAMPLE_RATE = 16000;
+const RTC_CONFIG = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  bundlePolicy: 'max-bundle',
+  rtcpMuxPolicy: 'require',
+};
 
 function bytesToBase64(bytes) {
   let binary = '';
@@ -13,16 +20,161 @@ function bytesToBase64(bytes) {
   return btoa(binary);
 }
 
+function encodeBase64(value) {
+  if (typeof btoa === 'function') return btoa(value);
+  return '';
+}
+
+function buildAuthHeader(token) {
+  if (!token) return {};
+  const encoded = encodeBase64(`${token}:${token}`);
+  return encoded ? { Authorization: `Basic ${encoded}` } : {};
+}
+
+function waitForIceGatheringComplete(pc, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    if (!pc || pc.iceGatheringState === 'complete') {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(() => {
+      pc.removeEventListener('icegatheringstatechange', onChange);
+      resolve();
+    }, timeoutMs);
+    function onChange() {
+      if (pc.iceGatheringState === 'complete') {
+        clearTimeout(timer);
+        pc.removeEventListener('icegatheringstatechange', onChange);
+        resolve();
+      }
+    }
+    pc.addEventListener('icegatheringstatechange', onChange);
+  });
+}
+
+function isPeerTransportReady(pc) {
+  if (!pc) return false;
+  const conn = pc.connectionState;
+  const ice = pc.iceConnectionState;
+  if (conn === 'connected') return true;
+  if (ice === 'connected' || ice === 'completed') return true;
+  return false;
+}
+
+function waitForPeerConnected(pc, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    if (!pc) {
+      reject(new Error('Peer connection missing'));
+      return;
+    }
+    if (isPeerTransportReady(pc)) {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Peer connection timeout'));
+    }, timeoutMs);
+    const onState = () => {
+      if (isPeerTransportReady(pc)) {
+        cleanup();
+        resolve();
+      } else if (
+        pc.connectionState === 'failed' ||
+        pc.connectionState === 'closed' ||
+        pc.iceConnectionState === 'failed'
+      ) {
+        cleanup();
+        reject(new Error(`Peer connection ${pc.connectionState || pc.iceConnectionState}`));
+      }
+    };
+    function cleanup() {
+      clearTimeout(timer);
+      pc.removeEventListener('connectionstatechange', onState);
+      pc.removeEventListener('iceconnectionstatechange', onState);
+    }
+    pc.addEventListener('connectionstatechange', onState);
+    pc.addEventListener('iceconnectionstatechange', onState);
+  });
+}
+
+async function configureSenderForLowLatency(sender) {
+  if (!sender?.getParameters || !sender?.setParameters) return;
+  const params = sender.getParameters() || {};
+  const first = (params.encodings && params.encodings[0]) || {};
+  params.encodings = [
+    {
+      ...first,
+      maxBitrate: 64000,
+      dtx: 'disabled',
+    },
+  ];
+  try {
+    await sender.setParameters(params);
+  } catch {
+    // Browser support varies; keep defaults if rejected.
+  }
+}
+
+function waitForOutboundAudioFlow(pc, timeoutMs = 6000) {
+  return new Promise((resolve, reject) => {
+    if (!pc) {
+      reject(new Error('Peer connection missing'));
+      return;
+    }
+    const start = Date.now();
+    let baseline = -1;
+    const timer = setInterval(async () => {
+      if (Date.now() - start > timeoutMs) {
+        clearInterval(timer);
+        reject(new Error('WHIP connected but no outbound audio flow'));
+        return;
+      }
+      try {
+        const senders = pc.getSenders().filter((s) => s.track?.kind === 'audio');
+        for (const sender of senders) {
+          const stats = await sender.getStats();
+          for (const report of stats.values()) {
+            if (report.type !== 'outbound-rtp' || report.kind !== 'audio') continue;
+            const sent = Number(report.bytesSent || 0);
+            const packets = Number(report.packetsSent || 0);
+            if (baseline < 0) {
+              baseline = sent;
+            } else if (sent > baseline + 200 || packets > 5) {
+              clearInterval(timer);
+              resolve();
+              return;
+            }
+          }
+        }
+      } catch {
+        // Keep polling until timeout.
+      }
+    }, 250);
+  });
+}
+
 export default function VipAudioUploadCard({
   ownRoverId = '',
   audioForwardByRover = {},
   playUploadedAudio,
   stopUploadedAudio,
+  startMicWhip,
+  readyMicWhip,
+  stopMicWhip,
 }) {
+  const { state: controlState } = useControlSystem();
   const roverId = String(ownRoverId || '').trim();
   const [selectedUpload, setSelectedUpload] = useState(null);
   const [working, setWorking] = useState(false);
+  const [openMicEnabled, setOpenMicEnabled] = useState(false);
+  const [micState, setMicState] = useState('idle');
   const [message, setMessage] = useState('');
+  const streamRef = useRef(null);
+  const whipPcRef = useRef(null);
+  const micActiveRef = useRef(false);
+  const activeRoverRef = useRef('');
+  const pttActive = Boolean(controlState?.mic?.pttActive);
 
   const selectedForwardState = useMemo(
     () => (roverId ? audioForwardByRover?.[roverId] || null : null),
@@ -80,6 +232,152 @@ export default function VipAudioUploadCard({
     }
   };
 
+  const stopMicCapture = useCallback(
+    async (targetRoverId) => {
+      const target = String(targetRoverId || activeRoverRef.current || '').trim();
+      micActiveRef.current = false;
+      setMicState('idle');
+      if (whipPcRef.current) {
+        try {
+          whipPcRef.current.getSenders().forEach((sender) => sender.track?.stop());
+        } catch {
+          // noop
+        }
+        try {
+          whipPcRef.current.close();
+        } catch {
+          // noop
+        }
+      }
+      whipPcRef.current = null;
+      if (streamRef.current) {
+        try {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+        } catch {
+          // noop
+        }
+      }
+      streamRef.current = null;
+      if (target) {
+        try {
+          await stopMicWhip?.(target);
+        } catch {
+          // noop
+        }
+      }
+      activeRoverRef.current = '';
+    },
+    [stopMicWhip],
+  );
+
+  const startWhipMic = useCallback(
+    async (target) => {
+      const startPayload = await startMicWhip?.(target);
+      const whipUrl = String(startPayload?.whipUrl || '').trim();
+      const token = String(startPayload?.token || '').trim();
+      if (!whipUrl || !token) {
+        throw new Error('WHIP endpoint unavailable');
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: TARGET_SAMPLE_RATE,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      streamRef.current = stream;
+
+      const track = stream.getAudioTracks()?.[0];
+      if (track?.applyConstraints) {
+        try {
+          await track.applyConstraints({
+            channelCount: 1,
+            sampleRate: TARGET_SAMPLE_RATE,
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          });
+        } catch {
+          // noop
+        }
+      }
+
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      whipPcRef.current = pc;
+      stream.getAudioTracks().forEach((audioTrack) => {
+        const sender = pc.addTrack(audioTrack, stream);
+        configureSenderForLowLatency(sender);
+      });
+
+      const offer = await pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
+      await pc.setLocalDescription(offer);
+      await waitForIceGatheringComplete(pc, 1800);
+
+      const response = await fetch(whipUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/sdp',
+          ...buildAuthHeader(token),
+        },
+        body: pc.localDescription?.sdp || offer.sdp,
+      });
+      if (!response.ok) {
+        throw new Error(`WHIP request failed: ${response.status}`);
+      }
+      const answerSdp = await response.text();
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      await waitForPeerConnected(pc, 10000);
+      await waitForOutboundAudioFlow(pc, 6000);
+      await readyMicWhip?.(target);
+    },
+    [readyMicWhip, startMicWhip],
+  );
+
+  useEffect(() => {
+    const desiredActive = Boolean(openMicEnabled || pttActive);
+    let cancelled = false;
+
+    async function syncMicState() {
+      if (!roverId || !desiredActive) {
+        await stopMicCapture(roverId);
+        return;
+      }
+      if (micActiveRef.current && activeRoverRef.current === roverId) return;
+
+      try {
+        setMicState('starting');
+        setMessage('');
+        micActiveRef.current = true;
+        activeRoverRef.current = roverId;
+        await startWhipMic(roverId);
+        if (!cancelled) {
+          setMicState('live');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setMicState('error');
+          setMessage(err?.message || 'Failed to start mic forwarding.');
+        }
+        await stopMicCapture(roverId);
+      }
+    }
+
+    syncMicState();
+    return () => {
+      cancelled = true;
+    };
+  }, [openMicEnabled, pttActive, roverId, startWhipMic, stopMicCapture]);
+
+  useEffect(
+    () => () => {
+      stopMicCapture(activeRoverRef.current || roverId);
+    },
+    [roverId, stopMicCapture],
+  );
+
   return (
     <section className={`surface ${flowWrapClass}`}>
       <div className={innerFlowClass}>
@@ -107,6 +405,23 @@ export default function VipAudioUploadCard({
             Stop
           </button>
         </div>
+
+        <div className="surface-muted mx-auto flex w-full max-w-sm flex-col gap-0.5 p-0.5 text-xs text-slate-300 text-center">
+          <p className="text-slate-200">Microphone Forwarding</p>
+          <label className="flex items-center justify-center gap-0.5">
+            <input
+              type="checkbox"
+              checked={openMicEnabled}
+              disabled={!roverId}
+              onChange={(event) => setOpenMicEnabled(Boolean(event.target.checked))}
+            />
+            <span>Open mic</span>
+          </label>
+          <p className="text-slate-400">PTT key: {controlState?.keymap?.micPtt?.[0] || 'm'} (hold)</p>
+          <p className="text-slate-400">mic: {micState}</p>
+          <p className="text-slate-500">transport: whip</p>
+        </div>
+
         {selectedForwardState ? (
           <div className="surface-muted mx-auto w-full max-w-sm text-xs text-slate-300 text-center">
             state: {selectedForwardState.state || 'idle'}

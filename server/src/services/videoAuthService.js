@@ -4,6 +4,8 @@ const logger = require('../globals/logger').child('videoAuth');
 const videoSessions = require('./videoSessions');
 const { getMode, MODES } = require('./modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('./roleService');
+const { isVerified } = require('./verificationService');
+const turnService = require('./turnService');
 const roverManager = require('./roverManager');
 const { loadConfig } = require('../helpers/configLoader');
 const { getRequestIp, getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
@@ -145,7 +147,9 @@ app.post('/mediamtx/auth', (req, res) => {
   }
 
   const info = videoSessions.getSession(sessionId);
-  const streamTypeMatches = info && info.sourceType === streamInfo.type;
+  const streamTypeMatches =
+    info &&
+    (info.sourceType === streamInfo.type || (info.sourceType === 'roverMic' && streamInfo.type === 'rover'));
   if (!info || !streamTypeMatches || info.sourceId !== streamInfo.id) {
     logger.warn('invalid session %s for stream %s:%s', sessionId, streamInfo.type, streamInfo.id);
     return res.status(401).end();
@@ -158,6 +162,20 @@ app.post('/mediamtx/auth', (req, res) => {
   if (!canView(socket)) {
     return res.status(401).end();
   }
+  if (info.sourceType === 'roverMic' && action === 'publish') {
+    const roverId = streamInfo.baseId || streamInfo.id;
+    if (!isVerified(socket)) {
+      return res.status(401).end();
+    }
+    if (!roverManager.isDriver(roverId, socket)) {
+      return res.status(401).end();
+    }
+    if (!turnService.canDrive(roverId, socket)) {
+      return res.status(401).end();
+    }
+    return res.status(200).end();
+  }
+
   const role = getRole(socket);
   const isAudio = streamInfo.id?.endsWith('-audio');
   if (role === 'spectator' && !isAdmin(socket) && !isAudio) {

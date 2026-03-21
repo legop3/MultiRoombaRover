@@ -28,6 +28,9 @@ const SessionContext = createContext({
   rebootServer: async () => {},
   playUploadedAudio: async () => {},
   stopUploadedAudio: async () => {},
+  startMicWhip: async () => {},
+  readyMicWhip: async () => {},
+  stopMicWhip: async () => {},
   setAudioLevels: async () => {},
   llmControl: async () => {},
 });
@@ -147,6 +150,9 @@ export function SessionProvider({ children }) {
       playUploadedAudio: ({ roverId, name, mime, dataBase64 }) =>
         emitWithAck('audio:uploadPlay', { roverId, name, mime, dataBase64 }),
       stopUploadedAudio: (roverId) => emitWithAck('audio:uploadStop', { roverId }),
+      startMicWhip: (roverId) => emitWithAck('audio:micWhipStart', { roverId }),
+      readyMicWhip: (roverId) => emitWithAck('audio:micWhipReady', { roverId }),
+      stopMicWhip: (roverId) => emitWithAck('audio:micWhipStop', { roverId }),
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),

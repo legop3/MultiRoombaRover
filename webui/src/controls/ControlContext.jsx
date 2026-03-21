@@ -452,6 +452,10 @@ export function ControlSystemProvider({ children }) {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });
   }, []);
 
+  const setMicPttActive = useCallback((active) => {
+    dispatch({ type: 'control/set-mic-ptt', payload: Boolean(active) });
+  }, []);
+
   const contextValue = useMemo(
     () => ({
       state,
@@ -478,6 +482,7 @@ export function ControlSystemProvider({ children }) {
         sendSong,
         startHorn,
         stopHorn,
+        setMicPttActive,
       },
     }),
     [
@@ -503,6 +508,7 @@ export function ControlSystemProvider({ children }) {
       sendSong,
       startHorn,
       stopHorn,
+      setMicPttActive,
     ],
   );
 
