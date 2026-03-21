@@ -21,6 +21,7 @@ const TAB_VARIANTS = {
 const TAB_HIGHLIGHTS = {
   none: '',
   pink: 'bg-pink-500 text-white border-pink-200 hover:bg-pink-400',
+  green: 'bg-emerald-500 text-white border-emerald-200 hover:bg-emerald-400',
 };
 
 const DEFAULT_VARIANT = 'primary';

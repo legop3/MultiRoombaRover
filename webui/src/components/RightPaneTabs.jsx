@@ -113,20 +113,31 @@ function DriveDockPanel() {
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   const { session } = useSession();
   const { state: controlState } = useControlSystem();
-  const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false });
+  const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
   const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-red-600';
   const ownRoverId = String(session?.assignment?.roverId || '').trim();
+  const ownAudioForward = ownRoverId ? session?.audioForward?.[ownRoverId] : null;
   const pttActive = Boolean(controlState?.mic?.pttActive);
   const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
+  const pttMode = vipAudio?.pttMode === 'clip' ? 'clip' : 'live';
   const vipMicActive = Boolean(
-    ownRoverId && session?.isVerified && (openMicEnabled || pttActive),
+    ownRoverId &&
+      session?.isVerified &&
+      (pttMode === 'clip' ? pttActive : (openMicEnabled || pttActive)),
+  );
+  const vipClipPlaying = Boolean(
+    ownRoverId &&
+      session?.isVerified &&
+      pttMode === 'clip' &&
+      ownAudioForward?.source === 'upload' &&
+      ownAudioForward?.state === 'playing',
   );
   return (
     <section className="panel text-base">
       <Tabs defaultTab="telemetry">
         <TabList>
           <Tab id="telemetry">Controls</Tab>
-          <Tab id="vip" highlight={vipMicActive ? 'pink' : 'none'}>
+          <Tab id="vip" highlight={vipClipPlaying ? 'green' : vipMicActive ? 'pink' : 'none'}>
             <span className="inline-flex items-center gap-2">
               <span>VIP</span>
               <span
