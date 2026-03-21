@@ -42,32 +42,66 @@ export default function VipPanel() {
 
   return (
     <section className="panel-section space-y-0.5 text-base">
-      {isVerified ? (
-        <VipAudioUploadCard
-          ownRoverId={ownRoverId}
-          audioForwardByRover={session?.audioForward || {}}
-          playUploadedAudio={playUploadedAudio}
-          stopUploadedAudio={stopUploadedAudio}
-          startMicWhip={startMicWhip}
-          readyMicWhip={readyMicWhip}
-          stopMicWhip={stopMicWhip}
-        />
-      ) : (
-        <VipVerificationCard
-          pendingRequestId={pendingRequestId}
-          currentStoredKey={currentStoredKey}
-          nickname={nickname}
-          requestVerification={requestVerification}
-          applyIdentityKey={applyIdentityKey}
-          onMessage={setMessage}
-        />
-      )}
+      <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)]">
+        <div className="lg:col-span-2">
+          {isVerified ? (
+            <section className="surface w-full">
+              <div className="mx-auto flex w-full max-w-md flex-col items-center space-y-0.5 text-center">
+                <p className="text-sm text-emerald-300">Verification complete</p>
+                <p className="text-xs text-slate-400">VIP audio controls are unlocked for your assigned rover.</p>
+              </div>
+            </section>
+          ) : (
+            <VipVerificationCard
+              pendingRequestId={pendingRequestId}
+              currentStoredKey={currentStoredKey}
+              nickname={nickname}
+              requestVerification={requestVerification}
+              applyIdentityKey={applyIdentityKey}
+              onMessage={setMessage}
+              fullWidth
+            />
+          )}
+        </div>
 
-      <VipIdentityCard
-        currentStoredKey={currentStoredKey}
-        applyIdentityKey={applyIdentityKey}
-        onMessage={setMessage}
-      />
+        {isVerified ? (
+          <VipAudioUploadCard
+            ownRoverId={ownRoverId}
+            audioForwardByRover={session?.audioForward || {}}
+            playUploadedAudio={playUploadedAudio}
+            stopUploadedAudio={stopUploadedAudio}
+            startMicWhip={startMicWhip}
+            readyMicWhip={readyMicWhip}
+            stopMicWhip={stopMicWhip}
+          />
+        ) : (
+          <section className="surface h-full">
+            <div className="flex h-full flex-col items-center justify-center text-center text-xs text-slate-400">
+              Verify your account to unlock audio upload and microphone forwarding.
+            </div>
+          </section>
+        )}
+
+        <section className="surface h-full">
+          <div className="space-y-0.5">
+            <p className="text-sm text-slate-200">VIP Notes</p>
+            <ul className="space-y-0.25 text-xs text-slate-400">
+              <li>Audio forwarding is locked to your currently assigned rover.</li>
+              <li>Losing control or turn ownership stops active forwarding.</li>
+              <li>PTT works page-wide using your keybind (default: m).</li>
+            </ul>
+          </div>
+        </section>
+
+        <div className="lg:col-span-2">
+          <VipIdentityCard
+            currentStoredKey={currentStoredKey}
+            applyIdentityKey={applyIdentityKey}
+            onMessage={setMessage}
+            fullWidth
+          />
+        </div>
+      </div>
 
       {message ? (
         <div className={flowWrapClass}>

@@ -112,12 +112,18 @@ function DriveDockPanel() {
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   const { session } = useSession();
   const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-red-600';
+  const ownRoverId = String(session?.assignment?.roverId || '').trim();
+  const ownAudioForward = ownRoverId ? session?.audioForward?.[ownRoverId] : null;
+  const vipMicActive = Boolean(
+    ownAudioForward?.source === 'mic-whip' &&
+      (ownAudioForward?.state === 'starting' || ownAudioForward?.state === 'playing'),
+  );
   return (
     <section className="panel text-base">
       <Tabs defaultTab="telemetry">
         <TabList>
           <Tab id="telemetry">Controls</Tab>
-          <Tab id="vip">
+          <Tab id="vip" highlight={vipMicActive ? 'pink' : 'none'}>
             <span className="inline-flex items-center gap-2">
               <span>VIP</span>
               <span
@@ -153,7 +159,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
               <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
             </div>
           </TabPanel>
-          <TabPanel id="vip">
+          <TabPanel id="vip" keepMounted>
             <VipPanel />
           </TabPanel>
           <TabPanel id="help">

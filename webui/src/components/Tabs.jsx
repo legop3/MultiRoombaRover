@@ -18,6 +18,11 @@ const TAB_VARIANTS = {
   },
 };
 
+const TAB_HIGHLIGHTS = {
+  none: '',
+  pink: 'bg-pink-500 text-white border-pink-200 hover:bg-pink-400',
+};
+
 const DEFAULT_VARIANT = 'primary';
 
 function classNames(...parts) {
@@ -89,17 +94,18 @@ export function TabList({ children, className = '' }) {
   return <div className={classNames('flex gap-0.5', className)}>{children}</div>;
 }
 
-export function Tab({ id, children, className = '', disabled = false }) {
+export function Tab({ id, children, className = '', disabled = false, highlight = 'none' }) {
   const { activeTab, setActiveTab, registerTab, variant } = useTabsContext();
 
   useEffect(() => registerTab(id), [id, registerTab]);
 
   const variantStyles = TAB_VARIANTS[variant] ?? TAB_VARIANTS[DEFAULT_VARIANT];
   const isActive = activeTab === id;
+  const highlightClass = TAB_HIGHLIGHTS[highlight] || TAB_HIGHLIGHTS.none;
 
   const buttonClassName = classNames(
     variantStyles.base,
-    isActive ? variantStyles.active : variantStyles.inactive,
+    highlightClass || (isActive ? variantStyles.active : variantStyles.inactive),
     disabled ? 'cursor-not-allowed opacity-50' : '',
     className
   );

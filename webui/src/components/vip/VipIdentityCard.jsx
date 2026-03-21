@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { fieldClass, flowWrapClass, innerFlowClass, maskKey } from './constants.js';
 
-export default function VipIdentityCard({ currentStoredKey, applyIdentityKey, onMessage }) {
+export default function VipIdentityCard({ currentStoredKey, applyIdentityKey, onMessage, fullWidth = false }) {
   const [restoreFlowStep, setRestoreFlowStep] = useState(0);
   const [restoreKeyInput, setRestoreKeyInput] = useState('');
   const [working, setWorking] = useState(false);
@@ -34,8 +34,10 @@ export default function VipIdentityCard({ currentStoredKey, applyIdentityKey, on
     }
   };
 
+  const wrapClass = fullWidth ? 'w-full' : flowWrapClass;
+
   return (
-    <section className={`surface ${flowWrapClass}`}>
+    <section className={`surface ${wrapClass}`}>
       <div className={innerFlowClass}>
         <p className="text-sm text-slate-300">Identity key</p>
         <p className="text-xs text-slate-500">Current: {maskKey(currentStoredKey) || 'not set yet'}</p>

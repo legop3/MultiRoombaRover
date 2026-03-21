@@ -85,12 +85,18 @@ function MobileFeatureTabs({
 }) {
   const { session } = useSession();
   const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-amber-400';
+  const ownRoverId = String(session?.assignment?.roverId || '').trim();
+  const ownAudioForward = ownRoverId ? session?.audioForward?.[ownRoverId] : null;
+  const vipMicActive = Boolean(
+    ownAudioForward?.source === 'mic-whip' &&
+      (ownAudioForward?.state === 'starting' || ownAudioForward?.state === 'playing'),
+  );
   return (
     <section className="panel text-base">
       <Tabs defaultTab="chat">
         <TabList>
           <Tab id="chat">Chat</Tab>
-          <Tab id="vip">
+          <Tab id="vip" highlight={vipMicActive ? 'pink' : 'none'}>
             <span className="inline-flex items-center gap-0.5">
               <span>VIP</span>
               <span
@@ -111,7 +117,7 @@ function MobileFeatureTabs({
               <RawUserPilePanel />
             </div>
           </TabPanel>
-          <TabPanel id="vip">
+          <TabPanel id="vip" keepMounted>
             <VipPanel />
           </TabPanel>
           <TabPanel id="roomcontrols">

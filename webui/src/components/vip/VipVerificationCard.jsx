@@ -9,6 +9,7 @@ export default function VipVerificationCard({
   requestVerification,
   applyIdentityKey,
   onMessage,
+  fullWidth = false,
 }) {
   const [requestFlowStep, setRequestFlowStep] = useState(0);
   const [requestKeyInput, setRequestKeyInput] = useState('');
@@ -53,9 +54,11 @@ export default function VipVerificationCard({
     }
   };
 
+  const wrapClass = fullWidth ? 'w-full' : flowWrapClass;
+
   if (pendingRequestId) {
     return (
-      <section className={`surface text-sm text-slate-300 ${flowWrapClass}`}>
+      <section className={`surface text-sm text-slate-300 ${wrapClass}`}>
         <div className={innerFlowClass}>Verification request pending: {pendingRequestId}</div>
       </section>
     );
@@ -63,7 +66,7 @@ export default function VipVerificationCard({
 
   if (requestFlowStep === 0) {
     return (
-      <section className={`surface ${flowWrapClass}`}>
+      <section className={`surface ${wrapClass}`}>
         <div className={innerFlowClass}>
           <p className="text-sm text-slate-300">Verification</p>
           <button type="button" className="button-dark text-sm" onClick={beginRequestFlow} disabled={working}>
@@ -75,7 +78,7 @@ export default function VipVerificationCard({
   }
 
   return (
-    <form className={`surface ${flowWrapClass}`} onSubmit={handleRequestSubmit}>
+    <form className={`surface ${wrapClass}`} onSubmit={handleRequestSubmit}>
       <div className={innerFlowClass}>
         <p className="text-sm text-slate-300">Request verification</p>
         <p className="text-xs text-slate-500">

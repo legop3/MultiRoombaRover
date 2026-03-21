@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fieldClass, flowWrapClass, innerFlowClass } from './constants.js';
+import { fieldClass } from './constants.js';
 import { useControlSystem } from '../../controls/index.js';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -154,6 +154,18 @@ function waitForOutboundAudioFlow(pc, timeoutMs = 6000) {
   });
 }
 
+function StatusLight({ label, active, detail = '' }) {
+  return (
+    <div className="surface-muted flex items-center justify-between px-0.5 py-0.25 text-xs">
+      <span className="text-slate-300">{label}</span>
+      <span className="inline-flex items-center gap-0.5">
+        <span className={`h-2 w-2 rounded-full ${active ? 'bg-emerald-400' : 'bg-slate-600'}`} aria-hidden="true" />
+        <span className={active ? 'text-emerald-300' : 'text-slate-500'}>{detail || (active ? 'on' : 'off')}</span>
+      </span>
+    </div>
+  );
+}
+
 export default function VipAudioUploadCard({
   ownRoverId = '',
   audioForwardByRover = {},
@@ -181,6 +193,18 @@ export default function VipAudioUploadCard({
     () => (roverId ? audioForwardByRover?.[roverId] || null : null),
     [audioForwardByRover, roverId],
   );
+
+  const pipelineConnected = Boolean(
+    selectedForwardState && selectedForwardState.state !== 'offline' && !selectedForwardState.error,
+  );
+  const uploadPlaying = Boolean(
+    selectedForwardState?.source === 'upload' && selectedForwardState?.state === 'playing',
+  );
+  const micRelayActive = Boolean(
+    selectedForwardState?.source === 'mic-whip' &&
+      (selectedForwardState?.state === 'starting' || selectedForwardState?.state === 'playing'),
+  );
+  const micTalking = Boolean(audioTrackRef.current && (openMicEnabled || pttActive));
 
   const handleUploadPlay = async () => {
     if (!roverId) {
@@ -403,24 +427,27 @@ export default function VipAudioUploadCard({
   );
 
   return (
-    <section className={`surface ${flowWrapClass}`}>
-      <div className={innerFlowClass}>
-        <p className="text-sm text-slate-300">VIP Audio Upload</p>
-        <label className="grid w-full gap-0.5 text-xs text-slate-300">
+    <section className="surface h-full">
+      <div className="grid h-full gap-0.5 grid-rows-[auto_auto_auto_1fr_auto]">
+        <p className="text-sm text-slate-200 text-center">VIP Audio Forwarding</p>
+
+        <label className="mx-auto grid w-full max-w-sm gap-0.5 text-xs text-slate-300 text-center">
           <span>Audio file (mp3 / wav / ogg)</span>
           <input
-            className={fieldClass}
+            className={`${fieldClass} text-center`}
             type="file"
             accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg"
             disabled={working || !roverId}
             onChange={(event) => setSelectedUpload(event.target.files?.[0] || null)}
           />
         </label>
+
         {selectedUpload ? (
           <div className="surface-muted mx-auto w-full max-w-sm text-xs text-slate-300 text-center">
             {selectedUpload.name} ({selectedUpload.size} bytes)
           </div>
         ) : null}
+
         <div className="flex justify-center gap-0.5">
           <button type="button" className="button-dark text-sm" disabled={working || !roverId} onClick={handleUploadPlay}>
             {working ? 'Working...' : 'Play Upload'}
@@ -430,28 +457,31 @@ export default function VipAudioUploadCard({
           </button>
         </div>
 
-        <div className="surface-muted mx-auto flex w-full max-w-sm flex-col gap-0.5 p-0.5 text-xs text-slate-300 text-center">
-          <p className="text-slate-200">Microphone Forwarding</p>
-          <label className="flex items-center justify-center gap-0.5">
-            <input
-              type="checkbox"
-              checked={openMicEnabled}
-              disabled={!roverId}
-              onChange={(event) => setOpenMicEnabled(Boolean(event.target.checked))}
-            />
-            <span>Open mic</span>
-          </label>
-          <p className="text-slate-400">PTT key: {controlState?.keymap?.micPtt?.[0] || 'm'} (hold)</p>
-          <p className="text-slate-400">mic: {micState}</p>
-          <p className="text-slate-500">transport: whip</p>
+        <div className="grid gap-0.5 lg:grid-cols-2">
+          <div className="space-y-0.5">
+            <p className="text-xs text-slate-300 text-center">Audio Path Status</p>
+            <StatusLight label="Forward pipe" active={pipelineConnected} detail={pipelineConnected ? 'connected' : 'offline'} />
+            <StatusLight label="Upload playing" active={uploadPlaying} detail={uploadPlaying ? 'active' : 'idle'} />
+            <StatusLight label="Mic relay" active={micRelayActive} detail={micRelayActive ? 'active' : 'idle'} />
+          </div>
+
+          <div className="space-y-0.5">
+            <p className="text-xs text-slate-300 text-center">Microphone</p>
+            <label className="surface-muted flex items-center justify-center gap-0.5 px-0.5 py-0.25 text-xs text-slate-300">
+              <input
+                type="checkbox"
+                checked={openMicEnabled}
+                disabled={!roverId}
+                onChange={(event) => setOpenMicEnabled(Boolean(event.target.checked))}
+              />
+              <span>Open mic</span>
+            </label>
+            <StatusLight label="WHIP link" active={micState === 'live' || micState === 'starting'} detail={micState} />
+            <StatusLight label="PTT transmit" active={micTalking} detail={micTalking ? 'talking' : 'muted'} />
+            <div className="surface-muted text-center text-xs text-slate-400">PTT key: {controlState?.keymap?.micPtt?.[0] || 'm'} (hold)</div>
+          </div>
         </div>
 
-        {selectedForwardState ? (
-          <div className="surface-muted mx-auto w-full max-w-sm text-xs text-slate-300 text-center">
-            state: {selectedForwardState.state || 'idle'}
-            {selectedForwardState.error ? ` | error: ${selectedForwardState.error}` : ''}
-          </div>
-        ) : null}
         {message ? <div className="text-xs text-slate-400 text-center">{message}</div> : null}
       </div>
     </section>
