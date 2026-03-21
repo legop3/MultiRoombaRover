@@ -50,6 +50,9 @@ function extractStreamInfo(path) {
   const remaining = segments.slice(start, end);
   if (remaining.length === 1) {
     const rawId = remaining[0] || '';
+    if (rawId.endsWith('-fwd')) {
+      return { type: 'rover', id: rawId, baseId: rawId.slice(0, -4) };
+    }
     if (rawId.endsWith('-mic')) {
       return { type: 'roverMic', id: rawId, baseId: rawId.slice(0, -4) };
     }
@@ -91,6 +94,9 @@ function extractStreamInfoFromBody(body = {}) {
 
   if (srtId.endsWith('-mic')) {
     return { type: 'roverMic', id: srtId, baseId: srtId.slice(0, -4) };
+  }
+  if (srtId.endsWith('-fwd')) {
+    return { type: 'rover', id: srtId, baseId: srtId.slice(0, -4) };
   }
   const baseId = srtId.endsWith('-audio') ? srtId.slice(0, -6) : srtId;
   return { type: 'rover', id: srtId, baseId };
@@ -147,7 +153,10 @@ app.post('/mediamtx/auth', (req, res) => {
   }
 
   const info = videoSessions.getSession(sessionId);
-  if (!info || info.sourceType !== streamInfo.type || info.sourceId !== streamInfo.id) {
+  const streamTypeMatches =
+    info &&
+    (info.sourceType === streamInfo.type || (info.sourceType === 'roverMic' && streamInfo.type === 'rover'));
+  if (!info || !streamTypeMatches || info.sourceId !== streamInfo.id) {
     logger.warn('invalid session %s for stream %s:%s', sessionId, streamInfo.type, streamInfo.id);
     return res.status(401).end();
   }
@@ -159,7 +168,7 @@ app.post('/mediamtx/auth', (req, res) => {
   if (!canView(socket)) {
     return res.status(401).end();
   }
-  if (streamInfo.type === 'roverMic' && action === 'publish') {
+  if (info.sourceType === 'roverMic' && action === 'publish') {
     const roverId = streamInfo.baseId || streamInfo.id;
     if (!isVerified(socket)) {
       return res.status(401).end();
