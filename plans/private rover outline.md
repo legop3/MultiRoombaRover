@@ -8,6 +8,8 @@ This means that locking / unlocking will act a little different than standard ro
 - private status is defined in the roverd config
 - needs to never leak through access to anyone while locked
 - unlocking a private rover is a big deal for verified users (opening up a rover in the main living space for a special event)
+- not included in LLM events system
+- basically needs to be online but completely hidden when its not open
 
 ## locking / unlocking:
 - private rovers start locked

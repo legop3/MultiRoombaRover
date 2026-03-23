@@ -3,8 +3,8 @@ import TelemetryPanel from './components/TelemetryPanel.jsx';
 import ReplaySourcesPanel from './components/ReplaySourcesPanel.jsx';
 import AlertFeed from './components/AlertFeed.jsx';
 import MobileControls, {
-  MobileLeftColumn,
-  MobileRightColumn,
+  MobileActionsColumn,
+  MobileDriveColumn,
 } from './components/MobileControls.jsx';
 import {
   ControlSystemProvider,
@@ -160,11 +160,11 @@ function MobileFeatureTabs({
   );
 }
 
-function MobilePortraitLayout({ onOpenHelpOverlay }) {
+function MobilePortraitLayout({ onOpenHelpOverlay, swapMobileControlColumns = false }) {
   return (
     <div className="flex flex-col gap-0.5">
       <DriverVideoPanel layoutFormat="mobile-portrait" />
-      <MobileControls />
+      <MobileControls swapColumns={swapMobileControlColumns} />
       <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <ReplaySourcesPanel panelId="replay-sources-mobile-portrait" />
         <RoverQueuesPanel />
@@ -179,12 +179,18 @@ function MobilePortraitLayout({ onOpenHelpOverlay }) {
   );
 }
 
-function MobileLandscapeLayout({ onOpenHelpOverlay }) {
+function MobileLandscapeLayout({ onOpenHelpOverlay, swapMobileControlColumns = false }) {
   const columnClass = 'self-start h-[min(100svh,32rem)]';
+  const firstColumn = swapMobileControlColumns
+    ? <MobileDriveColumn layout="landscape" className={columnClass} />
+    : <MobileActionsColumn layout="landscape" className={columnClass} />;
+  const secondColumn = swapMobileControlColumns
+    ? <MobileActionsColumn layout="landscape" className={columnClass} />
+    : <MobileDriveColumn layout="landscape" className={columnClass} />;
   return (
     <div className="flex flex-col gap-0.5">
       <section className="grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-0.5">
-        <MobileLeftColumn layout="landscape" className={columnClass} />
+        {firstColumn}
         <div>
           <DriverVideoPanel layoutFormat="mobile-landscape" />
           <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -193,7 +199,7 @@ function MobileLandscapeLayout({ onOpenHelpOverlay }) {
           </div>
           {/* <TelemetryPanel /> */}
         </div>
-        <MobileRightColumn layout="landscape" className={columnClass} />
+        {secondColumn}
       </section>
       <div className="flex flex-col gap-0.5 pb-0">
         <MobileFeatureTabs
@@ -234,6 +240,10 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
     status: helpStatus,
     save: saveHelpSettings,
   } = useSettingsNamespace('help', { showOnLoad: true });
+  const { value: pageSettings } = useSettingsNamespace('page', {
+    swapMobileControlColumns: false,
+  });
+  const swapMobileControlColumns = Boolean(pageSettings?.swapMobileControlColumns);
   const [helpVisible, setHelpVisible] = useState(false);
 
   useEffect(() => {
@@ -260,9 +270,9 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
       isDesktop
         ? <DesktopLayout layout={layout} onOpenHelpOverlay={openHelp} />
         : layout === 'mobile-landscape'
-        ? <MobileLandscapeLayout onOpenHelpOverlay={openHelp} />
-        : <MobilePortraitLayout onOpenHelpOverlay={openHelp} />,
-    [isDesktop, layout, openHelp],
+        ? <MobileLandscapeLayout onOpenHelpOverlay={openHelp} swapMobileControlColumns={swapMobileControlColumns} />
+        : <MobilePortraitLayout onOpenHelpOverlay={openHelp} swapMobileControlColumns={swapMobileControlColumns} />,
+    [isDesktop, layout, openHelp, swapMobileControlColumns],
   );
 
   return (

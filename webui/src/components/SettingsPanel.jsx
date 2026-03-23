@@ -32,9 +32,11 @@ export default function SettingsPanel() {
   const { value: pageSettings, save: savePageSettings } = useSettingsNamespace('page', {
     hudMapDesktop: false,
     connectionTransport: 'websocket',
+    swapMobileControlColumns: false,
   });
   const { value: audioSettings, save: saveAudioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const connectionTransport = pageSettings?.connectionTransport || 'websocket';
+  const swapMobileControlColumns = Boolean(pageSettings?.swapMobileControlColumns);
   const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
   const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
   const roverVolume = Number.isFinite(audioSettings?.roverVolume) ? audioSettings.roverVolume : AUDIO_SETTINGS_DEFAULTS.roverVolume;
@@ -80,6 +82,11 @@ export default function SettingsPanel() {
     const checked = Boolean(event.target.checked);
     saveAudioSettings((current) => ({ ...(current ?? {}), mainBrushDuckEnabled: checked }));
   };
+
+  const handleSwapMobileControlColumns = (event) => {
+    const checked = Boolean(event.target.checked);
+    savePageSettings((current) => ({ ...(current ?? {}), swapMobileControlColumns: checked }));
+  };
   return (
     <Tabs defaultTab="keybindings">
       <TabList>
@@ -113,6 +120,18 @@ export default function SettingsPanel() {
                 <span>Show top-down map in HUD (desktop)</span>
               </label>
               <p className="text-xs text-slate-500">Mobile HUD keeps the map on by default.</p>
+            </section>
+            <section className="panel-section space-y-0.5 text-sm">
+              <p className="text-slate-400">Mobile controls</p>
+              <label className="flex items-center gap-0.5 text-slate-200">
+                <input
+                  type="checkbox"
+                  className="accent-emerald-500"
+                  checked={swapMobileControlColumns}
+                  onChange={handleSwapMobileControlColumns}
+                />
+                <span>Swap control columns (put joystick on the left)</span>
+              </label>
             </section>
             <section className="panel-section space-y-0.5 text-sm">
               <p className="text-slate-400">Audio</p>

@@ -224,7 +224,7 @@ function MobileAuxButton({ id, label, values, color, disabled, onPress, onReleas
   );
 }
 
-function MobileLeftColumnContent({ layout }) {
+function MobileActionsColumnContent({ layout }) {
   const {
     state: { roverId, camera, horn },
     pipeline,
@@ -347,15 +347,15 @@ function MobileLeftColumnContent({ layout }) {
   );
 }
 
-export function MobileLeftColumn({ layout, className = '' }) {
+export function MobileActionsColumn({ layout, className = '' }) {
   return (
     <div className={`flex flex-col gap-0.5 ${className}`.trim()}>
-      <MobileLeftColumnContent layout={layout} />
+      <MobileActionsColumnContent layout={layout} />
     </div>
   );
 }
 
-export function MobileRightColumn({ layout, className = '' }) {
+export function MobileDriveColumn({ layout, className = '' }) {
   return (
     <div className={`flex flex-col gap-0.5 ${className}`.trim()}>
       <MobileJoystickPanel layout={layout === 'landscape' ? 'landscape' : 'portrait'} />
@@ -363,13 +363,19 @@ export function MobileRightColumn({ layout, className = '' }) {
   );
 }
 
-export default function MobilePortraitControls() {
+export default function MobilePortraitControls({ swapColumns = false }) {
   const columnHeight = 'h-[min(60svh,24rem)]';
+  const firstColumn = swapColumns
+    ? <MobileDriveColumn layout="portrait" className={columnHeight} />
+    : <MobileActionsColumn layout="portrait" className={columnHeight} />;
+  const secondColumn = swapColumns
+    ? <MobileActionsColumn layout="portrait" className={columnHeight} />
+    : <MobileDriveColumn layout="portrait" className={columnHeight} />;
   return (
     <section className="panel">
       <div className="grid grid-cols-2 gap-0.5 items-stretch">
-        <MobileLeftColumn layout="portrait" className={columnHeight} />
-        <MobileRightColumn layout="portrait" className={columnHeight} />
+        {firstColumn}
+        {secondColumn}
       </div>
     </section>
   );

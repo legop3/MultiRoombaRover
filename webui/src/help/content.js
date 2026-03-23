@@ -124,7 +124,7 @@ export const HELP_CONTENT = {
         title: 'Driving the rover',
         items: [
           { segments: ['Press the "Start Driving" button onscreen to put the rover into driving mode.'] },
-          'Look below the rover video. Use the joystick on the right to move the rover, and hold the buttons on the left to run the aux motors.'
+          'Look below the rover video. Use the joystick column to move the rover, and hold the aux buttons in the other control column.'
         ],
       },
       {
@@ -154,7 +154,7 @@ export const HELP_CONTENT = {
         title: 'Driving the rover',
         items: [
           { segments: ['Press the "Start Driving" button, or the "Drive" button to put the rover into driving mode.'] },
-          'Use the joystick to the right of the video feed to move the rover, and hold the buttons on the left to run the aux motors.'
+          'Use the joystick column beside the video feed to move the rover, and hold the aux buttons in the other control column.'
         ],
       },
       {
