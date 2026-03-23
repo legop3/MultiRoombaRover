@@ -6,10 +6,16 @@ export function normalizeRoverColor(value) {
   return raw.toUpperCase();
 }
 
-export function roverNameStyle(color) {
+export function roverNameChromeStyle(color, alpha = 0.2) {
   const normalized = normalizeRoverColor(color);
   if (!normalized) return undefined;
-  return { color: normalized };
+  const safeAlpha = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 0.2;
+  const rgb = hexToRgb(normalized);
+  if (!rgb) return undefined;
+  return {
+    borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.65)`,
+    backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${safeAlpha})`,
+  };
 }
 
 export function roverBadgeStyle(color, alpha = 0.2) {
@@ -21,7 +27,6 @@ export function roverBadgeStyle(color, alpha = 0.2) {
   return {
     borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.55)`,
     backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${safeAlpha})`,
-    color: normalized,
   };
 }
 

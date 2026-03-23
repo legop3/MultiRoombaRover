@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import NicknameForm from './NicknameForm.jsx';
 import SocialButtonsGrid from './SocialButtonsGrid.jsx';
-import { roverBadgeStyle, roverNameStyle } from '../lib/roverColor.js';
+import { roverBadgeStyle, roverNameChromeStyle } from '../lib/roverColor.js';
 
 export function NicknameEntryPanel({ compact = false }) {
   return (
@@ -217,8 +217,13 @@ export default function UserListPanel({
                 return (
                   <div key={roverId} className={`surface-muted flex flex-col gap-0.5 ${compact ? 'text-[0.8rem] py-0.25' : 'text-sm'}`}>
                     <div className="flex items-center gap-0.5">
-                      <p className="font-semibold text-slate-200" style={roverNameStyle(rosterEntry(roverId)?.color)}>
-                        {rosterEntry(roverId)?.name || roverId}
+                      <p className="font-semibold text-slate-200">
+                        <span
+                          className="rounded px-1 py-[1px] border border-transparent"
+                          style={roverNameChromeStyle(rosterEntry(roverId)?.color, 0.16)}
+                        >
+                          {rosterEntry(roverId)?.name || roverId}
+                        </span>
                       </p>
                       {remaining != null && (
                         <span className="rounded bg-slate-800 px-1 text-[0.7rem]">

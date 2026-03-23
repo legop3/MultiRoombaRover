@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
-import { roverNameStyle } from '../lib/roverColor.js';
+import { roverNameChromeStyle } from '../lib/roverColor.js';
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -132,8 +132,10 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-center justify-between gap-0.5">
                     <div className="flex items-center gap-0.5">
-                      <p className="text-slate-200" style={roverNameStyle(rover.color)}>
-                        {rover.name}
+                      <p className="text-slate-200">
+                        <span className="rounded px-1 py-[1px] border border-transparent" style={roverNameChromeStyle(rover.color, 0.16)}>
+                          {rover.name}
+                        </span>
                       </p>
                       {showTimer ? (
                         <span className="rounded bg-slate-800 px-1 text-[0.7rem] text-slate-200">

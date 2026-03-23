@@ -10,7 +10,7 @@ import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
 import BatteryBar from '../components/BatteryBar.jsx';
 import { buildBatteryVisual } from '../lib/battery.js';
-import { roverNameStyle } from '../lib/roverColor.js';
+import { roverNameChromeStyle } from '../lib/roverColor.js';
 
 const ROTATE_MS = 20000;
 const HARD_REFRESH_MS = 1 * 60 * 60 * 1000;
@@ -59,10 +59,10 @@ function InfoColumn({
         <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-between text-center">
           <div className="min-w-0 bg-transparent px-0 py-0 leading-none">
             <AutoFitText
-              className="font-semibold leading-none text-white"
+              className="font-semibold leading-none text-white rounded border border-transparent px-1 py-[1px]"
               maxSize={1000}
               minSize={18}
-              style={roverNameStyle(rover.color)}
+              style={roverNameChromeStyle(rover.color, 0.18)}
             >
               {rover.name || rover.id}
             </AutoFitText>
@@ -89,10 +89,10 @@ function InfoColumn({
           <div className="relative z-10 flex min-w-0 flex-col gap-1 text-center">
             <div className="min-w-0 bg-transparent px-0 py-0 leading-none">
               <AutoFitText
-                className="font-semibold leading-none text-white"
+                className="font-semibold leading-none text-white rounded border border-transparent px-1 py-[1px]"
                 maxSize={1000}
                 minSize={18}
-                style={roverNameStyle(rover.color)}
+                style={roverNameChromeStyle(rover.color, 0.18)}
               >
                 {rover.name || rover.id}
               </AutoFitText>
