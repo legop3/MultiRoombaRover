@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
-import { roverSwatchStyle } from '../lib/roverColor.js';
+import { roverNameChromeStyle, roverSwatchStyle } from '../lib/roverColor.js';
 
 function normalizeSources(list = []) {
   return list
@@ -152,7 +152,12 @@ function GroupList({ title, items, selected, onToggle }) {
                 aria-hidden="true"
               />
             ) : null}
-            <span className="truncate">{item.label}</span>
+            <span
+              className={`truncate ${item.type === 'rover' ? 'rounded px-1 py-[1px] border border-transparent' : ''}`}
+              style={item.type === 'rover' ? roverNameChromeStyle(item.color, 0.16) : undefined}
+            >
+              {item.label}
+            </span>
           </label>
         ))}
       </div>

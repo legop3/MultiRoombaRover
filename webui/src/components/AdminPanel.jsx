@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import RoverRoster from './RoverRoster.jsx';
 import ChatMessageRow from './ChatMessageRow.jsx';
+import { roverNameChromeStyle } from '../lib/roverColor.js';
 
 const MODES = [
   { key: 'open', label: 'Open' },
@@ -340,7 +341,7 @@ export default function AdminPanel() {
           </div>
         )}
       />
-      <ReplaySnapshotHealth health={health} />
+      <ReplaySnapshotHealth health={health} roster={roster} />
       <LlmCommentaryPanel
         state={llmCommentaryState}
         onClearHistory={handleClearLlmHistory}
@@ -603,10 +604,12 @@ function buildLlmConversationRowsFromMessages(modelMessages, rawOutput) {
   return rows;
 }
 
-function ReplaySnapshotHealth({ health }) {
+function ReplaySnapshotHealth({ health, roster = [] }) {
   if (!health) return null;
   const replay = health.replay || { sources: [], readyCount: 0, totalCount: 0 };
   const snapshots = health.snapshots || { rovers: [], rooms: [] };
+  const roverColorFor = (id) =>
+    roster.find((entry) => String(entry.id) === String(id))?.color || null;
   const replaySummary = `${replay.readyCount}/${replay.totalCount} sources ready`;
   const roverStale = snapshots.rovers.filter((entry) => entry.stale).length;
   const roomStale = snapshots.rooms.filter((entry) => entry.stale).length;
@@ -634,7 +637,16 @@ function ReplaySnapshotHealth({ health }) {
       <div className="space-y-0.5 text-xs text-slate-300">
         {replay.sources.map((source) => (
           <div key={`${source.type}:${source.id}`} className="flex items-center justify-between">
-            <span>{source.label}</span>
+            <span
+              className={`${source.type === 'rover' ? 'rounded px-1 py-[1px] border border-transparent' : ''}`}
+              style={
+                source.type === 'rover'
+                  ? roverNameChromeStyle(roverColorFor(source.id), 0.16)
+                  : undefined
+              }
+            >
+              {source.label}
+            </span>
             <span className={source.ready ? 'text-emerald-300' : 'text-amber-300'}>
               {source.recentCount}/{source.neededCount}
             </span>
@@ -644,7 +656,12 @@ function ReplaySnapshotHealth({ health }) {
       <div className="space-y-0.5 text-xs text-slate-300">
         {snapshots.rovers.map((entry) => (
           <div key={`rover:${entry.id}`} className="flex items-center justify-between">
-            <span>{entry.name}</span>
+            <span
+              className="rounded px-1 py-[1px] border border-transparent"
+              style={roverNameChromeStyle(roverColorFor(entry.id), 0.16)}
+            >
+              {entry.name}
+            </span>
             <span className={entry.stale ? 'text-amber-300' : 'text-emerald-300'}>
               {entry.stale ? 'stale' : 'ok'}
             </span>
