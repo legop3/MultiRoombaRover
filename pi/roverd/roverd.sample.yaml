@@ -1,5 +1,6 @@
 # Sample configuration for roverd
 name: roomba-alpha
+color: "#4DB6AC"
 serverUrl: ws://control-server.local:8080/rover
 serial:
   device: /dev/ttyAMA0

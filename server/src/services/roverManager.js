@@ -145,6 +145,7 @@ function getRoster() {
   return Array.from(rovers.values()).map((record) => ({
     id: record.id,
     name: record.meta?.name || record.id,
+    color: record.meta?.color || null,
     battery: record.meta?.battery,
     batteryState: record.batteryState,
     maxWheelSpeed: record.meta?.maxWheelSpeed,

@@ -9,6 +9,7 @@ import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 import SocialButton from './SocialButton.jsx';
 import BatteryBar from './BatteryBar.jsx';
 import { buildBatteryVisual } from '../lib/battery.js';
+import { roverNameStyle } from '../lib/roverColor.js';
 
 const RESTART_DELAY_MS = 2000;
 const UNMUTE_RETRY_MS = 3000;
@@ -23,6 +24,7 @@ export default function VideoTile({
   snapshotFeed = null,
   qualityNotice = null,
   label,
+  roverColor = null,
   forceMute = false,
   telemetryFrame,
   batteryConfig,
@@ -606,6 +608,7 @@ export default function VideoTile({
             frame={telemetryFrame}
             sensors={sensors}
             label={label}
+            roverColor={roverColor}
             status={renderedStatus}
             audioStatus={renderedAudioStatus}
             levelStatus={levelIndicator}
@@ -721,6 +724,7 @@ function HudOverlay({
   frame,
   sensors,
   label,
+  roverColor = null,
   status,
   audioStatus,
   levelStatus,
@@ -845,7 +849,9 @@ function HudOverlay({
             <div
               className={`flex items-center gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}
             >
-              <span className="font-semibold text-white">{label || 'Unnamed Rover'}</span>
+              <span className="font-semibold text-white" style={roverNameStyle(roverColor)}>
+                {label || 'Unnamed Rover'}
+              </span>
               {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
             </div>
           </div>
@@ -882,7 +888,9 @@ function HudOverlay({
       ) : null}
       <div className={`absolute ${labelPosClass} left-1/2`} style={labelWrapperStyle}>
         <div className={`flex gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}>
-          <span>Rover: "{label || 'Unnamed Rover'}"</span>
+          <span>
+            Rover: "<span style={roverNameStyle(roverColor)}>{label || 'Unnamed Rover'}</span>"
+          </span>
           {/* <span>{pulse ? 'Sensors active' : 'No recent sensors'}</span> */}
         </div>
       </div>

@@ -9,7 +9,7 @@
    - audio files first [x]
    - then voice chat [x]
 8. mobile controls column swapping (optional joystick on left) [x]
-9. fix fullscreen on mobile so that you can re-enter it
+9. fix fullscreen on mobile so that you can re-enter it [x]
 10. home assistant rover mute switch
 
 # relative pipe dreams:

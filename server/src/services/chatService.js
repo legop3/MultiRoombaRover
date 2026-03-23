@@ -83,6 +83,12 @@ function resolveRoverId(socketId) {
   return assignment?.roverId || null;
 }
 
+function resolveRoverColor(roverId) {
+  if (!roverId) return null;
+  const record = roverManager.rovers.get(String(roverId));
+  return record?.meta?.color || null;
+}
+
 function normalizeUserText(raw) {
   if (typeof raw !== 'string') return '';
   return raw.replace(/\\n/g, '\n');
@@ -90,6 +96,7 @@ function normalizeUserText(raw) {
 
 function buildMessage(socket, text, meta = {}) {
   const roverId = meta.roverId || resolveRoverId(socket?.id);
+  const roverColor = meta.roverColor ?? resolveRoverColor(roverId);
   return {
     id: uuidv4(),
     ts: Date.now(),
@@ -97,6 +104,7 @@ function buildMessage(socket, text, meta = {}) {
     nickname: meta.nickname || getNickname(socket) || null,
     role: meta.role || getRole(socket),
     roverId,
+    roverColor,
     fromDiscord: Boolean(meta.fromDiscord),
     discordGuildId: meta.discordGuildId || null,
     discordGuildName: meta.discordGuildName || null,
@@ -219,6 +227,7 @@ function buildRoverCtxSnapshot(roverId) {
 
 function buildTypingPayload(socket, meta = {}) {
   const roverId = meta.roverId || resolveRoverId(socket?.id);
+  const roverColor = meta.roverColor ?? resolveRoverColor(roverId);
   const socketId = socket?.id || null;
   const fromDiscord = Boolean(meta.fromDiscord);
   let typingId = meta.typingId || null;
@@ -250,6 +259,7 @@ function buildTypingPayload(socket, meta = {}) {
     nickname: meta.nickname || getNickname(socket) || null,
     role: meta.role || getRole(socket),
     roverId,
+    roverColor,
     fromDiscord,
     discordGuildId: meta.discordGuildId || null,
     discordGuildName: meta.discordGuildName || null,

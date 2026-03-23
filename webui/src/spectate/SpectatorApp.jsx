@@ -63,6 +63,7 @@ function RoverSpectatorCard({ rover, frame, sessionInfo, videoMode, snapshotFeed
           snapshotFeed={snapshotFeed}
           audioSessionInfo={audioInfo}
           label={rover.name}
+          roverColor={rover.color || null}
           telemetryFrame={frame}
           batteryConfig={rover.battery}
           hudVariant="spectator"

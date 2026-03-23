@@ -10,6 +10,7 @@ import AlertFeed from '../components/AlertFeed.jsx';
 import useDefaultNickname from '../hooks/useDefaultNickname.js';
 import BatteryBar from '../components/BatteryBar.jsx';
 import { buildBatteryVisual } from '../lib/battery.js';
+import { roverNameStyle } from '../lib/roverColor.js';
 
 const ROTATE_MS = 20000;
 const HARD_REFRESH_MS = 1 * 60 * 60 * 1000;
@@ -57,7 +58,12 @@ function InfoColumn({
       {isActiveView ? (
         <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-between text-center">
           <div className="min-w-0 bg-transparent px-0 py-0 leading-none">
-            <AutoFitText className="font-semibold leading-none text-white" maxSize={1000} minSize={18}>
+            <AutoFitText
+              className="font-semibold leading-none text-white"
+              maxSize={1000}
+              minSize={18}
+              style={roverNameStyle(rover.color)}
+            >
               {rover.name || rover.id}
             </AutoFitText>
           </div>
@@ -82,7 +88,12 @@ function InfoColumn({
         <>
           <div className="relative z-10 flex min-w-0 flex-col gap-1 text-center">
             <div className="min-w-0 bg-transparent px-0 py-0 leading-none">
-              <AutoFitText className="font-semibold leading-none text-white" maxSize={1000} minSize={18}>
+              <AutoFitText
+                className="font-semibold leading-none text-white"
+                maxSize={1000}
+                minSize={18}
+                style={roverNameStyle(rover.color)}
+              >
                 {rover.name || rover.id}
               </AutoFitText>
             </div>
@@ -113,6 +124,7 @@ function InfoColumn({
                       snapshotFeed={snapshotFeed}
                       audioSessionInfo={null}
                       label={rover.name || rover.id}
+                      roverColor={rover.color || null}
                       telemetryFrame={frame}
                       batteryConfig={rover.battery}
                       layoutFormat="mobile"
@@ -130,7 +142,7 @@ function InfoColumn({
   );
 }
 
-function AutoFitText({ children, className = '', maxSize = 1000, minSize = 14 }) {
+function AutoFitText({ children, className = '', maxSize = 1000, minSize = 14, style = undefined }) {
   const containerRef = useRef(null);
   const textRef = useRef(null);
   const [fontSize, setFontSize] = useState(maxSize);
@@ -183,7 +195,7 @@ function AutoFitText({ children, className = '', maxSize = 1000, minSize = 14 })
       <div
         ref={textRef}
         className={`whitespace-nowrap ${className}`}
-        style={{ fontSize: `${fontSize}px`, lineHeight: 1.1 }}
+        style={{ fontSize: `${fontSize}px`, lineHeight: 1.1, ...(style || {}) }}
       >
         {children}
       </div>
@@ -344,6 +356,7 @@ function MiniSummaryContent() {
                         audioSessionInfo={isActive ? activeAudio : null}
                         forceMute={!isActive}
                         label={rover.name || rover.id}
+                        roverColor={rover.color || null}
                         telemetryFrame={frames[rover.id] || null}
                         batteryConfig={rover.battery}
                         layoutFormat="mobile"
@@ -361,6 +374,7 @@ function MiniSummaryContent() {
                 snapshotFeed={activeSnapshot}
                 audioSessionInfo={activeAudio}
                 label={activeRover.name || activeRover.id}
+                roverColor={activeRover.color || null}
                 telemetryFrame={activeFrame}
                 batteryConfig={activeRover.battery}
                 layoutFormat="mobile"

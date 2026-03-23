@@ -31,3 +31,19 @@ This means that locking / unlocking will act a little different than standard ro
   - they will only show for lockdown admins
   - when unlocked, they show for everyone
     - with a different color in the rover list
+
+## . . .
+this will be kind of invasive, touching a lot of systems server-side, long story short:
+- private rovers are set as private in the roverd config
+- by default:
+  - locked to only lockdown admins
+  - cant be spectated by anyone
+  - any user who isnt a lockdown admin cannot know that it exists in any way at all
+  - not included by most automated systems like LLM integration, discord alerts, etc
+    - still included in safties like auto docking
+  - limitations dont apply because its lockdown admin only anyway
+- when opened up (can only be opened by lockdown admins):
+  - only verified users can drive them
+  - anyone can spectate them
+  - limits apply
+  - included in all automated systems just like a normal rover

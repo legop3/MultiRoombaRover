@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
+import { roverSwatchStyle } from '../lib/roverColor.js';
 
 function normalizeSources(list = []) {
   return list
@@ -10,6 +11,7 @@ function normalizeSources(list = []) {
         type: entry.type,
         id: String(entry.id),
         label: entry.label || String(entry.id),
+        color: entry.color || null,
         key: `${entry.type}:${entry.id}`,
       };
     })
@@ -143,6 +145,13 @@ function GroupList({ title, items, selected, onToggle }) {
               onChange={() => onToggle(item.key)}
               className="accent-emerald-400"
             />
+            {item.type === 'rover' && item.color ? (
+              <span
+                className="inline-block h-2 w-2 rounded-full border border-white/30"
+                style={roverSwatchStyle(item.color)}
+                aria-hidden="true"
+              />
+            ) : null}
             <span className="truncate">{item.label}</span>
           </label>
         ))}

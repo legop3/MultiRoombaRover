@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import NicknameForm from './NicknameForm.jsx';
 import SocialButtonsGrid from './SocialButtonsGrid.jsx';
+import { roverBadgeStyle, roverNameStyle } from '../lib/roverColor.js';
 
 export function NicknameEntryPanel({ compact = false }) {
   return (
@@ -75,8 +76,8 @@ export default function UserListPanel({
     [selfId, users],
   );
 
-  const rosterName = useCallback(
-    (roverId) => roster.find((r) => String(r.id) === String(roverId))?.name || roverId,
+  const rosterEntry = useCallback(
+    (roverId) => roster.find((r) => String(r.id) === String(roverId)) || null,
     [roster],
   );
 
@@ -124,7 +125,12 @@ export default function UserListPanel({
           >
             <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
             {user.roverId ? (
-              <span className="rounded bg-slate-800 px-1 text-[0.7rem]">rover {user.roverId}</span>
+              <span
+                className="rounded bg-slate-800 px-1 text-[0.7rem]"
+                style={roverBadgeStyle(rosterEntry(user.roverId)?.color, 0.12)}
+              >
+                rover {rosterEntry(user.roverId)?.name || user.roverId}
+              </span>
             ) : (
               <span className="text-[0.7rem] text-slate-500">no rover</span>
             )}
@@ -211,7 +217,9 @@ export default function UserListPanel({
                 return (
                   <div key={roverId} className={`surface-muted flex flex-col gap-0.5 ${compact ? 'text-[0.8rem] py-0.25' : 'text-sm'}`}>
                     <div className="flex items-center gap-0.5">
-                      <p className="font-semibold text-slate-200">{rosterName(roverId)}</p>
+                      <p className="font-semibold text-slate-200" style={roverNameStyle(rosterEntry(roverId)?.color)}>
+                        {rosterEntry(roverId)?.name || roverId}
+                      </p>
                       {remaining != null && (
                         <span className="rounded bg-slate-800 px-1 text-[0.7rem]">
                           {remaining}s left

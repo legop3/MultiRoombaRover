@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -123,6 +125,7 @@ type AutoSideBrushConfig struct {
 
 type Config struct {
 	Name          string              `yaml:"name"`
+	Color         string              `yaml:"color" json:"color,omitempty"`
 	ServerURL     string              `yaml:"serverUrl"`
 	Serial        SerialConfig        `yaml:"serial"`
 	BRC           BRCConfig           `yaml:"brc"`
@@ -207,6 +210,11 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.Name == "" {
 		return nil, errors.New("missing name")
 	}
+	normalizedColor, err := normalizeHexColor(cfg.Color)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Color = normalizedColor
 	if cfg.ServerURL == "" {
 		return nil, errors.New("missing serverUrl")
 	}
@@ -409,4 +417,17 @@ func deriveSRTURL(serverURL, streamName string, port int, mode string) (string, 
 	}
 	escaped := url.PathEscape(streamName)
 	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=%s&latency=10&mode=caller&transtype=live&pkt_size=1316", host, port, escaped, mode), nil
+}
+
+var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
+
+func normalizeHexColor(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", nil
+	}
+	if !hexColorRe.MatchString(trimmed) {
+		return "", fmt.Errorf("color must be #RRGGBB, got %q", raw)
+	}
+	return strings.ToUpper(trimmed), nil
 }

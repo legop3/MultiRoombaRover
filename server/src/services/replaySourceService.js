@@ -6,6 +6,7 @@ function getReplaySources() {
     type: 'rover',
     id: String(rover.id),
     label: rover.name || rover.id,
+    color: rover.color || null,
   }));
   const roomSources = getRoomCameras().map((camera) => ({
     type: 'room',

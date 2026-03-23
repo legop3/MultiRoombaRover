@@ -1,3 +1,5 @@
+import { roverNameStyle } from '../lib/roverColor.js';
+
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
 }
@@ -37,7 +39,9 @@ export default function RoverRoster({
               )}
             >
               <div>
-                <p className="text-slate-200">{rover.name}</p>
+                <p className="text-slate-200" style={roverNameStyle(rover.color)}>
+                  {rover.name}
+                </p>
                 <p className="text-xs text-slate-500 flex flex-wrap items-center gap-0.5">
                   <span>{rover.locked ? 'locked' : 'free'}</span>
                   {rover.lockReason && <span className="rounded bg-black/30 px-1">{rover.lockReason}</span>}

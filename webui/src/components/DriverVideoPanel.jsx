@@ -120,6 +120,7 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
           snapshotFeed={snapshotFeed}
           audioSessionInfo={audioInfo}
           label={roverLabel}
+          roverColor={batteryRecord?.color || null}
           telemetryFrame={frame}
           batteryConfig={batteryConfig}
           layoutFormat={layoutFormat}

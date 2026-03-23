@@ -113,6 +113,7 @@ func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
 	msg := helloMessage{
 		Type:          "hello",
 		Name:          c.cfg.Name,
+		Color:         c.cfg.Color,
 		Battery:       c.cfg.Battery,
 		MaxWheelSpeed: c.cfg.MaxWheelMMs,
 		Media:         c.cfg.Media,

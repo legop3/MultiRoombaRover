@@ -1,4 +1,5 @@
 import { FaDiscord } from 'react-icons/fa';
+import { roverBadgeStyle } from '../lib/roverColor.js';
 
 function roleColors(role) {
   switch (role) {
@@ -88,7 +89,12 @@ export function ChatIdentity({ message }) {
         </span>
       ) : null}
       {message.roverId && (
-        <span className="rounded bg-slate-800 px-1 text-[0.7rem]">{message.roverId}</span>
+        <span
+          className="rounded bg-slate-800 px-1 text-[0.7rem]"
+          style={roverBadgeStyle(message.roverColor, 0.14)}
+        >
+          {message.roverId}
+        </span>
       )}
     </>
   );
