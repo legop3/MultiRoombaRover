@@ -53,14 +53,17 @@ export function useFullscreenPrompt(layout) {
   const isMobileLayout = MOBILE_LAYOUTS.has(layout);
   const [visible, setVisible] = useState(false);
   const [mode, setMode] = useState('native');
+  const [forceVisible, setForceVisible] = useState(false);
   const isIOS = useMemo(() => detectIOS(), []);
+  const nativeSupported = useMemo(() => supportsFullscreen(), []);
 
   const reevaluate = useCallback(() => {
     if (!isMobileLayout) {
       setVisible(false);
+      setForceVisible(false);
       return;
     }
-    if (isDismissed()) {
+    if (!forceVisible && isDismissed()) {
       setVisible(false);
       return;
     }
@@ -79,7 +82,7 @@ export function useFullscreenPrompt(layout) {
     }
     setMode('native');
     setVisible(true);
-  }, [isIOS, isMobileLayout]);
+  }, [forceVisible, isIOS, isMobileLayout]);
 
   useEffect(() => {
     reevaluate();
@@ -89,6 +92,7 @@ export function useFullscreenPrompt(layout) {
     if (typeof document === 'undefined') return undefined;
     const handler = () => {
       if (document.fullscreenElement) {
+        setForceVisible(false);
         setVisible(false);
         return;
       }
@@ -104,12 +108,14 @@ export function useFullscreenPrompt(layout) {
 
   const dismiss = useCallback(() => {
     markDismissed();
+    setForceVisible(false);
     setVisible(false);
   }, []);
 
   const enterFullscreen = useCallback(async () => {
     if (!isMobileLayout || isIOS) return false;
     if (typeof document === 'undefined') return false;
+    if (document.fullscreenElement) return true;
     const element = document.documentElement;
     if (!element) return false;
     const request =
@@ -124,6 +130,7 @@ export function useFullscreenPrompt(layout) {
         await result;
       }
       markDismissed();
+      setForceVisible(false);
       setVisible(false);
       return true;
     } catch (error) {
@@ -132,8 +139,16 @@ export function useFullscreenPrompt(layout) {
     }
   }, [isIOS, isMobileLayout]);
 
+  const showPrompt = useCallback(() => {
+    if (!isMobileLayout) return;
+    setForceVisible(true);
+    setMode(isIOS ? 'pwa-hint' : 'native');
+    setVisible(true);
+  }, [isIOS, isMobileLayout]);
+
   useEffect(() => {
     if (!isMobileLayout) {
+      setForceVisible(false);
       setVisible(false);
     }
   }, [isMobileLayout]);
@@ -141,8 +156,11 @@ export function useFullscreenPrompt(layout) {
   return {
     visible,
     mode,
+    isIOS,
+    nativeSupported,
     enterFullscreen,
     dismiss,
+    showPrompt,
   };
 }
 

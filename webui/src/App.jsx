@@ -22,6 +22,7 @@ import TurnAlertListener from './components/TurnAlertListener.jsx';
 import RawUserPilePanel from './components/RawUserPilePanel.jsx';
 import ChatPanel from './components/ChatPanel.jsx';
 import FullscreenPrompt from './components/FullscreenPrompt.jsx';
+import FloatingFullscreenButton from './components/FloatingFullscreenButton.jsx';
 import { useFullscreenPrompt } from './hooks/useFullscreenPrompt.js';
 import { useSettingsNamespace } from './settings/index.js';
 import HelpOverlay from './components/HelpOverlay.jsx';
@@ -231,8 +232,11 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
   const {
     visible: fullscreenVisible,
     mode: fullscreenMode,
+    isIOS: fullscreenIsIOS,
+    nativeSupported: fullscreenNativeSupported,
     enterFullscreen,
     dismiss,
+    showPrompt,
   } = fullscreen;
 
   const {
@@ -244,6 +248,8 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
     swapMobileControlColumns: false,
   });
   const swapMobileControlColumns = Boolean(pageSettings?.swapMobileControlColumns);
+  const fullscreenButtonSide = swapMobileControlColumns ? 'left' : 'right';
+  const showFloatingFullscreenButton = !isDesktop && (fullscreenIsIOS || fullscreenNativeSupported);
   const [helpVisible, setHelpVisible] = useState(false);
 
   useEffect(() => {
@@ -254,6 +260,16 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
 
   const openHelp = useCallback(() => setHelpVisible(true), []);
   const closeHelp = useCallback(() => setHelpVisible(false), []);
+  const handleFloatingFullscreen = useCallback(async () => {
+    if (fullscreenIsIOS) {
+      showPrompt();
+      return;
+    }
+    const entered = await enterFullscreen();
+    if (!entered) {
+      showPrompt();
+    }
+  }, [enterFullscreen, fullscreenIsIOS, showPrompt]);
   const setShowOnLoad = useCallback(
     (enabled) => {
       const next = Boolean(enabled);
@@ -299,6 +315,12 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
         onEnterFullscreen={enterFullscreen}
         onDismiss={dismiss}
       />
+      {showFloatingFullscreenButton ? (
+        <FloatingFullscreenButton
+          side={fullscreenButtonSide}
+          onClick={handleFloatingFullscreen}
+        />
+      ) : null}
     </ControlSystemProvider>
   );
 }
