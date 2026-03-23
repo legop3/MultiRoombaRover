@@ -3,7 +3,7 @@
 3. private rovers
 4. custom webhook profile pictures for chat bridge in discord
 5. home assistant switch that tells the server to force the lights on
-6. color coding with colored names and tape
+6. color coding with colored names and tape [x]
 7. audio forwarding [x]
    - streaming from server to rovers [x]
    - audio files first [x]
