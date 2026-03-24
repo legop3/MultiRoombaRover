@@ -16,6 +16,9 @@ This means that locking / unlocking will act a little different than standard ro
 - when locked, only lockdown admins can drive them
 - when unlocked, only verified users (and lockdown admins of course) can drive them
 - if left unlocked with no one online for 30 mins, the server will automatically lock them
+- ## private rovers can be locked / unlocked by holding all 3 buttons on the top of the roomba for 3 seconds
+  - hold spot / clean / dock buttons for 3 seconds to toggle opened / closed on that private rover
+  - the server sends a TTS command to the rover to indicate when its toggled
 
 ## cliff rules / speed limit / overcurrent limit
 ### private rovers will be in a sensitive area, their physical capabilities will be optionally limited by the server, controllable by lockdown admins.
@@ -42,6 +45,7 @@ this will be kind of invasive, touching a lot of systems server-side, long story
   - not included by most automated systems like LLM integration, discord alerts, etc
     - still included in safties like auto docking
   - limitations dont apply because its lockdown admin only anyway
+  - chat messages from them dont get seen by anyone else at all, only sent to the rover for tts
 - when opened up (can only be opened by lockdown admins):
   - only verified users can drive them
   - anyone can spectate them
