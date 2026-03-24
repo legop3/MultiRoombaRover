@@ -34,3 +34,17 @@ cameraServo:
 autoSideBrush:
   enabled: true
   speed: 20
+private:
+  enabled: false
+  safety:
+    speedLimitEnabled: false
+    speedLimitMaxWheelSpeed: 250
+    hardOvercurrentEnabled: false
+    overcurrentStopMs: 300
+    hardBumpEnabled: false
+    bumpBackoffSpeed: 250
+    bumpBackoffMs: 350
+    cliffEnabled: false
+    cliffBackoffSpeed: 250
+    cliffBackoffMs: 500
+    triggerCooldownMs: 800

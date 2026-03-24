@@ -54,6 +54,14 @@ roverManager.managerEvents.on('lock', ({ roverId, locked }) => {
   }
 });
 
+roverManager.managerEvents.on('private', ({ roverId, open }) => {
+  if (open) {
+    reassignWaiting();
+  } else {
+    reassignFromRover(roverId);
+  }
+});
+
 roverManager.managerEvents.on('rover', ({ action }) => {
   if (action === 'removed' || action === 'upsert') {
     reassignWaiting();
@@ -77,7 +85,7 @@ function assignSocket(socket) {
   if (assignments.has(socket.id)) {
     return;
   }
-  const target = pickRover();
+  const target = pickRover(socket);
   if (!target) {
     waiting.add(socket.id);
     logger.info('No rover available, user waiting', socket.id);
@@ -159,13 +167,15 @@ function forceRelease(roverId, socketId) {
   assignmentEvents.emit('update', socketId);
 }
 
-function pickRover() {
+function pickRover(socket) {
   const mode = getMode();
   if (mode === MODES.ADMIN || mode === MODES.LOCKDOWN) {
     return null;
   }
   const candidates = Array.from(roverManager.rovers.values()).filter((rover) => {
     if (!rover || rover.locked) return false;
+    const access = roverManager.canRequestControl(rover.id, socket, { allowUser: true });
+    if (!access.ok) return false;
     return true;
   });
   if (candidates.length === 0) {

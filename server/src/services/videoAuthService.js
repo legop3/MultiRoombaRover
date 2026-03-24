@@ -162,6 +162,12 @@ app.post('/mediamtx/auth', (req, res) => {
   if (!canView(socket)) {
     return res.status(401).end();
   }
+  if (streamInfo.type === 'rover') {
+    const roverId = streamInfo.baseId || streamInfo.id;
+    if (!roverManager.canSeeRover(roverId, socket)) {
+      return res.status(401).end();
+    }
+  }
   if (info.sourceType === 'roverMic' && action === 'publish') {
     const roverId = streamInfo.baseId || streamInfo.id;
     if (!isVerified(socket)) {

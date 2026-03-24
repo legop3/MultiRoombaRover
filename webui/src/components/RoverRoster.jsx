@@ -30,12 +30,19 @@ export default function RoverRoster({
         <p className="text-sm text-slate-500">{emptyText}</p>
       ) : (
         <ul className="space-y-0.5 text-sm">
-          {roster.map((rover) => (
+          {roster.map((rover) => {
+            const isPrivateOpen = Boolean(rover?.private?.enabled && rover?.private?.open);
+            const isLocked = Boolean(rover?.locked);
+            return (
             <li
               key={rover.id}
               className={classNames(
                 'surface flex flex-wrap items-center justify-between gap-0.5',
-                rover.locked && 'bg-red-900/40',
+                isLocked
+                  ? 'bg-red-900/40'
+                  : isPrivateOpen
+                  ? 'bg-amber-700/35 border border-amber-200/30'
+                  : null,
               )}
             >
               <div>
@@ -54,7 +61,8 @@ export default function RoverRoster({
               </div>
               {renderActions ? renderActions(rover) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

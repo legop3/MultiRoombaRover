@@ -53,6 +53,9 @@ function canViewRover(socket, roverId) {
   if (!passesMode(socket)) {
     return false;
   }
+  if (!roverManager.canSeeRover(roverId, socket)) {
+    return false;
+  }
   const role = getRole(socket);
   if (role === 'spectator' || isAdmin(socket)) {
     return true;

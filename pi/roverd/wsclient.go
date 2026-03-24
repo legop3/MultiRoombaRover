@@ -121,6 +121,7 @@ func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
 		Audio:         c.cfg.Audio,
 		Horn:          c.cfg.Horn,
 		NightVision:   c.cfg.NightVision,
+		Private:       c.cfg.Private,
 	}
 	c.log.Printf("sending hello (camera servo enabled=%v pin=%d)", msg.CameraServo.Enabled, msg.CameraServo.Pin)
 	return writeJSON(ctx, conn, msg)

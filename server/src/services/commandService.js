@@ -1,7 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const io = require('../globals/io');
 const roverManager = require('./roverManager');
-const { isAdmin } = require('./roleService');
+const { isAdmin, isLockdownAdmin } = require('./roleService');
 const logger = require('../globals/logger').child('commandService');
 
 const pendingCommands = new Map(); // id -> { roverId }
@@ -82,12 +82,19 @@ io.on('connection', (socket) => {
       }
       const driveDirect = payload?.driveDirect;
       if (type === 'drive' && driveDirect && !isAdminSocket) {
-        const left = Number(driveDirect.left);
-        const right = Number(driveDirect.right);
+        const safeDrive = roverManager.applyPrivateDriveSafety(roverId, socket, driveDirect);
+        if (safeDrive) {
+          payload.driveDirect = safeDrive;
+        }
+        const left = Number(payload?.driveDirect?.left);
+        const right = Number(payload?.driveDirect?.right);
         const speed = Math.max(Math.abs(left), Math.abs(right));
         const blockedUntil = driveCooldowns.get(roverId);
         if (blockedUntil && Date.now() < blockedUntil && speed > 0) {
-          throw new Error('Drive blocked: dock protection cooldown');
+          const reason = isLockdownAdmin(socket)
+            ? 'Drive blocked: cooldown'
+            : 'Drive blocked: safety cooldown';
+          throw new Error(reason);
         }
         if (speed > 0) {
           let direction = 'turn';

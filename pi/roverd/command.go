@@ -11,6 +11,7 @@ type helloMessage struct {
 	Audio         AudioConfig       `json:"audio"`
 	Horn          HornConfig        `json:"horn"`
 	NightVision   NightVisionConfig `json:"nightVision"`
+	Private       PrivateConfig     `json:"private"`
 }
 
 type sensorMessage struct {

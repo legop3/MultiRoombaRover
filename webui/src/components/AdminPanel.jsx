@@ -22,6 +22,7 @@ export default function AdminPanel() {
     rebootRover,
     rebootServer,
     setAudioLevels,
+    setPrivateSafety,
     llmControl,
     adminLogs,
     llmCommentaryState,
@@ -44,11 +45,13 @@ export default function AdminPanel() {
     ttsGain: Number.isFinite(currentAudioLevels.ttsGain) ? currentAudioLevels.ttsGain : 1,
     forwardGain: Number.isFinite(currentAudioLevels.forwardGain) ? currentAudioLevels.forwardGain : 1,
   });
+  const [privateSafetyDrafts, setPrivateSafetyDrafts] = useState({});
 
   const isAdmin =
     session?.role === 'admin' ||
     session?.role === 'lockdown' ||
     session?.role === 'lockdown-admin';
+  const isLockdownAdmin = session?.role === 'lockdown' || session?.role === 'lockdown-admin';
 
   const currentMode = session?.mode ?? 'open';
 
@@ -180,6 +183,41 @@ export default function AdminPanel() {
     });
   }, [currentAudioLevels.forwardGain, currentAudioLevels.hornGain, currentAudioLevels.ttsGain]);
 
+  useEffect(() => {
+    const next = {};
+    (roster || []).forEach((rover) => {
+      if (!rover?.private?.enabled) return;
+      next[rover.id] = {
+        speedLimitEnabled: Boolean(rover?.private?.safety?.speedLimitEnabled),
+        speedLimitMaxWheelSpeed: Number.isFinite(rover?.private?.safety?.speedLimitMaxWheelSpeed)
+          ? rover.private.safety.speedLimitMaxWheelSpeed
+          : 250,
+        hardOvercurrentEnabled: Boolean(rover?.private?.safety?.hardOvercurrentEnabled),
+        overcurrentStopMs: Number.isFinite(rover?.private?.safety?.overcurrentStopMs)
+          ? rover.private.safety.overcurrentStopMs
+          : 300,
+        hardBumpEnabled: Boolean(rover?.private?.safety?.hardBumpEnabled),
+        bumpBackoffSpeed: Number.isFinite(rover?.private?.safety?.bumpBackoffSpeed)
+          ? rover.private.safety.bumpBackoffSpeed
+          : 250,
+        bumpBackoffMs: Number.isFinite(rover?.private?.safety?.bumpBackoffMs)
+          ? rover.private.safety.bumpBackoffMs
+          : 350,
+        cliffEnabled: Boolean(rover?.private?.safety?.cliffEnabled),
+        cliffBackoffSpeed: Number.isFinite(rover?.private?.safety?.cliffBackoffSpeed)
+          ? rover.private.safety.cliffBackoffSpeed
+          : 250,
+        cliffBackoffMs: Number.isFinite(rover?.private?.safety?.cliffBackoffMs)
+          ? rover.private.safety.cliffBackoffMs
+          : 500,
+        triggerCooldownMs: Number.isFinite(rover?.private?.safety?.triggerCooldownMs)
+          ? rover.private.safety.triggerCooldownMs
+          : 800,
+      };
+    });
+    setPrivateSafetyDrafts(next);
+  }, [roster]);
+
   const lockMap = useMemo(() => {
     const map = {};
     roster.forEach((rover) => {
@@ -187,6 +225,23 @@ export default function AdminPanel() {
     });
     return map;
   }, [roster, lockStates]);
+
+  const updatePrivateSafetyDraft = (roverId, patch = {}) => {
+    setPrivateSafetyDrafts((current) => ({
+      ...(current || {}),
+      [roverId]: { ...(current?.[roverId] || {}), ...(patch || {}) },
+    }));
+  };
+
+  const handlePrivateSafetySave = async (roverId) => {
+    try {
+      const draft = privateSafetyDrafts?.[roverId];
+      if (!draft) return;
+      await setPrivateSafety(roverId, draft);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   if (!isAdmin) return null;
 
@@ -338,6 +393,71 @@ export default function AdminPanel() {
             >
               {rebootStates[rover.id] ? 'Rebooting...' : 'Reboot'}
             </button>
+            {rover?.private?.enabled ? (
+              <div className="w-full rounded border border-slate-700/70 p-0.5 space-y-0.5 text-[0.7rem]">
+                <div className="text-slate-300">Private safety</div>
+                <label className="flex items-center gap-0.5">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(privateSafetyDrafts?.[rover.id]?.speedLimitEnabled)}
+                    disabled={!isLockdownAdmin}
+                    onChange={(event) =>
+                      updatePrivateSafetyDraft(rover.id, { speedLimitEnabled: Boolean(event.target.checked) })}
+                  />
+                  <span>Speed limit</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  className="field-input text-xs w-20"
+                  disabled={!isLockdownAdmin}
+                  value={privateSafetyDrafts?.[rover.id]?.speedLimitMaxWheelSpeed ?? 250}
+                  onChange={(event) =>
+                    updatePrivateSafetyDraft(rover.id, {
+                      speedLimitMaxWheelSpeed: Number(event.target.value) || 250,
+                    })}
+                />
+                <label className="flex items-center gap-0.5">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(privateSafetyDrafts?.[rover.id]?.hardOvercurrentEnabled)}
+                    disabled={!isLockdownAdmin}
+                    onChange={(event) =>
+                      updatePrivateSafetyDraft(rover.id, { hardOvercurrentEnabled: Boolean(event.target.checked) })}
+                  />
+                  <span>Hard overcurrent</span>
+                </label>
+                <label className="flex items-center gap-0.5">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(privateSafetyDrafts?.[rover.id]?.hardBumpEnabled)}
+                    disabled={!isLockdownAdmin}
+                    onChange={(event) =>
+                      updatePrivateSafetyDraft(rover.id, { hardBumpEnabled: Boolean(event.target.checked) })}
+                  />
+                  <span>Hard bump</span>
+                </label>
+                <label className="flex items-center gap-0.5">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(privateSafetyDrafts?.[rover.id]?.cliffEnabled)}
+                    disabled={!isLockdownAdmin}
+                    onChange={(event) =>
+                      updatePrivateSafetyDraft(rover.id, { cliffEnabled: Boolean(event.target.checked) })}
+                  />
+                  <span>Cliff safety</span>
+                </label>
+                <button
+                  type="button"
+                  disabled={!isLockdownAdmin}
+                  onClick={() => handlePrivateSafetySave(rover.id)}
+                  className="button-dark disabled:opacity-50"
+                >
+                  Apply Safety
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
       />

@@ -62,9 +62,19 @@ function sumQueueCounts(turnQueues = {}) {
   }, 0);
 }
 
+function getPublicRovers() {
+  return roverManager
+    .getRoster()
+    .filter((rover) => roverManager.canReplayRoverId(rover.id));
+}
+
 function buildEmbedCopy(state, camera) {
   const roversOnline = state?.rovers?.length || 0;
-  const driverCount = Object.keys(state?.activeDrivers || {}).length;
+  const visibleRoverIds = new Set((state?.rovers || []).map((rover) => String(rover.id)));
+  const driverCount = Object.entries(state?.activeDrivers || {}).reduce((count, [roverId, socketId]) => {
+    if (!socketId) return count;
+    return visibleRoverIds.has(String(roverId)) ? count + 1 : count;
+  }, 0);
   const mode = state?.mode || 'open';
   const modeLabel = {
     open: 'open drive',
@@ -148,7 +158,7 @@ async function renderIndexHtml(req) {
   const baseUrl = getBaseUrl(req);
   const state = {
     mode: getMode(),
-    rovers: roverManager.getRoster(),
+    rovers: getPublicRovers(),
     activeDrivers: getActiveDrivers(),
     turnQueues: getTurnQueues(),
   };
@@ -216,7 +226,7 @@ function buildOverlaySvg({ title, subtitle, stats, cameraLabel, hasFrame }) {
 async function renderOgImage() {
   const state = {
     mode: getMode(),
-    rovers: roverManager.getRoster(),
+    rovers: getPublicRovers(),
     activeDrivers: getActiveDrivers(),
     turnQueues: getTurnQueues(),
   };
