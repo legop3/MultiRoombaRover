@@ -84,6 +84,7 @@ type MediaConfig struct {
 	AudioPublishURL string   `yaml:"audioPublishUrl" json:"audioPublishUrl,omitempty"`
 	AudioForwardURL string   `yaml:"audioForwardUrl" json:"audioForwardUrl,omitempty"`
 	PublishPort     int      `yaml:"publishPort" json:"-"`
+	CameraInverted  bool     `yaml:"cameraInverted" json:"-"`
 	Manage          bool     `yaml:"manage"`
 	ManageAudio     bool     `yaml:"manageAudio"`
 	Service         string   `yaml:"service"`
@@ -178,6 +179,7 @@ func LoadConfig(path string) (*Config, error) {
 		},
 		Media: MediaConfig{
 			PublishPort:    9000,
+			CameraInverted: true,
 			HealthInterval: Duration{Duration: 30 * time.Second},
 			VideoBitrate:   2000000,
 		},

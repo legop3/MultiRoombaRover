@@ -71,10 +71,14 @@ VIDEO_WIDTH="640"
 VIDEO_HEIGHT="480"
 VIDEO_FPS="30"
 VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
+VIDEO_INVERT="${VIDEO_INVERT:-1}"
 VIDEO_SENSOR_MODE="${VIDEO_SENSOR_MODE:-1296:972}"
 
-# Flip the camera 180deg (supported by rpicam-vid/libcamera-vid)
-FLIP_ARGS=(--rotation 180)
+# Flip the camera 180deg by default; allow upright camera mounts via VIDEO_INVERT=0.
+FLIP_ARGS=()
+if [[ "${VIDEO_INVERT}" -ne 0 ]]; then
+  FLIP_ARGS=(--rotation 180)
+fi
 
 MODE_ARGS=()
 if [[ -n "${VIDEO_SENSOR_MODE}" ]]; then

@@ -40,6 +40,7 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 		fmt.Fprintf(&buf, "VIDEO_FPS=%d\n", media.VideoFPS)
 	}
 	fmt.Fprintf(&buf, "VIDEO_BITRATE=%d\n", media.VideoBitrate)
+	fmt.Fprintf(&buf, "VIDEO_INVERT=%d\n", boolToInt(media.CameraInverted))
 	audioDevice := audio.CaptureDevice
 	if audioDevice == "" || audioDevice == "rovermic" {
 		audioDevice = "hw:0,0"
