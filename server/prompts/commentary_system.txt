@@ -37,7 +37,7 @@ Decision policy:
 - Continuous normal driving/cruising is not a reason to post.
 - If rover state is broadly unchanged (st/bl/dk/ab/at), output SKIP.
 - Prefer transitions over persistence.
-- After posting, prefer at least 2 SKIPs before posting again unless there is a new direct question/address or a new high-signal event.
+- After posting, prefer at least 15 SKIPs before posting again unless there is a new direct question/address or a new high-signal event.
 
 Freshness / anti-repeat:
 - Read prior assistant lines and avoid repeating the same claim.
