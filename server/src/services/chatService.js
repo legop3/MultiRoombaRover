@@ -89,6 +89,11 @@ function resolveRoverColor(roverId) {
   return record?.meta?.color || null;
 }
 
+function isPrivateClosedRoverId(roverId) {
+  if (!roverId) return false;
+  return roverManager.canReplayRoverId(roverId) !== true;
+}
+
 function normalizeUserText(raw) {
   if (typeof raw !== 'string') return '';
   return raw.replace(/\\n/g, '\n');
@@ -406,6 +411,13 @@ function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
   });
   logger.info('Chat message', { socket: socket.id, roverId: message.roverId });
   playTypingNote(roverId, TYPING_SEND_NOTE, socket?.id);
+  const privateClosed = isPrivateClosedRoverId(message.roverId);
+  if (privateClosed) {
+    const forcedTts = ttsOptions || { speak: true, engine: 'flite' };
+    maybeSpeak(socket, message, forcedTts);
+    cb({ success: true, privateOnly: true });
+    return;
+  }
   broadcastMessage(message);
   maybeSendAccessNotice(message);
   maybeSpeak(socket, message, ttsOptions);
@@ -466,6 +478,9 @@ function sendExternalMessage({
   if (isKeymash(clean)) {
     throw new Error('Message looks like spam');
   }
+  if (isPrivateClosedRoverId(roverId)) {
+    throw new Error('Private rover chat is closed');
+  }
   const message = buildMessage(null, clean, {
     nickname,
     role,
@@ -499,6 +514,9 @@ function sendExternalTyping({
   discordUserAvatarUrl = null,
   isTyping = true,
 }) {
+  if (isPrivateClosedRoverId(roverId)) {
+    return null;
+  }
   const payload = buildTypingPayload(null, {
     nickname,
     role,
@@ -533,6 +551,9 @@ io.on('connection', (socket) => {
       typingBySocket.delete(socket.id);
     }
     const roverId = resolveRoverId(socket?.id);
+    if (isPrivateClosedRoverId(roverId)) {
+      return;
+    }
     const typingPayload = buildTypingPayload(socket, { roverId, fromDiscord: false, isTyping });
     broadcastTyping(typingPayload);
   });
@@ -540,6 +561,9 @@ io.on('connection', (socket) => {
     if (!typingBySocket.has(socket.id)) return;
     typingBySocket.delete(socket.id);
     const roverId = resolveRoverId(socket?.id);
+    if (isPrivateClosedRoverId(roverId)) {
+      return;
+    }
     const typingPayload = buildTypingPayload(socket, { roverId, fromDiscord: false, isTyping: false });
     broadcastTyping(typingPayload);
   });

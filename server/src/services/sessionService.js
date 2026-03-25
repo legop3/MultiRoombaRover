@@ -54,10 +54,42 @@ function buildUserEntry(socket) {
   };
 }
 
+function filterVisibleRoverId(socket, roverId) {
+  if (!roverId) return null;
+  return roverManager.canSeeRover(roverId, socket) ? roverId : null;
+}
+
+function filterActiveDriversForSocket(activeDrivers = {}, socket) {
+  const next = {};
+  Object.entries(activeDrivers || {}).forEach(([roverId, socketId]) => {
+    if (!roverManager.canSeeRover(roverId, socket)) return;
+    next[roverId] = socketId;
+  });
+  return next;
+}
+
+function filterTurnQueuesForSocket(turnQueues = {}, socket) {
+  const next = {};
+  Object.entries(turnQueues || {}).forEach(([roverId, info]) => {
+    if (!roverManager.canSeeRover(roverId, socket)) return;
+    next[roverId] = info;
+  });
+  return next;
+}
+
 function buildSession(socket) {
   const users = Array.from(io.sockets.sockets.values())
     .map((sock) => buildUserEntry(sock))
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((entry) => ({
+      ...entry,
+      roverId: filterVisibleRoverId(socket, entry.roverId),
+    }));
+  const roster = roverManager.getRosterForSocket(socket);
+  const assignment = assignmentService.describeAssignment(socket?.id || '');
+  const assignmentRoverId = filterVisibleRoverId(socket, assignment?.roverId);
+  const activeDrivers = filterActiveDriversForSocket(getActiveDrivers(), socket);
+  const turnQueues = filterTurnQueuesForSocket(getTurnQueues(), socket);
   const socials =
     configuredSocials?.length
       ? configuredSocials
@@ -70,14 +102,18 @@ function buildSession(socket) {
     role: getRole(socket),
     mode: getMode(),
     isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
-    roster: roverManager.getRoster(),
-    assignment: assignmentService.describeAssignment(socket?.id || ''),
-    activeDrivers: getActiveDrivers(),
-    turnQueues: getTurnQueues(),
+    roster,
+    assignment: {
+      ...assignment,
+      roverId: assignmentRoverId,
+      status: assignmentRoverId ? assignment.status : assignment.status === 'waiting' ? 'waiting' : null,
+    },
+    activeDrivers,
+    turnQueues,
     roomCameras: getRoomCameras(),
     homeAssistant: getHomeAssistantState(),
     replay: getReplayState(),
-    replaySources: getReplaySources(),
+    replaySources: getReplaySources(socket),
     health: getHealthSnapshot(),
     communityGoal: getCommunityGoal(),
     adminReason: getAdminReason(),
@@ -165,6 +201,16 @@ managerEvents.on('rover', (event = {}) => {
 
 managerEvents.on('lock', ({ roverId, locked }) => {
   logger.info('Rover lock change', roverId, locked);
+  syncAll();
+});
+
+managerEvents.on('private', ({ roverId, open }) => {
+  logger.info('Private rover visibility change', roverId, open);
+  syncAll();
+});
+
+managerEvents.on('privateSafety', ({ roverId }) => {
+  logger.info('Private rover safety config changed', roverId);
   syncAll();
 });
 

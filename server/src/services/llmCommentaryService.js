@@ -278,6 +278,7 @@ function upsertActivityState(roverId) {
 
 function onSensorEvent({ roverId, sensors, batteryState } = {}) {
   if (!roverId || !sensors) return;
+  if (!roverManager.canReplayRoverId(roverId)) return;
   const nowMs = Date.now();
   const dockedNow = Boolean(sensors?.chargingSources?.homeBase);
   const bucketTs = Math.floor(nowMs / ACTIVITY_BUCKET_MS) * ACTIVITY_BUCKET_MS;
@@ -603,7 +604,10 @@ function deriveMobilityState(sensors = {}, wheelsOffGround = false) {
 
 function buildRoversNow(nowMs = Date.now()) {
   const activeDrivers = getActiveDrivers();
-  const roster = roverManager.getRoster().slice(0, MAX_ROVERS);
+  const roster = roverManager
+    .getRoster()
+    .filter((entry) => roverManager.canReplayRoverId(entry.id))
+    .slice(0, MAX_ROVERS);
   const nextRoverStateById = new Map();
   const rovers = roster.map((entry) => {
     const roverId = String(entry.id);
@@ -693,7 +697,12 @@ function buildSnapshot() {
   const { rovers } = buildRoversNow(nowMs);
   const roverById = new Map(rovers.map((rover) => [String(rover.id), rover]));
   const allRecentMessages = getRecentMessages(300, { includeSystem: true })
-    .filter((entry) => Number(entry?.ts) >= contextResetAt);
+    .filter((entry) => Number(entry?.ts) >= contextResetAt)
+    .filter((entry) => {
+      const roverId = entry?.roverId ? String(entry.roverId) : null;
+      if (!roverId) return true;
+      return roverManager.canReplayRoverId(roverId);
+    });
   const chatRecent = allRecentMessages
     .filter((entry) => !entry?.system)
     .slice(-MAX_CHAT_MESSAGES)
@@ -710,7 +719,11 @@ function buildSnapshot() {
     (entry) => nowMs - Number(entry?.ts || 0) <= SELF_TALK_WINDOW_MS,
   );
 
-  const roverEvents = roverMajorEvents.filter((entry) => Number(entry?.ts) >= contextResetAt);
+  const roverEvents = roverMajorEvents.filter(
+    (entry) =>
+      Number(entry?.ts) >= contextResetAt &&
+      roverManager.canReplayRoverId(entry?.rover_id || ''),
+  );
   const timelineEntries = [
     ...allRecentMessages.map((entry) => ({ ts: Number(entry?.ts || 0), source: 'chat', entry })),
     ...roverEvents.map((entry) => ({ ts: Number(entry?.ts || 0), source: 'event', entry })),

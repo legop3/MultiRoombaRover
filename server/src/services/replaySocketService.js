@@ -27,10 +27,10 @@ io.on('connection', (socket) => {
       return;
     }
     const requestedSources = Array.isArray(payload?.sources) ? payload.sources : null;
-    let sources = requestedSources ? validateSources(requestedSources) : [];
+    let sources = requestedSources ? validateSources(requestedSources, socket) : [];
     if (!sources.length) {
       const assignment = assignmentService.describeAssignment(socket.id);
-      sources = getDefaultWebSources(assignment);
+      sources = getDefaultWebSources(assignment, socket);
     }
     if (!sources.length) {
       cb({ error: 'No replay sources selected', state: null });

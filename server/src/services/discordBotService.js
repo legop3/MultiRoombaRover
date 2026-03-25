@@ -13,7 +13,8 @@ const logger = require('../globals/logger').child('discordBot');
 const io = require('../globals/io');
 const { loadConfig } = require('../helpers/configLoader');
 const { subscribe } = require('./eventBus');
-const { getRoster, lockRover, rovers } = require('./roverManager');
+const roverManager = require('./roverManager');
+const { getRoster, lockRover, rovers } = roverManager;
 const { MODES, getMode, setMode } = require('./modeManager');
 const { sendExternalMessage, sendExternalTyping } = require('./chatService');
 const { buildReplayVideo } = require('./replayBuildService');
@@ -158,6 +159,7 @@ function isCharging(sensors) {
 
 function buildRoverStatusSnapshot(record) {
   if (!record) return null;
+  if (!roverManager.canReplayRoverId(record.id)) return null;
   const sensors = record.lastSensor?.decoded || record.lastSensor?.sensors || null;
   const docked = Boolean(sensors?.chargingSources?.homeBase);
   const charging = isCharging(sensors);
@@ -179,7 +181,7 @@ function buildRoverStatusSnapshot(record) {
 }
 
 function countReady() {
-  const roster = getRoster();
+  const roster = getRoster().filter((entry) => roverManager.canReplayRoverId(entry.id));
   const total = roster.length;
   const ready = roster.filter((r) => !r.locked).length;
   return { ready, total };
@@ -1097,7 +1099,9 @@ async function handleTimeStatusCommand(message) {
 
 function buildBatteryStatusEmbed(color, records = null) {
   const embed = buildEmbed({ title: 'Rover Battery Status', color: color || 0x2196f3 });
-  const baseRecords = records || Array.from(rovers.values());
+  const baseRecords = (records || Array.from(rovers.values())).filter((entry) =>
+    roverManager.canReplayRoverId(entry?.id),
+  );
   const snapshots = baseRecords.map(buildRoverStatusSnapshot).filter(Boolean);
   if (snapshots.length === 0) {
     embed.setDescription('No rovers online.');
@@ -1135,7 +1139,9 @@ function buildBatteryStatusEmbed(color, records = null) {
 
 function buildAllUnlockedEmbed(color, records = null) {
   const embed = buildEmbed({ title: 'All Rovers Unlocked', color: color || 0x4caf50 });
-  const baseRecords = records || Array.from(rovers.values());
+  const baseRecords = (records || Array.from(rovers.values())).filter((entry) =>
+    roverManager.canReplayRoverId(entry?.id),
+  );
   const snapshots = baseRecords.map(buildRoverStatusSnapshot).filter(Boolean);
   if (snapshots.length === 0) {
     embed.setDescription('No rovers online.');
@@ -1158,8 +1164,9 @@ function buildAllUnlockedCaption(records = null) {
 }
 
 function buildAccessModeEmbed(mode, color) {
-  const total = rovers.size;
-  const unlocked = Array.from(rovers.values()).filter((entry) => !entry.locked).length;
+  const visible = Array.from(rovers.values()).filter((entry) => roverManager.canReplayRoverId(entry?.id));
+  const total = visible.length;
+  const unlocked = visible.filter((entry) => !entry.locked).length;
   const embed = buildEmbed({
     title: 'Access Mode Updated',
     description: `Access mode set to **${mode}**\nUnlocked rovers: **${unlocked}/${total}**`,
@@ -1170,6 +1177,9 @@ function buildAccessModeEmbed(mode, color) {
 
 function buildBatteryCaption(type, payload) {
   const roverId = payload?.roverId || 'unknown';
+  if (!roverManager.canReplayRoverId(roverId)) {
+    return null;
+  }
   const record = rovers.get(roverId) || findRoverRecord(roverId);
   const snapshot = buildRoverStatusSnapshot(record);
   const base = snapshot?.name || roverId;
@@ -1258,6 +1268,10 @@ function handleBusEvent(event) {
   const { type, payload } = event || {};
   const channels = discordConfig.channels || {};
   const roles = discordConfig.roles || {};
+  const roverId = payload?.roverId || null;
+  if (roverId && !roverManager.canReplayRoverId(roverId)) {
+    return;
+  }
   switch (type) {
     case 'mode.changed':
       if (!skippedFirstModeAnnouncement) {
@@ -1342,6 +1356,7 @@ function handleBusEvent(event) {
       });
       break;
     case 'battery.warn':
+      if (!buildBatteryCaption(type, payload)) break;
       announce({
         channelId: channels.adminAlerts,
         pingRoleId: roles.adminPing || null,
@@ -1353,6 +1368,7 @@ function handleBusEvent(event) {
       });
       break;
     case 'battery.urgent':
+      if (!buildBatteryCaption(type, payload)) break;
       announce({
         channelId: channels.adminAlerts,
         pingRoleId: roles.adminPing || null,
@@ -1364,6 +1380,7 @@ function handleBusEvent(event) {
       });
       break;
     case 'battery.docked':
+      if (!buildBatteryCaption(type, payload)) break;
       announce({
         channelId: channels.adminAlerts,
         color: 0x2196f3,
@@ -1374,6 +1391,7 @@ function handleBusEvent(event) {
       });
       break;
     case 'battery.undocked':
+      if (!buildBatteryCaption(type, payload)) break;
       announce({
         channelId: channels.adminAlerts,
         color: 0x2196f3,
@@ -1384,6 +1402,7 @@ function handleBusEvent(event) {
       });
       break;
     case 'battery.charging.start':
+      if (!buildBatteryCaption(type, payload)) break;
       announce({
         channelId: channels.adminAlerts,
         color: 0x2196f3,
@@ -1394,6 +1413,7 @@ function handleBusEvent(event) {
       });
       break;
     case 'battery.charging.stop':
+      if (!buildBatteryCaption(type, payload)) break;
       announce({
         channelId: channels.adminAlerts,
         color: 0xf0b651,
@@ -1404,6 +1424,7 @@ function handleBusEvent(event) {
       });
       break;
     case 'battery.locked':
+      if (!buildBatteryCaption(type, payload)) break;
       announce({
         channelId: channels.adminAlerts,
         color: 0xf0b651,
@@ -1415,6 +1436,7 @@ function handleBusEvent(event) {
       schedulePresenceRotation();
       break;
     case 'battery.unlocked':
+      if (!buildBatteryCaption(type, payload)) break;
       announce({
         channelId: channels.adminAlerts,
         color: 0x4caf50,
@@ -1528,6 +1550,7 @@ async function handleVerificationReaction(reaction, user) {
 function handleChatBridgeOutbound(event) {
   const payload = event?.payload;
   if (!payload) return;
+  if (payload?.roverId && !roverManager.canReplayRoverId(payload.roverId)) return;
   const guildConfigs = listGuildConfigs();
   if (!guildConfigs.length) return;
   const text = payload.text?.length > 1900 ? `${payload.text.slice(0, 1897)}...` : payload.text;
@@ -1566,6 +1589,7 @@ function handleChatBridgeOutbound(event) {
 function handleChatTypingOutbound(event) {
   const payload = event?.payload;
   if (!payload || payload.fromDiscord) return;
+  if (payload?.roverId && !roverManager.canReplayRoverId(payload.roverId)) return;
   const guildConfigs = listGuildConfigs();
   if (!guildConfigs.length) return;
   guildConfigs.forEach((entry) => {

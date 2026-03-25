@@ -32,6 +32,7 @@ const SessionContext = createContext({
   readyMicWhip: async () => {},
   stopMicWhip: async () => {},
   setAudioLevels: async () => {},
+  setPrivateSafety: async () => {},
   llmControl: async () => {},
 });
 
@@ -154,6 +155,8 @@ export function SessionProvider({ children }) {
       readyMicWhip: (roverId) => emitWithAck('audio:micWhipReady', { roverId }),
       stopMicWhip: (roverId) => emitWithAck('audio:micWhipStop', { roverId }),
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
+      setPrivateSafety: (roverId, safety = {}) =>
+        emitWithAck('session:privateSafety:set', { roverId, safety }),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),
       pushAlert: (alert) =>

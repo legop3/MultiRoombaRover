@@ -210,11 +210,26 @@ function stopRecorder(key) {
   recorders.delete(key);
 }
 
+async function removeSourceArtifacts(key, source) {
+  try {
+    await fsp.rm(path.join(SEGMENT_DIR, key), { recursive: true, force: true });
+  } catch (err) {
+    logger.warn('Failed to clear replay segments', { key, error: err.message });
+  }
+  if (source?.type === 'rover' && source?.id) {
+    try {
+      await fsp.rm(path.join(ROVER_SNAPSHOT_DIR, `${source.id}.jpg`), { force: true });
+    } catch (err) {
+      logger.warn('Failed to clear rover snapshot artifact', { roverId: source.id, error: err.message });
+    }
+  }
+}
+
 function shouldRecord(source) {
   if (source.type === 'room') {
     return Boolean(source.streamUrl);
   }
-  return true;
+  return roverManager.canReplayRoverId(source.id);
 }
 
 function syncRecorders() {
@@ -230,7 +245,9 @@ function syncRecorders() {
   });
   Array.from(recorders.keys()).forEach((key) => {
     if (!desiredKeys.has(key)) {
+      const entry = recorders.get(key);
       stopRecorder(key);
+      removeSourceArtifacts(key, entry?.source).catch(() => {});
     }
   });
 }
@@ -292,6 +309,10 @@ roomCameraEvents.on('update', () => {
 });
 
 roverManager.managerEvents.on('rover', () => {
+  syncRecorders();
+});
+
+roverManager.managerEvents.on('private', () => {
   syncRecorders();
 });
 

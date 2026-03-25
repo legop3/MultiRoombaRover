@@ -123,6 +123,25 @@ type AutoSideBrushConfig struct {
 	Speed   int  `yaml:"speed"`
 }
 
+type PrivateConfig struct {
+	Enabled bool                `yaml:"enabled" json:"enabled"`
+	Safety  PrivateSafetyConfig `yaml:"safety" json:"safety"`
+}
+
+type PrivateSafetyConfig struct {
+	SpeedLimitEnabled      bool `yaml:"speedLimitEnabled" json:"speedLimitEnabled"`
+	SpeedLimitMaxWheelMMs  int  `yaml:"speedLimitMaxWheelSpeed" json:"speedLimitMaxWheelSpeed"`
+	HardOvercurrentEnabled bool `yaml:"hardOvercurrentEnabled" json:"hardOvercurrentEnabled"`
+	OvercurrentStopMs      int  `yaml:"overcurrentStopMs" json:"overcurrentStopMs"`
+	HardBumpEnabled        bool `yaml:"hardBumpEnabled" json:"hardBumpEnabled"`
+	BumpBackoffSpeed       int  `yaml:"bumpBackoffSpeed" json:"bumpBackoffSpeed"`
+	BumpBackoffMs          int  `yaml:"bumpBackoffMs" json:"bumpBackoffMs"`
+	CliffEnabled           bool `yaml:"cliffEnabled" json:"cliffEnabled"`
+	CliffBackoffSpeed      int  `yaml:"cliffBackoffSpeed" json:"cliffBackoffSpeed"`
+	CliffBackoffMs         int  `yaml:"cliffBackoffMs" json:"cliffBackoffMs"`
+	TriggerCooldownMs      int  `yaml:"triggerCooldownMs" json:"triggerCooldownMs"`
+}
+
 type Config struct {
 	Name          string              `yaml:"name"`
 	Color         string              `yaml:"color" json:"color,omitempty"`
@@ -137,6 +156,7 @@ type Config struct {
 	Horn          HornConfig          `yaml:"horn"`
 	NightVision   NightVisionConfig   `yaml:"nightVision" json:"nightVision"`
 	AutoSideBrush AutoSideBrushConfig `yaml:"autoSideBrush"`
+	Private       PrivateConfig       `yaml:"private" json:"private"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -202,6 +222,22 @@ func LoadConfig(path string) (*Config, error) {
 		AutoSideBrush: AutoSideBrushConfig{
 			Enabled: true,
 			Speed:   20,
+		},
+		Private: PrivateConfig{
+			Enabled: false,
+			Safety: PrivateSafetyConfig{
+				SpeedLimitEnabled:      false,
+				SpeedLimitMaxWheelMMs:  250,
+				HardOvercurrentEnabled: false,
+				OvercurrentStopMs:      300,
+				HardBumpEnabled:        false,
+				BumpBackoffSpeed:       250,
+				BumpBackoffMs:          350,
+				CliffEnabled:           false,
+				CliffBackoffSpeed:      250,
+				CliffBackoffMs:         500,
+				TriggerCooldownMs:      800,
+			},
 		},
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {

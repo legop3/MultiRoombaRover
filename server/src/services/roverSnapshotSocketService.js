@@ -117,11 +117,13 @@ roverSnapshotEvents.on('status', ({ id, error }) => {
 
 io.on('connection', (socket) => {
   socket.on('roverSnapshot:subscribe', (payload = {}, cb = () => {}) => {
+    const visibleRoster = roverManager.getRosterForSocket(socket);
+    const visibleIds = visibleRoster.map((rover) => String(rover.id));
     const list = Array.isArray(payload?.ids)
       ? payload.ids.map(String)
       : payload?.roverId || payload?.id
       ? [String(payload.roverId || payload.id)]
-      : roverManager.getRoster().map((rover) => rover.id);
+      : visibleIds;
     const uniqueIds = Array.from(new Set(list));
     try {
       if (!allowSubscribe(socket.id)) {
@@ -131,7 +133,7 @@ io.on('connection', (socket) => {
       if (!canViewSnapshots(socket)) {
         throw new Error('Not authorized for rover snapshots');
       }
-      const rosterIds = new Set(roverManager.getRoster().map((entry) => String(entry.id)));
+      const rosterIds = new Set(visibleIds);
       const validIds = uniqueIds.filter((id) => rosterIds.has(String(id)));
       validIds.forEach((roverId) => addSubscription(socket, roverId));
       validIds.forEach((roverId) => {

@@ -1,13 +1,16 @@
 const roverManager = require('./roverManager');
 const { getRoomCameras } = require('./roomCameraService');
 
-function getReplaySources() {
-  const roverSources = roverManager.getRoster().map((rover) => ({
-    type: 'rover',
-    id: String(rover.id),
-    label: rover.name || rover.id,
-    color: rover.color || null,
-  }));
+function getReplaySources(socket = null) {
+  const roster = socket ? roverManager.getRosterForSocket(socket) : roverManager.getRoster();
+  const roverSources = roster
+    .filter((rover) => roverManager.canReplayRoverId(rover.id))
+    .map((rover) => ({
+      type: 'rover',
+      id: String(rover.id),
+      label: rover.name || rover.id,
+      color: rover.color || null,
+    }));
   const roomSources = getRoomCameras().map((camera) => ({
     type: 'room',
     id: String(camera.id),
@@ -31,9 +34,9 @@ function normalizeSource(entry) {
   return null;
 }
 
-function validateSources(list = []) {
+function validateSources(list = [], socket = null) {
   const allowed = new Map();
-  getReplaySources().forEach((source) => {
+  getReplaySources(socket).forEach((source) => {
     allowed.set(`${source.type}:${source.id}`, source);
   });
   const unique = new Map();
@@ -48,11 +51,12 @@ function validateSources(list = []) {
   return Array.from(unique.values());
 }
 
-function getDefaultWebSources(assignment = {}) {
+function getDefaultWebSources(assignment = {}, socket = null) {
   if (assignment?.roverId) {
     const id = String(assignment.roverId);
-    const match = getReplaySources().find((entry) => entry.type === 'rover' && entry.id === id);
-    return [{ type: 'rover', id, label: match?.label || id }];
+    const match = getReplaySources(socket).find((entry) => entry.type === 'rover' && entry.id === id);
+    if (!match) return [];
+    return [{ type: 'rover', id, label: match.label || id }];
   }
   return [];
 }

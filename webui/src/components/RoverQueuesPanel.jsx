@@ -113,6 +113,7 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
             const isSelfNext = Boolean(selfId && nextId && nextId === selfId);
             const showTimer = remainingSeconds != null && (isSelfCurrent || isSelfNext);
             const locked = Boolean(rover.locked);
+            const isPrivateOpen = Boolean(rover?.private?.enabled && rover?.private?.open);
             const lockLabel = rover.lockReason ? `locked: ${rover.lockReason}` : 'locked';
             const buttonLabel = locked ? lockLabel : pending[roverId] ? '...' : 'request';
             const canClickRow = canRequest && !locked && !pending[roverId];
@@ -122,7 +123,11 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
                 className={classNames(
                   'surface flex flex-wrap items-start justify-between gap-0.5',
                   canClickRow && 'cursor-pointer',
-                  locked && 'bg-red-900/40',
+                  locked
+                    ? 'bg-red-900/40'
+                    : isPrivateOpen
+                    ? 'bg-amber-700/35 border border-amber-200/30'
+                    : null,
                 )}
                 onClick={() => {
                   if (!canClickRow) return;
