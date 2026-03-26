@@ -47,6 +47,13 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
   const [now, setNow] = useState(() => Date.now());
 
   const canRequest = useMemo(() => session?.role && session.role !== 'spectator', [session?.role]);
+  const adminCapable = useMemo(
+    () =>
+      session?.role === 'admin' ||
+      session?.role === 'lockdown' ||
+      session?.role === 'lockdown-admin',
+    [session?.role],
+  );
   const roster = session?.roster ?? [];
   const turnQueues = session?.turnQueues ?? {};
   const users = session?.users ?? [];
@@ -113,10 +120,11 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
             const isSelfNext = Boolean(selfId && nextId && nextId === selfId);
             const showTimer = remainingSeconds != null && (isSelfCurrent || isSelfNext);
             const locked = Boolean(rover.locked);
+            const lockedBlocked = locked && !adminCapable;
             const isPrivateOpen = Boolean(rover?.private?.enabled && rover?.private?.open);
             const lockLabel = rover.lockReason ? `locked: ${rover.lockReason}` : 'locked';
             const buttonLabel = locked ? lockLabel : pending[roverId] ? '...' : 'request';
-            const canClickRow = canRequest && !locked && !pending[roverId];
+            const canClickRow = canRequest && !lockedBlocked && !pending[roverId];
             return (
               <li
                 key={rover.id}
@@ -188,7 +196,7 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
                       event.stopPropagation();
                       handleRequest(rover.id);
                     }}
-                    disabled={pending[roverId] || locked}
+                    disabled={pending[roverId] || lockedBlocked}
                     className={classNames(
                       'button-dark disabled:opacity-40',
                       locked && 'bg-red-600/70 text-white hover:bg-red-600',

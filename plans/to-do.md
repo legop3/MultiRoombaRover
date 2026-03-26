@@ -1,7 +1,7 @@
 1. fix controls remapping [x]
 2. trusted user system [x]
 3. private rovers [x]
-4. optional bump-off in drive macro
+4. optional bump-off in drive macro [x]
 5. allow admins to click on locked rovers from the roster
 6. add faster way for admins to login
 7. custom webhook profile pictures for chat bridge in discord
