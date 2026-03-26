@@ -36,6 +36,23 @@ function clampServoAngle(config, value) {
   return clamp(value, min, max);
 }
 
+function removeDriveSequenceBackoff(steps = []) {
+  if (!Array.isArray(steps) || steps.length < 3) return steps;
+  const last3 = steps.slice(-3);
+  const [backoffStep, pauseStep, stopStep] = last3;
+  const isBackoffStep =
+    backoffStep?.type === 'drive' &&
+    Number(backoffStep?.speeds?.left) === -300 &&
+    Number(backoffStep?.speeds?.right) === -300;
+  const isPauseStep = pauseStep?.type === 'pause' && Number(pauseStep?.duration) === 600;
+  const isStopStep =
+    stopStep?.type === 'drive' &&
+    Number(stopStep?.speeds?.left) === 0 &&
+    Number(stopStep?.speeds?.right) === 0;
+  if (!isBackoffStep || !isPauseStep || !isStopStep) return steps;
+  return steps.slice(0, -3);
+}
+
 export function ControlSystemProvider({ children }) {
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
   const prevModeRef = useRef(null);
@@ -48,7 +65,12 @@ export function ControlSystemProvider({ children }) {
     value: controlSettings,
     save: saveControlSettings,
   } = useSettingsNamespace('controls', { keymap: DEFAULT_KEYMAP, macros: DEFAULT_MACROS });
+  const { value: pageSettings } = useSettingsNamespace('page', { driveMacroBackoffEnabled: true });
   const { value: hornSettings } = useSettingsNamespace('horn', HORN_SETTINGS_DEFAULTS);
+  const driveMacroBackoffEnabled =
+    typeof pageSettings?.driveMacroBackoffEnabled === 'boolean'
+      ? pageSettings.driveMacroBackoffEnabled
+      : true;
   const { session, homeAssistantSetState } = useSession();
   const roverId = session?.assignment?.roverId ?? null;
   const overcurrentLimiter = useOvercurrentLimiter(roverId);
@@ -280,18 +302,32 @@ export function ControlSystemProvider({ children }) {
     async (macroId) => {
       const macro = state.macros.find((item) => item.id === macroId) || null;
       if (!macro) return;
+      let macroToRun = macro;
       if (macroId === 'drive-sequence') {
         turnOnAllLights();
         if (!session?.homeAssistant?.entities) {
           pendingLightsRef.current = true;
         }
         recordControlIntent();
+        if (!driveMacroBackoffEnabled) {
+          macroToRun = {
+            ...macro,
+            steps: removeDriveSequenceBackoff(macro.steps),
+          };
+        }
       } else if (macroId === 'seek-dock') {
         recordControlIntent();
       }
-      await pipeline.runMacroSteps(macro);
+      await pipeline.runMacroSteps(macroToRun);
     },
-    [pipeline, recordControlIntent, session?.homeAssistant?.entities, state.macros, turnOnAllLights],
+    [
+      driveMacroBackoffEnabled,
+      pipeline,
+      recordControlIntent,
+      session?.homeAssistant?.entities,
+      state.macros,
+      turnOnAllLights,
+    ],
   );
 
   const stopAllMotion = useCallback(() => {

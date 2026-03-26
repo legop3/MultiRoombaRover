@@ -33,10 +33,15 @@ export default function SettingsPanel() {
     hudMapDesktop: false,
     connectionTransport: 'websocket',
     swapMobileControlColumns: false,
+    driveMacroBackoffEnabled: true,
   });
   const { value: audioSettings, save: saveAudioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const connectionTransport = pageSettings?.connectionTransport || 'websocket';
   const swapMobileControlColumns = Boolean(pageSettings?.swapMobileControlColumns);
+  const driveMacroBackoffEnabled =
+    typeof pageSettings?.driveMacroBackoffEnabled === 'boolean'
+      ? pageSettings.driveMacroBackoffEnabled
+      : true;
   const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
   const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
   const roverVolume = Number.isFinite(audioSettings?.roverVolume) ? audioSettings.roverVolume : AUDIO_SETTINGS_DEFAULTS.roverVolume;
@@ -87,6 +92,11 @@ export default function SettingsPanel() {
     const checked = Boolean(event.target.checked);
     savePageSettings((current) => ({ ...(current ?? {}), swapMobileControlColumns: checked }));
   };
+
+  const handleDriveMacroBackoffEnabled = (event) => {
+    const checked = Boolean(event.target.checked);
+    savePageSettings((current) => ({ ...(current ?? {}), driveMacroBackoffEnabled: checked }));
+  };
   return (
     <Tabs defaultTab="keybindings">
       <TabList>
@@ -131,6 +141,18 @@ export default function SettingsPanel() {
                   onChange={handleSwapMobileControlColumns}
                 />
                 <span>Swap control columns (put joystick on the left)</span>
+              </label>
+            </section>
+            <section className="panel-section space-y-0.5 text-sm">
+              <p className="text-slate-400">Macros</p>
+              <label className="flex items-center gap-0.5 text-slate-200">
+                <input
+                  type="checkbox"
+                  className="accent-emerald-500"
+                  checked={driveMacroBackoffEnabled}
+                  onChange={handleDriveMacroBackoffEnabled}
+                />
+                <span>Enable backward bump in drive macro</span>
               </label>
             </section>
             <section className="panel-section space-y-0.5 text-sm">
