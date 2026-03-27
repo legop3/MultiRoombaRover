@@ -21,6 +21,7 @@ const SessionContext = createContext({
   homeAssistantSetLightColor: async () => {},
   setNickname: async () => {},
   requestVerification: async () => {},
+  requestPrivateRoverAccess: async () => {},
   triggerReplay: async () => {},
   setCommunityGoal: async () => {},
   setAdminReason: async () => {},
@@ -142,6 +143,8 @@ export function SessionProvider({ children }) {
         emitWithAck('homeAssistant:lightColor', { entityId, rgbColor }),
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
       requestVerification: () => emitWithAck('verification:request'),
+      requestPrivateRoverAccess: (roverId) =>
+        emitWithAck('session:privateRover:requestAccess', { roverId }),
       triggerReplay: (sources = []) => emitWithAck('replay:trigger', { sources }),
       setCommunityGoal: (text) => emitWithAck('communityGoal:set', { text }),
       setAdminReason: (text) => emitWithAck('adminReason:set', { text }),

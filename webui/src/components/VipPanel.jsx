@@ -5,12 +5,14 @@ import { COOKIE_KEY_REGEX, flowWrapClass } from './vip/constants.js';
 import VipAudioUploadCard from './vip/VipAudioUploadCard.jsx';
 import VipVerificationCard from './vip/VipVerificationCard.jsx';
 import VipIdentityCard from './vip/VipIdentityCard.jsx';
+import VipPrivateRoverAccessCard from './vip/VipPrivateRoverAccessCard.jsx';
 
 export default function VipPanel() {
   const {
     session,
     identifySession,
     requestVerification,
+    requestPrivateRoverAccess,
     playUploadedAudio,
     stopUploadedAudio,
     startMicWhip,
@@ -24,6 +26,8 @@ export default function VipPanel() {
   const nickname = (profile?.nickname || '').trim();
   const isVerified = Boolean(session?.isVerified);
   const pendingRequestId = session?.verification?.pendingRequestId || null;
+  const requestablePrivateRovers = session?.privateRoverAccess?.requestableRovers || [];
+  const pendingPrivateRoverRequests = session?.privateRoverAccess?.pendingRequests || [];
   const ownRoverId = String(session?.assignment?.roverId || '').trim();
   const [message, setMessage] = useState('');
 
@@ -82,6 +86,16 @@ export default function VipPanel() {
               </div>
             </section>
           )}
+        </div>
+
+        <div className="lg:col-span-2">
+          <VipPrivateRoverAccessCard
+            requestableRovers={requestablePrivateRovers}
+            pendingRequests={pendingPrivateRoverRequests}
+            requestPrivateRoverAccess={requestPrivateRoverAccess}
+            onMessage={setMessage}
+            fullWidth
+          />
         </div>
 
         <div className="lg:col-span-2">

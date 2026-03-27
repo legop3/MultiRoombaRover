@@ -14,6 +14,10 @@ const {
   getIdentitySummary,
   verificationEvents,
 } = require('./verificationService');
+const {
+  getStateForSocket: getPrivateRoverAccessStateForSocket,
+  requestEvents: privateRoverAccessRequestEvents,
+} = require('./privateRoverAccessRequestService');
 const { getReplayState, replayEvents } = require('./replayService');
 const { getReplaySources } = require('./replaySourceService');
 const { getHealthSnapshot } = require('./healthService');
@@ -128,6 +132,7 @@ function buildSession(socket) {
     },
     identity: getIdentitySummary(socket),
     verification: getVerificationStateForSocket(socket),
+    privateRoverAccess: getPrivateRoverAccessStateForSocket(socket),
     isVerified: Boolean(socket?.data?.isVerified),
     audioForward: getAudioForwardState(),
     audioLevels: getAudioLevels(),
@@ -211,6 +216,11 @@ managerEvents.on('private', ({ roverId, open }) => {
 
 managerEvents.on('privateSafety', ({ roverId }) => {
   logger.info('Private rover safety config changed', roverId);
+  syncAll();
+});
+
+privateRoverAccessRequestEvents.on('change', (event = {}) => {
+  logger.info('Private rover access request state changed', event.reason || 'unknown');
   syncAll();
 });
 

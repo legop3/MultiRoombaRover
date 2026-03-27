@@ -135,9 +135,19 @@ function getPrivateSafety(record) {
 }
 
 function shouldApplyPrivateSafety(record, socket) {
-  if (!isPrivateRecord(record) || !isPrivateOpen(record)) return false;
+  if (!isPrivateRecord(record)) return false;
   if (isLockdownAdmin(socket)) return false;
   return true;
+}
+
+function shouldApplyPrivateSensorSafety(record) {
+  if (!isPrivateRecord(record)) return false;
+  const activeDrivers = turnService.getActiveDrivers();
+  const activeDriverId = activeDrivers?.[record.id];
+  if (!activeDriverId) return false;
+  const activeSocket = io.sockets.sockets.get(activeDriverId);
+  if (!activeSocket) return true;
+  return !isLockdownAdmin(activeSocket);
 }
 
 function isRoverVisibleToSocket(record, socket) {
@@ -639,7 +649,7 @@ function evaluatePrivateSafety(record, sensors) {
   const currentBump = bump;
   const currentCliff = cliff;
 
-  if (!isPrivateRecord(record) || !isPrivateOpen(record)) {
+  if (!shouldApplyPrivateSensorSafety(record)) {
     state.blockedUntil = 0;
     state.lastOvercurrent = currentOver;
     state.lastBump = currentBump;

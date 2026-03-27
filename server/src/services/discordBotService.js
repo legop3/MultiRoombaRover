@@ -40,7 +40,6 @@ const {
   listVerifiedUsers,
   removeVerifiedUser,
 } = require('./verificationService');
-
 const config = loadConfig();
 const discordConfig = config.discord || {};
 const enabled = Boolean(discordConfig.token);
@@ -1504,6 +1503,49 @@ async function sendVerificationRequestDms(event) {
   );
 }
 
+async function sendPrivateRoverAccessRequestDms(event) {
+  const payload = event?.payload || {};
+  const requestId = payload.id;
+  if (!requestId) return;
+  const adminIdsToNotify = Array.from(lockdownAdminIds);
+  if (!adminIdsToNotify.length) {
+    logger.warn('No lockdown admins configured for private rover access request DM', { requestId });
+    return;
+  }
+  const requester = payload.requester || {};
+  const createdAt = payload.createdAt ? new Date(payload.createdAt).toLocaleString() : 'unknown';
+  const content = [
+    '**Private Rover Access Request**',
+    `Request ID: \`${requestId}\``,
+    `Rover: ${sanitizeMentions(payload.roverName || payload.roverId || 'unknown')} (\`${payload.roverId || 'unknown'}\`)`,
+    `Requester: ${sanitizeMentions(requester.nickname || requester.socketId || 'unknown')}`,
+    `Role: \`${requester.role || 'unknown'}\``,
+    `Verified: \`${requester.isVerified ? 'yes' : 'no'}\``,
+    `Identity key: \`${requester.cookieUserId || 'unknown'}\``,
+    `IP: \`${requester.ip || 'unknown'}\``,
+    `Created: ${createdAt}`,
+    '',
+    'Open the rover manually in the admin UI if approved.',
+  ].join('\n');
+
+  await Promise.all(
+    adminIdsToNotify.map(async (adminId) => {
+      try {
+        const user = await client.users.fetch(String(adminId));
+        if (!user) return;
+        const dm = await user.createDM();
+        await dm.send({ content, allowedMentions: { parse: [] } });
+      } catch (err) {
+        logger.warn('Failed to DM lockdown admin for private rover access request', {
+          requestId,
+          adminId,
+          error: err.message,
+        });
+      }
+    }),
+  );
+}
+
 async function handleVerificationReaction(reaction, user) {
   if (!reaction || !user || user.bot) return;
   const emoji = reaction.emoji?.name;
@@ -1659,6 +1701,7 @@ client.once('ready', () => {
 
 subscribe('*', handleBusEvent);
 subscribe('verification.requested', sendVerificationRequestDms);
+subscribe('privateRoverAccess.requested', sendPrivateRoverAccessRequestDms);
 subscribe('chat:message', handleChatBridgeOutbound);
 subscribe('chat:typing', handleChatTypingOutbound);
 
