@@ -150,11 +150,19 @@ function shouldApplyPrivateSensorSafety(record) {
   return !isLockdownAdmin(activeSocket);
 }
 
+function socketHasClosedPrivateAccess(socket, roverId) {
+  const list = Array.isArray(socket?.data?.privateClosedAccessRovers)
+    ? socket.data.privateClosedAccessRovers
+    : [];
+  return list.some((id) => String(id) === String(roverId));
+}
+
 function isRoverVisibleToSocket(record, socket) {
   if (!record) return false;
   if (!isPrivateRecord(record)) return true;
   if (isPrivateOpen(record)) return true;
-  return isLockdownAdmin(socket);
+  if (isLockdownAdmin(socket)) return true;
+  return socketHasClosedPrivateAccess(socket, record.id);
 }
 
 function getControlDenialReason(record, socket, options = {}) {
@@ -183,6 +191,9 @@ function getControlDenialReason(record, socket, options = {}) {
   }
   if (!isPrivateOpen(record)) {
     if (!isLockdownAdmin(socket)) {
+      if (socketHasClosedPrivateAccess(socket, record.id)) {
+        return null;
+      }
       return 'Private rover is closed';
     }
     return null;

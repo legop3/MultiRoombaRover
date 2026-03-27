@@ -125,6 +125,10 @@ function reassignFromRover(roverId) {
       assignments.delete(socketId);
       continue;
     }
+    const access = roverManager.canRequestControl(roverId, socket, { allowUser: true });
+    if (access.ok) {
+      continue;
+    }
     roverManager.releaseControl(rid, socket);
     assignments.delete(socketId);
     assignSocket(socket);

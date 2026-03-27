@@ -10,10 +10,14 @@ const { getSocketIp, normalizeIp } = require('../helpers/ipResolver');
 
 const requestEvents = new EventEmitter();
 const REQUEST_COOLDOWN_MS = 15 * 1000;
+const DM_APPROVE_EMOJI = '✅';
+const DM_DENY_EMOJI = '❌';
 
 const pendingRequests = new Map(); // requestId -> request
 const pendingByRequesterRover = new Map(); // `${requesterKey}:${roverId}` -> requestId
 const lastRequestAtByRequester = new Map(); // requesterKey -> ts
+const dmMessages = new Map(); // messageId -> { requestId, adminDiscordId, createdAt }
+const grants = new Map(); // `${requesterKey}:${roverId}` -> { requesterKey, roverId, grantedAt, grantedBy, requestId }
 
 function normalizeRoverId(value) {
   return String(value || '').trim();
@@ -23,6 +27,14 @@ function buildRequesterKey(socket) {
   const cookieUserId = String(socket?.data?.cookieUserId || '').trim().toLowerCase();
   if (cookieUserId) return `cookie:${cookieUserId}`;
   return `socket:${socket?.id || 'unknown'}`;
+}
+
+function normalizeRequesterKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function buildGrantKey(requesterKey, roverId) {
+  return `${normalizeRequesterKey(requesterKey)}:${normalizeRoverId(roverId)}`;
 }
 
 function isClosedPrivateRoverRecord(record) {
@@ -60,9 +72,21 @@ function listPendingForRequester(socket) {
 }
 
 function getStateForSocket(socket) {
+  const requesterKey = buildRequesterKey(socket);
+  const grantedRovers = [];
+  for (const grant of grants.values()) {
+    if (grant.requesterKey !== requesterKey) continue;
+    grantedRovers.push({
+      roverId: grant.roverId,
+      grantedAt: grant.grantedAt,
+      requestId: grant.requestId || null,
+    });
+  }
+  grantedRovers.sort((a, b) => b.grantedAt - a.grantedAt);
   return {
     requestableRovers: listClosedPrivateRovers(),
     pendingRequests: listPendingForRequester(socket),
+    grantedRovers,
   };
 }
 
@@ -81,6 +105,188 @@ function clearPendingForRover(roverId, reason = 'resolved') {
     if (String(request.roverId) !== target) continue;
     clearPendingRequest(request, reason);
   }
+}
+
+function getGrantForRequester(requesterKey, roverId) {
+  if (!requesterKey || !roverId) return null;
+  return grants.get(buildGrantKey(requesterKey, roverId)) || null;
+}
+
+function hasClosedPrivateAccessForSocket(socket, roverId) {
+  if (!socket || !roverId) return false;
+  const requesterKey = buildRequesterKey(socket);
+  return Boolean(getGrantForRequester(requesterKey, roverId));
+}
+
+function listGrantedRoversForRequester(requesterKey) {
+  const key = normalizeRequesterKey(requesterKey);
+  if (!key) return [];
+  const roverIds = [];
+  for (const grant of grants.values()) {
+    if (grant.requesterKey !== key) continue;
+    roverIds.push(grant.roverId);
+  }
+  return Array.from(new Set(roverIds));
+}
+
+function applySocketGrantCache(socket) {
+  if (!socket) return;
+  socket.data = socket.data || {};
+  const requesterKey = buildRequesterKey(socket);
+  socket.data.privateClosedAccessRovers = listGrantedRoversForRequester(requesterKey);
+}
+
+function findPendingRequestById(requestId) {
+  const id = String(requestId || '').trim();
+  if (!id) return null;
+  const request = pendingRequests.get(id);
+  if (!request || request.status !== 'pending') return null;
+  return request;
+}
+
+function attachDmMessage(requestId, messageId, adminDiscordId = null) {
+  const rid = String(requestId || '').trim();
+  const mid = String(messageId || '').trim();
+  if (!rid || !mid) return;
+  dmMessages.set(mid, {
+    requestId: rid,
+    adminDiscordId: adminDiscordId ? String(adminDiscordId) : null,
+    createdAt: Date.now(),
+  });
+}
+
+function getRequestByMessageId(messageId) {
+  const mid = String(messageId || '').trim();
+  if (!mid) return null;
+  const map = dmMessages.get(mid);
+  if (!map) return null;
+  const request = pendingRequests.get(map.requestId) || null;
+  if (!request) return null;
+  return { request, map };
+}
+
+function getSocketByRequesterKey(requesterKey) {
+  if (!requesterKey) return null;
+  if (requesterKey.startsWith('socket:')) {
+    const socketId = requesterKey.slice('socket:'.length);
+    return io.sockets.sockets.get(socketId) || null;
+  }
+  return null;
+}
+
+function tryAssignClosedPrivateRover(socket, roverId) {
+  if (!socket || !roverId) return false;
+  const record = roverManager.rovers.get(String(roverId));
+  if (!record) return false;
+  const access = roverManager.canRequestControl(roverId, socket, { allowUser: true });
+  if (!access.ok) {
+    throw new Error(access.reason || 'Control denied');
+  }
+  const previousJoined = roverManager.getRoversForSocket(socket.id);
+  roverManager.requestControl(roverId, socket, { allowUser: true });
+  previousJoined.forEach((rid) => {
+    if (rid !== roverId) {
+      roverManager.releaseControl(rid, socket);
+    }
+  });
+  roverManager.managerEvents.emit('switch', { socketId: socket.id, roverId: String(roverId) });
+  try {
+    const assignmentService = require('./assignmentService');
+    assignmentService.moveAssignment(socket, String(roverId), { releasePrevious: false });
+  } catch (err) {
+    logger.warn('Failed to move assignment after private access grant', { socketId: socket.id, error: err.message });
+  }
+  socket.emit('controlGranted', { roverId: String(roverId) });
+  return true;
+}
+
+function approveRequest(requestId, actorDiscordId = null) {
+  const request = findPendingRequestById(requestId);
+  if (!request) {
+    throw new Error('Request not found or already resolved.');
+  }
+  request.status = 'approved';
+  request.resolvedAt = Date.now();
+  request.resolvedBy = actorDiscordId ? String(actorDiscordId) : null;
+  pendingByRequesterRover.delete(`${request.requesterKey}:${request.roverId}`);
+
+  const grantKey = buildGrantKey(request.requesterKey, request.roverId);
+  grants.set(grantKey, {
+    requesterKey: request.requesterKey,
+    roverId: request.roverId,
+    requestId: request.id,
+    grantedAt: Date.now(),
+    grantedBy: request.resolvedBy,
+  });
+
+  let assignedSocketId = null;
+  const socket = getSocketByRequesterKey(request.requesterKey);
+  if (socket) {
+    applySocketGrantCache(socket);
+    try {
+      if (tryAssignClosedPrivateRover(socket, request.roverId)) {
+        assignedSocketId = socket.id;
+      }
+    } catch (err) {
+      logger.warn('Private rover access approved but assignment failed', {
+        requestId: request.id,
+        roverId: request.roverId,
+        socketId: socket.id,
+        error: err.message,
+      });
+    }
+  }
+
+  publishEvent({
+    source: 'privateRoverAccessRequest',
+    type: 'privateRoverAccess.resolved',
+    payload: {
+      requestId: request.id,
+      decision: 'approved',
+      roverId: request.roverId,
+      requesterKey: request.requesterKey,
+      resolvedBy: request.resolvedBy,
+      resolvedAt: request.resolvedAt,
+      assignedSocketId,
+    },
+  });
+  requestEvents.emit('change', {
+    reason: 'approved',
+    requestId: request.id,
+    roverId: request.roverId,
+    socketId: assignedSocketId,
+  });
+  return { request, assignedSocketId };
+}
+
+function denyRequest(requestId, actorDiscordId = null) {
+  const request = findPendingRequestById(requestId);
+  if (!request) {
+    throw new Error('Request not found or already resolved.');
+  }
+  request.status = 'denied';
+  request.resolvedAt = Date.now();
+  request.resolvedBy = actorDiscordId ? String(actorDiscordId) : null;
+  pendingByRequesterRover.delete(`${request.requesterKey}:${request.roverId}`);
+
+  publishEvent({
+    source: 'privateRoverAccessRequest',
+    type: 'privateRoverAccess.resolved',
+    payload: {
+      requestId: request.id,
+      decision: 'denied',
+      roverId: request.roverId,
+      requesterKey: request.requesterKey,
+      resolvedBy: request.resolvedBy,
+      resolvedAt: request.resolvedAt,
+    },
+  });
+  requestEvents.emit('change', {
+    reason: 'denied',
+    requestId: request.id,
+    roverId: request.roverId,
+  });
+  return { request };
 }
 
 function createRequest(socket, roverIdRaw) {
@@ -167,6 +373,11 @@ roverManager.managerEvents.on('private', ({ roverId, open } = {}) => {
   if (!roverId) return;
   if (open) {
     clearPendingForRover(roverId, 'opened');
+    for (const [key, grant] of grants.entries()) {
+      if (String(grant.roverId) === String(roverId)) {
+        grants.delete(key);
+      }
+    }
   }
   requestEvents.emit('change', {
     reason: 'private_state',
@@ -179,6 +390,11 @@ roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
   if (!roverId) return;
   if (action === 'removed') {
     clearPendingForRover(roverId, 'rover_removed');
+    for (const [key, grant] of grants.entries()) {
+      if (String(grant.roverId) === String(roverId)) {
+        grants.delete(key);
+      }
+    }
   }
   requestEvents.emit('change', {
     reason: 'rover',
@@ -188,6 +404,8 @@ roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
 });
 
 io.on('connection', (socket) => {
+  applySocketGrantCache(socket);
+
   function handleRequest({ roverId } = {}, cb = () => {}) {
     try {
       const { request, isNew } = createRequest(socket, roverId);
@@ -204,11 +422,21 @@ io.on('connection', (socket) => {
 
   socket.on('privateRover:requestAccess', handleRequest);
   socket.on('session:privateRover:requestAccess', handleRequest);
+  socket.on('session:identify', () => {
+    applySocketGrantCache(socket);
+    requestEvents.emit('change', { reason: 'identify', socketId: socket.id });
+  });
 });
 
 module.exports = {
+  DM_APPROVE_EMOJI,
+  DM_DENY_EMOJI,
   requestEvents,
   getStateForSocket,
   createRequest,
+  hasClosedPrivateAccessForSocket,
+  attachDmMessage,
+  getRequestByMessageId,
+  approveRequest,
+  denyRequest,
 };
-

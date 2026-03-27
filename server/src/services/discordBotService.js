@@ -40,6 +40,14 @@ const {
   listVerifiedUsers,
   removeVerifiedUser,
 } = require('./verificationService');
+const {
+  DM_APPROVE_EMOJI: PRIVATE_ACCESS_APPROVE_EMOJI,
+  DM_DENY_EMOJI: PRIVATE_ACCESS_DENY_EMOJI,
+  attachDmMessage: attachPrivateAccessDmMessage,
+  getRequestByMessageId: getPrivateAccessRequestByMessageId,
+  approveRequest: approvePrivateAccessRequest,
+  denyRequest: denyPrivateAccessRequest,
+} = require('./privateRoverAccessRequestService');
 const config = loadConfig();
 const discordConfig = config.discord || {};
 const enabled = Boolean(discordConfig.token);
@@ -1525,7 +1533,7 @@ async function sendPrivateRoverAccessRequestDms(event) {
     `IP: \`${requester.ip || 'unknown'}\``,
     `Created: ${createdAt}`,
     '',
-    'Open the rover manually in the admin UI if approved.',
+    `React with ${PRIVATE_ACCESS_APPROVE_EMOJI} to approve or ${PRIVATE_ACCESS_DENY_EMOJI} to deny.`,
   ].join('\n');
 
   await Promise.all(
@@ -1534,7 +1542,14 @@ async function sendPrivateRoverAccessRequestDms(event) {
         const user = await client.users.fetch(String(adminId));
         if (!user) return;
         const dm = await user.createDM();
-        await dm.send({ content, allowedMentions: { parse: [] } });
+        const message = await dm.send({ content, allowedMentions: { parse: [] } });
+        try {
+          await message.react(PRIVATE_ACCESS_APPROVE_EMOJI);
+          await message.react(PRIVATE_ACCESS_DENY_EMOJI);
+        } catch (err) {
+          logger.warn('Failed to add private rover access reactions', { requestId, adminId, error: err.message });
+        }
+        attachPrivateAccessDmMessage(requestId, message.id, adminId);
       } catch (err) {
         logger.warn('Failed to DM lockdown admin for private rover access request', {
           requestId,
@@ -1583,6 +1598,52 @@ async function handleVerificationReaction(reaction, user) {
     }
   } catch (err) {
     logger.warn('Failed to resolve verification request from reaction', {
+      requestId: linked.request.id,
+      error: err.message,
+    });
+  }
+}
+
+async function handlePrivateAccessReaction(reaction, user) {
+  if (!reaction || !user || user.bot) return;
+  const emoji = reaction.emoji?.name;
+  if (emoji !== PRIVATE_ACCESS_APPROVE_EMOJI && emoji !== PRIVATE_ACCESS_DENY_EMOJI) return;
+  if (!isLockdownAdminUser(user.id)) return;
+
+  const maybePartial = reaction.message?.partial || reaction.partial;
+  if (maybePartial) {
+    try {
+      await reaction.fetch();
+    } catch (err) {
+      logger.warn('Failed to fetch partial private access reaction', err.message);
+      return;
+    }
+  }
+
+  const messageId = reaction.message?.id;
+  if (!messageId) return;
+  const linked = getPrivateAccessRequestByMessageId(messageId);
+  if (!linked?.request || linked.request.status !== 'pending') return;
+
+  try {
+    if (emoji === PRIVATE_ACCESS_APPROVE_EMOJI) {
+      const { assignedSocketId } = approvePrivateAccessRequest(linked.request.id, user.id);
+      const assignmentNote = assignedSocketId
+        ? ` Granted and assigned to socket \`${assignedSocketId}\`.`
+        : ' Granted.';
+      await reaction.message.reply({
+        content: `Approved private access request \`${linked.request.id}\`.${assignmentNote}`,
+        allowedMentions: { parse: [] },
+      });
+    } else {
+      denyPrivateAccessRequest(linked.request.id, user.id);
+      await reaction.message.reply({
+        content: `Denied private access request \`${linked.request.id}\`.`,
+        allowedMentions: { parse: [] },
+      });
+    }
+  } catch (err) {
+    logger.warn('Failed to resolve private rover access request from reaction', {
       requestId: linked.request.id,
       error: err.message,
     });
@@ -1691,6 +1752,9 @@ client.on('typingStart', (typing) => {
 client.on('messageReactionAdd', (reaction, user) => {
   handleVerificationReaction(reaction, user).catch((err) => {
     logger.warn('Error handling verification reaction', err.message);
+  });
+  handlePrivateAccessReaction(reaction, user).catch((err) => {
+    logger.warn('Error handling private access reaction', err.message);
   });
 });
 
