@@ -171,6 +171,15 @@ function getSocketByRequesterKey(requesterKey) {
     const socketId = requesterKey.slice('socket:'.length);
     return io.sockets.sockets.get(socketId) || null;
   }
+  if (requesterKey.startsWith('cookie:')) {
+    const cookieUserId = requesterKey.slice('cookie:'.length);
+    for (const socket of io.sockets.sockets.values()) {
+      const key = String(socket?.data?.cookieUserId || '').trim().toLowerCase();
+      if (key && key === cookieUserId) {
+        return socket;
+      }
+    }
+  }
   return null;
 }
 
