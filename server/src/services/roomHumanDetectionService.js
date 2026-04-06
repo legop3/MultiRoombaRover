@@ -8,6 +8,7 @@ const roverManager = require('./roverManager');
 const { issueCommand } = require('./commandService');
 const { publishEvent } = require('./eventBus');
 const { sendAlert } = require('./alertService');
+const { getMode, MODES } = require('./modeManager');
 
 const config = loadConfig();
 const visionConfig = config.vision?.humanDetection || {};
@@ -54,6 +55,11 @@ let discordSentThisEpisode = false;
 let latestPositiveFrame = null; // { cameraId, confidence, ts, buffer }
 let cooldownUntil = 0;
 let hasClearedSinceLastDiscord = true;
+
+function isDetectionActiveMode() {
+  const mode = getMode();
+  return mode !== MODES.ADMIN && mode !== MODES.LOCKDOWN;
+}
 
 function ensureCameraState(cameraId) {
   if (!cameraState.has(cameraId)) {
@@ -135,6 +141,10 @@ function sendDiscordDetectionAlert(now) {
 }
 
 function evaluateEpisode(now = Date.now()) {
+  if (!isDetectionActiveMode()) {
+    markCleared(now);
+    return;
+  }
   if (episodeStartAt != null && lastAnyPositiveAt != null && now - lastAnyPositiveAt > CLEAR_WINDOW_MS) {
     markCleared(now);
     return;
@@ -271,6 +281,7 @@ if (!startWorker()) {
 }
 
 roomCameraStreamEvents.on('frame', ({ id, buffer, ts }) => {
+  if (!isDetectionActiveMode()) return;
   if (!id || !buffer) return;
   submitFrame(String(id), buffer, ts);
 });
