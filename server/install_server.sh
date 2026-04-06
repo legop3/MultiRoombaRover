@@ -47,7 +47,10 @@ echo "[3/7] Installing OpenCV runtime..."
 mkdir -p "$VISION_HOME"
 python3 -m venv "$VISION_VENV"
 "$VISION_PYTHON" -m pip install --upgrade pip >/dev/null
-"$VISION_PYTHON" -m pip install "opencv-python-headless==4.10.0.84" "numpy==1.26.4" >/dev/null
+"$VISION_PYTHON" -m pip install \
+  --only-binary=:all: \
+  "numpy>=2.1,<3" \
+  "opencv-python-headless>=4.10,<5" >/dev/null
 "$VISION_PYTHON" - <<'PY'
 import cv2
 import numpy
