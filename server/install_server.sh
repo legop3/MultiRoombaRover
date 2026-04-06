@@ -10,6 +10,9 @@ MEDIAMTX_SERVICE="/etc/systemd/system/mediamtx.service"
 MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
 SNAPSHOT_DIR="/var/lib/rover-snapshots"
 REPLAY_SEGMENT_DIR="/var/lib/replay-segments"
+VISION_HOME="/opt/multiroomba-vision"
+VISION_VENV="$VISION_HOME/.venv"
+VISION_PYTHON="$VISION_VENV/bin/python3"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This installer must be run with sudo/root." >&2
@@ -27,11 +30,11 @@ SERVER_DIR="$SCRIPT_DIR"
 CONFIG_PATH="$SERVER_DIR/config.yaml"
 MEDIAMTX_TEMPLATE="$SERVER_DIR/mediamtx/mediamtx.yml"
 
-echo "[1/6] Installing dependencies..."
-dnf install -y nodejs npm curl tar >/dev/null
+echo "[1/7] Installing dependencies..."
+dnf install -y nodejs npm curl tar python3 python3-pip >/dev/null
 NODE_BIN="$(command -v node)"
 
-echo "[2/6] Installing Node production deps..."
+echo "[2/7] Installing Node production deps..."
 runuser -u "$TARGET_USER" -- bash -c "cd '$SERVER_DIR' && npm install --production"
 
 if [[ ! -f "$CONFIG_PATH" ]]; then
@@ -39,6 +42,18 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
   chown "$TARGET_USER":"$TARGET_USER" "$CONFIG_PATH"
   echo "Copied config.example.yaml to config.yaml; edit it before exposing the service."
 fi
+
+echo "[3/7] Installing OpenCV runtime..."
+mkdir -p "$VISION_HOME"
+python3 -m venv "$VISION_VENV"
+"$VISION_PYTHON" -m pip install --upgrade pip >/dev/null
+"$VISION_PYTHON" -m pip install "opencv-python-headless==4.10.0.84" "numpy==1.26.4" >/dev/null
+"$VISION_PYTHON" - <<'PY'
+import cv2
+import numpy
+print("Vision runtime OK", cv2.__version__, numpy.__version__)
+PY
+chown -R "$TARGET_USER":"$TARGET_USER" "$VISION_HOME"
 
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
@@ -60,7 +75,7 @@ case "$arch" in
     ;;
 esac
 
-echo "[3/6] Installing mediaMTX ${MEDIAMTX_VERSION}..."
+echo "[4/7] Installing mediaMTX ${MEDIAMTX_VERSION}..."
 curl -L "$MEDIAMTX_BASE_URL/$mediamtx_pkg" -o "$tmpdir/mediamtx.tgz"
 tar -xzf "$tmpdir/mediamtx.tgz" -C "$tmpdir" mediamtx
 install -m 0755 "$tmpdir/mediamtx" "$MEDIAMTX_BIN"
@@ -75,7 +90,7 @@ rm -f "$MEDIAMTX_CONFIG"
 install -m 0644 "$MEDIAMTX_TEMPLATE" "$MEDIAMTX_CONFIG"
 chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
 
-echo "[4/6] Writing systemd units..."
+echo "[5/7] Writing systemd units..."
 mkdir -p "$SNAPSHOT_DIR"
 chown "$TARGET_USER":"$TARGET_USER" "$SNAPSHOT_DIR"
 mkdir -p "$REPLAY_SEGMENT_DIR"
@@ -113,6 +128,7 @@ Environment=NODE_ENV=production
 Environment=SERVER_CONFIG=$CONFIG_PATH
 Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
 Environment=REPLAY_SEGMENT_DIR=$REPLAY_SEGMENT_DIR
+Environment=VISION_PYTHON=$VISION_PYTHON
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
 Restart=on-failure
 RestartSec=2
@@ -123,14 +139,14 @@ EOF
 
 chmod 644 "$MEDIAMTX_SERVICE" "$MULTIROVER_SERVICE"
 
-echo "[5/6] Enabling services..."
+echo "[6/7] Enabling services..."
 systemctl daemon-reload
 systemctl enable --now mediamtx.service
 systemctl enable --now multirover.service
 systemctl restart mediamtx.service
 systemctl restart multirover.service
 
-echo "[6/6] Done."
+echo "[7/7] Done."
 echo
 echo "Services installed:"
 echo "  mediamtx.service (WebRTC fan-out)"

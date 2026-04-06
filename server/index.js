@@ -27,6 +27,7 @@ require('./src/services/videoAuthService');
 require('./src/services/videoSocketService');
 require('./src/services/roomCameraSocketService');
 require('./src/services/roverSnapshotSocketService');
+require('./src/services/roomHumanDetectionService');
 require('./src/services/embedHttpService');
 require('./src/services/logStreamService');
 require('./src/services/adminLogService');

@@ -1231,6 +1231,7 @@ async function announce({
   title,
   description,
   embeds,
+  files,
 }) {
   if (!channelId) return;
   const mentionChunks = [];
@@ -1247,7 +1248,7 @@ async function announce({
   await sendToChannel(
     channelId,
     `${prefix}${content || ''}`.trim(),
-    { embeds: payloadEmbeds },
+    { embeds: payloadEmbeds, files: Array.isArray(files) ? files : undefined },
     allowedMentions,
     !pingRoleId, // keep mention intact when pinging
   );
@@ -1459,6 +1460,43 @@ function handleBusEvent(event) {
         logger.warn('Replay send failed', err.message);
       });
       break;
+    case 'vision.humanDetected': {
+      const imageBase64 = payload?.imageBase64 ? String(payload.imageBase64) : '';
+      let attachment = null;
+      if (imageBase64) {
+        try {
+          const imageBuffer = Buffer.from(imageBase64, 'base64');
+          if (imageBuffer.length > 0) {
+            attachment = new AttachmentBuilder(imageBuffer, { name: 'human-detected.jpg' });
+          }
+        } catch (err) {
+          logger.warn('Failed to decode human detection image for Discord', err.message);
+        }
+      }
+      const cameraLabel = payload?.cameraId ? `Camera: \`${payload.cameraId}\`` : 'Camera: unknown';
+      const confidenceLabel =
+        Number.isFinite(Number(payload?.confidence))
+          ? `Confidence: \`${Number(payload.confidence).toFixed(2)}\``
+          : 'Confidence: n/a';
+      const detectedAt = Number(payload?.detectedAt);
+      const detectedLabel = Number.isFinite(detectedAt)
+        ? `Detected: <t:${Math.floor(detectedAt / 1000)}:F>`
+        : null;
+      const embed = buildEmbed({
+        title: 'Human Detected',
+        description: [cameraLabel, confidenceLabel, detectedLabel].filter(Boolean).join('\n'),
+        color: 0xe53935,
+      });
+      announce({
+        channelId: channels.humanAlerts,
+        pingRoleId: roles.humanAlertPing || null,
+        content: payload?.message || 'Human detected in room.',
+        embeds: [embed],
+        files: attachment ? [attachment] : [],
+        includeSiteUrl: false,
+      });
+      break;
+    }
     default:
       break;
   }

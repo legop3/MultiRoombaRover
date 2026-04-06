@@ -52,6 +52,21 @@ roomCameras:
     url: "http://192.168.0.51/snapshot.jpg"
     streamUrl: "http://192.168.0.51/stream.mjpg"
 
+vision:
+  humanDetection:
+    enabled: false
+    confidenceThreshold: 0.55
+    # Continuous presence windows:
+    # - 30s => rover TTS warning
+    # - 60s => Discord human alert
+    ttsDelayMs: 30000
+    discordDelayMs: 60000
+    # Tolerates brief detector misses before declaring "cleared".
+    clearWindowMs: 3000
+    # After a Discord alert, require clear + cooldown before next alert.
+    cooldownMs: 900000
+    maxInferenceFpsPerCamera: 3
+
 discord:
   token: "DISCORD_BOT_TOKEN"
   guildId: "123456789012345678" # optional; bot works in any guild it's invited to
@@ -61,9 +76,11 @@ discord:
     adminAlerts: "123456789012345678"
     # chat bridge is configured per guild via `rs bridge` commands
     replay: "123456789012345678"
+    humanAlerts: "123456789012345678"
   roles:
     announcementPing: "123456789012345678"
     adminPing: "123456789012345678"
+    humanAlertPing: "123456789012345678"
 
 socials:
   - id: "discord"
