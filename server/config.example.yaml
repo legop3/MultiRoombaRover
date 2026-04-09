@@ -42,15 +42,19 @@ homeAssistant:
       # type is optional; if omitted it is inferred from the entity id (light/switch)
   buttons:
     # All Home Assistant button automations live here.
-    - entityId: "sensor.human_alert_button_action"
-      stateEquals: "single"
+    # Option A (state-based entity trigger):
+    # - entityId: "sensor.human_alert_button_action"
+    #   stateEquals: "single"
+    #   cooldownMs: 15000
+    #   action: "humanAlert"
+    #
+    # Option B (direct HA event trigger, for stateless button.* setups):
+    - eventType: "zha_event"
+      eventData:
+        device_id: "REPLACE_WITH_DEVICE_ID"
+        command: "single"
       cooldownMs: 15000
       action: "humanAlert"
-    # Example future button:
-    # - entityId: "sensor.replay_button_action"
-    #   stateEquals: "single"
-    #   cooldownMs: 10000
-    #   action: "replayClip"
 roomCameras:
   - id: "lobby"
     name: "Lobby Camera"
