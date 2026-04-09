@@ -22,6 +22,7 @@ const entityState = new Map(); // entityId -> normalized state
 const triggerConfig = []; // [{ runtimeKey, source, entityId?, eventType?, eventData?, action, stateEquals, payload, cooldownMs, allowedModes }]
 const triggerRuntime = new Map(); // triggerId -> { lastFiredAt, lastState, lastChanged, lastUpdated }
 const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
+const MQTT_EVENT_TYPES = new Set(['mqtt', 'mqtt_message', 'mqtt_message_received']);
 
 let connection = null;
 let unsubscribeEntities = null;
@@ -88,7 +89,7 @@ function normalizeTriggerEntry(entry, index) {
   const action = String(entry.action || '').trim();
   if (!action) return null;
   const entityId = String(entry.entityId || entry.entity_id || '').trim();
-  const eventType = String(entry.eventType || entry.event_type || '').trim();
+  const eventType = String(entry.eventType || entry.event_type || '').trim().toLowerCase();
   let source = null;
   if (entityId) source = 'entity';
   if (!source && eventType) source = 'event';
@@ -117,6 +118,15 @@ function normalizeTriggerEntry(entry, index) {
     cooldownMs,
     allowedModes,
   };
+}
+
+function eventTypeMatches(expected, actual) {
+  const exp = String(expected || '').trim().toLowerCase();
+  const act = String(actual || '').trim().toLowerCase();
+  if (!exp || !act) return false;
+  if (exp === act) return true;
+  if (exp === 'mqtt' && MQTT_EVENT_TYPES.has(act)) return true;
+  return false;
 }
 
 function loadTriggerConfig() {
@@ -297,11 +307,11 @@ function evaluateTriggers(snapshot = {}) {
 
 function handleHomeAssistantEvent(event = {}) {
   if (!triggerConfig.length) return;
-  const eventType = String(event?.event_type || '').trim();
+  const eventType = String(event?.event_type || '').trim().toLowerCase();
   if (!eventType) return;
   triggerConfig.forEach((trigger) => {
     if (trigger.source !== 'event') return;
-    if (trigger.eventType !== eventType) return;
+    if (!eventTypeMatches(trigger.eventType, eventType)) return;
     if (trigger.eventData && !objectContainsSubset(event?.data || {}, trigger.eventData)) return;
     const runtimeState = triggerRuntime.get(trigger.runtimeKey) || {
       lastFiredAt: 0,
@@ -377,19 +387,30 @@ async function connect() {
       new Set(
         triggerConfig
           .filter((trigger) => trigger.source === 'event' && trigger.eventType)
-          .map((trigger) => trigger.eventType),
+          .map((trigger) => String(trigger.eventType).toLowerCase()),
       ),
     );
-    for (const eventType of eventTypes) {
+    const hasMqttTrigger = eventTypes.some((type) => type === 'mqtt' || MQTT_EVENT_TYPES.has(type));
+    if (hasMqttTrigger) {
       try {
-        const unsubscribe = await connection.subscribeEvents(handleHomeAssistantEvent, eventType);
+        const unsubscribe = await connection.subscribeEvents(handleHomeAssistantEvent);
         eventUnsubscribers.push(unsubscribe);
+        logger.info('Subscribed Home Assistant event stream (all events) for MQTT button matching');
       } catch (err) {
-        logger.warn('Failed to subscribe Home Assistant event stream', { eventType, error: err.message });
+        logger.warn('Failed to subscribe Home Assistant all-event stream', { error: err.message });
       }
-    }
-    if (eventTypes.length) {
-      logger.info('Subscribed Home Assistant event streams', { count: eventTypes.length, eventTypes });
+    } else {
+      for (const eventType of eventTypes) {
+        try {
+          const unsubscribe = await connection.subscribeEvents(handleHomeAssistantEvent, eventType);
+          eventUnsubscribers.push(unsubscribe);
+        } catch (err) {
+          logger.warn('Failed to subscribe Home Assistant event stream', { eventType, error: err.message });
+        }
+      }
+      if (eventTypes.length) {
+        logger.info('Subscribed Home Assistant event streams', { count: eventTypes.length, eventTypes });
+      }
     }
     connection.addEventListener('disconnected', () => {
       logger.warn('Home Assistant connection lost');
