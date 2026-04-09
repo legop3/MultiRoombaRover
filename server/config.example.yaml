@@ -48,11 +48,10 @@ homeAssistant:
     #   cooldownMs: 15000
     #   action: "humanAlert"
     #
-    # Option B (direct HA event trigger, for stateless button.* setups):
-    - eventType: "zha_event"
-      eventData:
-        device_id: "REPLACE_WITH_DEVICE_ID"
-        command: "single"
+    # Option B (HA device-based trigger, for stateless button.* setups):
+    - deviceId: "REPLACE_WITH_DEVICE_ID"
+      # Optional: require a specific press/action value if available.
+      # press: "single"
       cooldownMs: 15000
       action: "humanAlert"
 roomCameras:
