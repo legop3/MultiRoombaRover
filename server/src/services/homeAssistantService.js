@@ -22,6 +22,7 @@ const entityState = new Map(); // entityId -> normalized state
 const triggerConfig = []; // [{ runtimeKey, source, entityId?, deviceId?, action, stateEquals?, press?, payload, cooldownMs, allowedModes }]
 const triggerRuntime = new Map(); // triggerId -> { lastFiredAt, lastState, lastChanged, lastUpdated }
 const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
+let deviceDebugSamplesRemaining = 30;
 
 let connection = null;
 let unsubscribeEntities = null;
@@ -342,8 +343,19 @@ function handleHomeAssistantEvent(event = {}) {
   if (!triggerConfig.length) return;
   const eventType = String(event?.event_type || '').trim().toLowerCase();
   if (!eventType) return;
+  const hasDeviceTriggers = triggerConfig.some((trigger) => trigger.source === 'device');
   const deviceCandidates = collectDeviceCandidates(event);
   const detectedPress = detectPressValue(event);
+  if (hasDeviceTriggers && deviceDebugSamplesRemaining > 0) {
+    deviceDebugSamplesRemaining -= 1;
+    logger.info('HA device trigger sample', {
+      eventType,
+      detectedPress,
+      deviceCandidates,
+      entityId: event?.data?.entity_id || null,
+      dataKeys: Object.keys(event?.data || {}),
+    });
+  }
   triggerConfig.forEach((trigger) => {
     if (trigger.source !== 'device') return;
     if (!trigger.deviceId) return;
