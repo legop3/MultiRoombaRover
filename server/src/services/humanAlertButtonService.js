@@ -4,6 +4,7 @@ const { subscribe, publishEvent } = require('./eventBus');
 const { getMode, MODES, setMode } = require('./modeManager');
 const { issueCommand } = require('./commandService');
 const roverManager = require('./roverManager');
+const { toggleLightsLockedOn } = require('./homeAssistantService');
 const { getRoomCameras } = require('./roomCameraService');
 const { getRoomCameraState } = require('./roomCameraSnapshotService');
 
@@ -11,14 +12,17 @@ const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
 const HUMAN_ALERT_ACTION = 'humanAlert';
 const MODE_TURNS_ACTION = 'modeTurns';
 const MODE_ADMIN_ACTION = 'modeAdmin';
+const LIGHTS_LOCK_TOGGLE_ACTION = 'lightsLockToggle';
 const HUMAN_ALERT_MESSAGE = 'Human alert button pressed.';
 const MODE_TURNS_TTS = 'Server mode is now turns.';
 const MODE_ADMIN_TTS = 'Server mode is now admin.';
+const LIGHTS_LOCKED_TTS = 'Room lights are now locked on.';
+const LIGHTS_UNLOCKED_TTS = 'Room lights are now unlocked.';
 const TILE_WIDTH = 480;
 const TILE_HEIGHT = 270;
 
 logger.info('HA button actions enabled', {
-  actions: [HUMAN_ALERT_ACTION, MODE_TURNS_ACTION, MODE_ADMIN_ACTION],
+  actions: [HUMAN_ALERT_ACTION, MODE_TURNS_ACTION, MODE_ADMIN_ACTION, LIGHTS_LOCK_TOGGLE_ACTION],
 });
 
 function isModeAllowed() {
@@ -120,6 +124,14 @@ async function handleTrigger(event = {}) {
       { force: true },
     );
     sendTtsToNonPrivateRovers(MODE_ADMIN_TTS);
+    return;
+  }
+  if (action === LIGHTS_LOCK_TOGGLE_ACTION) {
+    const lockedOn = await toggleLightsLockedOn({
+      source: 'ha-button:lightsLockToggle',
+      forceApply: true,
+    });
+    sendTtsToNonPrivateRovers(lockedOn ? LIGHTS_LOCKED_TTS : LIGHTS_UNLOCKED_TTS);
     return;
   }
   if (action !== HUMAN_ALERT_ACTION) {

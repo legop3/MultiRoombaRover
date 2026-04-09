@@ -84,19 +84,21 @@ function getEntityHue(entity) {
   return 0;
 }
 
-function EntityRow({ entity, connected, onToggle, onSetColor }) {
+function EntityRow({ entity, connected, controlsLocked, onToggle, onSetColor }) {
   const unavailable = entity.state === 'unavailable' || !entity.available;
   const isOn = entity.state === 'on';
   const supportsColor = entity.type === 'light' && entity.supportsColor;
   const statusTone = unavailable ? 'warn' : isOn ? 'success' : 'muted';
   const statusLabel = unavailable ? 'Unavailable' : isOn ? 'On' : 'Off';
-  const disableToggle = !connected || unavailable;
+  const disableToggle = controlsLocked || !connected || unavailable;
   const disableColor = disableToggle || !supportsColor;
   const [hue, setHue] = useState(() => getEntityHue(entity));
   const hueRef = useRef(hue);
   const draggingRef = useRef(false);
   const toneStyles = unavailable
     ? 'border-slate-800 bg-slate-900 text-slate-400 cursor-not-allowed'
+    : controlsLocked
+    ? 'border-slate-800 bg-slate-900 text-slate-300 cursor-not-allowed'
     : isOn
     ? 'border-emerald-700 bg-emerald-900/80 text-emerald-50 hover:bg-emerald-800'
     : 'border-rose-800 bg-rose-900/80 text-rose-50 hover:bg-rose-800';
@@ -210,6 +212,8 @@ export default function HomeAssistantControls() {
   const { session, homeAssistantToggle, homeAssistantSetLightColor } = useSession();
   const ha = session?.homeAssistant;
   const entities = useMemo(() => ha?.entities || [], [ha?.entities]);
+  const lightPolicy = ha?.lightPolicy || null;
+  const controlsLocked = Boolean(lightPolicy?.lockedOn);
   const onKeyLabel = formatKeyLabel(keymap?.homeAssistantOn?.[0]);
   const offKeyLabel = formatKeyLabel(keymap?.homeAssistantOff?.[0]);
 
@@ -239,6 +243,7 @@ export default function HomeAssistantControls() {
         <div className="flex items-center gap-0.5">
           <p>Room Controls</p>
           <span className="text-xs text-slate-500">{entities.length}</span>
+          {controlsLocked ? <StatusBadge label="Locked On" tone="warn" /> : null}
           <div className="flex items-center gap-0.5 text-xs text-slate-300 background-black">
             <span className="flex items-center gap-0.5">
               <span>On</span>
@@ -252,12 +257,18 @@ export default function HomeAssistantControls() {
         </div>
         <StatusBadge label={connected ? 'Connected' : 'Offline'} tone={connected ? 'success' : 'warn'} />
       </header>
+      {controlsLocked ? (
+        <p className="rounded border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
+          Lights are locked on. Room controls are disabled.
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-0.5">
         {entities.map((entity) => (
           <EntityRow
             key={entity.id}
             entity={entity}
             connected={connected}
+            controlsLocked={controlsLocked}
             onToggle={homeAssistantToggle}
             onSetColor={homeAssistantSetLightColor}
           />

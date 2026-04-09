@@ -40,6 +40,7 @@ homeAssistant:
     - id: "switch.dock_power"
       name: "Dock Power"
       # type is optional; if omitted it is inferred from the entity id (light/switch)
+      # For room-light policy, all configured entities are treated as room lights (including switches).
   buttons:
     # Legacy action entities only (for example sensor.<button>_action from Zigbee2MQTT).
     - entityId: "sensor.basement_rover_buttons_action"
@@ -57,6 +58,11 @@ homeAssistant:
       stateEquals: "hold"
       cooldownMs: 2000
       action: "modeAdmin"
+    - entityId: "sensor.basement_rover_buttons_action"
+      # Room lights lock toggle
+      stateEquals: "toggle"
+      cooldownMs: 1000
+      action: "lightsLockToggle"
 roomCameras:
   - id: "lobby"
     name: "Lobby Camera"

@@ -4,9 +4,10 @@ const { createConnection, subscribeEntities, callService, Auth } = require('home
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('homeAssistantService');
 const { loadConfig } = require('../helpers/configLoader');
-const { getMode } = require('./modeManager');
+const { getMode, MODES, modeEvents } = require('./modeManager');
 const { isAdmin, isLockdownAdmin } = require('./roleService');
 const { publishEvent } = require('./eventBus');
+const { getActiveDrivers, turnEvents } = require('./turnService');
 
 // home-assistant-js-websocket expects a global WebSocket in Node.
 if (!global.WebSocket) {
@@ -22,11 +23,15 @@ const entityState = new Map(); // entityId -> normalized state
 const triggerConfig = []; // [{ runtimeKey, entityId, action, stateEquals, payload, cooldownMs, allowedModes }]
 const triggerRuntime = new Map(); // triggerId -> { lastFiredAt, lastState, lastChanged, lastUpdated }
 const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
+const LIGHT_IDLE_OFF_MS = 2 * 60 * 1000;
 
 let connection = null;
 let unsubscribeEntities = null;
 let reconnectTimer = null;
 let connected = false;
+let lightsLockedOn = false;
+let lightsIdleOffTimer = null;
+let lightsIdleOffDeadline = null;
 
 const enabled = Boolean(haConfig?.url && haConfig?.token);
 
@@ -180,6 +185,68 @@ function emitUpdate() {
 
 function emitStatus() {
   events.emit('status', getState());
+}
+
+function getControllableEntityIds() {
+  return Array.from(entityConfig.values()).map((meta) => String(meta.id));
+}
+
+function getActiveDriverCount() {
+  const active = getActiveDrivers();
+  if (!active || typeof active !== 'object') return 0;
+  return Object.keys(active).length;
+}
+
+function hasActiveDrivers() {
+  return getActiveDriverCount() > 0;
+}
+
+function clearLightsIdleOffTimer() {
+  if (lightsIdleOffTimer) {
+    clearTimeout(lightsIdleOffTimer);
+    lightsIdleOffTimer = null;
+  }
+  if (lightsIdleOffDeadline != null) {
+    lightsIdleOffDeadline = null;
+    emitUpdate();
+  }
+}
+
+function scheduleLightsIdleOffTimer() {
+  if (!enabled) return;
+  if (getControllableEntityIds().length === 0) return;
+  if (lightsIdleOffTimer || lightsLockedOn || hasActiveDrivers()) {
+    return;
+  }
+  lightsIdleOffDeadline = Date.now() + LIGHT_IDLE_OFF_MS;
+  lightsIdleOffTimer = setTimeout(async () => {
+    lightsIdleOffTimer = null;
+    lightsIdleOffDeadline = null;
+    try {
+      await setAllControllableEntitiesState('off');
+      logger.info('Auto-turned off room lights due to no active drivers', {
+        idleMs: LIGHT_IDLE_OFF_MS,
+      });
+    } catch (err) {
+      logger.warn('Failed auto light-off after idle', err.message);
+    } finally {
+      emitUpdate();
+      evaluateLightAutomation();
+    }
+  }, LIGHT_IDLE_OFF_MS);
+  emitUpdate();
+}
+
+function evaluateLightAutomation() {
+  if (lightsLockedOn) {
+    clearLightsIdleOffTimer();
+    return;
+  }
+  if (hasActiveDrivers()) {
+    clearLightsIdleOffTimer();
+    return;
+  }
+  scheduleLightsIdleOffTimer();
 }
 
 function handleEntitySnapshot(snapshot = {}) {
@@ -353,6 +420,20 @@ async function setEntityState(entityId, desiredState) {
   logger.info('Issued Home Assistant command', { entityId, domain, service });
 }
 
+async function setAllControllableEntitiesState(desiredState) {
+  const ids = getControllableEntityIds();
+  if (!ids.length) return;
+  const results = await Promise.allSettled(ids.map((id) => setEntityState(id, desiredState)));
+  const failures = results.filter((result) => result.status === 'rejected');
+  if (failures.length) {
+    logger.warn('Some Home Assistant entity state updates failed', {
+      desiredState,
+      total: ids.length,
+      failed: failures.length,
+    });
+  }
+}
+
 async function toggleEntity(entityId) {
   const current = entityState.get(entityId);
   const nextState = current?.state === 'on' ? 'off' : 'on';
@@ -382,16 +463,86 @@ async function setLightColor(entityId, rgbColor) {
   logger.info('Issued Home Assistant color command', { entityId, rgbColor: normalized });
 }
 
+function isLightControlLocked() {
+  return lightsLockedOn;
+}
+
+function getLightPolicyState() {
+  return {
+    lockedOn: lightsLockedOn,
+    idleOffMs: LIGHT_IDLE_OFF_MS,
+    idleOffAt: lightsIdleOffDeadline,
+    activeDrivers: getActiveDriverCount(),
+  };
+}
+
+async function setLightsLockedOn(nextValue, options = {}) {
+  const next = Boolean(nextValue);
+  const forceApply = Boolean(options.forceApply);
+  const changed = lightsLockedOn !== next;
+  lightsLockedOn = next;
+  if (lightsLockedOn) {
+    clearLightsIdleOffTimer();
+    if (changed || forceApply) {
+      if (enabled) {
+        await setAllControllableEntitiesState('on');
+      }
+    }
+  } else {
+    evaluateLightAutomation();
+  }
+  if (changed) {
+    logger.info('Room lights lock state changed', {
+      lockedOn: lightsLockedOn,
+      source: options.source || 'unknown',
+    });
+  }
+  emitUpdate();
+  return lightsLockedOn;
+}
+
+async function toggleLightsLockedOn(options = {}) {
+  return setLightsLockedOn(!lightsLockedOn, options);
+}
+
 function getState() {
   const entities = Array.from(entityConfig.values()).map(
     (meta) => entityState.get(meta.id) || buildState(meta, null),
   );
-  return { enabled, connected, entities };
+  return {
+    enabled,
+    connected,
+    entities,
+    lightPolicy: getLightPolicyState(),
+  };
 }
 
 loadEntityConfig();
 loadTriggerConfig();
 connect();
+evaluateLightAutomation();
+
+turnEvents.on('activeDriver', () => {
+  evaluateLightAutomation();
+});
+
+turnEvents.on('queue', () => {
+  evaluateLightAutomation();
+});
+
+modeEvents.on('change', (mode) => {
+  if (mode === MODES.ADMIN || mode === MODES.LOCKDOWN) {
+    if (lightsLockedOn) {
+      setLightsLockedOn(false, { source: 'modeGateReset' }).catch((err) => {
+        logger.warn('Failed to disable lights lock on mode change', err.message);
+      });
+    } else {
+      evaluateLightAutomation();
+    }
+    return;
+  }
+  evaluateLightAutomation();
+});
 
 io.on('connection', (socket) => {
   socket.on('homeAssistant:toggle', async ({ entityId } = {}, cb = () => {}) => {
@@ -402,7 +553,9 @@ io.on('connection', (socket) => {
     ) {
       return cb({ error: 'Insufficient permissions to control Home Assistant' });
     }
-    
+    if (isLightControlLocked()) {
+      return cb({ error: 'Room controls are locked on' });
+    }
     try {
       if (!entityId) throw new Error('entityId required');
       await toggleEntity(entityId);
@@ -419,6 +572,9 @@ io.on('connection', (socket) => {
       (mode === 'lockdown' && isLockdownAdmin(socket) !== true)
     ) {
       return cb({ error: 'Insufficient permissions to control Home Assistant' });
+    }
+    if (isLightControlLocked()) {
+      return cb({ error: 'Room controls are locked on' });
     }
 
     try {
@@ -438,6 +594,9 @@ io.on('connection', (socket) => {
     ) {
       return cb({ error: 'Insufficient permissions to control Home Assistant' });
     }
+    if (isLightControlLocked()) {
+      return cb({ error: 'Room controls are locked on' });
+    }
 
     try {
       if (!entityId) throw new Error('entityId required');
@@ -451,8 +610,12 @@ io.on('connection', (socket) => {
 
 module.exports = {
   getState,
+  getLightPolicyState,
+  isLightControlLocked,
   toggleEntity,
   setEntityState,
   setLightColor,
+  setLightsLockedOn,
+  toggleLightsLockedOn,
   homeAssistantEvents: events,
 };
