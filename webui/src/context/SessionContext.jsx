@@ -10,7 +10,6 @@ const SessionContext = createContext({
   adminLogs: [],
   llmCommentaryState: null,
   llmCommentaryStatus: null,
-  visionHumanState: null,
   identifySession: async () => {},
   login: async () => {},
   setRole: async () => {},
@@ -36,11 +35,6 @@ const SessionContext = createContext({
   setAudioLevels: async () => {},
   setPrivateSafety: async () => {},
   llmControl: async () => {},
-  getVisionHumanState: async () => {},
-  updateVisionHumanConfig: async () => {},
-  testVisionHumanTts: async () => {},
-  testVisionHumanDiscord: async () => {},
-  clearVisionHumanState: async () => {},
 });
 
 function useAckEmitter(socket) {
@@ -67,7 +61,6 @@ export function SessionProvider({ children }) {
   const [adminLogs, setAdminLogs] = useState([]);
   const [llmCommentaryState, setLlmCommentaryState] = useState(null);
   const [llmCommentaryStatus, setLlmCommentaryStatus] = useState(null);
-  const [visionHumanState, setVisionHumanState] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [connected, setConnected] = useState(socket.connected);
 
@@ -85,9 +78,6 @@ export function SessionProvider({ children }) {
   useEffect(() => {
     function handleSession(payload) {
       setSession(payload);
-      if (payload?.visionHumanDetection) {
-        setVisionHumanState(payload.visionHumanDetection);
-      }
     }
     function handleLogInit(entries = []) {
       setLogs(entries);
@@ -114,10 +104,6 @@ export function SessionProvider({ children }) {
     socket.on('adminlog:init', handleAdminLogInit);
     socket.on('adminlog:entry', handleAdminLogEntry);
     socket.on('llm:state', handleLlmState);
-    socket.on('vision:human:state', (payload = null) => {
-      const state = payload && typeof payload === 'object' ? payload : null;
-      setVisionHumanState(state);
-    });
     socket.on('alert:new', (payload = {}) => {
       setAlerts((prev) => [
         ...prev.slice(-49),
@@ -134,7 +120,6 @@ export function SessionProvider({ children }) {
       socket.off('adminlog:init', handleAdminLogInit);
       socket.off('adminlog:entry', handleAdminLogEntry);
       socket.off('llm:state', handleLlmState);
-      socket.off('vision:human:state');
       socket.off('alert:new');
     };
   }, [socket]);
@@ -177,12 +162,6 @@ export function SessionProvider({ children }) {
         emitWithAck('session:privateSafety:set', { roverId, safety }),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),
-      getVisionHumanState: () => emitWithAck('vision:human:getState'),
-      updateVisionHumanConfig: (nextConfig = {}) =>
-        emitWithAck('vision:human:updateConfig', { config: nextConfig }),
-      testVisionHumanTts: () => emitWithAck('vision:human:testTts'),
-      testVisionHumanDiscord: () => emitWithAck('vision:human:testDiscord'),
-      clearVisionHumanState: () => emitWithAck('vision:human:clear'),
       pushAlert: (alert) =>
         setAlerts((prev) => [
           ...prev.slice(-49),
@@ -200,21 +179,10 @@ export function SessionProvider({ children }) {
       adminLogs,
       llmCommentaryState,
       llmCommentaryStatus,
-      visionHumanState,
       alerts,
       ...actions,
     }),
-    [
-      actions,
-      adminLogs,
-      alerts,
-      connected,
-      llmCommentaryState,
-      llmCommentaryStatus,
-      logs,
-      session,
-      visionHumanState,
-    ],
+    [actions, adminLogs, alerts, connected, llmCommentaryState, llmCommentaryStatus, logs, session],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

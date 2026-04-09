@@ -6,6 +6,7 @@ const logger = require('../globals/logger').child('homeAssistantService');
 const { loadConfig } = require('../helpers/configLoader');
 const { getMode } = require('./modeManager');
 const { isAdmin, isLockdownAdmin } = require('./roleService');
+const { publishEvent } = require('./eventBus');
 
 // home-assistant-js-websocket expects a global WebSocket in Node.
 if (!global.WebSocket) {
@@ -18,6 +19,9 @@ const haConfig = config.homeAssistant || {};
 const events = new EventEmitter();
 const entityConfig = new Map(); // entityId -> { id, name, type }
 const entityState = new Map(); // entityId -> normalized state
+const triggerConfig = []; // [{ runtimeKey, entityId, action, stateEquals, payload, cooldownMs, allowedModes }]
+const triggerRuntime = new Map(); // triggerId -> { lastFiredAt, lastState, lastChanged, lastUpdated }
+const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
 
 let connection = null;
 let unsubscribeEntities = null;
@@ -76,6 +80,49 @@ function loadEntityConfig() {
     }
   });
   logger.info('Loaded Home Assistant entities', { count: entityConfig.size });
+}
+
+function normalizeTriggerEntry(entry, index) {
+  if (!entry || typeof entry !== 'object') return null;
+  const entityId = String(entry.entityId || entry.entity_id || '').trim();
+  const action = String(entry.action || '').trim();
+  if (!entityId || !action) return null;
+  const stateEqualsRaw = entry.stateEquals ?? entry.state_equals;
+  const stateEquals =
+    stateEqualsRaw === null || stateEqualsRaw === undefined ? null : String(stateEqualsRaw).trim();
+  const runtimeKey = `${action}::${entityId}::${stateEquals || '*'}::${index}`;
+  const cooldownMs = Number.isFinite(Number(entry.cooldownMs)) ? Math.max(0, Number(entry.cooldownMs)) : 0;
+  const allowedModes = Array.isArray(entry.allowedModes)
+    ? entry.allowedModes.map((mode) => String(mode || '').trim().toLowerCase()).filter(Boolean)
+    : null;
+  return {
+    runtimeKey,
+    entityId,
+    action,
+    stateEquals,
+    payload: entry.payload && typeof entry.payload === 'object' ? entry.payload : {},
+    cooldownMs,
+    allowedModes,
+  };
+}
+
+function loadTriggerConfig() {
+  triggerConfig.length = 0;
+  const list = Array.isArray(haConfig?.buttons) ? haConfig.buttons : [];
+  list.forEach((entry, index) => {
+    const normalized = normalizeTriggerEntry(entry, index);
+    if (!normalized) return;
+    triggerConfig.push(normalized);
+    if (!triggerRuntime.has(normalized.runtimeKey)) {
+      triggerRuntime.set(normalized.runtimeKey, {
+        lastFiredAt: 0,
+        lastState: null,
+        lastChanged: null,
+        lastUpdated: null,
+      });
+    }
+  });
+  logger.info('Loaded Home Assistant buttons', { count: triggerConfig.length });
 }
 
 function buildState(meta, raw) {
@@ -153,6 +200,75 @@ function handleEntitySnapshot(snapshot = {}) {
   if (changed) {
     emitUpdate();
   }
+  evaluateTriggers(snapshot);
+}
+
+function triggerMatches(trigger, raw, runtimeState) {
+  if (!raw) return false;
+  const nextState = raw?.state ?? null;
+  const nextChanged = raw?.last_changed ?? null;
+  const nextUpdated = raw?.last_updated ?? null;
+  const changed =
+    runtimeState.lastState !== nextState ||
+    runtimeState.lastChanged !== nextChanged ||
+    runtimeState.lastUpdated !== nextUpdated;
+  if (!changed) {
+    return { matched: false, nextState, nextChanged, nextUpdated };
+  }
+  if (trigger.stateEquals != null && String(trigger.stateEquals) !== String(nextState)) {
+    return { matched: false, nextState, nextChanged, nextUpdated };
+  }
+  return { matched: true, nextState, nextChanged, nextUpdated };
+}
+
+function evaluateTriggers(snapshot = {}) {
+  if (!triggerConfig.length) return;
+  const now = Date.now();
+  const mode = String(getMode() || '').toLowerCase();
+  triggerConfig.forEach((trigger) => {
+    const runtimeState = triggerRuntime.get(trigger.runtimeKey) || {
+      lastFiredAt: 0,
+      lastState: null,
+      lastChanged: null,
+      lastUpdated: null,
+    };
+    const raw = snapshot?.[trigger.entityId] || null;
+    const evalResult = triggerMatches(trigger, raw, runtimeState);
+    runtimeState.lastState = evalResult.nextState;
+    runtimeState.lastChanged = evalResult.nextChanged;
+    runtimeState.lastUpdated = evalResult.nextUpdated;
+    triggerRuntime.set(trigger.runtimeKey, runtimeState);
+    if (!evalResult.matched) return;
+    if (trigger.allowedModes?.length && !trigger.allowedModes.includes(mode)) return;
+    if (trigger.cooldownMs > 0 && now - runtimeState.lastFiredAt < trigger.cooldownMs) return;
+    runtimeState.lastFiredAt = now;
+    triggerRuntime.set(trigger.runtimeKey, runtimeState);
+    events.emit('trigger', {
+      buttonId: trigger.action,
+      entityId: trigger.entityId,
+      action: trigger.action,
+      state: raw?.state ?? null,
+      attributes: raw?.attributes || {},
+      lastChanged: raw?.last_changed || null,
+      lastUpdated: raw?.last_updated || null,
+      firedAt: now,
+    });
+    publishEvent({
+      source: 'homeAssistant',
+      type: HA_BUTTON_EVENT_TYPE,
+      payload: {
+        buttonId: trigger.action,
+        entityId: trigger.entityId,
+        action: trigger.action,
+        state: raw?.state ?? null,
+        attributes: raw?.attributes || {},
+        lastChanged: raw?.last_changed || null,
+        lastUpdated: raw?.last_updated || null,
+        firedAt: now,
+        ...(trigger.payload || {}),
+      },
+    });
+  });
 }
 
 function teardownConnection() {
@@ -270,6 +386,7 @@ function getState() {
 }
 
 loadEntityConfig();
+loadTriggerConfig();
 connect();
 
 io.on('connection', (socket) => {

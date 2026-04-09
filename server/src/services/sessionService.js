@@ -1,6 +1,6 @@
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('sessionService');
-const { getRole, isAdmin, roleEvents } = require('./roleService');
+const { getRole, roleEvents } = require('./roleService');
 const { getMode, modeEvents } = require('./modeManager');
 const roverManager = require('./roverManager');
 const { managerEvents } = roverManager;
@@ -28,7 +28,6 @@ const { subscribe } = require('./eventBus');
 const { getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
 const { getAudioForwardState, audioForwardEvents } = require('./audioForwardService');
 const { getAudioLevels, audioLevelsEvents } = require('./audioLevelsService');
-const { getRoomHumanDetectionState } = require('./roomHumanDetectionService');
 
 const config = loadConfig();
 const discordInvite = config.discord?.invite || null;
@@ -137,7 +136,6 @@ function buildSession(socket) {
     isVerified: Boolean(socket?.data?.isVerified),
     audioForward: getAudioForwardState(),
     audioLevels: getAudioLevels(),
-    visionHumanDetection: isAdmin(socket) ? getRoomHumanDetectionState() : null,
   };
 }
 

@@ -24,12 +24,6 @@ export default function AdminPanel() {
     setAudioLevels,
     setPrivateSafety,
     llmControl,
-    visionHumanState,
-    getVisionHumanState,
-    updateVisionHumanConfig,
-    testVisionHumanTts,
-    testVisionHumanDiscord,
-    clearVisionHumanState,
     adminLogs,
     llmCommentaryState,
   } = useSession();
@@ -52,7 +46,6 @@ export default function AdminPanel() {
     forwardGain: Number.isFinite(currentAudioLevels.forwardGain) ? currentAudioLevels.forwardGain : 1,
   });
   const [privateSafetyDrafts, setPrivateSafetyDrafts] = useState({});
-  const [visionDraft, setVisionDraft] = useState(null);
 
   const isAdmin =
     session?.role === 'admin' ||
@@ -190,23 +183,6 @@ export default function AdminPanel() {
     });
   }, [currentAudioLevels.forwardGain, currentAudioLevels.hornGain, currentAudioLevels.ttsGain]);
 
-  useEffect(() => {
-    const source = visionHumanState?.config;
-    if (!source) return;
-    setVisionDraft({
-      enabled: Boolean(visionHumanState?.enabled),
-      confidenceThreshold: Number.isFinite(Number(source.confidenceThreshold))
-        ? Number(source.confidenceThreshold)
-        : 0.55,
-      ttsDelayMs: Number.isFinite(Number(source.ttsDelayMs)) ? Number(source.ttsDelayMs) : 30000,
-      discordDelayMs: Number.isFinite(Number(source.discordDelayMs)) ? Number(source.discordDelayMs) : 60000,
-      clearWindowMs: Number.isFinite(Number(source.clearWindowMs)) ? Number(source.clearWindowMs) : 3000,
-      cooldownMs: Number.isFinite(Number(source.cooldownMs)) ? Number(source.cooldownMs) : 900000,
-      maxInferenceFpsPerCamera: Number.isFinite(Number(source.maxInferenceFpsPerCamera))
-        ? Number(source.maxInferenceFpsPerCamera)
-        : 3,
-    });
-  }, [visionHumanState]);
 
   useEffect(() => {
     const next = {};
@@ -263,54 +239,6 @@ export default function AdminPanel() {
       const draft = privateSafetyDrafts?.[roverId];
       if (!draft) return;
       await setPrivateSafety(roverId, draft);
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleRefreshVision = async () => {
-    try {
-      await getVisionHumanState();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleVisionDraftChange = (key) => (event) => {
-    if (!visionDraft) return;
-    const isCheckbox = event.target.type === 'checkbox';
-    const value = isCheckbox ? Boolean(event.target.checked) : Number(event.target.value);
-    setVisionDraft((current) => ({ ...(current || {}), [key]: isCheckbox ? value : value }));
-  };
-
-  const handleSaveVisionConfig = async () => {
-    if (!visionDraft) return;
-    try {
-      await updateVisionHumanConfig(visionDraft);
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleVisionTestTts = async () => {
-    try {
-      await testVisionHumanTts();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleVisionTestDiscord = async () => {
-    try {
-      await testVisionHumanDiscord();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleVisionClear = async () => {
-    try {
-      await clearVisionHumanState();
     } catch (err) {
       alert(err.message);
     }
@@ -535,16 +463,6 @@ export default function AdminPanel() {
         )}
       />
       <ReplaySnapshotHealth health={health} roster={roster} />
-      <VisionHumanPanel
-        state={visionHumanState}
-        draft={visionDraft}
-        onDraftChange={handleVisionDraftChange}
-        onRefresh={handleRefreshVision}
-        onSaveConfig={handleSaveVisionConfig}
-        onTestTts={handleVisionTestTts}
-        onTestDiscord={handleVisionTestDiscord}
-        onClear={handleVisionClear}
-      />
       <LlmCommentaryPanel
         state={llmCommentaryState}
         onClearHistory={handleClearLlmHistory}
@@ -552,189 +470,6 @@ export default function AdminPanel() {
       />
       <AdminIpLogPanel entries={adminLogs} />
     </section>
-  );
-}
-
-function VisionHumanPanel({
-  state,
-  draft,
-  onDraftChange,
-  onRefresh,
-  onSaveConfig,
-  onTestTts,
-  onTestDiscord,
-  onClear,
-}) {
-  if (!state) {
-    return (
-      <div className="space-y-0.5">
-        <div className="panel-muted text-xs uppercase">Human Detection</div>
-        <div className="surface text-xs text-slate-300">No human detection state received yet.</div>
-      </div>
-    );
-  }
-  const modeGateText = state.modeActive ? 'active' : `inactive in ${state.mode}`;
-  const workerText = state.workerReady ? 'ready' : state.workerRunning ? 'starting' : 'offline';
-  const episode = state.episode || {};
-  const history = Array.isArray(state.history) ? state.history : [];
-  const cameras = Array.isArray(state.cameras) ? state.cameras : [];
-  const statusPills = [
-    { label: 'enabled', value: state.enabled ? 'yes' : 'no' },
-    { label: 'mode gate', value: modeGateText },
-    { label: 'worker', value: workerText },
-    { label: 'python', value: state.workerPython || '--' },
-    { label: 'worker restarts', value: state.workerRestartCount ?? 0 },
-    { label: 'present', value: episode.humanPresent ? 'yes' : 'no' },
-    { label: 'tts sent', value: episode.ttsSentThisEpisode ? 'yes' : 'no' },
-    { label: 'discord sent', value: episode.discordSentThisEpisode ? 'yes' : 'no' },
-    { label: 'tts in', value: `${Math.ceil((episode.timeToTtsMs || 0) / 1000)}s` },
-    { label: 'discord in', value: `${Math.ceil((episode.timeToDiscordMs || 0) / 1000)}s` },
-    { label: 'cooldown', value: `${Math.ceil((episode.cooldownRemainingMs || 0) / 1000)}s` },
-  ];
-  return (
-    <div className="space-y-0.5">
-      <div className="panel-muted text-xs uppercase">Human Detection</div>
-      <div className="flex flex-wrap gap-0.5 text-xs">
-        <button type="button" onClick={onRefresh} className="button-dark">
-          Refresh
-        </button>
-        <button type="button" onClick={onSaveConfig} className="button-dark">
-          Save Detection Config
-        </button>
-        <button type="button" onClick={onTestTts} className="button-dark">
-          Test TTS
-        </button>
-        <button type="button" onClick={onTestDiscord} className="button-dark">
-          Test Discord
-        </button>
-        <button type="button" onClick={onClear} className="button-danger">
-          Clear Episode
-        </button>
-      </div>
-      <div className="surface flex flex-wrap gap-0.5 text-xs">
-        {statusPills.map((pill) => (
-          <span
-            key={pill.label}
-            className="rounded border border-slate-600/60 bg-slate-800/70 px-0.5 py-0.25 text-[0.72rem] leading-tight text-slate-200"
-          >
-            {pill.label}: {pill.value}
-          </span>
-        ))}
-      </div>
-      {draft ? (
-        <div className="grid gap-0.5 md:grid-cols-2">
-          <label className="surface flex items-center justify-between gap-0.5 text-xs">
-            <span>Enabled</span>
-            <input type="checkbox" checked={Boolean(draft.enabled)} onChange={onDraftChange('enabled')} />
-          </label>
-          <label className="surface grid gap-0.25 text-xs">
-            <span>Confidence threshold</span>
-            <input
-              type="number"
-              min="0"
-              max="1"
-              step="0.01"
-              value={draft.confidenceThreshold}
-              onChange={onDraftChange('confidenceThreshold')}
-              className="field-input text-xs"
-            />
-          </label>
-          <label className="surface grid gap-0.25 text-xs">
-            <span>TTS delay (ms)</span>
-            <input
-              type="number"
-              min="1000"
-              step="250"
-              value={draft.ttsDelayMs}
-              onChange={onDraftChange('ttsDelayMs')}
-              className="field-input text-xs"
-            />
-          </label>
-          <label className="surface grid gap-0.25 text-xs">
-            <span>Discord delay (ms)</span>
-            <input
-              type="number"
-              min="1000"
-              step="250"
-              value={draft.discordDelayMs}
-              onChange={onDraftChange('discordDelayMs')}
-              className="field-input text-xs"
-            />
-          </label>
-          <label className="surface grid gap-0.25 text-xs">
-            <span>Clear window (ms)</span>
-            <input
-              type="number"
-              min="250"
-              step="250"
-              value={draft.clearWindowMs}
-              onChange={onDraftChange('clearWindowMs')}
-              className="field-input text-xs"
-            />
-          </label>
-          <label className="surface grid gap-0.25 text-xs">
-            <span>Cooldown (ms)</span>
-            <input
-              type="number"
-              min="0"
-              step="1000"
-              value={draft.cooldownMs}
-              onChange={onDraftChange('cooldownMs')}
-              className="field-input text-xs"
-            />
-          </label>
-          <label className="surface grid gap-0.25 text-xs">
-            <span>Max inference FPS/camera</span>
-            <input
-              type="number"
-              min="0.25"
-              max="30"
-              step="0.25"
-              value={draft.maxInferenceFpsPerCamera}
-              onChange={onDraftChange('maxInferenceFpsPerCamera')}
-              className="field-input text-xs"
-            />
-          </label>
-        </div>
-      ) : null}
-      <div className="space-y-0.5">
-        <div className="panel-muted text-xs uppercase">Per Camera</div>
-        <div className="surface max-h-40 overflow-y-auto text-xs text-slate-200">
-          {cameras.length ? (
-            cameras.map((cam) => (
-              <div key={cam.cameraId} className="flex items-center justify-between gap-0.5">
-                <span>{cam.cameraId}</span>
-                <span>{cam.lastConfidence?.toFixed?.(2) ?? '0.00'}</span>
-                <span>{cam.lastPositiveAt ? new Date(cam.lastPositiveAt).toLocaleTimeString() : '--'}</span>
-                <span className={cam.error ? 'text-amber-300' : 'text-emerald-300'}>
-                  {cam.error ? 'error' : cam.inflight ? 'inference' : 'ok'}
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className="text-slate-400">No camera state yet.</div>
-          )}
-        </div>
-      </div>
-      <div className="space-y-0.5">
-        <div className="panel-muted text-xs uppercase">Recent Events</div>
-        <div className="surface max-h-40 overflow-y-auto text-xs text-slate-200">
-          {history.length ? (
-            history
-              .slice()
-              .reverse()
-              .map((entry, idx) => (
-                <div key={`${entry.ts}-${entry.type}-${idx}`} className="flex items-start justify-between gap-0.5">
-                  <span>{entry.type}</span>
-                  <span className="text-slate-400">{entry.ts ? new Date(entry.ts).toLocaleTimeString() : '--'}</span>
-                </div>
-              ))
-          ) : (
-            <div className="text-slate-400">No events yet.</div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 

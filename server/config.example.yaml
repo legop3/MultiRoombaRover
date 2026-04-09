@@ -40,6 +40,17 @@ homeAssistant:
     - id: "switch.dock_power"
       name: "Dock Power"
       # type is optional; if omitted it is inferred from the entity id (light/switch)
+  buttons:
+    # All Home Assistant button automations live here.
+    - entityId: "sensor.human_alert_button_action"
+      stateEquals: "single"
+      cooldownMs: 15000
+      action: "humanAlert"
+    # Example future button:
+    # - entityId: "sensor.replay_button_action"
+    #   stateEquals: "single"
+    #   cooldownMs: 10000
+    #   action: "replayClip"
 roomCameras:
   - id: "lobby"
     name: "Lobby Camera"
@@ -51,21 +62,6 @@ roomCameras:
     description: "Shows the workbench and charging docks."
     url: "http://192.168.0.51/snapshot.jpg"
     streamUrl: "http://192.168.0.51/stream.mjpg"
-
-vision:
-  humanDetection:
-    enabled: false
-    confidenceThreshold: 0.55
-    # Continuous presence windows:
-    # - 30s => rover TTS warning
-    # - 60s => Discord human alert
-    ttsDelayMs: 30000
-    discordDelayMs: 60000
-    # Tolerates brief detector misses before declaring "cleared".
-    clearWindowMs: 3000
-    # After a Discord alert, require clear + cooldown before next alert.
-    cooldownMs: 900000
-    maxInferenceFpsPerCamera: 3
 
 discord:
   token: "DISCORD_BOT_TOKEN"
