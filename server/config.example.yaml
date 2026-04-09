@@ -43,10 +43,20 @@ homeAssistant:
   buttons:
     # Legacy action entities only (for example sensor.<button>_action from Zigbee2MQTT).
     - entityId: "sensor.basement_rover_buttons_action"
-      # Optional; if omitted, any state change triggers.
+      # Human alert button
       stateEquals: "on"
       cooldownMs: 15000
       action: "humanAlert"
+    - entityId: "sensor.basement_rover_buttons_action"
+      # Mode button: turns
+      stateEquals: "double"
+      cooldownMs: 2000
+      action: "modeTurns"
+    - entityId: "sensor.basement_rover_buttons_action"
+      # Mode button: admin
+      stateEquals: "hold"
+      cooldownMs: 2000
+      action: "modeAdmin"
 roomCameras:
   - id: "lobby"
     name: "Lobby Camera"

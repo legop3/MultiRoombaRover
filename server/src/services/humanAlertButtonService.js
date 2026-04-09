@@ -1,21 +1,47 @@
 const sharp = require('sharp');
 const logger = require('../globals/logger').child('humanAlertButton');
 const { subscribe, publishEvent } = require('./eventBus');
-const { getMode, MODES } = require('./modeManager');
+const { getMode, MODES, setMode } = require('./modeManager');
+const { issueCommand } = require('./commandService');
+const roverManager = require('./roverManager');
 const { getRoomCameras } = require('./roomCameraService');
 const { getRoomCameraState } = require('./roomCameraSnapshotService');
 
 const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
 const HUMAN_ALERT_ACTION = 'humanAlert';
+const MODE_TURNS_ACTION = 'modeTurns';
+const MODE_ADMIN_ACTION = 'modeAdmin';
 const HUMAN_ALERT_MESSAGE = 'Human alert button pressed.';
+const MODE_TURNS_TTS = 'Server mode is now turns.';
+const MODE_ADMIN_TTS = 'Server mode is now admin.';
 const TILE_WIDTH = 480;
 const TILE_HEIGHT = 270;
 
-logger.info('Human alert button service enabled', { action: HUMAN_ALERT_ACTION });
+logger.info('HA button actions enabled', {
+  actions: [HUMAN_ALERT_ACTION, MODE_TURNS_ACTION, MODE_ADMIN_ACTION],
+});
 
 function isModeAllowed() {
   const mode = getMode();
   return mode !== MODES.ADMIN && mode !== MODES.LOCKDOWN;
+}
+
+function sendTtsToNonPrivateRovers(text) {
+  const roster = roverManager.getRoster();
+  roster.forEach((entry) => {
+    if (entry?.private?.enabled) return;
+    try {
+      issueCommand(String(entry.id), {
+        type: 'tts',
+        tts: {
+          text,
+          speak: true,
+        },
+      });
+    } catch (err) {
+      logger.warn('Failed to send mode TTS', { roverId: entry?.id, error: err.message });
+    }
+  });
 }
 
 async function buildTile(camera, state) {
@@ -74,7 +100,29 @@ async function buildHorizontalMosaic() {
 }
 
 async function handleTrigger(event = {}) {
-  if (String(event?.payload?.action || '') !== HUMAN_ALERT_ACTION) {
+  const action = String(event?.payload?.action || '');
+  if (!action) {
+    return;
+  }
+  if (action === MODE_TURNS_ACTION) {
+    setMode(
+      MODES.TURNS,
+      { data: { user: { username: 'ha-button:modeTurns' } } },
+      { force: true },
+    );
+    sendTtsToNonPrivateRovers(MODE_TURNS_TTS);
+    return;
+  }
+  if (action === MODE_ADMIN_ACTION) {
+    setMode(
+      MODES.ADMIN,
+      { data: { user: { username: 'ha-button:modeAdmin' } } },
+      { force: true },
+    );
+    sendTtsToNonPrivateRovers(MODE_ADMIN_TTS);
+    return;
+  }
+  if (action !== HUMAN_ALERT_ACTION) {
     return;
   }
   const now = Date.now();
