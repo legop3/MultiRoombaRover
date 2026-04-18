@@ -122,11 +122,11 @@ export default function ButtonBoxPanel() {
   }, [effectiveAlertVolume, socket]);
 
   return (
-    <section className="panel-section space-y-1 text-base">
-      <header className="text-center text-sm text-slate-300">
+    <section className="panel-section space-y-0.5 text-base">
+      <header className="panel-muted text-center text-sm">
         <p>Button Box</p>
       </header>
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-4 gap-0.5">
         {buttons.map((button) => {
           const id = Number(button.id);
           const count = Number.isFinite(button.count) ? button.count : 0;
@@ -142,16 +142,16 @@ export default function ButtonBoxPanel() {
             <article
               key={id}
               className={[
-                'rounded bg-slate-800/70 p-1 text-center shadow-sm ring-1 ring-white/10 transition-colors duration-200',
-                incActive ? 'bg-cyan-900/70 ring-1 ring-cyan-400/70' : '',
-                rewardActive ? 'bg-fuchsia-900/70 ring-1 ring-fuchsia-400/80' : '',
+                'surface px-0.5 py-0.5 text-center transition-colors duration-200',
+                incActive ? 'border border-cyan-400/70 bg-cyan-900/40' : '',
+                rewardActive ? 'border border-fuchsia-400/80 bg-fuchsia-900/40' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
             >
-              <p className="text-xs text-slate-300">Button {id}</p>
+              <p className="text-xs text-slate-400">Button {id}</p>
               <p className="text-sm font-semibold text-white">{count} / {goal}</p>
-              <p className="truncate text-[0.7rem] text-slate-200">#{rewardNumber} {rewardName}</p>
+              <p className="truncate text-[0.7rem] text-slate-300">#{rewardNumber} {rewardName}</p>
             </article>
           );
         })}

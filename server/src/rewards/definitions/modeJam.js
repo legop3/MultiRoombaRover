@@ -54,7 +54,7 @@ module.exports = {
   async run(ctx) {
     const prevMode = ctx.getMode();
     const prevReason = ctx.getAdminReasonText();
-    const jamReason = `Button box chaos active until ${new Date(Date.now() + DURATION_MS).toLocaleTimeString()}`;
+    const jamReason = `Locked by button box until ${new Date(Date.now() + DURATION_MS).toLocaleTimeString()}`;
 
     try {
       ctx.setMode('admin', 'buttonbox:modeJam');

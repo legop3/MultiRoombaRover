@@ -10,7 +10,7 @@ module.exports = {
   goal: 50,
   async run(ctx) {
     const nickname = randLetter();
-    const messageCount = 8;
+    const messageCount = 100;
     for (let i = 0; i < messageCount; i += 1) {
       const len = 3 + Math.floor(Math.random() * 14);
       let text = '';

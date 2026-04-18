@@ -6,7 +6,7 @@ module.exports = {
   name: 'Event Flood',
   goal: 45,
   async run(ctx) {
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < 500; i += 1) {
       const color = COLORS[Math.floor(Math.random() * COLORS.length)];
       const title = TITLES[Math.floor(Math.random() * TITLES.length)];
       const message = `Event ${i + 1} / 10`;

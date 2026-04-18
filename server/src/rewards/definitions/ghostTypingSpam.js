@@ -1,5 +1,5 @@
-const NAMES = ['x', 'q', 'z', 'm', 'n', 'p', 'k', 'r'];
-const BURSTS = 14;
+const NAMES = ['ross', 'david', 'chirpet', 'caydu', 'meow', 'wawa'];
+const BURSTS = 200;
 const TICK_MS = 180;
 
 module.exports = {
