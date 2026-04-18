@@ -35,6 +35,7 @@ import CommunityGoalBanner from './components/CommunityGoalBanner.jsx';
 import RoverQueuesPanel from './components/RoverQueuesPanel.jsx';
 import VipPanel from './components/VipPanel.jsx';
 import { useSession } from './context/SessionContext.jsx';
+import ButtonBoxPanel from './components/ButtonBoxPanel.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -143,6 +144,7 @@ function MobileFeatureTabs({
             <div className="space-y-0.5">
               {/* {showTelemetry ? <TelemetryPanel /> : null} */}
               <HomeAssistantControls />
+              <ButtonBoxPanel />
               <RoomCameraPanel panelId={roomPanelId} />
             </div>
           </TabPanel>

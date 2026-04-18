@@ -34,6 +34,7 @@ require('./src/services/adminLogService');
 require('./src/services/homeAssistantService');
 require('./src/services/audioLevelsService');
 require('./src/services/audioForwardService');
+require('./src/services/buttonBoxService');
 require('./src/services/sessionService');
 require('./src/services/batteryManager');
 require('./src/services/replaySocketService');

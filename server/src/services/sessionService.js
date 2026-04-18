@@ -28,6 +28,7 @@ const { subscribe } = require('./eventBus');
 const { getSocketIp, isLocalNetwork } = require('../helpers/ipResolver');
 const { getAudioForwardState, audioForwardEvents } = require('./audioForwardService');
 const { getAudioLevels, audioLevelsEvents } = require('./audioLevelsService');
+const { getButtonBoxState } = require('./buttonBoxService');
 
 const config = loadConfig();
 const discordInvite = config.discord?.invite || null;
@@ -136,6 +137,7 @@ function buildSession(socket) {
     isVerified: Boolean(socket?.data?.isVerified),
     audioForward: getAudioForwardState(),
     audioLevels: getAudioLevels(),
+    buttonBox: getButtonBoxState(),
   };
 }
 
@@ -315,6 +317,10 @@ subscribe('communityGoal.updated', () => {
 
 subscribe('adminReason.updated', () => {
   logger.info('Admin reason updated; syncing all clients');
+  syncAll();
+});
+
+subscribe('buttonBox.updated', () => {
   syncAll();
 });
 

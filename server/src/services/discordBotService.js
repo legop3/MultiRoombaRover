@@ -1492,6 +1492,21 @@ function handleBusEvent(event) {
       });
       break;
     }
+    case 'buttonBox.discordStalkerPing': {
+      const message = payload?.message ? String(payload.message) : 'Button box chaos reward triggered.';
+      const stalkerRoleId = roles.stalkerPing || null;
+      const content = stalkerRoleId ? `<@&${stalkerRoleId}> ${message}` : message;
+      announce({
+        channelId: channels.general,
+        pingRoleId: stalkerRoleId,
+        content,
+        color: 0xe91e63,
+        title: 'Button Box Reward',
+        description: message,
+        includeSiteUrl: false,
+      });
+      break;
+    }
     default:
       break;
   }

@@ -213,6 +213,17 @@ function pickRover(socket) {
   return candidates[0];
 }
 
+function rerollAssignments() {
+  const users = Array.from(socketRefs.values()).filter((socket) => socket && getRole(socket) === 'user');
+  users.forEach((socket) => {
+    unassignSocket(socket);
+  });
+  users.forEach((socket) => {
+    assignSocket(socket);
+  });
+  return users.length;
+}
+
 function describeAssignment(socketId) {
   const assignedRoverId = assignments.get(socketId) || null;
   const adminRoverId = assignedRoverId ? null : roverManager.getPrimaryRoverForSocket(socketId);
@@ -230,6 +241,7 @@ module.exports = {
   assignmentEvents,
   describeAssignment,
   forceRelease,
+  rerollAssignments,
   getAssignedRover: (socketId) => assignments.get(socketId) || null,
   moveAssignment: (socket, roverId, { releasePrevious = true } = {}) => {
     if (!socket || !roverId) return;

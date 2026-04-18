@@ -19,6 +19,7 @@ import CameraTiltControl from './CameraTiltControl.jsx';
 import VipPanel from './VipPanel.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
+import ButtonBoxPanel from './ButtonBoxPanel.jsx';
 
 function TopDownMapPanel() {
   const {
@@ -170,6 +171,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
                 </div>
               </div>
               <HomeAssistantControls />
+              <ButtonBoxPanel />
               <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
             </div>
           </TabPanel>
