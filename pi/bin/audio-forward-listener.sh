@@ -14,6 +14,8 @@ source "$ENV_FILE"
 
 : "${AUDIO_FORWARD_URL:?AUDIO_FORWARD_URL not set in ${ENV_FILE}}"
 PLAYBACK_DEVICE="${AUDIO_PLAYBACK_DEVICE:-forward}"
+AUDIO_NORMALIZE_ENABLE="${AUDIO_NORMALIZE_ENABLE:-1}"
+AUDIO_NORMALIZE_FILTER="${AUDIO_NORMALIZE_FILTER:-dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled}"
 
 if [[ -n "${FFMPEG_BIN:-}" ]]; then
   FFMPEG_BIN_PATH="$FFMPEG_BIN"
@@ -36,26 +38,36 @@ LAST_APLAY_STATUS="unknown"
 
 run_pipeline() {
   set +e
-  "${FFMPEG_BIN_PATH}" \
-    -hide_banner \
-    -loglevel warning \
-    -fflags nobuffer \
-    -flags low_delay \
-    -analyzeduration 200k \
-    -probesize 32k \
-    -i "${AUDIO_FORWARD_URL}" \
-    -vn \
-    -ac 1 \
-    -ar 16000 \
-    -f s16le \
-    pipe:1 \
+  local -a ffmpeg_args=(
+    -hide_banner
+    -loglevel warning
+    -fflags nobuffer
+    -flags low_delay
+    -analyzeduration 200k
+    -probesize 32k
+    -i "${AUDIO_FORWARD_URL}"
+    -vn
+  )
+
+  if [[ "${AUDIO_NORMALIZE_ENABLE}" -ne 0 ]]; then
+    ffmpeg_args+=(-af "${AUDIO_NORMALIZE_FILTER}")
+  fi
+
+  ffmpeg_args+=(
+    -ac 1
+    -ar 16000
+    -f s16le
+    pipe:1
+  )
+
+  "${FFMPEG_BIN_PATH}" "${ffmpeg_args[@]}" \
     | "${APLAY_BIN_PATH}" \
-      -q \
-      -D "${PLAYBACK_DEVICE}" \
-      -t raw \
-      -f S16_LE \
-      -r 16000 \
-      -c 1
+        -q \
+        -D "${PLAYBACK_DEVICE}" \
+        -t raw \
+        -f S16_LE \
+        -r 16000 \
+        -c 1
   local rc=$?
   local -a statuses=("${PIPESTATUS[@]}")
   LAST_FFMPEG_STATUS="${statuses[0]:-unknown}"
