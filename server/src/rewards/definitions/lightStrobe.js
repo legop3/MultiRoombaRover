@@ -42,7 +42,7 @@ function startStrobe(ctx, effect = {}) {
 module.exports = {
   id: 'lightStrobe',
   name: 'Light Strobe',
-  goal: 55,
+  goal: 360,
   async run(ctx) {
     startStrobe(ctx, { endsAt: Date.now() + STROBE_MS, on: false });
     ctx.sendAlert({ color: '#ffc107', title: 'Light Strobe', message: 'Room light strobe started.' });

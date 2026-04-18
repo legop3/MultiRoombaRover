@@ -4,7 +4,7 @@ const STEPS = 10;
 module.exports = {
   id: 'cameraWhiplash',
   name: 'Camera Wiggle',
-  goal: 35,
+  goal: 160,
   async run(ctx) {
     const rovers = ctx
       .listOnlineRovers()

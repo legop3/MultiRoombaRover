@@ -3,7 +3,7 @@ const DOCK_COMMAND_BASE64 = Buffer.from([143]).toString('base64');
 module.exports = {
   id: 'dockPanic',
   name: 'All Dock',
-  goal: 30,
+  goal: 180,
   async run(ctx) {
     const rovers = ctx.listOnlineRovers();
     rovers.forEach((rover) => {

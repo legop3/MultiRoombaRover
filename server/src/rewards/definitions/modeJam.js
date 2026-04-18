@@ -50,7 +50,7 @@ function scheduleRestore(ctx, effect = {}) {
 module.exports = {
   id: 'modeJam',
   name: 'Admin Mode',
-  goal: 200,
+  goal: 1200,
   async run(ctx) {
     const prevMode = ctx.getMode();
     const prevReason = ctx.getAdminReasonText();

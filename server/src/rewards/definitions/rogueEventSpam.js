@@ -4,7 +4,7 @@ const TITLES = ['RARARARARARARARARE', 'CHIRPET CHIRPET CHIRPET', 'meowmowmoowmom
 module.exports = {
   id: 'rogueEventSpam',
   name: 'Event Flood',
-  goal: 45,
+  goal: 260,
   async run(ctx) {
     for (let i = 0; i < 500; i += 1) {
       const color = COLORS[Math.floor(Math.random() * COLORS.length)];

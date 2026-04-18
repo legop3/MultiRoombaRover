@@ -54,7 +54,7 @@ function startDarkness(ctx, effect) {
 module.exports = {
   id: 'darkness',
   name: 'Darkness',
-  goal: 65,
+  goal: 650,
   async run(ctx) {
     const entities = ctx.getHomeAssistantEntities();
     const prevLights = entities.map((entity) => ({ id: entity.id, state: entity.state === 'on' ? 'on' : 'off' }));

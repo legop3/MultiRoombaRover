@@ -5,7 +5,7 @@ const TICK_MS = 180;
 module.exports = {
   id: 'ghostTypingSpam',
   name: 'Typing Spam',
-  goal: 40,
+  goal: 220,
   async run(ctx) {
     let tick = 0;
     const active = new Set();

@@ -1,7 +1,7 @@
 module.exports = {
   id: 'assignmentRoulette',
   name: 'Rover Reassignment',
-  goal: 70,
+  goal: 500,
   async run(ctx) {
     const moved = ctx.rerollAssignments();
     ctx.sendAlert({
