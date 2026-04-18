@@ -7,7 +7,7 @@ function randLetter() {
 module.exports = {
   id: 'chatSpam',
   name: 'Chat Spam',
-  goal: 50,
+  goal: 100,
   async run(ctx) {
     const nickname = randLetter();
     const messageCount = 100;

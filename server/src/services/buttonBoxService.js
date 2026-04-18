@@ -5,7 +5,7 @@ const { app } = require('../globals/http');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('buttonBoxService');
 const { publishEvent } = require('./eventBus');
-const { getRewardById, pickRandomReward } = require('../rewards');
+const { getRewardById, listRewards } = require('../rewards');
 const roverManager = require('./roverManager');
 const { issueCommand } = require('./commandService');
 const { sendAlert } = require('./alertService');
@@ -108,9 +108,11 @@ function loadState() {
 
 function ensureRewardAssignments() {
   if (!state) return;
+  const seen = new Set();
   state.buttons.forEach((button) => {
     const reward = getRewardById(button.rewardId);
-    if (reward) {
+    if (reward && !seen.has(reward.id)) {
+      seen.add(reward.id);
       button.rewardName = reward.name || null;
       button.rewardNumber = reward.number;
       button.goal = reward.goal;
@@ -120,14 +122,27 @@ function ensureRewardAssignments() {
       return;
     }
     assignNewReward(button);
+    if (button.rewardId) {
+      seen.add(button.rewardId);
+    }
   });
 }
 
 function assignNewReward(button) {
-  const reward = pickRandomReward(button?.rewardId || null) || pickRandomReward(null);
-  if (!reward) {
-    throw new Error('No rewards configured');
-  }
+  const allRewards = listRewards();
+  if (!allRewards.length) throw new Error('No rewards configured');
+
+  const usedByOtherButtons = new Set(
+    state.buttons
+      .filter((entry) => entry.id !== button.id)
+      .map((entry) => entry.rewardId)
+      .filter((rewardId) => typeof rewardId === 'string' && rewardId.length > 0),
+  );
+  const uniqueCandidates = allRewards.filter((reward) => !usedByOtherButtons.has(reward.id));
+  const pool = uniqueCandidates.length ? uniqueCandidates : allRewards;
+  const reward = pool[Math.floor(Math.random() * pool.length)] || null;
+  if (!reward) throw new Error('No rewards configured');
+
   button.rewardId = reward.id;
   button.rewardName = reward.name || null;
   button.rewardNumber = reward.number;

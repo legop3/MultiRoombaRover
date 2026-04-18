@@ -89,14 +89,14 @@ export default function ButtonBoxPanel() {
       const gain = ctx.createGain();
       osc.type = 'square';
       osc.frequency.value = freq;
-      const peakGain = 0.08 * effectiveAlertVolume;
+      const peakGain = 0.14 * effectiveAlertVolume;
       gain.gain.setValueAtTime(0.0001, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), ctx.currentTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.11);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.2);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start();
-      osc.stop(ctx.currentTime + 0.12);
+      osc.stop(ctx.currentTime + 0.21);
     }
 
     function onIncrement(payload = {}) {
@@ -142,9 +142,9 @@ export default function ButtonBoxPanel() {
             <article
               key={id}
               className={[
-                'surface px-0.5 py-0.5 text-center transition-colors duration-200',
-                incActive ? 'border border-cyan-400/70 bg-cyan-900/40' : '',
-                rewardActive ? 'border border-fuchsia-400/80 bg-fuchsia-900/40' : '',
+                'surface px-0.5 py-0.5 text-center',
+                incActive ? 'bg-cyan-900/45' : '',
+                rewardActive ? 'bg-fuchsia-900/45' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
