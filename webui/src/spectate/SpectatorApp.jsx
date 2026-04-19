@@ -13,6 +13,7 @@ import useDefaultNickname from '../hooks/useDefaultNickname.js';
 import CommunityGoalBanner from '../components/CommunityGoalBanner.jsx';
 import RoverQueuesPanel from '../components/RoverQueuesPanel.jsx';
 import RawUserPilePanel from '../components/RawUserPilePanel.jsx';
+import ButtonBoxPanel from '../components/ButtonBoxPanel.jsx';
 
 function usePortraitLayout() {
   const [isPortrait, setIsPortrait] = useState(() => {
@@ -177,25 +178,21 @@ function SpectatorContent() {
           {isPortraitLayout ? (
             <div className={`${topBarItemClass} ${portraitItemHeight} flex flex-col gap-0.5`}>
               <CommunityGoalBanner layout="desktop" dismissable={false} className="text-sm" />
-              <div className="min-h-0 overflow-y-auto">
-                <div className="panel h-full">
-                  <RoverQueuesPanel title="Rovers" />
-                </div>
+              <ButtonBoxPanel />
+              <div className="min-h-0 flex-1">
+                <RawUserPilePanel hideNicknameForm hideHeader compact fillHeight className="h-full" />
               </div>
             </div>
           ) : (
             <div className={topBarItemClass}>
               <CommunityGoalBanner layout="desktop" dismissable={false} className="text-sm" />
+              <ButtonBoxPanel />
             </div>
           )}
           <div className={`${topBarItemClass} ${isPortraitLayout ? `${portraitItemHeight} overflow-y-auto` : ''}`}>
-            {isPortraitLayout ? (
-              <RawUserPilePanel hideNicknameForm hideHeader compact fillHeight className="h-full" />
-            ) : (
-              <div className="panel h-full">
-                <RoverQueuesPanel title="Rovers" />
-              </div>
-            )}
+            <div className="panel h-full">
+              <RoverQueuesPanel title="Rovers" />
+            </div>
           </div>
           {!isPortraitLayout ? (
             <div className={`${topBarItemClass} flex-1 min-h-0`}>
