@@ -1,4 +1,4 @@
-const DURATION_MS = 25 * 1000;
+const DURATION_MS = 300 * 1000;
 
 let activeTimer = null;
 
@@ -50,7 +50,7 @@ function scheduleRestore(ctx, effect = {}) {
 module.exports = {
   id: 'modeJam',
   name: 'Admin Mode',
-  goal: 1200,
+  goal: 1000,
   async run(ctx) {
     const prevMode = ctx.getMode();
     const prevReason = ctx.getAdminReasonText();

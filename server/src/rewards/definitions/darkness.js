@@ -1,4 +1,4 @@
-const DURATION_MS = 2 * 60 * 1000;
+const DURATION_MS = 5 * 60 * 1000;
 const LIGHT_ENFORCE_TICK_MS = 3000;
 
 let activeTimer = null;
@@ -115,7 +115,7 @@ module.exports = {
   id: 'darkness',
   name: 'Darkness',
   isNightVisionBlocked,
-  goal: 650,
+  goal: 600,
   async run(ctx) {
     const entities = ctx.getHomeAssistantEntities();
     const prevLights = entities.map((entity) => ({ id: entity.id, state: entity.state === 'on' ? 'on' : 'off' }));
