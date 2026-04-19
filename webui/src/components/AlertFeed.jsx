@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
+import { useSocket } from '../context/SocketContext.jsx';
 import ChatMessageRow from './ChatMessageRow.jsx';
 import ChatTypingRow from './ChatTypingRow.jsx';
+import ButtonBoxTile from './ButtonBoxTile.jsx';
 
 const LIFETIME_MS = 3000;
+const BUTTONBOX_LIFETIME_MS = 3500;
 const DEFAULT_COLOR = '#2196f3';
 
 function buildKey(alert) {
@@ -13,9 +16,37 @@ function buildKey(alert) {
 }
 
 export default function AlertFeed({ scale = 1 }) {
-  const { alerts } = useSession();
+  const { alerts, session, pushAlert } = useSession();
+  const socket = useSocket();
   const [now, setNow] = useState(() => Date.now());
-  const latest = useMemo(() => alerts.slice(-3).map((alert) => ({ alert, key: buildKey(alert) })), [alerts]);
+
+  useEffect(() => {
+    function onButtonIncrement(payload = {}) {
+      const buttonId = Number(payload.buttonId);
+      if (!Number.isFinite(buttonId) || buttonId < 1 || buttonId > 4) return;
+      const buttons = Array.isArray(session?.buttonBox?.buttons) ? session.buttonBox.buttons : [];
+      const button = buttons.find((entry) => Number(entry?.id) === buttonId) || {};
+      const count = Number.isFinite(payload.count) ? payload.count : Number(button.count) || 0;
+      const goal = Number.isFinite(button.goal) ? button.goal : 0;
+      const rewardNumber = Number.isFinite(button.rewardNumber) ? button.rewardNumber : '?';
+      const rewardName =
+        typeof button.rewardName === 'string' && button.rewardName.trim()
+          ? button.rewardName.trim()
+          : 'Unassigned';
+      pushAlert({
+        id: `buttonbox-active-${buttonId}`,
+        kind: 'buttonbox-active',
+        lifetimeMs: BUTTONBOX_LIFETIME_MS,
+        payload: { buttonId, count, goal, rewardNumber, rewardName },
+      });
+    }
+    socket.on('buttonBox:increment', onButtonIncrement);
+    return () => {
+      socket.off('buttonBox:increment', onButtonIncrement);
+    };
+  }, [pushAlert, session?.buttonBox?.buttons, socket]);
+
+  const latest = useMemo(() => alerts.slice(-12).map((alert) => ({ alert, key: buildKey(alert) })), [alerts]);
 
   useEffect(() => {
     if (!latest.length) return undefined;
@@ -23,12 +54,15 @@ export default function AlertFeed({ scale = 1 }) {
     return () => clearInterval(interval);
   }, [latest.length]);
 
-  const visible = latest
-    .map((item) => ({
-      ...item,
-      age: now - (item.alert.receivedAt ?? item.alert.timestamp ?? 0),
-    }))
-    .filter((item) => item.age <= LIFETIME_MS);
+  const visibleByKey = new Map();
+  latest.forEach((item) => {
+    const age = now - (item.alert.receivedAt ?? item.alert.timestamp ?? 0);
+    const lifetimeMs = Number.isFinite(item.alert.lifetimeMs) ? item.alert.lifetimeMs : LIFETIME_MS;
+    if (age <= lifetimeMs) {
+      visibleByKey.set(item.key, { ...item, age });
+    }
+  });
+  const visible = Array.from(visibleByKey.values()).slice(-3);
 
   if (!visible.length) return null;
 
@@ -66,6 +100,21 @@ function hexToRgb(hex) {
 }
 
 function AlertToast({ alert }) {
+  if (alert.kind === 'buttonbox-active' && alert.payload) {
+    const payload = alert.payload;
+    return (
+      <div className="pointer-events-none w-[12.5rem]">
+        <ButtonBoxTile
+          buttonId={payload.buttonId}
+          count={payload.count}
+          goal={payload.goal}
+          rewardNumber={payload.rewardNumber}
+          rewardName={payload.rewardName}
+          className="bg-cyan-900/45"
+        />
+      </div>
+    );
+  }
   if (alert.kind === 'chat' && alert.payload) {
     return <ChatMessageRow message={alert.payload} />;
   }

@@ -3,6 +3,7 @@ import { useSession } from '../context/SessionContext.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
+import ButtonBoxTile from './ButtonBoxTile.jsx';
 
 const FLASH_MS = 420;
 const REWARD_FLASH_MS = 1200;
@@ -139,20 +140,15 @@ export default function ButtonBoxPanel() {
           const rewardActive = Boolean(rewardFlash[id]);
 
           return (
-            <article
+            <ButtonBoxTile
               key={id}
-              className={[
-                'surface px-0.5 py-0.5 text-center',
-                incActive ? 'bg-cyan-900/45' : '',
-                rewardActive ? 'bg-fuchsia-900/45' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              <p className="text-xs text-slate-400">Button {id}</p>
-              <p className="text-sm font-semibold text-white">{count} / {goal}</p>
-              <p className="truncate text-[0.7rem] text-slate-300">#{rewardNumber} {rewardName}</p>
-            </article>
+              buttonId={id}
+              count={count}
+              goal={goal}
+              rewardNumber={rewardNumber}
+              rewardName={rewardName}
+              className={[incActive ? 'bg-cyan-900/45' : '', rewardActive ? 'bg-fuchsia-900/45' : ''].filter(Boolean).join(' ')}
+            />
           );
         })}
       </div>
