@@ -1,4 +1,4 @@
-const DURATION_MS = 5 * 60 * 1000;
+const DURATION_MS = 15 * 60 * 1000;
 const LIGHT_ENFORCE_TICK_MS = 3000;
 
 let activeTimer = null;

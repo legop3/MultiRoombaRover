@@ -1,5 +1,5 @@
 const STEP_MS = 220;
-const STEPS = 10;
+const STEPS = 40;
 
 module.exports = {
   id: 'cameraWhiplash',

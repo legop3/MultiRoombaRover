@@ -1495,13 +1495,13 @@ function handleBusEvent(event) {
     case 'buttonBox.discordStalkerPing': {
       const message = payload?.message ? String(payload.message) : 'Button box chaos reward triggered.';
       const stalkerRoleId = roles.stalkerPing || null;
-      const content = stalkerRoleId ? `<@&${stalkerRoleId}> ${message}` : message;
+      const content = message;
       announce({
         channelId: channels.general,
         pingRoleId: stalkerRoleId,
         content,
         color: 0xe91e63,
-        title: 'Button Box Reward',
+        title: 'Button Box',
         description: message,
         includeSiteUrl: false,
       });

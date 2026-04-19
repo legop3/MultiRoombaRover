@@ -1,19 +1,15 @@
-const STROBE_MS = 10000;
-const TICK_MS = 350;
+const STROBE_MS = 30 * 1000;
+const TICK_MS = 70;
 
 let activeTimer = null;
 
-async function applyAll(ctx, state) {
+function applyAll(ctx, state) {
   const entities = ctx.getHomeAssistantEntities();
-  await Promise.all(
-    entities.map(async (entity) => {
-      try {
-        await ctx.setHomeAssistantEntityState(entity.id, state);
-      } catch (err) {
-        ctx.logger.warn('lightStrobe entity set failed', { entityId: entity.id, error: err.message });
-      }
-    }),
-  );
+  entities.forEach((entity) => {
+    ctx.setHomeAssistantEntityState(entity.id, state).catch((err) => {
+      ctx.logger.warn('lightStrobe entity set failed', { entityId: entity.id, error: err.message });
+    });
+  });
 }
 
 function startStrobe(ctx, effect = {}) {
@@ -26,7 +22,7 @@ function startStrobe(ctx, effect = {}) {
   let on = Boolean(effect.on);
   ctx.saveEffect('lightStrobe', { endsAt, on });
 
-  activeTimer = setInterval(async () => {
+  activeTimer = setInterval(() => {
     if (Date.now() >= endsAt) {
       clearInterval(activeTimer);
       activeTimer = null;
@@ -34,7 +30,7 @@ function startStrobe(ctx, effect = {}) {
       return;
     }
     on = !on;
-    await applyAll(ctx, on ? 'on' : 'off');
+    applyAll(ctx, on ? 'on' : 'off');
     ctx.saveEffect('lightStrobe', { endsAt, on });
   }, TICK_MS);
 }
@@ -45,7 +41,7 @@ module.exports = {
   goal: 300,
   async run(ctx) {
     startStrobe(ctx, { endsAt: Date.now() + STROBE_MS, on: false });
-    ctx.sendAlert({ color: '#ffc107', title: 'Light Strobe', message: 'Room light strobe started.' });
+    ctx.sendAlert({ color: '#ffc107', title: 'Light Strobe', message: 'All room controls strobing for 30 seconds.' });
   },
   async recover(ctx, effect) {
     if (!effect || Number(effect.endsAt || 0) <= Date.now()) {

@@ -77,7 +77,7 @@ roverManager.managerEvents.on('switch', ({ socketId, roverId }) => {
   assignmentEvents.emit('update', socketId);
 });
 
-function assignSocket(socket) {
+function assignSocket(socket, options = {}) {
   if (!socket || isAdmin(socket) || getRole(socket) !== 'user') {
     return;
   }
@@ -85,7 +85,9 @@ function assignSocket(socket) {
   if (assignments.has(socket.id)) {
     return;
   }
-  const target = pickRover(socket);
+  const target = pickRover(socket, {
+    excludeRoverId: options.excludeRoverId || null,
+  });
   if (!target) {
     waiting.add(socket.id);
     logger.info('No rover available, user waiting', socket.id);
@@ -171,17 +173,25 @@ function forceRelease(roverId, socketId) {
   assignmentEvents.emit('update', socketId);
 }
 
-function pickRover(socket) {
+function pickRover(socket, options = {}) {
   const mode = getMode();
   if (mode === MODES.ADMIN || mode === MODES.LOCKDOWN) {
     return null;
   }
-  const candidates = Array.from(roverManager.rovers.values()).filter((rover) => {
+  const allCandidates = Array.from(roverManager.rovers.values()).filter((rover) => {
     if (!rover || rover.locked) return false;
     const access = roverManager.canRequestControl(rover.id, socket, { allowUser: true });
     if (!access.ok) return false;
     return true;
   });
+  let candidates = allCandidates;
+  const excludeRoverId = options?.excludeRoverId || null;
+  if (excludeRoverId) {
+    const withoutExcluded = allCandidates.filter((rover) => String(rover.id) !== String(excludeRoverId));
+    if (withoutExcluded.length > 0) {
+      candidates = withoutExcluded;
+    }
+  }
   if (candidates.length === 0) {
     return null;
   }
@@ -196,7 +206,7 @@ function pickRover(socket) {
     return 0;
   };
   const idleRank = (rover) => (rover?.drivers?.size === 0 ? 1 : 0);
-  candidates.sort((a, b) => {
+  const compare = (a, b) => {
     const aEmpty = idleRank(a);
     const bEmpty = idleRank(b);
     if (aEmpty !== bEmpty) return bEmpty - aEmpty;
@@ -209,19 +219,31 @@ function pickRover(socket) {
       return a.drivers.size - b.drivers.size;
     }
     return bDockRank - aDockRank;
-  });
-  return candidates[0];
+  };
+  candidates.sort(compare);
+  const best = candidates[0];
+  if (!best) return null;
+  const bestTier = candidates.filter((entry) => compare(entry, best) === 0);
+  if (!bestTier.length) return best;
+  return bestTier[Math.floor(Math.random() * bestTier.length)] || best;
 }
 
 function rerollAssignments() {
   const users = Array.from(socketRefs.values()).filter((socket) => socket && getRole(socket) === 'user');
+  const previous = new Map(users.map((socket) => [socket.id, assignments.get(socket.id) || null]));
   users.forEach((socket) => {
     unassignSocket(socket);
   });
+  let moved = 0;
   users.forEach((socket) => {
-    assignSocket(socket);
+    const prevRover = previous.get(socket.id) || null;
+    assignSocket(socket, { excludeRoverId: prevRover });
+    const nextRover = assignments.get(socket.id) || null;
+    if (nextRover && prevRover && String(nextRover) !== String(prevRover)) {
+      moved += 1;
+    }
   });
-  return users.length;
+  return moved;
 }
 
 function describeAssignment(socketId) {
