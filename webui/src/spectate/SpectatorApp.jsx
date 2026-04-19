@@ -14,6 +14,7 @@ import CommunityGoalBanner from '../components/CommunityGoalBanner.jsx';
 import RoverQueuesPanel from '../components/RoverQueuesPanel.jsx';
 import RawUserPilePanel from '../components/RawUserPilePanel.jsx';
 import ButtonBoxPanel from '../components/ButtonBoxPanel.jsx';
+import RewardRunOverlay from '../components/RewardRunOverlay.jsx';
 
 function usePortraitLayout() {
   const [isPortrait, setIsPortrait] = useState(() => {
@@ -220,6 +221,7 @@ function SpectatorContent() {
         </section>
       </main>
       <AlertFeed />
+      <RewardRunOverlay />
     </div>
   );
 }

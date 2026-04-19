@@ -36,6 +36,7 @@ import RoverQueuesPanel from './components/RoverQueuesPanel.jsx';
 import VipPanel from './components/VipPanel.jsx';
 import { useSession } from './context/SessionContext.jsx';
 import ButtonBoxPanel from './components/ButtonBoxPanel.jsx';
+import RewardRunOverlay from './components/RewardRunOverlay.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -302,6 +303,7 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
         {renderedLayout}
       </main>
       <AlertFeed />
+      <RewardRunOverlay />
       <TurnAlertListener />
       <ModeGateOverlay />
       <HelpOverlay

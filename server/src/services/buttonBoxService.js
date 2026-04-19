@@ -242,12 +242,22 @@ async function runRewardForButton(button) {
     assignNewReward(button);
     return;
   }
+  const completedCount = Number.isFinite(button.count) ? button.count : 0;
+  const completedGoal = Number.isFinite(button.goal) ? button.goal : 0;
   const ctx = buildRewardContext();
   try {
     await reward.run(ctx);
   } catch (err) {
     logger.warn('Reward execution failed', { rewardId: reward.id, error: err.message });
   }
+  io.emit('buttonBox:rewardRun', {
+    buttonId: button.id,
+    rewardId: reward.id,
+    rewardName: reward.name || reward.id,
+    count: completedCount,
+    goal: completedGoal,
+    ts: Date.now(),
+  });
   button.lastRewardAt = Date.now();
   button.count = 0;
   assignNewReward(button);

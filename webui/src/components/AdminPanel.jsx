@@ -167,6 +167,18 @@ export default function AdminPanel() {
     }
   };
 
+  const handleTestRewardOverlay = async () => {
+    window.dispatchEvent(
+      new CustomEvent('buttonBox:rewardRunLocalTest', {
+        detail: {
+          rewardName: 'Admin Mode',
+          count: 1000,
+          goal: 1000,
+        },
+      }),
+    );
+  };
+
   useEffect(() => {
     setGoalDraft(currentGoal);
   }, [currentGoal]);
@@ -266,6 +278,13 @@ export default function AdminPanel() {
           className="button-danger disabled:cursor-not-allowed disabled:opacity-60"
         >
           {serverRebooting ? 'Server rebooting...' : 'Reboot Server'}
+        </button>
+        <button
+          type="button"
+          onClick={handleTestRewardOverlay}
+          className="button-dark"
+        >
+          Test Reward Popup
         </button>
       </div>
       <div className="space-y-0.5">
