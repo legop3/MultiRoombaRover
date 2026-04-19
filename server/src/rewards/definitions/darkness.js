@@ -115,7 +115,7 @@ module.exports = {
   id: 'darkness',
   name: 'Darkness',
   isNightVisionBlocked,
-  goal: 600,
+  goal: 400,
   async run(ctx) {
     const entities = ctx.getHomeAssistantEntities();
     const prevLights = entities.map((entity) => ({ id: entity.id, state: entity.state === 'on' ? 'on' : 'off' }));
