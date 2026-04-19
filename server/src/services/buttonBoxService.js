@@ -16,6 +16,7 @@ const assignmentService = require('./assignmentService');
 const {
   getState: getHomeAssistantState,
   setEntityState: setHomeAssistantEntityState,
+  setLightsLockedOn: setHomeAssistantLightsLockedOn,
 } = require('./homeAssistantService');
 const { getRequestIp, isLocalNetwork, normalizeIp } = require('../helpers/ipResolver');
 
@@ -175,7 +176,10 @@ function buildRewardContext() {
       const entities = getHomeAssistantState()?.entities;
       return Array.isArray(entities) ? entities : [];
     },
+    getHomeAssistantLightPolicy: () => getHomeAssistantState()?.lightPolicy || null,
     setHomeAssistantEntityState,
+    setHomeAssistantLightsLockedOn: (next, options = {}) =>
+      setHomeAssistantLightsLockedOn(next, options),
     saveEffect: (effectId, payload = {}) => saveEffect(effectId, payload, { broadcast: false }),
     clearEffect: (effectId) => clearEffect(effectId, { broadcast: false }),
   };

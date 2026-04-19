@@ -213,7 +213,8 @@ export default function HomeAssistantControls() {
   const ha = session?.homeAssistant;
   const entities = useMemo(() => ha?.entities || [], [ha?.entities]);
   const lightPolicy = ha?.lightPolicy || null;
-  const controlsLocked = Boolean(lightPolicy?.lockedOn);
+  const controlsLocked = Boolean(lightPolicy?.locked || lightPolicy?.lockedOn);
+  const lockState = lightPolicy?.lockState || (lightPolicy?.lockedOn ? 'on' : null);
   const onKeyLabel = formatKeyLabel(keymap?.homeAssistantOn?.[0]);
   const offKeyLabel = formatKeyLabel(keymap?.homeAssistantOff?.[0]);
 
@@ -243,7 +244,7 @@ export default function HomeAssistantControls() {
         <div className="flex items-center gap-0.5">
           <p>Room Controls</p>
           <span className="text-xs text-slate-500">{entities.length}</span>
-          {controlsLocked ? <StatusBadge label="Locked On" tone="warn" /> : null}
+          {controlsLocked ? <StatusBadge label={lockState === 'off' ? 'Locked Off' : 'Locked On'} tone="warn" /> : null}
           <div className="flex items-center gap-0.5 text-xs text-slate-300 background-black">
             <span className="flex items-center gap-0.5">
               <span>On</span>
@@ -259,7 +260,9 @@ export default function HomeAssistantControls() {
       </header>
       {controlsLocked ? (
         <p className="rounded border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
-          Lights are locked on. Room controls are disabled.
+          {lockState === 'off'
+            ? 'Lights are locked off. Room controls are disabled.'
+            : 'Lights are locked on. Room controls are disabled.'}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-0.5">

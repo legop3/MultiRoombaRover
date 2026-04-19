@@ -317,7 +317,7 @@ export default function KeyboardInputManager() {
     (targetState) => {
       const ha = session?.homeAssistant;
       if (!ha?.enabled || !ha?.connected) return;
-      if (ha?.lightPolicy?.lockedOn) return;
+      if (ha?.lightPolicy?.locked || ha?.lightPolicy?.lockedOn) return;
       const entities = ha.entities || [];
       const eligible = entities.filter(
         (ent) =>

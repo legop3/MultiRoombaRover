@@ -29,7 +29,7 @@ let connection = null;
 let unsubscribeEntities = null;
 let reconnectTimer = null;
 let connected = false;
-let lightsLockedOn = false;
+let lightsLockState = null; // null | 'on' | 'off'
 let lightsIdleOffTimer = null;
 let lightsIdleOffDeadline = null;
 
@@ -215,7 +215,7 @@ function clearLightsIdleOffTimer() {
 function scheduleLightsIdleOffTimer() {
   if (!enabled) return;
   if (getControllableEntityIds().length === 0) return;
-  if (lightsIdleOffTimer || lightsLockedOn || hasActiveDrivers()) {
+  if (lightsIdleOffTimer || lightsLockState != null || hasActiveDrivers()) {
     return;
   }
   lightsIdleOffDeadline = Date.now() + LIGHT_IDLE_OFF_MS;
@@ -238,7 +238,7 @@ function scheduleLightsIdleOffTimer() {
 }
 
 function evaluateLightAutomation() {
-  if (lightsLockedOn) {
+  if (lightsLockState != null) {
     clearLightsIdleOffTimer();
     return;
   }
@@ -464,12 +464,14 @@ async function setLightColor(entityId, rgbColor) {
 }
 
 function isLightControlLocked() {
-  return lightsLockedOn;
+  return lightsLockState != null;
 }
 
 function getLightPolicyState() {
   return {
-    lockedOn: lightsLockedOn,
+    locked: lightsLockState != null,
+    lockState: lightsLockState,
+    lockedOn: lightsLockState === 'on',
     idleOffMs: LIGHT_IDLE_OFF_MS,
     idleOffAt: lightsIdleOffDeadline,
     activeDrivers: getActiveDriverCount(),
@@ -478,14 +480,16 @@ function getLightPolicyState() {
 
 async function setLightsLockedOn(nextValue, options = {}) {
   const next = Boolean(nextValue);
+  const targetState = options?.targetState === 'off' ? 'off' : 'on';
   const forceApply = Boolean(options.forceApply);
-  const changed = lightsLockedOn !== next;
-  lightsLockedOn = next;
-  if (lightsLockedOn) {
+  const nextLockState = next ? targetState : null;
+  const changed = lightsLockState !== nextLockState;
+  lightsLockState = nextLockState;
+  if (lightsLockState != null) {
     clearLightsIdleOffTimer();
     if (changed || forceApply) {
       if (enabled) {
-        await setAllControllableEntitiesState('on');
+        await setAllControllableEntitiesState(lightsLockState);
       }
     }
   } else {
@@ -493,16 +497,17 @@ async function setLightsLockedOn(nextValue, options = {}) {
   }
   if (changed) {
     logger.info('Room lights lock state changed', {
-      lockedOn: lightsLockedOn,
+      locked: lightsLockState != null,
+      lockState: lightsLockState,
       source: options.source || 'unknown',
     });
   }
   emitUpdate();
-  return lightsLockedOn;
+  return lightsLockState === 'on';
 }
 
 async function toggleLightsLockedOn(options = {}) {
-  return setLightsLockedOn(!lightsLockedOn, options);
+  return setLightsLockedOn(lightsLockState == null, options);
 }
 
 function getState() {
@@ -532,7 +537,7 @@ turnEvents.on('queue', () => {
 
 modeEvents.on('change', (mode) => {
   if (mode === MODES.ADMIN || mode === MODES.LOCKDOWN) {
-    if (lightsLockedOn) {
+    if (isLightControlLocked()) {
       setLightsLockedOn(false, { source: 'modeGateReset' }).catch((err) => {
         logger.warn('Failed to disable lights lock on mode change', err.message);
       });
@@ -554,7 +559,7 @@ io.on('connection', (socket) => {
       return cb({ error: 'Insufficient permissions to control Home Assistant' });
     }
     if (isLightControlLocked()) {
-      return cb({ error: 'Room controls are locked on' });
+      return cb({ error: 'Room controls are locked' });
     }
     try {
       if (!entityId) throw new Error('entityId required');
@@ -574,7 +579,7 @@ io.on('connection', (socket) => {
       return cb({ error: 'Insufficient permissions to control Home Assistant' });
     }
     if (isLightControlLocked()) {
-      return cb({ error: 'Room controls are locked on' });
+      return cb({ error: 'Room controls are locked' });
     }
 
     try {
@@ -595,7 +600,7 @@ io.on('connection', (socket) => {
       return cb({ error: 'Insufficient permissions to control Home Assistant' });
     }
     if (isLightControlLocked()) {
-      return cb({ error: 'Room controls are locked on' });
+      return cb({ error: 'Room controls are locked' });
     }
 
     try {

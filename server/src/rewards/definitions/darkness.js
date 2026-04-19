@@ -1,12 +1,41 @@
-const DURATION_MS = 60 * 1000;
+const DURATION_MS = 2 * 60 * 1000;
+const LIGHT_ENFORCE_TICK_MS = 3000;
 
 let activeTimer = null;
+let enforceLightsTimer = null;
+let nightVisionLockUntil = 0;
 
-async function stopDarkness(ctx, effect = {}) {
+function isNightVisionBlocked() {
+  return Date.now() < nightVisionLockUntil;
+}
+
+function clearTimers() {
   if (activeTimer) {
     clearTimeout(activeTimer);
     activeTimer = null;
   }
+  if (enforceLightsTimer) {
+    clearInterval(enforceLightsTimer);
+    enforceLightsTimer = null;
+  }
+}
+
+async function forceAllLightsOff(ctx) {
+  const entities = ctx.getHomeAssistantEntities();
+  await Promise.all(
+    entities.map(async (entity) => {
+      try {
+        await ctx.setHomeAssistantEntityState(entity.id, 'off');
+      } catch (err) {
+        ctx.logger.warn('darkness force light off failed', { entityId: entity.id, error: err.message });
+      }
+    }),
+  );
+}
+
+async function stopDarkness(ctx, effect = {}) {
+  clearTimers();
+  nightVisionLockUntil = 0;
 
   const prevLights = Array.isArray(effect.prevLights) ? effect.prevLights : [];
   await Promise.all(
@@ -18,6 +47,23 @@ async function stopDarkness(ctx, effect = {}) {
       }
     }),
   );
+
+  try {
+    const prevLockState = effect?.prevLightLockState;
+    if (prevLockState === 'on' || prevLockState === 'off') {
+      await ctx.setHomeAssistantLightsLockedOn(true, {
+        source: 'buttonbox:darknessRestore',
+        forceApply: true,
+        targetState: prevLockState,
+      });
+    } else {
+      await ctx.setHomeAssistantLightsLockedOn(false, {
+        source: 'buttonbox:darknessRestore',
+      });
+    }
+  } catch (err) {
+    ctx.logger.warn('darkness restore light lock failed', { error: err.message });
+  }
 
   const prevNightVision = effect.prevNightVision && typeof effect.prevNightVision === 'object'
     ? effect.prevNightVision
@@ -36,14 +82,28 @@ async function stopDarkness(ctx, effect = {}) {
   ctx.clearEffect('darkness');
 }
 
-function startDarkness(ctx, effect) {
-  if (activeTimer) {
-    clearTimeout(activeTimer);
-    activeTimer = null;
-  }
+async function startDarkness(ctx, effect) {
+  clearTimers();
   const endsAt = Number(effect.endsAt || Date.now() + DURATION_MS);
   const remaining = Math.max(0, endsAt - Date.now());
+  nightVisionLockUntil = endsAt;
+  try {
+    await ctx.setHomeAssistantLightsLockedOn(true, {
+      source: 'buttonbox:darkness',
+      forceApply: true,
+      targetState: 'off',
+    });
+  } catch (err) {
+    ctx.logger.warn('darkness set light lock failed', { error: err.message });
+  }
   ctx.saveEffect('darkness', effect);
+
+  enforceLightsTimer = setInterval(() => {
+    forceAllLightsOff(ctx).catch((err) => {
+      ctx.logger.warn('darkness periodic light enforcement failed', { error: err.message });
+    });
+  }, LIGHT_ENFORCE_TICK_MS);
+
   activeTimer = setTimeout(() => {
     stopDarkness(ctx, effect).catch((err) => {
       ctx.logger.warn('darkness stop failed', { error: err.message });
@@ -54,19 +114,12 @@ function startDarkness(ctx, effect) {
 module.exports = {
   id: 'darkness',
   name: 'Darkness',
+  isNightVisionBlocked,
   goal: 650,
   async run(ctx) {
     const entities = ctx.getHomeAssistantEntities();
     const prevLights = entities.map((entity) => ({ id: entity.id, state: entity.state === 'on' ? 'on' : 'off' }));
-    await Promise.all(
-      entities.map(async (entity) => {
-        try {
-          await ctx.setHomeAssistantEntityState(entity.id, 'off');
-        } catch (err) {
-          ctx.logger.warn('darkness light off failed', { entityId: entity.id, error: err.message });
-        }
-      }),
-    );
+    await forceAllLightsOff(ctx);
 
     const prevNightVision = {};
     ctx.listOnlineRovers().forEach((rover) => {
@@ -83,15 +136,17 @@ module.exports = {
       }
     });
 
-    const effect = { endsAt: Date.now() + DURATION_MS, prevLights, prevNightVision };
-    startDarkness(ctx, effect);
-    ctx.sendAlert({ color: '#212121', title: 'Darkness', message: 'Darkness effect active for 60 seconds.' });
+    const prevPolicy = ctx.getHomeAssistantLightPolicy?.() || null;
+    const prevLightLockState = prevPolicy?.lockState || (prevPolicy?.lockedOn ? 'on' : null);
+    const effect = { endsAt: Date.now() + DURATION_MS, prevLights, prevNightVision, prevLightLockState };
+    await startDarkness(ctx, effect);
+    ctx.sendAlert({ color: '#212121', title: 'Darkness', message: 'Darkness effect active for 120 seconds.' });
   },
   async recover(ctx, effect) {
     if (!effect || Number(effect.endsAt || 0) <= Date.now()) {
       await stopDarkness(ctx, effect || {});
       return;
     }
-    startDarkness(ctx, effect);
+    await startDarkness(ctx, effect);
   },
 };

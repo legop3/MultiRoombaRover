@@ -3,6 +3,7 @@ const io = require('../globals/io');
 const roverManager = require('./roverManager');
 const { isAdmin, isLockdownAdmin } = require('./roleService');
 const logger = require('../globals/logger').child('commandService');
+const { isNightVisionBlocked } = require('../rewards/definitions/darkness');
 
 const pendingCommands = new Map(); // id -> { roverId }
 const lastDriveActivity = new Map(); // roverId -> { ts, socketId, direction, speed, isAdmin }
@@ -69,6 +70,11 @@ io.on('connection', (socket) => {
       }
       if (type === 'audioLevels') {
         throw new Error('audioLevels command is service-managed');
+      }
+      if (type === 'nightVision' && isNightVisionBlocked()) {
+        logger.info('Ignoring night vision command while darkness lock is active', { socketId: socket.id, roverId });
+        reply({ ignored: true, reason: 'darknessActive' });
+        return;
       }
       const payload = data ? { ...data } : {};
       const isRebootCommand = type === 'reboot';
