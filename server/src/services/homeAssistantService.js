@@ -24,6 +24,7 @@ const triggerConfig = []; // [{ runtimeKey, entityId, action, stateEquals, paylo
 const triggerRuntime = new Map(); // triggerId -> { lastFiredAt, lastState, lastChanged, lastUpdated }
 const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
 const LIGHT_IDLE_OFF_MS = 2 * 60 * 1000;
+const DEFAULT_WHITE_KELVIN = 4000;
 
 let connection = null;
 let unsubscribeEntities = null;
@@ -463,6 +464,31 @@ async function setLightColor(entityId, rgbColor) {
   logger.info('Issued Home Assistant color command', { entityId, rgbColor: normalized });
 }
 
+async function setLightWhite(entityId, kelvin = DEFAULT_WHITE_KELVIN) {
+  if (!enabled) {
+    throw new Error('Home Assistant not configured');
+  }
+  const meta = entityConfig.get(entityId);
+  if (!meta || meta.type !== 'light') {
+    throw new Error('Home Assistant light required');
+  }
+  if (!connection) {
+    throw new Error('Home Assistant not connected');
+  }
+  const nextKelvin = Number(kelvin);
+  const normalizedKelvin = Number.isFinite(nextKelvin)
+    ? Math.max(2000, Math.min(6500, Math.round(nextKelvin)))
+    : DEFAULT_WHITE_KELVIN;
+  await callService(connection, 'light', 'turn_on', {
+    entity_id: entityId,
+    color_temp_kelvin: normalizedKelvin,
+  });
+  logger.info('Issued Home Assistant white command', {
+    entityId,
+    colorTempKelvin: normalizedKelvin,
+  });
+}
+
 function isLightControlLocked() {
   return lightsLockState != null;
 }
@@ -611,6 +637,27 @@ io.on('connection', (socket) => {
       cb({ error: err.message });
     }
   });
+
+  socket.on('homeAssistant:lightWhite', async ({ entityId } = {}, cb = () => {}) => {
+    const mode = getMode();
+    if (
+      (mode === 'admin' && isAdmin(socket) !== true) ||
+      (mode === 'lockdown' && isLockdownAdmin(socket) !== true)
+    ) {
+      return cb({ error: 'Insufficient permissions to control Home Assistant' });
+    }
+    if (isLightControlLocked()) {
+      return cb({ error: 'Room controls are locked' });
+    }
+
+    try {
+      if (!entityId) throw new Error('entityId required');
+      await setLightWhite(entityId, haConfig?.whiteKelvin);
+      cb({ success: true });
+    } catch (err) {
+      cb({ error: err.message });
+    }
+  });
 });
 
 module.exports = {
@@ -620,6 +667,7 @@ module.exports = {
   toggleEntity,
   setEntityState,
   setLightColor,
+  setLightWhite,
   setLightsLockedOn,
   toggleLightsLockedOn,
   homeAssistantEvents: events,

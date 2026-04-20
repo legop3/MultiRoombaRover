@@ -19,6 +19,7 @@ const SessionContext = createContext({
   homeAssistantToggle: async () => {},
   homeAssistantSetState: async () => {},
   homeAssistantSetLightColor: async () => {},
+  homeAssistantSetLightWhite: async () => {},
   setNickname: async () => {},
   requestVerification: async () => {},
   requestPrivateRoverAccess: async () => {},
@@ -141,6 +142,8 @@ export function SessionProvider({ children }) {
         emitWithAck('homeAssistant:setState', { entityId, state }),
       homeAssistantSetLightColor: (entityId, rgbColor) =>
         emitWithAck('homeAssistant:lightColor', { entityId, rgbColor }),
+      homeAssistantSetLightWhite: (entityId) =>
+        emitWithAck('homeAssistant:lightWhite', { entityId }),
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
       requestVerification: () => emitWithAck('verification:request'),
       requestPrivateRoverAccess: (roverId) =>

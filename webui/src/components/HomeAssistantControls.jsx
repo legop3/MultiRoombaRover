@@ -84,7 +84,7 @@ function getEntityHue(entity) {
   return 0;
 }
 
-function EntityRow({ entity, connected, controlsLocked, onToggle, onSetColor }) {
+function EntityRow({ entity, connected, controlsLocked, onToggle, onSetColor, onSetWhite }) {
   const unavailable = entity.state === 'unavailable' || !entity.available;
   const isOn = entity.state === 'on';
   const supportsColor = entity.type === 'light' && entity.supportsColor;
@@ -123,6 +123,12 @@ function EntityRow({ entity, connected, controlsLocked, onToggle, onSetColor }) 
 
   const stopPropagation = (event) => {
     event.stopPropagation();
+  };
+
+  const handleSetWhite = (event) => {
+    stopPropagation(event);
+    if (disableColor || !onSetWhite) return;
+    onSetWhite(entity.id);
   };
 
   const displayRgb = supportsColor ? hueToRgb(hueRef.current) : [255, 255, 255];
@@ -191,10 +197,35 @@ function EntityRow({ entity, connected, controlsLocked, onToggle, onSetColor }) 
         )}
       </div>
       {supportsColor && (
-        <span
-          className="pointer-events-none absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-white/60"
-          style={{ backgroundColor: displayColor }}
-        />
+        <div className="absolute right-1 top-1 flex items-center gap-0.5">
+          <span
+            role="button"
+            tabIndex={disableColor ? -1 : 0}
+            onClick={handleSetWhite}
+            onPointerDown={stopPropagation}
+            onKeyDown={(event) => {
+              if (disableColor) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleSetWhite(event);
+              }
+            }}
+            title="Set white color temperature"
+            aria-label={`Set ${entity.name || entity.id} to white`}
+            aria-disabled={disableColor}
+            className={`inline-flex items-center justify-center rounded border border-slate-200 bg-white px-1 py-0.5 text-xs font-semibold leading-none text-slate-900 ${
+              disableColor
+                ? 'cursor-not-allowed opacity-60'
+                : 'cursor-pointer hover:bg-slate-100'
+            }`}
+          >
+            white
+          </span>
+          <span
+            className="pointer-events-none h-2.5 w-2.5 rounded-full border border-white/60"
+            style={{ backgroundColor: displayColor }}
+          />
+        </div>
       )}
       {!supportsColor && (
         <div className="self-center text-xs font-semibold text-white/90">
@@ -209,7 +240,8 @@ export default function HomeAssistantControls() {
   const {
     state: { keymap },
   } = useControlSystem();
-  const { session, homeAssistantToggle, homeAssistantSetLightColor } = useSession();
+  const { session, homeAssistantToggle, homeAssistantSetLightColor, homeAssistantSetLightWhite } =
+    useSession();
   const ha = session?.homeAssistant;
   const entities = useMemo(() => ha?.entities || [], [ha?.entities]);
   const lightPolicy = ha?.lightPolicy || null;
@@ -274,6 +306,7 @@ export default function HomeAssistantControls() {
             controlsLocked={controlsLocked}
             onToggle={homeAssistantToggle}
             onSetColor={homeAssistantSetLightColor}
+            onSetWhite={homeAssistantSetLightWhite}
           />
         ))}
       </div>
