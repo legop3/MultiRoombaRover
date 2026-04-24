@@ -1,5 +1,6 @@
 const STEP_MS = 220;
-const STEPS = 40;
+const DURATION_MS = 30 * 1000;
+const STEPS = Math.ceil(DURATION_MS / STEP_MS);
 
 module.exports = {
   id: 'cameraWhiplash',
@@ -29,13 +30,23 @@ module.exports = {
       });
       if (step >= STEPS) {
         clearInterval(timer);
+        rovers.forEach((rover) => {
+          try {
+            ctx.issueCommand(String(rover.id), {
+              type: 'servo',
+              servo: { angle: 0 },
+            });
+          } catch (err) {
+            ctx.logger.warn('cameraWhiplash servo reset failed', { roverId: rover.id, error: err.message });
+          }
+        });
       }
     }, STEP_MS);
 
     ctx.sendAlert({
       color: '#00bcd4',
       title: 'Camera Wiggle',
-      message: `Wobble running on ${rovers.length} rover(s).`,
+      message: `Wobble running for 30 seconds on ${rovers.length} rover(s).`,
     });
   },
 };

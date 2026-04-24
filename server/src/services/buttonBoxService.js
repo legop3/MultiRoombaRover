@@ -129,9 +129,10 @@ function ensureRewardAssignments() {
   });
 }
 
-function assignNewReward(button) {
+function assignNewReward(button, options = {}) {
   const allRewards = listRewards();
   if (!allRewards.length) throw new Error('No rewards configured');
+  const excludeRewardId = typeof options.excludeRewardId === 'string' ? options.excludeRewardId : null;
 
   const usedByOtherButtons = new Set(
     state.buttons
@@ -139,8 +140,15 @@ function assignNewReward(button) {
       .map((entry) => entry.rewardId)
       .filter((rewardId) => typeof rewardId === 'string' && rewardId.length > 0),
   );
-  const uniqueCandidates = allRewards.filter((reward) => !usedByOtherButtons.has(reward.id));
-  const pool = uniqueCandidates.length ? uniqueCandidates : allRewards;
+  const uniqueCandidates = allRewards.filter(
+    (reward) => !usedByOtherButtons.has(reward.id) && (!excludeRewardId || reward.id !== excludeRewardId),
+  );
+  const fallbackUniqueCandidates = allRewards.filter((reward) => !usedByOtherButtons.has(reward.id));
+  const pool = uniqueCandidates.length
+    ? uniqueCandidates
+    : fallbackUniqueCandidates.length
+      ? fallbackUniqueCandidates
+      : allRewards.filter((reward) => !excludeRewardId || reward.id !== excludeRewardId);
   const reward = pool[Math.floor(Math.random() * pool.length)] || null;
   if (!reward) throw new Error('No rewards configured');
 
@@ -260,7 +268,7 @@ async function runRewardForButton(button) {
   });
   button.lastRewardAt = Date.now();
   button.count = 0;
-  assignNewReward(button);
+  assignNewReward(button, { excludeRewardId: reward.id });
 }
 
 async function applyPress(buttonId) {

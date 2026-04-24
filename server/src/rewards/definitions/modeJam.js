@@ -1,4 +1,5 @@
-const DURATION_MS = 300 * 1000;
+const MIN_DURATION_MS = 5 * 60 * 1000;
+const MAX_DURATION_MS = 10 * 60 * 1000;
 
 let activeTimer = null;
 
@@ -36,7 +37,7 @@ async function restore(ctx, effect = {}) {
 
 function scheduleRestore(ctx, effect = {}) {
   clearTimer();
-  const endsAt = Number(effect.endsAt || Date.now() + DURATION_MS);
+  const endsAt = Number(effect.endsAt || Date.now() + MIN_DURATION_MS);
   const remaining = Math.max(0, endsAt - Date.now());
   const next = { ...effect, endsAt };
   ctx.saveEffect('modeJam', next);
@@ -49,12 +50,15 @@ function scheduleRestore(ctx, effect = {}) {
 
 module.exports = {
   id: 'modeJam',
-  name: 'Admin Mode',
-  goal: 1000,
+  name: 'Admin Lock',
+  goal: 900,
   async run(ctx) {
+    const durationMs =
+      MIN_DURATION_MS + Math.floor(Math.random() * (MAX_DURATION_MS - MIN_DURATION_MS + 1));
+    const endsAt = Date.now() + durationMs;
     const prevMode = ctx.getMode();
     const prevReason = ctx.getAdminReasonText();
-    const jamReason = `Locked by button box until ${new Date(Date.now() + DURATION_MS).toLocaleTimeString()}`;
+    const jamReason = `Locked by button box until ${new Date(endsAt).toLocaleTimeString()}`;
 
     try {
       ctx.setMode('admin', 'buttonbox:modeJam');
@@ -70,7 +74,7 @@ module.exports = {
     scheduleRestore(ctx, {
       prevMode,
       prevReason,
-      endsAt: Date.now() + DURATION_MS,
+      endsAt,
     });
 
     ctx.sendAlert({ color: '#ff5722', title: 'Admin Mode', message: 'Server forced into admin mode temporarily.' });

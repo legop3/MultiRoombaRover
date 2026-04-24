@@ -1,16 +1,23 @@
 const NAMES = ['ross', 'david', 'chirpet', 'caydu', 'meow', 'wawa'];
-const BURSTS = 200;
-const TICK_MS = 180;
+const BURSTS = 120;
+const MIN_BURST_DELAY_MS = 70;
+const MAX_BURST_DELAY_MS = 350;
+
+function randInt(min, max) {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 module.exports = {
   id: 'ghostTypingSpam',
   name: 'Typing Spam',
   goal: 220,
   async run(ctx) {
-    let tick = 0;
     const active = new Set();
-    const timer = setInterval(() => {
-      tick += 1;
+    for (let burst = 0; burst < BURSTS; burst += 1) {
       const name = NAMES[Math.floor(Math.random() * NAMES.length)] + String(Math.floor(Math.random() * 10));
       const on = Math.random() > 0.35;
       try {
@@ -24,17 +31,16 @@ module.exports = {
       } catch {
         // ignore
       }
-      if (tick >= BURSTS) {
-        clearInterval(timer);
-        active.forEach((ghost) => {
-          try {
-            ctx.sendExternalTyping({ nickname: ghost, role: 'spectator', roverId: null, isTyping: false });
-          } catch {
-            // ignore
-          }
-        });
+      await sleep(randInt(MIN_BURST_DELAY_MS, MAX_BURST_DELAY_MS));
+    }
+
+    active.forEach((ghost) => {
+      try {
+        ctx.sendExternalTyping({ nickname: ghost, role: 'spectator', roverId: null, isTyping: false });
+      } catch {
+        // ignore
       }
-    }, TICK_MS);
+    });
 
     ctx.sendAlert({ color: '#9c27b0', title: 'Typing Spam', message: 'Ghost typing burst started.' });
   },
