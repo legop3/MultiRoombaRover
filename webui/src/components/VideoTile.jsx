@@ -3,7 +3,7 @@ import { WhepPlayer } from '../lib/whepPlayer.js';
 import TopDownMap from './TopDownMap.jsx';
 import { useHudMapSetting } from '../hooks/useHudMapSetting.js';
 import { useChat } from '../context/ChatContext.jsx';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionSelector } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 import SocialButton from './SocialButton.jsx';
@@ -42,7 +42,7 @@ export default function VideoTile({
   isActiveDriver = false,
   idleSkipSeconds = null,
 }) {
-  const { session } = useSession();
+  const session = useSessionSelector((state) => state.session);
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const restartTimer = useRef(null);
@@ -740,14 +740,6 @@ function HudOverlay({
   labelScale = 1,
 }) {
   const bumps = sensors?.bumpsAndWheelDrops || {};
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 150);
-    return () => clearInterval(interval);
-  }, []);
-
-  const pulse = frame?.receivedAt ? now - frame.receivedAt < 200 : false;
   const isMobile = mobileHud;
   const portraitMobile = layoutFormat === 'mobile-portrait';
   const statusTextClass = isMobile ? 'text-[0.45rem]' : 'text-[0.65rem]';
@@ -1004,7 +996,7 @@ function LowBatteryOverlay({ battery, compact = false }) {
 }
 
 function HudChatInput({ compact = false }) {
-  const { session } = useSession();
+  const session = useSessionSelector((state) => state.session);
   const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef, setTypingActive } = useChat();
   const { value: ttsSettings } = useSettingsNamespace('tts', { engine: 'flite', voice: 'rms', pitch: 50 });
   const [draft, setDraft] = useState('');

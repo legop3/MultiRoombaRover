@@ -1,42 +1,19 @@
 /* eslint-disable react-refresh/only-export-components */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from './SocketContext.jsx';
 
-const SessionContext = createContext({
+const INITIAL_STATE = {
   connected: false,
   session: null,
   logs: [],
   adminLogs: [],
   llmCommentaryState: null,
   llmCommentaryStatus: null,
-  identifySession: async () => {},
-  login: async () => {},
-  setRole: async () => {},
-  requestControl: async () => {},
-  releaseControl: async () => {},
-  subscribeAll: async () => {},
-  homeAssistantToggle: async () => {},
-  homeAssistantSetState: async () => {},
-  homeAssistantSetLightColor: async () => {},
-  homeAssistantSetLightWhite: async () => {},
-  setNickname: async () => {},
-  requestVerification: async () => {},
-  requestPrivateRoverAccess: async () => {},
-  triggerReplay: async () => {},
-  setCommunityGoal: async () => {},
-  setAdminReason: async () => {},
-  rebootRover: async () => {},
-  rebootServer: async () => {},
-  playUploadedAudio: async () => {},
-  stopUploadedAudio: async () => {},
-  startMicWhip: async () => {},
-  readyMicWhip: async () => {},
-  stopMicWhip: async () => {},
-  setAudioLevels: async () => {},
-  setPrivateSafety: async () => {},
-  llmControl: async () => {},
-});
+  alerts: [],
+};
+
+const SessionContext = createContext(null);
 
 function useAckEmitter(socket) {
   return useCallback(
@@ -54,66 +31,108 @@ function useAckEmitter(socket) {
   );
 }
 
+function normalizeSelector(selector) {
+  return typeof selector === 'function' ? selector : (state) => state;
+}
+
 export function SessionProvider({ children }) {
   const socket = useSocket();
   const emitWithAck = useAckEmitter(socket);
-  const [session, setSession] = useState(null);
-  const [logs, setLogs] = useState([]);
-  const [adminLogs, setAdminLogs] = useState([]);
-  const [llmCommentaryState, setLlmCommentaryState] = useState(null);
-  const [llmCommentaryStatus, setLlmCommentaryStatus] = useState(null);
-  const [alerts, setAlerts] = useState([]);
-  const [connected, setConnected] = useState(socket.connected);
+  const stateRef = useRef({ ...INITIAL_STATE, connected: socket.connected });
+  const subscribersRef = useRef(new Set());
+
+  const getState = useCallback(() => stateRef.current, []);
+
+  const setState = useCallback((updater) => {
+    const prev = stateRef.current;
+    const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...(updater || {}) };
+    if (next === prev) return;
+    stateRef.current = next;
+
+    subscribersRef.current.forEach((sub) => {
+      const nextSelected = sub.selector(next);
+      if (!sub.equalityFn(sub.current, nextSelected)) {
+        sub.current = nextSelected;
+        sub.listener(nextSelected);
+      }
+    });
+  }, []);
+
+  const subscribe = useCallback((selector, listener, equalityFn = Object.is) => {
+    const normalizedSelector = normalizeSelector(selector);
+    const sub = {
+      selector: normalizedSelector,
+      equalityFn,
+      listener,
+      current: normalizedSelector(stateRef.current),
+    };
+    subscribersRef.current.add(sub);
+    return () => {
+      subscribersRef.current.delete(sub);
+    };
+  }, []);
 
   useEffect(() => {
-    const onConnect = () => setConnected(true);
-    const onDisconnect = () => setConnected(false);
+    const onConnect = () => {
+      setState((prev) => (prev.connected ? prev : { ...prev, connected: true }));
+    };
+    const onDisconnect = () => {
+      setState((prev) => (prev.connected ? { ...prev, connected: false } : prev));
+    };
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
     };
-  }, [socket]);
+  }, [setState, socket]);
 
   useEffect(() => {
     function handleSession(payload) {
-      setSession(payload);
+      setState((prev) => ({ ...prev, session: payload }));
     }
     function handleLogInit(entries = []) {
-      setLogs(entries);
+      setState((prev) => ({ ...prev, logs: entries }));
     }
     function handleLogEntry(entry) {
-      setLogs((prev) => [...prev.slice(-199), entry]);
+      setState((prev) => ({ ...prev, logs: [...prev.logs.slice(-199), entry] }));
     }
     function handleAdminLogInit(entries = []) {
-      setAdminLogs(entries);
+      setState((prev) => ({ ...prev, adminLogs: entries }));
     }
     function handleAdminLogEntry(entry) {
-      setAdminLogs((prev) => [...prev.slice(-199), entry]);
+      setState((prev) => ({ ...prev, adminLogs: [...prev.adminLogs.slice(-199), entry] }));
     }
     function handleLlmState(payload = null) {
       const state = payload && typeof payload === 'object' ? payload : null;
       const nextStatus =
         state?.debug?.status && typeof state.debug.status === 'object' ? state.debug.status : null;
-      setLlmCommentaryState(state);
-      setLlmCommentaryStatus(nextStatus);
+      setState((prev) => ({
+        ...prev,
+        llmCommentaryState: state,
+        llmCommentaryStatus: nextStatus,
+      }));
     }
+    function handleAlertNew(payload = {}) {
+      setState((prev) => ({
+        ...prev,
+        alerts: [
+          ...prev.alerts.slice(-49),
+          {
+            ...payload,
+            receivedAt: Date.now(),
+          },
+        ],
+      }));
+    }
+
     socket.on('session:sync', handleSession);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
     socket.on('adminlog:init', handleAdminLogInit);
     socket.on('adminlog:entry', handleAdminLogEntry);
     socket.on('llm:state', handleLlmState);
-    socket.on('alert:new', (payload = {}) => {
-      setAlerts((prev) => [
-        ...prev.slice(-49),
-        {
-          ...payload,
-          receivedAt: Date.now(),
-        },
-      ]);
-    });
+    socket.on('alert:new', handleAlertNew);
     return () => {
       socket.off('session:sync', handleSession);
       socket.off('log:init', handleLogInit);
@@ -121,9 +140,9 @@ export function SessionProvider({ children }) {
       socket.off('adminlog:init', handleAdminLogInit);
       socket.off('adminlog:entry', handleAdminLogEntry);
       socket.off('llm:state', handleLlmState);
-      socket.off('alert:new');
+      socket.off('alert:new', handleAlertNew);
     };
-  }, [socket]);
+  }, [setState, socket]);
 
   const actions = useMemo(
     () => ({
@@ -166,31 +185,69 @@ export function SessionProvider({ children }) {
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),
       pushAlert: (alert) =>
-        setAlerts((prev) => [
-          ...prev.slice(-49),
-          { ...alert, receivedAt: Date.now(), id: alert.id || Math.random().toString(36).slice(2) },
-        ]),
+        setState((prev) => ({
+          ...prev,
+          alerts: [
+            ...prev.alerts.slice(-49),
+            { ...alert, receivedAt: Date.now(), id: alert.id || Math.random().toString(36).slice(2) },
+          ],
+        })),
     }),
-    [emitWithAck],
+    [emitWithAck, setState],
   );
 
-  const value = useMemo(
+  const store = useMemo(
     () => ({
-      connected,
-      session,
-      logs,
-      adminLogs,
-      llmCommentaryState,
-      llmCommentaryStatus,
-      alerts,
-      ...actions,
+      getState,
+      subscribe,
+      actions,
     }),
-    [actions, adminLogs, alerts, connected, llmCommentaryState, llmCommentaryStatus, logs, session],
+    [actions, getState, subscribe],
   );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider value={store}>{children}</SessionContext.Provider>;
+}
+
+export function useSessionSelector(selector, equalityFn = Object.is) {
+  const store = useContext(SessionContext);
+  if (!store) {
+    throw new Error('useSessionSelector must be used within SessionProvider');
+  }
+  const selectorRef = useRef(selector);
+  selectorRef.current = selector;
+  const equalityRef = useRef(equalityFn);
+  equalityRef.current = equalityFn;
+
+  const [selected, setSelected] = useState(() => selector(store.getState()));
+
+  useEffect(() => {
+    setSelected((prev) => {
+      const next = selectorRef.current(store.getState());
+      return equalityRef.current(prev, next) ? prev : next;
+    });
+
+    return store.subscribe(
+      (state) => selectorRef.current(state),
+      (nextSelected) => {
+        setSelected((prev) => (equalityRef.current(prev, nextSelected) ? prev : nextSelected));
+      },
+      (a, b) => equalityRef.current(a, b),
+    );
+  }, [store]);
+
+  return selected;
+}
+
+export function useSessionActions() {
+  const store = useContext(SessionContext);
+  if (!store) {
+    throw new Error('useSessionActions must be used within SessionProvider');
+  }
+  return store.actions;
 }
 
 export function useSession() {
-  return useContext(SessionContext);
+  const state = useSessionSelector((value) => value);
+  const actions = useSessionActions();
+  return useMemo(() => ({ ...state, ...actions }), [actions, state]);
 }

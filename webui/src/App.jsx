@@ -34,7 +34,7 @@ import useUserIdentitySync from './hooks/useUserIdentitySync.js';
 import CommunityGoalBanner from './components/CommunityGoalBanner.jsx';
 import RoverQueuesPanel from './components/RoverQueuesPanel.jsx';
 import VipPanel from './components/VipPanel.jsx';
-import { useSession } from './context/SessionContext.jsx';
+import { useSessionSelector } from './context/SessionContext.jsx';
 import ButtonBoxPanel from './components/ButtonBoxPanel.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay.jsx';
 
@@ -91,7 +91,7 @@ function MobileFeatureTabs({
   roomPanelId,
   showTelemetry = true,
 }) {
-  const { session } = useSession();
+  const session = useSessionSelector((state) => state.session);
   const { state: controlState } = useControlSystem();
   const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
   const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-amber-400';

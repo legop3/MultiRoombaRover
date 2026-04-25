@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 import { useControlSystem } from '../controls/index.js';
 import { formatKeyLabel } from '../controls/keymapUtils.js';
 
@@ -240,8 +240,9 @@ export default function HomeAssistantControls() {
   const {
     state: { keymap },
   } = useControlSystem();
-  const { session, homeAssistantToggle, homeAssistantSetLightColor, homeAssistantSetLightWhite } =
-    useSession();
+  const session = useSessionSelector((state) => state.session);
+  const { homeAssistantToggle, homeAssistantSetLightColor, homeAssistantSetLightWhite } =
+    useSessionActions();
   const ha = session?.homeAssistant;
   const entities = useMemo(() => ha?.entities || [], [ha?.entities]);
   const lightPolicy = ha?.lightPolicy || null;

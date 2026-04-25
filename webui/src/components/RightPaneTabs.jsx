@@ -17,7 +17,7 @@ import NightVisionControl from './NightVisionControl.jsx';
 import HornControl from './HornControl.jsx';
 import CameraTiltControl from './CameraTiltControl.jsx';
 import VipPanel from './VipPanel.jsx';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionSelector } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import ButtonBoxPanel from './ButtonBoxPanel.jsx';
 
@@ -112,7 +112,7 @@ function DriveDockPanel() {
 }
 
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
-  const { session } = useSession();
+  const session = useSessionSelector((state) => state.session);
   const { state: controlState } = useControlSystem();
   const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
   const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-red-600';

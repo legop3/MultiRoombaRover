@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from './SocketContext.jsx';
-import { useSession } from './SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from './SessionContext.jsx';
 import messageSound from '../assets/message.mp3';
 import { useSettingsNamespace } from '../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
@@ -22,7 +22,8 @@ const ChatContext = createContext({
 
 export function ChatProvider({ children }) {
   const socket = useSocket();
-  const { session, pushAlert } = useSession();
+  const session = useSessionSelector((state) => state.session);
+  const { pushAlert } = useSessionActions();
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const [messages, setMessages] = useState([]);
   const [typing, setTyping] = useState([]);

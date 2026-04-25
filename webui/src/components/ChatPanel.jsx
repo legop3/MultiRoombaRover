@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '../context/ChatContext.jsx';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionSelector } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import ChatMessageRow from './ChatMessageRow.jsx';
 import ChatTypingRow from './ChatTypingRow.jsx';
@@ -14,7 +14,7 @@ export default function ChatPanel({
   fillHeight = false,
   allowSpectatorInput = false,
 }) {
-  const { session } = useSession();
+  const session = useSessionSelector((state) => state.session);
   const {
     messages,
     typing,

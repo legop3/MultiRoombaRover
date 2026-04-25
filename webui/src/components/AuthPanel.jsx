@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionActions } from '../context/SessionContext.jsx';
 
 export default function AuthPanel() {
-  const { login, setRole } = useSession();
+  const { login, setRole } = useSessionActions();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

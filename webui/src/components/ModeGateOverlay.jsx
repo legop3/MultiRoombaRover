@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import AuthPanel from './AuthPanel.jsx';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionSelector } from '../context/SessionContext.jsx';
 import SocialButton from './SocialButton.jsx';
 import ChatPanel from './ChatPanel.jsx';
 import NicknameForm from './NicknameForm.jsx';
@@ -25,7 +25,7 @@ function getModeDetails(mode = 'admin') {
 }
 
 export default function ModeGateOverlay() {
-  const { session } = useSession();
+  const session = useSessionSelector((state) => state.session);
   const mode = session?.mode;
   const role = session?.role;
   const reason = session?.adminReason?.text || '';

@@ -4,6 +4,12 @@ import { getPadSignature } from './gamepadBindings.js';
 const listeners = new Set();
 let rafId = null;
 let lastState = { pads: [], timestamp: 0 };
+let hasDeviceListeners = false;
+let deviceChangeHandler = null;
+
+function hasConnectedPads() {
+  return readGamepads().some((pad) => pad?.connected !== false);
+}
 
 function readGamepads() {
   if (typeof navigator === 'undefined' || !navigator.getGamepads) {
@@ -41,11 +47,17 @@ function updateState() {
 
 function loop() {
   updateState();
+  if (lastState.pads.length === 0) {
+    stopLoop();
+    return;
+  }
   rafId = requestAnimationFrame(loop);
 }
 
 function startLoop() {
   if (rafId) return;
+  updateState();
+  if (lastState.pads.length === 0) return;
   rafId = requestAnimationFrame(loop);
 }
 
@@ -57,12 +69,37 @@ function stopLoop() {
 
 export function subscribeGamepadHub(listener) {
   listeners.add(listener);
-  startLoop();
+  if (!hasDeviceListeners && typeof window !== 'undefined') {
+    const handleDeviceChange = () => {
+      updateState();
+      if (listeners.size === 0) return;
+      if (hasConnectedPads()) {
+        startLoop();
+      } else {
+        stopLoop();
+      }
+    };
+    window.addEventListener('gamepadconnected', handleDeviceChange);
+    window.addEventListener('gamepaddisconnected', handleDeviceChange);
+    deviceChangeHandler = handleDeviceChange;
+    hasDeviceListeners = true;
+  }
+  if (hasConnectedPads()) {
+    startLoop();
+  } else {
+    updateState();
+  }
   listener(lastState);
   return () => {
     listeners.delete(listener);
     if (listeners.size === 0) {
       stopLoop();
+      if (hasDeviceListeners && typeof window !== 'undefined') {
+        window.removeEventListener('gamepadconnected', deviceChangeHandler);
+        window.removeEventListener('gamepaddisconnected', deviceChangeHandler);
+        deviceChangeHandler = null;
+        hasDeviceListeners = false;
+      }
     }
   };
 }

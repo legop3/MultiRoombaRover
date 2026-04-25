@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionSelector } from '../context/SessionContext.jsx';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useDockIr } from '../hooks/useDockIr.js';
 
@@ -9,7 +9,8 @@ function formatMetric(value, fallback = '--') {
 }
 
 export default function TelemetryPanel() {
-  const { connected, session } = useSession();
+  const connected = useSessionSelector((state) => state.connected);
+  const session = useSessionSelector((state) => state.session);
   const roverId = session?.assignment?.roverId;
   const frame = useTelemetryFrame(roverId);
   const sensors = frame?.sensors || {};

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionSelector } from '../context/SessionContext.jsx';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../hooks/useRoverSnapshots.js';
@@ -7,7 +7,7 @@ import { useControlSystem } from '../controls/index.js';
 import VideoTile from './VideoTile.jsx';
 
 export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
-  const { session } = useSession();
+  const session = useSessionSelector((state) => state.session);
   const {
     state: { song, lastControlIntentAt },
     overcurrentLimiter,

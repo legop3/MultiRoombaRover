@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionSelector } from '../context/SessionContext.jsx';
 
 export const OVERCURRENT_GROUPS = [
   { key: 'drive', motors: ['leftWheel', 'rightWheel'] },
@@ -27,7 +27,7 @@ function clampUnit(value) {
 }
 
 export function useOvercurrentLimiter(roverId, options = {}) {
-  const { session } = useSession();
+  const session = useSessionSelector((state) => state.session);
   const frame = useTelemetryFrame(roverId);
   const sensors = frame?.sensors || {};
   const overcurrentFlags = sensors?.wheelOvercurrents || {};
@@ -47,7 +47,18 @@ export function useOvercurrentLimiter(roverId, options = {}) {
     setCaps(createInitialCaps());
   }, [roverId]);
 
+  const hasAnyOvercurrent = useMemo(
+    () => OVERCURRENT_GROUPS.some((group) => group.motors.some((motor) => Boolean(overcurrentFlags?.[motor]))),
+    [overcurrentFlags],
+  );
+  const needsRecoveryTick = useMemo(
+    () => Object.values(caps || {}).some((entry) => (Number.isFinite(entry?.cap) ? entry.cap : 1) < 0.999),
+    [caps],
+  );
+  const shouldTick = Boolean(roverId) && (hasAnyOvercurrent || needsRecoveryTick);
+
   useEffect(() => {
+    if (!shouldTick) return undefined;
     const interval = setInterval(() => {
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
       const deltaMs = Math.max(0, now - lastTickRef.current);
@@ -79,7 +90,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [config.downRatePerSec, config.releaseDelaySec, config.upRatePerSec]);
+  }, [config.downRatePerSec, config.releaseDelaySec, config.upRatePerSec, roverId, shouldTick]);
 
   const scales = useMemo(() => {
     const perGroup = OVERCURRENT_GROUPS.reduce((acc, group) => {

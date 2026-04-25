@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
 import { useChat } from '../../context/ChatContext.jsx';
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
 import { isKeyboardCaptureLocked } from './keyboardCaptureLock.js';
 import { isTextInputElement } from './inputFocusUtils.js';
@@ -134,7 +134,8 @@ export default function KeyboardInputManager() {
       sendSong,
     },
   } = useControlSystem();
-  const { session, homeAssistantSetState } = useSession();
+  const session = useSessionSelector((state) => state.session);
+  const { homeAssistantSetState } = useSessionActions();
   const { focusChat, blurChat, isChatFocused } = useChat();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const keymap = useMemo(() => normalizeKeymapEntries(state.keymap), [state.keymap]);

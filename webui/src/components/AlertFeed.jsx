@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
 import ChatMessageRow from './ChatMessageRow.jsx';
 import ChatTypingRow from './ChatTypingRow.jsx';
@@ -16,7 +16,9 @@ function buildKey(alert) {
 }
 
 export default function AlertFeed({ scale = 1 }) {
-  const { alerts, session, pushAlert } = useSession();
+  const alerts = useSessionSelector((state) => state.alerts);
+  const session = useSessionSelector((state) => state.session);
+  const { pushAlert } = useSessionActions();
   const socket = useSocket();
   const [now, setNow] = useState(() => Date.now());
 

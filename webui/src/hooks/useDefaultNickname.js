@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useSettingsNamespace } from '../settings/index.js';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionActions } from '../context/SessionContext.jsx';
 import wordListText from '../assets/wordlist.txt?raw';
 
 function capitalize(word) {
@@ -19,7 +19,7 @@ function pickRandomWord() {
 }
 
 export default function useDefaultNickname() {
-  const { setNickname } = useSession();
+  const { setNickname } = useSessionActions();
   const { value, status, save } = useSettingsNamespace('profile', { nickname: '' });
   const attemptedRef = useRef(false);
 

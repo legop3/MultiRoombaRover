@@ -1,7 +1,7 @@
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionSelector } from '../context/SessionContext.jsx';
 
 export default function LogPanel() {
-  const { logs } = useSession();
+  const logs = useSessionSelector((state) => state.logs);
   return (
     <div className="panel-section space-y-0.5 text-base">
       <div className="flex items-center justify-between text-sm text-slate-400">

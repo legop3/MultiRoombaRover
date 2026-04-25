@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionSelector } from '../context/SessionContext.jsx';
 import {
   AUX_LIMITS,
   COMMAND_DELAY_MS,
@@ -14,7 +14,7 @@ import { bytesToBase64, clampRange, sleep } from './controlMath.js';
 export function useCommandPipeline(options = {}) {
   const { driveTransform, auxTransform } = options;
   const socket = useSocket();
-  const { session } = useSession();
+  const session = useSessionSelector((state) => state.session);
   const roverId = session?.assignment?.roverId;
 
   const rosterEntry = useMemo(() => {

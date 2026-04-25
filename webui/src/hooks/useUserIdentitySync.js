@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 
 export default function useUserIdentitySync() {
   const socket = useSocket();
-  const { connected, identifySession } = useSession();
+  const connected = useSessionSelector((state) => state.connected);
+  const { identifySession } = useSessionActions();
   const { value: identity, status: identityStatus, save: saveIdentity } = useSettingsNamespace('identity', {
     cookieUserId: '',
   });

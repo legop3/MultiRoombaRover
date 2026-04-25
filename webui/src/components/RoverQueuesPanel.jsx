@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 import { roverNameChromeStyle } from '../lib/roverColor.js';
 
 function classNames(...values) {
@@ -42,7 +42,8 @@ function formatLabel(user, selfId) {
 }
 
 export default function RoverQueuesPanel({ title = 'Rovers' }) {
-  const { session, requestControl } = useSession();
+  const session = useSessionSelector((state) => state.session);
+  const { requestControl } = useSessionActions();
   const [pending, setPending] = useState({});
   const [now, setNow] = useState(() => Date.now());
 

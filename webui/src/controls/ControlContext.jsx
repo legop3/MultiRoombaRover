@@ -13,7 +13,7 @@ import {
 } from './constants.js';
 import { canonicalizeKeyInput } from './keymapUtils.js';
 import { useSettingsNamespace } from '../settings/index.js';
-import { useSession } from '../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 import { HORN_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 import {
   applyAuxOvercurrentScale,
@@ -71,7 +71,8 @@ export function ControlSystemProvider({ children }) {
     typeof pageSettings?.driveMacroBackoffEnabled === 'boolean'
       ? pageSettings.driveMacroBackoffEnabled
       : true;
-  const { session, homeAssistantSetState } = useSession();
+  const session = useSessionSelector((state) => state.session);
+  const { homeAssistantSetState } = useSessionActions();
   const roverId = session?.assignment?.roverId ?? null;
   const overcurrentLimiter = useOvercurrentLimiter(roverId);
   const driveTransform = useCallback(
@@ -455,16 +456,38 @@ export function ControlSystemProvider({ children }) {
     }
   }, [dispatch, pipeline, state.horn?.heat, state.horn?.overheated, HORN_HEAT_UP_PER_SEC]);
 
+  const hornStateRef = useRef({
+    active: Boolean(state.horn?.active),
+    heat: state.horn?.heat ?? 0,
+    overheated: Boolean(state.horn?.overheated),
+  });
+  const stopHornRef = useRef(stopHorn);
+
   useEffect(() => {
+    hornStateRef.current = {
+      active: Boolean(state.horn?.active),
+      heat: state.horn?.heat ?? 0,
+      overheated: Boolean(state.horn?.overheated),
+    };
+  }, [state.horn?.active, state.horn?.heat, state.horn?.overheated]);
+
+  useEffect(() => {
+    stopHornRef.current = stopHorn;
+  }, [stopHorn]);
+
+  const hornNeedsTick = Boolean(state.horn?.active) || (state.horn?.heat ?? 0) > 0 || Boolean(state.horn?.overheated);
+  useEffect(() => {
+    if (!hornNeedsTick) return undefined;
     const tickMs = 100;
     const interval = setInterval(() => {
       const now = Date.now();
       const last = hornHeatTickRef.current || now;
       hornHeatTickRef.current = now;
       const dt = Math.min(1000, Math.max(0, now - last)) / 1000;
-      const currentHeat = state.horn?.heat ?? 0;
-      const active = Boolean(state.horn?.active);
-      const overheated = Boolean(state.horn?.overheated);
+      const current = hornStateRef.current;
+      const currentHeat = current.heat ?? 0;
+      const active = Boolean(current.active);
+      const overheated = Boolean(current.overheated);
       const delta = dt * (active ? HORN_HEAT_UP_PER_SEC : -HORN_HEAT_COOL_PER_SEC);
       let nextHeat = Math.max(0, Math.min(1, currentHeat + delta));
       let nextOverheated = overheated;
@@ -472,7 +495,7 @@ export function ControlSystemProvider({ children }) {
         nextHeat = 1;
         nextOverheated = true;
         if (active) {
-          stopHorn();
+          stopHornRef.current();
         }
       } else if (nextOverheated && nextHeat <= HORN_HEAT_RESUME_THRESHOLD) {
         nextOverheated = false;
@@ -482,7 +505,7 @@ export function ControlSystemProvider({ children }) {
       }
     }, tickMs);
     return () => clearInterval(interval);
-  }, [dispatch, state.horn?.active, state.horn?.heat, state.horn?.overheated, stopHorn]);
+  }, [dispatch, hornNeedsTick, HORN_HEAT_COOL_PER_SEC, HORN_HEAT_RESUME_THRESHOLD, HORN_HEAT_UP_PER_SEC]);
 
   const registerInputState = useCallback((source, data) => {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });
