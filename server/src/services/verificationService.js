@@ -1,28 +1,26 @@
-const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const net = require('net');
 const EventEmitter = require('events');
 const io = require('../globals/io');
 const logger = require('../globals/logger').child('verificationService');
 const { publishEvent } = require('./eventBus');
-const { getSocketIp, normalizeIp } = require('../helpers/ipResolver');
+const { normalizeIp } = require('../helpers/ipResolver');
 const { getNickname, setNickname } = require('./nicknameService');
 const { getRole, roleEvents } = require('./roleService');
+const {
+  sanitizeNickname,
+  normalizeCookieUserId,
+  isValidCookieUserId,
+  generateCookieUserId,
+  getKnownIp,
+  createJsonStore,
+} = require('./identityService');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'verified-users.json');
-const COOKIE_USER_ID_RE = /^cu_[a-f0-9]{32}$/;
 
 const verificationEvents = new EventEmitter();
-
-let cache = null;
-
-function sanitizeNickname(raw) {
-  if (typeof raw !== 'string') return '';
-  const trimmed = raw.trim();
-  if (!trimmed) return '';
-  return trimmed.replace(/\*/g, 'nope').slice(0, 32);
-}
 
 function normalizeStoreShape(store) {
   const next = store && typeof store === 'object' ? store : {};
@@ -30,66 +28,56 @@ function normalizeStoreShape(store) {
     verifiedUsers: Array.isArray(next.verifiedUsers) ? next.verifiedUsers : [],
     pendingRequests: Array.isArray(next.pendingRequests) ? next.pendingRequests : [],
     dmMessages: Array.isArray(next.dmMessages) ? next.dmMessages : [],
+    deterredUsers: Array.isArray(next.deterredUsers) ? next.deterredUsers : [],
   };
 }
 
-function loadStore() {
-  if (cache) return cache;
-  try {
-    const raw = fs.readFileSync(STORE_PATH, 'utf8');
-    cache = normalizeStoreShape(JSON.parse(raw));
-  } catch (err) {
-    if (err.code !== 'ENOENT') {
-      logger.warn('Failed to load verification store', err.message);
-    }
-    cache = normalizeStoreShape({});
-  }
-  return cache;
-}
-
-function writeStore(next) {
-  const normalized = normalizeStoreShape(next);
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const tempPath = `${STORE_PATH}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tempPath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
-  fs.renameSync(tempPath, STORE_PATH);
-  cache = normalized;
-  return cache;
-}
-
-function withStore(mutator) {
-  const current = loadStore();
-  const draft = {
-    verifiedUsers: current.verifiedUsers.map((entry) => ({ ...entry, knownIps: [...(entry.knownIps || [])] })),
-    pendingRequests: current.pendingRequests.map((entry) => ({ ...entry })),
-    dmMessages: current.dmMessages.map((entry) => ({ ...entry })),
+function cloneStore(current) {
+  return {
+    verifiedUsers: (current.verifiedUsers || []).map((entry) => ({ ...entry, knownIps: [...(entry.knownIps || [])] })),
+    pendingRequests: (current.pendingRequests || []).map((entry) => ({ ...entry })),
+    dmMessages: (current.dmMessages || []).map((entry) => ({ ...entry })),
+    deterredUsers: (current.deterredUsers || []).map((entry) => ({ ...entry, knownIps: [...(entry.knownIps || [])] })),
   };
-  const result = mutator(draft);
-  writeStore(draft);
-  return result;
 }
 
-function generateCookieUserId() {
-  return `cu_${crypto.randomBytes(16).toString('hex')}`;
-}
+const storeApi = createJsonStore({
+  path: STORE_PATH,
+  normalizeStoreShape,
+  cloneStore,
+  logger,
+});
 
-function normalizeCookieUserId(value) {
-  const raw = typeof value === 'string' ? value.trim() : '';
-  if (!raw) return '';
-  return raw.toLowerCase();
-}
-
-function isValidCookieUserId(value) {
-  return COOKIE_USER_ID_RE.test(normalizeCookieUserId(value));
-}
-
-function getKnownIp(socket) {
-  return normalizeIp(getSocketIp(socket));
-}
+const { loadStore, withStore } = storeApi;
 
 function ensureSocketData(socket) {
   socket.data = socket.data || {};
   return socket.data;
+}
+
+function identityFromSocket(socket) {
+  const data = ensureSocketData(socket);
+  return {
+    cookieUserId: normalizeCookieUserId(data.cookieUserId),
+    nickname: sanitizeNickname(getNickname(socket)),
+    ip: getKnownIp(socket),
+  };
+}
+
+function normalizeNicknameKey(value) {
+  return sanitizeNickname(value).toLowerCase();
+}
+
+function normalizeKnownIps(raw = []) {
+  const out = [];
+  (Array.isArray(raw) ? raw : []).forEach((value) => {
+    const ip = typeof value === 'string' ? value.trim() : '';
+    if (!ip) return;
+    if (!out.includes(ip)) {
+      out.push(ip);
+    }
+  });
+  return out;
 }
 
 function findVerifiedMatch(store, { cookieUserId, ip }) {
@@ -104,6 +92,25 @@ function findVerifiedMatch(store, { cookieUserId, ip }) {
   );
 }
 
+function isAdminRole(role) {
+  return role === 'admin' || role === 'lockdown' || role === 'lockdown-admin';
+}
+
+function findDeterredMatch(store, { cookieUserId, nickname, ip }) {
+  const nicknameKey = normalizeNicknameKey(nickname);
+  return (
+    (store.deterredUsers || []).find((entry) => {
+      const entryCookie = normalizeCookieUserId(entry.cookieUserId);
+      if (cookieUserId && entryCookie && entryCookie === cookieUserId) return true;
+      const entryIps = normalizeKnownIps(entry.knownIps);
+      if (ip && entryIps.includes(ip)) return true;
+      const entryNicknameKey = normalizeNicknameKey(entry.nickname);
+      if (nicknameKey && entryNicknameKey && entryNicknameKey === nicknameKey) return true;
+      return false;
+    }) || null
+  );
+}
+
 function emitChange(reason, payload = {}) {
   verificationEvents.emit('change', { reason, ...payload });
 }
@@ -113,9 +120,7 @@ function reevaluateSocketVerification(socket) {
   const store = loadStore();
   const data = ensureSocketData(socket);
   const role = getRole(socket);
-  const cookieUserId = normalizeCookieUserId(data.cookieUserId);
-  const nickname = sanitizeNickname(getNickname(socket));
-  const ip = getKnownIp(socket);
+  const { cookieUserId, nickname, ip } = identityFromSocket(socket);
 
   if (role === 'lockdown') {
     data.isVerified = true;
@@ -167,6 +172,59 @@ function reevaluateSocketVerification(socket) {
   };
 }
 
+function reevaluateSocketDeterrence(socket) {
+  if (!socket) return { isDeterred: false, matchedRecordId: null, reason: 'missing_socket' };
+  const store = loadStore();
+  const data = ensureSocketData(socket);
+  const role = getRole(socket);
+  const { cookieUserId, nickname, ip } = identityFromSocket(socket);
+
+  if (isAdminRole(role)) {
+    data.isDeterred = false;
+    data.deterredRecordId = null;
+    return {
+      isDeterred: false,
+      matchedRecordId: null,
+      reason: 'admin_bypass',
+      cookieUserId,
+      nickname,
+      ip,
+    };
+  }
+
+  const match = findDeterredMatch(store, { cookieUserId, nickname, ip });
+  const isDeterred = Boolean(match);
+  data.isDeterred = isDeterred;
+  data.deterredRecordId = isDeterred ? match.id : null;
+
+  if (isDeterred) {
+    withStore((draft) => {
+      const record = (draft.deterredUsers || []).find((entry) => entry.id === match.id);
+      if (!record) return;
+      record.updatedAt = Date.now();
+      if (cookieUserId) {
+        record.cookieUserId = cookieUserId;
+      }
+      if (nickname) {
+        record.nickname = nickname;
+      }
+      record.knownIps = normalizeKnownIps(record.knownIps);
+      if (ip && !record.knownIps.includes(ip)) {
+        record.knownIps.push(ip);
+      }
+    });
+  }
+
+  return {
+    isDeterred,
+    matchedRecordId: isDeterred ? match.id : null,
+    reason: isDeterred ? 'matched' : 'no_match',
+    cookieUserId,
+    nickname,
+    ip,
+  };
+}
+
 function identifySocket(socket, payload = {}) {
   if (!socket) {
     throw new Error('Socket required');
@@ -192,10 +250,12 @@ function identifySocket(socket, payload = {}) {
   }
 
   const verification = reevaluateSocketVerification(socket);
+  const deterrence = reevaluateSocketDeterrence(socket);
   emitChange('identify', { socketId: socket.id });
   return {
     cookieUserId: data.cookieUserId,
     isVerified: verification.isVerified,
+    isDeterred: deterrence.isDeterred,
     reason: verification.reason,
     identifiedAt: Date.now(),
   };
@@ -267,6 +327,7 @@ function removeVerifiedUser(selector, removedBy = null) {
     const data = ensureSocketData(socket);
     if (normalizeCookieUserId(data.cookieUserId) === removed.cookieUserId) {
       reevaluateSocketVerification(socket);
+      reevaluateSocketDeterrence(socket);
     }
   });
 
@@ -290,9 +351,7 @@ function createVerificationRequest(socket) {
     throw new Error('Socket required');
   }
   const data = ensureSocketData(socket);
-  const cookieUserId = normalizeCookieUserId(data.cookieUserId);
-  const nickname = sanitizeNickname(getNickname(socket));
-  const ip = getKnownIp(socket);
+  const { cookieUserId, nickname, ip } = identityFromSocket(socket);
 
   if (data.isVerified) {
     throw new Error('You are already verified.');
@@ -413,6 +472,7 @@ function approveRequest(requestId, actorDiscordId) {
     const data = ensureSocketData(socket);
     if (normalizeCookieUserId(data.cookieUserId) === request.cookieUserId) {
       reevaluateSocketVerification(socket);
+      reevaluateSocketDeterrence(socket);
     }
   });
 
@@ -476,8 +536,209 @@ function getVerificationStateForSocket(socket) {
   };
 }
 
+function getModerationStateForSocket(socket) {
+  const data = socket?.data || {};
+  return {
+    isDeterred: Boolean(data.isDeterred),
+    recordId: data.deterredRecordId || null,
+  };
+}
+
 function isVerified(socket) {
   return Boolean(socket?.data?.isVerified);
+}
+
+function isDeterred(socket) {
+  return Boolean(socket?.data?.isDeterred);
+}
+
+function parseDeterrenceSelector(selector) {
+  const value = String(selector || '').trim();
+  if (!value) {
+    throw new Error('Selector required.');
+  }
+  const cookie = normalizeCookieUserId(value);
+  if (cookie && isValidCookieUserId(cookie)) {
+    return { cookieUserId: cookie, nickname: '', ip: null };
+  }
+  const ip = normalizeIp(value);
+  if (ip && net.isIP(ip)) {
+    return { cookieUserId: '', nickname: '', ip };
+  }
+  const nickname = sanitizeNickname(value);
+  if (!nickname) {
+    throw new Error('Selector required.');
+  }
+  return { cookieUserId: '', nickname, ip: null };
+}
+
+function maybeResolveVerifiedRecordForSelector(store, parsed) {
+  if (parsed.cookieUserId) {
+    return store.verifiedUsers.find((entry) => normalizeCookieUserId(entry.cookieUserId) === parsed.cookieUserId) || null;
+  }
+  if (parsed.ip) {
+    return store.verifiedUsers.find((entry) => Array.isArray(entry.knownIps) && entry.knownIps.includes(parsed.ip)) || null;
+  }
+  const byNickname = store.verifiedUsers.filter((entry) => normalizeNicknameKey(entry.nickname) === normalizeNicknameKey(parsed.nickname));
+  if (byNickname.length === 1) return byNickname[0];
+  return null;
+}
+
+function listDeterredUsers() {
+  const store = loadStore();
+  return (store.deterredUsers || []).map((entry) => ({ ...entry, knownIps: [...(entry.knownIps || [])] }));
+}
+
+function deterUser(selector, options = {}) {
+  const parsed = parseDeterrenceSelector(selector);
+  const reasonRaw = String(options?.reason || '').trim();
+  const reason = reasonRaw ? reasonRaw.slice(0, 240) : null;
+  const actor = options?.actor ? String(options.actor) : null;
+  const now = Date.now();
+
+  let result = null;
+
+  withStore((draft) => {
+    const verified = maybeResolveVerifiedRecordForSelector(draft, parsed);
+    const cookieUserId = parsed.cookieUserId || normalizeCookieUserId(verified?.cookieUserId || '');
+    const nickname = parsed.nickname || sanitizeNickname(verified?.nickname || '');
+    const knownIps = normalizeKnownIps([
+      ...(parsed.ip ? [parsed.ip] : []),
+      ...((verified && Array.isArray(verified.knownIps)) ? verified.knownIps : []),
+    ]);
+
+    let existing = findDeterredMatch(draft, { cookieUserId, nickname, ip: parsed.ip || null });
+    if (!existing && cookieUserId) {
+      existing = (draft.deterredUsers || []).find((entry) => normalizeCookieUserId(entry.cookieUserId) === cookieUserId) || null;
+    }
+
+    if (existing) {
+      if (cookieUserId) {
+        existing.cookieUserId = cookieUserId;
+      }
+      if (nickname) {
+        existing.nickname = nickname;
+      }
+      const mergedIps = normalizeKnownIps([...(existing.knownIps || []), ...knownIps]);
+      existing.knownIps = mergedIps;
+      if (reason) {
+        existing.reason = reason;
+      }
+      existing.updatedAt = now;
+      existing.updatedBy = actor;
+      result = { ...existing, knownIps: [...(existing.knownIps || [])], created: false };
+      return;
+    }
+
+    const created = {
+      id: `du_${crypto.randomBytes(8).toString('hex')}`,
+      cookieUserId: cookieUserId || null,
+      nickname: nickname || null,
+      knownIps,
+      reason,
+      createdAt: now,
+      createdBy: actor,
+      updatedAt: now,
+      updatedBy: actor,
+    };
+    draft.deterredUsers.push(created);
+    result = { ...created, knownIps: [...(created.knownIps || [])], created: true };
+  });
+
+  io.sockets.sockets.forEach((socket) => {
+    reevaluateSocketDeterrence(socket);
+  });
+
+  emitChange('deter_update');
+  publishEvent({
+    source: 'moderation',
+    type: result?.created ? 'moderation.deterred' : 'moderation.deterrenceUpdated',
+    payload: {
+      id: result?.id || null,
+      cookieUserId: result?.cookieUserId || null,
+      nickname: result?.nickname || null,
+      knownIps: result?.knownIps || [],
+      reason: result?.reason || null,
+      actor,
+      ts: now,
+    },
+  });
+
+  return result;
+}
+
+function resolveDeterredSelector(selector) {
+  const store = loadStore();
+  const value = String(selector || '').trim();
+  if (!value) return { error: 'selector_required' };
+
+  const byId = (store.deterredUsers || []).find((entry) => String(entry.id) === value) || null;
+  if (byId) return { record: byId };
+
+  const cookie = normalizeCookieUserId(value);
+  if (cookie && isValidCookieUserId(cookie)) {
+    const byCookie = (store.deterredUsers || []).find((entry) => normalizeCookieUserId(entry.cookieUserId) === cookie) || null;
+    if (byCookie) return { record: byCookie };
+  }
+
+  const ip = typeof value === 'string' ? value.trim() : '';
+  if (ip && net.isIP(ip)) {
+    const byIp = (store.deterredUsers || []).find((entry) => Array.isArray(entry.knownIps) && entry.knownIps.includes(ip)) || null;
+    if (byIp) return { record: byIp };
+  }
+
+  const nicknameKey = normalizeNicknameKey(value);
+  const byNickname = (store.deterredUsers || []).filter((entry) => normalizeNicknameKey(entry.nickname) === nicknameKey);
+  if (byNickname.length === 1) return { record: byNickname[0] };
+  if (byNickname.length > 1) return { error: 'ambiguous_nickname' };
+
+  return { error: 'not_found' };
+}
+
+function undeterUser(selector, removedBy = null) {
+  const resolved = resolveDeterredSelector(selector);
+  if (resolved.error) {
+    throw new Error(
+      resolved.error === 'ambiguous_nickname'
+        ? 'Nickname matches multiple deterred users; remove by id or cookieUserId.'
+        : 'Deterred user not found.',
+    );
+  }
+
+  const target = resolved.record;
+  let removed = null;
+
+  withStore((draft) => {
+    const before = draft.deterredUsers.length;
+    draft.deterredUsers = draft.deterredUsers.filter((entry) => entry.id !== target.id);
+    if (draft.deterredUsers.length !== before) {
+      removed = target;
+    }
+  });
+
+  if (!removed) {
+    throw new Error('Deterred user not found.');
+  }
+
+  io.sockets.sockets.forEach((socket) => {
+    reevaluateSocketDeterrence(socket);
+  });
+
+  const removedAt = Date.now();
+  emitChange('deter_remove');
+  publishEvent({
+    source: 'moderation',
+    type: 'moderation.undeterred',
+    payload: {
+      id: removed.id,
+      cookieUserId: removed.cookieUserId || null,
+      nickname: removed.nickname || null,
+      removedBy: removedBy ? String(removedBy) : null,
+      removedAt,
+    },
+  });
+
+  return { ...removed, knownIps: [...(removed.knownIps || [])] };
 }
 
 io.on('connection', (socket) => {
@@ -506,6 +767,7 @@ roleEvents.on('change', ({ socket }) => {
   if (!socket) return;
   try {
     reevaluateSocketVerification(socket);
+    reevaluateSocketDeterrence(socket);
     emitChange('role_change', { socketId: socket.id });
   } catch (err) {
     logger.warn('Failed to reevaluate verification on role change', err.message);
@@ -517,6 +779,7 @@ module.exports = {
   getVerificationStatus,
   getIdentitySummary,
   getVerificationStateForSocket,
+  getModerationStateForSocket,
   createVerificationRequest,
   attachDmMessage,
   getRequestByMessageId,
@@ -524,7 +787,12 @@ module.exports = {
   denyRequest,
   listVerifiedUsers,
   removeVerifiedUser,
+  listDeterredUsers,
+  deterUser,
+  undeterUser,
   isVerified,
+  isDeterred,
   reevaluateSocketVerification,
+  reevaluateSocketDeterrence,
   verificationEvents,
 };

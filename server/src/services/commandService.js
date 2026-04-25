@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const io = require('../globals/io');
 const roverManager = require('./roverManager');
 const { isAdmin, isLockdownAdmin } = require('./roleService');
+const { isDeterred } = require('./verificationService');
 const logger = require('../globals/logger').child('commandService');
 const { isNightVisionBlocked } = require('../rewards/definitions/darkness');
 
@@ -80,6 +81,9 @@ io.on('connection', (socket) => {
       const isRebootCommand = type === 'reboot';
       const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));
       const isAdminSocket = isAdmin(socket);
+      if (!isAdminSocket && isDeterred(socket)) {
+        throw new Error('Not authorized');
+      }
       if (isRebootCommand && !isAdminSocket) {
         throw new Error('Not authorized');
       }

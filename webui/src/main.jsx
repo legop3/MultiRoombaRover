@@ -10,6 +10,7 @@ import { ChatProvider } from './context/ChatContext.jsx'
 import SpectatorApp from './spectate/SpectatorApp.jsx'
 import MiniSummaryApp from './mini/MiniSummaryApp.jsx'
 import { SettingsProvider } from './settings/index.js'
+import DeterrenceChaos from './components/DeterrenceChaos.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -18,6 +19,7 @@ createRoot(document.getElementById('root')).render(
         <TelemetryProvider>
           <SettingsProvider>
             <ChatProvider>
+              <DeterrenceChaos />
               <BrowserRouter>
                 <Routes>
                   <Route path="/" element={<App />} />

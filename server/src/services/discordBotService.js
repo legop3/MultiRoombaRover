@@ -39,6 +39,9 @@ const {
   denyRequest,
   listVerifiedUsers,
   removeVerifiedUser,
+  listDeterredUsers,
+  deterUser,
+  undeterUser,
 } = require('./verificationService');
 const {
   DM_APPROVE_EMOJI: PRIVATE_ACCESS_APPROVE_EMOJI,
@@ -295,6 +298,9 @@ function formatHelp() {
     '`rs goal [text|clear]` — show or set community goal',
     '`rs verify list` — list verified users (lockdown admins)',
     '`rs verify remove <cookieUserId|nickname>` — remove verified user (lockdown admins)',
+    '`rs deter list` — list deterred users (lockdown admins)',
+    '`rs deter ban <cookieUserId|nickname|ip> [reason]` — deter a user (lockdown admins)',
+    '`rs deter unban <id|cookieUserId|nickname|ip>` — remove deterrence (lockdown admins)',
     '`ts` — show time status',
   ].join('\n');
 }
@@ -672,6 +678,98 @@ async function handleVerifyCommand(message, tokens) {
   });
 }
 
+async function handleDeterCommand(message, tokens) {
+  if (!isLockdownAdminUser(message.author?.id)) {
+    await message.reply({
+      content: 'Only lockdown admins can manage deterred users.',
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  const action = (tokens.shift() || 'list').toLowerCase();
+
+  if (action === 'list') {
+    const users = listDeterredUsers();
+    if (!users.length) {
+      await message.reply({
+        content: 'No deterred users.',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+    const lines = users.map((entry, idx) => {
+      const updated = entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : 'unknown';
+      const ipCount = Array.isArray(entry.knownIps) ? entry.knownIps.length : 0;
+      const reason = entry.reason ? ` | reason:${entry.reason}` : '';
+      return `${idx + 1}. ${entry.id} | ${entry.nickname || 'unknown'} | ${formatMaskedCookieKey(entry.cookieUserId)} | ips:${ipCount} | updated:${updated}${reason}`;
+    });
+    await message.reply({
+      content: ['Deterred users:', ...lines].join('\n').slice(0, 1900),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (action === 'ban') {
+    const selector = String(tokens.shift() || '').trim();
+    const reason = tokens.join(' ').trim();
+    if (!selector) {
+      await message.reply({
+        content: 'Usage: `rs deter ban <cookieUserId|nickname|ip> [reason]`',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+    try {
+      const deterred = deterUser(selector, { reason, actor: message.author?.id || null });
+      await message.reply({
+        content: sanitizeMentions(
+          `${deterred.created ? 'Deterred' : 'Updated deterrence for'} ${deterred.nickname || 'unknown'} (${formatMaskedCookieKey(deterred.cookieUserId)}).`,
+        ),
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (err) {
+      await message.reply({
+        content: sanitizeMentions(`Failed to deter user: ${err.message}`),
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    }
+    return;
+  }
+
+  if (action === 'unban') {
+    const selector = tokens.join(' ').trim();
+    if (!selector) {
+      await message.reply({
+        content: 'Usage: `rs deter unban <id|cookieUserId|nickname|ip>`',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+    try {
+      const removed = undeterUser(selector, message.author?.id || null);
+      await message.reply({
+        content: sanitizeMentions(
+          `Removed deterrence for ${removed.nickname || 'unknown'} (${formatMaskedCookieKey(removed.cookieUserId)}).`,
+        ),
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (err) {
+      await message.reply({
+        content: sanitizeMentions(`Failed to remove deterrence: ${err.message}`),
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    }
+    return;
+  }
+
+  await message.reply({
+    content: 'Unknown deter command. Use `rs deter list`, `rs deter ban <selector> [reason]`, or `rs deter unban <selector>`.',
+    allowedMentions: { parse: [], repliedUser: false },
+  });
+}
+
 function canManageBridge(message) {
   if (isAdminUser(message.author.id)) return true;
   if (!message.guild || !message.member) return false;
@@ -849,7 +947,7 @@ async function handleCommand(message) {
   const isLockdownAdmin = isLockdownAdminUser(message.author.id);
   const isBridgeAdmin = action === 'bridge' ? canManageBridge(message) : false;
   const mode = getMode();
-  const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify']);
+  const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter']);
 
   if (
     !isAdmin &&
@@ -861,7 +959,8 @@ async function handleCommand(message) {
     action !== 'bridge' &&
     action !== 'goal' &&
     action !== 'reason' &&
-    action !== 'verify'
+    action !== 'verify' &&
+    action !== 'deter'
   ) {
     return; // ignore non-admins for privileged commands
   }
@@ -907,6 +1006,9 @@ async function handleCommand(message) {
       break;
     case 'verify':
       await handleVerifyCommand(message, tokens);
+      break;
+    case 'deter':
+      await handleDeterCommand(message, tokens);
       break;
     default:
       await message.reply(formatHelp());

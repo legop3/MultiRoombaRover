@@ -11,6 +11,7 @@ const { getState: getHomeAssistantState, homeAssistantEvents } = require('./home
 const { getNickname, nicknameEvents } = require('./nicknameService');
 const {
   getVerificationStateForSocket,
+  getModerationStateForSocket,
   getIdentitySummary,
   verificationEvents,
 } = require('./verificationService');
@@ -133,6 +134,7 @@ function buildSession(socket) {
     },
     identity: getIdentitySummary(socket),
     verification: getVerificationStateForSocket(socket),
+    moderation: getModerationStateForSocket(socket),
     privateRoverAccess: getPrivateRoverAccessStateForSocket(socket),
     isVerified: Boolean(socket?.data?.isVerified),
     audioForward: getAudioForwardState(),

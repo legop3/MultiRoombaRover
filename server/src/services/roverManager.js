@@ -186,6 +186,10 @@ function getControlDenialReason(record, socket, options = {}) {
   if (mode === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
     return 'Server in lockdown';
   }
+  const { isDeterred } = require('./verificationService');
+  if (!isAdmin(socket) && isDeterred(socket)) {
+    return 'Not authorized';
+  }
   if (!isPrivateRecord(record)) {
     return null;
   }
