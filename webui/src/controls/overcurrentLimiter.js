@@ -36,7 +36,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
     [options.config],
   );
   const [caps, setCaps] = useState(() => createInitialCaps());
-  const lastTickRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const lastTickRef = useRef(0);
   const flagsRef = useRef(overcurrentFlags);
 
   useEffect(() => {
@@ -45,6 +45,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
 
   useEffect(() => {
     setCaps(createInitialCaps());
+    lastTickRef.current = 0;
   }, [roverId]);
 
   const hasAnyOvercurrent = useMemo(
@@ -59,11 +60,12 @@ export function useOvercurrentLimiter(roverId, options = {}) {
 
   useEffect(() => {
     if (!shouldTick) return undefined;
+    lastTickRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const interval = setInterval(() => {
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
       const deltaMs = Math.max(0, now - lastTickRef.current);
       lastTickRef.current = now;
-      const deltaSec = deltaMs / 1000;
+      const deltaSec = Math.min(0.25, deltaMs / 1000);
       if (deltaSec <= 0) return;
       setCaps((prev) => {
         let changed = false;
