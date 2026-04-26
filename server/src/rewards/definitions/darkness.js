@@ -1,5 +1,11 @@
 const DURATION_MS = 15 * 60 * 1000;
 const LIGHT_ENFORCE_TICK_MS = 3000;
+// Rover daemon semantics are inverted:
+// action "on" => IR LED on => nightVisionOn=false
+// action "off" => IR LED off => nightVisionOn=true
+function actionForNightVisionState(nightVisionOn) {
+  return nightVisionOn ? 'off' : 'on';
+}
 
 let activeTimer = null;
 let enforceLightsTimer = null;
@@ -72,7 +78,7 @@ async function stopDarkness(ctx, effect = {}) {
     try {
       ctx.issueCommand(String(roverId), {
         type: 'nightVision',
-        nightVision: { action: wasOn ? 'on' : 'off' },
+        nightVision: { action: actionForNightVisionState(Boolean(wasOn)) },
       });
     } catch (err) {
       ctx.logger.warn('darkness restore nightVision failed', { roverId, error: err.message });
@@ -129,7 +135,7 @@ module.exports = {
       try {
         ctx.issueCommand(String(rover.id), {
           type: 'nightVision',
-          nightVision: { action: 'off' },
+          nightVision: { action: actionForNightVisionState(false) },
         });
       } catch (err) {
         ctx.logger.warn('darkness nightVision off failed', { roverId: rover.id, error: err.message });

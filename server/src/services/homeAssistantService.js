@@ -27,6 +27,8 @@ const triggerRuntime = new Map(); // triggerId -> { lastFiredAt, lastState, last
 const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
 const LIGHT_IDLE_OFF_MS = 2 * 60 * 1000;
 const DEFAULT_WHITE_KELVIN = 4000;
+// Rover daemon uses inverted semantics: action "on" powers IR LEDs, which means nightVisionOn=false.
+const NIGHT_VISION_DISABLE_ACTION = 'on';
 
 let connection = null;
 let unsubscribeEntities = null;
@@ -206,7 +208,7 @@ function turnOffAllRoverNightVision() {
     try {
       issueCommand(record.id, {
         type: 'nightVision',
-        nightVision: { action: 'off' },
+        nightVision: { action: NIGHT_VISION_DISABLE_ACTION },
       });
     } catch (err) {
       failed += 1;
