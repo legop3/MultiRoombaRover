@@ -198,9 +198,10 @@ function turnOffAllRoverNightVision() {
   const records = Array.from(roverManager.rovers.values());
   let attempted = 0;
   let failed = 0;
+  const roverIds = [];
   records.forEach((record) => {
     if (!record?.ws) return;
-    if (!record?.meta?.nightVision?.enabled) return;
+    roverIds.push(String(record.id));
     attempted += 1;
     try {
       issueCommand(record.id, {
@@ -215,7 +216,7 @@ function turnOffAllRoverNightVision() {
       });
     }
   });
-  return { attempted, failed };
+  return { attempted, failed, roverIds };
 }
 
 function getActiveDriverCount() {
@@ -256,6 +257,7 @@ function scheduleLightsIdleOffTimer() {
         idleMs: LIGHT_IDLE_OFF_MS,
         nightVisionRovers: nightVisionResult.attempted,
         nightVisionFailures: nightVisionResult.failed,
+        nightVisionRoverIds: nightVisionResult.roverIds,
       });
     } catch (err) {
       logger.warn('Failed auto light-off after idle', err.message);
