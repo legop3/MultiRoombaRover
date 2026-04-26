@@ -92,6 +92,19 @@ let presenceInterval = null;
 let presenceShowGoal = false;
 const VERIFY_APPROVE_EMOJI = '✅';
 const VERIFY_DENY_EMOJI = '❌';
+const ADMIN_ALERT_EVENT_TYPES = new Set([
+  'rover.online',
+  'rover.offline',
+  'rover.dockGuard',
+  'battery.warn',
+  'battery.urgent',
+  'battery.docked',
+  'battery.undocked',
+  'battery.charging.start',
+  'battery.charging.stop',
+  'battery.locked',
+  'battery.unlocked',
+]);
 function sanitizeMentions(text) {
   if (!text) return '';
   return String(text)
@@ -169,7 +182,6 @@ function isCharging(sensors) {
 
 function buildRoverStatusSnapshot(record) {
   if (!record) return null;
-  if (!roverManager.canReplayRoverId(record.id)) return null;
   const sensors = record.lastSensor?.decoded || record.lastSensor?.sensors || null;
   const docked = Boolean(sensors?.chargingSources?.homeBase);
   const charging = isCharging(sensors);
@@ -1208,10 +1220,11 @@ async function handleTimeStatusCommand(message) {
 
 function buildBatteryStatusEmbed(color, records = null) {
   const embed = buildEmbed({ title: 'Rover Battery Status', color: color || 0x2196f3 });
-  const baseRecords = (records || Array.from(rovers.values())).filter((entry) =>
-    roverManager.canReplayRoverId(entry?.id),
-  );
-  const snapshots = baseRecords.map(buildRoverStatusSnapshot).filter(Boolean);
+  const sourceRecords = records || Array.from(rovers.values());
+  const baseRecords = records
+    ? sourceRecords
+    : sourceRecords.filter((entry) => roverManager.canReplayRoverId(entry?.id));
+  const snapshots = baseRecords.map((entry) => buildRoverStatusSnapshot(entry)).filter(Boolean);
   if (snapshots.length === 0) {
     embed.setDescription('No rovers online.');
     return embed;
@@ -1286,9 +1299,6 @@ function buildAccessModeEmbed(mode, color) {
 
 function buildBatteryCaption(type, payload) {
   const roverId = payload?.roverId || 'unknown';
-  if (!roverManager.canReplayRoverId(roverId)) {
-    return null;
-  }
   const record = rovers.get(roverId) || findRoverRecord(roverId);
   const snapshot = buildRoverStatusSnapshot(record);
   const base = snapshot?.name || roverId;
@@ -1321,6 +1331,12 @@ function buildBatteryCaption(type, payload) {
     default:
       return `Battery update: ${base}. ${detail}`;
   }
+}
+
+function getEventRoverRecord(payload) {
+  const roverId = String(payload?.roverId || '').trim();
+  if (!roverId) return null;
+  return rovers.get(roverId) || findRoverRecord(roverId) || null;
 }
 
 async function announce({
@@ -1379,7 +1395,7 @@ function handleBusEvent(event) {
   const channels = discordConfig.channels || {};
   const roles = discordConfig.roles || {};
   const roverId = payload?.roverId || null;
-  if (roverId && !roverManager.canReplayRoverId(roverId)) {
+  if (roverId && !roverManager.canReplayRoverId(roverId) && !ADMIN_ALERT_EVENT_TYPES.has(type)) {
     return;
   }
   switch (type) {
@@ -1474,7 +1490,7 @@ function handleBusEvent(event) {
         content: buildBatteryCaption(type, payload),
         title: 'Battery Status',
         description: null,
-        embeds: [buildBatteryStatusEmbed(0xf0b651)],
+        embeds: [buildBatteryStatusEmbed(0xf0b651, [getEventRoverRecord(payload)].filter(Boolean))],
       });
       break;
     case 'battery.urgent':
@@ -1486,7 +1502,7 @@ function handleBusEvent(event) {
         content: buildBatteryCaption(type, payload),
         title: 'Battery Status',
         description: null,
-        embeds: [buildBatteryStatusEmbed(0xe53935)],
+        embeds: [buildBatteryStatusEmbed(0xe53935, [getEventRoverRecord(payload)].filter(Boolean))],
       });
       break;
     case 'battery.docked':
@@ -1497,7 +1513,7 @@ function handleBusEvent(event) {
         content: buildBatteryCaption(type, payload),
         title: 'Battery Status',
         description: null,
-        embeds: [buildBatteryStatusEmbed(0x2196f3)],
+        embeds: [buildBatteryStatusEmbed(0x2196f3, [getEventRoverRecord(payload)].filter(Boolean))],
       });
       break;
     case 'battery.undocked':
@@ -1508,7 +1524,7 @@ function handleBusEvent(event) {
         content: buildBatteryCaption(type, payload),
         title: 'Battery Status',
         description: null,
-        embeds: [buildBatteryStatusEmbed(0x2196f3)],
+        embeds: [buildBatteryStatusEmbed(0x2196f3, [getEventRoverRecord(payload)].filter(Boolean))],
       });
       break;
     case 'battery.charging.start':
@@ -1519,7 +1535,7 @@ function handleBusEvent(event) {
         content: buildBatteryCaption(type, payload),
         title: 'Battery Status',
         description: null,
-        embeds: [buildBatteryStatusEmbed(0x2196f3)],
+        embeds: [buildBatteryStatusEmbed(0x2196f3, [getEventRoverRecord(payload)].filter(Boolean))],
       });
       break;
     case 'battery.charging.stop':
@@ -1530,7 +1546,7 @@ function handleBusEvent(event) {
         content: buildBatteryCaption(type, payload),
         title: 'Battery Status',
         description: null,
-        embeds: [buildBatteryStatusEmbed(0xf0b651)],
+        embeds: [buildBatteryStatusEmbed(0xf0b651, [getEventRoverRecord(payload)].filter(Boolean))],
       });
       break;
     case 'battery.locked':
@@ -1541,7 +1557,7 @@ function handleBusEvent(event) {
         content: buildBatteryCaption(type, payload),
         title: 'Battery Status',
         description: null,
-        embeds: [buildBatteryStatusEmbed(0xf0b651)],
+        embeds: [buildBatteryStatusEmbed(0xf0b651, [getEventRoverRecord(payload)].filter(Boolean))],
       });
       schedulePresenceRotation();
       break;
@@ -1553,7 +1569,7 @@ function handleBusEvent(event) {
         content: buildBatteryCaption(type, payload),
         title: 'Battery Status',
         description: null,
-        embeds: [buildBatteryStatusEmbed(0x4caf50)],
+        embeds: [buildBatteryStatusEmbed(0x4caf50, [getEventRoverRecord(payload)].filter(Boolean))],
       });
       schedulePresenceRotation();
       break;

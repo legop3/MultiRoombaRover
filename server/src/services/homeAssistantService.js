@@ -6,6 +6,8 @@ const logger = require('../globals/logger').child('homeAssistantService');
 const { loadConfig } = require('../helpers/configLoader');
 const { getMode, MODES, modeEvents } = require('./modeManager');
 const { isAdmin, isLockdownAdmin } = require('./roleService');
+const roverManager = require('./roverManager');
+const { issueCommand } = require('./commandService');
 const { publishEvent } = require('./eventBus');
 const { getActiveDrivers, turnEvents } = require('./turnService');
 
@@ -192,6 +194,30 @@ function getControllableEntityIds() {
   return Array.from(entityConfig.values()).map((meta) => String(meta.id));
 }
 
+function turnOffAllRoverNightVision() {
+  const records = Array.from(roverManager.rovers.values());
+  let attempted = 0;
+  let failed = 0;
+  records.forEach((record) => {
+    if (!record?.ws) return;
+    if (!record?.meta?.nightVision?.enabled) return;
+    attempted += 1;
+    try {
+      issueCommand(record.id, {
+        type: 'nightVision',
+        nightVision: { action: 'off' },
+      });
+    } catch (err) {
+      failed += 1;
+      logger.warn('Failed to auto turn off rover night vision after idle', {
+        roverId: record.id,
+        error: err.message,
+      });
+    }
+  });
+  return { attempted, failed };
+}
+
 function getActiveDriverCount() {
   const active = getActiveDrivers();
   if (!active || typeof active !== 'object') return 0;
@@ -225,8 +251,11 @@ function scheduleLightsIdleOffTimer() {
     lightsIdleOffDeadline = null;
     try {
       await setAllControllableEntitiesState('off');
+      const nightVisionResult = turnOffAllRoverNightVision();
       logger.info('Auto-turned off room lights due to no active drivers', {
         idleMs: LIGHT_IDLE_OFF_MS,
+        nightVisionRovers: nightVisionResult.attempted,
+        nightVisionFailures: nightVisionResult.failed,
       });
     } catch (err) {
       logger.warn('Failed auto light-off after idle', err.message);
