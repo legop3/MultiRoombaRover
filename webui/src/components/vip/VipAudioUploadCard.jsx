@@ -739,127 +739,130 @@ export default function VipAudioUploadCard({
   );
 
   return (
-    <div className="grid gap-0.5">
-      <section className="surface">
-        <div className="flex items-center justify-center gap-0.5 py-0.25 text-xs text-slate-300">
-          <span>Push-to-Talk Key</span>
-          <KeyPill label={pttKeyLabel} />
-        </div>
-      </section>
-
-      <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
-        <section className="surface h-full">
-          <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr]">
-            <p className="text-sm text-slate-200 text-center">PTT Mode</p>
-            <p className="text-xs text-slate-400 text-center">
-              Choose how holding your PTT key behaves: live mic stream, or record-and-send clip. If the live stream doesn't work, switch to clip mode.
-            </p>
-            <div className="grid grid-cols-2 gap-0.5">
-              <button
-                type="button"
-                className={`button-dark w-full text-sm ${!clipMode ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
-                onClick={() => setPttMode('live')}
-              >
-                Live Mic (WHIP)
-              </button>
-              <button
-                type="button"
-                className={`button-dark w-full text-sm ${clipMode ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
-                onClick={() => setPttMode('clip')}
-              >
-                Record Clip
-              </button>
-            </div>
+    <section className="surface">
+      <div className="grid gap-1">
+        <p className="text-sm text-slate-100 text-center">Audio Controls</p>
+        <section className="surface">
+          <div className="flex items-center justify-center gap-0.5 py-0.25 text-xs text-slate-300">
+            <span>Push-to-Talk Key</span>
+            <KeyPill label={pttKeyLabel} />
           </div>
         </section>
 
-        <section className="surface h-full">
-          <div className="grid h-full gap-0.5 grid-rows-[auto_1fr]">
-            <p className="text-sm text-slate-200 text-center">PTT Clip Status</p>
-            <div className="grid gap-0.5 content-start">
-              <StatusIndicator label="Mode" active={clipMode} detail={clipMode ? 'record clip' : 'live mic'} />
-              <StatusIndicator label="PTT hold" active={pttActive} detail={pttActive ? 'held' : 'released'} />
-              <StatusIndicator label="Recording" active={clipRecording} detail={clipRecording ? 'capturing' : 'idle'} />
-              <StatusIndicator label="Playback" active={clipMode && uploadPlaying} detail={clipMode && uploadPlaying ? 'playing' : 'idle'} />
+        <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
+          <section className="surface h-full">
+            <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr]">
+              <p className="text-sm text-slate-200 text-center">PTT Mode</p>
+              <p className="text-xs text-slate-400 text-center">
+                Choose how holding your PTT key behaves: live mic stream, or record-and-send clip. If the live stream doesn't work, switch to clip mode.
+              </p>
+              <div className="grid grid-cols-2 gap-0.5">
+                <button
+                  type="button"
+                  className={`button-dark w-full text-sm ${!clipMode ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
+                  onClick={() => setPttMode('live')}
+                >
+                  Live Mic (WHIP)
+                </button>
+                <button
+                  type="button"
+                  className={`button-dark w-full text-sm ${clipMode ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
+                  onClick={() => setPttMode('clip')}
+                >
+                  Record Clip
+                </button>
+              </div>
             </div>
+          </section>
+
+          <section className="surface h-full">
+            <div className="grid h-full gap-0.5 grid-rows-[auto_1fr]">
+              <p className="text-sm text-slate-200 text-center">PTT Clip Status</p>
+              <div className="grid gap-0.5 content-start">
+                <StatusIndicator label="Mode" active={clipMode} detail={clipMode ? 'record clip' : 'live mic'} />
+                <StatusIndicator label="PTT hold" active={pttActive} detail={pttActive ? 'held' : 'released'} />
+                <StatusIndicator label="Recording" active={clipRecording} detail={clipRecording ? 'capturing' : 'idle'} />
+                <StatusIndicator label="Playback" active={clipMode && uploadPlaying} detail={clipMode && uploadPlaying ? 'playing' : 'idle'} />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
+          <section className="surface h-full">
+            <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr_auto]">
+              <p className="text-sm text-slate-200 text-center">Audio Upload</p>
+
+              <label className="mx-auto grid w-full max-w-sm gap-0.5 text-xs text-slate-300 text-center">
+                <span>Audio file (mp3 / wav / ogg)</span>
+                <input
+                  className={`${fieldClass} text-center`}
+                  type="file"
+                  accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg"
+                  disabled={working || !roverId}
+                  onChange={(event) => setSelectedUpload(event.target.files?.[0] || null)}
+                />
+              </label>
+
+              <div className="mx-auto w-full max-w-sm text-center">
+                {selectedUpload ? (
+                  <div className="surface-muted text-xs text-slate-300">
+                    {selectedUpload.name} ({selectedUpload.size} bytes)
+                  </div>
+                ) : (
+                  <div className="surface-muted text-xs text-slate-500">No file selected</div>
+                )}
+              </div>
+
+              <div className="flex justify-center gap-0.5">
+                <button type="button" className="button-dark text-sm" disabled={working || !roverId} onClick={handleUploadPlay}>
+                  {working ? 'Working...' : 'Play Upload'}
+                </button>
+                <button type="button" className="button-dark text-sm" disabled={working || !roverId} onClick={handleUploadStop}>
+                  Stop
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="surface h-full">
+            <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr]">
+              <p className="text-sm text-slate-200 text-center">Live Microphone</p>
+              <label className="surface-muted mx-auto flex w-full max-w-sm items-center justify-center gap-0.5 px-0.5 py-0.5 text-xs text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={openMicEnabled}
+                  disabled={!roverId || clipMode}
+                  onChange={(event) =>
+                    saveVipAudio((current) => ({ ...(current || {}), openMicEnabled: Boolean(event.target.checked) }))
+                  }
+                />
+                <span>{clipMode ? 'Open mic (live mode only)' : 'Open mic'}</span>
+              </label>
+              <div className="grid gap-0.5 content-start">
+                <StatusIndicator label="WHIP link" active={whipLinkActive} detail={micState} />
+                <StatusIndicator label="Mic hot" active={micHot} detail={micHot ? 'transmitting' : 'muted'} />
+                <div className="surface-muted text-center text-xs text-slate-400">Hold <KeyPill label={pttKeyLabel} /> to talk</div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section className="surface">
+          <div className="space-y-0.5">
+            <p className="text-sm text-slate-200 text-center">Audio Status</p>
+            <div className="grid gap-0.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-6">
+              <StatusIndicator label="Forward pipe" active={pipelineConnected} detail={pipelineConnected ? 'connected' : 'offline'} />
+              <StatusIndicator label="Upload playback" active={uploadPlaying} detail={uploadPlaying ? 'playing' : 'idle'} />
+              <StatusIndicator label="Mic relay" active={micRelayActive} detail={micRelayActive ? 'active' : 'idle'} />
+              <StatusIndicator label="WHIP transport" active={whipLinkActive} detail={micState} />
+              <StatusIndicator label="Clip recording" active={clipRecording} detail={clipRecording ? 'recording' : 'idle'} />
+              <StatusIndicator label="Clip sending" active={clipSending} detail={clipSending ? 'sending' : 'idle'} />
+            </div>
+            {message ? <div className="text-xs text-slate-400 text-center">{message}</div> : null}
           </div>
         </section>
       </div>
-
-      <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
-        <section className="surface h-full">
-          <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr_auto]">
-            <p className="text-sm text-slate-200 text-center">Audio Upload</p>
-
-            <label className="mx-auto grid w-full max-w-sm gap-0.5 text-xs text-slate-300 text-center">
-              <span>Audio file (mp3 / wav / ogg)</span>
-              <input
-                className={`${fieldClass} text-center`}
-                type="file"
-                accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg"
-                disabled={working || !roverId}
-                onChange={(event) => setSelectedUpload(event.target.files?.[0] || null)}
-              />
-            </label>
-
-            <div className="mx-auto w-full max-w-sm text-center">
-              {selectedUpload ? (
-                <div className="surface-muted text-xs text-slate-300">
-                  {selectedUpload.name} ({selectedUpload.size} bytes)
-                </div>
-              ) : (
-                <div className="surface-muted text-xs text-slate-500">No file selected</div>
-              )}
-            </div>
-
-            <div className="flex justify-center gap-0.5">
-              <button type="button" className="button-dark text-sm" disabled={working || !roverId} onClick={handleUploadPlay}>
-                {working ? 'Working...' : 'Play Upload'}
-              </button>
-              <button type="button" className="button-dark text-sm" disabled={working || !roverId} onClick={handleUploadStop}>
-                Stop
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section className="surface h-full">
-          <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr]">
-            <p className="text-sm text-slate-200 text-center">Live Microphone</p>
-            <label className="surface-muted mx-auto flex w-full max-w-sm items-center justify-center gap-0.5 px-0.5 py-0.5 text-xs text-slate-300">
-              <input
-                type="checkbox"
-                checked={openMicEnabled}
-                disabled={!roverId || clipMode}
-                onChange={(event) =>
-                  saveVipAudio((current) => ({ ...(current || {}), openMicEnabled: Boolean(event.target.checked) }))
-                }
-              />
-              <span>{clipMode ? 'Open mic (live mode only)' : 'Open mic'}</span>
-            </label>
-            <div className="grid gap-0.5 content-start">
-              <StatusIndicator label="WHIP link" active={whipLinkActive} detail={micState} />
-              <StatusIndicator label="Mic hot" active={micHot} detail={micHot ? 'transmitting' : 'muted'} />
-              <div className="surface-muted text-center text-xs text-slate-400">Hold <KeyPill label={pttKeyLabel} /> to talk</div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <section className="surface">
-        <div className="space-y-0.5">
-          <p className="text-sm text-slate-200 text-center">Audio Status</p>
-          <div className="grid gap-0.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-6">
-            <StatusIndicator label="Forward pipe" active={pipelineConnected} detail={pipelineConnected ? 'connected' : 'offline'} />
-            <StatusIndicator label="Upload playback" active={uploadPlaying} detail={uploadPlaying ? 'playing' : 'idle'} />
-            <StatusIndicator label="Mic relay" active={micRelayActive} detail={micRelayActive ? 'active' : 'idle'} />
-            <StatusIndicator label="WHIP transport" active={whipLinkActive} detail={micState} />
-            <StatusIndicator label="Clip recording" active={clipRecording} detail={clipRecording ? 'recording' : 'idle'} />
-            <StatusIndicator label="Clip sending" active={clipSending} detail={clipSending ? 'sending' : 'idle'} />
-          </div>
-          {message ? <div className="text-xs text-slate-400 text-center">{message}</div> : null}
-        </div>
-      </section>
-    </div>
+    </section>
   );
 }

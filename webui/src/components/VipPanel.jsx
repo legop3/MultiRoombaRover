@@ -50,17 +50,10 @@ export default function VipPanel() {
   };
 
   return (
-    <section className="panel-section space-y-0.5 text-base">
-      <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)]">
-        <div className="lg:col-span-2">
-          {isVerified ? (
-            <section className="surface w-full">
-              <div className="mx-auto flex w-full max-w-md flex-col items-center space-y-0.5 text-center">
-                <p className="text-sm text-emerald-300">Verification complete</p>
-                <p className="text-xs text-slate-400">VIP controls are unlocked for your assigned rover.</p>
-              </div>
-            </section>
-          ) : (
+    <section className="space-y-2 text-base">
+      <div className="grid gap-2 grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)]">
+        {!isVerified ? (
+          <div className="lg:col-span-2">
             <VipVerificationCard
               pendingRequestId={pendingRequestId}
               currentStoredKey={currentStoredKey}
@@ -70,12 +63,12 @@ export default function VipPanel() {
               onMessage={setMessage}
               fullWidth
             />
-          )}
-        </div>
+          </div>
+        ) : null}
 
         <div className="lg:col-span-2">
           {isVerified ? (
-            <div className="space-y-0.5">
+            <div className="space-y-2">
               <VipNeatoCard
                 neato={session?.neato || null}
                 onStart={neatoStart}
