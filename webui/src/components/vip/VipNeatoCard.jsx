@@ -52,7 +52,6 @@ export default function VipNeatoCard({
   fullWidth = false,
 }) {
   const [working, setWorking] = useState('');
-  const [message, setMessage] = useState('');
   const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const configured = Boolean(neato?.configured);
@@ -86,7 +85,6 @@ export default function VipNeatoCard({
         toneClass: 'bg-emerald-600 hover:bg-emerald-500 text-white',
         canRun: canStart,
         fn: onStart,
-        successMessage: 'Start cleaning command sent.',
       };
     }
     return {
@@ -96,7 +94,6 @@ export default function VipNeatoCard({
       toneClass: 'bg-sky-600 hover:bg-sky-500 text-white',
       canRun: canSendHome,
       fn: onSendHome,
-      successMessage: 'Send to dock command sent.',
     };
   }, [docked, canStart, onStart, canSendHome, onSendHome]);
 
@@ -104,15 +101,13 @@ export default function VipNeatoCard({
   const canRunLocate = configured && connected && canLocate;
   const canRunClearErrors = configured && connected && canClearErrors;
 
-  const runAction = async (key, fn, successMessage) => {
+  const runAction = async (key, fn) => {
     if (!fn) return;
     setWorking(key);
-    setMessage('');
     try {
       await fn();
-      setMessage(successMessage);
-    } catch (err) {
-      setMessage(err?.message || 'Action failed.');
+    } catch {
+      // Keep UI minimal; errors are intentionally silent in-panel.
     } finally {
       setWorking('');
     }
@@ -149,7 +144,7 @@ export default function VipNeatoCard({
                 <button
                   type="button"
                   disabled={!canRunPrimary || Boolean(working)}
-                  onClick={() => runAction(primaryAction.key, primaryAction.fn, primaryAction.successMessage)}
+                  onClick={() => runAction(primaryAction.key, primaryAction.fn)}
                   className={`rounded-md px-1 py-1 text-base font-semibold transition disabled:opacity-50 ${primaryAction.toneClass}`}
                 >
                   {working === primaryAction.key ? primaryAction.pending : primaryAction.label}
@@ -159,7 +154,7 @@ export default function VipNeatoCard({
                   <button
                     type="button"
                     disabled={!canRunLocate || Boolean(working)}
-                    onClick={() => runAction('locate', onLocate, 'Play sound command sent.')}
+                    onClick={() => runAction('locate', onLocate)}
                     className="rounded-md bg-fuchsia-600 px-1 py-0.75 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:opacity-50"
                   >
                     {working === 'locate' ? 'Playing...' : 'Play sound'}
@@ -167,7 +162,7 @@ export default function VipNeatoCard({
                   <button
                     type="button"
                     disabled={!canRunClearErrors || Boolean(working)}
-                    onClick={() => runAction('clearErrors', onClearErrors, 'Clear errors command sent.')}
+                    onClick={() => runAction('clearErrors', onClearErrors)}
                     className="rounded-md bg-amber-500 px-1 py-0.75 text-sm font-semibold text-slate-900 transition hover:bg-amber-400 disabled:opacity-50"
                   >
                     {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
@@ -204,8 +199,6 @@ export default function VipNeatoCard({
                 : 'Waiting for required Neato entities in Home Assistant.'}
           </p>
         ) : null}
-
-        {message ? <div className="text-xs text-slate-300 text-center">{message}</div> : null}
       </div>
     </section>
   );
