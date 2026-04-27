@@ -80,7 +80,6 @@ export default function VipPanel() {
                 onStart={neatoStart}
                 onSendHome={neatoSendHome}
                 onLocate={neatoLocate}
-                onMessage={setMessage}
                 fullWidth
               />
               <VipAudioUploadCard

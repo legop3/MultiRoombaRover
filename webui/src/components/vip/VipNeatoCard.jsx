@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { innerFlowClass } from './constants.js';
 
 function normalizeState(value) {
   return String(value || '').trim();
@@ -19,19 +18,26 @@ function humanizeUiState(value) {
 
 function badgeClass(active) {
   return active
-    ? 'rounded bg-emerald-600/80 px-1 py-0.5 text-[0.7rem] font-semibold text-white'
+    ? 'rounded bg-emerald-500 px-1 py-0.5 text-[0.7rem] font-semibold text-white'
     : 'rounded bg-slate-700 px-1 py-0.5 text-[0.7rem] font-semibold text-slate-200';
 }
 
-export default function VipNeatoCard({
-  neato,
-  onStart,
-  onSendHome,
-  onLocate,
-  onMessage,
-  fullWidth = false,
-}) {
+function StatusIndicator({ label, active, detail = '' }) {
+  return (
+    <div
+      className={`rounded-md px-0.5 py-0.5 text-xs text-slate-100 ${
+        active ? 'bg-emerald-500' : 'bg-slate-700'
+      }`}
+    >
+      <div className="text-center font-medium">{label}</div>
+      <div className="text-center text-[0.72rem] opacity-90">{detail || (active ? 'yes' : 'no')}</div>
+    </div>
+  );
+}
+
+export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, fullWidth = false }) {
   const [working, setWorking] = useState('');
+  const [message, setMessage] = useState('');
   const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const status = useMemo(() => {
@@ -59,16 +65,18 @@ export default function VipNeatoCard({
   const docked = Boolean(neato?.telemetry?.extPowerPresent);
   const robotError = normalizeState(neato?.telemetry?.robotError) || '--';
   const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
+  const hasError = robotError !== '--' && !/^no errors$/i.test(robotError) && !/^200/.test(robotError);
+  const hasAlert = robotAlert !== '--' && !/^200/.test(robotAlert);
 
   const runAction = async (key, fn, successMessage) => {
     if (!fn) return;
     setWorking(key);
-    onMessage?.('');
+    setMessage('');
     try {
       await fn();
-      onMessage?.(successMessage);
+      setMessage(successMessage);
     } catch (err) {
-      onMessage?.(err?.message || 'Action failed.');
+      setMessage(err?.message || 'Action failed.');
     } finally {
       setWorking('');
     }
@@ -76,69 +84,84 @@ export default function VipNeatoCard({
 
   return (
     <section className={`surface text-sm text-slate-300 ${wrapClass}`}>
-      <div className={innerFlowClass}>
+      <div className="grid gap-0.5">
         <div className="flex w-full items-center justify-between gap-0.5 text-left">
-          <p className="text-sm text-slate-100">Neato (Gen3)</p>
+          <p className="text-sm text-slate-100">Neato Controls (Gen3)</p>
           <span className={badgeClass(status === 'Online')}>{status}</span>
         </div>
 
-        <div className="grid w-full grid-cols-2 gap-0.5 text-xs">
-          <div className="surface-muted flex items-center justify-between px-1 py-0.5">
-            <span>UI State</span>
-            <span className="font-semibold text-slate-100">{uiStateLabel}</span>
-          </div>
-          <div className="surface-muted flex items-center justify-between px-1 py-0.5">
-            <span>Battery</span>
-            <span className="font-semibold text-slate-100">{batteryLabel}</span>
-          </div>
-          <div className="surface-muted flex items-center justify-between px-1 py-0.5">
-            <span>Docked</span>
-            <span className="font-semibold text-slate-100">{docked ? 'Yes' : 'No'}</span>
-          </div>
-          <div className="surface-muted flex items-center justify-between px-1 py-0.5">
-            <span>Charging</span>
-            <span className="font-semibold text-slate-100">{charging ? 'Yes' : 'No'}</span>
-          </div>
-          <div className="surface-muted flex items-center justify-between px-1 py-0.5">
-            <span>Voltage</span>
-            <span className="font-semibold text-slate-100">{voltageLabel}</span>
-          </div>
-          <div className="surface-muted flex items-center justify-between px-1 py-0.5">
-            <span>Error</span>
-            <span className="truncate pl-1 font-semibold text-slate-100" title={robotError}>{robotError}</span>
-          </div>
-          <div className="surface-muted col-span-2 flex items-center justify-between px-1 py-0.5">
-            <span>Alert</span>
-            <span className="truncate pl-1 font-semibold text-slate-100" title={robotAlert}>{robotAlert}</span>
-          </div>
+        <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
+          <section className="surface-muted h-full px-0.5 py-0.5">
+            <div className="grid h-full gap-0.5 grid-rows-[auto_1fr]">
+              <p className="text-sm text-slate-200 text-center">Robot Status</p>
+              <div className="grid gap-0.5 content-start">
+                <div className="rounded bg-slate-800 px-1 py-0.5 text-xs text-slate-300">
+                  <span className="font-semibold text-slate-100">UI State:</span> {uiStateLabel}
+                </div>
+                <div
+                  className={`rounded px-1 py-0.5 text-xs ${
+                    hasError ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-300'
+                  }`}
+                  title={robotError}
+                >
+                  <span className="font-semibold">Error:</span> {robotError}
+                </div>
+                <div
+                  className={`rounded px-1 py-0.5 text-xs ${
+                    hasAlert ? 'bg-amber-500 text-slate-900' : 'bg-slate-800 text-slate-300'
+                  }`}
+                  title={robotAlert}
+                >
+                  <span className="font-semibold">Alert:</span> {robotAlert}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="surface-muted h-full px-0.5 py-0.5">
+            <div className="grid h-full gap-0.5 grid-rows-[auto_1fr]">
+              <p className="text-sm text-slate-200 text-center">Power & Dock</p>
+              <div className="grid gap-0.5 content-start grid-cols-2">
+                <StatusIndicator label="Battery" active={battery != null} detail={batteryLabel} />
+                <StatusIndicator label="Voltage" active={voltage != null} detail={voltageLabel} />
+                <StatusIndicator label="Charging" active={charging} detail={charging ? 'active' : 'idle'} />
+                <StatusIndicator label="Docked" active={docked} detail={docked ? 'on base' : 'away'} />
+              </div>
+            </div>
+          </section>
         </div>
 
-        <div className="flex w-full justify-center gap-0.5">
-          <button
-            type="button"
-            className="button-dark text-sm disabled:opacity-50"
-            onClick={() => runAction('start', onStart, 'Neato start sent.')}
-            disabled={!canControl || Boolean(working)}
-          >
-            {working === 'start' ? 'Starting...' : 'Start'}
-          </button>
-          <button
-            type="button"
-            className="button-dark text-sm disabled:opacity-50"
-            onClick={() => runAction('home', onSendHome, 'Neato send-home sent.')}
-            disabled={!canControl || Boolean(working)}
-          >
-            {working === 'home' ? 'Sending...' : 'Send Home'}
-          </button>
-          <button
-            type="button"
-            className="button-dark text-sm disabled:opacity-50"
-            onClick={() => runAction('locate', onLocate, 'Neato locate sent.')}
-            disabled={!canControl || Boolean(working)}
-          >
-            {working === 'locate' ? 'Locating...' : 'Locate Robot'}
-          </button>
-        </div>
+        <section className="surface-muted px-0.5 py-0.5">
+          <div className="grid gap-0.5">
+            <p className="text-sm text-slate-200 text-center">Actions</p>
+            <div className="grid w-full gap-0.5 grid-cols-1 sm:grid-cols-3">
+              <button
+                type="button"
+                className="rounded-md border border-emerald-300 bg-emerald-500 px-1.5 py-1 text-base font-semibold text-white disabled:opacity-50"
+                onClick={() => runAction('start', onStart, 'Start cleaning command sent.')}
+                disabled={!canControl || Boolean(working)}
+              >
+                {working === 'start' ? 'Starting...' : 'Start Cleaning'}
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-sky-300 bg-sky-500 px-1.5 py-1 text-base font-semibold text-white disabled:opacity-50"
+                onClick={() => runAction('home', onSendHome, 'Send to dock command sent.')}
+                disabled={!canControl || Boolean(working)}
+              >
+                {working === 'home' ? 'Sending...' : 'Send to Dock'}
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-fuchsia-300 bg-fuchsia-500 px-1.5 py-1 text-base font-semibold text-white disabled:opacity-50"
+                onClick={() => runAction('locate', onLocate, 'Play sound command sent.')}
+                disabled={!canControl || Boolean(working)}
+              >
+                {working === 'locate' ? 'Playing...' : 'Play Sound'}
+              </button>
+            </div>
+          </div>
+        </section>
 
         {!canControl ? (
           <p className="text-xs text-slate-500 text-center">
@@ -149,6 +172,8 @@ export default function VipNeatoCard({
               : 'Waiting for required Neato entities in Home Assistant.'}
           </p>
         ) : null}
+
+        {message ? <div className="text-xs text-slate-300 text-center">{message}</div> : null}
       </div>
     </section>
   );
