@@ -43,7 +43,14 @@ function Row({ label, value, tone = 'muted' }) {
   );
 }
 
-export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, fullWidth = false }) {
+export default function VipNeatoCard({
+  neato,
+  onStart,
+  onSendHome,
+  onLocate,
+  onClearErrors,
+  fullWidth = false,
+}) {
   const [working, setWorking] = useState('');
   const [message, setMessage] = useState('');
   const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
@@ -68,6 +75,7 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
   const canStart = Boolean(controls?.start?.available);
   const canSendHome = Boolean(controls?.sendHome?.available);
   const canLocate = Boolean(controls?.locate?.available);
+  const canClearErrors = Boolean(controls?.clearErrors?.available);
 
   const primaryAction = useMemo(() => {
     if (docked) {
@@ -94,6 +102,7 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
 
   const canRunPrimary = configured && connected && primaryAction.canRun;
   const canRunLocate = configured && connected && canLocate;
+  const canRunClearErrors = configured && connected && canClearErrors;
 
   const runAction = async (key, fn, successMessage) => {
     if (!fn) return;
@@ -120,8 +129,9 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
   return (
     <section className={`surface text-sm text-slate-200 ${wrapClass}`}>
       <div className="grid gap-0.5">
-        <div className="flex items-center justify-between gap-0.5">
-          <p className="text-sm text-slate-100">Neato</p>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-0.5">
+          <div />
+          <p className="text-sm text-slate-100 text-center">Neato</p>
           <span className={`rounded px-1 py-0.25 text-xs font-semibold ${metricToneClass(headerTone)}`}>
             {headerStatus}
           </span>
@@ -134,24 +144,35 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
                 <div className="text-xs text-slate-300">State</div>
                 <div className="text-base font-semibold text-slate-100">{primaryState}</div>
               </div>
+              <div className="grid grid-cols-2 gap-0.5">
+                <button
+                  type="button"
+                  disabled={!canRunPrimary || Boolean(working)}
+                  onClick={() => runAction(primaryAction.key, primaryAction.fn, primaryAction.successMessage)}
+                  className={`rounded-md px-1 py-1 text-base font-semibold transition disabled:opacity-50 ${primaryAction.toneClass}`}
+                >
+                  {working === primaryAction.key ? primaryAction.pending : primaryAction.label}
+                </button>
 
-              <button
-                type="button"
-                disabled={!canRunPrimary || Boolean(working)}
-                onClick={() => runAction(primaryAction.key, primaryAction.fn, primaryAction.successMessage)}
-                className={`rounded-md px-1 py-1 text-base font-semibold transition disabled:opacity-50 ${primaryAction.toneClass}`}
-              >
-                {working === primaryAction.key ? primaryAction.pending : primaryAction.label}
-              </button>
-
-              <button
-                type="button"
-                disabled={!canRunLocate || Boolean(working)}
-                onClick={() => runAction('locate', onLocate, 'Play sound command sent.')}
-                className="rounded-md bg-fuchsia-600 px-1 py-0.75 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:opacity-50"
-              >
-                {working === 'locate' ? 'Playing...' : 'Play sound'}
-              </button>
+                <div className="grid grid-cols-2 gap-0.5">
+                  <button
+                    type="button"
+                    disabled={!canRunLocate || Boolean(working)}
+                    onClick={() => runAction('locate', onLocate, 'Play sound command sent.')}
+                    className="rounded-md bg-fuchsia-600 px-1 py-0.75 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:opacity-50"
+                  >
+                    {working === 'locate' ? 'Playing...' : 'Play sound'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canRunClearErrors || Boolean(working)}
+                    onClick={() => runAction('clearErrors', onClearErrors, 'Clear errors command sent.')}
+                    className="rounded-md bg-amber-500 px-1 py-0.75 text-sm font-semibold text-slate-900 transition hover:bg-amber-400 disabled:opacity-50"
+                  >
+                    {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -166,14 +187,14 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
         </div>
 
         <section className="surface-muted px-0.5 py-0.5">
-          <div className="grid gap-0.5">
+          <div className="grid gap-0.5 grid-cols-1 md:grid-cols-3">
             <Row label="UI state" value={uiStateLabel} tone="muted" />
             <Row label="Robot error" value={robotError} tone={hasError ? 'danger' : 'muted'} />
             <Row label="Robot alert" value={robotAlert} tone={hasAlert ? 'warn' : 'muted'} />
           </div>
         </section>
 
-        {!configured || !connected || !primaryAction.canRun || !canLocate ? (
+        {!configured || !connected || !primaryAction.canRun || !canLocate || !canClearErrors ? (
           <p className="text-xs text-slate-400 text-center">
             {!configured
               ? 'Set homeAssistant.neato.device in server config to enable Neato controls.'

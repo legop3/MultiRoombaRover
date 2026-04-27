@@ -34,6 +34,7 @@ const ENTITY_IDS = {
     start: entityId('button', 'house_clean'),
     sendHome: entityId('button', 'send_to_base'),
     locate: entityId('button', 'locate_robot'),
+    clearErrors: entityId('button', 'clear_errors'),
   },
   sensors: {
     batteryPercent: entityId('sensor', 'fuel_percent'),
@@ -91,6 +92,10 @@ function buildState() {
     locate: {
       entityId: ENTITY_IDS.buttons.locate,
       available: hasEntity(ENTITY_IDS.buttons.locate),
+    },
+    clearErrors: {
+      entityId: ENTITY_IDS.buttons.clearErrors,
+      available: hasEntity(ENTITY_IDS.buttons.clearErrors),
     },
   };
 
@@ -179,6 +184,10 @@ async function locateRobot() {
   await pressButton(ENTITY_IDS.buttons.locate, 'locate');
 }
 
+async function clearErrors() {
+  await pressButton(ENTITY_IDS.buttons.clearErrors, 'clear_errors');
+}
+
 function getState() {
   cachedState = buildState();
   return cachedState;
@@ -220,6 +229,18 @@ io.on('connection', (socket) => {
       cb({ error: err.message });
     }
   });
+
+  socket.on('neato:clearErrors', async (_, cb = () => {}) => {
+    try {
+      if (!isVerified(socket)) {
+        throw new Error('VIP verification required');
+      }
+      await clearErrors();
+      cb({ success: true });
+    } catch (err) {
+      cb({ error: err.message });
+    }
+  });
 });
 
 emitUpdate();
@@ -229,5 +250,6 @@ module.exports = {
   startCleaning,
   sendHome,
   locateRobot,
+  clearErrors,
   neatoEvents: events,
 };

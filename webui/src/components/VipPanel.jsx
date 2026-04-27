@@ -22,6 +22,7 @@ export default function VipPanel() {
     neatoStart,
     neatoSendHome,
     neatoLocate,
+    neatoClearErrors,
   } = useSession();
   const { value: identity, save: saveIdentity } = useSettingsNamespace('identity', { cookieUserId: '' });
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
@@ -80,6 +81,7 @@ export default function VipPanel() {
                 onStart={neatoStart}
                 onSendHome={neatoSendHome}
                 onLocate={neatoLocate}
+                onClearErrors={neatoClearErrors}
                 fullWidth
               />
               <VipAudioUploadCard
