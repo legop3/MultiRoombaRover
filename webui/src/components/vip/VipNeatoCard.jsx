@@ -126,55 +126,47 @@ export default function VipNeatoCard({
           </span>
         </div>
 
-        <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-          <section className="surface-muted px-0.5 py-0.5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-0.5">
-              <div className="grid gap-0.5">
-                <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
-                  <div className="text-xs text-slate-300">State</div>
-                  <div className="text-base font-semibold text-slate-100">{primaryState}</div>
-                </div>
-                <button
-                  type="button"
-                  disabled={!canRunPrimary || Boolean(working)}
-                  onClick={() => runAction(primaryAction.key, primaryAction.fn)}
-                  className={`rounded-md px-1 py-1 text-base font-semibold transition disabled:opacity-50 ${primaryAction.toneClass}`}
-                >
-                  {working === primaryAction.key ? primaryAction.pending : primaryAction.label}
-                </button>
+        <section className="surface-muted px-0.5 py-0.5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-0.5">
+            <div className="grid gap-0.5">
+              <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
+                <div className="text-xs text-slate-300">State</div>
+                <div className="text-base font-semibold text-slate-100">{primaryState}</div>
               </div>
-
               <button
                 type="button"
-                disabled={!canRunLocate || Boolean(working)}
-                onClick={() => runAction('locate', onLocate)}
-                className="rounded-md bg-fuchsia-600 px-1 py-0.75 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:opacity-50"
+                disabled={!canRunPrimary || Boolean(working)}
+                onClick={() => runAction(primaryAction.key, primaryAction.fn)}
+                className={`rounded-md px-1 py-1 text-base font-semibold transition disabled:opacity-50 ${primaryAction.toneClass}`}
               >
-                {working === 'locate' ? 'Playing...' : 'Play sound'}
-              </button>
-              <button
-                type="button"
-                disabled={!canRunClearErrors || Boolean(working)}
-                onClick={() => runAction('clearErrors', onClearErrors)}
-                className="rounded-md bg-amber-500 px-1 py-0.75 text-sm font-semibold text-slate-900 transition hover:bg-amber-400 disabled:opacity-50"
-              >
-                {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
+                {working === primaryAction.key ? primaryAction.pending : primaryAction.label}
               </button>
             </div>
-          </section>
-
-          <section className="surface-muted px-0.5 py-0.5">
-            <div className="grid gap-0.5 grid-cols-2">
-              <StatusTile label="Battery" value={batteryLabel} tone={batteryTone} />
-              <StatusTile label="Voltage" value={voltageLabel} tone={voltage == null ? 'muted' : 'info'} />
-              <StatusTile label="Docked" value={docked ? 'Yes' : 'No'} tone={docked ? 'info' : 'muted'} />
-              <StatusTile label="Charging" value={charging ? 'Yes' : 'No'} tone={charging ? 'info' : 'muted'} />
-            </div>
-          </section>
-        </div>
+            <button
+              type="button"
+              disabled={!canRunLocate || Boolean(working)}
+              onClick={() => runAction('locate', onLocate)}
+              className="rounded-md bg-fuchsia-600 px-1 py-0.75 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:opacity-50"
+            >
+              {working === 'locate' ? 'Playing...' : 'Play sound'}
+            </button>
+            <button
+              type="button"
+              disabled={!canRunClearErrors || Boolean(working)}
+              onClick={() => runAction('clearErrors', onClearErrors)}
+              className="rounded-md bg-amber-500 px-1 py-0.75 text-sm font-semibold text-slate-900 transition hover:bg-amber-400 disabled:opacity-50"
+            >
+              {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
+            </button>
+          </div>
+        </section>
 
         <section className="surface-muted px-0.5 py-0.5">
-          <div className="grid gap-0.5 grid-cols-1 md:grid-cols-3">
+          <div className="grid gap-0.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
+            <StatusTile label="Battery" value={batteryLabel} tone={batteryTone} />
+            <StatusTile label="Voltage" value={voltageLabel} tone={voltage == null ? 'muted' : 'info'} />
+            <StatusTile label="Docked" value={docked ? 'Yes' : 'No'} tone={docked ? 'info' : 'muted'} />
+            <StatusTile label="Charging" value={charging ? 'Yes' : 'No'} tone={charging ? 'info' : 'muted'} />
             <StatusTile label="UI state" value={uiStateLabel} tone="muted" valueClass="truncate" />
             <StatusTile
               label="Robot error"
