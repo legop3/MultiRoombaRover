@@ -9,53 +9,37 @@ function humanizeUiState(value) {
   if (!state) return '--';
   if (state.includes('DOCKINGRUNNING')) return 'Returning';
   if (state.includes('PAUSED')) return 'Paused';
-  if (state.includes('HOUSECLEANINGRUNNING')) return 'Cleaning House';
-  if (state.includes('SPOTCLEANINGRUNNING')) return 'Spot Cleaning';
+  if (state.includes('HOUSECLEANINGRUNNING')) return 'Cleaning';
+  if (state.includes('SPOTCLEANINGRUNNING')) return 'Spot cleaning';
   if (state.includes('STATE_START')) return 'Starting';
   if (state.includes('STATE_IDLE')) return 'Idle';
-  if (state.includes('STATE_STANDBY')) return 'Standby';
+  if (state.includes('STATE_STANDBY')) return 'Idle';
   return state;
 }
 
-function statusToneClass(tone) {
-  if (tone === 'good') return 'border-emerald-200 bg-emerald-600 text-white';
-  if (tone === 'warn') return 'border-amber-200 bg-amber-600 text-white';
-  if (tone === 'danger') return 'border-rose-200 bg-rose-600 text-white';
-  if (tone === 'info') return 'border-sky-200 bg-sky-600 text-white';
-  return 'border-slate-200/30 bg-slate-700 text-slate-100';
+function metricToneClass(tone) {
+  if (tone === 'good') return 'bg-emerald-600 text-white';
+  if (tone === 'warn') return 'bg-amber-500 text-slate-900';
+  if (tone === 'danger') return 'bg-rose-600 text-white';
+  if (tone === 'info') return 'bg-sky-600 text-white';
+  return 'bg-slate-700 text-slate-100';
 }
 
-function StatusRow({ label, value, tone = 'muted' }) {
+function MetricCell({ label, value, tone = 'muted' }) {
   return (
-    <div
-      className={`flex items-center justify-between rounded-lg border px-1 py-0.5 text-xs ${statusToneClass(tone)}`}
-    >
-      <span className="font-semibold uppercase tracking-wide opacity-90">{label}</span>
-      <span className="font-semibold">{value}</span>
-    </div>
-  );
-}
-
-function MetricCard({ label, value, tone = 'muted' }) {
-  return (
-    <div className={`rounded-lg border px-1 py-0.75 text-center ${statusToneClass(tone)}`}>
-      <div className="text-[0.7rem] uppercase tracking-wide opacity-90">{label}</div>
+    <div className={`rounded-md px-1 py-0.75 text-center ${metricToneClass(tone)}`}>
+      <div className="text-[0.72rem] opacity-90">{label}</div>
       <div className="text-sm font-semibold">{value}</div>
     </div>
   );
 }
 
-function ActionPill({ label, tone = 'indigo' }) {
-  const toneClasses =
-    tone === 'emerald'
-      ? 'border-emerald-200/70 bg-emerald-600/70 text-emerald-50'
-      : tone === 'amber'
-        ? 'border-amber-200/70 bg-amber-600/70 text-amber-50'
-        : 'border-indigo-200/70 bg-indigo-600/70 text-indigo-50';
+function Row({ label, value, tone = 'muted' }) {
   return (
-    <span className={`rounded-full border px-0.5 py-0.15 text-[0.7rem] font-semibold ${toneClasses}`}>
-      {label}
-    </span>
+    <div className={`flex items-center justify-between rounded-md px-1 py-0.5 text-xs ${metricToneClass(tone)}`}>
+      <span>{label}</span>
+      <span className="font-semibold truncate pl-1" title={String(value || '')}>{value}</span>
+    </div>
   );
 }
 
@@ -89,9 +73,9 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
     if (docked) {
       return {
         key: 'start',
-        label: 'Start Cleaning',
+        label: 'Start cleaning',
         pending: 'Starting...',
-        tone: 'emerald',
+        toneClass: 'bg-emerald-600 hover:bg-emerald-500 text-white',
         canRun: canStart,
         fn: onStart,
         successMessage: 'Start cleaning command sent.',
@@ -99,9 +83,9 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
     }
     return {
       key: 'home',
-      label: 'Send to Dock',
+      label: 'Send to dock',
       pending: 'Sending...',
-      tone: 'indigo',
+      toneClass: 'bg-sky-600 hover:bg-sky-500 text-white',
       canRun: canSendHome,
       fn: onSendHome,
       successMessage: 'Send to dock command sent.',
@@ -125,51 +109,37 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
     }
   };
 
-  const statusText = !configured
-    ? 'Not configured'
-    : !connected
-      ? 'Offline'
-      : 'Online';
-
-  const statusTone = !configured ? 'warn' : !connected ? 'danger' : 'good';
+  const headerStatus = !configured ? 'Not configured' : !connected ? 'Offline' : 'Online';
+  const headerTone = !configured ? 'warn' : !connected ? 'danger' : 'good';
 
   const batteryTone =
     battery == null ? 'muted' : battery >= 60 ? 'good' : battery >= 25 ? 'warn' : 'danger';
+
+  const primaryState = docked ? 'Docked' : uiStateLabel !== '--' ? uiStateLabel : 'Away from dock';
 
   return (
     <section className={`surface text-sm text-slate-200 ${wrapClass}`}>
       <div className="grid gap-0.5">
         <div className="flex items-center justify-between gap-0.5">
-          <p className="text-sm font-semibold text-slate-100">Neato Control Surface (Gen3)</p>
-          <ActionPill label={statusText} tone={connected ? 'emerald' : 'amber'} />
+          <p className="text-sm text-slate-100">Neato</p>
+          <span className={`rounded px-1 py-0.25 text-xs font-semibold ${metricToneClass(headerTone)}`}>
+            {headerStatus}
+          </span>
         </div>
 
         <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-          <section className="rounded-xl border-2 border-indigo-300/70 bg-indigo-900 px-0.75 py-0.75">
+          <section className="surface-muted px-0.5 py-0.5">
             <div className="grid gap-0.5">
-              <div className="flex flex-wrap items-center justify-between gap-0.5">
-                <span className="text-base font-semibold text-indigo-50">
-                  {docked ? 'Docked State' : 'Undocked State'}
-                </span>
-                <div className="flex flex-wrap gap-0.5">
-                  <ActionPill label={docked ? 'Primary: Start' : 'Primary: Dock'} tone="indigo" />
-                  <ActionPill label={uiStateLabel} tone="amber" />
-                </div>
+              <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
+                <div className="text-xs text-slate-300">State</div>
+                <div className="text-base font-semibold text-slate-100">{primaryState}</div>
               </div>
-
-              <p className="text-xs text-indigo-100/90">
-                This Neato tile mirrors rover mode controls: one context-aware primary action based on dock state.
-              </p>
 
               <button
                 type="button"
                 disabled={!canRunPrimary || Boolean(working)}
                 onClick={() => runAction(primaryAction.key, primaryAction.fn, primaryAction.successMessage)}
-                className={`w-full rounded-xl border-2 px-1 py-1 text-center text-base font-semibold text-white transition disabled:opacity-50 ${
-                  primaryAction.tone === 'emerald'
-                    ? 'border-emerald-200/70 bg-emerald-700 hover:bg-emerald-600'
-                    : 'border-indigo-200/70 bg-indigo-700 hover:bg-indigo-600'
-                }`}
+                className={`rounded-md px-1 py-1 text-base font-semibold transition disabled:opacity-50 ${primaryAction.toneClass}`}
               >
                 {working === primaryAction.key ? primaryAction.pending : primaryAction.label}
               </button>
@@ -178,38 +148,28 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
                 type="button"
                 disabled={!canRunLocate || Boolean(working)}
                 onClick={() => runAction('locate', onLocate, 'Play sound command sent.')}
-                className="w-full rounded-xl border-2 border-fuchsia-200/70 bg-fuchsia-700 px-1 py-0.75 text-center text-sm font-semibold text-fuchsia-50 transition hover:bg-fuchsia-600 disabled:opacity-50"
+                className="rounded-md bg-fuchsia-600 px-1 py-0.75 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:opacity-50"
               >
-                {working === 'locate' ? 'Playing...' : 'Play Sound'}
+                {working === 'locate' ? 'Playing...' : 'Play sound'}
               </button>
             </div>
           </section>
 
           <section className="surface-muted px-0.5 py-0.5">
-            <div className="grid gap-0.5">
-              <StatusRow label="Connection" value={statusText} tone={statusTone} />
-              <StatusRow label="Dock" value={docked ? 'On Base' : 'Away'} tone={docked ? 'info' : 'muted'} />
-              <StatusRow label="Charging" value={charging ? 'Active' : 'Idle'} tone={charging ? 'info' : 'muted'} />
-              <StatusRow label="UI State" value={uiStateLabel} tone="muted" />
+            <div className="grid gap-0.5 grid-cols-2">
+              <MetricCell label="Battery" value={batteryLabel} tone={batteryTone} />
+              <MetricCell label="Voltage" value={voltageLabel} tone={voltage == null ? 'muted' : 'info'} />
+              <MetricCell label="Docked" value={docked ? 'Yes' : 'No'} tone={docked ? 'info' : 'muted'} />
+              <MetricCell label="Charging" value={charging ? 'Yes' : 'No'} tone={charging ? 'info' : 'muted'} />
             </div>
           </section>
         </div>
 
         <section className="surface-muted px-0.5 py-0.5">
-          <div className="grid gap-0.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-            <MetricCard label="Battery" value={batteryLabel} tone={batteryTone} />
-            <MetricCard label="Voltage" value={voltageLabel} tone={voltage == null ? 'muted' : 'info'} />
-            <MetricCard label="Docked" value={docked ? 'Yes' : 'No'} tone={docked ? 'info' : 'muted'} />
-            <MetricCard label="Charging" value={charging ? 'Yes' : 'No'} tone={charging ? 'info' : 'muted'} />
-            <MetricCard label="Error" value={hasError ? 'Yes' : 'No'} tone={hasError ? 'danger' : 'good'} />
-            <MetricCard label="Alert" value={hasAlert ? 'Yes' : 'No'} tone={hasAlert ? 'warn' : 'good'} />
-          </div>
-        </section>
-
-        <section className="surface-muted px-0.5 py-0.5">
           <div className="grid gap-0.5">
-            <StatusRow label="Robot Error" value={robotError} tone={hasError ? 'danger' : 'muted'} />
-            <StatusRow label="Robot Alert" value={robotAlert} tone={hasAlert ? 'warn' : 'muted'} />
+            <Row label="UI state" value={uiStateLabel} tone="muted" />
+            <Row label="Robot error" value={robotError} tone={hasError ? 'danger' : 'muted'} />
+            <Row label="Robot alert" value={robotAlert} tone={hasAlert ? 'warn' : 'muted'} />
           </div>
         </section>
 
