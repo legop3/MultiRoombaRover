@@ -163,6 +163,9 @@ export function SessionProvider({ children }) {
         emitWithAck('homeAssistant:lightColor', { entityId, rgbColor }),
       homeAssistantSetLightWhite: (entityId) =>
         emitWithAck('homeAssistant:lightWhite', { entityId }),
+      neatoStart: () => emitWithAck('neato:start'),
+      neatoSendHome: () => emitWithAck('neato:sendHome'),
+      neatoLocate: () => emitWithAck('neato:locate'),
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
       requestVerification: () => emitWithAck('verification:request'),
       requestPrivateRoverAccess: (roverId) =>

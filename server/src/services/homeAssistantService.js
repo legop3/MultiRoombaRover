@@ -27,6 +27,7 @@ const triggerRuntime = new Map(); // triggerId -> { lastFiredAt, lastState, last
 const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
 const LIGHT_IDLE_OFF_MS = 2 * 60 * 1000;
 const DEFAULT_WHITE_KELVIN = 4000;
+let latestEntitySnapshot = {};
 // Rover daemon uses inverted semantics: action "on" powers IR LEDs, which means nightVisionOn=false.
 const NIGHT_VISION_DISABLE_ACTION = 'on';
 
@@ -284,6 +285,8 @@ function evaluateLightAutomation() {
 }
 
 function handleEntitySnapshot(snapshot = {}) {
+  latestEntitySnapshot = snapshot || {};
+  events.emit('snapshot', latestEntitySnapshot);
   let changed = false;
   entityConfig.forEach((meta, id) => {
     const raw = snapshot[id];
@@ -450,7 +453,7 @@ async function setEntityState(entityId, desiredState) {
   const nextState = desiredState === 'on' ? 'on' : 'off';
   const domain = meta.type === 'light' ? 'light' : 'switch';
   const service = nextState === 'on' ? 'turn_on' : 'turn_off';
-  await callService(connection, domain, service, { entity_id: entityId });
+  await callHomeAssistantService(domain, service, { entity_id: entityId });
   logger.info('Issued Home Assistant command', { entityId, domain, service });
 }
 
@@ -493,7 +496,7 @@ async function setLightColor(entityId, rgbColor) {
     if (Number.isNaN(next)) return 0;
     return Math.max(0, Math.min(255, Math.round(next)));
   });
-  await callService(connection, 'light', 'turn_on', { entity_id: entityId, rgb_color: normalized });
+  await callHomeAssistantService('light', 'turn_on', { entity_id: entityId, rgb_color: normalized });
   logger.info('Issued Home Assistant color command', { entityId, rgbColor: normalized });
 }
 
@@ -512,7 +515,7 @@ async function setLightWhite(entityId, kelvin = DEFAULT_WHITE_KELVIN) {
   const normalizedKelvin = Number.isFinite(nextKelvin)
     ? Math.max(2000, Math.min(6500, Math.round(nextKelvin)))
     : DEFAULT_WHITE_KELVIN;
-  await callService(connection, 'light', 'turn_on', {
+  await callHomeAssistantService('light', 'turn_on', {
     entity_id: entityId,
     color_temp_kelvin: normalizedKelvin,
   });
@@ -579,6 +582,28 @@ function getState() {
     entities,
     lightPolicy: getLightPolicyState(),
   };
+}
+
+function isConnected() {
+  return Boolean(connection && connected);
+}
+
+function getRawEntitySnapshot(entityId) {
+  if (!entityId) return null;
+  return latestEntitySnapshot?.[String(entityId)] || null;
+}
+
+async function callHomeAssistantService(domain, service, serviceData = {}) {
+  if (!enabled) {
+    throw new Error('Home Assistant not configured');
+  }
+  if (!connection) {
+    throw new Error('Home Assistant not connected');
+  }
+  if (!domain || !service) {
+    throw new Error('domain and service required');
+  }
+  await callService(connection, String(domain), String(service), serviceData || {});
 }
 
 loadEntityConfig();
@@ -695,8 +720,12 @@ io.on('connection', (socket) => {
 
 module.exports = {
   getState,
+  isConnected,
+  enabled,
   getLightPolicyState,
   isLightControlLocked,
+  getRawEntitySnapshot,
+  callHomeAssistantService,
   toggleEntity,
   setEntityState,
   setLightColor,

@@ -32,6 +32,7 @@ require('./src/services/embedHttpService');
 require('./src/services/logStreamService');
 require('./src/services/adminLogService');
 require('./src/services/homeAssistantService');
+require('./src/services/neatoService');
 require('./src/services/audioLevelsService');
 require('./src/services/audioForwardService');
 require('./src/services/buttonBoxService');

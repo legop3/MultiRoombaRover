@@ -6,6 +6,7 @@ import VipAudioUploadCard from './vip/VipAudioUploadCard.jsx';
 import VipVerificationCard from './vip/VipVerificationCard.jsx';
 import VipIdentityCard from './vip/VipIdentityCard.jsx';
 import VipPrivateRoverAccessCard from './vip/VipPrivateRoverAccessCard.jsx';
+import VipNeatoCard from './vip/VipNeatoCard.jsx';
 
 export default function VipPanel() {
   const {
@@ -18,6 +19,9 @@ export default function VipPanel() {
     startMicWhip,
     readyMicWhip,
     stopMicWhip,
+    neatoStart,
+    neatoSendHome,
+    neatoLocate,
   } = useSession();
   const { value: identity, save: saveIdentity } = useSettingsNamespace('identity', { cookieUserId: '' });
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
@@ -70,15 +74,25 @@ export default function VipPanel() {
 
         <div className="lg:col-span-2">
           {isVerified ? (
-            <VipAudioUploadCard
-              ownRoverId={ownRoverId}
-              audioForwardByRover={session?.audioForward || {}}
-              playUploadedAudio={playUploadedAudio}
-              stopUploadedAudio={stopUploadedAudio}
-              startMicWhip={startMicWhip}
-              readyMicWhip={readyMicWhip}
-              stopMicWhip={stopMicWhip}
-            />
+            <div className="space-y-0.5">
+              <VipNeatoCard
+                neato={session?.neato || null}
+                onStart={neatoStart}
+                onSendHome={neatoSendHome}
+                onLocate={neatoLocate}
+                onMessage={setMessage}
+                fullWidth
+              />
+              <VipAudioUploadCard
+                ownRoverId={ownRoverId}
+                audioForwardByRover={session?.audioForward || {}}
+                playUploadedAudio={playUploadedAudio}
+                stopUploadedAudio={stopUploadedAudio}
+                startMicWhip={startMicWhip}
+                readyMicWhip={readyMicWhip}
+                stopMicWhip={stopMicWhip}
+              />
+            </div>
           ) : (
             <section className="surface h-full">
               <div className="flex h-full flex-col items-center justify-center text-center text-xs text-slate-400">
