@@ -118,7 +118,10 @@ export default function VipNeatoCard({
     <section className={`surface text-sm text-slate-200 ${wrapClass}`}>
       <div className="grid gap-0.5">
         <div className="relative flex items-center justify-center min-h-[1.5rem]">
-          <p className="text-sm text-slate-100 text-center">Neato Controls</p>
+          <div className="text-center">
+            <p className="text-sm text-slate-100">Neato Controls</p>
+            <p className="text-xs text-slate-400">Control the autonomous Neato robovac</p>
+          </div>
           <span
             className={`absolute right-0 inline-flex w-auto rounded px-1 py-0.25 text-xs font-semibold ${metricToneClass(headerTone)}`}
           >
