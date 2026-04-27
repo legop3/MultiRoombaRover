@@ -44,9 +44,10 @@ const ENTITY_IDS = {
     extPowerPresent: entityId('binary_sensor', 'ext_power_present'),
   },
   textSensors: {
-    uiState: entityId('text_sensor', 'ui_state'),
-    robotError: entityId('text_sensor', 'robot_error'),
-    robotAlert: entityId('text_sensor', 'robot_alert'),
+    // ESPHome text_sensor entities surface in Home Assistant under the sensor domain.
+    uiState: entityId('sensor', 'ui_state'),
+    robotError: entityId('sensor', 'robot_error'),
+    robotAlert: entityId('sensor', 'robot_alert'),
   },
 };
 

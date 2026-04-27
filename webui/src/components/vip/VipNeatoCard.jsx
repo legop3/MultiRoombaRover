@@ -22,15 +22,19 @@ function badgeClass(active) {
     : 'rounded bg-slate-700 px-1 py-0.5 text-[0.7rem] font-semibold text-slate-200';
 }
 
-function StatusIndicator({ label, active, detail = '' }) {
+function statusToneClass(tone) {
+  if (tone === 'good') return 'bg-emerald-500';
+  if (tone === 'warn') return 'bg-amber-500 text-slate-900';
+  if (tone === 'danger') return 'bg-rose-600';
+  if (tone === 'info') return 'bg-sky-500';
+  return 'bg-slate-700';
+}
+
+function StatusIndicator({ label, tone = 'muted', detail = '' }) {
   return (
-    <div
-      className={`rounded-md px-0.5 py-0.5 text-xs text-slate-100 ${
-        active ? 'bg-emerald-500' : 'bg-slate-700'
-      }`}
-    >
+    <div className={`rounded-md px-0.5 py-0.5 text-xs text-slate-100 ${statusToneClass(tone)}`}>
       <div className="text-center font-medium">{label}</div>
-      <div className="text-center text-[0.72rem] opacity-90">{detail || (active ? 'yes' : 'no')}</div>
+      <div className="text-center text-[0.72rem] opacity-90">{detail || '--'}</div>
     </div>
   );
 }
@@ -67,6 +71,11 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
   const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
   const hasError = robotError !== '--' && !/^no errors$/i.test(robotError) && !/^200/.test(robotError);
   const hasAlert = robotAlert !== '--' && !/^200/.test(robotAlert);
+  const batteryTone =
+    battery == null ? 'muted' : battery >= 60 ? 'good' : battery >= 25 ? 'warn' : 'danger';
+  const voltageTone = voltage == null ? 'muted' : 'info';
+  const chargingTone = charging ? 'info' : 'muted';
+  const dockedTone = docked ? 'info' : 'muted';
 
   const runAction = async (key, fn, successMessage) => {
     if (!fn) return;
@@ -122,10 +131,10 @@ export default function VipNeatoCard({ neato, onStart, onSendHome, onLocate, ful
             <div className="grid h-full gap-0.5 grid-rows-[auto_1fr]">
               <p className="text-sm text-slate-200 text-center">Power & Dock</p>
               <div className="grid gap-0.5 content-start grid-cols-2">
-                <StatusIndicator label="Battery" active={battery != null} detail={batteryLabel} />
-                <StatusIndicator label="Voltage" active={voltage != null} detail={voltageLabel} />
-                <StatusIndicator label="Charging" active={charging} detail={charging ? 'active' : 'idle'} />
-                <StatusIndicator label="Docked" active={docked} detail={docked ? 'on base' : 'away'} />
+                <StatusIndicator label="Battery" tone={batteryTone} detail={batteryLabel} />
+                <StatusIndicator label="Voltage" tone={voltageTone} detail={voltageLabel} />
+                <StatusIndicator label="Charging" tone={chargingTone} detail={charging ? 'active' : 'idle'} />
+                <StatusIndicator label="Docked" tone={dockedTone} detail={docked ? 'on base' : 'away'} />
               </div>
             </div>
           </section>
