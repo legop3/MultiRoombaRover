@@ -25,20 +25,13 @@ function metricToneClass(tone) {
   return 'bg-slate-700 text-slate-100';
 }
 
-function MetricCell({ label, value, tone = 'muted' }) {
+function StatusTile({ label, value, tone = 'muted', valueClass = '' }) {
   return (
     <div className={`rounded-md px-1 py-0.75 text-center ${metricToneClass(tone)}`}>
       <div className="text-[0.72rem] opacity-90">{label}</div>
-      <div className="text-sm font-semibold">{value}</div>
-    </div>
-  );
-}
-
-function Row({ label, value, tone = 'muted' }) {
-  return (
-    <div className={`flex items-center justify-between rounded-md px-1 py-0.5 text-xs ${metricToneClass(tone)}`}>
-      <span>{label}</span>
-      <span className="font-semibold truncate pl-1" title={String(value || '')}>{value}</span>
+      <div className={`text-sm font-semibold ${valueClass}`} title={String(value || '')}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -172,19 +165,29 @@ export default function VipNeatoCard({
 
           <section className="surface-muted px-0.5 py-0.5">
             <div className="grid gap-0.5 grid-cols-2">
-              <MetricCell label="Battery" value={batteryLabel} tone={batteryTone} />
-              <MetricCell label="Voltage" value={voltageLabel} tone={voltage == null ? 'muted' : 'info'} />
-              <MetricCell label="Docked" value={docked ? 'Yes' : 'No'} tone={docked ? 'info' : 'muted'} />
-              <MetricCell label="Charging" value={charging ? 'Yes' : 'No'} tone={charging ? 'info' : 'muted'} />
+              <StatusTile label="Battery" value={batteryLabel} tone={batteryTone} />
+              <StatusTile label="Voltage" value={voltageLabel} tone={voltage == null ? 'muted' : 'info'} />
+              <StatusTile label="Docked" value={docked ? 'Yes' : 'No'} tone={docked ? 'info' : 'muted'} />
+              <StatusTile label="Charging" value={charging ? 'Yes' : 'No'} tone={charging ? 'info' : 'muted'} />
             </div>
           </section>
         </div>
 
         <section className="surface-muted px-0.5 py-0.5">
           <div className="grid gap-0.5 grid-cols-1 md:grid-cols-3">
-            <Row label="UI state" value={uiStateLabel} tone="muted" />
-            <Row label="Robot error" value={robotError} tone={hasError ? 'danger' : 'muted'} />
-            <Row label="Robot alert" value={robotAlert} tone={hasAlert ? 'warn' : 'muted'} />
+            <StatusTile label="UI state" value={uiStateLabel} tone="muted" valueClass="truncate" />
+            <StatusTile
+              label="Robot error"
+              value={robotError}
+              tone={hasError ? 'danger' : 'muted'}
+              valueClass="truncate"
+            />
+            <StatusTile
+              label="Robot alert"
+              value={robotAlert}
+              tone={hasAlert ? 'warn' : 'muted'}
+              valueClass="truncate"
+            />
           </div>
         </section>
 
