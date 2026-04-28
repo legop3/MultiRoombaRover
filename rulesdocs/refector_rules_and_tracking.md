@@ -20,6 +20,7 @@
 ## WebUI frontend
 - Split large JSX/components and large backing JS files into folderized modules.
 - Keep modules clear and focused, with title comments.
+- Each component must live entirely inside its own folder; do not leave wrapper/compatibility component files outside that folder.
 - Remove stale compatibility/leftover code only after usage verification.
 
 # REFACTOR TRACKING
@@ -58,7 +59,7 @@
 ### BIGGEST OFFENDERS
 - [x] mini summary app
 - [x] spectator app
-- [ ] vip audio upload card
+- [x] vip audio upload card
 - [ ] admin panel
 - [ ] drive dock action
 - [ ] gamepad mapping settings
@@ -71,11 +72,13 @@
 - mini summary app
 - spectator app
 - video tile
+- vip audio upload card
 
 ### LARGE CHANGES
 - Split `webui/src/mini/MiniSummaryApp.jsx` into folderized modules under `webui/src/mini/MiniSummaryApp/` with a compatibility entrypoint preserved.
 - Split `webui/src/spectate/SpectatorApp.jsx` into folderized modules under `webui/src/spectate/SpectatorApp/` with a compatibility entrypoint preserved.
 - Split `webui/src/components/VideoTile.jsx` by extracting HUD, overlays, chat input, and constants into `webui/src/components/VideoTile/` while preserving the existing `VideoTile.jsx` public component API.
+- Split `webui/src/components/vip/VipAudioUploadCard.jsx` by extracting transport/audio helpers and UI atoms into `webui/src/components/vip/VipAudioUploadCard/` while preserving the existing `VipAudioUploadCard.jsx` import/export API.
 
 ## Done criteria (per item)
 - [ ] Folderized structure created.

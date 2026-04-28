@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 import { COOKIE_KEY_REGEX, flowWrapClass } from './vip/constants.js';
-import VipAudioUploadCard from './vip/VipAudioUploadCard.jsx';
+import VipAudioUploadCard from './vip/VipAudioUploadCard/index.jsx';
 import VipVerificationCard from './vip/VipVerificationCard.jsx';
 import VipIdentityCard from './vip/VipIdentityCard.jsx';
 import VipPrivateRoverAccessCard from './vip/VipPrivateRoverAccessCard.jsx';
