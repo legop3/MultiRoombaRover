@@ -27,7 +27,7 @@ const TARGET_FPS = Math.max(10, Number.parseInt(process.env.REPLAY_TARGET_FPS ||
 const MAX_WIDTH = Math.max(320, Number.parseInt(process.env.REPLAY_MAX_WIDTH || '1280', 10));
 const MAX_HEIGHT = Math.max(180, Number.parseInt(process.env.REPLAY_MAX_HEIGHT || '720', 10));
 const MAX_BYTES = Math.floor(Number.parseFloat(process.env.REPLAY_MAX_OUTPUT_MB || '9.5') * 1024 * 1024);
-const SIDEBAR_WIDTH = Math.max(180, Number.parseInt(process.env.REPLAY_SIDEBAR_WIDTH || '250', 10));
+const SIDEBAR_WIDTH = 190;
 
 const events = new EventEmitter();
 
@@ -492,10 +492,11 @@ function renderSidebarSvg({
   driverBatteryLines,
   chatLines,
 }) {
-  const titleParts = wrapTextLines(title, 20).slice(0, 4).map((line) => escapeXml(line));
+  const textCols = Math.max(24, Math.floor((width - 16) / 6));
+  const titleParts = wrapTextLines(title, Math.max(26, textCols)).slice(0, 4).map((line) => escapeXml(line));
   const statLines = driverBatteryLines.slice(0, 8).map((line) => escapeXml(line));
   const normalizedChats = chatLines.slice(-12).map((entry) => {
-    const wrapped = wrapTextLines(entry.text || '', 22).slice(0, 4).map((line) => escapeXml(line));
+    const wrapped = wrapTextLines(entry.text || '', Math.max(24, textCols)).slice(0, 4).map((line) => escapeXml(line));
     const nick = escapeXml(entry.nickname || 'user');
     const roverId = escapeXml(entry.roverId || '');
     const roverRgb = hexToRgb(entry.roverColor || '');
@@ -563,7 +564,7 @@ function renderSidebarSvg({
       const firstLine = firstLineRaw ? firstLineRaw : '';
       const remainingRaw = block.wrapped.slice(firstLineRaw ? 1 : 0).map((line) => String(line || '').trim()).filter(Boolean);
       const fullText = (firstLine ? [firstLine, ...remainingRaw] : remainingRaw).join(' ');
-      const inlineWrapped = wrapTextLines(fullText, Math.max(8, 26 - prefixChars)).slice(0, 4).map((line) => escapeXml(line));
+      const inlineWrapped = wrapTextLines(fullText, Math.max(16, textCols - prefixChars)).slice(0, 4).map((line) => escapeXml(line));
       const bubbleH = pad * 2 + Math.max(1, inlineWrapped.length) * 12;
       if (cy + bubbleH + pad > y + chatCardH - pad) break;
       shapes.push(
