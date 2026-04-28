@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useControlSystem } from '../controls/index.js';
-import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
-import { formatKeyLabel } from '../controls/keymapUtils.js';
+import { useControlSystem } from '../../controls/index.js';
+import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
+import { formatKeyLabel } from '../../controls/keymapUtils.js';
 
 export function deriveDriveDockState(frame) {
   const sensors = frame?.sensors || {};

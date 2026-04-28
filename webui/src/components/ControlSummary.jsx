@@ -5,7 +5,7 @@ import { useControlSystem } from '../controls/index.js';
 import { formatKeyLabel } from '../controls/keymapUtils.js';
 import TopDownMap from './TopDownMap.jsx';
 import RoverRoster from './RoverRoster.jsx';
-import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
+import DriveDockAction, { useDriveDockState } from './DriveDockAction/index.jsx';
 import NightVisionControl from './NightVisionControl.jsx';
 import HornControl from './HornControl.jsx';
 import CameraTiltControl from './CameraTiltControl.jsx';

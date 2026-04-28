@@ -12,12 +12,14 @@
 - Treat `npm run build` output files committed into this repo as intentional deployment artifacts; do not discard them as noise.
 
 ## Server backend
+- Every service must live in its own folder, even when it remains a single-file implementation.
 - Convert every service into a folder-based structure.
 - Split very large service files into smaller focused modules.
 - Keep files concise and single-purpose.
 - Add clear title comments at top of split files.
 
 ## WebUI frontend
+- Every component must live in its own folder, even when it remains a single-file implementation.
 - Split large JSX/components and large backing JS files into folderized modules.
 - Keep modules clear and focused, with title comments.
 - Each component must live entirely inside its own folder; do not leave wrapper/compatibility component files outside that folder.
@@ -61,7 +63,7 @@
 - [x] spectator app
 - [x] vip audio upload card
 - [x] admin panel
-- [ ] drive dock action
+- [x] drive dock action
 - [ ] gamepad mapping settings
 - [ ] mobile controls
 - [ ] top down map
@@ -74,6 +76,7 @@
 - video tile
 - vip audio upload card
 - admin panel
+- drive dock action
 
 ### LARGE CHANGES
 - Split `webui/src/mini/MiniSummaryApp.jsx` into folderized modules under `webui/src/mini/MiniSummaryApp/` with a compatibility entrypoint preserved.
@@ -81,6 +84,7 @@
 - Split `webui/src/components/VideoTile.jsx` by extracting HUD, overlays, chat input, and constants into `webui/src/components/VideoTile/` while preserving the existing `VideoTile.jsx` public component API.
 - Split `webui/src/components/vip/VipAudioUploadCard.jsx` by extracting transport/audio helpers and UI atoms into `webui/src/components/vip/VipAudioUploadCard/` while preserving the existing `VipAudioUploadCard.jsx` import/export API.
 - Split `webui/src/components/AdminPanel.jsx` into `webui/src/components/AdminPanel/` and extracted monitor/health/log/LLM helper modules; updated consumers to folder entrypoint and removed external wrapper file.
+- Moved `DriveDockAction` to `webui/src/components/DriveDockAction/index.jsx` and updated all consumers to folder entrypoint imports.
 
 ## Done criteria (per item)
 - [ ] Folderized structure created.

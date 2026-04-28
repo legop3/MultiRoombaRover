@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import { clampUnit } from '../controls/controlMath.js';
-import DriveDockAction, { useDriveDockState } from './DriveDockAction.jsx';
+import DriveDockAction, { useDriveDockState } from './DriveDockAction/index.jsx';
 import NightVisionControl from './NightVisionControl.jsx';
 import HornControl from './HornControl.jsx';
 import CameraTiltControl from './CameraTiltControl.jsx';
