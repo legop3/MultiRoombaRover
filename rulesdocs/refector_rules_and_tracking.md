@@ -9,6 +9,7 @@
 - Preserve imports/exports and call signatures unless internal-only and non-observable.
 - Validate no runtime behavior changes (manual flow checks + targeted tests when available).
 - Make small, reviewable commits per service/component area.
+- Treat `npm run build` output files committed into this repo as intentional deployment artifacts; do not discard them as noise.
 
 ## Server backend
 - Convert every service into a folder-based structure.
@@ -56,7 +57,7 @@
 ## WebUI frontend
 ### BIGGEST OFFENDERS
 - [x] mini summary app
-- [ ] spectator app
+- [x] spectator app
 - [ ] vip audio upload card
 - [ ] admin panel
 - [ ] drive dock action
@@ -68,9 +69,11 @@
 
 ### COMPLETED COMPONENTS
 - mini summary app
+- spectator app
 
 ### LARGE CHANGES
 - Split `webui/src/mini/MiniSummaryApp.jsx` into folderized modules under `webui/src/mini/MiniSummaryApp/` with a compatibility entrypoint preserved.
+- Split `webui/src/spectate/SpectatorApp.jsx` into folderized modules under `webui/src/spectate/SpectatorApp/` with a compatibility entrypoint preserved.
 
 ## Done criteria (per item)
 - [ ] Folderized structure created.
