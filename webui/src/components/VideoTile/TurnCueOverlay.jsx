@@ -3,7 +3,6 @@ import React from 'react';
 
 export default function TurnCueOverlay({
   mobileHud = false,
-  turnSeconds = null,
   isActiveDriver = false,
   idleSkipSeconds = null,
 }) {

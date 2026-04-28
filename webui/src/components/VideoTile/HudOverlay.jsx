@@ -4,18 +4,15 @@ import TopDownMap from '../TopDownMap.jsx';
 import { roverNameChromeStyle } from '../../lib/roverColor.js';
 
 export default function HudOverlay({
-  frame,
   sensors,
   label,
   roverColor = null,
   status,
   audioStatus,
   levelStatus,
-  desktopLayout = true,
   layoutFormat = 'desktop',
   variant = 'default',
   driverLabel = null,
-  battery,
   showTopDown = false,
   mobileHud = false,
   mapPosition = 'top-center',

@@ -42,7 +42,6 @@ export default function VideoTile({
   overcurrentLimiter = null,
   showTurnCue = false,
   turnTimerText = null,
-  turnSeconds = null,
   isActiveDriver = false,
   idleSkipSeconds = null,
 }) {
@@ -86,15 +85,9 @@ export default function VideoTile({
   const desktopLayout = layoutFormat === 'desktop';
   const mobileHud = !desktopLayout;
   const effectiveHudMapPosition = mobileHud ? 'top-right' : hudMapPosition;
-  const [showHudMapDesktop, setShowHudMapDesktop] = useHudMapSetting();
+  const [showHudMapDesktop] = useHudMapSetting();
   const showHudMap = hudForceMap ? true : mobileHud ? true : showHudMapDesktop;
   const batteryVisual = buildBatteryVisual({ charge: batteryCharge, config: batteryConfig });
-  // console.log('[BatteryBarDebug]', {
-  //   frameSensors: sensors,
-  //   batteryCharge,
-  //   batteryCapacity,
-  //   config: batteryConfig,
-  // });
   const wheelOvercurrents = sensors?.wheelOvercurrents || null;
   const overcurrentMotors =
     wheelOvercurrents == null
@@ -602,25 +595,21 @@ export default function VideoTile({
         {!noHud && showTurnCue ? (
           <TurnCueOverlay
             mobileHud={mobileHud}
-            turnSeconds={turnSeconds}
             isActiveDriver={isActiveDriver}
             idleSkipSeconds={idleSkipSeconds}
           />
         ) : null}
         {!noHud ? (
           <HudOverlay
-            frame={telemetryFrame}
             sensors={sensors}
             label={label}
             roverColor={roverColor}
             status={renderedStatus}
             audioStatus={renderedAudioStatus}
             levelStatus={levelIndicator}
-            desktopLayout={desktopLayout}
             layoutFormat={layoutFormat}
             variant={hudVariant}
             driverLabel={driverLabel}
-            battery={batteryVisual}
             showTopDown={showHudMap}
             mobileHud={mobileHud}
             mapPosition={effectiveHudMapPosition}
@@ -677,4 +666,3 @@ export default function VideoTile({
     </div>
   );
 }
-
