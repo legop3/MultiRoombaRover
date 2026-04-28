@@ -5,7 +5,7 @@ import AlertFeed from './components/AlertFeed.jsx';
 import MobileControls, {
   MobileActionsColumn,
   MobileDriveColumn,
-} from './components/MobileControls.jsx';
+} from './components/MobileControls/index.jsx';
 import {
   ControlSystemProvider,
   KeyboardInputManager,
