@@ -3,7 +3,7 @@ import { useControlSystem } from '../controls/index.js';
 import AuthPanel from './AuthPanel.jsx';
 import AdminPanel from './AdminPanel/index.jsx';
 import KeymapSettings from './KeymapSettings.jsx';
-import GamepadMappingSettings from './GamepadMappingSettings.jsx';
+import GamepadMappingSettings from './GamepadMappingSettings/index.jsx';
 import OvercurrentLimiterPanel from './OvercurrentLimiterPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
 import SessionSnapshot from './SessionSnapshot.jsx';

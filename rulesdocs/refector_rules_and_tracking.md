@@ -64,7 +64,7 @@
 - [x] vip audio upload card
 - [x] admin panel
 - [x] drive dock action
-- [ ] gamepad mapping settings
+- [x] gamepad mapping settings
 - [ ] mobile controls
 - [ ] top down map
 - [x] video tile
@@ -77,6 +77,7 @@
 - vip audio upload card
 - admin panel
 - drive dock action
+- gamepad mapping settings
 
 ### LARGE CHANGES
 - Split `webui/src/mini/MiniSummaryApp.jsx` into folderized modules under `webui/src/mini/MiniSummaryApp/` with a compatibility entrypoint preserved.
@@ -85,6 +86,7 @@
 - Split `webui/src/components/vip/VipAudioUploadCard.jsx` by extracting transport/audio helpers and UI atoms into `webui/src/components/vip/VipAudioUploadCard/` while preserving the existing `VipAudioUploadCard.jsx` import/export API.
 - Split `webui/src/components/AdminPanel.jsx` into `webui/src/components/AdminPanel/` and extracted monitor/health/log/LLM helper modules; updated consumers to folder entrypoint and removed external wrapper file.
 - Moved `DriveDockAction` to `webui/src/components/DriveDockAction/index.jsx` and updated all consumers to folder entrypoint imports.
+- Split `webui/src/components/GamepadMappingSettings.jsx` into `webui/src/components/GamepadMappingSettings/` with extracted constants/helpers/SliderField modules and removed the standalone component file.
 
 ## Done criteria (per item)
 - [ ] Folderized structure created.
