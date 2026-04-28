@@ -64,16 +64,18 @@
 - [ ] gamepad mapping settings
 - [ ] mobile controls
 - [ ] top down map
-- [ ] video tile
+- [x] video tile
 - [ ] Sweep `webui` for unused or unneeded files/code with verification
 
 ### COMPLETED COMPONENTS
 - mini summary app
 - spectator app
+- video tile
 
 ### LARGE CHANGES
 - Split `webui/src/mini/MiniSummaryApp.jsx` into folderized modules under `webui/src/mini/MiniSummaryApp/` with a compatibility entrypoint preserved.
 - Split `webui/src/spectate/SpectatorApp.jsx` into folderized modules under `webui/src/spectate/SpectatorApp/` with a compatibility entrypoint preserved.
+- Split `webui/src/components/VideoTile.jsx` by extracting HUD, overlays, chat input, and constants into `webui/src/components/VideoTile/` while preserving the existing `VideoTile.jsx` public component API.
 
 ## Done criteria (per item)
 - [ ] Folderized structure created.

@@ -1,0 +1,24 @@
+// Low battery warning overlay.
+import React from 'react';
+
+export default function LowBatteryOverlay({ battery, compact = false }) {
+  if (!battery?.available) return null;
+  if (!battery.warnActive && !battery.urgentActive) return null;
+
+  const message = battery.urgentActive
+    ? 'BATTERY VERY LOW, DOCK THE ROVER AND CHARGE IMMEDIATELY!!'
+    : 'Battery low! please dock and charge the rover soon.';
+
+  const containerClass = compact ? 'p-2 top-6' : 'p-4 top-10';
+  const textClass = compact ? 'text-sm' : 'text-2xl';
+
+  return (
+    <div
+      className={`pointer-events-none absolute flex items-center justify-center bg-amber-900/60 left-1/2 -translate-x-1/2 ${containerClass}`}
+    >
+      <div className={`text-center font-semibold text-white animate-pulse ${textClass}`}>
+        <div>{message}</div>
+      </div>
+    </div>
+  );
+}
