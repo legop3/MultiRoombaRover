@@ -376,8 +376,7 @@ function scalePadFilter(tileWidth, tileHeight, titleText = '') {
   return (
     `scale=${tileWidth}:${tileHeight}:force_original_aspect_ratio=decrease:flags=lanczos,` +
     `pad=${tileWidth}:${tileHeight}:(ow-iw)/2:(oh-ih)/2:color=black,` +
-    `drawbox=x=0:y=0:w=iw:h=26:color=black@0.72:t=fill,` +
-    `drawtext=text='${safeTitle}':x=6:y=7:fontsize=14:fontcolor=white:borderw=1:bordercolor=black@0.7,` +
+    `drawtext=text='${safeTitle}':x=(w-text_w)/2:y=7:fontsize=14:fontcolor=white:borderw=1:bordercolor=black@0.7:box=1:boxcolor=black@0.52:boxborderw=4,` +
     'setsar=1'
   );
 }
