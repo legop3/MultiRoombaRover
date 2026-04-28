@@ -15,6 +15,11 @@ function buildRequesterLabel(socket) {
   return getNickname(socket) || socket?.data?.user?.username || socket?.id || 'unknown';
 }
 
+function normalizeReplayTitle(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, 120);
+}
+
 io.on('connection', (socket) => {
   socket.on('replay:trigger', (payload = {}, cb = () => {}) => {
     if (getMode() === MODES.LOCKDOWN) {
@@ -37,6 +42,7 @@ io.on('connection', (socket) => {
       return;
     }
     const requester = buildRequesterLabel(socket);
+    const title = normalizeReplayTitle(payload?.title);
     const attempt = tryTriggerReplay({ by: { source: 'web', requester } });
     if (!attempt.ok) {
       cb({ error: 'Replay cooldown active', remainingMs: attempt.remainingMs, state: attempt.state });
@@ -48,6 +54,7 @@ io.on('connection', (socket) => {
       payload: {
         channelId,
         requester,
+        title,
         sources,
         requestedBy: { socketId: socket.id },
       },

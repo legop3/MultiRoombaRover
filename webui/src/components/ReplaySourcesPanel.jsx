@@ -26,6 +26,8 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [title, setTitle] = useState('');
+  const [titleDirty, setTitleDirty] = useState(false);
   const replayState = session?.replay || null;
   const [remainingMs, setRemainingMs] = useState(0);
 
@@ -37,6 +39,19 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     return [];
   }, [session?.assignment?.roverId]);
 
+  const defaultTitle = useMemo(() => {
+    const self = Array.isArray(session?.users)
+      ? session.users.find((entry) => entry?.socketId === session?.socketId)
+      : null;
+    const nickname = (self?.nickname || 'Someone').trim() || 'Someone';
+    const roverId = session?.assignment?.roverId || null;
+    const roverName =
+      roverId && Array.isArray(session?.roster)
+        ? session.roster.find((entry) => String(entry?.id) === String(roverId))?.name || roverId
+        : 'a rover';
+    return `${nickname} driving ${roverName}`;
+  }, [session?.users, session?.socketId, session?.assignment?.roverId, session?.roster]);
+
   useEffect(() => {
     const saved = settings?.[panelId];
     if (Array.isArray(saved) && saved.length) {
@@ -45,6 +60,12 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     }
     setSelected(defaults);
   }, [settings?.[panelId], defaults, panelId]);
+
+  useEffect(() => {
+    if (!titleDirty) {
+      setTitle(defaultTitle);
+    }
+  }, [defaultTitle, titleDirty]);
 
   useEffect(() => {
     const allowed = new Set(sources.map((source) => source.key));
@@ -93,7 +114,8 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
         const [type, id] = key.split(':');
         return { type, id };
       });
-      await triggerReplay(payload);
+      const resolvedTitle = String(title || '').trim() || defaultTitle;
+      await triggerReplay(payload, resolvedTitle);
       setSuccess('Replay sent. Check the Discord replay channel.');
     } catch (err) {
       setError(err.message);
@@ -116,6 +138,17 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
         <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
       </div>
       <div className="space-y-0.5">
+        <input
+          type="text"
+          className="field-input w-full text-xs"
+          value={title}
+          onChange={(event) => {
+            setTitle(event.target.value);
+            setTitleDirty(true);
+          }}
+          placeholder={defaultTitle}
+          maxLength={120}
+        />
         <button
           type="button"
           className="button-dark w-full text-xs disabled:opacity-40"

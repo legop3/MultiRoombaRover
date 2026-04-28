@@ -365,6 +365,43 @@ function normalizeReplayQuery(input) {
   return String(input || '').trim().toLowerCase();
 }
 
+function sanitizeReplayTitleForFilename(title) {
+  const cleaned = String(title || '')
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 96);
+  return cleaned || 'replay';
+}
+
+function buildDefaultReplayTitle(requester, sources = []) {
+  const requesterLabel = String(requester || 'Someone').trim() || 'Someone';
+  const roverSource = sources.find((entry) => entry?.type === 'rover');
+  const roverLabel = roverSource?.label || roverSource?.id || 'a rover';
+  return `${requesterLabel} driving ${roverLabel}`;
+}
+
+function buildReplayDriverLines(requester, usedSources = []) {
+  const activeDrivers = getActiveDrivers();
+  const roverRecords = Array.from(rovers.values());
+  const roverById = new Map(roverRecords.map((record) => [String(record.id), record]));
+  const requestedRoverIds = new Set(
+    usedSources.filter((entry) => entry?.type === 'rover').map((entry) => String(entry.id)),
+  );
+  const lines = [];
+  requestedRoverIds.forEach((roverId) => {
+    const socketId = activeDrivers[roverId];
+    if (!socketId) return;
+    const socket = io.sockets.sockets.get(socketId);
+    const nickname = getNickname(socket) || socket?.data?.user?.username || socketId;
+    const roverRecord = roverById.get(roverId);
+    const roverName = roverRecord?.meta?.name || roverRecord?.id || roverId;
+    const isAuthor = String(nickname).toLowerCase() === String(requester || '').toLowerCase();
+    lines.push(`${nickname} driving ${roverName}${isAuthor ? ' **author**' : ''}`);
+  });
+  return lines;
+}
+
 function resolveReplaySources(query) {
   const cleaned = normalizeReplayQuery(query);
   if (!cleaned || cleaned === 'all' || cleaned === '*') {
@@ -393,31 +430,39 @@ function resolveReplaySources(query) {
   return { sources };
 }
 
-function buildReplayCaption(requester, sources = [], missingSources = []) {
-  const requesterLabel = requester || 'unknown';
-  const sourceLabel = sources.length
-    ? `Sources: ${sources.map((source) => source.label || `${source.type}:${source.id}`).join(', ')}.`
-    : 'No sources.';
-  const missingLabel = missingSources.length
-    ? `Missing: ${missingSources.map((source) => source.label || `${source.type}:${source.id}`).join(', ')}.`
-    : null;
-  return [
-    `Replay requested by ${requesterLabel}.`,
-    sourceLabel,
-    missingLabel,
-    buildDriverCaption(),
-  ]
-    .filter(Boolean)
-    .join(' ');
+function buildReplayCaption({ requester, usedSources = [], missingSources = [], title }) {
+  const lines = [];
+  if (title) {
+    lines.push(`**${title}**`);
+    lines.push('');
+  }
+  const driverLines = buildReplayDriverLines(requester, usedSources);
+  if (driverLines.length) {
+    lines.push(...driverLines);
+  }
+  if (missingSources.length) {
+    if (driverLines.length) lines.push('');
+    lines.push(`Missing: ${missingSources.map((source) => source.label || `${source.type}:${source.id}`).join(', ')}`);
+  }
+  if (!lines.length) {
+    lines.push(buildDriverCaption());
+  }
+  return lines.join('\n');
 }
 
-async function sendReplayToChannel(channelId, requester, sources = []) {
+async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '') {
   if (!channelId) {
     throw new Error('Replay channel not configured');
   }
-  const { buffer, usedSources, missingSources } = await buildReplayVideo({ sources });
-  const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
-  const caption = buildReplayCaption(requester, usedSources, missingSources);
+  const resolvedTitle = String(explicitTitle || '').trim() || buildDefaultReplayTitle(requester, sources);
+  const { buffer, usedSources, missingSources } = await buildReplayVideo({
+    sources,
+    title: resolvedTitle,
+    requester,
+  });
+  const filenameBase = sanitizeReplayTitleForFilename(resolvedTitle);
+  const attachment = new AttachmentBuilder(buffer, { name: `${filenameBase}.mp4` });
+  const caption = buildReplayCaption({ requester, usedSources, missingSources, title: resolvedTitle });
   await sendToChannel(channelId, caption, { files: [attachment] }, { parse: [] });
 }
 
@@ -453,9 +498,15 @@ async function handleReplayCommand(message, query) {
   const requester =
     message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
   try {
-    const { buffer, usedSources, missingSources } = await buildReplayVideo({ sources });
-    const attachment = new AttachmentBuilder(buffer, { name: 'replay.mp4' });
-    const caption = buildReplayCaption(requester, usedSources, missingSources);
+    const resolvedTitle = buildDefaultReplayTitle(requester, sources);
+    const { buffer, usedSources, missingSources } = await buildReplayVideo({
+      sources,
+      title: resolvedTitle,
+      requester,
+    });
+    const filenameBase = sanitizeReplayTitleForFilename(resolvedTitle);
+    const attachment = new AttachmentBuilder(buffer, { name: `${filenameBase}.mp4` });
+    const caption = buildReplayCaption({ requester, usedSources, missingSources, title: resolvedTitle });
     await message.reply({
       content: sanitizeMentions(caption),
       files: [attachment],
@@ -1568,7 +1619,7 @@ function handleBusEvent(event) {
       schedulePresenceRotation();
       break;
     case 'replay.requested':
-      sendReplayToChannel(payload?.channelId, payload?.requester, payload?.sources || []).catch((err) => {
+      sendReplayToChannel(payload?.channelId, payload?.requester, payload?.sources || [], payload?.title || '').catch((err) => {
         logger.warn('Replay send failed', err.message);
       });
       break;

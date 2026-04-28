@@ -8,6 +8,10 @@ const EventEmitter = require('events');
 const logger = require('../globals/logger').child('replayEngineV2');
 const roverManager = require('./roverManager');
 const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
+const io = require('../globals/io');
+const { getActiveDrivers } = require('./turnService');
+const { getNickname } = require('./nicknameService');
+const { getRecentMessages } = require('./chatService');
 
 const execFileAsync = promisify(execFile);
 
@@ -22,6 +26,7 @@ const TARGET_FPS = Math.max(10, Number.parseInt(process.env.REPLAY_TARGET_FPS ||
 const MAX_WIDTH = Math.max(320, Number.parseInt(process.env.REPLAY_MAX_WIDTH || '1280', 10));
 const MAX_HEIGHT = Math.max(180, Number.parseInt(process.env.REPLAY_MAX_HEIGHT || '720', 10));
 const MAX_BYTES = Math.floor(Number.parseFloat(process.env.REPLAY_MAX_OUTPUT_MB || '9.5') * 1024 * 1024);
+const SIDEBAR_WIDTH = Math.max(220, Number.parseInt(process.env.REPLAY_SIDEBAR_WIDTH || '360', 10));
 
 const events = new EventEmitter();
 
@@ -358,6 +363,141 @@ function scalePadFilter(tileWidth, tileHeight) {
   return `scale=${tileWidth}:${tileHeight}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${tileWidth}:${tileHeight}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
 }
 
+function escapeAssText(text) {
+  return String(text || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\{/g, '\\{')
+    .replace(/\}/g, '\\}')
+    .replace(/\r?\n/g, '\\N');
+}
+
+function assTimeFromSeconds(totalSeconds) {
+  const safe = Math.max(0, Number(totalSeconds) || 0);
+  const hours = Math.floor(safe / 3600);
+  const mins = Math.floor((safe % 3600) / 60);
+  const secs = Math.floor(safe % 60);
+  const centis = Math.floor((safe - Math.floor(safe)) * 100);
+  return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(centis).padStart(2, '0')}`;
+}
+
+function sanitizeReplayTitle(title, fallback = 'Replay') {
+  const value = String(title || '').trim();
+  if (!value) return fallback;
+  return value.slice(0, 120);
+}
+
+function resolveDefaultReplayTitle(requester = '', sources = []) {
+  const requesterLabel = String(requester || 'Someone').trim() || 'Someone';
+  const rover = (Array.isArray(sources) ? sources : []).find((entry) => entry?.type === 'rover');
+  const roverLabel = rover?.label || rover?.id || 'a rover';
+  return `${requesterLabel} driving ${roverLabel}`;
+}
+
+function buildDriverBatterySnapshot(selectedRoverIds = []) {
+  const activeDrivers = getActiveDrivers();
+  const byId = new Map(roverManager.getRoster().map((rover) => [String(rover.id), rover]));
+  const lines = [];
+  for (const roverId of selectedRoverIds) {
+    const socketId = activeDrivers[String(roverId)];
+    if (!socketId) continue;
+    const socket = io.sockets.sockets.get(socketId);
+    const nickname = getNickname(socket) || socket?.data?.user?.username || String(socketId);
+    const rover = byId.get(String(roverId));
+    const roverName = rover?.name || roverId;
+    const percent = rover?.batteryState?.percentDisplay;
+    const batteryLabel = Number.isFinite(percent) ? `${percent}%` : '--%';
+    lines.push(`${nickname} driving ${roverName} (${batteryLabel})`);
+  }
+  return lines;
+}
+
+function buildChatEventsForWindow(startMs, endMs, limit = 18) {
+  const all = getRecentMessages(300, { includeSystem: false });
+  const windowed = all
+    .filter((msg) => Number.isFinite(msg?.ts) && msg.ts >= startMs && msg.ts <= endMs)
+    .slice(-limit);
+  return windowed.map((msg) => {
+    const nickname = String(msg?.nickname || msg?.discordUserName || 'user').trim() || 'user';
+    const text = String(msg?.text || '').replace(/\s+/g, ' ').trim();
+    return {
+      ts: Number(msg.ts),
+      text: `${nickname}: ${text}`.slice(0, 120),
+    };
+  });
+}
+
+async function renderSidebarVideo({
+  tmpDir,
+  title,
+  durationSec,
+  height,
+  windowStartMs,
+  driverBatteryLines = [],
+  chatEvents = [],
+}) {
+  const assPath = path.join(tmpDir, 'sidebar.ass');
+  const sidebarPath = path.join(tmpDir, 'sidebar.mp4');
+  const headerLines = [];
+  headerLines.push('[Script Info]');
+  headerLines.push('ScriptType: v4.00+');
+  headerLines.push(`PlayResX: ${SIDEBAR_WIDTH}`);
+  headerLines.push(`PlayResY: ${height}`);
+  headerLines.push('ScaledBorderAndShadow: yes');
+  headerLines.push('');
+  headerLines.push('[V4+ Styles]');
+  headerLines.push(
+    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+  );
+  headerLines.push(
+    'Style: Sidebar,DejaVu Sans,24,&H00FFFFFF,&H00FFFFFF,&H64000000,&H96000000,0,0,0,0,100,100,0,0,1,2,0,7,18,18,18,1',
+  );
+  headerLines.push(
+    'Style: Chat,DejaVu Sans,21,&H00E6F2FF,&H00E6F2FF,&H64000000,&H96000000,0,0,0,0,100,100,0,0,1,2,0,7,18,18,280,1',
+  );
+  headerLines.push('');
+  headerLines.push('[Events]');
+  headerLines.push('Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text');
+
+  const fullEnd = assTimeFromSeconds(durationSec);
+  const staticLines = [escapeAssText(title), '', ...driverBatteryLines.map(escapeAssText)];
+  headerLines.push(`Dialogue: 0,0:00:00.00,${fullEnd},Sidebar,,0,0,0,,${staticLines.join('\\N')}`);
+
+  for (let i = 0; i < chatEvents.length; i += 1) {
+    const event = chatEvents[i];
+    const start = Math.max(0, (event.ts - windowStartMs) / 1000);
+    const end = Math.min(durationSec, start + 4.5);
+    if (end <= start) continue;
+    headerLines.push(
+      `Dialogue: 0,${assTimeFromSeconds(start)},${assTimeFromSeconds(end)},Chat,,0,0,0,,${escapeAssText(
+        event.text,
+      )}`,
+    );
+  }
+
+  await fsp.writeFile(assPath, `${headerLines.join('\n')}\n`, 'utf8');
+
+  await execFileAsync(FFMPEG_BIN, [
+    '-y',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    `color=c=0x111111:s=${SIDEBAR_WIDTH}x${height}:r=${TARGET_FPS}:d=${durationSec.toFixed(3)}`,
+    '-vf',
+    `subtitles=${assPath}`,
+    '-c:v',
+    'libx264',
+    '-preset',
+    'veryfast',
+    '-pix_fmt',
+    'yuv420p',
+    sidebarPath,
+  ]);
+  return sidebarPath;
+}
+
 async function concatFiles(inputPaths, outPath) {
   const listPath = `${outPath}.concat.txt`;
   const body = inputPaths.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
@@ -409,13 +549,14 @@ async function probeMaxFrameSize(paths) {
   return { maxWidth, maxHeight };
 }
 
-async function buildReplayVideo({ sources = [] } = {}) {
+async function buildReplayVideo({ sources = [], title = '', requester = '' } = {}) {
   if (!Array.isArray(sources) || !sources.length) {
     throw new Error('No replay sources selected');
   }
 
   const tEnd = Date.now() - BUILD_GUARD_MS;
   const tStart = tEnd - BUILD_DURATION_MS;
+  const resolvedTitle = sanitizeReplayTitle(title, resolveDefaultReplayTitle(requester, sources));
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'mrr-replay-v2-'));
 
   try {
@@ -527,6 +668,22 @@ async function buildReplayVideo({ sources = [] } = {}) {
     tileWidth = clampEven(tileWidth);
     tileHeight = clampEven(tileHeight);
 
+    const selectedRoverIds = usedSources
+      .filter((entry) => entry?.type === 'rover')
+      .map((entry) => String(entry.id));
+    const driverBatteryLines = buildDriverBatterySnapshot(selectedRoverIds);
+    const chatEvents = buildChatEventsForWindow(tStart, tEnd);
+    const durationSec = BUILD_DURATION_MS / 1000;
+    const sidebarPath = await renderSidebarVideo({
+      tmpDir,
+      title: resolvedTitle,
+      durationSec,
+      height: clampEven(tileHeight * layout.rows),
+      windowStartMs: tStart,
+      driverBatteryLines,
+      chatEvents,
+    });
+
     const inputArgs = [];
     const filterParts = [];
     const layoutParts = [];
@@ -539,26 +696,27 @@ async function buildReplayVideo({ sources = [] } = {}) {
       layoutParts.push(`${x}_${y}`);
     }
 
-    const audioInputStart = normalizedVideos.length;
+    inputArgs.push('-i', sidebarPath);
+    const sidebarInputIndex = normalizedVideos.length;
+    const audioInputStart = normalizedVideos.length + 1;
     for (const audioPath of normalizedAudios) {
       inputArgs.push('-i', audioPath);
     }
 
     if (normalizedVideos.length === 1) {
-      filterParts.push('[v0]null[vout]');
+      filterParts.push('[v0]null[vgrid]');
     } else {
       filterParts.push(
         `${normalizedVideos.map((_, i) => `[v${i}]`).join('')}` +
-          `xstack=inputs=${normalizedVideos.length}:layout=${layoutParts.join('|')}:fill=black[vout]`,
+          `xstack=inputs=${normalizedVideos.length}:layout=${layoutParts.join('|')}:fill=black[vgrid]`,
       );
     }
+    filterParts.push(`[vgrid][${sidebarInputIndex}:v]hstack=inputs=2[vout]`);
 
     if (normalizedAudios.length) {
       const audioRefs = normalizedAudios.map((_, idx) => `[${audioInputStart + idx}:a]`).join('');
       filterParts.push(`${audioRefs}amix=inputs=${normalizedAudios.length}:normalize=0,alimiter=limit=0.9[aout]`);
     }
-
-    const durationSec = BUILD_DURATION_MS / 1000;
     const targetBitrateKbps = Math.max(400, Math.floor((MAX_BYTES * 8) / durationSec / 1000));
     const outPath = path.join(tmpDir, 'replay.mp4');
 
@@ -596,7 +754,7 @@ async function buildReplayVideo({ sources = [] } = {}) {
 
     await execFileAsync(FFMPEG_BIN, args);
     const buffer = await fsp.readFile(outPath);
-    return { buffer, usedSources, missingSources };
+    return { buffer, usedSources, missingSources, title: resolvedTitle };
   } finally {
     try {
       await fsp.rm(tmpDir, { recursive: true, force: true });

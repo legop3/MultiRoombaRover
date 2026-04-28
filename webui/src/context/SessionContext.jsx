@@ -171,7 +171,12 @@ export function SessionProvider({ children }) {
       requestVerification: () => emitWithAck('verification:request'),
       requestPrivateRoverAccess: (roverId) =>
         emitWithAck('session:privateRover:requestAccess', { roverId }),
-      triggerReplay: (sources = []) => emitWithAck('replay:trigger', { sources }),
+      triggerReplay: (sourcesOrPayload = [], title = '') => {
+        if (sourcesOrPayload && typeof sourcesOrPayload === 'object' && !Array.isArray(sourcesOrPayload)) {
+          return emitWithAck('replay:trigger', sourcesOrPayload);
+        }
+        return emitWithAck('replay:trigger', { sources: sourcesOrPayload, title });
+      },
       setCommunityGoal: (text) => emitWithAck('communityGoal:set', { text }),
       setAdminReason: (text) => emitWithAck('adminReason:set', { text }),
       rebootRover: (roverId) =>
