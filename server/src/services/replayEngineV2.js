@@ -27,7 +27,7 @@ const TARGET_FPS = Math.max(10, Number.parseInt(process.env.REPLAY_TARGET_FPS ||
 const MAX_WIDTH = Math.max(320, Number.parseInt(process.env.REPLAY_MAX_WIDTH || '1280', 10));
 const MAX_HEIGHT = Math.max(180, Number.parseInt(process.env.REPLAY_MAX_HEIGHT || '720', 10));
 const MAX_BYTES = Math.floor(Number.parseFloat(process.env.REPLAY_MAX_OUTPUT_MB || '9.5') * 1024 * 1024);
-const SIDEBAR_WIDTH = Math.max(200, Number.parseInt(process.env.REPLAY_SIDEBAR_WIDTH || '290', 10));
+const SIDEBAR_WIDTH = Math.max(180, Number.parseInt(process.env.REPLAY_SIDEBAR_WIDTH || '250', 10));
 
 const events = new EventEmitter();
 
@@ -424,7 +424,7 @@ function escapeXml(text) {
     .replace(/'/g, '&#39;');
 }
 
-function wrapTextLines(text, maxChars = 28) {
+function wrapTextLines(text, maxChars = 24) {
   const words = String(text || '').split(/\s+/).filter(Boolean);
   const lines = [];
   let current = '';
@@ -473,10 +473,10 @@ function renderSidebarSvg({
   driverBatteryLines,
   chatLines,
 }) {
-  const titleParts = wrapTextLines(title, 22).slice(0, 4).map((line) => escapeXml(line));
+  const titleParts = wrapTextLines(title, 20).slice(0, 4).map((line) => escapeXml(line));
   const statLines = driverBatteryLines.slice(0, 8).map((line) => escapeXml(line));
   const normalizedChats = chatLines.slice(-12).map((entry) => {
-    const wrapped = wrapTextLines(entry.text || '', 24).slice(0, 3).map((line) => escapeXml(line));
+    const wrapped = wrapTextLines(entry.text || '', 20).slice(0, 4).map((line) => escapeXml(line));
     const nick = escapeXml(entry.nickname || 'user');
     const roverId = escapeXml(entry.roverId || '');
     const roverRgb = hexToRgb(entry.roverColor || '');
@@ -496,68 +496,68 @@ function renderSidebarSvg({
 
   const shapes = [];
   const textRows = [];
-  const pad = 8;
+  const pad = 5;
   const cardX = pad;
   const cardW = width - pad * 2;
-  let y = 8;
+  let y = 5;
 
   // Title card
-  const titleCardH = Math.max(56, 18 + titleParts.length * 22);
-  shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${titleCardH}" rx="6" class="card"/>`);
-  let ty = y + 28;
+  const titleCardH = Math.max(42, 12 + titleParts.length * 18);
+  shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${titleCardH}" rx="4" class="card"/>`);
+  let ty = y + 18;
   for (const part of titleParts) {
-    textRows.push(`<text x="${cardX + 12}" y="${ty}" class="title">${part}</text>`);
-    ty += 22;
+    textRows.push(`<text x="${cardX + 8}" y="${ty}" class="title">${part}</text>`);
+    ty += 18;
   }
-  y += titleCardH + 6;
+  y += titleCardH + 4;
 
   // Drivers card
   const driverLines = statLines.length ? statLines : ['No active drivers'];
-  const driversCardH = 24 + driverLines.length * 18 + 8;
-  shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${driversCardH}" rx="6" class="card"/>`);
-  textRows.push(`<text x="${cardX + 12}" y="${y + 22}" class="section">Drivers</text>`);
-  let dy = y + 44;
+  const driversCardH = 20 + driverLines.length * 16 + 6;
+  shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${driversCardH}" rx="4" class="card"/>`);
+  textRows.push(`<text x="${cardX + 8}" y="${y + 16}" class="section">Drivers</text>`);
+  let dy = y + 32;
   for (const line of driverLines) {
-    textRows.push(`<text x="${cardX + 12}" y="${dy}" class="${statLines.length ? 'body' : 'muted'}">${line}</text>`);
-    dy += 20;
+    textRows.push(`<text x="${cardX + 8}" y="${dy}" class="${statLines.length ? 'body' : 'muted'}">${line}</text>`);
+    dy += 16;
   }
-  y += driversCardH + 6;
+  y += driversCardH + 4;
 
   // Chat card
-  const chatCardH = Math.max(80, height - y - 8);
-  shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${chatCardH}" rx="6" class="card"/>`);
-  textRows.push(`<text x="${cardX + 12}" y="${y + 22}" class="section">Chat</text>`);
+  const chatCardH = Math.max(80, height - y - 5);
+  shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${chatCardH}" rx="4" class="card"/>`);
+  textRows.push(`<text x="${cardX + 8}" y="${y + 16}" class="section">Chat</text>`);
 
-  let cy = y + 34;
-  const bubbleX = cardX + 8;
-  const bubbleW = cardW - 16;
+  let cy = y + 22;
+  const bubbleX = cardX + 5;
+  const bubbleW = cardW - 10;
   if (!normalizedChats.length) {
-    textRows.push(`<text x="${cardX + 12}" y="${cy + 20}" class="muted">No chat in replay window</text>`);
+    textRows.push(`<text x="${cardX + 8}" y="${cy + 16}" class="muted">No chat in replay window</text>`);
   } else {
     for (let i = 0; i < normalizedChats.length; i += 1) {
       const block = normalizedChats[i];
-      const bubbleH = 26 + block.wrapped.length * 16;
-      if (cy + bubbleH + 6 > y + chatCardH - 8) break;
+      const bubbleH = 20 + block.wrapped.length * 14;
+      if (cy + bubbleH + 4 > y + chatCardH - 5) break;
       shapes.push(
-        `<rect x="${bubbleX}" y="${cy}" width="${bubbleW}" height="${bubbleH}" rx="6" class="${block.bubbleTone}"/>`,
+        `<rect x="${bubbleX}" y="${cy}" width="${bubbleW}" height="${bubbleH}" rx="4" class="${block.bubbleTone}"/>`,
       );
-      textRows.push(`<text x="${bubbleX + 8}" y="${cy + 16}" class="chatName" fill="${block.nameColor}">${block.nick}</text>`);
+      textRows.push(`<text x="${bubbleX + 6}" y="${cy + 13}" class="chatName" fill="${block.nameColor}">${block.nick}</text>`);
       if (block.fromDiscord) {
-        textRows.push(`<text x="${bubbleX + 8 + Math.min(110, block.nick.length * 7)}" y="${cy + 16}" class="discordTag">◈</text>`);
+        textRows.push(`<text x="${bubbleX + 6 + Math.min(95, block.nick.length * 6)}" y="${cy + 13}" class="discordTag">◈</text>`);
       }
       if (block.roverId) {
-        const badgeTextX = bubbleX + bubbleW - 70;
+        const badgeTextX = bubbleX + bubbleW - 56;
         shapes.push(
-          `<rect x="${badgeTextX - 4}" y="${cy + 5}" width="64" height="14" rx="4" fill="${block.roverBadgeBg}" stroke="${block.roverBadgeBorder}" stroke-width="1"/>`,
+          `<rect x="${badgeTextX - 3}" y="${cy + 3}" width="50" height="12" rx="3" fill="${block.roverBadgeBg}" stroke="${block.roverBadgeBorder}" stroke-width="0.8"/>`,
         );
-        textRows.push(`<text x="${badgeTextX}" y="${cy + 16}" class="roverTag">${block.roverId}</text>`);
+        textRows.push(`<text x="${badgeTextX}" y="${cy + 12}" class="roverTag">${block.roverId}</text>`);
       }
-      let by = cy + 32;
+      let by = cy + 25;
       for (const line of block.wrapped) {
-        textRows.push(`<text x="${bubbleX + 8}" y="${by}" class="chat">${line}</text>`);
-        by += 16;
+        textRows.push(`<text x="${bubbleX + 6}" y="${by}" class="chat">${line}</text>`);
+        by += 14;
       }
-      cy += bubbleH + 6;
+      cy += bubbleH + 4;
     }
   }
 
@@ -570,19 +570,18 @@ function renderSidebarSvg({
     </linearGradient>
   </defs>
   <rect width="${width}" height="${height}" fill="#000000"/>
-  <rect x="0" y="0" width="${width}" height="2" fill="#0ea5e9"/>
   <style>
-    .card { fill: #171717; stroke: #334155; stroke-width: 0.8; }
+    .card { fill: #141414; stroke: #262626; stroke-width: 0.6; }
     .chatBubble { fill: #3f3f46; }
-    .discordBubble { fill: #312e81; }
-    .title { font-family: "DejaVu Sans", sans-serif; font-size: 19px; font-weight: 700; fill: #f8fafc; }
-    .section { font-family: "DejaVu Sans", sans-serif; font-size: 13px; font-weight: 700; fill: #7dd3fc; text-transform: uppercase; letter-spacing: .4px; }
-    .body { font-family: "DejaVu Sans", sans-serif; font-size: 13px; fill: #e2e8f0; }
-    .chatName { font-family: "DejaVu Sans", sans-serif; font-size: 12px; font-weight: 700; }
-    .chat { font-family: "DejaVu Sans", sans-serif; font-size: 12px; fill: #f8fafc; }
-    .roverTag { font-family: "DejaVu Sans", sans-serif; font-size: 11px; fill: #dbeafe; }
+    .discordBubble { fill: #3f3f46; }
+    .title { font-family: "DejaVu Sans", sans-serif; font-size: 15px; font-weight: 700; fill: #f8fafc; }
+    .section { font-family: "DejaVu Sans", sans-serif; font-size: 11px; font-weight: 700; fill: #e2e8f0; text-transform: uppercase; letter-spacing: .3px; }
+    .body { font-family: "DejaVu Sans", sans-serif; font-size: 11px; fill: #e2e8f0; }
+    .chatName { font-family: "DejaVu Sans", sans-serif; font-size: 10px; font-weight: 700; }
+    .chat { font-family: "DejaVu Sans", sans-serif; font-size: 10px; fill: #f8fafc; }
+    .roverTag { font-family: "DejaVu Sans", sans-serif; font-size: 9px; fill: #dbeafe; }
     .discordTag { font-family: "DejaVu Sans", sans-serif; font-size: 10px; fill: #c7d2fe; }
-    .muted { font-family: "DejaVu Sans", sans-serif; font-size: 12px; fill: #94a3b8; }
+    .muted { font-family: "DejaVu Sans", sans-serif; font-size: 10px; fill: #94a3b8; }
   </style>
   ${shapes.join('\n  ')}
   ${textRows.join('\n  ')}
@@ -604,7 +603,7 @@ async function renderSidebarVideo({
   const secondCount = Math.max(1, Math.ceil(durationSec));
   for (let second = 0; second < secondCount; second += 1) {
     const sliceEndMs = windowStartMs + (second + 1) * 1000;
-    const visibleChat = chatEvents.filter((entry) => entry.ts <= sliceEndMs).slice(-10).map((entry) => entry.text);
+    const visibleChat = chatEvents.filter((entry) => entry.ts <= sliceEndMs).slice(-10);
     const svg = renderSidebarSvg({
       width: SIDEBAR_WIDTH,
       height,
