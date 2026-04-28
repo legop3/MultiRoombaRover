@@ -450,7 +450,7 @@ function buildReplayCaption({ requester, usedSources = [], missingSources = [], 
   return lines.join('\n');
 }
 
-async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '') {
+async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '', includeSidebar = true) {
   if (!channelId) {
     throw new Error('Replay channel not configured');
   }
@@ -459,6 +459,7 @@ async function sendReplayToChannel(channelId, requester, sources = [], explicitT
     sources,
     title: resolvedTitle,
     requester,
+    includeSidebar,
   });
   const filenameBase = sanitizeReplayTitleForFilename(resolvedTitle);
   const attachment = new AttachmentBuilder(buffer, { name: `${filenameBase}.mp4` });
@@ -1619,7 +1620,13 @@ function handleBusEvent(event) {
       schedulePresenceRotation();
       break;
     case 'replay.requested':
-      sendReplayToChannel(payload?.channelId, payload?.requester, payload?.sources || [], payload?.title || '').catch((err) => {
+      sendReplayToChannel(
+        payload?.channelId,
+        payload?.requester,
+        payload?.sources || [],
+        payload?.title || '',
+        payload?.includeSidebar !== false,
+      ).catch((err) => {
         logger.warn('Replay send failed', err.message);
       });
       break;

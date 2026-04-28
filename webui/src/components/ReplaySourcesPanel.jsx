@@ -28,6 +28,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const [success, setSuccess] = useState(null);
   const [title, setTitle] = useState('');
   const [titleDirty, setTitleDirty] = useState(false);
+  const [includeSidebar, setIncludeSidebar] = useState(true);
   const replayState = session?.replay || null;
   const [remainingMs, setRemainingMs] = useState(0);
 
@@ -60,6 +61,15 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     }
     setSelected(defaults);
   }, [settings?.[panelId], defaults, panelId]);
+
+  useEffect(() => {
+    const saved = settings?.[`${panelId}:includeSidebar`];
+    if (typeof saved === 'boolean') {
+      setIncludeSidebar(saved);
+      return;
+    }
+    setIncludeSidebar(true);
+  }, [settings?.[`${panelId}:includeSidebar`], panelId]);
 
   useEffect(() => {
     if (!titleDirty) {
@@ -115,7 +125,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
         return { type, id };
       });
       const resolvedTitle = String(title || '').trim() || defaultTitle;
-      await triggerReplay(payload, resolvedTitle);
+      await triggerReplay({ sources: payload, title: resolvedTitle, includeSidebar });
       setSuccess('Replay sent. Check the Discord replay channel.');
     } catch (err) {
       setError(err.message);
@@ -138,7 +148,11 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
         <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
       </div>
       <div className="space-y-0.5">
+        <label className="panel-muted block text-xs" htmlFor={`${panelId}-title`}>
+          Replay title
+        </label>
         <input
+          id={`${panelId}-title`}
           type="text"
           className="field-input w-full text-xs"
           value={title}
@@ -149,6 +163,19 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
           placeholder={defaultTitle}
           maxLength={120}
         />
+        <label className="surface flex items-center gap-0.5 text-xs">
+          <input
+            type="checkbox"
+            checked={includeSidebar}
+            onChange={(event) => {
+              const next = Boolean(event.target.checked);
+              setIncludeSidebar(next);
+              saveSettings((current) => ({ ...(current || {}), [`${panelId}:includeSidebar`]: next }));
+            }}
+            className="accent-emerald-400"
+          />
+          <span>Include replay sidebar</span>
+        </label>
         <button
           type="button"
           className="button-dark w-full text-xs disabled:opacity-40"

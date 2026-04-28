@@ -724,7 +724,7 @@ async function probeMaxFrameSize(paths) {
   return { maxWidth, maxHeight };
 }
 
-async function buildReplayVideo({ sources = [], title = '', requester = '' } = {}) {
+async function buildReplayVideo({ sources = [], title = '', requester = '', includeSidebar = true } = {}) {
   if (!Array.isArray(sources) || !sources.length) {
     throw new Error('No replay sources selected');
   }
@@ -843,22 +843,6 @@ async function buildReplayVideo({ sources = [], title = '', requester = '' } = {
     tileWidth = clampEven(tileWidth);
     tileHeight = clampEven(tileHeight);
 
-    const selectedRoverIds = usedSources
-      .filter((entry) => entry?.type === 'rover')
-      .map((entry) => String(entry.id));
-    const driverBatteryLines = buildDriverBatterySnapshot(selectedRoverIds);
-    const chatEvents = buildChatEventsForWindow(tStart, tEnd);
-    const durationSec = BUILD_DURATION_MS / 1000;
-    const sidebarPath = await renderSidebarVideo({
-      tmpDir,
-      title: resolvedTitle,
-      durationSec,
-      height: clampEven(tileHeight * layout.rows),
-      windowStartMs: tStart,
-      driverBatteryLines,
-      chatEvents,
-    });
-
     const inputArgs = [];
     const filterParts = [];
     const layoutParts = [];
@@ -872,9 +856,29 @@ async function buildReplayVideo({ sources = [], title = '', requester = '' } = {
       layoutParts.push(`${x}_${y}`);
     }
 
-    inputArgs.push('-i', sidebarPath);
-    const sidebarInputIndex = normalizedVideos.length;
-    const audioInputStart = normalizedVideos.length + 1;
+    let audioInputStart = normalizedVideos.length;
+    let sidebarInputIndex = -1;
+    if (includeSidebar) {
+      const selectedRoverIds = usedSources
+        .filter((entry) => entry?.type === 'rover')
+        .map((entry) => String(entry.id));
+      const driverBatteryLines = buildDriverBatterySnapshot(selectedRoverIds);
+      const chatEvents = buildChatEventsForWindow(tStart, tEnd);
+      const durationSec = BUILD_DURATION_MS / 1000;
+      const sidebarPath = await renderSidebarVideo({
+        tmpDir,
+        title: resolvedTitle,
+        durationSec,
+        height: clampEven(tileHeight * layout.rows),
+        windowStartMs: tStart,
+        driverBatteryLines,
+        chatEvents,
+      });
+      inputArgs.push('-i', sidebarPath);
+      sidebarInputIndex = normalizedVideos.length;
+      audioInputStart = normalizedVideos.length + 1;
+    }
+
     for (const audioPath of normalizedAudios) {
       inputArgs.push('-i', audioPath);
     }
@@ -887,7 +891,11 @@ async function buildReplayVideo({ sources = [], title = '', requester = '' } = {
           `xstack=inputs=${normalizedVideos.length}:layout=${layoutParts.join('|')}:fill=black[vgrid]`,
       );
     }
-    filterParts.push(`[vgrid][${sidebarInputIndex}:v]hstack=inputs=2[vout]`);
+    if (includeSidebar) {
+      filterParts.push(`[vgrid][${sidebarInputIndex}:v]hstack=inputs=2[vout]`);
+    } else {
+      filterParts.push('[vgrid]null[vout]');
+    }
 
     if (normalizedAudios.length) {
       const audioRefs = normalizedAudios.map((_, idx) => `[${audioInputStart + idx}:a]`).join('');

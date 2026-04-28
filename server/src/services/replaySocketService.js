@@ -20,6 +20,11 @@ function normalizeReplayTitle(value) {
   return value.trim().slice(0, 120);
 }
 
+function normalizeIncludeSidebar(value) {
+  if (typeof value === 'boolean') return value;
+  return true;
+}
+
 io.on('connection', (socket) => {
   socket.on('replay:trigger', (payload = {}, cb = () => {}) => {
     if (getMode() === MODES.LOCKDOWN) {
@@ -43,6 +48,7 @@ io.on('connection', (socket) => {
     }
     const requester = buildRequesterLabel(socket);
     const title = normalizeReplayTitle(payload?.title);
+    const includeSidebar = normalizeIncludeSidebar(payload?.includeSidebar);
     const attempt = tryTriggerReplay({ by: { source: 'web', requester } });
     if (!attempt.ok) {
       cb({ error: 'Replay cooldown active', remainingMs: attempt.remainingMs, state: attempt.state });
@@ -55,6 +61,7 @@ io.on('connection', (socket) => {
         channelId,
         requester,
         title,
+        includeSidebar,
         sources,
         requestedBy: { socketId: socket.id },
       },
