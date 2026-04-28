@@ -60,7 +60,7 @@
 - [x] mini summary app
 - [x] spectator app
 - [x] vip audio upload card
-- [ ] admin panel
+- [x] admin panel
 - [ ] drive dock action
 - [ ] gamepad mapping settings
 - [ ] mobile controls
@@ -73,12 +73,14 @@
 - spectator app
 - video tile
 - vip audio upload card
+- admin panel
 
 ### LARGE CHANGES
 - Split `webui/src/mini/MiniSummaryApp.jsx` into folderized modules under `webui/src/mini/MiniSummaryApp/` with a compatibility entrypoint preserved.
 - Split `webui/src/spectate/SpectatorApp.jsx` into folderized modules under `webui/src/spectate/SpectatorApp/` with a compatibility entrypoint preserved.
 - Split `webui/src/components/VideoTile.jsx` by extracting HUD, overlays, chat input, and constants into `webui/src/components/VideoTile/` while preserving the existing `VideoTile.jsx` public component API.
 - Split `webui/src/components/vip/VipAudioUploadCard.jsx` by extracting transport/audio helpers and UI atoms into `webui/src/components/vip/VipAudioUploadCard/` while preserving the existing `VipAudioUploadCard.jsx` import/export API.
+- Split `webui/src/components/AdminPanel.jsx` into `webui/src/components/AdminPanel/` and extracted monitor/health/log/LLM helper modules; updated consumers to folder entrypoint and removed external wrapper file.
 
 ## Done criteria (per item)
 - [ ] Folderized structure created.

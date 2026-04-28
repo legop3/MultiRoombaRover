@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useControlSystem } from '../controls/index.js';
 import AuthPanel from './AuthPanel.jsx';
-import AdminPanel from './AdminPanel.jsx';
+import AdminPanel from './AdminPanel/index.jsx';
 import KeymapSettings from './KeymapSettings.jsx';
 import GamepadMappingSettings from './GamepadMappingSettings.jsx';
 import OvercurrentLimiterPanel from './OvercurrentLimiterPanel.jsx';
