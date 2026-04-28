@@ -66,7 +66,7 @@
 - [x] drive dock action
 - [x] gamepad mapping settings
 - [x] mobile controls
-- [ ] top down map
+- [x] top down map
 - [x] video tile
 - [ ] Sweep `webui` for unused or unneeded files/code with verification
 
@@ -79,6 +79,7 @@
 - drive dock action
 - gamepad mapping settings
 - mobile controls
+- top down map
 
 ### LARGE CHANGES
 - Split `webui/src/mini/MiniSummaryApp.jsx` into folderized modules under `webui/src/mini/MiniSummaryApp/` with a compatibility entrypoint preserved.
@@ -89,6 +90,7 @@
 - Moved `DriveDockAction` to `webui/src/components/DriveDockAction/index.jsx` and updated all consumers to folder entrypoint imports.
 - Split `webui/src/components/GamepadMappingSettings.jsx` into `webui/src/components/GamepadMappingSettings/` with extracted constants/helpers/SliderField modules and removed the standalone component file.
 - Split `webui/src/components/MobileControls.jsx` into `webui/src/components/MobileControls/` with extracted joystick/aux/constants modules; preserved named exports and moved app import to folder entrypoint.
+- Split `webui/src/components/TopDownMap.jsx` into `webui/src/components/TopDownMap/` with extracted geometry/color helpers and visual SVG primitive modules; updated all consumers to folder entrypoint.
 
 ## Done criteria (per item)
 - [ ] Folderized structure created.

@@ -6,7 +6,7 @@ import ChatPanel from './ChatPanel.jsx';
 import { LinkButtonsPanel, NicknameEntryPanel } from './UserListPanel.jsx';
 import ReplaySourcesPanel from './ReplaySourcesPanel.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './Tabs.jsx';
-import TopDownMap from './TopDownMap.jsx';
+import TopDownMap from './TopDownMap/index.jsx';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction/index.jsx';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useControlSystem } from '../controls/index.js';

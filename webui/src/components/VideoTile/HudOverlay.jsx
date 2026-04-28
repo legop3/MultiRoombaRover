@@ -1,6 +1,6 @@
 // Telemetry HUD and map overlay for VideoTile.
 import React from 'react';
-import TopDownMap from '../TopDownMap.jsx';
+import TopDownMap from '../TopDownMap/index.jsx';
 import { roverNameChromeStyle } from '../../lib/roverColor.js';
 
 export default function HudOverlay({

@@ -3,7 +3,7 @@ import { useSession } from '../context/SessionContext.jsx';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useControlSystem } from '../controls/index.js';
 import { formatKeyLabel } from '../controls/keymapUtils.js';
-import TopDownMap from './TopDownMap.jsx';
+import TopDownMap from './TopDownMap/index.jsx';
 import RoverRoster from './RoverRoster.jsx';
 import DriveDockAction, { useDriveDockState } from './DriveDockAction/index.jsx';
 import NightVisionControl from './NightVisionControl.jsx';
