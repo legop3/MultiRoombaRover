@@ -17,6 +17,9 @@
 - Split very large service files into smaller focused modules.
 - Keep files concise and single-purpose.
 - Add clear title comments at top of split files.
+- Every service/module file should start with a descriptive comment header containing:
+- a title line naming the service/module file
+- a longer purpose/scope description (not a one-liner)
 
 ## WebUI frontend
 - Every component must live in its own folder, even when it remains a single-file implementation.
@@ -48,17 +51,20 @@
 - [ ] replay services (already partly split; reformat consistently)
 - [ ] room camera services (already partly split; reformat consistently)
 - [ ] rover manager service
-- [ ] session service
-- [ ] turn service
+- [x] session service
+- [x] turn service
 - [ ] verification service
 - [ ] video auth service
-- [ ] All remaining services: reorganize to folder structure where needed
+- [x] All remaining services: reorganize to folder structure where needed
 
 ### COMPLETED SERVICES
-- None yet.
+- turn service
+- session service
 
 ### LARGE CHANGES
-- None yet.
+- Folderized all files in `server/src/services/` into per-service folders with `index.js` entrypoints and updated internal relative imports for new path depth.
+- Split `server/src/services/turnService/index.js` by extracting constants, shared state helpers, and side-effect action helpers into `turnService/constants.js`, `turnService/state.js`, and `turnService/actions.js`.
+- Split `server/src/services/sessionService/index.js` by extracting config/timing constants, sync-throttle state storage, and visibility filter helpers into `sessionService/constants.js`, `sessionService/state.js`, and `sessionService/filters.js`.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS
