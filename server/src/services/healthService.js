@@ -3,8 +3,7 @@ const path = require('path');
 const roverManager = require('./roverManager');
 const { getRoomCameras } = require('./roomCameraService');
 const { getRoomCameraState } = require('./roomCameraSnapshotService');
-const { getReplaySources } = require('./replaySourceService');
-const { replaySegmentsDir, segmentSeconds, bufferSeconds } = require('./replaySegmentManager');
+const { getReplayHealthSnapshot } = require('./replayEngineV2');
 
 const ROVER_SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
 const HEALTH_INTERVAL_MS = 5000;
@@ -17,44 +16,8 @@ let latest = {
   snapshots: { rovers: [], rooms: [] },
 };
 
-async function collectReplayHealth(now) {
-  const neededCount = Math.max(1, Math.ceil(20000 / (segmentSeconds * 1000)));
-  const sources = getReplaySources();
-  const list = [];
-  let readyCount = 0;
-  for (const source of sources) {
-    const key = `${source.type}__${source.id}`;
-    const dir = path.join(replaySegmentsDir, key);
-    let lastSegmentAt = null;
-    let recentCount = 0;
-    try {
-      const entries = await fsp.readdir(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isFile() || !entry.name.endsWith('.mp4')) continue;
-        const stat = await fsp.stat(path.join(dir, entry.name));
-        if (stat.mtimeMs > (lastSegmentAt || 0)) {
-          lastSegmentAt = stat.mtimeMs;
-        }
-        if (now - stat.mtimeMs <= bufferSeconds * 1000) {
-          recentCount += 1;
-        }
-      }
-    } catch {
-      // directory missing or unreadable
-    }
-    const ready = recentCount >= neededCount;
-    if (ready) readyCount += 1;
-    list.push({
-      type: source.type,
-      id: source.id,
-      label: source.label || `${source.type}:${source.id}`,
-      recentCount,
-      neededCount,
-      lastSegmentAt,
-      ready,
-    });
-  }
-  return { sources: list, readyCount, totalCount: list.length };
+function collectReplayHealth() {
+  return getReplayHealthSnapshot();
 }
 
 async function collectSnapshotHealth(now) {
@@ -109,7 +72,7 @@ async function collectSnapshotHealth(now) {
 
 async function refreshHealth() {
   const now = Date.now();
-  const replay = await collectReplayHealth(now);
+  const replay = collectReplayHealth(now);
   const snapshots = await collectSnapshotHealth(now);
   latest = { updatedAt: now, replay, snapshots };
 }
