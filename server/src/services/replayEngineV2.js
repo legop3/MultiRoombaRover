@@ -90,8 +90,6 @@ function listDesiredSources() {
 function buildWorkerArgs(source) {
   const dir = sourceDirForKey(sourceKey(source));
   const pattern = path.join(dir, 'seg-%06d.mp4');
-  const listPath = path.join(dir, 'index.csv');
-  const listSize = Math.ceil((BUFFER_SECONDS + 10) / SEGMENT_SECONDS);
 
   const common = [
     '-hide_banner',
@@ -115,7 +113,7 @@ function buildWorkerArgs(source) {
       '-ar',
       '48000',
       '-af',
-      'aresample=48000',
+      'aresample=async=1:first_pts=0:min_hard_comp=0.100000,asetpts=N/SR/TB',
       '-c:a',
       'aac',
       '-b:a',
@@ -126,14 +124,6 @@ function buildWorkerArgs(source) {
       String(SEGMENT_SECONDS),
       '-segment_atclocktime',
       '1',
-      '-segment_list',
-      listPath,
-      '-segment_list_type',
-      'csv',
-      '-segment_list_size',
-      String(listSize),
-      '-segment_list_flags',
-      '+live',
       '-reset_timestamps',
       '1',
       pattern,
@@ -165,14 +155,6 @@ function buildWorkerArgs(source) {
     String(SEGMENT_SECONDS),
     '-segment_atclocktime',
     '1',
-    '-segment_list',
-    listPath,
-    '-segment_list_type',
-    'csv',
-    '-segment_list_size',
-    String(listSize),
-    '-segment_list_flags',
-    '+live',
     '-reset_timestamps',
     '1',
     pattern,
@@ -249,37 +231,50 @@ async function syncWorkers() {
   }
 }
 
-function parseCsvLine(line) {
-  const trimmed = String(line || '').trim();
-  if (!trimmed) return null;
-  const parts = trimmed.split(',');
-  if (parts.length < 3) return null;
-  return {
-    filename: parts[0],
-    startSec: Number(parts[1]),
-    endSec: Number(parts[2]),
-  };
+async function probeDurationSec(filePath) {
+  try {
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v',
+      'error',
+      '-show_entries',
+      'format=duration',
+      '-of',
+      'default=noprint_wrappers=1:nokey=1',
+      filePath,
+    ]);
+    const value = Number(String(stdout || '').trim());
+    if (Number.isFinite(value) && value > 0 && value < SEGMENT_SECONDS * 10) {
+      return value;
+    }
+  } catch {
+    // ignore probe failures; fallback below
+  }
+  return SEGMENT_SECONDS;
 }
 
 async function refreshIndexForWorker(worker) {
   const key = worker.key;
   const dir = sourceDirForKey(key);
-  const csvPath = path.join(dir, 'index.csv');
-  let csv;
+  let files;
   try {
-    csv = await fsp.readFile(csvPath, 'utf8');
+    files = await fsp.readdir(dir, { withFileTypes: true });
   } catch {
     return;
   }
 
-  const lines = csv.split(/\r?\n/).map(parseCsvLine).filter(Boolean);
-  if (!lines.length) return;
+  const segmentFiles = files
+    .filter((entry) => entry.isFile() && /^seg-\d{6}\.mp4$/.test(entry.name))
+    .map((entry) => entry.name)
+    .sort();
+  if (!segmentFiles.length) {
+    segmentIndex.set(key, []);
+    return;
+  }
   const cutoffMs = Date.now() - BUFFER_SECONDS * 1000 - 5000;
 
   const entries = [];
-  for (const row of lines) {
-    if (!Number.isFinite(row.startSec) || !Number.isFinite(row.endSec)) continue;
-    const filePath = path.join(dir, row.filename);
+  for (const filename of segmentFiles) {
+    const filePath = path.join(dir, filename);
     let stat;
     try {
       stat = await fsp.stat(filePath);
@@ -287,11 +282,7 @@ async function refreshIndexForWorker(worker) {
       continue;
     }
     if (!stat.isFile() || stat.size < 4096) continue;
-    const durSecRaw = row.endSec - row.startSec;
-    const durationSec =
-      Number.isFinite(durSecRaw) && durSecRaw > 0 && durSecRaw < SEGMENT_SECONDS * 6
-        ? durSecRaw
-        : SEGMENT_SECONDS;
+    const durationSec = await probeDurationSec(filePath);
     const endMs = Math.round(stat.mtimeMs);
     const startMs = Math.round(endMs - durationSec * 1000);
     if (endMs < cutoffMs) continue;
