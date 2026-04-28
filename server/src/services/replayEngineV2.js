@@ -12,7 +12,7 @@ const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 const execFileAsync = promisify(execFile);
 
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
-const SEGMENT_ROOT = process.env.REPLAY_SEGMENT_DIR || '/var/lib/replay-segments-v2';
+const SEGMENT_ROOT = process.env.REPLAY_SEGMENT_DIR || '/var/lib/replay-segments';
 const SEGMENT_SECONDS = Math.max(1, Number.parseInt(process.env.REPLAY_SEGMENT_SECONDS || '1', 10));
 const BUFFER_SECONDS = Math.max(20, Number.parseInt(process.env.REPLAY_BUFFER_SECONDS || '45', 10));
 const CLEANUP_INTERVAL_MS = 10_000;
@@ -28,13 +28,14 @@ const events = new EventEmitter();
 const workers = new Map(); // key -> worker
 const segmentIndex = new Map(); // key -> [{filePath,startMs,endMs,mtimeMs,size,kind,sourceType,sourceId}]
 let cleanupTimer = null;
+let activeSegmentRoot = SEGMENT_ROOT;
 
 function sourceKey(source) {
   return `${source.sourceType}__${source.kind}__${source.id}`;
 }
 
 function sourceDirForKey(key) {
-  return path.join(SEGMENT_ROOT, key);
+  return path.join(activeSegmentRoot, key);
 }
 
 function toSrtReadPath(streamId) {
@@ -312,11 +313,11 @@ async function refreshSegmentIndex() {
 async function cleanupOldFiles() {
   const cutoff = Date.now() - BUFFER_SECONDS * 1000;
   try {
-    await ensureDir(SEGMENT_ROOT);
-    const dirs = await fsp.readdir(SEGMENT_ROOT, { withFileTypes: true });
+    await ensureDir(activeSegmentRoot);
+    const dirs = await fsp.readdir(activeSegmentRoot, { withFileTypes: true });
     for (const dirent of dirs) {
       if (!dirent.isDirectory()) continue;
-      const dirPath = path.join(SEGMENT_ROOT, dirent.name);
+      const dirPath = path.join(activeSegmentRoot, dirent.name);
       let files;
       try {
         files = await fsp.readdir(dirPath, { withFileTypes: true });
@@ -654,8 +655,8 @@ function getReplayHealthSnapshot() {
 }
 
 async function bootstrapIndexFromDisk() {
-  await ensureDir(SEGMENT_ROOT);
-  const dirs = await fsp.readdir(SEGMENT_ROOT, { withFileTypes: true });
+  await ensureDir(activeSegmentRoot);
+  const dirs = await fsp.readdir(activeSegmentRoot, { withFileTypes: true });
   for (const dirent of dirs) {
     if (!dirent.isDirectory()) continue;
     segmentIndex.set(dirent.name, []);
@@ -670,7 +671,20 @@ async function tick() {
 }
 
 async function start() {
-  await ensureDir(SEGMENT_ROOT);
+  try {
+    await ensureDir(SEGMENT_ROOT);
+    activeSegmentRoot = SEGMENT_ROOT;
+  } catch (err) {
+    const fallback = path.join(os.tmpdir(), 'mrr-replay-segments');
+    await ensureDir(fallback);
+    activeSegmentRoot = fallback;
+    logger.warn('Replay segment root unavailable; using fallback path', {
+      configuredRoot: SEGMENT_ROOT,
+      fallbackRoot: fallback,
+      error: err.message,
+    });
+  }
+  logger.info('Replay engine using segment root', { segmentRoot: activeSegmentRoot });
   await bootstrapIndexFromDisk();
   await tick();
   if (cleanupTimer) clearInterval(cleanupTimer);
@@ -697,7 +711,7 @@ module.exports = {
   buildReplayVideo,
   getReplayHealthSnapshot,
   replayEngineEvents: events,
-  replaySegmentRootDir: SEGMENT_ROOT,
+  replaySegmentRootDir: () => activeSegmentRoot,
   replaySegmentSeconds: SEGMENT_SECONDS,
   replayBufferSeconds: BUFFER_SECONDS,
 };
