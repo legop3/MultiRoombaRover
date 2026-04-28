@@ -395,12 +395,11 @@ function buildDriverBatterySnapshot(selectedRoverIds = []) {
   return lines;
 }
 
-function buildChatEventsForWindow(startMs, endMs, limit = 18) {
+function buildChatEventsForWindow(startMs, endMs, limit = 22, preWindowCount = 10) {
   const all = getRecentMessages(300, { includeSystem: false });
-  const windowed = all
-    .filter((msg) => Number.isFinite(msg?.ts) && msg.ts >= startMs && msg.ts <= endMs)
-    .slice(-limit);
-  return windowed.map((msg) => {
+  const normalized = all
+    .filter((msg) => Number.isFinite(msg?.ts))
+    .map((msg) => {
     const nickname = String(msg?.nickname || msg?.discordUserName || 'user').trim() || 'user';
     const text = String(msg?.text || '').replace(/\s+/g, ' ').trim();
     return {
@@ -413,6 +412,9 @@ function buildChatEventsForWindow(startMs, endMs, limit = 18) {
       roverColor: msg?.roverColor ? String(msg.roverColor) : '',
     };
   });
+  const beforeWindow = normalized.filter((msg) => msg.ts < startMs).slice(-preWindowCount);
+  const inWindow = normalized.filter((msg) => msg.ts >= startMs && msg.ts <= endMs).slice(-limit);
+  return [...beforeWindow, ...inWindow].sort((a, b) => a.ts - b.ts);
 }
 
 function escapeXml(text) {
@@ -476,7 +478,7 @@ function renderSidebarSvg({
   const titleParts = wrapTextLines(title, 20).slice(0, 4).map((line) => escapeXml(line));
   const statLines = driverBatteryLines.slice(0, 8).map((line) => escapeXml(line));
   const normalizedChats = chatLines.slice(-12).map((entry) => {
-    const wrapped = wrapTextLines(entry.text || '', 20).slice(0, 4).map((line) => escapeXml(line));
+    const wrapped = wrapTextLines(entry.text || '', 22).slice(0, 4).map((line) => escapeXml(line));
     const nick = escapeXml(entry.nickname || 'user');
     const roverId = escapeXml(entry.roverId || '');
     const roverRgb = hexToRgb(entry.roverColor || '');
@@ -536,25 +538,39 @@ function renderSidebarSvg({
   } else {
     for (let i = 0; i < normalizedChats.length; i += 1) {
       const block = normalizedChats[i];
-      const bubbleH = 20 + block.wrapped.length * 14;
+      const nameW = Math.min(95, block.nick.length * 6);
+      const badgeW = block.roverId ? Math.min(58, Math.max(24, block.roverId.length * 6 + 10)) : 0;
+      const badgeGap = block.roverId ? 6 : 0;
+      const prefixChars = Math.ceil((nameW + badgeW + badgeGap + 18) / 5.8);
+      const firstLineRaw = String(block.wrapped[0] || '').trim();
+      const firstLine = firstLineRaw ? firstLineRaw : '';
+      const remainingRaw = block.wrapped.slice(firstLineRaw ? 1 : 0).map((line) => String(line || '').trim()).filter(Boolean);
+      const fullText = (firstLine ? [firstLine, ...remainingRaw] : remainingRaw).join(' ');
+      const inlineWrapped = wrapTextLines(fullText, Math.max(8, 26 - prefixChars)).slice(0, 4).map((line) => escapeXml(line));
+      const bubbleH = 16 + inlineWrapped.length * 14;
       if (cy + bubbleH + 4 > y + chatCardH - 5) break;
       shapes.push(
         `<rect x="${bubbleX}" y="${cy}" width="${bubbleW}" height="${bubbleH}" rx="4" class="${block.bubbleTone}"/>`,
       );
-      textRows.push(`<text x="${bubbleX + 6}" y="${cy + 13}" class="chatName" fill="${block.nameColor}">${block.nick}</text>`);
+      const nameX = bubbleX + 6;
+      const textStartX = nameX + nameW + 4 + (block.roverId ? badgeW + badgeGap : 0);
+      textRows.push(`<text x="${nameX}" y="${cy + 13}" class="chatName" fill="${block.nameColor}">${block.nick}</text>`);
       if (block.fromDiscord) {
-        textRows.push(`<text x="${bubbleX + 6 + Math.min(95, block.nick.length * 6)}" y="${cy + 13}" class="discordTag">◈</text>`);
+        textRows.push(`<text x="${nameX + nameW + 2}" y="${cy + 13}" class="discordTag">◈</text>`);
       }
       if (block.roverId) {
-        const badgeTextX = bubbleX + bubbleW - 56;
+        const badgeX = nameX + nameW + 4;
+        const badgeTextX = badgeX + 5;
         shapes.push(
-          `<rect x="${badgeTextX - 3}" y="${cy + 3}" width="50" height="12" rx="3" fill="${block.roverBadgeBg}" stroke="${block.roverBadgeBorder}" stroke-width="0.8"/>`,
+          `<rect x="${badgeX}" y="${cy + 3}" width="${badgeW}" height="12" rx="3" fill="${block.roverBadgeBg}" stroke="${block.roverBadgeBorder}" stroke-width="0.8"/>`,
         );
         textRows.push(`<text x="${badgeTextX}" y="${cy + 12}" class="roverTag">${block.roverId}</text>`);
       }
-      let by = cy + 25;
-      for (const line of block.wrapped) {
-        textRows.push(`<text x="${bubbleX + 6}" y="${by}" class="chat">${line}</text>`);
+      let by = cy + 13;
+      for (let lineIdx = 0; lineIdx < inlineWrapped.length; lineIdx += 1) {
+        const line = inlineWrapped[lineIdx];
+        const lineX = lineIdx === 0 ? textStartX : bubbleX + 6;
+        textRows.push(`<text x="${lineX}" y="${by}" class="chat">${line}</text>`);
         by += 14;
       }
       cy += bubbleH + 4;
