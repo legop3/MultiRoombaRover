@@ -604,7 +604,7 @@ async function buildReplayVideo({ sources = [] } = {}) {
 
 function getReplayHealthSnapshot() {
   const now = Date.now();
-  const neededWindowMs = BUILD_DURATION_MS;
+  const neededCount = Math.max(1, Math.ceil(BUILD_DURATION_MS / 1000));
   const sources = [];
   let readyCount = 0;
 
@@ -617,20 +617,41 @@ function getReplayHealthSnapshot() {
   }
 
   for (const source of replaySources) {
-    const entries = getVideoEntriesForSource({ id: source.id });
-    const inWindow = entries.filter((entry) => now - entry.endMs <= BUFFER_SECONDS * 1000);
-    const newest = inWindow[inWindow.length - 1] || null;
-    const oldest = inWindow[0] || null;
-    const coveredMs = newest && oldest ? Math.max(0, newest.endMs - oldest.startMs) : 0;
-    const ready = coveredMs >= neededWindowMs;
+    const key = sourceKey({ sourceType: source.type, kind: 'video', id: String(source.id) });
+    const dir = sourceDirForKey(key);
+    let recentCount = 0;
+    let lastSegmentAt = null;
+    try {
+      const files = fs.readdirSync(dir);
+      for (const name of files) {
+        if (!/^seg-\d{6}\.mp4$/.test(name)) continue;
+        const full = path.join(dir, name);
+        let stat;
+        try {
+          stat = fs.statSync(full);
+        } catch {
+          continue;
+        }
+        if (!stat.isFile() || stat.size < 4096) continue;
+        if (stat.mtimeMs > (lastSegmentAt || 0)) {
+          lastSegmentAt = stat.mtimeMs;
+        }
+        if (now - stat.mtimeMs <= BUFFER_SECONDS * 1000) {
+          recentCount += 1;
+        }
+      }
+    } catch {
+      // ignore missing source directory
+    }
+    const ready = recentCount >= neededCount;
     if (ready) readyCount += 1;
     sources.push({
       type: source.type,
       id: source.id,
       label: source.label,
-      recentCount: inWindow.length,
-      neededCount: Math.ceil(neededWindowMs / 1000),
-      lastSegmentAt: newest?.endMs || null,
+      recentCount,
+      neededCount,
+      lastSegmentAt,
       ready,
     });
   }
