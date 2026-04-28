@@ -12,8 +12,7 @@ const { getRoomCameras, roomCameraEvents } = require('./roomCameraService');
 const execFileAsync = promisify(execFile);
 
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
-const SEGMENT_ROOT =
-  process.env.REPLAY_SEGMENT_DIR || path.resolve(__dirname, '..', '..', 'data', 'replay-segments');
+const SEGMENT_ROOT = path.resolve(__dirname, '..', '..', 'data', 'replay-segments');
 const SEGMENT_SECONDS = Math.max(1, Number.parseInt(process.env.REPLAY_SEGMENT_SECONDS || '1', 10));
 const BUFFER_SECONDS = Math.max(20, Number.parseInt(process.env.REPLAY_BUFFER_SECONDS || '45', 10));
 const CLEANUP_INTERVAL_MS = 10_000;
@@ -672,19 +671,8 @@ async function tick() {
 }
 
 async function start() {
-  try {
-    await ensureDir(SEGMENT_ROOT);
-    activeSegmentRoot = SEGMENT_ROOT;
-  } catch (err) {
-    const fallback = path.join(os.tmpdir(), 'mrr-replay-segments');
-    await ensureDir(fallback);
-    activeSegmentRoot = fallback;
-    logger.warn('Replay segment root unavailable; using fallback path', {
-      configuredRoot: SEGMENT_ROOT,
-      fallbackRoot: fallback,
-      error: err.message,
-    });
-  }
+  await ensureDir(SEGMENT_ROOT);
+  activeSegmentRoot = SEGMENT_ROOT;
   logger.info('Replay engine using segment root', { segmentRoot: activeSegmentRoot });
   await bootstrapIndexFromDisk();
   await tick();
