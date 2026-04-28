@@ -26,9 +26,11 @@ const MAX_BYTES = Math.floor(Number.parseFloat(process.env.REPLAY_MAX_OUTPUT_MB 
 const events = new EventEmitter();
 
 const workers = new Map(); // key -> worker
+const pendingWorkerStarts = new Set(); // key
 const segmentIndex = new Map(); // key -> [{filePath,startMs,endMs,mtimeMs,size,kind,sourceType,sourceId}]
 let cleanupTimer = null;
 let activeSegmentRoot = SEGMENT_ROOT;
+let tickInFlight = false;
 
 function sourceKey(source) {
   return `${source.sourceType}__${source.kind}__${source.id}`;
@@ -168,10 +170,15 @@ async function ensureDir(dir) {
 
 function startWorker(source) {
   const key = sourceKey(source);
-  if (workers.has(key)) return;
+  if (workers.has(key) || pendingWorkerStarts.has(key)) return;
+  pendingWorkerStarts.add(key);
   const dir = sourceDirForKey(key);
   ensureDir(dir)
     .then(() => {
+      if (workers.has(key)) {
+        pendingWorkerStarts.delete(key);
+        return;
+      }
       const proc = spawn(FFMPEG_BIN, buildWorkerArgs(source), { stdio: ['ignore', 'ignore', 'pipe'] });
       const worker = {
         key,
@@ -179,6 +186,7 @@ function startWorker(source) {
         proc,
       };
       workers.set(key, worker);
+      pendingWorkerStarts.delete(key);
       proc.stderr.on('data', (chunk) => {
         const text = String(chunk || '').trim();
         if (!text) return;
@@ -199,6 +207,7 @@ function startWorker(source) {
       });
     })
     .catch((err) => {
+      pendingWorkerStarts.delete(key);
       logger.warn('failed to start worker', { key, error: err.message });
     });
 }
@@ -232,27 +241,6 @@ async function syncWorkers() {
   }
 }
 
-async function probeDurationSec(filePath) {
-  try {
-    const { stdout } = await execFileAsync('ffprobe', [
-      '-v',
-      'error',
-      '-show_entries',
-      'format=duration',
-      '-of',
-      'default=noprint_wrappers=1:nokey=1',
-      filePath,
-    ]);
-    const value = Number(String(stdout || '').trim());
-    if (Number.isFinite(value) && value > 0 && value < SEGMENT_SECONDS * 10) {
-      return value;
-    }
-  } catch {
-    // ignore probe failures; fallback below
-  }
-  return SEGMENT_SECONDS;
-}
-
 async function refreshIndexForWorker(worker) {
   const key = worker.key;
   const dir = sourceDirForKey(key);
@@ -283,7 +271,7 @@ async function refreshIndexForWorker(worker) {
       continue;
     }
     if (!stat.isFile() || stat.size < 4096) continue;
-    const durationSec = await probeDurationSec(filePath);
+    const durationSec = SEGMENT_SECONDS;
     const endMs = Math.round(stat.mtimeMs);
     const startMs = Math.round(endMs - durationSec * 1000);
     if (endMs < cutoffMs) continue;
@@ -664,10 +652,16 @@ async function bootstrapIndexFromDisk() {
 }
 
 async function tick() {
+  if (tickInFlight) return;
+  tickInFlight = true;
+  try {
   await syncWorkers();
   await refreshSegmentIndex();
   await cleanupOldFiles();
   events.emit('health', getReplayHealthSnapshot());
+  } finally {
+    tickInFlight = false;
+  }
 }
 
 async function start() {
