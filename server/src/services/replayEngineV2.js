@@ -27,7 +27,7 @@ const TARGET_FPS = Math.max(10, Number.parseInt(process.env.REPLAY_TARGET_FPS ||
 const MAX_WIDTH = Math.max(320, Number.parseInt(process.env.REPLAY_MAX_WIDTH || '1280', 10));
 const MAX_HEIGHT = Math.max(180, Number.parseInt(process.env.REPLAY_MAX_HEIGHT || '720', 10));
 const MAX_BYTES = Math.floor(Number.parseFloat(process.env.REPLAY_MAX_OUTPUT_MB || '9.5') * 1024 * 1024);
-const SIDEBAR_WIDTH = Math.max(220, Number.parseInt(process.env.REPLAY_SIDEBAR_WIDTH || '360', 10));
+const SIDEBAR_WIDTH = Math.max(200, Number.parseInt(process.env.REPLAY_SIDEBAR_WIDTH || '290', 10));
 
 const events = new EventEmitter();
 
@@ -419,7 +419,7 @@ function escapeXml(text) {
     .replace(/'/g, '&#39;');
 }
 
-function wrapTextLines(text, maxChars = 36) {
+function wrapTextLines(text, maxChars = 28) {
   const words = String(text || '').split(/\s+/).filter(Boolean);
   const lines = [];
   let current = '';
@@ -443,39 +443,67 @@ function renderSidebarSvg({
   driverBatteryLines,
   chatLines,
 }) {
-  const safeTitle = escapeXml(title);
+  const titleParts = wrapTextLines(title, 22).slice(0, 4).map((line) => escapeXml(line));
   const statLines = driverBatteryLines.slice(0, 8).map((line) => escapeXml(line));
-  const chatBlocks = chatLines.slice(0, 10).flatMap((line) => wrapTextLines(line, 34).map((wrapped) => escapeXml(wrapped)));
+  const normalizedChats = chatLines
+    .slice(-12)
+    .map((line) => wrapTextLines(line, 24).slice(0, 3).map((wrapped) => escapeXml(wrapped)));
 
-  let y = 34;
-  const titleParts = wrapTextLines(safeTitle, 26);
+  const shapes = [];
   const textRows = [];
+  const pad = 12;
+  const cardX = pad;
+  const cardW = width - pad * 2;
+  let y = 12;
+
+  // Title card
+  const titleCardH = Math.max(64, 22 + titleParts.length * 24);
+  shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${titleCardH}" rx="8" class="card"/>`);
+  let ty = y + 28;
   for (const part of titleParts) {
-    textRows.push(`<text x="20" y="${y}" class="title">${part}</text>`);
-    y += 34;
+    textRows.push(`<text x="${cardX + 12}" y="${ty}" class="title">${part}</text>`);
+    ty += 22;
   }
-  y += 8;
-  textRows.push(`<text x="20" y="${y}" class="section">Active Drivers</text>`);
-  y += 24;
-  if (!statLines.length) {
-    textRows.push(`<text x="20" y="${y}" class="muted">No active drivers</text>`);
-    y += 22;
-  } else {
-    for (const line of statLines) {
-      textRows.push(`<text x="20" y="${y}" class="body">${line}</text>`);
-      y += 23;
-    }
+  y += titleCardH + 10;
+
+  // Drivers card
+  const driverLines = statLines.length ? statLines : ['No active drivers'];
+  const driversCardH = 28 + driverLines.length * 20 + 10;
+  shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${driversCardH}" rx="8" class="card"/>`);
+  textRows.push(`<text x="${cardX + 12}" y="${y + 22}" class="section">Drivers</text>`);
+  let dy = y + 44;
+  for (const line of driverLines) {
+    textRows.push(`<text x="${cardX + 12}" y="${dy}" class="${statLines.length ? 'body' : 'muted'}">${line}</text>`);
+    dy += 20;
   }
-  y += 18;
-  textRows.push(`<text x="20" y="${y}" class="section">Chat</text>`);
-  y += 24;
-  if (!chatBlocks.length) {
-    textRows.push(`<text x="20" y="${y}" class="muted">No chat in replay window</text>`);
+  y += driversCardH + 10;
+
+  // Chat card
+  const chatCardH = Math.max(80, height - y - 12);
+  shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${chatCardH}" rx="8" class="card"/>`);
+  textRows.push(`<text x="${cardX + 12}" y="${y + 22}" class="section">Chat</text>`);
+
+  let cy = y + 34;
+  const bubbleX = cardX + 10;
+  const bubbleW = cardW - 20;
+  if (!normalizedChats.length) {
+    textRows.push(`<text x="${cardX + 12}" y="${cy + 20}" class="muted">No chat in replay window</text>`);
   } else {
-    for (const line of chatBlocks) {
-      textRows.push(`<text x="20" y="${y}" class="chat">${line}</text>`);
-      y += 22;
-      if (y > height - 20) break;
+    for (let i = 0; i < normalizedChats.length; i += 1) {
+      const block = normalizedChats[i];
+      const bubbleH = 10 + block.length * 18;
+      if (cy + bubbleH + 6 > y + chatCardH - 8) break;
+      shapes.push(
+        `<rect x="${bubbleX}" y="${cy}" width="${bubbleW}" height="${bubbleH}" rx="7" class="${
+          i % 2 === 0 ? 'bubbleA' : 'bubbleB'
+        }"/>`,
+      );
+      let by = cy + 18;
+      for (const line of block) {
+        textRows.push(`<text x="${bubbleX + 10}" y="${by}" class="chat">${line}</text>`);
+        by += 18;
+      }
+      cy += bubbleH + 6;
     }
   }
 
@@ -483,19 +511,23 @@ function renderSidebarSvg({
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0b1220"/>
-      <stop offset="100%" stop-color="#0a0d12"/>
+      <stop offset="0%" stop-color="#020617"/>
+      <stop offset="100%" stop-color="#000000"/>
     </linearGradient>
   </defs>
   <rect width="${width}" height="${height}" fill="url(#bg)"/>
-  <rect x="0" y="0" width="${width}" height="4" fill="#22d3ee"/>
+  <rect x="0" y="0" width="${width}" height="3" fill="#0ea5e9"/>
   <style>
-    .title { font-family: "DejaVu Sans", sans-serif; font-size: 30px; font-weight: 700; fill: #ffffff; }
-    .section { font-family: "DejaVu Sans", sans-serif; font-size: 19px; font-weight: 700; fill: #67e8f9; }
-    .body { font-family: "DejaVu Sans", sans-serif; font-size: 18px; fill: #e2e8f0; }
-    .chat { font-family: "DejaVu Sans", sans-serif; font-size: 17px; fill: #dbeafe; }
-    .muted { font-family: "DejaVu Sans", sans-serif; font-size: 17px; fill: #94a3b8; }
+    .card { fill: #171717; stroke: #334155; stroke-width: 1; }
+    .bubbleA { fill: #262626; }
+    .bubbleB { fill: #1f2937; }
+    .title { font-family: "DejaVu Sans", sans-serif; font-size: 21px; font-weight: 700; fill: #f8fafc; }
+    .section { font-family: "DejaVu Sans", sans-serif; font-size: 14px; font-weight: 700; fill: #7dd3fc; text-transform: uppercase; letter-spacing: .4px; }
+    .body { font-family: "DejaVu Sans", sans-serif; font-size: 14px; fill: #e2e8f0; }
+    .chat { font-family: "DejaVu Sans", sans-serif; font-size: 13px; fill: #f1f5f9; }
+    .muted { font-family: "DejaVu Sans", sans-serif; font-size: 13px; fill: #94a3b8; }
   </style>
+  ${shapes.join('\n  ')}
   ${textRows.join('\n  ')}
 </svg>`;
 }
