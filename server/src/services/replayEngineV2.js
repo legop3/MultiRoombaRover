@@ -429,7 +429,11 @@ async function buildReplayVideo({ sources = [] } = {}) {
     for (let i = 0; i < sources.length; i += 1) {
       const source = sources[i];
       const sourceId = String(source.id);
-      const videoEntries = overlapping(getVideoEntriesForSource({ id: sourceId }), tStart, tEnd);
+      const videoEntries = overlapping(
+        getVideoEntriesForSource({ type: String(source.type), id: sourceId }),
+        tStart,
+        tEnd,
+      );
       if (!videoEntries.length) {
         missingSources.push({ ...source, reason: 'no video coverage in replay window' });
         continue;
