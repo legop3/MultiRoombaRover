@@ -1,4 +1,6 @@
-// SVG primitives for top-down rover map rendering.
+// visuals
+// Purpose: Defines the visuals module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React from 'react';
 import { clamp01, currentColor, describeArc, lightBumpColor, cliffColor, polarToCartesian, toRad } from './helpers.js';
 

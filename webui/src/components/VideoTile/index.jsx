@@ -1,3 +1,6 @@
+// Video Tile
+// Purpose: Defines the Video Tile module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { WhepPlayer } from '../../lib/whepPlayer.js';
 import { useHudMapSetting } from '../../hooks/useHudMapSetting.js';

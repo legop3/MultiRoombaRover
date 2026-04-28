@@ -1,4 +1,6 @@
-// Admin-only IP log stream panel.
+// Admin Ip Log Panel
+// Purpose: Defines the Admin Ip Log Panel module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export default function AdminIpLogPanel({ entries }) {
   const logs = entries || [];
   return (

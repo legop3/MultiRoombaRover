@@ -1,4 +1,6 @@
-// Telemetry HUD and map overlay for VideoTile.
+// Hud Overlay
+// Purpose: Defines the Hud Overlay module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React from 'react';
 import TopDownMap from '../TopDownMap/index.jsx';
 import { roverNameChromeStyle } from '../../lib/roverColor.js';

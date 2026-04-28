@@ -1,3 +1,6 @@
+// Vip Private Rover Access Card
+// Purpose: Defines the Vip Private Rover Access Card module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo, useState } from 'react';
 import { flowWrapClass, innerFlowClass } from './constants.js';
 

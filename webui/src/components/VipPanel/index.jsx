@@ -1,3 +1,6 @@
+// Vip Panel
+// Purpose: Defines the Vip Panel module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';

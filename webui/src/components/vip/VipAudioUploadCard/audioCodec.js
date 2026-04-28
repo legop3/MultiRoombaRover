@@ -1,4 +1,6 @@
-// PCM/WAV helpers for clip-mode recording payloads.
+// audio Codec
+// Purpose: Defines the audio Codec module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export function mergeFloatChunks(chunks) {
   const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const merged = new Float32Array(total);

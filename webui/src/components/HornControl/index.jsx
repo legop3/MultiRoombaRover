@@ -1,3 +1,6 @@
+// Horn Control
+// Purpose: Defines the Horn Control module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { HORN_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';

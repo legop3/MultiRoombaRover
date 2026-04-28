@@ -1,4 +1,6 @@
-// Gamepad mapping constants and action catalog.
+// constants
+// Purpose: Defines the constants module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export const NUMBER_FORMAT = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
 export const ACTIONS = [

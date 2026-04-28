@@ -1,3 +1,6 @@
+// Button Box Tile
+// Purpose: Defines the Button Box Tile module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export default function ButtonBoxTile({
   buttonId,
   count,

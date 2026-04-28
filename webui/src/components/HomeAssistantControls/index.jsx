@@ -1,3 +1,6 @@
+// Home Assistant Controls
+// Purpose: Defines the Home Assistant Controls module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useControlSystem } from '../../controls/index.js';

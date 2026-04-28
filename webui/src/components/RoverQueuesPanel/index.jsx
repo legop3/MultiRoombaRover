@@ -1,3 +1,6 @@
+// Rover Queues Panel
+// Purpose: Defines the Rover Queues Panel module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { roverNameChromeStyle } from '../../lib/roverColor.js';

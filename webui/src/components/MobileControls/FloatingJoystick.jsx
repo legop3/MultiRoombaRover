@@ -1,4 +1,6 @@
-// Floating on-screen joystick used for mobile driving.
+// Floating Joystick
+// Purpose: Defines the Floating Joystick module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampUnit } from '../../controls/controlMath.js';
 

@@ -1,4 +1,6 @@
-// Admin control panel main composition and action handlers.
+// Admin Panel Content
+// Purpose: Defines the Admin Panel Content module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
 import RoverRoster from '../RoverRoster/index.jsx';

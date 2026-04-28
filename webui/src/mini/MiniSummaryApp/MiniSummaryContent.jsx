@@ -1,4 +1,6 @@
-// Main mini summary screen composition and rotation logic.
+// Mini Summary Content
+// Purpose: Defines the Mini Summary Content module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
 import { useTelemetryFrames } from '../../context/TelemetryContext.jsx';

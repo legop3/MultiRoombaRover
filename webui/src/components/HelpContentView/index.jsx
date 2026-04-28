@@ -1,3 +1,6 @@
+// Help Content View
+// Purpose: Defines the Help Content View module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { getHelpContent } from '../../help/content.js';

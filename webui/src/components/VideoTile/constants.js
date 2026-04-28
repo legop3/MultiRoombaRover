@@ -1,4 +1,6 @@
-// VideoTile timing and threshold constants.
+// constants
+// Purpose: Defines the constants module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export const RESTART_DELAY_MS = 2000;
 export const UNMUTE_RETRY_MS = 3000;
 export const AUDIO_RETRY_MS = 3000;

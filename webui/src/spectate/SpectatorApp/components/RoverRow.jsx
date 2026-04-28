@@ -1,4 +1,6 @@
-// Rover grid row for spectator view.
+// Rover Row
+// Purpose: Defines the Rover Row module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import RoverSpectatorCard from './RoverSpectatorCard.jsx';
 
 export default function RoverRow({ roster, frames, videoSources, snapshotFeeds, audioSources, session, canSpectateVideo }) {

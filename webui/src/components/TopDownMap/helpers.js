@@ -1,4 +1,6 @@
-// Geometry and color helpers for top-down rover sensor map.
+// helpers
+// Purpose: Defines the helpers module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export function clamp01(value) {
   return Math.max(0, Math.min(1, value));
 }

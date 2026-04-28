@@ -1,3 +1,6 @@
+// Deterrence Chaos
+// Purpose: Defines the Deterrence Chaos module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 

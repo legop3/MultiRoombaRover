@@ -1,4 +1,6 @@
-// WHIP/WebRTC transport helpers for microphone forwarding.
+// whip Transport
+// Purpose: Defines the whip Transport module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export function waitForIceGatheringComplete(pc, timeoutMs = 1500) {
   return new Promise((resolve) => {
     if (!pc || pc.iceGatheringState === 'complete') {

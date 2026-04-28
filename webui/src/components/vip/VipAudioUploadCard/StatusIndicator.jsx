@@ -1,4 +1,6 @@
-// Compact status tile used throughout VIP audio card.
+// Status Indicator
+// Purpose: Defines the Status Indicator module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export default function StatusIndicator({ label, active, detail = '' }) {
   return (
     <div

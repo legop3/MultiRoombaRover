@@ -1,4 +1,6 @@
-// Spectator app display formatting helpers.
+// utils
+// Purpose: Defines the utils module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export function formatDriverLabel({ roverId, session }) {
   const activeDriverId = session?.activeDrivers?.[roverId] || null;
   const user = (session?.users || []).find((entry) => entry.socketId === activeDriverId);

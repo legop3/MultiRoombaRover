@@ -1,4 +1,6 @@
-// Base64 and auth helpers for upload and WHIP requests.
+// base64
+// Purpose: Defines the base64 module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export function bytesToBase64(bytes) {
   let binary = '';
   const chunkSize = 0x8000;

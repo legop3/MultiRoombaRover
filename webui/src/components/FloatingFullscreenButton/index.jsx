@@ -1,3 +1,6 @@
+// Floating Fullscreen Button
+// Purpose: Defines the Floating Fullscreen Button module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export default function FloatingFullscreenButton({ side = 'right', onClick }) {
   const sideClass = side === 'left' ? 'left-2' : 'right-2';
   return (

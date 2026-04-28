@@ -1,3 +1,6 @@
+// Vip Identity Card
+// Purpose: Defines the Vip Identity Card module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useState } from 'react';
 import { fieldClass, flowWrapClass, innerFlowClass, maskKey } from './constants.js';
 

@@ -1,3 +1,6 @@
+// constants
+// Purpose: Defines the constants module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export const COOKIE_KEY_REGEX = /^cu_[a-f0-9]{32}$/;
 
 export const fieldClass = 'field-input w-full max-w-sm text-left focus:ring-emerald-500';

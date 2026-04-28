@@ -22,6 +22,9 @@
 - Every component must live in its own folder, even when it remains a single-file implementation.
 - Split large JSX/components and large backing JS files into folderized modules.
 - Keep modules clear and focused, with title comments.
+- Every component/module file should start with a descriptive comment header containing:
+- a title line naming the file/module
+- a longer purpose/scope description (not a one-liner)
 - Each component must live entirely inside its own folder; do not leave wrapper/compatibility component files outside that folder.
 - Remove stale compatibility/leftover code only after usage verification.
 

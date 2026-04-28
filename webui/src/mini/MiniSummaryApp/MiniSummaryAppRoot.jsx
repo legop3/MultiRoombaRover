@@ -1,4 +1,6 @@
-// Top-level mini summary app shell with hard-refresh timer and alerts.
+// Mini Summary App Root
+// Purpose: Defines the Mini Summary App Root module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect } from 'react';
 import AlertFeed from '../../components/AlertFeed/index.jsx';
 import MiniSummaryContent from './MiniSummaryContent.jsx';

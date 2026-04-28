@@ -1,3 +1,6 @@
+// Keymap Settings
+// Purpose: Defines the Keymap Settings module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useControlSystem } from '../../controls/index.js';
 import { DEFAULT_KEYMAP } from '../../controls/constants.js';

@@ -1,3 +1,6 @@
+// Battery Bar
+// Purpose: Defines the Battery Bar module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { WARN_DISPLAY_PERCENT } from '../../lib/battery.js';
 
 const WARN_FLASH_MS = 1600;

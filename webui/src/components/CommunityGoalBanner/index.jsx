@@ -1,3 +1,6 @@
+// Community Goal Banner
+// Purpose: Defines the Community Goal Banner module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
 

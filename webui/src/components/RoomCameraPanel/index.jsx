@@ -1,3 +1,6 @@
+// Room Camera Panel
+// Purpose: Defines the Room Camera Panel module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';

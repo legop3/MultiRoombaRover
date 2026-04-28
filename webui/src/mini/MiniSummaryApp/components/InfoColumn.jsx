@@ -1,4 +1,6 @@
-// Rover information and optional preview column for mini summary UI.
+// Info Column
+// Purpose: Defines the Info Column module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import VideoTile from '../../../components/VideoTile/index.jsx';
 import BatteryBar from '../../../components/BatteryBar/index.jsx';
 import { roverNameChromeStyle } from '../../../lib/roverColor.js';

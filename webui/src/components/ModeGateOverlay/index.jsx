@@ -1,3 +1,6 @@
+// Mode Gate Overlay
+// Purpose: Defines the Mode Gate Overlay module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 import AuthPanel from '../AuthPanel/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';

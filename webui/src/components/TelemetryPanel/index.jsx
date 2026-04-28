@@ -1,3 +1,6 @@
+// Telemetry Panel
+// Purpose: Defines the Telemetry Panel module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';

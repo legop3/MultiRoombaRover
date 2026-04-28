@@ -1,4 +1,6 @@
-// Auto-fitting single-line text component for mini summary layout.
+// Auto Fit Text
+// Purpose: Defines the Auto Fit Text module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useLayoutEffect, useRef, useState } from 'react';
 
 export default function AutoFitText({ children, className = '', maxSize = 1000, minSize = 14, style = undefined }) {

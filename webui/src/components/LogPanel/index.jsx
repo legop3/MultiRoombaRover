@@ -1,3 +1,6 @@
+// Log Panel
+// Purpose: Defines the Log Panel module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 
 export default function LogPanel() {

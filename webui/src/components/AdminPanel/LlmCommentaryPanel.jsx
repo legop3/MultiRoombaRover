@@ -1,4 +1,6 @@
-// Admin LLM commentary monitor panel.
+// Llm Commentary Panel
+// Purpose: Defines the Llm Commentary Panel module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useState } from 'react';
 import ChatMessageRow from '../ChatMessageRow/index.jsx';
 import { buildLlmLargeIndicatorFromState, buildLlmConversationRowsFromMessages } from './llmHelpers.js';

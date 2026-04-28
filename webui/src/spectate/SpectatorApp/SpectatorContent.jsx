@@ -1,4 +1,6 @@
-// Main spectator screen layout and feed wiring.
+// Spectator Content
+// Purpose: Defines the Spectator Content module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useSession } from '../../context/SessionContext.jsx';
 import { useTelemetryFrames } from '../../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../../hooks/useVideoRequests.js';

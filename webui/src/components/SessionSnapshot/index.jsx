@@ -1,3 +1,6 @@
+// Session Snapshot
+// Purpose: Defines the Session Snapshot module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
 

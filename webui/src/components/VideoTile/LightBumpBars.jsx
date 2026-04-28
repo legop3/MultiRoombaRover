@@ -1,4 +1,6 @@
-// Light bump signal bars used under the tile HUD.
+// Light Bump Bars
+// Purpose: Defines the Light Bump Bars module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React from 'react';
 
 export default function LightBumpBars({ sensors }) {

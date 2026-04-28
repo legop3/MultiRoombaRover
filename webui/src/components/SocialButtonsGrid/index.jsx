@@ -1,3 +1,6 @@
+// Social Buttons Grid
+// Purpose: Defines the Social Buttons Grid module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useSession } from '../../context/SessionContext.jsx';
 import SocialButton from '../SocialButton/index.jsx';
 

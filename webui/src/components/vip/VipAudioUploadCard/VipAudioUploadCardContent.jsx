@@ -1,3 +1,6 @@
+// Vip Audio Upload Card Content
+// Purpose: Defines the Vip Audio Upload Card Content module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fieldClass } from '../constants.js';
 import { useControlSystem } from '../../../controls/index.js';

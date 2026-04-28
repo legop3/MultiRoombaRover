@@ -1,4 +1,6 @@
-// LLM commentary monitor formatting helpers.
+// llm Helpers
+// Purpose: Defines the llm Helpers module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export function buildLlmLargeIndicatorFromState(state) {
   const runtime = state?.runtime || {};
   const output = state?.output || {};

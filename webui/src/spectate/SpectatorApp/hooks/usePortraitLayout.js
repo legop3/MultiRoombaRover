@@ -1,4 +1,6 @@
-// Detect portrait-oriented viewport layout mode for spectator UI.
+// use Portrait Layout
+// Purpose: Defines the use Portrait Layout module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useState } from 'react';
 
 export default function usePortraitLayout() {

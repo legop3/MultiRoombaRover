@@ -1,4 +1,6 @@
-// 4:3 viewport fitting frame for active mini-summary video.
+// Fit Viewport Frame
+// Purpose: Defines the Fit Viewport Frame module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export default function FitViewportFrame({ children }) {
   return (
     <div className="flex h-full w-full items-center justify-start overflow-hidden bg-black">

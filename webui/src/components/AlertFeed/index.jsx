@@ -1,3 +1,6 @@
+// Alert Feed
+// Purpose: Defines the Alert Feed module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSocket } from '../../context/SocketContext.jsx';

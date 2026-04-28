@@ -1,4 +1,6 @@
-// Gamepad mapping helper and capture functions.
+// helpers
+// Purpose: Defines the helpers module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { CAPTURE_AXIS_THRESHOLD, CAPTURE_BUTTON_THRESHOLD, NUMBER_FORMAT } from './constants.js';
 
 export function formatSource(source) {

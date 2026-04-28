@@ -1,4 +1,6 @@
-// Mobile controls layout and interaction wiring.
+// Mobile Controls Content
+// Purpose: Defines the Mobile Controls Content module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useRef } from 'react';
 import { useControlSystem } from '../../controls/index.js';
 import { clampUnit } from '../../controls/controlMath.js';

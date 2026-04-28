@@ -1,4 +1,6 @@
-// Mini summary app session/telemetry formatting utilities.
+// utils
+// Purpose: Defines the utils module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { buildBatteryVisual } from '../../lib/battery.js';
 
 export function formatDriverLabel({ roverId, session }) {

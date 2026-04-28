@@ -1,3 +1,6 @@
+// Fullscreen Prompt
+// Purpose: Defines the Fullscreen Prompt module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export default function FullscreenPrompt({ visible, mode, onEnterFullscreen, onDismiss }) {
   if (!visible) return null;
   const isIOSMode = mode === 'pwa-hint';

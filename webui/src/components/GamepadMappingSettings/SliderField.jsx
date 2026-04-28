@@ -1,4 +1,6 @@
-// Reusable slider field for gamepad calibration controls.
+// Slider Field
+// Purpose: Defines the Slider Field module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { NUMBER_FORMAT } from './constants.js';
 
 export default function SliderField({ label, description, min, max, step, value, onChange }) {

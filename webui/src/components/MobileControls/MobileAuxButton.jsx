@@ -1,4 +1,6 @@
-// Hold-to-run aux motor button for mobile controls.
+// Mobile Aux Button
+// Purpose: Defines the Mobile Aux Button module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export default function MobileAuxButton({ id, label, values, color, disabled, onPress, onRelease }) {
   return (
     <button

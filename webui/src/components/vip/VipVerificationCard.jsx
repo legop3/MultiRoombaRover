@@ -1,3 +1,6 @@
+// Vip Verification Card
+// Purpose: Defines the Vip Verification Card module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useState } from 'react';
 import NicknameForm from '../NicknameForm/index.jsx';
 import { flowWrapClass, innerFlowClass, fieldClass } from './constants.js';

@@ -1,3 +1,6 @@
+// Social Button
+// Purpose: Defines the Social Button module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect } from 'react';
 import { FaBook, FaCoffee, FaCrown, FaDiscord, FaLink } from 'react-icons/fa';
 

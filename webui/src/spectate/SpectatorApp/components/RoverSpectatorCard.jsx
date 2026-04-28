@@ -1,4 +1,6 @@
-// Single rover spectator card containing live/snapshot tile and HUD.
+// Rover Spectator Card
+// Purpose: Defines the Rover Spectator Card module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import VideoTile from '../../../components/VideoTile/index.jsx';
 import { formatDriverLabel } from '../utils.js';
 

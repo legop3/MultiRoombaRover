@@ -1,3 +1,6 @@
+// Reward Run Overlay
+// Purpose: Defines the Reward Run Overlay module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useRef, useState } from 'react';
 import { useSocket } from '../../context/SocketContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';

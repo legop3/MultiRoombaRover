@@ -1,4 +1,6 @@
-// Replay and snapshot health status panel.
+// Replay Snapshot Health
+// Purpose: Defines the Replay Snapshot Health module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { roverNameChromeStyle } from '../../lib/roverColor.js';
 
 export default function ReplaySnapshotHealth({ health, roster = [] }) {

@@ -1,4 +1,6 @@
-// Overcurrent warning overlay.
+// Overcurrent Overlay
+// Purpose: Defines the Overcurrent Overlay module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React from 'react';
 import { OVERCURRENT_LABELS } from './constants.js';
 

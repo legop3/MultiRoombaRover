@@ -1,3 +1,6 @@
+// Gamepad Mapping Settings Content
+// Purpose: Defines the Gamepad Mapping Settings Content module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { GAMEPAD_PROFILE_DEFAULT, GAMEPAD_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';

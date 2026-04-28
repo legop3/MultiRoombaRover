@@ -1,4 +1,6 @@
-// Mobile controls constants.
+// constants
+// Purpose: Defines the constants module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export const SOURCE = 'mobile-joystick';
 export const JOYSTICK_RADIUS = 80;
 export const JOYSTICK_SMOOTHING = 0.15;

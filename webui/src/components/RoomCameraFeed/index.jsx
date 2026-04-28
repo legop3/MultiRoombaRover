@@ -1,3 +1,6 @@
+// Room Camera Feed
+// Purpose: Defines the Room Camera Feed module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 
 export default function RoomCameraFeed({ feed, label }) {

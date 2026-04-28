@@ -1,3 +1,6 @@
+// Right Pane Tabs
+// Purpose: Defines the Right Pane Tabs module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import RoomCameraPanel from '../RoomCameraPanel/index.jsx';
 import HomeAssistantControls from '../HomeAssistantControls/index.jsx';
 import SettingsPanel from '../SettingsPanel/index.jsx';

@@ -1,3 +1,6 @@
+// Night Vision Control
+// Purpose: Defines the Night Vision Control module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 
 function isBoolean(value) {

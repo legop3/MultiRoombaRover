@@ -1,3 +1,6 @@
+// Help Panel
+// Purpose: Defines the Help Panel module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useControlSystem } from '../../controls/index.js';
 import HelpContentView from '../HelpContentView/index.jsx';
 

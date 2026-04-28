@@ -1,3 +1,6 @@
+// User List Panel
+// Purpose: Defines the User List Panel module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';

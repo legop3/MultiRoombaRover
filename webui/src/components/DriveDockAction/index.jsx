@@ -1,3 +1,6 @@
+// Drive Dock Action
+// Purpose: Defines the Drive Dock Action module and the local helpers/components used in this file.
+// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo, useState } from 'react';
 import { useControlSystem } from '../../controls/index.js';
 import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
