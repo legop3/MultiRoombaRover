@@ -1,6 +1,6 @@
 // Rover information and optional preview column for mini summary UI.
-import VideoTile from '../../../components/VideoTile.jsx';
-import BatteryBar from '../../../components/BatteryBar.jsx';
+import VideoTile from '../../../components/VideoTile/index.jsx';
+import BatteryBar from '../../../components/BatteryBar/index.jsx';
 import { roverNameChromeStyle } from '../../../lib/roverColor.js';
 import { getBatteryVisual } from '../utils.js';
 import AutoFitText from './AutoFitText.jsx';

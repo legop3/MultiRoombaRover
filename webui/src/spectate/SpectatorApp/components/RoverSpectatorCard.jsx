@@ -1,5 +1,5 @@
 // Single rover spectator card containing live/snapshot tile and HUD.
-import VideoTile from '../../../components/VideoTile.jsx';
+import VideoTile from '../../../components/VideoTile/index.jsx';
 import { formatDriverLabel } from '../utils.js';
 
 export default function RoverSpectatorCard({ rover, frame, sessionInfo, videoMode, snapshotFeed, audioInfo, session }) {

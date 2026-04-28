@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import NicknameForm from '../NicknameForm.jsx';
+import NicknameForm from '../NicknameForm/index.jsx';
 import { flowWrapClass, innerFlowClass, fieldClass } from './constants.js';
 
 export default function VipVerificationCard({

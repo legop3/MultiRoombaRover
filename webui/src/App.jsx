@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import TelemetryPanel from './components/TelemetryPanel.jsx';
-import ReplaySourcesPanel from './components/ReplaySourcesPanel.jsx';
-import AlertFeed from './components/AlertFeed.jsx';
+import TelemetryPanel from './components/TelemetryPanel/index.jsx';
+import ReplaySourcesPanel from './components/ReplaySourcesPanel/index.jsx';
+import AlertFeed from './components/AlertFeed/index.jsx';
 import MobileControls, {
   MobileActionsColumn,
   MobileDriveColumn,
@@ -12,31 +12,31 @@ import {
   GamepadInputManager,
   useControlSystem,
 } from './controls/index.js';
-import RoomCameraPanel from './components/RoomCameraPanel.jsx';
-import LogPanel from './components/LogPanel.jsx';
-import DriverVideoPanel from './components/DriverVideoPanel.jsx';
-import RightPaneTabs from './components/RightPaneTabs.jsx';
-import ModeGateOverlay from './components/ModeGateOverlay.jsx';
-import HomeAssistantControls from './components/HomeAssistantControls.jsx';
-import TurnAlertListener from './components/TurnAlertListener.jsx';
-import RawUserPilePanel from './components/RawUserPilePanel.jsx';
-import ChatPanel from './components/ChatPanel.jsx';
-import FullscreenPrompt from './components/FullscreenPrompt.jsx';
-import FloatingFullscreenButton from './components/FloatingFullscreenButton.jsx';
+import RoomCameraPanel from './components/RoomCameraPanel/index.jsx';
+import LogPanel from './components/LogPanel/index.jsx';
+import DriverVideoPanel from './components/DriverVideoPanel/index.jsx';
+import RightPaneTabs from './components/RightPaneTabs/index.jsx';
+import ModeGateOverlay from './components/ModeGateOverlay/index.jsx';
+import HomeAssistantControls from './components/HomeAssistantControls/index.jsx';
+import TurnAlertListener from './components/TurnAlertListener/index.jsx';
+import RawUserPilePanel from './components/RawUserPilePanel/index.jsx';
+import ChatPanel from './components/ChatPanel/index.jsx';
+import FullscreenPrompt from './components/FullscreenPrompt/index.jsx';
+import FloatingFullscreenButton from './components/FloatingFullscreenButton/index.jsx';
 import { useFullscreenPrompt } from './hooks/useFullscreenPrompt.js';
 import { useSettingsNamespace } from './settings/index.js';
-import HelpOverlay from './components/HelpOverlay.jsx';
-import HelpPanel from './components/HelpPanel.jsx';
-import SettingsPanel from './components/SettingsPanel.jsx';
-import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs.jsx';
+import HelpOverlay from './components/HelpOverlay/index.jsx';
+import HelpPanel from './components/HelpPanel/index.jsx';
+import SettingsPanel from './components/SettingsPanel/index.jsx';
+import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs/index.jsx';
 import useDefaultNickname from './hooks/useDefaultNickname.js';
 import useUserIdentitySync from './hooks/useUserIdentitySync.js';
-import CommunityGoalBanner from './components/CommunityGoalBanner.jsx';
-import RoverQueuesPanel from './components/RoverQueuesPanel.jsx';
-import VipPanel from './components/VipPanel.jsx';
+import CommunityGoalBanner from './components/CommunityGoalBanner/index.jsx';
+import RoverQueuesPanel from './components/RoverQueuesPanel/index.jsx';
+import VipPanel from './components/VipPanel/index.jsx';
 import { useSessionSelector } from './context/SessionContext.jsx';
-import ButtonBoxPanel from './components/ButtonBoxPanel.jsx';
-import RewardRunOverlay from './components/RewardRunOverlay.jsx';
+import ButtonBoxPanel from './components/ButtonBoxPanel/index.jsx';
+import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {

@@ -6,7 +6,7 @@ import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
-import VideoTile from '../../components/VideoTile.jsx';
+import VideoTile from '../../components/VideoTile/index.jsx';
 import FitViewportFrame from './components/FitViewportFrame.jsx';
 import InfoColumn from './components/InfoColumn.jsx';
 import { ROTATE_MS } from './constants.js';

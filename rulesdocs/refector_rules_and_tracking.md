@@ -28,7 +28,7 @@
 # REFACTOR TRACKING
 ## Current phase
 - [x] Phase 1: Inventory + usage mapping (server + webui)
-- [ ] Phase 2: Refactor highest-impact offenders first
+- [x] Phase 2: Refactor highest-impact offenders first
 - [ ] Phase 3: Sweep remaining services/components
 - [ ] Phase 4: Dead code/file removal pass
 - [ ] Phase 5: Final regression validation
@@ -68,7 +68,7 @@
 - [x] mobile controls
 - [x] top down map
 - [x] video tile
-- [ ] Sweep `webui` for unused or unneeded files/code with verification
+- [x] Sweep `webui` for unused or unneeded files/code with verification
 
 ### COMPLETED COMPONENTS
 - mini summary app
@@ -91,6 +91,8 @@
 - Split `webui/src/components/GamepadMappingSettings.jsx` into `webui/src/components/GamepadMappingSettings/` with extracted constants/helpers/SliderField modules and removed the standalone component file.
 - Split `webui/src/components/MobileControls.jsx` into `webui/src/components/MobileControls/` with extracted joystick/aux/constants modules; preserved named exports and moved app import to folder entrypoint.
 - Split `webui/src/components/TopDownMap.jsx` into `webui/src/components/TopDownMap/` with extracted geometry/color helpers and visual SVG primitive modules; updated all consumers to folder entrypoint.
+- Folderized all remaining top-level files under `webui/src/components/` into per-component `index.jsx` folders and rewired component imports to match the new structure.
+- Removed unreferenced components `CameraServoPanel` and `ControlSummary` after dependency-map verification and successful rebuild.
 
 ## Done criteria (per item)
 - [ ] Folderized structure created.

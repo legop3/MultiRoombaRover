@@ -1,7 +1,7 @@
 // Admin control panel main composition and action handlers.
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
-import RoverRoster from '../RoverRoster.jsx';
+import RoverRoster from '../RoverRoster/index.jsx';
 import LlmCommentaryPanel from './LlmCommentaryPanel.jsx';
 import ReplaySnapshotHealth from './ReplaySnapshotHealth.jsx';
 import AdminIpLogPanel from './AdminIpLogPanel.jsx';

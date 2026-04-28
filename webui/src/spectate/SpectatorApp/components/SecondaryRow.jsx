@@ -1,5 +1,5 @@
 // Secondary panel row showing room cameras.
-import RoomCameraPanel from '../../../components/RoomCameraPanel.jsx';
+import RoomCameraPanel from '../../../components/RoomCameraPanel/index.jsx';
 
 export default function SecondaryRow() {
   return (

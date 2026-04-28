@@ -1,6 +1,6 @@
 // Admin LLM commentary monitor panel.
 import { useState } from 'react';
-import ChatMessageRow from '../ChatMessageRow.jsx';
+import ChatMessageRow from '../ChatMessageRow/index.jsx';
 import { buildLlmLargeIndicatorFromState, buildLlmConversationRowsFromMessages } from './llmHelpers.js';
 
 export default function LlmCommentaryPanel({ state, onClearHistory, clearingHistory }) {

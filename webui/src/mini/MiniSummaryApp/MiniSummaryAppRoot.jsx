@@ -1,6 +1,6 @@
 // Top-level mini summary app shell with hard-refresh timer and alerts.
 import { useEffect } from 'react';
-import AlertFeed from '../../components/AlertFeed.jsx';
+import AlertFeed from '../../components/AlertFeed/index.jsx';
 import MiniSummaryContent from './MiniSummaryContent.jsx';
 import { HARD_REFRESH_MS } from './constants.js';
 
