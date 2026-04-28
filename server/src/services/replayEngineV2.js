@@ -842,6 +842,7 @@ async function buildReplayVideo({ sources = [], title = '', requester = '', incl
     }
     tileWidth = clampEven(tileWidth);
     tileHeight = clampEven(tileHeight);
+    const durationSec = BUILD_DURATION_MS / 1000;
 
     const inputArgs = [];
     const filterParts = [];
@@ -864,7 +865,6 @@ async function buildReplayVideo({ sources = [], title = '', requester = '', incl
         .map((entry) => String(entry.id));
       const driverBatteryLines = buildDriverBatterySnapshot(selectedRoverIds);
       const chatEvents = buildChatEventsForWindow(tStart, tEnd);
-      const durationSec = BUILD_DURATION_MS / 1000;
       const sidebarPath = await renderSidebarVideo({
         tmpDir,
         title: resolvedTitle,
