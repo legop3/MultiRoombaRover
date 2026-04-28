@@ -12,6 +12,7 @@ const io = require('../globals/io');
 const { getActiveDrivers } = require('./turnService');
 const { getNickname } = require('./nicknameService');
 const { getRecentMessages } = require('./chatService');
+const sharp = require('sharp');
 
 const execFileAsync = promisify(execFile);
 
@@ -363,23 +364,6 @@ function scalePadFilter(tileWidth, tileHeight) {
   return `scale=${tileWidth}:${tileHeight}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${tileWidth}:${tileHeight}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
 }
 
-function escapeAssText(text) {
-  return String(text || '')
-    .replace(/\\/g, '\\\\')
-    .replace(/\{/g, '\\{')
-    .replace(/\}/g, '\\}')
-    .replace(/\r?\n/g, '\\N');
-}
-
-function assTimeFromSeconds(totalSeconds) {
-  const safe = Math.max(0, Number(totalSeconds) || 0);
-  const hours = Math.floor(safe / 3600);
-  const mins = Math.floor((safe % 3600) / 60);
-  const secs = Math.floor(safe % 60);
-  const centis = Math.floor((safe - Math.floor(safe)) * 100);
-  return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(centis).padStart(2, '0')}`;
-}
-
 function sanitizeReplayTitle(title, fallback = 'Replay') {
   const value = String(title || '').trim();
   if (!value) return fallback;
@@ -426,6 +410,96 @@ function buildChatEventsForWindow(startMs, endMs, limit = 18) {
   });
 }
 
+function escapeXml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function wrapTextLines(text, maxChars = 36) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.slice(0, 4);
+}
+
+function renderSidebarSvg({
+  width,
+  height,
+  title,
+  driverBatteryLines,
+  chatLines,
+}) {
+  const safeTitle = escapeXml(title);
+  const statLines = driverBatteryLines.slice(0, 8).map((line) => escapeXml(line));
+  const chatBlocks = chatLines.slice(0, 10).flatMap((line) => wrapTextLines(line, 34).map((wrapped) => escapeXml(wrapped)));
+
+  let y = 34;
+  const titleParts = wrapTextLines(safeTitle, 26);
+  const textRows = [];
+  for (const part of titleParts) {
+    textRows.push(`<text x="20" y="${y}" class="title">${part}</text>`);
+    y += 34;
+  }
+  y += 8;
+  textRows.push(`<text x="20" y="${y}" class="section">Active Drivers</text>`);
+  y += 24;
+  if (!statLines.length) {
+    textRows.push(`<text x="20" y="${y}" class="muted">No active drivers</text>`);
+    y += 22;
+  } else {
+    for (const line of statLines) {
+      textRows.push(`<text x="20" y="${y}" class="body">${line}</text>`);
+      y += 23;
+    }
+  }
+  y += 18;
+  textRows.push(`<text x="20" y="${y}" class="section">Chat</text>`);
+  y += 24;
+  if (!chatBlocks.length) {
+    textRows.push(`<text x="20" y="${y}" class="muted">No chat in replay window</text>`);
+  } else {
+    for (const line of chatBlocks) {
+      textRows.push(`<text x="20" y="${y}" class="chat">${line}</text>`);
+      y += 22;
+      if (y > height - 20) break;
+    }
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#0a0d12"/>
+    </linearGradient>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#bg)"/>
+  <rect x="0" y="0" width="${width}" height="4" fill="#22d3ee"/>
+  <style>
+    .title { font-family: "DejaVu Sans", sans-serif; font-size: 30px; font-weight: 700; fill: #ffffff; }
+    .section { font-family: "DejaVu Sans", sans-serif; font-size: 19px; font-weight: 700; fill: #67e8f9; }
+    .body { font-family: "DejaVu Sans", sans-serif; font-size: 18px; fill: #e2e8f0; }
+    .chat { font-family: "DejaVu Sans", sans-serif; font-size: 17px; fill: #dbeafe; }
+    .muted { font-family: "DejaVu Sans", sans-serif; font-size: 17px; fill: #94a3b8; }
+  </style>
+  ${textRows.join('\n  ')}
+</svg>`;
+}
+
 async function renderSidebarVideo({
   tmpDir,
   title,
@@ -435,58 +509,37 @@ async function renderSidebarVideo({
   driverBatteryLines = [],
   chatEvents = [],
 }) {
-  const assPath = path.join(tmpDir, 'sidebar.ass');
+  const framesDir = path.join(tmpDir, 'sidebar-frames');
   const sidebarPath = path.join(tmpDir, 'sidebar.mp4');
-  const headerLines = [];
-  headerLines.push('[Script Info]');
-  headerLines.push('ScriptType: v4.00+');
-  headerLines.push(`PlayResX: ${SIDEBAR_WIDTH}`);
-  headerLines.push(`PlayResY: ${height}`);
-  headerLines.push('ScaledBorderAndShadow: yes');
-  headerLines.push('');
-  headerLines.push('[V4+ Styles]');
-  headerLines.push(
-    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-  );
-  headerLines.push(
-    'Style: Sidebar,DejaVu Sans,24,&H00FFFFFF,&H00FFFFFF,&H64000000,&H96000000,0,0,0,0,100,100,0,0,1,2,0,7,18,18,18,1',
-  );
-  headerLines.push(
-    'Style: Chat,DejaVu Sans,21,&H00E6F2FF,&H00E6F2FF,&H64000000,&H96000000,0,0,0,0,100,100,0,0,1,2,0,7,18,18,280,1',
-  );
-  headerLines.push('');
-  headerLines.push('[Events]');
-  headerLines.push('Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text');
-
-  const fullEnd = assTimeFromSeconds(durationSec);
-  const staticLines = [escapeAssText(title), '', ...driverBatteryLines.map(escapeAssText)];
-  headerLines.push(`Dialogue: 0,0:00:00.00,${fullEnd},Sidebar,,0,0,0,,${staticLines.join('\\N')}`);
-
-  for (let i = 0; i < chatEvents.length; i += 1) {
-    const event = chatEvents[i];
-    const start = Math.max(0, (event.ts - windowStartMs) / 1000);
-    const end = Math.min(durationSec, start + 4.5);
-    if (end <= start) continue;
-    headerLines.push(
-      `Dialogue: 0,${assTimeFromSeconds(start)},${assTimeFromSeconds(end)},Chat,,0,0,0,,${escapeAssText(
-        event.text,
-      )}`,
-    );
+  await ensureDir(framesDir);
+  const secondCount = Math.max(1, Math.ceil(durationSec));
+  for (let second = 0; second < secondCount; second += 1) {
+    const sliceEndMs = windowStartMs + (second + 1) * 1000;
+    const visibleChat = chatEvents.filter((entry) => entry.ts <= sliceEndMs).slice(-10).map((entry) => entry.text);
+    const svg = renderSidebarSvg({
+      width: SIDEBAR_WIDTH,
+      height,
+      title,
+      driverBatteryLines,
+      chatLines: visibleChat,
+    });
+    const framePath = path.join(framesDir, `frame-${String(second + 1).padStart(4, '0')}.png`);
+    await sharp(Buffer.from(svg, 'utf8')).png().toFile(framePath);
   }
-
-  await fsp.writeFile(assPath, `${headerLines.join('\n')}\n`, 'utf8');
 
   await execFileAsync(FFMPEG_BIN, [
     '-y',
     '-hide_banner',
     '-loglevel',
     'error',
-    '-f',
-    'lavfi',
+    '-framerate',
+    '1',
     '-i',
-    `color=c=0x111111:s=${SIDEBAR_WIDTH}x${height}:r=${TARGET_FPS}:d=${durationSec.toFixed(3)}`,
+    path.join(framesDir, 'frame-%04d.png'),
     '-vf',
-    `subtitles=${assPath}`,
+    `fps=${TARGET_FPS},format=yuv420p`,
+    '-t',
+    durationSec.toFixed(3),
     '-c:v',
     'libx264',
     '-preset',
