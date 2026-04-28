@@ -1,67 +1,80 @@
 # REFACTOR RULES
-- do NOT change ANY functionality!!! all changes should be purely internal!!
-- this refactor is for simplification purposes, to make it easier to work on. remove any unused files and code.
+- Do NOT change ANY functionality. All changes must be purely internal refactors.
+- Refactor for simplification and maintainability.
+- Remove unused files/code only when verified unused.
+- No backwards compatability is needed anywhere. Clients and the server are both always up to date.
+- Keep behavior/API contracts unchanged.
 
-## server backend
-- there are a lot of services and some have gotten huge, like way too large to manage manually
-- all services should be converted into folders, with their files inside the folders
-- large functions of the service should be split off into more, smaller files within the service's folder
-- keep files relatively small and very clear and concise in their function. with titles commented at the top.
+## Required safety checks for every change
+- Preserve imports/exports and call signatures unless internal-only and non-observable.
+- Validate no runtime behavior changes (manual flow checks + targeted tests when available).
+- Make small, reviewable commits per service/component area.
 
-## webui frontend
-- similar situation to the server's service file bloat, but with large jsx component files
-- split up large jsx components and backing js files into folders containing smaller files
-- use same clear concise functional format, with title comments
-- the web UI probably has a lot of leftovers inside still, old files that arent used, backwards compatability that doesnt need to exist, etc. simplify it all.
+## Server backend
+- Convert every service into a folder-based structure.
+- Split very large service files into smaller focused modules.
+- Keep files concise and single-purpose.
+- Add clear title comments at top of split files.
 
+## WebUI frontend
+- Split large JSX/components and large backing JS files into folderized modules.
+- Keep modules clear and focused, with title comments.
+- Remove stale compatibility/leftover code only after usage verification.
 
 # REFACTOR TRACKING
-## server backend
+## Current phase
+- [x] Phase 1: Inventory + usage mapping (server + webui)
+- [ ] Phase 2: Refactor highest-impact offenders first
+- [ ] Phase 3: Sweep remaining services/components
+- [ ] Phase 4: Dead code/file removal pass
+- [ ] Phase 5: Final regression validation
+
+## Server backend
 ### BIGGEST OFFENDERS
-- audio forward service
-- button box service
-- chat service
-- discord bot service
-- home assistant service
-- llm commentary service
-- private rover access request service
-- replay services, already split up kinda. still go through them and reformat into folders.
-- room camera services, also split up already. go through and reformat
-- rover manager service
-- session service
-- turn service
-- verification service
-- video auth service
-- despite this list, ALL SERVICES should be reorganized into folders and split up where reasonable
+- [ ] audio forward service
+- [ ] button box service
+- [ ] chat service
+- [ ] discord bot service
+- [ ] home assistant service
+- [ ] llm commentary service
+- [ ] private rover access request service
+- [ ] replay services (already partly split; reformat consistently)
+- [ ] room camera services (already partly split; reformat consistently)
+- [ ] rover manager service
+- [ ] session service
+- [ ] turn service
+- [ ] verification service
+- [ ] video auth service
+- [ ] All remaining services: reorganize to folder structure where needed
 
 ### COMPLETED SERVICES
-- 
+- None yet.
 
 ### LARGE CHANGES
-- 
+- None yet.
 
-
-
-
-
-
-
-
-## webui frontend
+## WebUI frontend
 ### BIGGEST OFFENDERS
-- mini summary app
-- spectator app
-- vip audio upload card
-- admin panel
-- drive dock action
-- gamepad mapping settings
-- mobile controls
-- top down map
-- videotile
-- a lot of the code in the webui folder may be unused or unneeded. when going through the files, check if that function needs to exist, or if the file is used
+- [x] mini summary app
+- [ ] spectator app
+- [ ] vip audio upload card
+- [ ] admin panel
+- [ ] drive dock action
+- [ ] gamepad mapping settings
+- [ ] mobile controls
+- [ ] top down map
+- [ ] video tile
+- [ ] Sweep `webui` for unused or unneeded files/code with verification
 
 ### COMPLETED COMPONENTS
-- 
+- mini summary app
 
 ### LARGE CHANGES
-- 
+- Split `webui/src/mini/MiniSummaryApp.jsx` into folderized modules under `webui/src/mini/MiniSummaryApp/` with a compatibility entrypoint preserved.
+
+## Done criteria (per item)
+- [ ] Folderized structure created.
+- [ ] Large functions extracted into focused files.
+- [ ] Imports/exports updated with no external behavior change.
+- [ ] Verified references/usages still resolve.
+- [ ] Passed targeted checks/tests for touched area.
