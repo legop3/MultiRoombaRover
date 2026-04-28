@@ -360,8 +360,26 @@ function clampEven(value) {
   return Math.max(2, Math.floor(value / 2) * 2);
 }
 
-function scalePadFilter(tileWidth, tileHeight) {
-  return `scale=${tileWidth}:${tileHeight}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${tileWidth}:${tileHeight}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
+function escapeDrawtext(text) {
+  return String(text || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/:/g, '\\:')
+    .replace(/'/g, "\\'")
+    .replace(/,/g, '\\,')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]')
+    .replace(/%/g, '\\%');
+}
+
+function scalePadFilter(tileWidth, tileHeight, titleText = '') {
+  const safeTitle = escapeDrawtext(titleText);
+  return (
+    `scale=${tileWidth}:${tileHeight}:force_original_aspect_ratio=decrease:flags=lanczos,` +
+    `pad=${tileWidth}:${tileHeight}:(ow-iw)/2:(oh-ih)/2:color=black,` +
+    `drawbox=x=0:y=0:w=iw:h=26:color=black@0.72:t=fill,` +
+    `drawtext=text='${safeTitle}':x=6:y=7:fontsize=14:fontcolor=white:borderw=1:bordercolor=black@0.7,` +
+    'setsar=1'
+  );
 }
 
 function sanitizeReplayTitle(title, fallback = 'Replay') {
@@ -538,10 +556,10 @@ function renderSidebarSvg({
   } else {
     for (let i = 0; i < normalizedChats.length; i += 1) {
       const block = normalizedChats[i];
-      const nameW = Math.min(95, block.nick.length * 6);
-      const badgeW = block.roverId ? Math.min(58, Math.max(24, block.roverId.length * 6 + 10)) : 0;
-      const badgeGap = block.roverId ? 6 : 0;
-      const prefixChars = Math.ceil((nameW + badgeW + badgeGap + 18) / 5.8);
+      const nameW = Math.min(72, block.nick.length * 5.2);
+      const badgeW = block.roverId ? Math.min(46, Math.max(18, block.roverId.length * 5 + 6)) : 0;
+      const badgeGap = block.roverId ? 2 : 0;
+      const prefixChars = Math.ceil((nameW + badgeW + badgeGap + 10) / 5.8);
       const firstLineRaw = String(block.wrapped[0] || '').trim();
       const firstLine = firstLineRaw ? firstLineRaw : '';
       const remainingRaw = block.wrapped.slice(firstLineRaw ? 1 : 0).map((line) => String(line || '').trim()).filter(Boolean);
@@ -553,14 +571,14 @@ function renderSidebarSvg({
         `<rect x="${bubbleX}" y="${cy}" width="${bubbleW}" height="${bubbleH}" rx="4" class="${block.bubbleTone}"/>`,
       );
       const nameX = bubbleX + pad;
-      const textStartX = nameX + nameW + pad + (block.roverId ? badgeW + badgeGap : 0);
+      const textStartX = nameX + nameW + 2 + (block.roverId ? badgeW + badgeGap : 0);
       textRows.push(`<text x="${nameX}" y="${cy + pad + 8}" class="chatName" fill="${block.nameColor}">${block.nick}</text>`);
       if (block.fromDiscord) {
         textRows.push(`<text x="${nameX + nameW + 2}" y="${cy + pad + 8}" class="discordTag">◈</text>`);
       }
       if (block.roverId) {
-        const badgeX = nameX + nameW + pad;
-        const badgeTextX = badgeX + 5;
+        const badgeX = nameX + nameW + 2;
+        const badgeTextX = badgeX + 3;
         shapes.push(
           `<rect x="${badgeX}" y="${cy + pad - 1}" width="${badgeW}" height="12" rx="3" fill="${block.roverBadgeBg}" stroke="${block.roverBadgeBorder}" stroke-width="0.8"/>`,
         );
@@ -847,7 +865,8 @@ async function buildReplayVideo({ sources = [], title = '', requester = '' } = {
 
     for (let i = 0; i < normalizedVideos.length; i += 1) {
       inputArgs.push('-i', normalizedVideos[i].path);
-      filterParts.push(`[${i}:v]${scalePadFilter(tileWidth, tileHeight)}[v${i}]`);
+      const sourceTitle = normalizedVideos[i]?.source?.label || normalizedVideos[i]?.source?.id || `Source ${i + 1}`;
+      filterParts.push(`[${i}:v]${scalePadFilter(tileWidth, tileHeight, sourceTitle)}[v${i}]`);
       const x = (i % layout.cols) * tileWidth;
       const y = Math.floor(i / layout.cols) * tileHeight;
       layoutParts.push(`${x}_${y}`);
