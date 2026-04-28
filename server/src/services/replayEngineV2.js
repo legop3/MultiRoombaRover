@@ -194,9 +194,6 @@ function startWorker(source) {
         key,
         source,
         proc,
-        startedAtMs: Date.now(),
-        firstSegmentStartSec: null,
-        restarting: false,
       };
       workers.set(key, worker);
       proc.stderr.on('data', (chunk) => {
@@ -277,21 +274,11 @@ async function refreshIndexForWorker(worker) {
 
   const lines = csv.split(/\r?\n/).map(parseCsvLine).filter(Boolean);
   if (!lines.length) return;
-  const first = lines[0];
-  if (!Number.isFinite(first.startSec) || !Number.isFinite(first.endSec)) return;
-
-  if (worker.firstSegmentStartSec == null) {
-    worker.firstSegmentStartSec = first.startSec;
-  }
-
-  const baseMs = worker.startedAtMs - Math.max(0, (worker.firstSegmentStartSec || 0) * 1000);
   const cutoffMs = Date.now() - BUFFER_SECONDS * 1000 - 5000;
 
   const entries = [];
   for (const row of lines) {
     if (!Number.isFinite(row.startSec) || !Number.isFinite(row.endSec)) continue;
-    const startMs = Math.round(baseMs + row.startSec * 1000);
-    const endMs = Math.round(baseMs + row.endSec * 1000);
     const filePath = path.join(dir, row.filename);
     let stat;
     try {
@@ -300,6 +287,13 @@ async function refreshIndexForWorker(worker) {
       continue;
     }
     if (!stat.isFile() || stat.size < 4096) continue;
+    const durSecRaw = row.endSec - row.startSec;
+    const durationSec =
+      Number.isFinite(durSecRaw) && durSecRaw > 0 && durSecRaw < SEGMENT_SECONDS * 6
+        ? durSecRaw
+        : SEGMENT_SECONDS;
+    const endMs = Math.round(stat.mtimeMs);
+    const startMs = Math.round(endMs - durationSec * 1000);
     if (endMs < cutoffMs) continue;
     entries.push({
       filePath,
