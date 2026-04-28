@@ -516,39 +516,39 @@ function renderSidebarSvg({
 
   const shapes = [];
   const textRows = [];
-  const pad = 4;
+  const pad = 3;
   const cardX = pad;
   const cardW = width - pad * 2;
   let y = pad;
 
   // Title card
-  const titleCardH = Math.max(30, pad * 2 + titleParts.length * 16);
+  const titleCardH = Math.max(26, pad * 2 + titleParts.length * 15);
   shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${titleCardH}" rx="4" class="card"/>`);
-  let ty = y + pad + 12;
+  let ty = y + pad + 11;
   for (const part of titleParts) {
     textRows.push(`<text x="${cardX + pad}" y="${ty}" class="title">${part}</text>`);
-    ty += 16;
+    ty += 15;
   }
   y += titleCardH + pad;
 
   // Drivers card
   const driverLines = statLines.length ? statLines : ['No active drivers'];
-  const driversCardH = pad * 2 + 12 + driverLines.length * 14;
+  const driversCardH = pad * 2 + 11 + driverLines.length * 13;
   shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${driversCardH}" rx="4" class="card"/>`);
-  textRows.push(`<text x="${cardX + pad}" y="${y + pad + 10}" class="section">Drivers</text>`);
-  let dy = y + pad + 22;
+  textRows.push(`<text x="${cardX + pad}" y="${y + pad + 9}" class="section">Drivers</text>`);
+  let dy = y + pad + 19;
   for (const line of driverLines) {
     textRows.push(`<text x="${cardX + pad}" y="${dy}" class="${statLines.length ? 'body' : 'muted'}">${line}</text>`);
-    dy += 14;
+    dy += 13;
   }
   y += driversCardH + pad;
 
   // Chat card
   const chatCardH = Math.max(80, height - y - pad);
   shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${chatCardH}" rx="4" class="card"/>`);
-  textRows.push(`<text x="${cardX + pad}" y="${y + pad + 10}" class="section">Chat</text>`);
+  textRows.push(`<text x="${cardX + pad}" y="${y + pad + 9}" class="section">Chat</text>`);
 
-  let cy = y + pad + 14;
+  let cy = y + pad + 12;
   const bubbleX = cardX + pad;
   const bubbleW = cardW - pad * 2;
   if (!normalizedChats.length) {
@@ -558,7 +558,7 @@ function renderSidebarSvg({
       const block = normalizedChats[i];
       const nameW = Math.min(72, block.nick.length * 5.2);
       const badgeW = block.roverId ? Math.min(46, Math.max(18, block.roverId.length * 5 + 6)) : 0;
-      const badgeGap = block.roverId ? 2 : 0;
+      const badgeGap = block.roverId ? 3 : 0;
       const prefixChars = Math.ceil((nameW + badgeW + badgeGap + 10) / 5.8);
       const firstLineRaw = String(block.wrapped[0] || '').trim();
       const firstLine = firstLineRaw ? firstLineRaw : '';
@@ -571,13 +571,13 @@ function renderSidebarSvg({
         `<rect x="${bubbleX}" y="${cy}" width="${bubbleW}" height="${bubbleH}" rx="4" class="${block.bubbleTone}"/>`,
       );
       const nameX = bubbleX + pad;
-      const textStartX = nameX + nameW + 2 + (block.roverId ? badgeW + badgeGap : 0);
+      const textStartX = nameX + nameW + 3 + (block.roverId ? badgeW + badgeGap : 0);
       textRows.push(`<text x="${nameX}" y="${cy + pad + 8}" class="chatName" fill="${block.nameColor}">${block.nick}</text>`);
       if (block.fromDiscord) {
         textRows.push(`<text x="${nameX + nameW + 2}" y="${cy + pad + 8}" class="discordTag">◈</text>`);
       }
       if (block.roverId) {
-        const badgeX = nameX + nameW + 2;
+        const badgeX = nameX + nameW + 3;
         const badgeTextX = badgeX + 3;
         shapes.push(
           `<rect x="${badgeX}" y="${cy + pad - 1}" width="${badgeW}" height="12" rx="3" fill="${block.roverBadgeBg}" stroke="${block.roverBadgeBorder}" stroke-width="0.8"/>`,
