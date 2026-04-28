@@ -498,43 +498,43 @@ function renderSidebarSvg({
 
   const shapes = [];
   const textRows = [];
-  const pad = 5;
+  const pad = 4;
   const cardX = pad;
   const cardW = width - pad * 2;
-  let y = 5;
+  let y = pad;
 
   // Title card
-  const titleCardH = Math.max(42, 12 + titleParts.length * 18);
+  const titleCardH = Math.max(30, pad * 2 + titleParts.length * 16);
   shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${titleCardH}" rx="4" class="card"/>`);
-  let ty = y + 18;
+  let ty = y + pad + 12;
   for (const part of titleParts) {
-    textRows.push(`<text x="${cardX + 8}" y="${ty}" class="title">${part}</text>`);
-    ty += 18;
+    textRows.push(`<text x="${cardX + pad}" y="${ty}" class="title">${part}</text>`);
+    ty += 16;
   }
-  y += titleCardH + 4;
+  y += titleCardH + pad;
 
   // Drivers card
   const driverLines = statLines.length ? statLines : ['No active drivers'];
-  const driversCardH = 20 + driverLines.length * 16 + 6;
+  const driversCardH = pad * 2 + 12 + driverLines.length * 14;
   shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${driversCardH}" rx="4" class="card"/>`);
-  textRows.push(`<text x="${cardX + 8}" y="${y + 16}" class="section">Drivers</text>`);
-  let dy = y + 32;
+  textRows.push(`<text x="${cardX + pad}" y="${y + pad + 10}" class="section">Drivers</text>`);
+  let dy = y + pad + 22;
   for (const line of driverLines) {
-    textRows.push(`<text x="${cardX + 8}" y="${dy}" class="${statLines.length ? 'body' : 'muted'}">${line}</text>`);
-    dy += 16;
+    textRows.push(`<text x="${cardX + pad}" y="${dy}" class="${statLines.length ? 'body' : 'muted'}">${line}</text>`);
+    dy += 14;
   }
-  y += driversCardH + 4;
+  y += driversCardH + pad;
 
   // Chat card
-  const chatCardH = Math.max(80, height - y - 5);
+  const chatCardH = Math.max(80, height - y - pad);
   shapes.push(`<rect x="${cardX}" y="${y}" width="${cardW}" height="${chatCardH}" rx="4" class="card"/>`);
-  textRows.push(`<text x="${cardX + 8}" y="${y + 16}" class="section">Chat</text>`);
+  textRows.push(`<text x="${cardX + pad}" y="${y + pad + 10}" class="section">Chat</text>`);
 
-  let cy = y + 22;
-  const bubbleX = cardX + 5;
-  const bubbleW = cardW - 10;
+  let cy = y + pad + 14;
+  const bubbleX = cardX + pad;
+  const bubbleW = cardW - pad * 2;
   if (!normalizedChats.length) {
-    textRows.push(`<text x="${cardX + 8}" y="${cy + 16}" class="muted">No chat in replay window</text>`);
+    textRows.push(`<text x="${cardX + pad}" y="${cy + 14}" class="muted">No chat in replay window</text>`);
   } else {
     for (let i = 0; i < normalizedChats.length; i += 1) {
       const block = normalizedChats[i];
@@ -547,33 +547,33 @@ function renderSidebarSvg({
       const remainingRaw = block.wrapped.slice(firstLineRaw ? 1 : 0).map((line) => String(line || '').trim()).filter(Boolean);
       const fullText = (firstLine ? [firstLine, ...remainingRaw] : remainingRaw).join(' ');
       const inlineWrapped = wrapTextLines(fullText, Math.max(8, 26 - prefixChars)).slice(0, 4).map((line) => escapeXml(line));
-      const bubbleH = 16 + inlineWrapped.length * 14;
-      if (cy + bubbleH + 4 > y + chatCardH - 5) break;
+      const bubbleH = pad * 2 + Math.max(1, inlineWrapped.length) * 12;
+      if (cy + bubbleH + pad > y + chatCardH - pad) break;
       shapes.push(
         `<rect x="${bubbleX}" y="${cy}" width="${bubbleW}" height="${bubbleH}" rx="4" class="${block.bubbleTone}"/>`,
       );
-      const nameX = bubbleX + 6;
-      const textStartX = nameX + nameW + 4 + (block.roverId ? badgeW + badgeGap : 0);
-      textRows.push(`<text x="${nameX}" y="${cy + 13}" class="chatName" fill="${block.nameColor}">${block.nick}</text>`);
+      const nameX = bubbleX + pad;
+      const textStartX = nameX + nameW + pad + (block.roverId ? badgeW + badgeGap : 0);
+      textRows.push(`<text x="${nameX}" y="${cy + pad + 8}" class="chatName" fill="${block.nameColor}">${block.nick}</text>`);
       if (block.fromDiscord) {
-        textRows.push(`<text x="${nameX + nameW + 2}" y="${cy + 13}" class="discordTag">◈</text>`);
+        textRows.push(`<text x="${nameX + nameW + 2}" y="${cy + pad + 8}" class="discordTag">◈</text>`);
       }
       if (block.roverId) {
-        const badgeX = nameX + nameW + 4;
+        const badgeX = nameX + nameW + pad;
         const badgeTextX = badgeX + 5;
         shapes.push(
-          `<rect x="${badgeX}" y="${cy + 3}" width="${badgeW}" height="12" rx="3" fill="${block.roverBadgeBg}" stroke="${block.roverBadgeBorder}" stroke-width="0.8"/>`,
+          `<rect x="${badgeX}" y="${cy + pad - 1}" width="${badgeW}" height="12" rx="3" fill="${block.roverBadgeBg}" stroke="${block.roverBadgeBorder}" stroke-width="0.8"/>`,
         );
-        textRows.push(`<text x="${badgeTextX}" y="${cy + 12}" class="roverTag">${block.roverId}</text>`);
+        textRows.push(`<text x="${badgeTextX}" y="${cy + pad + 8}" class="roverTag">${block.roverId}</text>`);
       }
-      let by = cy + 13;
+      let by = cy + pad + 8;
       for (let lineIdx = 0; lineIdx < inlineWrapped.length; lineIdx += 1) {
         const line = inlineWrapped[lineIdx];
-        const lineX = lineIdx === 0 ? textStartX : bubbleX + 6;
+        const lineX = lineIdx === 0 ? textStartX : bubbleX + pad;
         textRows.push(`<text x="${lineX}" y="${by}" class="chat">${line}</text>`);
-        by += 14;
+        by += 12;
       }
-      cy += bubbleH + 4;
+      cy += bubbleH + pad;
     }
   }
 
