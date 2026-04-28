@@ -12,8 +12,8 @@ const { getRoomCameras } = require('../roomCameraService');
 const { getRoomCameraState } = require('../roomCameraSnapshotService');
 const { loadConfig } = require('../../helpers/configLoader');
 
-const INDEX_HTML_PATH = path.join(__dirname, '..', '..', 'public', 'index.html');
-const BITMAP_PATH = path.join(__dirname, '..', '..', 'public', 'bitmap.png');
+const INDEX_HTML_PATH = path.join(__dirname, '..', '..', '..', 'public', 'index.html');
+const BITMAP_PATH = path.join(__dirname, '..', '..', '..', 'public', 'bitmap.png');
 
 const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
