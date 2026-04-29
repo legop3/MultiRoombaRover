@@ -20,7 +20,12 @@ function passesMode(socket) {
   return true;
 }
 
-function registerRoverSnapshotSocketGateway({ roverManager, roverSnapshotEvents, getRoverSnapshotState }) {
+function registerRoverSnapshotSocketGateway({
+  roverManager,
+  roverSnapshotEvents,
+  getRoverSnapshotState,
+  fetchSnapshotNow,
+}) {
   const roverSubscribers = new Map();
   const socketSubscriptions = new Map();
   const subscribeBuckets = new Map();
@@ -113,8 +118,19 @@ function registerRoverSnapshotSocketGateway({ roverManager, roverSnapshotEvents,
         if (!passesMode(socket)) throw new Error('Not authorized for rover snapshots');
         const rosterIds = new Set(visibleIds);
         const validIds = uniqueIds.filter((id) => rosterIds.has(String(id)));
+        logger.info('Rover snapshot subscribe', {
+          socketId: socket.id,
+          requestedIds: uniqueIds,
+          visibleIds,
+          subscribedIds: validIds,
+        });
         validIds.forEach((roverId) => addSubscription(socket, roverId));
         validIds.forEach((roverId) => {
+          if (typeof fetchSnapshotNow === 'function') {
+            fetchSnapshotNow(String(roverId)).catch((err) => {
+              logger.warn('Immediate snapshot fetch failed', { roverId, err: err.message });
+            });
+          }
           const state = getRoverSnapshotState(roverId);
           if (state?.frame) sendFrame(socket, roverId, { ts: state.ts }, state.frame);
           sendStatus(socket, roverId, { ts: state?.ts || null, error: state?.error || null });

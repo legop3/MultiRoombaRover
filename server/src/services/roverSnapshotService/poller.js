@@ -8,9 +8,6 @@ const logger = require('../../globals/logger').child('roverSnapshot');
 
 const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
 const POLL_INTERVAL_MS = 300;
-const FORCE_REREAD_STALE_MS = 2000;
-const STALE_WARN_MS = 10000;
-
 const roverState = new Map();
 const events = new EventEmitter();
 let pollTimer = null;
@@ -28,46 +25,19 @@ function getSnapshotPath(id) {
 
 function createRoverSnapshotPoller({ roverManager }) {
   async function fetchSnapshot(id) {
-    const prev = roverState.get(id);
-    if (prev?.fetching) return;
+    const state = roverState.get(id);
+    if (state?.fetching) return;
     markState(id, { fetching: true });
     try {
       const filePath = getSnapshotPath(id);
       const stats = await fs.stat(filePath);
-      const now = Date.now();
-      const staleAgeMs = prev?.ts ? now - prev.ts : 0;
-      const mtimeUnchanged = Boolean(prev?.mtimeMs && stats.mtimeMs <= prev.mtimeMs);
-      const shouldForceRead = mtimeUnchanged && staleAgeMs >= FORCE_REREAD_STALE_MS;
-      if (mtimeUnchanged && !shouldForceRead) return;
-
+      if (state?.mtimeMs && stats.mtimeMs <= state.mtimeMs) return;
       const buffer = await fs.readFile(filePath);
-      const ts = stats.mtimeMs || now;
-      const prevFrame = prev?.frame || null;
-      const changed =
-        !prevFrame ||
-        prevFrame.length !== buffer.length ||
-        !prevFrame.equals(buffer) ||
-        !mtimeUnchanged;
-      const nextState = markState(id, {
-        frame: changed ? buffer : prevFrame,
-        ts: changed ? ts : prev?.ts || ts,
-        error: null,
-        failures: 0,
-        mtimeMs: stats.mtimeMs,
-      });
-      if (changed) {
-        events.emit('frame', { id, buffer, ts: nextState.ts });
-      } else if (staleAgeMs >= STALE_WARN_MS) {
-        logger.warn('Snapshot appears stale', {
-          id,
-          snapshotDir: SNAPSHOT_DIR,
-          path: filePath,
-          ageMs: staleAgeMs,
-          mtimeMs: stats.mtimeMs,
-        });
-      }
+      const ts = stats.mtimeMs || Date.now();
+      markState(id, { frame: buffer, ts, error: null, failures: 0, mtimeMs: stats.mtimeMs });
+      events.emit('frame', { id, buffer, ts });
     } catch (err) {
-      const failures = (prev?.failures || 0) + 1;
+      const failures = (state?.failures || 0) + 1;
       const message = err.code === 'ENOENT' ? 'Snapshot missing' : err.message;
       markState(id, { error: message, failures });
       events.emit('status', { id, error: message });
@@ -96,7 +66,6 @@ function createRoverSnapshotPoller({ roverManager }) {
     logger.info('Starting rover snapshot polling', {
       snapshotDir: SNAPSHOT_DIR,
       intervalMs: POLL_INTERVAL_MS,
-      forceRereadStaleMs: FORCE_REREAD_STALE_MS,
     });
     pollTimer = setInterval(() => {
       const roster = roverManager.getRoster();
@@ -120,6 +89,7 @@ function createRoverSnapshotPoller({ roverManager }) {
   return {
     startAll,
     stopAll,
+    fetchSnapshotNow: fetchSnapshot,
     roverSnapshotEvents: events,
     getRoverSnapshotState,
   };

@@ -12,6 +12,7 @@ registerRoverSnapshotSocketGateway({
   roverManager,
   roverSnapshotEvents: poller.roverSnapshotEvents,
   getRoverSnapshotState: poller.getRoverSnapshotState,
+  fetchSnapshotNow: poller.fetchSnapshotNow,
 });
 
 module.exports = {
