@@ -80,7 +80,8 @@ function createButtonBoxCore(deps) {
         return Array.isArray(entities) ? entities : [];
       },
       getHomeAssistantLightPolicy: () => getHomeAssistantState()?.lightPolicy || null,
-      setHomeAssistantEntityState,
+      setHomeAssistantEntityState: (entityId, state) =>
+        setHomeAssistantEntityState(entityId, state, { source: 'buttonBoxReward' }),
       setHomeAssistantLightsLockedOn: (next, options = {}) =>
         setHomeAssistantLightsLockedOn(next, options),
       saveEffect: (effectId, payload = {}) => saveEffect(effectId, payload, { broadcast: false }),

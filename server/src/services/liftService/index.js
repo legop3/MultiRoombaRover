@@ -31,6 +31,7 @@ const state = {
   lastActor: null,
   lastError: null,
 };
+let lastEmittedStateJson = null;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -92,7 +93,11 @@ function getState() {
 }
 
 function emitUpdate() {
-  events.emit('update', getState());
+  const next = getState();
+  const nextJson = JSON.stringify(next);
+  if (nextJson === lastEmittedStateJson) return;
+  lastEmittedStateJson = nextJson;
+  events.emit('update', next);
 }
 
 function assertReady() {

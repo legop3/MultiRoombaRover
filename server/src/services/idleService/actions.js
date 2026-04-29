@@ -13,7 +13,7 @@ const {
 } = require('./constants');
 
 async function turnOffRoomControls() {
-  await homeAssistantService.setAllControllableEntitiesState('off');
+  await homeAssistantService.setAllControllableEntitiesState('off', { source: 'idleService:turnOffRoomControls' });
   return { action: 'roomControlsOff' };
 }
 

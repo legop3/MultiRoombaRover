@@ -64,7 +64,7 @@ function createRuntimeEngine(deps) {
     return Array.from(entityConfig.values()).map((meta) => String(meta.id));
   }
 
-  async function setEntityState(entityId, desiredState) {
+  async function setEntityState(entityId, desiredState, options = {}) {
     if (!enabled) throw new Error('Home Assistant not configured');
     const meta = entityConfig.get(entityId);
     if (!meta) throw new Error('Unknown Home Assistant entity');
@@ -73,14 +73,23 @@ function createRuntimeEngine(deps) {
     const nextState = desiredState === 'on' ? 'on' : 'off';
     const domain = meta.type === 'light' ? 'light' : 'switch';
     const service = nextState === 'on' ? 'turn_on' : 'turn_off';
+    const source = String(options?.source || 'unknown');
     await callHomeAssistantService(domain, service, { entity_id: entityId });
-    logger.info('Issued Home Assistant command', { entityId, domain, service });
+    logger.info('Issued Home Assistant command', { entityId, domain, service, source });
   }
 
-  async function setAllControllableEntitiesState(desiredState) {
+  async function setAllControllableEntitiesState(desiredState, options = {}) {
+    const source = String(options?.source || 'unknown');
     const ids = getControllableEntityIds();
     if (!ids.length) return;
-    const results = await Promise.allSettled(ids.map((id) => setEntityState(id, desiredState)));
+    logger.info('Issuing Home Assistant bulk state update', {
+      desiredState: desiredState === 'on' ? 'on' : 'off',
+      source,
+      total: ids.length,
+    });
+    const results = await Promise.allSettled(
+      ids.map((id) => setEntityState(id, desiredState, { source: `${source}:bulk` })),
+    );
     const failures = results.filter((result) => result.status === 'rejected');
     if (failures.length) {
       logger.warn('Some Home Assistant entity state updates failed', {
@@ -200,10 +209,11 @@ function createRuntimeEngine(deps) {
     evaluateTriggers(snapshot);
   }
 
-  async function toggleEntity(entityId) {
+  async function toggleEntity(entityId, options = {}) {
     const current = entityState.get(entityId);
     const nextState = current?.state === 'on' ? 'off' : 'on';
-    return setEntityState(entityId, nextState);
+    const source = String(options?.source || 'homeAssistant:toggleEntity');
+    return setEntityState(entityId, nextState, { source });
   }
 
   async function setLightColor(entityId, rgbColor) {
@@ -250,7 +260,9 @@ function createRuntimeEngine(deps) {
 
     if (runtime.lightsLockState != null) {
       if ((changed || forceApply) && enabled) {
-        await setAllControllableEntitiesState(runtime.lightsLockState);
+        await setAllControllableEntitiesState(runtime.lightsLockState, {
+          source: String(options?.source || 'homeAssistant:setLightsLockedOn'),
+        });
       }
     } else {
       evaluateLightAutomation();

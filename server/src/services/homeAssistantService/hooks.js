@@ -44,7 +44,7 @@ function registerHomeAssistantHooks(deps) {
       }
       try {
         if (!entityId) throw new Error('entityId required');
-        await toggleEntity(entityId);
+        await toggleEntity(entityId, { source: `socket:${socket.id}:homeAssistant:toggle` });
         cb({ success: true });
       } catch (err) {
         cb({ error: err.message });
@@ -60,7 +60,7 @@ function registerHomeAssistantHooks(deps) {
       }
       try {
         if (!entityId) throw new Error('entityId required');
-        await setEntityState(entityId, state);
+        await setEntityState(entityId, state, { source: `socket:${socket.id}:homeAssistant:setState` });
         cb({ success: true });
       } catch (err) {
         cb({ error: err.message });
