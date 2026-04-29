@@ -1,3 +1,5 @@
+// Socket Library Helper
+// Purpose: Builds and exports the browser Socket.IO client with shared defaults. Scope: Centralizes connection URL/options so all modules use consistent socket behavior.
 import { io } from 'socket.io-client';
 import { loadSettings } from '../settings/persistence.js';
 

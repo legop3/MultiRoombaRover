@@ -1,3 +1,5 @@
+// Gamepad Hub Runtime
+// Purpose: Tracks connected gamepads and polls input state for downstream handlers. Scope: Encapsulates browser Gamepad API access and per-frame update orchestration.
 import { useEffect, useState } from 'react';
 import { getPadSignature } from './gamepadBindings.js';
 

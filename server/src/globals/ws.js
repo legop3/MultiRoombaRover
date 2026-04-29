@@ -1,3 +1,5 @@
+// Global WebSocket Server
+// Purpose: Stores the shared raw WebSocket server instance for modules that need direct access. Scope: Centralizes setter/getter access for process-wide WS wiring.
 const { WebSocketServer } = require('ws');
 const { httpServer } = require('./http');
 const logger = require('./logger');

@@ -1,3 +1,5 @@
+// Hook: useVideoRequests
+// Purpose: Coordinates client-side video stream request intents and authorization timing. Scope: Provides reusable request helpers for rover and room video consumers.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 

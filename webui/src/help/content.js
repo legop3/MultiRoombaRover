@@ -1,3 +1,5 @@
+// Help Content Definitions
+// Purpose: Stores static/dynamic help text content displayed by help UI components. Scope: Central content source for onboarding instructions and control references.
 export const HELP_LAYOUTS = ['desktop', 'mobile-portrait', 'mobile-landscape'];
 
 // Block-based help content; each layout defines a hero plus main/aside blocks.

@@ -1,3 +1,5 @@
+// Hook: useRoverSnapshots
+// Purpose: Subscribes to rover snapshot streams and stores latest per-rover image states. Scope: Manages socket request/subscription lifecycle and data normalization.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 

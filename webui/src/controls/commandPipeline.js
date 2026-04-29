@@ -1,3 +1,5 @@
+// Control Command Pipeline
+// Purpose: Converts normalized inputs into command packets sent to the server. Scope: Applies throttling/coalescing/safety filters before socket command emission.
 import { useCallback, useMemo } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSessionSelector } from '../context/SessionContext.jsx';

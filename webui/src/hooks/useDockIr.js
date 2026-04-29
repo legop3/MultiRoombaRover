@@ -1,3 +1,5 @@
+// Hook: useDockIr
+// Purpose: Tracks dock IR telemetry/status values for docking-related UI indicators. Scope: Converts telemetry feed updates into component-friendly reactive state.
 import { useEffect, useMemo, useState } from 'react';
 
 const HOLD_MS = 650;

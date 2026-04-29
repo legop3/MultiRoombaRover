@@ -1,3 +1,5 @@
+// Telemetry Context Provider
+// Purpose: Maintains shared telemetry snapshots and rover status streams for UI consumers. Scope: Subscribes to telemetry events and exposes normalized read APIs to components.
 /* eslint-disable react-refresh/only-export-components */
 
 import { createContext, useContext, useMemo, useState, useEffect } from 'react';

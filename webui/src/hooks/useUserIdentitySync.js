@@ -1,3 +1,5 @@
+// Hook: useUserIdentitySync
+// Purpose: Keeps local identity state synchronized with server session/auth updates. Scope: Handles identity hydration, change propagation, and persistence touch points.
 import { useCallback, useEffect, useRef } from 'react';
 import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 import { useSocket } from '../context/SocketContext.jsx';

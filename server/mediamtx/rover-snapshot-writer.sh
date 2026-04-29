@@ -19,7 +19,7 @@ mkdir -p "$SNAP_DIR"
 exec ffmpeg -hide_banner -loglevel warning -nostdin -y \
   -i "srt://127.0.0.1:9000?streamid=read:${PATH_NAME}" \
   -an \
-  -vf fps=2 \
+  -vf fps=1 \
   -q:v 6 \
   -update 1 \
   "${SNAP_DIR}/${PATH_NAME}.jpg"

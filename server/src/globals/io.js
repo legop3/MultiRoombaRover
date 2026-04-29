@@ -1,3 +1,5 @@
+// Global Socket.IO
+// Purpose: Stores the singleton Socket.IO server instance for cross-service access. Scope: Exposes getters/setters used during startup wiring and runtime event emission.
 const { Server: SocketIOServer } = require('socket.io');
 const { httpServer } = require('./http');
 

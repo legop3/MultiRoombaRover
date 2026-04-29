@@ -1,3 +1,5 @@
+// Config Loader Helper
+// Purpose: Loads and validates YAML server configuration from configured paths. Scope: Provides normalized config access with sane defaults and cache behavior.
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');

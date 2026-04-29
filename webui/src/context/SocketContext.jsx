@@ -1,3 +1,5 @@
+// Socket Context Provider
+// Purpose: Creates React context for shared socket lifecycle and connection state. Scope: Owns socket initialization, reconnect behavior, and consumer hooks.
 /* eslint-disable react-refresh/only-export-components */
 
 // src/context/SocketContext.jsx

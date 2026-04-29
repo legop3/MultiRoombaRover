@@ -1,3 +1,5 @@
+// WHEP Player Helper
+// Purpose: Implements browser playback utilities for WHEP/WebRTC media streams. Scope: Manages stream attach/detach, lifecycle cleanup, and error handling hooks.
 /* global Buffer */
 
 const RTC_CONFIG = {

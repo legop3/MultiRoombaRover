@@ -1,3 +1,5 @@
+// Control Context Provider
+// Purpose: Exposes control-system state/actions to control-capable components. Scope: Owns reducer wiring, pipeline integration, and top-level provider hooks.
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
 import { controlReducer, initialControlState } from './controlReducer.js';
 import { computeDifferentialSpeeds, clamp } from './controlMath.js';

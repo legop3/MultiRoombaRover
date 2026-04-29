@@ -1,3 +1,5 @@
+// Input Focus Utilities
+// Purpose: Handles focus/blur guards so controls only capture input when appropriate. Scope: Prevents accidental command capture while typing or using form elements.
 const TEXT_INPUT_TYPES = new Set([
   '',
   'text',

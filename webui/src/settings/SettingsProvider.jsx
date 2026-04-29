@@ -1,3 +1,5 @@
+// Settings Provider
+// Purpose: Supplies app-wide settings state and namespace-scoped update APIs. Scope: Bridges persistence helpers with React context for consistent settings access.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { loadSettings, saveSettings } from './persistence.js';
 

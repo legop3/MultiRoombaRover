@@ -1,3 +1,5 @@
+// Keymap Utilities
+// Purpose: Normalizes key binding definitions and lookup behavior for control settings. Scope: Provides conversion/validation helpers for keyboard mapping workflows.
 const KEY_ALIASES = {
   '{': '[',
   '}': ']',

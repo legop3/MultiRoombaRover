@@ -1,3 +1,5 @@
+// Sensor Decoder Helper
+// Purpose: Decodes incoming rover sensor payloads into normalized telemetry fields. Scope: Handles binary/string parsing and defensive fallback behavior for malformed frames.
 const HEADER = 0x13;
 const CHARGING_STATE = {
   0: 'not charging',

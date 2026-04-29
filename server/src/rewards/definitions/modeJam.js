@@ -1,3 +1,5 @@
+// Reward Definition: Mode Jam
+// Purpose: Defines the mode-jam reward that interferes with mode/state transitions. Scope: Supplies effect metadata and execution inputs to reward orchestration code.
 const MIN_DURATION_MS = 5 * 60 * 1000;
 const MAX_DURATION_MS = 10 * 60 * 1000;
 

@@ -1,3 +1,5 @@
+// Hook: useFullscreenPrompt
+// Purpose: Manages fullscreen prompt visibility and dismissal logic across screen sizes/devices. Scope: Provides reusable fullscreen UX state and action handlers.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const SESSION_KEY = 'fullscreenPromptDismissed';

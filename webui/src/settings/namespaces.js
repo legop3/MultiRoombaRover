@@ -1,3 +1,5 @@
+// Settings Namespaces
+// Purpose: Defines namespace identifiers used to segment persisted settings data. Scope: Prevents key collisions and standardizes settings lookup domains.
 export const INPUT_SETTINGS_DEFAULTS = {
   keyboard: {
     baseSpeed: 250,

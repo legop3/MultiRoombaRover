@@ -1,3 +1,5 @@
+// Hook: useSpectatorMode
+// Purpose: Encapsulates spectator mode detection and toggle behavior for controls/UI gating. Scope: Derives spectator-specific flags from session and route state.
 import { useEffect, useState } from 'react';
 import { useSession } from '../context/SessionContext.jsx';
 

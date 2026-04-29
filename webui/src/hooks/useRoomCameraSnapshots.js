@@ -1,3 +1,5 @@
+// Hook: useRoomCameraSnapshots
+// Purpose: Subscribes to room camera snapshot updates and tracks latest image payloads. Scope: Normalizes snapshot event handling for room camera display components.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 

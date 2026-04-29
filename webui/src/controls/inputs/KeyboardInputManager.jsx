@@ -1,3 +1,5 @@
+// Keyboard Input Manager
+// Purpose: Captures and translates keyboard events into normalized control intents. Scope: Owns keydown/keyup listeners and dispatch coordination for drive controls.
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
 import { useChat } from '../../context/ChatContext.jsx';

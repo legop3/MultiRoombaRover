@@ -1,3 +1,5 @@
+// Gamepad Input Manager
+// Purpose: Converts polled gamepad state into normalized control actions/commands. Scope: Integrates bindings, deadzone math, and dispatch callbacks for driving.
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';

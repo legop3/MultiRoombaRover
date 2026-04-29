@@ -1,3 +1,5 @@
+// Gamepad Bindings
+// Purpose: Defines default gamepad axis/button-to-action mappings and lookup helpers. Scope: Supplies binding metadata for gamepad input manager and settings UI.
 const CURVE_EXPO = 1.6;
 
 export function getPadSignature(pad) {

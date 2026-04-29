@@ -1,3 +1,5 @@
+// Settings Persistence
+// Purpose: Implements local persistence read/write behavior for settings namespaces. Scope: Encapsulates storage IO, parsing guards, and migration-safe defaults.
 import { SETTINGS_COOKIE, SETTINGS_MAX_AGE } from './constants.js';
 
 function parseCookieValue(raw) {

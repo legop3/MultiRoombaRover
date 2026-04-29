@@ -1,3 +1,5 @@
+// Reward Definition: Ghost Typing Spam
+// Purpose: Defines the ghost-typing spam reward used for chat-based deterrence events. Scope: Exposes reward metadata and handler inputs for moderation/reward pipelines.
 const NAMES = ['ross', 'david', 'chirpet', 'caydu', 'meow', 'wawa'];
 const BURSTS = 120;
 const MIN_BURST_DELAY_MS = 70;

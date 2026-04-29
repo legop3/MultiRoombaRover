@@ -1,3 +1,5 @@
+// Reward Definition: Chat Spam
+// Purpose: Defines the chat-spam reward for automated disruptive message bursts. Scope: Exposes metadata and effect settings consumed by reward execution.
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
 const BURST_COUNT = 18;
 const MIN_BURST_SIZE = 2;

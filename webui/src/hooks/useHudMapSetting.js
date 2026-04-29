@@ -1,3 +1,5 @@
+// Hook: useHudMapSetting
+// Purpose: Reads and persists HUD map visibility/preferences via settings namespaces. Scope: Exposes a small stateful API for map toggle interactions.
 import { useSettingsNamespace } from '../settings/index.js';
 
 export function useHudMapSetting() {

@@ -1,3 +1,5 @@
+// Battery Utility Library
+// Purpose: Provides battery normalization, threshold classification, and display helpers. Scope: Keeps battery rendering/math consistent across UI components.
 export const WARN_DISPLAY_PERCENT = 10;
 
 export function buildBatteryVisual({ batteryState = null, charge = null, config = null }) {

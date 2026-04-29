@@ -1,3 +1,5 @@
+// Hook: useDefaultNickname
+// Purpose: Computes and applies fallback nickname behavior for unauthenticated/new sessions. Scope: Wraps nickname initialization policy and side effects.
 import { useEffect, useRef } from 'react';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSessionActions } from '../context/SessionContext.jsx';

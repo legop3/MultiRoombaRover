@@ -1,3 +1,5 @@
+// Control Math Utilities
+// Purpose: Contains numeric transforms for joystick/keyboard input normalization and shaping. Scope: Implements deadzone, clamp, and mixing math used by control dispatch logic.
 /* global Buffer */
 
 import { DRIVE_LIMITS } from './constants.js';

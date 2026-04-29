@@ -1,3 +1,5 @@
+// Global HTTP Server
+// Purpose: Stores the process-level HTTP server instance created at bootstrap. Scope: Enables services to access server lifecycle state without circular imports.
 const http = require('http');
 const express = require('express');
 const morgan = require('morgan');

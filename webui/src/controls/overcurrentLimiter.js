@@ -1,3 +1,5 @@
+// Overcurrent Limiter Hook/Utility
+// Purpose: Applies client-side overcurrent guard logic to reduce harmful command spikes. Scope: Tracks limiter state and exposes gated dispatch behavior to controls.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
 import { useSessionSelector } from '../context/SessionContext.jsx';

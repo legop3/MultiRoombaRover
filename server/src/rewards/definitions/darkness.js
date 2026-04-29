@@ -1,3 +1,5 @@
+// Reward Definition: Darkness
+// Purpose: Defines the darkness reward that alters visibility/lighting behavior. Scope: Encapsulates reward metadata and effect configuration for runtime execution.
 const DURATION_MS = 15 * 60 * 1000;
 const LIGHT_ENFORCE_TICK_MS = 3000;
 // Rover daemon semantics are inverted:

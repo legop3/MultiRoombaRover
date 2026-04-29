@@ -1,3 +1,5 @@
+// Global Logger
+// Purpose: Configures structured console logging helpers used by server services. Scope: Formats timestamped log lines and supports child logger prefixes.
 const sinks = new Set();
 
 function notifySinks(level, label, args) {

@@ -35,22 +35,22 @@
 ## Current phase
 - [x] Phase 1: Inventory + usage mapping (server + webui)
 - [x] Phase 2: Refactor highest-impact offenders first
-- [ ] Phase 3: Sweep remaining services/components
+- [x] Phase 3: Sweep remaining services/components
 - [ ] Phase 4: Dead code/file removal pass
-- [ ] Phase 5: Final regression validation
+- [ ] Phase 5: Final regression validation (in progress)
 
 ## Server backend
 ### BIGGEST OFFENDERS
-- [ ] audio forward service
-- [ ] button box service
+- [x] audio forward service
+- [x] button box service
 - [x] chat service
 - [x] discord bot service
 - [x] home assistant service
-- [ ] llm commentary service
+- [x] llm commentary service
 - [x] private rover access request service
 - [x] replay services (consolidated under replayEngineV2)
 - [x] room camera services (consolidated into roomCameraService multipart folder)
-- [ ] rover manager service (in progress: constants/state extracted)
+- [x] rover manager service
 - [x] session service
 - [x] turn service
 - [x] verification service
@@ -119,8 +119,8 @@
 - top down map
 
 ### LARGE CHANGES
-- Split `webui/src/mini/MiniSummaryApp.jsx` into folderized modules under `webui/src/mini/MiniSummaryApp/` with a compatibility entrypoint preserved.
-- Split `webui/src/spectate/SpectatorApp.jsx` into folderized modules under `webui/src/spectate/SpectatorApp/` with a compatibility entrypoint preserved.
+- Split mini summary app into folderized modules under `webui/src/mini/MiniSummaryApp/`, then removed the now-unneeded external wrapper (`webui/src/mini/MiniSummaryApp.jsx`) and rewired app bootstrap imports directly to the folder entrypoint module.
+- Split spectator app into folderized modules under `webui/src/spectate/SpectatorApp/`, then removed the now-unneeded external wrapper (`webui/src/spectate/SpectatorApp.jsx`) and rewired app bootstrap imports directly to the folder entrypoint module.
 - Split `webui/src/components/VideoTile.jsx` by extracting HUD, overlays, chat input, and constants into `webui/src/components/VideoTile/` while preserving the existing `VideoTile.jsx` public component API.
 - Split `webui/src/components/vip/VipAudioUploadCard.jsx` by extracting transport/audio helpers and UI atoms into `webui/src/components/vip/VipAudioUploadCard/` while preserving the existing `VipAudioUploadCard.jsx` import/export API.
 - Split `webui/src/components/AdminPanel.jsx` into `webui/src/components/AdminPanel/` and extracted monitor/health/log/LLM helper modules; updated consumers to folder entrypoint and removed external wrapper file.
@@ -137,3 +137,17 @@
 - [ ] Imports/exports updated with no external behavior change.
 - [ ] Verified references/usages still resolve.
 - [ ] Passed targeted checks/tests for touched area.
+
+## Phase 4 notes
+- Removed stale WebUI compatibility wrapper files `webui/src/mini/MiniSummaryApp.jsx` and `webui/src/spectate/SpectatorApp.jsx` after reference verification; rewired `webui/src/main.jsx` directly to folder entrypoint modules.
+- Verified no remaining replay/room-camera/rover-snapshot legacy service imports (`replayBuildService`, `replayService`, `replaySourceService`, `replaySocketService`, `roomCameraReplayService`, `roomCameraSocketService`, `roomCameraSnapshotService`, `roverSnapshotSocketService`) in server startup/runtime wiring.
+
+## Phase 5 checklist
+- [x] WebUI production build passes (`npm run build`), including updated import graph after wrapper removals.
+- [x] Server JS syntax check passes (`node --check` across `server/src/**/*.js`).
+- [ ] Live rover snapshots: verify continuously updating snapshots from mediaMTX writer on deployed server.
+- [ ] Replay from WebUI button: verify request -> build -> delivery path on deployed server.
+- [ ] Replay from Discord command: verify request -> build -> delivery path on deployed server.
+- [ ] Discord verification + private access request flow: verify end-to-end behavior on deployed server.
+- [ ] Home Assistant idle-light behavior: verify expected mode/idle transitions on deployed server.
+- [ ] Driver/session/turn core flow: verify control assignment, queue movement, command acceptance/rejection behavior.

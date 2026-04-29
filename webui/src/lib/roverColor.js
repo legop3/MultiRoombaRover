@@ -1,3 +1,5 @@
+// Rover Color Utility
+// Purpose: Maps rover identity/state to deterministic UI color choices. Scope: Supplies shared color resolution helpers for lists, badges, and overlays.
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 
 export function normalizeRoverColor(value) {

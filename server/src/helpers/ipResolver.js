@@ -1,3 +1,5 @@
+// IP Resolver Helper
+// Purpose: Resolves client IP addresses from request/socket metadata and proxy headers. Scope: Normalizes IP extraction so auth/logging services use consistent address values.
 const net = require('net');
 
 function extractForwardedIp(value) {

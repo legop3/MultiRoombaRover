@@ -1,3 +1,5 @@
+// Session Context Provider
+// Purpose: Tracks user session identity, roles, queue state, and control assignment data. Scope: Supplies synchronized session state and update hooks to the UI tree.
 /* eslint-disable react-refresh/only-export-components */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';

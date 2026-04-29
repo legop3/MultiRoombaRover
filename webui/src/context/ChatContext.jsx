@@ -1,3 +1,5 @@
+// Chat Context Provider
+// Purpose: Maintains global chat message state, posting helpers, and typing indicators. Scope: Provides chat event subscriptions and mutation actions for chat-capable components.
 /* eslint-disable react-refresh/only-export-components */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';

@@ -1,3 +1,5 @@
+// WebUI Bootstrap Entry
+// Purpose: Boots the React application and mounts global providers/router roots. Scope: Defines top-level route wiring and root render lifecycle for the browser app.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
@@ -7,8 +9,8 @@ import { SocketProvider } from './context/SocketContext.jsx'
 import { SessionProvider } from './context/SessionContext.jsx'
 import { TelemetryProvider } from './context/TelemetryContext.jsx'
 import { ChatProvider } from './context/ChatContext.jsx'
-import SpectatorApp from './spectate/SpectatorApp.jsx'
-import MiniSummaryApp from './mini/MiniSummaryApp.jsx'
+import SpectatorApp from './spectate/SpectatorApp/SpectatorAppRoot.jsx'
+import MiniSummaryApp from './mini/MiniSummaryApp/MiniSummaryAppRoot.jsx'
 import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 

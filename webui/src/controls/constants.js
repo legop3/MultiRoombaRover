@@ -1,3 +1,5 @@
+// Control System Constants
+// Purpose: Defines immutable control tuning and command constants for input pipelines. Scope: Central source of truth for movement scaling, deadzones, and timing values.
 export const AUX_LIMITS = {
   main: [-127, 127],
   side: [-127, 127],

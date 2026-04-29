@@ -1,3 +1,5 @@
+// Reward Registry
+// Purpose: Registers and exports all deterrence/chaos reward definitions. Scope: Builds the canonical reward catalog consumed by button box and moderation flows.
 const dockPanic = require('./definitions/dockPanic');
 const cameraWhiplash = require('./definitions/cameraWhiplash');
 const lightStrobe = require('./definitions/lightStrobe');

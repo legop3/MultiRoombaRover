@@ -1,3 +1,5 @@
+// Reward Definition: Dock Panic
+// Purpose: Defines the dock-panic deterrence reward behavior and metadata. Scope: Produces a deterministic action payload used by reward execution pipelines.
 const DOCK_COMMAND_BASE64 = Buffer.from([143]).toString('base64');
 
 module.exports = {

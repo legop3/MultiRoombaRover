@@ -1,3 +1,5 @@
+// Control State Reducer
+// Purpose: Implements reducer transitions for control-system runtime state. Scope: Centralizes deterministic state updates for input, mode, and dispatch events.
 import { DEFAULT_KEYMAP, DEFAULT_MACROS, SONG_DEFAULT_NOTE } from './constants.js';
 
 function createDriveState() {

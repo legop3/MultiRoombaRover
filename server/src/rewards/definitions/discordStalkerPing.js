@@ -1,3 +1,5 @@
+// Reward Definition: Discord Stalker Ping
+// Purpose: Defines the Discord ping reward that notifies configured channels/users. Scope: Provides reward metadata and dispatch parameters for integration handlers.
 module.exports = {
   id: 'discordStalkerPing',
   name: 'Discord Ping',

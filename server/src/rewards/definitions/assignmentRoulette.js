@@ -1,3 +1,5 @@
+// Reward Definition: Assignment Roulette
+// Purpose: Defines the assignment-roulette reward for reshuffling control assignments. Scope: Encodes reward identity, messaging, and runtime action parameters.
 module.exports = {
   id: 'assignmentRoulette',
   name: 'Rover Reassignment',
