@@ -11,6 +11,12 @@ if (!global.WebSocket) {
 
 function createTransport(deps) {
   const { logger, enabled, haConfig, onSnapshot, onStatus } = deps;
+  function getCallerFrame() {
+    const stack = new Error().stack || '';
+    const lines = stack.split('\n').slice(2).map((line) => line.trim());
+    const frame = lines.find((line) => !line.includes('transport.js') && !line.includes('node:internal')) || null;
+    return frame;
+  }
 
   function buildAuth() {
     const token = haConfig?.token?.trim();
@@ -103,6 +109,7 @@ function createTransport(deps) {
       domain: String(domain),
       service: String(service),
       serviceData: serviceData && typeof serviceData === 'object' ? { ...serviceData } : serviceData,
+      caller: getCallerFrame(),
     });
     await callService(runtime.connection, String(domain), String(service), serviceData || {});
   }
