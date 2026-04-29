@@ -45,7 +45,7 @@
 - [ ] button box service
 - [ ] chat service
 - [ ] discord bot service
-- [ ] home assistant service
+- [x] home assistant service
 - [ ] llm commentary service
 - [x] private rover access request service
 - [ ] replay services (already partly split; reformat consistently)
@@ -84,6 +84,7 @@
 - Finished `verificationService` decomposition by extracting persisted store handling to `verificationService/store.js`, identity/selector normalization to `verificationService/identity.js`, verification/deterrence/request lifecycle logic to `verificationService/verificationFlow.js`, `verificationService/deterrenceFlow.js`, and `verificationService/requestFlow.js`, plus socket/role event wiring to `verificationService/hooks.js`; `verificationService/index.js` is now a thin composition layer.
 - Finished `videoAuthService` decomposition by extracting MediaMTX stream parsing to `videoAuthService/streamParsing.js`, role/mode/stream policy checks to `videoAuthService/policy.js`, and auth HTTP transport wiring to `videoAuthService/httpRoute.js`; `videoAuthService/index.js` is now a thin composition layer.
 - Finished `privateRoverAccessRequestService` decomposition by extracting in-memory maps/events/constants to `privateRoverAccessRequestService/state.js`, shared keying/lookup helpers to `privateRoverAccessRequestService/helpers.js`, request/grant business logic to `privateRoverAccessRequestService/core.js`, and rover/socket event wiring to `privateRoverAccessRequestService/hooks.js`; `privateRoverAccessRequestService/index.js` is now a thin composition layer.
+- Finished `homeAssistantService` decomposition by extracting shared runtime caches/constants to `homeAssistantService/state.js`, entity/trigger normalization helpers to `homeAssistantService/entityHelpers.js`, automation/state engine logic to `homeAssistantService/runtimeEngine.js`, websocket transport/reconnect lifecycle to `homeAssistantService/transport.js`, and mode/turn/socket event wiring to `homeAssistantService/hooks.js`; `homeAssistantService/index.js` is now a thin composition layer.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS
