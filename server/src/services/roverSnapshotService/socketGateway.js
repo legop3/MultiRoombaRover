@@ -25,6 +25,7 @@ function registerRoverSnapshotSocketGateway({ roverManager, roverSnapshotEvents,
   const socketSubscriptions = new Map();
   const subscribeBuckets = new Map();
   const lastSentBySocket = new Map();
+  const sentCounts = new Map();
 
   function addSubscription(socket, roverId) {
     if (!roverSubscribers.has(roverId)) roverSubscribers.set(roverId, new Set());
@@ -84,6 +85,12 @@ function registerRoverSnapshotSocketGateway({ roverManager, roverSnapshotEvents,
       const now = ts || Date.now();
       if (now - lastSent < STREAM_INTERVAL_MS) return;
       lastMap.set(id, now);
+      const key = `${socketId}:${id}`;
+      const sentCount = (sentCounts.get(key) || 0) + 1;
+      sentCounts.set(key, sentCount);
+      if (sentCount === 1 || sentCount % 30 === 0) {
+        logger.warn('Snapshot frame sent', { socketId, roverId: id, sentCount, ts, bytes: buffer.length });
+      }
       sendFrame(socket, id, { ts }, buffer);
     });
   });

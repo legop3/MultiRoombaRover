@@ -41,3 +41,7 @@ paths:
   all:
     source: publisher
     sourceOnDemand: no
+    # Rover Snapshot Writer
+    # Keep rover snapshots continuously updated while a rover video path is live.
+    runOnReady: /usr/local/bin/rover-snapshot-writer.sh
+    runOnReadyRestart: yes

@@ -6,6 +6,7 @@ MEDIAMTX_BASE_URL="https://github.com/bluenviron/mediamtx/releases/download/v${M
 MEDIAMTX_BIN="/usr/local/bin/mediamtx"
 MEDIAMTX_CONF_DIR="/etc/mediamtx"
 MEDIAMTX_CONFIG="$MEDIAMTX_CONF_DIR/mediamtx.yml"
+ROVER_SNAPSHOT_WRITER_BIN="/usr/local/bin/rover-snapshot-writer.sh"
 MEDIAMTX_SERVICE="/etc/systemd/system/mediamtx.service"
 MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
 SNAPSHOT_DIR="/var/lib/rover-snapshots"
@@ -26,6 +27,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 SERVER_DIR="$SCRIPT_DIR"
 CONFIG_PATH="$SERVER_DIR/config.yaml"
 MEDIAMTX_TEMPLATE="$SERVER_DIR/mediamtx/mediamtx.yml"
+ROVER_SNAPSHOT_WRITER_TEMPLATE="$SERVER_DIR/mediamtx/rover-snapshot-writer.sh"
 
 echo "[1/6] Installing dependencies..."
 dnf install -y nodejs npm curl tar >/dev/null
@@ -70,9 +72,15 @@ if [[ ! -f "$MEDIAMTX_TEMPLATE" ]]; then
   echo "mediaMTX template missing at $MEDIAMTX_TEMPLATE" >&2
   exit 1
 fi
+if [[ ! -f "$ROVER_SNAPSHOT_WRITER_TEMPLATE" ]]; then
+  echo "Snapshot writer template missing at $ROVER_SNAPSHOT_WRITER_TEMPLATE" >&2
+  exit 1
+fi
 echo "      Installing mediaMTX config -> $MEDIAMTX_CONFIG"
 rm -f "$MEDIAMTX_CONFIG"
 install -m 0644 "$MEDIAMTX_TEMPLATE" "$MEDIAMTX_CONFIG"
+echo "      Installing rover snapshot writer -> $ROVER_SNAPSHOT_WRITER_BIN"
+install -m 0755 "$ROVER_SNAPSHOT_WRITER_TEMPLATE" "$ROVER_SNAPSHOT_WRITER_BIN"
 chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
 
 echo "[4/6] Writing systemd units..."
