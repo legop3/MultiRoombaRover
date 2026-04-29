@@ -9,7 +9,7 @@ const { isVerified } = require('../verificationService');
 const {
   homeAssistantEvents,
   getRawEntitySnapshot,
-  setEntityState,
+  callHomeAssistantService,
   isConnected: isHomeAssistantConnected,
   enabled: homeAssistantEnabled,
 } = require('../homeAssistantService');
@@ -102,15 +102,20 @@ function assertReady() {
 }
 
 async function applyPosition(target) {
+  async function setSwitch(entityId, desiredState) {
+    const service = desiredState === 'on' ? 'turn_on' : 'turn_off';
+    await callHomeAssistantService('switch', service, { entity_id: entityId });
+  }
+
   if (target === 'up') {
-    await setEntityState(downSwitchId, 'off');
+    await setSwitch(downSwitchId, 'off');
     await sleep(interlockMs);
-    await setEntityState(upSwitchId, 'on');
+    await setSwitch(upSwitchId, 'on');
     return;
   }
-  await setEntityState(upSwitchId, 'off');
+  await setSwitch(upSwitchId, 'off');
   await sleep(interlockMs);
-  await setEntityState(downSwitchId, 'on');
+  await setSwitch(downSwitchId, 'on');
 }
 
 async function requestPosition(target, actor = 'unknown') {
