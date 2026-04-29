@@ -38,7 +38,6 @@ require('./src/services/audioForwardService');
 require('./src/services/buttonBoxService');
 require('./src/services/sessionService');
 require('./src/services/batteryManager');
-require('./src/services/replaySocketService');
 require('./src/services/replayEngineV2');
 require('./src/services/discordBotService');
 require('./src/services/httpServer');
