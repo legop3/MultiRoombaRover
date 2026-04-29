@@ -9,6 +9,7 @@ const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
 const SUBSCRIBE_LIMIT = 50;
 const SUBSCRIBE_WINDOW_MS = 10000;
 const STREAM_INTERVAL_MS = 333;
+const FALLBACK_REFRESH_MS = 500;
 
 function passesMode(socket) {
   const mode = getMode();
@@ -31,6 +32,8 @@ function registerRoverSnapshotSocketGateway({
   const subscribeBuckets = new Map();
   const lastSentBySocket = new Map();
   const sentCounts = new Map();
+  const lastForcedTsBySocket = new Map();
+  let fallbackTimer = null;
 
   function addSubscription(socket, roverId) {
     if (!roverSubscribers.has(roverId)) roverSubscribers.set(roverId, new Set());
@@ -73,6 +76,29 @@ function registerRoverSnapshotSocketGateway({
 
   function sendStatus(socket, roverId, status) {
     socket.emit('roverSnapshot:status', { id: roverId, ...status });
+  }
+
+  function ensureFallbackTimer() {
+    if (fallbackTimer || typeof fetchSnapshotNow !== 'function') return;
+    fallbackTimer = setInterval(() => {
+      socketSubscriptions.forEach((roverIds, socketId) => {
+        const socket = io.sockets.sockets.get(socketId);
+        if (!socket) return;
+        roverIds.forEach(async (roverId) => {
+          try {
+            const result = await fetchSnapshotNow(String(roverId), { force: true });
+            if (!result?.frame) return;
+            const key = `${socketId}:${roverId}`;
+            const prevTs = lastForcedTsBySocket.get(key) || 0;
+            if ((result.ts || 0) <= prevTs) return;
+            lastForcedTsBySocket.set(key, result.ts || Date.now());
+            sendFrame(socket, roverId, { ts: result.ts || Date.now() }, result.frame);
+          } catch (err) {
+            logger.warn('Fallback refresh failed', { socketId, roverId, err: err.message });
+          }
+        });
+      });
+    }, FALLBACK_REFRESH_MS);
   }
 
   roverSnapshotEvents.on('frame', ({ id, buffer, ts }) => {
@@ -133,6 +159,7 @@ function registerRoverSnapshotSocketGateway({
           subscribedIds: validIds,
         });
         validIds.forEach((roverId) => addSubscription(socket, roverId));
+        ensureFallbackTimer();
         validIds.forEach(async (roverId) => {
           if (typeof fetchSnapshotNow === 'function') {
             try {
@@ -165,6 +192,9 @@ function registerRoverSnapshotSocketGateway({
       removeAllSubscriptions(socket.id);
       subscribeBuckets.delete(socket.id);
       lastSentBySocket.delete(socket.id);
+      Array.from(lastForcedTsBySocket.keys()).forEach((key) => {
+        if (key.startsWith(`${socket.id}:`)) lastForcedTsBySocket.delete(key);
+      });
     });
   });
 }
