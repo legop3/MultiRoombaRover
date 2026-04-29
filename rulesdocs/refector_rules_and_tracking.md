@@ -66,6 +66,11 @@
 - Split `server/src/services/turnService/index.js` by extracting constants, shared state helpers, and side-effect action helpers into `turnService/constants.js`, `turnService/state.js`, and `turnService/actions.js`.
 - Split `server/src/services/sessionService/index.js` by extracting config/timing constants, sync-throttle state storage, and visibility filter helpers into `sessionService/constants.js`, `sessionService/state.js`, and `sessionService/filters.js`.
 - Began splitting `server/src/services/roverManager/index.js` by extracting immutable constants and shared state containers into `roverManager/constants.js` and `roverManager/state.js`.
+- Continued `roverManager` split by extracting socket event wiring/handlers into `roverManager/socketHandlers.js` with dependency injection to keep existing behavior unchanged.
+- Continued `roverManager` split by extracting numeric/private-safety normalization and battery math into `roverManager/mathUtils.js`.
+- Continued `roverManager` split by extracting control lifecycle/switching logic into `roverManager/roverLifecycle.js`.
+- Continued `roverManager` split by extracting sensor processing + private safety + dock guard logic into `roverManager/sensorPipeline.js`.
+- Finished `roverManager` decomposition by extracting private access policy, roster lifecycle, and spectator/auto-close orchestration into `roverManager/privateAccess.js`, `roverManager/rosterLifecycle.js`, and `roverManager/spectatorAccess.js`; `roverManager/index.js` is now a thin composition layer.
 - Hotfix: corrected `llmCommentaryService` prompt file path to `server/prompts/commentary_system.txt` after service folder move.
 - Hotfix: added `server/src/helpers/dataPaths.js` and rewired data-backed services to resolve canonical + legacy data-file locations safely after folderization (`adminReason`, `audioLevels`, `buttonBox`, `communityGoal`, `discordGuildStore`, `verification`, `replayEngineV2`).
 
