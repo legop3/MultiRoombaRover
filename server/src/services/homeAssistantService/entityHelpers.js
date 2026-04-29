@@ -10,13 +10,19 @@ function inferType(entityId, explicitType) {
   return 'switch';
 }
 
+function inferDomain(entityId) {
+  const domain = String(entityId || '').split('.')[0].trim().toLowerCase();
+  return domain || 'switch';
+}
+
 function normalizeConfigEntry(entry) {
   if (!entry) return null;
   const id = entry.id || entry.entityId || entry.entity_id;
   if (!id) return null;
   const type = inferType(id, entry.type);
+  const domain = inferDomain(id);
   const name = entry.name || null;
-  return { id: String(id), name, type };
+  return { id: String(id), name, type, domain };
 }
 
 function normalizeTriggerEntry(entry, index) {

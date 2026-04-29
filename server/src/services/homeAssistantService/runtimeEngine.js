@@ -71,7 +71,7 @@ function createRuntimeEngine(deps) {
     if (!runtime.connection) throw new Error('Home Assistant not connected');
 
     const nextState = desiredState === 'on' ? 'on' : 'off';
-    const domain = meta.type === 'light' ? 'light' : 'switch';
+    const domain = String(meta.domain || (meta.type === 'light' ? 'light' : 'switch')).toLowerCase();
     const service = nextState === 'on' ? 'turn_on' : 'turn_off';
     const source = String(options?.source || 'unknown');
     await callHomeAssistantService(domain, service, { entity_id: entityId });
@@ -90,14 +90,29 @@ function createRuntimeEngine(deps) {
     const results = await Promise.allSettled(
       ids.map((id) => setEntityState(id, desiredState, { source: `${source}:bulk` })),
     );
-    const failures = results.filter((result) => result.status === 'rejected');
+    const failures = results
+      .map((result, index) => ({ result, entityId: ids[index] }))
+      .filter(({ result }) => result.status === 'rejected')
+      .map(({ result, entityId }) => ({ entityId, error: result.reason?.message || 'unknown error' }));
+    const succeeded = results
+      .map((result, index) => ({ result, entityId: ids[index] }))
+      .filter(({ result }) => result.status === 'fulfilled')
+      .map(({ entityId }) => entityId);
     if (failures.length) {
       logger.warn('Some Home Assistant entity state updates failed', {
         desiredState,
         total: ids.length,
         failed: failures.length,
+        failures,
       });
     }
+    return {
+      desiredState: desiredState === 'on' ? 'on' : 'off',
+      source,
+      total: ids.length,
+      succeeded,
+      failures,
+    };
   }
 
   function triggerMatches(trigger, raw, runtimeState) {

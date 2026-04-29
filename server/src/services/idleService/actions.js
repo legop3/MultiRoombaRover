@@ -13,8 +13,20 @@ const {
 } = require('./constants');
 
 async function turnOffRoomControls() {
-  await homeAssistantService.setAllControllableEntitiesState('off', { source: 'idleService:turnOffRoomControls' });
-  return { action: 'roomControlsOff' };
+  const before = homeAssistantService.getState?.().entities || [];
+  const summary = await homeAssistantService.setAllControllableEntitiesState('off', {
+    source: 'idleService:turnOffRoomControls',
+  });
+  const after = homeAssistantService.getState?.().entities || [];
+  logger.info('Idle room-controls off summary', {
+    attempted: summary?.total || 0,
+    succeeded: Array.isArray(summary?.succeeded) ? summary.succeeded.length : 0,
+    failed: Array.isArray(summary?.failures) ? summary.failures.length : 0,
+    failedEntities: summary?.failures || [],
+    beforeStates: before.map((entity) => ({ id: entity.id, state: entity.state, available: entity.available })),
+    afterStates: after.map((entity) => ({ id: entity.id, state: entity.state, available: entity.available })),
+  });
+  return { action: 'roomControlsOff', ...summary };
 }
 
 async function dockAllRovers() {
