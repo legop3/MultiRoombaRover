@@ -66,6 +66,8 @@
 - Split `server/src/services/turnService/index.js` by extracting constants, shared state helpers, and side-effect action helpers into `turnService/constants.js`, `turnService/state.js`, and `turnService/actions.js`.
 - Split `server/src/services/sessionService/index.js` by extracting config/timing constants, sync-throttle state storage, and visibility filter helpers into `sessionService/constants.js`, `sessionService/state.js`, and `sessionService/filters.js`.
 - Began splitting `server/src/services/roverManager/index.js` by extracting immutable constants and shared state containers into `roverManager/constants.js` and `roverManager/state.js`.
+- Hotfix: corrected `llmCommentaryService` prompt file path to `server/prompts/commentary_system.txt` after service folder move.
+- Hotfix: added `server/src/helpers/dataPaths.js` and rewired data-backed services to resolve canonical + legacy data-file locations safely after folderization (`adminReason`, `audioLevels`, `buttonBox`, `communityGoal`, `discordGuildStore`, `verification`, `replayEngineV2`).
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS

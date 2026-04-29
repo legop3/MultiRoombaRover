@@ -2,11 +2,11 @@
 // Purpose: Defines the button Box Service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const { app } = require('../../globals/http');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('buttonBoxService');
+const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { publishEvent } = require('../eventBus');
 const { getRewardById, listRewards } = require('../../rewards');
 const roverManager = require('../roverManager');
@@ -23,8 +23,8 @@ const {
 } = require('../homeAssistantService');
 const { getRequestIp, isLocalNetwork, normalizeIp } = require('../../helpers/ipResolver');
 
-const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'buttonbox-state.json');
+const DATA_DIR = resolveDataDir();
+const STORE_PATH = resolveDataPath('buttonbox-state.json');
 const BUTTON_COUNT = 4;
 const STORE_VERSION = 1;
 

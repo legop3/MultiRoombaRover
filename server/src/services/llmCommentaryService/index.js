@@ -13,7 +13,7 @@ const { getActiveDrivers } = require('../turnService');
 const { getNickname } = require('../nicknameService');
 const { getRecentMessages, sendSystemMessage } = require('../chatService');
 
-const PROMPT_PATH = path.join(__dirname, '..', '..', 'prompts', 'commentary_system.txt');
+const PROMPT_PATH = path.join(__dirname, '..', '..', '..', 'prompts', 'commentary_system.txt');
 const DEFAULT_FREQUENCY_MS = 0;
 const MIN_FREQUENCY_MS = 0;
 const JITTER_MS = 0;

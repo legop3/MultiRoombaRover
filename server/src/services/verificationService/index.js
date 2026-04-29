@@ -1,12 +1,12 @@
 // verification Service
 // Purpose: Defines the verification Service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
-const path = require('path');
 const crypto = require('crypto');
 const net = require('net');
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('verificationService');
+const { resolveDataPath } = require('../../helpers/dataPaths');
 const { publishEvent } = require('../eventBus');
 const { normalizeIp } = require('../../helpers/ipResolver');
 const { getNickname, setNickname } = require('../nicknameService');
@@ -20,8 +20,7 @@ const {
   createJsonStore,
 } = require('../identityService');
 
-const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'verified-users.json');
+const STORE_PATH = resolveDataPath('verified-users.json');
 
 const verificationEvents = new EventEmitter();
 

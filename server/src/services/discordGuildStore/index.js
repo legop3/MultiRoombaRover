@@ -2,11 +2,11 @@
 // Purpose: Defines the discord Guild Store module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const fs = require('fs');
-const path = require('path');
 const logger = require('../../globals/logger').child('discordGuildStore');
+const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 
-const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'discord-guilds.json');
+const DATA_DIR = resolveDataDir();
+const STORE_PATH = resolveDataPath('discord-guilds.json');
 const VALID_MODES = new Set(['global', 'private']);
 
 let cache = null;

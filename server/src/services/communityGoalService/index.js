@@ -2,14 +2,14 @@
 // Purpose: Defines the community Goal Service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const fs = require('fs');
-const path = require('path');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('communityGoalService');
 const { isAdmin } = require('../roleService');
 const { publishEvent } = require('../eventBus');
+const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 
-const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'community-goal.json');
+const DATA_DIR = resolveDataDir();
+const STORE_PATH = resolveDataPath('community-goal.json');
 const MAX_GOAL_LENGTH = 240;
 
 let cache = null;

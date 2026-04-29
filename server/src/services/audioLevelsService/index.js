@@ -2,18 +2,18 @@
 // Purpose: Defines the audio Levels Service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const fs = require('fs');
-const path = require('path');
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('audioLevelsService');
 const { loadConfig } = require('../../helpers/configLoader');
+const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { isAdmin } = require('../roleService');
 const roverManager = require('../roverManager');
 const { issueCommand } = require('../commandService');
 
 const audioLevelsEvents = new EventEmitter();
-const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'audio-levels.json');
+const DATA_DIR = resolveDataDir();
+const STORE_PATH = resolveDataPath('audio-levels.json');
 const config = loadConfig();
 const configuredDefaults = config.audioLevels || {};
 
