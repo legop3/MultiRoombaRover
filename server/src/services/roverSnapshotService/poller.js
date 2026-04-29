@@ -6,7 +6,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const logger = require('../../globals/logger').child('roverSnapshot');
 
-const SNAPSHOT_DIR = path.resolve(__dirname, '..', '..', 'data', 'rover-snapshots');
+const SNAPSHOT_DIR = path.resolve(__dirname, '..', '..', '..', 'data', 'rover-snapshots');
 const POLL_INTERVAL_MS = 300;
 const roverState = new Map();
 const events = new EventEmitter();

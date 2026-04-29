@@ -8,7 +8,7 @@ const { getRoomCameras } = require('../roomCameraService');
 const { getRoomCameraState } = require('../roomCameraService');
 const { getReplayHealthSnapshot } = require('../replayEngineV2');
 
-const SNAPSHOT_DIR = path.resolve(__dirname, '..', '..', 'data', 'rover-snapshots');
+const SNAPSHOT_DIR = path.resolve(__dirname, '..', '..', '..', 'data', 'rover-snapshots');
 const HEALTH_INTERVAL_MS = 5000;
 const ROOM_CAMERA_STALE_MS = 5000;
 const ROVER_SNAPSHOT_STALE_MS = 5000;

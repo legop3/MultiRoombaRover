@@ -1,0 +1,3 @@
+- discord verification and access requests dont work
+- home assistant idle lights are all messed up. remove from home assistant and make new idle service
+- snapshots are not working
