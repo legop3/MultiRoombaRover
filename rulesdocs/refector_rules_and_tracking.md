@@ -43,7 +43,7 @@
 ### BIGGEST OFFENDERS
 - [ ] audio forward service
 - [ ] button box service
-- [ ] chat service
+- [x] chat service
 - [x] discord bot service
 - [x] home assistant service
 - [ ] llm commentary service
@@ -60,6 +60,7 @@
 ### COMPLETED SERVICES
 - turn service
 - session service
+- chat service
 
 ### LARGE CHANGES
 - Folderized all files in `server/src/services/` into per-service folders with `index.js` entrypoints and updated internal relative imports for new path depth.
@@ -88,6 +89,7 @@
 - Finished `discordBotService` decomposition by extracting presence rotation/state to `discordBotService/presence.js`, channel/typing transport helpers to `discordBotService/channelIO.js`, command routing and admin command handlers to `discordBotService/commandHandlers.js`, and event-bus/chat-bridge/moderation DM workflows to `discordBotService/integrations.js`; `discordBotService/index.js` is now a thin composition layer.
 - Finished `replayEngineV2` decomposition by extracting environment/path constants to `replayEngineV2/constants.js`, mutable runtime state to `replayEngineV2/state.js`, source discovery/worker arg building to `replayEngineV2/sources.js`, ffmpeg worker lifecycle to `replayEngineV2/workerManager.js`, segment indexing/retention/health snapshot logic to `replayEngineV2/segmentStore.js`, sidebar SVG/video rendering to `replayEngineV2/sidebarRenderer.js`, and replay assembly pipeline to `replayEngineV2/replayBuilder.js`; `replayEngineV2/index.js` is now a thin orchestration layer.
 - Consolidated replay-related single-file services into `replayEngineV2` by moving cooldown state (`cooldown.js`), user-facing replay source validation/defaults (`replaySources.js`), and replay socket hooks (`socketHooks.js`) into the engine folder; removed obsolete standalone services `replayBuildService`, `replayService`, `replaySourceService`, and `replaySocketService` and rewired dependents to import directly from `replayEngineV2`.
+- Finished `chatService` decomposition by extracting runtime constants (`chatService/constants.js`), shared mutable state (`chatService/state.js`), content/moderation helpers (`chatService/contentFilters.js`), payload/context builders (`chatService/contextBuilders.js`), bus/history broadcast pipeline (`chatService/broadcast.js`), rover-side notification helpers (`chatService/notifications.js`), message handlers (`chatService/handlers.js`), and socket/event-bus wiring (`chatService/socketHooks.js`); `chatService/index.js` is now a thin orchestration layer.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS
