@@ -6,6 +6,21 @@ const { EmbedBuilder } = require('discord.js');
 function createStatusCommand({ rovers, roverManager }) {
   function formatVoltage(voltageMv) { return voltageMv == null ? 'n/a' : `${(voltageMv / 1000).toFixed(2)}V`; }
   function formatCurrent(currentMa) { return currentMa == null ? 'n/a' : `${currentMa}mA`; }
+  function formatDockEmoji(docked) { return docked ? '🏠' : '🧭'; }
+  function formatChargeEmoji(charging) { return charging ? '⚡' : '🔌'; }
+  function formatLockEmoji(locked) { return locked ? '🔒' : '🔓'; }
+  function formatBatteryEmoji(batteryState) {
+    if (batteryState?.urgentActive) return '🛑';
+    if (batteryState?.warnActive) return '⚠️';
+    return '🔋';
+  }
+  function formatOiEmoji(oiMode) {
+    if (oiMode === 'full') return '🕹️';
+    if (oiMode === 'safe') return '🧰';
+    if (oiMode === 'passive') return '🟢';
+    if (oiMode === 'off') return '⏹️';
+    return '❔';
+  }
   function formatChargeState(batteryState) {
     if (!batteryState) return 'n/a';
     const chargeText = batteryState.charge != null && batteryState.capacity != null ? `${batteryState.charge}/${batteryState.capacity}mAh` : 'n/a';
@@ -44,7 +59,25 @@ function createStatusCommand({ rovers, roverManager }) {
     }
     snapshots.forEach((s) => {
       const lockLabel = s.locked ? `locked${s.lockReason ? ` (${s.lockReason})` : ''}` : 'unlocked';
-      embed.addFields({ name: s.name, value: [`Dock: ${s.docked ? 'docked' : 'undocked'}`, `Charging: ${s.charging ? `charging (${s.chargingLabel})` : 'not charging'}`, `Battery: ${formatChargeState(s.batteryState)}`, `Voltage: ${formatVoltage(s.voltageMv)}`, `Current: ${formatCurrent(s.currentMa)}`, `OI: ${s.oiMode}`, `Lock: ${lockLabel}`].join('\n'), inline: true });
+      const header = [
+        formatBatteryEmoji(s.batteryState),
+        formatDockEmoji(s.docked),
+        formatChargeEmoji(s.charging),
+        formatLockEmoji(s.locked),
+      ].join(' ');
+      embed.addFields({
+        name: `${header} ${s.name}`,
+        value: [
+          `Dock: ${s.docked ? 'docked' : 'undocked'}`,
+          `Charging: ${s.charging ? `charging (${s.chargingLabel})` : 'not charging'}`,
+          `Battery: ${formatChargeState(s.batteryState)}`,
+          `Voltage: ${formatVoltage(s.voltageMv)}`,
+          `Current: ${formatCurrent(s.currentMa)}`,
+          `OI: ${s.oiMode} ${formatOiEmoji(s.oiMode)}`,
+          `Lock: ${lockLabel}`,
+        ].join('\n'),
+        inline: true,
+      });
     });
     return embed;
   }
