@@ -38,7 +38,14 @@ function createRuntimeEngine(deps) {
         }
       }
     });
-    logger.info('Loaded Home Assistant entities', { count: entityConfig.size });
+    logger.info('Loaded Home Assistant entities', {
+      count: entityConfig.size,
+      entities: Array.from(entityConfig.values()).map((entry) => ({
+        id: entry.id,
+        type: entry.type,
+        domain: entry.domain,
+      })),
+    });
   }
 
   function loadTriggerConfig() {
@@ -81,7 +88,19 @@ function createRuntimeEngine(deps) {
   async function setAllControllableEntitiesState(desiredState, options = {}) {
     const source = String(options?.source || 'unknown');
     const ids = getControllableEntityIds();
-    if (!ids.length) return;
+    if (!ids.length) {
+      logger.warn('Home Assistant bulk state update skipped; no controllable entities configured', {
+        desiredState: desiredState === 'on' ? 'on' : 'off',
+        source,
+      });
+      return {
+        desiredState: desiredState === 'on' ? 'on' : 'off',
+        source,
+        total: 0,
+        succeeded: [],
+        failures: [],
+      };
+    }
     logger.info('Issuing Home Assistant bulk state update', {
       desiredState: desiredState === 'on' ? 'on' : 'off',
       source,

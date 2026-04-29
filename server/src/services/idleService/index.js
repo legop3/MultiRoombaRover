@@ -36,6 +36,7 @@ function clearIdleTimer() {
   if (runtime.timer) {
     clearTimeout(runtime.timer);
     runtime.timer = null;
+    logger.info('Idle timer cleared');
   }
   runtime.deadlineAt = null;
 }
@@ -43,6 +44,10 @@ function clearIdleTimer() {
 function scheduleIdleTimer() {
   if (runtime.timer) return;
   runtime.deadlineAt = Date.now() + IDLE_TIMEOUT_MS;
+  logger.info('Idle timer scheduled', {
+    timeoutMs: IDLE_TIMEOUT_MS,
+    deadlineAt: runtime.deadlineAt,
+  });
   runtime.timer = setTimeout(async () => {
     runtime.timer = null;
     runtime.deadlineAt = null;
@@ -64,6 +69,7 @@ function scheduleIdleTimer() {
 
 function refreshIdleState() {
   const activity = getActivitySnapshot();
+  logger.info('Idle state refresh', activity);
   if (activity.totalActive > 0) {
     clearIdleTimer();
     return;

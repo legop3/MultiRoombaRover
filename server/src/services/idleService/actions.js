@@ -92,9 +92,13 @@ const idleActions = [
 
 async function runIdleActions() {
   const results = [];
+  logger.info('Idle action pipeline starting', {
+    actions: idleActions.map((action) => action.name),
+  });
   for (const action of idleActions) {
     try {
       const result = await action();
+      logger.info('Idle action completed', { action: action.name, result });
       results.push({ ok: true, result });
     } catch (err) {
       logger.warn('Idle action failed', { action: action.name, error: err.message });
