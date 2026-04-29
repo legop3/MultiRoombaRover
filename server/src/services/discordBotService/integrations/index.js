@@ -19,7 +19,7 @@ function createIntegrations(deps) {
 
   const dm = createDmModerationHandlers({ ...deps, sanitizeMentions });
   const chat = createChatBridgeHandlers({ ...deps, clearTypingMessage, sendTypingMessage, formatWebhookUsername, getTypingId });
-  const { handleBusEvent, handleReplayRequested } = createBusEventHandler({ ...deps, sendToChannel, schedulePresenceRotation, formatDuration });
+  const { handleBusEvent } = createBusEventHandler({ ...deps, sendToChannel, schedulePresenceRotation, formatDuration });
 
   function register() {
     client.on('typingStart', (typing) => {
@@ -32,7 +32,6 @@ function createIntegrations(deps) {
     });
 
     subscribe('*', handleBusEvent);
-    subscribe('replay.requested', handleReplayRequested);
     subscribe('verification.requested', dm.sendVerificationRequestDms);
     subscribe('privateRoverAccess.requested', dm.sendPrivateRoverAccessRequestDms);
     subscribe('chat:message', chat.handleChatBridgeOutbound);

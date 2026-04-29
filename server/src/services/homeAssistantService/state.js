@@ -10,9 +10,7 @@ const triggerConfig = [];
 const triggerRuntime = new Map();
 
 const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
-const LIGHT_IDLE_OFF_MS = 2 * 60 * 1000;
 const DEFAULT_WHITE_KELVIN = 4000;
-const NIGHT_VISION_DISABLE_ACTION = 'on';
 
 const runtime = {
   latestEntitySnapshot: {},
@@ -21,8 +19,6 @@ const runtime = {
   reconnectTimer: null,
   connected: false,
   lightsLockState: null,
-  lightsIdleOffTimer: null,
-  lightsIdleOffDeadline: null,
 };
 
 module.exports = {
@@ -32,8 +28,6 @@ module.exports = {
   triggerConfig,
   triggerRuntime,
   HA_BUTTON_EVENT_TYPE,
-  LIGHT_IDLE_OFF_MS,
   DEFAULT_WHITE_KELVIN,
-  NIGHT_VISION_DISABLE_ACTION,
   runtime,
 };

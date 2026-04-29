@@ -1,3 +1,9 @@
-- discord verification and access requests dont work
-- home assistant idle lights are all messed up. remove from home assistant and make new idle service
-- snapshots are not working
+- discord verification and private access requests dont work. missing important info compared to before, and reactions dont work.
+- replays are sent twice sometimes, look into it.
+- home assistant idle lights are all messed up. remove from home assistant and make new idle service.
+  - idle service will trigger, after 2 minutes of no drivers:
+    - all room lights (room controls) off
+    - tell all rovers to dock
+    - turn off all rover night vision lights
+    - tell the neato to return to home
+  - the idle service should be easily expandable to add more things in the future

@@ -25,7 +25,16 @@ function createDmModerationHandlers(deps) {
     const payload = event?.payload || {};
     const requestId = payload.id;
     if (!requestId) return;
-    const content = [`**Verification Request**`, `Request ID: \`${requestId}\``, `Nickname: ${sanitizeMentions(payload.nickname || 'unknown')}`, '', `React with ${APPROVE} to approve or ${DENY} to deny.`].join('\n');
+    const content = [
+      '**Verification Request**',
+      `Request ID: \`${requestId}\``,
+      `Nickname: ${sanitizeMentions(payload.nickname || 'unknown')}`,
+      `Identity Key: \`${String(payload.cookieUserId || 'unknown')}\``,
+      `IP: \`${String(payload.ip || 'unknown')}\``,
+      `Socket: \`${String(payload.socketId || 'unknown')}\``,
+      '',
+      `React with ${APPROVE} to approve or ${DENY} to deny.`,
+    ].join('\n');
     await Promise.all(Array.from(lockdownAdminIds).map(async (adminId) => {
       try {
         const user = await client.users.fetch(String(adminId));
@@ -44,7 +53,20 @@ function createDmModerationHandlers(deps) {
     const payload = event?.payload || {};
     const requestId = payload.id;
     if (!requestId) return;
-    const content = [`**Private Rover Access Request**`, `Request ID: \`${requestId}\``, '', `React with ${APPROVE} to approve or ${DENY} to deny.`].join('\n');
+    const requester = payload?.requester || {};
+    const content = [
+      '**Private Rover Access Request**',
+      `Request ID: \`${requestId}\``,
+      `Rover: ${sanitizeMentions(payload.roverName || payload.roverId || 'unknown')} (\`${String(payload.roverId || 'unknown')}\`)`,
+      `Nickname: ${sanitizeMentions(requester.nickname || 'unknown')}`,
+      `Role: \`${String(requester.role || 'unknown')}\``,
+      `Verified: \`${requester.isVerified ? 'yes' : 'no'}\``,
+      `Identity Key: \`${String(requester.cookieUserId || 'unknown')}\``,
+      `IP: \`${String(requester.ip || 'unknown')}\``,
+      `Socket: \`${String(requester.socketId || 'unknown')}\``,
+      '',
+      `React with ${APPROVE} to approve or ${DENY} to deny.`,
+    ].join('\n');
     await Promise.all(Array.from(lockdownAdminIds).map(async (adminId) => {
       try {
         const user = await client.users.fetch(String(adminId));

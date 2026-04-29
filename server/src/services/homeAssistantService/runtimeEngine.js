@@ -1,11 +1,8 @@
 // Home Assistant Runtime Engine
 // Purpose: Implements entity/trigger processing, light automation policy, and exposed control operations.
 // Scope: Owns business logic while transport and event wiring are delegated to companion modules.
-const roverManager = require('../roverManager');
-const { issueCommand } = require('../commandService');
-const { publishEvent } = require('../eventBus');
 const { getMode } = require('../modeManager');
-const { getActiveDrivers } = require('../turnService');
+const { publishEvent } = require('../eventBus');
 const {
   events,
   entityConfig,
@@ -13,9 +10,7 @@ const {
   triggerConfig,
   triggerRuntime,
   HA_BUTTON_EVENT_TYPE,
-  LIGHT_IDLE_OFF_MS,
   DEFAULT_WHITE_KELVIN,
-  NIGHT_VISION_DISABLE_ACTION,
   runtime,
 } = require('./state');
 const { normalizeConfigEntry, normalizeTriggerEntry, buildState } = require('./entityHelpers');
@@ -69,56 +64,6 @@ function createRuntimeEngine(deps) {
     return Array.from(entityConfig.values()).map((meta) => String(meta.id));
   }
 
-  function getActiveDriverCount() {
-    const active = getActiveDrivers();
-    const turnCount = active && typeof active === 'object' ? Object.keys(active).length : 0;
-    if (turnCount > 0) return turnCount;
-    let liveCount = 0;
-    roverManager.rovers.forEach((record) => {
-      if (record?.drivers?.size > 0) {
-        liveCount += 1;
-      }
-    });
-    return liveCount;
-  }
-
-  function hasActiveDrivers() {
-    return getActiveDriverCount() > 0;
-  }
-
-  function turnOffAllRoverNightVision() {
-    const records = Array.from(roverManager.rovers.values());
-    let attempted = 0;
-    let failed = 0;
-    const roverIds = [];
-    records.forEach((record) => {
-      if (!record?.ws) return;
-      roverIds.push(String(record.id));
-      attempted += 1;
-      try {
-        issueCommand(record.id, {
-          type: 'nightVision',
-          nightVision: { action: NIGHT_VISION_DISABLE_ACTION },
-        });
-      } catch (err) {
-        failed += 1;
-        logger.warn('Failed to auto turn off rover night vision after idle', { roverId: record.id, error: err.message });
-      }
-    });
-    return { attempted, failed, roverIds };
-  }
-
-  function clearLightsIdleOffTimer(getState) {
-    if (runtime.lightsIdleOffTimer) {
-      clearTimeout(runtime.lightsIdleOffTimer);
-      runtime.lightsIdleOffTimer = null;
-    }
-    if (runtime.lightsIdleOffDeadline != null) {
-      runtime.lightsIdleOffDeadline = null;
-      emitUpdate(getState);
-    }
-  }
-
   async function setEntityState(entityId, desiredState) {
     if (!enabled) throw new Error('Home Assistant not configured');
     const meta = entityConfig.get(entityId);
@@ -144,35 +89,6 @@ function createRuntimeEngine(deps) {
         failed: failures.length,
       });
     }
-  }
-
-  function scheduleLightsIdleOffTimer(getState, evaluateLightAutomation) {
-    if (!enabled) return;
-    if (getControllableEntityIds().length === 0) return;
-    if (runtime.lightsIdleOffTimer || runtime.lightsLockState != null || hasActiveDrivers()) {
-      return;
-    }
-    runtime.lightsIdleOffDeadline = Date.now() + LIGHT_IDLE_OFF_MS;
-    runtime.lightsIdleOffTimer = setTimeout(async () => {
-      runtime.lightsIdleOffTimer = null;
-      runtime.lightsIdleOffDeadline = null;
-      try {
-        await setAllControllableEntitiesState('off');
-        const nightVisionResult = turnOffAllRoverNightVision();
-        logger.info('Auto-turned off room lights due to no active drivers', {
-          idleMs: LIGHT_IDLE_OFF_MS,
-          nightVisionRovers: nightVisionResult.attempted,
-          nightVisionFailures: nightVisionResult.failed,
-          nightVisionRoverIds: nightVisionResult.roverIds,
-        });
-      } catch (err) {
-        logger.warn('Failed auto light-off after idle', err.message);
-      } finally {
-        emitUpdate(getState);
-        evaluateLightAutomation();
-      }
-    }, LIGHT_IDLE_OFF_MS);
-    emitUpdate(getState);
   }
 
   function triggerMatches(trigger, raw, runtimeState) {
@@ -247,9 +163,9 @@ function createRuntimeEngine(deps) {
       locked: runtime.lightsLockState != null,
       lockState: runtime.lightsLockState,
       lockedOn: runtime.lightsLockState === 'on',
-      idleOffMs: LIGHT_IDLE_OFF_MS,
-      idleOffAt: runtime.lightsIdleOffDeadline,
-      activeDrivers: getActiveDriverCount(),
+      idleOffMs: null,
+      idleOffAt: null,
+      activeDrivers: null,
     };
   }
 
@@ -264,15 +180,7 @@ function createRuntimeEngine(deps) {
   }
 
   function evaluateLightAutomation() {
-    if (runtime.lightsLockState != null) {
-      clearLightsIdleOffTimer(getState);
-      return;
-    }
-    if (hasActiveDrivers()) {
-      clearLightsIdleOffTimer(getState);
-      return;
-    }
-    scheduleLightsIdleOffTimer(getState, evaluateLightAutomation);
+    // Idle automation moved to idleService; HA service only owns explicit room-control lock behavior.
   }
 
   function handleEntitySnapshot(snapshot = {}) {
@@ -341,7 +249,6 @@ function createRuntimeEngine(deps) {
     runtime.lightsLockState = nextLockState;
 
     if (runtime.lightsLockState != null) {
-      clearLightsIdleOffTimer(getState);
       if ((changed || forceApply) && enabled) {
         await setAllControllableEntitiesState(runtime.lightsLockState);
       }
@@ -379,10 +286,12 @@ function createRuntimeEngine(deps) {
     getLightPolicyState,
     isLightControlLocked,
     getRawEntitySnapshot,
+    getControllableEntityIds,
     toggleEntity,
     setEntityState,
     setLightColor,
     setLightWhite,
+    setAllControllableEntitiesState,
     setLightsLockedOn,
     toggleLightsLockedOn,
   };

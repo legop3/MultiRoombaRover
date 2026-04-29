@@ -36,12 +36,10 @@ callHomeAssistantServiceImpl = transport.callHomeAssistantService;
 runtimeEngine.loadEntityConfig();
 runtimeEngine.loadTriggerConfig();
 transport.connect();
-runtimeEngine.evaluateLightAutomation();
 
 registerHomeAssistantHooks({
   logger,
   haConfig,
-  evaluateLightAutomation: runtimeEngine.evaluateLightAutomation,
   isLightControlLocked: runtimeEngine.isLightControlLocked,
   setLightsLockedOn: runtimeEngine.setLightsLockedOn,
   toggleEntity: runtimeEngine.toggleEntity,
@@ -57,11 +55,13 @@ module.exports = {
   getLightPolicyState: runtimeEngine.getLightPolicyState,
   isLightControlLocked: runtimeEngine.isLightControlLocked,
   getRawEntitySnapshot: runtimeEngine.getRawEntitySnapshot,
+  getControllableEntityIds: runtimeEngine.getControllableEntityIds,
   callHomeAssistantService: transport.callHomeAssistantService,
   toggleEntity: runtimeEngine.toggleEntity,
   setEntityState: runtimeEngine.setEntityState,
   setLightColor: runtimeEngine.setLightColor,
   setLightWhite: runtimeEngine.setLightWhite,
+  setAllControllableEntitiesState: runtimeEngine.setAllControllableEntitiesState,
   setLightsLockedOn: runtimeEngine.setLightsLockedOn,
   toggleLightsLockedOn: runtimeEngine.toggleLightsLockedOn,
   homeAssistantEvents: events,

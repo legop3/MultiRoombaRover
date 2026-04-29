@@ -4,13 +4,11 @@
 const io = require('../../globals/io');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { isAdmin, isLockdownAdmin } = require('../roleService');
-const { turnEvents } = require('../turnService');
 
 function registerHomeAssistantHooks(deps) {
   const {
     logger,
     haConfig,
-    evaluateLightAutomation,
     isLightControlLocked,
     setLightsLockedOn,
     toggleEntity,
@@ -19,26 +17,14 @@ function registerHomeAssistantHooks(deps) {
     setLightWhite,
   } = deps;
 
-  turnEvents.on('activeDriver', () => {
-    evaluateLightAutomation();
-  });
-
-  turnEvents.on('queue', () => {
-    evaluateLightAutomation();
-  });
-
   modeEvents.on('change', (mode) => {
     if (mode === MODES.ADMIN || mode === MODES.LOCKDOWN) {
       if (isLightControlLocked()) {
         setLightsLockedOn(false, { source: 'modeGateReset' }).catch((err) => {
           logger.warn('Failed to disable lights lock on mode change', err.message);
         });
-      } else {
-        evaluateLightAutomation();
       }
-      return;
     }
-    evaluateLightAutomation();
   });
 
   io.on('connection', (socket) => {
