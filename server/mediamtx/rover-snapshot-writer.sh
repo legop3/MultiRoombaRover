@@ -16,7 +16,7 @@ esac
 
 mkdir -p "$SNAP_DIR"
 
-exec ffmpeg -hide_banner -loglevel warning \
+exec ffmpeg -hide_banner -loglevel warning -nostdin -y \
   -i "srt://127.0.0.1:9000?streamid=read:${PATH_NAME}" \
   -an \
   -vf fps=2 \
