@@ -80,6 +80,7 @@
 - Finished major `llmCommentaryService` decomposition by extracting tick scheduling, run-loop orchestration, and history-reset behavior into `llmCommentaryService/runner.js`; `llmCommentaryService/index.js` is now a thin composition layer.
 - Began `audioForwardService` decomposition by extracting permission/path policy helpers to `audioForwardService/policy.js` and rover/turn/socket event wiring to `audioForwardService/hooks.js`; rewired service entrypoint to use extracted modules.
 - Continued `audioForwardService` decomposition by extracting ffmpeg worker lifecycle, upload playback, and WHIP ownership/session control into `audioForwardService/workerEngine.js`; `audioForwardService/index.js` is now a thin composition layer.
+- Finished `buttonBoxService` decomposition by extracting persisted state management to `buttonBoxService/store.js`, reward/effect workflows to `buttonBoxService/core.js`, and HTTP transport wiring to `buttonBoxService/httpRoute.js`; `buttonBoxService/index.js` is now a thin composition layer.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS
