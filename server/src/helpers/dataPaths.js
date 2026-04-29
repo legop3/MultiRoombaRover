@@ -6,8 +6,6 @@ const path = require('path');
 
 const CANONICAL_DATA_DIR = path.resolve(__dirname, '..', '..', 'data');
 const LEGACY_DATA_DIR = path.resolve(__dirname, '..', 'data');
-const CANONICAL_ROVER_SNAPSHOT_DIR = path.join(CANONICAL_DATA_DIR, 'rover-snapshots');
-const LEGACY_ROVER_SNAPSHOT_DIR = path.join(LEGACY_DATA_DIR, 'rover-snapshots');
 
 function pathExists(target) {
   try {
@@ -37,16 +35,7 @@ function resolveDataPath(fileName) {
   return canonicalPath;
 }
 
-function resolveRoverSnapshotDir() {
-  const configured = String(process.env.ROVER_SNAPSHOT_DIR || '').trim();
-  if (configured) return path.resolve(configured);
-  if (pathExists(CANONICAL_ROVER_SNAPSHOT_DIR)) return CANONICAL_ROVER_SNAPSHOT_DIR;
-  if (pathExists(LEGACY_ROVER_SNAPSHOT_DIR)) return LEGACY_ROVER_SNAPSHOT_DIR;
-  return '/var/lib/rover-snapshots';
-}
-
 module.exports = {
   resolveDataDir,
   resolveDataPath,
-  resolveRoverSnapshotDir,
 };

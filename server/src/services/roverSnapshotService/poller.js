@@ -5,9 +5,9 @@ const EventEmitter = require('events');
 const fs = require('fs/promises');
 const path = require('path');
 const logger = require('../../globals/logger').child('roverSnapshot');
-const { resolveRoverSnapshotDir } = require('../../helpers/dataPaths');
+const { resolveDataDir } = require('../../helpers/dataPaths');
 
-const SNAPSHOT_DIR = resolveRoverSnapshotDir();
+const SNAPSHOT_DIR = path.join(resolveDataDir(), 'rover-snapshots');
 const POLL_INTERVAL_MS = 300;
 const roverState = new Map();
 const events = new EventEmitter();
@@ -25,15 +25,14 @@ function getSnapshotPath(id) {
 }
 
 function createRoverSnapshotPoller({ roverManager }) {
-  async function fetchSnapshot(id, options = {}) {
-    const force = Boolean(options?.force);
+  async function fetchSnapshot(id) {
     const state = roverState.get(id);
     if (state?.fetching) return;
     markState(id, { fetching: true });
     try {
       const filePath = getSnapshotPath(id);
       const stats = await fs.stat(filePath);
-      if (!force && state?.mtimeMs && stats.mtimeMs <= state.mtimeMs) return;
+      if (state?.mtimeMs && stats.mtimeMs <= state.mtimeMs) return;
       const buffer = await fs.readFile(filePath);
       const ts = stats.mtimeMs || Date.now();
       markState(id, { frame: buffer, ts, error: null, failures: 0, mtimeMs: stats.mtimeMs });
@@ -93,7 +92,6 @@ function createRoverSnapshotPoller({ roverManager }) {
   return {
     startAll,
     stopAll,
-    fetchSnapshotNow: fetchSnapshot,
     roverSnapshotEvents: events,
     getRoverSnapshotState,
   };
