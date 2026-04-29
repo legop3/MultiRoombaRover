@@ -1,54 +1,43 @@
 // rover Manager
 // Purpose: Defines the rover Manager module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
-const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('roverManager');
 const { sendAlert } = require('../alertService');
-const ALERT_COLOR = '#8bc34a';
 const { parseSensorFrame } = require('../../helpers/sensorDecoder');
 const { MODES, getMode } = require('../modeManager');
 const { isAdmin, isLockdownAdmin, roleEvents } = require('../roleService');
 const { publishEvent } = require('../eventBus');
 const videoSessions = require('../videoSessions');
-
-const rovers = new Map(); // roverId -> record
-const socketToRovers = new Map(); // socketId -> Set(roverId)
-const spectatorSockets = new Set();
+const {
+  ALERT_COLOR,
+  DOCK_GUARD_WINDOW_MS,
+  IDLE_UNDOCKED_MS,
+  PASSIVE_UNDOCKED_MS,
+  DOCK_GUARD_RETRY_MS,
+  DOCK_COMMAND_BASE64,
+  BACKOFF_MS,
+  BACKOFF_SPEED,
+  PRIVATE_BUTTON_HOLD_MS,
+  PRIVATE_AUTO_CLOSE_IDLE_MS,
+  PRIVATE_AUTO_CLOSE_TICK_MS,
+  SAFETY_BACKOFF_MIN,
+  SAFETY_BACKOFF_MAX,
+  DEFAULT_PRIVATE_SAFETY,
+} = require('./constants');
+const {
+  rovers,
+  socketToRovers,
+  spectatorSockets,
+  managerEvents,
+  backoffTimers,
+  dockGuardStates,
+  privateButtonStates,
+  privateNoUsersSince,
+  privateSafetyTimers,
+  privateSafetyStates,
+} = require('./state');
 const turnService = require('../turnService');
-const managerEvents = new EventEmitter();
-const DOCK_GUARD_WINDOW_MS = 2 * 1000;
-const IDLE_UNDOCKED_MS = 2 * 60 * 1000;
-const PASSIVE_UNDOCKED_MS = 60 * 1000;
-const DOCK_GUARD_RETRY_MS = 10 * 1000;
-const DOCK_COMMAND_BASE64 = Buffer.from([143]).toString('base64');
-const BACKOFF_MS = 500;
-const BACKOFF_SPEED = 300;
-const PRIVATE_BUTTON_HOLD_MS = 3000;
-const PRIVATE_AUTO_CLOSE_IDLE_MS = 30 * 60 * 1000;
-const PRIVATE_AUTO_CLOSE_TICK_MS = 30000;
-const SAFETY_BACKOFF_MIN = -500;
-const SAFETY_BACKOFF_MAX = 500;
-const backoffTimers = new Map(); // roverId -> Timeout
-const dockGuardStates = new Map(); // roverId -> guard state
-const privateButtonStates = new Map(); // roverId -> { pressedSince:number|null, latched:boolean }
-const privateNoUsersSince = new Map(); // roverId -> timestamp|null
-const privateSafetyTimers = new Map(); // roverId -> Timeout
-const privateSafetyStates = new Map(); // roverId -> state
-
-const DEFAULT_PRIVATE_SAFETY = Object.freeze({
-  speedLimitEnabled: false,
-  speedLimitMaxWheelSpeed: 250,
-  hardOvercurrentEnabled: false,
-  overcurrentStopMs: 300,
-  hardBumpEnabled: false,
-  bumpBackoffSpeed: 250,
-  bumpBackoffMs: 350,
-  cliffEnabled: false,
-  cliffBackoffSpeed: 250,
-  cliffBackoffMs: 500,
-  triggerCooldownMs: 800,
-});
 
 function parsePrivateMeta(meta = {}) {
   const raw = meta?.private;

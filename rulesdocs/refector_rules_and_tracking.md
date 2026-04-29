@@ -50,7 +50,7 @@
 - [ ] private rover access request service
 - [ ] replay services (already partly split; reformat consistently)
 - [ ] room camera services (already partly split; reformat consistently)
-- [ ] rover manager service
+- [ ] rover manager service (in progress: constants/state extracted)
 - [x] session service
 - [x] turn service
 - [ ] verification service
@@ -65,6 +65,7 @@
 - Folderized all files in `server/src/services/` into per-service folders with `index.js` entrypoints and updated internal relative imports for new path depth.
 - Split `server/src/services/turnService/index.js` by extracting constants, shared state helpers, and side-effect action helpers into `turnService/constants.js`, `turnService/state.js`, and `turnService/actions.js`.
 - Split `server/src/services/sessionService/index.js` by extracting config/timing constants, sync-throttle state storage, and visibility filter helpers into `sessionService/constants.js`, `sessionService/state.js`, and `sessionService/filters.js`.
+- Began splitting `server/src/services/roverManager/index.js` by extracting immutable constants and shared state containers into `roverManager/constants.js` and `roverManager/state.js`.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS
