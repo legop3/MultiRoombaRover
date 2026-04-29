@@ -76,6 +76,8 @@
 - Began `llmCommentaryService` decomposition by extracting immutable runtime limits/path/frequency normalization to `llmCommentaryService/constants.js` and pure prompt/text output helpers to `llmCommentaryService/formatters.js`.
 - Continued `llmCommentaryService` decomposition by extracting admin/runtime projection + failure-normalization helpers to `llmCommentaryService/runtimeHelpers.js`.
 - Continued `llmCommentaryService` decomposition by extracting sensor activity aggregation and snapshot assembly to `llmCommentaryService/snapshotEngine.js`; rewired commentary tick/event flow to use the new engine.
+- Continued `llmCommentaryService` decomposition by extracting socket/role/rover event wiring into `llmCommentaryService/hooks.js` and keeping `index.js` focused on orchestration.
+- Finished major `llmCommentaryService` decomposition by extracting tick scheduling, run-loop orchestration, and history-reset behavior into `llmCommentaryService/runner.js`; `llmCommentaryService/index.js` is now a thin composition layer.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS
