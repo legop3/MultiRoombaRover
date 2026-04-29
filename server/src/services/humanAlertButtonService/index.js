@@ -9,7 +9,7 @@ const { issueCommand } = require('../commandService');
 const roverManager = require('../roverManager');
 const { toggleLightsLockedOn } = require('../homeAssistantService');
 const { getRoomCameras } = require('../roomCameraService');
-const { getRoomCameraState } = require('../roomCameraSnapshotService');
+const { getRoomCameraState } = require('../roomCameraService');
 
 const HA_BUTTON_EVENT_TYPE = 'ha.button.action';
 const HUMAN_ALERT_ACTION = 'humanAlert';

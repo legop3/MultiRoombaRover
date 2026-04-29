@@ -49,7 +49,7 @@
 - [ ] llm commentary service
 - [x] private rover access request service
 - [x] replay services (consolidated under replayEngineV2)
-- [ ] room camera services (already partly split; reformat consistently)
+- [x] room camera services (consolidated into roomCameraService multipart folder)
 - [ ] rover manager service (in progress: constants/state extracted)
 - [x] session service
 - [x] turn service
@@ -90,6 +90,9 @@
 - Finished `replayEngineV2` decomposition by extracting environment/path constants to `replayEngineV2/constants.js`, mutable runtime state to `replayEngineV2/state.js`, source discovery/worker arg building to `replayEngineV2/sources.js`, ffmpeg worker lifecycle to `replayEngineV2/workerManager.js`, segment indexing/retention/health snapshot logic to `replayEngineV2/segmentStore.js`, sidebar SVG/video rendering to `replayEngineV2/sidebarRenderer.js`, and replay assembly pipeline to `replayEngineV2/replayBuilder.js`; `replayEngineV2/index.js` is now a thin orchestration layer.
 - Consolidated replay-related single-file services into `replayEngineV2` by moving cooldown state (`cooldown.js`), user-facing replay source validation/defaults (`replaySources.js`), and replay socket hooks (`socketHooks.js`) into the engine folder; removed obsolete standalone services `replayBuildService`, `replayService`, `replaySourceService`, and `replaySocketService` and rewired dependents to import directly from `replayEngineV2`.
 - Finished `chatService` decomposition by extracting runtime constants (`chatService/constants.js`), shared mutable state (`chatService/state.js`), content/moderation helpers (`chatService/contentFilters.js`), payload/context builders (`chatService/contextBuilders.js`), bus/history broadcast pipeline (`chatService/broadcast.js`), rover-side notification helpers (`chatService/notifications.js`), message handlers (`chatService/handlers.js`), and socket/event-bus wiring (`chatService/socketHooks.js`); `chatService/index.js` is now a thin orchestration layer.
+- Consolidated room-camera services into `roomCameraService` by absorbing catalog (`roomCameraService`), snapshot polling/streaming (`roomCameraSnapshotService`), socket fan-out (`roomCameraSocketService`), and replay assembly (`roomCameraReplayService`) into one multipart folder (`roomCameraService/catalog.js`, `snapshotEngine.js`, `socketGateway.js`, `replayBuilder.js`), and updated imports/startup wiring to use the consolidated service exports.
+- Follow-up: moved room-camera replay assembly module from `roomCameraService/replayBuilder.js` into `replayEngineV2/roomCameraReplayBuilder.js`; `roomCameraService` now consumes replay functionality from replay engine ownership while keeping the same exported room-camera replay API.
+- Consolidated rover snapshot polling/socket services into `roverSnapshotService` by absorbing `roverSnapshotSocketService` into folder modules (`roverSnapshotService/poller.js`, `socketGateway.js`) and keeping `roverSnapshotService/index.js` as the startup composition/export layer.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS

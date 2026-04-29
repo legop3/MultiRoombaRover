@@ -1,61 +1,36 @@
-// room Camera Service
-// Purpose: Defines the room Camera Service module and the helpers/state used by this service unit.
-// Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
-const EventEmitter = require('events');
-const logger = require('../../globals/logger').child('roomCameraService');
-const { loadConfig } = require('../../helpers/configLoader');
+// Room Camera Service
+// Purpose: Composes room camera catalog, snapshot streaming, socket delivery, and replay helpers in one service folder.
+// Scope: Exposes the existing room-camera public API while preserving side-effect startup behavior.
+const { loadFromConfig, getRoomCameras, getRoomCamera, roomCameraEvents } = require('./catalog');
+const { createSnapshotEngine } = require('./snapshotEngine');
+const { registerRoomCameraSocketGateway } = require('./socketGateway');
+const replay = require('../replayEngineV2/roomCameraReplayBuilder');
 
-const events = new EventEmitter();
-const config = loadConfig();
+const snapshotEngine = createSnapshotEngine({ getRoomCameras, roomCameraEvents });
+snapshotEngine.startAll();
 
-const cameraMap = new Map();
-
-function normalizeCamera(camera) {
-  if (!camera) return null;
-  const id = camera.id || camera.name;
-  if (!id) {
-    logger.warn('Room camera missing id', camera);
-    return null;
-  }
-  if (!camera.url && !camera.streamUrl && !camera.mjpegUrl) {
-    logger.warn('Room camera missing url/streamUrl', { id, camera });
-    return null;
-  }
-  return {
-    id: String(id),
-    name: camera.name || camera.id || String(id),
-    description: camera.description || null,
-    url: camera.url || null,
-    streamUrl: camera.streamUrl || camera.mjpegUrl || null,
-  };
-}
-
-function loadFromConfig() {
-  cameraMap.clear();
-  const list = Array.isArray(config.roomCameras) ? config.roomCameras : [];
-  list.forEach((camera) => {
-    const normalized = normalizeCamera(camera);
-    if (normalized) {
-      cameraMap.set(normalized.id, normalized);
-    }
-  });
-  logger.info('Loaded room cameras', { count: cameraMap.size });
-  events.emit('update', getRoomCameras());
-}
-
-function getRoomCameras() {
-  return Array.from(cameraMap.values());
-}
-
-function getRoomCamera(id) {
-  if (!id) return null;
-  return cameraMap.get(String(id)) || null;
-}
+registerRoomCameraSocketGateway({
+  getRoomCamera,
+  getRoomCameras,
+  getRoomCameraState: snapshotEngine.getRoomCameraState,
+  roomCameraStreamEvents: snapshotEngine.roomCameraStreamEvents,
+});
 
 loadFromConfig();
+
+function buildRoomCameraReplayVideo(options = {}) {
+  return replay.buildRoomCameraReplayVideo(options, { getRoomCamera, getRoomCameras });
+}
 
 module.exports = {
   getRoomCameras,
   getRoomCamera,
-  roomCameraEvents: events,
+  roomCameraEvents,
+  roomCameraStreamEvents: snapshotEngine.roomCameraStreamEvents,
+  getRoomCameraState: snapshotEngine.getRoomCameraState,
+  recordRoomCameraFrame: replay.recordRoomCameraFrame,
+  clearRoomCameraReplayFrames: replay.clearRoomCameraReplayFrames,
+  getRoomCameraReplayMetadata: replay.getRoomCameraReplayMetadata,
+  buildRoomCameraReplayVideo,
+  roomCameraReplayEvents: replay.roomCameraReplayEvents,
 };

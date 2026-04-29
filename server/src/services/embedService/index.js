@@ -9,7 +9,7 @@ const { getMode } = require('../modeManager');
 const roverManager = require('../roverManager');
 const { getActiveDrivers, getTurnQueues } = require('../turnService');
 const { getRoomCameras } = require('../roomCameraService');
-const { getRoomCameraState } = require('../roomCameraSnapshotService');
+const { getRoomCameraState } = require('../roomCameraService');
 const { loadConfig } = require('../../helpers/configLoader');
 
 const INDEX_HTML_PATH = path.join(__dirname, '..', '..', '..', 'public', 'index.html');

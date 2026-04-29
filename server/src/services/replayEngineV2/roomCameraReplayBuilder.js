@@ -1,6 +1,6 @@
-// room Camera Replay Service
-// Purpose: Defines the room Camera Replay Service module and the helpers/state used by this service unit.
-// Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
+// Room Camera Replay Builder
+// Purpose: Records recent room-camera frames and assembles short replay videos for operator workflows.
+// Scope: Owns frame history retention and ffmpeg/ffprobe-based replay rendering.
 const { execFile } = require('child_process');
 const EventEmitter = require('events');
 const fsp = require('fs/promises');
@@ -9,7 +9,6 @@ const path = require('path');
 const { promisify } = require('util');
 
 const logger = require('../../globals/logger').child('roomCameraReplay');
-const { getRoomCamera, getRoomCameras } = require('../roomCameraService');
 
 const execFileAsync = promisify(execFile);
 
@@ -20,34 +19,29 @@ const MAX_REPLAY_WIDTH = 1280;
 const MAX_REPLAY_HEIGHT = 720;
 const REPLAY_MAX_BYTES = Math.floor(9.5 * 1024 * 1024);
 
-const frameHistory = new Map(); // id -> [{ buffer, ts }]
-const latestFrames = new Map(); // id -> { buffer, ts }
+const frameHistory = new Map();
+const latestFrames = new Map();
 const events = new EventEmitter();
 
-function recordFrame(id, buffer, ts = Date.now()) {
+function recordRoomCameraFrame(id, buffer, ts = Date.now()) {
   if (!id || !buffer) return;
   const entry = { buffer, ts };
   latestFrames.set(id, entry);
   const history = frameHistory.get(id) || [];
   history.push(entry);
   const cutoff = ts - HISTORY_WINDOW_MS;
-  while (history.length && history[0].ts < cutoff) {
-    history.shift();
-  }
+  while (history.length && history[0].ts < cutoff) history.shift();
   frameHistory.set(id, history);
   events.emit('frame', { id, ts });
 }
 
-function clearFrames() {
+function clearRoomCameraReplayFrames() {
   frameHistory.clear();
   latestFrames.clear();
 }
 
-function getReplayMetadata() {
-  return {
-    durationMs: REPLAY_DURATION_MS,
-    fps: REPLAY_FPS,
-  };
+function getRoomCameraReplayMetadata() {
+  return { durationMs: REPLAY_DURATION_MS, fps: REPLAY_FPS };
 }
 
 function buildTimelineForCamera(id, startMs, frameCount, frameStepMs) {
@@ -60,9 +54,7 @@ function buildTimelineForCamera(id, startMs, frameCount, frameStepMs) {
     lastBuffer = history[idx].buffer;
     idx += 1;
   }
-  if (!lastBuffer) {
-    lastBuffer = history[0]?.buffer || fallback;
-  }
+  if (!lastBuffer) lastBuffer = history[0]?.buffer || fallback;
   const frames = new Array(frameCount);
   for (let i = 0; i < frameCount; i += 1) {
     const slotTs = startMs + i * frameStepMs;
@@ -87,15 +79,7 @@ async function probeMaxFrameSize(framePaths) {
   for (const framePath of framePaths) {
     try {
       const { stdout } = await execFileAsync('ffprobe', [
-        '-v',
-        'error',
-        '-select_streams',
-        'v:0',
-        '-show_entries',
-        'stream=width,height',
-        '-of',
-        'csv=p=0',
-        framePath,
+        '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', framePath,
       ]);
       const [widthRaw, heightRaw] = stdout.trim().split(',');
       const width = Number(widthRaw);
@@ -119,27 +103,20 @@ function clampEven(value) {
   return Math.max(2, Math.floor(value / 2) * 2);
 }
 
-async function buildReplayVideo({ cameraId = null } = {}) {
+async function buildRoomCameraReplayVideo({ cameraId = null } = {}, { getRoomCamera, getRoomCameras }) {
   const cameras = cameraId ? [getRoomCamera(cameraId)].filter(Boolean) : getRoomCameras();
-  if (!cameras.length) {
-    throw new Error('No room cameras configured');
-  }
+  if (!cameras.length) throw new Error('No room cameras configured');
 
-  const fpsValue = REPLAY_FPS;
-  const frameCount = Math.max(1, Math.round((REPLAY_DURATION_MS / 1000) * fpsValue));
-  const frameStepMs = 1000 / fpsValue;
+  const frameCount = Math.max(1, Math.round((REPLAY_DURATION_MS / 1000) * REPLAY_FPS));
+  const frameStepMs = 1000 / REPLAY_FPS;
   const startMs = Date.now() - REPLAY_DURATION_MS;
 
   const cameraEntries = [];
   cameras.forEach((camera) => {
     const frames = buildTimelineForCamera(camera.id, startMs, frameCount, frameStepMs);
-    if (!frames) return;
-    cameraEntries.push({ camera, frames });
+    if (frames) cameraEntries.push({ camera, frames });
   });
-
-  if (!cameraEntries.length) {
-    throw new Error('No camera frames available yet');
-  }
+  if (!cameraEntries.length) throw new Error('No camera frames available yet');
 
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rover-replay-'));
   try {
@@ -151,14 +128,10 @@ async function buildReplayVideo({ cameraId = null } = {}) {
       await fsp.mkdir(camDir, { recursive: true });
       for (let j = 0; j < entry.frames.length; j += 1) {
         const buffer = entry.frames[j];
-        if (!buffer) {
-          throw new Error(`Camera ${entry.camera.id} missing replay frame`);
-        }
+        if (!buffer) throw new Error(`Camera ${entry.camera.id} missing replay frame`);
         const filename = `frame-${String(j + 1).padStart(4, '0')}.jpg`;
         const fullPath = path.join(camDir, filename);
-        if (j === 0) {
-          firstFramePaths.push(fullPath);
-        }
+        if (j === 0) firstFramePaths.push(fullPath);
         await fsp.writeFile(fullPath, buffer);
       }
     }
@@ -171,8 +144,8 @@ async function buildReplayVideo({ cameraId = null } = {}) {
     let outputHeight = tileHeight * layout.rows;
     if (outputWidth > MAX_REPLAY_WIDTH || outputHeight > MAX_REPLAY_HEIGHT) {
       const scale = Math.min(MAX_REPLAY_WIDTH / outputWidth, MAX_REPLAY_HEIGHT / outputHeight);
-      tileWidth = tileWidth * scale;
-      tileHeight = tileHeight * scale;
+      tileWidth *= scale;
+      tileHeight *= scale;
       outputWidth = tileWidth * layout.cols;
       outputHeight = tileHeight * layout.rows;
     }
@@ -181,8 +154,8 @@ async function buildReplayVideo({ cameraId = null } = {}) {
     outputWidth = clampEven(tileWidth * layout.cols);
     outputHeight = clampEven(tileHeight * layout.rows);
 
-    const fps = fpsValue.toFixed(3);
-    const durationSec = Math.max(1, frameCount / fpsValue);
+    const fps = REPLAY_FPS.toFixed(3);
+    const durationSec = Math.max(1, frameCount / REPLAY_FPS);
     const targetBitrateKbps = Math.max(300, Math.floor((REPLAY_MAX_BYTES * 8) / durationSec / 1000));
     const maxrateKbps = Math.floor(targetBitrateKbps * 1.1);
     const bufsizeKbps = Math.floor(targetBitrateKbps * 2);
@@ -192,9 +165,7 @@ async function buildReplayVideo({ cameraId = null } = {}) {
     const layoutParts = [];
     for (let i = 0; i < cameraEntries.length; i += 1) {
       inputArgs.push('-framerate', fps, '-i', path.join(cameraEntries[i].dir, 'frame-%04d.jpg'));
-      filterParts.push(
-        `[${i}:v]${buildScalePadFilter(tileWidth, tileHeight)}[v${i}]`,
-      );
+      filterParts.push(`[${i}:v]${buildScalePadFilter(tileWidth, tileHeight)}[v${i}]`);
       const x = (i % layout.cols) * tileWidth;
       const y = Math.floor(i / layout.cols) * tileHeight;
       layoutParts.push(`${x}_${y}`);
@@ -203,38 +174,25 @@ async function buildReplayVideo({ cameraId = null } = {}) {
       filterParts.push('[v0]null[v]');
     } else {
       filterParts.push(
-        `${cameraEntries.map((_, i) => `[v${i}]`).join('')}` +
-          `xstack=inputs=${cameraEntries.length}:layout=${layoutParts.join('|')}:fill=black[v]`,
+        `${cameraEntries.map((_, i) => `[v${i}]`).join('')}xstack=inputs=${cameraEntries.length}:layout=${layoutParts.join('|')}:fill=black[v]`,
       );
     }
 
     const outPath = path.join(tmpDir, 'replay.mp4');
     await execFileAsync('ffmpeg', [
-      '-y',
-      '-hide_banner',
-      '-loglevel',
-      'error',
+      '-y', '-hide_banner', '-loglevel', 'error',
       ...inputArgs,
-      '-filter_complex',
-      filterParts.join(';'),
-      '-map',
-      '[v]',
-      '-r',
-      fps,
-      '-c:v',
-      'libx264',
-      '-b:v',
-      `${targetBitrateKbps}k`,
-      '-maxrate',
-      `${maxrateKbps}k`,
-      '-bufsize',
-      `${bufsizeKbps}k`,
-      '-pix_fmt',
-      'yuv420p',
+      '-filter_complex', filterParts.join(';'),
+      '-map', '[v]',
+      '-r', fps,
+      '-c:v', 'libx264',
+      '-b:v', `${targetBitrateKbps}k`,
+      '-maxrate', `${maxrateKbps}k`,
+      '-bufsize', `${bufsizeKbps}k`,
+      '-pix_fmt', 'yuv420p',
       outPath,
     ]);
-    const buffer = await fsp.readFile(outPath);
-    return buffer;
+    return await fsp.readFile(outPath);
   } finally {
     try {
       await fsp.rm(tmpDir, { recursive: true, force: true });
@@ -245,9 +203,9 @@ async function buildReplayVideo({ cameraId = null } = {}) {
 }
 
 module.exports = {
-  recordRoomCameraFrame: recordFrame,
-  clearRoomCameraReplayFrames: clearFrames,
-  getRoomCameraReplayMetadata: getReplayMetadata,
-  buildRoomCameraReplayVideo: buildReplayVideo,
+  recordRoomCameraFrame,
+  clearRoomCameraReplayFrames,
+  getRoomCameraReplayMetadata,
+  buildRoomCameraReplayVideo,
   roomCameraReplayEvents: events,
 };
