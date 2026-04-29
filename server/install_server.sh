@@ -8,7 +8,7 @@ MEDIAMTX_CONF_DIR="/etc/mediamtx"
 MEDIAMTX_CONFIG="$MEDIAMTX_CONF_DIR/mediamtx.yml"
 MEDIAMTX_SERVICE="/etc/systemd/system/mediamtx.service"
 MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
-SNAPSHOT_DIR="/var/lib/rover-snapshots"
+SNAPSHOT_DIR="$SERVER_DIR/data/rover-snapshots"
 REPLAY_SEGMENT_DIR="/var/lib/replay-segments"
 
 if [[ $EUID -ne 0 ]]; then
@@ -90,7 +90,6 @@ Wants=network-online.target
 User=$TARGET_USER
 Group=$TARGET_USER
 WorkingDirectory=$MEDIAMTX_CONF_DIR
-Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
 ExecStart=$MEDIAMTX_BIN $MEDIAMTX_CONFIG
 Restart=on-failure
 RestartSec=2
@@ -111,7 +110,6 @@ Group=$TARGET_USER
 WorkingDirectory=$SERVER_DIR
 Environment=NODE_ENV=production
 Environment=SERVER_CONFIG=$CONFIG_PATH
-Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
 Environment=REPLAY_SEGMENT_DIR=$REPLAY_SEGMENT_DIR
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
 Restart=on-failure
