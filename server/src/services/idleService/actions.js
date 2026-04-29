@@ -6,6 +6,7 @@ const roverManager = require('../roverManager');
 const { issueCommand } = require('../commandService');
 const homeAssistantService = require('../homeAssistantService');
 const neatoService = require('../neatoService');
+const liftService = require('../liftService');
 const {
   NIGHT_VISION_DISABLE_ACTION,
   DOCK_COMMAND_BASE64,
@@ -60,11 +61,21 @@ async function sendNeatoHome() {
   }
 }
 
+async function raiseLift() {
+  try {
+    await liftService.moveUp('idleService');
+    return { action: 'liftMoveUp', success: true };
+  } catch (err) {
+    return { action: 'liftMoveUp', success: false, error: err.message };
+  }
+}
+
 const idleActions = [
   turnOffRoomControls,
   dockAllRovers,
   disableAllRoverNightVision,
   sendNeatoHome,
+  raiseLift,
 ];
 
 async function runIdleActions() {

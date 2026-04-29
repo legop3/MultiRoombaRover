@@ -1,0 +1,22 @@
+# lift control
+- control a lift up / down from the web UI
+- for verified users only
+- add new service in server for controlling the lift
+- add new action in idle service, to raise the lift when idle triggers 
+- UI in VIP panel
+  - match UI styling of neato panel
+  - put below VIP panel
+  - have 2 buttons that get toggled between. down / up.
+- lift is controlled through home assistant:
+  - lift shows up as two switches
+    - add spots for these 2 lift switches in server config
+    - one for up and one for down
+    - the way that they have to be operated is a little bit odd, examples:
+      - to raise the lift:
+        - turn down switch off
+        - wait 2 ish seconds
+        - turn up switch on
+      - to lower the lift:
+        - turn up switch off
+        - wait 2 ish seconds
+        - turn down switch on

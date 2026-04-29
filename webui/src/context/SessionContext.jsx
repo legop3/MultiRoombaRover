@@ -169,6 +169,8 @@ export function SessionProvider({ children }) {
       neatoSendHome: () => emitWithAck('neato:sendHome'),
       neatoLocate: () => emitWithAck('neato:locate'),
       neatoClearErrors: () => emitWithAck('neato:clearErrors'),
+      liftUp: () => emitWithAck('lift:up'),
+      liftDown: () => emitWithAck('lift:down'),
       setNickname: (nickname) => emitWithAck('nickname:set', { nickname }),
       requestVerification: () => emitWithAck('verification:request'),
       requestPrivateRoverAccess: (roverId) =>

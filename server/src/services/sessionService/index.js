@@ -12,6 +12,7 @@ const { getActiveDrivers, getTurnQueues, turnEvents } = require('../turnService'
 const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
 const { getState: getNeatoState, neatoEvents } = require('../neatoService');
+const { getState: getLiftState, liftEvents } = require('../liftService');
 const { getNickname, nicknameEvents } = require('../nicknameService');
 const {
   getVerificationStateForSocket,
@@ -100,6 +101,7 @@ function buildSession(socket) {
     roomCameras: getRoomCameras(),
     homeAssistant: getHomeAssistantState(),
     neato: getNeatoState(),
+    lift: getLiftState(),
     replay: getReplayState(),
     replaySources: getReplaySources(socket),
     health: getHealthSnapshot(),
@@ -272,6 +274,11 @@ homeAssistantEvents.on('status', () => {
 
 neatoEvents.on('update', () => {
   logger.info('Neato state change; syncing all clients');
+  syncAll();
+});
+
+liftEvents.on('update', () => {
+  logger.info('Lift state change; syncing all clients');
   syncAll();
 });
 

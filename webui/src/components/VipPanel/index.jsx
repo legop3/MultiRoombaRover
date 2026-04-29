@@ -10,6 +10,7 @@ import VipVerificationCard from '../vip/VipVerificationCard.jsx';
 import VipIdentityCard from '../vip/VipIdentityCard.jsx';
 import VipPrivateRoverAccessCard from '../vip/VipPrivateRoverAccessCard.jsx';
 import VipNeatoCard from '../vip/VipNeatoCard.jsx';
+import VipLiftCard from '../vip/VipLiftCard.jsx';
 
 export default function VipPanel() {
   const {
@@ -26,6 +27,8 @@ export default function VipPanel() {
     neatoSendHome,
     neatoLocate,
     neatoClearErrors,
+    liftUp,
+    liftDown,
   } = useSession();
   const { value: identity, save: saveIdentity } = useSettingsNamespace('identity', { cookieUserId: '' });
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
@@ -78,6 +81,12 @@ export default function VipPanel() {
                 onSendHome={neatoSendHome}
                 onLocate={neatoLocate}
                 onClearErrors={neatoClearErrors}
+                fullWidth
+              />
+              <VipLiftCard
+                lift={session?.lift || null}
+                onUp={liftUp}
+                onDown={liftDown}
                 fullWidth
               />
               <VipAudioUploadCard
