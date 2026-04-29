@@ -104,6 +104,7 @@ function registerRoverSnapshotSocketGateway({
   });
 
   io.on('connection', (socket) => {
+    logger.warn('Rover snapshot gateway saw socket connection', { socketId: socket.id });
     socket.on('roverSnapshot:subscribe', (payload = {}, cb = () => {}) => {
       const visibleRoster = roverManager.getRosterForSocket(socket);
       const visibleIds = visibleRoster.map((rover) => String(rover.id));
@@ -118,7 +119,7 @@ function registerRoverSnapshotSocketGateway({
         if (!passesMode(socket)) throw new Error('Not authorized for rover snapshots');
         const rosterIds = new Set(visibleIds);
         const validIds = uniqueIds.filter((id) => rosterIds.has(String(id)));
-        logger.info('Rover snapshot subscribe', {
+        logger.warn('Rover snapshot subscribe', {
           socketId: socket.id,
           requestedIds: uniqueIds,
           visibleIds,
