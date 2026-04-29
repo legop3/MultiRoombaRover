@@ -53,8 +53,8 @@
 - [ ] rover manager service (in progress: constants/state extracted)
 - [x] session service
 - [x] turn service
-- [ ] verification service
-- [ ] video auth service
+- [x] verification service
+- [x] video auth service
 - [x] All remaining services: reorganize to folder structure where needed
 
 ### COMPLETED SERVICES
@@ -81,6 +81,8 @@
 - Began `audioForwardService` decomposition by extracting permission/path policy helpers to `audioForwardService/policy.js` and rover/turn/socket event wiring to `audioForwardService/hooks.js`; rewired service entrypoint to use extracted modules.
 - Continued `audioForwardService` decomposition by extracting ffmpeg worker lifecycle, upload playback, and WHIP ownership/session control into `audioForwardService/workerEngine.js`; `audioForwardService/index.js` is now a thin composition layer.
 - Finished `buttonBoxService` decomposition by extracting persisted state management to `buttonBoxService/store.js`, reward/effect workflows to `buttonBoxService/core.js`, and HTTP transport wiring to `buttonBoxService/httpRoute.js`; `buttonBoxService/index.js` is now a thin composition layer.
+- Finished `verificationService` decomposition by extracting persisted store handling to `verificationService/store.js`, identity/selector normalization to `verificationService/identity.js`, verification/deterrence/request lifecycle logic to `verificationService/verificationFlow.js`, `verificationService/deterrenceFlow.js`, and `verificationService/requestFlow.js`, plus socket/role event wiring to `verificationService/hooks.js`; `verificationService/index.js` is now a thin composition layer.
+- Finished `videoAuthService` decomposition by extracting MediaMTX stream parsing to `videoAuthService/streamParsing.js`, role/mode/stream policy checks to `videoAuthService/policy.js`, and auth HTTP transport wiring to `videoAuthService/httpRoute.js`; `videoAuthService/index.js` is now a thin composition layer.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS
