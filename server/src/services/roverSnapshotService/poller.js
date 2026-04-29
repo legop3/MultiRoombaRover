@@ -10,6 +10,7 @@ const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots
 const POLL_INTERVAL_MS = 300;
 const roverState = new Map();
 const events = new EventEmitter();
+const readCounts = new Map();
 let pollTimer = null;
 
 function markState(id, updates = {}) {
@@ -24,24 +25,32 @@ function getSnapshotPath(id) {
 }
 
 function createRoverSnapshotPoller({ roverManager }) {
-  async function fetchSnapshot(id) {
+  async function fetchSnapshot(id, options = {}) {
+    const force = Boolean(options?.force);
     const state = roverState.get(id);
     if (state?.fetching) return;
     markState(id, { fetching: true });
     try {
       const filePath = getSnapshotPath(id);
       const stats = await fs.stat(filePath);
-      if (state?.mtimeMs && stats.mtimeMs <= state.mtimeMs) return;
+      if (!force && state?.mtimeMs && stats.mtimeMs <= state.mtimeMs) return;
       const buffer = await fs.readFile(filePath);
       const ts = stats.mtimeMs || Date.now();
       markState(id, { frame: buffer, ts, error: null, failures: 0, mtimeMs: stats.mtimeMs });
+      const count = (readCounts.get(id) || 0) + 1;
+      readCounts.set(id, count);
+      if (count === 1 || count % 30 === 0) {
+        logger.warn('Snapshot read ok', { id, count, bytes: buffer.length, ts, mtimeMs: stats.mtimeMs });
+      }
       events.emit('frame', { id, buffer, ts });
+      return { frame: buffer, ts };
     } catch (err) {
       const failures = (state?.failures || 0) + 1;
       const message = err.code === 'ENOENT' ? 'Snapshot missing' : err.message;
       markState(id, { error: message, failures });
       events.emit('status', { id, error: message });
       if (failures % 20 === 1) logger.warn('Snapshot read failed', { id, err: message });
+      return null;
     } finally {
       markState(id, { fetching: false });
     }
