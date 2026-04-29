@@ -153,7 +153,7 @@ const commands = createCommandHandlers({
   config,
 });
 
-const integrations = createIntegrations({
+  const integrations = createIntegrations({
   logger,
   client,
   config,
@@ -184,6 +184,7 @@ const integrations = createIntegrations({
   clearTypingMessage: channelIO.clearTypingMessage,
   sendTypingMessage: channelIO.sendTypingMessage,
   schedulePresenceRotation: presence.schedulePresenceRotation,
+  buildReplayVideo,
 });
 
 const integrationHandlers = integrations.register();

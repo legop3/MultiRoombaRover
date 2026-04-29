@@ -28,7 +28,7 @@ function normalizeIncludeSidebar(value) {
 
 function registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefaultWebSources }) {
   io.on('connection', (socket) => {
-    socket.on('replay:trigger', (payload = {}, cb = () => {}) => {
+    const handleReplayTrigger = (payload = {}, cb = () => {}) => {
       if (getMode() === MODES.LOCKDOWN) {
         cb({ error: 'Replay disabled in lockdown', state: null });
         return;
@@ -72,7 +72,9 @@ function registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefau
       });
       logger.info('Replay requested via web', { socketId: socket.id });
       cb({ success: true, state: attempt.state });
-    });
+    };
+
+    socket.on('replay:trigger', handleReplayTrigger);
   });
 }
 

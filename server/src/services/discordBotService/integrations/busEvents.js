@@ -5,7 +5,7 @@ const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { buildBatteryStatusEmbed, buildBatteryCaption } = require('../batteryEmbeds');
 
 function createBusEventHandler(deps) {
-  const { logger, discordConfig, MODES, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel } = deps;
+  const { logger, discordConfig, MODES, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel, buildReplayVideo } = deps;
   const ADMIN_ALERT_EVENT_TYPES = new Set(['rover.online', 'rover.offline', 'rover.dockGuard', 'battery.warn', 'battery.urgent', 'battery.docked', 'battery.undocked', 'battery.charging.start', 'battery.charging.stop', 'battery.locked', 'battery.unlocked']);
   let skippedFirstModeAnnouncement = false;
 
@@ -26,7 +26,33 @@ function createBusEventHandler(deps) {
     await sendToChannel(channelId, `${prefix}${content || ''}`.trim(), { embeds: payloadEmbeds, files: Array.isArray(files) ? files : undefined }, { parse: [], roles: pingRoleId ? [pingRoleId] : [] }, !pingRoleId);
   }
 
-  return function handleBusEvent(event) {
+  function sanitizeReplayTitleForFilename(title) {
+    const cleaned = String(title || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 96);
+    return cleaned || 'replay';
+  }
+
+  async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '', includeSidebar = true) {
+    if (!channelId) throw new Error('Replay channel not configured');
+    const resolvedTitle = String(explicitTitle || '').trim() || `${String(requester || 'Someone').trim() || 'Someone'} replay`;
+    const { buffer } = await buildReplayVideo({ sources, title: resolvedTitle, requester, includeSidebar });
+    const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(resolvedTitle)}.mp4` });
+    await sendToChannel(channelId, `**${resolvedTitle}**`, { files: [attachment] }, { parse: [] });
+  }
+
+  function handleReplayRequested(event) {
+    const payload = event?.payload || {};
+    sendReplayToChannel(
+      payload?.channelId,
+      payload?.requester,
+      payload?.sources || [],
+      payload?.title || '',
+      payload?.includeSidebar !== false,
+    ).catch((err) => {
+      logger.warn('Replay send failed', { error: err.message });
+    });
+  }
+
+  function handleBusEvent(event) {
     const { type, payload } = event || {};
     const channels = discordConfig.channels || {};
     const roles = discordConfig.roles || {};
@@ -84,10 +110,15 @@ function createBusEventHandler(deps) {
         announce({ channelId: channels.humanAlerts, pingRoleId: roles.humanAlertPing || null, content: payload?.message || 'Human alert button pressed.', embeds: [buildEmbed({ title: 'Human Alert Button Pressed', description: null, color: 0xe53935 })], files: attachment ? [attachment] : [] });
         break;
       }
+      case 'replay.requested':
+        handleReplayRequested(event);
+        break;
       default:
         break;
     }
-  };
+  }
+
+  return { handleBusEvent, handleReplayRequested };
 }
 
 module.exports = { createBusEventHandler };
