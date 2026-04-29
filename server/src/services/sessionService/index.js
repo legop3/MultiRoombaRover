@@ -23,8 +23,7 @@ const {
   getStateForSocket: getPrivateRoverAccessStateForSocket,
   requestEvents: privateRoverAccessRequestEvents,
 } = require('../privateRoverAccessRequestService');
-const { getReplayState, replayEvents } = require('../replayService');
-const { getReplaySources } = require('../replaySourceService');
+const { getReplayState, replayEvents, getReplaySources } = require('../replayEngineV2');
 const { getHealthSnapshot } = require('../healthService');
 const { getCommunityGoal } = require('../communityGoalService');
 const { getAdminReason } = require('../adminReasonService');

@@ -13,11 +13,9 @@ const roverManager = require('../roverManager');
 const { getRoster, lockRover, rovers } = roverManager;
 const { MODES, getMode, setMode } = require('../modeManager');
 const { sendExternalMessage, sendExternalTyping } = require('../chatService');
-const { buildReplayVideo } = require('../replayBuildService');
-const { getReplaySources, getDefaultDiscordSources, validateSources } = require('../replaySourceService');
+const { buildReplayVideo, getReplaySources, getDefaultDiscordSources, validateSources, tryTriggerReplay } = require('../replayEngineV2');
 const { getActiveDrivers } = require('../turnService');
 const { getNickname } = require('../nicknameService');
-const { tryTriggerReplay } = require('../replayService');
 const { getCommunityGoal, setCommunityGoal, clearCommunityGoal } = require('../communityGoalService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
 const {

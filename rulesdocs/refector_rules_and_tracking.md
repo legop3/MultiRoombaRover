@@ -48,7 +48,7 @@
 - [x] home assistant service
 - [ ] llm commentary service
 - [x] private rover access request service
-- [ ] replay services (already partly split; reformat consistently)
+- [x] replay services (consolidated under replayEngineV2)
 - [ ] room camera services (already partly split; reformat consistently)
 - [ ] rover manager service (in progress: constants/state extracted)
 - [x] session service
@@ -86,6 +86,8 @@
 - Finished `privateRoverAccessRequestService` decomposition by extracting in-memory maps/events/constants to `privateRoverAccessRequestService/state.js`, shared keying/lookup helpers to `privateRoverAccessRequestService/helpers.js`, request/grant business logic to `privateRoverAccessRequestService/core.js`, and rover/socket event wiring to `privateRoverAccessRequestService/hooks.js`; `privateRoverAccessRequestService/index.js` is now a thin composition layer.
 - Finished `homeAssistantService` decomposition by extracting shared runtime caches/constants to `homeAssistantService/state.js`, entity/trigger normalization helpers to `homeAssistantService/entityHelpers.js`, automation/state engine logic to `homeAssistantService/runtimeEngine.js`, websocket transport/reconnect lifecycle to `homeAssistantService/transport.js`, and mode/turn/socket event wiring to `homeAssistantService/hooks.js`; `homeAssistantService/index.js` is now a thin composition layer.
 - Finished `discordBotService` decomposition by extracting presence rotation/state to `discordBotService/presence.js`, channel/typing transport helpers to `discordBotService/channelIO.js`, command routing and admin command handlers to `discordBotService/commandHandlers.js`, and event-bus/chat-bridge/moderation DM workflows to `discordBotService/integrations.js`; `discordBotService/index.js` is now a thin composition layer.
+- Finished `replayEngineV2` decomposition by extracting environment/path constants to `replayEngineV2/constants.js`, mutable runtime state to `replayEngineV2/state.js`, source discovery/worker arg building to `replayEngineV2/sources.js`, ffmpeg worker lifecycle to `replayEngineV2/workerManager.js`, segment indexing/retention/health snapshot logic to `replayEngineV2/segmentStore.js`, sidebar SVG/video rendering to `replayEngineV2/sidebarRenderer.js`, and replay assembly pipeline to `replayEngineV2/replayBuilder.js`; `replayEngineV2/index.js` is now a thin orchestration layer.
+- Consolidated replay-related single-file services into `replayEngineV2` by moving cooldown state (`cooldown.js`), user-facing replay source validation/defaults (`replaySources.js`), and replay socket hooks (`socketHooks.js`) into the engine folder; removed obsolete standalone services `replayBuildService`, `replayService`, `replaySourceService`, and `replaySocketService` and rewired dependents to import directly from `replayEngineV2`.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS

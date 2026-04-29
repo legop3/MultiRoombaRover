@@ -1,6 +1,6 @@
-// replay Source Service
-// Purpose: Defines the replay Source Service module and the helpers/state used by this service unit.
-// Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
+// Replay Source Selection
+// Purpose: Exposes replay source discovery/validation for web and Discord replay requests.
+// Scope: Handles user-visible replay source catalogs and default source selection rules.
 const roverManager = require('../roverManager');
 const { getRoomCameras } = require('../roomCameraService');
 
@@ -14,11 +14,13 @@ function getReplaySources(socket = null) {
       label: rover.name || rover.id,
       color: rover.color || null,
     }));
+
   const roomSources = getRoomCameras().map((camera) => ({
     type: 'room',
     id: String(camera.id),
     label: camera.name || camera.id,
   }));
+
   return [...roverSources, ...roomSources];
 }
 
@@ -29,10 +31,8 @@ function normalizeSource(entry) {
     if (!type || !id) return null;
     return { type, id: String(id) };
   }
-  if (typeof entry === 'object') {
-    if (entry.type && entry.id) {
-      return { type: entry.type, id: String(entry.id) };
-    }
+  if (typeof entry === 'object' && entry.type && entry.id) {
+    return { type: entry.type, id: String(entry.id) };
   }
   return null;
 }
@@ -42,6 +42,7 @@ function validateSources(list = [], socket = null) {
   getReplaySources(socket).forEach((source) => {
     allowed.set(`${source.type}:${source.id}`, source);
   });
+
   const unique = new Map();
   (Array.isArray(list) ? list : []).forEach((entry) => {
     const normalized = normalizeSource(entry);
@@ -51,6 +52,7 @@ function validateSources(list = [], socket = null) {
     if (!source) return;
     unique.set(key, { type: source.type, id: source.id, label: source.label });
   });
+
   return Array.from(unique.values());
 }
 
