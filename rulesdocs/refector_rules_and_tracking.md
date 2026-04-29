@@ -47,7 +47,7 @@
 - [ ] discord bot service
 - [ ] home assistant service
 - [ ] llm commentary service
-- [ ] private rover access request service
+- [x] private rover access request service
 - [ ] replay services (already partly split; reformat consistently)
 - [ ] room camera services (already partly split; reformat consistently)
 - [ ] rover manager service (in progress: constants/state extracted)
@@ -83,6 +83,7 @@
 - Finished `buttonBoxService` decomposition by extracting persisted state management to `buttonBoxService/store.js`, reward/effect workflows to `buttonBoxService/core.js`, and HTTP transport wiring to `buttonBoxService/httpRoute.js`; `buttonBoxService/index.js` is now a thin composition layer.
 - Finished `verificationService` decomposition by extracting persisted store handling to `verificationService/store.js`, identity/selector normalization to `verificationService/identity.js`, verification/deterrence/request lifecycle logic to `verificationService/verificationFlow.js`, `verificationService/deterrenceFlow.js`, and `verificationService/requestFlow.js`, plus socket/role event wiring to `verificationService/hooks.js`; `verificationService/index.js` is now a thin composition layer.
 - Finished `videoAuthService` decomposition by extracting MediaMTX stream parsing to `videoAuthService/streamParsing.js`, role/mode/stream policy checks to `videoAuthService/policy.js`, and auth HTTP transport wiring to `videoAuthService/httpRoute.js`; `videoAuthService/index.js` is now a thin composition layer.
+- Finished `privateRoverAccessRequestService` decomposition by extracting in-memory maps/events/constants to `privateRoverAccessRequestService/state.js`, shared keying/lookup helpers to `privateRoverAccessRequestService/helpers.js`, request/grant business logic to `privateRoverAccessRequestService/core.js`, and rover/socket event wiring to `privateRoverAccessRequestService/hooks.js`; `privateRoverAccessRequestService/index.js` is now a thin composition layer.
 
 ## WebUI frontend
 ### BIGGEST OFFENDERS
