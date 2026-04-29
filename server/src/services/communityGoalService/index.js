@@ -8,7 +8,7 @@ const logger = require('../../globals/logger').child('communityGoalService');
 const { isAdmin } = require('../roleService');
 const { publishEvent } = require('../eventBus');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'community-goal.json');
 const MAX_GOAL_LENGTH = 240;
 

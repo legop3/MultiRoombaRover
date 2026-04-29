@@ -20,7 +20,7 @@ const {
   createJsonStore,
 } = require('../identityService');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'verified-users.json');
 
 const verificationEvents = new EventEmitter();

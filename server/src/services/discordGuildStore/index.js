@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../../globals/logger').child('discordGuildStore');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'discord-guilds.json');
 const VALID_MODES = new Set(['global', 'private']);
 

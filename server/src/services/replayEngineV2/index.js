@@ -20,7 +20,7 @@ const sharp = require('sharp');
 const execFileAsync = promisify(execFile);
 
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
-const SEGMENT_ROOT = path.resolve(__dirname, '..', '..', 'data', 'replay-segments');
+const SEGMENT_ROOT = path.resolve(__dirname, '..', '..', '..', 'data', 'replay-segments');
 const SEGMENT_SECONDS = Math.max(1, Number.parseInt(process.env.REPLAY_SEGMENT_SECONDS || '1', 10));
 const BUFFER_SECONDS = Math.max(20, Number.parseInt(process.env.REPLAY_BUFFER_SECONDS || '45', 10));
 const CLEANUP_INTERVAL_MS = 10_000;

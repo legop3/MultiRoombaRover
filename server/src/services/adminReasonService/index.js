@@ -8,7 +8,7 @@ const logger = require('../../globals/logger').child('adminReasonService');
 const { isAdmin } = require('../roleService');
 const { publishEvent } = require('../eventBus');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'admin-reason.json');
 const MAX_REASON_LENGTH = 240;
 

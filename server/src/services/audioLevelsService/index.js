@@ -12,7 +12,7 @@ const roverManager = require('../roverManager');
 const { issueCommand } = require('../commandService');
 
 const audioLevelsEvents = new EventEmitter();
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'audio-levels.json');
 const config = loadConfig();
 const configuredDefaults = config.audioLevels || {};

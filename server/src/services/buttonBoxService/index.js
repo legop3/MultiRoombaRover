@@ -23,7 +23,7 @@ const {
 } = require('../homeAssistantService');
 const { getRequestIp, isLocalNetwork, normalizeIp } = require('../../helpers/ipResolver');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const DATA_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const STORE_PATH = path.join(DATA_DIR, 'buttonbox-state.json');
 const BUTTON_COUNT = 4;
 const STORE_VERSION = 1;
