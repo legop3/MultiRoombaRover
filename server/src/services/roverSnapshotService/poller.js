@@ -5,12 +5,12 @@ const EventEmitter = require('events');
 const fs = require('fs/promises');
 const path = require('path');
 const logger = require('../../globals/logger').child('roverSnapshot');
+const { resolveRoverSnapshotDir } = require('../../helpers/dataPaths');
 
-const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
+const SNAPSHOT_DIR = resolveRoverSnapshotDir();
 const POLL_INTERVAL_MS = 300;
 const roverState = new Map();
 const events = new EventEmitter();
-const readCounts = new Map();
 let pollTimer = null;
 
 function markState(id, updates = {}) {
@@ -37,11 +37,6 @@ function createRoverSnapshotPoller({ roverManager }) {
       const buffer = await fs.readFile(filePath);
       const ts = stats.mtimeMs || Date.now();
       markState(id, { frame: buffer, ts, error: null, failures: 0, mtimeMs: stats.mtimeMs });
-      const count = (readCounts.get(id) || 0) + 1;
-      readCounts.set(id, count);
-      if (count === 1 || count % 30 === 0) {
-        logger.warn('Snapshot read ok', { id, count, bytes: buffer.length, ts, mtimeMs: stats.mtimeMs });
-      }
       events.emit('frame', { id, buffer, ts });
       return { frame: buffer, ts };
     } catch (err) {

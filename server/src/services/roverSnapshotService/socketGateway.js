@@ -9,7 +9,6 @@ const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
 const SUBSCRIBE_LIMIT = 50;
 const SUBSCRIBE_WINDOW_MS = 10000;
 const STREAM_INTERVAL_MS = 333;
-const FALLBACK_REFRESH_MS = 500;
 
 function passesMode(socket) {
   const mode = getMode();
@@ -21,19 +20,11 @@ function passesMode(socket) {
   return true;
 }
 
-function registerRoverSnapshotSocketGateway({
-  roverManager,
-  roverSnapshotEvents,
-  getRoverSnapshotState,
-  fetchSnapshotNow,
-}) {
+function registerRoverSnapshotSocketGateway({ roverManager, roverSnapshotEvents, getRoverSnapshotState }) {
   const roverSubscribers = new Map();
   const socketSubscriptions = new Map();
   const subscribeBuckets = new Map();
   const lastSentBySocket = new Map();
-  const sentCounts = new Map();
-  const lastForcedTsBySocket = new Map();
-  let fallbackTimer = null;
 
   function addSubscription(socket, roverId) {
     if (!roverSubscribers.has(roverId)) roverSubscribers.set(roverId, new Set());
@@ -78,29 +69,6 @@ function registerRoverSnapshotSocketGateway({
     socket.emit('roverSnapshot:status', { id: roverId, ...status });
   }
 
-  function ensureFallbackTimer() {
-    if (fallbackTimer || typeof fetchSnapshotNow !== 'function') return;
-    fallbackTimer = setInterval(() => {
-      socketSubscriptions.forEach((roverIds, socketId) => {
-        const socket = io.sockets.sockets.get(socketId);
-        if (!socket) return;
-        roverIds.forEach(async (roverId) => {
-          try {
-            const result = await fetchSnapshotNow(String(roverId), { force: true });
-            if (!result?.frame) return;
-            const key = `${socketId}:${roverId}`;
-            const prevTs = lastForcedTsBySocket.get(key) || 0;
-            if ((result.ts || 0) <= prevTs) return;
-            lastForcedTsBySocket.set(key, result.ts || Date.now());
-            sendFrame(socket, roverId, { ts: result.ts || Date.now() }, result.frame);
-          } catch (err) {
-            logger.warn('Fallback refresh failed', { socketId, roverId, err: err.message });
-          }
-        });
-      });
-    }, FALLBACK_REFRESH_MS);
-  }
-
   roverSnapshotEvents.on('frame', ({ id, buffer, ts }) => {
     const bucket = roverSubscribers.get(id);
     if (!bucket || !buffer) return;
@@ -116,12 +84,6 @@ function registerRoverSnapshotSocketGateway({
       const now = ts || Date.now();
       if (now - lastSent < STREAM_INTERVAL_MS) return;
       lastMap.set(id, now);
-      const key = `${socketId}:${id}`;
-      const sentCount = (sentCounts.get(key) || 0) + 1;
-      sentCounts.set(key, sentCount);
-      if (sentCount === 1 || sentCount % 30 === 0) {
-        logger.warn('Snapshot frame sent', { socketId, roverId: id, sentCount, ts, bytes: buffer.length });
-      }
       sendFrame(socket, id, { ts }, buffer);
     });
   });
@@ -137,7 +99,6 @@ function registerRoverSnapshotSocketGateway({
   });
 
   io.on('connection', (socket) => {
-    logger.warn('Rover snapshot gateway saw socket connection', { socketId: socket.id });
     socket.on('roverSnapshot:subscribe', (payload = {}, cb = () => {}) => {
       const visibleRoster = roverManager.getRosterForSocket(socket);
       const visibleIds = visibleRoster.map((rover) => String(rover.id));
@@ -152,22 +113,8 @@ function registerRoverSnapshotSocketGateway({
         if (!passesMode(socket)) throw new Error('Not authorized for rover snapshots');
         const rosterIds = new Set(visibleIds);
         const validIds = uniqueIds.filter((id) => rosterIds.has(String(id)));
-        logger.warn('Rover snapshot subscribe', {
-          socketId: socket.id,
-          requestedIds: uniqueIds,
-          visibleIds,
-          subscribedIds: validIds,
-        });
         validIds.forEach((roverId) => addSubscription(socket, roverId));
-        ensureFallbackTimer();
-        validIds.forEach(async (roverId) => {
-          if (typeof fetchSnapshotNow === 'function') {
-            try {
-              await fetchSnapshotNow(String(roverId), { force: true });
-            } catch (err) {
-              logger.warn('Immediate snapshot fetch failed', { roverId, err: err.message });
-            }
-          }
+        validIds.forEach((roverId) => {
           const state = getRoverSnapshotState(roverId);
           if (state?.frame) sendFrame(socket, roverId, { ts: state.ts }, state.frame);
           sendStatus(socket, roverId, { ts: state?.ts || null, error: state?.error || null });
@@ -192,9 +139,6 @@ function registerRoverSnapshotSocketGateway({
       removeAllSubscriptions(socket.id);
       subscribeBuckets.delete(socket.id);
       lastSentBySocket.delete(socket.id);
-      Array.from(lastForcedTsBySocket.keys()).forEach((key) => {
-        if (key.startsWith(`${socket.id}:`)) lastForcedTsBySocket.delete(key);
-      });
     });
   });
 }
