@@ -8,7 +8,7 @@ const { getRoomCameras } = require('../roomCameraService');
 const { getRoomCameraState } = require('../roomCameraService');
 const { getReplayHealthSnapshot } = require('../replayEngineV2');
 
-const SNAPSHOT_DIR = path.resolve(__dirname, '..', '..', '..', 'data', 'rover-snapshots');
+const ROVER_SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
 const HEALTH_INTERVAL_MS = 5000;
 const ROOM_CAMERA_STALE_MS = 5000;
 const ROVER_SNAPSHOT_STALE_MS = 5000;
@@ -30,7 +30,7 @@ async function collectSnapshotHealth(now) {
   }));
   const roverSnapshots = [];
   for (const rover of rovers) {
-    const filePath = path.join(SNAPSHOT_DIR, `${rover.id}.jpg`);
+    const filePath = path.join(ROVER_SNAPSHOT_DIR, `${rover.id}.jpg`);
     let exists = false;
     let size = 0;
     let updatedAt = null;
