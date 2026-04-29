@@ -99,6 +99,11 @@ function createTransport(deps) {
     if (!enabled) throw new Error('Home Assistant not configured');
     if (!runtime.connection) throw new Error('Home Assistant not connected');
     if (!domain || !service) throw new Error('domain and service required');
+    logger.info('Home Assistant outbound service call', {
+      domain: String(domain),
+      service: String(service),
+      serviceData: serviceData && typeof serviceData === 'object' ? { ...serviceData } : serviceData,
+    });
     await callService(runtime.connection, String(domain), String(service), serviceData || {});
   }
 
