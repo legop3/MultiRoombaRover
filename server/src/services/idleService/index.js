@@ -4,19 +4,32 @@
 const logger = require('../../globals/logger').child('idleService');
 const { getActiveDrivers, turnEvents } = require('../turnService');
 const roverManager = require('../roverManager');
+const { getRecentDriveActivity } = require('../commandService');
 const { IDLE_TIMEOUT_MS } = require('./constants');
 const { runtime } = require('./state');
 const { runIdleActions } = require('./actions');
 
-function getActiveDriverCount() {
+function getActivitySnapshot() {
   const active = getActiveDrivers();
   const turnCount = active && typeof active === 'object' ? Object.keys(active).length : 0;
-  if (turnCount > 0) return turnCount;
+  const activeByTurn = turnCount;
+
   let liveCount = 0;
   roverManager.rovers.forEach((record) => {
     if (record?.drivers?.size > 0) liveCount += 1;
   });
-  return liveCount;
+  const activeByRoverDrivers = liveCount;
+
+  const recentDriveEvents = getRecentDriveActivity(IDLE_TIMEOUT_MS, { excludeAdmins: false });
+  const activeByRecentDrive = recentDriveEvents.length;
+
+  const totalActive = Math.max(activeByTurn, activeByRoverDrivers, activeByRecentDrive);
+  return {
+    activeByTurn,
+    activeByRoverDrivers,
+    activeByRecentDrive,
+    totalActive,
+  };
 }
 
 function clearIdleTimer() {
@@ -33,7 +46,9 @@ function scheduleIdleTimer() {
   runtime.timer = setTimeout(async () => {
     runtime.timer = null;
     runtime.deadlineAt = null;
-    if (getActiveDriverCount() > 0) {
+    const activity = getActivitySnapshot();
+    if (activity.totalActive > 0) {
+      logger.info('Idle automation skipped; active control detected', activity);
       return;
     }
     runtime.lastTriggeredAt = Date.now();
@@ -48,7 +63,8 @@ function scheduleIdleTimer() {
 }
 
 function refreshIdleState() {
-  if (getActiveDriverCount() > 0) {
+  const activity = getActivitySnapshot();
+  if (activity.totalActive > 0) {
     clearIdleTimer();
     return;
   }

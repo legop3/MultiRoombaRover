@@ -94,20 +94,24 @@ io.on('connection', (socket) => {
         throw new Error('Not your turn or no control');
       }
       const driveDirect = payload?.driveDirect;
-      if (type === 'drive' && driveDirect && !isAdminSocket) {
-        const safeDrive = roverManager.applyPrivateDriveSafety(roverId, socket, driveDirect);
-        if (safeDrive) {
-          payload.driveDirect = safeDrive;
+      if (type === 'drive' && driveDirect) {
+        if (!isAdminSocket) {
+          const safeDrive = roverManager.applyPrivateDriveSafety(roverId, socket, driveDirect);
+          if (safeDrive) {
+            payload.driveDirect = safeDrive;
+          }
         }
         const left = Number(payload?.driveDirect?.left);
         const right = Number(payload?.driveDirect?.right);
         const speed = Math.max(Math.abs(left), Math.abs(right));
-        const blockedUntil = driveCooldowns.get(roverId);
-        if (blockedUntil && Date.now() < blockedUntil && speed > 0) {
-          const reason = isLockdownAdmin(socket)
-            ? 'Drive blocked: cooldown'
-            : 'Drive blocked: safety cooldown';
-          throw new Error(reason);
+        if (!isAdminSocket) {
+          const blockedUntil = driveCooldowns.get(roverId);
+          if (blockedUntil && Date.now() < blockedUntil && speed > 0) {
+            const reason = isLockdownAdmin(socket)
+              ? 'Drive blocked: cooldown'
+              : 'Drive blocked: safety cooldown';
+            throw new Error(reason);
+          }
         }
         if (speed > 0) {
           let direction = 'turn';
