@@ -43,6 +43,10 @@ function createSpectatorAccess(deps) {
         privateNoUsersSince.delete(record.id);
         continue;
       }
+      if (record.drivers && record.drivers.size > 0) {
+        privateNoUsersSince.delete(record.id);
+        continue;
+      }
       if (onlineCount > 0) {
         privateNoUsersSince.delete(record.id);
         continue;

@@ -227,8 +227,16 @@ function turnOffAllRoverNightVision() {
 
 function getActiveDriverCount() {
   const active = getActiveDrivers();
-  if (!active || typeof active !== 'object') return 0;
-  return Object.keys(active).length;
+  const turnCount = active && typeof active === 'object' ? Object.keys(active).length : 0;
+  if (turnCount > 0) return turnCount;
+  // Fallback: trust live rover driver sets if turn-service tracking is temporarily out of sync.
+  let liveCount = 0;
+  roverManager.rovers.forEach((record) => {
+    if (record?.drivers?.size > 0) {
+      liveCount += 1;
+    }
+  });
+  return liveCount;
 }
 
 function hasActiveDrivers() {
