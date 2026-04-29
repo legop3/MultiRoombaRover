@@ -21,7 +21,7 @@ const liftConfig = haConfig.lift || {};
 
 const upSwitchId = String(liftConfig.upSwitch || '').trim();
 const downSwitchId = String(liftConfig.downSwitch || '').trim();
-const interlockMs = Math.max(250, Number(liftConfig.interlockMs) || 2000);
+const interlockMs = Math.max(250, Number(liftConfig.interlockMs) || 4000);
 const commandCooldownMs = Math.max(interlockMs, Number(liftConfig.commandCooldownMs) || 3000);
 
 const state = {
