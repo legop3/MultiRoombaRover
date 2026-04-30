@@ -56,6 +56,7 @@ export default function VipNeatoCard({
   const charging = Boolean(neato?.telemetry?.chargingActive);
 
   const uiStateLabel = humanizeUiState(neato?.telemetry?.uiState);
+  const uiStateRaw = normalizeState(neato?.telemetry?.uiState).toUpperCase();
   const battery = neato?.telemetry?.batteryPercent;
   const batteryLabel = Number.isFinite(battery) ? `${battery}%` : '--';
   const voltage = neato?.telemetry?.batteryVoltage;
@@ -73,7 +74,8 @@ export default function VipNeatoCard({
   const canClearErrors = Boolean(controls?.clearErrors?.available);
 
   const primaryAction = useMemo(() => {
-    if (docked) {
+    const looksDockedByState = uiStateRaw.includes('STATE_IDLE') || uiStateRaw.includes('STATE_STANDBY');
+    if (docked || looksDockedByState) {
       return {
         key: 'start',
         label: 'Start cleaning',
@@ -91,7 +93,7 @@ export default function VipNeatoCard({
       canRun: canSendHome,
       fn: onSendHome,
     };
-  }, [docked, canStart, onStart, canSendHome, onSendHome]);
+  }, [docked, uiStateRaw, canStart, onStart, canSendHome, onSendHome]);
 
   const canRunPrimary = configured && connected && primaryAction.canRun;
   const canRunLocate = configured && connected && canLocate;
