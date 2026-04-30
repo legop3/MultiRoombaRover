@@ -84,7 +84,7 @@ async function raiseLift() {
 
 const idleActions = [
   turnOffRoomControls,
-  dockAllRovers,
+  // dockAllRovers,
   disableAllRoverNightVision,
   sendNeatoHome,
   raiseLift,
