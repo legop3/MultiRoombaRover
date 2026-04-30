@@ -1,7 +1,7 @@
 // Vip Neato Card
 // Purpose: Defines the Vip Neato Card module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 function normalizeState(value) {
   return String(value || '').trim();
@@ -56,7 +56,6 @@ export default function VipNeatoCard({
   const charging = Boolean(neato?.telemetry?.chargingActive);
 
   const uiStateLabel = humanizeUiState(neato?.telemetry?.uiState);
-  const uiStateRaw = normalizeState(neato?.telemetry?.uiState).toUpperCase();
   const battery = neato?.telemetry?.batteryPercent;
   const batteryLabel = Number.isFinite(battery) ? `${battery}%` : '--';
   const voltage = neato?.telemetry?.batteryVoltage;
@@ -73,29 +72,8 @@ export default function VipNeatoCard({
   const canLocate = Boolean(controls?.locate?.available);
   const canClearErrors = Boolean(controls?.clearErrors?.available);
 
-  const primaryAction = useMemo(() => {
-    const looksDockedByState = uiStateRaw.includes('STATE_IDLE') || uiStateRaw.includes('STATE_STANDBY');
-    if (docked || looksDockedByState) {
-      return {
-        key: 'start',
-        label: 'Start cleaning',
-        pending: 'Starting...',
-        toneClass: 'bg-emerald-600 hover:bg-emerald-500 text-white',
-        canRun: canStart,
-        fn: onStart,
-      };
-    }
-    return {
-      key: 'home',
-      label: 'Send to dock',
-      pending: 'Sending...',
-      toneClass: 'bg-sky-600 hover:bg-sky-500 text-white',
-      canRun: canSendHome,
-      fn: onSendHome,
-    };
-  }, [docked, uiStateRaw, canStart, onStart, canSendHome, onSendHome]);
-
-  const canRunPrimary = configured && connected && primaryAction.canRun;
+  const canRunStart = configured && connected && canStart;
+  const canRunSendHome = configured && connected && canSendHome;
   const canRunLocate = configured && connected && canLocate;
   const canRunClearErrors = configured && connected && canClearErrors;
 
@@ -125,7 +103,7 @@ export default function VipNeatoCard({
         <div className="relative flex items-center justify-center min-h-[1.5rem]">
           <div className="text-center">
             <p className="text-sm text-slate-100">Neato Controls</p>
-            <p className="text-xs text-slate-400">Control the autonomous Neato robovac</p>
+            <p className="text-xs text-slate-400">Control the autonomous Neato robovac. Be nice to him.</p>
           </div>
           <span
             className={`absolute right-0 inline-flex w-auto rounded px-1 py-0.25 text-xs font-semibold ${metricToneClass(headerTone)}`}
@@ -135,37 +113,49 @@ export default function VipNeatoCard({
         </div>
 
         <section className="surface-muted px-0.5 py-0.5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-0.5">
-            <div className="grid gap-0.5">
-              <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
-                <div className="text-xs text-slate-300">State</div>
-                <div className="text-base font-semibold text-slate-100">{primaryState}</div>
-              </div>
-              <button
-                type="button"
-                disabled={!canRunPrimary || Boolean(working)}
-                onClick={() => runAction(primaryAction.key, primaryAction.fn)}
-                className={`rounded-md px-1 py-1 text-base font-semibold transition disabled:opacity-50 ${primaryAction.toneClass}`}
-              >
-                {working === primaryAction.key ? primaryAction.pending : primaryAction.label}
-              </button>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-0.5">
+            <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
+              <div className="text-xs text-slate-300">State</div>
+              <div className="text-base font-semibold text-slate-100">{primaryState}</div>
             </div>
             <button
               type="button"
-              disabled={!canRunLocate || Boolean(working)}
-              onClick={() => runAction('locate', onLocate)}
-              className="rounded-md bg-fuchsia-600 px-1 py-0.75 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:opacity-50"
+              disabled={!canRunStart || Boolean(working)}
+              onClick={() => runAction('start', onStart)}
+              className="rounded-md border border-sky-300 bg-emerald-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-emerald-500 disabled:opacity-50"
             >
-              {working === 'locate' ? 'Playing...' : 'Play sound'}
+              {working === 'start' ? 'Starting...' : 'Start cleaning'}
             </button>
             <button
               type="button"
-              disabled={!canRunClearErrors || Boolean(working)}
-              onClick={() => runAction('clearErrors', onClearErrors)}
-              className="rounded-md bg-amber-500 px-1 py-0.75 text-sm font-semibold text-slate-900 transition hover:bg-amber-400 disabled:opacity-50"
+              disabled={!canRunSendHome || Boolean(working)}
+              onClick={() => runAction('sendHome', onSendHome)}
+              className="rounded-md border border-sky-300 bg-sky-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-sky-500 disabled:opacity-50"
             >
-              {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
+              {working === 'sendHome' ? 'Sending...' : 'Send to dock'}
             </button>
+            <div className="grid grid-cols-2 md:grid-cols-1 gap-0.5">
+              <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
+                <button
+                  type="button"
+                  disabled={!canRunLocate || Boolean(working)}
+                  onClick={() => runAction('locate', onLocate)}
+                  className="w-full rounded-md border border-sky-300 bg-fuchsia-600 px-1 py-0.5 text-xs font-semibold text-white transition hover:border-sky-500 hover:bg-fuchsia-500 disabled:opacity-50"
+                >
+                  {working === 'locate' ? 'Playing...' : 'Play sound'}
+                </button>
+              </div>
+              <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
+                <button
+                  type="button"
+                  disabled={!canRunClearErrors || Boolean(working)}
+                  onClick={() => runAction('clearErrors', onClearErrors)}
+                  className="w-full rounded-md border border-sky-300 bg-amber-500 px-1 py-0.5 text-xs font-semibold text-slate-900 transition hover:border-sky-500 hover:bg-amber-400 disabled:opacity-50"
+                >
+                  {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -175,7 +165,12 @@ export default function VipNeatoCard({
             <StatusTile label="Voltage" value={voltageLabel} tone={voltage == null ? 'muted' : 'info'} />
             <StatusTile label="Docked" value={docked ? 'Yes' : 'No'} tone={docked ? 'info' : 'muted'} />
             <StatusTile label="Charging" value={charging ? 'Yes' : 'No'} tone={charging ? 'info' : 'muted'} />
-            <StatusTile label="UI state" value={uiStateLabel} tone="muted" valueClass="truncate" />
+            <StatusTile
+              label="UI state"
+              value={uiStateLabel}
+              tone="muted"
+              valueClass="truncate"
+            />
             <StatusTile
               label="Robot error"
               value={robotError}
@@ -191,7 +186,7 @@ export default function VipNeatoCard({
           </div>
         </section>
 
-        {!configured || !connected || !primaryAction.canRun || !canLocate || !canClearErrors ? (
+        {!configured || !connected || !canStart || !canSendHome || !canLocate || !canClearErrors ? (
           <p className="text-xs text-slate-400 text-center">
             {!configured
               ? 'Set homeAssistant.neato.device in server config to enable Neato controls.'

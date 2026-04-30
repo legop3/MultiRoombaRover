@@ -78,9 +78,36 @@ function hasEntity(entityIdValue) {
   return Boolean(readRaw(entityIdValue));
 }
 
+function isEntityAvailable(entityIdValue) {
+  const raw = readRaw(entityIdValue);
+  if (!raw) return false;
+  const state = String(raw.state ?? '').trim().toLowerCase();
+  if (!state) return false;
+  return state !== 'unavailable';
+}
+
+function requiredEntityIds() {
+  return [
+    ENTITY_IDS.buttons.start,
+    ENTITY_IDS.buttons.sendHome,
+    ENTITY_IDS.buttons.locate,
+    ENTITY_IDS.buttons.clearErrors,
+    ENTITY_IDS.sensors.batteryPercent,
+    ENTITY_IDS.sensors.batteryVoltage,
+    ENTITY_IDS.binarySensors.chargingActive,
+    ENTITY_IDS.binarySensors.extPowerPresent,
+    ENTITY_IDS.textSensors.uiState,
+    ENTITY_IDS.textSensors.robotError,
+    ENTITY_IDS.textSensors.robotAlert,
+  ].filter(Boolean);
+}
+
 function buildState() {
   const configured = Boolean(device);
-  const connected = isHomeAssistantConnected();
+  const haConnected = isHomeAssistantConnected();
+  const requiredIds = requiredEntityIds();
+  const entitiesAvailable = requiredIds.length > 0 && requiredIds.every((id) => isEntityAvailable(id));
+  const connected = Boolean(haConnected && entitiesAvailable);
   const enabled = Boolean(homeAssistantEnabled && configured);
 
   const controls = {
