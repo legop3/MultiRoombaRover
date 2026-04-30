@@ -50,6 +50,7 @@ function isCharging(sensors) {
 function buildRoverStatusSnapshot(record) {
   if (!record) return null;
   const sensors = record.lastSensor?.decoded || record.lastSensor?.sensors || null;
+  const oiMode = String(sensors?.oiMode?.label || 'unknown').toLowerCase();
   return {
     id: record.id,
     name: record.meta?.name || record.id,
@@ -61,7 +62,7 @@ function buildRoverStatusSnapshot(record) {
     voltageMv: sensors?.voltageMv ?? null,
     currentMa: sensors?.currentMa ?? null,
     batteryState: record.batteryState,
-    oiMode: sensors?.oiMode?.label || 'unknown',
+    oiMode,
   };
 }
 
@@ -85,16 +86,16 @@ function buildBatteryStatusEmbed({ color = 0x2196f3, records = [], includeOi = t
     ].join(' ');
 
     const lines = [
-      `Dock: ${dockLabel}`,
-      `Charging: ${chargingLabel}`,
-      `Battery: ${formatChargeState(snapshot.batteryState)}`,
-      `Voltage: ${formatVoltage(snapshot.voltageMv)}`,
-      `Current: ${formatCurrent(snapshot.currentMa)}`,
+      `${formatDockEmoji(snapshot.docked)} Dock: ${dockLabel}`,
+      `${formatChargeEmoji(snapshot.charging)} Charging: ${chargingLabel}`,
+      `${formatBatteryEmoji(snapshot.batteryState)} Battery: ${formatChargeState(snapshot.batteryState)}`,
+      `🔌 Voltage: ${formatVoltage(snapshot.voltageMv)}`,
+      `📈 Current: ${formatCurrent(snapshot.currentMa)}`,
     ];
     if (includeOi) {
-      lines.push(`OI: ${snapshot.oiMode} ${formatOiEmoji(snapshot.oiMode)}`);
+      lines.push(`${formatOiEmoji(snapshot.oiMode)} OI mode: ${snapshot.oiMode}`);
     }
-    lines.push(`Lock: ${lockLabel}`);
+    lines.push(`${formatLockEmoji(snapshot.locked)} Lock: ${lockLabel}`);
 
     embed.addFields({
       name: `${header} ${snapshot.name}`,

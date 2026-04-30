@@ -90,8 +90,19 @@ function createDmModerationHandlers(deps) {
     }
     const linked = getRequestByMessageId(reaction.message?.id);
     if (!linked?.request || linked.request.status !== 'pending') return;
-    if (emoji === APPROVE) approveRequest(linked.request.id, user.id);
-    else denyRequest(linked.request.id, user.id);
+    if (emoji === APPROVE) {
+      approveRequest(linked.request.id, user.id);
+      await reaction.message.reply({
+        content: `✅ Verification request \`${linked.request.id}\` approved by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+        allowedMentions: { parse: [] },
+      });
+    } else {
+      denyRequest(linked.request.id, user.id);
+      await reaction.message.reply({
+        content: `❌ Verification request \`${linked.request.id}\` denied by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+        allowedMentions: { parse: [] },
+      });
+    }
   }
 
   async function handlePrivateAccessReaction(reaction, user) {
@@ -103,8 +114,19 @@ function createDmModerationHandlers(deps) {
     }
     const linked = getPrivateAccessRequestByMessageId(reaction.message?.id);
     if (!linked?.request || linked.request.status !== 'pending') return;
-    if (emoji === APPROVE) approvePrivateAccessRequest(linked.request.id, user.id);
-    else denyPrivateAccessRequest(linked.request.id, user.id);
+    if (emoji === APPROVE) {
+      approvePrivateAccessRequest(linked.request.id, user.id);
+      await reaction.message.reply({
+        content: `✅ Private access request \`${linked.request.id}\` approved by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+        allowedMentions: { parse: [] },
+      });
+    } else {
+      denyPrivateAccessRequest(linked.request.id, user.id);
+      await reaction.message.reply({
+        content: `❌ Private access request \`${linked.request.id}\` denied by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+        allowedMentions: { parse: [] },
+      });
+    }
   }
 
   return {
