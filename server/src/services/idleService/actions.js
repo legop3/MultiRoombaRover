@@ -13,6 +13,21 @@ const {
 } = require('./constants');
 
 async function turnOffRoomControls() {
+  const lightPolicy = homeAssistantService.getLightPolicyState?.() || null;
+  const lockState = lightPolicy?.lockState || null;
+  if (lockState === 'on') {
+    logger.info('Idle room-controls off skipped because room controls are locked on', {
+      lockState,
+      source: 'idleService:turnOffRoomControls',
+    });
+    return {
+      action: 'roomControlsOff',
+      skipped: true,
+      reason: 'lightsLockedOn',
+      lockState,
+    };
+  }
+
   const before = homeAssistantService.getState?.().entities || [];
   const summary = await homeAssistantService.setAllControllableEntitiesState('off', {
     source: 'idleService:turnOffRoomControls',

@@ -93,16 +93,27 @@ function createDmModerationHandlers(deps) {
     if (emoji === APPROVE) {
       approveRequest(linked.request.id, user.id);
       await reaction.message.reply({
-        content: `✅ Verification request \`${linked.request.id}\` approved by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+        content: [
+          `✅ Verification request \`${linked.request.id}\` approved by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+          `Nickname: ${sanitizeMentions(linked.request.nickname || 'unknown')}`,
+          `Identity Key: \`${String(linked.request.cookieUserId || 'unknown')}\``,
+        ].join('\n'),
         allowedMentions: { parse: [] },
       });
     } else {
       denyRequest(linked.request.id, user.id);
       await reaction.message.reply({
-        content: `❌ Verification request \`${linked.request.id}\` denied by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+        content: [
+          `❌ Verification request \`${linked.request.id}\` denied by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+          `Nickname: ${sanitizeMentions(linked.request.nickname || 'unknown')}`,
+          `Identity Key: \`${String(linked.request.cookieUserId || 'unknown')}\``,
+        ].join('\n'),
         allowedMentions: { parse: [] },
       });
     }
+    try {
+      await reaction.message.reactions.removeAll();
+    } catch {}
   }
 
   async function handlePrivateAccessReaction(reaction, user) {
@@ -117,16 +128,27 @@ function createDmModerationHandlers(deps) {
     if (emoji === APPROVE) {
       approvePrivateAccessRequest(linked.request.id, user.id);
       await reaction.message.reply({
-        content: `✅ Private access request \`${linked.request.id}\` approved by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+        content: [
+          `✅ Private access request \`${linked.request.id}\` approved by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+          `Rover: ${sanitizeMentions(linked.request.roverName || linked.request.roverId || 'unknown')} (\`${String(linked.request.roverId || 'unknown')}\`)`,
+          `Requester: ${sanitizeMentions(linked.request.requester?.nickname || 'unknown')}`,
+        ].join('\n'),
         allowedMentions: { parse: [] },
       });
     } else {
       denyPrivateAccessRequest(linked.request.id, user.id);
       await reaction.message.reply({
-        content: `❌ Private access request \`${linked.request.id}\` denied by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+        content: [
+          `❌ Private access request \`${linked.request.id}\` denied by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
+          `Rover: ${sanitizeMentions(linked.request.roverName || linked.request.roverId || 'unknown')} (\`${String(linked.request.roverId || 'unknown')}\`)`,
+          `Requester: ${sanitizeMentions(linked.request.requester?.nickname || 'unknown')}`,
+        ].join('\n'),
         allowedMentions: { parse: [] },
       });
     }
+    try {
+      await reaction.message.reactions.removeAll();
+    } catch {}
   }
 
   return {

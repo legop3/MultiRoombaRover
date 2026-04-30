@@ -13,7 +13,7 @@ function badgeClass(tone) {
 function positionLabel(value) {
   if (value === 'up') return 'Up';
   if (value === 'down') return 'Down';
-  if (value === 'stopped') return 'Stopped';
+  if (value === 'stopped') return 'Transitioning...';
   if (value === 'conflict') return 'Conflict';
   return '--';
 }
@@ -78,7 +78,7 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
               Controls are disabled while the lift is moving, otherwise it's tiny brain would get confused.
             </p>
             {!busy && cooldownActive ? (
-              <p className="text-xs text-slate-400">Try again in {cooldownSeconds}s.</p>
+              <p className="text-xs text-slate-400">About {cooldownSeconds}s remaining.</p>
             ) : null}
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
               type="button"
               disabled={!canRun}
               onClick={() => run('down', onDown)}
-              className={`rounded-md px-1 py-0.75 text-base font-semibold transition disabled:opacity-50 ${position === 'down' || activeTarget === 'down' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-100 hover:bg-slate-600'}`}
+              className={`button-dark w-full text-sm disabled:opacity-50 ${position === 'down' || activeTarget === 'down' ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
             >
               {working === 'down' || activeTarget === 'down' ? 'Lowering...' : 'Down'}
             </button>
@@ -114,7 +114,7 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
               type="button"
               disabled={!canRun}
               onClick={() => run('up', onUp)}
-              className={`rounded-md px-1 py-0.75 text-base font-semibold transition disabled:opacity-50 ${position === 'up' || activeTarget === 'up' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-100 hover:bg-slate-600'}`}
+              className={`button-dark w-full text-sm disabled:opacity-50 ${position === 'up' || activeTarget === 'up' ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
             >
               {working === 'up' || activeTarget === 'up' ? 'Raising...' : 'Up'}
             </button>

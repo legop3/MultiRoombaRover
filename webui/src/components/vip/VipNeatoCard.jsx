@@ -24,14 +24,13 @@ function metricToneClass(tone) {
   if (tone === 'good') return 'bg-emerald-600 text-white';
   if (tone === 'warn') return 'bg-amber-500 text-slate-900';
   if (tone === 'danger') return 'bg-rose-600 text-white';
-  if (tone === 'info') return 'bg-sky-600 text-white';
   return 'bg-slate-700 text-slate-100';
 }
 
-function StatusTile({ label, value, tone = 'muted', valueClass = '' }) {
+function StatusTile({ label, value, tone = 'muted', valueClass = '', hideLabel = false }) {
   return (
     <div className={`rounded-md px-1 py-0.75 text-center ${metricToneClass(tone)}`}>
-      <div className="text-[0.72rem] opacity-90">{label}</div>
+      {!hideLabel ? <div className="text-[0.72rem] opacity-90">{label}</div> : null}
       <div className={`text-sm font-semibold ${valueClass}`} title={String(value || '')}>
         {value}
       </div>
@@ -56,6 +55,7 @@ export default function VipNeatoCard({
   const charging = Boolean(neato?.telemetry?.chargingActive);
 
   const uiStateLabel = humanizeUiState(neato?.telemetry?.uiState);
+  const robotStateRaw = normalizeState(neato?.telemetry?.robotState) || '--';
   const battery = neato?.telemetry?.batteryPercent;
   const batteryLabel = Number.isFinite(battery) ? `${battery}%` : '--';
   const voltage = neato?.telemetry?.batteryVoltage;
@@ -112,30 +112,26 @@ export default function VipNeatoCard({
           </span>
         </div>
 
-        <section className="surface-muted px-0.5 py-0.5">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-0.5">
-            <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
-              <div className="text-xs text-slate-300">State</div>
-              <div className="text-base font-semibold text-slate-100">{primaryState}</div>
-            </div>
-            <button
-              type="button"
-              disabled={!canRunStart || Boolean(working)}
-              onClick={() => runAction('start', onStart)}
-              className="rounded-md border border-sky-300 bg-emerald-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-emerald-500 disabled:opacity-50"
-            >
-              {working === 'start' ? 'Starting...' : 'Start cleaning'}
-            </button>
-            <button
-              type="button"
-              disabled={!canRunSendHome || Boolean(working)}
-              onClick={() => runAction('sendHome', onSendHome)}
-              className="rounded-md border border-sky-300 bg-sky-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-sky-500 disabled:opacity-50"
-            >
-              {working === 'sendHome' ? 'Sending...' : 'Send to dock'}
-            </button>
-            <div className="grid grid-cols-2 md:grid-cols-1 gap-0.5">
-              <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0.5">
+            <div className="surface-muted grid gap-0.5">
+              <p className="text-xs text-slate-300 text-center">Controls</p>
+              <button
+                type="button"
+                disabled={!canRunStart || Boolean(working)}
+                onClick={() => runAction('start', onStart)}
+                className="rounded-md border border-sky-300 bg-emerald-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {working === 'start' ? 'Starting...' : 'Start cleaning'}
+              </button>
+              <button
+                type="button"
+                disabled={!canRunSendHome || Boolean(working)}
+                onClick={() => runAction('sendHome', onSendHome)}
+                className="rounded-md border border-sky-300 bg-sky-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-sky-500 disabled:opacity-50"
+              >
+                {working === 'sendHome' ? 'Sending...' : 'Send to dock'}
+              </button>
+              <div className="grid grid-cols-2 gap-0.5">
                 <button
                   type="button"
                   disabled={!canRunLocate || Boolean(working)}
@@ -144,8 +140,6 @@ export default function VipNeatoCard({
                 >
                   {working === 'locate' ? 'Playing...' : 'Play sound'}
                 </button>
-              </div>
-              <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
                 <button
                   type="button"
                   disabled={!canRunClearErrors || Boolean(working)}
@@ -155,36 +149,51 @@ export default function VipNeatoCard({
                   {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
                 </button>
               </div>
+              <div className="surface-muted grid gap-0.5 pt-0.25">
+                <p className="text-xs text-slate-300 text-center">Power status</p>
+                <div className="grid grid-cols-2 gap-0.5">
+                  <StatusTile label="Battery" value={batteryLabel} tone={batteryTone} />
+                  <StatusTile label="Voltage" value={voltageLabel} tone="muted" />
+                  <StatusTile
+                    label="Docked"
+                    value={docked ? 'Docked' : 'Not docked'}
+                    tone={docked ? 'good' : 'muted'}
+                    hideLabel
+                  />
+                  <StatusTile
+                    label="Charging"
+                    value={charging ? 'Charging' : 'Not charging'}
+                    tone={charging ? 'good' : 'muted'}
+                    hideLabel
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="surface-muted grid gap-0.5">
+              <p className="text-xs text-slate-300 text-center">Robot Status</p>
+              <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                <div className="text-[0.72rem] text-slate-300">Robot state (raw)</div>
+                <div className="font-mono text-sm text-slate-100 break-all">{robotStateRaw}</div>
+              </div>
+              <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                <div className="text-[0.72rem] text-slate-300">Basic state</div>
+                <div className="font-mono text-sm text-slate-100 break-all">{primaryState}</div>
+              </div>
+              <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                <div className="text-[0.72rem] text-slate-300">UI state</div>
+                <div className="font-mono text-sm text-slate-100 break-all">{uiStateLabel}</div>
+              </div>
+              <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                <div className="text-[0.72rem] text-slate-300">Robot error</div>
+                <div className="font-mono text-sm text-slate-100 break-all">{robotError}</div>
+              </div>
+              <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                <div className="text-[0.72rem] text-slate-300">Robot alert</div>
+                <div className="font-mono text-sm text-slate-100 break-all">{robotAlert}</div>
+              </div>
             </div>
           </div>
-        </section>
-
-        <section className="surface-muted px-0.5 py-0.5">
-          <div className="grid gap-0.5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
-            <StatusTile label="Battery" value={batteryLabel} tone={batteryTone} />
-            <StatusTile label="Voltage" value={voltageLabel} tone={voltage == null ? 'muted' : 'info'} />
-            <StatusTile label="Docked" value={docked ? 'Yes' : 'No'} tone={docked ? 'info' : 'muted'} />
-            <StatusTile label="Charging" value={charging ? 'Yes' : 'No'} tone={charging ? 'info' : 'muted'} />
-            <StatusTile
-              label="UI state"
-              value={uiStateLabel}
-              tone="muted"
-              valueClass="truncate"
-            />
-            <StatusTile
-              label="Robot error"
-              value={robotError}
-              tone={hasError ? 'danger' : 'muted'}
-              valueClass="truncate"
-            />
-            <StatusTile
-              label="Robot alert"
-              value={robotAlert}
-              tone={hasAlert ? 'warn' : 'muted'}
-              valueClass="truncate"
-            />
-          </div>
-        </section>
 
         {!configured || !connected || !canStart || !canSendHome || !canLocate || !canClearErrors ? (
           <p className="text-xs text-slate-400 text-center">

@@ -331,10 +331,10 @@ audioLevelsEvents.on('change', () => {
 });
 
 // sync all sockets 20 seconds
-setInterval(() => {
-  logger.info('Periodic session sync for all clients');
-  syncAll();
-}, PERIODIC_SYNC_MS);
+// setInterval(() => {
+//   logger.info('Periodic session sync for all clients');
+//   syncAll();
+// }, PERIODIC_SYNC_MS);
 
 module.exports = {
   buildSession,

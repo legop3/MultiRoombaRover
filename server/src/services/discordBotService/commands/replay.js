@@ -34,7 +34,7 @@ function createReplayCommand({ getMode, MODES, tryTriggerReplay, getReplaySource
       const roverName = record?.meta?.name || source?.label || roverId;
       lines.push(`${nickname} → ${roverName}`);
     });
-    if (!lines.length) return '';
+    if (!lines.length) return 'Drivers: none active for selected rover sources';
     return `Drivers: ${lines.join(' | ')}`;
   }
   function resolveReplaySources(query) {

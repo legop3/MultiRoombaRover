@@ -49,6 +49,7 @@ const ENTITY_IDS = {
   },
   textSensors: {
     // ESPHome text_sensor entities surface in Home Assistant under the sensor domain.
+    robotState: entityId('sensor', 'robot_state'),
     uiState: entityId('sensor', 'ui_state'),
     robotError: entityId('sensor', 'robot_error'),
     robotAlert: entityId('sensor', 'robot_alert'),
@@ -96,6 +97,7 @@ function requiredEntityIds() {
     ENTITY_IDS.sensors.batteryVoltage,
     ENTITY_IDS.binarySensors.chargingActive,
     ENTITY_IDS.binarySensors.extPowerPresent,
+    ENTITY_IDS.textSensors.robotState,
     ENTITY_IDS.textSensors.uiState,
     ENTITY_IDS.textSensors.robotError,
     ENTITY_IDS.textSensors.robotAlert,
@@ -133,6 +135,7 @@ function buildState() {
   const batteryPercent =
     batteryPercentValue == null ? null : Math.max(0, Math.min(100, Math.round(batteryPercentValue)));
   const batteryVoltage = parseNumber(readState(ENTITY_IDS.sensors.batteryVoltage));
+  const robotState = readState(ENTITY_IDS.textSensors.robotState);
   const uiState = readState(ENTITY_IDS.textSensors.uiState);
   const robotError = readState(ENTITY_IDS.textSensors.robotError);
   const robotAlert = readState(ENTITY_IDS.textSensors.robotAlert);
@@ -151,6 +154,7 @@ function buildState() {
       batteryVoltage,
       chargingActive,
       extPowerPresent,
+      robotState,
       uiState,
       robotError,
       robotAlert,

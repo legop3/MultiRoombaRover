@@ -141,8 +141,7 @@ function createRuntimeEngine(deps) {
     const nextUpdated = raw?.last_updated ?? null;
     const changed =
       runtimeState.lastState !== nextState ||
-      runtimeState.lastChanged !== nextChanged ||
-      runtimeState.lastUpdated !== nextUpdated;
+      runtimeState.lastChanged !== nextChanged;
     if (!changed) {
       return { matched: false, nextState, nextChanged, nextUpdated };
     }
