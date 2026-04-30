@@ -1,7 +1,7 @@
 // Vip Lift Card
 // Purpose: Renders a shared lift controller panel synced from server session state.
 // Scope: Presents verified-user controls while reflecting global busy/position/cooldown state.
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 function badgeClass(tone) {
   if (tone === 'good') return 'bg-emerald-600 text-white';
@@ -20,6 +20,7 @@ function positionLabel(value) {
 
 export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
   const [working, setWorking] = useState('');
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const configured = Boolean(lift?.configured);
@@ -29,11 +30,29 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
   const position = String(lift?.position || '').toLowerCase();
   const upAvailable = Boolean(lift?.availability?.upSwitch);
   const downAvailable = Boolean(lift?.availability?.downSwitch);
+  const lastActionAt = Number(lift?.lastActionAt || 0);
+  const commandCooldownMs = Math.max(0, Number(lift?.commandCooldownMs || 0));
+  const cooldownRemainingMs = Math.max(0, lastActionAt + commandCooldownMs - nowMs);
+  const cooldownActive = !busy && cooldownRemainingMs > 0;
+  const blocked = busy || cooldownActive;
 
-  const status = !configured ? 'Not configured' : !connected ? 'Offline' : busy ? 'Busy' : 'Ready';
-  const statusTone = !configured ? 'warn' : !connected ? 'danger' : busy ? 'warn' : 'good';
+  useEffect(() => {
+    if (!blocked) return undefined;
+    const t = setInterval(() => {
+      setNowMs(Date.now());
+    }, 100);
+    return () => clearInterval(t);
+  }, [blocked]);
 
-  const canRun = configured && connected && !busy && !working && upAvailable && downAvailable;
+  useEffect(() => {
+    setNowMs(Date.now());
+  }, [lastActionAt, commandCooldownMs, busy]);
+
+  const status = !configured ? 'Not configured' : !connected ? 'Offline' : blocked ? 'Busy' : 'Ready';
+  const statusTone = !configured ? 'warn' : !connected ? 'danger' : blocked ? 'warn' : 'good';
+
+  const canRun = configured && connected && !blocked && !working && upAvailable && downAvailable;
+  const cooldownSeconds = useMemo(() => Math.ceil(cooldownRemainingMs / 1000), [cooldownRemainingMs]);
 
   const run = async (dir, fn) => {
     if (!fn) return;
@@ -48,7 +67,22 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
   };
 
   return (
-    <section className={`surface text-sm text-slate-200 ${wrapClass}`}>
+    <section className={`surface relative text-sm text-slate-200 ${wrapClass}`}>
+      {blocked ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-md bg-slate-950/80 px-1.5 text-center">
+          <div className="space-y-0.25">
+            <p className="text-sm font-semibold text-slate-100">
+              {busy ? 'Motion in progress' : 'Motion cooldown active'}
+            </p>
+            <p className="text-xs text-slate-300">
+              Controls are disabled while the lift is moving, otherwise it's tiny brain would get confused.
+            </p>
+            {!busy && cooldownActive ? (
+              <p className="text-xs text-slate-400">Try again in {cooldownSeconds}s.</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <div className="grid gap-0.5">
         <div className="relative flex items-center justify-center min-h-[1.5rem]">
           <div className="text-center">
