@@ -2,16 +2,40 @@
 // Purpose: Handles replay capture requests from Discord.
 // Scope: Resolves source selectors, enforces cooldowns, and replies with replay video attachment.
 const { AttachmentBuilder } = require('discord.js');
+const io = require('../../../globals/io');
 
-function createReplayCommand({ getMode, MODES, tryTriggerReplay, getReplaySources, getDefaultDiscordSources, validateSources, buildReplayVideo, sanitizeMentions }) {
+function createReplayCommand({ getMode, MODES, tryTriggerReplay, getReplaySources, getDefaultDiscordSources, validateSources, buildReplayVideo, sanitizeMentions, getActiveDrivers, getNickname, rovers }) {
   function normalizeReplayQuery(input) { return String(input || '').trim().toLowerCase(); }
   function sanitizeReplayTitleForFilename(title) {
     const cleaned = String(title || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 96);
     return cleaned || 'replay';
   }
   function buildDefaultReplayTitle(requester, sources = []) {
-    const roverSource = sources.find((entry) => entry?.type === 'rover');
-    return `${String(requester || 'Someone').trim() || 'Someone'} driving ${roverSource?.label || roverSource?.id || 'a rover'}`;
+    const requesterLabel = String(requester || 'Someone').trim() || 'Someone';
+    const labels = (Array.isArray(sources) ? sources : [])
+      .map((entry) => String(entry?.label || entry?.id || '').trim())
+      .filter(Boolean);
+    if (!labels.length) return `${requesterLabel} replay`;
+    if (labels.length === 1) return `${requesterLabel} replay: ${labels[0]}`;
+    return `${requesterLabel} replay: ${labels.slice(0, 3).join(' + ')}`;
+  }
+
+  function buildDriverSummary(sources = []) {
+    const activeDrivers = getActiveDrivers();
+    const roverSources = (Array.isArray(sources) ? sources : []).filter((entry) => entry?.type === 'rover');
+    const lines = [];
+    roverSources.forEach((source) => {
+      const roverId = String(source.id);
+      const socketId = activeDrivers?.[roverId];
+      if (!socketId) return;
+      const socket = io.sockets.sockets.get(socketId);
+      const nickname = getNickname(socket) || socket?.data?.user?.username || socketId;
+      const record = rovers.get(roverId);
+      const roverName = record?.meta?.name || source?.label || roverId;
+      lines.push(`${nickname} → ${roverName}`);
+    });
+    if (!lines.length) return '';
+    return `Drivers: ${lines.join(' | ')}`;
   }
   function resolveReplaySources(query) {
     const cleaned = normalizeReplayQuery(query);
@@ -48,7 +72,9 @@ function createReplayCommand({ getMode, MODES, tryTriggerReplay, getReplaySource
     try {
       const { buffer } = await buildReplayVideo({ sources: resolved.sources || [], title, requester });
       const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(title)}.mp4` });
-      await message.reply({ content: sanitizeMentions(`**${title}**`), files: [attachment], allowedMentions: { parse: [], repliedUser: false } });
+      const summary = buildDriverSummary(resolved.sources || []);
+      const body = [ `**${title}**`, summary ].filter(Boolean).join('\n');
+      await message.reply({ content: sanitizeMentions(body), files: [attachment], allowedMentions: { parse: [], repliedUser: false } });
     } catch (err) {
       await message.reply({ content: sanitizeMentions(`Replay failed: ${err.message}`), allowedMentions: { parse: [], repliedUser: false } });
     }

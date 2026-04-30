@@ -2,10 +2,11 @@
 // Purpose: Handles event-bus announcements to Discord channels.
 // Scope: Processes supported event types and posts formatted messages/embeds.
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const io = require('../../../globals/io');
 const { buildBatteryStatusEmbed, buildBatteryCaption } = require('../batteryEmbeds');
 
 function createBusEventHandler(deps) {
-  const { logger, discordConfig, MODES, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel, buildReplayVideo } = deps;
+  const { logger, discordConfig, MODES, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel, buildReplayVideo, getActiveDrivers, getNickname } = deps;
   const ADMIN_ALERT_EVENT_TYPES = new Set(['rover.online', 'rover.offline', 'rover.dockGuard', 'battery.warn', 'battery.urgent', 'battery.docked', 'battery.undocked', 'battery.charging.start', 'battery.charging.stop', 'battery.locked', 'battery.unlocked']);
   let skippedFirstModeAnnouncement = false;
 
@@ -31,12 +32,42 @@ function createBusEventHandler(deps) {
     return cleaned || 'replay';
   }
 
+  function buildDefaultReplayTitle(requester, sources = []) {
+    const requesterLabel = String(requester || 'Someone').trim() || 'Someone';
+    const labels = (Array.isArray(sources) ? sources : [])
+      .map((entry) => String(entry?.label || entry?.id || '').trim())
+      .filter(Boolean);
+    if (!labels.length) return `${requesterLabel} replay`;
+    if (labels.length === 1) return `${requesterLabel} replay: ${labels[0]}`;
+    return `${requesterLabel} replay: ${labels.slice(0, 3).join(' + ')}`;
+  }
+
+  function buildDriverSummary(sources = []) {
+    const activeDrivers = getActiveDrivers();
+    const roverSources = (Array.isArray(sources) ? sources : []).filter((entry) => entry?.type === 'rover');
+    const lines = [];
+    roverSources.forEach((source) => {
+      const roverId = String(source.id);
+      const socketId = activeDrivers?.[roverId];
+      if (!socketId) return;
+      const socket = io.sockets.sockets.get(socketId);
+      const nickname = getNickname(socket) || socket?.data?.user?.username || socketId;
+      const record = rovers.get(roverId);
+      const roverName = record?.meta?.name || source?.label || roverId;
+      lines.push(`${nickname} → ${roverName}`);
+    });
+    if (!lines.length) return '';
+    return `Drivers: ${lines.join(' | ')}`;
+  }
+
   async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '', includeSidebar = true) {
     if (!channelId) throw new Error('Replay channel not configured');
-    const resolvedTitle = String(explicitTitle || '').trim() || `${String(requester || 'Someone').trim() || 'Someone'} replay`;
+    const resolvedTitle = String(explicitTitle || '').trim() || buildDefaultReplayTitle(requester, sources);
     const { buffer } = await buildReplayVideo({ sources, title: resolvedTitle, requester, includeSidebar });
     const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(resolvedTitle)}.mp4` });
-    await sendToChannel(channelId, `**${resolvedTitle}**`, { files: [attachment] }, { parse: [] });
+    const summary = buildDriverSummary(sources);
+    const body = [ `**${resolvedTitle}**`, summary ].filter(Boolean).join('\n');
+    await sendToChannel(channelId, body, { files: [attachment] }, { parse: [] });
   }
 
   function handleReplayRequested(event) {
