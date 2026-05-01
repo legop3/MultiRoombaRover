@@ -1,4 +1,4 @@
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const EventEmitter = require('events');
 const fs = require('fs');
 
@@ -9,10 +9,6 @@ function sanitizeLogText(value) {
   return String(value || '')
     .replace(/\u0000/g, '')
     .replace(/\x1B\[[0-9;]*[A-Za-z]/g, '');
-}
-
-function shellQuote(value) {
-  return `'${String(value || '').replace(/'/g, `'\"'\"'`)}'`;
 }
 
 function parsePayloadFromLine(line) {
@@ -268,30 +264,38 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     if (state.process) return;
     ensureLogStream();
 
-    const baseCommand = [
-      'env',
-      'PYTHONUNBUFFERED=1',
-      'NO_COLOR=1',
-      'TERM=dumb',
-      'uvx',
+    logger.info('Starting Neato lidar log stream', { host, port: Number(port || 6053) });
+    const env = {
+      ...process.env,
+      PYTHONUNBUFFERED: '1',
+      NO_COLOR: '1',
+      TERM: 'dumb',
+    };
+    const uvxArgs = [
       '--from',
       'aioesphomeapi',
       'aioesphomeapi-logs',
-      shellQuote(host),
+      host,
       '--port',
-      shellQuote(String(port || 6053)),
+      String(port || 6053),
       '--noise-psk',
-      shellQuote(key),
+      key,
       '--no-states',
-    ].join(' ');
-    const launchCommand = `if command -v script >/dev/null 2>&1; then exec script -qefc ${shellQuote(baseCommand)} /dev/null; else exec ${baseCommand}; fi`;
-
-    logger.info('Starting Neato lidar log stream', { host, port: Number(port || 6053) });
-    const proc = spawn('bash', ['-lc', launchCommand], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    ];
+    const hasScript = spawnSync('bash', ['-lc', 'command -v script >/dev/null 2>&1'], { stdio: 'ignore' }).status === 0;
+    const proc = hasScript
+      ? spawn('script', ['-qefc', `uvx ${uvxArgs.map((arg) => JSON.stringify(arg)).join(' ')}`, '/dev/null'], {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env,
+        })
+      : spawn('uvx', uvxArgs, {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env,
+        });
+    logger.info('Neato lidar log launch mode', { mode: hasScript ? 'script' : 'direct' });
     state.process = proc;
     state.stdoutBuffer = '';
+    state.stderrBuffer = '';
 
     proc.stdout.on('data', (chunk) => {
       if (!state.connected) {
