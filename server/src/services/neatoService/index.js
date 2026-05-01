@@ -271,7 +271,7 @@ function hasVerifiedSockets() {
 function broadcastLidarScan(payload) {
   for (const socket of io.sockets.sockets.values()) {
     if (!isVerified(socket)) continue;
-    socket.volatile.emit('neato:lidar', payload);
+    socket.emit('neato:lidar', payload);
   }
 }
 
