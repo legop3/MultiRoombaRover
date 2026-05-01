@@ -221,6 +221,13 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     }
   }
 
+  function ensureConnected() {
+    if (state.connected) return;
+    state.connected = true;
+    emitStatus();
+    triggerPollSoon();
+  }
+
   function teardownProcess() {
     const proc = state.process;
     state.process = null;
@@ -298,15 +305,12 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     state.stderrBuffer = '';
 
     proc.stdout.on('data', (chunk) => {
-      if (!state.connected) {
-        state.connected = true;
-        emitStatus();
-        triggerPollSoon();
-      }
+      ensureConnected();
       handleTextChunk(chunk, 'stdoutBuffer', 'stdout');
     });
 
     proc.stderr.on('data', (chunk) => {
+      ensureConnected();
       handleTextChunk(chunk, 'stderrBuffer', 'stderr');
       const message = String(chunk || '').trim();
       if (message) logger.warn('Neato lidar log stream stderr', message);
