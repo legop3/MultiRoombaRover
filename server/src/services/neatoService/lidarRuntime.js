@@ -2,11 +2,17 @@ const { spawn } = require('child_process');
 const EventEmitter = require('events');
 const fs = require('fs');
 
-const SCAN_TIMEOUT_MS = 4000;
+const SCAN_TIMEOUT_MS = 8000;
 const RECONNECT_DELAY_MS = 5000;
 
+function sanitizeLogText(value) {
+  return String(value || '')
+    .replace(/\u0000/g, '')
+    .replace(/\x1B\[[0-9;]*[A-Za-z]/g, '');
+}
+
 function parsePayloadLine(line) {
-  const raw = String(line || '').trim();
+  const raw = sanitizeLogText(line).trim();
   if (!raw) return null;
   const quotedMatch = raw.match(/<<< "(.*)"$/);
   if (quotedMatch) return quotedMatch[1];
@@ -51,6 +57,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     pollSoonTimer: null,
     requestTimeoutTimer: null,
     stdoutBuffer: '',
+    stderrBuffer: '',
     currentScan: null,
     requestInFlight: false,
     requestStartedAt: 0,
@@ -138,13 +145,20 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     state.currentScan.points.set(point.angleDeg, point);
   }
 
-  function handleStdoutChunk(chunk) {
+  function handleTextChunk(chunk, bufferKey, sourceLabel = '') {
+    const text = String(chunk || '');
     if (state.logStream) {
-      state.logStream.write(String(chunk || ''));
+      const prefix = sourceLabel ? `[${sourceLabel}] ` : '';
+      state.logStream.write(
+        text
+          .split(/\r?\n/)
+          .map((line, index, parts) => (index === parts.length - 1 && line === '' ? '' : `${prefix}${line}`))
+          .join('\n'),
+      );
     }
-    state.stdoutBuffer += String(chunk || '');
-    const lines = state.stdoutBuffer.split(/\r?\n/);
-    state.stdoutBuffer = lines.pop() || '';
+    state[bufferKey] += sanitizeLogText(text);
+    const lines = state[bufferKey].split(/\r?\n/);
+    state[bufferKey] = lines.pop() || '';
     for (const line of lines) {
       const payload = parsePayloadLine(line);
       handlePayload(payload);
@@ -219,10 +233,11 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
         emitStatus();
         triggerPollSoon();
       }
-      handleStdoutChunk(chunk);
+      handleTextChunk(chunk, 'stdoutBuffer', 'stdout');
     });
 
     proc.stderr.on('data', (chunk) => {
+      handleTextChunk(chunk, 'stderrBuffer', 'stderr');
       const message = String(chunk || '').trim();
       if (message) logger.warn('Neato lidar log stream stderr', message);
     });
