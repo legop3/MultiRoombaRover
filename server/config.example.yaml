@@ -42,6 +42,8 @@ homeAssistant:
     brainslugHost: "neato-vacuum.local"
     brainslugPort: 6053
     brainslugKey: "REPLACE_WITH_ESPHOME_NOISE_PSK"
+    # Optional: mirror raw ESPHome lidar log output to a local file for debugging.
+    brainslugLogFile: "/tmp/brainslug-lidar.log"
   lift:
     # Two Home Assistant switches controlling lift direction.
     # Raise sequence: down off -> wait interlockMs -> up on

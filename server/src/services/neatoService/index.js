@@ -31,6 +31,7 @@ const RESUME_DELAY_MS = 3000;
 const brainslugHost = String(neatoConfig.brainslugHost || '').trim();
 const brainslugPort = Number(neatoConfig.brainslugPort) || 6053;
 const brainslugKey = String(neatoConfig.brainslugKey || '').trim();
+const brainslugLogFile = String(neatoConfig.brainslugLogFile || '').trim();
 let lidarRuntime = null;
 
 function entityId(domain, suffix) {
@@ -281,6 +282,7 @@ lidarRuntime =
         host: brainslugHost,
         port: brainslugPort,
         key: brainslugKey,
+        logFile: brainslugLogFile,
         shouldPoll: () => Boolean(homeAssistantEnabled && isHomeAssistantConnected() && hasVerifiedSockets()),
         requestScan: requestLidarScan,
       })

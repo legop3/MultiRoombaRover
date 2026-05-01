@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
+const fs = require('fs');
 
 const SCAN_TIMEOUT_MS = 4000;
 const RECONNECT_DELAY_MS = 5000;
@@ -41,7 +42,7 @@ function parseRotationSpeed(payload) {
   return Number(match[1]);
 }
 
-function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, requestScan }) {
+function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shouldPoll, requestScan }) {
   const events = new EventEmitter();
   const state = {
     connected: false,
@@ -53,6 +54,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
     currentScan: null,
     requestInFlight: false,
     requestStartedAt: 0,
+    logStream: null,
   };
 
   function emitStatus() {
@@ -137,6 +139,9 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
   }
 
   function handleStdoutChunk(chunk) {
+    if (state.logStream) {
+      state.logStream.write(String(chunk || ''));
+    }
     state.stdoutBuffer += String(chunk || '');
     const lines = state.stdoutBuffer.split(/\r?\n/);
     state.stdoutBuffer = lines.pop() || '';
@@ -163,9 +168,31 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
     }
   }
 
+  function ensureLogStream() {
+    if (!logFile || state.logStream) return;
+    try {
+      state.logStream = fs.createWriteStream(logFile, { flags: 'a' });
+      logger.info('Neato lidar raw log capture enabled', { logFile });
+    } catch (err) {
+      logger.warn('Failed to open Neato lidar raw log file', { logFile, error: err.message });
+      state.logStream = null;
+    }
+  }
+
+  function closeLogStream() {
+    if (!state.logStream) return;
+    try {
+      state.logStream.end();
+    } catch (err) {
+      logger.warn('Failed to close Neato lidar raw log file', err.message);
+    }
+    state.logStream = null;
+  }
+
   function startLogStream() {
     if (!host || !key) return;
     if (state.process) return;
+    ensureLogStream();
 
     const args = [
       '--from',
@@ -244,6 +271,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
     clearPollSoonTimer();
     clearRequestTimeoutTimer();
     teardownProcess();
+    closeLogStream();
   }
 
   function getState() {
