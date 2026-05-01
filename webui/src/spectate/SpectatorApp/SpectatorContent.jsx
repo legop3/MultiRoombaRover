@@ -9,7 +9,7 @@ import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import ChatPanel from '../../components/ChatPanel/index.jsx';
 import AlertFeed from '../../components/AlertFeed/index.jsx';
-import CommunityGoalBanner from '../../components/CommunityGoalBanner/index.jsx';
+import GlobalObjectiveBanner from '../../components/GlobalObjectiveBanner/index.jsx';
 import RoverQueuesPanel from '../../components/RoverQueuesPanel/index.jsx';
 import RawUserPilePanel from '../../components/RawUserPilePanel/index.jsx';
 import ButtonBoxPanel from '../../components/ButtonBoxPanel/index.jsx';
@@ -75,7 +75,7 @@ export default function SpectatorContent() {
         <section className={sidebarClass}>
           {isPortraitLayout ? (
             <div className={`${topBarItemClass} ${portraitItemHeight} flex flex-col gap-0.5`}>
-              <CommunityGoalBanner layout="desktop" dismissable={false} className="text-sm" />
+              <GlobalObjectiveBanner layout="desktop" dismissable={false} className="text-sm" />
               <ButtonBoxPanel />
               <div className="min-h-0 flex-1">
                 <RawUserPilePanel hideNicknameForm hideHeader compact fillHeight className="h-full" />
@@ -83,7 +83,7 @@ export default function SpectatorContent() {
             </div>
           ) : (
             <div className={topBarItemClass}>
-              <CommunityGoalBanner layout="desktop" dismissable={false} className="text-sm" />
+              <GlobalObjectiveBanner layout="desktop" dismissable={false} className="text-sm" />
               <ButtonBoxPanel />
             </div>
           )}

@@ -98,8 +98,8 @@ function createBusEventHandler(deps) {
         }
         schedulePresenceRotation();
         break;
-      case 'communityGoal.updated':
-        announce({ channelId: channels.announcements, content: payload?.text ? `Community goal: ${payload.text}` : 'Community goal cleared.', color: 0x8bc34a, title: 'Community Goal', description: payload?.text || 'Community goal cleared.' });
+      case 'globalObjective.updated':
+        announce({ channelId: channels.announcements, content: payload?.text ? `Global objective: ${payload.text}` : 'Global objective cleared.', color: 0x8bc34a, title: 'Global Objective', description: payload?.text || 'Global objective cleared.' });
         schedulePresenceRotation();
         break;
       case 'rover.online':

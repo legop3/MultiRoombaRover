@@ -1,15 +1,16 @@
-// community Goal Service
-// Purpose: Defines the community Goal Service module and the helpers/state used by this service unit.
+// Global Objective Service
+// Purpose: Defines the global objective service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const fs = require('fs');
 const io = require('../../globals/io');
-const logger = require('../../globals/logger').child('communityGoalService');
+const logger = require('../../globals/logger').child('globalObjectiveService');
 const { isAdmin } = require('../roleService');
 const { publishEvent } = require('../eventBus');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 
 const DATA_DIR = resolveDataDir();
-const STORE_PATH = resolveDataPath('community-goal.json');
+const STORE_PATH = resolveDataPath('global-objective.json');
+const LEGACY_STORE_PATH = resolveDataPath('community-goal.json');
 const MAX_GOAL_LENGTH = 240;
 
 let cache = null;
@@ -21,9 +22,18 @@ function loadStore() {
     cache = JSON.parse(raw);
   } catch (err) {
     if (err.code !== 'ENOENT') {
-      logger.warn('Failed to load community goal', err.message);
+      logger.warn('Failed to load global objective', err.message);
+    } else {
+      try {
+        const legacyRaw = fs.readFileSync(LEGACY_STORE_PATH, 'utf8');
+        cache = JSON.parse(legacyRaw);
+      } catch (legacyErr) {
+        if (legacyErr.code !== 'ENOENT') {
+          logger.warn('Failed to load legacy global objective', legacyErr.message);
+        }
+      }
     }
-    cache = null;
+    if (!cache) cache = null;
   }
   return cache;
 }
@@ -39,11 +49,11 @@ function normalizeText(input) {
   return input.replace(/\s+/g, ' ').trim();
 }
 
-function getCommunityGoal() {
+function getGlobalObjective() {
   return loadStore();
 }
 
-function setCommunityGoal(text, meta = {}) {
+function setGlobalObjective(text, meta = {}) {
   const clean = normalizeText(text);
   if (!clean) {
     throw new Error('Goal text required');
@@ -57,23 +67,23 @@ function setCommunityGoal(text, meta = {}) {
     updatedBy: meta.by || null,
   };
   saveStore(payload);
-  publishEvent({ source: 'communityGoal', type: 'communityGoal.updated', payload });
+  publishEvent({ source: 'globalObjective', type: 'globalObjective.updated', payload });
   return payload;
 }
 
-function clearCommunityGoal(meta = {}) {
+function clearGlobalObjective(meta = {}) {
   const payload = {
     text: null,
     updatedAt: Date.now(),
     updatedBy: meta.by || null,
   };
   saveStore(payload);
-  publishEvent({ source: 'communityGoal', type: 'communityGoal.updated', payload });
+  publishEvent({ source: 'globalObjective', type: 'globalObjective.updated', payload });
   return payload;
 }
 
 io.on('connection', (socket) => {
-  socket.on('communityGoal:set', ({ text } = {}, cb = () => {}) => {
+  socket.on('globalObjective:set', ({ text } = {}, cb = () => {}) => {
     if (!isAdmin(socket)) {
       cb({ error: 'Not authorized' });
       return;
@@ -81,8 +91,8 @@ io.on('connection', (socket) => {
     try {
       const result =
         text == null || String(text).trim() === ''
-          ? clearCommunityGoal({ by: socket?.data?.user?.username || socket?.id })
-          : setCommunityGoal(text, { by: socket?.data?.user?.username || socket?.id });
+          ? clearGlobalObjective({ by: socket?.data?.user?.username || socket?.id })
+          : setGlobalObjective(text, { by: socket?.data?.user?.username || socket?.id });
       cb({ success: true, goal: result });
     } catch (err) {
       cb({ error: err.message });
@@ -91,8 +101,8 @@ io.on('connection', (socket) => {
 });
 
 module.exports = {
-  getCommunityGoal,
-  setCommunityGoal,
-  clearCommunityGoal,
+  getGlobalObjective,
+  setGlobalObjective,
+  clearGlobalObjective,
   MAX_GOAL_LENGTH,
 };

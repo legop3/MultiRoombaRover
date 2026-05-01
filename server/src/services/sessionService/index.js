@@ -26,7 +26,7 @@ const {
 } = require('../privateRoverAccessRequestService');
 const { getReplayState, replayEvents, getReplaySources } = require('../replayEngineV2');
 const { getHealthSnapshot } = require('../healthService');
-const { getCommunityGoal } = require('../communityGoalService');
+const { getGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason } = require('../adminReasonService');
 const { subscribe } = require('../eventBus');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
@@ -105,7 +105,7 @@ function buildSession(socket) {
     replay: getReplayState(),
     replaySources: getReplaySources(socket),
     health: getHealthSnapshot(),
-    communityGoal: getCommunityGoal(),
+    globalObjective: getGlobalObjective(),
     adminReason: getAdminReason(),
     users,
     socials,
@@ -308,8 +308,8 @@ verificationEvents.on('change', ({ socketId } = {}) => {
   syncAll();
 });
 
-subscribe('communityGoal.updated', () => {
-  logger.info('Community goal updated; syncing all clients');
+subscribe('globalObjective.updated', () => {
+  logger.info('Global objective updated; syncing all clients');
   syncAll();
 });
 

@@ -73,7 +73,7 @@
 - Continued `roverManager` split by extracting sensor processing + private safety + dock guard logic into `roverManager/sensorPipeline.js`.
 - Finished `roverManager` decomposition by extracting private access policy, roster lifecycle, and spectator/auto-close orchestration into `roverManager/privateAccess.js`, `roverManager/rosterLifecycle.js`, and `roverManager/spectatorAccess.js`; `roverManager/index.js` is now a thin composition layer.
 - Hotfix: corrected `llmCommentaryService` prompt file path to `server/prompts/commentary_system.txt` after service folder move.
-- Hotfix: added `server/src/helpers/dataPaths.js` and rewired data-backed services to resolve canonical + legacy data-file locations safely after folderization (`adminReason`, `audioLevels`, `buttonBox`, `communityGoal`, `discordGuildStore`, `verification`, `replayEngineV2`).
+- Hotfix: added `server/src/helpers/dataPaths.js` and rewired data-backed services to resolve canonical + legacy data-file locations safely after folderization (`adminReason`, `audioLevels`, `buttonBox`, `globalObjective`, `discordGuildStore`, `verification`, `replayEngineV2`).
 - Began `llmCommentaryService` decomposition by extracting immutable runtime limits/path/frequency normalization to `llmCommentaryService/constants.js` and pure prompt/text output helpers to `llmCommentaryService/formatters.js`.
 - Continued `llmCommentaryService` decomposition by extracting admin/runtime projection + failure-normalization helpers to `llmCommentaryService/runtimeHelpers.js`.
 - Continued `llmCommentaryService` decomposition by extracting sensor activity aggregation and snapshot assembly to `llmCommentaryService/snapshotEngine.js`; rewired commentary tick/event flow to use the new engine.

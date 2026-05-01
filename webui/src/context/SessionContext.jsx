@@ -181,7 +181,7 @@ export function SessionProvider({ children }) {
         }
         return emitWithAck('replay:trigger', { sources: sourcesOrPayload, title });
       },
-      setCommunityGoal: (text) => emitWithAck('communityGoal:set', { text }),
+      setGlobalObjective: (text) => emitWithAck('globalObjective:set', { text }),
       setAdminReason: (text) => emitWithAck('adminReason:set', { text }),
       rebootRover: (roverId) =>
         emitWithAck('command', { roverId, type: 'reboot', data: { reboot: {} } }),

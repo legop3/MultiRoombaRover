@@ -21,7 +21,7 @@ export default function AdminPanelContent() {
     lockRover,
     setMode,
     requestControl,
-    setCommunityGoal,
+    setGlobalObjective,
     setAdminReason,
     rebootRover,
     rebootServer,
@@ -37,8 +37,8 @@ export default function AdminPanelContent() {
   const [serverRebooting, setServerRebooting] = useState(false);
   const [clearingLlmHistory, setClearingLlmHistory] = useState(false);
   const health = session?.health || null;
-  const currentGoal = session?.communityGoal?.text || '';
-  const goalUpdatedAt = session?.communityGoal?.updatedAt || null;
+  const currentGoal = session?.globalObjective?.text || '';
+  const goalUpdatedAt = session?.globalObjective?.updatedAt || null;
   const [goalDraft, setGoalDraft] = useState(currentGoal);
   const currentReason = session?.adminReason?.text || '';
   const reasonUpdatedAt = session?.adminReason?.updatedAt || null;
@@ -128,7 +128,7 @@ export default function AdminPanelContent() {
 
   const handleGoalSave = async () => {
     try {
-      await setCommunityGoal(goalDraft);
+      await setGlobalObjective(goalDraft);
     } catch (err) {
       alert(err.message);
     }
@@ -136,7 +136,7 @@ export default function AdminPanelContent() {
 
   const handleGoalClear = async () => {
     try {
-      await setCommunityGoal(null);
+      await setGlobalObjective(null);
     } catch (err) {
       alert(err.message);
     }
@@ -351,7 +351,7 @@ export default function AdminPanelContent() {
       </div>
       <div className="space-y-0.5">
         <div className="flex items-center justify-between text-xs text-slate-400">
-          <span>Community goal</span>
+          <span>Global objective</span>
           {goalUpdatedAt ? (
             <span>Updated {new Date(goalUpdatedAt).toLocaleString()}</span>
           ) : null}
@@ -360,12 +360,12 @@ export default function AdminPanelContent() {
           type="text"
           value={goalDraft}
           onChange={(event) => setGoalDraft(event.target.value)}
-          placeholder="Set a community goal"
+          placeholder="Set a global objective"
           className="field-input text-sm"
         />
         <div className="flex gap-0.5 text-xs">
           <button type="button" onClick={handleGoalSave} className="button-dark">
-            Set goal
+            Set objective
           </button>
           <button type="button" onClick={handleGoalClear} className="button-danger">
             Clear
@@ -495,4 +495,3 @@ export default function AdminPanelContent() {
     </section>
   );
 }
-

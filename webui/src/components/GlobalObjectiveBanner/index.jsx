@@ -1,5 +1,5 @@
-// Community Goal Banner
-// Purpose: Defines the Community Goal Banner module and the local helpers/components used in this file.
+// Global Objective Banner
+// Purpose: Defines the Global Objective Banner module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
@@ -8,9 +8,9 @@ const MOBILE_DISMISS_MS = 10000;
 const MAX_FONT_PX = 28;
 const MIN_FONT_PX = 14;
 
-export default function CommunityGoalBanner({ layout = 'desktop', className = '', dismissable = true }) {
+export default function GlobalObjectiveBanner({ layout = 'desktop', className = '', dismissable = true }) {
   const { session } = useSession();
-  const goalText = session?.communityGoal?.text ? String(session.communityGoal.text).trim() : '';
+  const goalText = session?.globalObjective?.text ? String(session.globalObjective.text).trim() : '';
   const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape' || layout === 'mobile';
   const [visible, setVisible] = useState(false);
   const [fontSize, setFontSize] = useState(MAX_FONT_PX);
@@ -97,8 +97,8 @@ export default function CommunityGoalBanner({ layout = 'desktop', className = ''
     >
       <span className="flex w-full items-stretch gap-0.5 whitespace-nowrap rounded-md">
         <span className="flex flex-col justify-center border-r border-slate-700/60 px-0.5 text-[0.55em] font-semibold leading-tight text-slate-400">
-          <span>Community</span>
-          <span>Goal</span>
+          <span>Global</span>
+          <span>Objective</span>
         </span>
         <span ref={textContainerRef} className="flex-1 overflow-hidden text-slate-100">
           <span ref={textRef} className="block">

@@ -15,7 +15,7 @@ function formatHelp() {
     '`rs unlock <id>` — unlock a rover',
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
     '`rs reason [text|clear]` — show or set admin mode reason',
-    '`rs goal [text|clear]` — show or set community goal',
+    '`rs goal [text|clear]` — show or set global objective',
     '`rs verify list|remove ...` — manage verified users',
     '`rs deter list|ban|unban ...` — manage deterred users',
     '`ts` — show time status',

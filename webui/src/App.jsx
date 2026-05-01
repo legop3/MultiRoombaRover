@@ -33,7 +33,7 @@ import SettingsPanel from './components/SettingsPanel/index.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs/index.jsx';
 import useDefaultNickname from './hooks/useDefaultNickname.js';
 import useUserIdentitySync from './hooks/useUserIdentitySync.js';
-import CommunityGoalBanner from './components/CommunityGoalBanner/index.jsx';
+import GlobalObjectiveBanner from './components/GlobalObjectiveBanner/index.jsx';
 import RoverQueuesPanel from './components/RoverQueuesPanel/index.jsx';
 import VipPanel from './components/VipPanel/index.jsx';
 import { useSessionSelector } from './context/SessionContext.jsx';
@@ -79,7 +79,7 @@ function DesktopLayout({ layout, onOpenHelpOverlay }) {
         <LogPanel />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-        <CommunityGoalBanner layout={layout} />
+        <GlobalObjectiveBanner layout={layout} />
         <RightPaneTabs layout={layout} onOpenHelpOverlay={onOpenHelpOverlay} />
         {/* <SessionSnapshot /> */}
       </div>
@@ -301,7 +301,7 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
       <KeyboardInputManager />
       <GamepadInputManager />
       <main className={`flex w-full flex-col gap-0.5 text-base ${isDesktop ? 'h-full overflow-hidden' : ''}`}>
-        {!isDesktop ? <CommunityGoalBanner layout={layout} /> : null}
+        {!isDesktop ? <GlobalObjectiveBanner layout={layout} /> : null}
         {renderedLayout}
       </main>
       <AlertFeed />

@@ -16,7 +16,7 @@ const { sendExternalMessage, sendExternalTyping } = require('../chatService');
 const { buildReplayVideo, getReplaySources, getDefaultDiscordSources, validateSources, tryTriggerReplay } = require('../replayEngineV2');
 const { getActiveDrivers } = require('../turnService');
 const { getNickname } = require('../nicknameService');
-const { getCommunityGoal, setCommunityGoal, clearCommunityGoal } = require('../communityGoalService');
+const { getGlobalObjective, setGlobalObjective, clearGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
 const {
   getGuildConfig,
@@ -108,7 +108,7 @@ const presence = createPresenceManager({
   client,
   logger,
   getMode,
-  getCommunityGoal,
+  getGlobalObjective,
   countReady,
 });
 
@@ -129,9 +129,9 @@ const commands = createCommandHandlers({
   getDefaultDiscordSources,
   validateSources,
   tryTriggerReplay,
-  getCommunityGoal,
-  setCommunityGoal,
-  clearCommunityGoal,
+  getGlobalObjective,
+  setGlobalObjective,
+  clearGlobalObjective,
   getAdminReason,
   setAdminReason,
   clearAdminReason,
