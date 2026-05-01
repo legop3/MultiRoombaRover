@@ -25,13 +25,14 @@ function createDmModerationHandlers(deps) {
     const payload = event?.payload || {};
     const requestId = payload.id;
     if (!requestId) return;
+    const createdAt = payload.createdAt ? new Date(payload.createdAt).toLocaleString() : 'unknown';
     const content = [
       '**Verification Request**',
       `Request ID: \`${requestId}\``,
       `Nickname: ${sanitizeMentions(payload.nickname || 'unknown')}`,
-      `Identity Key: \`${String(payload.cookieUserId || 'unknown')}\``,
+      `Identity key: \`${String(payload.cookieUserId || 'unknown')}\``,
       `IP: \`${String(payload.ip || 'unknown')}\``,
-      `Socket: \`${String(payload.socketId || 'unknown')}\``,
+      `Created: ${createdAt}`,
       '',
       `React with ${APPROVE} to approve or ${DENY} to deny.`,
     ].join('\n');
@@ -54,16 +55,17 @@ function createDmModerationHandlers(deps) {
     const requestId = payload.id;
     if (!requestId) return;
     const requester = payload?.requester || {};
+    const createdAt = payload.createdAt ? new Date(payload.createdAt).toLocaleString() : 'unknown';
     const content = [
       '**Private Rover Access Request**',
       `Request ID: \`${requestId}\``,
       `Rover: ${sanitizeMentions(payload.roverName || payload.roverId || 'unknown')} (\`${String(payload.roverId || 'unknown')}\`)`,
-      `Nickname: ${sanitizeMentions(requester.nickname || 'unknown')}`,
+      `Requester: ${sanitizeMentions(requester.nickname || requester.socketId || 'unknown')}`,
       `Role: \`${String(requester.role || 'unknown')}\``,
       `Verified: \`${requester.isVerified ? 'yes' : 'no'}\``,
-      `Identity Key: \`${String(requester.cookieUserId || 'unknown')}\``,
+      `Identity key: \`${String(requester.cookieUserId || 'unknown')}\``,
       `IP: \`${String(requester.ip || 'unknown')}\``,
-      `Socket: \`${String(requester.socketId || 'unknown')}\``,
+      `Created: ${createdAt}`,
       '',
       `React with ${APPROVE} to approve or ${DENY} to deny.`,
     ].join('\n');
@@ -93,21 +95,13 @@ function createDmModerationHandlers(deps) {
     if (emoji === APPROVE) {
       approveRequest(linked.request.id, user.id);
       await reaction.message.reply({
-        content: [
-          `✅ Verification request \`${linked.request.id}\` approved by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
-          `Nickname: ${sanitizeMentions(linked.request.nickname || 'unknown')}`,
-          `Identity Key: \`${String(linked.request.cookieUserId || 'unknown')}\``,
-        ].join('\n'),
+        content: `Approved request \`${linked.request.id}\`.`,
         allowedMentions: { parse: [] },
       });
     } else {
       denyRequest(linked.request.id, user.id);
       await reaction.message.reply({
-        content: [
-          `❌ Verification request \`${linked.request.id}\` denied by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
-          `Nickname: ${sanitizeMentions(linked.request.nickname || 'unknown')}`,
-          `Identity Key: \`${String(linked.request.cookieUserId || 'unknown')}\``,
-        ].join('\n'),
+        content: `Denied request \`${linked.request.id}\`.`,
         allowedMentions: { parse: [] },
       });
     }
@@ -126,23 +120,18 @@ function createDmModerationHandlers(deps) {
     const linked = getPrivateAccessRequestByMessageId(reaction.message?.id);
     if (!linked?.request || linked.request.status !== 'pending') return;
     if (emoji === APPROVE) {
-      approvePrivateAccessRequest(linked.request.id, user.id);
+      const { assignedSocketId } = approvePrivateAccessRequest(linked.request.id, user.id);
+      const assignmentNote = assignedSocketId
+        ? ` Granted and assigned to socket \`${assignedSocketId}\`.`
+        : ' Granted.';
       await reaction.message.reply({
-        content: [
-          `✅ Private access request \`${linked.request.id}\` approved by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
-          `Rover: ${sanitizeMentions(linked.request.roverName || linked.request.roverId || 'unknown')} (\`${String(linked.request.roverId || 'unknown')}\`)`,
-          `Requester: ${sanitizeMentions(linked.request.requester?.nickname || 'unknown')}`,
-        ].join('\n'),
+        content: `Approved private access request \`${linked.request.id}\`.${assignmentNote}`,
         allowedMentions: { parse: [] },
       });
     } else {
       denyPrivateAccessRequest(linked.request.id, user.id);
       await reaction.message.reply({
-        content: [
-          `❌ Private access request \`${linked.request.id}\` denied by ${sanitizeMentions(user.username || user.tag || user.id)}.`,
-          `Rover: ${sanitizeMentions(linked.request.roverName || linked.request.roverId || 'unknown')} (\`${String(linked.request.roverId || 'unknown')}\`)`,
-          `Requester: ${sanitizeMentions(linked.request.requester?.nickname || 'unknown')}`,
-        ].join('\n'),
+        content: `Denied private access request \`${linked.request.id}\`.`,
         allowedMentions: { parse: [] },
       });
     }

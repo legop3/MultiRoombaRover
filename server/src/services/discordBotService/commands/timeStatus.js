@@ -26,24 +26,32 @@ function createTimeStatusCommand({ config, discordConfig }) {
     const serverTimezone = getServerTimezone();
     const now = new Date();
     const zones = [
-      'UTC',
-      'America/Los_Angeles',
-      'America/Denver',
-      'America/Chicago',
-      'America/New_York',
-      'America/Halifax',
-      'Pacific/Honolulu',
-      'Europe/London',
-      'Europe/Berlin',
-      'Asia/Tokyo',
-      'Australia/Sydney',
-      'Pacific/Auckland',
+      { label: 'UTC', zone: 'UTC' },
+      { label: 'US Pacific', zone: 'America/Los_Angeles' },
+      { label: 'US Mountain', zone: 'America/Denver' },
+      { label: 'US Central', zone: 'America/Chicago' },
+      { label: 'US Eastern', zone: 'America/New_York' },
+      { label: 'Europe London', zone: 'Europe/London' },
+      { label: 'Europe Berlin', zone: 'Europe/Berlin' },
+      { label: 'Asia Kolkata', zone: 'Asia/Kolkata' },
+      { label: 'Asia Shanghai', zone: 'Asia/Shanghai' },
+      { label: 'Asia Tokyo', zone: 'Asia/Tokyo' },
+      { label: 'Australia Sydney', zone: 'Australia/Sydney' },
+      { label: 'New Zealand Auckland', zone: 'Pacific/Auckland' },
     ];
-    if (!zones.includes(serverTimezone)) {
-      zones.push(serverTimezone);
+    const entries = zones.map((entry) => {
+      const time = formatTimeInZone(now, entry.zone);
+      const highlight =
+        String(entry.zone).toLowerCase() === String(serverTimezone).toLowerCase()
+          ? ' **(server local timezone)**'
+          : '';
+      return `${entry.label} — ${time}${highlight}`;
+    });
+    if (!zones.some((entry) => String(entry.zone).toLowerCase() === String(serverTimezone).toLowerCase())) {
+      const time = formatTimeInZone(now, serverTimezone);
+      entries.push(`Server Local — ${time} **(server local timezone)**`);
     }
-    const lines = zones.map((zone) => `${zone} — ${formatTimeInZone(now, zone)}${zone === serverTimezone ? ' **(server local timezone)**' : ''}`);
-    const embed = buildEmbed({ title: 'Time Status', description: lines.join('\n'), color: 0x2196f3 });
+    const embed = buildEmbed({ title: 'Time Status', description: entries.join('\n'), color: 0x2196f3 });
     embed.setFooter({ text: `Server local timezone: ${serverTimezone}` });
     await message.reply({ embeds: [embed], allowedMentions: { parse: [], repliedUser: false } });
   };

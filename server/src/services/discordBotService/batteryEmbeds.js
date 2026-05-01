@@ -23,6 +23,15 @@ function formatChargeState(batteryState) {
   return `${chargeText} (${percentText})`;
 }
 
+function formatDockEmoji(docked) { return docked ? '🏠' : '🧭'; }
+function formatChargeEmoji(charging) { return charging ? '⚡' : '🔌'; }
+function formatLockEmoji(locked) { return locked ? '🔒' : '🔓'; }
+function formatBatteryEmoji(batteryState) {
+  if (batteryState?.urgentActive) return '🛑';
+  if (batteryState?.warnActive) return '⚠️';
+  return '🔋';
+}
+
 function formatOiEmoji(oiMode) {
   if (oiMode === 'full') return '🕹️';
   if (oiMode === 'safe') return '🧰';
@@ -70,6 +79,12 @@ function buildBatteryStatusEmbed({ color = 0x2196f3, records = [] }) {
     const lockLabel = snapshot.locked ? `locked${snapshot.lockReason ? ` (${snapshot.lockReason})` : ''}` : 'unlocked';
     const dockLabel = snapshot.docked ? 'docked' : 'undocked';
     const chargingLabel = snapshot.charging ? `charging (${snapshot.chargingLabel})` : 'not charging';
+    const header = [
+      formatBatteryEmoji(snapshot.batteryState),
+      formatDockEmoji(snapshot.docked),
+      formatChargeEmoji(snapshot.charging),
+      formatLockEmoji(snapshot.locked),
+    ].join(' ');
 
     const lines = [
       `Dock: ${dockLabel}`,
@@ -77,12 +92,12 @@ function buildBatteryStatusEmbed({ color = 0x2196f3, records = [] }) {
       `Battery: ${formatChargeState(snapshot.batteryState)}`,
       `Voltage: ${formatVoltage(snapshot.voltageMv)}`,
       `Current: ${formatCurrent(snapshot.currentMa)}`,
+      `OI: ${snapshot.oiMode} ${formatOiEmoji(snapshot.oiMode)}`,
+      `Lock: ${lockLabel}`,
     ];
-    lines.push(`${formatOiEmoji(snapshot.oiMode)} OI mode: ${snapshot.oiMode}`);
-    lines.push(`Lock: ${lockLabel}`);
 
     embed.addFields({
-      name: snapshot.name,
+      name: `${header} ${snapshot.name}`,
       value: lines.join('\n'),
       inline: true,
     });

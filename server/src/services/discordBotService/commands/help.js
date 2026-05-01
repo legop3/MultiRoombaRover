@@ -16,8 +16,11 @@ function formatHelp() {
     '`rs mode <open|turns|admin|lockdown>` — change server mode',
     '`rs reason [text|clear]` — show or set admin mode reason',
     '`rs goal [text|clear]` — show or set global objective',
-    '`rs verify list|remove ...` — manage verified users',
-    '`rs deter list|ban|unban ...` — manage deterred users',
+    '`rs verify list` — list verified users (lockdown admins)',
+    '`rs verify remove <cookieUserId|nickname>` — remove verified user (lockdown admins)',
+    '`rs deter list` — list deterred users (lockdown admins)',
+    '`rs deter ban <cookieUserId|nickname|ip> [reason]` — deter a user (lockdown admins)',
+    '`rs deter unban <id|cookieUserId|nickname|ip>` — remove deterrence (lockdown admins)',
     '`ts` — show time status',
   ].join('\n');
 }

@@ -12,30 +12,57 @@ function createReplayCommand({ getMode, MODES, tryTriggerReplay, getReplaySource
   }
   function buildDefaultReplayTitle(requester, sources = []) {
     const requesterLabel = String(requester || 'Someone').trim() || 'Someone';
-    const labels = (Array.isArray(sources) ? sources : [])
-      .map((entry) => String(entry?.label || entry?.id || '').trim())
-      .filter(Boolean);
-    if (!labels.length) return `${requesterLabel} replay`;
-    if (labels.length === 1) return `${requesterLabel} replay: ${labels[0]}`;
-    return `${requesterLabel} replay: ${labels.slice(0, 3).join(' + ')}`;
+    const roverSource = (Array.isArray(sources) ? sources : []).find((entry) => entry?.type === 'rover');
+    const roverLabel = roverSource?.label || roverSource?.id || 'a rover';
+    return `${requesterLabel} driving ${roverLabel}`;
   }
 
-  function buildDriverSummary(sources = []) {
+  function buildReplayDriverLines(requester, sources = []) {
     const activeDrivers = getActiveDrivers();
     const roverSources = (Array.isArray(sources) ? sources : []).filter((entry) => entry?.type === 'rover');
+    const requestedRoverIds = new Set(roverSources.map((entry) => String(entry.id)));
     const lines = [];
-    roverSources.forEach((source) => {
-      const roverId = String(source.id);
+    requestedRoverIds.forEach((roverId) => {
       const socketId = activeDrivers?.[roverId];
       if (!socketId) return;
       const socket = io.sockets.sockets.get(socketId);
       const nickname = getNickname(socket) || socket?.data?.user?.username || socketId;
       const record = rovers.get(roverId);
-      const roverName = record?.meta?.name || source?.label || roverId;
-      lines.push(`${nickname} → ${roverName}`);
+      const roverName = record?.meta?.name || record?.id || roverId;
+      const isAuthor = String(nickname).toLowerCase() === String(requester || '').toLowerCase();
+      lines.push(`${nickname} driving ${roverName}${isAuthor ? ' **author**' : ''}`);
     });
-    if (!lines.length) return 'Drivers: none active for selected rover sources';
-    return `Drivers: ${lines.join(' | ')}`;
+    return lines;
+  }
+
+  function buildDriverCaption() {
+    const activeDrivers = getActiveDrivers();
+    const roster = Array.from(rovers.values());
+    if (!roster.length) return 'Drivers: no rovers online.';
+    const entries = roster.map((record) => {
+      const driverId = activeDrivers[record.id];
+      if (!driverId) return `${record.meta?.name || record.id}: none`;
+      const socket = io.sockets.sockets.get(driverId);
+      const nickname = getNickname(socket) || socket?.data?.user?.username || driverId;
+      return `${record.meta?.name || record.id}: ${nickname}`;
+    });
+    return `Drivers: ${entries.join(', ')}`;
+  }
+
+  function buildReplayCaption({ requester, usedSources = [], missingSources = [], title }) {
+    const lines = [];
+    if (title) {
+      lines.push(`**${title}**`);
+      lines.push('');
+    }
+    const driverLines = buildReplayDriverLines(requester, usedSources);
+    if (driverLines.length) lines.push(...driverLines);
+    if (missingSources.length) {
+      if (driverLines.length) lines.push('');
+      lines.push(`Missing: ${missingSources.map((source) => source.label || `${source.type}:${source.id}`).join(', ')}`);
+    }
+    if (!lines.length) lines.push(buildDriverCaption());
+    return lines.join('\n');
   }
   function resolveReplaySources(query) {
     const cleaned = normalizeReplayQuery(query);
@@ -70,10 +97,13 @@ function createReplayCommand({ getMode, MODES, tryTriggerReplay, getReplaySource
     const requester = message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
     const title = buildDefaultReplayTitle(requester, resolved.sources || []);
     try {
-      const { buffer } = await buildReplayVideo({ sources: resolved.sources || [], title, requester });
+      const { buffer, usedSources = resolved.sources || [], missingSources = [] } = await buildReplayVideo({
+        sources: resolved.sources || [],
+        title,
+        requester,
+      });
       const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(title)}.mp4` });
-      const summary = buildDriverSummary(resolved.sources || []);
-      const body = [ `**${title}**`, summary ].filter(Boolean).join('\n');
+      const body = buildReplayCaption({ requester, usedSources, missingSources, title });
       await message.reply({ content: sanitizeMentions(body), files: [attachment], allowedMentions: { parse: [], repliedUser: false } });
     } catch (err) {
       await message.reply({ content: sanitizeMentions(`Replay failed: ${err.message}`), allowedMentions: { parse: [], repliedUser: false } });

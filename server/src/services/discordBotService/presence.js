@@ -22,7 +22,7 @@ function createPresenceManager({ client, logger, getMode, getGlobalObjective, co
     const objectiveText = objective?.text ? String(objective.text).trim() : '';
     if (presenceShowObjective && objectiveText) {
       const trimmed = truncatePresenceText(objectiveText, 110);
-      return `Objective: ${trimmed}`;
+      return `Goal: ${trimmed}`;
     }
     return `${mode} · ${ready}/${total} Rovers Ready`;
   }
