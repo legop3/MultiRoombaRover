@@ -11,6 +11,10 @@ function sanitizeLogText(value) {
     .replace(/\x1B\[[0-9;]*[A-Za-z]/g, '');
 }
 
+function shellQuote(value) {
+  return `'${String(value || '').replace(/'/g, `'\"'\"'`)}'`;
+}
+
 function parsePayloadFromLine(line) {
   const raw = sanitizeLogText(line).trim();
   if (!raw) return null;
@@ -264,20 +268,26 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     if (state.process) return;
     ensureLogStream();
 
-    const args = [
+    const baseCommand = [
+      'env',
+      'PYTHONUNBUFFERED=1',
+      'NO_COLOR=1',
+      'TERM=dumb',
+      'uvx',
       '--from',
       'aioesphomeapi',
       'aioesphomeapi-logs',
-      host,
+      shellQuote(host),
       '--port',
-      String(port || 6053),
+      shellQuote(String(port || 6053)),
       '--noise-psk',
-      key,
+      shellQuote(key),
       '--no-states',
-    ];
+    ].join(' ');
+    const launchCommand = `if command -v script >/dev/null 2>&1; then exec script -qefc ${shellQuote(baseCommand)} /dev/null; else exec ${baseCommand}; fi`;
 
     logger.info('Starting Neato lidar log stream', { host, port: Number(port || 6053) });
-    const proc = spawn('uvx', args, {
+    const proc = spawn('bash', ['-lc', launchCommand], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     state.process = proc;

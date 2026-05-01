@@ -2,6 +2,7 @@
 // Purpose: Defines the Vip Neato Card module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useState } from 'react';
+import { useSocket } from '../../context/SocketContext.jsx';
 
 function normalizeState(value) {
   return String(value || '').trim();
@@ -58,7 +59,6 @@ function buildLidarDots(points = []) {
 export default function VipNeatoCard({
   neato,
   lidar,
-  lidarLines,
   onStart,
   onSendHome,
   onLocate,
@@ -66,9 +66,11 @@ export default function VipNeatoCard({
   onPowerCycle,
   fullWidth = false,
 }) {
+  const socket = useSocket();
   const [working, setWorking] = useState('');
   const [lidarFlash, setLidarFlash] = useState(false);
   const [showLidarDebug, setShowLidarDebug] = useState(false);
+  const [recentLidarLines, setRecentLidarLines] = useState([]);
   const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const configured = Boolean(neato?.configured);
@@ -85,7 +87,6 @@ export default function VipNeatoCard({
   const robotError = normalizeState(neato?.telemetry?.robotError) || '--';
   const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
   const lidarPoints = Array.isArray(lidar?.points) ? lidar.points : [];
-  const recentLidarLines = Array.isArray(lidarLines) ? lidarLines : [];
   const lidarDots = buildLidarDots(lidarPoints);
   const lidarStatus = normalizeState(lidar?.status) || '--';
   const lidarDebug = lidar?.debug && typeof lidar.debug === 'object' ? lidar.debug : null;
@@ -133,6 +134,19 @@ export default function VipNeatoCard({
     }, 120);
     return () => clearTimeout(timer);
   }, [lidar]);
+
+  useEffect(() => {
+    function handleLidarLine(payload = null) {
+      const next = payload && typeof payload === 'object' ? payload : null;
+      if (!next?.line) return;
+      setRecentLidarLines((prev) => [...prev.slice(-199), next]);
+    }
+
+    socket.on('neato:lidarLine', handleLidarLine);
+    return () => {
+      socket.off('neato:lidarLine', handleLidarLine);
+    };
+  }, [socket]);
 
   return (
     <section className={`surface text-sm text-slate-200 ${wrapClass}`}>
