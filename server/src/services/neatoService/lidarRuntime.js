@@ -11,28 +11,25 @@ function sanitizeLogText(value) {
     .replace(/\x1B\[[0-9;]*[A-Za-z]/g, '');
 }
 
-function parsePayloadLine(line) {
+function parsePayloadFromLine(line) {
   const raw = sanitizeLogText(line).trim();
   if (!raw) return null;
   const quotedMatch = raw.match(/<<< "(.*)"$/);
   if (!quotedMatch) return null;
   const payload = quotedMatch[1];
   if (!payload) return null;
-
-  // Ignore the duplicated multiline blob form and trust the clean one-message stream.
-  if (payload.includes('\\r\\n') || payload.includes('\r') || payload.includes('\n')) {
+  if (
+    payload.includes('\\r\\n') ||
+    payload.includes('\\n') ||
+    payload.includes('\\r') ||
+    payload.includes('\r') ||
+    payload.includes('\n')
+  ) {
     return null;
   }
-
-  if (payload === 'AngleInDegrees,DistInMM,Intensity,ErrorCodeHEX') {
-    return payload;
-  }
-  if (/^ROTATION_SPEED,[0-9.]+$/.test(payload)) {
-    return payload;
-  }
-  if (/^\d+,\d+,\d+,[0-9A-Fa-f]+$/.test(payload)) {
-    return payload;
-  }
+  if (payload === 'AngleInDegrees,DistInMM,Intensity,ErrorCodeHEX') return payload;
+  if (/^ROTATION_SPEED,[0-9.]+$/.test(payload)) return payload;
+  if (/^\d+,\d+,\d+,[0-9A-Fa-f]+$/.test(payload)) return payload;
   return null;
 }
 
@@ -215,7 +212,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     const lines = state[bufferKey].split(/\r?\n/);
     state[bufferKey] = lines.pop() || '';
     for (const line of lines) {
-      const payload = parsePayloadLine(line);
+      const payload = parsePayloadFromLine(line);
       handlePayload(payload);
     }
   }
