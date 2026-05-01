@@ -1,14 +1,23 @@
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 
-const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 10000;
 const SCAN_TIMEOUT_MS = 6000;
 const RECONNECT_DELAY_MS = 5000;
 
-function parseQuotedPayload(line) {
-  const match = String(line || '').match(/<<< "(.*)"$/);
-  if (!match) return null;
-  return match[1];
+function parsePayloadLine(line) {
+  const raw = String(line || '').trim();
+  if (!raw) return null;
+  const quotedMatch = raw.match(/<<< "(.*)"$/);
+  if (quotedMatch) return quotedMatch[1];
+  if (raw.includes('AngleInDegrees,DistInMM,Intensity,ErrorCodeHEX')) {
+    return 'AngleInDegrees,DistInMM,Intensity,ErrorCodeHEX';
+  }
+  const rotationMatch = raw.match(/ROTATION_SPEED,[0-9.]+/);
+  if (rotationMatch) return rotationMatch[0];
+  const pointMatch = raw.match(/\b\d+,\d+,\d+,[0-9A-Fa-f]+\b/);
+  if (pointMatch) return pointMatch[0];
+  return null;
 }
 
 function parsePointPayload(payload) {
@@ -80,6 +89,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
       points,
       rotationSpeed: state.currentScan.rotationSpeed,
     };
+    logger.info('Neato lidar scan parsed', { points: points.length, rotationSpeed: payload.rotationSpeed });
     resetScanState();
     events.emit('scan', payload);
   }
@@ -109,7 +119,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
     const lines = state.stdoutBuffer.split(/\r?\n/);
     state.stdoutBuffer = lines.pop() || '';
     for (const line of lines) {
-      const payload = parseQuotedPayload(line);
+      const payload = parsePayloadLine(line);
       handlePayload(payload);
     }
   }
