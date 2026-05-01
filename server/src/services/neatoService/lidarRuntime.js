@@ -1,8 +1,7 @@
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 
-const POLL_INTERVAL_MS = 3500;
-const SCAN_TIMEOUT_MS = 2000;
+const SCAN_TIMEOUT_MS = 4000;
 const RECONNECT_DELAY_MS = 5000;
 
 function parsePayloadLine(line) {
@@ -48,7 +47,8 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
     connected: false,
     process: null,
     reconnectTimer: null,
-    pollTimer: null,
+    pollSoonTimer: null,
+    requestTimeoutTimer: null,
     stdoutBuffer: '',
     currentScan: null,
     requestInFlight: false,
@@ -65,6 +65,26 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
     state.reconnectTimer = null;
   }
 
+  function clearPollSoonTimer() {
+    if (!state.pollSoonTimer) return;
+    clearTimeout(state.pollSoonTimer);
+    state.pollSoonTimer = null;
+  }
+
+  function clearRequestTimeoutTimer() {
+    if (!state.requestTimeoutTimer) return;
+    clearTimeout(state.requestTimeoutTimer);
+    state.requestTimeoutTimer = null;
+  }
+
+  function triggerPollSoon() {
+    if (state.pollSoonTimer) return;
+    state.pollSoonTimer = setTimeout(() => {
+      state.pollSoonTimer = null;
+      tickPoll();
+    }, 0);
+  }
+
   function scheduleReconnect() {
     if (state.reconnectTimer) return;
     state.reconnectTimer = setTimeout(() => {
@@ -74,6 +94,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
   }
 
   function resetScanState() {
+    clearRequestTimeoutTimer();
     state.currentScan = null;
     state.requestInFlight = false;
     state.requestStartedAt = 0;
@@ -92,6 +113,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
     logger.info('Neato lidar scan parsed', { points: points.length, rotationSpeed: payload.rotationSpeed });
     resetScanState();
     events.emit('scan', payload);
+    triggerPollSoon();
   }
 
   function handlePayload(payload) {
@@ -168,6 +190,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
       if (!state.connected) {
         state.connected = true;
         emitStatus();
+        triggerPollSoon();
       }
       handleStdoutChunk(chunk);
     });
@@ -193,38 +216,33 @@ function createLidarRuntime({ logger, host, port = 6053, key, shouldPoll, reques
   async function tickPoll() {
     if (!state.connected) return;
     if (!shouldPoll?.()) return;
-    if (state.requestInFlight) {
-      if (Date.now() - state.requestStartedAt >= SCAN_TIMEOUT_MS) {
-        logger.warn('Neato lidar scan timed out; resetting parser state');
-        resetScanState();
-      }
-      return;
-    }
+    if (state.requestInFlight) return;
     state.requestInFlight = true;
     state.requestStartedAt = Date.now();
+    clearRequestTimeoutTimer();
+    state.requestTimeoutTimer = setTimeout(() => {
+      logger.warn('Neato lidar scan timed out; resetting parser state');
+      resetScanState();
+      triggerPollSoon();
+    }, SCAN_TIMEOUT_MS);
     try {
       await requestScan?.();
     } catch (err) {
       logger.warn('Failed to request Neato lidar scan', err.message);
       resetScanState();
+      triggerPollSoon();
     }
   }
 
   function start() {
     startLogStream();
-    if (!state.pollTimer) {
-      state.pollTimer = setInterval(() => {
-        tickPoll();
-      }, POLL_INTERVAL_MS);
-    }
+    triggerPollSoon();
   }
 
   function stop() {
     clearReconnectTimer();
-    if (state.pollTimer) {
-      clearInterval(state.pollTimer);
-      state.pollTimer = null;
-    }
+    clearPollSoonTimer();
+    clearRequestTimeoutTimer();
     teardownProcess();
   }
 
