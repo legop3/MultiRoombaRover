@@ -15,6 +15,7 @@ import VipLiftCard from '../vip/VipLiftCard.jsx';
 export default function VipPanel() {
   const {
     session,
+    neatoLidar,
     identifySession,
     requestVerification,
     requestPrivateRoverAccess,
@@ -78,6 +79,7 @@ export default function VipPanel() {
             <div className="space-y-2">
               <VipNeatoCard
                 neato={session?.neato || null}
+                lidar={neatoLidar}
                 onStart={neatoStart}
                 onSendHome={neatoSendHome}
                 onLocate={neatoLocate}

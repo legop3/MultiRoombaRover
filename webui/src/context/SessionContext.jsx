@@ -8,6 +8,7 @@ import { useSocket } from './SocketContext.jsx';
 const INITIAL_STATE = {
   connected: false,
   session: null,
+  neatoLidar: null,
   logs: [],
   adminLogs: [],
   llmCommentaryState: null,
@@ -127,8 +128,13 @@ export function SessionProvider({ children }) {
         ],
       }));
     }
+    function handleNeatoLidar(payload = null) {
+      const next = payload && typeof payload === 'object' ? payload : null;
+      setState((prev) => ({ ...prev, neatoLidar: next }));
+    }
 
     socket.on('session:sync', handleSession);
+    socket.on('neato:lidar', handleNeatoLidar);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
     socket.on('adminlog:init', handleAdminLogInit);
@@ -137,6 +143,7 @@ export function SessionProvider({ children }) {
     socket.on('alert:new', handleAlertNew);
     return () => {
       socket.off('session:sync', handleSession);
+      socket.off('neato:lidar', handleNeatoLidar);
       socket.off('log:init', handleLogInit);
       socket.off('log:entry', handleLogEntry);
       socket.off('adminlog:init', handleAdminLogInit);

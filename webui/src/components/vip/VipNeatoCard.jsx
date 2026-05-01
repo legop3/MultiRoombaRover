@@ -38,8 +38,26 @@ function StatusTile({ label, value, tone = 'muted', valueClass = '', hideLabel =
   );
 }
 
+function buildLidarDots(points = []) {
+  const center = 110;
+  const radius = 92;
+  const maxDistanceMm = 4000;
+  return points
+    .filter((point) => point && point.valid && Number.isFinite(point.angleDeg) && Number.isFinite(point.distanceMm))
+    .map((point) => {
+      const angleRad = ((Number(point.angleDeg) - 90) * Math.PI) / 180;
+      const normalized = Math.max(0, Math.min(1, Number(point.distanceMm) / maxDistanceMm));
+      const scaledRadius = normalized * radius;
+      const x = center + Math.cos(angleRad) * scaledRadius;
+      const y = center + Math.sin(angleRad) * scaledRadius;
+      return `${x},${y}`;
+    })
+    .join(' ');
+}
+
 export default function VipNeatoCard({
   neato,
+  lidar,
   onStart,
   onSendHome,
   onLocate,
@@ -63,9 +81,8 @@ export default function VipNeatoCard({
   const voltageLabel = Number.isFinite(voltage) ? `${voltage.toFixed(2)} V` : '--';
   const robotError = normalizeState(neato?.telemetry?.robotError) || '--';
   const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
-
-  const hasError = robotError !== '--' && !/^no errors$/i.test(robotError) && !/^200/.test(robotError);
-  const hasAlert = robotAlert !== '--' && !/^200/.test(robotAlert);
+  const lidarPoints = Array.isArray(lidar?.points) ? lidar.points : [];
+  const lidarDots = buildLidarDots(lidarPoints);
 
   const controls = neato?.controls || {};
   const canStart = Boolean(controls?.start?.available);
@@ -116,95 +133,121 @@ export default function VipNeatoCard({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-0.5">
-            <div className="surface-muted grid gap-0.5">
-              <p className="text-xs text-slate-300 text-center">Controls</p>
+          <div className="surface-muted grid gap-0.5">
+            <p className="text-xs text-slate-300 text-center">Controls</p>
+            <button
+              type="button"
+              disabled={!canRunStart || Boolean(working)}
+              onClick={() => runAction('start', onStart)}
+              className="rounded-md border border-sky-300 bg-emerald-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {working === 'start' ? 'Starting...' : 'Start cleaning'}
+            </button>
+            <button
+              type="button"
+              disabled={!canRunSendHome || Boolean(working)}
+              onClick={() => runAction('sendHome', onSendHome)}
+              className="rounded-md border border-sky-300 bg-sky-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-sky-500 disabled:opacity-50"
+            >
+              {working === 'sendHome' ? 'Sending...' : 'Send to dock'}
+            </button>
+            <div className="grid grid-cols-3 gap-0.5">
               <button
                 type="button"
-                disabled={!canRunStart || Boolean(working)}
-                onClick={() => runAction('start', onStart)}
-                className="rounded-md border border-sky-300 bg-emerald-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-emerald-500 disabled:opacity-50"
+                disabled={!canRunLocate || Boolean(working)}
+                onClick={() => runAction('locate', onLocate)}
+                className="w-full rounded-md border border-sky-300 bg-fuchsia-600 px-1 py-0.5 text-xs font-semibold text-white transition hover:border-sky-500 hover:bg-fuchsia-500 disabled:opacity-50"
               >
-                {working === 'start' ? 'Starting...' : 'Start cleaning'}
+                {working === 'locate' ? 'Playing...' : 'Play sound'}
               </button>
               <button
                 type="button"
-                disabled={!canRunSendHome || Boolean(working)}
-                onClick={() => runAction('sendHome', onSendHome)}
-                className="rounded-md border border-sky-300 bg-sky-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-sky-500 disabled:opacity-50"
+                disabled={!canRunClearErrors || Boolean(working)}
+                onClick={() => runAction('clearErrors', onClearErrors)}
+                className="w-full rounded-md border border-sky-300 bg-amber-500 px-1 py-0.5 text-xs font-semibold text-slate-900 transition hover:border-sky-500 hover:bg-amber-400 disabled:opacity-50"
               >
-                {working === 'sendHome' ? 'Sending...' : 'Send to dock'}
+                {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
               </button>
-              <div className="grid grid-cols-3 gap-0.5">
-                <button
-                  type="button"
-                  disabled={!canRunLocate || Boolean(working)}
-                  onClick={() => runAction('locate', onLocate)}
-                  className="w-full rounded-md border border-sky-300 bg-fuchsia-600 px-1 py-0.5 text-xs font-semibold text-white transition hover:border-sky-500 hover:bg-fuchsia-500 disabled:opacity-50"
-                >
-                  {working === 'locate' ? 'Playing...' : 'Play sound'}
-                </button>
-                <button
-                  type="button"
-                  disabled={!canRunClearErrors || Boolean(working)}
-                  onClick={() => runAction('clearErrors', onClearErrors)}
-                  className="w-full rounded-md border border-sky-300 bg-amber-500 px-1 py-0.5 text-xs font-semibold text-slate-900 transition hover:border-sky-500 hover:bg-amber-400 disabled:opacity-50"
-                >
-                  {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
-                </button>
-                <button
-                  type="button"
-                  disabled={!canRunPowerCycle || Boolean(working)}
-                  onClick={() => runAction('powerCycle', onPowerCycle)}
-                  className="w-full rounded-md border border-rose-300 bg-rose-600 px-1 py-0.5 text-xs font-semibold text-white transition hover:border-rose-500 hover:bg-rose-500 disabled:opacity-50"
-                >
-                  {working === 'powerCycle' ? 'Cycling...' : 'Power cycle'}
-                </button>
-              </div>
-              <div className="surface-muted grid gap-0.5 pt-0.25">
-                <p className="text-xs text-slate-300 text-center">Power status</p>
-                <div className="grid grid-cols-2 gap-0.5">
-                  <StatusTile label="Battery" value={batteryLabel} tone={batteryTone} />
-                  <StatusTile label="Voltage" value={voltageLabel} tone="muted" />
-                  <StatusTile
-                    label="Docked"
-                    value={docked ? 'Docked' : 'Not docked'}
-                    tone={docked ? 'good' : 'muted'}
-                    hideLabel
-                  />
-                  <StatusTile
-                    label="Charging"
-                    value={charging ? 'Charging' : 'Not charging'}
-                    tone={charging ? 'good' : 'muted'}
-                    hideLabel
-                  />
-                </div>
-              </div>
+              <button
+                type="button"
+                disabled={!canRunPowerCycle || Boolean(working)}
+                onClick={() => runAction('powerCycle', onPowerCycle)}
+                className="w-full rounded-md border border-rose-300 bg-rose-600 px-1 py-0.5 text-xs font-semibold text-white transition hover:border-rose-500 hover:bg-rose-500 disabled:opacity-50"
+              >
+                {working === 'powerCycle' ? 'Cycling...' : 'Power cycle'}
+              </button>
             </div>
-
-            <div className="surface-muted grid gap-0.5">
-              <p className="text-xs text-slate-300 text-center">Robot Status</p>
-              <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                <div className="text-[0.72rem] text-slate-300">Robot state (raw)</div>
-                <div className="font-mono text-sm text-slate-100 break-all">{robotStateRaw}</div>
-              </div>
-              <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                <div className="text-[0.72rem] text-slate-300">Basic state</div>
-                <div className="font-mono text-sm text-slate-100 break-all">{primaryState}</div>
-              </div>
-              <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                <div className="text-[0.72rem] text-slate-300">UI state</div>
-                <div className="font-mono text-sm text-slate-100 break-all">{uiStateLabel}</div>
-              </div>
-              <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                <div className="text-[0.72rem] text-slate-300">Robot error</div>
-                <div className="font-mono text-sm text-slate-100 break-all">{robotError}</div>
-              </div>
-              <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                <div className="text-[0.72rem] text-slate-300">Robot alert</div>
-                <div className="font-mono text-sm text-slate-100 break-all">{robotAlert}</div>
+            <div className="surface-muted grid gap-0.5 pt-0.25">
+              <p className="text-xs text-slate-300 text-center">Power status</p>
+              <div className="grid grid-cols-2 gap-0.5">
+                <StatusTile label="Battery" value={batteryLabel} tone={batteryTone} />
+                <StatusTile label="Voltage" value={voltageLabel} tone="muted" />
+                <StatusTile
+                  label="Docked"
+                  value={docked ? 'Docked' : 'Not docked'}
+                  tone={docked ? 'good' : 'muted'}
+                  hideLabel
+                />
+                <StatusTile
+                  label="Charging"
+                  value={charging ? 'charging' : 'not charging'}
+                  tone={charging ? 'good' : 'muted'}
+                  hideLabel
+                />
               </div>
             </div>
           </div>
+
+          <div className="surface-muted grid gap-0.5">
+            <p className="text-xs text-slate-300 text-center">Robot Status</p>
+            <div className="rounded-md bg-slate-800 px-1 py-0.5">
+              <div className="text-[0.72rem] text-slate-300">Robot state (raw)</div>
+              <div className="font-mono text-sm text-slate-100 break-all">{robotStateRaw}</div>
+            </div>
+            <div className="rounded-md bg-slate-800 px-1 py-0.5">
+              <div className="text-[0.72rem] text-slate-300">Basic state</div>
+              <div className="font-mono text-sm text-slate-100 break-all">{primaryState}</div>
+            </div>
+            <div className="rounded-md bg-slate-800 px-1 py-0.5">
+              <div className="text-[0.72rem] text-slate-300">UI state</div>
+              <div className="font-mono text-sm text-slate-100 break-all">{uiStateLabel}</div>
+            </div>
+            <div className="rounded-md bg-slate-800 px-1 py-0.5">
+              <div className="text-[0.72rem] text-slate-300">Robot error</div>
+              <div className="font-mono text-sm text-slate-100 break-all">{robotError}</div>
+            </div>
+            <div className="rounded-md bg-slate-800 px-1 py-0.5">
+              <div className="text-[0.72rem] text-slate-300">Robot alert</div>
+              <div className="font-mono text-sm text-slate-100 break-all">{robotAlert}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="surface-muted grid gap-0.5">
+          <p className="text-xs text-slate-300 text-center">Lidar</p>
+          <div className="rounded-md bg-slate-800 p-0.5">
+            {lidarDots ? (
+              <svg viewBox="0 0 220 220" className="w-full max-w-[26rem] mx-auto">
+                <circle cx="110" cy="110" r="92" fill="none" stroke="#475569" strokeWidth="1" />
+                <circle cx="110" cy="110" r="61" fill="none" stroke="#334155" strokeWidth="1" />
+                <circle cx="110" cy="110" r="31" fill="none" stroke="#1e293b" strokeWidth="1" />
+                <line x1="110" y1="18" x2="110" y2="202" stroke="#334155" strokeWidth="1" />
+                <line x1="18" y1="110" x2="202" y2="110" stroke="#334155" strokeWidth="1" />
+                <circle cx="110" cy="110" r="4" fill="#e2e8f0" />
+                <polyline
+                  points={lidarDots}
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <div className="py-3 text-center text-xs text-slate-400">Waiting for lidar scan...</div>
+            )}
+          </div>
+        </div>
 
         {!configured || !connected || !canStart || !canSendHome || !canLocate || !canClearErrors || !canPowerCycle ? (
           <p className="text-xs text-slate-400 text-center">

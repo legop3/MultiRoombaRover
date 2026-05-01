@@ -38,6 +38,10 @@ homeAssistant:
     # ESPHome device name, used to derive gen3 entities:
     # button.<device>_house_clean, button.<device>_send_to_base, button.<device>_locate_robot, etc.
     device: "neato_vacuum"
+    # Direct ESPHome API connection used for lidar log streaming.
+    brainslugHost: "neato-vacuum.local"
+    brainslugPort: 6053
+    brainslugKey: "REPLACE_WITH_ESPHOME_NOISE_PSK"
   lift:
     # Two Home Assistant switches controlling lift direction.
     # Raise sequence: down off -> wait interlockMs -> up on
