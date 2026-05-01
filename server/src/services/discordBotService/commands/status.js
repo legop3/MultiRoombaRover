@@ -21,7 +21,7 @@ function createStatusCommand({ rovers, roverManager }) {
     }
     const records = roverId ? [single] : Array.from(rovers.values()).filter((entry) => roverManager.canReplayRoverId(entry?.id));
     await message.reply({
-      embeds: [buildBatteryStatusEmbed({ color: 0x2196f3, records, includeOi: true })],
+      embeds: [buildBatteryStatusEmbed({ color: 0x2196f3, records })],
       allowedMentions: { parse: [], repliedUser: false },
     });
   };

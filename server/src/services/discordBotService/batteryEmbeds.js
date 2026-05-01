@@ -23,14 +23,6 @@ function formatChargeState(batteryState) {
   return `${chargeText} (${percentText})`;
 }
 
-function formatDockEmoji(docked) { return docked ? '🏠' : '🧭'; }
-function formatChargeEmoji(charging) { return charging ? '⚡' : '🔌'; }
-function formatLockEmoji(locked) { return locked ? '🔒' : '🔓'; }
-function formatBatteryEmoji(batteryState) {
-  if (batteryState?.urgentActive) return '🛑';
-  if (batteryState?.warnActive) return '⚠️';
-  return '🔋';
-}
 function formatOiEmoji(oiMode) {
   if (oiMode === 'full') return '🕹️';
   if (oiMode === 'safe') return '🧰';
@@ -66,7 +58,7 @@ function buildRoverStatusSnapshot(record) {
   };
 }
 
-function buildBatteryStatusEmbed({ color = 0x2196f3, records = [], includeOi = true }) {
+function buildBatteryStatusEmbed({ color = 0x2196f3, records = [] }) {
   const embed = new EmbedBuilder().setTitle('Rover Battery Status').setColor(color).setTimestamp(new Date());
   const snapshots = records.map((entry) => buildRoverStatusSnapshot(entry)).filter(Boolean);
   if (!snapshots.length) {
@@ -78,27 +70,19 @@ function buildBatteryStatusEmbed({ color = 0x2196f3, records = [], includeOi = t
     const lockLabel = snapshot.locked ? `locked${snapshot.lockReason ? ` (${snapshot.lockReason})` : ''}` : 'unlocked';
     const dockLabel = snapshot.docked ? 'docked' : 'undocked';
     const chargingLabel = snapshot.charging ? `charging (${snapshot.chargingLabel})` : 'not charging';
-    const header = [
-      formatBatteryEmoji(snapshot.batteryState),
-      formatDockEmoji(snapshot.docked),
-      formatChargeEmoji(snapshot.charging),
-      formatLockEmoji(snapshot.locked),
-    ].join(' ');
 
     const lines = [
-      `${formatDockEmoji(snapshot.docked)} Dock: ${dockLabel}`,
-      `${formatChargeEmoji(snapshot.charging)} Charging: ${chargingLabel}`,
-      `${formatBatteryEmoji(snapshot.batteryState)} Battery: ${formatChargeState(snapshot.batteryState)}`,
-      `🔌 Voltage: ${formatVoltage(snapshot.voltageMv)}`,
-      `📈 Current: ${formatCurrent(snapshot.currentMa)}`,
+      `Dock: ${dockLabel}`,
+      `Charging: ${chargingLabel}`,
+      `Battery: ${formatChargeState(snapshot.batteryState)}`,
+      `Voltage: ${formatVoltage(snapshot.voltageMv)}`,
+      `Current: ${formatCurrent(snapshot.currentMa)}`,
     ];
-    if (includeOi) {
-      lines.push(`${formatOiEmoji(snapshot.oiMode)} OI mode: ${snapshot.oiMode}`);
-    }
-    lines.push(`${formatLockEmoji(snapshot.locked)} Lock: ${lockLabel}`);
+    lines.push(`${formatOiEmoji(snapshot.oiMode)} OI mode: ${snapshot.oiMode}`);
+    lines.push(`Lock: ${lockLabel}`);
 
     embed.addFields({
-      name: `${header} ${snapshot.name}`,
+      name: snapshot.name,
       value: lines.join('\n'),
       inline: true,
     });
