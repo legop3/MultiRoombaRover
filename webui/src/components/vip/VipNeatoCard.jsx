@@ -258,14 +258,6 @@ export default function VipNeatoCard({
                         <line x1="110" y1="18" x2="110" y2="202" stroke="#166534" strokeWidth="1" />
                         <line x1="18" y1="110" x2="202" y2="110" stroke="#166534" strokeWidth="1" />
                         <circle cx="110" cy="110" r="4" fill="#4ade80" />
-                        <polyline
-                          points={lidarDots}
-                          fill="none"
-                          stroke="#4ade80"
-                          strokeWidth="1.5"
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                        />
                         {lidarPoints
                           .filter(
                             (point) =>
