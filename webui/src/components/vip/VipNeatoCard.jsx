@@ -227,28 +227,26 @@ export default function VipNeatoCard({
 
                 <div className="rounded-md bg-slate-800 px-1 py-0.5">
                   <div className="text-[0.72rem] text-slate-300">Lidar</div>
-                  <div className="mt-0.25 aspect-square rounded-md border border-emerald-950 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.14),rgba(0,0,0,0.96)_68%)] p-0.25">
+                  <div className="mt-0.25 aspect-square rounded-md bg-slate-900 p-0.25">
                     {lidarDots ? (
                       <svg viewBox="0 0 220 220" className="h-full w-full">
-                        <circle cx="110" cy="110" r="92" fill="none" stroke="#14532d" strokeWidth="1.2" />
-                        <circle cx="110" cy="110" r="61" fill="none" stroke="#166534" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="31" fill="none" stroke="#15803d" strokeWidth="0.9" />
-                        <line x1="110" y1="18" x2="110" y2="202" stroke="#14532d" strokeWidth="1" />
-                        <line x1="18" y1="110" x2="202" y2="110" stroke="#14532d" strokeWidth="1" />
-                        <line x1="45" y1="45" x2="175" y2="175" stroke="#0f3d22" strokeWidth="0.8" />
-                        <line x1="175" y1="45" x2="45" y2="175" stroke="#0f3d22" strokeWidth="0.8" />
-                        <circle cx="110" cy="110" r="4" fill="#86efac" />
+                        <circle cx="110" cy="110" r="92" fill="none" stroke="#475569" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="61" fill="none" stroke="#334155" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="31" fill="none" stroke="#1e293b" strokeWidth="1" />
+                        <line x1="110" y1="18" x2="110" y2="202" stroke="#334155" strokeWidth="1" />
+                        <line x1="18" y1="110" x2="202" y2="110" stroke="#334155" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="4" fill="#e2e8f0" />
                         <polyline
                           points={lidarDots}
                           fill="none"
-                          stroke="#22c55e"
-                          strokeWidth="1.4"
+                          stroke="#38bdf8"
+                          strokeWidth="1.5"
                           strokeLinejoin="round"
                           strokeLinecap="round"
                         />
                       </svg>
                     ) : (
-                      <div className="flex h-full items-center justify-center text-center text-xs text-emerald-500/80">
+                      <div className="flex h-full items-center justify-center text-center text-xs text-slate-400">
                         Waiting for scan
                       </div>
                     )}
