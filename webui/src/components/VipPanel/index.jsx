@@ -16,6 +16,7 @@ export default function VipPanel() {
   const {
     session,
     neatoLidar,
+    neatoLidarLines,
     identifySession,
     requestVerification,
     requestPrivateRoverAccess,
@@ -80,6 +81,7 @@ export default function VipPanel() {
               <VipNeatoCard
                 neato={session?.neato || null}
                 lidar={neatoLidar}
+                lidarLines={neatoLidarLines}
                 onStart={neatoStart}
                 onSendHome={neatoSendHome}
                 onLocate={neatoLocate}

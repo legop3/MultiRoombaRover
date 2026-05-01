@@ -58,6 +58,7 @@ function buildLidarDots(points = []) {
 export default function VipNeatoCard({
   neato,
   lidar,
+  lidarLines,
   onStart,
   onSendHome,
   onLocate,
@@ -84,6 +85,7 @@ export default function VipNeatoCard({
   const robotError = normalizeState(neato?.telemetry?.robotError) || '--';
   const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
   const lidarPoints = Array.isArray(lidar?.points) ? lidar.points : [];
+  const recentLidarLines = Array.isArray(lidarLines) ? lidarLines : [];
   const lidarDots = buildLidarDots(lidarPoints);
   const lidarStatus = normalizeState(lidar?.status) || '--';
   const lidarDebug = lidar?.debug && typeof lidar.debug === 'object' ? lidar.debug : null;
@@ -288,6 +290,18 @@ export default function VipNeatoCard({
                       <div>Rotation no scan: {lidarStats?.rotationsWithoutScan ?? '--'}</div>
                       <div>Parseable payloads: {lidarStats?.parseablePayloads ?? '--'}</div>
                       <div>Point payloads: {lidarStats?.pointPayloads ?? '--'}</div>
+                      <div className="mt-0.5 border-t border-slate-700 pt-0.5 text-slate-400">Raw ESP lines</div>
+                      <div className="mt-0.25 max-h-40 overflow-y-auto rounded bg-black/30 px-0.5 py-0.5 text-[0.62rem] leading-tight text-slate-300">
+                        {recentLidarLines.length ? (
+                          recentLidarLines.map((entry, index) => (
+                            <div key={`${index}-${entry.source || 'line'}`} className="break-all">
+                              <span className="text-slate-500">[{entry.source || 'line'}]</span> {entry.line}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-slate-500">No raw lines yet</div>
+                        )}
+                      </div>
                     </div>
                   ) : null}
                 </div>

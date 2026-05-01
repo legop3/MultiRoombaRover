@@ -9,6 +9,7 @@ const INITIAL_STATE = {
   connected: false,
   session: null,
   neatoLidar: null,
+  neatoLidarLines: [],
   logs: [],
   adminLogs: [],
   llmCommentaryState: null,
@@ -132,9 +133,18 @@ export function SessionProvider({ children }) {
       const next = payload && typeof payload === 'object' ? payload : null;
       setState((prev) => ({ ...prev, neatoLidar: next }));
     }
+    function handleNeatoLidarLine(payload = null) {
+      const next = payload && typeof payload === 'object' ? payload : null;
+      if (!next?.line) return;
+      setState((prev) => ({
+        ...prev,
+        neatoLidarLines: [...prev.neatoLidarLines.slice(-199), next],
+      }));
+    }
 
     socket.on('session:sync', handleSession);
     socket.on('neato:lidar', handleNeatoLidar);
+    socket.on('neato:lidarLine', handleNeatoLidarLine);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
     socket.on('adminlog:init', handleAdminLogInit);
@@ -144,6 +154,7 @@ export function SessionProvider({ children }) {
     return () => {
       socket.off('session:sync', handleSession);
       socket.off('neato:lidar', handleNeatoLidar);
+      socket.off('neato:lidarLine', handleNeatoLidarLine);
       socket.off('log:init', handleLogInit);
       socket.off('log:entry', handleLogEntry);
       socket.off('adminlog:init', handleAdminLogInit);

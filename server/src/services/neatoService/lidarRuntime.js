@@ -212,6 +212,10 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     const lines = state[bufferKey].split(/\r?\n/);
     state[bufferKey] = lines.pop() || '';
     for (const line of lines) {
+      events.emit('line', {
+        source: sourceLabel || 'unknown',
+        line: sanitizeLogText(line),
+      });
       const payload = parsePayloadFromLine(line);
       handlePayload(payload);
     }
