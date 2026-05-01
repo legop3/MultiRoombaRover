@@ -1,7 +1,7 @@
 // Vip Neato Card
 // Purpose: Defines the Vip Neato Card module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 function normalizeState(value) {
   return String(value || '').trim();
@@ -66,6 +66,7 @@ export default function VipNeatoCard({
   fullWidth = false,
 }) {
   const [working, setWorking] = useState('');
+  const [lidarFlash, setLidarFlash] = useState(false);
   const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const configured = Boolean(neato?.configured);
@@ -116,6 +117,15 @@ export default function VipNeatoCard({
     battery == null ? 'muted' : battery >= 60 ? 'good' : battery >= 25 ? 'warn' : 'danger';
 
   const primaryState = docked ? 'Docked' : uiStateLabel !== '--' ? uiStateLabel : 'Away from dock';
+
+  useEffect(() => {
+    if (!lidar || !Array.isArray(lidar.points)) return undefined;
+    setLidarFlash(true);
+    const timer = setTimeout(() => {
+      setLidarFlash(false);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [lidar]);
 
   return (
     <section className={`surface text-sm text-slate-200 ${wrapClass}`}>
@@ -225,7 +235,7 @@ export default function VipNeatoCard({
                   </div>
                 </div>
 
-                <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                <div className={`rounded-md px-1 py-0.5 ${lidarFlash ? 'bg-emerald-900' : 'bg-slate-800'}`}>
                   <div className="text-[0.72rem] text-slate-300">Lidar</div>
                   <div className="mt-0.25 aspect-square rounded-md bg-slate-900 p-0.25">
                     {lidarDots ? (
