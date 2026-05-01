@@ -67,6 +67,7 @@ export default function VipNeatoCard({
 }) {
   const [working, setWorking] = useState('');
   const [lidarFlash, setLidarFlash] = useState(false);
+  const [showLidarDebug, setShowLidarDebug] = useState(false);
   const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const configured = Boolean(neato?.configured);
@@ -84,6 +85,10 @@ export default function VipNeatoCard({
   const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
   const lidarPoints = Array.isArray(lidar?.points) ? lidar.points : [];
   const lidarDots = buildLidarDots(lidarPoints);
+  const lidarStatus = normalizeState(lidar?.status) || '--';
+  const lidarDebug = lidar?.debug && typeof lidar.debug === 'object' ? lidar.debug : null;
+  const lidarReason = normalizeState(lidarDebug?.reason) || '--';
+  const lidarStats = lidarDebug?.stats && typeof lidarDebug.stats === 'object' ? lidarDebug.stats : null;
 
   const controls = neato?.controls || {};
   const canStart = Boolean(controls?.start?.available);
@@ -236,7 +241,13 @@ export default function VipNeatoCard({
                 </div>
 
                 <div className={`rounded-md px-1 py-0.5 ${lidarFlash ? 'bg-emerald-900' : 'bg-slate-800'}`}>
-                  <div className="text-[0.72rem] text-slate-300">Lidar</div>
+                  <button
+                    type="button"
+                    onClick={() => setShowLidarDebug((value) => !value)}
+                    className="w-full text-left text-[0.72rem] text-slate-300"
+                  >
+                    Lidar
+                  </button>
                   <div className="mt-0.25 aspect-square rounded-md bg-slate-900 p-0.25">
                     {lidarDots ? (
                       <svg viewBox="0 0 220 220" className="h-full w-full">
@@ -261,6 +272,24 @@ export default function VipNeatoCard({
                       </div>
                     )}
                   </div>
+                  {showLidarDebug ? (
+                    <div className="mt-0.5 rounded-md bg-slate-900 px-0.75 py-0.5 font-mono text-[0.68rem] text-slate-300">
+                      <div>Status: {lidarStatus}</div>
+                      <div>Reason: {lidarReason}</div>
+                      <div>Points: {lidarPoints.length}</div>
+                      <div>Rotation: {Number.isFinite(lidar?.rotationSpeed) ? lidar.rotationSpeed.toFixed(2) : '--'}</div>
+                      <div>Request in flight: {lidarDebug?.requestInFlight ? 'yes' : 'no'}</div>
+                      <div>Started at: {lidarDebug?.requestStartedAt || '--'}</div>
+                      <div>Headers: {lidarStats?.headersSeen ?? '--'}</div>
+                      <div>Rotations: {lidarStats?.rotationsSeen ?? '--'}</div>
+                      <div>Scans ok: {lidarStats?.scansOk ?? '--'}</div>
+                      <div>Timeouts: {lidarStats?.scansTimedOut ?? '--'}</div>
+                      <div>Restarts: {lidarStats?.scansRestarted ?? '--'}</div>
+                      <div>Rotation no scan: {lidarStats?.rotationsWithoutScan ?? '--'}</div>
+                      <div>Parseable payloads: {lidarStats?.parseablePayloads ?? '--'}</div>
+                      <div>Point payloads: {lidarStats?.pointPayloads ?? '--'}</div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>

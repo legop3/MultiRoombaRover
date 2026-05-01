@@ -72,6 +72,16 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     requestInFlight: false,
     requestStartedAt: 0,
     logStream: null,
+    stats: {
+      headersSeen: 0,
+      rotationsSeen: 0,
+      scansOk: 0,
+      scansTimedOut: 0,
+      scansRestarted: 0,
+      rotationsWithoutScan: 0,
+      parseablePayloads: 0,
+      pointPayloads: 0,
+    },
   };
 
   function emitStatus() {
@@ -119,25 +129,56 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     state.requestStartedAt = 0;
   }
 
-  function finalizeScan() {
+  function buildPoints(scan) {
+    return Array.from(scan?.points?.values?.() || []).sort((a, b) => a.angleDeg - b.angleDeg);
+  }
+
+  function emitFrame({ status, reason, scan = state.currentScan }) {
+    const points = buildPoints(scan);
+    const payload = {
+      points,
+      rotationSpeed: scan?.rotationSpeed ?? null,
+      status,
+      debug: {
+        reason,
+        pointsReceived: points.length,
+        validPoints: points.filter((point) => point?.valid).length,
+        requestInFlight: state.requestInFlight,
+        requestStartedAt: state.requestStartedAt || null,
+        stats: { ...state.stats },
+      },
+    };
+    events.emit('scan', payload);
+    return payload;
+  }
+
+  function finalizeScan(reason = 'rotation_complete') {
     if (!state.currentScan) {
+      state.stats.rotationsWithoutScan += 1;
+      emitFrame({ status: 'error', reason: 'rotation_without_scan', scan: null });
       resetScanState();
       return;
     }
-    const points = Array.from(state.currentScan.points.values()).sort((a, b) => a.angleDeg - b.angleDeg);
-    const payload = {
-      points,
-      rotationSpeed: state.currentScan.rotationSpeed,
-    };
-    logger.info('Neato lidar scan parsed', { points: points.length, rotationSpeed: payload.rotationSpeed });
+    state.stats.scansOk += 1;
+    const payload = emitFrame({ status: 'ok', reason });
+    logger.info('Neato lidar scan parsed', {
+      points: payload.points.length,
+      rotationSpeed: payload.rotationSpeed,
+      reason,
+    });
     resetScanState();
-    events.emit('scan', payload);
     triggerPollSoon();
   }
 
   function handlePayload(payload) {
     if (!payload) return;
+    state.stats.parseablePayloads += 1;
     if (payload === 'AngleInDegrees,DistInMM,Intensity,ErrorCodeHEX') {
+      state.stats.headersSeen += 1;
+      if (state.currentScan) {
+        state.stats.scansRestarted += 1;
+        emitFrame({ status: 'error', reason: 'header_restart' });
+      }
       state.currentScan = {
         points: new Map(),
         rotationSpeed: null,
@@ -146,12 +187,16 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     }
     const rotationSpeed = parseRotationSpeed(payload);
     if (rotationSpeed != null) {
-      if (state.currentScan) state.currentScan.rotationSpeed = rotationSpeed;
-      finalizeScan();
+      state.stats.rotationsSeen += 1;
+      if (state.currentScan) {
+        state.currentScan.rotationSpeed = rotationSpeed;
+      }
+      finalizeScan('rotation_complete');
       return;
     }
     const point = parsePointPayload(payload);
     if (!point || !state.currentScan) return;
+    state.stats.pointPayloads += 1;
     state.currentScan.points.set(point.angleDeg, point);
   }
 
@@ -274,6 +319,8 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     clearRequestTimeoutTimer();
     state.requestTimeoutTimer = setTimeout(() => {
       logger.warn('Neato lidar scan timed out; resetting parser state');
+      state.stats.scansTimedOut += 1;
+      emitFrame({ status: 'error', reason: 'scan_timeout' });
       resetScanState();
       triggerPollSoon();
     }, SCAN_TIMEOUT_MS);
