@@ -225,11 +225,9 @@ export default function VipNeatoCard({
                   </div>
                 </div>
 
-                <div className="rounded-md border border-emerald-900 bg-black p-0.5">
-                  <div className="mb-0.25 text-center text-[0.72rem] uppercase tracking-[0.18em] text-emerald-400">
-                    Lidar
-                  </div>
-                  <div className="aspect-square rounded-md border border-emerald-950 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.14),rgba(0,0,0,0.96)_68%)] p-0.25">
+                <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                  <div className="text-[0.72rem] text-slate-300">Lidar</div>
+                  <div className="mt-0.25 aspect-square rounded-md border border-emerald-950 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.14),rgba(0,0,0,0.96)_68%)] p-0.25">
                     {lidarDots ? (
                       <svg viewBox="0 0 220 220" className="h-full w-full">
                         <circle cx="110" cy="110" r="92" fill="none" stroke="#14532d" strokeWidth="1.2" />

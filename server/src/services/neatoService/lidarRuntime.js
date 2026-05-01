@@ -1,7 +1,7 @@
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 
-const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 3500;
 const SCAN_TIMEOUT_MS = 2000;
 const RECONNECT_DELAY_MS = 5000;
 
