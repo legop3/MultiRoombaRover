@@ -4,6 +4,7 @@ const fs = require('fs');
 
 const SCAN_TIMEOUT_MS = 8000;
 const RECONNECT_DELAY_MS = 5000;
+const IDLE_RETRY_MS = 1000;
 
 function sanitizeLogText(value) {
   return String(value || '')
@@ -109,6 +110,14 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
       state.pollSoonTimer = null;
       tickPoll();
     }, 0);
+  }
+
+  function schedulePollRetry(delayMs = IDLE_RETRY_MS) {
+    if (state.pollSoonTimer) return;
+    state.pollSoonTimer = setTimeout(() => {
+      state.pollSoonTimer = null;
+      tickPoll();
+    }, delayMs);
   }
 
   function scheduleReconnect() {
@@ -330,8 +339,14 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
   }
 
   async function tickPoll() {
-    if (!state.connected) return;
-    if (!shouldPoll?.()) return;
+    if (!state.connected) {
+      schedulePollRetry();
+      return;
+    }
+    if (!shouldPoll?.()) {
+      schedulePollRetry();
+      return;
+    }
     if (state.requestInFlight) return;
     state.requestInFlight = true;
     state.requestStartedAt = Date.now();
