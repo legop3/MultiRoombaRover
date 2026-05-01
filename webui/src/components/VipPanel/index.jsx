@@ -27,6 +27,7 @@ export default function VipPanel() {
     neatoSendHome,
     neatoLocate,
     neatoClearErrors,
+    neatoPowerCycle,
     liftUp,
     liftDown,
   } = useSession();
@@ -81,6 +82,7 @@ export default function VipPanel() {
                 onSendHome={neatoSendHome}
                 onLocate={neatoLocate}
                 onClearErrors={neatoClearErrors}
+                onPowerCycle={neatoPowerCycle}
                 fullWidth
               />
               <VipLiftCard

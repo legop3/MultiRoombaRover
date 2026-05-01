@@ -26,6 +26,7 @@ function normalizeDeviceName(value) {
 }
 
 const device = normalizeDeviceName(neatoConfig.device);
+const RESUME_DELAY_MS = 3000;
 
 function entityId(domain, suffix) {
   if (!device) return '';
@@ -35,9 +36,11 @@ function entityId(domain, suffix) {
 const ENTITY_IDS = {
   buttons: {
     start: entityId('button', 'house_clean'),
+    resume: entityId('button', 'resume_cleaning'),
     sendHome: entityId('button', 'send_to_base'),
     locate: entityId('button', 'locate_robot'),
     clearErrors: entityId('button', 'clear_errors'),
+    powerCycle: entityId('button', 'powercycle'),
   },
   sensors: {
     batteryPercent: entityId('sensor', 'fuel_percent'),
@@ -90,9 +93,11 @@ function isEntityAvailable(entityIdValue) {
 function requiredEntityIds() {
   return [
     ENTITY_IDS.buttons.start,
+    ENTITY_IDS.buttons.resume,
     ENTITY_IDS.buttons.sendHome,
     ENTITY_IDS.buttons.locate,
     ENTITY_IDS.buttons.clearErrors,
+    ENTITY_IDS.buttons.powerCycle,
     ENTITY_IDS.sensors.batteryPercent,
     ENTITY_IDS.sensors.batteryVoltage,
     ENTITY_IDS.binarySensors.chargingActive,
@@ -117,6 +122,10 @@ function buildState() {
       entityId: ENTITY_IDS.buttons.start,
       available: hasEntity(ENTITY_IDS.buttons.start),
     },
+    resume: {
+      entityId: ENTITY_IDS.buttons.resume,
+      available: hasEntity(ENTITY_IDS.buttons.resume),
+    },
     sendHome: {
       entityId: ENTITY_IDS.buttons.sendHome,
       available: hasEntity(ENTITY_IDS.buttons.sendHome),
@@ -128,6 +137,10 @@ function buildState() {
     clearErrors: {
       entityId: ENTITY_IDS.buttons.clearErrors,
       available: hasEntity(ENTITY_IDS.buttons.clearErrors),
+    },
+    powerCycle: {
+      entityId: ENTITY_IDS.buttons.powerCycle,
+      available: hasEntity(ENTITY_IDS.buttons.powerCycle),
     },
   };
 
@@ -208,6 +221,8 @@ async function pressButton(entityIdValue, actionLabel) {
 
 async function startCleaning() {
   await pressButton(ENTITY_IDS.buttons.start, 'start');
+  await new Promise((resolve) => setTimeout(resolve, RESUME_DELAY_MS));
+  await pressButton(ENTITY_IDS.buttons.resume, 'resume_cleaning');
 }
 
 async function sendHome() {
@@ -220,6 +235,10 @@ async function locateRobot() {
 
 async function clearErrors() {
   await pressButton(ENTITY_IDS.buttons.clearErrors, 'clear_errors');
+}
+
+async function powerCycle() {
+  await pressButton(ENTITY_IDS.buttons.powerCycle, 'powercucle');
 }
 
 function getState() {
@@ -275,6 +294,18 @@ io.on('connection', (socket) => {
       cb({ error: err.message });
     }
   });
+
+  socket.on('neato:powerCycle', async (_, cb = () => {}) => {
+    try {
+      if (!isVerified(socket)) {
+        throw new Error('VIP verification required');
+      }
+      await powerCycle();
+      cb({ success: true });
+    } catch (err) {
+      cb({ error: err.message });
+    }
+  });
 });
 
 emitUpdate();
@@ -285,5 +316,6 @@ module.exports = {
   sendHome,
   locateRobot,
   clearErrors,
+  powerCycle,
   neatoEvents: events,
 };

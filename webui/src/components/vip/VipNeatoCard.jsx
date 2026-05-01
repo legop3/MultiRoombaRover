@@ -44,6 +44,7 @@ export default function VipNeatoCard({
   onSendHome,
   onLocate,
   onClearErrors,
+  onPowerCycle,
   fullWidth = false,
 }) {
   const [working, setWorking] = useState('');
@@ -71,11 +72,13 @@ export default function VipNeatoCard({
   const canSendHome = Boolean(controls?.sendHome?.available);
   const canLocate = Boolean(controls?.locate?.available);
   const canClearErrors = Boolean(controls?.clearErrors?.available);
+  const canPowerCycle = Boolean(controls?.powerCycle?.available);
 
   const canRunStart = configured && connected && canStart;
   const canRunSendHome = configured && connected && canSendHome;
   const canRunLocate = configured && connected && canLocate;
   const canRunClearErrors = configured && connected && canClearErrors;
+  const canRunPowerCycle = configured && connected && canPowerCycle;
 
   const runAction = async (key, fn) => {
     if (!fn) return;
@@ -131,7 +134,7 @@ export default function VipNeatoCard({
               >
                 {working === 'sendHome' ? 'Sending...' : 'Send to dock'}
               </button>
-              <div className="grid grid-cols-2 gap-0.5">
+              <div className="grid grid-cols-3 gap-0.5">
                 <button
                   type="button"
                   disabled={!canRunLocate || Boolean(working)}
@@ -147,6 +150,14 @@ export default function VipNeatoCard({
                   className="w-full rounded-md border border-sky-300 bg-amber-500 px-1 py-0.5 text-xs font-semibold text-slate-900 transition hover:border-sky-500 hover:bg-amber-400 disabled:opacity-50"
                 >
                   {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!canRunPowerCycle || Boolean(working)}
+                  onClick={() => runAction('powerCycle', onPowerCycle)}
+                  className="w-full rounded-md border border-rose-300 bg-rose-600 px-1 py-0.5 text-xs font-semibold text-white transition hover:border-rose-500 hover:bg-rose-500 disabled:opacity-50"
+                >
+                  {working === 'powerCycle' ? 'Cycling...' : 'Power cycle'}
                 </button>
               </div>
               <div className="surface-muted grid gap-0.5 pt-0.25">
@@ -195,7 +206,7 @@ export default function VipNeatoCard({
             </div>
           </div>
 
-        {!configured || !connected || !canStart || !canSendHome || !canLocate || !canClearErrors ? (
+        {!configured || !connected || !canStart || !canSendHome || !canLocate || !canClearErrors || !canPowerCycle ? (
           <p className="text-xs text-slate-400 text-center">
             {!configured
               ? 'Set homeAssistant.neato.device in server config to enable Neato controls.'
