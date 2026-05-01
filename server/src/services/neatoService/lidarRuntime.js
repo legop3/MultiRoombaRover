@@ -15,14 +15,24 @@ function parsePayloadLine(line) {
   const raw = sanitizeLogText(line).trim();
   if (!raw) return null;
   const quotedMatch = raw.match(/<<< "(.*)"$/);
-  if (quotedMatch) return quotedMatch[1];
-  if (raw.includes('AngleInDegrees,DistInMM,Intensity,ErrorCodeHEX')) {
-    return 'AngleInDegrees,DistInMM,Intensity,ErrorCodeHEX';
+  if (!quotedMatch) return null;
+  const payload = quotedMatch[1];
+  if (!payload) return null;
+
+  // Ignore the duplicated multiline blob form and trust the clean one-message stream.
+  if (payload.includes('\\r\\n') || payload.includes('\r') || payload.includes('\n')) {
+    return null;
   }
-  const rotationMatch = raw.match(/ROTATION_SPEED,[0-9.]+/);
-  if (rotationMatch) return rotationMatch[0];
-  const pointMatch = raw.match(/\b\d+,\d+,\d+,[0-9A-Fa-f]+\b/);
-  if (pointMatch) return pointMatch[0];
+
+  if (payload === 'AngleInDegrees,DistInMM,Intensity,ErrorCodeHEX') {
+    return payload;
+  }
+  if (/^ROTATION_SPEED,[0-9.]+$/.test(payload)) {
+    return payload;
+  }
+  if (/^\d+,\d+,\d+,[0-9A-Fa-f]+$/.test(payload)) {
+    return payload;
+  }
   return null;
 }
 
