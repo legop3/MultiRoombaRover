@@ -275,13 +275,6 @@ function broadcastLidarScan(payload) {
   }
 }
 
-function broadcastLidarLine(payload) {
-  for (const socket of io.sockets.sockets.values()) {
-    if (!isVerified(socket)) continue;
-    socket.emit('neato:lidarLine', payload);
-  }
-}
-
 lidarRuntime =
   brainslugHost && brainslugKey
     ? createLidarRuntime({
@@ -298,9 +291,6 @@ lidarRuntime =
 if (lidarRuntime) {
   lidarRuntime.on('scan', (payload) => {
     broadcastLidarScan(payload);
-  });
-  lidarRuntime.on('line', (payload) => {
-    broadcastLidarLine(payload);
   });
   lidarRuntime.on('status', () => {
     emitUpdate();

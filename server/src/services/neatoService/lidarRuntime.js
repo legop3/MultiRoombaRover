@@ -163,6 +163,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
       state.stats.rotationsWithoutScan += 1;
       emitFrame({ status: 'error', reason: 'rotation_without_scan', scan: null });
       resetScanState();
+      triggerPollSoon();
       return;
     }
     state.stats.scansOk += 1;

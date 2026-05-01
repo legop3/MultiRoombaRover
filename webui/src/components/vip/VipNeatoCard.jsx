@@ -2,7 +2,6 @@
 // Purpose: Defines the Vip Neato Card module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useState } from 'react';
-import { useSocket } from '../../context/SocketContext.jsx';
 
 function normalizeState(value) {
   return String(value || '').trim();
@@ -66,11 +65,9 @@ export default function VipNeatoCard({
   onPowerCycle,
   fullWidth = false,
 }) {
-  const socket = useSocket();
   const [working, setWorking] = useState('');
   const [lidarFlash, setLidarFlash] = useState(false);
   const [showLidarDebug, setShowLidarDebug] = useState(false);
-  const [recentLidarLines, setRecentLidarLines] = useState([]);
   const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const configured = Boolean(neato?.configured);
@@ -134,19 +131,6 @@ export default function VipNeatoCard({
     }, 120);
     return () => clearTimeout(timer);
   }, [lidar]);
-
-  useEffect(() => {
-    function handleLidarLine(payload = null) {
-      const next = payload && typeof payload === 'object' ? payload : null;
-      if (!next?.line) return;
-      setRecentLidarLines((prev) => [...prev.slice(-199), next]);
-    }
-
-    socket.on('neato:lidarLine', handleLidarLine);
-    return () => {
-      socket.off('neato:lidarLine', handleLidarLine);
-    };
-  }, [socket]);
 
   return (
     <section className={`surface text-sm text-slate-200 ${wrapClass}`}>
@@ -267,23 +251,37 @@ export default function VipNeatoCard({
                   <div className="mt-0.25 aspect-square rounded-md bg-slate-900 p-0.25">
                     {lidarDots ? (
                       <svg viewBox="0 0 220 220" className="h-full w-full">
-                        <circle cx="110" cy="110" r="92" fill="none" stroke="#475569" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="61" fill="none" stroke="#334155" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="31" fill="none" stroke="#1e293b" strokeWidth="1" />
-                        <line x1="110" y1="18" x2="110" y2="202" stroke="#334155" strokeWidth="1" />
-                        <line x1="18" y1="110" x2="202" y2="110" stroke="#334155" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="4" fill="#e2e8f0" />
+                        <rect x="0" y="0" width="220" height="220" fill="#020617" />
+                        <circle cx="110" cy="110" r="92" fill="none" stroke="#166534" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="61" fill="none" stroke="#15803d" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="31" fill="none" stroke="#22c55e" strokeWidth="1" />
+                        <line x1="110" y1="18" x2="110" y2="202" stroke="#166534" strokeWidth="1" />
+                        <line x1="18" y1="110" x2="202" y2="110" stroke="#166534" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="4" fill="#4ade80" />
                         <polyline
                           points={lidarDots}
                           fill="none"
-                          stroke="#38bdf8"
+                          stroke="#4ade80"
                           strokeWidth="1.5"
                           strokeLinejoin="round"
                           strokeLinecap="round"
                         />
+                        {lidarPoints
+                          .filter(
+                            (point) =>
+                              point && point.valid && Number.isFinite(point.angleDeg) && Number.isFinite(point.distanceMm),
+                          )
+                          .map((point) => {
+                            const angleRad = ((Number(point.angleDeg) - 90) * Math.PI) / 180;
+                            const normalized = Math.max(0, Math.min(1, Number(point.distanceMm) / 4000));
+                            const scaledRadius = normalized * 92;
+                            const x = 110 + Math.cos(angleRad) * scaledRadius;
+                            const y = 110 + Math.sin(angleRad) * scaledRadius;
+                            return <circle key={`${point.angleDeg}-${point.distanceMm}-${point.intensity}`} cx={x} cy={y} r="1.6" fill="#86efac" />;
+                          })}
                       </svg>
                     ) : (
-                      <div className="flex h-full items-center justify-center text-center text-xs text-slate-400">
+                      <div className="flex h-full items-center justify-center text-center text-xs text-emerald-300">
                         Waiting for scan
                       </div>
                     )}
@@ -304,18 +302,6 @@ export default function VipNeatoCard({
                       <div>Rotation no scan: {lidarStats?.rotationsWithoutScan ?? '--'}</div>
                       <div>Parseable payloads: {lidarStats?.parseablePayloads ?? '--'}</div>
                       <div>Point payloads: {lidarStats?.pointPayloads ?? '--'}</div>
-                      <div className="mt-0.5 border-t border-slate-700 pt-0.5 text-slate-400">Raw ESP lines</div>
-                      <div className="mt-0.25 max-h-40 overflow-y-auto rounded bg-black/30 px-0.5 py-0.5 text-[0.62rem] leading-tight text-slate-300">
-                        {recentLidarLines.length ? (
-                          recentLidarLines.map((entry, index) => (
-                            <div key={`${index}-${entry.source || 'line'}`} className="break-all">
-                              <span className="text-slate-500">[{entry.source || 'line'}]</span> {entry.line}
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-slate-500">No raw lines yet</div>
-                        )}
-                      </div>
                     </div>
                   ) : null}
                 </div>
