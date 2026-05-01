@@ -119,12 +119,13 @@ function formatSnapshotFinalMessage(currentSnapshot = {}, runMeta = {}) {
   rovers.forEach((rover) => {
     lines.push(formatRoverSnapshotLine(rover));
   });
-  if (Array.isArray(currentSnapshot?.chat_recent) && currentSnapshot.chat_recent.length) {
-    lines.push('chat_recent:');
-    currentSnapshot.chat_recent.forEach((entry) => {
-      lines.push(`- ${entry.nickname || 'unknown'}: ${entry.text || ''}`);
-    });
-  }
+  // disable chat_recent to maybe make it less spammy...
+  // if (Array.isArray(currentSnapshot?.chat_recent) && currentSnapshot.chat_recent.length) {
+  //   lines.push('chat_recent:');
+  //   currentSnapshot.chat_recent.forEach((entry) => {
+  //     lines.push(`- ${entry.nickname || 'unknown'}: ${entry.text || ''}`);
+  //   });
+  // }
   return lines.join('\n');
 }
 
