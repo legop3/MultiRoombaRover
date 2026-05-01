@@ -132,7 +132,7 @@ export default function VipNeatoCard({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0.5">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-0.5">
           <div className="surface-muted grid gap-0.5">
             <p className="text-xs text-slate-300 text-center">Controls</p>
             <button
@@ -198,54 +198,66 @@ export default function VipNeatoCard({
             </div>
           </div>
 
-          <div className="surface-muted grid gap-0.5">
-            <p className="text-xs text-slate-300 text-center">Robot Status</p>
-            <div className="rounded-md bg-slate-800 px-1 py-0.5">
-              <div className="text-[0.72rem] text-slate-300">Robot state (raw)</div>
-              <div className="font-mono text-sm text-slate-100 break-all">{robotStateRaw}</div>
-            </div>
-            <div className="rounded-md bg-slate-800 px-1 py-0.5">
-              <div className="text-[0.72rem] text-slate-300">Basic state</div>
-              <div className="font-mono text-sm text-slate-100 break-all">{primaryState}</div>
-            </div>
-            <div className="rounded-md bg-slate-800 px-1 py-0.5">
-              <div className="text-[0.72rem] text-slate-300">UI state</div>
-              <div className="font-mono text-sm text-slate-100 break-all">{uiStateLabel}</div>
-            </div>
-            <div className="rounded-md bg-slate-800 px-1 py-0.5">
-              <div className="text-[0.72rem] text-slate-300">Robot error</div>
-              <div className="font-mono text-sm text-slate-100 break-all">{robotError}</div>
-            </div>
-            <div className="rounded-md bg-slate-800 px-1 py-0.5">
-              <div className="text-[0.72rem] text-slate-300">Robot alert</div>
-              <div className="font-mono text-sm text-slate-100 break-all">{robotAlert}</div>
-            </div>
-          </div>
-        </div>
+          <div className="grid gap-0.5">
+            <div className="surface-muted grid gap-0.5">
+              <p className="text-xs text-slate-300 text-center">Robot Status</p>
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(13rem,15rem)] gap-0.5 items-start">
+                <div className="grid gap-0.5">
+                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                    <div className="text-[0.72rem] text-slate-300">Robot state (raw)</div>
+                    <div className="font-mono text-sm text-slate-100 break-all">{robotStateRaw}</div>
+                  </div>
+                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                    <div className="text-[0.72rem] text-slate-300">Basic state</div>
+                    <div className="font-mono text-sm text-slate-100 break-all">{primaryState}</div>
+                  </div>
+                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                    <div className="text-[0.72rem] text-slate-300">UI state</div>
+                    <div className="font-mono text-sm text-slate-100 break-all">{uiStateLabel}</div>
+                  </div>
+                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                    <div className="text-[0.72rem] text-slate-300">Robot error</div>
+                    <div className="font-mono text-sm text-slate-100 break-all">{robotError}</div>
+                  </div>
+                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                    <div className="text-[0.72rem] text-slate-300">Robot alert</div>
+                    <div className="font-mono text-sm text-slate-100 break-all">{robotAlert}</div>
+                  </div>
+                </div>
 
-        <div className="surface-muted grid gap-0.5">
-          <p className="text-xs text-slate-300 text-center">Lidar</p>
-          <div className="rounded-md bg-slate-800 p-0.5">
-            {lidarDots ? (
-              <svg viewBox="0 0 220 220" className="w-full max-w-[26rem] mx-auto">
-                <circle cx="110" cy="110" r="92" fill="none" stroke="#475569" strokeWidth="1" />
-                <circle cx="110" cy="110" r="61" fill="none" stroke="#334155" strokeWidth="1" />
-                <circle cx="110" cy="110" r="31" fill="none" stroke="#1e293b" strokeWidth="1" />
-                <line x1="110" y1="18" x2="110" y2="202" stroke="#334155" strokeWidth="1" />
-                <line x1="18" y1="110" x2="202" y2="110" stroke="#334155" strokeWidth="1" />
-                <circle cx="110" cy="110" r="4" fill="#e2e8f0" />
-                <polyline
-                  points={lidarDots}
-                  fill="none"
-                  stroke="#38bdf8"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-              </svg>
-            ) : (
-              <div className="py-3 text-center text-xs text-slate-400">Waiting for lidar scan...</div>
-            )}
+                <div className="rounded-md border border-emerald-900 bg-black p-0.5">
+                  <div className="mb-0.25 text-center text-[0.72rem] uppercase tracking-[0.18em] text-emerald-400">
+                    Lidar
+                  </div>
+                  <div className="aspect-square rounded-md border border-emerald-950 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.14),rgba(0,0,0,0.96)_68%)] p-0.25">
+                    {lidarDots ? (
+                      <svg viewBox="0 0 220 220" className="h-full w-full">
+                        <circle cx="110" cy="110" r="92" fill="none" stroke="#14532d" strokeWidth="1.2" />
+                        <circle cx="110" cy="110" r="61" fill="none" stroke="#166534" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="31" fill="none" stroke="#15803d" strokeWidth="0.9" />
+                        <line x1="110" y1="18" x2="110" y2="202" stroke="#14532d" strokeWidth="1" />
+                        <line x1="18" y1="110" x2="202" y2="110" stroke="#14532d" strokeWidth="1" />
+                        <line x1="45" y1="45" x2="175" y2="175" stroke="#0f3d22" strokeWidth="0.8" />
+                        <line x1="175" y1="45" x2="45" y2="175" stroke="#0f3d22" strokeWidth="0.8" />
+                        <circle cx="110" cy="110" r="4" fill="#86efac" />
+                        <polyline
+                          points={lidarDots}
+                          fill="none"
+                          stroke="#22c55e"
+                          strokeWidth="1.4"
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-center text-xs text-emerald-500/80">
+                        Waiting for scan
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

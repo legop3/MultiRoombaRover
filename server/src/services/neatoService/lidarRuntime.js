@@ -1,8 +1,8 @@
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 
-const POLL_INTERVAL_MS = 10000;
-const SCAN_TIMEOUT_MS = 6000;
+const POLL_INTERVAL_MS = 1000;
+const SCAN_TIMEOUT_MS = 2000;
 const RECONNECT_DELAY_MS = 5000;
 
 function parsePayloadLine(line) {
