@@ -45,21 +45,49 @@ function buildLidarRenderPoints(points = []) {
     (point) => point && point.valid && Number.isFinite(point.angleDeg) && Number.isFinite(point.distanceMm),
   );
   const sortedPoints = [...validPoints].sort((a, b) => Number(a.angleDeg) - Number(b.angleDeg));
-  const filteredPoints = sortedPoints.filter((point, index, list) => {
-    if (list.length < 3) return true;
-    const distanceMm = Math.max(0, Number(point.distanceMm));
-    const prev = list[(index - 1 + list.length) % list.length];
-    const next = list[(index + 1) % list.length];
-    const prevDistanceMm = Math.max(0, Number(prev.distanceMm));
-    const nextDistanceMm = Math.max(0, Number(next.distanceMm));
-    const neighborDistanceMm = Math.max(prevDistanceMm, nextDistanceMm);
+  const groups = [];
+  let currentGroup = [];
 
-    // Drop single-point radial spikes that sit far beyond both adjacent angle samples.
-    if (neighborDistanceMm <= 0) return true;
-    const muchFartherThanNeighbors = distanceMm > neighborDistanceMm * 1.85;
-    const largeAbsoluteGap = distanceMm - neighborDistanceMm > 1400;
-    return !(muchFartherThanNeighbors && largeAbsoluteGap);
+  for (const point of sortedPoints) {
+    if (!currentGroup.length) {
+      currentGroup.push(point);
+      continue;
+    }
+    const previousPoint = currentGroup[currentGroup.length - 1];
+    const angleGap = Math.abs(Number(point.angleDeg) - Number(previousPoint.angleDeg));
+    const prevDistanceMm = Math.max(0, Number(previousPoint.distanceMm));
+    const distanceMm = Math.max(0, Number(point.distanceMm));
+    const distanceGap = Math.abs(distanceMm - prevDistanceMm);
+
+    if (angleGap <= 2 && distanceGap <= 900) {
+      currentGroup.push(point);
+      continue;
+    }
+
+    groups.push(currentGroup);
+    currentGroup = [point];
+  }
+  if (currentGroup.length) groups.push(currentGroup);
+
+  const groupStats = groups.map((group) => {
+    const distances = group.map((point) => Math.max(0, Number(point.distanceMm)));
+    const avgDistanceMm = distances.reduce((sum, value) => sum + value, 0) / Math.max(1, distances.length);
+    return {
+      points: group,
+      size: group.length,
+      avgDistanceMm,
+    };
   });
+  const largestGroup = groupStats.reduce((best, group) => (group.size > (best?.size || 0) ? group : best), null);
+  const referenceDistanceMm = largestGroup?.avgDistanceMm || 1000;
+  const filteredPoints = groupStats
+    .filter((group) => {
+      const tinyCluster = group.size <= 3;
+      const farFromMainBody =
+        group.avgDistanceMm > referenceDistanceMm * 1.8 && group.avgDistanceMm - referenceDistanceMm > 1400;
+      return !(tinyCluster && farFromMainBody);
+    })
+    .flatMap((group) => group.points);
   const scaleDistances = filteredPoints.map((point) => Math.max(0, Number(point.distanceMm))).sort((a, b) => a - b);
   const percentileIndex = Math.max(0, Math.floor((scaleDistances.length - 1) * 0.95));
   const maxDistanceMm = Math.max(1000, scaleDistances[percentileIndex] || 1000);
