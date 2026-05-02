@@ -33,3 +33,4 @@
     - so that people who are making spectator bots can just add a new bot: true field to their message emits and show up as a bot
 - keep the old overseer, don't replace it with the new llm system. 
   - just change it a little to use the new bot chat message stuff.
+- have a new admin debug UI for the new LLM system, in place of the old one (depending on which ones enabled in server config)
