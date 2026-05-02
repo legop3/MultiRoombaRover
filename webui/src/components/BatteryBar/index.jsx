@@ -1,6 +1,7 @@
 // Battery Bar
 // Purpose: Defines the Battery Bar module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
+import React from 'react';
 import { WARN_DISPLAY_PERCENT } from '../../lib/battery.js';
 
 const WARN_FLASH_MS = 1600;
@@ -10,7 +11,7 @@ function classNames(...values) {
   return values.filter(Boolean).join(' ');
 }
 
-export default function BatteryBar({
+function BatteryBar({
   visual,
   orientation = 'horizontal',
   variant = 'inline',
@@ -155,3 +156,5 @@ export default function BatteryBar({
     </div>
   );
 }
+
+export default React.memo(BatteryBar);

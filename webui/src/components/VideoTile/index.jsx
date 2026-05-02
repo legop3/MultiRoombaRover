@@ -48,7 +48,15 @@ export default function VideoTile({
   isActiveDriver = false,
   idleSkipSeconds = null,
 }) {
-  const session = useSessionSelector((state) => state.session);
+  const discordUrl = useSessionSelector((state) => {
+    const socials = state.session?.socials || [];
+    const socialUrl =
+      socials.find((entry) => {
+        const key = String(entry?.id || entry?.label || '').toLowerCase();
+        return key === 'discord';
+      })?.url || null;
+    return socialUrl || state.session?.discord?.invite || null;
+  });
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const restartTimer = useRef(null);
@@ -92,12 +100,15 @@ export default function VideoTile({
   const showHudMap = hudForceMap ? true : mobileHud ? true : showHudMapDesktop;
   const batteryVisual = buildBatteryVisual({ charge: batteryCharge, config: batteryConfig });
   const wheelOvercurrents = sensors?.wheelOvercurrents || null;
-  const overcurrentMotors =
-    wheelOvercurrents == null
-      ? []
-      : Object.entries(wheelOvercurrents)
-          .filter(([, active]) => Boolean(active))
-          .map(([key]) => key);
+  const overcurrentMotors = useMemo(
+    () =>
+      wheelOvercurrents == null
+        ? []
+        : Object.entries(wheelOvercurrents)
+            .filter(([, active]) => Boolean(active))
+            .map(([key]) => key),
+    [wheelOvercurrents],
+  );
   const limiterCaps = overcurrentLimiter?.caps || null;
   const limiterGroups = overcurrentLimiter?.overcurrent?.groups || null;
   const debugFlags = useMemo(() => {
@@ -119,9 +130,15 @@ export default function VideoTile({
     return Math.max(0, Math.min(1, 1 - Math.min(driveCap, auxCap)));
   }, [limiterCaps]);
   const limiterActive = Boolean(overcurrentLimiter?.isActive);
-  const overlayMotors = overcurrentMotors.length ? overcurrentMotors : limiterActive ? ['limiter'] : [];
-  const overlayFill = limiterFill ?? (overcurrentMotors.length ? 1 : 0);
-  const overlayVisible = Boolean(overlayMotors.length);
+  const overlayState = useMemo(() => {
+    const motors = overcurrentMotors.length ? overcurrentMotors : limiterActive ? ['limiter'] : [];
+    const fill = limiterFill ?? (overcurrentMotors.length ? 1 : 0);
+    return {
+      motors,
+      fill,
+      visible: Boolean(motors.length),
+    };
+  }, [overcurrentMotors, limiterActive, limiterFill]);
   const mainBrushActive = Boolean(
     (Number(sensors?.mainBrushCurrentMa) || 0) > BRUSH_CURRENT_THRESHOLD_MA ||
       sensors?.wheelOvercurrents?.mainBrush,
@@ -196,26 +213,18 @@ export default function VideoTile({
     },
     [debugAudio, label],
   );
-  const discordUrl =
-    session?.socials?.find((entry) => {
-      const key = String(entry?.id || entry?.label || '').toLowerCase();
-      return key === 'discord';
-    })?.url ||
-    session?.discord?.invite ||
-    null;
-
   useEffect(() => {
     if (!debugHud) return;
     console.log('[OvercurrentHUD]', {
-      overlayVisible,
-      overlayMotors,
-      overlayFill,
+      overlayVisible: overlayState.visible,
+      overlayMotors: overlayState.motors,
+      overlayFill: overlayState.fill,
       limiterActive,
       limiterCaps,
       limiterGroups,
       wheelOvercurrents,
     });
-  }, [debugHud, overlayFill, overlayMotors, overlayVisible, limiterActive, limiterCaps, limiterGroups, wheelOvercurrents]);
+  }, [debugHud, overlayState, limiterActive, limiterCaps, limiterGroups, wheelOvercurrents]);
 
   useEffect(() => {
     logAudio('settings/update');
@@ -631,10 +640,12 @@ export default function VideoTile({
         {!noHud ? <HudChatInput compact={mobileHud} /> : null}
         {!noHud && debugHud ? (
           <div className="pointer-events-none absolute left-1 top-1 z-40 rounded bg-black/80 px-1 py-0.5 text-[0.6rem] text-lime-200">
-            {`OC vis:${overlayVisible ? 1 : 0} motors:${overlayMotors.length} fill:${Math.round(overlayFill * 100)}%`}
+            {`OC vis:${overlayState.visible ? 1 : 0} motors:${overlayState.motors.length} fill:${Math.round(
+              overlayState.fill * 100,
+            )}%`}
           </div>
         ) : null}
-        {!noHud ? <OvercurrentOverlay motors={overlayMotors} fill={overlayFill} compact={mobileHud} /> : null}
+        {!noHud ? <OvercurrentOverlay motors={overlayState.motors} fill={overlayState.fill} compact={mobileHud} /> : null}
         {!noHud ? <LowBatteryOverlay battery={batteryVisual} compact={mobileHud} /> : null}
         {!noHud && showVerticalBattery && batteryVisual.available ? (
           <div className="pointer-events-none absolute right-1 top-1/2 flex h-[70%] -translate-y-1/2 flex-col items-center justify-center rounded bg-black/60 px-0.5 pb-1 pt-1">

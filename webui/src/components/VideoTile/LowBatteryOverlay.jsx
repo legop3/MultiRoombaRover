@@ -3,7 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React from 'react';
 
-export default function LowBatteryOverlay({ battery, compact = false }) {
+function LowBatteryOverlay({ battery, compact = false }) {
   if (!battery?.available) return null;
   if (!battery.warnActive && !battery.urgentActive) return null;
 
@@ -24,3 +24,5 @@ export default function LowBatteryOverlay({ battery, compact = false }) {
     </div>
   );
 }
+
+export default React.memo(LowBatteryOverlay);

@@ -4,7 +4,7 @@
 import React from 'react';
 import { OVERCURRENT_LABELS } from './constants.js';
 
-export default function OvercurrentOverlay({ motors, fill = 0, compact = false }) {
+function OvercurrentOverlay({ motors, fill = 0, compact = false }) {
   if (!motors?.length) return null;
   const safeLabels = motors.map((name) => OVERCURRENT_LABELS[name] || name);
   const containerClass = compact ? 'w-[12rem] h-[3.5rem]' : 'w-[20rem] h-[7rem]';
@@ -29,3 +29,5 @@ export default function OvercurrentOverlay({ motors, fill = 0, compact = false }
     </div>
   );
 }
+
+export default React.memo(OvercurrentOverlay);

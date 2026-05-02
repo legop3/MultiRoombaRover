@@ -1,23 +1,24 @@
 // Hud Chat Input
 // Purpose: Defines the Hud Chat Input module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useChat } from '../../context/ChatContext.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 
-export default function HudChatInput({ compact = false }) {
-  const session = useSessionSelector((state) => state.session);
+function HudChatInput({ compact = false }) {
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
+  const roverRoster = useSessionSelector((state) => state.session?.roster || []);
   const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef, setTypingActive } = useChat();
   const { value: ttsSettings } = useSettingsNamespace('tts', { engine: 'flite', voice: 'rms', pitch: 50 });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
-  const canChat = session?.role !== 'spectator';
-  const hideHudChat = session?.role === 'spectator';
-  const currentRoverId = session?.assignment?.roverId || null;
+  const canChat = role !== 'spectator';
+  const hideHudChat = role === 'spectator';
   const rover = useMemo(
-    () => session?.roster?.find((entry) => String(entry.id) === String(currentRoverId)) || null,
-    [currentRoverId, session?.roster],
+    () => roverRoster.find((entry) => String(entry.id) === String(currentRoverId)) || null,
+    [currentRoverId, roverRoster],
   );
   const ttsSupported = Boolean(rover?.audio?.ttsEnabled);
   const ttsPayload = useMemo(() => {
@@ -98,3 +99,5 @@ export default function HudChatInput({ compact = false }) {
     </form>
   );
 }
+
+export default memo(HudChatInput);
