@@ -38,21 +38,49 @@ function StatusTile({ label, value, tone = 'muted', valueClass = '', hideLabel =
   );
 }
 
-function buildLidarDots(points = []) {
+function buildLidarRenderPoints(points = []) {
   const center = 110;
-  const radius = 92;
-  const maxDistanceMm = 4000;
-  return points
-    .filter((point) => point && point.valid && Number.isFinite(point.angleDeg) && Number.isFinite(point.distanceMm))
+  const plotRadius = 102;
+  const validPoints = points.filter(
+    (point) => point && point.valid && Number.isFinite(point.angleDeg) && Number.isFinite(point.distanceMm),
+  );
+  const sortedPoints = [...validPoints].sort((a, b) => Number(a.angleDeg) - Number(b.angleDeg));
+  const filteredPoints = sortedPoints.filter((point, index, list) => {
+    if (list.length < 3) return true;
+    const distanceMm = Math.max(0, Number(point.distanceMm));
+    const prev = list[(index - 1 + list.length) % list.length];
+    const next = list[(index + 1) % list.length];
+    const prevDistanceMm = Math.max(0, Number(prev.distanceMm));
+    const nextDistanceMm = Math.max(0, Number(next.distanceMm));
+    const neighborDistanceMm = Math.max(prevDistanceMm, nextDistanceMm);
+
+    // Drop single-point radial spikes that sit far beyond both adjacent angle samples.
+    if (neighborDistanceMm <= 0) return true;
+    const muchFartherThanNeighbors = distanceMm > neighborDistanceMm * 1.85;
+    const largeAbsoluteGap = distanceMm - neighborDistanceMm > 1400;
+    return !(muchFartherThanNeighbors && largeAbsoluteGap);
+  });
+  const scaleDistances = filteredPoints.map((point) => Math.max(0, Number(point.distanceMm))).sort((a, b) => a - b);
+  const percentileIndex = Math.max(0, Math.floor((scaleDistances.length - 1) * 0.95));
+  const maxDistanceMm = Math.max(1000, scaleDistances[percentileIndex] || 1000);
+
+  return filteredPoints
     .map((point) => {
       const angleRad = ((Number(point.angleDeg) - 90) * Math.PI) / 180;
-      const normalized = Math.max(0, Math.min(1, Number(point.distanceMm) / maxDistanceMm));
-      const scaledRadius = normalized * radius;
+      const distanceMm = Math.max(0, Number(point.distanceMm));
+      const normalizedDistance = Math.max(0, Math.min(1, distanceMm / maxDistanceMm));
+      const scaledRadius = normalizedDistance * plotRadius;
       const x = center + Math.cos(angleRad) * scaledRadius;
       const y = center + Math.sin(angleRad) * scaledRadius;
-      return `${x},${y}`;
-    })
-    .join(' ');
+      const intensity = Math.max(0, Math.min(255, Number(point.intensity) || 0));
+      const colorLightness = 38 + (intensity / 255) * 38;
+      return {
+        key: `${point.angleDeg}-${point.distanceMm}-${point.intensity}`,
+        x,
+        y,
+        fill: `hsl(198 100% ${colorLightness}%)`,
+      };
+    });
 }
 
 export default function VipNeatoCard({
@@ -84,7 +112,7 @@ export default function VipNeatoCard({
   const robotError = normalizeState(neato?.telemetry?.robotError) || '--';
   const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
   const lidarPoints = Array.isArray(lidar?.points) ? lidar.points : [];
-  const lidarDots = buildLidarDots(lidarPoints);
+  const lidarRenderPoints = buildLidarRenderPoints(lidarPoints);
   const lidarStatus = normalizeState(lidar?.status) || '--';
   const lidarDebug = lidar?.debug && typeof lidar.debug === 'object' ? lidar.debug : null;
   const lidarReason = normalizeState(lidarDebug?.reason) || '--';
@@ -249,30 +277,20 @@ export default function VipNeatoCard({
                     Lidar
                   </button>
                   <div className="mt-0.25 text-center text-[0.68rem] text-slate-400">Front of robot</div>
-                  <div className="mt-0.25 aspect-square rounded-md bg-slate-900 p-0.25">
-                    {lidarDots ? (
+                  <div className="mt-0.25 aspect-square rounded-md bg-slate-800 p-0">
+                    {lidarRenderPoints.length ? (
                       <svg viewBox="0 0 220 220" className="h-full w-full">
-                        <rect x="0" y="0" width="220" height="220" fill="#0f172a" />
-                        <circle cx="110" cy="110" r="23" fill="none" stroke="#1e293b" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="46" fill="none" stroke="#334155" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="69" fill="none" stroke="#334155" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="92" fill="none" stroke="#475569" strokeWidth="1" />
-                        <line x1="110" y1="18" x2="110" y2="202" stroke="#334155" strokeWidth="1" />
-                        <line x1="18" y1="110" x2="202" y2="110" stroke="#334155" strokeWidth="1" />
+                        <rect x="0" y="0" width="220" height="220" fill="#1e293b" />
+                        <rect x="7" y="7" width="206" height="206" fill="none" stroke="#64748b" strokeWidth="1" />
+                        <rect x="33" y="33" width="154" height="154" fill="none" stroke="#475569" strokeWidth="1" />
+                        <rect x="59" y="59" width="102" height="102" fill="none" stroke="#475569" strokeWidth="1" />
+                        <rect x="85" y="85" width="50" height="50" fill="none" stroke="#334155" strokeWidth="1" />
+                        <line x1="110" y1="7" x2="110" y2="213" stroke="#475569" strokeWidth="1" />
+                        <line x1="7" y1="110" x2="213" y2="110" stroke="#475569" strokeWidth="1" />
                         <circle cx="110" cy="110" r="4" fill="#e2e8f0" />
-                        {lidarPoints
-                          .filter(
-                            (point) =>
-                              point && point.valid && Number.isFinite(point.angleDeg) && Number.isFinite(point.distanceMm),
-                          )
-                          .map((point) => {
-                            const angleRad = ((Number(point.angleDeg) - 90) * Math.PI) / 180;
-                            const normalized = Math.max(0, Math.min(1, Number(point.distanceMm) / 4000));
-                            const scaledRadius = normalized * 92;
-                            const x = 110 + Math.cos(angleRad) * scaledRadius;
-                            const y = 110 + Math.sin(angleRad) * scaledRadius;
-                            return <circle key={`${point.angleDeg}-${point.distanceMm}-${point.intensity}`} cx={x} cy={y} r="1.6" fill="#38bdf8" />;
-                          })}
+                        {lidarRenderPoints.map((point) => (
+                          <circle key={point.key} cx={point.x} cy={point.y} r="1.8" fill={point.fill} />
+                        ))}
                       </svg>
                     ) : (
                       <div className="flex h-full items-center justify-center text-center text-xs text-slate-400">
