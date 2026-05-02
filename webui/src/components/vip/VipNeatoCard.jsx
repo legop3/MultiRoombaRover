@@ -248,16 +248,18 @@ export default function VipNeatoCard({
                   >
                     Lidar
                   </button>
+                  <div className="mt-0.25 text-center text-[0.68rem] text-slate-400">Front of robot</div>
                   <div className="mt-0.25 aspect-square rounded-md bg-slate-900 p-0.25">
                     {lidarDots ? (
                       <svg viewBox="0 0 220 220" className="h-full w-full">
-                        <rect x="0" y="0" width="220" height="220" fill="#020617" />
-                        <circle cx="110" cy="110" r="92" fill="none" stroke="#166534" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="61" fill="none" stroke="#15803d" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="31" fill="none" stroke="#22c55e" strokeWidth="1" />
-                        <line x1="110" y1="18" x2="110" y2="202" stroke="#166534" strokeWidth="1" />
-                        <line x1="18" y1="110" x2="202" y2="110" stroke="#166534" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="4" fill="#4ade80" />
+                        <rect x="0" y="0" width="220" height="220" fill="#0f172a" />
+                        <circle cx="110" cy="110" r="23" fill="none" stroke="#1e293b" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="46" fill="none" stroke="#334155" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="69" fill="none" stroke="#334155" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="92" fill="none" stroke="#475569" strokeWidth="1" />
+                        <line x1="110" y1="18" x2="110" y2="202" stroke="#334155" strokeWidth="1" />
+                        <line x1="18" y1="110" x2="202" y2="110" stroke="#334155" strokeWidth="1" />
+                        <circle cx="110" cy="110" r="4" fill="#e2e8f0" />
                         {lidarPoints
                           .filter(
                             (point) =>
@@ -269,11 +271,11 @@ export default function VipNeatoCard({
                             const scaledRadius = normalized * 92;
                             const x = 110 + Math.cos(angleRad) * scaledRadius;
                             const y = 110 + Math.sin(angleRad) * scaledRadius;
-                            return <circle key={`${point.angleDeg}-${point.distanceMm}-${point.intensity}`} cx={x} cy={y} r="1.6" fill="#86efac" />;
+                            return <circle key={`${point.angleDeg}-${point.distanceMm}-${point.intensity}`} cx={x} cy={y} r="1.6" fill="#38bdf8" />;
                           })}
                       </svg>
                     ) : (
-                      <div className="flex h-full items-center justify-center text-center text-xs text-emerald-300">
+                      <div className="flex h-full items-center justify-center text-center text-xs text-slate-400">
                         Waiting for scan
                       </div>
                     )}
