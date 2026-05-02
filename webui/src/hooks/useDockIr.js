@@ -53,20 +53,6 @@ export function useDockIr(sensors, options = {}) {
     }));
   }, [sensors?.infraredCharacterLeft, sensors?.infraredCharacterRight, sensors?.infraredCharacterOmni]);
 
-  useEffect(() => {
-    // Debug: log when new codes appear
-    const { left, right, omni } = state;
-    const haveAny = left?.ts || right?.ts || omni?.ts;
-    if (!haveAny) return;
-    const stamp = new Date().toISOString();
-    // eslint-disable-next-line no-console
-    console.debug('[DockIR]', stamp, {
-      left: left?.code ?? 0,
-      omni: omni?.code ?? 0,
-      right: right?.code ?? 0,
-    });
-  }, [state.left?.code, state.right?.code, state.omni?.code]);
-
   return useMemo(() => {
     const now = Date.now();
     const withWindow = (entry) => {

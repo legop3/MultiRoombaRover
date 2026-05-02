@@ -2,9 +2,11 @@
 // Purpose: Defines the Log Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useSessionSelector } from '../../context/SessionContext.jsx';
+import { useMemo } from 'react';
 
 export default function LogPanel() {
   const logs = useSessionSelector((state) => state.logs);
+  const rendered = useMemo(() => logs.slice().reverse(), [logs]);
   return (
     <div className="panel-section space-y-0.5 text-base">
       <div className="flex items-center justify-between text-sm text-slate-400">
@@ -15,10 +17,7 @@ export default function LogPanel() {
         {logs.length === 0 ? (
           <p>No logs yet.</p>
         ) : (
-          logs
-            .slice()
-            .reverse()
-            .map((entry) => (
+          rendered.map((entry) => (
               <div key={entry.id} className="surface">
                 <span className="text-amber-400">{entry.timestamp}</span>{' '}
                 <span className="text-lime-400">[{entry.level}]</span>{' '}

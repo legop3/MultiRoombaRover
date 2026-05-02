@@ -1,7 +1,7 @@
 // Vip Neato Card
 // Purpose: Defines the Vip Neato Card module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 function normalizeState(value) {
   return String(value || '').trim();
@@ -114,6 +114,7 @@ function buildLidarRenderPoints(points = []) {
 export default function VipNeatoCard({
   neato,
   lidar,
+  lidarActive = true,
   onStart,
   onSendHome,
   onLocate,
@@ -140,7 +141,10 @@ export default function VipNeatoCard({
   const robotError = normalizeState(neato?.telemetry?.robotError) || '--';
   const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
   const lidarPoints = Array.isArray(lidar?.points) ? lidar.points : [];
-  const lidarRenderPoints = buildLidarRenderPoints(lidarPoints);
+  const lidarRenderPoints = useMemo(
+    () => (lidarActive ? buildLidarRenderPoints(lidarPoints) : []),
+    [lidarActive, lidarPoints],
+  );
   const lidarStatus = normalizeState(lidar?.status) || '--';
   const lidarDebug = lidar?.debug && typeof lidar.debug === 'object' ? lidar.debug : null;
   const lidarReason = normalizeState(lidarDebug?.reason) || '--';
@@ -180,13 +184,14 @@ export default function VipNeatoCard({
   const primaryState = docked ? 'Docked' : uiStateLabel !== '--' ? uiStateLabel : 'Away from dock';
 
   useEffect(() => {
+    if (!lidarActive) return undefined;
     if (!lidar || !Array.isArray(lidar.points)) return undefined;
     setLidarFlash(true);
     const timer = setTimeout(() => {
       setLidarFlash(false);
     }, 120);
     return () => clearTimeout(timer);
-  }, [lidar]);
+  }, [lidar, lidarActive]);
 
   return (
     <section className={`surface text-sm text-slate-200 ${wrapClass}`}>

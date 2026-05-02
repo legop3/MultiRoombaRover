@@ -3,7 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React from 'react';
 
-export default function LightBumpBars({ sensors }) {
+function LightBumpBars({ sensors }) {
   const values = [
     sensors?.lightBumpLeftSignal,
     sensors?.lightBumpFrontLeftSignal,
@@ -47,3 +47,5 @@ export default function LightBumpBars({ sensors }) {
     </div>
   );
 }
+
+export default React.memo(LightBumpBars);

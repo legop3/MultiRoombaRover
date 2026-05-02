@@ -5,7 +5,7 @@ import React from 'react';
 import TopDownMap from '../TopDownMap/index.jsx';
 import { roverNameChromeStyle } from '../../lib/roverColor.js';
 
-export default function HudOverlay({
+function HudOverlay({
   sensors,
   label,
   roverColor = null,
@@ -174,3 +174,5 @@ export default function HudOverlay({
     </div>
   );
 }
+
+export default React.memo(HudOverlay);

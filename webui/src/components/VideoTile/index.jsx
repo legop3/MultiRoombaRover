@@ -100,10 +100,18 @@ export default function VideoTile({
           .map(([key]) => key);
   const limiterCaps = overcurrentLimiter?.caps || null;
   const limiterGroups = overcurrentLimiter?.overcurrent?.groups || null;
-  const debugAudio =
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debugAudio');
-  const debugHud =
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debugHud');
+  const debugFlags = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return { debugAudio: false, debugHud: false };
+    }
+    const params = new URLSearchParams(window.location.search);
+    return {
+      debugAudio: params.has('debugAudio'),
+      debugHud: params.has('debugHud'),
+    };
+  }, []);
+  const debugAudio = debugFlags.debugAudio;
+  const debugHud = debugFlags.debugHud;
   const limiterFill = useMemo(() => {
     if (!limiterCaps) return null;
     const driveCap = Number.isFinite(limiterCaps?.drive?.cap) ? limiterCaps.drive.cap : 1;

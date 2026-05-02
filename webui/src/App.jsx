@@ -93,6 +93,7 @@ function MobileFeatureTabs({
   roomPanelId,
   showTelemetry = true,
 }) {
+  const [activeTab, setActiveTab] = useState('chat');
   const session = useSessionSelector((state) => state.session);
   const { state: controlState } = useControlSystem();
   const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
@@ -116,7 +117,7 @@ function MobileFeatureTabs({
   );
   return (
     <section className="panel text-base">
-      <Tabs defaultTab="chat">
+      <Tabs defaultTab="chat" currentTab={activeTab} onTabChange={setActiveTab}>
         <TabList>
           <Tab id="chat">Chat</Tab>
           <Tab id="vip" highlight={vipClipPlaying ? 'green' : vipMicActive ? 'pink' : 'none'}>
@@ -141,7 +142,7 @@ function MobileFeatureTabs({
             </div>
           </TabPanel>
           <TabPanel id="vip" keepMounted>
-            <VipPanel />
+            <VipPanel isActive={activeTab === 'vip'} />
           </TabPanel>
           <TabPanel id="roomcontrols">
             <div className="space-y-0.5">

@@ -23,6 +23,7 @@ import VipPanel from '../VipPanel/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
+import { useState } from 'react';
 
 function TopDownMapPanel() {
   const {
@@ -115,6 +116,7 @@ function DriveDockPanel() {
 }
 
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
+  const [activeTab, setActiveTab] = useState('telemetry');
   const session = useSessionSelector((state) => state.session);
   const { state: controlState } = useControlSystem();
   const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
@@ -138,7 +140,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   );
   return (
     <section className="panel text-base">
-      <Tabs defaultTab="telemetry">
+      <Tabs defaultTab="telemetry" currentTab={activeTab} onTabChange={setActiveTab}>
         <TabList>
           <Tab id="telemetry">Controls</Tab>
           <Tab id="vip" highlight={vipClipPlaying ? 'green' : vipMicActive ? 'pink' : 'none'}>
@@ -179,7 +181,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
             </div>
           </TabPanel>
           <TabPanel id="vip" keepMounted>
-            <VipPanel />
+            <VipPanel isActive={activeTab === 'vip'} />
           </TabPanel>
           <TabPanel id="help">
             <HelpPanel layout={layout} onOpenOverlay={onOpenHelpOverlay} />
