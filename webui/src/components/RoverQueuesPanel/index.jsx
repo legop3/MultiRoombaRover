@@ -45,23 +45,20 @@ function formatLabel(user, selfId) {
 }
 
 export default function RoverQueuesPanel({ title = 'Rovers' }) {
-  const session = useSessionSelector((state) => state.session);
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const roster = useSessionSelector((state) => state.session?.roster ?? []);
+  const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
+  const users = useSessionSelector((state) => state.session?.users ?? []);
+  const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const { requestControl } = useSessionActions();
   const [pending, setPending] = useState({});
   const [now, setNow] = useState(() => Date.now());
 
-  const canRequest = useMemo(() => session?.role && session.role !== 'spectator', [session?.role]);
+  const canRequest = useMemo(() => role && role !== 'spectator', [role]);
   const adminCapable = useMemo(
-    () =>
-      session?.role === 'admin' ||
-      session?.role === 'lockdown' ||
-      session?.role === 'lockdown-admin',
-    [session?.role],
+    () => role === 'admin' || role === 'lockdown' || role === 'lockdown-admin',
+    [role],
   );
-  const roster = session?.roster ?? [];
-  const turnQueues = session?.turnQueues ?? {};
-  const users = session?.users ?? [];
-  const selfId = session?.socketId || null;
   const hasDeadlines = useMemo(
     () => Object.values(turnQueues || {}).some((info) => info?.deadline || info?.idleDeadline),
     [turnQueues],

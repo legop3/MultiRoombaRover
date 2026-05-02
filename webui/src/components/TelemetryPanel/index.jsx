@@ -13,8 +13,13 @@ function formatMetric(value, fallback = '--') {
 
 export default function TelemetryPanel() {
   const connected = useSessionSelector((state) => state.connected);
-  const session = useSessionSelector((state) => state.session);
-  const roverId = session?.assignment?.roverId;
+  const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const activeDriverId = useSessionSelector((state) => {
+    const id = state.session?.assignment?.roverId;
+    return id ? state.session?.activeDrivers?.[id] || null : null;
+  });
+  const selfSocketId = useSessionSelector((state) => state.session?.socketId || null);
+  const users = useSessionSelector((state) => state.session?.users ?? []);
   const frame = useTelemetryFrame(roverId);
   const sensors = frame?.sensors || {};
   const dockIr = useDockIr(sensors);
@@ -25,14 +30,13 @@ export default function TelemetryPanel() {
   const capacity = sensors.batteryCapacityMah;
   const updated = frame?.receivedAt ? new Date(frame.receivedAt).toLocaleTimeString() : null;
   const rawSnippet = frame?.raw ? frame.raw : null;
-  const activeDriverId = roverId ? session?.activeDrivers?.[roverId] : null;
   const driverLabel = useMemo(() => {
     if (!roverId) return 'n/a';
     if (!activeDriverId) return 'Available';
-    if (activeDriverId === session?.socketId) return 'You';
-    const user = (session?.users || []).find((entry) => entry.socketId === activeDriverId);
+    if (activeDriverId === selfSocketId) return 'You';
+    const user = users.find((entry) => entry.socketId === activeDriverId);
     return user?.nickname || activeDriverId.slice(0, 6);
-  }, [activeDriverId, roverId, session?.socketId, session?.users]);
+  }, [activeDriverId, roverId, selfSocketId, users]);
 
   return (
     <section className="panel-section space-y-0.5 text-base text-slate-100">

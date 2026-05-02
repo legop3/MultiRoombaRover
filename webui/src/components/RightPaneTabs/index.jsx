@@ -117,23 +117,26 @@ function DriveDockPanel() {
 
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   const [activeTab, setActiveTab] = useState('telemetry');
-  const session = useSessionSelector((state) => state.session);
+  const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
+  const ownRoverId = useSessionSelector((state) => String(state.session?.assignment?.roverId || '').trim());
+  const ownAudioForward = useSessionSelector((state) => {
+    const roverId = String(state.session?.assignment?.roverId || '').trim();
+    return roverId ? state.session?.audioForward?.[roverId] || null : null;
+  });
   const { state: controlState } = useControlSystem();
   const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
-  const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-red-600';
-  const ownRoverId = String(session?.assignment?.roverId || '').trim();
-  const ownAudioForward = ownRoverId ? session?.audioForward?.[ownRoverId] : null;
+  const vipDotClass = isVerified ? 'bg-emerald-400' : 'bg-red-600';
   const pttActive = Boolean(controlState?.mic?.pttActive);
   const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
   const pttMode = vipAudio?.pttMode === 'clip' ? 'clip' : 'live';
   const vipMicActive = Boolean(
     ownRoverId &&
-      session?.isVerified &&
+      isVerified &&
       (pttMode === 'clip' ? pttActive : (openMicEnabled || pttActive)),
   );
   const vipClipPlaying = Boolean(
     ownRoverId &&
-      session?.isVerified &&
+      isVerified &&
       pttMode === 'clip' &&
       ownAudioForward?.source === 'upload' &&
       ownAudioForward?.state === 'playing',
@@ -149,7 +152,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
               <span
                 className={`inline-block h-3 w-3 rounded-full ${vipDotClass}`}
                 aria-hidden="true"
-                title={session?.isVerified ? 'Verified' : 'Not verified'}
+                title={isVerified ? 'Verified' : 'Not verified'}
               />
             </span>
           </Tab>

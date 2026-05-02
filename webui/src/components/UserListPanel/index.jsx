@@ -2,7 +2,7 @@
 // Purpose: Defines the User List Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButtonsGrid from '../SocialButtonsGrid/index.jsx';
 import { roverBadgeStyle, roverNameChromeStyle } from '../../lib/roverColor.js';
@@ -55,13 +55,14 @@ export default function UserListPanel({
   compact = false,
   showBothTurnsAndUsers = false,
 }) {
-  const { session } = useSession();
-  const canSetNickname = session?.role !== 'spectator';
-  const users = session?.users ?? [];
-  const selfId = session?.socketId || null;
-  const isTurnsMode = session?.mode === 'turns';
-  const turnQueues = session?.turnQueues || {};
-  const roster = session?.roster || [];
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const users = useSessionSelector((state) => state.session?.users ?? []);
+  const selfId = useSessionSelector((state) => state.session?.socketId || null);
+  const mode = useSessionSelector((state) => state.session?.mode || null);
+  const turnQueues = useSessionSelector((state) => state.session?.turnQueues || {});
+  const roster = useSessionSelector((state) => state.session?.roster || []);
+  const canSetNickname = role !== 'spectator';
+  const isTurnsMode = mode === 'turns';
   const [turnView, setTurnView] = useState('queues');
 
   useEffect(() => {

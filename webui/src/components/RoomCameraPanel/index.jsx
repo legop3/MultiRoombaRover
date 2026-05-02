@@ -32,8 +32,7 @@ export default function RoomCameraPanel({
   hideHeader = false,
   panelId = null,
 }) {
-  const session = useSessionSelector((state) => state.session);
-  const cameras = session?.roomCameras || [];
+  const cameras = useSessionSelector((state) => state.session?.roomCameras || []);
   const feedMap = useRoomCameraSnapshots(cameras.map((camera) => ({ id: camera.id })));
   const { value: orientationSettings, save: saveOrientationSettings } = useSettingsNamespace('roomCameraPanels', {});
   const [orientation, setOrientation] = useState(() =>

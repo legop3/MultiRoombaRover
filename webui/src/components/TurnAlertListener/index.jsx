@@ -1,7 +1,7 @@
 // Turn Alert Listener
 // Purpose: Defines the Turn Alert Listener module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import turnSound from '../../assets/turn_alert.mp3';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
@@ -24,7 +24,9 @@ function useAudio(src, volume = 1) {
 }
 
 export default function TurnAlertListener() {
-  const session = useSessionSelector((state) => state.session);
+  const socketId = useSessionSelector((state) => state.session?.socketId || null);
+  const assignments = useSessionSelector((state) => state.session?.turnQueues || {});
+  const roster = useSessionSelector((state) => state.session?.roster || []);
   const { pushAlert } = useSessionActions();
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
@@ -32,9 +34,6 @@ export default function TurnAlertListener() {
   const effectiveAlertVolume = Math.max(0, Math.min(1, masterVolume * alertVolume));
   const playSound = useAudio(turnSound, effectiveAlertVolume);
   const seenRoversRef = useRef(new Set());
-
-  const assignments = useMemo(() => session?.turnQueues || {}, [session?.turnQueues]);
-  const socketId = session?.socketId || null;
 
   useEffect(() => {
     if (!socketId) return;
@@ -53,7 +52,7 @@ export default function TurnAlertListener() {
     });
     if (newlyMine.length === 0) return;
     newlyMine.forEach((roverId) => {
-      const roverName = session?.roster?.find((r) => String(r.id) === String(roverId))?.name || roverId;
+      const roverName = roster.find((r) => String(r.id) === String(roverId))?.name || roverId;
       pushAlert({
         title: 'Your turn!',
         message: `You now control ${roverName}.`,
@@ -61,7 +60,7 @@ export default function TurnAlertListener() {
       });
     });
     playSound();
-  }, [assignments, playSound, pushAlert, session?.roster, socketId]);
+  }, [assignments, playSound, pushAlert, roster, socketId]);
 
   return null;
 }

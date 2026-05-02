@@ -9,8 +9,10 @@ const MAX_FONT_PX = 28;
 const MIN_FONT_PX = 14;
 
 export default function GlobalObjectiveBanner({ layout = 'desktop', className = '', dismissable = true }) {
-  const session = useSessionSelector((state) => state.session);
-  const goalText = session?.globalObjective?.text ? String(session.globalObjective.text).trim() : '';
+  const goalText = useSessionSelector((state) => {
+    const text = state.session?.globalObjective?.text;
+    return text ? String(text).trim() : '';
+  });
   const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape' || layout === 'mobile';
   const [visible, setVisible] = useState(false);
   const [fontSize, setFontSize] = useState(MAX_FONT_PX);

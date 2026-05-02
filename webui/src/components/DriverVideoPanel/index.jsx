@@ -10,7 +10,12 @@ import { useControlSystem } from '../../controls/index.js';
 import VideoTile from '../VideoTile/index.jsx';
 
 export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
-  const session = useSessionSelector((state) => state.session);
+  const mode = useSessionSelector((state) => state.session?.mode || null);
+  const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const roster = useSessionSelector((state) => state.session?.roster ?? []);
+  const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
+  const socketId = useSessionSelector((state) => state.session?.socketId || null);
+  const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
   const {
     state: { song, lastControlIntentAt },
     overcurrentLimiter,
@@ -20,19 +25,17 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const [turnCueStartAt, setTurnCueStartAt] = useState(null);
   const lastTurnRef = useRef({ active: false, roverId: null });
   useEffect(() => {
-    if (session?.mode !== 'turns') {
+    if (mode !== 'turns') {
       return undefined;
     }
     const timer = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(timer);
-  }, [session?.mode]);
-  const roverId = session?.assignment?.roverId;
+  }, [mode]);
   const rosterEntry =
-    roverId && session?.roster ? session.roster.find((item) => String(item.id) === String(roverId)) : null;
+    roverId && roster ? roster.find((item) => String(item.id) === String(roverId)) : null;
   const hasAudio = Boolean(rosterEntry?.media?.audioPublishUrl);
-  const turnInfo = roverId ? session?.turnQueues?.[roverId] : null;
-  const socketId = session?.socketId || null;
-  const activeDriverId = roverId ? session?.activeDrivers?.[roverId] : null;
+  const turnInfo = roverId ? turnQueues?.[roverId] : null;
+  const activeDriverId = roverId ? activeDrivers?.[roverId] : null;
   const isActiveDriver = Boolean(socketId && activeDriverId === socketId);
   const nextDriverId = useMemo(() => {
     const queue = turnInfo?.queue || [];
@@ -49,8 +52,8 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const msUntilTurn = deadline ? deadline - now : null;
   const msUntilIdleSkip = idleDeadline ? idleDeadline - now : null;
   const isPreSwitchWindow =
-    session?.mode === 'turns' && isNextDriver && msUntilTurn != null && msUntilTurn <= 5000 && msUntilTurn > 0;
-  const shouldShowVideo = session?.mode !== 'turns' || isActiveDriver || isPreSwitchWindow;
+    mode === 'turns' && isNextDriver && msUntilTurn != null && msUntilTurn <= 5000 && msUntilTurn > 0;
+  const shouldShowVideo = mode !== 'turns' || isActiveDriver || isPreSwitchWindow;
   const turnSeconds =
     msUntilTurn != null && Number.isFinite(msUntilTurn) ? Math.max(0, Math.ceil(msUntilTurn / 1000)) : null;
   const idleSkipSeconds =
@@ -75,20 +78,20 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const audioInfo = roverId && hasAudio ? sources[`${roverId}-audio`] : null;
   const snapshotFeeds = useRoverSnapshots(roverId ? [roverId] : [], {
     enabled: Boolean(roverId),
-    version: session?.mode,
+    version: mode,
   });
   const snapshotFeed = roverId ? snapshotFeeds[roverId] || null : null;
   const frame = useTelemetryFrame(roverId);
   const batteryRecord =
-    roverId && session?.roster
-      ? session.roster.find((item) => String(item.id) === String(roverId))
+    roverId && roster
+      ? roster.find((item) => String(item.id) === String(roverId))
       : null;
   const batteryConfig = batteryRecord?.battery ?? null;
 
   const roverLabel = batteryRecord?.name || (roverId ? `Rover ${roverId}` : '');
 
   useEffect(() => {
-    if (session?.mode !== 'turns') {
+    if (mode !== 'turns') {
       setTurnCueVisible(false);
       setTurnCueStartAt(null);
       lastTurnRef.current = { active: false, roverId: null };
@@ -105,7 +108,7 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
       setTurnCueStartAt(null);
     }
     lastTurnRef.current = { active: isActiveDriver, roverId };
-  }, [isActiveDriver, roverId, session?.mode]);
+  }, [isActiveDriver, roverId, mode]);
 
   useEffect(() => {
     if (!turnCueVisible || !turnCueStartAt) return;

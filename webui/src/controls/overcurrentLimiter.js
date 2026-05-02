@@ -29,7 +29,7 @@ function clampUnit(value) {
 }
 
 export function useOvercurrentLimiter(roverId, options = {}) {
-  const session = useSessionSelector((state) => state.session);
+  const role = useSessionSelector((state) => state.session?.role || null);
   const frame = useTelemetryFrame(roverId);
   const sensors = frame?.sensors || {};
   const overcurrentFlags = sensors?.wheelOvercurrents || {};
@@ -131,10 +131,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
     return { motors, groups };
   }, [overcurrentFlags]);
 
-  const adminImmune =
-    session?.role === 'admin' ||
-    session?.role === 'lockdown' ||
-    session?.role === 'lockdown-admin';
+  const adminImmune = role === 'admin' || role === 'lockdown' || role === 'lockdown-admin';
 
   return useMemo(
     () => ({

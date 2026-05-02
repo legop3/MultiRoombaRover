@@ -35,10 +35,10 @@ export default function RawUserPilePanel({
   fillHeight = false,
   compact = false,
 }) {
-  const session = useSessionSelector((state) => state.session);
-  const canSetNickname = session?.role !== 'spectator';
-  const users = session?.users ?? [];
-  const selfId = session?.socketId || null;
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const users = useSessionSelector((state) => state.session?.users ?? []);
+  const selfId = useSessionSelector((state) => state.session?.socketId || null);
+  const canSetNickname = role !== 'spectator';
 
   const sorted = useMemo(
     () =>

@@ -243,10 +243,9 @@ export default function HomeAssistantControls() {
   const {
     state: { keymap },
   } = useControlSystem();
-  const session = useSessionSelector((state) => state.session);
+  const ha = useSessionSelector((state) => state.session?.homeAssistant || null);
   const { homeAssistantToggle, homeAssistantSetLightColor, homeAssistantSetLightWhite } =
     useSessionActions();
-  const ha = session?.homeAssistant;
   const entities = useMemo(() => ha?.entities || [], [ha?.entities]);
   const lightPolicy = ha?.lightPolicy || null;
   const controlsLocked = Boolean(lightPolicy?.locked || lightPolicy?.lockedOn);
