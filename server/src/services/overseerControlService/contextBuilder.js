@@ -17,9 +17,10 @@ function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster
   }
   const roverLines = (Array.isArray(roster) ? roster : []).slice(0, 6).map((rover) => {
     const roverId = rover?.id || 'unknown';
-    const driver = rover?.driverNickname || 'none';
+    const drivers = Array.isArray(rover?.drivers) ? rover.drivers.filter(Boolean) : [];
+    const driver = drivers.length ? drivers.join(',') : 'none';
     const status = rover?.statusTag || 'unknown';
-    return `- ${roverId} status=${status} driver=${driver}`;
+    return `- ${roverId} status=${status} drivers=${driver}`;
   });
   if (roverLines.length) {
     lines.push('rovers:');

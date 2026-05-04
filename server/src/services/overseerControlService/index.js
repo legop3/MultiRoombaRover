@@ -126,11 +126,34 @@ function buildRosterSummary() {
   return roverManager
     .getRoster()
     .filter((rover) => roverManager.canReplayRoverId(rover?.id))
-    .map((rover) => ({
-      id: rover?.id || 'unknown',
-      statusTag: rover?.statusTag || 'unknown',
-      driverNickname: rover?.driverNickname || null,
-    }));
+    .map((rover) => {
+      const roverId = String(rover?.id || '');
+      const record = roverManager.rovers.get(roverId);
+      const driverSocketIds = record?.drivers ? Array.from(record.drivers) : [];
+      const drivers = driverSocketIds
+        .map((socketId) => {
+          const socket = io.sockets.sockets.get(socketId);
+          const nickname = String(socket?.data?.nickname || socket?.data?.user?.username || '').trim();
+          return nickname || socketId;
+        })
+        .filter(Boolean);
+      const sensors = record?.lastSensor?.decoded || {};
+      const docked = Boolean(record?.docked || sensors?.chargingSources?.homeBase);
+      const oiMode = String(sensors?.oiMode?.label || '').toLowerCase();
+      let statusTag = 'docking';
+      if (docked) {
+        statusTag = 'docked';
+      } else if (oiMode === 'safe' || oiMode === 'full') {
+        statusTag = 'driving';
+      } else if (oiMode === 'passive' || oiMode === 'off' || oiMode === 'unknown' || !oiMode) {
+        statusTag = 'docking';
+      }
+      return {
+        id: roverId || 'unknown',
+        statusTag,
+        drivers,
+      };
+    });
 }
 
 function computeTriggerReason() {
