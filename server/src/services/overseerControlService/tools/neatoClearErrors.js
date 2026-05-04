@@ -1,4 +1,5 @@
 module.exports = {
+  id: 'neato_clear_errors',
   signature: 'neato_clear_errors()',
   availability(ctx = {}) {
     const mode = String(ctx.mode || '');
@@ -7,5 +8,9 @@ module.exports = {
     }
     if (!ctx.neatoState?.connected) return { available: false, reason: 'unavailable' };
     return { available: true, reason: null };
+  },
+  async execute({ neatoService }) {
+    await neatoService.clearErrors();
+    return { ok: true };
   },
 };

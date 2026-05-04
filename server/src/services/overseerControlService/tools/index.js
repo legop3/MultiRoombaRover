@@ -21,6 +21,7 @@ const TOOL_DEFINITIONS = [
   neatoClearErrors,
   haSetEntity,
 ];
+const TOOL_BY_ID = new Map(TOOL_DEFINITIONS.map((tool) => [tool.id, tool]));
 
 function evaluateTools(context = {}) {
   const available = [];
@@ -36,7 +37,20 @@ function evaluateTools(context = {}) {
   return { available, blocked };
 }
 
+async function executeToolAction(action = {}, context = {}) {
+  const toolId = String(action?.tool || '').trim();
+  const tool = TOOL_BY_ID.get(toolId);
+  if (!tool) {
+    throw new Error(`Unknown tool: ${toolId}`);
+  }
+  if (typeof tool.execute !== 'function') {
+    throw new Error(`Tool ${toolId} is not executable`);
+  }
+  return tool.execute({ ...context, args: action?.args || {} });
+}
+
 module.exports = {
   TOOL_DEFINITIONS,
   evaluateTools,
+  executeToolAction,
 };

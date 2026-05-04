@@ -51,7 +51,8 @@ function buildModelMessages({ systemPrompt, stateUpdate, transcriptRows, availab
   });
   messages.push({
     role: 'user',
-    content: 'Respond with one line: SKIP, CHAT, ACTION, or ACTION+CHAT.',
+    content:
+      'Respond with JSON only: {"decision":"SKIP|CHAT|ACTION|ACTION+CHAT","chat":"optional text","actions":[{"tool":"tool_id","args":{}}]}. Use action tool ids only.',
   });
   return messages;
 }

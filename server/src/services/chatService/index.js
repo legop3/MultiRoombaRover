@@ -8,13 +8,13 @@ const { broadcastMessage, getRecentMessages } = require('./broadcast');
 const { createHandlers } = require('./handlers');
 const { registerChatSocketHooks } = require('./socketHooks');
 
-function sendSystemMessage(text) {
+function sendSystemMessage(text, options = {}) {
   const normalized = normalizeUserText(text);
   const clean = normalized.trim();
   if (!clean) return null;
   const safe = clean.length > 256 ? `${clean.slice(0, 253)}...` : clean;
   const message = buildMessage(null, safe, {
-    nickname: 'The Overseer',
+    nickname: String(options.nickname || 'The Overseer'),
     role: 'user',
     fromDiscord: false,
     system: true,

@@ -7,6 +7,8 @@ Rules:
 - If directly addressed, avoid ignoring users.
 - Keep lines concise and in-character.
 
-Output contract for this phase:
-- Return exactly one line.
-- Return one of: SKIP, CHAT, ACTION, ACTION+CHAT.
+Output contract:
+- Return valid JSON only.
+- Shape:
+  {"decision":"SKIP|CHAT|ACTION|ACTION+CHAT","chat":"optional text","actions":[{"tool":"tool_id","args":{}}]}
+- Use `tool_id` values only from available tools.

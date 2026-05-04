@@ -5,11 +5,14 @@ const logger = require('../../globals/logger').child('overseerControl');
 const { loadConfig } = require('../../helpers/configLoader');
 const { getRole, roleEvents } = require('../roleService');
 const { getMode } = require('../modeManager');
-const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
-const { getState: getNeatoState, neatoEvents } = require('../neatoService');
-const { getState: getLiftState, liftEvents } = require('../liftService');
+const homeAssistantService = require('../homeAssistantService');
+const neatoService = require('../neatoService');
+const liftService = require('../liftService');
+const { getState: getHomeAssistantState, homeAssistantEvents } = homeAssistantService;
+const { getState: getNeatoState, neatoEvents } = neatoService;
+const { getState: getLiftState, liftEvents } = liftService;
 const roverManager = require('../roverManager');
-const { getRecentMessages } = require('../chatService');
+const { getRecentMessages, sendSystemMessage } = require('../chatService');
 const {
   PROMPT_PATH,
   DEFAULT_NAME,
@@ -20,18 +23,9 @@ const {
   MAX_BOT_CONTEXT,
   normalizeMs,
 } = require('./constants');
-const {
-  isAdminRole,
-  buildAdminState,
-  normalizeDecision,
-  buildFailureInfo,
-} = require('./runtimeHelpers');
-const {
-  toStateUpdate,
-  buildToolState,
-  buildConversation,
-  buildModelMessages,
-} = require('./contextBuilder');
+const { isAdminRole, buildAdminState, parseOverseerOutput, buildFailureInfo } = require('./runtimeHelpers');
+const { toStateUpdate, buildToolState, buildConversation, buildModelMessages } = require('./contextBuilder');
+const { executeToolAction } = require('./tools');
 
 const config = loadConfig();
 const overseerConfig = config.overseerControl || {};
@@ -47,12 +41,12 @@ const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 const runtime = {
   timer: null,
   inFlight: false,
-  running: false,
   tickCount: 0,
   lastModelAt: 0,
   generationCount: 0,
   generationTotalMs: 0,
   runHistory: [],
+  memoryStore: ['', '', ''],
 };
 
 let status = {
@@ -83,6 +77,9 @@ let status = {
   lastModelOutputAt: null,
   lastModelRawOutput: null,
   lastDecision: null,
+  lastChatDraft: null,
+  lastRequestedActions: null,
+  lastActionResults: null,
   lastOutcome: null,
   lastReason: null,
   lastError: null,
@@ -95,11 +92,7 @@ let status = {
 };
 
 function updateStatus(patch = {}) {
-  status = {
-    ...status,
-    ...patch,
-    updatedAt: Date.now(),
-  };
+  status = { ...status, ...patch, updatedAt: Date.now() };
   const payload = buildAdminState(status, runtime.runHistory);
   io.sockets.sockets.forEach((socket) => {
     if (!isAdminRole(getRole(socket))) return;
@@ -131,26 +124,16 @@ function computeTriggerReason() {
   const last = recent[recent.length - 1];
   if (last && Date.now() - Number(last.ts || 0) < 5000) {
     const txt = String(last.text || '').toLowerCase();
-    if (txt.includes(name.toLowerCase()) || txt.includes('overseer') || txt.includes('bot')) {
-      return 'direct_address';
-    }
+    if (txt.includes(name.toLowerCase()) || txt.includes('overseer') || txt.includes('bot')) return 'direct_address';
     return 'chat_activity';
   }
-  if (!runtime.lastModelAt || Date.now() - runtime.lastModelAt >= heartbeatMs) {
-    return 'heartbeat';
-  }
+  if (!runtime.lastModelAt || Date.now() - runtime.lastModelAt >= heartbeatMs) return 'heartbeat';
   return null;
 }
 
 async function runDecision(triggerReason) {
   const runId = runtime.tickCount;
-  updateStatus({
-    phase: 'context_build',
-    currentRunId: runId,
-    lastTriggerReason: triggerReason,
-    lastError: null,
-    lastErrorDetails: null,
-  });
+  updateStatus({ phase: 'context_build', currentRunId: runId, lastTriggerReason: triggerReason, lastError: null, lastErrorDetails: null });
 
   const mode = getMode();
   const homeAssistantState = getHomeAssistantState();
@@ -162,19 +145,11 @@ async function runDecision(triggerReason) {
   const toolState = buildToolState({ mode, homeAssistantState, neatoState, liftState });
 
   const human = getRecentMessages(MAX_CHAT_CONTEXT, { includeSystem: false });
-  const bots = getRecentMessages(100, { includeSystem: true })
-    .filter((entry) => entry?.system)
-    .slice(-MAX_BOT_CONTEXT);
+  const bots = getRecentMessages(100, { includeSystem: true }).filter((entry) => entry?.system).slice(-MAX_BOT_CONTEXT);
   const transcriptRows = buildConversation({ recentMessages: [...human, ...bots].slice(-(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT)), name });
 
   const systemPrompt = await readPrompt();
-  const modelMessages = buildModelMessages({
-    systemPrompt,
-    stateUpdate,
-    transcriptRows,
-    availableTools: toolState.available,
-    blockedTools: toolState.blocked,
-  });
+  const modelMessages = buildModelMessages({ systemPrompt, stateUpdate, transcriptRows, availableTools: toolState.available, blockedTools: toolState.blocked });
 
   updateStatus({
     phase: 'awaiting_model',
@@ -187,40 +162,73 @@ async function runDecision(triggerReason) {
     lastModelInputAt: Date.now(),
   });
 
-  let decision = 'SKIP';
-  let rawOutput = '';
+  let parsed = { decision: 'SKIP', chat: null, actions: [], raw: '' };
   const generationStart = Date.now();
   if (ollamaClient && model) {
     const payload = await ollamaClient.chat({
       model,
       stream: false,
       keep_alive: -1,
-      options: {
-        temperature: 0.4,
-        top_p: 0.9,
-      },
+      options: { temperature: 0.4, top_p: 0.9 },
       messages: modelMessages,
     });
-    const parsed = normalizeDecision(payload?.message?.content || '');
-    rawOutput = parsed.raw;
-    decision = parsed.decision;
+    parsed = parseOverseerOutput(payload?.message?.content || '');
   }
 
   const generationMs = Math.max(0, Date.now() - generationStart);
   runtime.generationCount += 1;
   runtime.generationTotalMs += generationMs;
   const avgGenerationMs = Math.round(runtime.generationTotalMs / runtime.generationCount);
-
   runtime.lastModelAt = Date.now();
-  const outcome = observeOnly ? 'observed' : 'pending_execution';
+
+  const actionResults = [];
+  let outcome = observeOnly ? 'observed' : 'executed';
+  let reason = observeOnly ? 'observe-only mode' : null;
+
+  if (!observeOnly) {
+    if ((parsed.decision === 'CHAT' || parsed.decision === 'ACTION+CHAT') && parsed.chat) {
+      sendSystemMessage(parsed.chat, { nickname: name });
+      actionResults.push({ kind: 'chat', ok: true });
+    }
+
+    if (parsed.decision === 'ACTION' || parsed.decision === 'ACTION+CHAT') {
+      for (const action of parsed.actions) {
+        const isAvailable = toolState.available.some((signature) => signature.startsWith(`${action.tool}(`));
+        if (!isAvailable) {
+          actionResults.push({ kind: 'tool', tool: action.tool, ok: false, error: 'tool unavailable or blocked' });
+          continue;
+        }
+        try {
+          const result = await executeToolAction(action, {
+            sendSystemMessage,
+            name,
+            memoryStore: runtime.memoryStore,
+            neatoService,
+            liftService,
+            homeAssistantService,
+            actor: 'overseerControl',
+          });
+          if (action.tool === 'memory_write' && Array.isArray(result?.slots)) {
+            runtime.memoryStore = result.slots;
+          }
+          actionResults.push({ kind: 'tool', tool: action.tool, ok: true, result });
+        } catch (err) {
+          actionResults.push({ kind: 'tool', tool: action.tool, ok: false, error: err.message });
+        }
+      }
+    }
+  }
 
   updateStatus({
     phase: 'decision_recorded',
     lastModelOutputAt: Date.now(),
-    lastModelRawOutput: rawOutput,
-    lastDecision: decision,
+    lastModelRawOutput: parsed.raw,
+    lastDecision: parsed.decision,
+    lastChatDraft: parsed.chat,
+    lastRequestedActions: parsed.actions,
+    lastActionResults: actionResults,
     lastOutcome: outcome,
-    lastReason: observeOnly ? 'observe-only mode' : null,
+    lastReason: reason,
     lastGenerationMs: generationMs,
     avgGenerationMs,
     generationCount: runtime.generationCount,
@@ -230,7 +238,10 @@ async function runDecision(triggerReason) {
     runId,
     at: Date.now(),
     triggerReason,
-    decision,
+    decision: parsed.decision,
+    chatDraft: parsed.chat,
+    requestedActions: parsed.actions,
+    actionResults,
     outcome,
     observeOnly,
     generationMs,
@@ -241,24 +252,15 @@ async function runDecision(triggerReason) {
 async function tick() {
   runtime.tickCount += 1;
   runtime.inFlight = true;
-  updateStatus({
-    inFlight: true,
-    tickCount: runtime.tickCount,
-    lastTickAt: Date.now(),
-    phase: 'gate_check',
-  });
+  updateStatus({ inFlight: true, tickCount: runtime.tickCount, lastTickAt: Date.now(), phase: 'gate_check' });
 
   try {
     const triggerReason = computeTriggerReason();
     if (!triggerReason) {
-      updateStatus({
-        phase: 'idle',
-        lastOutcome: 'skipped',
-        lastReason: 'gate not triggered',
-      });
-      return;
+      updateStatus({ phase: 'idle', lastOutcome: 'skipped', lastReason: 'gate not triggered' });
+    } else {
+      await runDecision(triggerReason);
     }
-    await runDecision(triggerReason);
   } catch (err) {
     const failure = buildFailureInfo(err);
     updateStatus({
@@ -271,12 +273,7 @@ async function tick() {
     });
   } finally {
     runtime.inFlight = false;
-    updateStatus({
-      inFlight: false,
-      currentRunId: null,
-      phase: 'idle',
-      nextRunAt: Date.now() + gateIntervalMs,
-    });
+    updateStatus({ inFlight: false, currentRunId: null, phase: 'idle', nextRunAt: Date.now() + gateIntervalMs });
     runtime.timer = setTimeout(tick, gateIntervalMs);
   }
 }
@@ -290,51 +287,33 @@ function clearHistory() {
   runtime.runHistory = [];
   runtime.generationCount = 0;
   runtime.generationTotalMs = 0;
-  updateStatus({
-    lastReason: 'admin requested clear history',
-    lastOutcome: 'cleared',
-  });
+  runtime.memoryStore = ['', '', ''];
+  updateStatus({ lastReason: 'admin requested clear history', lastOutcome: 'cleared' });
 }
 
 io.on('connection', (socket) => {
   emitStateToSocket(socket);
   socket.on('overseer:control', ({ controls } = {}, cb = () => {}) => {
-    if (!isAdminRole(getRole(socket))) {
-      cb({ error: 'Not authorized' });
-      return;
-    }
+    if (!isAdminRole(getRole(socket))) return cb({ error: 'Not authorized' });
     const action = controls?.action || null;
     if (action === 'clearHistory') {
       clearHistory();
-      cb({ success: true, state: buildAdminState(status, runtime.runHistory) });
-      return;
+      return cb({ success: true, state: buildAdminState(status, runtime.runHistory) });
     }
-    cb({ error: 'Unknown overseer control action' });
+    return cb({ error: 'Unknown overseer control action' });
   });
 });
 
-roleEvents.on('change', ({ socket }) => {
-  emitStateToSocket(socket);
-});
-
-homeAssistantEvents.on('update', () => {
-  updateStatus({ phase: status.phase });
-});
-neatoEvents.on('update', () => {
-  updateStatus({ phase: status.phase });
-});
-liftEvents.on('update', () => {
-  updateStatus({ phase: status.phase });
-});
-roverManager.managerEvents.on('rover', () => {
-  updateStatus({ phase: status.phase });
-});
+roleEvents.on('change', ({ socket }) => emitStateToSocket(socket));
+homeAssistantEvents.on('update', () => updateStatus({ phase: status.phase }));
+neatoEvents.on('update', () => updateStatus({ phase: status.phase }));
+liftEvents.on('update', () => updateStatus({ phase: status.phase }));
+roverManager.managerEvents.on('rover', () => updateStatus({ phase: status.phase }));
 
 if (!enabled) {
   logger.info('overseerControl disabled');
   updateStatus({ running: false, lastReason: 'overseerControl.enabled is false' });
 } else {
-  runtime.running = true;
   updateStatus({ running: true, lastReason: observeOnly ? 'observe-only mode' : null });
   runtime.timer = setTimeout(tick, gateIntervalMs);
   logger.info('overseerControl enabled', { model, ollamaUrl, gateIntervalMs, heartbeatMs, observeOnly });
