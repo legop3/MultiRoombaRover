@@ -17,6 +17,17 @@ export default function OverseerControlPanel({ state, onClearHistory, clearingHi
   const timings = state.timings || {};
   const input = state.input || {};
   const errors = state.errors || {};
+  const renderModelMessages = () => {
+    const messages = Array.isArray(input.modelMessages) ? input.modelMessages : [];
+    if (!messages.length) return '<none>';
+    return messages
+      .map((msg, idx) => {
+        const role = String(msg?.role || 'unknown').toUpperCase();
+        const content = String(msg?.content || '');
+        return `#${idx + 1} ${role}\n${content}`;
+      })
+      .join('\n\n----------------------------------------\n\n');
+  };
 
   return (
     <div className="space-y-0.5">
@@ -55,7 +66,7 @@ export default function OverseerControlPanel({ state, onClearHistory, clearingHi
       <details className="surface text-xs text-slate-200" open>
         <summary className="cursor-pointer select-none text-slate-300">Exact Model Input (messages[])</summary>
         <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
-          {JSON.stringify(input.modelMessages || [], null, 2)}
+          {renderModelMessages()}
         </pre>
       </details>
 
@@ -84,6 +95,13 @@ export default function OverseerControlPanel({ state, onClearHistory, clearingHi
         <summary className="cursor-pointer select-none text-slate-300">Exact Model Output</summary>
         <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
           {output.raw || '<none>'}
+        </pre>
+      </details>
+
+      <details className="surface text-xs text-slate-200" open>
+        <summary className="cursor-pointer select-none text-slate-300">Live Tool Calls</summary>
+        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+          {JSON.stringify(output.liveToolCalls || [], null, 2)}
         </pre>
       </details>
 

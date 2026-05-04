@@ -49,6 +49,7 @@ const runtime = {
   generationCount: 0,
   generationTotalMs: 0,
   runHistory: [],
+  liveToolCalls: [],
   memoryStore: loadMemory(),
 };
 
@@ -84,6 +85,7 @@ let status = {
   lastChatDraft: null,
   lastRequestedActions: null,
   lastActionResults: null,
+  lastLiveToolCalls: null,
   lastOutcome: null,
   lastReason: null,
   lastError: null,
@@ -106,6 +108,11 @@ function updateStatus(patch = {}) {
 
 function pushRun(run = {}) {
   runtime.runHistory = [...runtime.runHistory.slice(-(MAX_RUN_HISTORY - 1)), run];
+}
+
+function pushLiveToolCall(entry = {}) {
+  runtime.liveToolCalls = [...runtime.liveToolCalls.slice(-49), { at: Date.now(), ...entry }];
+  updateStatus({ lastLiveToolCalls: runtime.liveToolCalls });
 }
 
 async function readPrompt() {
@@ -256,7 +263,9 @@ async function runDecision(triggerReason) {
 
     if (decision === 'ACTION' || decision === 'ACTION+CHAT') {
       for (const action of requestedActions) {
+        pushLiveToolCall({ phase: 'start', tool: action.tool, args: action.args });
         if (!toolState.availableIds.includes(action.tool)) {
+          pushLiveToolCall({ phase: 'blocked', tool: action.tool, error: 'tool unavailable or blocked' });
           actionResults.push({ kind: 'tool', tool: action.tool, ok: false, error: 'tool unavailable or blocked' });
           continue;
         }
@@ -274,8 +283,10 @@ async function runDecision(triggerReason) {
           if (result?.memory && typeof result.memory === 'object') {
             runtime.memoryStore = saveMemory(result.memory);
           }
+          pushLiveToolCall({ phase: 'ok', tool: action.tool, result });
           actionResults.push({ kind: 'tool', tool: action.tool, ok: true, result });
         } catch (err) {
+          pushLiveToolCall({ phase: 'error', tool: action.tool, error: err.message });
           actionResults.push({ kind: 'tool', tool: action.tool, ok: false, error: err.message });
         }
       }
@@ -348,10 +359,11 @@ function emitStateToSocket(socket) {
 
 function clearHistory() {
   runtime.runHistory = [];
+  runtime.liveToolCalls = [];
   runtime.generationCount = 0;
   runtime.generationTotalMs = 0;
   runtime.memoryStore = saveMemory(createDefaultMemory());
-  updateStatus({ lastReason: 'admin requested clear history', lastOutcome: 'cleared' });
+  updateStatus({ lastReason: 'admin requested clear history', lastOutcome: 'cleared', lastLiveToolCalls: [] });
 }
 
 io.on('connection', (socket) => {

@@ -41,6 +41,7 @@ function buildAdminState(status, runHistory) {
       chat: status.lastChatDraft,
       actions: status.lastRequestedActions,
       actionResults: status.lastActionResults,
+      liveToolCalls: status.lastLiveToolCalls || [],
       outputAt: status.lastModelOutputAt,
       outcome: status.lastOutcome,
       reason: status.lastReason,

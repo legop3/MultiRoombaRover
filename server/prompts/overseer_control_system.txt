@@ -11,7 +11,7 @@ Execution mode:
 - Decide what to do yourself each cycle.
 
 Actions:
-- Use tool calls when actions are needed.
+- Use tool calls when actions or memory updates are needed.
 - Respect safety limits, lock policies, cooldowns, and blocked tools.
 - Do not invent tools.
 - Ask a question only if a required action parameter is missing.
