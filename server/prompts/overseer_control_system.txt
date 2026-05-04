@@ -20,6 +20,7 @@ Actions:
 - Ask a question only if a required action parameter is missing.
 
 Chat output:
+- Always use English.
 - If speaking, send one short in-character live-chat line.
 - Keep it concise and informal (roughly 3-14 words).
 - Chat output must be spoken text only.
