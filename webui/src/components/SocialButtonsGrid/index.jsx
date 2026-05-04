@@ -1,20 +1,20 @@
 // Social Buttons Grid
 // Purpose: Defines the Social Buttons Grid module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
 import SocialButton from '../SocialButton/index.jsx';
 
-function normalizeSocials(session) {
-  const configured = Array.isArray(session?.socials) ? session.socials : null;
+function normalizeSocials({ socials, discordInvite, kofiLink }) {
+  const configured = Array.isArray(socials) ? socials : null;
   if (configured && configured.length) {
     return configured;
   }
   const fallback = [];
-  if (session?.discord?.invite) {
-    fallback.push({ id: 'discord', label: 'Discord', url: session.discord.invite });
+  if (discordInvite) {
+    fallback.push({ id: 'discord', label: 'Discord', url: discordInvite });
   }
-  if (session?.kofi?.link) {
-    fallback.push({ id: 'kofi', label: 'Ko-fi', url: session.kofi.link });
+  if (kofiLink) {
+    fallback.push({ id: 'kofi', label: 'Ko-fi', url: kofiLink });
   }
   return fallback;
 }
@@ -28,8 +28,12 @@ function normalizeEntry(entry) {
 }
 
 export default function SocialButtonsGrid({ className = '' }) {
-  const { session } = useSession();
-  const socials = normalizeSocials(session)
+  const socialsInput = useSessionSelector((state) => ({
+    socials: state.session?.socials ?? [],
+    discordInvite: state.session?.discord?.invite || null,
+    kofiLink: state.session?.kofi?.link || null,
+  }));
+  const socials = normalizeSocials(socialsInput)
     .map(normalizeEntry)
     .filter(Boolean)
     .slice(0, 4);

@@ -136,7 +136,7 @@ export default function KeyboardInputManager() {
       sendSong,
     },
   } = useControlSystem();
-  const session = useSessionSelector((state) => state.session);
+  const homeAssistant = useSessionSelector((state) => state.session?.homeAssistant || null);
   const { homeAssistantSetState } = useSessionActions();
   const { focusChat, blurChat, isChatFocused } = useChat();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
@@ -318,7 +318,7 @@ export default function KeyboardInputManager() {
 
   const triggerHomeAssistantCycle = useCallback(
     (targetState) => {
-      const ha = session?.homeAssistant;
+      const ha = homeAssistant;
       if (!ha?.enabled || !ha?.connected) return;
       if (ha?.lightPolicy?.locked || ha?.lightPolicy?.lockedOn) return;
       const entities = ha.entities || [];
@@ -346,7 +346,7 @@ export default function KeyboardInputManager() {
         }
       }
     },
-    [homeAssistantSetState, session?.homeAssistant],
+    [homeAssistantSetState, homeAssistant],
   );
 
   useEffect(() => {

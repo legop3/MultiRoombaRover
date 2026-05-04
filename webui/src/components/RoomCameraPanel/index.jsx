@@ -2,7 +2,7 @@
 // Purpose: Defines the Room Camera Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useState } from 'react';
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { useRoomCameraSnapshots } from '../../hooks/useRoomCameraSnapshots.js';
 import RoomCameraFeed from '../RoomCameraFeed/index.jsx';
@@ -32,8 +32,7 @@ export default function RoomCameraPanel({
   hideHeader = false,
   panelId = null,
 }) {
-  const { session } = useSession();
-  const cameras = session?.roomCameras || [];
+  const cameras = useSessionSelector((state) => state.session?.roomCameras || []);
   const feedMap = useRoomCameraSnapshots(cameras.map((camera) => ({ id: camera.id })));
   const { value: orientationSettings, save: saveOrientationSettings } = useSettingsNamespace('roomCameraPanels', {});
   const [orientation, setOrientation] = useState(() =>

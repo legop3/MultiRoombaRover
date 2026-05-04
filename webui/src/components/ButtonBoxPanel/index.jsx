@@ -2,7 +2,7 @@
 // Purpose: Defines the Button Box Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSocket } from '../../context/SocketContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
@@ -18,7 +18,7 @@ const BUTTON_TONES = {
 };
 
 export default function ButtonBoxPanel() {
-  const { session } = useSession();
+  const buttonBoxButtons = useSessionSelector((state) => state.session?.buttonBox?.buttons ?? []);
   const socket = useSocket();
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const masterVolume = Number.isFinite(audioSettings?.masterVolume)
@@ -29,7 +29,7 @@ export default function ButtonBoxPanel() {
     : AUDIO_SETTINGS_DEFAULTS.alertVolume;
   const effectiveAlertVolume = Math.max(0, Math.min(1, masterVolume * alertVolume));
   const buttons = useMemo(() => {
-    const list = Array.isArray(session?.buttonBox?.buttons) ? session.buttonBox.buttons : [];
+    const list = Array.isArray(buttonBoxButtons) ? buttonBoxButtons : [];
     if (list.length === 4) return list;
     return [1, 2, 3, 4].map((id) => list.find((entry) => Number(entry?.id) === id) || {
       id,
@@ -40,7 +40,7 @@ export default function ButtonBoxPanel() {
       rewardNumber: null,
       lastRewardAt: null,
     });
-  }, [session?.buttonBox?.buttons]);
+  }, [buttonBoxButtons]);
 
   const [incFlash, setIncFlash] = useState({});
   const [rewardFlash, setRewardFlash] = useState({});

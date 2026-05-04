@@ -28,19 +28,19 @@ function getModeDetails(mode = 'admin') {
 }
 
 export default function ModeGateOverlay() {
-  const session = useSessionSelector((state) => state.session);
-  const mode = session?.mode;
-  const role = session?.role;
-  const reason = session?.adminReason?.text || '';
-  const reasonUpdatedAt = session?.adminReason?.updatedAt || null;
-  const timezone = session?.timezone || 'UTC';
-  const discordUrl =
-    session?.socials?.find((entry) => {
+  const mode = useSessionSelector((state) => state.session?.mode || null);
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const reason = useSessionSelector((state) => state.session?.adminReason?.text || '');
+  const reasonUpdatedAt = useSessionSelector((state) => state.session?.adminReason?.updatedAt || null);
+  const timezone = useSessionSelector((state) => state.session?.timezone || 'UTC');
+  const discordUrl = useSessionSelector((state) => {
+    const socials = state.session?.socials || [];
+    const fromSocials = socials.find((entry) => {
       const key = String(entry?.id || entry?.label || '').toLowerCase();
       return key === 'discord';
-    })?.url ||
-    session?.discord?.invite ||
-    null;
+    })?.url;
+    return fromSocials || state.session?.discord?.invite || null;
+  });
   const restricted = RESTRICTED_MODES.has(mode);
   const privileged = mode === 'lockdown' ? LOCKDOWN_ROLES.has(role) : PRIVILEGED_ROLES.has(role);
   const [now, setNow] = useState(() => new Date());

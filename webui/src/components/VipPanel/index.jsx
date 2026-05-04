@@ -2,7 +2,7 @@
 // Purpose: Defines the Vip Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo, useState } from 'react';
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { COOKIE_KEY_REGEX, flowWrapClass } from '../vip/constants.js';
 import VipAudioUploadCard from '../vip/VipAudioUploadCard/index.jsx';
@@ -12,10 +12,10 @@ import VipPrivateRoverAccessCard from '../vip/VipPrivateRoverAccessCard.jsx';
 import VipNeatoCard from '../vip/VipNeatoCard.jsx';
 import VipLiftCard from '../vip/VipLiftCard.jsx';
 
-export default function VipPanel() {
+export default function VipPanel({ isActive = true }) {
+  const session = useSessionSelector((state) => state.session);
+  const neatoLidar = useSessionSelector((state) => state.neatoLidar);
   const {
-    session,
-    neatoLidar,
     identifySession,
     requestVerification,
     requestPrivateRoverAccess,
@@ -31,7 +31,7 @@ export default function VipPanel() {
     neatoPowerCycle,
     liftUp,
     liftDown,
-  } = useSession();
+  } = useSessionActions();
   const { value: identity, save: saveIdentity } = useSettingsNamespace('identity', { cookieUserId: '' });
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
 
@@ -80,6 +80,7 @@ export default function VipPanel() {
               <VipNeatoCard
                 neato={session?.neato || null}
                 lidar={neatoLidar}
+                lidarActive={isActive}
                 onStart={neatoStart}
                 onSendHome={neatoSendHome}
                 onLocate={neatoLocate}

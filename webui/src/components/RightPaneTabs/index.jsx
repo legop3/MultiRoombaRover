@@ -23,6 +23,7 @@ import VipPanel from '../VipPanel/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
+import { useState } from 'react';
 
 function TopDownMapPanel() {
   const {
@@ -115,30 +116,34 @@ function DriveDockPanel() {
 }
 
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
-  const session = useSessionSelector((state) => state.session);
+  const [activeTab, setActiveTab] = useState('telemetry');
+  const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
+  const ownRoverId = useSessionSelector((state) => String(state.session?.assignment?.roverId || '').trim());
+  const ownAudioForward = useSessionSelector((state) => {
+    const roverId = String(state.session?.assignment?.roverId || '').trim();
+    return roverId ? state.session?.audioForward?.[roverId] || null : null;
+  });
   const { state: controlState } = useControlSystem();
   const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
-  const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-red-600';
-  const ownRoverId = String(session?.assignment?.roverId || '').trim();
-  const ownAudioForward = ownRoverId ? session?.audioForward?.[ownRoverId] : null;
+  const vipDotClass = isVerified ? 'bg-emerald-400' : 'bg-red-600';
   const pttActive = Boolean(controlState?.mic?.pttActive);
   const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
   const pttMode = vipAudio?.pttMode === 'clip' ? 'clip' : 'live';
   const vipMicActive = Boolean(
     ownRoverId &&
-      session?.isVerified &&
+      isVerified &&
       (pttMode === 'clip' ? pttActive : (openMicEnabled || pttActive)),
   );
   const vipClipPlaying = Boolean(
     ownRoverId &&
-      session?.isVerified &&
+      isVerified &&
       pttMode === 'clip' &&
       ownAudioForward?.source === 'upload' &&
       ownAudioForward?.state === 'playing',
   );
   return (
     <section className="panel text-base">
-      <Tabs defaultTab="telemetry">
+      <Tabs defaultTab="telemetry" currentTab={activeTab} onTabChange={setActiveTab}>
         <TabList>
           <Tab id="telemetry">Controls</Tab>
           <Tab id="vip" highlight={vipClipPlaying ? 'green' : vipMicActive ? 'pink' : 'none'}>
@@ -147,7 +152,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
               <span
                 className={`inline-block h-3 w-3 rounded-full ${vipDotClass}`}
                 aria-hidden="true"
-                title={session?.isVerified ? 'Verified' : 'Not verified'}
+                title={isVerified ? 'Verified' : 'Not verified'}
               />
             </span>
           </Tab>
@@ -179,7 +184,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
             </div>
           </TabPanel>
           <TabPanel id="vip" keepMounted>
-            <VipPanel />
+            <VipPanel isActive={activeTab === 'vip'} />
           </TabPanel>
           <TabPanel id="help">
             <HelpPanel layout={layout} onOpenOverlay={onOpenHelpOverlay} />

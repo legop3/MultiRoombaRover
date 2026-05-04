@@ -2,15 +2,17 @@
 // Purpose: Defines the Global Objective Banner module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
 
 const MOBILE_DISMISS_MS = 10000;
 const MAX_FONT_PX = 28;
 const MIN_FONT_PX = 14;
 
 export default function GlobalObjectiveBanner({ layout = 'desktop', className = '', dismissable = true }) {
-  const { session } = useSession();
-  const goalText = session?.globalObjective?.text ? String(session.globalObjective.text).trim() : '';
+  const goalText = useSessionSelector((state) => {
+    const text = state.session?.globalObjective?.text;
+    return text ? String(text).trim() : '';
+  });
   const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape' || layout === 'mobile';
   const [visible, setVisible] = useState(false);
   const [fontSize, setFontSize] = useState(MAX_FONT_PX);

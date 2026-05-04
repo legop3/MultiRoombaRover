@@ -19,6 +19,8 @@ export function useRoverSnapshots(sourceList = [], options = {}) {
   const idsRef = useRef([]);
   const [connectionNonce, setConnectionNonce] = useState(0);
   const statsRef = useRef(new Map());
+  const debugSnapshots =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debugSnapshots');
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -64,7 +66,7 @@ export function useRoverSnapshots(sourceList = [], options = {}) {
         totalBytes: prevStats.totalBytes + sizeBytes,
         lastLogAt: prevStats.lastLogAt,
       };
-      if (!nextStats.lastLogAt || now - nextStats.lastLogAt >= 10000) {
+      if (debugSnapshots && (!nextStats.lastLogAt || now - nextStats.lastLogAt >= 10000)) {
         const avgBytes = nextStats.count ? nextStats.totalBytes / nextStats.count : 0;
         console.log(
           '[roverSnapshot]',
@@ -123,7 +125,7 @@ export function useRoverSnapshots(sourceList = [], options = {}) {
       objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.current.clear();
     };
-  }, [socket, idsKey, enabled, connectionNonce]);
+  }, [socket, idsKey, enabled, connectionNonce, debugSnapshots]);
 
   return feeds;
 }

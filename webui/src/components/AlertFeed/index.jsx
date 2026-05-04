@@ -20,7 +20,7 @@ function buildKey(alert) {
 
 export default function AlertFeed({ scale = 1 }) {
   const alerts = useSessionSelector((state) => state.alerts);
-  const session = useSessionSelector((state) => state.session);
+  const buttonBoxButtons = useSessionSelector((state) => state.session?.buttonBox?.buttons ?? []);
   const { pushAlert } = useSessionActions();
   const socket = useSocket();
   const [now, setNow] = useState(() => Date.now());
@@ -29,7 +29,7 @@ export default function AlertFeed({ scale = 1 }) {
     function onButtonIncrement(payload = {}) {
       const buttonId = Number(payload.buttonId);
       if (!Number.isFinite(buttonId) || buttonId < 1 || buttonId > 4) return;
-      const buttons = Array.isArray(session?.buttonBox?.buttons) ? session.buttonBox.buttons : [];
+      const buttons = Array.isArray(buttonBoxButtons) ? buttonBoxButtons : [];
       const button = buttons.find((entry) => Number(entry?.id) === buttonId) || {};
       const count = Number.isFinite(payload.count) ? payload.count : Number(button.count) || 0;
       const goal = Number.isFinite(button.goal) ? button.goal : 0;
@@ -49,7 +49,7 @@ export default function AlertFeed({ scale = 1 }) {
     return () => {
       socket.off('buttonBox:increment', onButtonIncrement);
     };
-  }, [pushAlert, session?.buttonBox?.buttons, socket]);
+  }, [pushAlert, buttonBoxButtons, socket]);
 
   const latest = useMemo(() => alerts.slice(-12).map((alert) => ({ alert, key: buildKey(alert) })), [alerts]);
 

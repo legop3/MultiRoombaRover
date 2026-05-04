@@ -2,7 +2,7 @@
 // Purpose: Defines the Raw User Pile Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButtonsGrid from '../SocialButtonsGrid/index.jsx';
 
@@ -35,10 +35,10 @@ export default function RawUserPilePanel({
   fillHeight = false,
   compact = false,
 }) {
-  const { session } = useSession();
-  const canSetNickname = session?.role !== 'spectator';
-  const users = session?.users ?? [];
-  const selfId = session?.socketId || null;
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const users = useSessionSelector((state) => state.session?.users ?? []);
+  const selfId = useSessionSelector((state) => state.session?.socketId || null);
+  const canSetNickname = role !== 'spectator';
 
   const sorted = useMemo(
     () =>

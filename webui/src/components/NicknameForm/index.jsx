@@ -2,16 +2,17 @@
 // Purpose: Defines the Nickname Form module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useState } from 'react';
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 
 export default function NicknameForm({ compact = false }) {
-  const { session, setNickname } = useSession();
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const { setNickname } = useSessionActions();
   const { value, save } = useSettingsNamespace('profile', { nickname: '' });
   const [nicknameInput, setNicknameInput] = useState(value.nickname || '');
   const [saving, setSaving] = useState(false);
 
-  const canSetNickname = session?.role !== 'spectator';
+  const canSetNickname = role !== 'spectator';
 
   useEffect(() => {
     setNicknameInput(value.nickname || '');

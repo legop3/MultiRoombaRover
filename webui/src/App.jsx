@@ -93,30 +93,34 @@ function MobileFeatureTabs({
   roomPanelId,
   showTelemetry = true,
 }) {
-  const session = useSessionSelector((state) => state.session);
+  const [activeTab, setActiveTab] = useState('chat');
+  const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
+  const ownRoverId = useSessionSelector((state) => String(state.session?.assignment?.roverId || '').trim());
+  const ownAudioForward = useSessionSelector((state) => {
+    const roverId = String(state.session?.assignment?.roverId || '').trim();
+    return roverId ? state.session?.audioForward?.[roverId] || null : null;
+  });
   const { state: controlState } = useControlSystem();
   const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
-  const vipDotClass = session?.isVerified ? 'bg-emerald-400' : 'bg-amber-400';
-  const ownRoverId = String(session?.assignment?.roverId || '').trim();
-  const ownAudioForward = ownRoverId ? session?.audioForward?.[ownRoverId] : null;
+  const vipDotClass = isVerified ? 'bg-emerald-400' : 'bg-amber-400';
   const pttActive = Boolean(controlState?.mic?.pttActive);
   const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
   const pttMode = vipAudio?.pttMode === 'clip' ? 'clip' : 'live';
   const vipMicActive = Boolean(
     ownRoverId &&
-      session?.isVerified &&
+      isVerified &&
       (pttMode === 'clip' ? pttActive : (openMicEnabled || pttActive)),
   );
   const vipClipPlaying = Boolean(
     ownRoverId &&
-      session?.isVerified &&
+      isVerified &&
       pttMode === 'clip' &&
       ownAudioForward?.source === 'upload' &&
       ownAudioForward?.state === 'playing',
   );
   return (
     <section className="panel text-base">
-      <Tabs defaultTab="chat">
+      <Tabs defaultTab="chat" currentTab={activeTab} onTabChange={setActiveTab}>
         <TabList>
           <Tab id="chat">Chat</Tab>
           <Tab id="vip" highlight={vipClipPlaying ? 'green' : vipMicActive ? 'pink' : 'none'}>
@@ -125,7 +129,7 @@ function MobileFeatureTabs({
               <span
                 className={`inline-block h-1.5 w-1.5 rounded-full ${vipDotClass}`}
                 aria-hidden="true"
-                title={session?.isVerified ? 'Verified' : 'Not verified'}
+                title={isVerified ? 'Verified' : 'Not verified'}
               />
             </span>
           </Tab>
@@ -141,7 +145,7 @@ function MobileFeatureTabs({
             </div>
           </TabPanel>
           <TabPanel id="vip" keepMounted>
-            <VipPanel />
+            <VipPanel isActive={activeTab === 'vip'} />
           </TabPanel>
           <TabPanel id="roomcontrols">
             <div className="space-y-0.5">

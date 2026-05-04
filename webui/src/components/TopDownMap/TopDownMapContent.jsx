@@ -13,7 +13,7 @@ import {
   cliffColor,
 } from './visuals.jsx';
 
-export default function TopDownMapContent({ sensors = {}, variant = 'full', size: overrideSize, overlay = false }) {
+function TopDownMapContent({ sensors = {}, variant = 'full', size: overrideSize, overlay = false }) {
   const size = overrideSize || (variant === 'mini' ? 190 : 260);
   const center = size / 2;
   const offsetY = size * 0.07;
@@ -147,3 +147,5 @@ export default function TopDownMapContent({ sensors = {}, variant = 'full', size
     </div>
   );
 }
+
+export default React.memo(TopDownMapContent);

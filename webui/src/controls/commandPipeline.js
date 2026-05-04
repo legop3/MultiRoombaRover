@@ -16,13 +16,13 @@ import { bytesToBase64, clampRange, sleep } from './controlMath.js';
 export function useCommandPipeline(options = {}) {
   const { driveTransform, auxTransform } = options;
   const socket = useSocket();
-  const session = useSessionSelector((state) => state.session);
-  const roverId = session?.assignment?.roverId;
+  const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const roster = useSessionSelector((state) => state.session?.roster ?? []);
 
   const rosterEntry = useMemo(() => {
-    if (!roverId || !Array.isArray(session?.roster)) return null;
-    return session.roster.find((entry) => String(entry.id) === String(roverId)) || null;
-  }, [roverId, session?.roster]);
+    if (!roverId || !Array.isArray(roster)) return null;
+    return roster.find((entry) => String(entry.id) === String(roverId)) || null;
+  }, [roverId, roster]);
 
   const servoConfig = useMemo(() => {
     if (!rosterEntry?.cameraServo || !rosterEntry.cameraServo.enabled) return null;

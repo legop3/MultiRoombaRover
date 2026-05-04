@@ -2,7 +2,7 @@
 // Purpose: Defines the Replay Sources Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { roverNameChromeStyle } from '../../lib/roverColor.js';
 
@@ -22,8 +22,15 @@ function normalizeSources(list = []) {
 }
 
 export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHeight = false }) {
-  const { session, triggerReplay } = useSession();
-  const sources = normalizeSources(session?.replaySources || []);
+  const replaySources = useSessionSelector((state) => state.session?.replaySources ?? []);
+  const mode = useSessionSelector((state) => state.session?.mode || null);
+  const assignmentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const users = useSessionSelector((state) => state.session?.users ?? []);
+  const selfSocketId = useSessionSelector((state) => state.session?.socketId || null);
+  const roster = useSessionSelector((state) => state.session?.roster ?? []);
+  const replayState = useSessionSelector((state) => state.session?.replay || null);
+  const { triggerReplay } = useSessionActions();
+  const sources = normalizeSources(replaySources || []);
   const { value: settings, save: saveSettings } = useSettingsNamespace('replaySources', {});
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -32,29 +39,28 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const [title, setTitle] = useState('');
   const [titleDirty, setTitleDirty] = useState(false);
   const [includeSidebar, setIncludeSidebar] = useState(true);
-  const replayState = session?.replay || null;
   const [remainingMs, setRemainingMs] = useState(0);
 
   const defaults = useMemo(() => {
-    const roverId = session?.assignment?.roverId;
+    const roverId = assignmentRoverId;
     if (roverId) {
       return [`rover:${roverId}`];
     }
     return [];
-  }, [session?.assignment?.roverId]);
+  }, [assignmentRoverId]);
 
   const defaultTitle = useMemo(() => {
-    const self = Array.isArray(session?.users)
-      ? session.users.find((entry) => entry?.socketId === session?.socketId)
+    const self = Array.isArray(users)
+      ? users.find((entry) => entry?.socketId === selfSocketId)
       : null;
     const nickname = (self?.nickname || 'Someone').trim() || 'Someone';
-    const roverId = session?.assignment?.roverId || null;
+    const roverId = assignmentRoverId || null;
     const roverName =
-      roverId && Array.isArray(session?.roster)
-        ? session.roster.find((entry) => String(entry?.id) === String(roverId))?.name || roverId
+      roverId && Array.isArray(roster)
+        ? roster.find((entry) => String(entry?.id) === String(roverId))?.name || roverId
         : 'a rover';
     return `${nickname} driving ${roverName}`;
-  }, [session?.users, session?.socketId, session?.assignment?.roverId, session?.roster]);
+  }, [users, selfSocketId, assignmentRoverId, roster]);
 
   useEffect(() => {
     const saved = settings?.[panelId];
@@ -106,7 +112,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     return () => clearInterval(interval);
   }, [replayState?.lastTriggeredAt, replayState?.cooldownMs, replayState?.remainingMs]);
 
-  const replayDisabled = busy || session?.mode === 'lockdown' || remainingMs > 0 || !selected.length;
+  const replayDisabled = busy || mode === 'lockdown' || remainingMs > 0 || !selected.length;
 
   const toggleKey = (key) => {
     setSelected((prev) => {

@@ -73,9 +73,9 @@ export function ControlSystemProvider({ children }) {
     typeof pageSettings?.driveMacroBackoffEnabled === 'boolean'
       ? pageSettings.driveMacroBackoffEnabled
       : true;
-  const session = useSessionSelector((state) => state.session);
+  const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const homeAssistantEntities = useSessionSelector((state) => state.session?.homeAssistant?.entities ?? []);
   const { homeAssistantSetState } = useSessionActions();
-  const roverId = session?.assignment?.roverId ?? null;
   const overcurrentLimiter = useOvercurrentLimiter(roverId);
   const driveTransform = useCallback(
     (speeds) => applyDriveOvercurrentScale(speeds, overcurrentLimiter.scales, overcurrentLimiter.adminImmune),
@@ -88,7 +88,7 @@ export function ControlSystemProvider({ children }) {
   const pipeline = useCommandPipeline({ driveTransform, auxTransform });
 
   const turnOnAllLights = useCallback(() => {
-    const entities = session?.homeAssistant?.entities || [];
+    const entities = homeAssistantEntities || [];
     const targets = entities.filter(
       (ent) =>
         (ent.type === 'light' || ent.type === 'switch') &&
@@ -105,7 +105,7 @@ export function ControlSystemProvider({ children }) {
     });
     // Give the loop a chance; clear pending after issuing commands.
     pendingLightsRef.current = false;
-  }, [session?.homeAssistant?.entities, homeAssistantSetState]);
+  }, [homeAssistantEntities, homeAssistantSetState]);
 
   useEffect(() => {
     dispatch({ type: 'control/set-rover', payload: pipeline.roverId });
@@ -114,18 +114,18 @@ export function ControlSystemProvider({ children }) {
   useEffect(() => {
     const prevMode = prevModeRef.current;
     prevModeRef.current = state.mode;
-    if (prevMode !== 'drive' && state.mode === 'drive' && session?.homeAssistant?.entities) {
+    if (prevMode !== 'drive' && state.mode === 'drive' && homeAssistantEntities?.length) {
       turnOnAllLights();
     } else if (prevMode !== 'drive' && state.mode === 'drive') {
       pendingLightsRef.current = true;
     }
-  }, [state.mode, session?.homeAssistant?.entities, turnOnAllLights]);
+  }, [state.mode, homeAssistantEntities, turnOnAllLights]);
 
   useEffect(() => {
-    if (pendingLightsRef.current && session?.homeAssistant?.entities) {
+    if (pendingLightsRef.current && homeAssistantEntities?.length) {
       turnOnAllLights();
     }
-  }, [session?.homeAssistant?.entities, turnOnAllLights]);
+  }, [homeAssistantEntities, turnOnAllLights]);
 
   useEffect(() => {
     const mergedKeymap = { ...DEFAULT_KEYMAP, ...(controlSettings?.keymap || {}) };
@@ -308,7 +308,7 @@ export function ControlSystemProvider({ children }) {
       let macroToRun = macro;
       if (macroId === 'drive-sequence') {
         turnOnAllLights();
-        if (!session?.homeAssistant?.entities) {
+        if (!homeAssistantEntities?.length) {
           pendingLightsRef.current = true;
         }
         recordControlIntent();
@@ -327,7 +327,7 @@ export function ControlSystemProvider({ children }) {
       driveMacroBackoffEnabled,
       pipeline,
       recordControlIntent,
-      session?.homeAssistant?.entities,
+      homeAssistantEntities,
       state.macros,
       turnOnAllLights,
     ],

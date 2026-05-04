@@ -17,7 +17,9 @@ export default function ChatPanel({
   fillHeight = false,
   allowSpectatorInput = false,
 }) {
-  const session = useSessionSelector((state) => state.session);
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
+  const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const {
     messages,
     typing,
@@ -38,13 +40,12 @@ export default function ChatPanel({
   const [engine, setEngine] = useState(() => ttsSettings?.engine || 'flite');
   const [voice, setVoice] = useState(() => ttsSettings?.voice || 'rms');
   const [pitch, setPitch] = useState(() => (Number.isFinite(ttsSettings?.pitch) ? ttsSettings.pitch : 50));
-  const canChat = session?.role !== 'spectator' || allowSpectatorInput;
+  const canChat = role !== 'spectator' || allowSpectatorInput;
   const listRef = useRef(null);
-  const currentRoverId = session?.assignment?.roverId || null;
 
   const rover = useMemo(
-    () => session?.roster?.find((entry) => String(entry.id) === String(currentRoverId)) || null,
-    [currentRoverId, session?.roster],
+    () => roster.find((entry) => String(entry.id) === String(currentRoverId)) || null,
+    [currentRoverId, roster],
   );
   const ttsSupported = Boolean(rover?.audio?.ttsEnabled);
 
