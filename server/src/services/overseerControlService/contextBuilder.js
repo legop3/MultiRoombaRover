@@ -64,11 +64,6 @@ function buildModelMessages({ systemPrompt, stateUpdate, conversationMessages, a
     role: 'user',
     content: `blocked_tools:\n${blockedTools.map((entry) => `- ${entry.tool} reason=${entry.reason}`).join('\n') || '- none'}`,
   });
-  messages.push({
-    role: 'user',
-    content:
-      'Use tool calls when needed. If no tool is needed, respond with one short in-character chat line.',
-  });
   return messages;
 }
 
