@@ -1,4 +1,3 @@
-const chatSay = require('./chatSay');
 const memoryRead = require('./memoryRead');
 const memoryWrite = require('./memoryWrite');
 const liftUp = require('./liftUp');
@@ -11,7 +10,6 @@ const haSetEntity = require('./haSetEntity');
 const buttonBoxAddCount = require('./buttonBoxAddCount');
 
 const TOOL_DEFINITIONS = [
-  chatSay,
   memoryRead,
   memoryWrite,
   liftUp,

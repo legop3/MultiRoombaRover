@@ -22,6 +22,7 @@ function buildAdminState(status, runHistory) {
       ollamaUrl: status.ollamaUrl,
       gateIntervalMs: status.gateIntervalMs,
       heartbeatMs: status.heartbeatMs,
+      alwaysRunModel: status.alwaysRunModel,
       observeOnly: status.observeOnly,
       promptPath: status.promptPath,
     },

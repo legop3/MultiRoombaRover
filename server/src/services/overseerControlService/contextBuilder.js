@@ -67,7 +67,7 @@ function buildModelMessages({ systemPrompt, stateUpdate, conversationMessages, a
   messages.push({
     role: 'user',
     content:
-      'Use tool calls when needed. If no tool is needed, either respond with one short chat line or SKIP.',
+      'Use tool calls when needed. If no tool is needed, respond with one short in-character chat line.',
   });
   return messages;
 }

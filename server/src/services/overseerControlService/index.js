@@ -38,6 +38,7 @@ const model = String(overseerConfig.model || '').trim();
 const ollamaUrl = String(overseerConfig.ollamaUrl || overseerConfig.ollamaServer || '').trim();
 const gateIntervalMs = normalizeMs(Number(overseerConfig.gateIntervalMs), DEFAULT_GATE_INTERVAL_MS);
 const heartbeatMs = normalizeMs(Number(overseerConfig.heartbeatMs), DEFAULT_HEARTBEAT_MS);
+const alwaysRunModel = Boolean(overseerConfig.alwaysRunModel);
 const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 
 const runtime = {
@@ -60,6 +61,7 @@ let status = {
   promptPath: PROMPT_PATH,
   gateIntervalMs,
   heartbeatMs,
+  alwaysRunModel,
   running: false,
   inFlight: false,
   phase: 'idle',
@@ -125,6 +127,7 @@ function buildRosterSummary() {
 }
 
 function computeTriggerReason() {
+  if (alwaysRunModel) return 'loop_tick';
   const recent = getRecentMessages(1, { includeSystem: false });
   const last = recent[recent.length - 1];
   if (last && Date.now() - Number(last.ts || 0) < 5000) {
@@ -164,6 +167,13 @@ function inferDecision({ toolCalls, chatText }) {
   if (hasTools) return 'ACTION';
   if (hasChat) return 'CHAT';
   return 'SKIP';
+}
+
+function normalizeChatDraft(text) {
+  const next = String(text || '').trim();
+  if (!next) return null;
+  if (next.toUpperCase() === 'SKIP') return null;
+  return next;
 }
 
 async function runDecision(triggerReason) {
@@ -223,7 +233,7 @@ async function runDecision(triggerReason) {
 
   const rawOutput = String(payload?.message?.content || '');
   const toolCalls = normalizeToolCalls(payload);
-  const chatDraft = rawOutput.trim() || null;
+  const chatDraft = normalizeChatDraft(rawOutput);
   const decision = inferDecision({ toolCalls, chatText: chatDraft });
 
   const generationMs = Math.max(0, Date.now() - generationStart);

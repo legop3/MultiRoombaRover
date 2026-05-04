@@ -12,7 +12,7 @@ function sendSystemMessage(text, options = {}) {
   const normalized = normalizeUserText(text);
   const clean = normalized.trim();
   if (!clean) return null;
-  const safe = clean.length > 256 ? `${clean.slice(0, 253)}...` : clean;
+  const safe = clean;
   const message = buildMessage(null, safe, {
     nickname: String(options.nickname || 'The Overseer'),
     role: 'user',
