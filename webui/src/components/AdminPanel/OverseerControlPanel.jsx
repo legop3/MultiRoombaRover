@@ -52,12 +52,46 @@ export default function OverseerControlPanel({ state, onClearHistory, clearingHi
         </pre>
       </details>
 
+      <details className="surface text-xs text-slate-200" open>
+        <summary className="cursor-pointer select-none text-slate-300">Exact Model Input (messages[])</summary>
+        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+          {JSON.stringify(input.modelMessages || [], null, 2)}
+        </pre>
+      </details>
+
+      <details className="surface text-xs text-slate-200">
+        <summary className="cursor-pointer select-none text-slate-300">Exact System Prompt</summary>
+        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+          {input.systemPrompt || '<none>'}
+        </pre>
+      </details>
+
+      <details className="surface text-xs text-slate-200">
+        <summary className="cursor-pointer select-none text-slate-300">Exact Transcript Rows</summary>
+        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+          {JSON.stringify(input.transcript || [], null, 2)}
+        </pre>
+      </details>
+
       <details className="surface text-xs text-slate-200">
         <summary className="cursor-pointer select-none text-slate-300">Tool Availability</summary>
         <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
           {JSON.stringify({ available: input.availableTools, blocked: input.blockedTools }, null, 2)}
         </pre>
       </details>
+
+      <details className="surface text-xs text-slate-200" open>
+        <summary className="cursor-pointer select-none text-slate-300">Exact Model Output</summary>
+        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+          {output.raw || '<none>'}
+        </pre>
+      </details>
+
+      <div className="surface text-xs text-slate-200">
+        <div>Normalized decision: {output.normalized || '--'}</div>
+        <div>Model input at: {input.modelInputAt ? new Date(input.modelInputAt).toLocaleString() : 'n/a'}</div>
+        <div>Model output at: {output.outputAt ? new Date(output.outputAt).toLocaleString() : 'n/a'}</div>
+      </div>
 
       {errors.message ? <div className="surface text-xs text-red-300">Error: {errors.message}</div> : null}
 
