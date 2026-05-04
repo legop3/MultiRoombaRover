@@ -1,6 +1,8 @@
 module.exports = {
   id: 'neato_start',
   signature: 'neato_start()',
+  description: 'Start Neato cleaning cycle.',
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
   availability(ctx = {}) {
     const mode = String(ctx.mode || '');
     if (mode === 'admin' || mode === 'lockdown') {

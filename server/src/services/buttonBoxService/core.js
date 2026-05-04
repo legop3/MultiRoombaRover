@@ -142,6 +142,32 @@ function createButtonBoxCore(deps) {
     return store.clone(button);
   }
 
+  async function addCount(buttonId, amount = 1) {
+    const state = store.getState();
+    const button = state.buttons.find((entry) => entry.id === buttonId);
+    if (!button) {
+      throw new Error('Unknown button');
+    }
+    const inc = Math.max(1, Math.floor(Number(amount) || 0));
+    button.count += inc;
+    button.lastIncrementAt = Date.now();
+    store.writeState();
+
+    io.emit('buttonBox:increment', {
+      buttonId,
+      count: button.count,
+      ts: button.lastIncrementAt,
+    });
+
+    while (button.count >= button.goal) {
+      await runRewardForButton(button);
+      store.writeState();
+    }
+
+    publishUpdated();
+    return store.clone(button);
+  }
+
   async function recoverEffects() {
     const state = store.getState();
     const effects = state.effects && typeof state.effects === 'object' ? { ...state.effects } : {};
@@ -165,6 +191,7 @@ function createButtonBoxCore(deps) {
 
   return {
     applyPress,
+    addCount,
     recoverEffects,
   };
 }

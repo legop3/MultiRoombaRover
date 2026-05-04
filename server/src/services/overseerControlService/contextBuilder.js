@@ -8,6 +8,13 @@ function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster
   lines.push(`lights_locked_on: ${homeAssistantState?.lightPolicy?.lockedOn ? 'yes' : 'no'}`);
   lines.push(`lift: ${liftState?.connected ? 'connected' : 'offline'} busy=${liftState?.busy ? 'yes' : 'no'}`);
   lines.push(`neato: ${neatoState?.connected ? 'connected' : 'offline'} state=${neatoState?.telemetry?.robotState || 'unknown'}`);
+  const entities = Array.isArray(homeAssistantState?.entities) ? homeAssistantState.entities : [];
+  if (entities.length) {
+    lines.push('home_assistant_entities:');
+    entities.slice(0, 24).forEach((entity) => {
+      lines.push(`- ${entity.id} (${entity.type || 'entity'}) state=${entity.state || 'unknown'} available=${entity.available ? 'yes' : 'no'}`);
+    });
+  }
   const roverLines = (Array.isArray(roster) ? roster : []).slice(0, 6).map((rover) => {
     const roverId = rover?.id || 'unknown';
     const driver = rover?.driverNickname || 'none';
@@ -60,7 +67,7 @@ function buildModelMessages({ systemPrompt, stateUpdate, conversationMessages, a
   messages.push({
     role: 'user',
     content:
-      'Respond with JSON only: {"decision":"SKIP|CHAT|ACTION|ACTION+CHAT","chat":"optional text","actions":[{"tool":"tool_id","args":{}}]}. Use action tool ids only.',
+      'Use tool calls when needed. If no tool is needed, either respond with one short chat line or SKIP.',
   });
   return messages;
 }

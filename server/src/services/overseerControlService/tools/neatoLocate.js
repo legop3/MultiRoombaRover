@@ -1,6 +1,8 @@
 module.exports = {
   id: 'neato_locate',
   signature: 'neato_locate()',
+  description: 'Play Neato locate/chime action.',
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
   availability(ctx = {}) {
     const mode = String(ctx.mode || '');
     if (mode === 'admin' || mode === 'lockdown') {

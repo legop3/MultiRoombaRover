@@ -1,6 +1,8 @@
 module.exports = {
   id: 'neato_send_home',
   signature: 'neato_send_home()',
+  description: 'Send Neato back to base.',
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
   availability(ctx = {}) {
     const mode = String(ctx.mode || '');
     if (mode === 'admin' || mode === 'lockdown') {

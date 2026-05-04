@@ -1,6 +1,15 @@
 module.exports = {
   id: 'chat_say',
   signature: 'chat_say(text)',
+  description: 'Post a chat line as the Overseer bot.',
+  parameters: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', minLength: 1, maxLength: 220 },
+    },
+    required: ['text'],
+    additionalProperties: false,
+  },
   availability() {
     return { available: true, reason: null };
   },

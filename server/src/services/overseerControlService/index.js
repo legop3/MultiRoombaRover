@@ -8,6 +8,7 @@ const { getMode } = require('../modeManager');
 const homeAssistantService = require('../homeAssistantService');
 const neatoService = require('../neatoService');
 const liftService = require('../liftService');
+const buttonBoxService = require('../buttonBoxService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = homeAssistantService;
 const { getState: getNeatoState, neatoEvents } = neatoService;
 const { getState: getLiftState, liftEvents } = liftService;
@@ -23,9 +24,10 @@ const {
   MAX_BOT_CONTEXT,
   normalizeMs,
 } = require('./constants');
-const { isAdminRole, buildAdminState, parseOverseerOutput, buildFailureInfo } = require('./runtimeHelpers');
+const { isAdminRole, buildAdminState, buildFailureInfo } = require('./runtimeHelpers');
 const { toStateUpdate, buildToolState, buildConversation, buildModelMessages } = require('./contextBuilder');
-const { executeToolAction } = require('./tools');
+const { buildOllamaTools, executeToolAction } = require('./tools');
+const { loadMemory, saveMemory, createDefaultMemory } = require('./memoryStore');
 
 const config = loadConfig();
 const overseerConfig = config.overseerControl || {};
@@ -46,7 +48,7 @@ const runtime = {
   generationCount: 0,
   generationTotalMs: 0,
   runHistory: [],
-  memoryStore: ['', '', ''],
+  memoryStore: loadMemory(),
 };
 
 let status = {
@@ -112,11 +114,14 @@ async function readPrompt() {
 }
 
 function buildRosterSummary() {
-  return roverManager.getRoster().map((rover) => ({
-    id: rover?.id || 'unknown',
-    statusTag: rover?.statusTag || 'unknown',
-    driverNickname: rover?.driverNickname || null,
-  }));
+  return roverManager
+    .getRoster()
+    .filter((rover) => roverManager.canReplayRoverId(rover?.id))
+    .map((rover) => ({
+      id: rover?.id || 'unknown',
+      statusTag: rover?.statusTag || 'unknown',
+      driverNickname: rover?.driverNickname || null,
+    }));
 }
 
 function computeTriggerReason() {
@@ -129,6 +134,36 @@ function computeTriggerReason() {
   }
   if (!runtime.lastModelAt || Date.now() - runtime.lastModelAt >= heartbeatMs) return 'heartbeat';
   return null;
+}
+
+function normalizeToolCalls(payload = null) {
+  const calls = Array.isArray(payload?.message?.tool_calls) ? payload.message.tool_calls : [];
+  return calls
+    .map((call) => {
+      const fn = call?.function || {};
+      const tool = String(fn.name || '').trim();
+      if (!tool) return null;
+      let args = fn.arguments;
+      if (typeof args === 'string') {
+        try {
+          args = JSON.parse(args);
+        } catch {
+          args = {};
+        }
+      }
+      if (!args || typeof args !== 'object') args = {};
+      return { tool, args };
+    })
+    .filter(Boolean);
+}
+
+function inferDecision({ toolCalls, chatText }) {
+  const hasTools = (toolCalls || []).length > 0;
+  const hasChat = Boolean(String(chatText || '').trim());
+  if (hasTools && hasChat) return 'ACTION+CHAT';
+  if (hasTools) return 'ACTION';
+  if (hasChat) return 'CHAT';
+  return 'SKIP';
 }
 
 async function runDecision(triggerReason) {
@@ -144,7 +179,12 @@ async function runDecision(triggerReason) {
   const stateUpdate = toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason });
   const toolState = buildToolState({ mode, homeAssistantState, neatoState, liftState });
 
-  const recentConversation = getRecentMessages(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT, { includeSystem: true });
+  const recentConversation = getRecentMessages(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT + 20, { includeSystem: true })
+    .filter((entry) => {
+      if (!entry?.roverId) return true;
+      return roverManager.canReplayRoverId(entry.roverId);
+    })
+    .slice(-(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT));
   const conversationMessages = buildConversation({ recentMessages: recentConversation, name });
 
   const systemPrompt = await readPrompt();
@@ -155,6 +195,7 @@ async function runDecision(triggerReason) {
     availableTools: toolState.available,
     blockedTools: toolState.blocked,
   });
+  const ollamaTools = buildOllamaTools(toolState.availableIds);
 
   updateStatus({
     phase: 'awaiting_model',
@@ -167,18 +208,23 @@ async function runDecision(triggerReason) {
     lastModelInputAt: Date.now(),
   });
 
-  let parsed = { decision: 'SKIP', chat: null, actions: [], raw: '' };
   const generationStart = Date.now();
+  let payload = null;
   if (ollamaClient && model) {
-    const payload = await ollamaClient.chat({
+    payload = await ollamaClient.chat({
       model,
       stream: false,
       keep_alive: -1,
       options: { temperature: 0.4, top_p: 0.9 },
       messages: modelMessages,
+      tools: ollamaTools,
     });
-    parsed = parseOverseerOutput(payload?.message?.content || '');
   }
+
+  const rawOutput = String(payload?.message?.content || '');
+  const toolCalls = normalizeToolCalls(payload);
+  const chatDraft = rawOutput.trim() || null;
+  const decision = inferDecision({ toolCalls, chatText: chatDraft });
 
   const generationMs = Math.max(0, Date.now() - generationStart);
   runtime.generationCount += 1;
@@ -187,33 +233,37 @@ async function runDecision(triggerReason) {
   runtime.lastModelAt = Date.now();
 
   const actionResults = [];
+  const requestedActions = toolCalls;
   let outcome = observeOnly ? 'observed' : 'executed';
-  let reason = observeOnly ? 'observe-only mode' : null;
+  const reason = observeOnly ? 'observe-only mode' : null;
 
   if (!observeOnly) {
-    if ((parsed.decision === 'CHAT' || parsed.decision === 'ACTION+CHAT') && parsed.chat) {
-      sendSystemMessage(parsed.chat, { nickname: name });
+    if ((decision === 'CHAT' || decision === 'ACTION+CHAT') && chatDraft) {
+      sendSystemMessage(chatDraft, { nickname: name });
       actionResults.push({ kind: 'chat', ok: true });
     }
 
-    if (parsed.decision === 'ACTION' || parsed.decision === 'ACTION+CHAT') {
-      for (const action of parsed.actions) {
-        const isAvailable = toolState.available.some((signature) => signature.startsWith(`${action.tool}(`));
-        if (!isAvailable) {
+    if (decision === 'ACTION' || decision === 'ACTION+CHAT') {
+      for (const action of requestedActions) {
+        if (!toolState.availableIds.includes(action.tool)) {
           actionResults.push({ kind: 'tool', tool: action.tool, ok: false, error: 'tool unavailable or blocked' });
           continue;
         }
         try {
-          const result = await executeToolAction(action, {
+          const result = await executeToolAction(action.tool, action.args, {
             sendSystemMessage,
             name,
             memoryStore: runtime.memoryStore,
             neatoService,
             liftService,
             homeAssistantService,
+            buttonBoxService,
             actor: 'overseerControl',
           });
           if (action.tool === 'memory_write' && Array.isArray(result?.slots)) {
+            runtime.memoryStore = saveMemory(result.slots);
+          }
+          if (action.tool === 'memory_read' && Array.isArray(result?.slots)) {
             runtime.memoryStore = result.slots;
           }
           actionResults.push({ kind: 'tool', tool: action.tool, ok: true, result });
@@ -227,10 +277,10 @@ async function runDecision(triggerReason) {
   updateStatus({
     phase: 'decision_recorded',
     lastModelOutputAt: Date.now(),
-    lastModelRawOutput: parsed.raw,
-    lastDecision: parsed.decision,
-    lastChatDraft: parsed.chat,
-    lastRequestedActions: parsed.actions,
+    lastModelRawOutput: rawOutput,
+    lastDecision: decision,
+    lastChatDraft: chatDraft,
+    lastRequestedActions: requestedActions,
     lastActionResults: actionResults,
     lastOutcome: outcome,
     lastReason: reason,
@@ -243,9 +293,9 @@ async function runDecision(triggerReason) {
     runId,
     at: Date.now(),
     triggerReason,
-    decision: parsed.decision,
-    chatDraft: parsed.chat,
-    requestedActions: parsed.actions,
+    decision,
+    chatDraft,
+    requestedActions,
     actionResults,
     outcome,
     observeOnly,
@@ -292,7 +342,7 @@ function clearHistory() {
   runtime.runHistory = [];
   runtime.generationCount = 0;
   runtime.generationTotalMs = 0;
-  runtime.memoryStore = ['', '', ''];
+  runtime.memoryStore = saveMemory(createDefaultMemory());
   updateStatus({ lastReason: 'admin requested clear history', lastOutcome: 'cleared' });
 }
 

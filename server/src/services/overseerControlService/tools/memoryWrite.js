@@ -1,6 +1,16 @@
 module.exports = {
   id: 'memory_write',
   signature: 'memory_write(slot, text)',
+  description: 'Write one of 3 Overseer memory slots.',
+  parameters: {
+    type: 'object',
+    properties: {
+      slot: { type: 'integer', minimum: 1, maximum: 3 },
+      text: { type: 'string', minLength: 1, maxLength: 180 },
+    },
+    required: ['slot', 'text'],
+    additionalProperties: false,
+  },
   availability() {
     return { available: true, reason: null };
   },

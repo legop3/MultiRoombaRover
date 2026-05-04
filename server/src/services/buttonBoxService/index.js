@@ -79,4 +79,5 @@ core.recoverEffects().catch((err) => {
 
 module.exports = {
   getButtonBoxState: store.getStateClone,
+  addButtonBoxCount: core.addCount,
 };

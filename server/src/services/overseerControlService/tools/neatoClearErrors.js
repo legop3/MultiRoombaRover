@@ -1,6 +1,8 @@
 module.exports = {
   id: 'neato_clear_errors',
   signature: 'neato_clear_errors()',
+  description: 'Clear Neato errors.',
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
   availability(ctx = {}) {
     const mode = String(ctx.mode || '');
     if (mode === 'admin' || mode === 'lockdown') {

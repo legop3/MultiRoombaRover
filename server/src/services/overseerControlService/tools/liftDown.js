@@ -1,6 +1,8 @@
 module.exports = {
   id: 'lift_down',
   signature: 'lift_down()',
+  description: 'Move the lift downward.',
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
   availability(ctx = {}) {
     const mode = String(ctx.mode || '');
     if (mode === 'admin' || mode === 'lockdown') {
