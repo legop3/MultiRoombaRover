@@ -27,7 +27,7 @@ const {
 const { isAdminRole, buildAdminState, buildFailureInfo } = require('./runtimeHelpers');
 const { toStateUpdate, buildToolState, buildConversation, buildModelMessages } = require('./contextBuilder');
 const { buildOllamaTools, executeToolAction } = require('./tools');
-const { loadMemory, saveMemory, createDefaultMemory } = require('./memoryStore');
+const { loadMemory, saveMemory, createDefaultMemory, summarizeMemory } = require('./memoryStore');
 
 const config = loadConfig();
 const overseerConfig = config.overseerControl || {};
@@ -201,6 +201,7 @@ async function runDecision(triggerReason) {
   const modelMessages = buildModelMessages({
     systemPrompt,
     stateUpdate,
+    memorySummary: summarizeMemory(runtime.memoryStore),
     conversationMessages,
     availableTools: toolState.available,
     blockedTools: toolState.blocked,
@@ -270,11 +271,8 @@ async function runDecision(triggerReason) {
             buttonBoxService,
             actor: 'overseerControl',
           });
-          if (action.tool === 'memory_write' && Array.isArray(result?.slots)) {
-            runtime.memoryStore = saveMemory(result.slots);
-          }
-          if (action.tool === 'memory_read' && Array.isArray(result?.slots)) {
-            runtime.memoryStore = result.slots;
+          if (result?.memory && typeof result.memory === 'object') {
+            runtime.memoryStore = saveMemory(result.memory);
           }
           actionResults.push({ kind: 'tool', tool: action.tool, ok: true, result });
         } catch (err) {

@@ -1,7 +1,7 @@
 module.exports = {
   id: 'memory_read',
   signature: 'memory_read()',
-  description: 'Read the Overseer persistent 3-slot memory.',
+  description: 'Read full persistent memory (slots, notes, recent events).',
   parameters: {
     type: 'object',
     properties: {},
@@ -11,6 +11,6 @@ module.exports = {
     return { available: true, reason: null };
   },
   async execute({ memoryStore }) {
-    return { ok: true, slots: memoryStore || ['', '', ''] };
+    return { ok: true, memory: memoryStore };
   },
 };

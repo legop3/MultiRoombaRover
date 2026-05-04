@@ -1,7 +1,7 @@
 module.exports = {
   id: 'memory_write',
   signature: 'memory_write(slot, text)',
-  description: 'Write one of 3 Overseer memory slots.',
+  description: 'Write one of 3 scratchpad slots for short-term reminders.',
   parameters: {
     type: 'object',
     properties: {
@@ -19,9 +19,11 @@ module.exports = {
     if (!slot) throw new Error('memory_write requires args.slot 1..3');
     const text = String(args?.text || '').trim();
     if (!text) throw new Error('memory_write requires args.text');
-    const next = Array.isArray(memoryStore) ? [...memoryStore] : ['', '', ''];
-    while (next.length < 3) next.push('');
-    next[slot - 1] = text.slice(0, 180);
-    return { ok: true, slots: next };
+    const next = memoryStore && typeof memoryStore === 'object' ? { ...memoryStore } : {};
+    const slots = Array.isArray(next.slots) ? [...next.slots] : ['', '', ''];
+    while (slots.length < 3) slots.push('');
+    slots[slot - 1] = text.slice(0, 180);
+    next.slots = slots.slice(0, 3);
+    return { ok: true, memory: next };
   },
 };

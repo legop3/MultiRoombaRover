@@ -48,10 +48,13 @@ function buildConversation({ recentMessages, name }) {
   return messages;
 }
 
-function buildModelMessages({ systemPrompt, stateUpdate, conversationMessages, availableTools, blockedTools }) {
+function buildModelMessages({ systemPrompt, stateUpdate, memorySummary, conversationMessages, availableTools, blockedTools }) {
   const messages = [];
   messages.push({ role: 'system', content: systemPrompt });
   messages.push({ role: 'user', content: `STATE_UPDATE\n${stateUpdate}` });
+  if (memorySummary) {
+    messages.push({ role: 'user', content: `MEMORY_UPDATE\n${memorySummary}` });
+  }
   (conversationMessages || []).forEach((message) => {
     if (!message || !message.role || !message.content) return;
     messages.push(message);

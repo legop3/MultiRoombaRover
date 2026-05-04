@@ -1,5 +1,8 @@
 const memoryRead = require('./memoryRead');
 const memoryWrite = require('./memoryWrite');
+const memoryNoteUpsert = require('./memoryNoteUpsert');
+const memoryNoteDelete = require('./memoryNoteDelete');
+const memoryEventAdd = require('./memoryEventAdd');
 const liftUp = require('./liftUp');
 const liftDown = require('./liftDown');
 const neatoStart = require('./neatoStart');
@@ -12,6 +15,9 @@ const buttonBoxAddCount = require('./buttonBoxAddCount');
 const TOOL_DEFINITIONS = [
   memoryRead,
   memoryWrite,
+  memoryNoteUpsert,
+  memoryNoteDelete,
+  memoryEventAdd,
   liftUp,
   liftDown,
   neatoStart,
