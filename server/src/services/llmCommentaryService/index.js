@@ -258,17 +258,31 @@ const runner = createRunner({
   updateStatus,
 });
 
-registerHooks({
-  io,
-  roleEvents,
-  roverManager,
-  emitStatusToSocket,
-  isAdminSocket,
-  clearRuntimeHistory: runner.clearRuntimeHistory,
-  getAdminState: () => buildAdminState(status, runtime.runHistory),
-  onDriverActivity: runner.wakeForDriverActivity,
-  onSensorEvent: snapshotEngine.onSensorEvent,
-  onRoverRemoved: snapshotEngine.removeRover,
-});
+if (enabled && model && ollamaUrl) {
+  registerHooks({
+    io,
+    roleEvents,
+    roverManager,
+    emitStatusToSocket,
+    isAdminSocket,
+    clearRuntimeHistory: runner.clearRuntimeHistory,
+    getAdminState: () => buildAdminState(status, runtime.runHistory),
+    onDriverActivity: runner.wakeForDriverActivity,
+    onSensorEvent: snapshotEngine.onSensorEvent,
+    onRoverRemoved: snapshotEngine.removeRover,
+  });
 
-runner.start();
+  runner.start();
+} else {
+  const disabledReason = !enabled
+    ? 'llmCommentary.enabled is false'
+    : 'model or ollama server missing';
+  updatePhase('disabled', {
+    running: false,
+    inFlight: false,
+    currentRunId: null,
+    lastOutcome: 'disabled',
+    lastReason: disabledReason,
+  });
+  logger.info('LLM commentary service not started', { reason: disabledReason });
+}
