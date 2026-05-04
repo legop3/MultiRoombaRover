@@ -51,21 +51,15 @@ function buildConversation({ recentMessages, name }) {
 function buildModelMessages({ systemPrompt, stateUpdate, memorySummary, conversationMessages, availableTools, blockedTools }) {
   const messages = [];
   messages.push({ role: 'system', content: systemPrompt });
-  messages.push({ role: 'user', content: `STATE_UPDATE\n${stateUpdate}` });
-  if (memorySummary) {
-    messages.push({ role: 'user', content: `MEMORY_UPDATE\n${memorySummary}` });
-  }
+  const metadataSections = [];
+  metadataSections.push(`STATE_UPDATE\n${stateUpdate}`);
+  if (memorySummary) metadataSections.push(`MEMORY_UPDATE\n${memorySummary}`);
+  metadataSections.push(`available_tools:\n${availableTools.map((tool) => `- ${tool}`).join('\n') || '- none'}`);
+  metadataSections.push(`blocked_tools:\n${blockedTools.map((entry) => `- ${entry.tool} reason=${entry.reason}`).join('\n') || '- none'}`);
+  messages.push({ role: 'user', content: metadataSections.join('\n\n') });
   (conversationMessages || []).forEach((message) => {
     if (!message || !message.role || !message.content) return;
     messages.push(message);
-  });
-  messages.push({
-    role: 'user',
-    content: `available_tools:\n${availableTools.map((tool) => `- ${tool}`).join('\n') || '- none'}`,
-  });
-  messages.push({
-    role: 'user',
-    content: `blocked_tools:\n${blockedTools.map((entry) => `- ${entry.tool} reason=${entry.reason}`).join('\n') || '- none'}`,
   });
   return messages;
 }
