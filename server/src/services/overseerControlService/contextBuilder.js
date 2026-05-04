@@ -26,21 +26,29 @@ function buildToolState({ mode, homeAssistantState, neatoState, liftState }) {
 }
 
 function buildConversation({ recentMessages, name }) {
-  const rows = [];
+  const messages = [];
   (recentMessages || []).forEach((entry) => {
     const text = String(entry?.text || '').trim();
     if (!text) return;
-    const who = entry?.system ? (entry?.nickname || name || 'Overseer') : (entry?.nickname || 'user');
-    rows.push(`${who}: ${text}`);
+    const isAssistant = Boolean(entry?.bot || entry?.system);
+    const nickname = String(entry?.nickname || (isAssistant ? name || 'Overseer' : 'user')).trim();
+    if (isAssistant) {
+      messages.push({ role: 'assistant', content: text });
+      return;
+    }
+    messages.push({ role: 'user', content: `${nickname}: ${text}` });
   });
-  return rows;
+  return messages;
 }
 
-function buildModelMessages({ systemPrompt, stateUpdate, transcriptRows, availableTools, blockedTools }) {
+function buildModelMessages({ systemPrompt, stateUpdate, conversationMessages, availableTools, blockedTools }) {
   const messages = [];
   messages.push({ role: 'system', content: systemPrompt });
   messages.push({ role: 'user', content: `STATE_UPDATE\n${stateUpdate}` });
-  transcriptRows.forEach((row) => messages.push({ role: 'user', content: row }));
+  (conversationMessages || []).forEach((message) => {
+    if (!message || !message.role || !message.content) return;
+    messages.push(message);
+  });
   messages.push({
     role: 'user',
     content: `available_tools:\n${availableTools.map((tool) => `- ${tool}`).join('\n') || '- none'}`,

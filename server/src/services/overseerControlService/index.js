@@ -144,18 +144,23 @@ async function runDecision(triggerReason) {
   const stateUpdate = toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason });
   const toolState = buildToolState({ mode, homeAssistantState, neatoState, liftState });
 
-  const human = getRecentMessages(MAX_CHAT_CONTEXT, { includeSystem: false });
-  const bots = getRecentMessages(100, { includeSystem: true }).filter((entry) => entry?.system).slice(-MAX_BOT_CONTEXT);
-  const transcriptRows = buildConversation({ recentMessages: [...human, ...bots].slice(-(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT)), name });
+  const recentConversation = getRecentMessages(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT, { includeSystem: true });
+  const conversationMessages = buildConversation({ recentMessages: recentConversation, name });
 
   const systemPrompt = await readPrompt();
-  const modelMessages = buildModelMessages({ systemPrompt, stateUpdate, transcriptRows, availableTools: toolState.available, blockedTools: toolState.blocked });
+  const modelMessages = buildModelMessages({
+    systemPrompt,
+    stateUpdate,
+    conversationMessages,
+    availableTools: toolState.available,
+    blockedTools: toolState.blocked,
+  });
 
   updateStatus({
     phase: 'awaiting_model',
     lastSystemPrompt: systemPrompt,
     lastStateUpdate: stateUpdate,
-    lastTranscript: transcriptRows,
+    lastTranscript: conversationMessages,
     lastAvailableTools: toolState.available,
     lastBlockedTools: toolState.blocked,
     lastModelMessages: modelMessages,
