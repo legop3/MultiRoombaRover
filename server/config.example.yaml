@@ -13,6 +13,14 @@ llmCommentary:
   model: "qwen2.5:7b-instruct"
   ollamaServer: "http://127.0.0.1:11434"
   frequency: 120000
+overseerControl:
+  enabled: false
+  observeOnly: true
+  name: "The Overseer"
+  model: "qwen2.5:7b-instruct"
+  ollamaServer: "http://127.0.0.1:11434"
+  gateIntervalMs: 2000
+  heartbeatMs: 30000
 media:
   # Base address for mediaMTX (scheme + host + optional port/path). The UI will always request
   #   http://<base>/<roverId>/whep

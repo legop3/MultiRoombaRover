@@ -18,6 +18,7 @@ function sendSystemMessage(text) {
     role: 'user',
     fromDiscord: false,
     system: true,
+    bot: true,
   });
   broadcastMessage(message);
   return message;

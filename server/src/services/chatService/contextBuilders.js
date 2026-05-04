@@ -107,6 +107,7 @@ function buildMessage(socket, text, meta = {}) {
     text,
     tts: meta.tts || null,
     system: Boolean(meta.system),
+    bot: Boolean(meta.bot),
   };
 }
 

@@ -13,6 +13,7 @@ const INITIAL_STATE = {
   adminLogs: [],
   llmCommentaryState: null,
   llmCommentaryStatus: null,
+  overseerControlState: null,
   alerts: [],
 };
 
@@ -128,6 +129,10 @@ export function SessionProvider({ children }) {
         ],
       }));
     }
+    function handleOverseerState(payload = null) {
+      const state = payload && typeof payload === 'object' ? payload : null;
+      setState((prev) => ({ ...prev, overseerControlState: state }));
+    }
     function handleNeatoLidar(payload = null) {
       const next = payload && typeof payload === 'object' ? payload : null;
       setState((prev) => ({ ...prev, neatoLidar: next }));
@@ -139,6 +144,7 @@ export function SessionProvider({ children }) {
     socket.on('adminlog:init', handleAdminLogInit);
     socket.on('adminlog:entry', handleAdminLogEntry);
     socket.on('llm:state', handleLlmState);
+    socket.on('overseer:state', handleOverseerState);
     socket.on('alert:new', handleAlertNew);
     return () => {
       socket.off('session:sync', handleSession);
@@ -148,6 +154,7 @@ export function SessionProvider({ children }) {
       socket.off('adminlog:init', handleAdminLogInit);
       socket.off('adminlog:entry', handleAdminLogEntry);
       socket.off('llm:state', handleLlmState);
+      socket.off('overseer:state', handleOverseerState);
       socket.off('alert:new', handleAlertNew);
     };
   }, [setState, socket]);
@@ -204,6 +211,8 @@ export function SessionProvider({ children }) {
         emitWithAck('session:privateSafety:set', { roverId, safety }),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),
+      overseerControl: (action, controls = {}) =>
+        emitWithAck('overseer:control', { controls: { action, ...controls } }),
       pushAlert: (alert) =>
         setState((prev) => ({
           ...prev,

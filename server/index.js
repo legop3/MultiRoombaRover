@@ -20,6 +20,7 @@ require('./src/services/verificationService');
 require('./src/services/privateRoverAccessRequestService');
 require('./src/services/chatService');
 require('./src/services/llmCommentaryService');
+require('./src/services/overseerControlService');
 require('./src/services/globalObjectiveService');
 require('./src/services/serverControlService');
 require('./src/services/videoSessions');

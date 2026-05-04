@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
 import RoverRoster from '../RoverRoster/index.jsx';
 import LlmCommentaryPanel from './LlmCommentaryPanel.jsx';
+import OverseerControlPanel from './OverseerControlPanel.jsx';
 import ReplaySnapshotHealth from './ReplaySnapshotHealth.jsx';
 import AdminIpLogPanel from './AdminIpLogPanel.jsx';
 
@@ -28,14 +29,17 @@ export default function AdminPanelContent() {
     setAudioLevels,
     setPrivateSafety,
     llmControl,
+    overseerControl,
     adminLogs,
     llmCommentaryState,
+    overseerControlState,
   } = useSession();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
   const [rebootStates, setRebootStates] = useState({});
   const [serverRebooting, setServerRebooting] = useState(false);
   const [clearingLlmHistory, setClearingLlmHistory] = useState(false);
+  const [clearingOverseerHistory, setClearingOverseerHistory] = useState(false);
   const health = session?.health || null;
   const currentGoal = session?.globalObjective?.text || '';
   const goalUpdatedAt = session?.globalObjective?.updatedAt || null;
@@ -123,6 +127,19 @@ export default function AdminPanelContent() {
       alert(err.message);
     } finally {
       setClearingLlmHistory(false);
+    }
+  };
+
+  const handleClearOverseerHistory = async () => {
+    const ok = window.confirm('Clear Overseer Control history now?');
+    if (!ok) return;
+    setClearingOverseerHistory(true);
+    try {
+      await overseerControl('clearHistory');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setClearingOverseerHistory(false);
     }
   };
 
@@ -490,6 +507,11 @@ export default function AdminPanelContent() {
         state={llmCommentaryState}
         onClearHistory={handleClearLlmHistory}
         clearingHistory={clearingLlmHistory}
+      />
+      <OverseerControlPanel
+        state={overseerControlState}
+        onClearHistory={handleClearOverseerHistory}
+        clearingHistory={clearingOverseerHistory}
       />
       <AdminIpLogPanel entries={adminLogs} />
     </section>
