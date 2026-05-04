@@ -54,8 +54,9 @@ function buildModelMessages({ systemPrompt, stateUpdate, memorySummary, conversa
   const metadataSections = [];
   metadataSections.push(`STATE_UPDATE\n${stateUpdate}`);
   if (memorySummary) metadataSections.push(`MEMORY_UPDATE\n${memorySummary}`);
-  metadataSections.push(`available_tools:\n${availableTools.map((tool) => `- ${tool}`).join('\n') || '- none'}`);
-  metadataSections.push(`blocked_tools:\n${blockedTools.map((entry) => `- ${entry.tool} reason=${entry.reason}`).join('\n') || '- none'}`);
+  metadataSections.push(
+    `tool_constraints:\n${blockedTools.map((entry) => `- blocked: ${entry.tool} reason=${entry.reason}`).join('\n') || '- none'}`,
+  );
   messages.push({ role: 'user', content: metadataSections.join('\n\n') });
   (conversationMessages || []).forEach((message) => {
     if (!message || !message.role || !message.content) return;
