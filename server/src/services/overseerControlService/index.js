@@ -256,7 +256,7 @@ async function runDecision(triggerReason) {
       model,
       stream: false,
       keep_alive: -1,
-      options: { temperature: 0.4, top_p: 0.9 },
+      options: { temperature: 0.25, top_p: 0.9 },
       messages: modelMessages,
       tools: ollamaTools,
     });
