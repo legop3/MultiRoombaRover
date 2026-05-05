@@ -1,5 +1,12 @@
 const { evaluateTools } = require('./tools');
 
+function normalizeNeatoIssue(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'none';
+  if (raw === '200 - (UI_ALERT_INVALID)') return 'none';
+  return raw;
+}
+
 function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason }) {
   const lines = [];
   lines.push(`trigger: ${triggerReason || 'heartbeat'}`);
@@ -7,7 +14,11 @@ function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster
   lines.push(`home_assistant_connected: ${homeAssistantState?.connected ? 'yes' : 'no'}`);
   lines.push(`lights_locked_on: ${homeAssistantState?.lightPolicy?.lockedOn ? 'yes' : 'no'}`);
   lines.push(`lift: ${liftState?.connected ? 'connected' : 'offline'} busy=${liftState?.busy ? 'yes' : 'no'}`);
-  lines.push(`neato: ${neatoState?.connected ? 'connected' : 'offline'} state=${neatoState?.telemetry?.robotState || 'unknown'}`);
+  const neatoError = normalizeNeatoIssue(neatoState?.telemetry?.robotError);
+  const neatoAlert = normalizeNeatoIssue(neatoState?.telemetry?.robotAlert);
+  lines.push(
+    `neato: ${neatoState?.connected ? 'connected' : 'offline'} state=${neatoState?.telemetry?.robotState || 'unknown'} error=${neatoError} alert=${neatoAlert}`,
+  );
   const entities = Array.isArray(homeAssistantState?.entities) ? homeAssistantState.entities : [];
   if (entities.length) {
     lines.push('home_assistant_entities:');
