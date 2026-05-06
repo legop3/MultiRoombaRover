@@ -28,6 +28,7 @@ function normalizeDeviceName(value) {
 
 const device = normalizeDeviceName(neatoConfig.device);
 const RESUME_DELAY_MS = 3000;
+const OFFLINE_LIDAR_RETRY_MS = 10000;
 const brainslugHost = String(neatoConfig.brainslugHost || '').trim();
 const brainslugPort = Number(neatoConfig.brainslugPort) || 6053;
 const brainslugKey = String(neatoConfig.brainslugKey || '').trim();
@@ -283,7 +284,20 @@ lidarRuntime =
         port: brainslugPort,
         key: brainslugKey,
         logFile: brainslugLogFile,
-        shouldPoll: () => Boolean(homeAssistantEnabled && isHomeAssistantConnected() && hasVerifiedSockets()),
+        getPollReadiness: () => {
+          const verifiedSockets = hasVerifiedSockets();
+          if (!verifiedSockets) {
+            return { allowed: false, delayMs: 1000 };
+          }
+          if (!homeAssistantEnabled || !isHomeAssistantConnected()) {
+            return { allowed: false, delayMs: OFFLINE_LIDAR_RETRY_MS };
+          }
+          const neatoOnline = buildState().connected;
+          if (!neatoOnline) {
+            return { allowed: false, delayMs: OFFLINE_LIDAR_RETRY_MS };
+          }
+          return { allowed: true, delayMs: 0 };
+        },
         requestScan: requestLidarScan,
       })
     : null;

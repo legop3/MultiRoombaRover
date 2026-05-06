@@ -5,6 +5,8 @@ const fs = require('fs');
 const SCAN_TIMEOUT_MS = 8000;
 const RECONNECT_DELAY_MS = 5000;
 const IDLE_RETRY_MS = 1000;
+const OFFLINE_RETRY_MS = 10000;
+const REQUEST_FAILURE_RETRY_MS = 10000;
 
 function sanitizeLogText(value) {
   return String(value || '')
@@ -56,7 +58,7 @@ function parseRotationSpeed(payload) {
   return Number(match[1]);
 }
 
-function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shouldPoll, requestScan }) {
+function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shouldPoll, getPollReadiness, requestScan }) {
   const events = new EventEmitter();
   const state = {
     connected: false,
@@ -341,11 +343,15 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
 
   async function tickPoll() {
     if (!state.connected) {
-      schedulePollRetry();
+      schedulePollRetry(OFFLINE_RETRY_MS);
       return;
     }
-    if (!shouldPoll?.()) {
-      schedulePollRetry();
+    const readiness =
+      typeof getPollReadiness === 'function'
+        ? getPollReadiness()
+        : { allowed: shouldPoll?.() !== false, delayMs: IDLE_RETRY_MS };
+    if (!readiness?.allowed) {
+      schedulePollRetry(Number(readiness?.delayMs) || OFFLINE_RETRY_MS);
       return;
     }
     if (state.requestInFlight) return;
@@ -364,7 +370,7 @@ function createLidarRuntime({ logger, host, port = 6053, key, logFile = '', shou
     } catch (err) {
       logger.warn('Failed to request Neato lidar scan', err.message);
       resetScanState();
-      triggerPollSoon();
+      schedulePollRetry(REQUEST_FAILURE_RETRY_MS);
     }
   }
 
