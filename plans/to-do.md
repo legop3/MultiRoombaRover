@@ -5,7 +5,7 @@
 5. allow admins to click on locked rovers from the roster [x]
 6. add faster way for admins to login
 7. custom webhook profile pictures for chat bridge in discord
-8. home assistant switch that tells the server to force the lights on
+8. home assistant switch that tells the server to force the lights on [x]
 9. color coding with colored names and tape [x]
 10. audio forwarding [x]
    - streaming from server to rovers [x]
@@ -13,7 +13,11 @@
    - then voice chat [x]
 10. mobile controls column swapping (optional joystick on left) [x]
 11. fix fullscreen on mobile so that you can re-enter it [x]
-12. home assistant rover mute switch
+12. fix scroll bars on mobile
+13. add tool call embeds or something for the llm bot in discord, probably not in web ui
+14. add discord bot typing thing for when someone requests a replay
+15. change replay title for ones requested from discord, something other than "requester driving rover"
+
 
 # relative pipe dreams:
 1. VPS video forwarding
