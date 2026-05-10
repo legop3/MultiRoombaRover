@@ -7,6 +7,7 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('llmCommentary');
 const { loadConfig } = require('../../helpers/configLoader');
 const { getRole, roleEvents } = require('../roleService');
+const { getMode, MODES, modeEvents } = require('../modeManager');
 const roverManager = require('../roverManager');
 const { getActiveDrivers } = require('../turnService');
 const { getNickname } = require('../nicknameService');
@@ -258,7 +259,9 @@ const runner = createRunner({
   updateStatus,
 });
 
-if (enabled && model && ollamaUrl) {
+const canRunFromConfig = enabled && model && ollamaUrl;
+
+if (canRunFromConfig) {
   registerHooks({
     io,
     roleEvents,
@@ -272,7 +275,22 @@ if (enabled && model && ollamaUrl) {
     onRoverRemoved: snapshotEngine.removeRover,
   });
 
-  runner.start();
+  const mode = getMode();
+  if (mode === MODES.LOCKDOWN) {
+    runner.stop('paused during lockdown');
+    logger.info('LLM commentary paused due to lockdown mode');
+  } else {
+    runner.start();
+  }
+
+  modeEvents.on('change', (nextMode) => {
+    if (nextMode === MODES.LOCKDOWN) {
+      runner.stop('paused during lockdown');
+      logger.info('LLM commentary paused due to lockdown mode');
+      return;
+    }
+    runner.start();
+  });
 } else {
   const disabledReason = !enabled
     ? 'llmCommentary.enabled is false'

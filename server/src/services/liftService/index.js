@@ -6,6 +6,8 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('liftService');
 const { loadConfig } = require('../../helpers/configLoader');
 const { isVerified } = require('../verificationService');
+const { getMode, MODES } = require('../modeManager');
+const { isLockdownAdmin } = require('../roleService');
 const {
   homeAssistantEvents,
   getRawEntitySnapshot,
@@ -178,6 +180,9 @@ homeAssistantEvents.on('status', emitUpdate);
 io.on('connection', (socket) => {
   socket.on('lift:up', async (_, cb = () => {}) => {
     try {
+      if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
+        throw new Error('Server in lockdown');
+      }
       if (!isVerified(socket)) throw new Error('VIP verification required');
       const resp = await moveUp(socket.id || 'socket');
       cb({ success: true, ...resp });
@@ -188,6 +193,9 @@ io.on('connection', (socket) => {
 
   socket.on('lift:down', async (_, cb = () => {}) => {
     try {
+      if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
+        throw new Error('Server in lockdown');
+      }
       if (!isVerified(socket)) throw new Error('VIP verification required');
       const resp = await moveDown(socket.id || 'socket');
       cb({ success: true, ...resp });

@@ -6,6 +6,8 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('neatoService');
 const { loadConfig } = require('../../helpers/configLoader');
 const { isVerified } = require('../verificationService');
+const { getMode, MODES } = require('../modeManager');
+const { isLockdownAdmin } = require('../roleService');
 const { createLidarRuntime } = require('./lidarRuntime');
 const {
   homeAssistantEvents,
@@ -315,8 +317,15 @@ if (lidarRuntime) {
 }
 
 io.on('connection', (socket) => {
+  function assertLockdownAccess() {
+    if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
+      throw new Error('Server in lockdown');
+    }
+  }
+
   socket.on('neato:start', async (_, cb = () => {}) => {
     try {
+      assertLockdownAccess();
       if (!isVerified(socket)) {
         throw new Error('VIP verification required');
       }
@@ -329,6 +338,7 @@ io.on('connection', (socket) => {
 
   socket.on('neato:sendHome', async (_, cb = () => {}) => {
     try {
+      assertLockdownAccess();
       if (!isVerified(socket)) {
         throw new Error('VIP verification required');
       }
@@ -341,6 +351,7 @@ io.on('connection', (socket) => {
 
   socket.on('neato:locate', async (_, cb = () => {}) => {
     try {
+      assertLockdownAccess();
       if (!isVerified(socket)) {
         throw new Error('VIP verification required');
       }
@@ -353,6 +364,7 @@ io.on('connection', (socket) => {
 
   socket.on('neato:clearErrors', async (_, cb = () => {}) => {
     try {
+      assertLockdownAccess();
       if (!isVerified(socket)) {
         throw new Error('VIP verification required');
       }
@@ -365,6 +377,7 @@ io.on('connection', (socket) => {
 
   socket.on('neato:powerCycle', async (_, cb = () => {}) => {
     try {
+      assertLockdownAccess();
       if (!isVerified(socket)) {
         throw new Error('VIP verification required');
       }

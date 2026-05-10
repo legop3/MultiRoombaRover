@@ -47,6 +47,21 @@ function createRunner(deps) {
     scheduleNextTick(runTick, 0);
   }
 
+  function stop(reason = 'stopped') {
+    if (runtime.timer) {
+      clearTimeout(runtime.timer);
+      runtime.timer = null;
+    }
+    updatePhase('paused', {
+      running: false,
+      inFlight: false,
+      currentRunId: null,
+      nextRunAt: null,
+      lastOutcome: 'paused',
+      lastReason: reason,
+    });
+  }
+
   function clearRuntimeHistory() {
     runtime.contextResetAt = Date.now();
     runtime.clearCount += 1;
@@ -331,6 +346,7 @@ function createRunner(deps) {
 
   return {
     start,
+    stop,
     runTick,
     clearRuntimeHistory,
     wakeForDriverActivity: () => wakeForDriverActivity(runTick),
