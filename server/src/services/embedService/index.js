@@ -86,7 +86,7 @@ function buildEmbedCopy(state, camera) {
     lockdown: 'locked',
   }[mode] || mode;
 
-  let title = 'Multi Roomba Rover';
+  let title = 'Roomba Rover';
   if (mode === 'lockdown') {
     title = 'Private mode is on';
   } else if (roversOnline === 0) {
