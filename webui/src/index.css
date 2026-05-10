@@ -14,9 +14,15 @@ body {
   @apply bg-black text-slate-100;
 }
 
+html,
+body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3b82f6 rgba(255, 255, 255, 0.08);
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
 }
 
 @keyframes spin {
@@ -29,16 +35,16 @@ body {
 }
 
 *::-webkit-scrollbar {
-  width: 1px;
-  height: 1px;
+  width: 2px;
+  height: 2px;
 }
 
 *::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: #3b82f6;
+  background-color: rgba(148, 163, 184, 0.55);
   border-radius: 9999px;
 }
 
