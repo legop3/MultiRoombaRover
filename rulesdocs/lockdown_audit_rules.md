@@ -31,3 +31,12 @@ ONLY lockdown admins can log in and use the site as normal
 - show admin login overlay on driver page, already correct i think
 - show disabled overlay on spectator pages, also already good i think
 - dont worry about disabling buttons and stuff. anything unallowed will be blocked server-side, and there will be the overlay in UI.
+
+## what features should still work for everyone:
+- the admin login overlay
+  - meaning, everyone still sees it and can log in and stuff
+- the chat, since its in the overlay
+  - includes setting nicknames and such
+- session sync and stuff
+  - cause it makes the whole page work and be correct
+  - not really a big deal if someone can see the session sync during lockdown. biggest concern for lockdown is that no one can see or use the real world stuff.
