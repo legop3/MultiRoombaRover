@@ -1,4 +1,11 @@
 # RULES FOR LOCKDOWN AUDIT
+## why is lockdown a thing?
+lockdown mode exists so that the physical owner of the server can get some privacy. 
+during lockdown mode, no one can spectate anything or replay anything
+users cant use the site, its locked
+admins cant log in
+ONLY lockdown admins can log in and use the site as normal
+
 ## what should not work at all during lockdown?:
 - spectator pages should be disabled
 - llm services should be paused
@@ -17,7 +24,7 @@
 - cant request and drive a rover
 
 ## lockdown admin rule:
-- lockdown admins should be able to log in and use ALL features, even during lockdown
+- lockdown admins should be able to log in and use ALL features as normal, even during lockdown
 - non-lockdown admins are not able to log in at all during lockdown.
 
 ## web ui lockdown rules:
