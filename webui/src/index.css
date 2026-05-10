@@ -48,6 +48,16 @@ body {
   border-radius: 9999px;
 }
 
+@supports (scrollbar-width: thin) {
+  @media (pointer: coarse) {
+    html,
+    body,
+    * {
+      scrollbar-width: none;
+    }
+  }
+}
+
 @layer components {
   .panel {
     @apply bg-black text-white p-0 rounded-md;
