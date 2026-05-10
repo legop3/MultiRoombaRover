@@ -70,7 +70,7 @@ export default function ModeGateOverlay() {
   const details = getModeDetails(mode);
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-0.5 py-0.5">
+    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black px-0.5 py-0.5">
       <div className="surface w-full max-w-md space-y-0.5 text-slate-100 shadow-2xl">
         <div className="space-y-0.5">
           <p className="text-lg font-semibold">{details.title}</p>

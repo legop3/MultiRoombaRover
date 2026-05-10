@@ -28,6 +28,7 @@ import FloatingFullscreenButton from './components/FloatingFullscreenButton/inde
 import { useFullscreenPrompt } from './hooks/useFullscreenPrompt.js';
 import { useSettingsNamespace } from './settings/index.js';
 import HelpOverlay from './components/HelpOverlay/index.jsx';
+import QuickstartOverlay from './components/QuickstartOverlay/index.jsx';
 import HelpPanel from './components/HelpPanel/index.jsx';
 import SettingsPanel from './components/SettingsPanel/index.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs/index.jsx';
@@ -250,9 +251,13 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
 
   const {
     value: helpSettings,
-    status: helpStatus,
     save: saveHelpSettings,
   } = useSettingsNamespace('help', { showOnLoad: true });
+  const {
+    value: quickstartSettings,
+    status: quickstartStatus,
+    save: saveQuickstartSettings,
+  } = useSettingsNamespace('quickstart', { showOnLoad: true });
   const { value: pageSettings } = useSettingsNamespace('page', {
     swapMobileControlColumns: false,
   });
@@ -260,15 +265,17 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
   const fullscreenButtonSide = swapMobileControlColumns ? 'left' : 'right';
   const showFloatingFullscreenButton = !isDesktop && (fullscreenIsIOS || fullscreenNativeSupported);
   const [helpVisible, setHelpVisible] = useState(false);
+  const [quickstartVisible, setQuickstartVisible] = useState(false);
 
   useEffect(() => {
-    if (helpStatus === 'ready') {
-      setHelpVisible(helpSettings?.showOnLoad !== false);
+    if (quickstartStatus === 'ready') {
+      setQuickstartVisible(quickstartSettings?.showOnLoad !== false);
     }
-  }, [helpStatus, helpSettings?.showOnLoad]);
+  }, [quickstartStatus, quickstartSettings?.showOnLoad]);
 
   const openHelp = useCallback(() => setHelpVisible(true), []);
   const closeHelp = useCallback(() => setHelpVisible(false), []);
+  const closeQuickstart = useCallback(() => setQuickstartVisible(false), []);
   const handleFloatingFullscreen = useCallback(async () => {
     if (fullscreenIsIOS) {
       showPrompt();
@@ -279,16 +286,20 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
       showPrompt();
     }
   }, [enterFullscreen, fullscreenIsIOS, showPrompt]);
-  const setShowOnLoad = useCallback(
+  const setQuickstartShowOnLoad = useCallback(
     (enabled) => {
       const next = Boolean(enabled);
-      saveHelpSettings((current) => ({ ...(current ?? {}), showOnLoad: next }));
+      saveQuickstartSettings((current) => ({ ...(current ?? {}), showOnLoad: next }));
       if (!next) {
-        setHelpVisible(false);
+        setQuickstartVisible(false);
       }
     },
-    [saveHelpSettings],
+    [saveQuickstartSettings],
   );
+  const openHelpFromQuickstart = useCallback(() => {
+    setQuickstartVisible(false);
+    setHelpVisible(true);
+  }, []);
 
   const renderedLayout = useMemo(
     () =>
@@ -312,18 +323,27 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
       <RewardRunOverlay />
       <TurnAlertListener />
       <ModeGateOverlay />
+
       <HelpOverlay
         visible={helpVisible}
         layout={layout}
         onClose={closeHelp}
         showOnLoad={helpSettings?.showOnLoad !== false}
-        onToggleShowOnLoad={setShowOnLoad}
+        onToggleShowOnLoad={(enabled) => saveHelpSettings((current) => ({ ...(current ?? {}), showOnLoad: Boolean(enabled) }))}
       />
       <FullscreenPrompt
         visible={fullscreenVisible}
         mode={fullscreenMode}
         onEnterFullscreen={enterFullscreen}
         onDismiss={dismiss}
+      />
+      <QuickstartOverlay
+        visible={quickstartVisible}
+        layout={layout}
+        showOnLoad={quickstartSettings?.showOnLoad !== false}
+        onToggleShowOnLoad={setQuickstartShowOnLoad}
+        onOpenHelp={openHelpFromQuickstart}
+        onClose={closeQuickstart}
       />
       {showFloatingFullscreenButton ? (
         <FloatingFullscreenButton

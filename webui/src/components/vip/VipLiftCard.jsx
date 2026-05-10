@@ -72,10 +72,10 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-md bg-slate-950/80 px-1.5 text-center">
           <div className="space-y-0.25">
             <p className="text-sm font-semibold text-slate-100">
-              {busy ? 'Motion in progress' : 'Motion cooldown active'}
+              {busy ? 'Preparing to move' : 'Moving!'}
             </p>
             <p className="text-xs text-slate-300">
-              Controls are disabled while the lift is moving, otherwise it's tiny brain would get confused.
+              Controls are disabled while the lift is moving, otherwise its tiny brain would get confused.
             </p>
             {!busy && cooldownActive ? (
               <p className="text-xs text-slate-400">About {cooldownSeconds}s remaining.</p>

@@ -4,7 +4,7 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('overseerControl');
 const { loadConfig } = require('../../helpers/configLoader');
 const { getRole, roleEvents } = require('../roleService');
-const { getMode } = require('../modeManager');
+const { getMode, MODES, modeEvents } = require('../modeManager');
 const homeAssistantService = require('../homeAssistantService');
 const neatoService = require('../neatoService');
 const liftService = require('../liftService');
@@ -370,8 +370,12 @@ async function tick() {
     });
   } finally {
     runtime.inFlight = false;
-    updateStatus({ inFlight: false, currentRunId: null, phase: 'idle', nextRunAt: Date.now() + gateIntervalMs });
-    runtime.timer = setTimeout(tick, gateIntervalMs);
+    if (status.running) {
+      updateStatus({ inFlight: false, currentRunId: null, phase: 'idle', nextRunAt: Date.now() + gateIntervalMs });
+      runtime.timer = setTimeout(tick, gateIntervalMs);
+    } else {
+      updateStatus({ inFlight: false, currentRunId: null, nextRunAt: null });
+    }
   }
 }
 
@@ -387,6 +391,28 @@ function clearHistory() {
   runtime.generationTotalMs = 0;
   runtime.memoryStore = saveMemory(createDefaultMemory());
   updateStatus({ lastReason: 'admin requested clear history', lastOutcome: 'cleared', lastLiveToolCalls: [] });
+}
+
+function stopScheduler(reason = 'paused') {
+  if (runtime.timer) {
+    clearTimeout(runtime.timer);
+    runtime.timer = null;
+  }
+  updateStatus({
+    running: false,
+    inFlight: false,
+    currentRunId: null,
+    nextRunAt: null,
+    phase: 'paused',
+    lastOutcome: 'paused',
+    lastReason: reason,
+  });
+}
+
+function startScheduler(reason = null) {
+  if (runtime.timer) return;
+  updateStatus({ running: true, phase: 'idle', lastReason: reason });
+  runtime.timer = setTimeout(tick, gateIntervalMs);
 }
 
 io.on('connection', (socket) => {
@@ -407,14 +433,27 @@ homeAssistantEvents.on('update', () => updateStatus({ phase: status.phase }));
 neatoEvents.on('update', () => updateStatus({ phase: status.phase }));
 liftEvents.on('update', () => updateStatus({ phase: status.phase }));
 roverManager.managerEvents.on('rover', () => updateStatus({ phase: status.phase }));
+modeEvents.on('change', (mode) => {
+  if (!enabled) return;
+  if (mode === MODES.LOCKDOWN) {
+    stopScheduler('paused during lockdown');
+    logger.info('overseerControl paused due to lockdown mode');
+    return;
+  }
+  startScheduler(observeOnly ? 'observe-only mode' : null);
+});
 
 if (!enabled) {
   logger.info('overseerControl disabled');
   updateStatus({ running: false, lastReason: 'overseerControl.enabled is false' });
 } else {
-  updateStatus({ running: true, lastReason: observeOnly ? 'observe-only mode' : null });
-  runtime.timer = setTimeout(tick, gateIntervalMs);
-  logger.info('overseerControl enabled', { model, ollamaUrl, gateIntervalMs, heartbeatMs, observeOnly });
+  if (getMode() === MODES.LOCKDOWN) {
+    stopScheduler('paused during lockdown');
+    logger.info('overseerControl paused on startup due to lockdown mode');
+  } else {
+    startScheduler(observeOnly ? 'observe-only mode' : null);
+    logger.info('overseerControl enabled', { model, ollamaUrl, gateIntervalMs, heartbeatMs, observeOnly });
+  }
 }
 
 module.exports = {};
