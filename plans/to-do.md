@@ -17,6 +17,7 @@
 13. add tool call embeds or something for the llm bot in discord, probably not in web ui
 14. add discord bot typing thing for when someone requests a replay
 15. change replay title for ones requested from discord, something other than "requester driving rover"
+16. better quickstart guide, something better than just a big list of controls. help overlay sucks i think.
 
 
 # relative pipe dreams:

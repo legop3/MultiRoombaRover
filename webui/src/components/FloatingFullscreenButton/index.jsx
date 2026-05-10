@@ -7,7 +7,7 @@ export default function FloatingFullscreenButton({ side = 'right', onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`fixed bottom-2 ${sideClass} z-30 flex h-10 w-10 items-center justify-center rounded-full border border-cyan-200/50 bg-slate-900/70 text-cyan-100 shadow-lg backdrop-blur-sm transition hover:bg-slate-800/80 active:scale-95`}
+      className={`fixed bottom-2 ${sideClass} z-30 flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-black text-slate-200 transition hover:bg-zinc-900 active:scale-95`}
       aria-label="Enter fullscreen"
       title="Enter fullscreen"
     >
