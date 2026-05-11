@@ -3,7 +3,7 @@ const { evaluateTools } = require('./tools');
 function normalizeNeatoIssue(value) {
   const raw = String(value || '').trim();
   if (!raw) return 'none';
-  if (raw === '200 - (UI_ALERT_INVALID)') return 'none';
+  if (raw.includes('200')) return 'none';
   return raw;
 }
 
