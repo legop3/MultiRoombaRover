@@ -29,7 +29,6 @@ function roleColors(role) {
   switch (role) {
     case 'admin':
     case 'lockdown':
-    case 'lockdown-admin':
       return 'text-amber-300';
     case 'spectator':
       return 'text-slate-400';
@@ -121,7 +120,7 @@ export default function UserListPanel({
     ) : (
       sorted.map((user) => {
         const isAdmin =
-          user.role === 'admin' || user.role === 'lockdown' || user.role === 'lockdown-admin';
+          user.role === 'admin' || user.role === 'lockdown';
         return (
           <div
             key={user.socketId}
@@ -245,7 +244,7 @@ export default function UserListPanel({
                           const isNext = Boolean(nextId && socketId === nextId && !isCurrent);
                           const isSelf = Boolean(selfId && socketId === selfId);
                           const isAdmin =
-                            user.role === 'admin' || user.role === 'lockdown' || user.role === 'lockdown-admin';
+                            user.role === 'admin' || user.role === 'lockdown';
                           const highlightClass = isCurrent
                             ? 'bg-sky-600 text-white ring-2 ring-amber-300 animate-pulse'
                             : isNext

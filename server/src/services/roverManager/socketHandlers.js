@@ -18,7 +18,6 @@ function registerSocketHandlers(deps) {
     tickPrivateAutoClose,
     removeSocket,
     enableSpectator,
-    getRosterForSocket,
     canRequestControl,
     canSwitchRover,
     getRoversForSocket,
@@ -32,7 +31,6 @@ function registerSocketHandlers(deps) {
 
   io.on('connection', (socket) => {
     tickPrivateAutoClose();
-    socket.emit('rovers', getRosterForSocket(socket));
     if (socket.data?.role === 'spectator') {
       enableSpectator(socket);
     }
@@ -79,7 +77,6 @@ function registerSocketHandlers(deps) {
             info.sourceId !== `${targetId}-audio`,
         );
         managerEvents.emit('switch', { socketId: socket.id, roverId: targetId });
-        socket.emit('controlGranted', { roverId: targetId });
         cb({ success: true, roverId: targetId });
       } catch (err) {
         logger.warn('Request control failed', socket.id, err.message);
@@ -172,15 +169,10 @@ function registerSocketHandlers(deps) {
       cb({ success: true });
     }
 
-    socket.on('requestControl', handleRequestControl);
     socket.on('session:requestControl', handleRequestControl);
-    socket.on('releaseControl', handleReleaseControl);
     socket.on('session:releaseControl', handleReleaseControl);
-    socket.on('lockRover', handleLockToggle);
     socket.on('session:lockRover', handleLockToggle);
-    socket.on('privateSafety:set', handlePrivateSafetySet);
     socket.on('session:privateSafety:set', handlePrivateSafetySet);
-    socket.on('subscribeAll', handleSubscribeAll);
     socket.on('session:subscribeAll', handleSubscribeAll);
 
     socket.on('disconnecting', () => {

@@ -10,7 +10,6 @@ const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 
 const DATA_DIR = resolveDataDir();
 const STORE_PATH = resolveDataPath('global-objective.json');
-const LEGACY_STORE_PATH = resolveDataPath('community-goal.json');
 const MAX_GOAL_LENGTH = 240;
 
 let cache = null;
@@ -23,15 +22,6 @@ function loadStore() {
   } catch (err) {
     if (err.code !== 'ENOENT') {
       logger.warn('Failed to load global objective', err.message);
-    } else {
-      try {
-        const legacyRaw = fs.readFileSync(LEGACY_STORE_PATH, 'utf8');
-        cache = JSON.parse(legacyRaw);
-      } catch (legacyErr) {
-        if (legacyErr.code !== 'ENOENT') {
-          logger.warn('Failed to load legacy global objective', legacyErr.message);
-        }
-      }
     }
     if (!cache) cache = null;
   }
@@ -104,5 +94,4 @@ module.exports = {
   getGlobalObjective,
   setGlobalObjective,
   clearGlobalObjective,
-  MAX_GOAL_LENGTH,
 };

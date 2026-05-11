@@ -4,7 +4,7 @@
 const path = require('path');
 const roverManager = require('../roverManager');
 const { getRoomCameras } = require('../roomCameraService');
-const { FFMPEG_BIN, SEGMENT_SECONDS, TARGET_FPS } = require('./constants');
+const { SEGMENT_SECONDS, TARGET_FPS } = require('./constants');
 
 function sourceKey(source) {
   return `${source.sourceType}__${source.kind}__${source.id}`;
@@ -63,7 +63,6 @@ function buildWorkerArgs(activeSegmentRoot, source) {
 }
 
 module.exports = {
-  FFMPEG_BIN,
   sourceKey,
   sourceDirForKey,
   listDesiredSources,

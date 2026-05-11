@@ -102,8 +102,6 @@ function registerRoomCameraSocketGateway({ getRoomCamera, getRoomCameras, getRoo
     socket.on('roomCamera:subscribe', (payload = {}, cb = () => {}) => {
       const list = Array.isArray(payload?.ids)
         ? payload.ids.map(String)
-        : payload?.roomCameraId || payload?.id
-        ? [String(payload.roomCameraId || payload.id)]
         : getRoomCameras().map((cam) => cam.id);
       const uniqueIds = Array.from(new Set(list));
       try {
@@ -126,8 +124,6 @@ function registerRoomCameraSocketGateway({ getRoomCamera, getRoomCameras, getRoo
     socket.on('roomCamera:unsubscribe', (payload = {}) => {
       const list = Array.isArray(payload?.ids)
         ? payload.ids.map(String)
-        : payload?.roomCameraId || payload?.id
-        ? [String(payload.roomCameraId || payload.id)]
         : [];
       list.forEach((cameraId) => removeSubscription(socket.id, cameraId));
     });

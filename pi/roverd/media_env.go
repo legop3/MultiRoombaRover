@@ -16,8 +16,8 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	if media.AudioPublishURL == "" && audio.CaptureEnabled {
 		return fmt.Errorf("audio publishUrl missing")
 	}
-	if media.VideoWidth < 0 || media.VideoHeight < 0 || media.VideoFPS < 0 || media.VideoBitrate <= 0 {
-		return fmt.Errorf("invalid media dimensions/bitrate")
+	if media.VideoBitrate <= 0 {
+		return fmt.Errorf("invalid media bitrate")
 	}
 	if err := os.MkdirAll(filepath.Dir(publisherEnvPath), 0o755); err != nil {
 		return err
@@ -29,15 +29,6 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	}
 	if media.AudioForwardURL != "" {
 		fmt.Fprintf(&buf, "AUDIO_FORWARD_URL=%s\n", media.AudioForwardURL)
-	}
-	if media.VideoWidth > 0 {
-		fmt.Fprintf(&buf, "VIDEO_WIDTH=%d\n", media.VideoWidth)
-	}
-	if media.VideoHeight > 0 {
-		fmt.Fprintf(&buf, "VIDEO_HEIGHT=%d\n", media.VideoHeight)
-	}
-	if media.VideoFPS > 0 {
-		fmt.Fprintf(&buf, "VIDEO_FPS=%d\n", media.VideoFPS)
 	}
 	fmt.Fprintf(&buf, "VIDEO_BITRATE=%d\n", media.VideoBitrate)
 	fmt.Fprintf(&buf, "VIDEO_INVERT=%d\n", boolToInt(media.CameraInverted))

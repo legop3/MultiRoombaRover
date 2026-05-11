@@ -43,7 +43,7 @@ function normalizeKnownIps(raw = []) {
 }
 
 function isAdminRole(role) {
-  return role === 'admin' || role === 'lockdown' || role === 'lockdown-admin';
+  return role === 'admin' || role === 'lockdown';
 }
 
 function parseDeterrenceSelector(selector) {

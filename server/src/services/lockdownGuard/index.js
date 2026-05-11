@@ -2,19 +2,11 @@
 // Purpose: Defines the lockdown Guard module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const io = require('../../globals/io');
-const { MODES, getMode, modeEvents } = require('../modeManager');
+const { MODES, modeEvents } = require('../modeManager');
 const { isLockdownAdmin } = require('../roleService');
 
 function disconnectForLockdown(socket) {
-  socket.emit('lockdown', { message: 'Server is in lockdown mode' });
   socket.disconnect(true);
-}
-
-function clearLockdownTimer(socket) {
-  if (socket?.data?.lockdownTimer) {
-    clearTimeout(socket.data.lockdownTimer);
-    socket.data.lockdownTimer = null;
-  }
 }
 
 function enforceLockdown() {
@@ -25,11 +17,7 @@ function enforceLockdown() {
   }
 }
 
-module.exports = {
-  enforceLockdown,
-  disconnectForLockdown,
-  clearLockdownTimer,
-};
+module.exports = {};
 
 modeEvents.on('change', (mode) => {
   if (mode === MODES.LOCKDOWN) {

@@ -43,18 +43,7 @@ function subscribe(type, handler) {
   return () => eventBus.off(type, handler);
 }
 
-/**
- * Subscribe to all events on the bus.
- * @param {(event: object) => void} handler
- */
-function subscribeAll(handler) {
-  eventBus.on('*', handler);
-  return () => eventBus.off('*', handler);
-}
-
 module.exports = {
-  eventBus,
   publishEvent,
   subscribe,
-  subscribeAll,
 };

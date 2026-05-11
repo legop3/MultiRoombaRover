@@ -73,21 +73,8 @@ async function executeToolAction(toolId, args = {}, context = {}) {
   return tool.execute({ ...context, args: args || {} });
 }
 
-function getToolById(toolId) {
-  return TOOL_BY_ID.get(String(toolId || '').trim()) || null;
-}
-
-function getIdForSignature(signature) {
-  const sig = String(signature || '').trim();
-  const match = TOOL_DEFINITIONS.find((tool) => tool.signature === sig);
-  return match?.id || null;
-}
-
 module.exports = {
-  TOOL_DEFINITIONS,
   evaluateTools,
   buildOllamaTools,
   executeToolAction,
-  getToolById,
-  getIdForSignature,
 };

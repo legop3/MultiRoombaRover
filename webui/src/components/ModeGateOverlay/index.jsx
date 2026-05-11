@@ -8,8 +8,8 @@ import SocialButton from '../SocialButton/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
 
-const PRIVILEGED_ROLES = new Set(['admin', 'lockdown', 'lockdown-admin']);
-const LOCKDOWN_ROLES = new Set(['lockdown', 'lockdown-admin']);
+const PRIVILEGED_ROLES = new Set(['admin', 'lockdown']);
+const LOCKDOWN_ROLES = new Set(['lockdown']);
 const RESTRICTED_MODES = new Set(['admin', 'lockdown']);
 
 function getModeDetails(mode = 'admin') {

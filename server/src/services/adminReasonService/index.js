@@ -94,5 +94,4 @@ module.exports = {
   getAdminReason,
   setAdminReason,
   clearAdminReason,
-  MAX_REASON_LENGTH,
 };

@@ -221,5 +221,4 @@ function validateChecksum(frame, checksum) {
 
 module.exports = {
   parseSensorFrame,
-  CHARGING_STATE,
 };

@@ -5,7 +5,6 @@ const bcrypt = require('bcrypt');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('authService');
 const { loadConfig } = require('../../helpers/configLoader');
-const { clearLockdownTimer } = require('../lockdownGuard');
 const { getMode, MODES } = require('../modeManager');
 const { setRole } = require('../roleService');
 
@@ -41,7 +40,6 @@ io.on('connection', (socket) => {
   const initialRole = requestedRole === 'spectator' ? 'spectator' : 'user';
   setRole(socket, initialRole);
   logger.info('Socket connected with role', socket.id, initialRole);
-  socket.emit('auth:role', { role: initialRole });
   socket.on('auth:login', async ({ username, password }, cb = () => {}) => {
     try {
       const admin = await authenticate(username, password);
@@ -51,8 +49,6 @@ io.on('connection', (socket) => {
       const role = admin.lockdown ? 'lockdown' : 'admin';
       socket.data.user = { username: admin.username, discordId: admin.discord_id };
       setRole(socket, role);
-      socket.emit('auth:role', { role });
-      clearLockdownTimer(socket);
       logger.info('Login success', socket.id, role);
       cb({ success: true, role: socket.data.role });
     } catch (err) {
@@ -64,7 +60,6 @@ io.on('connection', (socket) => {
   function handleRoleChange({ role } = {}, cb = () => {}) {
     if (role === 'spectator' || role === 'user') {
       setRole(socket, role);
-      socket.emit('auth:role', { role });
       logger.info('Role changed via client request', socket.id, role);
       cb({ success: true, role });
     } else {
@@ -72,12 +67,7 @@ io.on('connection', (socket) => {
     }
   }
 
-  socket.on('role:set', handleRoleChange);
   socket.on('session:setRole', handleRoleChange);
 });
 
-module.exports = {
-  isAdmin,
-  isLockdownAdmin,
-  authenticate,
-};
+module.exports = {};

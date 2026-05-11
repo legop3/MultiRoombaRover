@@ -51,7 +51,6 @@ function setMode(nextMode, socket, options = {}) {
     payload: { mode: currentMode, by: socket?.data?.user?.username || null },
   });
   modeEvents.emit('change', currentMode);
-  io.emit('mode', { mode: currentMode });
   return currentMode;
 }
 
@@ -67,7 +66,6 @@ module.exports = {
 };
 
 io.on('connection', (socket) => {
-  socket.emit('mode', { mode: currentMode });
   socket.on('setMode', ({ mode }) => {
     try {
       setMode(mode, socket);

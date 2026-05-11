@@ -32,14 +32,7 @@ function getRewardById(id) {
   return rewardById.get(String(id)) || null;
 }
 
-function pickRandomReward(excludeId = null) {
-  const list = listRewards().filter((reward) => !excludeId || reward.id !== excludeId);
-  if (!list.length) return null;
-  return list[Math.floor(Math.random() * list.length)] || null;
-}
-
 module.exports = {
   listRewards,
   getRewardById,
-  pickRandomReward,
 };

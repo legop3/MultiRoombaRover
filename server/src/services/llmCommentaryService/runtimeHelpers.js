@@ -2,7 +2,7 @@
 // Purpose: Provides pure helpers for admin state projection, role checks, and structured error normalization.
 // Scope: Keeps runtime behavior unchanged by extracting deterministic helper logic from index orchestration.
 function isAdminRole(role) {
-  return role === 'admin' || role === 'lockdown' || role === 'lockdown-admin';
+  return role === 'admin' || role === 'lockdown';
 }
 
 function buildAdminState(status, runHistory) {

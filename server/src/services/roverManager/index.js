@@ -216,7 +216,6 @@ registerSocketHandlers({
   tickPrivateAutoClose,
   removeSocket,
   enableSpectator,
-  getRosterForSocket,
   canRequestControl,
   canSwitchRover,
   getRoversForSocket,

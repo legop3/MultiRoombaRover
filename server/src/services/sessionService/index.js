@@ -40,7 +40,6 @@ const {
   configuredSocials,
   ACTIVITY_SYNC_COOLDOWN_MS,
   NIGHT_VISION_SYNC_COOLDOWN_MS,
-  PERIODIC_SYNC_MS,
 } = require('./constants');
 const { getState, setState } = require('./state');
 const {
@@ -330,14 +329,4 @@ audioLevelsEvents.on('change', () => {
   syncAll();
 });
 
-// sync all sockets 20 seconds
-// setInterval(() => {
-//   logger.info('Periodic session sync for all clients');
-//   syncAll();
-// }, PERIODIC_SYNC_MS);
-
-module.exports = {
-  buildSession,
-  syncSocket,
-  syncAll,
-};
+module.exports = {};

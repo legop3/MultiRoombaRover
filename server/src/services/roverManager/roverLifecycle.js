@@ -44,7 +44,6 @@ function createRoverLifecycle(deps) {
     socketToRovers.get(socket.id).add(roverId);
     socket.join(record.room);
     turnService.driverAdded(roverId, socket.id, force && isAdmin(socket));
-    socket.emit('controlGranted', { roverId });
     managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'add' });
     sendAlert({
       color: ALERT_COLOR,

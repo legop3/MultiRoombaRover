@@ -251,9 +251,6 @@ function createRosterLifecycle(deps) {
 
   function broadcastRoster() {
     syncSpectatorRooms();
-    io.sockets.sockets.forEach((socket) => {
-      socket.emit('rovers', getRosterForSocket(socket));
-    });
   }
 
   function setNightVisionState(roverId, nightVisionOn) {

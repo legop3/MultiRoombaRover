@@ -155,7 +155,6 @@ function tryAssignClosedPrivateRover(socket, roverId) {
   } catch (err) {
     logger.warn('Failed to move assignment after private access grant', { socketId: socket.id, error: err.message });
   }
-  socket.emit('controlGranted', { roverId: String(roverId) });
   return true;
 }
 

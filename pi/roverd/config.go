@@ -91,9 +91,6 @@ type MediaConfig struct {
 	AudioService    string   `yaml:"audioService"`
 	HealthURL       string   `yaml:"healthUrl"`
 	HealthInterval  Duration `yaml:"healthInterval"`
-	VideoWidth      int      `yaml:"videoWidth" json:"-"`
-	VideoHeight     int      `yaml:"videoHeight" json:"-"`
-	VideoFPS        int      `yaml:"videoFps" json:"-"`
 	VideoBitrate    int      `yaml:"videoBitrate" json:"-"`
 }
 

@@ -4,8 +4,6 @@
 const EventEmitter = require('events');
 
 const REQUEST_COOLDOWN_MS = 15 * 1000;
-const DM_APPROVE_EMOJI = '✅';
-const DM_DENY_EMOJI = '❌';
 
 const requestEvents = new EventEmitter();
 const pendingRequests = new Map();
@@ -16,8 +14,6 @@ const grants = new Map();
 
 module.exports = {
   REQUEST_COOLDOWN_MS,
-  DM_APPROVE_EMOJI,
-  DM_DENY_EMOJI,
   requestEvents,
   pendingRequests,
   pendingByRequesterRover,

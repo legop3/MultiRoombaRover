@@ -31,13 +31,7 @@ function getMediaPrefix() {
 function buildWhepUrlForSource(source) {
   const cleanBase = getMediaPrefix();
   if (!cleanBase) return '';
-  const segments = [];
-  if (source.type === 'room') {
-    segments.push('room', encodeURIComponent(source.id));
-  } else {
-    segments.push(encodeURIComponent(source.id));
-  }
-  return `${cleanBase}/${segments.join('/')}/whep`;
+  return `${cleanBase}/${encodeURIComponent(source.id)}/whep`;
 }
 
 function passesMode(socket) {
@@ -66,20 +60,13 @@ function canViewRover(socket, roverId) {
   return roverManager.isDriver(roverId, socket);
 }
 
-function canViewRoomCamera(socket) {
-  return passesMode(socket);
-}
-
 function normalizeRequest(payload = {}) {
   if (!payload) return null;
-  if (payload.type && payload.id) {
-    return { type: payload.type, id: String(payload.id) };
+  if (payload.type && payload.id && payload.type === 'rover') {
+    return { type: 'rover', id: String(payload.id) };
   }
   if (payload.roverId) {
     return { type: 'rover', id: String(payload.roverId) };
-  }
-  if (payload.roomCameraId) {
-    return { type: 'room', id: String(payload.roomCameraId) };
   }
   return null;
 }
@@ -91,26 +78,20 @@ io.on('connection', (socket) => {
       if (!target) {
         throw new Error('video source required');
       }
-      if (target.type === 'rover') {
-        const baseId = target.id.endsWith('-audio') ? target.id.slice(0, -6) : target.id;
-        const isAudio = target.id.endsWith('-audio');
-        if (!roverManager.rovers.has(baseId)) {
-          throw new Error('Rover offline');
-        }
-        if (!canViewRover(socket, baseId)) {
+      const baseId = target.id.endsWith('-audio') ? target.id.slice(0, -6) : target.id;
+      const isAudio = target.id.endsWith('-audio');
+      if (!roverManager.rovers.has(baseId)) {
+        throw new Error('Rover offline');
+      }
+      if (!canViewRover(socket, baseId)) {
+        throw new Error('Not authorized for video');
+      }
+      const role = getRole(socket);
+      if (role === 'spectator' && !isAdmin(socket) && !isAudio) {
+        const ip = getSocketIp(socket);
+        if (!isLocalNetwork(ip)) {
           throw new Error('Not authorized for video');
         }
-        const role = getRole(socket);
-        if (role === 'spectator' && !isAdmin(socket) && !isAudio) {
-          const ip = getSocketIp(socket);
-          if (!isLocalNetwork(ip)) {
-            throw new Error('Not authorized for video');
-          }
-        }
-      } else if (target.type === 'room') {
-        throw new Error('Room cameras now use the snapshot feed');
-      } else {
-        throw new Error('Unsupported video source');
       }
       const url = buildWhepUrlForSource(target);
       if (!url) {

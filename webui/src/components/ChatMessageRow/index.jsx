@@ -8,7 +8,6 @@ function roleColors(role) {
   switch (role) {
     case 'admin':
     case 'lockdown':
-    case 'lockdown-admin':
       return 'text-amber-300';
     case 'spectator':
       return 'text-slate-400';
@@ -108,7 +107,7 @@ function chatRowClass(message) {
     return 'surface-muted relative flex flex-wrap items-start gap-0.5 border border-emerald-500/40 bg-emerald-900/15 text-sm';
   }
   const isAdmin =
-    message.role === 'admin' || message.role === 'lockdown' || message.role === 'lockdown-admin';
+    message.role === 'admin' || message.role === 'lockdown';
   return `surface-muted relative flex flex-wrap items-start gap-0.5 text-sm ${
     isAdmin
       ? 'border border-amber-400/30'

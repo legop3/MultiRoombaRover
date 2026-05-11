@@ -19,11 +19,11 @@ function formatWebhookUsername(payload) {
   const name = payload.nickname || payload.socketId?.slice(0, 6) || 'unknown';
   if (payload.fromDiscord) {
     const origin = payload.discordGuildName ? ` (From: ${payload.discordGuildName})` : '';
-    const adminTag = payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin' ? ' [Rover Admin]' : '';
+    const adminTag = payload.role === 'admin' || payload.role === 'lockdown' ? ' [Rover Admin]' : '';
     return `${name}${origin}${adminTag}`;
   }
   const roverText = payload.roverId ? `Rover: ${payload.roverId}` : `No rover`;
-  const roleText = payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin' ? 'Admin' : null;
+  const roleText = payload.role === 'admin' || payload.role === 'lockdown' ? 'Admin' : null;
   const suffix = [roverText, roleText].filter(Boolean).join(' · ');
   return suffix ? `${name} · ${suffix}` : name;
 }

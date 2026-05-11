@@ -68,6 +68,5 @@ module.exports = {
   createSession,
   getSession,
   revokeSession,
-  revokeBySocket,
   revokeWhere,
 };

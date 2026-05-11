@@ -1,5 +1,5 @@
 // Hook: useVideoRequests
-// Purpose: Coordinates client-side video stream request intents and authorization timing. Scope: Provides reusable request helpers for rover and room video consumers.
+// Purpose: Coordinates client-side video stream request intents and authorization timing. Scope: Provides reusable request helpers for rover video consumers.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 
@@ -13,12 +13,9 @@ function normalizeEntry(entry) {
   if (typeof entry === 'object') {
     if (entry.type && entry.id) {
       const id = String(entry.id);
-      let key = entry.key;
-      if (!key) {
-        key = entry.type === 'room' ? `room:${id}` : id;
-      }
+      const key = entry.key || id;
       return {
-        type: entry.type,
+        type: 'rover',
         id,
         key,
       };
@@ -26,10 +23,6 @@ function normalizeEntry(entry) {
     if (entry.roverId) {
       const id = String(entry.roverId);
       return { type: 'rover', id, key: entry.key || id };
-    }
-    if (entry.roomCameraId) {
-      const id = String(entry.roomCameraId);
-      return { type: 'room', id, key: entry.key || `room:${id}` };
     }
   }
   return null;
@@ -87,7 +80,7 @@ export function useVideoRequests(sourceList = [], options = {}) {
     let cancelled = false;
 
     function requestEntry(entry) {
-      const payload = entry.type === 'room' ? { roomCameraId: entry.id } : { roverId: entry.id };
+      const payload = { roverId: entry.id };
       socket.emit('video:request', payload, (resp = {}) => {
         if (cancelled) return;
         setSources((prev) => ({ ...prev, [entry.key]: resp }));
