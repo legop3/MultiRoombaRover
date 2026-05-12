@@ -135,6 +135,8 @@ run_pipeline() {
       -c:v copy \
       -an \
       -flush_packets 1 \
+      -muxdelay 0 \
+      -muxpreload 0 \
       -f mpegts \
       "${PUBLISH_URL}"
 }
