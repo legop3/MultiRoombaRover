@@ -47,6 +47,8 @@ export default function VideoTile({
   turnTimerText = null,
   isActiveDriver = false,
   idleSkipSeconds = null,
+  showNotTurnNotice = false,
+  notTurnFlashAt = 0,
 }) {
   const discordUrl = useSessionSelector((state) => {
     const socials = state.session?.socials || [];
@@ -72,6 +74,7 @@ export default function VideoTile({
   const [restartToken, setRestartToken] = useState(0);
   const [audioRestartToken, setAudioRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
+  const [noticeFlashActive, setNoticeFlashActive] = useState(false);
   const hasDedicatedAudio = Boolean(audioSessionInfo?.url);
   const usingSnapshot = videoMode === 'snapshot';
   const sensors = telemetryFrame?.sensors;
@@ -297,6 +300,13 @@ export default function VideoTile({
     },
     [],
   );
+
+  useEffect(() => {
+    if (!showNotTurnNotice || !notTurnFlashAt) return undefined;
+    setNoticeFlashActive(true);
+    const timer = setTimeout(() => setNoticeFlashActive(false), 650);
+    return () => clearTimeout(timer);
+  }, [showNotTurnNotice, notTurnFlashAt]);
 
   useEffect(() => {
     if (status === 'playing') {
@@ -634,6 +644,7 @@ export default function VideoTile({
             mobileHud={mobileHud}
             mapPosition={effectiveHudMapPosition}
             turnTimerText={turnTimerText}
+            turnTimerFlashActive={noticeFlashActive}
             labelScale={hudLabelScale}
           />
         ) : null}

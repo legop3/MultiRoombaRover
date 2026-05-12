@@ -9,10 +9,24 @@ import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useControlSystem } from '../../controls/index.js';
 import VideoTile from '../VideoTile/index.jsx';
 
-export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
+function countEligibleDrivers(users = []) {
+  const unique = new Set();
+  users.forEach((entry) => {
+    const role = String(entry?.role || '');
+    if (role === 'spectator') return;
+    const roverId = String(entry?.roverId || '').trim();
+    const socketId = String(entry?.socketId || '').trim();
+    if (!roverId || !socketId) return;
+    unique.add(socketId);
+  });
+  return unique.size;
+}
+
+export default function DriverVideoPanel({ layoutFormat = 'desktop' }) {
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
+  const users = useSessionSelector((state) => state.session?.users ?? []);
   const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
@@ -23,7 +37,9 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const [now, setNow] = useState(() => Date.now());
   const [turnCueVisible, setTurnCueVisible] = useState(false);
   const [turnCueStartAt, setTurnCueStartAt] = useState(null);
+  const [notTurnFlashAt, setNotTurnFlashAt] = useState(0);
   const lastTurnRef = useRef({ active: false, roverId: null });
+  const lastIntentRef = useRef(lastControlIntentAt || 0);
   useEffect(() => {
     if (mode !== 'turns') {
       return undefined;
@@ -51,22 +67,34 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
   const idleDeadline = turnInfo?.idleDeadline || null;
   const msUntilTurn = deadline ? deadline - now : null;
   const msUntilIdleSkip = idleDeadline ? idleDeadline - now : null;
-  const isPreSwitchWindow =
-    mode === 'turns' && isNextDriver && msUntilTurn != null && msUntilTurn <= 5000 && msUntilTurn > 0;
-  const shouldShowVideo = mode !== 'turns' || isActiveDriver || isPreSwitchWindow;
+  const isTurnsMode = mode === 'turns';
+  const totalRovers = roster.length;
+  const totalDrivers = useMemo(() => countEligibleDrivers(users), [users]);
+  const shouldUsePreviewByLoad = isTurnsMode && totalDrivers > totalRovers;
+  const isPreSwitchWindow = isTurnsMode && isNextDriver && msUntilTurn != null && msUntilTurn <= 5000 && msUntilTurn > 0;
+  const isNotYourTurn = isTurnsMode && !isActiveDriver;
+  const shouldUsePreview = isNotYourTurn && !isPreSwitchWindow && shouldUsePreviewByLoad;
+  const shouldShowVideo = !shouldUsePreview;
   const turnSeconds =
     msUntilTurn != null && Number.isFinite(msUntilTurn) ? Math.max(0, Math.ceil(msUntilTurn / 1000)) : null;
   const idleSkipSeconds =
     msUntilIdleSkip != null && Number.isFinite(msUntilIdleSkip)
       ? Math.max(0, Math.ceil(msUntilIdleSkip / 1000))
       : null;
-  const turnTimerText = isActiveDriver
-    ? turnSeconds != null
-      ? `${turnSeconds}s left`
-      : null
-    : isNextDriver && turnSeconds != null
-    ? `Your turn in ${turnSeconds}s`
-    : null;
+  const turnTimerText = useMemo(() => {
+    if (!isTurnsMode) return null;
+    if (isActiveDriver) {
+      return turnSeconds != null ? `${turnSeconds}s left` : 'Your turn';
+    }
+    const parts = ['Not your turn'];
+    if (isNextDriver && turnSeconds != null) {
+      parts.push(`your turn in ${turnSeconds}s`);
+    }
+    if (shouldUsePreview) {
+      parts.push('preview to save upload bandwidth');
+    }
+    return parts.join(' • ');
+  }, [isTurnsMode, isActiveDriver, isNextDriver, turnSeconds, shouldUsePreview]);
   const entries = roverId
     ? [
         ...(shouldShowVideo ? [{ type: 'rover', id: roverId, key: roverId }] : []),
@@ -117,6 +145,16 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
     }
   }, [lastControlIntentAt, turnCueStartAt, turnCueVisible]);
 
+  useEffect(() => {
+    const lastIntent = Number(lastIntentRef.current) || 0;
+    const nextIntent = Number(lastControlIntentAt) || 0;
+    const advanced = nextIntent > lastIntent;
+    if (advanced && isNotYourTurn) {
+      setNotTurnFlashAt(Date.now());
+    }
+    lastIntentRef.current = nextIntent;
+  }, [isNotYourTurn, lastControlIntentAt]);
+
   return (
     <section className="panel">
       {roverId ? (
@@ -132,12 +170,14 @@ export default function DriverVideoPanel({layoutFormat = 'desktop'}) {
           layoutFormat={layoutFormat}
           overcurrentLimiter={overcurrentLimiter}
           songNote={song?.note}
-          qualityNotice={!shouldShowVideo ? 'Preview feed (low FPS) until your turn.' : null}
+          qualityNotice={null}
           showTurnCue={turnCueVisible}
           turnTimerText={turnTimerText}
           turnSeconds={turnSeconds}
           isActiveDriver={isActiveDriver}
           idleSkipSeconds={idleSkipSeconds}
+          showNotTurnNotice={isNotYourTurn}
+          notTurnFlashAt={notTurnFlashAt}
         />
       ) : (
         <div className="panel-muted content-center text-center text-sm text-slate-400 aspect-[4/3]">

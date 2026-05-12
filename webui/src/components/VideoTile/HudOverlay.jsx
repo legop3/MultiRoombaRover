@@ -19,6 +19,7 @@ function HudOverlay({
   mobileHud = false,
   mapPosition = 'top-center',
   turnTimerText = null,
+  turnTimerFlashActive = false,
   labelScale = 1,
 }) {
   const isMobile = mobileHud;
@@ -147,7 +148,9 @@ function HudOverlay({
       </div>
       {turnTimerText ? (
         <div
-          className={`absolute left-1/2 top-0.5 -translate-x-1/2 rounded bg-black/70 text-slate-100 ${timerPadClass} ${timerTextClass}`}
+          className={`absolute left-1/2 top-0.5 -translate-x-1/2 rounded transition-colors ${
+            turnTimerFlashActive ? 'bg-red-900/80 text-red-100' : 'bg-black/70 text-slate-100'
+          } ${timerPadClass} ${timerTextClass}`}
         >
           {turnTimerText}
         </div>
