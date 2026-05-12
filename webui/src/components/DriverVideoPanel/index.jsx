@@ -38,7 +38,7 @@ export default function DriverVideoPanel({ layoutFormat = 'desktop' }) {
   const [turnCueVisible, setTurnCueVisible] = useState(false);
   const [turnCueStartAt, setTurnCueStartAt] = useState(null);
   const [notTurnFlashAt, setNotTurnFlashAt] = useState(0);
-  const lastTurnRef = useRef({ active: false, roverId: null });
+  const lastTurnRef = useRef({ initialized: false, roverId: null, activeDriverId: null });
   const lastIntentRef = useRef(lastControlIntentAt || 0);
   useEffect(() => {
     if (mode !== 'turns') {
@@ -116,21 +116,46 @@ export default function DriverVideoPanel({ layoutFormat = 'desktop' }) {
     if (mode !== 'turns') {
       setTurnCueVisible(false);
       setTurnCueStartAt(null);
-      lastTurnRef.current = { active: false, roverId: null };
+      lastTurnRef.current = { initialized: false, roverId: null, activeDriverId: null };
       return;
     }
     const lastTurn = lastTurnRef.current;
-    const becameActive = isActiveDriver && !lastTurn.active;
-    const roverChanged = isActiveDriver && roverId && roverId !== lastTurn.roverId;
-    if (becameActive || roverChanged) {
+    const nextActiveDriverId = activeDriverId || null;
+    if (!socketId || !roverId) {
+      setTurnCueVisible(false);
+      setTurnCueStartAt(null);
+      lastTurnRef.current = {
+        initialized: false,
+        roverId: null,
+        activeDriverId: null,
+      };
+      return;
+    }
+    if (!lastTurn.initialized || lastTurn.roverId !== roverId) {
+      lastTurnRef.current = {
+        initialized: true,
+        roverId,
+        activeDriverId: nextActiveDriverId,
+      };
+      return;
+    }
+    const becameActive =
+      Boolean(lastTurn.activeDriverId) &&
+      lastTurn.activeDriverId !== socketId &&
+      nextActiveDriverId === socketId;
+    if (becameActive) {
       setTurnCueVisible(true);
       setTurnCueStartAt(Date.now());
-    } else if (!isActiveDriver && lastTurn.active) {
+    } else if (nextActiveDriverId !== socketId && turnCueVisible) {
       setTurnCueVisible(false);
       setTurnCueStartAt(null);
     }
-    lastTurnRef.current = { active: isActiveDriver, roverId };
-  }, [isActiveDriver, roverId, mode]);
+    lastTurnRef.current = {
+      initialized: true,
+      roverId,
+      activeDriverId: nextActiveDriverId,
+    };
+  }, [activeDriverId, mode, roverId, socketId, turnCueVisible]);
 
   useEffect(() => {
     if (!turnCueVisible || !turnCueStartAt) return;
