@@ -148,7 +148,7 @@ function HudOverlay({
       </div>
       {turnTimerText ? (
         <div
-          className={`absolute right-1 top-1 rounded border transition-colors ${
+          className={`absolute right-1 top-1 rounded border ${
             turnTimerFlashActive
               ? 'border-red-300/90 bg-red-900/80 text-red-100'
               : 'border-amber-300/80 bg-black/75 text-amber-200'

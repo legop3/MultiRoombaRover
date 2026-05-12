@@ -698,9 +698,17 @@ export default function VideoTile({
                   : 'border-amber-300/80 bg-black/75 text-amber-200'
               } ${mobileHud ? 'px-2 py-1 text-[0.6rem]' : 'px-2.5 py-1.5 text-[0.72rem]'}`}
             >
-              <div className="font-semibold">Not your turn to drive!</div>
-              {notTurnCountdownText ? <div>{notTurnCountdownText}</div> : null}
-              {showPreviewReason ? <div>Video switched to preview mode to save bandwidth.</div> : null}
+              <div className={noticeFlashActive ? 'font-semibold text-red-50' : 'font-semibold text-white'}>
+                Not your turn to drive!
+              </div>
+              {notTurnCountdownText ? (
+                <div className={noticeFlashActive ? 'text-red-100/95' : 'text-amber-100'}>{notTurnCountdownText}</div>
+              ) : null}
+              {showPreviewReason ? (
+                <div className={noticeFlashActive ? 'text-red-100/90' : 'text-amber-200/85'}>
+                  Video switched to preview mode to save bandwidth.
+                </div>
+              ) : null}
               <div className="pointer-events-auto mt-0.5">
                 <SocialButton
                   id="discord"
