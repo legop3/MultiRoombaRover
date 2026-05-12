@@ -698,11 +698,19 @@ export default function VideoTile({
                   : 'border-amber-300/80 bg-black/75 text-amber-200'
               } ${mobileHud ? 'px-2 py-1 text-[0.6rem]' : 'px-2.5 py-1.5 text-[0.72rem]'}`}
             >
-              <div className={noticeFlashActive ? 'font-semibold text-red-50' : 'font-semibold text-white'}>
+              <div
+                className={
+                  noticeFlashActive
+                    ? 'text-[0.82rem] font-semibold text-red-50'
+                    : 'text-[0.82rem] font-semibold text-white'
+                }
+              >
                 Not your turn to drive!
               </div>
               {notTurnCountdownText ? (
-                <div className={noticeFlashActive ? 'text-red-100/95' : 'text-amber-100'}>{notTurnCountdownText}</div>
+                <div className={noticeFlashActive ? 'text-red-100/95' : 'text-amber-100'}>
+                  {notTurnCountdownText}
+                </div>
               ) : null}
               {showPreviewReason ? (
                 <div className={noticeFlashActive ? 'text-red-100/90' : 'text-amber-200/85'}>
