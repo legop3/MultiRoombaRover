@@ -5,7 +5,7 @@ export const INPUT_SETTINGS_DEFAULTS = {
     baseSpeed: 250,
     turboSpeed: 400,
     precisionSpeed: 125,
-    tiltSpeed: 100,
+    tiltSpeed: 90,
     tiltIntervalMs: 110,
   },
 };

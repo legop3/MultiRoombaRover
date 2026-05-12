@@ -1,0 +1,13 @@
+# main idea:
+- first of all, NONE of this should effect the spectator pages.
+- right now, when youre on a rover and its not your turn, you see a preview feed.
+  - this is annoying if you are ex: trying to sit there and watch something with multiple people on one rover
+- I want it changed so that if there are less TOTAL drivers than there are rovers, everyone sees full video even when it's not their turn.
+  - if there are more total drivers than rovers, when its not your turn youll see the preview feed
+- I also want some UI changes to make it better:
+  - right now theres a big overlay in the middle of the screen when its not your turn, that explains the preview thing
+  - I want this moved to the top left corner
+  - I want it to blink on input, to draw attention to it
+  - I want it to always show when its not your turn
+    - but I only want it to explain the preview thing when its showing the preview
+    - the preview exists to save upload bandwith

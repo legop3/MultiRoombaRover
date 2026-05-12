@@ -20,6 +20,11 @@
 16. better quickstart guide, something better than just a big list of controls. help overlay sucks i think. [x]
     1.  restyle fullscreen overlay... please..[x]
 17. fix rover request spam queue cheat
+18. not always preview feed for non-turners
+    1.  if theres less drivers than there are rovers online, everyone sees full video even if its not your turn
+    2.  move the thing out of the middle of the screen no matter what mode its in
+        1.  have it just say "its not your turn!" and preview mesasge if preview mode
+        2.  make it flash on input to draw attention that its not your turn
 
 
 # relative pipe dreams:
