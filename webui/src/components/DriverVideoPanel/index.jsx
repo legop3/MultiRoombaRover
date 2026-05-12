@@ -82,19 +82,13 @@ export default function DriverVideoPanel({ layoutFormat = 'desktop' }) {
       ? Math.max(0, Math.ceil(msUntilIdleSkip / 1000))
       : null;
   const turnTimerText = useMemo(() => {
-    if (!isTurnsMode) return null;
-    if (isActiveDriver) {
-      return turnSeconds != null ? `${turnSeconds}s left` : 'Your turn';
-    }
-    const parts = ['Not your turn'];
-    if (isNextDriver && turnSeconds != null) {
-      parts.push(`your turn in ${turnSeconds}s`);
-    }
-    if (shouldUsePreview) {
-      parts.push('preview to save upload bandwidth');
-    }
-    return parts.join(' • ');
-  }, [isTurnsMode, isActiveDriver, isNextDriver, turnSeconds, shouldUsePreview]);
+    if (!isTurnsMode || !isActiveDriver) return null;
+    return turnSeconds != null ? `${turnSeconds}s left` : 'Your turn';
+  }, [isTurnsMode, isActiveDriver, turnSeconds]);
+  const notTurnCountdownText = useMemo(() => {
+    if (!isNotYourTurn || !isNextDriver || turnSeconds == null) return null;
+    return `${turnSeconds} seconds until your turn.`;
+  }, [isNotYourTurn, isNextDriver, turnSeconds]);
   const entries = roverId
     ? [
         ...(shouldShowVideo ? [{ type: 'rover', id: roverId, key: roverId }] : []),
@@ -177,6 +171,8 @@ export default function DriverVideoPanel({ layoutFormat = 'desktop' }) {
           isActiveDriver={isActiveDriver}
           idleSkipSeconds={idleSkipSeconds}
           showNotTurnNotice={isNotYourTurn}
+          notTurnCountdownText={notTurnCountdownText}
+          showPreviewReason={shouldUsePreview}
           notTurnFlashAt={notTurnFlashAt}
         />
       ) : (

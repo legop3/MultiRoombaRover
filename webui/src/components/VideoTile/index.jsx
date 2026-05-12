@@ -48,6 +48,8 @@ export default function VideoTile({
   isActiveDriver = false,
   idleSkipSeconds = null,
   showNotTurnNotice = false,
+  notTurnCountdownText = null,
+  showPreviewReason = false,
   notTurnFlashAt = 0,
 }) {
   const discordUrl = useSessionSelector((state) => {
@@ -681,6 +683,28 @@ export default function VideoTile({
                 <SocialButton
                   id="discord"
                   label="Join our Discord server while you wait!"
+                  url={discordUrl}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {!noHud && showNotTurnNotice ? (
+          <div className="pointer-events-none absolute right-1 top-1 z-40">
+            <div
+              className={`max-w-[18rem] rounded border ${
+                noticeFlashActive
+                  ? 'border-red-300/90 bg-red-900/80 text-red-100'
+                  : 'border-amber-300/80 bg-black/75 text-amber-200'
+              } ${mobileHud ? 'px-2 py-1 text-[0.6rem]' : 'px-2.5 py-1.5 text-[0.72rem]'}`}
+            >
+              <div className="font-semibold">Not your turn to drive!</div>
+              {notTurnCountdownText ? <div>{notTurnCountdownText}</div> : null}
+              {showPreviewReason ? <div>Video switched to preview mode to save bandwidth.</div> : null}
+              <div className="pointer-events-auto mt-0.5">
+                <SocialButton
+                  id="discord"
+                  label="Join our Discord while you wait!"
                   url={discordUrl}
                 />
               </div>
