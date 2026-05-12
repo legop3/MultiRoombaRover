@@ -690,7 +690,7 @@ export default function VideoTile({
           </div>
         ) : null}
         {!noHud && showNotTurnNotice ? (
-          <div className="pointer-events-none absolute right-1 top-1 z-40">
+          <div className="pointer-events-none absolute bottom-1 left-1 z-40">
             <div
               className={`max-w-[18rem] rounded border ${
                 noticeFlashActive
