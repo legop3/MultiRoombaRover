@@ -692,11 +692,11 @@ export default function VideoTile({
         {!noHud && showNotTurnNotice ? (
           <div className="pointer-events-none absolute bottom-1 left-1 z-40">
             <div
-              className={`max-w-[18rem] rounded border ${
+              className={`w-fit rounded border ${
                 noticeFlashActive
                   ? 'border-red-300/90 bg-red-900/80 text-red-100'
                   : 'border-amber-300/80 bg-black/75 text-amber-200'
-              } ${mobileHud ? 'px-2 py-1 text-[0.6rem]' : 'px-2.5 py-1.5 text-[0.72rem]'}`}
+              } ${mobileHud ? 'px-2 py-1 text-[0.6rem]' : 'px-3 py-1.5 text-sm'}`}
             >
               <div
                 className={
