@@ -76,6 +76,7 @@ export default function RoverDescriptionOverlay({
           largeFading ? 'opacity-0' : 'opacity-100'
         } ${mobileHud ? 'text-[1rem] leading-tight' : 'text-[1.5rem] leading-tight'}`}
       >
+        <p>Just so you know, this rover</p>
         <p>{description}</p>
         <p className={`${mobileHud ? 'text-[0.58rem]' : 'text-[0.72rem]'} mt-0.5 font-normal text-slate-300`}>
           This fades 5 seconds after your first control input.
