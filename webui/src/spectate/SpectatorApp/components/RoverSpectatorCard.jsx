@@ -15,6 +15,7 @@ export default function RoverSpectatorCard({ rover, frame, sessionInfo, videoMod
           snapshotFeed={snapshotFeed}
           audioSessionInfo={audioInfo}
           label={rover.name}
+          roverDescription={rover.description}
           roverColor={rover.color || null}
           telemetryFrame={frame}
           batteryConfig={rover.battery}

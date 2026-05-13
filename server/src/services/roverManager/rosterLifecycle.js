@@ -211,6 +211,7 @@ function createRosterLifecycle(deps) {
     return Array.from(rovers.values()).map((record) => ({
       id: record.id,
       name: record.meta?.name || record.id,
+      description: record.meta?.description,
       color: record.meta?.color || null,
       battery: record.meta?.battery,
       batteryState: record.batteryState,

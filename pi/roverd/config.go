@@ -145,6 +145,7 @@ type PrivateSafetyConfig struct {
 
 type Config struct {
 	Name          string              `yaml:"name"`
+	Description   string              `yaml:"description" json:"description,omitempty"`
 	Color         string              `yaml:"color" json:"color,omitempty"`
 	ServerURL     string              `yaml:"serverUrl"`
 	Serial        SerialConfig        `yaml:"serial"`

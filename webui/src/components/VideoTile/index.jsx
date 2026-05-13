@@ -12,6 +12,7 @@ import BatteryBar from '../BatteryBar/index.jsx';
 import { buildBatteryVisual } from '../../lib/battery.js';
 import TurnCueOverlay from './TurnCueOverlay.jsx';
 import HudOverlay from './HudOverlay.jsx';
+import RoverDescriptionOverlay from './RoverDescriptionOverlay.jsx';
 import OvercurrentOverlay from './OvercurrentOverlay.jsx';
 import LowBatteryOverlay from './LowBatteryOverlay.jsx';
 import LightBumpBars from './LightBumpBars.jsx';
@@ -31,6 +32,7 @@ export default function VideoTile({
   snapshotFeed = null,
   qualityNotice = null,
   label,
+  roverDescription = null,
   roverColor = null,
   forceMute = false,
   telemetryFrame,
@@ -594,6 +596,7 @@ export default function VideoTile({
     : audioStatus;
   const showVerticalBattery = hudVariant === 'spectator';
   const noHud = hudVariant === 'none';
+  const descriptionDisplayKey = `${label || ''}::${roverDescription || ''}`;
 
   return (
     <div className={`flex flex-col gap-0.5 ${fitParent ? 'h-full' : ''}`}>
@@ -629,6 +632,14 @@ export default function VideoTile({
             mobileHud={mobileHud}
             isActiveDriver={isActiveDriver}
             idleSkipSeconds={idleSkipSeconds}
+          />
+        ) : null}
+        {!noHud ? (
+          <RoverDescriptionOverlay
+            description={roverDescription}
+            variant={hudVariant}
+            mobileHud={mobileHud}
+            displayKey={descriptionDisplayKey}
           />
         ) : null}
         {!noHud ? (

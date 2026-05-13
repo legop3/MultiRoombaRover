@@ -1,5 +1,6 @@
 # Sample configuration for roverd
 name: roomba-alpha
+description: "Loves corners, hates cords."
 color: "#4DB6AC"
 serverUrl: ws://control-server.local:8080/rover
 serial:

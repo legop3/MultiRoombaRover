@@ -3,6 +3,7 @@ package roverd
 type helloMessage struct {
 	Type          string            `json:"type"`
 	Name          string            `json:"name"`
+	Description   string            `json:"description,omitempty"`
 	Color         string            `json:"color,omitempty"`
 	Battery       BatteryConfig     `json:"battery"`
 	MaxWheelSpeed int               `json:"maxWheelSpeed"`
