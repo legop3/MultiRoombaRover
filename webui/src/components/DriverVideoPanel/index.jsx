@@ -200,6 +200,7 @@ export default function DriverVideoPanel({ layoutFormat = 'desktop' }) {
           notTurnCountdownText={notTurnCountdownText}
           showPreviewReason={shouldUsePreview}
           notTurnFlashAt={notTurnFlashAt}
+          controlIntentAt={lastControlIntentAt}
         />
       ) : (
         <div className="panel-muted content-center text-center text-sm text-slate-400 aspect-[4/3]">

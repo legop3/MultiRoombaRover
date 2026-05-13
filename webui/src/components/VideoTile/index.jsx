@@ -53,6 +53,7 @@ export default function VideoTile({
   notTurnCountdownText = null,
   showPreviewReason = false,
   notTurnFlashAt = 0,
+  controlIntentAt = 0,
 }) {
   const discordUrl = useSessionSelector((state) => {
     const socials = state.session?.socials || [];
@@ -640,6 +641,7 @@ export default function VideoTile({
             variant={hudVariant}
             mobileHud={mobileHud}
             displayKey={descriptionDisplayKey}
+            controlIntentAt={controlIntentAt}
           />
         ) : null}
         {!noHud ? (
