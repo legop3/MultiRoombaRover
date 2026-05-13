@@ -38,7 +38,7 @@ export default function RoverDescriptionOverlay({
     setLargeFading(false);
     baselineIntentRef.current = Number(controlIntentAt) || 0;
     return undefined;
-  }, [controlIntentAt, description, displayKey, variant]);
+  }, [description, displayKey, variant]);
 
   useEffect(() => {
     if (variant !== 'default' || !description || !largeVisible || largeFading) return;
