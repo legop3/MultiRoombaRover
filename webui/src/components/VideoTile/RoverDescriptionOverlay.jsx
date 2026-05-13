@@ -49,6 +49,7 @@ export default function RoverDescriptionOverlay({
           largeFading ? 'opacity-0' : 'opacity-100'
         } ${mobileHud ? 'text-[1rem] leading-tight' : 'text-[1.5rem] leading-tight'}`}
       >
+        <p>Just so you know, this rover</p>
         {description}
       </div>
     </div>
