@@ -124,7 +124,7 @@ export default function ChatMessageRow({ message }) {
     <div className={chatRowClass(message)}>
       <ChatIdentity message={message} />
       <span
-        className={`w-full break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
+        className={`min-w-0 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
       >
         {message.text}
       </span>

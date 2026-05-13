@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-const LARGE_VISIBLE_MS = 3500;
+const LARGE_VISIBLE_MS = 6000;
 const LARGE_FADE_MS = 700;
 
 export default function RoverDescriptionOverlay({
