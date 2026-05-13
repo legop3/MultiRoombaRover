@@ -4,9 +4,8 @@
 4.  add discord bot typing thing for when someone requests a replay
 5.  change replay title for ones requested from discord, something other than "requester driving rover"
 6.  fix rover request spam queue cheat
-7.  rover descriptions. show in the HUD at the bottom or top for a few seconds, then fade away.
-8.  reorganize internal structure of video, HUD stuff...
-9.  button box reward: ping @everyone, 7567 presses
+7.  reorganize internal structure of video, HUD stuff...
+8.  button box reward: ping @everyone, 7567 presses
 
 
 # relative pipe dreams:

@@ -1,7 +1,7 @@
 // Info Column
 // Purpose: Defines the Info Column module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import VideoTile from '../../../components/VideoTile/index.jsx';
+import RoverMediaPlayer from '../../../components/RoverMediaPlayer/index.jsx';
 import BatteryBar from '../../../components/BatteryBar/index.jsx';
 import { roverNameChromeStyle } from '../../../lib/roverColor.js';
 import { getBatteryVisual } from '../utils.js';
@@ -95,18 +95,13 @@ export default function InfoColumn({
               {showPreview ? (
                 <div className="mt-auto w-full">
                   <div className="w-full aspect-[4/3]">
-                    <VideoTile
+                    <RoverMediaPlayer
                       sessionInfo={sessionInfo}
                       videoMode={videoMode}
                       snapshotFeed={snapshotFeed}
                       audioSessionInfo={null}
                       label={rover.name || rover.id}
-                      roverColor={rover.color || null}
-                      telemetryFrame={frame}
-                      batteryConfig={rover.battery}
-                      layoutFormat="mobile"
-                      hudVariant="none"
-                      fitParent
+                      sensors={frame?.sensors || null}
                     />
                   </div>
                 </div>

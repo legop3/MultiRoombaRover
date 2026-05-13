@@ -1,22 +1,11 @@
-// Video Tile
-// Purpose: Defines the Video Tile module and the local helpers/components used in this file.
-// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { WhepPlayer } from '../../lib/whepPlayer.js';
-import { useHudMapSetting } from '../../hooks/useHudMapSetting.js';
+import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
+import { useVideoRequests } from '../../hooks/useVideoRequests.js';
+import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
-import SocialButton from '../SocialButton/index.jsx';
-import BatteryBar from '../BatteryBar/index.jsx';
-import { buildBatteryVisual } from '../../lib/battery.js';
-import TurnCueOverlay from './TurnCueOverlay.jsx';
-import HudOverlay from './HudOverlay.jsx';
-import RoverDescriptionOverlay from './RoverDescriptionOverlay.jsx';
-import OvercurrentOverlay from './OvercurrentOverlay.jsx';
-import LowBatteryOverlay from './LowBatteryOverlay.jsx';
-import LightBumpBars from './LightBumpBars.jsx';
-import HudChatInput from './HudChatInput.jsx';
 import {
   RESTART_DELAY_MS,
   UNMUTE_RETRY_MS,
@@ -25,45 +14,55 @@ import {
   DUCK_RELEASE_FADE_MS,
 } from './constants.js';
 
-export default function VideoTile({
-  sessionInfo,
-  audioSessionInfo,
-  videoMode = 'whep',
+export default function RoverMediaPlayer({
+  roverId = null,
+  sessionInfo = null,
+  audioSessionInfo = null,
+  videoMode = null,
   snapshotFeed = null,
-  qualityNotice = null,
   label,
-  roverDescription = null,
-  roverColor = null,
   forceMute = false,
-  telemetryFrame,
-  batteryConfig,
-  layoutFormat = 'desktop',
-  hudVariant = 'default',
-  driverLabel = null,
-  hudForceMap = false,
-  hudMapPosition = 'top-center',
-  hudLabelScale = 1,
-  fitParent = false,
-  overcurrentLimiter = null,
-  showTurnCue = false,
-  turnTimerText = null,
-  isActiveDriver = false,
-  idleSkipSeconds = null,
-  showNotTurnNotice = false,
-  notTurnCountdownText = null,
-  showPreviewReason = false,
-  notTurnFlashAt = 0,
-  controlIntentAt = 0,
+  sensors,
 }) {
-  const discordUrl = useSessionSelector((state) => {
-    const socials = state.session?.socials || [];
-    const socialUrl =
-      socials.find((entry) => {
-        const key = String(entry?.id || entry?.label || '').toLowerCase();
-        return key === 'discord';
-      })?.url || null;
-    return socialUrl || state.session?.discord?.invite || null;
+  const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const effectiveRoverId = roverId ?? assignedRoverId;
+  const mode = useSessionSelector((state) => state.session?.mode || null);
+  const isLocalNetwork = useSessionSelector((state) => Boolean(state.session?.isLocalNetwork));
+  const rosterEntry = useSessionSelector((state) =>
+    effectiveRoverId && Array.isArray(state.session?.roster)
+      ? state.session.roster.find((item) => String(item.id) === String(effectiveRoverId)) || null
+      : null,
+  );
+  const hasAudio = Boolean(rosterEntry?.media?.audioPublishUrl);
+  const autoVideoEnabled = videoMode ? videoMode === 'whep' : isLocalNetwork;
+  const autoEntries = useMemo(() => {
+    if (!effectiveRoverId || !autoVideoEnabled) return [];
+    return [
+      { type: 'rover', id: effectiveRoverId, key: effectiveRoverId },
+      ...(hasAudio
+        ? [{ type: 'rover', id: `${effectiveRoverId}-audio`, key: `${effectiveRoverId}-audio` }]
+        : []),
+    ];
+  }, [effectiveRoverId, autoVideoEnabled, hasAudio]);
+  const autoSources = useVideoRequests(autoEntries, {
+    enabled: Boolean(effectiveRoverId && autoVideoEnabled),
+    version: mode,
   });
+  const resolvedSessionInfo =
+    sessionInfo ?? (effectiveRoverId ? autoSources[effectiveRoverId] || null : null);
+  const resolvedAudioSessionInfo =
+    audioSessionInfo ??
+    (effectiveRoverId && hasAudio ? autoSources[`${effectiveRoverId}-audio`] || null : null);
+  const autoSnapshots = useRoverSnapshots(effectiveRoverId ? [effectiveRoverId] : [], {
+    enabled: Boolean(effectiveRoverId && !resolvedSessionInfo?.url),
+    version: mode,
+  });
+  const resolvedSnapshotFeed =
+    snapshotFeed ?? (effectiveRoverId ? autoSnapshots[effectiveRoverId] || null : null);
+  const resolvedLabel =
+    label || rosterEntry?.name || (effectiveRoverId ? `Rover ${effectiveRoverId}` : 'Rover');
+  const frame = useTelemetryFrame(effectiveRoverId);
+  const resolvedSensors = sensors ?? frame?.sensors ?? null;
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const restartTimer = useRef(null);
@@ -79,10 +78,8 @@ export default function VideoTile({
   const [restartToken, setRestartToken] = useState(0);
   const [audioRestartToken, setAudioRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
-  const [noticeFlashActive, setNoticeFlashActive] = useState(false);
-  const hasDedicatedAudio = Boolean(audioSessionInfo?.url);
-  const usingSnapshot = videoMode === 'snapshot';
-  const sensors = telemetryFrame?.sensors;
+  const hasDedicatedAudio = Boolean(resolvedAudioSessionInfo?.url);
+  const usingSnapshot = videoMode === 'snapshot' || (!videoMode && !resolvedSessionInfo?.url);
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const masterVolume = Number.isFinite(audioSettings?.masterVolume)
     ? audioSettings.masterVolume
@@ -100,63 +97,21 @@ export default function VideoTile({
     ? Math.max(0, Math.min(1, audioSettings.mainBrushDuckAmount))
     : AUDIO_SETTINGS_DEFAULTS.mainBrushDuckAmount;
   const baseRoverGain = Math.max(0, Math.min(1, masterVolume * roverVolume));
-  const batteryCharge = sensors?.batteryChargeMah ?? null;
-  const desktopLayout = layoutFormat === 'desktop';
-  const mobileHud = !desktopLayout;
-  const effectiveHudMapPosition = mobileHud ? 'top-right' : hudMapPosition;
-  const [showHudMapDesktop] = useHudMapSetting();
-  const showHudMap = hudForceMap ? true : mobileHud ? true : showHudMapDesktop;
-  const batteryVisual = buildBatteryVisual({ charge: batteryCharge, config: batteryConfig });
-  const wheelOvercurrents = sensors?.wheelOvercurrents || null;
-  const overcurrentMotors = useMemo(
-    () =>
-      wheelOvercurrents == null
-        ? []
-        : Object.entries(wheelOvercurrents)
-            .filter(([, active]) => Boolean(active))
-            .map(([key]) => key),
-    [wheelOvercurrents],
-  );
-  const limiterCaps = overcurrentLimiter?.caps || null;
-  const limiterGroups = overcurrentLimiter?.overcurrent?.groups || null;
-  const debugFlags = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return { debugAudio: false, debugHud: false };
-    }
-    const params = new URLSearchParams(window.location.search);
-    return {
-      debugAudio: params.has('debugAudio'),
-      debugHud: params.has('debugHud'),
-    };
-  }, []);
-  const debugAudio = debugFlags.debugAudio;
-  const debugHud = debugFlags.debugHud;
-  const limiterFill = useMemo(() => {
-    if (!limiterCaps) return null;
-    const driveCap = Number.isFinite(limiterCaps?.drive?.cap) ? limiterCaps.drive.cap : 1;
-    const auxCap = Number.isFinite(limiterCaps?.aux?.cap) ? limiterCaps.aux.cap : 1;
-    return Math.max(0, Math.min(1, 1 - Math.min(driveCap, auxCap)));
-  }, [limiterCaps]);
-  const limiterActive = Boolean(overcurrentLimiter?.isActive);
-  const overlayState = useMemo(() => {
-    const motors = overcurrentMotors.length ? overcurrentMotors : limiterActive ? ['limiter'] : [];
-    const fill = limiterFill ?? (overcurrentMotors.length ? 1 : 0);
-    return {
-      motors,
-      fill,
-      visible: Boolean(motors.length),
-    };
-  }, [overcurrentMotors, limiterActive, limiterFill]);
   const mainBrushActive = Boolean(
-    (Number(sensors?.mainBrushCurrentMa) || 0) > BRUSH_CURRENT_THRESHOLD_MA ||
-      sensors?.wheelOvercurrents?.mainBrush,
+    (Number(resolvedSensors?.mainBrushCurrentMa) || 0) > BRUSH_CURRENT_THRESHOLD_MA ||
+      resolvedSensors?.wheelOvercurrents?.mainBrush,
   );
   const duckGain = mainBrushDuckEnabled && mainBrushActive ? 1 - mainBrushDuckAmount : 1;
   const effectiveRoverGain = Math.max(0, Math.min(1, baseRoverGain * duckGain));
-  const levelIndicator =
-    mainBrushDuckEnabled && mainBrushActive && mainBrushDuckAmount > 0
-      ? `Volume decreased ${Math.round(mainBrushDuckAmount * 1000) / 10}%`
-      : null;
+
+  const debugAudio = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    const params = new URLSearchParams(window.location.search);
+    return params.has('debugAudio');
+  }, []);
+
   const audioDebugStateRef = useRef({
     hasDedicatedAudio: false,
     audioUrl: null,
@@ -169,7 +124,7 @@ export default function VideoTile({
   useEffect(() => {
     audioDebugStateRef.current = {
       hasDedicatedAudio,
-      audioUrl: audioSessionInfo?.url || null,
+      audioUrl: resolvedAudioSessionInfo?.url || null,
       mainBrushDuckEnabled,
       mainBrushDuckAmount,
       mainBrushActive,
@@ -178,13 +133,14 @@ export default function VideoTile({
     };
   }, [
     hasDedicatedAudio,
-    audioSessionInfo?.url,
+    resolvedAudioSessionInfo?.url,
     mainBrushDuckEnabled,
     mainBrushDuckAmount,
     mainBrushActive,
     baseRoverGain,
     effectiveRoverGain,
   ]);
+
   const logAudio = useCallback(
     (event, meta = {}) => {
       if (!debugAudio) return;
@@ -193,7 +149,7 @@ export default function VideoTile({
       const payload = {
         event,
         ts: Date.now(),
-        roverLabel: label || null,
+        roverLabel: resolvedLabel || null,
         hasDedicatedAudio: state.hasDedicatedAudio,
         audioUrl: state.audioUrl,
         mainBrushDuckEnabled: state.mainBrushDuckEnabled,
@@ -219,20 +175,8 @@ export default function VideoTile({
         console.log('[AudioDebug]', event, payload);
       }
     },
-    [debugAudio, label],
+    [debugAudio, resolvedLabel],
   );
-  useEffect(() => {
-    if (!debugHud) return;
-    console.log('[OvercurrentHUD]', {
-      overlayVisible: overlayState.visible,
-      overlayMotors: overlayState.motors,
-      overlayFill: overlayState.fill,
-      limiterActive,
-      limiterCaps,
-      limiterGroups,
-      wheelOvercurrents,
-    });
-  }, [debugHud, overlayState, limiterActive, limiterCaps, limiterGroups, wheelOvercurrents]);
 
   useEffect(() => {
     logAudio('settings/update');
@@ -307,13 +251,6 @@ export default function VideoTile({
   );
 
   useEffect(() => {
-    if (!showNotTurnNotice || !notTurnFlashAt) return undefined;
-    setNoticeFlashActive(true);
-    const timer = setTimeout(() => setNoticeFlashActive(false), 650);
-    return () => clearTimeout(timer);
-  }, [showNotTurnNotice, notTurnFlashAt]);
-
-  useEffect(() => {
     if (status === 'playing') {
       attemptUnmute(0);
     }
@@ -327,16 +264,16 @@ export default function VideoTile({
   }, [usingSnapshot]);
 
   useEffect(() => {
-    if (usingSnapshot || !sessionInfo?.url || !videoRef.current) {
+    if (usingSnapshot || !resolvedSessionInfo?.url || !videoRef.current) {
       return undefined;
     }
     let active = true;
     let player;
     const resetMuteId = setTimeout(() => setMuted(true), 0);
-      const handleStatus = (nextStatus, info) => {
-        if (!active) return;
-        logAudio('video/status', { nextStatus, info: info || null });
-        setStatus(nextStatus);
+    const handleStatus = (nextStatus, info) => {
+      if (!active) return;
+      logAudio('video/status', { nextStatus, info: info || null });
+      setStatus(nextStatus);
       setDetail(info || null);
       if (nextStatus === 'playing') {
         ensurePlayback();
@@ -347,8 +284,8 @@ export default function VideoTile({
     };
 
     player = new WhepPlayer({
-      url: sessionInfo.url,
-      token: sessionInfo.token,
+      url: resolvedSessionInfo.url,
+      token: resolvedSessionInfo.token,
       video: videoRef.current,
       receiveAudio: !hasDedicatedAudio,
       onStatus: handleStatus,
@@ -366,17 +303,26 @@ export default function VideoTile({
       clearTimeout(resetMuteId);
       player?.stop();
     };
-  }, [usingSnapshot, sessionInfo?.url, sessionInfo?.token, restartToken, scheduleRestart, ensurePlayback, hasDedicatedAudio, logAudio]);
+  }, [
+    usingSnapshot,
+    resolvedSessionInfo?.url,
+    resolvedSessionInfo?.token,
+    restartToken,
+    scheduleRestart,
+    ensurePlayback,
+    hasDedicatedAudio,
+    logAudio,
+  ]);
 
   useEffect(() => {
-    if (status === 'stopped' && sessionInfo?.url) {
+    if (status === 'stopped' && resolvedSessionInfo?.url) {
       scheduleRestart();
     }
-  }, [status, sessionInfo?.url, scheduleRestart]);
+  }, [status, resolvedSessionInfo?.url, scheduleRestart]);
 
   useEffect(() => {
     const audioEl = audioRef.current;
-    if (!audioEl || !audioSessionInfo?.url) {
+    if (!audioEl || !resolvedAudioSessionInfo?.url) {
       logAudio('route/no-audio-url');
       appliedVolumeRef.current = null;
       return;
@@ -417,7 +363,7 @@ export default function VideoTile({
       duckAmount: mainBrushDuckAmount,
     });
   }, [
-    audioSessionInfo?.url,
+    resolvedAudioSessionInfo?.url,
     effectiveRoverGain,
     mainBrushDuckEnabled,
     mainBrushActive,
@@ -425,9 +371,8 @@ export default function VideoTile({
     logAudio,
   ]);
 
-  // Audio-only WHEP (no pausing/muting; keeps trying to play)
   useEffect(() => {
-    if (!audioSessionInfo?.url || !audioRef.current) {
+    if (!resolvedAudioSessionInfo?.url || !audioRef.current) {
       return undefined;
     }
     let active = true;
@@ -451,8 +396,8 @@ export default function VideoTile({
     };
 
     player = new WhepPlayer({
-      url: audioSessionInfo.url,
-      token: audioSessionInfo.token,
+      url: resolvedAudioSessionInfo.url,
+      token: resolvedAudioSessionInfo.token,
       video: audioRef.current,
       audioOnly: true,
       onStatus: handleStatus,
@@ -470,17 +415,16 @@ export default function VideoTile({
       player?.stop();
     };
   }, [
-    audioSessionInfo?.url,
-    audioSessionInfo?.token,
+    resolvedAudioSessionInfo?.url,
+    resolvedAudioSessionInfo?.token,
     audioRestartToken,
     scheduleAudioRestart,
     logAudio,
   ]);
 
-  // Keep nudging the audio element to play in case autoplay was blocked.
   useEffect(() => {
     const audioEl = audioRef.current;
-    if (!audioSessionInfo?.url || !audioEl) {
+    if (!resolvedAudioSessionInfo?.url || !audioEl) {
       clearInterval(audioPlayInterval.current);
       return undefined;
     }
@@ -513,13 +457,8 @@ export default function VideoTile({
     audioPlayInterval.current = setInterval(attemptPlay, AUDIO_RETRY_MS);
 
     return () => clearInterval(audioPlayInterval.current);
-  }, [
-    audioSessionInfo?.url,
-    audioStatus,
-    logAudio,
-  ]);
+  }, [resolvedAudioSessionInfo?.url, audioStatus, logAudio]);
 
-  // Reflect audio element events back into status/detail so the HUD stays accurate.
   useEffect(() => {
     const audioEl = audioRef.current;
     if (!audioEl) return undefined;
@@ -570,185 +509,64 @@ export default function VideoTile({
       audioEl.removeEventListener('canplay', handleCanPlay);
       audioEl.removeEventListener('stalled', handleStalled);
     };
-  }, [audioSessionInfo?.url, logAudio]);
+  }, [resolvedAudioSessionInfo?.url, logAudio]);
 
-  const snapshotStatus = snapshotFeed?.error
-    ? `Error: ${snapshotFeed.error}`
-    : snapshotFeed?.objectUrl
+  const snapshotStatus = resolvedSnapshotFeed?.error
+    ? `Error: ${resolvedSnapshotFeed.error}`
+    : resolvedSnapshotFeed?.objectUrl
     ? 'snapshot'
-    : snapshotFeed?.status || 'waiting';
+    : resolvedSnapshotFeed?.status || 'waiting';
   const renderedStatus = usingSnapshot
     ? snapshotStatus
-    : !sessionInfo?.url
+    : !resolvedSessionInfo?.url
     ? 'waiting'
     : status === 'error'
     ? `Error: ${detail || 'unknown'}`
     : detail
     ? `${status} (${detail})`
     : status;
-  const renderedAudioStatus = audioSessionInfo?.error
-    ? `Error: ${audioSessionInfo.error}`
-    : !audioSessionInfo?.url
+  const renderedAudioStatus = resolvedAudioSessionInfo?.error
+    ? `Error: ${resolvedAudioSessionInfo.error}`
+    : !resolvedAudioSessionInfo?.url
     ? null
     : audioStatus === 'error'
     ? `Error: ${audioDetail || 'unknown'}`
     : audioDetail
     ? `${audioStatus} (${audioDetail})`
     : audioStatus;
-  const showVerticalBattery = hudVariant === 'spectator';
-  const noHud = hudVariant === 'none';
-  const descriptionDisplayKey = `${label || ''}::${roverDescription || ''}`;
 
   return (
-    <div className={`flex flex-col gap-0.5 ${fitParent ? 'h-full' : ''}`}>
-      <div
-        className={`relative w-full overflow-hidden bg-black ${fitParent ? 'h-full flex-1' : 'aspect-[4/3]'}`}
-      >
-        {usingSnapshot ? (
-          snapshotFeed?.objectUrl ? (
-            <img
-              src={snapshotFeed.objectUrl}
-              alt={label}
-              className="h-full w-full object-contain"
-              draggable={false}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-sm text-slate-300">
-              Waiting for frame…
-            </div>
-          )
-        ) : (
-          <video
-            ref={videoRef}
-            muted={forceMute || muted || hasDedicatedAudio}
-            playsInline
-            autoPlay
-            controls={false}
+    <>
+      {usingSnapshot ? (
+        resolvedSnapshotFeed?.objectUrl ? (
+          <img
+            src={resolvedSnapshotFeed.objectUrl}
+            alt={resolvedLabel}
             className="h-full w-full object-contain"
+            draggable={false}
           />
-        )}
-        <audio ref={audioRef} autoPlay hidden />
-        {!noHud && showTurnCue ? (
-          <TurnCueOverlay
-            mobileHud={mobileHud}
-            isActiveDriver={isActiveDriver}
-            idleSkipSeconds={idleSkipSeconds}
-          />
-        ) : null}
-        {!noHud ? (
-          <RoverDescriptionOverlay
-            description={roverDescription}
-            variant={hudVariant}
-            mobileHud={mobileHud}
-            displayKey={descriptionDisplayKey}
-            controlIntentAt={controlIntentAt}
-          />
-        ) : null}
-        {!noHud ? (
-          <HudOverlay
-            sensors={sensors}
-            label={label}
-            roverColor={roverColor}
-            status={renderedStatus}
-            audioStatus={renderedAudioStatus}
-            levelStatus={levelIndicator}
-            layoutFormat={layoutFormat}
-            variant={hudVariant}
-            driverLabel={driverLabel}
-            showTopDown={showHudMap}
-            mobileHud={mobileHud}
-            mapPosition={effectiveHudMapPosition}
-            turnTimerText={turnTimerText}
-            turnTimerFlashActive={noticeFlashActive}
-            labelScale={hudLabelScale}
-          />
-        ) : null}
-        {!noHud ? <HudChatInput compact={mobileHud} /> : null}
-        {!noHud && debugHud ? (
-          <div className="pointer-events-none absolute left-1 top-1 z-40 rounded bg-black/80 px-1 py-0.5 text-[0.6rem] text-lime-200">
-            {`OC vis:${overlayState.visible ? 1 : 0} motors:${overlayState.motors.length} fill:${Math.round(
-              overlayState.fill * 100,
-            )}%`}
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-sm text-slate-300">
+            Waiting for frame…
           </div>
-        ) : null}
-        {!noHud ? <OvercurrentOverlay motors={overlayState.motors} fill={overlayState.fill} compact={mobileHud} /> : null}
-        {!noHud ? <LowBatteryOverlay battery={batteryVisual} compact={mobileHud} /> : null}
-        {!noHud && showVerticalBattery && batteryVisual.available ? (
-          <div className="pointer-events-none absolute right-1 top-1/2 flex h-[70%] -translate-y-1/2 flex-col items-center justify-center rounded bg-black/60 px-0.5 pb-1 pt-1">
-            <BatteryBar
-              visual={batteryVisual}
-              orientation="vertical"
-              variant="inline"
-              compact={mobileHud}
-              className="h-full w-4"
-            />
-          </div>
-        ) : null}
-        {!noHud && qualityNotice ? (
-          <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2">
-            <div
-              className={`mx-auto w-fit rounded border border-amber-300/80 bg-black/75 text-amber-200 ${
-                mobileHud ? 'px-2 py-1 text-[0.6rem]' : 'px-3 py-1.5 text-sm'
-              }`}
-            >
-              <div className="text-center">{qualityNotice}</div>
-              <div className="pointer-events-auto mt-0">
-                <SocialButton
-                  id="discord"
-                  label="Join our Discord server while you wait!"
-                  url={discordUrl}
-                />
-              </div>
-            </div>
-          </div>
-        ) : null}
-        {!noHud && showNotTurnNotice ? (
-          <div className="pointer-events-none absolute bottom-1 left-1 z-40">
-            <div
-              className={`w-fit rounded border ${
-                noticeFlashActive
-                  ? 'border-red-300/90 bg-red-900/80 text-red-100'
-                  : 'border-amber-300/80 bg-black/75 text-amber-200'
-              } ${mobileHud ? 'px-2 py-1 text-[0.6rem]' : 'px-3 py-1.5 text-sm'}`}
-            >
-              <div
-                className={
-                  noticeFlashActive
-                    ? 'text-[0.82rem] font-semibold text-red-50'
-                    : 'text-[0.82rem] font-semibold text-white'
-                }
-              >
-                Not your turn to drive!
-              </div>
-              {notTurnCountdownText ? (
-                <div className={noticeFlashActive ? 'text-red-100/95' : 'text-amber-100'}>
-                  {notTurnCountdownText}
-                </div>
-              ) : null}
-              {showPreviewReason ? (
-                <div className={noticeFlashActive ? 'text-red-100/90' : 'text-amber-200/85'}>
-                  Video switched to preview mode to save bandwidth.
-                </div>
-              ) : null}
-              <div className="pointer-events-auto mt-0.5">
-                <SocialButton
-                  id="discord"
-                  label="Join our Discord while you wait!"
-                  url={discordUrl}
-                />
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-      {!noHud && !showVerticalBattery && (
-        <div className="space-y-0.5">
-          <LightBumpBars sensors={sensors} />
-          <div className="panel-section space-y-0.5 text-sm">
-            <BatteryBar visual={batteryVisual} compact={mobileHud} />
-          </div>
-        </div>
+        )
+      ) : (
+        <video
+          ref={videoRef}
+          muted={forceMute || muted || hasDedicatedAudio}
+          playsInline
+          autoPlay
+          controls={false}
+          className="h-full w-full object-contain"
+        />
       )}
-    </div>
+      <audio ref={audioRef} autoPlay hidden />
+      <div className="pointer-events-none absolute left-1 top-1 z-20 font-medium text-slate-100 text-[0.65rem]">
+        <div className="flex flex-col gap-0.5 leading-none">
+          <span>Status: {renderedStatus}</span>
+          {renderedAudioStatus ? <span>Audio: {renderedAudioStatus}</span> : null}
+        </div>
+      </div>
+    </>
   );
 }

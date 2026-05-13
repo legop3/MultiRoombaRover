@@ -2,35 +2,64 @@
 // Purpose: Defines the Hud Overlay module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React from 'react';
-import TopDownMap from '../TopDownMap/index.jsx';
-import { roverNameChromeStyle } from '../../lib/roverColor.js';
+import { useHudMapSetting } from '../../../hooks/useHudMapSetting.js';
+import { useSessionSelector } from '../../../context/SessionContext.jsx';
+import { useTelemetryFrame } from '../../../context/TelemetryContext.jsx';
+import TopDownMap from '../../TopDownMap/index.jsx';
+import { roverNameChromeStyle } from '../../../lib/roverColor.js';
 
 function HudOverlay({
+  roverId = null,
   sensors,
   label,
   roverColor = null,
-  status,
-  audioStatus,
-  levelStatus,
   layoutFormat = 'desktop',
   variant = 'default',
   driverLabel = null,
-  showTopDown = false,
+  showTopDown = undefined,
   mobileHud = false,
-  mapPosition = 'top-center',
-  turnTimerText = null,
-  turnTimerFlashActive = false,
+  mapPosition = null,
   labelScale = 1,
 }) {
+  const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const effectiveRoverId = roverId ?? assignedRoverId;
+  const frame = useTelemetryFrame(effectiveRoverId);
+  const rosterInfo = useSessionSelector((state) => {
+    if (!effectiveRoverId) return { label: null, roverColor: null };
+    const roster = state.session?.roster || [];
+    const rover = roster.find((entry) => String(entry.id) === String(effectiveRoverId));
+    return {
+      label: rover?.name || null,
+      roverColor: rover?.color || null,
+    };
+  });
+  const derivedDriverLabel = useSessionSelector((state) => {
+    if (!effectiveRoverId || variant !== 'spectator') return null;
+    const activeId = state.session?.activeDrivers?.[effectiveRoverId] || null;
+    const users = state.session?.users || [];
+    const match = users.find((u) => String(u.socketId || '') === String(activeId || ''));
+    return match?.nickname || match?.name || null;
+  });
+  const resolvedSensors = sensors ?? frame?.sensors ?? null;
+  const resolvedLabel = label ?? rosterInfo.label ?? null;
+  const resolvedRoverColor = roverColor ?? rosterInfo.roverColor ?? null;
+  const resolvedDriverLabel = driverLabel ?? derivedDriverLabel;
   const isMobile = mobileHud;
+  const [showHudMapDesktop] = useHudMapSetting();
+  const resolvedShowTopDown =
+    typeof showTopDown === 'boolean'
+      ? showTopDown
+      : variant === 'spectator'
+      ? true
+      : isMobile
+      ? true
+      : showHudMapDesktop;
+  const resolvedMapPosition =
+    mapPosition || (variant === 'spectator' ? 'top-center' : isMobile ? 'top-right' : 'top-center');
   const portraitMobile = layoutFormat === 'mobile-portrait';
-  const statusTextClass = isMobile ? 'text-[0.45rem]' : 'text-[0.65rem]';
   const statusPadClass = isMobile ? 'px-0.25 py-0.25' : 'px-1 py-0.5';
   const labelPadClass = isMobile ? 'px-0.25 py-0.25' : 'px-0.5 py-0.5';
   const labelTextClass = isMobile ? 'text-[0.55rem]' : 'text-[0.8rem]';
-  const statusPosClass = isMobile ? 'left-0.5 top-0.5' : 'left-1 top-1';
-  const timerTextClass = isMobile ? 'text-[0.5rem]' : 'text-[0.7rem]';
-  const timerPadClass = isMobile ? 'px-0.5 py-0.25' : 'px-1 py-0.5';
   const telemetryPosClass = isMobile ? 'left-0.5 top-1/2' : 'left-1 top-1/2';
   const labelPosClass = isMobile ? 'bottom-0.5' : 'bottom-0.5';
   const labelWrapperStyle = {
@@ -44,12 +73,16 @@ function HudOverlay({
     width: mapSize,
     height: mapSize,
     opacity: mapOpacity,
-    transform: mapPosition === 'top-center' ? `translateX(-50%) scale(${mapScale})` : `scale(${mapScale})`,
+    transform: resolvedMapPosition === 'top-center' ? `translateX(-50%) scale(${mapScale})` : `scale(${mapScale})`,
     transformOrigin:
-      mapPosition === 'bottom-left' ? 'bottom left' : mapPosition === 'top-center' ? 'top center' : 'top right',
-    ...(mapPosition === 'bottom-left'
+      resolvedMapPosition === 'bottom-left'
+        ? 'bottom left'
+        : resolvedMapPosition === 'top-center'
+        ? 'top center'
+        : 'top right',
+    ...(resolvedMapPosition === 'bottom-left'
       ? { left: '0.25rem', bottom: '0.25rem' }
-      : mapPosition === 'top-center'
+      : resolvedMapPosition === 'top-center'
         ? { left: '50%', top: '0.25rem' }
         : { right: '0.25rem', top: '0.25rem' }),
   };
@@ -60,15 +93,15 @@ function HudOverlay({
 
   if (variant === 'spectator') {
     const telemetryEntries = [
-      ['Voltage', sensors?.voltageMv != null ? `${(sensors.voltageMv / 1000).toFixed(2)} V` : '--'],
-      ['Current', sensors?.currentMa != null ? `${sensors.currentMa} mA` : '--'],
-      ['Charge', sensors?.batteryChargeMah != null ? `${sensors.batteryChargeMah}` : '--'],
-      ['OI', sensors?.oiMode?.label || '--'],
+      ['Voltage', resolvedSensors?.voltageMv != null ? `${(resolvedSensors.voltageMv / 1000).toFixed(2)} V` : '--'],
+      ['Current', resolvedSensors?.currentMa != null ? `${resolvedSensors.currentMa} mA` : '--'],
+      ['Charge', resolvedSensors?.batteryChargeMah != null ? `${resolvedSensors.batteryChargeMah}` : '--'],
+      ['OI', resolvedSensors?.oiMode?.label || '--'],
     ];
-    const docked = Boolean(sensors?.chargingSources?.homeBase);
-    const chargingLabel = sensors?.chargingState?.label || '';
+    const docked = Boolean(resolvedSensors?.chargingSources?.homeBase);
+    const chargingLabel = resolvedSensors?.chargingState?.label || '';
     const charging = Boolean(chargingLabel && chargingLabel.toLowerCase() !== 'not charging');
-    const oiLabel = sensors?.oiMode?.label || 'Unknown';
+    const oiLabel = resolvedSensors?.oiMode?.label || 'Unknown';
     const oiNormalized = oiLabel.toLowerCase();
     const oiTone =
       oiNormalized === 'full'
@@ -87,15 +120,8 @@ function HudOverlay({
     return (
       <>
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className={`absolute ${statusPosClass} font-medium text-slate-100 ${statusTextClass}`}>
-            <div className="flex flex-col gap-0.5 leading-none">
-              <span>Status: {status}</span>
-              {audioStatus ? <span>Audio: {audioStatus}</span> : null}
-              {levelStatus ? <span className="text-cyan-300">{levelStatus}</span> : null}
-            </div>
-          </div>
           <div
-            className={`absolute ${telemetryPosClass} flex -translate-y-1/2 flex-col gap-0.5 bg-black/70 text-slate-100 ${statusTextClass} ${statusPadClass}`}
+            className={`absolute ${telemetryPosClass} flex -translate-y-1/2 flex-col gap-0.5 bg-black/70 text-slate-100 ${isMobile ? 'text-[0.45rem]' : 'text-[0.65rem]'} ${statusPadClass}`}
           >
             <div className="space-y-0.5 leading-tight">
               <div className="flex flex-col gap-0.5 text-[0.75rem] font-semibold uppercase tracking-wide">
@@ -120,17 +146,17 @@ function HudOverlay({
             >
               <span
                 className="font-semibold text-white rounded px-1 py-[1px] border border-transparent"
-                style={roverNameChromeStyle(roverColor, 0.18)}
+                style={roverNameChromeStyle(resolvedRoverColor, 0.18)}
               >
-                {label || 'Unnamed Rover'}
+                {resolvedLabel || 'Unnamed Rover'}
               </span>
-              {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
+              {resolvedDriverLabel ? <span className="text-slate-300">• {resolvedDriverLabel}</span> : null}
             </div>
           </div>
         </div>
-        {showTopDown ? (
+        {resolvedShowTopDown ? (
           <div className="pointer-events-none absolute rounded" style={{ ...mapStyle }}>
-            <TopDownMap sensors={sensors} size={240} overlay />
+            <TopDownMap sensors={resolvedSensors} size={240} overlay />
           </div>
         ) : null}
       </>
@@ -139,41 +165,23 @@ function HudOverlay({
 
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div className={`absolute ${statusPosClass} font-medium text-slate-100 ${statusTextClass}`}>
-        <div className="flex flex-col gap-0.5 leading-none">
-          <span>Status: {status}</span>
-          {audioStatus ? <span>Audio: {audioStatus}</span> : null}
-          {levelStatus ? <span className="text-cyan-300">{levelStatus}</span> : null}
-        </div>
-      </div>
-      {turnTimerText ? (
-        <div
-          className={`absolute bottom-1 left-1 rounded border ${
-            turnTimerFlashActive
-              ? 'border-red-300/90 bg-red-900/80 text-red-100'
-              : 'border-amber-300/80 bg-black/75 text-amber-200'
-          } ${timerPadClass} ${timerTextClass}`}
-        >
-          {turnTimerText}
-        </div>
-      ) : null}
       <div className={`absolute ${labelPosClass} left-1/2`} style={labelWrapperStyle}>
         <div className={`flex gap-0.5 bg-black/80 text-slate-100 ${labelPadClass} ${labelTextClass}`}>
           <span>
             Rover:{' '}
             <span
               className="rounded px-1 py-[1px] border border-transparent"
-              style={roverNameChromeStyle(roverColor, 0.18)}
+              style={roverNameChromeStyle(resolvedRoverColor, 0.18)}
             >
-              "{label || 'Unnamed Rover'}"
+              "{resolvedLabel || 'Unnamed Rover'}"
             </span>
           </span>
         </div>
       </div>
 
-      {showTopDown && variant !== 'spectator' ? (
+      {resolvedShowTopDown && variant !== 'spectator' ? (
         <div className="pointer-events-none absolute rounded" style={{ ...mapStyle }}>
-          <TopDownMap sensors={sensors} size={240} overlay />
+          <TopDownMap sensors={resolvedSensors} size={240} overlay />
         </div>
       ) : null}
     </div>

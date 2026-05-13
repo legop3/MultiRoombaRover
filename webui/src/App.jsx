@@ -16,7 +16,7 @@ import {
 } from './controls/index.js';
 import RoomCameraPanel from './components/RoomCameraPanel/index.jsx';
 import LogPanel from './components/LogPanel/index.jsx';
-import DriverVideoPanel from './components/DriverVideoPanel/index.jsx';
+import DriverVideo from './components/DriverVideo/index.jsx';
 import RightPaneTabs from './components/RightPaneTabs/index.jsx';
 import ModeGateOverlay from './components/ModeGateOverlay/index.jsx';
 import HomeAssistantControls from './components/HomeAssistantControls/index.jsx';
@@ -75,7 +75,7 @@ function DesktopLayout({ layout, onOpenHelpOverlay }) {
   return (
     <div className="flex h-full gap-0.5 overflow-hidden">
       <div className="flex min-w-0 flex-[1.22] flex-col gap-0.5 overflow-y-auto pr-0">
-        <DriverVideoPanel />
+        <DriverVideo />
         <TelemetryPanel />
         <LogPanel />
       </div>
@@ -174,7 +174,7 @@ function MobileFeatureTabs({
 function MobilePortraitLayout({ onOpenHelpOverlay, swapMobileControlColumns = false }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <DriverVideoPanel layoutFormat="mobile-portrait" />
+      <DriverVideo layoutFormat="mobile-portrait" />
       <MobileControls swapColumns={swapMobileControlColumns} />
       <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <ReplaySourcesPanel panelId="replay-sources-mobile-portrait" />
@@ -203,7 +203,7 @@ function MobileLandscapeLayout({ onOpenHelpOverlay, swapMobileControlColumns = f
       <section className="grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-0.5">
         {firstColumn}
         <div>
-          <DriverVideoPanel layoutFormat="mobile-landscape" />
+          <DriverVideo layoutFormat="mobile-landscape" />
           <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
             <ReplaySourcesPanel panelId="replay-sources-mobile-landscape" />
             <RoverQueuesPanel />
