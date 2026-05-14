@@ -5,8 +5,9 @@
 5.  change replay title for ones requested from discord, something other than "requester driving rover"
 6.  fix rover request spam queue cheat
 7.  rover descriptions. show in the HUD at the bottom or top for a few seconds, then fade away.
-8.  reorganize internal structure of video, HUD stuff...
+8.  reorganize internal structure of video, HUD stuff... [x]
 9.  button box reward: ping @everyone, 7567 presses
+10. enable scrolling on horn frequencies, turn down frequency limit to like 3500
 
 
 # relative pipe dreams:
