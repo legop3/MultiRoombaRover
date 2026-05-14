@@ -1,6 +1,7 @@
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import RoverMediaPlayer from '../RoverMediaPlayer/index.jsx';
 import { useControlSystem } from '../../controls/index.js';
+import { useDriverVideoModePolicy } from '../../hooks/useDriverVideoModePolicy.js';
 import TurnsOverlay from '../HudOverlays/TurnsOverlay/index.jsx';
 import HudOverlay from '../HudOverlays/HudOverlay/index.jsx';
 import RoverDescriptionOverlay from '../HudOverlays/RoverDescriptionOverlay/index.jsx';
@@ -11,6 +12,7 @@ import HudChatInput from '../HudOverlays/HudChatInput/index.jsx';
 
 export default function DriverVideo({ layoutFormat = 'desktop' }) {
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const videoMode = useDriverVideoModePolicy(roverId);
   const {
     state: { lastControlIntentAt },
   } = useControlSystem();
@@ -35,7 +37,7 @@ export default function DriverVideo({ layoutFormat = 'desktop' }) {
     <section className="panel">
       <div className="flex flex-col gap-0.5">
         <div className="relative w-full overflow-hidden bg-black aspect-[4/3]">
-          <RoverMediaPlayer />
+          <RoverMediaPlayer roverId={roverId} videoMode={videoMode} />
           <TurnsOverlay mobileHud={mobileHud} />
           <RoverDescriptionOverlay
             variant="default"
