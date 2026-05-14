@@ -5,14 +5,16 @@ import React from 'react';
 import { useMemo } from 'react';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import { useTelemetryFrame } from '../../../context/TelemetryContext.jsx';
+import { useOvercurrentLimiter } from '../../../controls/index.js';
 import { OVERCURRENT_LABELS } from './constants.js';
 
 function OvercurrentOverlay({ roverId = null, sensors, overcurrentLimiter = null, compact = false }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const effectiveRoverId = roverId ?? assignedRoverId;
   const frame = useTelemetryFrame(effectiveRoverId);
+  const internalLimiter = useOvercurrentLimiter(effectiveRoverId);
   const resolvedSensors = sensors ?? frame?.sensors ?? null;
-  const resolvedOvercurrentLimiter = overcurrentLimiter ?? null;
+  const resolvedOvercurrentLimiter = overcurrentLimiter ?? internalLimiter ?? null;
   const wheelOvercurrents = resolvedSensors?.wheelOvercurrents || null;
   const overcurrentMotors = useMemo(
     () =>

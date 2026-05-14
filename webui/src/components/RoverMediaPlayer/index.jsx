@@ -534,6 +534,10 @@ export default function RoverMediaPlayer({
     : audioDetail
     ? `${audioStatus} (${audioDetail})`
     : audioStatus;
+  const showConnectingOverlay =
+    !usingSnapshot &&
+    !resolvedSessionInfo?.error &&
+    ['idle', 'new', 'connecting'].includes(status);
 
   return (
     <>
@@ -560,6 +564,13 @@ export default function RoverMediaPlayer({
           className="h-full w-full object-contain"
         />
       )}
+      {showConnectingOverlay ? (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/45">
+          <div className="rounded border border-slate-500/70 bg-black/70 px-3 py-1 text-sm font-semibold text-slate-100">
+            Connecting to video....
+          </div>
+        </div>
+      ) : null}
       <audio ref={audioRef} autoPlay hidden />
       <div className="pointer-events-none absolute left-1 top-1 z-20 font-medium text-slate-100 text-[0.65rem]">
         <div className="flex flex-col gap-0.5 leading-none">
