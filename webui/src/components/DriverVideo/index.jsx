@@ -1,4 +1,5 @@
 import RoverMediaPlayer from '../RoverMediaPlayer/index.jsx';
+import { useControlSystem } from '../../controls/index.js';
 import TurnsOverlay from '../HudOverlays/TurnsOverlay/index.jsx';
 import HudOverlay from '../HudOverlays/HudOverlay/index.jsx';
 import RoverDescriptionOverlay from '../HudOverlays/RoverDescriptionOverlay/index.jsx';
@@ -8,6 +9,9 @@ import DriverBottomStrip from '../HudOverlays/DriverBottomStrip/index.jsx';
 import HudChatInput from '../HudOverlays/HudChatInput/index.jsx';
 
 export default function DriverVideo({ layoutFormat = 'desktop' }) {
+  const {
+    state: { lastControlIntentAt },
+  } = useControlSystem();
   const mobileHud = layoutFormat !== 'desktop';
   return (
     <section className="panel">
@@ -18,6 +22,7 @@ export default function DriverVideo({ layoutFormat = 'desktop' }) {
           <RoverDescriptionOverlay
             variant="default"
             mobileHud={mobileHud}
+            controlIntentAt={lastControlIntentAt}
           />
           <HudOverlay
             layoutFormat={layoutFormat}
