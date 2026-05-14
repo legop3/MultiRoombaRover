@@ -8,6 +8,13 @@
 8.  reorganize internal structure of video, HUD stuff... [x]
 9.  button box reward: ping @everyone, 7567 presses
 10. enable scrolling on horn frequencies, turn down frequency limit to like 3500
+11. make replays more instant, probably make segments shorter
+    1.  fix replay UI so it doesnt save anything in cookie
+12. rework drive / dock panel somehow to explain how to dock manually instead of relying on auto docking
+    1.  maybe have a flag in the rover to choose between auto or manual directions
+    2.  probably have a short inline video that plays and shows the process
+    3.  manual docking mode
+        1.  have camera move down automatically and limit speed during manual docking mode
 
 
 # relative pipe dreams:
