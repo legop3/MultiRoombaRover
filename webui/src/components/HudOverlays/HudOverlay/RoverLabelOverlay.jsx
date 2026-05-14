@@ -24,7 +24,7 @@ export default function RoverLabelOverlay({
             className="font-semibold text-white rounded px-1 py-[1px] border border-transparent"
             style={roverNameChromeStyle(roverColor, 0.18)}
           >
-            {label || 'Unnamed Rover'}
+            {label || 'No rover'}
           </span>
           {driverLabel ? <span className="text-slate-300">• {driverLabel}</span> : null}
         </div>
@@ -41,7 +41,7 @@ export default function RoverLabelOverlay({
             className="rounded px-1 py-[1px] border border-transparent"
             style={roverNameChromeStyle(roverColor, 0.18)}
           >
-            "{label || 'Unnamed Rover'}"
+            "{label || 'No rover'}"
           </span>
         </span>
       </div>
