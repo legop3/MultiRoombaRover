@@ -10,7 +10,7 @@ const { broadcastMessage, broadcastTyping } = require('./broadcast');
 const { playTypingNote, normalizeTtsOptions, maybeSendAccessNotice, maybeSpeak, TYPING_SEND_NOTE } = require('./notifications');
 
 function createHandlers({ sendSystemMessage }) {
-  function handleIncoming({ text, tts } = {}, socket, cb = () => {}) {
+  function handleIncoming({ text, tts, bot = false, profileImage = null } = {}, socket, cb = () => {}) {
     const role = getRole(socket);
     void role;
     const normalized = normalizeUserText(text);
@@ -27,6 +27,8 @@ function createHandlers({ sendSystemMessage }) {
       roverId,
       roverCtx: buildRoverCtxSnapshot(roverId),
       tts: ttsOptions,
+      bot,
+      profileImage,
     });
 
     logger.info('Chat message', { socket: socket.id, roverId: message.roverId });
