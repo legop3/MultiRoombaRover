@@ -27,7 +27,6 @@ export default function RoverDescriptionOverlay({
     displayKey || `${effectiveRoverId || ''}::${resolvedDescription || ''}`;
   const [largeVisible, setLargeVisible] = useState(false);
   const [largeFading, setLargeFading] = useState(false);
-  const baselineIntentRef = useRef(0);
   const fadeTimerRef = useRef(null);
   const hideTimerRef = useRef(null);
 
@@ -51,14 +50,13 @@ export default function RoverDescriptionOverlay({
     clearTimeout(hideTimerRef.current);
     setLargeVisible(true);
     setLargeFading(false);
-    baselineIntentRef.current = Number(resolvedControlIntentAt) || 0;
     return undefined;
-  }, [resolvedDescription, resolvedDisplayKey, resolvedControlIntentAt, variant]);
+  }, [resolvedDescription, resolvedDisplayKey, variant]);
 
   useEffect(() => {
     if (variant !== 'default' || !resolvedDescription || !largeVisible || largeFading) return;
     const nextIntent = Number(resolvedControlIntentAt) || 0;
-    if (nextIntent <= baselineIntentRef.current) return;
+    if (nextIntent <= 0) return;
     if (fadeTimerRef.current || hideTimerRef.current) return;
     fadeTimerRef.current = setTimeout(() => {
       setLargeFading(true);
