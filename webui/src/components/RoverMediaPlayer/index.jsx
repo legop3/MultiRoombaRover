@@ -27,14 +27,13 @@ export default function RoverMediaPlayer({
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const effectiveRoverId = roverId ?? assignedRoverId;
   const mode = useSessionSelector((state) => state.session?.mode || null);
-  const isLocalNetwork = useSessionSelector((state) => Boolean(state.session?.isLocalNetwork));
   const rosterEntry = useSessionSelector((state) =>
     effectiveRoverId && Array.isArray(state.session?.roster)
       ? state.session.roster.find((item) => String(item.id) === String(effectiveRoverId)) || null
       : null,
   );
   const hasAudio = Boolean(rosterEntry?.media?.audioPublishUrl);
-  const autoVideoEnabled = videoMode ? videoMode === 'whep' : isLocalNetwork;
+  const autoVideoEnabled = videoMode ? videoMode === 'whep' : true;
   const autoEntries = useMemo(() => {
     if (!effectiveRoverId || !autoVideoEnabled) return [];
     return [
