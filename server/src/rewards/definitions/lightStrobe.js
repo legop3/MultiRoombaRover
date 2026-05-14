@@ -1,7 +1,7 @@
 // Reward Definition: Light Strobe
 // Purpose: Defines the light-strobe deterrence reward and activation contract. Scope: Encapsulates reward identity, labels, and effect parameters for runtime dispatch.
 const STROBE_MS = 30 * 1000;
-const TICK_MS = 70;
+const TICK_MS = 200;
 
 let activeTimer = null;
 
