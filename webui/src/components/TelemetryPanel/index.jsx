@@ -48,7 +48,7 @@ export default function TelemetryPanel() {
         <span> · driver {driverLabel}</span>
       </div> */}
       {!roverId ? (
-        <p className="text-sm text-slate-500">Assign a rover to view sensors.</p>
+        <p className="text-sm text-slate-500">You are not assigned to a rover!!!!!!</p>
       ) : !frame ? (
         <p className="text-sm text-slate-500">Waiting for sensor frames…</p>
       ) : (
