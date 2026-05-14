@@ -8,7 +8,7 @@ import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
-import VideoTile from '../../components/VideoTile/index.jsx';
+import RoverMediaPlayer from '../../components/RoverMediaPlayer/index.jsx';
 import FitViewportFrame from './components/FitViewportFrame.jsx';
 import InfoColumn from './components/InfoColumn.jsx';
 import { ROTATE_MS } from './constants.js';
@@ -163,37 +163,27 @@ export default function MiniSummaryContent() {
                       key={rover.id}
                       className={`absolute inset-0 ${isActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                     >
-                      <VideoTile
+                      <RoverMediaPlayer
                         sessionInfo={videoSources[rover.id] || null}
                         videoMode="whep"
                         snapshotFeed={null}
                         audioSessionInfo={isActive ? activeAudio : null}
                         forceMute={!isActive}
                         label={rover.name || rover.id}
-                        roverColor={rover.color || null}
-                        telemetryFrame={frames[rover.id] || null}
-                        batteryConfig={rover.battery}
-                        layoutFormat="mobile"
-                        hudVariant="none"
-                        fitParent
+                        sensors={frames[rover.id]?.sensors || null}
                       />
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <VideoTile
+              <RoverMediaPlayer
                 sessionInfo={null}
                 videoMode="snapshot"
                 snapshotFeed={activeSnapshot}
                 audioSessionInfo={activeAudio}
                 label={activeRover.name || activeRover.id}
-                roverColor={activeRover.color || null}
-                telemetryFrame={activeFrame}
-                batteryConfig={activeRover.battery}
-                layoutFormat="mobile"
-                hudVariant="none"
-                fitParent
+                sensors={activeFrame?.sensors || null}
               />
             )}
           </FitViewportFrame>

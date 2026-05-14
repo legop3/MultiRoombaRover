@@ -2,9 +2,6 @@
 // Purpose: Defines the Spectator Content module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useSession } from '../../context/SessionContext.jsx';
-import { useTelemetryFrames } from '../../context/TelemetryContext.jsx';
-import { useVideoRequests } from '../../hooks/useVideoRequests.js';
-import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import ChatPanel from '../../components/ChatPanel/index.jsx';
@@ -22,29 +19,10 @@ import LogsRow from './components/LogsRow.jsx';
 export default function SpectatorContent() {
   const { session } = useSession();
   const inLockdown = session?.mode === 'lockdown';
-  const canSpectateVideo = Boolean(session?.isLocalNetwork);
   useDefaultNickname();
   useSpectatorMode();
   const isPortraitLayout = usePortraitLayout();
-  const frames = useTelemetryFrames();
   const roster = session?.roster ?? [];
-  const snapshotFeeds = useRoverSnapshots(
-    roster.map((rover) => rover.id),
-    { enabled: !inLockdown && !canSpectateVideo, version: session?.mode },
-  );
-  const videoEntries = canSpectateVideo
-    ? roster.map((rover) => ({ type: 'rover', id: rover.id, key: rover.id }))
-    : [];
-  const videoSources = useVideoRequests(videoEntries, {
-    enabled: !inLockdown && canSpectateVideo,
-    version: session?.mode,
-  });
-  const audioEntries = roster.flatMap((rover) =>
-    rover.media?.audioPublishUrl
-      ? [{ type: 'rover', id: `${rover.id}-audio`, key: `${rover.id}-audio` }]
-      : [],
-  );
-  const audioSources = useVideoRequests(audioEntries, { enabled: !inLockdown, version: session?.mode });
 
   if (inLockdown) {
     return (
@@ -105,15 +83,7 @@ export default function SpectatorContent() {
           </div>
         </section>
         <section className={contentClass}>
-          <RoverRow
-            roster={roster}
-            frames={frames}
-            videoSources={videoSources}
-            snapshotFeeds={snapshotFeeds}
-            audioSources={audioSources}
-            session={session}
-            canSpectateVideo={canSpectateVideo}
-          />
+          <RoverRow roster={roster} />
           <SecondaryRow />
         </section>
       </main>

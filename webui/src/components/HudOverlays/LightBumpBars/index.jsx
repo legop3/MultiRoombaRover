@@ -2,15 +2,21 @@
 // Purpose: Defines the Light Bump Bars module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React from 'react';
+import { useSessionSelector } from '../../../context/SessionContext.jsx';
+import { useTelemetryFrame } from '../../../context/TelemetryContext.jsx';
 
-function LightBumpBars({ sensors }) {
+function LightBumpBars({ roverId = null, sensors }) {
+  const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const effectiveRoverId = roverId ?? assignedRoverId;
+  const frame = useTelemetryFrame(effectiveRoverId);
+  const resolvedSensors = sensors ?? frame?.sensors ?? null;
   const values = [
-    sensors?.lightBumpLeftSignal,
-    sensors?.lightBumpFrontLeftSignal,
-    sensors?.lightBumpCenterLeftSignal,
-    sensors?.lightBumpCenterRightSignal,
-    sensors?.lightBumpFrontRightSignal,
-    sensors?.lightBumpRightSignal,
+    resolvedSensors?.lightBumpLeftSignal,
+    resolvedSensors?.lightBumpFrontLeftSignal,
+    resolvedSensors?.lightBumpCenterLeftSignal,
+    resolvedSensors?.lightBumpCenterRightSignal,
+    resolvedSensors?.lightBumpFrontRightSignal,
+    resolvedSensors?.lightBumpRightSignal,
   ];
   const max = values.filter((v) => v != null).reduce((acc, v) => Math.max(acc, v), 1200);
   const eased = (v) => Math.pow(Math.max(0, Math.min(1, (v ?? 0) / max)), 0.35);
