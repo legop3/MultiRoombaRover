@@ -223,7 +223,7 @@ function createRunner(deps) {
       updatePhase('decision_post', { lastGeneratedText: text });
       const recentBotMessages = getRecentMessages(120, { includeSystem: true })
         .filter((entry) => Number(entry?.ts) >= runtime.contextResetAt)
-        .filter((entry) => entry?.system)
+        .filter((entry) => entry?.bot)
         .slice(-Math.max(3, maxBotMessages));
       const duplicateKey = normalizeDuplicateKey(text);
       const duplicate = recentBotMessages.some(

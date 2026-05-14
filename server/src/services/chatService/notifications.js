@@ -49,7 +49,7 @@ function buildAccessNoticeText(mode, reasonText) {
 }
 
 function shouldSendAccessNotice(message) {
-  if (!message?.text || message.system) return false;
+  if (!message?.text || message.bot) return false;
   const mode = getMode();
   if (mode !== MODES.ADMIN && mode !== MODES.LOCKDOWN) return false;
   if (!ACCESS_KEYWORD_RE.test(message.text)) return false;

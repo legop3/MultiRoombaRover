@@ -49,7 +49,7 @@ function buildConversation({ recentMessages, name }) {
   (recentMessages || []).forEach((entry) => {
     const text = String(entry?.text || '').trim();
     if (!text) return;
-    const isAssistant = Boolean(entry?.bot || entry?.system);
+    const isAssistant = Boolean(entry?.bot);
     const nickname = String(entry?.nickname || (isAssistant ? name || 'Overseer' : 'user')).trim();
     if (isAssistant) {
       messages.push({ role: 'assistant', content: text });

@@ -50,7 +50,7 @@ function createChatBridgeHandlers(deps) {
 
     const text = payload.text?.length > 1900 ? `${payload.text.slice(0, 1897)}...` : payload.text;
     const username = formatWebhookUsername(payload);
-    const avatarURL = payload.fromDiscord ? payload.discordUserAvatarUrl || null : client.user?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null;
+    const avatarURL = payload.profileImage || (payload.fromDiscord ? payload.discordUserAvatarUrl || null : client.user?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null);
     const typingId = getTypingId(payload);
 
     guildConfigs.forEach((entry) => {

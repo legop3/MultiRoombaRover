@@ -39,6 +39,7 @@ const ollamaUrl = String(overseerConfig.ollamaUrl || overseerConfig.ollamaServer
 const gateIntervalMs = normalizeMs(Number(overseerConfig.gateIntervalMs), DEFAULT_GATE_INTERVAL_MS);
 const heartbeatMs = normalizeMs(Number(overseerConfig.heartbeatMs), DEFAULT_HEARTBEAT_MS);
 const alwaysRunModel = Boolean(overseerConfig.alwaysRunModel);
+const profileImageUrl = String(overseerConfig.profileImageUrl || '').trim() || null;
 const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 
 const runtime = {
@@ -280,7 +281,7 @@ async function runDecision(triggerReason) {
 
   if (!observeOnly) {
     if ((decision === 'CHAT' || decision === 'ACTION+CHAT') && chatDraft) {
-      sendSystemMessage(chatDraft, { nickname: name });
+      sendSystemMessage(chatDraft, { nickname: name, bot: true, profileImage: profileImageUrl });
       actionResults.push({ kind: 'chat', ok: true });
     }
 

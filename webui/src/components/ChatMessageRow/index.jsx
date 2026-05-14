@@ -17,8 +17,8 @@ function roleColors(role) {
   }
 }
 
-function isBotSystemMessage(message) {
-  return Boolean(message?.system);
+function isBotMessage(message) {
+  return Boolean(message?.bot);
 }
 
 function formatTime(ts) {
@@ -65,23 +65,38 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
   );
 }
 
+function ProfileAvatar({ imageUrl, label }) {
+  if (!imageUrl) return null;
+  return (
+    <span className="flex h-4 w-4 overflow-hidden rounded-full border border-slate-700/80" title={label}>
+      <span
+        className="h-full w-full bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${imageUrl})` }}
+      />
+    </span>
+  );
+}
+
 export function ChatIdentity({ message }) {
   const discordLabel = message.fromDiscord
     ? `${message.discordGuildName || 'Discord'} · ${displayName(message)}`
     : null;
-  const isBot = isBotSystemMessage(message);
+  const isBot = isBotMessage(message);
   const nameClass = isBot ? 'text-emerald-300' : roleColors(message.role);
   return (
     <>
       {message.fromDiscord ? (
         <>
           <FaDiscord className="h-3.5 w-3.5 text-indigo-200" />
-          <DiscordAvatar
-            guildIconUrl={message.discordGuildIconUrl}
-            userAvatarUrl={message.discordUserAvatarUrl}
-            label={discordLabel}
-          />
         </>
+      ) : null}
+      <ProfileAvatar imageUrl={message.profileImage} label={discordLabel || displayName(message)} />
+      {!message.profileImage ? (
+        <DiscordAvatar
+          guildIconUrl={message.discordGuildIconUrl}
+          userAvatarUrl={message.discordUserAvatarUrl}
+          label={discordLabel}
+        />
       ) : null}
       <span className={`font-semibold text-[0.85rem] ${nameClass}`}>
         {displayName(message)}
@@ -104,7 +119,7 @@ export function ChatIdentity({ message }) {
 }
 
 function chatRowClass(message) {
-  if (isBotSystemMessage(message)) {
+  if (isBotMessage(message)) {
     return 'surface-muted relative flex flex-wrap items-start gap-0.5 border border-emerald-500/40 bg-emerald-900/15 text-sm';
   }
   const isAdmin =
@@ -119,7 +134,7 @@ function chatRowClass(message) {
 }
 
 export default function ChatMessageRow({ message }) {
-  const isBot = isBotSystemMessage(message);
+  const isBot = isBotMessage(message);
   return (
     <div className={chatRowClass(message)}>
       <ChatIdentity message={message} />

@@ -28,7 +28,7 @@ function pushHistory(message) {
 function getRecentMessages(limit = 20, options = {}) {
   const safeLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 20;
   const includeSystem = options?.includeSystem !== false;
-  const source = includeSystem ? history : history.filter((entry) => !entry?.system);
+  const source = includeSystem ? history : history.filter((entry) => !entry?.bot);
   return source.slice(-safeLimit);
 }
 

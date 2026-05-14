@@ -16,7 +16,7 @@ module.exports = {
   async execute({ args = {}, sendSystemMessage, name }) {
     const text = String(args?.text || '').trim();
     if (!text) throw new Error('chat_say requires args.text');
-    sendSystemMessage(text, { nickname: name });
+    sendSystemMessage(text, { nickname: name, bot: true });
     return { ok: true };
   },
 };

@@ -371,7 +371,7 @@ function createSnapshotEngine(deps) {
         return roverManager.canReplayRoverId(roverId);
       });
     const chatRecent = allRecentMessages
-      .filter((entry) => !entry?.system)
+      .filter((entry) => !entry?.bot)
       .slice(-MAX_CHAT_MESSAGES)
       .map((entry) => ({
         nickname: entry.nickname || entry.socketId?.slice(0, 6) || 'unknown',
@@ -380,7 +380,7 @@ function createSnapshotEngine(deps) {
 
     const botRecentWindow = allRecentMessages
       .filter((entry) => Number(entry?.ts) >= contextResetAt)
-      .filter((entry) => entry?.system);
+      .filter((entry) => entry?.bot);
     const lastBotMessage = botRecentWindow.length ? botRecentWindow[botRecentWindow.length - 1] : null;
     const botRecent30m = botRecentWindow.filter(
       (entry) => nowMs - Number(entry?.ts || 0) <= SELF_TALK_WINDOW_MS,
@@ -408,7 +408,7 @@ function createSnapshotEngine(deps) {
           summary: entry.summary || '',
         };
       }
-      if (entry?.system) {
+      if (entry?.bot) {
         return {
           type: 'bot',
           nickname: entry.nickname || 'Rover Bot',

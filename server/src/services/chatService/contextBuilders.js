@@ -26,6 +26,19 @@ function isPrivateClosedRoverId(roverId) {
   return roverManager.canReplayRoverId(roverId) !== true;
 }
 
+function normalizeProfileImageUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    const protocol = String(parsed.protocol || '').toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 function isChargingFromSensors(sensors = {}) {
   const label = String(sensors?.chargingState?.label || '').toLowerCase();
   if (label === 'waiting' || label === 'full charging' || label === 'trickle charging') return true;
@@ -103,10 +116,10 @@ function buildMessage(socket, text, meta = {}) {
     discordUserId: meta.discordUserId || null,
     discordUserName: meta.discordUserName || null,
     discordUserAvatarUrl: meta.discordUserAvatarUrl || null,
+    profileImage: normalizeProfileImageUrl(meta.profileImage),
     roverCtx: meta.roverCtx || null,
     text,
     tts: meta.tts || null,
-    system: Boolean(meta.system),
     bot: Boolean(meta.bot),
   };
 }

@@ -1,0 +1,12 @@
+# main idea
+- add a way for a spectator bot to show up as a bot with the bot tag in a message
+  - just like chat: {bot: true} basically
+  - having this would make it show as a bot in the web UI and discord
+- add a system for custom profile images that can be defined per chat message
+  - image shows as circle in chat row, like discord icons, or as the webhook icon
+  - only accept image URLs
+  - chat: {profileImage: "https://image.com/image.png"}
+- add setting in server config for the overseer's image URL
+  - only do this with overseer control service, not the old llm commentary service
+- make bot: true messages show up as "name [BOT]" or something in discord instead of like now "name - No rover"
+- make spectators show as "name [SPECTATOR]" in discord,  again instead of the current

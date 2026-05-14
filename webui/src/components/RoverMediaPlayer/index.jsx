@@ -379,16 +379,8 @@ export default function RoverMediaPlayer({
     const handleStatus = (nextStatus, info) => {
       if (!active) return;
       logAudio('audio/status', { nextStatus, info: info || null });
-      setAudioDetail(info || (nextStatus === 'connected' ? 'connected' : null));
-      setAudioStatus((prev) => {
-        if (nextStatus === 'connected' && (prev === 'playing' || prev === 'connecting')) {
-          return prev;
-        }
-        if (nextStatus === 'new') {
-          return prev;
-        }
-        return nextStatus;
-      });
+      setAudioStatus(nextStatus);
+      setAudioDetail(info || null);
       if (['error', 'failed'].includes(nextStatus)) {
         scheduleAudioRestart();
       }

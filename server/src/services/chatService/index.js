@@ -17,8 +17,8 @@ function sendSystemMessage(text, options = {}) {
     nickname: String(options.nickname || 'The Overseer'),
     role: 'user',
     fromDiscord: false,
-    system: true,
-    bot: true,
+    bot: options.bot !== false,
+    profileImage: options.profileImage || null,
   });
   broadcastMessage(message);
   return message;

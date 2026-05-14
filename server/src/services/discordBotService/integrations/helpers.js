@@ -17,15 +17,15 @@ function formatDuration(ms) {
 
 function formatWebhookUsername(payload) {
   const name = payload.nickname || payload.socketId?.slice(0, 6) || 'unknown';
+  const botTag = payload.bot ? ' [BOT]' : '';
+  const spectatorTag = payload.role === 'spectator' ? ' [SPECTATOR]' : '';
+  const adminTag = payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin' ? ' [Rover Admin]' : '';
   if (payload.fromDiscord) {
     const origin = payload.discordGuildName ? ` (From: ${payload.discordGuildName})` : '';
-    const adminTag = payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin' ? ' [Rover Admin]' : '';
-    return `${name}${origin}${adminTag}`;
+    return `${name}${origin}${botTag}${spectatorTag}${adminTag}`;
   }
-  const roverText = payload.roverId ? `Rover: ${payload.roverId}` : `No rover`;
-  const roleText = payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin' ? 'Admin' : null;
-  const suffix = [roverText, roleText].filter(Boolean).join(' · ');
-  return suffix ? `${name} · ${suffix}` : name;
+  const roverTag = payload.roverId ? ` [${payload.roverId}]` : '';
+  return `${name}${botTag}${spectatorTag}${adminTag}${roverTag}`;
 }
 
 function getTypingId(payload = {}) {

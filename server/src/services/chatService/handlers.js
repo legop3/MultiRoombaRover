@@ -45,7 +45,7 @@ function createHandlers({ sendSystemMessage }) {
     cb({ success: true });
   }
 
-  function sendExternalMessage({ text, nickname = 'Discord', role = 'admin', roverId = null, discordGuildId = null, discordGuildName = null, discordGuildIconUrl = null, discordChannelId = null, discordUserId = null, discordUserName = null, discordUserAvatarUrl = null }) {
+  function sendExternalMessage({ text, nickname = 'Discord', role = 'admin', roverId = null, discordGuildId = null, discordGuildName = null, discordGuildIconUrl = null, discordChannelId = null, discordUserId = null, discordUserName = null, discordUserAvatarUrl = null, bot = false, profileImage = null }) {
     const normalized = normalizeUserText(text);
     const clean = normalized.trim();
     if (!clean || clean.length > 400) throw new Error('Message invalid');
@@ -66,6 +66,8 @@ function createHandlers({ sendSystemMessage }) {
       discordUserId,
       discordUserName,
       discordUserAvatarUrl,
+      bot,
+      profileImage,
     });
 
     logger.info('External chat message', { roverId, nickname });

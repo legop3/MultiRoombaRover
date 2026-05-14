@@ -62,7 +62,7 @@ export function buildLlmConversationRowsFromMessages(modelMessages, rawOutput) {
         nickname,
         text: content,
         role: 'spectator',
-        system: role === 'system',
+        bot: role === 'system',
       },
     };
   });
@@ -75,7 +75,7 @@ export function buildLlmConversationRowsFromMessages(modelMessages, rawOutput) {
         nickname: 'LLM Output',
         text: raw.trim() ? raw : '<empty>',
         role: 'spectator',
-        system: true,
+        bot: true,
       },
     });
   }

@@ -20,6 +20,7 @@ overseerControl:
   name: "The Overseer"
   model: "qwen2.5:7b-instruct"
   ollamaServer: "http://127.0.0.1:11434"
+  profileImageUrl: "https://example.com/overseer.png"
   gateIntervalMs: 2000
   heartbeatMs: 30000
 media:
