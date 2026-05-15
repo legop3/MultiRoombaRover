@@ -88,6 +88,9 @@ export function ChatIdentity({ message }) {
       {message.fromDiscord ? (
         <FaDiscord className="h-4 w-4 shrink-0 text-indigo-200" />
       ) : null}
+      <span className={`font-semibold text-[0.85rem] ${nameClass}`}>
+        {displayName(message)}
+      </span>
       <ProfileAvatar imageUrl={message.profileImage} label={discordLabel || displayName(message)} />
       {!message.profileImage ? (
         <DiscordAvatar
@@ -96,9 +99,6 @@ export function ChatIdentity({ message }) {
           label={discordLabel}
         />
       ) : null}
-      <span className={`font-semibold text-[0.85rem] ${nameClass}`}>
-        {displayName(message)}
-      </span>
       {isBot ? (
         <span className="shrink-0 rounded bg-emerald-900/60 px-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white">
           bot
