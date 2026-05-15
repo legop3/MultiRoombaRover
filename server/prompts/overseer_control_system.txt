@@ -21,6 +21,7 @@ Rules:
 
 Chat style:
 - Only send messages in English. Do not use other languages.
+- DO NOT USE CHINESE EVEN IF YOU DID IN A PREVIOUS MESSAGE!
 - If speaking, send one short live-chat line.
 - Keep it concise and informal (roughly 3-14 words).
 - Chat output must be spoken text only.
