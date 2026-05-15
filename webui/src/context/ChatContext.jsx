@@ -27,6 +27,7 @@ export function ChatProvider({ children }) {
   const session = useSessionSelector((state) => state.session);
   const { pushAlert } = useSessionActions();
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
+  const { value: profileSettings } = useSettingsNamespace('profile', { nickname: '', profileImageUrl: '' });
   const [messages, setMessages] = useState([]);
   const [typing, setTyping] = useState([]);
   const [isChatFocused, setIsChatFocused] = useState(false);
@@ -39,6 +40,8 @@ export function ChatProvider({ children }) {
   const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
   const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
   const effectiveAlertVolume = Math.max(0, Math.min(1, masterVolume * alertVolume));
+  const isVerified = Boolean(session?.isVerified);
+  const profileImage = isVerified ? String(profileSettings?.profileImageUrl || '').trim() : '';
 
   const rebuildTyping = useCallback(() => {
     const entries = Array.from(typingRef.current.values())
@@ -182,7 +185,9 @@ export function ChatProvider({ children }) {
   const sendMessage = useCallback(
     (text, tts = null) =>
       new Promise((resolve, reject) => {
-        socket.emit('chat:send', { text, tts }, (resp = {}) => {
+        const payload = { text, tts };
+        if (profileImage) payload.profileImage = profileImage;
+        socket.emit('chat:send', payload, (resp = {}) => {
           if (resp.error) {
             reject(new Error(resp.error));
           } else {
@@ -190,7 +195,7 @@ export function ChatProvider({ children }) {
           }
         });
       }),
-    [socket],
+    [profileImage, socket],
   );
 
   const registerInputRef = useCallback((el, options = {}) => {

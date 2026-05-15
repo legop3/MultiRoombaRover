@@ -11,6 +11,7 @@ import VipIdentityCard from '../vip/VipIdentityCard.jsx';
 import VipPrivateRoverAccessCard from '../vip/VipPrivateRoverAccessCard.jsx';
 import VipNeatoCard from '../vip/VipNeatoCard.jsx';
 import VipLiftCard from '../vip/VipLiftCard.jsx';
+import VipProfileImageCard from '../vip/VipProfileImageCard.jsx';
 
 export default function VipPanel({ isActive = true }) {
   const session = useSessionSelector((state) => state.session);
@@ -127,6 +128,14 @@ export default function VipPanel({ isActive = true }) {
           <VipIdentityCard
             currentStoredKey={currentStoredKey}
             applyIdentityKey={applyIdentityKey}
+            onMessage={setMessage}
+            fullWidth
+          />
+        </div>
+
+        <div className="lg:col-span-2">
+          <VipProfileImageCard
+            isVerified={isVerified}
             onMessage={setMessage}
             fullWidth
           />
