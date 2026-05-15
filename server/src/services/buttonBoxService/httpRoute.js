@@ -8,7 +8,6 @@ function registerButtonBoxRoute(deps) {
     app,
     logger,
     buttonCount,
-    getRequestIp,
     normalizeIp,
     isLocalNetwork,
     applyPress,
@@ -21,8 +20,16 @@ function registerButtonBoxRoute(deps) {
     return null;
   }
 
+  function getSocketIp(req) {
+    return (
+      req?.socket?.remoteAddress ||
+      req?.connection?.remoteAddress ||
+      null
+    );
+  }
+
   function denyIfNotLocal(req, res) {
-    const ip = normalizeIp(getRequestIp(req));
+    const ip = normalizeIp(getSocketIp(req));
     if (isLocalNetwork(ip)) {
       return false;
     }

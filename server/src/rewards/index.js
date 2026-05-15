@@ -6,6 +6,7 @@ const lightStrobe = require('./definitions/lightStrobe');
 const ghostTypingSpam = require('./definitions/ghostTypingSpam');
 const darkness = require('./definitions/darkness');
 const discordStalkerPing = require('./definitions/discordStalkerPing');
+const discordPingEveryone = require('./definitions/discordPingEveryone');
 const modeJam = require('./definitions/modeJam');
 const assignmentRoulette = require('./definitions/assignmentRoulette');
 const chatSpam = require('./definitions/chatSpam');
@@ -17,6 +18,7 @@ const orderedRewards = [
   ghostTypingSpam,
   darkness,
   discordStalkerPing,
+  discordPingEveryone,
   modeJam,
   assignmentRoulette,
   chatSpam,

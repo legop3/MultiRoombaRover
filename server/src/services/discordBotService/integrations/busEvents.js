@@ -250,6 +250,19 @@ function createBusEventHandler(deps) {
         });
         break;
       }
+      case 'buttonBox.discordPingEveryone': {
+        const message = payload?.message ? String(payload.message) : 'Button box chaos reward triggered.';
+        sendToChannel(
+          channels.general,
+          `@everyone ${message}`.trim(),
+          {
+            embeds: [buildEmbed({ title: 'Button Box', description: message, color: 0xff3b30, includeSiteUrl: false })],
+          },
+          { parse: ['everyone'] },
+          false,
+        );
+        break;
+      }
       default:
         break;
     }

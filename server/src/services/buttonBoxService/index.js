@@ -19,7 +19,7 @@ const {
   setEntityState: setHomeAssistantEntityState,
   setLightsLockedOn: setHomeAssistantLightsLockedOn,
 } = require('../homeAssistantService');
-const { getRequestIp, isLocalNetwork, normalizeIp } = require('../../helpers/ipResolver');
+const { isLocalNetwork, normalizeIp } = require('../../helpers/ipResolver');
 const { createButtonBoxStore } = require('./store');
 const { createButtonBoxCore } = require('./core');
 const { registerButtonBoxRoute } = require('./httpRoute');
@@ -66,7 +66,6 @@ registerButtonBoxRoute({
   app,
   logger,
   buttonCount: BUTTON_COUNT,
-  getRequestIp,
   normalizeIp,
   isLocalNetwork,
   applyPress: core.applyPress,
