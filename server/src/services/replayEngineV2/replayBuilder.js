@@ -52,6 +52,22 @@ function buildChatEventsForWindow(startMs, endMs, limit = 22, preWindowCount = 1
 }
 
 function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo, getVideoEntriesForSource, getAudioEntriesForRover, overlapping }) {
+  function resolveReplayWindow({ sources = [], nowMs, guardMs, durationMs }) {
+    const tentativeEnd = nowMs - guardMs;
+    const sourceEnds = [];
+    for (const source of sources) {
+      const sourceId = String(source.id);
+      const allEntries = getVideoEntriesForSource({ type: String(source.type), id: sourceId });
+      if (!Array.isArray(allEntries) || !allEntries.length) continue;
+      const bounded = allEntries.filter((entry) => Number.isFinite(entry?.endMs) && entry.endMs <= tentativeEnd);
+      if (!bounded.length) continue;
+      const latest = bounded.reduce((best, entry) => (entry.endMs > best.endMs ? entry : best), bounded[0]);
+      sourceEnds.push(latest.endMs);
+    }
+    const alignedEnd = sourceEnds.length ? Math.min(...sourceEnds) : tentativeEnd;
+    return { tEnd: alignedEnd, tStart: alignedEnd - durationMs };
+  }
+
   async function concatFiles(inputPaths, outPath) {
     const listPath = `${outPath}.concat.txt`;
     const body = inputPaths.map((file) => `file '${file.replace(/'/g, "'\\''")}'`).join('\n');
@@ -74,8 +90,12 @@ function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo
 
   async function buildReplayVideo({ sources = [], title = '', requester = '', includeSidebar = true } = {}) {
     if (!Array.isArray(sources) || !sources.length) throw new Error('No replay sources selected');
-    const tEnd = Date.now() - BUILD_GUARD_MS;
-    const tStart = tEnd - BUILD_DURATION_MS;
+    const { tEnd, tStart } = resolveReplayWindow({
+      sources,
+      nowMs: Date.now(),
+      guardMs: BUILD_GUARD_MS,
+      durationMs: BUILD_DURATION_MS,
+    });
     const resolvedTitle = sanitizeReplayTitle(title, resolveDefaultReplayTitle(requester, sources));
     const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'mrr-replay-v2-'));
 

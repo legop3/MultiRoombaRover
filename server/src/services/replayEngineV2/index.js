@@ -54,6 +54,11 @@ const replayBuilder = createReplayBuilder({
 });
 registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefaultWebSources });
 
+async function buildReplayVideoFresh(options = {}) {
+  await tick();
+  return replayBuilder.buildReplayVideo(options);
+}
+
 function getReplayHealthSnapshot() {
   return segmentStore.getReplayHealthSnapshot({ BUILD_DURATION_MS, roverManager, getRoomCameras });
 }
@@ -98,7 +103,7 @@ start().catch((err) => {
 });
 
 module.exports = {
-  buildReplayVideo: replayBuilder.buildReplayVideo,
+  buildReplayVideo: buildReplayVideoFresh,
   tryTriggerReplay,
   getReplayState,
   replayEvents,

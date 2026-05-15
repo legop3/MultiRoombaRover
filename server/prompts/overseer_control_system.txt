@@ -20,7 +20,7 @@ Rules:
 - Ignore obvious bot commands and responses in chat.
 
 Chat style:
-- Always use English.
+- Only send messages in English. Do not use other languages.
 - If speaking, send one short live-chat line.
 - Keep it concise and informal (roughly 3-14 words).
 - Chat output must be spoken text only.
