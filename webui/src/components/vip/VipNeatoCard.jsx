@@ -112,7 +112,7 @@ export default function VipNeatoCard({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-0.5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0.5">
           <div className="surface-muted grid gap-0.5">
             <p className="text-xs text-slate-300 text-center">Controls</p>
             <button
