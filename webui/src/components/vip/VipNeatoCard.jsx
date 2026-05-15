@@ -1,7 +1,7 @@
 // Vip Neato Card
 // Purpose: Defines the Vip Neato Card module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 
 function normalizeState(value) {
   return String(value || '').trim();
@@ -38,83 +38,8 @@ function StatusTile({ label, value, tone = 'muted', valueClass = '', hideLabel =
   );
 }
 
-function buildLidarRenderPoints(points = []) {
-  const center = 110;
-  const plotRadius = 102;
-  const validPoints = points.filter(
-    (point) => point && point.valid && Number.isFinite(point.angleDeg) && Number.isFinite(point.distanceMm),
-  );
-  const sortedPoints = [...validPoints].sort((a, b) => Number(a.angleDeg) - Number(b.angleDeg));
-  const groups = [];
-  let currentGroup = [];
-
-  for (const point of sortedPoints) {
-    if (!currentGroup.length) {
-      currentGroup.push(point);
-      continue;
-    }
-    const previousPoint = currentGroup[currentGroup.length - 1];
-    const angleGap = Math.abs(Number(point.angleDeg) - Number(previousPoint.angleDeg));
-    const prevDistanceMm = Math.max(0, Number(previousPoint.distanceMm));
-    const distanceMm = Math.max(0, Number(point.distanceMm));
-    const distanceGap = Math.abs(distanceMm - prevDistanceMm);
-
-    if (angleGap <= 2 && distanceGap <= 900) {
-      currentGroup.push(point);
-      continue;
-    }
-
-    groups.push(currentGroup);
-    currentGroup = [point];
-  }
-  if (currentGroup.length) groups.push(currentGroup);
-
-  const groupStats = groups.map((group) => {
-    const distances = group.map((point) => Math.max(0, Number(point.distanceMm)));
-    const avgDistanceMm = distances.reduce((sum, value) => sum + value, 0) / Math.max(1, distances.length);
-    return {
-      points: group,
-      size: group.length,
-      avgDistanceMm,
-    };
-  });
-  const largestGroup = groupStats.reduce((best, group) => (group.size > (best?.size || 0) ? group : best), null);
-  const referenceDistanceMm = largestGroup?.avgDistanceMm || 1000;
-  const filteredPoints = groupStats
-    .filter((group) => {
-      const tinyCluster = group.size <= 3;
-      const farFromMainBody =
-        group.avgDistanceMm > referenceDistanceMm * 1.8 && group.avgDistanceMm - referenceDistanceMm > 1400;
-      return !(tinyCluster && farFromMainBody);
-    })
-    .flatMap((group) => group.points);
-  const scaleDistances = filteredPoints.map((point) => Math.max(0, Number(point.distanceMm))).sort((a, b) => a - b);
-  const percentileIndex = Math.max(0, Math.floor((scaleDistances.length - 1) * 0.95));
-  const maxDistanceMm = Math.max(1000, scaleDistances[percentileIndex] || 1000);
-
-  return filteredPoints
-    .map((point) => {
-      const angleRad = ((Number(point.angleDeg) - 90) * Math.PI) / 180;
-      const distanceMm = Math.max(0, Number(point.distanceMm));
-      const normalizedDistance = Math.max(0, Math.min(1, distanceMm / maxDistanceMm));
-      const scaledRadius = normalizedDistance * plotRadius;
-      const x = center + Math.cos(angleRad) * scaledRadius;
-      const y = center + Math.sin(angleRad) * scaledRadius;
-      const intensity = Math.max(0, Math.min(255, Number(point.intensity) || 0));
-      const colorLightness = 38 + (intensity / 255) * 38;
-      return {
-        key: `${point.angleDeg}-${point.distanceMm}-${point.intensity}`,
-        x,
-        y,
-        fill: `hsl(198 100% ${colorLightness}%)`,
-      };
-    });
-}
-
 export default function VipNeatoCard({
   neato,
-  lidar,
-  lidarActive = true,
   onStart,
   onSendHome,
   onLocate,
@@ -123,8 +48,6 @@ export default function VipNeatoCard({
   fullWidth = false,
 }) {
   const [working, setWorking] = useState('');
-  const [lidarFlash, setLidarFlash] = useState(false);
-  const [showLidarDebug, setShowLidarDebug] = useState(false);
   const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const configured = Boolean(neato?.configured);
@@ -140,15 +63,6 @@ export default function VipNeatoCard({
   const voltageLabel = Number.isFinite(voltage) ? `${voltage.toFixed(2)} V` : '--';
   const robotError = normalizeState(neato?.telemetry?.robotError) || '--';
   const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
-  const lidarPoints = Array.isArray(lidar?.points) ? lidar.points : [];
-  const lidarRenderPoints = useMemo(
-    () => (lidarActive ? buildLidarRenderPoints(lidarPoints) : []),
-    [lidarActive, lidarPoints],
-  );
-  const lidarStatus = normalizeState(lidar?.status) || '--';
-  const lidarDebug = lidar?.debug && typeof lidar.debug === 'object' ? lidar.debug : null;
-  const lidarReason = normalizeState(lidarDebug?.reason) || '--';
-  const lidarStats = lidarDebug?.stats && typeof lidarDebug.stats === 'object' ? lidarDebug.stats : null;
 
   const controls = neato?.controls || {};
   const canStart = Boolean(controls?.start?.available);
@@ -182,16 +96,6 @@ export default function VipNeatoCard({
     battery == null ? 'muted' : battery >= 60 ? 'good' : battery >= 25 ? 'warn' : 'danger';
 
   const primaryState = docked ? 'Docked' : uiStateLabel !== '--' ? uiStateLabel : 'Away from dock';
-
-  useEffect(() => {
-    if (!lidarActive) return undefined;
-    if (!lidar || !Array.isArray(lidar.points)) return undefined;
-    setLidarFlash(true);
-    const timer = setTimeout(() => {
-      setLidarFlash(false);
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [lidar, lidarActive]);
 
   return (
     <section className={`surface text-sm text-slate-200 ${wrapClass}`}>
@@ -277,78 +181,26 @@ export default function VipNeatoCard({
           <div className="grid gap-0.5">
             <div className="surface-muted grid gap-0.5">
               <p className="text-xs text-slate-300 text-center">Robot Status</p>
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(13rem,15rem)] gap-0.5 items-start">
-                <div className="grid gap-0.5">
-                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                    <div className="text-[0.72rem] text-slate-300">Robot state (raw)</div>
-                    <div className="font-mono text-sm text-slate-100 break-all">{robotStateRaw}</div>
-                  </div>
-                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                    <div className="text-[0.72rem] text-slate-300">Basic state</div>
-                    <div className="font-mono text-sm text-slate-100 break-all">{primaryState}</div>
-                  </div>
-                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                    <div className="text-[0.72rem] text-slate-300">UI state</div>
-                    <div className="font-mono text-sm text-slate-100 break-all">{uiStateLabel}</div>
-                  </div>
-                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                    <div className="text-[0.72rem] text-slate-300">Robot error</div>
-                    <div className="font-mono text-sm text-slate-100 break-all">{robotError}</div>
-                  </div>
-                  <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                    <div className="text-[0.72rem] text-slate-300">Robot alert</div>
-                    <div className="font-mono text-sm text-slate-100 break-all">{robotAlert}</div>
-                  </div>
+              <div className="grid gap-0.5">
+                <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                  <div className="text-[0.72rem] text-slate-300">Robot state (raw)</div>
+                  <div className="font-mono text-sm text-slate-100 break-all">{robotStateRaw}</div>
                 </div>
-
-                <div className={`rounded-md px-1 py-0.5 ${lidarFlash ? 'bg-emerald-900' : 'bg-slate-800'}`}>
-                  <button
-                    type="button"
-                    onClick={() => setShowLidarDebug((value) => !value)}
-                    className="w-full text-left text-[0.72rem] text-slate-300"
-                  >
-                    Lidar
-                  </button>
-                  <div className="mt-0.25 text-center text-[0.68rem] text-slate-400">Front of robot</div>
-                  <div className="mt-0.25 aspect-square rounded-md bg-slate-800 p-0">
-                    {lidarRenderPoints.length ? (
-                      <svg viewBox="0 0 220 220" className="h-full w-full">
-                        <rect x="0" y="0" width="220" height="220" fill="#1e293b" />
-                        <rect x="7" y="7" width="206" height="206" fill="none" stroke="#64748b" strokeWidth="1" />
-                        <rect x="33" y="33" width="154" height="154" fill="none" stroke="#475569" strokeWidth="1" />
-                        <rect x="59" y="59" width="102" height="102" fill="none" stroke="#475569" strokeWidth="1" />
-                        <rect x="85" y="85" width="50" height="50" fill="none" stroke="#334155" strokeWidth="1" />
-                        <line x1="110" y1="7" x2="110" y2="213" stroke="#475569" strokeWidth="1" />
-                        <line x1="7" y1="110" x2="213" y2="110" stroke="#475569" strokeWidth="1" />
-                        <circle cx="110" cy="110" r="4" fill="#e2e8f0" />
-                        {lidarRenderPoints.map((point) => (
-                          <circle key={point.key} cx={point.x} cy={point.y} r="1.8" fill={point.fill} />
-                        ))}
-                      </svg>
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-center text-xs text-slate-400">
-                        Waiting for scan
-                      </div>
-                    )}
-                  </div>
-                  {showLidarDebug ? (
-                    <div className="mt-0.5 rounded-md bg-slate-900 px-0.75 py-0.5 font-mono text-[0.68rem] text-slate-300">
-                      <div>Status: {lidarStatus}</div>
-                      <div>Reason: {lidarReason}</div>
-                      <div>Points: {lidarPoints.length}</div>
-                      <div>Rotation: {Number.isFinite(lidar?.rotationSpeed) ? lidar.rotationSpeed.toFixed(2) : '--'}</div>
-                      <div>Request in flight: {lidarDebug?.requestInFlight ? 'yes' : 'no'}</div>
-                      <div>Started at: {lidarDebug?.requestStartedAt || '--'}</div>
-                      <div>Headers: {lidarStats?.headersSeen ?? '--'}</div>
-                      <div>Rotations: {lidarStats?.rotationsSeen ?? '--'}</div>
-                      <div>Scans ok: {lidarStats?.scansOk ?? '--'}</div>
-                      <div>Timeouts: {lidarStats?.scansTimedOut ?? '--'}</div>
-                      <div>Restarts: {lidarStats?.scansRestarted ?? '--'}</div>
-                      <div>Rotation no scan: {lidarStats?.rotationsWithoutScan ?? '--'}</div>
-                      <div>Parseable payloads: {lidarStats?.parseablePayloads ?? '--'}</div>
-                      <div>Point payloads: {lidarStats?.pointPayloads ?? '--'}</div>
-                    </div>
-                  ) : null}
+                <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                  <div className="text-[0.72rem] text-slate-300">Basic state</div>
+                  <div className="font-mono text-sm text-slate-100 break-all">{primaryState}</div>
+                </div>
+                <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                  <div className="text-[0.72rem] text-slate-300">UI state</div>
+                  <div className="font-mono text-sm text-slate-100 break-all">{uiStateLabel}</div>
+                </div>
+                <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                  <div className="text-[0.72rem] text-slate-300">Robot error</div>
+                  <div className="font-mono text-sm text-slate-100 break-all">{robotError}</div>
+                </div>
+                <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                  <div className="text-[0.72rem] text-slate-300">Robot alert</div>
+                  <div className="font-mono text-sm text-slate-100 break-all">{robotAlert}</div>
                 </div>
               </div>
             </div>

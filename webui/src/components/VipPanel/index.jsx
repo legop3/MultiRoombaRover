@@ -15,7 +15,6 @@ import VipProfileImageCard from '../vip/VipProfileImageCard.jsx';
 
 export default function VipPanel({ isActive = true }) {
   const session = useSessionSelector((state) => state.session);
-  const neatoLidar = useSessionSelector((state) => state.neatoLidar);
   const {
     identifySession,
     requestVerification,
@@ -80,8 +79,6 @@ export default function VipPanel({ isActive = true }) {
             <div className="space-y-2">
               <VipNeatoCard
                 neato={session?.neato || null}
-                lidar={neatoLidar}
-                lidarActive={isActive}
                 onStart={neatoStart}
                 onSendHome={neatoSendHome}
                 onLocate={neatoLocate}

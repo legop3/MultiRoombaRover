@@ -8,7 +8,6 @@ const { loadConfig } = require('../../helpers/configLoader');
 const { isVerified } = require('../verificationService');
 const { getMode, MODES } = require('../modeManager');
 const { isLockdownAdmin } = require('../roleService');
-const { createLidarRuntime } = require('./lidarRuntime');
 const {
   homeAssistantEvents,
   getRawEntitySnapshot,
@@ -30,12 +29,6 @@ function normalizeDeviceName(value) {
 
 const device = normalizeDeviceName(neatoConfig.device);
 const RESUME_DELAY_MS = 3000;
-const OFFLINE_LIDAR_RETRY_MS = 10000;
-const brainslugHost = String(neatoConfig.brainslugHost || '').trim();
-const brainslugPort = Number(neatoConfig.brainslugPort) || 6053;
-const brainslugKey = String(neatoConfig.brainslugKey || '').trim();
-const brainslugLogFile = String(neatoConfig.brainslugLogFile || '').trim();
-let lidarRuntime = null;
 
 function entityId(domain, suffix) {
   if (!device) return '';
@@ -168,7 +161,6 @@ function buildState() {
     enabled,
     configured,
     connected,
-    lidarConnected: lidarRuntime?.getState?.().connected || false,
     device,
     entityPrefix: device ? `${device}_` : '',
     controls,
@@ -229,14 +221,6 @@ async function pressButton(entityIdValue, actionLabel) {
   logger.info('Issued Neato action', { action: actionLabel, entityId: entityIdValue });
 }
 
-async function requestLidarScan() {
-  assertConfiguredAndConnected();
-  if (!device) {
-    throw new Error('Neato not configured');
-  }
-  await callHomeAssistantService('esphome', `${device}_send_cmd`, { command: 'GetLDSScan' });
-}
-
 async function startCleaning() {
   await pressButton(ENTITY_IDS.buttons.start, 'start');
   await new Promise((resolve) => setTimeout(resolve, RESUME_DELAY_MS));
@@ -269,51 +253,6 @@ function hasVerifiedSockets() {
     if (isVerified(socket)) return true;
   }
   return false;
-}
-
-function broadcastLidarScan(payload) {
-  for (const socket of io.sockets.sockets.values()) {
-    if (!isVerified(socket)) continue;
-    socket.emit('neato:lidar', payload);
-  }
-}
-
-lidarRuntime =
-  brainslugHost && brainslugKey
-    ? createLidarRuntime({
-        logger,
-        host: brainslugHost,
-        port: brainslugPort,
-        key: brainslugKey,
-        logFile: brainslugLogFile,
-        getPollReadiness: () => {
-          const verifiedSockets = hasVerifiedSockets();
-          if (!verifiedSockets) {
-            return { allowed: false, delayMs: 1000 };
-          }
-          if (!homeAssistantEnabled || !isHomeAssistantConnected()) {
-            return { allowed: false, delayMs: OFFLINE_LIDAR_RETRY_MS };
-          }
-          const neatoOnline = buildState().connected;
-          if (!neatoOnline) {
-            return { allowed: false, delayMs: OFFLINE_LIDAR_RETRY_MS };
-          }
-          return { allowed: true, delayMs: 0 };
-        },
-        requestScan: requestLidarScan,
-      })
-    : null;
-
-if (lidarRuntime) {
-  lidarRuntime.on('scan', (payload) => {
-    broadcastLidarScan(payload);
-  });
-  lidarRuntime.on('status', () => {
-    emitUpdate();
-  });
-  lidarRuntime.start();
-} else if (device) {
-  logger.info('Neato lidar stream disabled; brainslugHost/brainslugKey missing');
 }
 
 io.on('connection', (socket) => {
