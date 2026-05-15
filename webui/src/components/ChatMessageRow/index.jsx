@@ -34,7 +34,7 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
   if (!guildIconUrl && !userAvatarUrl) return null;
   return (
     <span
-      className="flex h-4 w-4 overflow-hidden rounded-full border border-slate-700/80"
+      className="flex h-4 w-4 shrink-0 overflow-hidden rounded-none border border-slate-700/80"
       title={label}
     >
       <span
@@ -68,7 +68,7 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
 function ProfileAvatar({ imageUrl, label }) {
   if (!imageUrl) return null;
   return (
-    <span className="flex h-4 w-4 overflow-hidden rounded-full border border-slate-700/80" title={label}>
+    <span className="flex h-4 w-4 shrink-0 overflow-hidden rounded-none border border-slate-700/80" title={label}>
       <span
         className="h-full w-full bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${imageUrl})` }}
@@ -84,11 +84,9 @@ export function ChatIdentity({ message }) {
   const isBot = isBotMessage(message);
   const nameClass = isBot ? 'text-emerald-300' : roleColors(message.role);
   return (
-    <>
+    <span className="inline-flex min-w-0 items-center gap-0.5 align-middle">
       {message.fromDiscord ? (
-        <>
-          <FaDiscord className="h-3.5 w-3.5 text-indigo-200" />
-        </>
+        <FaDiscord className="h-4 w-4 shrink-0 text-indigo-200" />
       ) : null}
       <ProfileAvatar imageUrl={message.profileImage} label={discordLabel || displayName(message)} />
       {!message.profileImage ? (
@@ -102,29 +100,29 @@ export function ChatIdentity({ message }) {
         {displayName(message)}
       </span>
       {isBot ? (
-        <span className="rounded bg-emerald-900/60 px-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white">
+        <span className="shrink-0 rounded bg-emerald-900/60 px-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white">
           bot
         </span>
       ) : null}
       {message.roverId && (
         <span
-          className="rounded bg-slate-800 px-1 text-[0.7rem]"
+          className="shrink-0 rounded bg-slate-800 px-1 text-[0.7rem]"
           style={roverBadgeStyle(message.roverColor, 0.14)}
         >
           {message.roverId}
         </span>
       )}
-    </>
+    </span>
   );
 }
 
 function chatRowClass(message) {
   if (isBotMessage(message)) {
-    return 'surface-muted relative flex flex-wrap items-start gap-0.5 border border-emerald-500/40 bg-emerald-900/15 text-sm';
+    return 'surface-muted flex items-center gap-0.5 border border-emerald-500/40 bg-emerald-900/15 text-sm';
   }
   const isAdmin =
     message.role === 'admin' || message.role === 'lockdown' || message.role === 'lockdown-admin';
-  return `surface-muted relative flex flex-wrap items-start gap-0.5 text-sm ${
+  return `surface-muted flex items-center gap-0.5 text-sm ${
     isAdmin
       ? 'border border-amber-400/30'
       : message.fromDiscord
@@ -137,13 +135,12 @@ export default function ChatMessageRow({ message }) {
   const isBot = isBotMessage(message);
   return (
     <div className={chatRowClass(message)}>
-      <ChatIdentity message={message} />
       <span
-        className={`min-w-0 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
+        className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
       >
-        {message.text}
+        <ChatIdentity message={message} /> {message.text}
       </span>
-      <span className="absolute bottom-0.5 right-1 text-[0.65rem] text-slate-400/60">
+      <span className="ml-auto shrink-0 text-[0.65rem] text-slate-400/60">
         {formatTime(message.ts)}
       </span>
     </div>
