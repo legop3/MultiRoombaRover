@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	autoChargeTimeout  = 5 * time.Second
+	autoChargeTimeout  = 2 * time.Second
 	autoChargeCooldown = 0 * time.Minute
 	sourceHomeBase     = 1 << 1
 )

@@ -123,9 +123,9 @@ export default function DriveDockAction({
   const dockInstructions = {
     summary: 'Use assist mode to manually line up with the dock.',
     steps: [
-      'Line up the round front sensor on the rover with the sensor on the dock',
-      'Use tiny forward/reverse turns until the sensors are centered',
-      'When contact is made, wait for docked + charging status',
+      'Line up the round front sensor on the rover with the sensors on the dock',
+      'Move carefully, lining up your sensor with the center of the dock',
+      'When contact is made, charging will start in about 5 seconds.',
     ],
   };
 
@@ -140,9 +140,9 @@ export default function DriveDockAction({
 
   useEffect(() => {
     if (!manualAssistActive) return;
-    if (!docked) return;
+    if (!charging) return;
     actions.setManualDockAssistActive(false);
-  }, [actions, docked, manualAssistActive]);
+  }, [actions, charging, manualAssistActive]);
 
   const handleReturnToDrive = async () => {
     if (!roverId || pending) return;
