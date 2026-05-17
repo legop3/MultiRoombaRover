@@ -121,16 +121,13 @@ export default function DriveDockAction({
   const dockKeyLabel = formatKeyLabel(keymap?.dockMacro?.[0]);
 
   const dockInstructions = {
-    summary: 'This enables precision manual docking assist in the web UI.',
+    summary: 'Use assist mode to manually line up with the dock.',
     steps: [
       'Line up the round front sensor on the rover with the sensor on the dock',
-      'Camera will tilt all the way down so you can see the front sensor',
-      'Drive speed will be limited for precise alignment',
+      'Use tiny forward/reverse turns until the sensors are centered',
+      'When contact is made, wait for docked + charging status',
     ],
   };
-  const dockButtonCaption = manualAssistActive
-    ? 'Manual docking assist is active: slow speed limit + camera down.'
-    : 'Click to enter manual docking assist.';
 
   const startDriveInstructions = {
     summary: 'You must enable driving mode before you can move the rover.',
@@ -138,7 +135,7 @@ export default function DriveDockAction({
   };
   const dockValue = docked ? 'Docked' : 'Undocked';
   const dockTone = docked ? 'good' : 'bad';
-  const chargeValue = charging ? 'Charging' : docked ? 'Charging in 5s' : '—';
+  const chargeValue = charging ? 'Charging' : docked ? 'Charging soon...' : '—';
   const chargeTone = charging ? 'good' : docked ? 'warn' : 'bad';
 
   const handleReturnToDrive = async () => {
@@ -200,7 +197,6 @@ export default function DriveDockAction({
   const ctaText = 'text-center';
   const ctaLayout = 'items-center justify-between';
   const compactLayout = 'items-center justify-center';
-  const ctaTextAndLayout = `${ctaText} ${ctaLayout}`;
   const ctaSize = isMobile ? 'text-sm font-semibold' : '';
   const emeraldCta =
     'border-emerald-300/70 bg-emerald-800 text-emerald-50 hover:bg-emerald-700 focus-visible:ring-emerald-300';
@@ -322,13 +318,10 @@ export default function DriveDockAction({
         </div>
         {!isMobile && expanded && (
           <>
-            <p className="text-sm text-indigo-50/90">{dockButtonCaption}</p>
+            <StepList steps={dockInstructions.steps} tone="indigo" />
             <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
               <StatusRow label="Dock" value={dockValue} tone={dockTone} />
               <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
-            </div>
-            <div className="text-xs text-indigo-100/80">
-              Align front sensor to dock sensor; use tiny movements.
             </div>
           </>
         )}
