@@ -123,8 +123,8 @@ export default function DriveDockAction({
   const dockInstructions = {
     summary: 'Use assist mode to manually line up with the dock.',
     steps: [
-      'Line up the round front sensor on the rover with the sensors on the dock',
-      'Move carefully, lining up your sensor with the center of the dock',
+      'Line up the center dot of your rover with the center of the dock',
+      'The UI will indicate when you are successfully docked',
       'When good contact is made, charging will start in about 5 seconds.',
     ],
   };
