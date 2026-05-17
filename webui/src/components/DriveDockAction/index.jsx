@@ -313,7 +313,7 @@ export default function DriveDockAction({
       >
         <div className="flex w-full flex-col items-center gap-0.25">
           <span className="text-base font-semibold text-indigo-50 md:text-lg">
-            {compactDockedDriving ? 'Docked!' : manualAssistActive ? 'Exit Docking Assist' : 'Enter Docking Assist'}
+            {compactDockedDriving ? 'Docked!' : manualAssistActive ? 'Exit Docking Assist' : 'Dock and charge'}
           </span>
           {!isMobile && expanded ? (
             <div className="flex flex-wrap items-center justify-center gap-0.5">
