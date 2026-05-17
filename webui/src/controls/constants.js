@@ -12,7 +12,7 @@ export const DRIVE_LIMITS = {
   boostSpeed: 400,
 };
 
-export const MANUAL_DOCK_ASSIST_MAX_SPEED = 70;
+export const MANUAL_DOCK_ASSIST_MAX_SPEED = 60;
 
 export const COMMAND_DELAY_MS = 100;
 

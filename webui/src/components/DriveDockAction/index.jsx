@@ -125,7 +125,7 @@ export default function DriveDockAction({
     steps: [
       'Line up the round front sensor on the rover with the sensors on the dock',
       'Move carefully, lining up your sensor with the center of the dock',
-      'When contact is made, charging will start in about 5 seconds.',
+      'When good contact is made, charging will start in about 5 seconds.',
     ],
   };
 
@@ -257,8 +257,8 @@ export default function DriveDockAction({
 
   if (dockingInProgress) {
     const inProgressCopy = {
-      summary: 'If the rover is failing to dock, click to drive and try again.',
-      steps: ['The rover should be slowly wiggling towards the dock', 'If it is obviously not working, press this button to enter driving mode and try again'],
+      summary: 'The rover is currently attempting to dock itself due to being idle.',
+      steps: ['Click to return to driving mode.'],
     };
 
     return (
@@ -271,7 +271,7 @@ export default function DriveDockAction({
       >
         <div className="space-y-0.5 w-full">
           <div className="flex w-full flex-col items-center gap-0.25">
-            <span className="text-base font-semibold text-amber-50 md:text-lg">Docking in Progress</span>
+            <span className="text-base font-semibold text-amber-50 md:text-lg">Attempting to auto-dock...</span>
             {/* {!isMobile && expanded ? ( */}
             {expanded ? (
               <div className="flex flex-wrap items-center justify-center gap-0.5">
