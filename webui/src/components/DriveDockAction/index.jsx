@@ -1,7 +1,7 @@
 // Drive Dock Action
 // Purpose: Defines the Drive Dock Action module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useControlSystem } from '../../controls/index.js';
 import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
@@ -113,6 +113,7 @@ export default function DriveDockAction({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const manualAssistActive = Boolean(manualDockAssist?.active);
+  const wasDockedRef = useRef(false);
 
   const driveDisabled = !roverId || pending !== null;
   const dockDisabled = !roverId || pending !== null;
@@ -139,16 +140,16 @@ export default function DriveDockAction({
   const chargeTone = charging ? 'good' : docked ? 'warn' : 'bad';
 
   useEffect(() => {
+    const justDocked = docked && !wasDockedRef.current;
+    if (manualAssistActive && justDocked) {
+      actions.sendSong([{ note: 84, duration: 6 }], { slot: 1 });
+    }
+    wasDockedRef.current = docked;
+  }, [actions, docked, manualAssistActive]);
+
+  useEffect(() => {
     if (!manualAssistActive) return;
     if (!charging) return;
-    actions.sendSong(
-      [
-        { note: 79, duration: 10 },
-        { note: 84, duration: 10 },
-        { note: 88, duration: 14 },
-      ],
-      { slot: 1 },
-    );
     actions.setManualDockAssistActive(false);
   }, [actions, charging, manualAssistActive]);
 
