@@ -27,9 +27,10 @@ export const HELP_CONTENT = {
         type: 'list',
         title: 'Docking the rover',
         items: [
-          'Line up the rover to the dock, about a foot away, then:',
-          { segments: ['Press the "Dock and Charge" button onscreen, or press ', { action: 'dockMacro' }, ' on your keyboard to start docking.'] },
-          'Wait for the rover to confirm it is docked and charging before leaving it unattended.',
+          'If the rover shows "Docking in Progress", it is already auto-seeking the dock.',
+          'To dock manually, enter Docking Assist from the drive panel.',
+          { segments: ['Press "Enter Docking Assist", or press ', { action: 'dockMacro' }, '.'] },
+          'In assist mode, camera tilts down and driving speed is limited for precise alignment.',
         ],
       },
     ],
@@ -56,7 +57,7 @@ export const HELP_CONTENT = {
             title: 'Rover modes & chat',
             items: [
               { action: 'driveMacro', label: 'Drive macro' },
-              { action: 'dockMacro', label: 'Dock macro' },
+              { action: 'dockMacro', label: 'Docking assist toggle' },
               { action: 'chatFocus', label: 'Chat focus' },
             ],
           },
@@ -133,9 +134,9 @@ export const HELP_CONTENT = {
         type: 'list',
         title: 'Docking the rover',
         items: [
-          'Line up the rover to the dock, about a foot away, then:',
-          { segments: ['Press the "Dock and Charge" button onscreen to start docking.'] },
-          'Wait for the rover to confirm it is docked and charging before leaving it unattended.',
+          'If you see "Docking in Progress", the rover is currently auto-seeking the dock.',
+          { segments: ['For manual docking, press "Enter Docking Assist".'] },
+          'Assist mode tilts camera down and limits speed for precise alignment.',
         ],
       }
     ],
@@ -163,9 +164,9 @@ export const HELP_CONTENT = {
         type: 'list',
         title: 'Docking the rover',
         items: [
-          'Line up the rover to the dock, about a foot away, then:',
-          { segments: ['Press the "Dock and Charge" or the "Dock" button onscreen to start docking.'] },
-          'Wait for the rover to confirm it is docked and charging before leaving it unattended.',
+          'If you see "Docking in Progress", the rover is currently auto-seeking the dock.',
+          { segments: ['For manual docking, press "Enter Docking Assist" (or "Dock" button).'] },
+          'Assist mode tilts camera down and limits speed for precise alignment.',
         ],
       }
     ],

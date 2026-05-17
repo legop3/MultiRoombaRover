@@ -50,6 +50,8 @@ export default function GamepadInputManager() {
     state,
     actions: {
       setMode,
+      setManualDockAssistActive,
+      toggleManualDockAssist,
       setDriveVector,
       setAuxMotors,
       setServoAngle,
@@ -243,6 +245,7 @@ export default function GamepadInputManager() {
       }
 
       if (outputs.buttons.driveMacro && handleButtonEdge('driveMacro', true)) {
+        setManualDockAssistActive(false);
         setMode('drive');
         runMacro('drive-sequence');
       } else if (!outputs.buttons.driveMacro) {
@@ -250,8 +253,7 @@ export default function GamepadInputManager() {
       }
 
       if (outputs.buttons.dockMacro && handleButtonEdge('dockMacro', true)) {
-        setMode('dock');
-        runMacro('seek-dock');
+        toggleManualDockAssist();
       } else if (!outputs.buttons.dockMacro) {
         handleButtonEdge('dockMacro', false);
       }
@@ -288,9 +290,11 @@ export default function GamepadInputManager() {
     handleCameraAxis,
     registerInputState,
     runMacro,
+    setManualDockAssistActive,
     setAuxMotors,
     setDriveVector,
     setMode,
+    toggleManualDockAssist,
     toggleNightVision,
   ]);
 

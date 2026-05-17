@@ -12,6 +12,8 @@ export const DRIVE_LIMITS = {
   boostSpeed: 400,
 };
 
+export const MANUAL_DOCK_ASSIST_MAX_SPEED = 110;
+
 export const COMMAND_DELAY_MS = 100;
 
 export const SONG_NOTE_RANGE = [31, 127];
@@ -76,14 +78,6 @@ export const DEFAULT_MACROS = [
       { type: 'drive', speeds: { left: -300, right: -300 } },
       { type: 'pause', duration: 600 },
       { type: 'drive', speeds: { left: 0, right: 0 } },
-    ],
-  },
-  {
-    id: 'seek-dock',
-    label: 'Dock',
-    description: 'Send the seek dock command.',
-    steps: [
-      { type: 'oi', command: 'dock' }
     ],
   },
 ];

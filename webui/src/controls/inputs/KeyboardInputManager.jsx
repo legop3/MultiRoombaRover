@@ -122,6 +122,8 @@ export default function KeyboardInputManager() {
     state,
     actions: {
       setMode,
+      setManualDockAssistActive,
+      toggleManualDockAssist,
       setDriveVector,
       setAuxMotors,
       nudgeServo,
@@ -372,11 +374,11 @@ export default function KeyboardInputManager() {
 
       if (newlyPressed.length > 0) {
         if (newlyPressed.some((token) => keymap.driveMacro?.has(token))) {
+          setManualDockAssistActive(false);
           setMode('drive');
           runMacro('drive-sequence');
         } else if (newlyPressed.some((token) => keymap.dockMacro?.has(token))) {
-          setMode('dock');
-          runMacro('seek-dock');
+          toggleManualDockAssist();
         } else if (newlyPressed.some((token) => keymap.nightVisionToggle?.has(token))) {
           toggleNightVision();
         } else if (newlyPressed.some((token) => keymap.hornHonk?.has(token))) {
@@ -441,12 +443,14 @@ export default function KeyboardInputManager() {
     keymap.micPtt,
     resetAll,
     runMacro,
+    setManualDockAssistActive,
     setMicPttActive,
     setMode,
     stopAllMotion,
     stopSongLoop,
     startHorn,
     stopHorn,
+    toggleManualDockAssist,
     triggerHomeAssistantCycle,
   ]);
 

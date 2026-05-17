@@ -30,7 +30,7 @@ function DesktopQuickstart({ keymap }) {
           <ControlRow label="Move slower" keyLabel={formatKeyLabel(keymap?.slowModifier?.[0])} />
         </div>
       </div>
-      <p className="text-sm text-slate-200">3. When done, please dock your rover! Line up with the dock and press "Dock and Charge".</p>
+      <p className="text-sm text-slate-200">3. When done, enter "Docking Assist" and line up the front sensor with the dock sensor.</p>
     </div>
   );
 }
@@ -41,7 +41,7 @@ function MobileQuickstart() {
       <p>1. Press "Start Driving" put your rover into driving mode.</p>
       <p>2. Touch and hold in Joystick area to move.</p>
       <p>3. Use the other column for motor, horn, and camera controls.</p>
-      <p>4. When done, please dock your rover! Line up with the dock and press "Dock and Charge".</p>
+      <p>4. When done, enter "Docking Assist" and line up the front sensor with the dock sensor.</p>
     </div>
   );
 }

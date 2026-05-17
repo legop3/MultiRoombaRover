@@ -43,6 +43,12 @@ function createMicState() {
   };
 }
 
+function createManualDockAssistState() {
+  return {
+    active: false,
+  };
+}
+
 export const initialControlState = {
   roverId: null,
   mode: 'drive',
@@ -52,6 +58,7 @@ export const initialControlState = {
   song: createSongState(),
   horn: createHornState(),
   mic: createMicState(),
+  manualDockAssist: createManualDockAssistState(),
   lastControlIntentAt: 0,
   macros: DEFAULT_MACROS,
   keymap: DEFAULT_KEYMAP,
@@ -69,6 +76,7 @@ export function controlReducer(state, action) {
         song: action.payload ? state.song : createSongState(),
         horn: action.payload ? state.horn : createHornState(),
         mic: action.payload ? state.mic : createMicState(),
+        manualDockAssist: action.payload ? state.manualDockAssist : createManualDockAssistState(),
         lastControlIntentAt: action.payload ? state.lastControlIntentAt : 0,
       };
     case 'control/set-mode':
@@ -185,6 +193,14 @@ export function controlReducer(state, action) {
         mic: {
           ...(state.mic || createMicState()),
           pttActive: Boolean(action.payload),
+        },
+      };
+    case 'control/set-manual-dock-assist':
+      return {
+        ...state,
+        manualDockAssist: {
+          ...(state.manualDockAssist || createManualDockAssistState()),
+          active: Boolean(action.payload),
         },
       };
     default:
