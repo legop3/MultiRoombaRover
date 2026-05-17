@@ -141,6 +141,14 @@ export default function DriveDockAction({
   useEffect(() => {
     if (!manualAssistActive) return;
     if (!charging) return;
+    actions.sendSong(
+      [
+        { note: 79, duration: 10 },
+        { note: 84, duration: 10 },
+        { note: 88, duration: 14 },
+      ],
+      { slot: 1 },
+    );
     actions.setManualDockAssistActive(false);
   }, [actions, charging, manualAssistActive]);
 
