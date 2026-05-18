@@ -49,7 +49,7 @@ function ManualDockAssistOverlay({ mobileHud = false }) {
       {popupMessage ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <div
-            className={`rounded-xl border border-indigo-200/95 bg-black/92 px-4 py-2 text-center font-semibold text-indigo-50 shadow-2xl ${
+            className={`rounded-xl border border-indigo-200/95 bg-black/95 px-4 py-2 text-center font-semibold text-indigo-50 shadow-2xl ${
               mobileHud ? 'text-lg' : 'text-2xl'
             }`}
           >
@@ -58,7 +58,7 @@ function ManualDockAssistOverlay({ mobileHud = false }) {
         </div>
       ) : (
         <div
-          className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border bg-black/88 px-2 py-1 font-semibold shadow-lg ${toneClass} ${
+          className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border bg-black/90 px-2 py-1 font-semibold shadow-lg ${toneClass} ${
             mobileHud ? 'text-[0.65rem]' : 'text-xs'
           }`}
         >
