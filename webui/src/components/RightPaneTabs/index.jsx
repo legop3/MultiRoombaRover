@@ -43,7 +43,7 @@ function TopDownMapPanel() {
 
 function DriveDockPanel() {
   const {
-    state: { roverId, keymap, camera, horn },
+    state: { roverId, keymap, camera, horn, manualDockAssist },
     pipeline,
     actions: { setServoAngle, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
@@ -68,6 +68,7 @@ function DriveDockPanel() {
   const hornLabel = formatKeyLabel(keymap?.hornHonk?.[0]);
   const upLabel = formatKeyLabel(keymap?.cameraUp?.[0]);
   const downLabel = formatKeyLabel(keymap?.cameraDown?.[0]);
+  const cameraDisabled = Boolean(!roverId || manualDockAssist?.active);
 
   return (
     <section className="panel-section grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-0.5">
@@ -97,6 +98,7 @@ function DriveDockPanel() {
               value={value}
               min={min}
               max={max}
+              disabled={cameraDisabled}
               onChange={setServoAngle}
               keyDownLabel={downLabel}
               keyUpLabel={upLabel}

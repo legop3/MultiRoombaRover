@@ -279,15 +279,17 @@ export function ControlSystemProvider({ children }) {
   }, [saveControlSettings]);
 
   const setServoAngle = useCallback(
-    (value) => {
+    (value, options = {}) => {
       if (!pipeline.servoConfig) return;
+      const force = Boolean(options?.force);
+      if (state.manualDockAssist?.active && !force) return;
       const clamped = clampServoAngle(pipeline.servoConfig, value);
       dispatch({ type: 'control/set-camera-angle', payload: clamped });
       pipeline.sendServoAngle(clamped);
       servoAngleRef.current = clamped;
       recordControlIntent();
     },
-    [pipeline, recordControlIntent],
+    [pipeline, recordControlIntent, state.manualDockAssist?.active],
   );
 
   const nudgeServo = useCallback(
@@ -530,12 +532,15 @@ export function ControlSystemProvider({ children }) {
       const prevActive = Boolean(state.manualDockAssist?.active);
       if (prevActive === nextActive) return;
       dispatch({ type: 'control/set-manual-dock-assist', payload: nextActive });
-      if (!nextActive) return;
+      if (!nextActive) {
+        setServoAngle(0, { force: true });
+        return;
+      }
       const minAngle =
         typeof pipeline.servoConfig?.minAngle === 'number'
           ? pipeline.servoConfig.minAngle
           : -45;
-      setServoAngle(minAngle);
+      setServoAngle(minAngle, { force: true });
       pipeline.sendSong([{ note: 76, duration: 10 }, { note: 83, duration: 10 }], { slot: 0 });
       recordControlIntent();
     },

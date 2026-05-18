@@ -95,7 +95,7 @@ function MobileJoystickPanel({ layout }) {
 
 function MobileActionsColumnContent({ layout }) {
   const {
-    state: { roverId, camera, horn },
+    state: { roverId, camera, horn, manualDockAssist },
     pipeline,
     actions: { setServoAngle, setNightVision, setAuxMotors, startHorn, stopHorn },
   } = useControlSystem();
@@ -115,6 +115,7 @@ function MobileActionsColumnContent({ layout }) {
       : typeof cameraConfig?.homeAngle === 'number'
       ? cameraConfig.homeAngle
       : (cameraMin + cameraMax) / 2;
+  const cameraDisabled = Boolean(disabled || manualDockAssist?.active);
 
   const handleNightVisionToggle = useCallback(
     (nextOn) => {
@@ -174,6 +175,7 @@ function MobileActionsColumnContent({ layout }) {
               min={cameraMin}
               max={cameraMax}
               step={0.5}
+              disabled={cameraDisabled}
               onChange={setServoAngle}
               orientation="vertical"
               label="Camera Tilt"
