@@ -39,10 +39,10 @@ function ManualDockAssistOverlay({ mobileHud = false }) {
   if (!visible) return null;
   const toneClass =
     statusTone === 'good'
-      ? 'border-emerald-200/85 bg-emerald-900/96 text-emerald-50'
+      ? 'border-emerald-200/85 text-emerald-50'
       : statusTone === 'warn'
-      ? 'border-amber-200/85 bg-amber-900/96 text-amber-50'
-      : 'border-indigo-200/85 bg-indigo-900/96 text-indigo-50';
+      ? 'border-amber-200/85 text-amber-50'
+      : 'border-indigo-200/85 text-indigo-50';
 
   return (
     <div className="pointer-events-none absolute inset-0">
