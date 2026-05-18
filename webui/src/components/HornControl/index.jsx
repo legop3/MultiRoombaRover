@@ -1,7 +1,7 @@
 // Horn Control
 // Purpose: Defines the Horn Control module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { HORN_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import { HORN_MAX_FREQUENCY } from '../../controls/constants.js';
@@ -32,6 +32,7 @@ export default function HornControl({
     HORN_SETTINGS_DEFAULTS,
   );
   const [waveform, setWaveform] = useState(hornSettings?.waveform || HORN_SETTINGS_DEFAULTS.waveform);
+  const settingsRootRef = useRef(null);
   const [freqs, setFreqs] = useState(() => {
     const base = Array.isArray(hornSettings?.freqs) ? hornSettings.freqs : HORN_SETTINGS_DEFAULTS.freqs;
     return [...base, 0, 0, 0, 0].slice(0, 4).map((f) => clampFreq(f));
@@ -100,17 +101,27 @@ export default function HornControl({
     [saveHornSettings],
   );
 
-  const handleFreqWheel = useCallback(
-    (index) => (event) => {
+  useEffect(() => {
+    const root = settingsRootRef.current;
+    if (!root) return undefined;
+
+    const handleWheel = (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      const index = Number(target.dataset.hornFreqIndex);
+      if (!Number.isInteger(index)) return;
       event.preventDefault();
       event.stopPropagation();
       const direction = event.deltaY < 0 ? 1 : -1;
-      const step = 25;
       const current = Number(freqs[index]) || 0;
-      updateFreq(index, current + direction * step);
-    },
-    [freqs, updateFreq],
-  );
+      updateFreq(index, current + direction * 25);
+    };
+
+    root.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    return () => {
+      root.removeEventListener('wheel', handleWheel, { capture: true });
+    };
+  }, [freqs, updateFreq]);
 
   const handlePointerDown = (event) => {
     if (disabled) return;
@@ -189,7 +200,7 @@ export default function HornControl({
       </div>
       {showSettings ? (
         compactSettings ? (
-          <div className="relative z-10 flex flex-col gap-0.5 text-[0.65rem]">
+          <div ref={settingsRootRef} className="relative z-10 flex flex-col gap-0.5 text-[0.65rem]">
             <label className="flex items-center justify-between gap-0.5 text-slate-200">
               <span className="text-slate-300">Wave</span>
               <select
@@ -211,9 +222,8 @@ export default function HornControl({
                     max={HORN_MAX_FREQUENCY}
                     step={1}
                     value={freq}
+                    data-horn-freq-index={idx}
                     onChange={(event) => updateFreq(idx, event.target.value)}
-                    onWheelCapture={handleFreqWheel(idx)}
-                    onWheel={handleFreqWheel(idx)}
                     className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
                   />
                 </label>
@@ -221,7 +231,10 @@ export default function HornControl({
             </div>
           </div>
         ) : (
-          <div className="relative z-10 grid grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))] items-center gap-0.5 text-[0.65rem]">
+          <div
+            ref={settingsRootRef}
+            className="relative z-10 grid grid-cols-[minmax(0,1.2fr)_repeat(4,minmax(0,1fr))] items-center gap-0.5 text-[0.65rem]"
+          >
             <label className="flex items-center gap-0.5 text-slate-200">
               <span className="text-slate-300">Wave</span>
               <select
@@ -242,9 +255,8 @@ export default function HornControl({
                   max={HORN_MAX_FREQUENCY}
                   step={1}
                   value={freq}
+                  data-horn-freq-index={idx}
                   onChange={(event) => updateFreq(idx, event.target.value)}
-                  onWheelCapture={handleFreqWheel(idx)}
-                  onWheel={handleFreqWheel(idx)}
                   className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
                 />
               </label>
