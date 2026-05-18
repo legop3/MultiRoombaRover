@@ -322,7 +322,9 @@ export default function DriveDockAction({
         </div>
         {!isMobile && expanded && (
           <>
-            <StepList steps={dockInstructions.steps} tone="indigo" />
+            <p className="text-sm text-indigo-50/90">
+              Get near a dock and press this button to enter docking assist mode.
+            </p>
             <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
               <StatusRow label="Dock" value={dockValue} tone={dockTone} />
               <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
