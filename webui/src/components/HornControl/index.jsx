@@ -107,9 +107,11 @@ export default function HornControl({
 
     const handleWheel = (event) => {
       const target = event.target;
-      if (!(target instanceof HTMLInputElement)) return;
-      const index = Number(target.dataset.hornFreqIndex);
-      if (!Number.isInteger(index)) return;
+      if (!(target instanceof Element)) return;
+      const input = target.closest('input[data-horn-freq-index]');
+      if (!input) return;
+      const index = Number(input.dataset.hornFreqIndex);
+      if (!Number.isInteger(index) || index < 0 || index >= freqs.length) return;
       event.preventDefault();
       event.stopPropagation();
       const direction = event.deltaY < 0 ? 1 : -1;
