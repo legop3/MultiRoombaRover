@@ -39,10 +39,10 @@ function ManualDockAssistOverlay({ mobileHud = false }) {
   if (!visible) return null;
   const toneClass =
     statusTone === 'good'
-      ? 'border-emerald-200/85 text-emerald-50'
+      ? 'border-emerald-200/90 bg-emerald-900/90 text-emerald-50'
       : statusTone === 'warn'
-      ? 'border-amber-200/85 text-amber-50'
-      : 'border-indigo-200/85 text-indigo-50';
+      ? 'border-amber-200/90 bg-amber-900/90 text-amber-50'
+      : 'border-indigo-200/90 bg-indigo-900/90 text-indigo-50';
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -58,7 +58,7 @@ function ManualDockAssistOverlay({ mobileHud = false }) {
         </div>
       ) : (
         <div
-          className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border bg-black/90 px-2 py-1 font-semibold shadow-lg ${toneClass} ${
+          className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border px-2 py-1 font-semibold shadow-lg ${toneClass} ${
             mobileHud ? 'text-[0.65rem]' : 'text-xs'
           }`}
         >
