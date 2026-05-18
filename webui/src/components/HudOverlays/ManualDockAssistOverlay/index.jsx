@@ -1,31 +1,15 @@
 import React from 'react';
-import { useControlSystem } from '../../../controls/index.js';
-import { useSessionSelector } from '../../../context/SessionContext.jsx';
-import { useTelemetryFrame } from '../../../context/TelemetryContext.jsx';
+import { useManualDockAssist } from '../../../features/manualDockAssist/useManualDockAssist.js';
 
 function ManualDockAssistOverlay({ mobileHud = false }) {
-  const {
-    state: { manualDockAssist },
-  } = useControlSystem();
-  const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
-  const frame = useTelemetryFrame(roverId);
-  const sensors = frame?.sensors || {};
-  const chargingLabel = sensors?.chargingState?.label || '';
-  const docked = Boolean(sensors?.chargingSources?.homeBase);
-  const charging = docked && chargingLabel.toLowerCase() !== 'not charging' && chargingLabel !== '';
-  const active = Boolean(manualDockAssist?.active);
-  if (!active && !docked) return null;
-
-  const status = charging
-    ? 'Docked and charging'
-    : docked
-    ? 'Docked'
-    : 'Docking assist active';
-  const toneClass = charging
-    ? 'border-emerald-200/70 bg-emerald-900/85 text-emerald-50'
-    : docked
-    ? 'border-amber-200/70 bg-amber-900/85 text-amber-50'
-    : 'border-indigo-200/70 bg-indigo-900/85 text-indigo-50';
+  const { visible, statusLabel, statusTone } = useManualDockAssist({ manageLifecycle: true });
+  if (!visible) return null;
+  const toneClass =
+    statusTone === 'good'
+      ? 'border-emerald-200/70 bg-emerald-900/85 text-emerald-50'
+      : statusTone === 'warn'
+      ? 'border-amber-200/70 bg-amber-900/85 text-amber-50'
+      : 'border-indigo-200/70 bg-indigo-900/85 text-indigo-50';
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -34,7 +18,7 @@ function ManualDockAssistOverlay({ mobileHud = false }) {
           mobileHud ? 'text-[0.65rem]' : 'text-xs'
         }`}
       >
-        {status}
+        {statusLabel}
       </div>
     </div>
   );

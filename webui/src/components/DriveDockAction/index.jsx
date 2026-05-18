@@ -1,10 +1,11 @@
 // Drive Dock Action
 // Purpose: Defines the Drive Dock Action module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useControlSystem } from '../../controls/index.js';
 import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 
 export function deriveDriveDockState(frame) {
   const sensors = frame?.sensors || {};
@@ -103,17 +104,17 @@ export default function DriveDockAction({
 }) {
   const isMobile = layout === 'mobile';
   const {
-    state: { roverId, keymap, manualDockAssist },
+    state: { roverId, keymap },
     actions,
   } = useControlSystem();
+  const dockAssist = useManualDockAssist();
   const frame = useTelemetryFrame(roverId);
   const state = driveDockState ?? deriveDriveDockState(frame);
   const { driving, docked, charging, dockingInProgress } = state;
   const [pending, setPending] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const manualAssistActive = Boolean(manualDockAssist?.active);
-  const wasDockedRef = useRef(false);
+  const manualAssistActive = Boolean(dockAssist.active);
 
   const driveDisabled = !roverId || pending !== null;
   const dockDisabled = !roverId || pending !== null;
@@ -139,25 +140,11 @@ export default function DriveDockAction({
   const chargeValue = charging ? 'Charging' : docked ? 'Charging soon...' : '—';
   const chargeTone = charging ? 'good' : docked ? 'warn' : 'bad';
 
-  useEffect(() => {
-    const justDocked = docked && !wasDockedRef.current;
-    if (manualAssistActive && justDocked) {
-      actions.sendSong([{ note: 84, duration: 6 }], { slot: 1 });
-    }
-    wasDockedRef.current = docked;
-  }, [actions, docked, manualAssistActive]);
-
-  useEffect(() => {
-    if (!manualAssistActive) return;
-    if (!charging) return;
-    actions.setManualDockAssistActive(false);
-  }, [actions, charging, manualAssistActive]);
-
   const handleReturnToDrive = async () => {
     if (!roverId || pending) return;
     setPending('drive');
     try {
-      actions.setManualDockAssistActive(false);
+      dockAssist.exitAssist();
       actions.setMode('drive');
       await actions.runMacro('drive-sequence');
     } catch (err) {
@@ -173,7 +160,7 @@ export default function DriveDockAction({
     setShowModal(false);
     setPending('drive');
     try {
-      actions.setManualDockAssistActive(false);
+      dockAssist.exitAssist();
       actions.setMode('drive');
       await actions.runMacro('drive-sequence');
     } catch (err) {
@@ -187,7 +174,7 @@ export default function DriveDockAction({
     if (!roverId || pending) return;
     setPending('dock');
     try {
-      actions.setManualDockAssistActive(true);
+      dockAssist.enterAssist();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -200,7 +187,7 @@ export default function DriveDockAction({
   const handleOpenDock = () => {
     if (dockDisabled) return;
     if (manualAssistActive) {
-      actions.setManualDockAssistActive(false);
+      dockAssist.exitAssist();
       return;
     }
     setShowModal(true);

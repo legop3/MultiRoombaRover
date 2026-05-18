@@ -11,6 +11,7 @@ import {
 } from './gamepadBindings.js';
 import { subscribeGamepadHub } from './gamepadHub.js';
 import { isTextEntryActive } from './inputFocusUtils.js';
+import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 
 const SOURCE = 'gamepad';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
@@ -50,8 +51,6 @@ export default function GamepadInputManager() {
     state,
     actions: {
       setMode,
-      setManualDockAssistActive,
-      toggleManualDockAssist,
       setDriveVector,
       setAuxMotors,
       setServoAngle,
@@ -60,6 +59,7 @@ export default function GamepadInputManager() {
       registerInputState,
     },
   } = useControlSystem();
+  const dockAssist = useManualDockAssist();
   const { value: gamepadSettings, save: saveGamepadSettings } = useSettingsNamespace(
     'gamepad',
     GAMEPAD_SETTINGS_DEFAULTS,
@@ -245,7 +245,7 @@ export default function GamepadInputManager() {
       }
 
       if (outputs.buttons.driveMacro && handleButtonEdge('driveMacro', true)) {
-        setManualDockAssistActive(false);
+        dockAssist.exitAssist();
         setMode('drive');
         runMacro('drive-sequence');
       } else if (!outputs.buttons.driveMacro) {
@@ -253,7 +253,7 @@ export default function GamepadInputManager() {
       }
 
       if (outputs.buttons.dockMacro && handleButtonEdge('dockMacro', true)) {
-        toggleManualDockAssist();
+        dockAssist.toggleAssist();
       } else if (!outputs.buttons.dockMacro) {
         handleButtonEdge('dockMacro', false);
       }
@@ -290,12 +290,11 @@ export default function GamepadInputManager() {
     handleCameraAxis,
     registerInputState,
     runMacro,
-    setManualDockAssistActive,
     setAuxMotors,
     setDriveVector,
     setMode,
-    toggleManualDockAssist,
     toggleNightVision,
+    dockAssist,
   ]);
 
   return null;
