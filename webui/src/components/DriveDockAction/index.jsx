@@ -206,6 +206,8 @@ export default function DriveDockAction({
     'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800 focus-visible:ring-amber-300';
   const indigoCta =
     'border-indigo-300/70 bg-indigo-900 text-indigo-50 hover:bg-indigo-800 focus-visible:ring-indigo-300';
+  const cyanCta =
+    'border-cyan-300/70 bg-cyan-900 text-cyan-50 hover:bg-cyan-800 focus-visible:ring-cyan-300';
   const orangeCta =
     'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800 focus-visible:ring-amber-300';
   const forceExpanded = dockingInProgress;
@@ -302,9 +304,9 @@ export default function DriveDockAction({
         className={
           isMobile
             ? `flex w-full ${baseCardClasses} ${compactHeight} ${ctaText} ${layoutClass} ${ctaSize} ${
-                compactDockedDriving ? orangeCta : indigoCta
+                manualAssistActive ? cyanCta : compactDockedDriving ? orangeCta : indigoCta
               }`
-            : `${baseCardClasses} ${filledHeight} ${ctaText} ${ctaLayout} ${ctaSize} ${indigoCta}`
+            : `${baseCardClasses} ${filledHeight} ${ctaText} ${ctaLayout} ${ctaSize} ${manualAssistActive ? cyanCta : indigoCta}`
         }
       >
         <div className="flex w-full flex-col items-center gap-0.25">

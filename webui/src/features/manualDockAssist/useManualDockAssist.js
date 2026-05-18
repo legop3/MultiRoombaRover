@@ -31,8 +31,11 @@ export function useManualDockAssist(options = {}) {
   useEffect(() => {
     if (!manageLifecycle) return;
     const justDocked = docked && !wasDockedRef.current;
+    const justUndocked = !docked && wasDockedRef.current;
     if (active && justDocked) {
       actions.sendSong([{ note: 84, duration: 6 }], { slot: 1 });
+    } else if (active && justUndocked) {
+      actions.sendSong([{ note: 72, duration: 6 }], { slot: 1 });
     }
     wasDockedRef.current = docked;
   }, [actions, active, docked, manageLifecycle]);
@@ -62,4 +65,3 @@ export function useManualDockAssist(options = {}) {
     [active, charging, docked, enterAssist, exitAssist, statusLabel, statusTone, toggleAssist, visible],
   );
 }
-

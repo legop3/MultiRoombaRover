@@ -42,7 +42,7 @@ function ManualDockAssistOverlay({ mobileHud = false }) {
       ? 'border-emerald-200/90 bg-emerald-900/90 text-emerald-50'
       : statusTone === 'warn'
       ? 'border-amber-200/90 bg-amber-900/90 text-amber-50'
-      : 'border-indigo-200/90 bg-indigo-900/90 text-indigo-50';
+      : 'border-cyan-200/90 bg-cyan-900/90 text-cyan-50';
 
   return (
     <div className="pointer-events-none absolute inset-0">
