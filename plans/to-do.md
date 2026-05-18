@@ -6,12 +6,6 @@
 6.  enable scrolling on horn frequencies, turn down frequency limit to like 3500
 7.  make replays more instant, probably make segments shorter
     1.  fix replay UI so it doesnt save anything in cookie
-8.  rework drive / dock panel somehow to explain how to dock manually instead of relying on auto docking
-    1.  maybe have a flag in the rover to choose between auto or manual directions
-    2.  probably have a short inline video that plays and shows the process
-    3.  manual docking mode
-        1.  have camera move down automatically and limit speed during manual docking mode
-        2.  maybe do some image recodgnition on the server and guide the rover manually?? might be too much
 
 # relative pipe dreams:
 1. VPS video forwarding
