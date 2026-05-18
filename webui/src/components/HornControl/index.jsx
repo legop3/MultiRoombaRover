@@ -4,12 +4,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { HORN_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import { HORN_MAX_FREQUENCY } from '../../controls/constants.js';
 
 function clampFreq(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return 0;
   if (num <= 0) return 0;
-  return Math.min(5000, Math.round(num));
+  return Math.min(HORN_MAX_FREQUENCY, Math.round(num));
 }
 
 export default function HornControl({
@@ -97,6 +98,16 @@ export default function HornControl({
       });
     },
     [saveHornSettings],
+  );
+
+  const handleFreqWheel = useCallback(
+    (index) => (event) => {
+      event.preventDefault();
+      const direction = event.deltaY < 0 ? 1 : -1;
+      const current = Number(freqs[index]) || 0;
+      updateFreq(index, current + direction);
+    },
+    [freqs, updateFreq],
   );
 
   const handlePointerDown = (event) => {
@@ -195,10 +206,11 @@ export default function HornControl({
                   <input
                     type="number"
                     min={0}
-                    max={5000}
+                    max={HORN_MAX_FREQUENCY}
                     step={1}
                     value={freq}
                     onChange={(event) => updateFreq(idx, event.target.value)}
+                    onWheel={handleFreqWheel(idx)}
                     className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
                   />
                 </label>
@@ -224,10 +236,11 @@ export default function HornControl({
                 <input
                   type="number"
                   min={0}
-                  max={5000}
+                  max={HORN_MAX_FREQUENCY}
                   step={1}
                   value={freq}
                   onChange={(event) => updateFreq(idx, event.target.value)}
+                  onWheel={handleFreqWheel(idx)}
                   className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
                 />
               </label>

@@ -10,6 +10,7 @@ import {
   HORN_HEAT_COOL_PER_SEC,
   HORN_HEAT_RESUME_THRESHOLD,
   HORN_HEAT_UP_PER_SEC,
+  HORN_MAX_FREQUENCY,
   HORN_MAX_MS,
   MANUAL_DOCK_ASSIST_MAX_SPEED,
   SONG_DEFAULT_NOTE,
@@ -424,7 +425,7 @@ export function ControlSystemProvider({ children }) {
       .map((value) => {
         const num = Number(value);
         if (!Number.isFinite(num)) return 0;
-        return num <= 0 ? 0 : Math.min(5000, Math.round(num));
+        return num <= 0 ? 0 : Math.min(HORN_MAX_FREQUENCY, Math.round(num));
       });
     return { waveform, freqs: normalized };
   }, [hornSettings]);
