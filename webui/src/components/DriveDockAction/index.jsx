@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useControlSystem } from '../../controls/index.js';
 import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 
 export function deriveDriveDockState(frame) {
   const sensors = frame?.sensors || {};
@@ -68,7 +69,7 @@ function DockModal({ instructions, onConfirm, onCancel, pending }) {
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-1">
       <div className="surface w-full max-w-md space-y-0.5 border border-indigo-700 bg-indigo-950/90 p-1 text-slate-100 shadow-2xl">
         <div className="space-y-0.5">
-          <p className="text-lg font-semibold text-indigo-50">Dock Rover</p>
+          <p className="text-lg font-semibold text-indigo-50">Manual Docking Assist</p>
           <p className="text-sm text-slate-200">{instructions.summary}</p>
           <StepList steps={instructions.steps} tone="indigo" />
         </div>
@@ -86,7 +87,7 @@ function DockModal({ instructions, onConfirm, onCancel, pending }) {
             onClick={onConfirm}
             className="bg-indigo-600 px-0.5 py-1 font-semibold text-indigo-50 transition hover:bg-indigo-500 disabled:opacity-50"
           >
-            {pending ? 'Docking…' : 'Confirm Dock'}
+            {pending ? 'Starting…' : 'Enter Assist'}
           </button>
         </div>
       </div>
@@ -106,12 +107,14 @@ export default function DriveDockAction({
     state: { roverId, keymap },
     actions,
   } = useControlSystem();
+  const dockAssist = useManualDockAssist();
   const frame = useTelemetryFrame(roverId);
   const state = driveDockState ?? deriveDriveDockState(frame);
   const { driving, docked, charging, dockingInProgress } = state;
   const [pending, setPending] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const manualAssistActive = Boolean(dockAssist.active);
 
   const driveDisabled = !roverId || pending !== null;
   const dockDisabled = !roverId || pending !== null;
@@ -120,10 +123,13 @@ export default function DriveDockAction({
   const dockKeyLabel = formatKeyLabel(keymap?.dockMacro?.[0]);
 
   const dockInstructions = {
-    summary: 'You are about to trigger an automatic docking attempt! To have a successful dock:',
-    steps: ['Line up the rover straight in front of the dock', 'Make sure the rover is about one foot or half a meter away from the dock', 'Press Confirm Dock to begin the docking process'],
+    summary: 'Use assist mode to manually line up with the dock.',
+    steps: [
+      'Line up the center dot of your rover with the center of the dock',
+      'The UI will indicate when you are successfully docked',
+      'When good contact is made, charging will start in about 5 seconds.',
+    ],
   };
-  const dockButtonCaption = 'Click this button to initate auto-dock.';
 
   const startDriveInstructions = {
     summary: 'You must enable driving mode before you can move the rover.',
@@ -131,13 +137,14 @@ export default function DriveDockAction({
   };
   const dockValue = docked ? 'Docked' : 'Undocked';
   const dockTone = docked ? 'good' : 'bad';
-  const chargeValue = charging ? 'Charging' : docked ? 'Charging in 5s' : '—';
+  const chargeValue = charging ? 'Charging' : docked ? 'Charging soon...' : '—';
   const chargeTone = charging ? 'good' : docked ? 'warn' : 'bad';
 
   const handleReturnToDrive = async () => {
     if (!roverId || pending) return;
     setPending('drive');
     try {
+      dockAssist.exitAssist();
       actions.setMode('drive');
       await actions.runMacro('drive-sequence');
     } catch (err) {
@@ -153,6 +160,7 @@ export default function DriveDockAction({
     setShowModal(false);
     setPending('drive');
     try {
+      dockAssist.exitAssist();
       actions.setMode('drive');
       await actions.runMacro('drive-sequence');
     } catch (err) {
@@ -166,8 +174,7 @@ export default function DriveDockAction({
     if (!roverId || pending) return;
     setPending('dock');
     try {
-      actions.setMode('dock');
-      await actions.runMacro('seek-dock');
+      dockAssist.enterAssist();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -179,6 +186,10 @@ export default function DriveDockAction({
 
   const handleOpenDock = () => {
     if (dockDisabled) return;
+    if (manualAssistActive) {
+      dockAssist.exitAssist();
+      return;
+    }
     setShowModal(true);
     setConfirmOpen(true);
   };
@@ -188,7 +199,6 @@ export default function DriveDockAction({
   const ctaText = 'text-center';
   const ctaLayout = 'items-center justify-between';
   const compactLayout = 'items-center justify-center';
-  const ctaTextAndLayout = `${ctaText} ${ctaLayout}`;
   const ctaSize = isMobile ? 'text-sm font-semibold' : '';
   const emeraldCta =
     'border-emerald-300/70 bg-emerald-800 text-emerald-50 hover:bg-emerald-700 focus-visible:ring-emerald-300';
@@ -196,6 +206,8 @@ export default function DriveDockAction({
     'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800 focus-visible:ring-amber-300';
   const indigoCta =
     'border-indigo-300/70 bg-indigo-900 text-indigo-50 hover:bg-indigo-800 focus-visible:ring-indigo-300';
+  const cyanCta =
+    'border-cyan-300/70 bg-cyan-900 text-cyan-50 hover:bg-cyan-800 focus-visible:ring-cyan-300';
   const orangeCta =
     'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800 focus-visible:ring-amber-300';
   const forceExpanded = dockingInProgress;
@@ -243,8 +255,8 @@ export default function DriveDockAction({
 
   if (dockingInProgress) {
     const inProgressCopy = {
-      summary: 'If the rover is failing to dock, click to drive and try again.',
-      steps: ['The rover should be slowly wiggling towards the dock', 'If it is obviously not working, press this button to enter driving mode and try again'],
+      summary: 'The rover is currently attempting to dock itself due to being idle.',
+      steps: ['Click to return to driving mode.'],
     };
 
     return (
@@ -257,7 +269,7 @@ export default function DriveDockAction({
       >
         <div className="space-y-0.5 w-full">
           <div className="flex w-full flex-col items-center gap-0.25">
-            <span className="text-base font-semibold text-amber-50 md:text-lg">Docking in Progress</span>
+            <span className="text-base font-semibold text-amber-50 md:text-lg">Attempting to auto-dock...</span>
             {/* {!isMobile && expanded ? ( */}
             {expanded ? (
               <div className="flex flex-wrap items-center justify-center gap-0.5">
@@ -292,31 +304,30 @@ export default function DriveDockAction({
         className={
           isMobile
             ? `flex w-full ${baseCardClasses} ${compactHeight} ${ctaText} ${layoutClass} ${ctaSize} ${
-                compactDockedDriving ? orangeCta : indigoCta
+                manualAssistActive ? cyanCta : compactDockedDriving ? orangeCta : indigoCta
               }`
-            : `${baseCardClasses} ${filledHeight} ${ctaText} ${ctaLayout} ${ctaSize} ${indigoCta}`
+            : `${baseCardClasses} ${filledHeight} ${ctaText} ${ctaLayout} ${ctaSize} ${manualAssistActive ? cyanCta : indigoCta}`
         }
       >
         <div className="flex w-full flex-col items-center gap-0.25">
           <span className="text-base font-semibold text-indigo-50 md:text-lg">
-            {compactDockedDriving ? 'Docked!' : 'Dock and Charge'}
+            {compactDockedDriving ? 'Docked!' : manualAssistActive ? 'Exit Docking Assist' : 'Dock and charge'}
           </span>
           {!isMobile && expanded ? (
             <div className="flex flex-wrap items-center justify-center gap-0.5">
               {dockKeyLabel ? <KeyPill label={dockKeyLabel} /> : null}
-              <ActionPill label="Click to begin docking" tone="indigo" />
+              <ActionPill label={manualAssistActive ? 'Click to exit assist' : 'Click to enable assist'} tone="indigo" />
             </div>
           ) : null}
         </div>
         {!isMobile && expanded && (
           <>
-            <p className="text-sm text-indigo-50/90">{dockButtonCaption}</p>
+            <p className="text-sm text-indigo-50/90">
+              Get near a dock and press this button to enter docking assist mode.
+            </p>
             <div className="flex w-full flex-1 flex-col gap-0.5 self-stretch">
               <StatusRow label="Dock" value={dockValue} tone={dockTone} />
               <StatusRow label="Charge" value={chargeValue} tone={chargeTone} />
-            </div>
-            <div className="text-xs text-indigo-100/80">
-              Line up straight, about 1 foot away, before docking.
             </div>
           </>
         )}

@@ -4,6 +4,7 @@ import { useControlSystem } from '../../controls/index.js';
 import { useDriverVideoModePolicy } from '../../hooks/useDriverVideoModePolicy.js';
 import TurnsOverlay from '../HudOverlays/TurnsOverlay/index.jsx';
 import HudOverlay from '../HudOverlays/HudOverlay/index.jsx';
+import ManualDockAssistOverlay from '../HudOverlays/ManualDockAssistOverlay/index.jsx';
 import RoverDescriptionOverlay from '../HudOverlays/RoverDescriptionOverlay/index.jsx';
 import OvercurrentOverlay from '../HudOverlays/OvercurrentOverlay/index.jsx';
 import LowBatteryOverlay from '../HudOverlays/LowBatteryOverlay/index.jsx';
@@ -50,6 +51,7 @@ export default function DriverVideo({ layoutFormat = 'desktop' }) {
             mobileHud={mobileHud}
             labelScale={1}
           />
+          <ManualDockAssistOverlay mobileHud={mobileHud} />
           <HudChatInput compact={mobileHud} />
           <OvercurrentOverlay compact={mobileHud} />
           <LowBatteryOverlay compact={mobileHud} />

@@ -1,0 +1,11 @@
+- roombas are worn out, cant dock themselves anymore using seek dock
+- completely redesign the user facing docking process
+  - get rid of the auto dock instructions
+  - replace it with a flow for manual docking mode:
+    - does a little explanation
+      - line up your round front sensor with the sensor on the dock
+      - maybe show a video or an image in the HUD to assist
+    - plays a song on the roomba to indicate that "docking mode" has been entered even though its all client side.
+    - forces the camera to look all the way down so people can see their round front sensor
+    - limits movement speed to be very slow to help people be more precise
+- MAYBE try some computer vision stuff that runs server-side and guides people? sounds hard and slow and not worth it.

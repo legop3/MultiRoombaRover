@@ -24,6 +24,7 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
 import { useState } from 'react';
+import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 
 function TopDownMapPanel() {
   const {
@@ -47,6 +48,7 @@ function DriveDockPanel() {
     pipeline,
     actions: { setServoAngle, setNightVision, startHorn, stopHorn },
   } = useControlSystem();
+  const dockAssist = useManualDockAssist();
   const driveDockState = useDriveDockState(roverId);
   const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
@@ -68,6 +70,7 @@ function DriveDockPanel() {
   const hornLabel = formatKeyLabel(keymap?.hornHonk?.[0]);
   const upLabel = formatKeyLabel(keymap?.cameraUp?.[0]);
   const downLabel = formatKeyLabel(keymap?.cameraDown?.[0]);
+  const cameraDisabled = Boolean(!roverId || dockAssist.cameraLocked);
 
   return (
     <section className="panel-section grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-0.5">
@@ -97,6 +100,7 @@ function DriveDockPanel() {
               value={value}
               min={min}
               max={max}
+              disabled={cameraDisabled}
               onChange={setServoAngle}
               keyDownLabel={downLabel}
               keyUpLabel={upLabel}

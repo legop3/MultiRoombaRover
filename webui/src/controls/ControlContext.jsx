@@ -11,6 +11,7 @@ import {
   HORN_HEAT_RESUME_THRESHOLD,
   HORN_HEAT_UP_PER_SEC,
   HORN_MAX_MS,
+  MANUAL_DOCK_ASSIST_MAX_SPEED,
   SONG_DEFAULT_NOTE,
 } from './constants.js';
 import { canonicalizeKeyInput } from './keymapUtils.js';
@@ -212,7 +213,23 @@ export function ControlSystemProvider({ children }) {
 
   const setDriveVector = useCallback(
     (vector, meta = {}) => {
-      const computed = computeDifferentialSpeeds(vector, meta.speedOptions);
+      const speedOptions = { ...(meta.speedOptions || {}) };
+      if (state.manualDockAssist?.active) {
+        const capped = Math.max(1, Math.min(MANUAL_DOCK_ASSIST_MAX_SPEED, 500));
+        speedOptions.maxSpeed = Math.min(
+          typeof speedOptions.maxSpeed === 'number' ? speedOptions.maxSpeed : capped,
+          capped,
+        );
+        speedOptions.baseSpeed = Math.min(
+          typeof speedOptions.baseSpeed === 'number' ? speedOptions.baseSpeed : capped,
+          capped,
+        );
+        speedOptions.boostSpeed = Math.min(
+          typeof speedOptions.boostSpeed === 'number' ? speedOptions.boostSpeed : capped,
+          capped,
+        );
+      }
+      const computed = computeDifferentialSpeeds(vector, speedOptions);
       dispatch({
         type: 'control/update-drive',
         payload: { ...computed, source: meta.source ?? null },
@@ -220,7 +237,7 @@ export function ControlSystemProvider({ children }) {
       recordControlIntent();
       pipeline.sendDriveDirect(computed.speeds);
     },
-    [pipeline, recordControlIntent],
+    [pipeline, recordControlIntent, state.manualDockAssist?.active],
   );
 
   const setAuxMotors = useCallback(
@@ -262,15 +279,17 @@ export function ControlSystemProvider({ children }) {
   }, [saveControlSettings]);
 
   const setServoAngle = useCallback(
-    (value) => {
+    (value, options = {}) => {
       if (!pipeline.servoConfig) return;
+      const force = Boolean(options?.force);
+      if (state.manualDockAssist?.active && !force) return;
       const clamped = clampServoAngle(pipeline.servoConfig, value);
       dispatch({ type: 'control/set-camera-angle', payload: clamped });
       pipeline.sendServoAngle(clamped);
       servoAngleRef.current = clamped;
       recordControlIntent();
     },
-    [pipeline, recordControlIntent],
+    [pipeline, recordControlIntent, state.manualDockAssist?.active],
   );
 
   const nudgeServo = useCallback(
@@ -318,8 +337,6 @@ export function ControlSystemProvider({ children }) {
             steps: removeDriveSequenceBackoff(macro.steps),
           };
         }
-      } else if (macroId === 'seek-dock') {
-        recordControlIntent();
       }
       await pipeline.runMacroSteps(macroToRun);
     },
@@ -509,6 +526,32 @@ export function ControlSystemProvider({ children }) {
     return () => clearInterval(interval);
   }, [dispatch, hornNeedsTick, HORN_HEAT_COOL_PER_SEC, HORN_HEAT_RESUME_THRESHOLD, HORN_HEAT_UP_PER_SEC]);
 
+  const setManualDockAssistActive = useCallback(
+    (active) => {
+      const nextActive = Boolean(active);
+      const prevActive = Boolean(state.manualDockAssist?.active);
+      if (prevActive === nextActive) return;
+      dispatch({ type: 'control/set-manual-dock-assist', payload: nextActive });
+      if (!nextActive) {
+        pipeline.sendSong([{ note: 83, duration: 10 }, { note: 76, duration: 10 }], { slot: 0 });
+        setServoAngle(0, { force: true });
+        return;
+      }
+      const minAngle =
+        typeof pipeline.servoConfig?.minAngle === 'number'
+          ? pipeline.servoConfig.minAngle
+          : -45;
+      setServoAngle(minAngle, { force: true });
+      pipeline.sendSong([{ note: 76, duration: 10 }, { note: 83, duration: 10 }], { slot: 0 });
+      recordControlIntent();
+    },
+    [pipeline, recordControlIntent, setServoAngle, state.manualDockAssist?.active],
+  );
+
+  const toggleManualDockAssist = useCallback(() => {
+    setManualDockAssistActive(!state.manualDockAssist?.active);
+  }, [setManualDockAssistActive, state.manualDockAssist?.active]);
+
   const registerInputState = useCallback((source, data) => {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });
   }, []);
@@ -539,6 +582,8 @@ export function ControlSystemProvider({ children }) {
         updateKeyBinding,
         resetKeyBindings,
         registerInputState,
+        setManualDockAssistActive,
+        toggleManualDockAssist,
         setSongNote,
         sendSong,
         startHorn,
@@ -565,6 +610,8 @@ export function ControlSystemProvider({ children }) {
       updateKeyBinding,
       resetKeyBindings,
       registerInputState,
+      setManualDockAssistActive,
+      toggleManualDockAssist,
       setSongNote,
       sendSong,
       startHorn,

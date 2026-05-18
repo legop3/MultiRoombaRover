@@ -9,6 +9,7 @@ import { isKeyboardCaptureLocked } from './keyboardCaptureLock.js';
 import { isTextInputElement } from './inputFocusUtils.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import {
   SONG_DEFAULT_DURATION,
   SONG_DEFAULT_NOTE,
@@ -137,6 +138,7 @@ export default function KeyboardInputManager() {
     },
   } = useControlSystem();
   const homeAssistant = useSessionSelector((state) => state.session?.homeAssistant || null);
+  const dockAssist = useManualDockAssist();
   const { homeAssistantSetState } = useSessionActions();
   const { focusChat, blurChat, isChatFocused } = useChat();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
@@ -372,11 +374,11 @@ export default function KeyboardInputManager() {
 
       if (newlyPressed.length > 0) {
         if (newlyPressed.some((token) => keymap.driveMacro?.has(token))) {
+          dockAssist.exitAssist();
           setMode('drive');
           runMacro('drive-sequence');
         } else if (newlyPressed.some((token) => keymap.dockMacro?.has(token))) {
-          setMode('dock');
-          runMacro('seek-dock');
+          dockAssist.toggleAssist();
         } else if (newlyPressed.some((token) => keymap.nightVisionToggle?.has(token))) {
           toggleNightVision();
         } else if (newlyPressed.some((token) => keymap.hornHonk?.has(token))) {
@@ -448,6 +450,7 @@ export default function KeyboardInputManager() {
     startHorn,
     stopHorn,
     triggerHomeAssistantCycle,
+    dockAssist,
   ]);
 
   const latestResetAllRef = useRef(resetAll);

@@ -18,6 +18,7 @@ import {
   AUX_ALL_FORWARD,
   AUX_ALL_BACKWARD,
 } from './constants.js';
+import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 
 function MobileJoystickPanel({ layout }) {
   const {
@@ -99,6 +100,7 @@ function MobileActionsColumnContent({ layout }) {
     pipeline,
     actions: { setServoAngle, setNightVision, setAuxMotors, startHorn, stopHorn },
   } = useControlSystem();
+  const dockAssist = useManualDockAssist();
   const disabled = !roverId;
   const activeRef = useRef(null);
   const cameraConfig = camera?.config;
@@ -115,6 +117,7 @@ function MobileActionsColumnContent({ layout }) {
       : typeof cameraConfig?.homeAngle === 'number'
       ? cameraConfig.homeAngle
       : (cameraMin + cameraMax) / 2;
+  const cameraDisabled = Boolean(disabled || dockAssist.cameraLocked);
 
   const handleNightVisionToggle = useCallback(
     (nextOn) => {
@@ -174,6 +177,7 @@ function MobileActionsColumnContent({ layout }) {
               min={cameraMin}
               max={cameraMax}
               step={0.5}
+              disabled={cameraDisabled}
               onChange={setServoAngle}
               orientation="vertical"
               label="Camera Tilt"
