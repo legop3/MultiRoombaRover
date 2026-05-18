@@ -533,6 +533,7 @@ export function ControlSystemProvider({ children }) {
       if (prevActive === nextActive) return;
       dispatch({ type: 'control/set-manual-dock-assist', payload: nextActive });
       if (!nextActive) {
+        pipeline.sendSong([{ note: 83, duration: 10 }, { note: 76, duration: 10 }], { slot: 0 });
         setServoAngle(0, { force: true });
         return;
       }

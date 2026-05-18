@@ -39,17 +39,17 @@ function ManualDockAssistOverlay({ mobileHud = false }) {
   if (!visible) return null;
   const toneClass =
     statusTone === 'good'
-      ? 'border-emerald-200/70 bg-emerald-900/85 text-emerald-50'
+      ? 'border-emerald-200/85 bg-emerald-900/96 text-emerald-50'
       : statusTone === 'warn'
-      ? 'border-amber-200/70 bg-amber-900/85 text-amber-50'
-      : 'border-indigo-200/70 bg-indigo-900/85 text-indigo-50';
+      ? 'border-amber-200/85 bg-amber-900/96 text-amber-50'
+      : 'border-indigo-200/85 bg-indigo-900/96 text-indigo-50';
 
   return (
     <div className="pointer-events-none absolute inset-0">
       {popupMessage ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <div
-            className={`rounded-xl border border-indigo-200/70 bg-indigo-900/88 px-4 py-2 text-center font-semibold text-indigo-50 shadow-2xl ${
+            className={`rounded-xl border border-indigo-200/90 bg-indigo-950/98 px-4 py-2 text-center font-semibold text-indigo-50 shadow-2xl ${
               mobileHud ? 'text-lg' : 'text-2xl'
             }`}
           >
