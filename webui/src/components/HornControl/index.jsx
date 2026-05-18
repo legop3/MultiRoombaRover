@@ -103,9 +103,11 @@ export default function HornControl({
   const handleFreqWheel = useCallback(
     (index) => (event) => {
       event.preventDefault();
+      event.stopPropagation();
       const direction = event.deltaY < 0 ? 1 : -1;
+      const step = 25;
       const current = Number(freqs[index]) || 0;
-      updateFreq(index, current + direction);
+      updateFreq(index, current + direction * step);
     },
     [freqs, updateFreq],
   );
@@ -210,6 +212,7 @@ export default function HornControl({
                     step={1}
                     value={freq}
                     onChange={(event) => updateFreq(idx, event.target.value)}
+                    onWheelCapture={handleFreqWheel(idx)}
                     onWheel={handleFreqWheel(idx)}
                     className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
                   />
@@ -240,6 +243,7 @@ export default function HornControl({
                   step={1}
                   value={freq}
                   onChange={(event) => updateFreq(idx, event.target.value)}
+                  onWheelCapture={handleFreqWheel(idx)}
                   onWheel={handleFreqWheel(idx)}
                   className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
                 />
