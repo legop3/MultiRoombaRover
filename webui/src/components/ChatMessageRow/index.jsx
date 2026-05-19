@@ -156,10 +156,11 @@ export default function ChatMessageRow({ message }) {
               <div className="mt-0.5 rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
                 {toolCalls.map((entry, idx) => {
                   const status = String(entry?.status || 'unknown');
-                  const icon = status === 'ok' ? '✅' : status === 'blocked' ? '⛔' : status === 'error' ? '❌' : '•';
+                  const statusLabel = status === 'ok' ? 'ok' : status === 'blocked' ? 'blocked' : status === 'error' ? 'error' : 'unknown';
+                  const argsText = JSON.stringify(entry?.args && typeof entry.args === 'object' ? entry.args : {});
                   return (
                     <div key={`${entry?.tool || 'tool'}-${idx}`} className="mb-0.5 last:mb-0">
-                      <div>{icon} {entry?.tool || 'unknown'}</div>
+                      <div>{statusLabel} {entry?.tool || 'unknown'} args={argsText}</div>
                       {entry?.error ? <div className="text-rose-300">error: {String(entry.error)}</div> : null}
                     </div>
                   );

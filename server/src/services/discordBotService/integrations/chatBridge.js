@@ -6,10 +6,11 @@ const { WebhookClient } = require('discord.js');
 function summarizeToolCall(entry = {}) {
   const tool = String(entry?.tool || 'unknown');
   const status = String(entry?.status || 'unknown').toLowerCase();
-  if (status === 'ok') return `✅ ${tool}`;
-  if (status === 'blocked') return `⛔ ${tool} — ${String(entry?.error || 'blocked')}`;
-  if (status === 'error') return `❌ ${tool} — ${String(entry?.error || 'failed')}`;
-  return `• ${tool}`;
+  const argsText = JSON.stringify(entry?.args && typeof entry.args === 'object' ? entry.args : {});
+  if (status === 'ok') return `ok ${tool} args=${argsText}`;
+  if (status === 'blocked') return `blocked ${tool} args=${argsText} - ${String(entry?.error || 'blocked')}`;
+  if (status === 'error') return `error ${tool} args=${argsText} - ${String(entry?.error || 'failed')}`;
+  return `unknown ${tool} args=${argsText}`;
 }
 
 function formatToolCallsCodeBlock(toolCalls = []) {
