@@ -150,28 +150,17 @@ export default function ChatMessageRow({ message }) {
     ) : null;
   return (
     <div className={chatRowClass(message)}>
-      {!open ? (
-        <div className="flex w-full items-start gap-0.5">
-          <span
-            className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
-          >
-            <ChatIdentity message={message} toolsToggle={toolsToggle} />
-            {hasText ? ` ${message.text}` : ''}
-          </span>
-          <span className="shrink-0 text-[0.65rem] text-slate-400/60">
-            {formatTime(message.ts)}
-          </span>
-        </div>
-      ) : (
-        <div className="flex w-full items-start gap-0.5">
-          <span className={`min-w-0 flex-1 ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
-            <ChatIdentity message={message} toolsToggle={toolsToggle} />
-          </span>
-          <span className="shrink-0 text-[0.65rem] text-slate-400/60">
-            {formatTime(message.ts)}
-          </span>
-        </div>
-      )}
+      <div className="flex w-full items-start gap-0.5">
+        <span
+          className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
+        >
+          <ChatIdentity message={message} toolsToggle={toolsToggle} />
+          {!open && hasText ? ` ${message.text}` : ''}
+        </span>
+        <span className="shrink-0 text-[0.65rem] text-slate-400/60">
+          {formatTime(message.ts)}
+        </span>
+      </div>
       {open && toolCalls.length > 0 ? (
         <div className="w-full rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
           {toolCalls.map((entry, idx) => {
