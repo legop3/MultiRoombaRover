@@ -1,6 +1,7 @@
 // Chat Message Row
 // Purpose: Defines the Chat Message Row module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
+import { useState } from 'react';
 import { FaDiscord } from 'react-icons/fa';
 import { roverBadgeStyle } from '../../lib/roverColor.js';
 
@@ -133,12 +134,40 @@ function chatRowClass(message) {
 
 export default function ChatMessageRow({ message }) {
   const isBot = isBotMessage(message);
+  const [open, setOpen] = useState(false);
+  const toolCalls = Array.isArray(message?.toolCalls) ? message.toolCalls : [];
+  const hasText = Boolean(String(message?.text || '').trim());
   return (
     <div className={chatRowClass(message)}>
       <span
         className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
       >
-        <ChatIdentity message={message} /> {message.text}
+        <ChatIdentity message={message} />{hasText ? ` ${message.text}` : ''}
+        {toolCalls.length > 0 ? (
+          <span className="mt-0.5 block">
+            <button
+              type="button"
+              className="rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
+              onClick={() => setOpen((v) => !v)}
+            >
+              {open ? '▼' : '▶'} Tools ({toolCalls.length})
+            </button>
+            {open ? (
+              <div className="mt-0.5 rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
+                {toolCalls.map((entry, idx) => {
+                  const status = String(entry?.status || 'unknown');
+                  const icon = status === 'ok' ? '✅' : status === 'blocked' ? '⛔' : status === 'error' ? '❌' : '•';
+                  return (
+                    <div key={`${entry?.tool || 'tool'}-${idx}`} className="mb-0.5 last:mb-0">
+                      <div>{icon} {entry?.tool || 'unknown'}</div>
+                      {entry?.error ? <div className="text-rose-300">error: {String(entry.error)}</div> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </span>
+        ) : null}
       </span>
       <span className="ml-auto shrink-0 text-[0.65rem] text-slate-400/60">
         {formatTime(message.ts)}

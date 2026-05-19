@@ -11,7 +11,8 @@ const { registerChatSocketHooks } = require('./socketHooks');
 function sendSystemMessage(text, options = {}) {
   const normalized = normalizeUserText(text);
   const clean = normalized.trim();
-  if (!clean) return null;
+  const hasToolCalls = Array.isArray(options.toolCalls) && options.toolCalls.length > 0;
+  if (!clean && !hasToolCalls) return null;
   const safe = clean;
   const message = buildMessage(null, safe, {
     nickname: String(options.nickname || 'The Overseer'),
@@ -19,6 +20,7 @@ function sendSystemMessage(text, options = {}) {
     fromDiscord: false,
     bot: options.bot !== false,
     profileImage: options.profileImage || null,
+    toolCalls: hasToolCalls ? options.toolCalls : null,
   });
   broadcastMessage(message);
   return message;

@@ -3,6 +3,21 @@
 // Scope: Handles inbound Discord messages plus outbound webhook and typing relay.
 const { WebhookClient } = require('discord.js');
 
+function summarizeToolCall(entry = {}) {
+  const tool = String(entry?.tool || 'unknown');
+  const status = String(entry?.status || 'unknown').toLowerCase();
+  if (status === 'ok') return `✅ ${tool}`;
+  if (status === 'blocked') return `⛔ ${tool} — ${String(entry?.error || 'blocked')}`;
+  if (status === 'error') return `❌ ${tool} — ${String(entry?.error || 'failed')}`;
+  return `• ${tool}`;
+}
+
+function formatToolCallsCodeBlock(toolCalls = []) {
+  const rows = (toolCalls || []).map((entry) => summarizeToolCall(entry));
+  if (!rows.length) return '';
+  return `\`\`\`txt\nTool calls:\n${rows.join('\n')}\n\`\`\``;
+}
+
 function createChatBridgeHandlers(deps) {
   const {
     logger,
@@ -48,7 +63,15 @@ function createChatBridgeHandlers(deps) {
     const guildConfigs = listGuildConfigs();
     if (!guildConfigs.length) return;
 
-    const text = payload.text?.length > 1900 ? `${payload.text.slice(0, 1897)}...` : payload.text;
+    const baseText = String(payload.text || '');
+    const toolCalls = Array.isArray(payload.toolCalls) ? payload.toolCalls : [];
+    const toolsBlock = formatToolCallsCodeBlock(toolCalls);
+    let text = baseText;
+    if (toolsBlock) {
+      text = text ? `${text}\n\n${toolsBlock}` : `Overseer ran tools (no chat line).\n\n${toolsBlock}`;
+    }
+    if (text.length > 1900) text = `${text.slice(0, 1897)}...`;
+    if (!text.trim()) return;
     const username = formatWebhookUsername(payload);
     const avatarURL = payload.profileImage || (payload.fromDiscord ? payload.discordUserAvatarUrl || null : client.user?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null);
     const typingId = getTypingId(payload);

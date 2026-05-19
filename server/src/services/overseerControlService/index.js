@@ -207,6 +207,44 @@ function normalizeChatDraft(text) {
   return next;
 }
 
+function summarizeResult(result) {
+  if (!result || typeof result !== 'object') return null;
+  if (Object.prototype.hasOwnProperty.call(result, 'ok')) return { ok: Boolean(result.ok) };
+  return null;
+}
+
+function buildToolCallFeedEntries(requestedActions = [], actionResults = []) {
+  const resultsByTool = new Map();
+  (actionResults || []).forEach((entry) => {
+    if (!entry || entry.kind !== 'tool') return;
+    const key = String(entry.tool || '');
+    if (!key) return;
+    if (!resultsByTool.has(key)) resultsByTool.set(key, []);
+    resultsByTool.get(key).push(entry);
+  });
+  return (requestedActions || []).map((action) => {
+    const tool = String(action?.tool || '').trim() || 'unknown';
+    const bucket = resultsByTool.get(tool) || [];
+    const resultEntry = bucket.length ? bucket.shift() : null;
+    const ok = Boolean(resultEntry?.ok);
+    const errText = resultEntry?.error ? String(resultEntry.error) : '';
+    const status = resultEntry
+      ? ok
+        ? 'ok'
+        : errText.includes('blocked') || errText.includes('unavailable')
+          ? 'blocked'
+          : 'error'
+      : 'started';
+    return {
+      tool,
+      status,
+      args: action?.args && typeof action.args === 'object' ? action.args : {},
+      result: summarizeResult(resultEntry?.result),
+      error: errText || null,
+    };
+  });
+}
+
 async function runDecision(triggerReason) {
   const runId = runtime.tickCount;
   updateStatus({ phase: 'context_build', currentRunId: runId, lastTriggerReason: triggerReason, lastError: null, lastErrorDetails: null });
@@ -280,11 +318,6 @@ async function runDecision(triggerReason) {
   const reason = observeOnly ? 'observe-only mode' : null;
 
   if (!observeOnly) {
-    if ((decision === 'CHAT' || decision === 'ACTION+CHAT') && chatDraft) {
-      sendSystemMessage(chatDraft, { nickname: name, bot: true, profileImage: profileImageUrl });
-      actionResults.push({ kind: 'chat', ok: true });
-    }
-
     if (decision === 'ACTION' || decision === 'ACTION+CHAT') {
       for (const action of requestedActions) {
         pushLiveToolCall({ phase: 'start', tool: action.tool, args: action.args });
@@ -314,6 +347,17 @@ async function runDecision(triggerReason) {
           actionResults.push({ kind: 'tool', tool: action.tool, ok: false, error: err.message });
         }
       }
+    }
+
+    const toolCallFeed = buildToolCallFeedEntries(requestedActions, actionResults);
+    if (toolCallFeed.length > 0) {
+      if ((decision === 'CHAT' || decision === 'ACTION+CHAT') && chatDraft) {
+        sendSystemMessage(chatDraft, { nickname: name, bot: true, profileImage: profileImageUrl, toolCalls: toolCallFeed });
+      } else {
+        sendSystemMessage('', { nickname: name, bot: true, profileImage: profileImageUrl, toolCalls: toolCallFeed });
+      }
+    } else if ((decision === 'CHAT' || decision === 'ACTION+CHAT') && chatDraft) {
+      sendSystemMessage(chatDraft, { nickname: name, bot: true, profileImage: profileImageUrl });
     }
   }
 

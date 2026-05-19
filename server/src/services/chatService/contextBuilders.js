@@ -100,6 +100,21 @@ function buildRoverCtxSnapshot(roverId) {
 function buildMessage(socket, text, meta = {}) {
   const roverId = meta.roverId || resolveRoverId(socket?.id);
   const roverColor = meta.roverColor ?? resolveRoverColor(roverId);
+  const toolCalls = Array.isArray(meta.toolCalls)
+    ? meta.toolCalls
+        .map((entry) => {
+          if (!entry || typeof entry !== 'object') return null;
+          return {
+            tool: String(entry.tool || '').trim() || 'unknown',
+            status: String(entry.status || '').trim() || 'unknown',
+            args: entry.args && typeof entry.args === 'object' ? entry.args : {},
+            result: entry.result && typeof entry.result === 'object' ? entry.result : null,
+            error: entry.error ? String(entry.error) : null,
+            durationMs: Number.isFinite(entry.durationMs) ? Math.max(0, Math.round(entry.durationMs)) : null,
+          };
+        })
+        .filter(Boolean)
+    : null;
   return {
     id: uuidv4(),
     ts: Date.now(),
@@ -119,6 +134,7 @@ function buildMessage(socket, text, meta = {}) {
     profileImage: normalizeProfileImageUrl(meta.profileImage),
     roverCtx: meta.roverCtx || null,
     text,
+    toolCalls,
     tts: meta.tts || null,
     bot: Boolean(meta.bot),
   };

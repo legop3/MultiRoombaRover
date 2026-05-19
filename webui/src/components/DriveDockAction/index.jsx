@@ -127,7 +127,7 @@ export default function DriveDockAction({
     steps: [
       'Line up the center dot of your rover with the center of the dock',
       'The UI will indicate when you are successfully docked',
-      'When good contact is made, charging will start in about 5 seconds.',
+      'When good contact is made, the dock will stop flashing.',
     ],
   };
 
