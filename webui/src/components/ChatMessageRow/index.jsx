@@ -78,7 +78,7 @@ function ProfileAvatar({ imageUrl, label }) {
   );
 }
 
-export function ChatIdentity({ message }) {
+export function ChatIdentity({ message, toolsToggle = null }) {
   const discordLabel = message.fromDiscord
     ? `${message.discordGuildName || 'Discord'} · ${displayName(message)}`
     : null;
@@ -113,6 +113,7 @@ export function ChatIdentity({ message }) {
           {message.roverId}
         </span>
       )}
+      {toolsToggle}
     </span>
   );
 }
@@ -140,24 +141,31 @@ export default function ChatMessageRow({ message }) {
   return (
     <div className={chatRowClass(message)}>
       <div className="flex w-full items-center gap-0.5">
-        <span
-          className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
-        >
-          <ChatIdentity message={message} />{hasText ? ` ${message.text}` : ''}
+        <span className={`min-w-0 flex-1 ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
+          <ChatIdentity
+            message={message}
+            toolsToggle={
+              toolCalls.length > 0 ? (
+                <button
+                  type="button"
+                  className="shrink-0 rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
+                  onClick={() => setOpen((v) => !v)}
+                >
+                  {open ? '▼' : '▶'} Tools ({toolCalls.length})
+                </button>
+              ) : null
+            }
+          />
         </span>
-        {toolCalls.length > 0 ? (
-          <button
-            type="button"
-            className="shrink-0 rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? '▼' : '▶'} Tools ({toolCalls.length})
-          </button>
-        ) : null}
         <span className="shrink-0 text-[0.65rem] text-slate-400/60">
           {formatTime(message.ts)}
         </span>
       </div>
+      {hasText ? (
+        <div className={`w-full break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
+          {message.text}
+        </div>
+      ) : null}
       {open && toolCalls.length > 0 ? (
         <div className="w-full rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
           {toolCalls.map((entry, idx) => {
