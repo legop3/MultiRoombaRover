@@ -63,13 +63,8 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   }, [users, selfSocketId, assignmentRoverId, roster]);
 
   useEffect(() => {
-    const saved = settings?.[panelId];
-    if (Array.isArray(saved) && saved.length) {
-      setSelected(saved);
-      return;
-    }
     setSelected(defaults);
-  }, [settings?.[panelId], defaults, panelId]);
+  }, [defaults]);
 
   useEffect(() => {
     const saved = settings?.[`${panelId}:includeSidebar`];
@@ -79,6 +74,16 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     }
     setIncludeSidebar(true);
   }, [settings?.[`${panelId}:includeSidebar`], panelId]);
+
+  useEffect(() => {
+    const saved = settings?.[`${panelId}:title`];
+    if (typeof saved === 'string') {
+      setTitle(saved);
+      setTitleDirty(true);
+      return;
+    }
+    setTitleDirty(false);
+  }, [settings?.[`${panelId}:title`], panelId]);
 
   useEffect(() => {
     if (!titleDirty) {
@@ -116,9 +121,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
 
   const toggleKey = (key) => {
     setSelected((prev) => {
-      const next = prev.includes(key) ? prev.filter((value) => value !== key) : [...prev, key];
-      saveSettings((current) => ({ ...(current || {}), [panelId]: next }));
-      return next;
+      return prev.includes(key) ? prev.filter((value) => value !== key) : [...prev, key];
     });
     setSuccess(null);
   };
@@ -166,8 +169,10 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
           className="field-input w-full text-xs"
           value={title}
           onChange={(event) => {
-            setTitle(event.target.value);
+            const next = event.target.value;
+            setTitle(next);
             setTitleDirty(true);
+            saveSettings((current) => ({ ...(current || {}), [`${panelId}:title`]: next }));
           }}
           placeholder={defaultTitle}
           maxLength={120}

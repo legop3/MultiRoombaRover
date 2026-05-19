@@ -1,9 +1,12 @@
 1.  add faster way for admins to login, like an invisible button in top left or something
-2.  add tool call embeds or something for the llm bot in discord, probably not in web ui
-3.  add discord bot typing thing for when someone requests a replay
-4.  change replay title for ones requested from discord, something other than "requester driving rover"
-5.  fix rover request spam queue cheat
-6.  enable scrolling on horn frequencies, turn down frequency limit to like 3500
+2.  make camera card not wait for ack before sending next command. speed is inconsistent and this is bad.
+3.  add tool call embeds or something for the llm bot in discord, probably not in web ui
+    1.  fix overseer prompt so it doesnt talk every run
+    2.  rename neato locate to neato playsound for overseer
+    3.  you can't control the rovers
+4.  add discord bot typing thing for when someone requests a replay
+5.  change replay title for ones requested from discord, something other than "requester driving rover"
+6.  fix rover request spam queue cheat
 7.  make replays more instant, probably make segments shorter
     1.  fix replay UI so it doesnt save anything in cookie
 
