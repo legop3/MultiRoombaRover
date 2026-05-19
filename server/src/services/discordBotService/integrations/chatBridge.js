@@ -69,7 +69,7 @@ function createChatBridgeHandlers(deps) {
     const toolsBlock = formatToolCallsCodeBlock(toolCalls);
     let text = baseText;
     if (toolsBlock) {
-      text = text ? `${text}\n\n${toolsBlock}` : `Overseer ran tools (no chat line).\n\n${toolsBlock}`;
+      text = text ? `${text}\n\n${toolsBlock}` : `${toolsBlock}`;
     }
     if (text.length > 1900) text = `${text.slice(0, 1897)}...`;
     if (!text.trim()) return;

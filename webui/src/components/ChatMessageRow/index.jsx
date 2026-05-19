@@ -161,11 +161,6 @@ export default function ChatMessageRow({ message }) {
           {formatTime(message.ts)}
         </span>
       </div>
-      {hasText ? (
-        <div className={`w-full break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
-          {message.text}
-        </div>
-      ) : null}
       {open && toolCalls.length > 0 ? (
         <div className="w-full rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
           {toolCalls.map((entry, idx) => {
@@ -179,6 +174,11 @@ export default function ChatMessageRow({ message }) {
               </div>
             );
           })}
+        </div>
+      ) : null}
+      {hasText ? (
+        <div className={`w-full break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
+          {message.text}
         </div>
       ) : null}
     </div>
