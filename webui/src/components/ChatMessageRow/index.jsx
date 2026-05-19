@@ -78,7 +78,7 @@ function ProfileAvatar({ imageUrl, label }) {
   );
 }
 
-export function ChatIdentity({ message, toolsToggle = null }) {
+export function ChatIdentity({ message, toolsToggle = null, inlineText = '' }) {
   const discordLabel = message.fromDiscord
     ? `${message.discordGuildName || 'Discord'} · ${displayName(message)}`
     : null;
@@ -113,6 +113,7 @@ export function ChatIdentity({ message, toolsToggle = null }) {
           {message.roverId}
         </span>
       )}
+      {inlineText ? <span className="min-w-0 break-words leading-tight whitespace-pre-wrap">{inlineText}</span> : null}
       {toolsToggle}
     </span>
   );
@@ -144,6 +145,7 @@ export default function ChatMessageRow({ message }) {
         <span className={`min-w-0 flex-1 ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
           <ChatIdentity
             message={message}
+            inlineText={!open && hasText ? message.text : ''}
             toolsToggle={
               toolCalls.length > 0 ? (
                 <button
@@ -176,7 +178,7 @@ export default function ChatMessageRow({ message }) {
           })}
         </div>
       ) : null}
-      {hasText ? (
+      {open && hasText ? (
         <div className={`w-full break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
           {message.text}
         </div>
