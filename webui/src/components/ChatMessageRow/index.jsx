@@ -119,11 +119,11 @@ export function ChatIdentity({ message }) {
 
 function chatRowClass(message) {
   if (isBotMessage(message)) {
-    return 'surface-muted flex items-center gap-0.5 border border-emerald-500/40 bg-emerald-900/15 text-sm';
+    return 'surface-muted flex flex-col gap-0.5 border border-emerald-500/40 bg-emerald-900/15 text-sm';
   }
   const isAdmin =
     message.role === 'admin' || message.role === 'lockdown' || message.role === 'lockdown-admin';
-  return `surface-muted flex items-center gap-0.5 text-sm ${
+  return `surface-muted flex flex-col gap-0.5 text-sm ${
     isAdmin
       ? 'border border-amber-400/30'
       : message.fromDiscord
@@ -139,40 +139,40 @@ export default function ChatMessageRow({ message }) {
   const hasText = Boolean(String(message?.text || '').trim());
   return (
     <div className={chatRowClass(message)}>
-      <span
-        className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
-      >
-        <ChatIdentity message={message} />{hasText ? ` ${message.text}` : ''}
+      <div className="flex w-full items-center gap-0.5">
+        <span
+          className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
+        >
+          <ChatIdentity message={message} />{hasText ? ` ${message.text}` : ''}
+        </span>
         {toolCalls.length > 0 ? (
-          <span className="mt-0.5 block">
-            <button
-              type="button"
-              className="rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
-              onClick={() => setOpen((v) => !v)}
-            >
-              {open ? '▼' : '▶'} Tools ({toolCalls.length})
-            </button>
-            {open ? (
-              <div className="mt-0.5 rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
-                {toolCalls.map((entry, idx) => {
-                  const status = String(entry?.status || 'unknown');
-                  const statusLabel = status === 'ok' ? 'ok' : status === 'blocked' ? 'blocked' : status === 'error' ? 'error' : 'unknown';
-                  const argsText = JSON.stringify(entry?.args && typeof entry.args === 'object' ? entry.args : {});
-                  return (
-                    <div key={`${entry?.tool || 'tool'}-${idx}`} className="mb-0.5 last:mb-0">
-                      <div>{statusLabel} {entry?.tool || 'unknown'} args={argsText}</div>
-                      {entry?.error ? <div className="text-rose-300">error: {String(entry.error)}</div> : null}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-          </span>
+          <button
+            type="button"
+            className="shrink-0 rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? '▼' : '▶'} Tools ({toolCalls.length})
+          </button>
         ) : null}
-      </span>
-      <span className="ml-auto shrink-0 text-[0.65rem] text-slate-400/60">
-        {formatTime(message.ts)}
-      </span>
+        <span className="shrink-0 text-[0.65rem] text-slate-400/60">
+          {formatTime(message.ts)}
+        </span>
+      </div>
+      {open && toolCalls.length > 0 ? (
+        <div className="w-full rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
+          {toolCalls.map((entry, idx) => {
+            const status = String(entry?.status || 'unknown');
+            const statusLabel = status === 'ok' ? 'ok' : status === 'blocked' ? 'blocked' : status === 'error' ? 'error' : 'unknown';
+            const argsText = JSON.stringify(entry?.args && typeof entry.args === 'object' ? entry.args : {});
+            return (
+              <div key={`${entry?.tool || 'tool'}-${idx}`} className="mb-0.5 last:mb-0">
+                <div>{statusLabel} {entry?.tool || 'unknown'} args={argsText}</div>
+                {entry?.error ? <div className="text-rose-300">error: {String(entry.error)}</div> : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
