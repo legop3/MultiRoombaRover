@@ -138,36 +138,40 @@ export default function ChatMessageRow({ message }) {
   const [open, setOpen] = useState(false);
   const toolCalls = Array.isArray(message?.toolCalls) ? message.toolCalls : [];
   const hasText = Boolean(String(message?.text || '').trim());
+  const toolsToggle =
+    toolCalls.length > 0 ? (
+      <button
+        type="button"
+        className="shrink-0 rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? '▼' : '▶'} Tools ({toolCalls.length})
+      </button>
+    ) : null;
   return (
     <div className={chatRowClass(message)}>
-      <div className="grid w-full grid-cols-[auto,1fr,auto] items-center gap-0.5">
-        <span className={`min-w-0 ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
-          <ChatIdentity
-            message={message}
-            toolsToggle={
-              toolCalls.length > 0 ? (
-                <button
-                  type="button"
-                  className="shrink-0 rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
-                  onClick={() => setOpen((v) => !v)}
-                >
-                  {open ? '▼' : '▶'} Tools ({toolCalls.length})
-                </button>
-              ) : null
-            }
-          />
-        </span>
-        {!open && hasText ? (
-          <span className={`min-w-0 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
-            {message.text}
+      {!open ? (
+        <div className="flex w-full items-start gap-0.5">
+          <span
+            className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
+          >
+            <ChatIdentity message={message} toolsToggle={toolsToggle} />
+            {hasText ? ` ${message.text}` : ''}
           </span>
-        ) : (
-          <span />
-        )}
-        <span className="shrink-0 text-[0.65rem] text-slate-400/60">
-          {formatTime(message.ts)}
-        </span>
-      </div>
+          <span className="shrink-0 text-[0.65rem] text-slate-400/60">
+            {formatTime(message.ts)}
+          </span>
+        </div>
+      ) : (
+        <div className="flex w-full items-start gap-0.5">
+          <span className={`min-w-0 flex-1 ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
+            <ChatIdentity message={message} toolsToggle={toolsToggle} />
+          </span>
+          <span className="shrink-0 text-[0.65rem] text-slate-400/60">
+            {formatTime(message.ts)}
+          </span>
+        </div>
+      )}
       {open && toolCalls.length > 0 ? (
         <div className="w-full rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
           {toolCalls.map((entry, idx) => {
