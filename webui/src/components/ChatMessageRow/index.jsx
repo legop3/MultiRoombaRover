@@ -78,7 +78,7 @@ function ProfileAvatar({ imageUrl, label }) {
   );
 }
 
-export function ChatIdentity({ message, toolsToggle = null, inlineText = '' }) {
+export function ChatIdentity({ message, toolsToggle = null }) {
   const discordLabel = message.fromDiscord
     ? `${message.discordGuildName || 'Discord'} · ${displayName(message)}`
     : null;
@@ -114,7 +114,6 @@ export function ChatIdentity({ message, toolsToggle = null, inlineText = '' }) {
         </span>
       )}
       {toolsToggle}
-      {inlineText ? <span className="min-w-0 break-words leading-tight whitespace-pre-wrap">{inlineText}</span> : null}
     </span>
   );
 }
@@ -141,11 +140,10 @@ export default function ChatMessageRow({ message }) {
   const hasText = Boolean(String(message?.text || '').trim());
   return (
     <div className={chatRowClass(message)}>
-      <div className="flex w-full items-center gap-0.5">
-        <span className={`min-w-0 flex-1 ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
+      <div className="grid w-full grid-cols-[auto,1fr,auto] items-center gap-0.5">
+        <span className={`min-w-0 ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
           <ChatIdentity
             message={message}
-            inlineText={!open && hasText ? message.text : ''}
             toolsToggle={
               toolCalls.length > 0 ? (
                 <button
@@ -159,6 +157,13 @@ export default function ChatMessageRow({ message }) {
             }
           />
         </span>
+        {!open && hasText ? (
+          <span className={`min-w-0 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
+            {message.text}
+          </span>
+        ) : (
+          <span />
+        )}
         <span className="shrink-0 text-[0.65rem] text-slate-400/60">
           {formatTime(message.ts)}
         </span>
