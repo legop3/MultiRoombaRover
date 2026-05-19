@@ -113,8 +113,8 @@ export function ChatIdentity({ message, toolsToggle = null, inlineText = '' }) {
           {message.roverId}
         </span>
       )}
-      {inlineText ? <span className="min-w-0 break-words leading-tight whitespace-pre-wrap">{inlineText}</span> : null}
       {toolsToggle}
+      {inlineText ? <span className="min-w-0 break-words leading-tight whitespace-pre-wrap">{inlineText}</span> : null}
     </span>
   );
 }
