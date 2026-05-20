@@ -1,7 +1,7 @@
 // Chat Service Orchestrator
 // Purpose: Composes chat submodules into the public service API and boots socket/event wiring.
 // Scope: Keeps external chat contracts stable while delegating logic to focused modules.
-const { history } = require('./state');
+const { history, clearHistory } = require('./state');
 const { normalizeUserText } = require('./contentFilters');
 const { buildMessage, buildTypingPayload } = require('./contextBuilders');
 const { broadcastMessage, getRecentMessages } = require('./broadcast');
@@ -37,4 +37,5 @@ module.exports = {
   buildTypingPayload,
   sendSystemMessage,
   getRecentMessages,
+  clearHistory,
 };

@@ -40,6 +40,12 @@ function setLastAccessNoticeAt(ts) {
   lastAccessNoticeAt = ts;
 }
 
+function clearHistory() {
+  history.length = 0;
+  lastMessageBySocket.clear();
+  typingBySocket.clear();
+}
+
 module.exports = {
   rateBuckets,
   history,
@@ -50,4 +56,5 @@ module.exports = {
   getRecentMessages,
   getLastAccessNoticeAt,
   setLastAccessNoticeAt,
+  clearHistory,
 };

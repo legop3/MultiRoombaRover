@@ -14,7 +14,8 @@ const { getState: getHomeAssistantState, homeAssistantEvents } = homeAssistantSe
 const { getState: getNeatoState, neatoEvents } = neatoService;
 const { getState: getLiftState, liftEvents } = liftService;
 const roverManager = require('../roverManager');
-const { getRecentMessages, sendSystemMessage } = require('../chatService');
+const { getRecentMessages, sendSystemMessage, clearHistory: clearChatHistory } = require('../chatService');
+const { subscribe } = require('../eventBus');
 const {
   PROMPT_PATH,
   DEFAULT_NAME,
@@ -53,6 +54,7 @@ const runtime = {
   runHistory: [],
   liveToolCalls: [],
   memoryStore: loadMemory(),
+  contextResetAt: Date.now(),
 };
 
 let status = {
@@ -104,15 +106,28 @@ function buildVoteStatus() {
   const sockets = Array.from(io.sockets.sockets.values());
   let yesCount = 0;
   let noCount = 0;
-  let eligibleCount = 0;
+  const votesByIdentity = new Map();
   const isEligibleVoter = (socket) => getRole(socket) !== 'spectator';
+
   sockets.forEach((socket) => {
     if (!isEligibleVoter(socket)) return;
-    eligibleCount += 1;
-    const pref = socket?.data?.overseerEnabled;
-    if (typeof pref === 'boolean' ? pref : true) yesCount += 1;
+    const identityKey = String(socket?.data?.cookieUserId || '').trim() || `socket:${socket.id}`;
+    const pref = typeof socket?.data?.overseerEnabled === 'boolean' ? socket.data.overseerEnabled : true;
+    const prev = votesByIdentity.get(identityKey);
+    if (typeof prev === 'boolean') {
+      // If one tab says "no", treat that user as "no" to avoid accidental override by stale tabs.
+      votesByIdentity.set(identityKey, prev && pref);
+      return;
+    }
+    votesByIdentity.set(identityKey, pref);
+  });
+
+  votesByIdentity.forEach((pref) => {
+    if (pref) yesCount += 1;
     else noCount += 1;
   });
+
+  const eligibleCount = votesByIdentity.size;
   const onlineCount = yesCount + noCount;
   const gatePassed = eligibleCount === 0 ? true : yesCount > noCount;
   return {
@@ -188,6 +203,7 @@ function computeTriggerReason() {
   if (alwaysRunModel) return 'loop_tick';
   const recent = getRecentMessages(1, { includeSystem: false });
   const last = recent[recent.length - 1];
+  if (last && Number(last.ts || 0) < runtime.contextResetAt) return null;
   if (last && Date.now() - Number(last.ts || 0) < 5000) {
     const txt = String(last.text || '').toLowerCase();
     if (txt.includes(name.toLowerCase()) || txt.includes('overseer') || txt.includes('bot')) return 'direct_address';
@@ -286,6 +302,7 @@ async function runDecision(triggerReason) {
   const toolState = buildToolState({ mode, homeAssistantState, neatoState, liftState });
 
   const recentConversation = getRecentMessages(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT + 20, { includeSystem: true })
+    .filter((entry) => Number(entry?.ts || 0) >= runtime.contextResetAt)
     .filter((entry) => {
       if (!entry?.roverId) return true;
       return roverManager.canReplayRoverId(entry.roverId);
@@ -456,13 +473,39 @@ function emitStateToSocket(socket) {
   socket.emit('overseer:state', buildAdminState(status, runtime.runHistory));
 }
 
-function clearHistory() {
+function clearHistory(reason = 'admin requested clear history') {
+  runtime.contextResetAt = Date.now();
   runtime.runHistory = [];
   runtime.liveToolCalls = [];
   runtime.generationCount = 0;
   runtime.generationTotalMs = 0;
+  runtime.lastModelAt = 0;
   runtime.memoryStore = saveMemory(createDefaultMemory());
-  updateStatus({ lastReason: 'admin requested clear history', lastOutcome: 'cleared', lastLiveToolCalls: [] });
+  try {
+    clearChatHistory();
+  } catch (err) {
+    logger.warn('Failed to clear chat history during overseer clear', err.message);
+  }
+  updateStatus({
+    phase: 'idle',
+    currentRunId: null,
+    lastSystemPrompt: null,
+    lastStateUpdate: null,
+    lastTranscript: null,
+    lastAvailableTools: null,
+    lastBlockedTools: null,
+    lastModelMessages: null,
+    lastModelInputAt: null,
+    lastModelOutputAt: null,
+    lastModelRawOutput: null,
+    lastDecision: null,
+    lastChatDraft: null,
+    lastRequestedActions: null,
+    lastActionResults: null,
+    lastLiveToolCalls: [],
+    lastOutcome: 'cleared',
+    lastReason: reason,
+  });
 }
 
 function stopScheduler(reason = 'paused') {
@@ -524,6 +567,12 @@ io.on('connection', (socket) => {
 roleEvents.on('change', ({ socket }) => {
   emitStateToSocket(socket);
   evaluateSchedulerGate('online vote update');
+});
+subscribe('chat:message', ({ payload } = {}) => {
+  const text = String(payload?.text || '').trim();
+  if (text !== 'CLEAR') return;
+  if (payload?.bot) return;
+  clearHistory('chat CLEAR command');
 });
 verificationEvents.on('change', () => evaluateSchedulerGate('online vote update'));
 homeAssistantEvents.on('update', () => updateStatus({ phase: status.phase }));

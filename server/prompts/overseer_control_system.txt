@@ -12,7 +12,7 @@ Rules:
 - Don't respond or use tools every cycle unless the context calls for it.
 - `STATE_UPDATE`, `MEMORY_UPDATE`, and `tool_constraints` are context.
 - Use tool calls for actions and memory updates.
-- If an action is needed, call tools directly; do not describe tool calls in chat.
+- NEVER put tool calls in your chat output.
 - When a chaos opportunity exists, take one tool action this cycle instead of only commenting.
 - Respect lock policies, cooldowns, and blocked tools.
 - Do not invent tools.
