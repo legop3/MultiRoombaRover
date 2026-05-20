@@ -41,6 +41,7 @@ const ollamaUrl = String(overseerConfig.ollamaUrl || overseerConfig.ollamaServer
 const gateIntervalMs = normalizeMs(Number(overseerConfig.gateIntervalMs), DEFAULT_GATE_INTERVAL_MS);
 const heartbeatMs = normalizeMs(Number(overseerConfig.heartbeatMs), DEFAULT_HEARTBEAT_MS);
 const alwaysRunModel = Boolean(overseerConfig.alwaysRunModel);
+const postToolsOnlyMessages = Boolean(overseerConfig.postToolsOnlyMessages);
 const profileImageUrl = String(overseerConfig.profileImageUrl || '').trim() || null;
 const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 
@@ -67,6 +68,7 @@ let status = {
   gateIntervalMs,
   heartbeatMs,
   alwaysRunModel,
+  postToolsOnlyMessages,
   running: false,
   inFlight: false,
   phase: 'idle',
@@ -397,7 +399,7 @@ async function runDecision(triggerReason) {
     if (toolCallFeed.length > 0) {
       if ((decision === 'CHAT' || decision === 'ACTION+CHAT') && chatDraft) {
         sendSystemMessage(chatDraft, { nickname: name, bot: true, profileImage: profileImageUrl, toolCalls: toolCallFeed });
-      } else {
+      } else if (postToolsOnlyMessages) {
         sendSystemMessage('', { nickname: name, bot: true, profileImage: profileImageUrl, toolCalls: toolCallFeed });
       }
     } else if ((decision === 'CHAT' || decision === 'ACTION+CHAT') && chatDraft) {
@@ -473,14 +475,18 @@ function emitStateToSocket(socket) {
   socket.emit('overseer:state', buildAdminState(status, runtime.runHistory));
 }
 
-function clearHistory(reason = 'admin requested clear history') {
+function clearHistory(reason = 'admin requested clear history', options = {}) {
+  const resetPersistentMemory = options?.resetPersistentMemory !== false;
+  const sendConfirmation = options?.sendConfirmation === true;
   runtime.contextResetAt = Date.now();
   runtime.runHistory = [];
   runtime.liveToolCalls = [];
   runtime.generationCount = 0;
   runtime.generationTotalMs = 0;
   runtime.lastModelAt = 0;
-  runtime.memoryStore = saveMemory(createDefaultMemory());
+  if (resetPersistentMemory) {
+    runtime.memoryStore = saveMemory(createDefaultMemory());
+  }
   try {
     clearChatHistory();
   } catch (err) {
@@ -506,6 +512,9 @@ function clearHistory(reason = 'admin requested clear history') {
     lastOutcome: 'cleared',
     lastReason: reason,
   });
+  if (sendConfirmation) {
+    sendSystemMessage('Context cleared.', { nickname: name, bot: true, profileImage: profileImageUrl });
+  }
 }
 
 function stopScheduler(reason = 'paused') {
@@ -572,7 +581,7 @@ subscribe('chat:message', ({ payload } = {}) => {
   const text = String(payload?.text || '').trim();
   if (text !== 'CLEAR') return;
   if (payload?.bot) return;
-  clearHistory('chat CLEAR command');
+  clearHistory('chat CLEAR command', { resetPersistentMemory: false, sendConfirmation: true });
 });
 verificationEvents.on('change', () => evaluateSchedulerGate('online vote update'));
 homeAssistantEvents.on('update', () => updateStatus({ phase: status.phase }));

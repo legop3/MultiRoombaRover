@@ -17,6 +17,7 @@ overseerControl:
   enabled: false
   observeOnly: true
   alwaysRunModel: false
+  postToolsOnlyMessages: false
   name: "The Overseer"
   model: "qwen2.5:7b-instruct"
   ollamaServer: "http://127.0.0.1:11434"
