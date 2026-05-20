@@ -1,38 +1,9 @@
 // Hook: useFullscreenPrompt
 // Purpose: Manages fullscreen prompt visibility and dismissal logic across screen sizes/devices. Scope: Provides reusable fullscreen UX state and action handlers.
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSettingsNamespace } from '../settings/index.js';
 
-const SESSION_KEY = 'fullscreenPromptDismissed';
 const MOBILE_LAYOUTS = new Set(['mobile-portrait', 'mobile-landscape']);
-
-const getStorage = () => {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.sessionStorage;
-  } catch {
-    return null;
-  }
-};
-
-const isDismissed = () => {
-  const storage = getStorage();
-  if (!storage) return false;
-  try {
-    return storage.getItem(SESSION_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
-
-const markDismissed = () => {
-  const storage = getStorage();
-  if (!storage) return;
-  try {
-    storage.setItem(SESSION_KEY, '1');
-  } catch {
-    /* ignore */
-  }
-};
 
 const detectIOS = () => {
   if (typeof navigator === 'undefined') return false;
@@ -52,20 +23,35 @@ const supportsFullscreen = () => {
 };
 
 export function useFullscreenPrompt(layout) {
+  const { value: pageSettings, save: savePageSettings, status: settingsStatus } = useSettingsNamespace('page', {
+    fullscreenPromptShown: false,
+  });
   const isMobileLayout = MOBILE_LAYOUTS.has(layout);
   const [visible, setVisible] = useState(false);
   const [mode, setMode] = useState('native');
   const [forceVisible, setForceVisible] = useState(false);
+  const hasShownPrompt = Boolean(pageSettings?.fullscreenPromptShown);
   const isIOS = useMemo(() => detectIOS(), []);
   const nativeSupported = useMemo(() => supportsFullscreen(), []);
+  const markShown = useCallback(() => {
+    if (settingsStatus !== 'ready') return;
+    savePageSettings((current) => {
+      if (current?.fullscreenPromptShown) return current;
+      return { ...(current || {}), fullscreenPromptShown: true };
+    });
+  }, [savePageSettings, settingsStatus]);
 
   const reevaluate = useCallback(() => {
+    if (settingsStatus !== 'ready') {
+      setVisible(false);
+      return;
+    }
     if (!isMobileLayout) {
       setVisible(false);
       setForceVisible(false);
       return;
     }
-    if (!forceVisible && isDismissed()) {
+    if (!forceVisible && hasShownPrompt) {
       setVisible(false);
       return;
     }
@@ -84,7 +70,7 @@ export function useFullscreenPrompt(layout) {
     }
     setMode('native');
     setVisible(true);
-  }, [forceVisible, isIOS, isMobileLayout]);
+  }, [forceVisible, hasShownPrompt, isIOS, isMobileLayout, settingsStatus]);
 
   useEffect(() => {
     reevaluate();
@@ -109,10 +95,10 @@ export function useFullscreenPrompt(layout) {
   }, [reevaluate]);
 
   const dismiss = useCallback(() => {
-    markDismissed();
+    markShown();
     setForceVisible(false);
     setVisible(false);
-  }, []);
+  }, [markShown]);
 
   const enterFullscreen = useCallback(async () => {
     if (!isMobileLayout || isIOS) return false;
@@ -131,7 +117,7 @@ export function useFullscreenPrompt(layout) {
       if (result && typeof result.then === 'function') {
         await result;
       }
-      markDismissed();
+      markShown();
       setForceVisible(false);
       setVisible(false);
       return true;
@@ -139,7 +125,7 @@ export function useFullscreenPrompt(layout) {
       console.warn('Failed to enter fullscreen', error);
       return false;
     }
-  }, [isIOS, isMobileLayout]);
+  }, [isIOS, isMobileLayout, markShown]);
 
   const showPrompt = useCallback(() => {
     if (!isMobileLayout) return;

@@ -114,7 +114,7 @@ function buildVoteStatus() {
     else noCount += 1;
   });
   const onlineCount = yesCount + noCount;
-  const gatePassed = yesCount > noCount;
+  const gatePassed = eligibleCount === 0 ? true : yesCount > noCount;
   return {
     yesCount,
     noCount,

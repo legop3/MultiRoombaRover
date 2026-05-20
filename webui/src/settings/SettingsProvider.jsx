@@ -30,9 +30,10 @@ export function SettingsProvider({ children }) {
 
   const setNamespace = useCallback((namespace, updater) => {
     setState((prev) => {
-      const current = prev.data[namespace] || {};
+      const baseData = prev.status === 'ready' ? prev.data : loadSettings() ?? {};
+      const current = baseData[namespace] || {};
       const nextValue = typeof updater === 'function' ? updater(current) : { ...current, ...(updater ?? {}) };
-      const nextData = { ...prev.data, [namespace]: nextValue };
+      const nextData = { ...baseData, [namespace]: nextValue };
       const success = saveSettings(nextData);
       if (!success) {
         return { ...prev, status: 'error' };
