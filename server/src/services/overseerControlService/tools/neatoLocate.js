@@ -1,7 +1,7 @@
 module.exports = {
-  id: 'neato_locate',
-  signature: 'neato_locate()',
-  description: 'Play Neato locate/chime action.',
+  id: 'neato_play_sound',
+  signature: 'neato_play_sound()',
+  description: 'Play a sound/chime on the Neato robot.',
   parameters: { type: 'object', properties: {}, additionalProperties: false },
   availability(ctx = {}) {
     const mode = String(ctx.mode || '');

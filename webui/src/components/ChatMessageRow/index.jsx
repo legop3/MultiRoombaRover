@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { FaDiscord } from 'react-icons/fa';
 import { roverBadgeStyle } from '../../lib/roverColor.js';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
 
 function roleColors(role) {
   switch (role) {
@@ -135,7 +136,10 @@ function chatRowClass(message) {
 
 export default function ChatMessageRow({ message }) {
   const isBot = isBotMessage(message);
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const isSpectator = role === 'spectator';
   const [open, setOpen] = useState(false);
+  const isOpen = isSpectator || open;
   const toolCalls = Array.isArray(message?.toolCalls) ? message.toolCalls : [];
   const hasText = Boolean(String(message?.text || '').trim());
   const toolsToggle =
@@ -143,9 +147,12 @@ export default function ChatMessageRow({ message }) {
       <button
         type="button"
         className="shrink-0 rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (isSpectator) return;
+          setOpen((v) => !v);
+        }}
       >
-        {open ? '▼' : '▶'} Tools ({toolCalls.length})
+        {isOpen ? '▼' : '▶'} Tools ({toolCalls.length})
       </button>
     ) : null;
   return (
@@ -155,13 +162,13 @@ export default function ChatMessageRow({ message }) {
           className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
         >
           <ChatIdentity message={message} toolsToggle={toolsToggle} />
-          {!open && hasText ? ` ${message.text}` : ''}
+          {!isOpen && hasText ? ` ${message.text}` : ''}
         </span>
         <span className="shrink-0 text-[0.65rem] text-slate-400/60">
           {formatTime(message.ts)}
         </span>
       </div>
-      {open && toolCalls.length > 0 ? (
+      {isOpen && toolCalls.length > 0 ? (
         <div className="w-full rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
           {toolCalls.map((entry, idx) => {
             const status = String(entry?.status || 'unknown');
@@ -176,7 +183,7 @@ export default function ChatMessageRow({ message }) {
           })}
         </div>
       ) : null}
-      {open && hasText ? (
+      {isOpen && hasText ? (
         <div className={`w-full break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
           {message.text}
         </div>
