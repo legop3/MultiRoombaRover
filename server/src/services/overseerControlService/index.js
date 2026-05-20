@@ -104,7 +104,10 @@ function buildVoteStatus() {
   const sockets = Array.from(io.sockets.sockets.values());
   let yesCount = 0;
   let noCount = 0;
+  let eligibleCount = 0;
   sockets.forEach((socket) => {
+    if (getRole(socket) === 'spectator') return;
+    eligibleCount += 1;
     const pref = socket?.data?.overseerEnabled;
     if (typeof pref === 'boolean' ? pref : true) yesCount += 1;
     else noCount += 1;
@@ -115,6 +118,7 @@ function buildVoteStatus() {
     yesCount,
     noCount,
     onlineCount,
+    eligibleCount,
     gatePassed,
     running: Boolean(enabled && gatePassed && getMode() !== MODES.LOCKDOWN),
   };
