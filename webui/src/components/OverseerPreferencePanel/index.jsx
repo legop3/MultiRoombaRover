@@ -29,8 +29,14 @@ export default function OverseerPreferencePanel() {
       <div className="mt-0.5 text-slate-400">
         Yes?: {Number(vote?.yesCount || 0)}, No!: {Number(vote?.noCount || 0)}
       </div>
-      <div className="mt-0.5 text-slate-300">
-        {running ? 'running' : 'stopped'}, {running ? 'yes' : 'no'}
+      <div className="mt-0.5">
+        <span
+          className={`inline-flex items-center rounded px-1.5 py-0.5 text-[0.7rem] font-medium ${
+            running ? 'bg-emerald-600/80 text-emerald-50' : 'bg-slate-600/70 text-slate-100'
+          }`}
+        >
+          {running ? 'running' : 'stopped'}
+        </span>
       </div>
     </section>
   );
