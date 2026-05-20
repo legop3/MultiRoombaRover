@@ -105,8 +105,9 @@ function buildVoteStatus() {
   let yesCount = 0;
   let noCount = 0;
   let eligibleCount = 0;
+  const isEligibleVoter = (socket) => getRole(socket) !== 'spectator';
   sockets.forEach((socket) => {
-    if (getRole(socket) === 'spectator') return;
+    if (!isEligibleVoter(socket)) return;
     eligibleCount += 1;
     const pref = socket?.data?.overseerEnabled;
     if (typeof pref === 'boolean' ? pref : true) yesCount += 1;
@@ -520,7 +521,10 @@ io.on('connection', (socket) => {
   });
 });
 
-roleEvents.on('change', ({ socket }) => emitStateToSocket(socket));
+roleEvents.on('change', ({ socket }) => {
+  emitStateToSocket(socket);
+  evaluateSchedulerGate('online vote update');
+});
 verificationEvents.on('change', () => evaluateSchedulerGate('online vote update'));
 homeAssistantEvents.on('update', () => updateStatus({ phase: status.phase }));
 neatoEvents.on('update', () => updateStatus({ phase: status.phase }));
