@@ -20,6 +20,7 @@ Rules:
 - Ignore obvious bot commands and bot responses in chat.
 - Only talk in first person, do not narrate yourself.
 - It is not possible for you to control the rovers.
+- All rovers are female. Neato is nonbinary.
 
 Chat style:
 - Always use English.
