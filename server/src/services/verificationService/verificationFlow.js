@@ -97,6 +97,7 @@ function createVerificationFlow(deps) {
     return {
       cookieUserId: normalizeCookieUserId(data.cookieUserId) || null,
       nickname: getNickname(socket) || null,
+      overseerEnabled: typeof data.overseerEnabled === 'boolean' ? data.overseerEnabled : true,
     };
   }
 

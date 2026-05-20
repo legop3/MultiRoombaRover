@@ -5,6 +5,7 @@ const logger = require('../../globals/logger').child('overseerControl');
 const { loadConfig } = require('../../helpers/configLoader');
 const { getRole, roleEvents } = require('../roleService');
 const { getMode, MODES, modeEvents } = require('../modeManager');
+const { verificationEvents } = require('../verificationService');
 const homeAssistantService = require('../homeAssistantService');
 const neatoService = require('../neatoService');
 const liftService = require('../liftService');
@@ -89,6 +90,7 @@ let status = {
   lastLiveToolCalls: null,
   lastOutcome: null,
   lastReason: null,
+  voteStatus: null,
   lastError: null,
   lastErrorDetails: null,
   lastFailedAt: null,
@@ -97,6 +99,26 @@ let status = {
   generationCount: 0,
   updatedAt: Date.now(),
 };
+
+function buildVoteStatus() {
+  const sockets = Array.from(io.sockets.sockets.values());
+  let yesCount = 0;
+  let noCount = 0;
+  sockets.forEach((socket) => {
+    const pref = socket?.data?.overseerEnabled;
+    if (typeof pref === 'boolean' ? pref : true) yesCount += 1;
+    else noCount += 1;
+  });
+  const onlineCount = yesCount + noCount;
+  const gatePassed = yesCount > noCount;
+  return {
+    yesCount,
+    noCount,
+    onlineCount,
+    gatePassed,
+    running: Boolean(enabled && gatePassed && getMode() !== MODES.LOCKDOWN),
+  };
+}
 
 function updateStatus(patch = {}) {
   status = { ...status, ...patch, updatedAt: Date.now() };
@@ -460,8 +482,29 @@ function startScheduler(reason = null) {
   runtime.timer = setTimeout(tick, gateIntervalMs);
 }
 
+function evaluateSchedulerGate(reason = 'gate reevaluated') {
+  const voteStatus = buildVoteStatus();
+  const runningAllowed = Boolean(enabled && voteStatus.gatePassed && getMode() !== MODES.LOCKDOWN);
+  updateStatus({ voteStatus });
+  if (!enabled) {
+    stopScheduler('overseerControl.enabled is false');
+    return;
+  }
+  if (getMode() === MODES.LOCKDOWN) {
+    stopScheduler('paused during lockdown');
+    return;
+  }
+  if (!voteStatus.gatePassed) {
+    stopScheduler('paused by user vote');
+    return;
+  }
+  startScheduler(reason);
+}
+
 io.on('connection', (socket) => {
   emitStateToSocket(socket);
+  evaluateSchedulerGate('online vote update');
+  socket.on('disconnect', () => evaluateSchedulerGate('online vote update'));
   socket.on('overseer:control', ({ controls } = {}, cb = () => {}) => {
     if (!isAdminRole(getRole(socket))) return cb({ error: 'Not authorized' });
     const action = controls?.action || null;
@@ -474,6 +517,7 @@ io.on('connection', (socket) => {
 });
 
 roleEvents.on('change', ({ socket }) => emitStateToSocket(socket));
+verificationEvents.on('change', () => evaluateSchedulerGate('online vote update'));
 homeAssistantEvents.on('update', () => updateStatus({ phase: status.phase }));
 neatoEvents.on('update', () => updateStatus({ phase: status.phase }));
 liftEvents.on('update', () => updateStatus({ phase: status.phase }));
@@ -485,7 +529,7 @@ modeEvents.on('change', (mode) => {
     logger.info('overseerControl paused due to lockdown mode');
     return;
   }
-  startScheduler(observeOnly ? 'observe-only mode' : null);
+  evaluateSchedulerGate(observeOnly ? 'observe-only mode' : null);
 });
 
 if (!enabled) {
@@ -496,9 +540,11 @@ if (!enabled) {
     stopScheduler('paused during lockdown');
     logger.info('overseerControl paused on startup due to lockdown mode');
   } else {
-    startScheduler(observeOnly ? 'observe-only mode' : null);
+    evaluateSchedulerGate(observeOnly ? 'observe-only mode' : null);
     logger.info('overseerControl enabled', { model, ollamaUrl, gateIntervalMs, heartbeatMs, observeOnly });
   }
 }
 
-module.exports = {};
+module.exports = {
+  getVoteStatus: () => status.voteStatus || buildVoteStatus(),
+};

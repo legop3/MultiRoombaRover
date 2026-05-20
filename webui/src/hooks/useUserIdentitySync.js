@@ -13,14 +13,20 @@ export default function useUserIdentitySync() {
     cookieUserId: '',
   });
   const { value: profile, status: profileStatus } = useSettingsNamespace('profile', { nickname: '' });
+  const { value: overseerPreference, status: overseerPreferenceStatus } = useSettingsNamespace(
+    'overseerPreference',
+    { enabled: true },
+  );
 
   const inFlightRef = useRef(false);
   const lastAckSocketRef = useRef(null);
   const retryTimerRef = useRef(null);
 
-  const ready = identityStatus === 'ready' && profileStatus === 'ready';
+  const ready =
+    identityStatus === 'ready' && profileStatus === 'ready' && overseerPreferenceStatus === 'ready';
   const cookieUserId = (identity?.cookieUserId || '').trim();
   const nickname = (profile?.nickname || '').trim();
+  const overseerEnabled = Boolean(overseerPreference?.enabled);
 
   const clearRetry = useCallback(() => {
     if (retryTimerRef.current) {
@@ -33,7 +39,7 @@ export default function useUserIdentitySync() {
     if (!ready || !connected || !socket?.id || inFlightRef.current) return;
     inFlightRef.current = true;
     try {
-      const resp = await identifySession({ cookieUserId, nickname });
+      const resp = await identifySession({ cookieUserId, nickname, overseerEnabled });
       const nextKey = (resp?.cookieUserId || '').trim();
       if (nextKey && nextKey !== cookieUserId) {
         saveIdentity((current) => ({ ...(current || {}), cookieUserId: nextKey }));
@@ -48,7 +54,17 @@ export default function useUserIdentitySync() {
     } finally {
       inFlightRef.current = false;
     }
-  }, [clearRetry, connected, cookieUserId, identifySession, nickname, ready, saveIdentity, socket?.id]);
+  }, [
+    clearRetry,
+    connected,
+    cookieUserId,
+    identifySession,
+    nickname,
+    overseerEnabled,
+    ready,
+    saveIdentity,
+    socket?.id,
+  ]);
 
   useEffect(() => {
     if (!ready || !connected || !socket?.id) return;
@@ -59,7 +75,7 @@ export default function useUserIdentitySync() {
   useEffect(() => {
     if (!ready || !connected || !socket?.id) return;
     sendIdentify();
-  }, [ready, connected, socket?.id, cookieUserId, nickname, sendIdentify]);
+  }, [ready, connected, socket?.id, cookieUserId, nickname, overseerEnabled, sendIdentify]);
 
   useEffect(() => {
     const handleOnline = () => {

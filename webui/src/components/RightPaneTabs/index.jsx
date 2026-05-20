@@ -23,6 +23,7 @@ import VipPanel from '../VipPanel/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
+import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
 import { useState } from 'react';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 
@@ -177,7 +178,8 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
               </div>
               <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.3fr)_minmax(0,0.22fr)] h-[14rem]">
                 <ChatPanel fillHeight />
-                <div className="grid min-h-0 gap-0.5 grid-rows-[minmax(0,1fr)_auto]">
+                <div className="grid min-h-0 gap-0.5 grid-rows-[auto_minmax(0,1fr)_auto]">
+                  <OverseerPreferencePanel />
                   <RawUserPilePanel compact hideNicknameForm fillHeight />
                   <NicknameEntryPanel compact />
                 </div>

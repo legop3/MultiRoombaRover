@@ -13,6 +13,7 @@ const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
 const { getState: getNeatoState, neatoEvents } = require('../neatoService');
 const { getState: getLiftState, liftEvents } = require('../liftService');
+const { getVoteStatus: getOverseerVoteStatus } = require('../overseerControlService');
 const { getNickname, nicknameEvents } = require('../nicknameService');
 const {
   getVerificationStateForSocket,
@@ -66,6 +67,7 @@ function buildUserEntry(socket) {
 }
 
 function buildSession(socket) {
+  const overseerVote = getOverseerVoteStatus();
   const users = Array.from(io.sockets.sockets.values())
     .map((sock) => buildUserEntry(sock))
     .filter(Boolean)
@@ -124,6 +126,10 @@ function buildSession(socket) {
     audioForward: getAudioForwardState(),
     audioLevels: getAudioLevels(),
     buttonBox: getButtonBoxState(),
+    overseerVote: {
+      ...overseerVote,
+      preference: typeof socket?.data?.overseerEnabled === 'boolean' ? socket.data.overseerEnabled : true,
+    },
   };
 }
 

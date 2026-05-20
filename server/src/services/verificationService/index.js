@@ -111,11 +111,18 @@ function identifySocket(socket, payload = {}) {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(payload, 'overseerEnabled')) {
+    data.overseerEnabled = Boolean(payload.overseerEnabled);
+  } else if (typeof data.overseerEnabled !== 'boolean') {
+    data.overseerEnabled = true;
+  }
+
   const verification = reevaluateSocketVerification(socket);
   const deterrence = reevaluateSocketDeterrence(socket);
   emitChange('identify', { socketId: socket.id });
   return {
     cookieUserId: data.cookieUserId,
+    overseerEnabled: Boolean(data.overseerEnabled),
     isVerified: verification.isVerified,
     isDeterred: deterrence.isDeterred,
     reason: verification.reason,
