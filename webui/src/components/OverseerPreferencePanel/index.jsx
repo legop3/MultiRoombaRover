@@ -26,7 +26,7 @@ export default function OverseerPreferencePanel() {
         <input type="checkbox" checked={enabled} onChange={onToggle} />
         <span>Enable Overseer LLM</span>
       </label>
-        <span className='text-xs'>Cast your to enable Overseer in chat.</span>
+        <span className='text-xs'>Cast your vote to enable Overseer in chat.</span>
 
       <div className="mt-0.5 text-slate-400">
         Yes!: {Number(vote?.yesCount || 0)}, No...: {Number(vote?.noCount || 0)}
