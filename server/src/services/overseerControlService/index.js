@@ -14,7 +14,7 @@ const { getState: getHomeAssistantState, homeAssistantEvents } = homeAssistantSe
 const { getState: getNeatoState, neatoEvents } = neatoService;
 const { getState: getLiftState, liftEvents } = liftService;
 const roverManager = require('../roverManager');
-const { getRecentMessages, sendSystemMessage, clearHistory: clearChatHistory } = require('../chatService');
+const { getRecentMessages, sendSystemMessage } = require('../chatService');
 const { subscribe } = require('../eventBus');
 const {
   PROMPT_PATH,
@@ -131,7 +131,7 @@ function buildVoteStatus() {
 
   const eligibleCount = votesByIdentity.size;
   const onlineCount = yesCount + noCount;
-  const gatePassed = eligibleCount === 0 ? true : yesCount > noCount;
+  const gatePassed = eligibleCount > 0 && yesCount > noCount;
   return {
     yesCount,
     noCount,
@@ -486,11 +486,6 @@ function clearHistory(reason = 'admin requested clear history', options = {}) {
   runtime.lastModelAt = 0;
   if (resetPersistentMemory) {
     runtime.memoryStore = saveMemory(createDefaultMemory());
-  }
-  try {
-    clearChatHistory();
-  } catch (err) {
-    logger.warn('Failed to clear chat history during overseer clear', err.message);
   }
   updateStatus({
     phase: 'idle',

@@ -29,7 +29,7 @@ export default function OverseerPreferencePanel() {
         }`}
       >
         <input type="checkbox" checked={enabled} onChange={onToggle} />
-        <span>Your vote: {enabled ? 'yes' : 'no'}</span>
+        <span>Your vote: {enabled ? 'Yes' : 'No'}</span>
       </label>
       <span className="text-xs">Enable a local LLM in chat</span>
 
