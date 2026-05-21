@@ -7,6 +7,7 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import ChatMessageRow from '../ChatMessageRow/index.jsx';
 import ChatTypingRow from '../ChatTypingRow/index.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 
 const FLITE_VOICES = ['kal', 'rms', 'slt', 'ksp', 'bdl'];
 const ESPEAK_PITCHES = Array.from({ length: 10 }, (_, idx) => idx * 10);
@@ -106,12 +107,12 @@ export default function ChatPanel({
   const listClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : 'h-48 overflow-y-auto';
 
   return (
-    <section className={`panel-section space-y-0.5 text-base ${fillHeight ? 'flex h-full flex-col overflow-hidden' : ''}`}>
-      {title ? (
-        <div className="panel-title-row">
-          <span className="panel-title-text">{title}</span>
-        </div>
-      ) : null}
+    <CardFrame
+      title={title}
+      hideHeader={!title}
+      fillHeight={fillHeight}
+      bodyClassName="space-y-0.5 text-base"
+    >
       <div className={`surface overflow-y-auto space-y-0.5 px-0 ${listClass}`} ref={listRef}>
         {sorted.length === 0 && typingRows.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet.</p>
@@ -218,6 +219,6 @@ export default function ChatPanel({
           </button>
         </form>
       )}
-    </section>
+    </CardFrame>
   );
 }

@@ -17,6 +17,7 @@ import {
 import { mergeFloatChunks, encodeWavMono16 } from './audioCodec.js';
 import StatusIndicator from './StatusIndicator.jsx';
 import KeyPill from './KeyPill.jsx';
+import CardFrame from '../../CardFrame/index.jsx';
 
 export default function VipAudioUploadCard({
   ownRoverId = '',
@@ -529,9 +530,8 @@ export default function VipAudioUploadCard({
   );
 
   return (
-    <section className="surface">
+    <CardFrame title="Audio Controls">
       <div className="grid gap-1">
-        <p className="text-sm text-slate-100 text-center">Audio Controls</p>
         <section className="surface">
           <div className="flex items-center justify-center gap-0.5 py-0.25 text-xs text-slate-300">
             <span>Push-to-Talk Key</span>
@@ -653,6 +653,6 @@ export default function VipAudioUploadCard({
           </div>
         </section>
       </div>
-    </section>
+    </CardFrame>
   );
 }

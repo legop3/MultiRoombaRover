@@ -68,12 +68,6 @@ function TopDownMapContent({ sensors = {}, variant = 'full', size: overrideSize,
       className={`${overlay ? 'relative' : 'surface relative p-1'}`}
       style={overlay ? { width: `${size}px`, height: `${size}px` } : { height: '100%', width: '100%', aspectRatio: '1 / 1' }}
     >
-      {!overlay ? (
-        <>
-          <div className="absolute left-1 top-1 text-xs text-slate-400">Top-down</div>
-          <div className="absolute right-1 top-1 text-[0.65rem] text-slate-500">0–{maxLight}</div>
-        </>
-      ) : null}
       <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} preserveAspectRatio="xMidYMid meet" className="mx-auto block">
         <circle cx={centerX} cy={centerY} r={innerCircle} fill="#0f172a" stroke="#334155" strokeWidth="2" />
         <WheelVisual cx={centerX - wheelLineOffset} cy={centerY} current={wheelCurrentLeft} drop={bumps.wheelDropLeft} overcurrent={wheelOver.leftWheel} label="L" />

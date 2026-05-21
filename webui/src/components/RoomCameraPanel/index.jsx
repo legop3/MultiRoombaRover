@@ -6,6 +6,7 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { useRoomCameraSnapshots } from '../../hooks/useRoomCameraSnapshots.js';
 import RoomCameraFeed from '../RoomCameraFeed/index.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 
 function EmptyState() {
   return (
@@ -66,35 +67,32 @@ export default function RoomCameraPanel({
     return <EmptyState />;
   }
 
+  const actions = showLayoutToggle ? (
+    <div className="flex items-center gap-0.5 text-[0.68rem] text-slate-400">
+      <span>Layout</span>
+      <div className="inline-flex overflow-hidden rounded border border-slate-700">
+        {ORIENTATIONS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={`px-1 py-0.5 ${effectiveOrientation === option ? 'bg-slate-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`}
+            onClick={() => applyOrientation(option)}
+          >
+            {option === 'vertical' ? 'Vertical' : 'Grid'}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   return (
-    <section className="panel-section space-y-0.5 text-base">
-      {!hideHeader && (
-        <header className="panel-title-row">
-          <div className="panel-title-left">
-            <p className="panel-title-text">Room cameras</p>
-            <span className="panel-title-meta">{cameras.length}</span>
-          </div>
-          <div className="panel-title-right">
-            {showLayoutToggle && (
-              <div className="panel-title-actions">
-                <span className="panel-title-meta">Layout</span>
-                <div className="inline-flex overflow-hidden rounded border border-slate-700">
-                  {ORIENTATIONS.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={`px-1 py-0.5 ${effectiveOrientation === option ? 'bg-slate-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`}
-                      onClick={() => applyOrientation(option)}
-                    >
-                      {option === 'vertical' ? 'Vertical' : 'Grid'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </header>
-      )}
+    <CardFrame
+      title="Room cameras"
+      meta={cameras.length}
+      actions={actions}
+      hideHeader={hideHeader}
+      bodyClassName="space-y-0.5 text-base"
+    >
       <div className={containerClass}>
         {cameras.map((camera) => {
           const feed = feedMap[camera.id] || null;
@@ -109,6 +107,6 @@ export default function RoomCameraPanel({
           );
         })}
       </div>
-    </section>
+    </CardFrame>
   );
 }

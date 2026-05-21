@@ -173,7 +173,7 @@ function SensorDetails({ sensors, dockState }) {
 function DetailCard({ title, children }) {
   return (
     <div className="surface space-y-0.5 p-1 text-sm">
-      <div className="panel-title-text">{title}</div>
+      <div className="text-[0.78rem] font-semibold leading-none text-slate-200">{title}</div>
       <div className="space-y-0.5">{children}</div>
     </div>
   );

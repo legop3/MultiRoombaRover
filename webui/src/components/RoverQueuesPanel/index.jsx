@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { roverNameChromeStyle } from '../../lib/roverColor.js';
+import CardFrame from '../CardFrame/index.jsx';
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -96,12 +97,7 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
     users.find((u) => u.socketId === socketId) || { socketId, nickname: null, role: null };
 
   return (
-    <div className="space-y-0.5 text-sm">
-      {title && (
-        <div className="panel-title-row">
-          <p className="panel-title-text">{title}</p>
-        </div>
-      )}
+    <CardFrame title={title} bodyClassName="space-y-0.5 text-sm">
       {rosterItems.length === 0 ? (
         <p className="text-sm text-slate-500">No rovers registered.</p>
       ) : (
@@ -220,6 +216,6 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
           })}
         </ul>
       )}
-    </div>
+    </CardFrame>
   );
 }

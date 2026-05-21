@@ -2,6 +2,7 @@
 // Purpose: Defines the Vip Neato Card module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useState } from 'react';
+import CardFrame from '../CardFrame/index.jsx';
 
 function normalizeState(value) {
   return String(value || '').trim();
@@ -98,18 +99,19 @@ export default function VipNeatoCard({
   const primaryState = docked ? 'Docked' : uiStateLabel !== '--' ? uiStateLabel : 'Away from dock';
 
   return (
-    <section className={`surface text-sm text-slate-200 ${wrapClass}`}>
+    <CardFrame
+      title="Neato Controls"
+      className={wrapClass}
+      bodyClassName="text-sm text-slate-200"
+      actions={
+        <span className={`inline-flex w-auto rounded px-1 py-0.25 text-xs font-semibold ${metricToneClass(headerTone)}`}>
+          {headerStatus}
+        </span>
+      }
+    >
       <div className="grid gap-0.5">
-        <div className="relative flex items-center justify-center min-h-[1.5rem]">
-          <div className="text-center">
-            <p className="text-sm text-slate-100">Neato Controls</p>
-            <p className="text-xs text-slate-400">Control the autonomous Neato robovac. Be nice to him.</p>
-          </div>
-          <span
-            className={`absolute right-0 inline-flex w-auto rounded px-1 py-0.25 text-xs font-semibold ${metricToneClass(headerTone)}`}
-          >
-            {headerStatus}
-          </span>
+        <div className="text-center">
+          <p className="text-xs text-slate-400">Control the autonomous Neato robovac. Be nice to him.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-0.5">
@@ -217,6 +219,6 @@ export default function VipNeatoCard({
           </p>
         ) : null}
       </div>
-    </section>
+    </CardFrame>
   );
 }

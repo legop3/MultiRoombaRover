@@ -24,6 +24,7 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
 import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 import { useState } from 'react';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 
@@ -35,11 +36,11 @@ function TopDownMapPanel() {
   const sensors = frame?.sensors || {};
 
   return (
-    <section className="panel-section">
+    <CardFrame hideHeader>
       <div className="aspect-square w-full">
         <TopDownMap sensors={sensors} />
       </div>
-    </section>
+    </CardFrame>
   );
 }
 

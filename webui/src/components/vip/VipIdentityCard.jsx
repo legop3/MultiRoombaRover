@@ -2,6 +2,7 @@
 // Purpose: Defines the Vip Identity Card module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useState } from 'react';
+import CardFrame from '../CardFrame/index.jsx';
 import { fieldClass, flowWrapClass, innerFlowClass, maskKey } from './constants.js';
 
 export default function VipIdentityCard({ currentStoredKey, applyIdentityKey, onMessage, fullWidth = false }) {
@@ -40,9 +41,8 @@ export default function VipIdentityCard({ currentStoredKey, applyIdentityKey, on
   const wrapClass = fullWidth ? 'w-full' : flowWrapClass;
 
   return (
-    <section className={`surface ${wrapClass}`}>
+    <CardFrame title="Identity key" className={wrapClass}>
       <div className={innerFlowClass}>
-        <p className="text-sm text-slate-300">Identity key</p>
         <p className="text-xs text-slate-500">Current: {maskKey(currentStoredKey) || 'not set yet'}</p>
         <input
           className={fieldClass}
@@ -109,6 +109,6 @@ export default function VipIdentityCard({ currentStoredKey, applyIdentityKey, on
           </form>
         ) : null}
       </div>
-    </section>
+    </CardFrame>
   );
 }

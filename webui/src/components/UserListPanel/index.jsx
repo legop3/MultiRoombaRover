@@ -6,6 +6,7 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButtonsGrid from '../SocialButtonsGrid/index.jsx';
 import { roverBadgeStyle, roverNameChromeStyle } from '../../lib/roverColor.js';
+import CardFrame from '../CardFrame/index.jsx';
 
 export function NicknameEntryPanel({ compact = false }) {
   return (
@@ -19,12 +20,9 @@ export function NicknameEntryPanel({ compact = false }) {
 
 export function LinkButtonsPanel() {
   return (
-    <section className="panel-section flex h-full min-h-0 flex-col gap-0.5 text-base">
-      <div className="panel-title-row">
-        <span className="panel-title-text">Socials</span>
-      </div>
+    <CardFrame title="Socials" fillHeight bodyClassName="flex flex-1 min-h-0 flex-col gap-0.5 text-base">
       <SocialButtonsGrid className="flex-1 min-h-0" />
-    </section>
+    </CardFrame>
   );
 }
 

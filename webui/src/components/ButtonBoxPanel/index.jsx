@@ -7,6 +7,7 @@ import { useSocket } from '../../context/SocketContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import ButtonBoxTile from '../ButtonBoxTile/index.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 
 const FLASH_MS = 420;
 const REWARD_FLASH_MS = 1200;
@@ -126,10 +127,7 @@ export default function ButtonBoxPanel() {
   }, [effectiveAlertVolume, socket]);
 
   return (
-    <section className="panel-section space-y-0.5 text-base">
-      <header className="panel-title-row">
-        <p className="panel-title-text">Button Box</p>
-      </header>
+    <CardFrame title="Button Box" bodyClassName="space-y-0.5 text-base">
       <div className="grid grid-cols-4 gap-0.5">
         {buttons.map((button) => {
           const id = Number(button.id);
@@ -155,6 +153,6 @@ export default function ButtonBoxPanel() {
           );
         })}
       </div>
-    </section>
+    </CardFrame>
   );
 }

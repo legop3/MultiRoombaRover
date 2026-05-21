@@ -2,6 +2,7 @@
 // Purpose: Renders a shared lift controller panel synced from server session state.
 // Scope: Presents verified-user controls while reflecting global busy/position/cooldown state.
 import { useEffect, useMemo, useState } from 'react';
+import CardFrame from '../CardFrame/index.jsx';
 
 function badgeClass(tone) {
   if (tone === 'good') return 'bg-emerald-600 text-white';
@@ -67,7 +68,16 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
   };
 
   return (
-    <section className={`surface relative text-sm text-slate-200 ${wrapClass}`}>
+    <CardFrame
+      title="Lift Controls"
+      className={`relative ${wrapClass}`}
+      bodyClassName="text-sm text-slate-200"
+      actions={
+        <span className={`inline-flex w-auto rounded px-1 py-0.25 text-xs font-semibold ${badgeClass(statusTone)}`}>
+          {status}
+        </span>
+      }
+    >
       {blocked ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-md bg-slate-950/80 px-1.5 text-center">
           <div className="space-y-0.25">
@@ -82,18 +92,10 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
             ) : null}
           </div>
         </div>
-      ) : null}
+        ) : null}
       <div className="grid gap-0.5">
-        <div className="relative flex items-center justify-center min-h-[1.5rem]">
-          <div className="text-center">
-            <p className="text-sm text-slate-100">Lift Controls</p>
-            <p className="text-xs text-slate-400">Move the lift up and down. Please don't break anything...</p>
-          </div>
-          <span
-            className={`absolute right-0 inline-flex w-auto rounded px-1 py-0.25 text-xs font-semibold ${badgeClass(statusTone)}`}
-          >
-            {status}
-          </span>
+        <div className="text-center">
+          <p className="text-xs text-slate-400">Move the lift up and down. Please don't break anything...</p>
         </div>
 
         <section className="surface-muted px-0.5 py-0.5">
@@ -133,6 +135,6 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
 
         {lift?.lastError ? <p className="text-xs text-rose-300 text-center">Last error: {lift.lastError}</p> : null}
       </div>
-    </section>
+    </CardFrame>
   );
 }
