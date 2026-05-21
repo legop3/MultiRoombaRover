@@ -43,7 +43,7 @@ export default function VipPrivateRoverAccessCard({
   };
 
   return (
-    <CardFrame title="Private rover access requests" className={wrapClass} bodyClassName="text-sm text-slate-300">
+    <CardFrame title="Private rover access requests" accent="#f43f5e" className={wrapClass} bodyClassName="text-sm text-slate-300">
       <div className={innerFlowClass}>
         {requestableRovers.length === 0 ? (
           <p className="text-xs text-slate-500">No closed private rovers are available to request right now.</p>

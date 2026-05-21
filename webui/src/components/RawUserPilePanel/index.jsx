@@ -61,6 +61,7 @@ export default function RawUserPilePanel({
     <CardFrame
       title={!hideHeader ? 'Users' : ''}
       meta={!hideHeader ? sorted.length : null}
+      accent="#94a3b8"
       hideHeader={hideHeader}
       fillHeight={fillHeight}
       className={className}

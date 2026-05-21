@@ -530,7 +530,7 @@ export default function VipAudioUploadCard({
   );
 
   return (
-    <CardFrame title="Audio Controls">
+    <CardFrame title="Audio Controls" accent="#a78bfa">
       <div className="grid gap-1">
         <section className="surface">
           <div className="flex items-center justify-center gap-0.5 py-0.25 text-xs text-slate-300">

@@ -36,7 +36,7 @@ function TopDownMapPanel() {
   const sensors = frame?.sensors || {};
 
   return (
-    <CardFrame hideHeader>
+    <CardFrame hideHeader accent="#0067f7">
       <div className="aspect-square w-full">
         <TopDownMap sensors={sensors} />
       </div>

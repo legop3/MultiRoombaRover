@@ -9,7 +9,7 @@ export default function LogPanel() {
   const logs = useSessionSelector((state) => state.logs);
   const rendered = useMemo(() => logs.slice().reverse(), [logs]);
   return (
-    <CardFrame title="Server logs" meta={logs.length} bodyClassName="space-y-0.5 text-base">
+    <CardFrame title="Server logs" meta={logs.length} accent="#f97316" bodyClassName="space-y-0.5 text-base">
       <div className="surface h-64 overflow-y-auto font-mono text-xs">
         {logs.length === 0 ? (
           <p>No logs yet.</p>

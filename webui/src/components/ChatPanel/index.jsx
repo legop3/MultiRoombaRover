@@ -109,6 +109,7 @@ export default function ChatPanel({
   return (
     <CardFrame
       title={title}
+      accent="#22c55e"
       hideHeader={!title}
       fillHeight={fillHeight}
       bodyClassName="space-y-0.5 text-base"

@@ -70,6 +70,7 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
   return (
     <CardFrame
       title="Lift Controls"
+      accent="#06b6d4"
       className={`relative ${wrapClass}`}
       bodyClassName="text-sm text-slate-200"
       actions={
