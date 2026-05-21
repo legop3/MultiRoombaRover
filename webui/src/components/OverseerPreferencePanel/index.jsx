@@ -6,7 +6,7 @@ export default function OverseerPreferencePanel() {
   const vote = useSessionSelector((state) => state.session?.overseerVote || null);
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
   const { value: identity } = useSettingsNamespace('identity', { cookieUserId: '' });
-  const { value, save } = useSettingsNamespace('overseerPreference', { enabled: true });
+  const { value, save } = useSettingsNamespace('overseerPreference', { enabled: false });
   const enabled = Boolean(value?.enabled);
   const running = Boolean(vote?.running);
 
@@ -22,22 +22,27 @@ export default function OverseerPreferencePanel() {
 
   return (
     <section className="surface p-1 text-xs text-slate-200 text-center">
-      <label className="flex items-center justify-center gap-1.5 bg-gray-700 surface">
+      <div className="text-[0.65rem] text-slate-400">Overseer vote</div>
+      <label
+        className={`flex items-center justify-center gap-1.5 rounded px-1 py-0.5 ${
+          enabled ? 'bg-emerald-600/80 text-emerald-50' : 'bg-slate-600/70 text-slate-100'
+        }`}
+      >
         <input type="checkbox" checked={enabled} onChange={onToggle} />
-        <span>Enable Overseer LLM</span>
+        <span>Your vote: {enabled ? 'yes' : 'no'}</span>
       </label>
-        <span className='text-xs'>Cast your vote to enable Overseer in chat.</span>
+      <span className="text-xs">(A local LLM in chat)</span>
 
-      <div className="mt-0.5 text-slate-400">
+      {/* <div className="mt-0.5 text-slate-400">
         Yes!: {Number(vote?.yesCount || 0)}, No...: {Number(vote?.noCount || 0)}
-      </div>
+      </div> */}
       <div className="mt-0.5 flex justify-center">
         <span
           className={`inline-flex items-center rounded px-1.5 py-0.5 text-[0.7rem] font-medium ${
             running ? 'bg-emerald-600/80 text-emerald-50' : 'bg-slate-600/70 text-slate-100'
           }`}
         >
-          {running ? 'Running!' : 'Stopped...'}
+          {running ? 'Running!' : 'Stopped by vote.'}
         </span>
       </div>
     </section>

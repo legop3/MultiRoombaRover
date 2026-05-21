@@ -15,7 +15,7 @@ export default function useUserIdentitySync() {
   const { value: profile, status: profileStatus } = useSettingsNamespace('profile', { nickname: '' });
   const { value: overseerPreference, status: overseerPreferenceStatus } = useSettingsNamespace(
     'overseerPreference',
-    { enabled: true },
+    { enabled: false },
   );
 
   const inFlightRef = useRef(false);
