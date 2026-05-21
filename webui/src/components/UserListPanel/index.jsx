@@ -20,6 +20,9 @@ export function NicknameEntryPanel({ compact = false }) {
 export function LinkButtonsPanel() {
   return (
     <section className="panel-section flex h-full min-h-0 flex-col gap-0.5 text-base">
+      <div className="panel-title-row">
+        <span className="panel-title-text">Socials</span>
+      </div>
       <SocialButtonsGrid className="flex-1 min-h-0" />
     </section>
   );

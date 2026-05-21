@@ -16,6 +16,7 @@ export default function ChatPanel({
   hideSpectatorNotice = false,
   fillHeight = false,
   allowSpectatorInput = false,
+  title = 'Chat',
 }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
@@ -106,6 +107,11 @@ export default function ChatPanel({
 
   return (
     <section className={`panel-section space-y-0.5 text-base ${fillHeight ? 'flex h-full flex-col overflow-hidden' : ''}`}>
+      {title ? (
+        <div className="panel-title-row">
+          <span className="panel-title-text">{title}</span>
+        </div>
+      ) : null}
       <div className={`surface overflow-y-auto space-y-0.5 px-0 ${listClass}`} ref={listRef}>
         {sorted.length === 0 && typingRows.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet.</p>

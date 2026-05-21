@@ -127,8 +127,8 @@ export default function ButtonBoxPanel() {
 
   return (
     <section className="panel-section space-y-0.5 text-base">
-      <header className="panel-muted text-center text-sm">
-        <p>Button Box</p>
+      <header className="panel-title-row">
+        <p className="panel-title-text">Button Box</p>
       </header>
       <div className="grid grid-cols-4 gap-0.5">
         {buttons.map((button) => {

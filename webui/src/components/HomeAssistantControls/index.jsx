@@ -256,7 +256,7 @@ export default function HomeAssistantControls() {
   if (!ha?.enabled) {
     return (
       <section className="panel-section space-y-0.5 text-sm text-slate-400">
-        <p className="text-slate-300">Room Controls</p>
+        <p className="panel-title-text">Room Controls</p>
         <p className="text-slate-500">Not configured on the server.</p>
       </section>
     );
@@ -265,7 +265,7 @@ export default function HomeAssistantControls() {
   if (entities.length === 0) {
     return (
       <section className="panel-section space-y-0.5 text-sm text-slate-400">
-        <p className="text-slate-300">Room Controls</p>
+        <p className="panel-title-text">Room Controls</p>
         <p className="text-slate-500">No lights or switches configured.</p>
       </section>
     );
@@ -275,23 +275,25 @@ export default function HomeAssistantControls() {
 
   return (
     <section className="panel-section space-y-0.5 text-base">
-      <header className="flex items-center justify-between gap-0.5 text-sm text-slate-400">
-        <div className="flex items-center gap-0.5">
-          <p>Room Controls</p>
-          <span className="text-xs text-slate-500">{entities.length}</span>
-          {controlsLocked ? <StatusBadge label={lockState === 'off' ? 'Locked Off' : 'Locked On'} tone="warn" /> : null}
-          <div className="flex items-center gap-0.5 text-xs text-slate-300 background-black">
+      <header className="panel-title-row">
+        <div className="panel-title-left">
+          <p className="panel-title-text">Room Controls</p>
+          <span className="panel-title-meta">{entities.length}</span>
+        </div>
+        <div className="panel-title-right">
+          <div className="panel-title-actions">
             <span className="flex items-center gap-0.5">
-              <span>On</span>
+              <span className="panel-title-meta">On</span>
               {onKeyLabel ? <KeyPill label={onKeyLabel} /> : null}
             </span>
             <span className="flex items-center gap-0.5">
-              <span>Off</span>
+              <span className="panel-title-meta">Off</span>
               {offKeyLabel ? <KeyPill label={offKeyLabel} /> : null}
             </span>
           </div>
+          {controlsLocked ? <StatusBadge label={lockState === 'off' ? 'Locked Off' : 'Locked On'} tone="warn" /> : null}
+          <StatusBadge label={connected ? 'Connected' : 'Offline'} tone={connected ? 'success' : 'warn'} />
         </div>
-        <StatusBadge label={connected ? 'Connected' : 'Offline'} tone={connected ? 'success' : 'warn'} />
       </header>
       {controlsLocked ? (
         <p className="rounded border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
@@ -319,5 +321,5 @@ export default function HomeAssistantControls() {
 
 function KeyPill({ label }) {
   if (!label) return null;
-  return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
+  return <span className="rounded border border-slate-600 px-1 text-[0.65rem] text-slate-300">{label}</span>;
 }

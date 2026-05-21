@@ -101,6 +101,7 @@ function DriveDockPanel() {
               value={value}
               min={min}
               max={max}
+              label="Camera tilt"
               disabled={cameraDisabled}
               onChange={setServoAngle}
               keyDownLabel={downLabel}

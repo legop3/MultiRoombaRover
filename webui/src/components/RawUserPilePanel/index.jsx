@@ -76,9 +76,9 @@ export default function RawUserPilePanel({
 
       <div className={`space-y-0.5 ${fillHeight ? 'flex flex-1 min-h-0 flex-col' : ''}`}>
         {!hideHeader && (
-          <div className={`flex items-center justify-between text-sm text-slate-400 ${compact ? 'text-xs' : ''}`}>
-            <span>Users</span>
-            <span className="text-xs text-slate-500">{sorted.length}</span>
+          <div className="panel-title-row">
+            <span className="panel-title-text">Users</span>
+            <span className="panel-title-meta">{sorted.length}</span>
           </div>
         )}
         <div

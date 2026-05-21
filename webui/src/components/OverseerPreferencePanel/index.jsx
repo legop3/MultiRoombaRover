@@ -22,7 +22,9 @@ export default function OverseerPreferencePanel() {
 
   return (
     <section className="surface p-1 text-xs text-slate-200 text-center">
-      <div className="text-[0.65rem] text-slate-400">Overseer vote</div>
+      <div className="panel-title-row">
+        <span className="panel-title-text">Overseer vote</span>
+      </div>
       <label
         className={`flex items-center justify-center gap-1.5 rounded px-1 py-0.5 ${
           enabled ? 'bg-emerald-600/80 text-emerald-50' : 'bg-slate-600/70 text-slate-100'

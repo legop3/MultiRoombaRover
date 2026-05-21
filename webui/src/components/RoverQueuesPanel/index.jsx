@@ -97,7 +97,11 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
 
   return (
     <div className="space-y-0.5 text-sm">
-      {title && <p className="text-sm text-slate-400">{title}</p>}
+      {title && (
+        <div className="panel-title-row">
+          <p className="panel-title-text">{title}</p>
+        </div>
+      )}
       {rosterItems.length === 0 ? (
         <p className="text-sm text-slate-500">No rovers registered.</p>
       ) : (

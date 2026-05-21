@@ -69,15 +69,15 @@ export default function RoomCameraPanel({
   return (
     <section className="panel-section space-y-0.5 text-base">
       {!hideHeader && (
-        <header className="flex flex-wrap items-center justify-between gap-0.5 text-sm text-slate-400">
-          <div className="flex items-center gap-0.5">
-            <p>Room cameras</p>
-            <span className="text-xs text-slate-500">{cameras.length}</span>
+        <header className="panel-title-row">
+          <div className="panel-title-left">
+            <p className="panel-title-text">Room cameras</p>
+            <span className="panel-title-meta">{cameras.length}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-0.5 text-xs">
+          <div className="panel-title-right">
             {showLayoutToggle && (
-              <div className="flex items-center gap-0.5">
-                <span className="text-slate-500">Layout:</span>
+              <div className="panel-title-actions">
+                <span className="panel-title-meta">Layout</span>
                 <div className="inline-flex overflow-hidden rounded border border-slate-700">
                   {ORIENTATIONS.map((option) => (
                     <button

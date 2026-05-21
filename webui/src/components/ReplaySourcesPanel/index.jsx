@@ -151,9 +151,9 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
 
   return (
     <section className={`panel-section p-0.75 text-sm ${containerClass}`}>
-      <header className="panel-muted flex items-center justify-between text-xs">
-        <span>Replay Sources</span>
-        <span>{sources.length}</span>
+      <header className="panel-title-row">
+        <span className="panel-title-text">Replay Sources</span>
+        <span className="panel-title-meta">{sources.length}</span>
       </header>
       <div className={`grid gap-0.5 md:grid-cols-2 ${listWrapClass}`}>
         <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />

@@ -71,6 +71,30 @@ body {
     @apply text-sm text-slate-400 rounded-md;
   }
 
+  .panel-title-row {
+    @apply flex items-center justify-between gap-0.5 rounded-md bg-slate-900 px-0.5 py-0.5 text-left;
+  }
+
+  .panel-title-text {
+    @apply text-[0.78rem] font-semibold tracking-normal text-slate-200 leading-none text-left;
+  }
+
+  .panel-title-meta {
+    @apply text-[0.68rem] font-medium tracking-normal text-slate-400 leading-none;
+  }
+
+  .panel-title-left {
+    @apply flex min-w-0 items-center gap-0.5;
+  }
+
+  .panel-title-right {
+    @apply flex flex-wrap items-center justify-end gap-0.5;
+  }
+
+  .panel-title-actions {
+    @apply flex items-center gap-0.5 text-[0.68rem] text-slate-400 leading-none;
+  }
+
   .surface {
     @apply bg-neutral-800 text-white px-0.5 py-0.5 rounded-md;
   }

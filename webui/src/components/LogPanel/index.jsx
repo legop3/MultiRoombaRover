@@ -9,9 +9,9 @@ export default function LogPanel() {
   const rendered = useMemo(() => logs.slice().reverse(), [logs]);
   return (
     <div className="panel-section space-y-0.5 text-base">
-      <div className="flex items-center justify-between text-sm text-slate-400">
-        <span>Server logs</span>
-        <span>{logs.length}</span>
+      <div className="panel-title-row">
+        <span className="panel-title-text">Server logs</span>
+        <span className="panel-title-meta">{logs.length}</span>
       </div>
       <div className="surface h-64 overflow-y-auto font-mono text-xs">
         {logs.length === 0 ? (
