@@ -150,7 +150,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const listWrapClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : '';
 
   return (
-    <CardFrame title="Replay Sources" meta={sources.length} accent="#06b6d4" fillHeight={fillHeight} bodyClassName="space-y-0.5 text-sm">
+    <CardFrame title="Replay Sources" accent="#06b6d4" fillHeight={fillHeight} bodyClassName="space-y-0.5 text-sm">
       <div className={`grid gap-0.5 md:grid-cols-2 ${listWrapClass}`}>
         <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />
         <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />

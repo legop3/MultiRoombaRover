@@ -290,7 +290,7 @@ export default function HomeAssistantControls() {
   );
 
   return (
-    <CardFrame title="Room Controls" meta={entities.length} accent="#14b8a6" actions={actions} bodyClassName="space-y-0.5 text-base">
+    <CardFrame title="Room Controls" accent="#14b8a6" actions={actions} bodyClassName="space-y-0.5 text-base">
       {controlsLocked ? (
         <p className="rounded border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
           {lockState === 'off'

@@ -88,7 +88,6 @@ export default function RoomCameraPanel({
   return (
     <CardFrame
       title="Room cameras"
-      meta={cameras.length}
       accent="#38bdf8"
       actions={actions}
       hideHeader={hideHeader}
