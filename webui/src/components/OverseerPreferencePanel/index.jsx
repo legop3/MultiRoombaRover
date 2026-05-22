@@ -33,9 +33,9 @@ export default function OverseerPreferencePanel() {
       </label>
       <span className="text-xs">Enable a local LLM in chat</span>
 
-      {/* <div className="mt-0.5 text-slate-400">
+      <div className="mt-0.5 text-slate-400">
         Yes!: {Number(vote?.yesCount || 0)}, No...: {Number(vote?.noCount || 0)}
-      </div> */}
+      </div>
       <div className="mt-0.5 flex justify-center">
         <span
           className={`inline-flex items-center rounded px-1.5 py-0.5 text-[0.7rem] font-medium ${

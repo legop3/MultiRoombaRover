@@ -6,7 +6,6 @@ import AuthPanel from '../AuthPanel/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import SocialButton from '../SocialButton/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
-import NicknameForm from '../NicknameForm/index.jsx';
 
 const PRIVILEGED_ROLES = new Set(['admin', 'lockdown', 'lockdown-admin']);
 const LOCKDOWN_ROLES = new Set(['lockdown', 'lockdown-admin']);
@@ -101,8 +100,7 @@ export default function ModeGateOverlay() {
         You can still use the chat while the server is locked:
         {/* set max height of this box */}
         <div className='max-h-80 overflow-y-auto'>
-          <ChatPanel />
-          <NicknameForm />
+          <ChatPanel nicknameLayout="stacked" />
         </div>
         
         {/* <p className="text-xs text-slate-500">

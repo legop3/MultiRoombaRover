@@ -8,6 +8,7 @@ import { useSettingsNamespace } from '../../settings/index.js';
 import ChatMessageRow from '../ChatMessageRow/index.jsx';
 import ChatTypingRow from '../ChatTypingRow/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
+import NicknameForm from '../NicknameForm/index.jsx';
 
 const FLITE_VOICES = ['kal', 'rms', 'slt', 'ksp', 'bdl'];
 const ESPEAK_PITCHES = Array.from({ length: 10 }, (_, idx) => idx * 10);
@@ -18,6 +19,7 @@ export default function ChatPanel({
   fillHeight = false,
   allowSpectatorInput = false,
   title = 'Chat',
+  nicknameLayout = 'inline',
 }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
@@ -105,6 +107,7 @@ export default function ChatPanel({
   }
 
   const listClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : 'h-48 overflow-y-auto';
+  const isStackedNickname = nicknameLayout === 'stacked';
 
   return (
     <CardFrame
@@ -125,9 +128,15 @@ export default function ChatPanel({
         ))}
       </div>
       {!hideInput && (
-        <form className="flex flex-wrap items-stretch gap-0.5" onSubmit={handleSend}>
+        <form
+          className={`flex items-stretch gap-0.5 ${isStackedNickname ? 'flex-col' : 'flex-wrap'}`}
+          onSubmit={handleSend}
+        >
+          <div className={isStackedNickname ? 'w-full' : 'w-[9rem] sm:w-[10rem] shrink-0'}>
+            <NicknameForm compact />
+          </div>
           <input
-            className="field-input flex-1 min-w-[10rem]"
+            className={`field-input ${isStackedNickname ? 'w-full min-w-0' : 'flex-1 min-w-[10rem]'}`}
             value={draft}
             onChange={(e) => {
               const next = e.target.value;
@@ -154,7 +163,11 @@ export default function ChatPanel({
             disabled={!canChat}
           />
           {ttsSupported && (
-            <div className="flex flex-wrap items-center gap-0.5 basis-full sm:basis-auto">
+            <div
+              className={`flex flex-wrap items-center gap-0.5 ${
+                isStackedNickname ? 'w-full' : 'basis-full sm:basis-auto'
+              }`}
+            >
               <label className="flex items-center gap-0.5 text-xs text-slate-300">
                 <input
                   type="checkbox"
@@ -214,7 +227,7 @@ export default function ChatPanel({
           <button
             type="submit"
             disabled={!canChat || sending}
-            className="button-dark h-full disabled:opacity-50 self-stretch"
+            className={`button-dark disabled:opacity-50 ${isStackedNickname ? 'w-full h-8' : 'h-full self-stretch'}`}
           >
             {sending ? '...' : 'Send'}
           </button>

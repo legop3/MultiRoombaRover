@@ -6,7 +6,7 @@ import HomeAssistantControls from '../HomeAssistantControls/index.jsx';
 import SettingsPanel from '../SettingsPanel/index.jsx';
 import HelpPanel from '../HelpPanel/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
-import { LinkButtonsPanel, NicknameEntryPanel } from '../UserListPanel/index.jsx';
+import { LinkButtonsPanel } from '../UserListPanel/index.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../Tabs/index.jsx';
 import TopDownMap from '../TopDownMap/index.jsx';
@@ -180,10 +180,9 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
               </div>
               <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.3fr)_minmax(0,0.22fr)] h-[14rem]">
                 <ChatPanel fillHeight />
-                <div className="grid min-h-0 gap-0.5 grid-rows-[auto_minmax(0,1fr)_auto]">
+                <div className="grid min-h-0 gap-0.5 grid-rows-[auto_minmax(0,1fr)]">
                   <OverseerPreferencePanel />
                   <RawUserPilePanel compact hideNicknameForm fillHeight />
-                  <NicknameEntryPanel compact />
                 </div>
               </div>
               <HomeAssistantControls />
