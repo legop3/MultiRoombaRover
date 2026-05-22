@@ -256,7 +256,7 @@ export default function HomeAssistantControls() {
 
   if (!ha?.enabled) {
     return (
-      <CardFrame title="Room Controls" accent="#14b8a6" bodyClassName="space-y-0.5 text-sm text-slate-400">
+      <CardFrame title="Room Controls" bodyClassName="space-y-0.5 text-sm text-slate-400">
         <p className="text-slate-500">Not configured on the server.</p>
       </CardFrame>
     );
@@ -264,7 +264,7 @@ export default function HomeAssistantControls() {
 
   if (entities.length === 0) {
     return (
-      <CardFrame title="Room Controls" accent="#14b8a6" bodyClassName="space-y-0.5 text-sm text-slate-400">
+      <CardFrame title="Room Controls" bodyClassName="space-y-0.5 text-sm text-slate-400">
         <p className="text-slate-500">No lights or switches configured.</p>
       </CardFrame>
     );
@@ -290,7 +290,7 @@ export default function HomeAssistantControls() {
   );
 
   return (
-    <CardFrame title="Room Controls" accent="#14b8a6" actions={actions} bodyClassName="space-y-0.5 text-base">
+    <CardFrame title="Room Controls" actions={actions} bodyClassName="space-y-0.5 text-base">
       {controlsLocked ? (
         <p className="rounded border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
           {lockState === 'off'

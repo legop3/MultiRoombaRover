@@ -62,7 +62,7 @@ export default function VipVerificationCard({
 
   if (pendingRequestId) {
     return (
-      <CardFrame title="Verification" accent="#eab308" className={wrapClass} bodyClassName="text-sm text-slate-300">
+      <CardFrame title="Verification" className={wrapClass} bodyClassName="text-sm text-slate-300">
         <div className={innerFlowClass}>Verification request pending: {pendingRequestId}</div>
       </CardFrame>
     );
@@ -70,7 +70,7 @@ export default function VipVerificationCard({
 
   if (requestFlowStep === 0) {
     return (
-      <CardFrame title="Verification" accent="#eab308" className={wrapClass}>
+      <CardFrame title="Verification" className={wrapClass}>
         <div className={innerFlowClass}>
           <button type="button" className="button-dark text-sm" onClick={beginRequestFlow} disabled={working}>
             Request Verification
@@ -81,7 +81,7 @@ export default function VipVerificationCard({
   }
 
   return (
-    <CardFrame title="Request verification" accent="#eab308" className={wrapClass}>
+    <CardFrame title="Request verification" className={wrapClass}>
       <form onSubmit={handleRequestSubmit}>
       <div className={innerFlowClass}>
         <p className="text-xs text-slate-500">

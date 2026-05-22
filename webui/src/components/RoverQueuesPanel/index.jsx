@@ -97,7 +97,7 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
     users.find((u) => u.socketId === socketId) || { socketId, nickname: null, role: null };
 
   return (
-    <CardFrame title={title} accent="#f59e0b" bodyClassName="space-y-0.5 text-sm">
+    <CardFrame title={title} bodyClassName="space-y-0.5 text-sm">
       {rosterItems.length === 0 ? (
         <p className="text-sm text-slate-500">No rovers registered.</p>
       ) : (

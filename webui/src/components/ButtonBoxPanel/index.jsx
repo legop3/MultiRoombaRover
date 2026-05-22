@@ -127,7 +127,7 @@ export default function ButtonBoxPanel() {
   }, [effectiveAlertVolume, socket]);
 
   return (
-    <CardFrame title="Button Box" accent="#eab308" bodyClassName="space-y-0.5 text-base">
+    <CardFrame title="Button Box" bodyClassName="space-y-0.5 text-base">
       <div className="grid grid-cols-4 gap-0.5">
         {buttons.map((button) => {
           const id = Number(button.id);

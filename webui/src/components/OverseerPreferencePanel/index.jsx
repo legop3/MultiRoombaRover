@@ -22,7 +22,7 @@ export default function OverseerPreferencePanel() {
   };
 
   return (
-    <CardFrame title="Overseer vote" accent="#10b981" bodyClassName="space-y-0.5 text-center text-xs text-slate-200">
+    <CardFrame title="Overseer vote" bodyClassName="space-y-0.5 text-center text-xs text-slate-200">
       <label
         className={`flex items-center justify-center gap-1.5 rounded px-1 py-0.5 ${
           enabled ? 'bg-emerald-600/80 text-emerald-50' : 'bg-slate-600/70 text-slate-100'

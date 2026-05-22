@@ -41,7 +41,7 @@ export default function VipIdentityCard({ currentStoredKey, applyIdentityKey, on
   const wrapClass = fullWidth ? 'w-full' : flowWrapClass;
 
   return (
-    <CardFrame title="Identity key" accent="#60a5fa" className={wrapClass}>
+    <CardFrame title="Identity key" className={wrapClass}>
       <div className={innerFlowClass}>
         <p className="text-xs text-slate-500">Current: {maskKey(currentStoredKey) || 'not set yet'}</p>
         <input

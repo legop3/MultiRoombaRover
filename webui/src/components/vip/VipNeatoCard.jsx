@@ -101,7 +101,7 @@ export default function VipNeatoCard({
   return (
     <CardFrame
       title="Neato Controls"
-      accent="#22c55e"
+     
       className={wrapClass}
       bodyClassName="text-sm text-slate-200"
       actions={

@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
 import { useDockIr } from '../../hooks/useDockIr.js';
+import CardFrame from '../CardFrame/index.jsx';
 
 function formatMetric(value, fallback = '--') {
   if (value == null || value === '') return fallback;
@@ -39,7 +40,7 @@ export default function TelemetryPanel() {
   }, [activeDriverId, roverId, selfSocketId, users]);
 
   return (
-    <section className="panel-section space-y-0.5 text-base text-slate-100">
+    <CardFrame hideHeader clipOverflow={false} bodyClassName="space-y-0.5 text-base text-slate-100">
       {/* <div className="text-sm text-slate-400">
         <span>{connected ? 'online' : 'offline'}</span>
         <span> · role {session?.role || 'unknown'}</span>
@@ -60,7 +61,7 @@ export default function TelemetryPanel() {
       {rawSnippet && (
         <pre className="surface whitespace-pre-wrap break-words text-xs text-lime-300">{rawSnippet}</pre>
       )}
-    </section>
+    </CardFrame>
   );
 }
 

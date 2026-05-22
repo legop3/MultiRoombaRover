@@ -55,7 +55,7 @@ export default function VipProfileImageCard({ isVerified = false, fullWidth = fa
   };
 
   return (
-    <CardFrame title="Chat profile image URL" accent="#f59e0b" className={wrapClass} bodyClassName="text-sm text-slate-300">
+    <CardFrame title="Chat profile image URL" className={wrapClass} bodyClassName="text-sm text-slate-300">
       <form className={innerFlowClass} onSubmit={handleSave}>
         <p className="text-xs text-slate-500">
           Verified users can set a custom avatar for chat and Discord bridge messages.
