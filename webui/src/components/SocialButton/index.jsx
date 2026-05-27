@@ -1,97 +1,59 @@
 // Social Button
 // Purpose: Defines the Social Button module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect } from 'react';
-import { FaBook, FaCoffee, FaCrown, FaDiscord, FaLink } from 'react-icons/fa';
+import * as FaIcons from 'react-icons/fa';
+import { FaLink } from 'react-icons/fa';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
+import { getSocialById } from '../../lib/socials.js';
 
-const ICONS_BY_ID = {
-  discord: FaDiscord,
-  kofi: FaCoffee,
-  'ko-fi': FaCoffee,
-  wiki: FaBook,
-  throne: FaCrown,
-};
-
-const GRADIENT_STYLE_BY_ID = {
-  discord: {
-    backgroundImage:
-      'linear-gradient(270deg,#5865F2,#404EED,#5865F2)',
-    backgroundSize: '600% 600%',
-    animation: 'socialGradient 180s ease infinite',
-  },
-  kofi: {
-    backgroundImage: 'linear-gradient(270deg,#FF6433,#E04822,#FF6433)',
-    backgroundSize: '600% 600%',
-    animation: 'socialGradient 170s ease infinite',
-  },
-  'ko-fi': {
-    backgroundImage: 'linear-gradient(270deg,#FF6433,#E04822,#FF6433)',
-    backgroundSize: '600% 600%',
-    animation: 'socialGradient 170s ease infinite',
-  },
-  wiki: {
-    backgroundImage: 'linear-gradient(270deg,#EE8019,#C65C08,#EE8019)',
-    backgroundSize: '600% 600%',
-    animation: 'socialGradient 180s ease infinite',
-  },
-  throne: {
-    backgroundImage: 'linear-gradient(270deg,#7C3AED,#5B21B6,#7C3AED)',
-    backgroundSize: '600% 600%',
-    animation: 'socialGradient 180s ease infinite',
-  },
-};
-
-function useSocialButtonStyles() {
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const styleId = 'social-button-keyframes';
-    if (document.getElementById(styleId)) return;
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = `
-      @keyframes socialGradient {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
-    `;
-    document.head.appendChild(style);
-  }, []);
+function sanitizeCssColor(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^#[0-9a-fA-F]{3,8}$/.test(trimmed)) return trimmed;
+  if (/^(rgb|rgba|hsl|hsla)\([^)]+\)$/.test(trimmed)) return trimmed;
+  return null;
 }
 
-function normalizeId(id, label) {
-  if (typeof id === 'string' && id.trim()) return id.trim().toLowerCase();
-  if (typeof label === 'string' && label.trim()) {
-    return label
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '');
-  }
-  return '';
+function resolveIcon(iconName) {
+  if (typeof iconName !== 'string' || !iconName.trim()) return FaLink;
+  const icon = FaIcons[iconName.trim()];
+  return typeof icon === 'function' ? icon : FaLink;
 }
 
-export default function SocialButton({ id, label, url, className = '' }) {
-  if (!url) return null;
-  useSocialButtonStyles();
-  const key = normalizeId(id, label);
-  const Icon = ICONS_BY_ID[key] || FaLink;
-  const gradientStyle = GRADIENT_STYLE_BY_ID[key] || null;
-  const text = label || id || 'Link';
+export default function SocialButton({ id = null, label, url, icon, color, layout = 'stacked', className = '' }) {
+  const socialFromId = useSessionSelector((state) => (id ? getSocialById(state, id) : null));
+  const resolvedUrl = url || socialFromId?.url || null;
+  if (!resolvedUrl) return null;
+  const resolvedIcon = icon || socialFromId?.icon || null;
+  const resolvedColor = color || socialFromId?.color || null;
+  const Icon = resolveIcon(resolvedIcon);
+  const bgColor = sanitizeCssColor(resolvedColor);
+  const text = label || socialFromId?.label || 'Link';
+  const isInline = layout === 'inline';
 
   return (
     <a
-      href={url}
+      href={resolvedUrl}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={text}
-      className={`inline-flex items-center w-full px-0.5 py-0.5 text-sm font-medium text-white transition justify-center gap-1 rounded-md ${
-        gradientStyle ? '' : 'bg-slate-700 hover:bg-slate-600'
-      } ${className}`}
-      style={gradientStyle || undefined}
+      className={`grid h-full min-h-0 w-full place-items-center rounded-md bg-slate-700 px-0.5 py-0.5 text-center text-sm font-medium text-white transition hover:opacity-90 ${className}`}
+      style={bgColor ? { backgroundColor: bgColor } : undefined}
     >
-      <Icon className="mr-0" />
-      {text}
+      {isInline ? (
+        <span className="inline-flex max-w-full items-center justify-center gap-1 text-center leading-tight">
+          <Icon className="shrink-0" style={{ fontSize: '1.1em' }} />
+          <span className="break-words">{text}</span>
+        </span>
+      ) : (
+        <span className="flex h-full w-full max-w-full flex-col items-center justify-between text-center leading-tight">
+          <span className="flex min-h-0 flex-1 items-center justify-center">
+            <Icon className="shrink-0" style={{ fontSize: 'clamp(1rem, 2.2vh + 1.2vw, 2rem)' }} />
+          </span>
+          <span className="w-full break-words leading-tight">{text}</span>
+        </span>
+      )}
     </a>
   );
 }

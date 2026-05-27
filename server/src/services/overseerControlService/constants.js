@@ -4,6 +4,7 @@ const PROMPT_PATH = path.join(__dirname, '..', '..', '..', 'prompts', 'overseer_
 const DEFAULT_NAME = 'The Overseer';
 const DEFAULT_GATE_INTERVAL_MS = 2000;
 const DEFAULT_HEARTBEAT_MS = 30000;
+const DEFAULT_POST_CHAT_DELAY_MS = 20000;
 const MIN_INTERVAL_MS = 250;
 const MAX_RUN_HISTORY = 100;
 const MAX_CHAT_CONTEXT = 12;
@@ -19,6 +20,7 @@ module.exports = {
   DEFAULT_NAME,
   DEFAULT_GATE_INTERVAL_MS,
   DEFAULT_HEARTBEAT_MS,
+  DEFAULT_POST_CHAT_DELAY_MS,
   MAX_RUN_HISTORY,
   MAX_CHAT_CONTEXT,
   MAX_BOT_CONTEXT,

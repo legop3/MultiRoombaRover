@@ -4,7 +4,6 @@ import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButton from '../SocialButton/index.jsx';
 import KeyPill from '../vip/VipAudioUploadCard/KeyPill.jsx';
-import { useSessionSelector } from '../../context/SessionContext.jsx';
 
 function ControlRow({ label, keyLabel }) {
   return (
@@ -56,15 +55,6 @@ export default function QuickstartOverlay({
 }) {
   const { state } = useControlSystem();
   const isDesktop = layout === 'desktop';
-  const discordUrl = useSessionSelector((sessionState) => {
-    const socials = sessionState.session?.socials || [];
-    const entry = socials.find((item) => {
-      const key = String(item?.id || item?.label || '').toLowerCase();
-      return key === 'discord';
-    });
-    return entry?.url || sessionState.session?.discord?.invite || null;
-  });
-
   const keymap = useMemo(() => state?.keymap || {}, [state?.keymap]);
 
   if (!visible) return null;
@@ -98,7 +88,7 @@ export default function QuickstartOverlay({
             <div className="surface p-0.5">
               <p className="text-xl font-semibold text-slate-200">Join our Discord server!</p>
               <p className="text-sm font-semibold text-slate-200">We have an active and welcoming community :3</p>
-              <SocialButton id="discord" label="Join Discord" url={discordUrl} />
+              <SocialButton id="discord" label="Join Discord" />
             </div>
           </section>
         </div>
