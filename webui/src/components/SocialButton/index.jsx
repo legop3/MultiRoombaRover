@@ -38,7 +38,7 @@ export default function SocialButton({ id = null, label, url, icon, color, layou
       target="_blank"
       rel="noopener noreferrer"
       aria-label={text}
-      className={`grid h-full min-h-0 w-full place-items-center rounded-md bg-slate-700 px-0.5 py-0.5 text-center text-sm font-medium text-white transition hover:opacity-90 ${className}`}
+      className={`grid h-full min-h-0 w-full place-items-center rounded-md bg-slate-700 px-0.5 ${isInline ? 'py-0.5' : 'pb-3'} text-center text-sm font-medium text-white transition hover:opacity-90 ${className}`}
       style={bgColor ? { backgroundColor: bgColor } : undefined}
     >
       {isInline ? (
@@ -49,7 +49,7 @@ export default function SocialButton({ id = null, label, url, icon, color, layou
       ) : (
         <span className="flex h-full w-full max-w-full flex-col items-center justify-between text-center leading-tight">
           <span className="flex min-h-0 flex-1 items-center justify-center">
-            <Icon className="shrink-0" style={{ fontSize: 'clamp(1rem, 2.2vh + 1.2vw, 2rem)' }} />
+            <Icon className="shrink-0" style={{ fontSize: 'clamp(1rem, 2.2vh + 1.2vw, 3rem)' }} />
           </span>
           <span className="w-full break-words leading-tight">{text}</span>
         </span>
