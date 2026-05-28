@@ -192,6 +192,14 @@ function createBusEventHandler(deps) {
         announce({ channelId: channels.adminAlerts, pingRoleId: roles.adminPing || null, color: 0xe53935, title: 'Rover Offline', description: `${payload?.roverId} went offline.` });
         schedulePresenceRotation();
         break;
+      case 'rover.reboot.userRequested':
+        announce({
+          channelId: channels.adminAlerts,
+          color: 0xf0b651,
+          title: 'User Rover Reboot Requested',
+          description: `${payload?.by || 'unknown user'} requested reboot for ${payload?.roverName || payload?.roverId || 'unknown rover'}.`,
+        });
+        break;
       case 'rover.dockGuard':
         announce({ channelId: channels.adminAlerts, color: 0xf0b651, title: 'Dock Guard Triggered', description: `${payload?.roverId} (${payload?.reasonText || 'undocked'}) for ${formatDuration(payload?.idleMs)}.` });
         break;

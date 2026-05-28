@@ -15,6 +15,7 @@ require('./src/services/roverManager');
 require('./src/services/commandService');
 require('./src/services/roverConnectionService');
 require('./src/services/assignmentService');
+require('./src/services/roverRebootService');
 require('./src/services/nicknameService');
 require('./src/services/verificationService');
 require('./src/services/privateRoverAccessRequestService');

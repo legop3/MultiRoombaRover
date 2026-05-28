@@ -182,6 +182,7 @@ export function SessionProvider({ children }) {
       requestVerification: () => emitWithAck('verification:request'),
       requestPrivateRoverAccess: (roverId) =>
         emitWithAck('session:privateRover:requestAccess', { roverId }),
+      rebootOwnRover: () => emitWithAck('session:rebootOwnRover'),
       triggerReplay: (sourcesOrPayload = [], title = '') => {
         if (sourcesOrPayload && typeof sourcesOrPayload === 'object' && !Array.isArray(sourcesOrPayload)) {
           return emitWithAck('replay:trigger', sourcesOrPayload);

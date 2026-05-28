@@ -51,8 +51,16 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
   const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const users = useSessionSelector((state) => state.session?.users ?? []);
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
-  const { requestControl } = useSessionActions();
+  const assignedRoverId = useSessionSelector((state) => String(state.session?.assignment?.roverId || '').trim());
+  const assignedRoverName = useSessionSelector((state) => {
+    const roverId = String(state.session?.assignment?.roverId || '').trim();
+    if (!roverId) return '';
+    const rover = (state.session?.roster || []).find((entry) => String(entry?.id) === roverId);
+    return rover?.name || roverId;
+  });
+  const { requestControl, rebootOwnRover } = useSessionActions();
   const [pending, setPending] = useState({});
+  const [rebootPending, setRebootPending] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const canRequest = useMemo(() => role && role !== 'spectator', [role]);
@@ -96,8 +104,36 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
   const lookupUser = (socketId) =>
     users.find((u) => u.socketId === socketId) || { socketId, nickname: null, role: null };
 
+  async function handleRebootOwnRover() {
+    if (rebootPending) return;
+    const ok = window.confirm(`Reboot your rover "${assignedRoverName}" now?`);
+    if (!ok) return;
+    setRebootPending(true);
+    try {
+      await rebootOwnRover();
+      alert('Reboot command sent.');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRebootPending(false);
+    }
+  }
+
+  const headerActions =
+    role !== 'spectator' && assignedRoverId ? (
+      <button
+        type="button"
+        onClick={handleRebootOwnRover}
+        disabled={rebootPending}
+        className="button-dark bg-amber-700/80 text-amber-50 hover:bg-amber-600 disabled:opacity-40"
+        title="Reboot your assigned rover"
+      >
+        {rebootPending ? 'Rebooting...' : 'Reboot My Rover'}
+      </button>
+    ) : null;
+
   return (
-    <CardFrame title={title} bodyClassName="space-y-0.5 text-sm">
+    <CardFrame title={title} actions={headerActions} bodyClassName="space-y-0.5 text-sm">
       {rosterItems.length === 0 ? (
         <p className="text-sm text-slate-500">No rovers registered.</p>
       ) : (
