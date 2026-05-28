@@ -21,6 +21,7 @@ const {
   DEFAULT_NAME,
   DEFAULT_GATE_INTERVAL_MS,
   DEFAULT_HEARTBEAT_MS,
+  DEFAULT_POST_CHAT_DELAY_MS,
   MAX_RUN_HISTORY,
   MAX_CHAT_CONTEXT,
   MAX_BOT_CONTEXT,
@@ -40,6 +41,7 @@ const model = String(overseerConfig.model || '').trim();
 const ollamaUrl = String(overseerConfig.ollamaUrl || overseerConfig.ollamaServer || '').trim();
 const gateIntervalMs = normalizeMs(Number(overseerConfig.gateIntervalMs), DEFAULT_GATE_INTERVAL_MS);
 const heartbeatMs = normalizeMs(Number(overseerConfig.heartbeatMs), DEFAULT_HEARTBEAT_MS);
+const postChatDelayMs = normalizeMs(Number(overseerConfig.postChatDelayMs), DEFAULT_POST_CHAT_DELAY_MS);
 const alwaysRunModel = Boolean(overseerConfig.alwaysRunModel);
 const postToolsOnlyMessages = Boolean(overseerConfig.postToolsOnlyMessages);
 const profileImageUrl = String(overseerConfig.profileImageUrl || '').trim() || null;
@@ -67,6 +69,7 @@ let status = {
   promptPath: PROMPT_PATH,
   gateIntervalMs,
   heartbeatMs,
+  postChatDelayMs,
   alwaysRunModel,
   postToolsOnlyMessages,
   running: false,
@@ -290,6 +293,20 @@ function buildToolCallFeedEntries(requestedActions = [], actionResults = []) {
   });
 }
 
+function buildRecentEventsSummary() {
+  const events = (runtime.liveToolCalls || [])
+    .filter((entry) => entry && (entry.phase === 'ok' || entry.phase === 'error' || entry.phase === 'blocked'))
+    .slice(-3)
+    .map((entry) => {
+      const tool = String(entry.tool || 'unknown');
+      const phase = String(entry.phase || 'unknown');
+      const err = entry.error ? ` error=${String(entry.error).slice(0, 60)}` : '';
+      return `- tool=${tool} phase=${phase}${err}`;
+    });
+  if (!events.length) return '- none';
+  return events.join('\n');
+}
+
 async function runDecision(triggerReason) {
   const runId = runtime.tickCount;
   updateStatus({ phase: 'context_build', currentRunId: runId, lastTriggerReason: triggerReason, lastError: null, lastErrorDetails: null });
@@ -317,6 +334,7 @@ async function runDecision(triggerReason) {
     systemPrompt,
     stateUpdate,
     memorySummary: summarizeMemory(runtime.memoryStore),
+    recentEvents: buildRecentEventsSummary(),
     conversationMessages,
     availableTools: toolState.available,
     blockedTools: toolState.blocked,
@@ -360,6 +378,7 @@ async function runDecision(triggerReason) {
 
   const actionResults = [];
   const requestedActions = toolCalls;
+  let postedChat = false;
   let outcome = observeOnly ? 'observed' : 'executed';
   const reason = observeOnly ? 'observe-only mode' : null;
 
@@ -399,11 +418,13 @@ async function runDecision(triggerReason) {
     if (toolCallFeed.length > 0) {
       if ((decision === 'CHAT' || decision === 'ACTION+CHAT') && chatDraft) {
         sendSystemMessage(chatDraft, { nickname: name, bot: true, profileImage: profileImageUrl, toolCalls: toolCallFeed });
+        postedChat = true;
       } else if (postToolsOnlyMessages) {
         sendSystemMessage('', { nickname: name, bot: true, profileImage: profileImageUrl, toolCalls: toolCallFeed });
       }
     } else if ((decision === 'CHAT' || decision === 'ACTION+CHAT') && chatDraft) {
       sendSystemMessage(chatDraft, { nickname: name, bot: true, profileImage: profileImageUrl });
+      postedChat = true;
     }
   }
 
@@ -435,6 +456,8 @@ async function runDecision(triggerReason) {
     generationMs,
     blockedTools: toolState.blocked,
   });
+
+  return { postedChat };
 }
 
 async function tick() {
@@ -442,12 +465,16 @@ async function tick() {
   runtime.inFlight = true;
   updateStatus({ inFlight: true, tickCount: runtime.tickCount, lastTickAt: Date.now(), phase: 'gate_check' });
 
+  let nextDelayMs = gateIntervalMs;
   try {
     const triggerReason = computeTriggerReason();
     if (!triggerReason) {
       updateStatus({ phase: 'idle', lastOutcome: 'skipped', lastReason: 'gate not triggered' });
     } else {
-      await runDecision(triggerReason);
+      const runResult = await runDecision(triggerReason);
+      if (runResult?.postedChat) {
+        nextDelayMs = postChatDelayMs;
+      }
     }
   } catch (err) {
     const failure = buildFailureInfo(err);
@@ -462,8 +489,8 @@ async function tick() {
   } finally {
     runtime.inFlight = false;
     if (status.running) {
-      updateStatus({ inFlight: false, currentRunId: null, phase: 'idle', nextRunAt: Date.now() + gateIntervalMs });
-      runtime.timer = setTimeout(tick, gateIntervalMs);
+      updateStatus({ inFlight: false, currentRunId: null, phase: 'idle', nextRunAt: Date.now() + nextDelayMs });
+      runtime.timer = setTimeout(tick, nextDelayMs);
     } else {
       updateStatus({ inFlight: false, currentRunId: null, nextRunAt: null });
     }

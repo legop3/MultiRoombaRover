@@ -23,7 +23,6 @@ import HomeAssistantControls from './components/HomeAssistantControls/index.jsx'
 import TurnAlertListener from './components/TurnAlertListener/index.jsx';
 import RawUserPilePanel from './components/RawUserPilePanel/index.jsx';
 import OverseerPreferencePanel from './components/OverseerPreferencePanel/index.jsx';
-import NicknameForm from './components/NicknameForm/index.jsx';
 import SocialButtonsGrid from './components/SocialButtonsGrid/index.jsx';
 import ChatPanel from './components/ChatPanel/index.jsx';
 import FullscreenPrompt from './components/FullscreenPrompt/index.jsx';
@@ -144,12 +143,9 @@ function MobileFeatureTabs({
         <TabPanels>
           <TabPanel id="chat">
             <div className="space-y-0.5">
-              <ChatPanel />
+              <ChatPanel nicknameLayout="stacked" />
               <div className="space-y-0.5">
                 <div className="grid gap-0.5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-                  <div className="surface flex w-full items-center px-0 py-0">
-                    <NicknameForm />
-                  </div>
                   <SocialButtonsGrid />
                 </div>
                 <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

@@ -24,6 +24,7 @@ overseerControl:
   profileImageUrl: "https://example.com/overseer.png"
   gateIntervalMs: 2000
   heartbeatMs: 30000
+  postChatDelayMs: 20000
 media:
   # Base address for mediaMTX (scheme + host + optional port/path). The UI will always request
   #   http://<base>/<roverId>/whep
@@ -119,12 +120,20 @@ socials:
   - id: "discord"
     label: "Discord"
     url: "https://discord.gg/your-invite"
+    icon: "FaDiscord"
+    color: "#5865F2"
   - id: "kofi"
     label: "Ko-fi"
     url: "https://ko-fi.com/your-handle"
+    icon: "FaCoffee"
+    color: "#29ABE0"
   - id: "wiki"
     label: "Wiki"
     url: "https://wiki.example.com"
+    icon: "FaBook"
+    color: "#475569"
   - id: "throne"
     label: "Throne"
     url: "https://throne.me/yourname"
+    icon: "FaCrown"
+    color: "#334155"

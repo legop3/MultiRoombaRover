@@ -2,6 +2,7 @@
 // Purpose: Defines the Vip Private Rover Access Card module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo, useState } from 'react';
+import CardFrame from '../CardFrame/index.jsx';
 import { flowWrapClass, innerFlowClass } from './constants.js';
 
 export default function VipPrivateRoverAccessCard({
@@ -42,9 +43,8 @@ export default function VipPrivateRoverAccessCard({
   };
 
   return (
-    <section className={`surface text-sm text-slate-300 ${wrapClass}`}>
+    <CardFrame title="Private rover access requests" className={wrapClass} bodyClassName="text-sm text-slate-300">
       <div className={innerFlowClass}>
-        <p className="text-sm text-slate-300">Private rover access requests</p>
         {requestableRovers.length === 0 ? (
           <p className="text-xs text-slate-500">No closed private rovers are available to request right now.</p>
         ) : (
@@ -79,7 +79,6 @@ export default function VipPrivateRoverAccessCard({
           </div>
         )}
       </div>
-    </section>
+    </CardFrame>
   );
 }
-

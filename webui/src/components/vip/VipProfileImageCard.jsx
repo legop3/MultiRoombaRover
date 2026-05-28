@@ -3,6 +3,7 @@
 // Scope: Owns local URL validation UX and writes to the existing profile settings namespace.
 import { useEffect, useMemo, useState } from 'react';
 import { useSettingsNamespace } from '../../settings/index.js';
+import CardFrame from '../CardFrame/index.jsx';
 import { fieldClass, flowWrapClass, innerFlowClass } from './constants.js';
 
 function normalizeHttpUrl(value) {
@@ -54,9 +55,8 @@ export default function VipProfileImageCard({ isVerified = false, fullWidth = fa
   };
 
   return (
-    <section className={`surface text-sm text-slate-300 ${wrapClass}`}>
+    <CardFrame title="Chat profile image URL" className={wrapClass} bodyClassName="text-sm text-slate-300">
       <form className={innerFlowClass} onSubmit={handleSave}>
-        <p className="text-sm text-slate-300">Chat profile image URL</p>
         <p className="text-xs text-slate-500">
           Verified users can set a custom avatar for chat and Discord bridge messages.
         </p>
@@ -86,6 +86,6 @@ export default function VipProfileImageCard({ isVerified = false, fullWidth = fa
           </button>
         </div>
       </form>
-    </section>
+    </CardFrame>
   );
 }

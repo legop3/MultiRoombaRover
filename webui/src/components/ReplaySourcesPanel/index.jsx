@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { roverNameChromeStyle } from '../../lib/roverColor.js';
+import CardFrame from '../CardFrame/index.jsx';
 
 function normalizeSources(list = []) {
   return list
@@ -146,15 +147,10 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     }
   };
 
-  const containerClass = fillHeight ? 'h-full flex flex-col' : '';
   const listWrapClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : '';
 
   return (
-    <section className={`panel-section p-0.75 text-sm ${containerClass}`}>
-      <header className="panel-muted flex items-center justify-between text-xs">
-        <span>Replay Sources</span>
-        <span>{sources.length}</span>
-      </header>
+    <CardFrame title="Replay Sources" fillHeight={fillHeight} bodyClassName="space-y-0.5 text-sm">
       <div className={`grid gap-0.5 md:grid-cols-2 ${listWrapClass}`}>
         <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />
         <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
@@ -201,7 +197,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
         {error ? <div className="text-xs text-amber-400">{error}</div> : null}
         {success ? <div className="text-xs text-emerald-300">{success}</div> : null}
       </div>
-    </section>
+    </CardFrame>
   );
 }
 

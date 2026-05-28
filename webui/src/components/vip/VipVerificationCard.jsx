@@ -3,6 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useState } from 'react';
 import NicknameForm from '../NicknameForm/index.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 import { flowWrapClass, innerFlowClass, fieldClass } from './constants.js';
 
 export default function VipVerificationCard({
@@ -61,29 +62,28 @@ export default function VipVerificationCard({
 
   if (pendingRequestId) {
     return (
-      <section className={`surface text-sm text-slate-300 ${wrapClass}`}>
+      <CardFrame title="Verification" className={wrapClass} bodyClassName="text-sm text-slate-300">
         <div className={innerFlowClass}>Verification request pending: {pendingRequestId}</div>
-      </section>
+      </CardFrame>
     );
   }
 
   if (requestFlowStep === 0) {
     return (
-      <section className={`surface ${wrapClass}`}>
+      <CardFrame title="Verification" className={wrapClass}>
         <div className={innerFlowClass}>
-          <p className="text-sm text-slate-300">Verification</p>
           <button type="button" className="button-dark text-sm" onClick={beginRequestFlow} disabled={working}>
             Request Verification
           </button>
         </div>
-      </section>
+      </CardFrame>
     );
   }
 
   return (
-    <form className={`surface ${wrapClass}`} onSubmit={handleRequestSubmit}>
+    <CardFrame title="Request verification" className={wrapClass}>
+      <form onSubmit={handleRequestSubmit}>
       <div className={innerFlowClass}>
-        <p className="text-sm text-slate-300">Request verification</p>
         <p className="text-xs text-slate-500">
           Step {requestFlowStep} of 3
         </p>
@@ -189,6 +189,7 @@ export default function VipVerificationCard({
           </div>
         ) : null}
       </div>
-    </form>
+      </form>
+    </CardFrame>
   );
 }

@@ -6,7 +6,6 @@ import AuthPanel from '../AuthPanel/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import SocialButton from '../SocialButton/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
-import NicknameForm from '../NicknameForm/index.jsx';
 
 const PRIVILEGED_ROLES = new Set(['admin', 'lockdown', 'lockdown-admin']);
 const LOCKDOWN_ROLES = new Set(['lockdown', 'lockdown-admin']);
@@ -33,14 +32,6 @@ export default function ModeGateOverlay() {
   const reason = useSessionSelector((state) => state.session?.adminReason?.text || '');
   const reasonUpdatedAt = useSessionSelector((state) => state.session?.adminReason?.updatedAt || null);
   const timezone = useSessionSelector((state) => state.session?.timezone || 'UTC');
-  const discordUrl = useSessionSelector((state) => {
-    const socials = state.session?.socials || [];
-    const fromSocials = socials.find((entry) => {
-      const key = String(entry?.id || entry?.label || '').toLowerCase();
-      return key === 'discord';
-    })?.url;
-    return fromSocials || state.session?.discord?.invite || null;
-  });
   const restricted = RESTRICTED_MODES.has(mode);
   const privileged = mode === 'lockdown' ? LOCKDOWN_ROLES.has(role) : PRIVILEGED_ROLES.has(role);
   const [now, setNow] = useState(() => new Date());
@@ -92,17 +83,12 @@ export default function ModeGateOverlay() {
           <AuthPanel />
         </div>
         <div className="w-full justify-center items-center">
-          <SocialButton
-            id="discord"
-            label="Join our Discord server for updates!"
-            url={discordUrl}
-          />
+          <SocialButton id="discord" label="Join our Discord server for updates!"/>
         </div>
         You can still use the chat while the server is locked:
         {/* set max height of this box */}
         <div className='max-h-80 overflow-y-auto'>
-          <ChatPanel />
-          <NicknameForm />
+          <ChatPanel nicknameLayout="stacked" />
         </div>
         
         {/* <p className="text-xs text-slate-500">

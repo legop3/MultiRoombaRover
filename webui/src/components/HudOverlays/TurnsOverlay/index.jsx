@@ -6,7 +6,6 @@ import SocialButton from '../../SocialButton/index.jsx';
 function TurnsOverlay({
   roverId = null,
   mobileHud = false,
-  discordUrl: discordUrlProp = null,
 }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const effectiveRoverId = roverId ?? assignedRoverId;
@@ -16,19 +15,9 @@ function TurnsOverlay({
   const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
-  const discordUrl = useSessionSelector((state) => {
-    const socials = state.session?.socials || [];
-    const socialUrl =
-      socials.find((entry) => {
-        const key = String(entry?.id || entry?.label || '').toLowerCase();
-        return key === 'discord';
-      })?.url || null;
-    return socialUrl || state.session?.discord?.invite || null;
-  });
   const {
     state: { lastControlIntentAt },
   } = useControlSystem();
-  const effectiveDiscordUrl = discordUrlProp || discordUrl;
   const [now, setNow] = useState(() => Date.now());
   const [showTurnCue, setShowTurnCue] = useState(false);
   const [turnCueStartAt, setTurnCueStartAt] = useState(null);
@@ -214,11 +203,7 @@ function TurnsOverlay({
               </div>
             ) : null}
             <div className="pointer-events-auto mt-0.5">
-              <SocialButton
-                id="discord"
-                label="Join our Discord while you wait!"
-                url={effectiveDiscordUrl}
-              />
+              <SocialButton id="discord" label="Join our Discord while you wait!" layout='inline'/>
             </div>
           </div>
         </div>

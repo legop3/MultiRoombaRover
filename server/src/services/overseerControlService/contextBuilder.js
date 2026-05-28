@@ -60,16 +60,28 @@ function buildConversation({ recentMessages, name }) {
   return messages;
 }
 
-function buildModelMessages({ systemPrompt, stateUpdate, memorySummary, conversationMessages, availableTools, blockedTools }) {
+function buildModelMessages({
+  systemPrompt,
+  stateUpdate,
+  memorySummary,
+  recentEvents,
+  conversationMessages,
+  availableTools,
+  blockedTools,
+}) {
   const messages = [];
   messages.push({ role: 'system', content: systemPrompt });
-  const metadataSections = [];
-  metadataSections.push(`STATE_UPDATE\n${stateUpdate}`);
-  if (memorySummary) metadataSections.push(`MEMORY_UPDATE\n${memorySummary}`);
-  metadataSections.push(
-    `tool_constraints:\n${blockedTools.map((entry) => `- blocked: ${entry.tool} reason=${entry.reason}`).join('\n') || '- none'}`,
-  );
-  messages.push({ role: 'user', content: metadataSections.join('\n\n') });
+  messages.push({ role: 'system', content: `ROOM_SNAPSHOT\n${stateUpdate}` });
+  if (memorySummary) {
+    messages.push({ role: 'system', content: `MEMORY_SUMMARY\n${memorySummary}` });
+  }
+  if (recentEvents) {
+    messages.push({ role: 'system', content: `RECENT_EVENTS\n${recentEvents}` });
+  }
+  messages.push({
+    role: 'system',
+    content: `TOOL_CONSTRAINTS\n${blockedTools.map((entry) => `- blocked: ${entry.tool} reason=${entry.reason}`).join('\n') || '- none'}`,
+  });
   (conversationMessages || []).forEach((message) => {
     if (!message || !message.role || !message.content) return;
     messages.push(message);

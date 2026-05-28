@@ -6,7 +6,7 @@ import HomeAssistantControls from '../HomeAssistantControls/index.jsx';
 import SettingsPanel from '../SettingsPanel/index.jsx';
 import HelpPanel from '../HelpPanel/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
-import { LinkButtonsPanel, NicknameEntryPanel } from '../UserListPanel/index.jsx';
+import { LinkButtonsPanel } from '../UserListPanel/index.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../Tabs/index.jsx';
 import TopDownMap from '../TopDownMap/index.jsx';
@@ -24,6 +24,7 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
 import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 import { useState } from 'react';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 
@@ -35,11 +36,11 @@ function TopDownMapPanel() {
   const sensors = frame?.sensors || {};
 
   return (
-    <section className="panel-section">
+    <CardFrame hideHeader>
       <div className="aspect-square w-full">
         <TopDownMap sensors={sensors} />
       </div>
-    </section>
+    </CardFrame>
   );
 }
 
@@ -101,6 +102,7 @@ function DriveDockPanel() {
               value={value}
               min={min}
               max={max}
+              label="Camera tilt"
               disabled={cameraDisabled}
               onChange={setServoAngle}
               keyDownLabel={downLabel}
@@ -178,10 +180,9 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
               </div>
               <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.3fr)_minmax(0,0.22fr)] h-[14rem]">
                 <ChatPanel fillHeight />
-                <div className="grid min-h-0 gap-0.5 grid-rows-[auto_minmax(0,1fr)_auto]">
+                <div className="grid min-h-0 gap-0.5 grid-rows-[auto_minmax(0,1fr)]">
                   <OverseerPreferencePanel />
                   <RawUserPilePanel compact hideNicknameForm fillHeight />
-                  <NicknameEntryPanel compact />
                 </div>
               </div>
               <HomeAssistantControls />

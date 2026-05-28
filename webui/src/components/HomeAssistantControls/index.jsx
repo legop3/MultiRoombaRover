@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useControlSystem } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import CardFrame from '../CardFrame/index.jsx';
 
 function StatusBadge({ label, tone = 'muted' }) {
   const styles =
@@ -255,44 +256,41 @@ export default function HomeAssistantControls() {
 
   if (!ha?.enabled) {
     return (
-      <section className="panel-section space-y-0.5 text-sm text-slate-400">
-        <p className="text-slate-300">Room Controls</p>
+      <CardFrame title="Room Controls" bodyClassName="space-y-0.5 text-sm text-slate-400">
         <p className="text-slate-500">Not configured on the server.</p>
-      </section>
+      </CardFrame>
     );
   }
 
   if (entities.length === 0) {
     return (
-      <section className="panel-section space-y-0.5 text-sm text-slate-400">
-        <p className="text-slate-300">Room Controls</p>
+      <CardFrame title="Room Controls" bodyClassName="space-y-0.5 text-sm text-slate-400">
         <p className="text-slate-500">No lights or switches configured.</p>
-      </section>
+      </CardFrame>
     );
   }
 
   const connected = Boolean(ha?.connected);
 
+  const actions = (
+    <>
+      <div className="flex items-center gap-0.5 text-[0.68rem] text-slate-400">
+        <span className="flex items-center gap-0.5">
+          <span>On</span>
+          {onKeyLabel ? <KeyPill label={onKeyLabel} /> : null}
+        </span>
+        <span className="flex items-center gap-0.5">
+          <span>Off</span>
+          {offKeyLabel ? <KeyPill label={offKeyLabel} /> : null}
+        </span>
+      </div>
+      {controlsLocked ? <StatusBadge label={lockState === 'off' ? 'Locked Off' : 'Locked On'} tone="warn" /> : null}
+      <StatusBadge label={connected ? 'Connected' : 'Offline'} tone={connected ? 'success' : 'warn'} />
+    </>
+  );
+
   return (
-    <section className="panel-section space-y-0.5 text-base">
-      <header className="flex items-center justify-between gap-0.5 text-sm text-slate-400">
-        <div className="flex items-center gap-0.5">
-          <p>Room Controls</p>
-          <span className="text-xs text-slate-500">{entities.length}</span>
-          {controlsLocked ? <StatusBadge label={lockState === 'off' ? 'Locked Off' : 'Locked On'} tone="warn" /> : null}
-          <div className="flex items-center gap-0.5 text-xs text-slate-300 background-black">
-            <span className="flex items-center gap-0.5">
-              <span>On</span>
-              {onKeyLabel ? <KeyPill label={onKeyLabel} /> : null}
-            </span>
-            <span className="flex items-center gap-0.5">
-              <span>Off</span>
-              {offKeyLabel ? <KeyPill label={offKeyLabel} /> : null}
-            </span>
-          </div>
-        </div>
-        <StatusBadge label={connected ? 'Connected' : 'Offline'} tone={connected ? 'success' : 'warn'} />
-      </header>
+    <CardFrame title="Room Controls" actions={actions} bodyClassName="space-y-0.5 text-base">
       {controlsLocked ? (
         <p className="rounded border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
           {lockState === 'off'
@@ -313,11 +311,11 @@ export default function HomeAssistantControls() {
           />
         ))}
       </div>
-    </section>
+    </CardFrame>
   );
 }
 
 function KeyPill({ label }) {
   if (!label) return null;
-  return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
+  return <span className="rounded border border-slate-600 px-1 text-[0.65rem] text-slate-300">{label}</span>;
 }

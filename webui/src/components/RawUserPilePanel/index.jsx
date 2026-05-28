@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButtonsGrid from '../SocialButtonsGrid/index.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 
 function roleColors(role) {
   switch (role) {
@@ -57,8 +58,13 @@ export default function RawUserPilePanel({
       : 'h-48 overflow-y-auto';
 
   return (
-    <section
-      className={`panel-section space-y-0.5 text-base ${fillHeight ? 'flex h-full min-h-0 flex-col overflow-hidden' : ''} ${className}`}
+    <CardFrame
+      title={!hideHeader ? 'Users' : ''}
+     
+      hideHeader={hideHeader}
+      fillHeight={fillHeight}
+      className={className}
+      bodyClassName="space-y-0.5 text-base"
     >
       {!hideNicknameForm && (
         <div className="space-y-0.5">
@@ -75,12 +81,6 @@ export default function RawUserPilePanel({
       )}
 
       <div className={`space-y-0.5 ${fillHeight ? 'flex flex-1 min-h-0 flex-col' : ''}`}>
-        {!hideHeader && (
-          <div className={`flex items-center justify-between text-sm text-slate-400 ${compact ? 'text-xs' : ''}`}>
-            <span>Users</span>
-            <span className="text-xs text-slate-500">{sorted.length}</span>
-          </div>
-        )}
         <div
           className={`surface flex flex-wrap content-start items-start gap-0.5 px-0 pb-0 ${baseListClass} ${compact ? 'text-[0.8rem]' : ''}`}
         >
@@ -98,6 +98,6 @@ export default function RawUserPilePanel({
           )}
         </div>
       </div>
-    </section>
+    </CardFrame>
   );
 }

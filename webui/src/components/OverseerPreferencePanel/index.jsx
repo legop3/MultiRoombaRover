@@ -1,5 +1,6 @@
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
+import CardFrame from '../CardFrame/index.jsx';
 
 export default function OverseerPreferencePanel() {
   const { identifySession } = useSessionActions();
@@ -21,8 +22,7 @@ export default function OverseerPreferencePanel() {
   };
 
   return (
-    <section className="surface p-1 text-xs text-slate-200 text-center">
-      <div className="text-[0.65rem] text-slate-400">Overseer vote</div>
+    <CardFrame title="Overseer vote" bodyClassName="space-y-0.5 text-center text-xs text-slate-200">
       <label
         className={`flex items-center justify-center gap-1.5 rounded px-1 py-0.5 ${
           enabled ? 'bg-emerald-600/80 text-emerald-50' : 'bg-slate-600/70 text-slate-100'
@@ -33,9 +33,9 @@ export default function OverseerPreferencePanel() {
       </label>
       <span className="text-xs">Enable a local LLM in chat</span>
 
-      {/* <div className="mt-0.5 text-slate-400">
+      <div className="mt-0.5 text-slate-400">
         Yes!: {Number(vote?.yesCount || 0)}, No...: {Number(vote?.noCount || 0)}
-      </div> */}
+      </div>
       <div className="mt-0.5 flex justify-center">
         <span
           className={`inline-flex items-center rounded px-1.5 py-0.5 text-[0.7rem] font-medium ${
@@ -45,6 +45,6 @@ export default function OverseerPreferencePanel() {
           {running ? 'Running!' : 'Stopped by vote.'}
         </span>
       </div>
-    </section>
+    </CardFrame>
   );
 }
