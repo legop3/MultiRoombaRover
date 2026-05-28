@@ -44,6 +44,8 @@ const heartbeatMs = normalizeMs(Number(overseerConfig.heartbeatMs), DEFAULT_HEAR
 const postChatDelayMs = normalizeMs(Number(overseerConfig.postChatDelayMs), DEFAULT_POST_CHAT_DELAY_MS);
 const alwaysRunModel = Boolean(overseerConfig.alwaysRunModel);
 const postToolsOnlyMessages = Boolean(overseerConfig.postToolsOnlyMessages);
+const tiebreakerEnable = Boolean(overseerConfig.tiebreakerEnable);
+const runWhileNoPeopleOnline = Boolean(overseerConfig.runWhileNoPeopleOnline);
 const profileImageUrl = String(overseerConfig.profileImageUrl || '').trim() || null;
 const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
 
@@ -72,6 +74,8 @@ let status = {
   postChatDelayMs,
   alwaysRunModel,
   postToolsOnlyMessages,
+  tiebreakerEnable,
+  runWhileNoPeopleOnline,
   running: false,
   inFlight: false,
   phase: 'idle',
@@ -134,7 +138,14 @@ function buildVoteStatus() {
 
   const eligibleCount = votesByIdentity.size;
   const onlineCount = yesCount + noCount;
-  const gatePassed = eligibleCount > 0 && yesCount > noCount;
+  let gatePassed = false;
+  if (eligibleCount === 0) {
+    gatePassed = runWhileNoPeopleOnline;
+  } else if (yesCount === noCount) {
+    gatePassed = tiebreakerEnable;
+  } else {
+    gatePassed = yesCount > noCount;
+  }
   return {
     yesCount,
     noCount,
