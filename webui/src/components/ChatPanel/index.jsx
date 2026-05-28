@@ -18,7 +18,7 @@ export default function ChatPanel({
   hideSpectatorNotice = false,
   fillHeight = false,
   allowSpectatorInput = false,
-  title = 'Chat',
+  title = 'Chat and TTS',
   nicknameLayout = 'inline',
 }) {
   const role = useSessionSelector((state) => state.session?.role || null);
