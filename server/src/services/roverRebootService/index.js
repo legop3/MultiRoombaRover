@@ -10,16 +10,15 @@ const { stopRover } = require('../turnService/actions');
 const { issueCommand } = require('../commandService');
 const { publishEvent } = require('../eventBus');
 
-const USER_COOLDOWN_MS = 2 * 60 * 1000;
-const userCooldowns = new Map(); // socketId -> blockedUntil
+const USER_COOLDOWN_MS = 6 * 60 * 1000;
+let globalCooldownUntil = 0;
 
-function getCooldownLeftMs(socketId) {
-  const blockedUntil = Number(userCooldowns.get(socketId) || 0);
-  return Math.max(0, blockedUntil - Date.now());
+function getCooldownLeftMs() {
+  return Math.max(0, Number(globalCooldownUntil) - Date.now());
 }
 
-function setCooldown(socketId) {
-  userCooldowns.set(socketId, Date.now() + USER_COOLDOWN_MS);
+function setCooldown() {
+  globalCooldownUntil = Date.now() + USER_COOLDOWN_MS;
 }
 
 function canRequestReboot(socket) {
@@ -34,7 +33,7 @@ function canRequestReboot(socket) {
   if (!(record.drivers instanceof Set) || record.drivers.size !== 1 || !record.drivers.has(socket.id)) {
     throw new Error('Reboot blocked while other drivers are connected');
   }
-  const cooldownLeftMs = getCooldownLeftMs(socket.id);
+  const cooldownLeftMs = getCooldownLeftMs();
   if (cooldownLeftMs > 0) {
     throw new Error(`Reboot cooldown active (${Math.ceil(cooldownLeftMs / 1000)}s)`);
   }
@@ -47,7 +46,7 @@ io.on('connection', (socket) => {
       const { roverId, record } = canRequestReboot(socket);
       stopRover(roverId);
       issueCommand(roverId, { type: 'reboot', reboot: { delayMs: 300 } });
-      setCooldown(socket.id);
+      setCooldown();
       const requester = socket?.data?.user?.username || socket.id;
       publishEvent({
         source: 'roverRebootService',
@@ -67,10 +66,6 @@ io.on('connection', (socket) => {
 
   socket.on('session:rebootOwnRover', handleRebootOwnRover);
   socket.on('rebootOwnRover', handleRebootOwnRover);
-
-  socket.on('disconnect', () => {
-    userCooldowns.delete(socket.id);
-  });
 });
 
 module.exports = {};
