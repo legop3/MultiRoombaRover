@@ -34,17 +34,18 @@ export default function RoverMediaPlayer({
   );
   const hasAudio = Boolean(rosterEntry?.media?.audioPublishUrl);
   const autoVideoEnabled = videoMode ? videoMode === 'whep' : true;
+  const autoAudioEnabled = hasAudio;
   const autoEntries = useMemo(() => {
-    if (!effectiveRoverId || !autoVideoEnabled) return [];
+    if (!effectiveRoverId) return [];
     return [
-      { type: 'rover', id: effectiveRoverId, key: effectiveRoverId },
-      ...(hasAudio
+      ...(autoVideoEnabled ? [{ type: 'rover', id: effectiveRoverId, key: effectiveRoverId }] : []),
+      ...(autoAudioEnabled
         ? [{ type: 'rover', id: `${effectiveRoverId}-audio`, key: `${effectiveRoverId}-audio` }]
         : []),
     ];
-  }, [effectiveRoverId, autoVideoEnabled, hasAudio]);
+  }, [effectiveRoverId, autoVideoEnabled, autoAudioEnabled]);
   const autoSources = useVideoRequests(autoEntries, {
-    enabled: Boolean(effectiveRoverId && autoVideoEnabled),
+    enabled: Boolean(effectiveRoverId && (autoVideoEnabled || autoAudioEnabled)),
     version: mode,
   });
   const resolvedSessionInfo =
@@ -435,8 +436,10 @@ export default function RoverMediaPlayer({
         .play()
         .then(() => {
           logAudio('retry/play-ok');
-          setAudioStatus((prev) => (prev === 'connected' ? 'playing' : prev));
-          setAudioDetail((prev) => (prev === 'paused' ? null : prev));
+          setAudioStatus((prev) =>
+            ['error', 'failed', 'disconnected', 'closed'].includes(prev) ? prev : 'playing',
+          );
+          setAudioDetail(null);
         })
         .catch((err) => {
           logAudio('retry/play-fail', { error: err?.message });
@@ -519,7 +522,7 @@ export default function RoverMediaPlayer({
   const renderedAudioStatus = resolvedAudioSessionInfo?.error
     ? `Error: ${resolvedAudioSessionInfo.error}`
     : !resolvedAudioSessionInfo?.url
-    ? null
+    ? 'waiting'
     : audioStatus === 'error'
     ? `Error: ${audioDetail || 'unknown'}`
     : audioDetail
@@ -528,7 +531,7 @@ export default function RoverMediaPlayer({
   const showConnectingOverlay =
     !usingSnapshot &&
     !resolvedSessionInfo?.error &&
-    ['idle', 'new', 'connecting'].includes(status);
+    status !== 'playing';
 
   return (
     <>
