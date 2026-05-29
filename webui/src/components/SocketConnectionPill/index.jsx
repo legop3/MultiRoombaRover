@@ -87,10 +87,10 @@ export default function SocketConnectionPill() {
   const detail = connected ? '' : lastReason;
 
   const toneClass = connected
-    ? 'border-emerald-300/40 bg-emerald-700/70 text-emerald-100'
+    ? 'bg-emerald-700 text-emerald-100'
     : offline
-      ? 'border-red-300/50 bg-red-800/80 text-red-100'
-      : 'border-amber-300/50 bg-amber-800/80 text-amber-100';
+      ? 'bg-red-800 text-red-100'
+      : 'bg-amber-800 text-amber-100';
 
   return (
     <div
@@ -101,7 +101,7 @@ export default function SocketConnectionPill() {
       )}
       aria-live="polite"
     >
-      <div className={cls('rounded-md border px-2 py-1 text-xs shadow-lg backdrop-blur-sm', toneClass)}>
+      <div className={cls('rounded-sm px-2 py-1 text-xs', toneClass)}>
         <span className="font-semibold">{statusLabel}</span>
         {detail ? <span className="ml-1 opacity-85">({detail})</span> : null}
       </div>
