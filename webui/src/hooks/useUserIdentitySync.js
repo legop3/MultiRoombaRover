@@ -95,5 +95,14 @@ export default function useUserIdentitySync() {
     };
   }, [sendIdentify, socket?.connected]);
 
+  useEffect(() => {
+    if (!ready || !socket?.connected) return undefined;
+    const timer = setInterval(() => {
+      if (!socket?.connected) return;
+      sendIdentify();
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [ready, sendIdentify, socket?.connected]);
+
   useEffect(() => () => clearRetry(), [clearRetry]);
 }

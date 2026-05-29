@@ -14,11 +14,14 @@ function registerVerificationHooks(deps) {
   } = deps;
 
   io.on('connection', (socket) => {
+    socket.data = socket.data || {};
+    socket.data.connectedAt = Date.now();
     identifySocket(socket, {});
 
     socket.on('session:identify', (payload = {}, cb = () => {}) => {
       try {
         const result = identifySocket(socket, payload || {});
+        socket.data.lastClientIdentifyAt = Date.now();
         cb({ success: true, ...result });
       } catch (err) {
         cb({ error: err.message });

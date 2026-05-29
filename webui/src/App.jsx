@@ -42,6 +42,7 @@ import VipPanel from './components/VipPanel/index.jsx';
 import { useSessionSelector } from './context/SessionContext.jsx';
 import ButtonBoxPanel from './components/ButtonBoxPanel/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
+import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -333,6 +334,7 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
       <RewardRunOverlay />
       <TurnAlertListener />
       <ModeGateOverlay />
+      <SocketConnectionPill />
 
       <HelpOverlay
         visible={helpVisible}

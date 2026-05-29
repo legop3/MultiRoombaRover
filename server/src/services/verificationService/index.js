@@ -28,6 +28,8 @@ const { createRequestFlow } = require('./requestFlow');
 const { registerVerificationHooks } = require('./hooks');
 
 const verificationEvents = new EventEmitter();
+const IDENTITY_TIMEOUT_MS = 2 * 60 * 1000;
+const IDENTITY_SWEEP_INTERVAL_MS = 15 * 1000;
 
 function emitChange(reason, payload = {}) {
   verificationEvents.emit('change', { reason, ...payload });
@@ -144,6 +146,27 @@ registerVerificationHooks({
   reevaluateSocketDeterrence,
   emitChange,
 });
+
+setInterval(() => {
+  const now = Date.now();
+  io.sockets.sockets.forEach((socket) => {
+    if (!socket?.id) return;
+    const role = getRole(socket);
+    if (role === 'admin' || role === 'lockdown') return;
+    const connectedAt = Number(socket?.data?.connectedAt || 0);
+    const lastClientIdentifyAt = Number(socket?.data?.lastClientIdentifyAt || 0);
+    const referenceTs = lastClientIdentifyAt || connectedAt;
+    if (!referenceTs) return;
+    if (now - referenceTs < IDENTITY_TIMEOUT_MS) return;
+    logger.info('Disconnecting socket due to stale identity heartbeat', {
+      socketId: socket.id,
+      role,
+      ageMs: now - referenceTs,
+      hadClientIdentify: Boolean(lastClientIdentifyAt),
+    });
+    socket.disconnect(true);
+  });
+}, IDENTITY_SWEEP_INTERVAL_MS);
 
 module.exports = {
   identifySocket,

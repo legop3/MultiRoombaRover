@@ -2,6 +2,9 @@
 2. add "reboot your own rover" feature
    1. time delay and you can only do it if youre the only one on. server locks the rover then tells it to reboot
 3. add a clear socket disconnection indicator in the web UI
+   1. fix reconnection stuff, make sure identity always sends. maybe even on a timer
+   2. stop allowing dead sockets (no identity) on rovers... idk how to handle this  
+      1. disconnect dead sockets after 2 minutes, if identity is sent every minute no matter what, no one should ever get disconnected while functional
 4. add votekicking
    1. simply just disconnect the users socket.
 5.  add faster way for admins to login, like an invisible button in top left or something
