@@ -152,7 +152,7 @@ setInterval(() => {
   io.sockets.sockets.forEach((socket) => {
     if (!socket?.id) return;
     const role = getRole(socket);
-    if (role === 'admin' || role === 'lockdown') return;
+    if (role === 'admin' || role === 'lockdown' || role === 'spectator') return;
     const connectedAt = Number(socket?.data?.connectedAt || 0);
     const lastClientIdentifyAt = Number(socket?.data?.lastClientIdentifyAt || 0);
     const referenceTs = lastClientIdentifyAt || connectedAt;
