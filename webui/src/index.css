@@ -59,6 +59,27 @@ body {
 }
 
 @layer components {
+  .pride-page-bg {
+    background-color: #050505;
+    background-image:
+      linear-gradient(rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0.24)),
+      repeating-linear-gradient(
+        45deg,
+        #5bcefa 0 1.818%,
+        #f5a9b8 1.818% 3.636%,
+        #ffffff 3.636% 5.455%,
+        #f5a9b8 5.455% 7.273%,
+        #5bcefa 7.273% 9.091%,
+        #e40303 9.091% 10.909%,
+        #ff8c00 10.909% 12.727%,
+        #ffed00 12.727% 14.545%,
+        #00a651 14.545% 16.364%,
+        #0066ff 16.364% 18.182%,
+        #9b2fae 18.182% 20%
+      );
+    background-attachment: fixed;
+  }
+
   .panel {
     @apply bg-black text-white p-0 rounded-md;
   }

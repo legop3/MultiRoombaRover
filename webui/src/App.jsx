@@ -43,6 +43,7 @@ import { useSessionSelector } from './context/SessionContext.jsx';
 import ButtonBoxPanel from './components/ButtonBoxPanel/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
+import { pageBackgroundClass, themeGapClass, themeStackClass } from './themeFlags.js';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -76,13 +77,13 @@ function useLayoutMode() {
 
 function DesktopLayout({ layout, onOpenHelpOverlay }) {
   return (
-    <div className="flex h-full gap-0.5 overflow-hidden">
-      <div className="flex min-w-0 flex-[1.22] flex-col gap-0.5 overflow-y-auto pr-0">
+    <div className={`flex h-full ${themeGapClass} overflow-hidden`}>
+      <div className={`flex min-w-0 flex-[1.22] flex-col ${themeGapClass} overflow-y-auto pr-0`}>
         <DriverVideo />
         <TelemetryPanel />
         <LogPanel />
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+      <div className={`flex min-w-0 flex-1 flex-col ${themeGapClass} overflow-y-auto`}>
         <GlobalObjectiveBanner layout={layout} />
         <RightPaneTabs layout={layout} onOpenHelpOverlay={onOpenHelpOverlay} />
         {/* <SessionSnapshot /> */}
@@ -123,7 +124,7 @@ function MobileFeatureTabs({
       ownAudioForward?.state === 'playing',
   );
   return (
-    <section className="panel text-base">
+    <section className="text-base">
       <Tabs defaultTab="chat" currentTab={activeTab} onTabChange={setActiveTab}>
         <TabList>
           <Tab id="chat">Chat</Tab>
@@ -143,13 +144,13 @@ function MobileFeatureTabs({
         </TabList>
         <TabPanels>
           <TabPanel id="chat">
-            <div className="space-y-0.5">
+            <div className={themeStackClass}>
               <ChatPanel nicknameLayout="stacked" />
-              <div className="space-y-0.5">
-                <div className="grid gap-0.5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+              <div className={themeStackClass}>
+                <div className={`grid ${themeGapClass} md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]`}>
                   <SocialButtonsGrid />
                 </div>
-                <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,1fr)]`}>
                   <OverseerPreferencePanel />
                   <RawUserPilePanel hideNicknameForm />
                 </div>
@@ -160,7 +161,7 @@ function MobileFeatureTabs({
             <VipPanel isActive={activeTab === 'vip'} />
           </TabPanel>
           <TabPanel id="roomcontrols">
-            <div className="space-y-0.5">
+            <div className={themeStackClass}>
               {/* {showTelemetry ? <TelemetryPanel /> : null} */}
               <HomeAssistantControls />
               <ButtonBoxPanel />
@@ -171,7 +172,7 @@ function MobileFeatureTabs({
             <HelpPanel layout={layout} onOpenOverlay={onOpenHelpOverlay} />
           </TabPanel>
           <TabPanel id="settings">
-            <div className="space-y-0.5">
+            <div className={themeStackClass}>
               <SettingsPanel />
               <LogPanel />
             </div>
@@ -184,10 +185,10 @@ function MobileFeatureTabs({
 
 function MobilePortraitLayout({ onOpenHelpOverlay, swapMobileControlColumns = false }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className={`flex flex-col ${themeGapClass}`}>
       <DriverVideo layoutFormat="mobile-portrait" />
       <MobileControls swapColumns={swapMobileControlColumns} />
-      <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+      <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]`}>
         <ReplaySourcesPanel panelId="replay-sources-mobile-portrait" />
         <RoverQueuesPanel />
       </div>
@@ -210,12 +211,12 @@ function MobileLandscapeLayout({ onOpenHelpOverlay, swapMobileControlColumns = f
     ? <MobileActionsColumn layout="landscape" className={columnClass} />
     : <MobileDriveColumn layout="landscape" className={columnClass} />;
   return (
-    <div className="flex flex-col gap-0.5">
-      <section className="grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] gap-0.5">
+    <div className={`flex flex-col ${themeGapClass}`}>
+      <section className={`grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] ${themeGapClass}`}>
         {firstColumn}
         <div>
           <DriverVideo layoutFormat="mobile-landscape" />
-          <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]`}>
             <ReplaySourcesPanel panelId="replay-sources-mobile-landscape" />
             <RoverQueuesPanel />
           </div>
@@ -223,7 +224,7 @@ function MobileLandscapeLayout({ onOpenHelpOverlay, swapMobileControlColumns = f
         </div>
         {secondColumn}
       </section>
-      <div className="flex flex-col gap-0.5 pb-0">
+      <div className={`flex flex-col ${themeGapClass} pb-0`}>
         <MobileFeatureTabs
           layout="mobile-landscape"
           onOpenHelpOverlay={onOpenHelpOverlay}
@@ -241,7 +242,7 @@ function App() {
   const fullscreen = useFullscreenPrompt(layout);
 
   return (
-    <div className={`bg-black text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
+    <div className={`${pageBackgroundClass} text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       <AppWithProviders layout={layout} isDesktop={isDesktop} fullscreen={fullscreen} />
     </div>
   );
@@ -326,7 +327,7 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
     <ControlSystemProvider>
       <KeyboardInputManager />
       <GamepadInputManager />
-      <main className={`flex w-full flex-col gap-0.5 text-base ${isDesktop ? 'h-full overflow-hidden' : ''}`}>
+      <main className={`flex w-full flex-col ${themeGapClass} text-base ${isDesktop ? 'h-full overflow-hidden' : ''}`}>
         {!isDesktop ? <GlobalObjectiveBanner layout={layout} /> : null}
         {renderedLayout}
       </main>

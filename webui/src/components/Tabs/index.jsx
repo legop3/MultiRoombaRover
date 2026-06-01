@@ -2,7 +2,7 @@
 // Purpose: Defines the Tabs module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
-import { useSessionSelector } from '../../context/SessionContext.jsx';
+import { themeGapClass, themeStackClass } from '../../themeFlags.js';
 
 const TabsContext = createContext(null);
 
@@ -32,28 +32,6 @@ const DEFAULT_VARIANT = 'primary';
 
 function classNames(...parts) {
   return parts.filter(Boolean).join(' ');
-}
-
-function hexToRgb(hex) {
-  const raw = String(hex || '').trim();
-  const normalized = raw.startsWith('#') ? raw.slice(1) : raw;
-  if (!/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(normalized)) return null;
-  const expanded =
-    normalized.length === 3
-      ? normalized
-          .split('')
-          .map((ch) => ch + ch)
-          .join('')
-      : normalized;
-  return {
-    r: Number.parseInt(expanded.slice(0, 2), 16),
-    g: Number.parseInt(expanded.slice(2, 4), 16),
-    b: Number.parseInt(expanded.slice(4, 6), 16),
-  };
-}
-
-function rgba(rgb, alpha) {
-  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
 }
 
 export default function Tabs({ children, defaultTab, currentTab, onTabChange, variant = DEFAULT_VARIANT }) {
@@ -118,30 +96,14 @@ export default function Tabs({ children, defaultTab, currentTab, onTabChange, va
 }
 
 export function TabList({ children, className = '' }) {
-  const ownRoverColor = useSessionSelector((state) => {
-    const roverId = String(state.session?.assignment?.roverId || '').trim();
-    if (!roverId) return null;
-    const roster = Array.isArray(state.session?.roster) ? state.session.roster : [];
-    const rover = roster.find((entry) => String(entry?.id) === roverId);
-    return rover?.color || null;
-  });
-  const accentRgb = hexToRgb(ownRoverColor);
-  const frameStyle = accentRgb ? { borderColor: rgba(accentRgb, 0.35) } : undefined;
-  const headerStyle = accentRgb
-    ? {
-        backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 58%, ${rgba(accentRgb, 0.18)} 100%)`,
-      }
-    : undefined;
-
   return (
     <div
       className={classNames(
-        'panel-section overflow-hidden border border-neutral-500/60 bg-neutral-900/95 p-0.5 shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_10px_24px_rgba(0,0,0,0.28)]',
+        'panel-section overflow-hidden border border-neutral-500/60 bg-neutral-900/95 p-0.5',
         className
       )}
-      style={frameStyle}
     >
-      <div className="flex gap-0.5" style={headerStyle}>{children}</div>
+      <div className={`flex ${themeGapClass}`}>{children}</div>
     </div>
   );
 }
@@ -176,7 +138,7 @@ export function Tab({ id, children, className = '', disabled = false, highlight 
 }
 
 export function TabPanels({ children, className = '' }) {
-  return <div className={classNames('mt-0 space-y-0.5', className)}>{children}</div>;
+  return <div className={classNames('mt-0', themeStackClass, className)}>{children}</div>;
 }
 
 export function TabPanel({ id, children, keepMounted = false }) {

@@ -27,6 +27,7 @@ import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import { useState } from 'react';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
+import { themeGapClass, themeStackClass } from '../../themeFlags.js';
 
 function TopDownMapPanel() {
   const {
@@ -75,10 +76,10 @@ function DriveDockPanel() {
   const cameraDisabled = Boolean(!roverId || dockAssist.cameraLocked);
 
   return (
-    <section className="panel-section grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-0.5">
+    <section className={`panel-section grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] ${themeGapClass}`}>
       <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
       {!hideInlineControls ? (
-        <div className="surface space-y-0.5 p-0 text-sm text-slate-200">
+        <div className={`surface ${themeStackClass} p-0 text-sm text-slate-200`}>
           {nightVisionAvailable && (
             <NightVisionControl
               nightVisionOn={nightVisionState?.nightVisionOn}
@@ -107,7 +108,7 @@ function DriveDockPanel() {
               onChange={setServoAngle}
               keyDownLabel={downLabel}
               keyUpLabel={upLabel}
-              className="space-y-0.5 px-1 py-1"
+              className={`${themeStackClass} px-1 py-1`}
               labelRowClass="text-xs text-slate-300"
               labelClass=""
               valueClass="font-mono text-slate-100"
@@ -149,7 +150,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
       ownAudioForward?.state === 'playing',
   );
   return (
-    <section className="panel text-base">
+    <section className="text-base">
       <Tabs defaultTab="telemetry" currentTab={activeTab} onTabChange={setActiveTab}>
         <TabList>
           <Tab id="telemetry">Controls</Tab>
@@ -168,19 +169,19 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
         </TabList>
         <TabPanels>
           <TabPanel id="telemetry">
-            <div className="space-y-0.5">
-              <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]">
+            <div className={themeStackClass}>
+              <div className={`grid items-stretch ${themeGapClass} grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]`}>
                 <TopDownMapPanel />
                 <DriveDockPanel />
               </div>
-              <div className="grid gap-0.5 grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.75fr)]">
+              <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.75fr)]`}>
                 <RoverQueuesPanel />
                 <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
                 <LinkButtonsPanel />
               </div>
-              <div className="grid items-stretch gap-0.5 grid-cols-[minmax(0,1.3fr)_minmax(0,0.22fr)] h-[14rem]">
+              <div className={`grid items-stretch ${themeGapClass} grid-cols-[minmax(0,1.3fr)_minmax(0,0.22fr)] h-[14rem]`}>
                 <ChatPanel fillHeight />
-                <div className="grid min-h-0 gap-0.5 grid-rows-[auto_minmax(0,1fr)]">
+                <div className={`grid min-h-0 ${themeGapClass} grid-rows-[auto_minmax(0,1fr)]`}>
                   <OverseerPreferencePanel />
                   <RawUserPilePanel compact hideNicknameForm fillHeight />
                 </div>

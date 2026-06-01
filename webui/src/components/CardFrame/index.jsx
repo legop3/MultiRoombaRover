@@ -60,7 +60,7 @@ export default function CardFrame({
   return (
     <section
       className={cx(
-        'panel-section border border-neutral-500/60 bg-neutral-900/95 shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_10px_24px_rgba(0,0,0,0.28)]',
+        'panel-section border border-neutral-500/60 bg-neutral-900/95',
         clipOverflow ? 'overflow-hidden' : 'overflow-visible',
         fillHeight && 'flex h-full min-h-0 flex-col',
         className,
