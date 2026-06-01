@@ -28,7 +28,6 @@ function getRoomCameraStream(camera) {
 function listDesiredSources() {
   const sources = [];
   for (const rover of roverManager.getRoster()) {
-    if (!roverManager.canReplayRoverId(rover.id)) continue;
     const roverId = String(rover.id);
     sources.push({ id: roverId, sourceType: 'rover', kind: 'video', label: rover.name || roverId, inputUrl: toSrtReadPath(roverId) });
     if (rover?.media?.audioPublishUrl) {

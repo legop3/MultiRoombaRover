@@ -188,8 +188,12 @@ function removeSocket(socket) {
   roverLifecycle.removeSocket(socket, disableSpectator);
 }
 
-function canReplayRoverId(roverId) {
-  return roverLifecycle.canReplayRoverId(roverId, isPrivateRecord, isPrivateOpen);
+function canReplayRoverId(roverId, socket = null) {
+  const record = rovers.get(String(roverId));
+  if (!record) return false;
+  if (!isPrivateRecord(record)) return true;
+  if (isPrivateOpen(record)) return true;
+  return socket ? isRoverVisibleToSocket(record, socket) : false;
 }
 
 roleEvents.on('change', ({ socket, role }) => {

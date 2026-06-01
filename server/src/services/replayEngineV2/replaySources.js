@@ -7,7 +7,7 @@ const { getRoomCameras } = require('../roomCameraService');
 function getReplaySources(socket = null) {
   const roster = socket ? roverManager.getRosterForSocket(socket) : roverManager.getRoster();
   const roverSources = roster
-    .filter((rover) => roverManager.canReplayRoverId(rover.id))
+    .filter((rover) => roverManager.canReplayRoverId(rover.id, socket))
     .map((rover) => ({
       type: 'rover',
       id: String(rover.id),
