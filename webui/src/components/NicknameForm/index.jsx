@@ -35,22 +35,28 @@ export default function NicknameForm({ compact = false }) {
   }
 
   return (
-    <form className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-stretch gap-0.5" onSubmit={handleSave}>
+    <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-stretch gap-0.5">
       <input
         className="field-input flex-1 min-w-0"
         value={nicknameInput}
         onChange={(e) => setNicknameInput(e.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return;
+          event.preventDefault();
+          handleSave(event);
+        }}
         maxLength={32}
         placeholder="Enter a nickname"
         disabled={!canSetNickname}
       />
       <button
-        type="submit"
+        type="button"
+        onClick={handleSave}
         disabled={!canSetNickname || saving}
         className="button-dark h-full shrink-0 whitespace-nowrap px-0.5 py-0 disabled:opacity-50"
       >
         {saving ? 'Saving…' : compact ? 'Set' : 'Save'}
       </button>
-    </form>
+    </div>
   );
 }
