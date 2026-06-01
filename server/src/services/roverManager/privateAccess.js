@@ -74,14 +74,25 @@ function createPrivateAccessPolicy(deps) {
   }
 
   function getControlDenialReason(record, socket, options = {}) {
-    const { allowUser = false } = options;
+    const { allowUser = false, allowClosedPrivateGrantInLockdown = false } = options;
     if (!record) return 'Unknown rover';
     if (!allowUser && !isAdmin(socket)) return 'Only admins can request control';
     if (record.locked && !isAdmin(socket)) return 'Rover locked';
     const mode = getMode();
     if (!allowUser && mode === MODES.ADMIN && !isAdmin(socket)) return 'Admins only';
     if (!allowUser && mode === MODES.LOCKDOWN && !isLockdownAdmin(socket)) return 'Server in lockdown';
-    if (mode === MODES.LOCKDOWN && !isLockdownAdmin(socket)) return 'Server in lockdown';
+    if (
+      mode === MODES.LOCKDOWN &&
+      !isLockdownAdmin(socket) &&
+      !(
+        allowClosedPrivateGrantInLockdown &&
+        isPrivateRecord(record) &&
+        !isPrivateOpen(record) &&
+        socketHasClosedPrivateAccess(socket, record.id)
+      )
+    ) {
+      return 'Server in lockdown';
+    }
     const { isDeterred } = require('../verificationService');
     if (!isAdmin(socket) && isDeterred(socket)) return 'Not authorized';
     if (!isPrivateRecord(record)) return null;

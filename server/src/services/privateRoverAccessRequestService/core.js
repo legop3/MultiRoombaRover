@@ -64,6 +64,10 @@ function applySocketGrantCache(socket) {
   socket.data.privateClosedAccessRovers = listGrantedRoversForRequester(requesterKey);
 }
 
+function refreshAllSocketGrantCaches() {
+  io.sockets.sockets.forEach((socket) => applySocketGrantCache(socket));
+}
+
 function getGrantForRequester(requesterKey, roverId) {
   if (!requesterKey || !roverId) return null;
   return grants.get(buildGrantKey(requesterKey, roverId)) || null;
@@ -139,12 +143,19 @@ function tryAssignClosedPrivateRover(socket, roverId) {
   if (!socket || !roverId) return false;
   const record = roverManager.rovers.get(String(roverId));
   if (!record) return false;
-  const access = roverManager.canRequestControl(roverId, socket, { allowUser: true });
+  const access = roverManager.canRequestControl(roverId, socket, {
+    allowUser: true,
+    allowClosedPrivateGrantInLockdown: true,
+  });
   if (!access.ok) {
     throw new Error(access.reason || 'Control denied');
   }
   const previousJoined = roverManager.getRoversForSocket(socket.id);
-  roverManager.requestControl(roverId, socket, { allowUser: true });
+  roverManager.requestControl(roverId, socket, {
+    allowUser: true,
+    allowClosedPrivateGrantInLockdown: true,
+    forceTurn: true,
+  });
   previousJoined.forEach((rid) => {
     if (rid !== roverId) roverManager.releaseControl(rid, socket);
   });
@@ -156,6 +167,7 @@ function tryAssignClosedPrivateRover(socket, roverId) {
     logger.warn('Failed to move assignment after private access grant', { socketId: socket.id, error: err.message });
   }
   socket.emit('controlGranted', { roverId: String(roverId) });
+  roverManager.broadcastRoster();
   return true;
 }
 
@@ -304,5 +316,6 @@ module.exports = {
   approveRequest,
   denyRequest,
   applySocketGrantCache,
+  refreshAllSocketGrantCaches,
   clearPendingForRover,
 };

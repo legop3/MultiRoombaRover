@@ -11,12 +11,14 @@ const {
   approveRequest,
   denyRequest,
   applySocketGrantCache,
+  refreshAllSocketGrantCaches,
   clearPendingForRover,
 } = require('./core');
 const { registerPrivateRoverAccessHooks } = require('./hooks');
 
 registerPrivateRoverAccessHooks({
   applySocketGrantCache,
+  refreshAllSocketGrantCaches,
   createRequest,
   clearPendingForRover,
 });

@@ -57,15 +57,20 @@ function registerSocketHandlers(deps) {
           throw new Error('No rovers available');
         }
         const previousJoined = getRoversForSocket(socket.id);
+        const allowClosedPrivateGrantInLockdown = true;
         if (!isAdmin(socket)) {
-          const { ok, message } = canSwitchRover(socket, targetId);
+          const { ok, message } = canSwitchRover(socket, targetId, { allowClosedPrivateGrantInLockdown });
           if (!ok) {
             throw new Error(message || 'Switch denied');
           }
         }
         const forceAllowed = Boolean(force) && isAdmin(socket);
         logger.info('Request control', socket.id, targetId, { force: forceAllowed });
-        requestControl(targetId, socket, { force: forceAllowed, allowUser: true });
+        requestControl(targetId, socket, {
+          force: forceAllowed,
+          allowUser: true,
+          allowClosedPrivateGrantInLockdown,
+        });
         previousJoined.forEach((rid) => {
           if (rid !== targetId) {
             releaseControl(rid, socket);

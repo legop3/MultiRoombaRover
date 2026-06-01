@@ -6,7 +6,7 @@ const roverManager = require('../roverManager');
 const { requestEvents, grants } = require('./state');
 
 function registerPrivateRoverAccessHooks(deps) {
-  const { applySocketGrantCache, createRequest, clearPendingForRover } = deps;
+  const { applySocketGrantCache, refreshAllSocketGrantCaches, createRequest, clearPendingForRover } = deps;
 
   roverManager.managerEvents.on('private', ({ roverId, open } = {}) => {
     if (!roverId) return;
@@ -17,6 +17,8 @@ function registerPrivateRoverAccessHooks(deps) {
           grants.delete(key);
         }
       }
+      refreshAllSocketGrantCaches();
+      roverManager.broadcastRoster();
     }
     requestEvents.emit('change', { reason: 'private_state', roverId: String(roverId), open: Boolean(open) });
   });
@@ -30,6 +32,8 @@ function registerPrivateRoverAccessHooks(deps) {
           grants.delete(key);
         }
       }
+      refreshAllSocketGrantCaches();
+      roverManager.broadcastRoster();
     }
     requestEvents.emit('change', { reason: 'rover', roverId: String(roverId), action: action || null });
   });

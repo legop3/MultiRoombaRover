@@ -33,9 +33,17 @@ function createRoverLifecycle(deps) {
   }
 
   function requestControl(roverId, socket, options = {}) {
-    const { force = false, allowUser = false } = options;
+    const {
+      force = false,
+      allowUser = false,
+      forceTurn = false,
+      allowClosedPrivateGrantInLockdown = false,
+    } = options;
     const record = rovers.get(roverId);
-    const denied = getControlDenialReason(record, socket, { allowUser });
+    const denied = getControlDenialReason(record, socket, {
+      allowUser,
+      allowClosedPrivateGrantInLockdown,
+    });
     if (denied) throw new Error(denied);
     record.drivers.add(socket.id);
     if (!socketToRovers.has(socket.id)) {
@@ -43,7 +51,7 @@ function createRoverLifecycle(deps) {
     }
     socketToRovers.get(socket.id).add(roverId);
     socket.join(record.room);
-    turnService.driverAdded(roverId, socket.id, force && isAdmin(socket));
+    turnService.driverAdded(roverId, socket.id, (force && isAdmin(socket)) || forceTurn);
     socket.emit('controlGranted', { roverId });
     managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'add' });
     sendAlert({
@@ -77,7 +85,10 @@ function createRoverLifecycle(deps) {
   function canDrive(roverId, socket) {
     const record = rovers.get(roverId);
     if (!record) return false;
-    const denied = getControlDenialReason(record, socket, { allowUser: true });
+    const denied = getControlDenialReason(record, socket, {
+      allowUser: true,
+      allowClosedPrivateGrantInLockdown: true,
+    });
     if (denied) return false;
     const _mode = getMode();
     if (isAdmin(socket)) return true;
@@ -116,10 +127,13 @@ function createRoverLifecycle(deps) {
     return false;
   }
 
-  function canSwitchRover(socket, targetRoverId) {
+  function canSwitchRover(socket, targetRoverId, options = {}) {
     const target = rovers.get(targetRoverId);
     if (!target) return { ok: false, message: 'Unknown rover' };
-    const denied = getControlDenialReason(target, socket, { allowUser: true });
+    const denied = getControlDenialReason(target, socket, {
+      allowUser: true,
+      allowClosedPrivateGrantInLockdown: Boolean(options.allowClosedPrivateGrantInLockdown),
+    });
     if (denied) return { ok: false, message: denied };
     const currentId = getPrimaryRoverForSocket(socket.id);
     if (!currentId || currentId === targetRoverId) return { ok: true, currentId };
