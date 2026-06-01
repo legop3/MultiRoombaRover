@@ -64,11 +64,12 @@ type servoPayload struct {
 }
 
 type ttsPayload struct {
-	Text   string `json:"text"`
-	Engine string `json:"engine,omitempty"`
-	Voice  string `json:"voice,omitempty"`
-	Pitch  int    `json:"pitch,omitempty"`
-	Speak  bool   `json:"speak,omitempty"`
+	Text   string  `json:"text"`
+	Engine string  `json:"engine,omitempty"`
+	Voice  string  `json:"voice,omitempty"`
+	Pitch  float64 `json:"pitch,omitempty"`
+	Speed  float64 `json:"speed,omitempty"`
+	Speak  bool    `json:"speak,omitempty"`
 }
 
 type hornPayload struct {

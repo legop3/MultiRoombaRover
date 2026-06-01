@@ -11,7 +11,13 @@ function HudChatInput({ compact = false }) {
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
   const roverRoster = useSessionSelector((state) => state.session?.roster || []);
   const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef, setTypingActive } = useChat();
-  const { value: ttsSettings } = useSettingsNamespace('tts', { engine: 'flite', voice: 'rms', pitch: 50 });
+  const { value: ttsSettings } = useSettingsNamespace('tts', {
+    engine: 'flite',
+    voice: 'rms',
+    pitch: 50,
+    googlePitch: 1,
+    googleSpeed: 1,
+  });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const canChat = role !== 'spectator';
@@ -23,7 +29,8 @@ function HudChatInput({ compact = false }) {
   const ttsSupported = Boolean(rover?.audio?.ttsEnabled);
   const ttsPayload = useMemo(() => {
     if (!ttsSupported) return null;
-    const engine = ttsSettings?.engine === 'espeak' ? 'espeak' : 'flite';
+    const engine =
+      ttsSettings?.engine === 'espeak' ? 'espeak' : ttsSettings?.engine === 'chromegtts' ? 'chromegtts' : 'flite';
     if (engine === 'espeak') {
       let pitch = Number.isFinite(ttsSettings?.pitch) ? Math.round(ttsSettings.pitch) : undefined;
       if (typeof pitch === 'number') {
@@ -32,8 +39,20 @@ function HudChatInput({ compact = false }) {
       return { speak: true, engine, pitch };
     }
     const voice = typeof ttsSettings?.voice === 'string' ? ttsSettings.voice : undefined;
+    if (engine === 'chromegtts') {
+      const pitch = Number.isFinite(ttsSettings?.googlePitch) ? ttsSettings.googlePitch : 1;
+      const speed = Number.isFinite(ttsSettings?.googleSpeed) ? ttsSettings.googleSpeed : 1;
+      return { speak: true, engine, voice, pitch, speed };
+    }
     return { speak: true, engine, voice };
-  }, [ttsSettings?.engine, ttsSettings?.pitch, ttsSettings?.voice, ttsSupported]);
+  }, [
+    ttsSettings?.engine,
+    ttsSettings?.googlePitch,
+    ttsSettings?.googleSpeed,
+    ttsSettings?.pitch,
+    ttsSettings?.voice,
+    ttsSupported,
+  ]);
   const containerClass = compact
     ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-[9rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.4 py-0.2'
     : 'pointer-events-auto absolute bottom-1 right-1 flex w-[12rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.5 py-0.25';

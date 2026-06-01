@@ -21,6 +21,7 @@ The script must run from the repository root and as root (sudo). It will:
   * create system users/groups if needed
   * install /usr/local/bin/roverd and /etc/roverd.yaml
   * install /usr/local/bin/video/audio helpers and systemd units
+  * install fixed-location Google Chrome TTS assets for roverd
   * enable roverd.service and media publisher/listener services
 USAGE
 }
@@ -190,15 +191,70 @@ install_audio_support() {
 		log "ALSA config updated; reboot recommended for overlay + audio changes"
 	fi
 
-	log "Installing TTS/audio packages (flite, espeak)..."
+	log "Installing TTS/audio packages (flite, espeak, Chrome TTS runtime deps)..."
 	# check for flite and espeak before installing, and then install them if either is missing
-	if command -v flite >/dev/null 2>&1 && command -v espeak >/dev/null 2>&1; then
-		log "TTS packages flite and espeak already installed; skipping apt install"
+	if command -v flite >/dev/null 2>&1 \
+		&& command -v espeak >/dev/null 2>&1 \
+		&& command -v python3 >/dev/null 2>&1 \
+		&& command -v curl >/dev/null 2>&1 \
+		&& command -v xz >/dev/null 2>&1 \
+		&& command -v unzip >/dev/null 2>&1 \
+		&& command -v aplay >/dev/null 2>&1 \
+		&& ldconfig -p 2>/dev/null | grep -q 'libc++\.so\.1' \
+		&& ldconfig -p 2>/dev/null | grep -q 'libc++abi\.so\.1'; then
+		log "Core TTS packages already installed; skipping apt install"
+	else
+		apt-get update
+		apt-get install -y --no-install-recommends flite espeak python3 curl xz-utils unzip alsa-utils libc++1 libc++abi1 \
+			|| apt-get install -y --no-install-recommends flite espeak python3 curl xz-utils unzip alsa-utils libc++1-14 libc++abi1-14
+	fi
+
+	install -D -o root -g root -m 0755 pi/bin/chromegtts-daemon.py /usr/local/bin/chromegtts-daemon
+	log "Installed chromegtts daemon"
+
+	install_google_tts_assets
+}
+
+install_google_tts_assets() {
+	local asset_dir="/opt/roverd/googletts"
+	local voice_dir="${asset_dir}/en-us-x-multi-r30"
+	local dist_url="https://storage.googleapis.com/chromeos-localmirror/distfiles/googletts-26.5.tar.xz"
+	local tmp_dir
+	local lib_member
+
+	case "$(uname -m)" in
+		aarch64|arm64)
+			lib_member="libchrometts_arm64.so"
+			;;
+		armv7l|armhf)
+			lib_member="libchrometts_armv7.so"
+			;;
+		*)
+			log "WARNING: unsupported Chrome TTS architecture $(uname -m); skipping Google TTS assets"
+			return
+			;;
+	esac
+
+	if [[ -f "${asset_dir}/libchrometts.so" && -f "${voice_dir}/pipeline.pb" ]]; then
+		log "Google Chrome TTS assets already installed; skipping download"
 		return
 	fi
-	
-	apt-get update
-	apt-get install -y --no-install-recommends flite espeak
+
+	tmp_dir="$(mktemp -d)"
+	log "Downloading Google Chrome TTS assets..."
+	curl -L -o "${tmp_dir}/googletts-26.5.tar.xz" "$dist_url"
+	tar -xf "${tmp_dir}/googletts-26.5.tar.xz" -C "$tmp_dir" en-us-x-multi.zvoice "$lib_member"
+
+	install -d -o root -g root -m 0755 "$asset_dir"
+	install -o root -g root -m 0644 "${tmp_dir}/${lib_member}" "${asset_dir}/libchrometts.so"
+	rm -rf "$voice_dir"
+	install -d -o root -g root -m 0755 "$voice_dir"
+	unzip -q "${tmp_dir}/en-us-x-multi.zvoice" -d "$voice_dir"
+	chown -R root:root "$asset_dir"
+	find "$asset_dir" -type d -exec chmod 0755 {} +
+	find "$asset_dir" -type f -exec chmod 0644 {} +
+	rm -rf "$tmp_dir"
+	log "Installed Google Chrome TTS assets to $asset_dir"
 }
 
 # Install video publisher assets

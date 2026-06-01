@@ -38,11 +38,11 @@ func (c *WSClient) handleTTSPayload(ctx context.Context, payload *ttsPayload) er
 	if voice == "" {
 		voice = strings.TrimSpace(c.cfg.Audio.DefaultVoice)
 	}
-	pitch := payload.Pitch
-	if pitch <= 0 {
-		pitch = c.cfg.Audio.DefaultPitch
+	espeakPitch := int(payload.Pitch)
+	if espeakPitch <= 0 {
+		espeakPitch = c.cfg.Audio.DefaultPitch
 	}
-	pitch = clampInt(pitch, 0, 99)
+	espeakPitch = clampInt(espeakPitch, 0, 99)
 
 	runCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
@@ -51,8 +51,8 @@ func (c *WSClient) handleTTSPayload(ctx context.Context, payload *ttsPayload) er
 	switch engine {
 	case "espeak", "e":
 		args := []string{}
-		if pitch > 0 {
-			args = append(args, "-p", fmt.Sprintf("%d", pitch))
+		if espeakPitch > 0 {
+			args = append(args, "-p", fmt.Sprintf("%d", espeakPitch))
 		}
 		args = append(args, text)
 		cmd = exec.CommandContext(runCtx, "espeak", args...)
@@ -63,6 +63,11 @@ func (c *WSClient) handleTTSPayload(ctx context.Context, payload *ttsPayload) er
 		}
 		args = append(args, "-t", text)
 		cmd = exec.CommandContext(runCtx, "flite", args...)
+	case "chromegtts", "googletts", "gtts", "google":
+		if c.chromeTTS == nil {
+			return fmt.Errorf("chromegtts unavailable")
+		}
+		return c.chromeTTS.Speak(runCtx, text, voice, payload.Pitch, payload.Speed)
 	default:
 		return fmt.Errorf("unsupported tts engine: %s", engine)
 	}

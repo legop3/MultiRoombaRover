@@ -35,11 +35,22 @@ function normalizeTtsOptions(raw = {}) {
   if (!raw || typeof raw !== 'object') return null;
   const speak = raw.speak !== false;
   if (!speak) return null;
-  const engine = typeof raw.engine === 'string' && raw.engine.toLowerCase() === 'espeak' ? 'espeak' : 'flite';
+  const rawEngine = typeof raw.engine === 'string' ? raw.engine.toLowerCase() : '';
+  const engine = rawEngine === 'espeak' ? 'espeak' : rawEngine === 'chromegtts' ? 'chromegtts' : 'flite';
   const voice = typeof raw.voice === 'string' ? raw.voice.trim() : undefined;
-  let pitch = Number.isFinite(raw.pitch) ? Math.round(raw.pitch) : undefined;
-  if (typeof pitch === 'number') pitch = Math.max(0, Math.min(99, pitch));
-  return { speak, engine, voice, pitch };
+  let pitch = Number.isFinite(raw.pitch) ? raw.pitch : undefined;
+  let speed = Number.isFinite(raw.speed) ? raw.speed : undefined;
+  if (engine === 'espeak') {
+    if (typeof pitch === 'number') pitch = Math.max(0, Math.min(99, Math.round(pitch)));
+    speed = undefined;
+  } else if (engine === 'chromegtts') {
+    if (typeof pitch === 'number') pitch = Math.max(0.5, Math.min(2, pitch));
+    if (typeof speed === 'number') speed = Math.max(0.5, Math.min(2, speed));
+  } else {
+    pitch = undefined;
+    speed = undefined;
+  }
+  return { speak, engine, voice, pitch, speed };
 }
 
 function buildAccessNoticeText(mode, reasonText) {
@@ -81,6 +92,7 @@ function maybeSpeak(socket, message, ttsOptions) {
         engine: ttsOptions.engine,
         voice: ttsOptions.voice,
         pitch: ttsOptions.pitch,
+        speed: ttsOptions.speed,
         speak: true,
       },
     });

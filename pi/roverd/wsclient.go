@@ -26,6 +26,7 @@ type WSClient struct {
 	recoverMu    sync.Mutex
 	recovering   bool
 	ttsQueue     chan *ttsPayload
+	chromeTTS    *chromeTTSDaemon
 	lastAux      motorPWMPayload
 	autoSideOn   bool
 	connMu       sync.Mutex
@@ -43,6 +44,10 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 	if cfg.Audio.TTSEnabled {
 		ttsQueue = make(chan *ttsPayload, 2)
 	}
+	var chromeTTS *chromeTTSDaemon
+	if cfg.Audio.TTSEnabled {
+		chromeTTS = NewChromeTTSDaemon(logger)
+	}
 	var horn *HornSynth
 	if cfg.Horn.Enabled {
 		horn = NewHornSynth(cfg.Horn, logger)
@@ -58,6 +63,7 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		nightVision:  nightVision,
 		log:          logger,
 		ttsQueue:     ttsQueue,
+		chromeTTS:    chromeTTS,
 		audioLevels: AudioLevels{
 			HornGain:    1.0,
 			TTSGain:     1.0,
@@ -79,6 +85,9 @@ func (c *WSClient) Run(ctx context.Context) error {
 	c.markConnected()
 	defer conn.Close(websocket.StatusInternalError, "closed")
 	defer c.markDisconnected()
+	if c.chromeTTS != nil {
+		defer c.chromeTTS.Shutdown()
+	}
 
 	if err := c.sendHello(ctx, conn); err != nil {
 		return err
@@ -89,6 +98,7 @@ func (c *WSClient) Run(ctx context.Context) error {
 
 	errCh := make(chan error, 2)
 	c.startTTSWorker(ctx)
+	c.warmChromeTTS(ctx)
 	go func() {
 		errCh <- c.readLoop(ctx, conn)
 	}()
@@ -352,6 +362,17 @@ func (c *WSClient) startTTSWorker(ctx context.Context) {
 					c.emitEvent("tts.error", map[string]any{"error": err.Error()})
 				}
 			}
+		}
+	}()
+}
+
+func (c *WSClient) warmChromeTTS(ctx context.Context) {
+	if c.chromeTTS == nil {
+		return
+	}
+	go func() {
+		if err := c.chromeTTS.Start(ctx); err != nil {
+			c.log.Printf("chromegtts warmup failed: %v", err)
 		}
 	}()
 }

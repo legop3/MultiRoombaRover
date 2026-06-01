@@ -11,7 +11,10 @@ import CardFrame from '../CardFrame/index.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
 
 const FLITE_VOICES = ['kal', 'rms', 'slt', 'ksp', 'bdl'];
+const CHROME_TTS_VOICES = ['sfg', 'iob', 'iog', 'iol', 'iom', 'tpc', 'tpd', 'tpf'];
 const ESPEAK_PITCHES = Array.from({ length: 10 }, (_, idx) => idx * 10);
+const GOOGLE_TTS_VALUES = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+const DEFAULT_GOOGLE_TTS_VALUE = 1.0;
 
 export default function ChatPanel({
   hideInput = false,
@@ -37,13 +40,25 @@ export default function ChatPanel({
   const {
     value: ttsSettings,
     save: saveTtsSettings,
-  } = useSettingsNamespace('tts', { engine: 'flite', voice: 'rms', pitch: 50 });
+  } = useSettingsNamespace('tts', {
+    engine: 'flite',
+    voice: 'rms',
+    pitch: 50,
+    googlePitch: DEFAULT_GOOGLE_TTS_VALUE,
+    googleSpeed: DEFAULT_GOOGLE_TTS_VALUE,
+  });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [speak, setSpeak] = useState(false);
   const [engine, setEngine] = useState(() => ttsSettings?.engine || 'flite');
   const [voice, setVoice] = useState(() => ttsSettings?.voice || 'rms');
   const [pitch, setPitch] = useState(() => (Number.isFinite(ttsSettings?.pitch) ? ttsSettings.pitch : 50));
+  const [googlePitch, setGooglePitch] = useState(() =>
+    Number.isFinite(ttsSettings?.googlePitch) ? ttsSettings.googlePitch : DEFAULT_GOOGLE_TTS_VALUE,
+  );
+  const [googleSpeed, setGoogleSpeed] = useState(() =>
+    Number.isFinite(ttsSettings?.googleSpeed) ? ttsSettings.googleSpeed : DEFAULT_GOOGLE_TTS_VALUE,
+  );
   const canChat = role !== 'spectator' || allowSpectatorInput;
   const listRef = useRef(null);
 
@@ -65,10 +80,29 @@ export default function ChatPanel({
     const nextEngine = ttsSettings?.engine || 'flite';
     const nextVoice = ttsSettings?.voice || 'rms';
     const nextPitch = Number.isFinite(ttsSettings?.pitch) ? ttsSettings.pitch : 50;
+    const nextGooglePitch = Number.isFinite(ttsSettings?.googlePitch)
+      ? ttsSettings.googlePitch
+      : DEFAULT_GOOGLE_TTS_VALUE;
+    const nextGoogleSpeed = Number.isFinite(ttsSettings?.googleSpeed)
+      ? ttsSettings.googleSpeed
+      : DEFAULT_GOOGLE_TTS_VALUE;
     if (engine !== nextEngine) setEngine(nextEngine);
     if (voice !== nextVoice) setVoice(nextVoice);
     if (pitch !== nextPitch) setPitch(nextPitch);
-  }, [engine, pitch, ttsSettings?.engine, ttsSettings?.pitch, ttsSettings?.voice, voice]);
+    if (googlePitch !== nextGooglePitch) setGooglePitch(nextGooglePitch);
+    if (googleSpeed !== nextGoogleSpeed) setGoogleSpeed(nextGoogleSpeed);
+  }, [
+    engine,
+    googlePitch,
+    googleSpeed,
+    pitch,
+    ttsSettings?.engine,
+    ttsSettings?.googlePitch,
+    ttsSettings?.googleSpeed,
+    ttsSettings?.pitch,
+    ttsSettings?.voice,
+    voice,
+  ]);
 
   useEffect(() => {
     if (ttsSupported) {
@@ -83,8 +117,11 @@ export default function ChatPanel({
     if (engine === 'espeak') {
       return { speak: true, engine, pitch };
     }
+    if (engine === 'chromegtts') {
+      return { speak: true, engine, voice, pitch: googlePitch, speed: googleSpeed };
+    }
     return { speak: true, engine, voice };
-  }, [engine, pitch, speak, ttsSupported, voice]);
+  }, [engine, googlePitch, googleSpeed, pitch, speak, ttsSupported, voice]);
 
   async function handleSend(event) {
     event.preventDefault();
@@ -181,30 +218,74 @@ export default function ChatPanel({
                 value={engine}
                 onChange={(e) => {
                   const next = e.target.value;
+                  const nextVoice =
+                    next === 'chromegtts' && !CHROME_TTS_VOICES.includes(voice)
+                      ? 'tpf'
+                      : next === 'flite' && !FLITE_VOICES.includes(voice)
+                      ? 'rms'
+                      : voice;
                   setEngine(next);
-                  saveTtsSettings((current) => ({ ...(current || {}), engine: next }));
+                  if (nextVoice !== voice) setVoice(nextVoice);
+                  saveTtsSettings((current) => ({ ...(current || {}), engine: next, voice: nextVoice }));
                 }}
                 className="field-input text-xs"
               >
                 <option value="flite">flite</option>
                 <option value="espeak">espeak</option>
+                <option value="chromegtts">Google TTS</option>
               </select>
-              {engine === 'flite' ? (
-                <select
-                  value={voice}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setVoice(next);
-                    saveTtsSettings((current) => ({ ...(current || {}), voice: next }));
-                  }}
-                  className="field-input text-xs"
-                >
-                  {FLITE_VOICES.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
+              {engine === 'flite' || engine === 'chromegtts' ? (
+                <>
+                  <select
+                    value={voice}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setVoice(next);
+                      saveTtsSettings((current) => ({ ...(current || {}), voice: next }));
+                    }}
+                    className="field-input text-xs"
+                  >
+                    {(engine === 'chromegtts' ? CHROME_TTS_VOICES : FLITE_VOICES).map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                  {engine === 'chromegtts' && (
+                    <>
+                      <select
+                        value={googlePitch}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          setGooglePitch(next);
+                          saveTtsSettings((current) => ({ ...(current || {}), googlePitch: next }));
+                        }}
+                        className="field-input text-xs"
+                      >
+                        {GOOGLE_TTS_VALUES.map((value) => (
+                          <option key={`pitch-${value}`} value={value}>
+                            pitch {value.toFixed(2)}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={googleSpeed}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          setGoogleSpeed(next);
+                          saveTtsSettings((current) => ({ ...(current || {}), googleSpeed: next }));
+                        }}
+                        className="field-input text-xs"
+                      >
+                        {GOOGLE_TTS_VALUES.map((value) => (
+                          <option key={`speed-${value}`} value={value}>
+                            speed {value.toFixed(2)}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </>
               ) : (
                 <select
                   value={pitch}
