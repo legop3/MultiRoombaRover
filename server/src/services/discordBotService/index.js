@@ -162,6 +162,7 @@ const commands = createCommandHandlers({
   roverManager,
   getMode,
   MODES,
+  getGlobalObjective,
   getActiveDrivers,
   getNickname,
   subscribe,

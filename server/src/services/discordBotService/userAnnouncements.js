@@ -73,7 +73,7 @@ function createUserAnnouncements(deps) {
   function buildSnapshot() {
     const mode = getMode();
     const publicMode = isPublicMode(mode);
-    const objective = getGlobalObjective();
+    const objective = typeof getGlobalObjective === 'function' ? getGlobalObjective() : null;
     const objectiveText = objective?.text ? String(objective.text).trim() : '';
     const publicRecords = Array.from(rovers.values()).filter((record) => roverManager.canReplayRoverId(record?.id));
     const readyRecords = publicMode ? publicRecords.filter((record) => !record.locked) : [];
