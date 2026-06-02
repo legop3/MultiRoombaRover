@@ -4,6 +4,7 @@
 const { createDmModerationHandlers } = require('./dmModeration');
 const { createChatBridgeHandlers } = require('./chatBridge');
 const { createBusEventHandler } = require('./busEvents');
+const { createUserAnnouncements } = require('../userAnnouncements');
 const { sanitizeMentions, formatDuration, formatWebhookUsername, getTypingId } = require('./helpers');
 
 function createIntegrations(deps) {
@@ -20,6 +21,7 @@ function createIntegrations(deps) {
   const dm = createDmModerationHandlers({ ...deps, sanitizeMentions });
   const chat = createChatBridgeHandlers({ ...deps, clearTypingMessage, sendTypingMessage, formatWebhookUsername, getTypingId });
   const { handleBusEvent } = createBusEventHandler({ ...deps, sendToChannel, schedulePresenceRotation, formatDuration });
+  const userAnnouncements = createUserAnnouncements({ ...deps, sendToChannel, schedulePresenceRotation });
 
   function register() {
     client.on('typingStart', (typing) => {
@@ -32,6 +34,7 @@ function createIntegrations(deps) {
     });
 
     subscribe('*', handleBusEvent);
+    subscribe('*', userAnnouncements.handleBusEvent);
     subscribe('verification.requested', dm.sendVerificationRequestDms);
     subscribe('privateRoverAccess.requested', dm.sendPrivateRoverAccessRequestDms);
     subscribe('chat:message', chat.handleChatBridgeOutbound);

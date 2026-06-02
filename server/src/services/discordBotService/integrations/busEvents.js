@@ -6,7 +6,7 @@ const io = require('../../../globals/io');
 const { buildBatteryStatusEmbed, buildBatteryCaption } = require('../batteryEmbeds');
 
 function createBusEventHandler(deps) {
-  const { logger, discordConfig, getMode, MODES, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel, buildReplayVideo, getActiveDrivers, getNickname } = deps;
+  const { logger, discordConfig, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel, buildReplayVideo, getActiveDrivers, getNickname } = deps;
   const ADMIN_ALERT_EVENT_TYPES = new Set(['rover.online', 'rover.offline', 'rover.dockGuard', 'battery.warn', 'battery.urgent', 'battery.docked', 'battery.undocked', 'battery.charging.start', 'battery.charging.stop', 'battery.locked', 'battery.unlocked']);
   let skippedFirstModeAnnouncement = false;
 
@@ -38,24 +38,6 @@ function createBusEventHandler(deps) {
       ? embeds
       : [buildEmbed({ title, description, color, includeSiteUrl })];
     await sendToChannel(channelId, `${prefix}${content || ''}`.trim(), { embeds: payloadEmbeds, files: Array.isArray(files) ? files : undefined }, { parse: [], roles: pingRoleId ? [pingRoleId] : [] }, !pingRoleId);
-  }
-
-  async function announceUserStatus({ channelId, content, color, title, description, embeds }) {
-    const roles = discordConfig.roles || {};
-    const mode = getMode();
-    const allowPing = mode !== MODES.ADMIN && mode !== MODES.LOCKDOWN;
-    const pingRoleId = allowPing ? roles.announcementPing || null : null;
-    const mainLine = pingRoleId ? `<@&${pingRoleId}> ${content || ''}`.trim() : content;
-    await announce({
-      channelId,
-      content: mainLine,
-      pingRoleId,
-      prefixMentions: false,
-      color,
-      title,
-      description,
-      embeds,
-    });
   }
 
   function sanitizeReplayTitleForFilename(title) {
@@ -160,28 +142,21 @@ function createBusEventHandler(deps) {
     switch (type) {
       case 'mode.changed':
         if (!skippedFirstModeAnnouncement) { skippedFirstModeAnnouncement = true; schedulePresenceRotation(); break; }
-        if (payload?.mode === MODES.OPEN || payload?.mode === MODES.TURNS) {
-          announceUserStatus({ channelId: channels.announcements, content: `Access mode set to ${payload?.mode}.`, color: 0x2196f3, title: 'Access Mode Updated', description: `Access mode set to **${payload?.mode}**` });
-        }
         schedulePresenceRotation();
         break;
       case 'globalObjective.updated':
-        announceUserStatus({ channelId: channels.announcements, content: payload?.text ? `Global objective: ${payload.text}` : 'Global objective cleared.', color: 0x8bc34a, title: 'Global Objective', description: payload?.text || 'Global objective cleared.' });
         schedulePresenceRotation();
         break;
       case 'communityGoal.updated':
-        announceUserStatus({ channelId: channels.announcements, content: payload?.text ? `Global objective: ${payload.text}` : 'Global objective cleared.', color: 0x8bc34a, title: 'Global Objective', description: payload?.text || 'Global objective cleared.' });
         schedulePresenceRotation();
         break;
       case 'rover.locked':
-        announceUserStatus({ channelId: channels.announcements, content: `${payload?.roverId} locked${payload?.reason ? ` (${payload.reason})` : ''}.`, color: 0xf0b651, title: 'Rover Locked', description: `${payload?.roverId} locked${payload?.reason ? ` (${payload.reason})` : ''}.` });
         schedulePresenceRotation();
         break;
       case 'rover.unlocked':
         schedulePresenceRotation();
         break;
       case 'rovers.allUnlocked':
-        announceUserStatus({ channelId: channels.announcements, content: 'All rovers are now unlocked.', color: 0x4caf50, title: 'All Rovers Unlocked', description: 'All rovers are now unlocked.' });
         schedulePresenceRotation();
         break;
       case 'rover.online':
