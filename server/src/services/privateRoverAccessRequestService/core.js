@@ -12,6 +12,7 @@ const { getSocketIp, normalizeIp } = require('../../helpers/ipResolver');
 const { normalizeCookieUserId } = require('../identityService');
 const {
   REQUEST_COOLDOWN_MS,
+  GRANT_TTL_MS,
   requestEvents,
   pendingRequests,
   pendingByRequesterRover,
@@ -27,6 +28,30 @@ const {
   listClosedPrivateRovers,
   getSocketByRequesterKey,
 } = require('./helpers');
+
+function isGrantExpired(grant, now = Date.now()) {
+  const expiresAt = Number(grant?.expiresAt || 0);
+  return expiresAt > 0 && expiresAt <= now;
+}
+
+function pruneExpiredGrants(now = Date.now()) {
+  let removed = 0;
+  for (const [key, grant] of grants.entries()) {
+    if (!isGrantExpired(grant, now)) continue;
+    grants.delete(key);
+    removed += 1;
+  }
+  return removed;
+}
+
+function pruneExpiredGrantsAndRefresh(reason = 'grant_expired') {
+  const removed = pruneExpiredGrants();
+  if (!removed) return 0;
+  refreshAllSocketGrantCaches();
+  roverManager.broadcastRoster();
+  requestEvents.emit('change', { reason, expiredGrants: removed });
+  return removed;
+}
 
 function listPendingForRequester(socket) {
   const requesterKey = buildRequesterKey(socket);
@@ -47,6 +72,7 @@ function listPendingForRequester(socket) {
 }
 
 function listGrantedRoversForRequester(requesterKey) {
+  pruneExpiredGrants();
   const key = normalizeRequesterKey(requesterKey);
   if (!key) return [];
   const roverIds = [];
@@ -70,7 +96,14 @@ function refreshAllSocketGrantCaches() {
 
 function getGrantForRequester(requesterKey, roverId) {
   if (!requesterKey || !roverId) return null;
-  return grants.get(buildGrantKey(requesterKey, roverId)) || null;
+  const grantKey = buildGrantKey(requesterKey, roverId);
+  const grant = grants.get(grantKey) || null;
+  if (!grant) return null;
+  if (isGrantExpired(grant)) {
+    grants.delete(grantKey);
+    return null;
+  }
+  return grant;
 }
 
 function hasClosedPrivateAccessForSocket(socket, roverId) {
@@ -79,11 +112,17 @@ function hasClosedPrivateAccessForSocket(socket, roverId) {
 }
 
 function getStateForSocket(socket) {
+  pruneExpiredGrants();
   const requesterKey = buildRequesterKey(socket);
   const grantedRovers = [];
   for (const grant of grants.values()) {
     if (grant.requesterKey !== requesterKey) continue;
-    grantedRovers.push({ roverId: grant.roverId, grantedAt: grant.grantedAt, requestId: grant.requestId || null });
+    grantedRovers.push({
+      roverId: grant.roverId,
+      grantedAt: grant.grantedAt,
+      expiresAt: grant.expiresAt || null,
+      requestId: grant.requestId || null,
+    });
   }
   grantedRovers.sort((a, b) => b.grantedAt - a.grantedAt);
   return {
@@ -181,11 +220,13 @@ function approveRequest(requestId, actorDiscordId = null) {
   pendingByRequesterRover.delete(`${request.requesterKey}:${request.roverId}`);
 
   const grantKey = buildGrantKey(request.requesterKey, request.roverId);
+  const grantedAt = Date.now();
   grants.set(grantKey, {
     requesterKey: request.requesterKey,
     roverId: request.roverId,
     requestId: request.id,
-    grantedAt: Date.now(),
+    grantedAt,
+    expiresAt: grantedAt + GRANT_TTL_MS,
     grantedBy: request.resolvedBy,
   });
 
@@ -217,6 +258,7 @@ function approveRequest(requestId, actorDiscordId = null) {
       requesterKey: request.requesterKey,
       resolvedBy: request.resolvedBy,
       resolvedAt: request.resolvedAt,
+      grantExpiresAt: grantedAt + GRANT_TTL_MS,
       assignedSocketId,
     },
   });
@@ -317,5 +359,6 @@ module.exports = {
   denyRequest,
   applySocketGrantCache,
   refreshAllSocketGrantCaches,
+  pruneExpiredGrantsAndRefresh,
   clearPendingForRover,
 };

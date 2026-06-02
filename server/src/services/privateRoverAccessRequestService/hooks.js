@@ -5,8 +5,26 @@ const io = require('../../globals/io');
 const roverManager = require('../roverManager');
 const { requestEvents, grants } = require('./state');
 
+const GRANT_PRUNE_INTERVAL_MS = 60 * 1000;
+let grantPruneTimer = null;
+
 function registerPrivateRoverAccessHooks(deps) {
-  const { applySocketGrantCache, refreshAllSocketGrantCaches, createRequest, clearPendingForRover } = deps;
+  const {
+    applySocketGrantCache,
+    refreshAllSocketGrantCaches,
+    pruneExpiredGrantsAndRefresh,
+    createRequest,
+    clearPendingForRover,
+  } = deps;
+
+  if (!grantPruneTimer) {
+    grantPruneTimer = setInterval(() => {
+      pruneExpiredGrantsAndRefresh('grant_expired');
+    }, GRANT_PRUNE_INTERVAL_MS);
+    if (typeof grantPruneTimer.unref === 'function') {
+      grantPruneTimer.unref();
+    }
+  }
 
   roverManager.managerEvents.on('private', ({ roverId, open } = {}) => {
     if (!roverId) return;

@@ -4,6 +4,7 @@
 const EventEmitter = require('events');
 
 const REQUEST_COOLDOWN_MS = 15 * 1000;
+const GRANT_TTL_MS = 60 * 60 * 1000;
 const DM_APPROVE_EMOJI = '✅';
 const DM_DENY_EMOJI = '❌';
 
@@ -16,6 +17,7 @@ const grants = new Map();
 
 module.exports = {
   REQUEST_COOLDOWN_MS,
+  GRANT_TTL_MS,
   DM_APPROVE_EMOJI,
   DM_DENY_EMOJI,
   requestEvents,

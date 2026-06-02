@@ -70,11 +70,16 @@ function createPrivateAccessPolicy(deps) {
     if (!isPrivateRecord(record)) return true;
     if (isPrivateOpen(record)) return true;
     if (isLockdownAdmin(socket)) return true;
+    if (socket?.id && record.drivers?.has(socket.id)) return true;
     return socketHasClosedPrivateAccess(socket, record.id);
   }
 
   function getControlDenialReason(record, socket, options = {}) {
-    const { allowUser = false, allowClosedPrivateGrantInLockdown = false } = options;
+    const {
+      allowUser = false,
+      allowClosedPrivateGrantInLockdown = false,
+      allowClosedPrivateCurrentDriver = false,
+    } = options;
     if (!record) return 'Unknown rover';
     if (!allowUser && !isAdmin(socket)) return 'Only admins can request control';
     if (record.locked && !isAdmin(socket)) return 'Rover locked';
@@ -89,6 +94,11 @@ function createPrivateAccessPolicy(deps) {
         isPrivateRecord(record) &&
         !isPrivateOpen(record) &&
         socketHasClosedPrivateAccess(socket, record.id)
+      ) &&
+      !(
+        allowClosedPrivateCurrentDriver &&
+        isPrivateRecord(record) &&
+        !isPrivateOpen(record)
       )
     ) {
       return 'Server in lockdown';
@@ -98,6 +108,7 @@ function createPrivateAccessPolicy(deps) {
     if (!isPrivateRecord(record)) return null;
     if (!isPrivateOpen(record)) {
       if (!isLockdownAdmin(socket)) {
+        if (allowClosedPrivateCurrentDriver) return null;
         if (socketHasClosedPrivateAccess(socket, record.id)) return null;
         return 'Private rover is closed';
       }

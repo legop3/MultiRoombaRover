@@ -85,14 +85,15 @@ function createRoverLifecycle(deps) {
   function canDrive(roverId, socket) {
     const record = rovers.get(roverId);
     if (!record) return false;
+    if (isAdmin(socket)) return true;
+    if (!socket || !isDriver(roverId, socket)) return false;
     const denied = getControlDenialReason(record, socket, {
       allowUser: true,
       allowClosedPrivateGrantInLockdown: true,
+      allowClosedPrivateCurrentDriver: true,
     });
     if (denied) return false;
     const _mode = getMode();
-    if (isAdmin(socket)) return true;
-    if (!socket || !isDriver(roverId, socket)) return false;
     return turnService.canDrive(roverId, socket);
   }
 

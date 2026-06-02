@@ -12,6 +12,7 @@ const {
   denyRequest,
   applySocketGrantCache,
   refreshAllSocketGrantCaches,
+  pruneExpiredGrantsAndRefresh,
   clearPendingForRover,
 } = require('./core');
 const { registerPrivateRoverAccessHooks } = require('./hooks');
@@ -19,6 +20,7 @@ const { registerPrivateRoverAccessHooks } = require('./hooks');
 registerPrivateRoverAccessHooks({
   applySocketGrantCache,
   refreshAllSocketGrantCaches,
+  pruneExpiredGrantsAndRefresh,
   createRequest,
   clearPendingForRover,
 });
