@@ -1,7 +1,7 @@
 // Rover Roster
 // Purpose: Defines the Rover Roster module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { roverNameChromeStyle } from '../../lib/roverColor.js';
+import RoverLabel from '../RoverLabel/index.jsx';
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -49,10 +49,8 @@ export default function RoverRoster({
               )}
             >
               <div>
-                <p className="text-slate-200">
-                  <span className="rounded px-1 py-[1px] border border-transparent" style={roverNameChromeStyle(rover.color, 0.16)}>
-                    {rover.name}
-                  </span>
+                <p>
+                  <RoverLabel rover={rover} fallback={rover.id} />
                 </p>
                 <p className="text-xs text-slate-500 flex flex-wrap items-center gap-0.5">
                   <span>{rover.locked ? 'locked' : 'free'}</span>

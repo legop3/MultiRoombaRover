@@ -37,7 +37,9 @@ function TopDownMapPanel() {
   const sensors = frame?.sensors || {};
 
   return (
-    <CardFrame hideHeader>
+    <CardFrame
+      title = "Roomba sensor view"
+    >
       <div className="aspect-square w-full">
         <TopDownMap sensors={sensors} />
       </div>

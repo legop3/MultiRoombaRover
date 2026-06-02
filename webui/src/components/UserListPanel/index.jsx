@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButtonsGrid from '../SocialButtonsGrid/index.jsx';
-import { roverBadgeStyle, roverNameChromeStyle } from '../../lib/roverColor.js';
 import CardFrame from '../CardFrame/index.jsx';
+import RoverLabel from '../RoverLabel/index.jsx';
 
 export function NicknameEntryPanel({ compact = false }) {
   return (
@@ -130,12 +130,12 @@ export default function UserListPanel({
           >
             <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
             {user.roverId ? (
-              <span
-                className="rounded bg-slate-800 px-1 text-[0.7rem]"
-                style={roverBadgeStyle(rosterEntry(user.roverId)?.color, 0.12)}
-              >
-                rover {rosterEntry(user.roverId)?.name || user.roverId}
-              </span>
+              <RoverLabel
+                roverId={user.roverId}
+                color={rosterEntry(user.roverId)?.color}
+                fallback={user.roverId}
+                className="text-[0.7rem]"
+              />
             ) : (
               <span className="text-[0.7rem] text-slate-500">no rover</span>
             )}
@@ -214,12 +214,7 @@ export default function UserListPanel({
                   <div key={roverId} className={`flex flex-col gap-0.5 ${compact ? 'text-[0.8rem] py-0.25' : 'text-sm'}`}>
                     <div className="flex items-center gap-0.5">
                       <p className="font-semibold text-slate-200">
-                        <span
-                          className="rounded px-1 py-[1px] border border-transparent"
-                          style={roverNameChromeStyle(rosterEntry(roverId)?.color, 0.16)}
-                        >
-                          {rosterEntry(roverId)?.name || roverId}
-                        </span>
+                        <RoverLabel roverId={roverId} fallback={roverId} />
                       </p>
                       {remaining != null && (
                         <span className="rounded bg-slate-800 px-1 text-[0.7rem]">

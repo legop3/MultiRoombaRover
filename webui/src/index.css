@@ -62,7 +62,7 @@ body {
   .pride-page-bg {
     background-color: #050505;
     background-image:
-      linear-gradient(rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0.24)),
+      linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
       repeating-linear-gradient(
         45deg,
         #5bcefa 0 1.818%,

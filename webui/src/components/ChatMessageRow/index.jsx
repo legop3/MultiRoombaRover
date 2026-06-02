@@ -3,8 +3,8 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useState } from 'react';
 import { FaDiscord } from 'react-icons/fa';
-import { roverBadgeStyle } from '../../lib/roverColor.js';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
+import RoverLabel from '../RoverLabel/index.jsx';
 
 function roleColors(role) {
   switch (role) {
@@ -107,12 +107,12 @@ export function ChatIdentity({ message, toolsToggle = null }) {
         </span>
       ) : null}
       {message.roverId && (
-        <span
-          className="shrink-0 rounded bg-slate-800 px-1 text-[0.7rem]"
-          style={roverBadgeStyle(message.roverColor, 0.14)}
-        >
-          {message.roverId}
-        </span>
+        <RoverLabel
+          roverId={message.roverId}
+          color={message.roverColor}
+          fallback={message.roverId}
+          className="shrink-0 text-[0.7rem]"
+        />
       )}
       {toolsToggle}
     </span>

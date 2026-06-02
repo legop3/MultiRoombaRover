@@ -10,7 +10,7 @@ import CardFrame from '../CardFrame/index.jsx';
 
 function EmptyState() {
   return (
-    <CardFrame title="Room cameras" bodyClassName="space-y-0.5 text-sm">
+    <CardFrame title="Room Cameras" bodyClassName="space-y-0.5 text-sm">
       <p className="text-center text-slate-400">No room cameras configured.</p>
       <p className="text-center text-slate-500">Add entries to server config to populate this list.</p>
     </CardFrame>

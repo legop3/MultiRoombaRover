@@ -4,6 +4,7 @@
 import { useMemo, useState } from 'react';
 import CardFrame from '../CardFrame/index.jsx';
 import { flowWrapClass, innerFlowClass } from './constants.js';
+import RoverLabel from '../RoverLabel/index.jsx';
 
 export default function VipPrivateRoverAccessCard({
   requestableRovers = [],
@@ -56,7 +57,9 @@ export default function VipPrivateRoverAccessCard({
               return (
                 <div key={roverId} className="surface-muted flex items-center justify-between gap-0.5 px-1 py-0.5">
                   <div className="min-w-0 text-left">
-                    <p className="truncate text-xs font-semibold text-slate-100">{rover.name || roverId}</p>
+                    <p className="truncate text-xs">
+                      <RoverLabel rover={rover} fallback={roverId} className="max-w-full truncate align-middle" />
+                    </p>
                     <p className="truncate text-[0.7rem] text-slate-500">{roverId}</p>
                   </div>
                   {pending ? (

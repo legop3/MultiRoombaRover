@@ -3,8 +3,8 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
-import { roverNameChromeStyle } from '../../lib/roverColor.js';
 import CardFrame from '../CardFrame/index.jsx';
+import RoverLabel from '../RoverLabel/index.jsx';
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -188,9 +188,7 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
                   <div className="flex items-center justify-between gap-0.5">
                     <div className="flex min-w-0 items-center gap-0.5">
                       <p className="min-w-0 flex items-center gap-0.5 whitespace-nowrap text-slate-200">
-                        <span className="rounded px-1 py-[1px] border border-transparent" style={roverNameChromeStyle(rover.color, 0.16)}>
-                          {rover.name}
-                        </span>
+                        <RoverLabel rover={rover} fallback={roverId} />
                         {rover.description ? (
                           <span className="min-w-0 flex-1 truncate text-[0.7rem] text-slate-400">
                             {rover.description}

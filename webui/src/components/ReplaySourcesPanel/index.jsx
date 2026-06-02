@@ -4,8 +4,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
-import { roverNameChromeStyle } from '../../lib/roverColor.js';
 import CardFrame from '../CardFrame/index.jsx';
+import RoverLabel from '../RoverLabel/index.jsx';
 
 function normalizeSources(list = []) {
   return list
@@ -215,12 +215,11 @@ function GroupList({ title, items, selected, onToggle }) {
               onChange={() => onToggle(item.key)}
               className="accent-emerald-400"
             />
-            <span
-              className={`truncate ${item.type === 'rover' ? 'rounded px-1 py-[1px] border border-transparent' : ''}`}
-              style={item.type === 'rover' ? roverNameChromeStyle(item.color, 0.16) : undefined}
-            >
-              {item.label}
-            </span>
+            {item.type === 'rover' ? (
+              <RoverLabel name={item.label} color={item.color} fallback={item.id} className="truncate" />
+            ) : (
+              <span className="truncate">{item.label}</span>
+            )}
           </label>
         ))}
       </div>

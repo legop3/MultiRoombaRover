@@ -50,17 +50,24 @@ export default function CardFrame({
     return rover?.color || null;
   });
   const accentRgb = hexToRgb(ownRoverColor);
-  const cardStyle = accentRgb ? { borderColor: rgba(accentRgb, 0.5) } : undefined;
+  
+  // swap these to toggle rover card border colors stuff 
+  const cardStyle = accentRgb ? { borderColor: rgba(accentRgb, 0.3) } : undefined;
+  // const cardStyle = undefined;
+
+
   const headerStyle = accentRgb
     ? {
-        backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 30%, ${rgba(accentRgb, 0.28)} 100%)`,
+        backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 0%, ${rgba(accentRgb, 0.1)} 100%)`,
+        // backgroundImage: `linear-gradient(90deg, ${rgba(accentRgb, 0.1)} 100%)`,
+        // backgroundImage: `background-color: ${rgba(accentRgb, 0.2)}`
       }
     : undefined;
 
   return (
     <section
       className={cx(
-        'panel-section border border-neutral-500/60 bg-neutral-900/95',
+        'panel-section border border-neutral-500/60 bg-neutral-900/100',
         clipOverflow ? 'overflow-hidden' : 'overflow-visible',
         fillHeight && 'flex h-full min-h-0 flex-col',
         className,
@@ -71,7 +78,8 @@ export default function CardFrame({
         // Header row
         <header
           className={cx(
-            'flex items-center justify-between gap-0.5 border-b border-neutral-500/50 bg-gradient-to-r from-neutral-800 via-neutral-700 to-neutral-600 px-0.5 py-0.5',
+            'flex items-center justify-between gap-0.5 border-b border-neutral-500/50 bg-slate-800 px-0.5 py-0.5',
+            // 'flex items-center justify-between gap-0.5 border-b border-neutral-500/50 bg-gradient-to-r from-neutral-800 via-neutral-700 to-neutral-600 px-0.5 py-0.5',
             headerClassName,
           )}
           style={headerStyle}

@@ -1,7 +1,7 @@
 // Replay Snapshot Health
 // Purpose: Defines the Replay Snapshot Health module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { roverNameChromeStyle } from '../../lib/roverColor.js';
+import RoverLabel from '../RoverLabel/index.jsx';
 
 export default function ReplaySnapshotHealth({ health, roster = [] }) {
   if (!health) return null;
@@ -35,12 +35,11 @@ export default function ReplaySnapshotHealth({ health, roster = [] }) {
       <div className="space-y-0.5 text-xs text-slate-300">
         {replay.sources.map((source) => (
           <div key={`${source.type}:${source.id}`} className="flex items-center justify-between">
-            <span
-              className={`${source.type === 'rover' ? 'rounded px-1 py-[1px] border border-transparent' : ''}`}
-              style={source.type === 'rover' ? roverNameChromeStyle(roverColorFor(source.id), 0.16) : undefined}
-            >
-              {source.label}
-            </span>
+            {source.type === 'rover' ? (
+              <RoverLabel name={source.label} color={roverColorFor(source.id)} fallback={source.id} />
+            ) : (
+              <span>{source.label}</span>
+            )}
             <span className={source.ready ? 'text-emerald-300' : 'text-amber-300'}>
               {source.recentCount}/{source.neededCount}
             </span>
@@ -50,12 +49,7 @@ export default function ReplaySnapshotHealth({ health, roster = [] }) {
       <div className="space-y-0.5 text-xs text-slate-300">
         {snapshots.rovers.map((entry) => (
           <div key={`rover:${entry.id}`} className="flex items-center justify-between">
-            <span
-              className="rounded px-1 py-[1px] border border-transparent"
-              style={roverNameChromeStyle(roverColorFor(entry.id), 0.16)}
-            >
-              {entry.name}
-            </span>
+            <RoverLabel name={entry.name} color={roverColorFor(entry.id)} fallback={entry.id} />
             <span className={entry.stale ? 'text-amber-300' : 'text-emerald-300'}>{entry.stale ? 'stale' : 'ok'}</span>
           </div>
         ))}

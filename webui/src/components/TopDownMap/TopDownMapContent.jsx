@@ -16,7 +16,7 @@ import {
 function TopDownMapContent({ sensors = {}, variant = 'full', size: overrideSize, overlay = false }) {
   const size = overrideSize || (variant === 'mini' ? 190 : 260);
   const center = size / 2;
-  const offsetY = size * 0.07;
+  const offsetY = size * 0.05;
   const centerX = center;
   const centerY = center + offsetY;
   const innerCircle = center * 0.8;
