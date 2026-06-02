@@ -100,3 +100,10 @@ export const AUDIO_SETTINGS_DEFAULTS = {
   mainBrushDuckEnabled: true,
   mainBrushDuckAmount: 0.75,
 };
+
+export const VIDEO_SETTINGS_DEFAULTS = {
+  // Keep the default as unfiltered color because most rovers still provide useful color
+  // information. The filter is an operator preference, so it belongs in persisted UI
+  // settings instead of being inferred from a rover stream or camera URL.
+  colorFilter: 'none',
+};

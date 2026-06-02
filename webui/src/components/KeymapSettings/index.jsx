@@ -27,6 +27,7 @@ const KEY_ACTIONS = [
   { id: 'cameraUp', label: 'Camera Up', group: 'Camera' },
   { id: 'cameraDown', label: 'Camera Down', group: 'Camera' },
   { id: 'nightVisionToggle', label: 'Toggle Night Vision', group: 'Camera' },
+  { id: 'videoFilterCycle', label: 'Cycle Video Filter', group: 'Camera' },
   { id: 'hornHonk', label: 'Horn (Hold)', group: 'Audio' },
   { id: 'micPtt', label: 'Mic Push To Talk', group: 'Audio' },
   { id: 'driveMacro', label: 'Drive Macro', group: 'Macros' },

@@ -8,7 +8,7 @@ import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
 import { isKeyboardCaptureLocked } from './keyboardCaptureLock.js';
 import { isTextInputElement } from './inputFocusUtils.js';
 import { useSettingsNamespace } from '../../settings/index.js';
-import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import { INPUT_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import {
   SONG_DEFAULT_DURATION,
@@ -26,6 +26,23 @@ const TILT_INTERVAL_MIN = 5;
 const TILT_INTERVAL_MAX = 500;
 const TILT_SPEED_MIN = 1;
 const TILT_SPEED_MAX = 100;
+const VIDEO_FILTER_SEQUENCE = ['none', 'grayscale', 'greenscale'];
+
+function normalizeVideoFilter(value) {
+  // The setting is persisted in a browser cookie and can become stale if filter names change.
+  // Normalizing before cycling keeps the shortcut deterministic instead of getting stuck on an
+  // unknown value.
+  return VIDEO_FILTER_SEQUENCE.includes(value) ? value : VIDEO_SETTINGS_DEFAULTS.colorFilter;
+}
+
+function nextVideoFilter(value) {
+  const current = normalizeVideoFilter(value);
+  const currentIndex = VIDEO_FILTER_SEQUENCE.indexOf(current);
+
+  // The modulo wrap intentionally makes the shortcut a simple single-key cycle:
+  // Color -> Gray -> Green -> Color. That is faster while driving than needing separate keys.
+  return VIDEO_FILTER_SEQUENCE[(currentIndex + 1) % VIDEO_FILTER_SEQUENCE.length];
+}
 
 function clampSpeed(value, fallback) {
   const num = Number(value);
@@ -142,6 +159,7 @@ export default function KeyboardInputManager() {
   const { homeAssistantSetState } = useSessionActions();
   const { focusChat, blurChat, isChatFocused } = useChat();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
+  const { save: saveVideoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
   const keymap = useMemo(() => normalizeKeymapEntries(state.keymap), [state.keymap]);
   const actionTokens = useMemo(() => {
     const tokens = new Set();
@@ -187,7 +205,6 @@ export default function KeyboardInputManager() {
 
   const driveFromKeys = useCallback(() => {
     const tokensSnapshot = new Set(activeTokensRef.current);
-    const boostActive = bindingActive(keymap.boostModifier, tokensSnapshot);
     const slowActive = bindingActive(keymap.slowModifier, tokensSnapshot);
     const speedOptions = slowActive
       ? { baseSpeed: keyboardSpeeds.precisionSpeed, boostSpeed: keyboardSpeeds.precisionSpeed }
@@ -279,7 +296,7 @@ export default function KeyboardInputManager() {
       const finalNote = setSongNote(next);
       sendSong([{ note: finalNote, duration: SONG_DEFAULT_DURATION }], { slot: 0 });
     },
-    [sendSong, setSongNote, state.song?.note],
+    [sendSong, setSongNote, state.song],
   );
 
   const ensureSongLoop = useCallback(() => {
@@ -351,6 +368,15 @@ export default function KeyboardInputManager() {
     [homeAssistantSetState, homeAssistant],
   );
 
+  const cycleVideoFilter = useCallback(() => {
+    // Update through the same settings namespace as the Page settings dropdown so the keyboard
+    // shortcut and menu never maintain separate copies of the selected filter.
+    saveVideoSettings((current) => ({
+      ...(current ?? {}),
+      colorFilter: nextVideoFilter(current?.colorFilter),
+    }));
+  }, [saveVideoSettings]);
+
   useEffect(() => {
     function handleKeyDown(event) {
       if (isKeyboardCaptureLocked()) return;
@@ -381,6 +407,8 @@ export default function KeyboardInputManager() {
           dockAssist.toggleAssist();
         } else if (newlyPressed.some((token) => keymap.nightVisionToggle?.has(token))) {
           toggleNightVision();
+        } else if (newlyPressed.some((token) => keymap.videoFilterCycle?.has(token))) {
+          cycleVideoFilter();
         } else if (newlyPressed.some((token) => keymap.hornHonk?.has(token))) {
           if (!hornActiveRef.current) {
             const started = startHorn();
@@ -440,7 +468,11 @@ export default function KeyboardInputManager() {
     keymap.dockMacro,
     keymap.driveMacro,
     keymap.hornHonk,
+    keymap.homeAssistantOff,
+    keymap.homeAssistantOn,
     keymap.micPtt,
+    keymap.nightVisionToggle,
+    keymap.videoFilterCycle,
     resetAll,
     runMacro,
     setMicPttActive,
@@ -449,7 +481,9 @@ export default function KeyboardInputManager() {
     stopSongLoop,
     startHorn,
     stopHorn,
+    toggleNightVision,
     triggerHomeAssistantCycle,
+    cycleVideoFilter,
     dockAssist,
   ]);
 

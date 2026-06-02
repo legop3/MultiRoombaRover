@@ -12,10 +12,12 @@ import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../Tabs/index.jsx';
 import SessionSnapshot from '../SessionSnapshot/index.jsx';
 import SocketLogPanel from '../SocketLogPanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
+import KeyPill from '../vip/VipAudioUploadCard/KeyPill.jsx';
 import { useHudMapSetting } from '../../hooks/useHudMapSetting.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { useSocket } from '../../context/SocketContext.jsx';
-import { AUDIO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import { AUDIO_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import { formatKeyLabel } from '../../controls/keymapUtils.js';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -25,9 +27,28 @@ const manualTabs = [
   { key: 'dock', label: 'Dock' },
 ];
 
+const VIDEO_FILTER_OPTIONS = [
+  // "Color" is the pass-through mode users can return to when the scene has usable color.
+  { key: 'none', label: 'Color' },
+  // Grayscale removes the pink IR-contaminated cast while preserving luminance detail.
+  { key: 'grayscale', label: 'Gray' },
+  // Greenscale keeps the same luminance-first idea as grayscale, then tints it green for
+  // users who find green-on-black easier to visually parse in bright outdoor scenes.
+  { key: 'greenscale', label: 'Green' },
+];
+
+function normalizeVideoFilter(value) {
+  // Settings are stored in a browser cookie and can contain stale or hand-edited values.
+  // Falling back here keeps the dropdown and media player predictable instead of rendering
+  // with an unknown mode.
+  return VIDEO_FILTER_OPTIONS.some((option) => option.key === value)
+    ? value
+    : VIDEO_SETTINGS_DEFAULTS.colorFilter;
+}
+
 export default function SettingsPanel() {
   const {
-    state: { roverId },
+    state: { keymap, roverId },
     actions: { sendOiCommand, setSensorStream },
   } = useControlSystem();
   const canControl = Boolean(roverId);
@@ -40,6 +61,7 @@ export default function SettingsPanel() {
     driveMacroBackoffEnabled: true,
   });
   const { value: audioSettings, save: saveAudioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
+  const { value: videoSettings, save: saveVideoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
   const connectionTransport = pageSettings?.connectionTransport || 'websocket';
   const swapMobileControlColumns = Boolean(pageSettings?.swapMobileControlColumns);
   const driveMacroBackoffEnabled =
@@ -58,6 +80,8 @@ export default function SettingsPanel() {
   const mainBrushDuckAmount = Number.isFinite(audioSettings?.mainBrushDuckAmount)
     ? Math.max(0, Math.min(1, audioSettings.mainBrushDuckAmount))
     : AUDIO_SETTINGS_DEFAULTS.mainBrushDuckAmount;
+  const videoColorFilter = normalizeVideoFilter(videoSettings?.colorFilter);
+  const videoFilterCycleKeyLabel = formatKeyLabel(keymap?.videoFilterCycle?.[0]);
 
   const sensorButtons = useMemo(
     () => [
@@ -101,6 +125,18 @@ export default function SettingsPanel() {
     const checked = Boolean(event.target.checked);
     savePageSettings((current) => ({ ...(current ?? {}), driveMacroBackoffEnabled: checked }));
   };
+
+  const handleVideoFilterChange = (event) => {
+    const nextFilter = normalizeVideoFilter(event.target.value);
+
+    // Merge into the current video namespace so future video preferences can coexist with this
+    // filter choice. This follows the same persisted-settings shape used by page/audio options.
+    saveVideoSettings((current) => ({
+      ...(current ?? {}),
+      colorFilter: nextFilter,
+    }));
+  };
+
   return (
     <Tabs defaultTab="keybindings">
       <TabList>
@@ -133,6 +169,34 @@ export default function SettingsPanel() {
                 <span>Show top-down map in HUD (desktop)</span>
               </label>
               <p className="text-xs text-slate-500">Mobile HUD keeps the map on by default.</p>
+            </CardFrame>
+            <CardFrame title="Video" bodyClassName="space-y-0.5 text-sm">
+              {/* The dropdown mirrors the other Page settings controls and writes through the
+                  existing cookie-backed settings provider, so the choice survives reloads without
+                  adding rover-side state. */}
+              <label className="flex items-center justify-between gap-0.5 text-slate-200">
+                <span>Rover video filter</span>
+                <select
+                  value={videoColorFilter}
+                  onChange={handleVideoFilterChange}
+                  className="field-input text-sm"
+                >
+                  {VIDEO_FILTER_OPTIONS.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-xs text-slate-500">
+                {/* Use the live keymap value here instead of hardcoding the default key because
+                    this shortcut is user-configurable in the Keybindings tab. */}
+                <span className="inline-flex flex-wrap items-center gap-0.5">
+                  <span>Use</span>
+                  {videoFilterCycleKeyLabel ? <KeyPill label={videoFilterCycleKeyLabel} /> : null}
+                  <span>to cycle filters. Applies only to rover camera pixels; HUD overlays stay full color.</span>
+                </span>
+              </p>
             </CardFrame>
             <CardFrame title="Mobile controls" bodyClassName="space-y-0.5 text-sm">
               <label className="flex items-center gap-0.5 text-slate-200">

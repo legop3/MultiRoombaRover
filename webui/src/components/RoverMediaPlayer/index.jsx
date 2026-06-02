@@ -5,7 +5,7 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useSettingsNamespace } from '../../settings/index.js';
-import { AUDIO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import { AUDIO_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import {
   RESTART_DELAY_MS,
   UNMUTE_RETRY_MS,
@@ -13,6 +13,27 @@ import {
   BRUSH_CURRENT_THRESHOLD_MA,
   DUCK_RELEASE_FADE_MS,
 } from './constants.js';
+
+const VIDEO_FILTER_STYLES = {
+  // The empty filter keeps the browser's native video presentation untouched when the user
+  // wants normal color or when a rover's camera color is already useful.
+  none: '',
+  // Grayscale is the most reliable way to remove the pink cast from a no-IR-filter camera
+  // because it depends on luminance instead of trying to guess the original scene colors.
+  grayscale: 'grayscale(1) contrast(1.08)',
+  // Greenscale is intentionally implemented as a CSS tint over grayscale rather than canvas
+  // processing. That keeps latency low, works for both <video> and snapshot <img>, and avoids
+  // interfering with WebRTC playback.
+  greenscale: 'grayscale(1) sepia(1) hue-rotate(70deg) saturate(2.2) brightness(0.95) contrast(1.1)',
+};
+
+function normalizeVideoFilter(value) {
+  // Persisted settings may outlive code changes, so every media render validates the stored
+  // value before using it in a style. Unknown values fall back to full color.
+  return Object.prototype.hasOwnProperty.call(VIDEO_FILTER_STYLES, value)
+    ? value
+    : VIDEO_SETTINGS_DEFAULTS.colorFilter;
+}
 
 export default function RoverMediaPlayer({
   roverId = null,
@@ -81,6 +102,16 @@ export default function RoverMediaPlayer({
   const hasDedicatedAudio = Boolean(resolvedAudioSessionInfo?.url);
   const usingSnapshot = videoMode === 'snapshot' || (!videoMode && !resolvedSessionInfo?.url);
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
+  const { value: videoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
+  const videoFilter = normalizeVideoFilter(videoSettings?.colorFilter);
+  const videoFilterStyle = VIDEO_FILTER_STYLES[videoFilter];
+  const mediaStyle = videoFilterStyle
+    ? {
+        // Apply the filter only to the camera pixels. The parent overlays remain unfiltered so
+        // telemetry, chat, and warning text do not lose contrast or inherit the green tint.
+        filter: videoFilterStyle,
+      }
+    : undefined;
   const masterVolume = Number.isFinite(audioSettings?.masterVolume)
     ? audioSettings.masterVolume
     : AUDIO_SETTINGS_DEFAULTS.masterVolume;
@@ -541,6 +572,7 @@ export default function RoverMediaPlayer({
             src={resolvedSnapshotFeed.objectUrl}
             alt={resolvedLabel}
             className="h-full w-full object-contain"
+            style={mediaStyle}
             draggable={false}
           />
         ) : (
@@ -556,6 +588,7 @@ export default function RoverMediaPlayer({
           autoPlay
           controls={false}
           className="h-full w-full object-contain"
+          style={mediaStyle}
         />
       )}
       {showConnectingOverlay ? (
