@@ -5,12 +5,16 @@ import { NUMBER_FORMAT } from './constants.js';
 
 export default function SliderField({ label, description, min, max, step, value, onChange }) {
   return (
-    <label className="block p-0.5">
-      <div className="flex items-center justify-between text-xs text-slate-300">
-        <span className="font-semibold text-slate-100">{label}</span>
-        <span className="font-mono text-slate-400">{NUMBER_FORMAT.format(value)}</span>
+    <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+      {/* The formatted value is kept close to the setting name because calibration usually
+          happens by nudging a slider and watching the number, not by reading the full panel row. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 text-sm text-white">
+        <span className="min-w-0 font-semibold text-white">{label}</span>
+        <span className="rounded bg-neutral-900 px-1 py-0.5 font-mono text-xs text-white">
+          {NUMBER_FORMAT.format(value)}
+        </span>
       </div>
-      {description && <p className="text-[0.65rem] text-slate-500">{description}</p>}
+      {description && <p className="mt-0.5 text-xs leading-snug text-white">{description}</p>}
       <input
         type="range"
         min={min}
@@ -18,7 +22,7 @@ export default function SliderField({ label, description, min, max, step, value,
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-0 w-full accent-emerald-400"
+        className="mt-1 w-full accent-emerald-400"
       />
     </label>
   );

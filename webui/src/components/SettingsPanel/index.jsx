@@ -46,6 +46,50 @@ function normalizeVideoFilter(value) {
     : VIDEO_SETTINGS_DEFAULTS.colorFilter;
 }
 
+function SettingRow({ children, className = '' }) {
+  // Page settings are changed one row at a time, so each row gets a subtle container and a
+  // max width. This keeps the label and control together instead of stretching them across
+  // the full settings pane.
+  return (
+    <label
+      className={`mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm text-white max-[420px]:grid-cols-1 ${className}`}
+    >
+      {children}
+    </label>
+  );
+}
+
+function SettingHelp({ children }) {
+  // Helper text is still secondary, but it no longer uses the very small microcopy scale that
+  // made the settings panel difficult to read from a normal driving distance.
+  return <p className="mx-auto w-full max-w-lg text-xs leading-snug text-white">{children}</p>;
+}
+
+function RangeSetting({ label, value, disabled = false, onChange }) {
+  // Range settings need enough horizontal room for accurate pointer input, so the slider spans
+  // the row while the percentage value stays beside the label for quick feedback.
+  return (
+    <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1 text-sm text-white">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
+        <span className="min-w-0 font-semibold text-white">{label}</span>
+        <span className="rounded bg-neutral-900 px-1 py-0.5 text-xs text-white">
+          {Math.round(value * 100)}%
+        </span>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={value}
+        onChange={onChange}
+        className="mt-1 w-full accent-emerald-500 disabled:opacity-50"
+        disabled={disabled}
+      />
+    </label>
+  );
+}
+
 export default function SettingsPanel() {
   const {
     state: { keymap, roverId },
@@ -157,29 +201,32 @@ export default function SettingsPanel() {
           </div>
         </TabPanel>
         <TabPanel id="page">
-          <div className="space-y-0.5">
-            <CardFrame title="HUD" bodyClassName="space-y-0.5 text-sm">
-              <label className="flex items-center gap-0.5 text-slate-200">
+          {/* Page settings use a responsive card grid so unrelated settings do not form one long,
+              stretched column. Audio spans both columns because volume sliders need extra width
+              for comfortable pointer control. */}
+          <div className="grid gap-1.5 lg:grid-cols-2">
+            <CardFrame title="HUD" bodyClassName="space-y-1 p-1 text-sm">
+              <SettingRow className="grid-cols-[auto_minmax(0,1fr)] max-[420px]:grid-cols-[auto_minmax(0,1fr)]">
                 <input
                   type="checkbox"
-                  className="accent-emerald-500"
+                  className="h-3.5 w-3.5 accent-emerald-500"
                   checked={hudMapDesktop}
                   onChange={(e) => setHudMapDesktop(e.target.checked)}
                 />
-                <span>Show top-down map in HUD (desktop)</span>
-              </label>
-              <p className="text-xs text-slate-500">Mobile HUD keeps the map on by default.</p>
+                <span className="font-semibold text-white">Show top-down map in HUD (desktop)</span>
+              </SettingRow>
+              <SettingHelp>Mobile HUD keeps the map on by default.</SettingHelp>
             </CardFrame>
-            <CardFrame title="Video" bodyClassName="space-y-0.5 text-sm">
+            <CardFrame title="Video" bodyClassName="space-y-1 p-1 text-sm">
               {/* The dropdown mirrors the other Page settings controls and writes through the
                   existing cookie-backed settings provider, so the choice survives reloads without
                   adding rover-side state. */}
-              <label className="flex items-center justify-between gap-0.5 text-slate-200">
-                <span>Rover video filter</span>
+              <SettingRow>
+                <span className="font-semibold text-white">Rover video filter</span>
                 <select
                   value={videoColorFilter}
                   onChange={handleVideoFilterChange}
-                  className="field-input text-sm"
+                  className="field-input min-w-28 px-1 py-0.5 text-sm"
                 >
                   {VIDEO_FILTER_OPTIONS.map((option) => (
                     <option key={option.key} value={option.key}>
@@ -187,127 +234,89 @@ export default function SettingsPanel() {
                     </option>
                   ))}
                 </select>
-              </label>
-              <p className="text-xs text-slate-500">
+              </SettingRow>
+              <SettingHelp>
                 {/* Use the live keymap value here instead of hardcoding the default key because
                     this shortcut is user-configurable in the Keybindings tab. */}
-                <span className="inline-flex flex-wrap items-center gap-0.5">
+                <span className="inline-flex flex-wrap items-center gap-1">
                   <span>Use</span>
                   {videoFilterCycleKeyLabel ? <KeyPill label={videoFilterCycleKeyLabel} /> : null}
                   <span>to cycle filters. Applies only to rover camera pixels; HUD overlays stay full color.</span>
                 </span>
-              </p>
+              </SettingHelp>
             </CardFrame>
-            <CardFrame title="Mobile controls" bodyClassName="space-y-0.5 text-sm">
-              <label className="flex items-center gap-0.5 text-slate-200">
+            <CardFrame title="Mobile controls" bodyClassName="space-y-1 p-1 text-sm">
+              <SettingRow className="grid-cols-[auto_minmax(0,1fr)] max-[420px]:grid-cols-[auto_minmax(0,1fr)]">
                 <input
                   type="checkbox"
-                  className="accent-emerald-500"
+                  className="h-3.5 w-3.5 accent-emerald-500"
                   checked={swapMobileControlColumns}
                   onChange={handleSwapMobileControlColumns}
                 />
-                <span>Swap control columns (put joystick on the left)</span>
-              </label>
+                <span className="font-semibold text-white">Swap control columns (put joystick on the left)</span>
+              </SettingRow>
             </CardFrame>
-            <CardFrame title="Macros" bodyClassName="space-y-0.5 text-sm">
-              <label className="flex items-center gap-0.5 text-slate-200">
+            <CardFrame title="Macros" bodyClassName="space-y-1 p-1 text-sm">
+              <SettingRow className="grid-cols-[auto_minmax(0,1fr)] max-[420px]:grid-cols-[auto_minmax(0,1fr)]">
                 <input
                   type="checkbox"
-                  className="accent-emerald-500"
+                  className="h-3.5 w-3.5 accent-emerald-500"
                   checked={driveMacroBackoffEnabled}
                   onChange={handleDriveMacroBackoffEnabled}
                 />
-                <span>Enable backward bump in drive macro</span>
-              </label>
+                <span className="font-semibold text-white">Enable backward bump in drive macro</span>
+              </SettingRow>
             </CardFrame>
-            <CardFrame title="Audio" bodyClassName="space-y-0.5 text-sm">
-              <label className="grid gap-0.5 text-slate-200">
-                <div className="flex items-center justify-between gap-0.5">
-                  <span>Master volume</span>
-                  <span className="text-xs text-slate-400">{Math.round(masterVolume * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={masterVolume}
-                  onChange={handleAudioRange('masterVolume')}
-                  className="w-full accent-emerald-500"
-                />
-              </label>
-              <label className="grid gap-0.5 text-slate-200">
-                <div className="flex items-center justify-between gap-0.5">
-                  <span>Alert/page sounds</span>
-                  <span className="text-xs text-slate-400">{Math.round(alertVolume * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={alertVolume}
-                  onChange={handleAudioRange('alertVolume')}
-                  className="w-full accent-emerald-500"
-                />
-              </label>
-              <label className="grid gap-0.5 text-slate-200">
-                <div className="flex items-center justify-between gap-0.5">
-                  <span>Rover audio</span>
-                  <span className="text-xs text-slate-400">{Math.round(roverVolume * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={roverVolume}
-                  onChange={handleAudioRange('roverVolume')}
-                  className="w-full accent-emerald-500"
-                />
-              </label>
-              <label className="flex items-center justify-between gap-0.5 text-slate-200">
-                <span>Main brush ducking</span>
+            <CardFrame title="Audio" className="lg:col-span-2" bodyClassName="space-y-1 p-1 text-sm">
+              {/* Audio sliders are stacked inside the wider card so the value chip, label, and
+                  slider remain easy to compare while preserving enough drag distance. */}
+              <RangeSetting
+                label="Master volume"
+                value={masterVolume}
+                onChange={handleAudioRange('masterVolume')}
+              />
+              <RangeSetting
+                label="Alert/page sounds"
+                value={alertVolume}
+                onChange={handleAudioRange('alertVolume')}
+              />
+              <RangeSetting
+                label="Rover audio"
+                value={roverVolume}
+                onChange={handleAudioRange('roverVolume')}
+              />
+              <SettingRow>
+                <span className="font-semibold text-white">Main brush ducking</span>
                 <input
                   type="checkbox"
-                  className="accent-emerald-500"
+                  className="h-3.5 w-3.5 accent-emerald-500"
                   checked={mainBrushDuckEnabled}
                   onChange={handleMainBrushDuckEnabled}
                 />
-              </label>
-              <label className="grid gap-0.5 text-slate-200">
-                <div className="flex items-center justify-between gap-0.5">
-                  <span>Main brush duck amount</span>
-                  <span className="text-xs text-slate-400">{Math.round(mainBrushDuckAmount * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={mainBrushDuckAmount}
-                  onChange={handleAudioRange('mainBrushDuckAmount')}
-                  className="w-full accent-emerald-500"
-                  disabled={!mainBrushDuckEnabled}
-                />
-              </label>
-              <p className="text-xs text-slate-500">
+              </SettingRow>
+              <RangeSetting
+                label="Main brush duck amount"
+                value={mainBrushDuckAmount}
+                onChange={handleAudioRange('mainBrushDuckAmount')}
+                disabled={!mainBrushDuckEnabled}
+              />
+              <SettingHelp>
                 Lowers rover audio only while the main brush is running.
-              </p>
+              </SettingHelp>
             </CardFrame>
-            <CardFrame title="Connection" bodyClassName="space-y-0.5 text-sm">
-              <label className="flex items-center justify-between gap-0.5 text-slate-200">
-                <span>Transport</span>
+            <CardFrame title="Connection" bodyClassName="space-y-1 p-1 text-sm">
+              <SettingRow>
+                <span className="font-semibold text-white">Transport</span>
                 <select
                   value={connectionTransport}
                   onChange={handleTransportChange}
-                  className="field-input text-sm"
+                  className="field-input min-w-28 px-1 py-0.5 text-sm"
                 >
                   <option value="websocket">WebSocket</option>
                   <option value="polling">Polling</option>
                 </select>
-              </label>
-              <p className="text-xs text-slate-500">Switching reconnects your session.</p>
+              </SettingRow>
+              <SettingHelp>Switching reconnects your session.</SettingHelp>
             </CardFrame>
           </div>
         </TabPanel>

@@ -20,6 +20,85 @@ import {
   buildDescriptorFromCapture,
 } from './helpers.js';
 
+function SettingsGroupLabel({ children }) {
+  // Section labels stay visually modest so this panel matches the rest of the app, while white
+  // text keeps them readable without uppercase or oversized type.
+  return <p className="mx-auto w-full max-w-lg text-sm font-semibold text-white">{children}</p>;
+}
+
+function MappingRow({
+  action,
+  source,
+  isCapturing,
+  onClear,
+  onCapture,
+  onInvert,
+}) {
+  // Mapping rows are constrained to a readable width so the source text and buttons remain
+  // visually connected. Buttons wrap on very narrow panes instead of forcing tiny text.
+  return (
+    <div className="mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm max-[520px]:grid-cols-1">
+      <div className="min-w-0">
+        <p className="font-semibold leading-snug text-white">{action.label}</p>
+        <p className="mt-0.5 text-xs leading-snug text-white">{formatSource(source)}</p>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-1 max-[520px]:justify-start">
+        {/* Axis-pair controls expose independent inversion because stick X/Y directions often
+            differ between browser mappings. Keeping those buttons beside the source avoids
+            making users hunt across a wide row while testing a binding. */}
+        {action.kind === 'axisPair' && (
+          <>
+            <button
+              type="button"
+              disabled={!source}
+              onClick={() => onInvert(action, 'invertX')}
+              className="button-dark px-1 py-0.5 text-xs font-medium disabled:opacity-50"
+            >
+              Invert X
+            </button>
+            <button
+              type="button"
+              disabled={!source}
+              onClick={() => onInvert(action, 'invertY')}
+              className="button-dark px-1 py-0.5 text-xs font-medium disabled:opacity-50"
+            >
+              Invert Y
+            </button>
+          </>
+        )}
+        {/* Single-axis mappings only have one inversion flag, so they render the smaller control
+            set and keep button clutter down for trigger-like bindings. */}
+        {action.kind === 'axis' && (
+          <button
+            type="button"
+            disabled={!source}
+            onClick={() => onInvert(action)}
+            className="button-dark px-1 py-0.5 text-xs font-medium disabled:opacity-50"
+          >
+            Invert
+          </button>
+        )}
+        {/* Clear and Capture are always present because they are the primary row actions. They
+            wrap with the inversion controls on narrow panes instead of shrinking text. */}
+        <button type="button" onClick={() => onClear(action)} className="button-dark px-1 py-0.5 text-xs">
+          Clear
+        </button>
+        <button
+          type="button"
+          onClick={() => onCapture(action)}
+          className={`${
+            isCapturing
+              ? 'rounded-md bg-emerald-500 px-1 py-0.5 text-emerald-950 hover:bg-emerald-400'
+              : 'button-dark px-1 py-0.5'
+          } text-xs font-medium`}
+        >
+          {isCapturing ? 'Waiting...' : 'Capture'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function GamepadMappingSettings() {
   const hubState = useGamepadHubState();
   const { value: gamepadSettings, save: saveGamepadSettings } = useSettingsNamespace(
@@ -226,22 +305,24 @@ export default function GamepadMappingSettings() {
     <CardFrame
       title="Controller"
       meta={activePad ? 'Move sticks or press buttons to bind' : 'Connect a controller to configure.'}
-      bodyClassName="space-y-0.5 text-sm"
+      bodyClassName="space-y-2 p-1 text-sm"
     >
       {captureAction && (
-        <p className="mt-0 text-[0.7rem] text-emerald-400">Capturing {captureAction.label}…</p>
+        <p className="mx-auto w-full max-w-lg rounded bg-emerald-950/50 px-1.5 py-1 text-sm text-white">
+          Capturing {captureAction.label}...
+        </p>
       )}
 
-      <div className="space-y-0.5">
-        <p className="text-[0.7rem] text-slate-500">Connected controller</p>
+      <div className="space-y-1">
+        <SettingsGroupLabel>Connected controller</SettingsGroupLabel>
         {hubState.pads.length === 0 ? (
-          <p className="text-[0.7rem] text-slate-400">No controller detected.</p>
+          <p className="mx-auto w-full max-w-lg text-sm text-white">No controller detected.</p>
         ) : (
-          <div className="flex items-center justify-between gap-0.5 text-xs">
+          <div className="mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm max-[420px]:grid-cols-1">
             <select
               value={activeSignature ?? ''}
               onChange={(event) => setActiveSignature(event.target.value)}
-              className="flex-1 rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-[0.75rem] text-slate-100"
+              className="min-w-0 rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
             >
               {hubState.pads.map((pad) => (
                 <option key={pad.signature} value={pad.signature}>
@@ -249,14 +330,18 @@ export default function GamepadMappingSettings() {
                 </option>
               ))}
             </select>
-            <span className="text-[0.7rem] text-slate-400">{activePad?.mapping ?? 'unknown'}</span>
+            <span className="rounded bg-neutral-900 px-1 py-0.5 text-xs text-white">
+              {activePad?.mapping ?? 'unknown'}
+            </span>
           </div>
         )}
       </div>
 
-      <div className="space-y-0.5">
-        <p className="text-[0.7rem] text-slate-500">Calibration</p>
-        <div className="space-y-0.5">
+      <div className="space-y-1">
+        <SettingsGroupLabel>Calibration</SettingsGroupLabel>
+        {/* Calibration controls stay in one stacked column because range inputs become harder to
+            tune when squeezed into multiple narrow columns. */}
+        <div className="grid gap-1">
           <SliderField
             label="Drive deadzone"
             description="Ignore small drive stick drift"
@@ -293,19 +378,21 @@ export default function GamepadMappingSettings() {
             value={activeProfile.calibration?.auxSideScale ?? 0.55}
             onChange={(value) => updateCalibration({ auxSideScale: value })}
           />
-          <label className="block p-0.5">
-            <div className="flex items-center justify-between text-xs text-slate-300">
-              <span className="font-semibold text-slate-100">Camera mode</span>
+          <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+            {/* Camera mode is styled like the sliders so calibration controls read as one group
+                even though this specific setting is a select instead of a range input. */}
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 text-sm text-white">
+              <span className="min-w-0 font-semibold text-white">Camera mode</span>
               <select
                 value={activeProfile.calibration?.cameraMode ?? 'absolute'}
                 onChange={(event) => updateCalibration({ cameraMode: event.target.value })}
-                className="rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-[0.75rem] text-slate-100"
+                className="rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
               >
                 <option value="absolute">Absolute</option>
                 <option value="velocity">Velocity</option>
               </select>
             </div>
-            <p className="text-[0.65rem] text-slate-500">Absolute maps stick to angle; velocity moves over time.</p>
+            <p className="mt-0.5 text-xs leading-snug text-white">Absolute maps stick to angle; velocity moves over time.</p>
           </label>
           <SliderField
             label="Camera sensitivity"
@@ -319,67 +406,26 @@ export default function GamepadMappingSettings() {
         </div>
       </div>
 
-      <div className="space-y-0.5">
+      <div className="space-y-2">
         {Object.entries(grouped).map(([section, actions]) => (
-          <div key={section} className="space-y-0.5">
-            <p className="text-[0.7rem] text-slate-500">{section}</p>
-            <div className="space-y-0.5">
+          <div key={section} className="space-y-1">
+            <SettingsGroupLabel>{section}</SettingsGroupLabel>
+            <div className="grid gap-1">
               {actions.map((action) => {
                 const binding = activeProfile.bindings?.[action.id];
                 const source = binding?.sources?.[0] ?? null;
+                // The binding data is unchanged; MappingRow only changes presentation so the
+                // existing capture, clear, and invert handlers continue to own behavior.
                 return (
-                  <div key={action.id} className="flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-semibold text-slate-100">{action.label}</p>
-                      <p className="text-[0.65rem] text-slate-400">{formatSource(source)}</p>
-                    </div>
-                    <div className="flex items-center gap-0.5">
-                      {action.kind === 'axisPair' && (
-                        <>
-                          <button
-                            type="button"
-                            disabled={!source}
-                            onClick={() => handleInvert(action, 'invertX')}
-                            className="button-dark text-[0.7rem] font-medium disabled:opacity-50"
-                          >
-                            Invert X
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!source}
-                            onClick={() => handleInvert(action, 'invertY')}
-                            className="button-dark text-[0.7rem] font-medium disabled:opacity-50"
-                          >
-                            Invert Y
-                          </button>
-                        </>
-                      )}
-                      {action.kind === 'axis' && (
-                        <button
-                          type="button"
-                          disabled={!source}
-                          onClick={() => handleInvert(action)}
-                          className="button-dark text-[0.7rem] font-medium disabled:opacity-50"
-                        >
-                          Invert
-                        </button>
-                      )}
-                      <button type="button" onClick={() => handleClear(action)} className="button-dark text-[0.7rem]">
-                        Clear
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCaptureAction(action)}
-                        className={`${
-                          captureAction?.id === action.id
-                            ? 'px-0.5 py-0.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400'
-                            : 'button-dark'
-                        } text-[0.7rem] font-medium`}
-                      >
-                        {captureAction?.id === action.id ? 'Waiting…' : 'Capture'}
-                      </button>
-                    </div>
-                  </div>
+                  <MappingRow
+                    key={action.id}
+                    action={action}
+                    source={source}
+                    isCapturing={captureAction?.id === action.id}
+                    onClear={handleClear}
+                    onCapture={setCaptureAction}
+                    onInvert={handleInvert}
+                  />
                 );
               })}
             </div>
@@ -387,43 +433,43 @@ export default function GamepadMappingSettings() {
         ))}
       </div>
 
-      <div className="space-y-0.5">
-        <p className="text-[0.7rem] text-slate-500">Diagnostics</p>
+      <div className="space-y-1">
+        <SettingsGroupLabel>Diagnostics</SettingsGroupLabel>
         {!activePad ? (
-          <p className="text-[0.7rem] text-slate-400">No controller detected.</p>
+          <p className="mx-auto w-full max-w-lg text-sm text-white">No controller detected.</p>
         ) : (
-          <div className="space-y-0.5 text-[0.7rem] text-slate-300">
-            <p className="text-slate-400">Raw axes</p>
-            <div className="grid grid-cols-2 gap-0.5">
+          <div className="mx-auto w-full max-w-lg space-y-1 rounded bg-neutral-900/70 px-1.5 py-1 text-xs text-white">
+            <p className="text-white">Raw axes</p>
+            <div className="grid grid-cols-2 gap-1">
               {activePad.axes.map((value, index) => (
-                <span key={`axis-${index}`} className="font-mono text-slate-300">
+                <span key={`axis-${index}`} className="font-mono text-white">
                   A{index}: {NUMBER_FORMAT.format(value)}
                 </span>
               ))}
             </div>
-            <p className="text-slate-400">Raw buttons</p>
-            <div className="grid grid-cols-2 gap-0.5">
+            <p className="text-white">Raw buttons</p>
+            <div className="grid grid-cols-2 gap-1">
               {activePad.buttons.map((btn, index) => (
-                <span key={`btn-${index}`} className="font-mono text-slate-300">
+                <span key={`btn-${index}`} className="font-mono text-white">
                   B{index}: {NUMBER_FORMAT.format(btn.value)} {btn.pressed ? '●' : ''}
                 </span>
               ))}
             </div>
             {diagnostics?.outputs && (
               <>
-                <p className="text-slate-400">Mapped outputs</p>
-                <div className="grid grid-cols-2 gap-0.5">
-                  <span className="font-mono text-slate-300">
+                <p className="text-white">Mapped outputs</p>
+                <div className="grid grid-cols-2 gap-1">
+                  <span className="font-mono text-white">
                     Drive: {NUMBER_FORMAT.format(diagnostics.outputs.driveVector.x)},{' '}
                     {NUMBER_FORMAT.format(diagnostics.outputs.driveVector.y)}
                   </span>
-                  <span className="font-mono text-slate-300">
+                  <span className="font-mono text-white">
                     Camera: {NUMBER_FORMAT.format(diagnostics.outputs.cameraAxis)}
                   </span>
-                  <span className="font-mono text-slate-300">
+                  <span className="font-mono text-white">
                     Main: {NUMBER_FORMAT.format(diagnostics.outputs.auxAxis.main)}
                   </span>
-                  <span className="font-mono text-slate-300">
+                  <span className="font-mono text-white">
                     Side: {NUMBER_FORMAT.format(diagnostics.outputs.auxAxis.side)}
                   </span>
                 </div>

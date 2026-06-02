@@ -118,22 +118,31 @@ function useKeyCapture(onCapture) {
   return { active, startCapture, cancel, captureFromEvent };
 }
 
+function SettingsGroupLabel({ children }) {
+  // Group labels stay at the app's normal small-panel scale, but use white text so they are
+  // readable without resorting to oversized type or all-caps styling.
+  return <p className="mx-auto w-full max-w-lg text-sm font-semibold text-white">{children}</p>;
+}
+
 function SpeedField({ label, description, value, onChange, min = 0, max = 500, step = 5 }) {
   return (
-    <label className="block p-0.5">
-      <div className="flex items-center justify-between text-xs text-slate-300">
-        <span className="font-semibold text-slate-100">{label}</span>
+    <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+      {/* The value field sits beside the label because users tune these settings by comparing
+          the name and the numeric value together. Keeping them in one row prevents the number
+          input from drifting across a wide settings panel. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_4.75rem] items-start gap-1.5 text-sm text-white">
+        <span className="min-w-0 font-semibold text-white">{label}</span>
         <input
           type="number"
           min={min}
           max={max}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="w-16 rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.75rem] font-mono text-slate-100"
+          className="w-full rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-right text-xs font-mono text-white"
         />
       </div>
-      {description && <p className="text-[0.65rem] text-slate-500">{description}</p>}
-      <div className="mt-0 flex items-center gap-0.5">
+      {description && <p className="mt-0.5 text-xs leading-snug text-white">{description}</p>}
+      <div className="mt-1 flex items-center gap-1.5">
         <input
           type="range"
           min={min}
@@ -141,11 +150,43 @@ function SpeedField({ label, description, value, onChange, min = 0, max = 500, s
           step={step}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-2 flex-1 accent-emerald-400"
+          className="h-2 min-w-0 flex-1 accent-emerald-400"
         />
-        <span className="w-12 text-right text-[0.75rem] font-mono text-slate-400">{value}</span>
+        <span className="w-10 text-right text-xs font-mono text-white">{value}</span>
       </div>
     </label>
+  );
+}
+
+function BindingRow({ action, value, isActive, onCaptureStart, onCancel, onCaptureKeyDown }) {
+  // Binding rows are intentionally constrained and boxed: the action name, current key, and
+  // change button are one interaction unit, so proximity matters more than stretching to fill
+  // every available pixel in the surrounding sidebar.
+  return (
+    <div className="mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm max-[420px]:grid-cols-1">
+      <div className="min-w-0">
+        <p className="font-semibold leading-snug text-white">{action.label}</p>
+        <p className="mt-0.5 text-xs leading-snug text-white">{formatKeyLabel(value)}</p>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-1 max-[420px]:justify-start">
+        {/* The cancel button only appears during capture so the normal row stays compact, while
+            the active row still gives users an obvious way out if they clicked Change by mistake. */}
+        {isActive && (
+          <button type="button" onClick={onCancel} className="button-danger px-1 py-0.5 text-xs">
+            Cancel
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onCaptureStart}
+          onKeyDown={isActive ? onCaptureKeyDown : undefined}
+          autoFocus={isActive}
+          className={`${isActive ? 'rounded-md bg-emerald-500 px-1 py-0.5 text-emerald-950 hover:bg-emerald-400' : 'button-dark px-1 py-0.5'} text-xs font-medium transition-colors`}
+        >
+          {isActive ? 'Press a key...' : 'Change'}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -218,15 +259,17 @@ export default function KeymapSettings() {
       title="Keyboard layout"
       meta="Per-browser · click to change a binding"
       actions={
-        <button type="button" onClick={() => resetKeyBindings()} className="button-dark text-xs">
+        <button type="button" onClick={() => resetKeyBindings()} className="button-dark px-1 py-0.5 text-xs">
           Reset defaults
         </button>
       }
-      bodyClassName="space-y-0.5 text-sm"
+      bodyClassName="space-y-2 p-1 text-sm"
     >
-      <div className="space-y-0.5">
-        <p className="text-[0.7rem] text-slate-500">Keyboard speeds</p>
-        <div className="space-y-0.5">
+      <div className="space-y-1">
+        <SettingsGroupLabel>Keyboard speeds</SettingsGroupLabel>
+        {/* Speed controls remain stacked instead of becoming two columns because each slider
+            needs enough width for fine adjustment and a nearby number input. */}
+        <div className="grid gap-1">
           <SpeedField
             label="Base speed"
             description="Normal driving speed"
@@ -247,8 +290,8 @@ export default function KeymapSettings() {
           />
         </div>
       </div>
-      <div className="space-y-0.5">
-        <p className="text-[0.7rem] text-slate-500">Camera tilt</p>
+      <div className="space-y-1">
+        <SettingsGroupLabel>Camera tilt</SettingsGroupLabel>
         <SpeedField
           label="Tilt speed"
           description="Higher = faster when holding tilt keys"
@@ -259,37 +302,26 @@ export default function KeymapSettings() {
           step={1}
         />
       </div>
-      <div className="space-y-0.5">
+      <div className="space-y-2">
         {Object.entries(grouped).map(([group, actions]) => (
-          <div key={group} className="space-y-0.5">
-            <p className="text-[0.75rem] text-slate-400">{group}</p>
-            <div className="space-y-0.5">
+          <div key={group} className="space-y-1">
+            <SettingsGroupLabel>{group}</SettingsGroupLabel>
+            <div className="grid gap-1">
               {actions.map((action) => {
                 const value = currentKey(action.id);
                 const isActive = active === action.id;
+                // Each action keeps the same capture behavior as before; only the row chrome
+                // changes so the current binding and Change button stay visually connected.
                 return (
-                  <div key={action.id} className="flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-semibold text-slate-100">{action.label}</p>
-                      <p className="text-[0.65rem] text-slate-400">{formatKeyLabel(value)}</p>
-                    </div>
-                    <div className="flex items-center gap-0.5">
-                      {isActive && (
-                        <button type="button" onClick={() => cancel()} className="button-danger text-[0.7rem]">
-                          Cancel
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => startCapture(action.id)}
-                        onKeyDown={isActive ? (event) => captureFromEvent(action.id, event) : undefined}
-                        autoFocus={isActive}
-                        className={`${isActive ? 'px-0.5 py-0.5 bg-emerald-500 text-emerald-950 hover:bg-emerald-400' : 'button-dark'} text-[0.7rem] font-medium transition-colors`}
-                      >
-                        {isActive ? 'Press a key…' : 'Change'}
-                      </button>
-                    </div>
-                  </div>
+                  <BindingRow
+                    key={action.id}
+                    action={action}
+                    value={value}
+                    isActive={isActive}
+                    onCancel={() => cancel()}
+                    onCaptureStart={() => startCapture(action.id)}
+                    onCaptureKeyDown={(event) => captureFromEvent(action.id, event)}
+                  />
                 );
               })}
             </div>
