@@ -121,15 +121,15 @@ export function ChatIdentity({ message, toolsToggle = null }) {
 
 function chatRowClass(message) {
   if (isBotMessage(message)) {
-    return 'surface-muted flex flex-col gap-0.5 border border-emerald-500/40 bg-emerald-900/15 text-sm';
+    return 'flex flex-col gap-0.5 rounded-md border border-emerald-500/40 bg-emerald-950 px-0.5 py-0.5 text-sm text-neutral-100';
   }
   const isAdmin =
     message.role === 'admin' || message.role === 'lockdown' || message.role === 'lockdown-admin';
-  return `surface-muted flex flex-col gap-0.5 text-sm ${
+  return `flex flex-col gap-0.5 rounded-md bg-neutral-800 px-0.5 py-0.5 text-sm text-neutral-100 ${
     isAdmin
       ? 'border border-amber-400/30'
       : message.fromDiscord
-        ? 'border border-indigo-400/30 bg-indigo-900/20'
+        ? 'border border-indigo-400/30 bg-indigo-950'
         : ''
   }`;
 }

@@ -65,7 +65,7 @@ function TopDownMapContent({ sensors = {}, variant = 'full', size: overrideSize,
 
   return (
     <div
-      className={`${overlay ? 'relative' : 'surface relative p-1'}`}
+      className={`${overlay ? 'relative' : 'relative p-1'}`}
       style={overlay ? { width: `${size}px`, height: `${size}px` } : { height: '100%', width: '100%', aspectRatio: '1 / 1' }}
     >
       <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} preserveAspectRatio="xMidYMid meet" className="mx-auto block">

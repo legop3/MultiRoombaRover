@@ -70,7 +70,7 @@ export default function RawUserPilePanel({
         <div className="space-y-0.5">
           <div className="grid gap-0.5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <div className="min-w-0">
-              <div className="surface flex w-full items-center px-0 py-0">
+              <div className="flex w-full items-center px-0 py-0">
                 <NicknameForm compact={compact} />
               </div>
             </div>
@@ -82,7 +82,7 @@ export default function RawUserPilePanel({
 
       <div className={`space-y-0.5 ${fillHeight ? 'flex flex-1 min-h-0 flex-col' : ''}`}>
         <div
-          className={`surface flex flex-wrap content-start items-start gap-0.5 px-0 pb-0 ${baseListClass} ${compact ? 'text-[0.8rem]' : ''}`}
+          className={`flex flex-wrap content-start items-start gap-0.5 px-0 pb-0 ${baseListClass} ${compact ? 'text-[0.8rem]' : ''}`}
         >
           {sorted.length === 0 ? (
             <p className="text-sm text-slate-500">Waiting for users…</p>
@@ -90,7 +90,7 @@ export default function RawUserPilePanel({
             sorted.map((user) => (
               <span
                 key={user.socketId}
-                className={`rounded bg-slate-800/80 px-1 py-0.25 text-[0.7rem] ${roleColors(user.role)}`}
+                className={`rounded px-1 py-0.25 text-[0.7rem] ${roleColors(user.role)}`}
               >
                 {formatLabel(user, selfId)}
               </span>

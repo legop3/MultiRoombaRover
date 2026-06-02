@@ -3,9 +3,10 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useState } from 'react';
 import { useSessionActions } from '../../context/SessionContext.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 
 export default function AuthPanel() {
-  const { login, setRole } = useSessionActions();
+  const { login } = useSessionActions();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,8 +26,7 @@ export default function AuthPanel() {
   }
 
   return (
-    <div className="panel-section space-y-0.5 text-base">
-      <p className="text-sm text-slate-400">Admin login</p>
+    <CardFrame title="Admin login" bodyClassName="space-y-0.5 text-base">
       <form className="flex flex-col gap-0.5" onSubmit={handleLogin}>
         <input
           className="field-input"
@@ -53,6 +53,6 @@ export default function AuthPanel() {
           Spectator
         </button>
       </div> */}
-    </div>
+    </CardFrame>
   );
 }

@@ -53,14 +53,14 @@ export default function CardFrame({
   const cardStyle = accentRgb ? { borderColor: rgba(accentRgb, 0.35) } : undefined;
   const headerStyle = accentRgb
     ? {
-        backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 58%, ${rgba(accentRgb, 0.18)} 100%)`,
+        backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 30%, ${rgba(accentRgb, 0.28)} 100%)`,
       }
     : undefined;
 
   return (
     <section
       className={cx(
-        'panel-section border border-neutral-500/60 bg-neutral-900/95',
+        'panel-section border-2 border-neutral-500/60 bg-neutral-900/95',
         clipOverflow ? 'overflow-hidden' : 'overflow-visible',
         fillHeight && 'flex h-full min-h-0 flex-col',
         className,

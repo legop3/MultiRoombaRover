@@ -76,10 +76,15 @@ function DriveDockPanel() {
   const cameraDisabled = Boolean(!roverId || dockAssist.cameraLocked);
 
   return (
-    <section className={`panel-section grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] ${themeGapClass}`}>
+    <CardFrame
+      hideHeader
+      
+      className="h-full"
+      bodyClassName={`grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] ${themeGapClass}`}
+    >
       <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
       {!hideInlineControls ? (
-        <div className={`surface ${themeStackClass} p-0 text-sm text-slate-200`}>
+        <div className={`${themeStackClass} p-0 text-sm text-slate-200`}>
           {nightVisionAvailable && (
             <NightVisionControl
               nightVisionOn={nightVisionState?.nightVisionOn}
@@ -108,18 +113,18 @@ function DriveDockPanel() {
               onChange={setServoAngle}
               keyDownLabel={downLabel}
               keyUpLabel={upLabel}
-              className={`${themeStackClass} px-1 py-1`}
-              labelRowClass="text-xs text-slate-300"
-              labelClass=""
+              className={`${themeStackClass} rounded-xl border-2 border-emerald-300/70 bg-emerald-900 px-1 py-1 text-emerald-50`}
+              labelRowClass="text-xs text-emerald-100"
+              labelClass="text-sm font-semibold"
               valueClass="font-mono text-slate-100"
               sliderClass="w-full"
               accentClass="accent-emerald-400"
-              endpointClass="text-[0.7rem] text-slate-400"
+              endpointClass="text-[0.7rem] text-emerald-100/80"
             />
           )}
         </div>
       ) : null}
-    </section>
+    </CardFrame>
   );
 }
 

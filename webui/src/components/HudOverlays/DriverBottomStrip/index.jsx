@@ -23,7 +23,7 @@ export default function DriverBottomStrip({ roverId = null, mobileHud = false })
   return (
     <div className="space-y-0.5">
       <LightBumpBars roverId={effectiveRoverId} />
-      <div className="panel-section space-y-0.5 text-sm">
+      <div className="space-y-0.5 text-sm">
         <BatteryBar visual={batteryVisual} compact={mobileHud} />
       </div>
     </div>

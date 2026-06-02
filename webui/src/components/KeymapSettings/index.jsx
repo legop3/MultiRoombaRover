@@ -8,6 +8,7 @@ import { canonicalizeKeyInput, formatKeyLabel } from '../../controls/keymapUtils
 import { setKeyboardCaptureLocked } from '../../controls/inputs/keyboardCaptureLock.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import CardFrame from '../CardFrame/index.jsx';
 
 const KEY_ACTIONS = [
   { id: 'driveForward', label: 'Drive Forward', group: 'Driving' },
@@ -118,7 +119,7 @@ function useKeyCapture(onCapture) {
 
 function SpeedField({ label, description, value, onChange, min = 0, max = 500, step = 5 }) {
   return (
-    <label className="surface-muted block p-0.5">
+    <label className="block p-0.5">
       <div className="flex items-center justify-between text-xs text-slate-300">
         <span className="font-semibold text-slate-100">{label}</span>
         <input
@@ -212,17 +213,17 @@ export default function KeymapSettings() {
   );
 
   return (
-    <section className="panel-section space-y-0.5 text-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-slate-400">Keyboard layout</p>
-          <p className="text-[0.7rem] text-slate-500">Per-browser · click to change a binding</p>
-        </div>
+    <CardFrame
+      title="Keyboard layout"
+      meta="Per-browser · click to change a binding"
+      actions={
         <button type="button" onClick={() => resetKeyBindings()} className="button-dark text-xs">
           Reset defaults
         </button>
-      </div>
-      <div className="space-y-0.5 surface">
+      }
+      bodyClassName="space-y-0.5 text-sm"
+    >
+      <div className="space-y-0.5">
         <p className="text-[0.7rem] text-slate-500">Keyboard speeds</p>
         <div className="space-y-0.5">
           <SpeedField
@@ -245,7 +246,7 @@ export default function KeymapSettings() {
           />
         </div>
       </div>
-      <div className="space-y-0.5 surface">
+      <div className="space-y-0.5">
         <p className="text-[0.7rem] text-slate-500">Camera tilt</p>
         <SpeedField
           label="Tilt speed"
@@ -259,14 +260,14 @@ export default function KeymapSettings() {
       </div>
       <div className="space-y-0.5">
         {Object.entries(grouped).map(([group, actions]) => (
-          <div key={group} className="space-y-0.5 surface">
+          <div key={group} className="space-y-0.5">
             <p className="text-[0.75rem] text-slate-400">{group}</p>
             <div className="space-y-0.5">
               {actions.map((action) => {
                 const value = currentKey(action.id);
                 const isActive = active === action.id;
                 return (
-                  <div key={action.id} className="surface-muted flex items-center justify-between text-xs">
+                  <div key={action.id} className="flex items-center justify-between text-xs">
                     <div>
                       <p className="font-semibold text-slate-100">{action.label}</p>
                       <p className="text-[0.65rem] text-slate-400">{formatKeyLabel(value)}</p>
@@ -294,6 +295,6 @@ export default function KeymapSettings() {
           </div>
         ))}
       </div>
-    </section>
+    </CardFrame>
   );
 }

@@ -104,8 +104,8 @@ function EntityRow({ entity, connected, controlsLocked, onToggle, onSetColor, on
     : controlsLocked
     ? 'border-slate-800 bg-slate-900 text-slate-300 cursor-not-allowed'
     : isOn
-    ? 'border-emerald-700 bg-emerald-900/80 text-emerald-50 hover:bg-emerald-800'
-    : 'border-rose-800 bg-rose-900/80 text-rose-50 hover:bg-rose-800';
+    ? 'border-emerald-700 bg-emerald-900 text-emerald-50 hover:bg-emerald-800'
+    : 'border-rose-800 bg-rose-900 text-rose-50 hover:bg-rose-800';
 
   useEffect(() => {
     if (!supportsColor || draggingRef.current) return;

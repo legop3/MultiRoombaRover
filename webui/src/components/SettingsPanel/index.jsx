@@ -11,6 +11,7 @@ import OvercurrentLimiterPanel from '../OvercurrentLimiterPanel/index.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../Tabs/index.jsx';
 import SessionSnapshot from '../SessionSnapshot/index.jsx';
 import SocketLogPanel from '../SocketLogPanel/index.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 import { useHudMapSetting } from '../../hooks/useHudMapSetting.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { useSocket } from '../../context/SocketContext.jsx';
@@ -121,8 +122,7 @@ export default function SettingsPanel() {
         </TabPanel>
         <TabPanel id="page">
           <div className="space-y-0.5">
-            <section className="panel-section space-y-0.5 text-sm">
-              <p className="text-slate-400">HUD</p>
+            <CardFrame title="HUD" bodyClassName="space-y-0.5 text-sm">
               <label className="flex items-center gap-0.5 text-slate-200">
                 <input
                   type="checkbox"
@@ -133,9 +133,8 @@ export default function SettingsPanel() {
                 <span>Show top-down map in HUD (desktop)</span>
               </label>
               <p className="text-xs text-slate-500">Mobile HUD keeps the map on by default.</p>
-            </section>
-            <section className="panel-section space-y-0.5 text-sm">
-              <p className="text-slate-400">Mobile controls</p>
+            </CardFrame>
+            <CardFrame title="Mobile controls" bodyClassName="space-y-0.5 text-sm">
               <label className="flex items-center gap-0.5 text-slate-200">
                 <input
                   type="checkbox"
@@ -145,9 +144,8 @@ export default function SettingsPanel() {
                 />
                 <span>Swap control columns (put joystick on the left)</span>
               </label>
-            </section>
-            <section className="panel-section space-y-0.5 text-sm">
-              <p className="text-slate-400">Macros</p>
+            </CardFrame>
+            <CardFrame title="Macros" bodyClassName="space-y-0.5 text-sm">
               <label className="flex items-center gap-0.5 text-slate-200">
                 <input
                   type="checkbox"
@@ -157,9 +155,8 @@ export default function SettingsPanel() {
                 />
                 <span>Enable backward bump in drive macro</span>
               </label>
-            </section>
-            <section className="panel-section space-y-0.5 text-sm">
-              <p className="text-slate-400">Audio</p>
+            </CardFrame>
+            <CardFrame title="Audio" bodyClassName="space-y-0.5 text-sm">
               <label className="grid gap-0.5 text-slate-200">
                 <div className="flex items-center justify-between gap-0.5">
                   <span>Master volume</span>
@@ -233,9 +230,8 @@ export default function SettingsPanel() {
               <p className="text-xs text-slate-500">
                 Lowers rover audio only while the main brush is running.
               </p>
-            </section>
-            <section className="panel-section space-y-0.5 text-sm">
-              <p className="text-slate-400">Connection</p>
+            </CardFrame>
+            <CardFrame title="Connection" bodyClassName="space-y-0.5 text-sm">
               <label className="flex items-center justify-between gap-0.5 text-slate-200">
                 <span>Transport</span>
                 <select
@@ -248,14 +244,13 @@ export default function SettingsPanel() {
                 </select>
               </label>
               <p className="text-xs text-slate-500">Switching reconnects your session.</p>
-            </section>
+            </CardFrame>
           </div>
         </TabPanel>
         <TabPanel id="admin">
           <div className="space-y-0.5">
-            <section className="panel-section space-y-0.5 text-sm">
-              <p className="text-slate-400">Manual OI commands</p>
-              <div className="surface flex flex-wrap gap-0.5">
+            <CardFrame title="Manual OI commands" bodyClassName="space-y-0.5 text-sm">
+              <div className="flex flex-wrap gap-0.5">
                 {manualTabs.map((tab) => (
                   <button
                     key={tab.key}
@@ -268,10 +263,9 @@ export default function SettingsPanel() {
                   </button>
                 ))}
               </div>
-            </section>
-            <section className="panel-section space-y-0.5 text-sm">
-              <p className="text-slate-400">Sensor stream</p>
-              <div className="surface flex gap-0.5">
+            </CardFrame>
+            <CardFrame title="Sensor stream" bodyClassName="space-y-0.5 text-sm">
+              <div className="flex gap-0.5">
                 {sensorButtons.map((btn) => (
                   <button
                     key={btn.key}
@@ -285,7 +279,7 @@ export default function SettingsPanel() {
                 ))}
               </div>
               {!canControl && <p className="text-xs text-slate-500">Assign a rover to toggle streams.</p>}
-            </section>
+            </CardFrame>
             <AuthPanel />
             <OvercurrentLimiterPanel />
             <AdminPanel />

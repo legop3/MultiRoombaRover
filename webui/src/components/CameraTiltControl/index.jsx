@@ -10,7 +10,7 @@ function formatDegrees(value) {
 
 function KeyPill({ label }) {
   if (!label) return null;
-  return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
+  return <span className="rounded bg-slate-800 px-1 py-0.5 text-[0.6rem] font-semibold text-slate-200">{label}</span>;
 }
 
 export default function CameraTiltControl({
@@ -143,10 +143,14 @@ export default function CameraTiltControl({
   }
 
   return (
-    <div className={`space-y-0.5 ${className}`.trim()}>
+    <div className={`space-y-0.5 ${disabled ? 'opacity-50' : ''} ${className}`.trim()}>
       <div className={`flex items-center justify-between ${labelRowClass}`.trim()}>
         <span className={labelClass}>{label}</span>
-        {showValue ? <span className={valueClass}>{formatDegrees(value)}</span> : null}
+        {showValue ? (
+          <span className={`rounded bg-slate-800 px-1 py-0.5 text-[0.7rem] font-semibold ${valueClass}`.trim()}>
+            {formatDegrees(value)}
+          </span>
+        ) : null}
       </div>
       <div>
         {slider}

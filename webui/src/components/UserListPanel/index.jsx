@@ -10,11 +10,11 @@ import CardFrame from '../CardFrame/index.jsx';
 
 export function NicknameEntryPanel({ compact = false }) {
   return (
-    <section className="panel-section flex h-full min-h-0 flex-col gap-0.5 text-base">
-      <div className="surface flex w-full items-center px-0 py-0">
+    <CardFrame hideHeader className="h-full" bodyClassName="flex h-full min-h-0 flex-col gap-0.5 text-base">
+      <div className="flex w-full items-center px-0 py-0">
         <NicknameForm compact={compact} />
       </div>
-    </section>
+    </CardFrame>
   );
 }
 
@@ -126,7 +126,7 @@ export default function UserListPanel({
         return (
           <div
             key={user.socketId}
-            className={`surface-muted flex items-center gap-0.5 ${compact ? 'py-0.25 text-[0.8rem]' : 'text-sm'}`}
+            className={`flex items-center gap-0.5 ${compact ? 'py-0.25 text-[0.8rem]' : 'text-sm'}`}
           >
             <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
             {user.roverId ? (
@@ -150,14 +150,19 @@ export default function UserListPanel({
     );
 
   return (
-    <section
-      className={`panel-section space-y-0.5 text-base ${fillHeight ? 'flex h-full min-h-0 flex-col overflow-hidden' : ''} ${className}`}
+    <CardFrame
+      title={!hideHeader ? (isTurnsMode ? (showQueuesSection ? 'Turn queues' : 'Users') : 'Users') : ''}
+      meta={!hideHeader ? (showQueuesSection && isTurnsMode ? Object.keys(turnQueues || {}).length : sorted.length) : null}
+      hideHeader={hideHeader}
+      fillHeight={fillHeight}
+      className={className}
+      bodyClassName="space-y-0.5 text-base"
     >
       {!hideNicknameForm && (
         <div className="space-y-0.5">
           <div className="grid gap-0.5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <div className="min-w-0">
-              <div className="surface flex w-full items-center px-0 py-0">
+              <div className="flex w-full items-center px-0 py-0">
                 <NicknameForm compact={compact} />
               </div>
             </div>
@@ -168,21 +173,8 @@ export default function UserListPanel({
       )}
 
       <div className={`space-y-0.5 ${fillHeight ? 'flex flex-1 min-h-0 flex-col' : ''}`}>
-        {!hideHeader && (
-          <div className={`flex items-center justify-between text-sm text-slate-400 ${compact ? 'text-xs' : ''}`}>
-            <div className="flex items-center gap-0.5">
-              <span>
-                {isTurnsMode
-                  ? showQueuesSection
-                    ? 'Turn queues'
-                    : 'Users'
-                  : 'Users'}
-              </span>
-              <span className="text-xs text-slate-500">
-                {showQueuesSection && isTurnsMode ? Object.keys(turnQueues || {}).length : sorted.length}
-              </span>
-            </div>
-            {showToggle ? (
+        {!hideHeader && showToggle ? (
+          <div className="flex justify-end">
               <div className="inline-flex overflow-hidden rounded border border-slate-700 text-[0.7rem]">
                 <button
                   type="button"
@@ -199,11 +191,10 @@ export default function UserListPanel({
                   Users
                 </button>
               </div>
-            ) : null}
           </div>
-        )}
+        ) : null}
         {showQueuesSection ? (
-          <div className={`surface space-y-0.5 px-0 pb-0 ${turnsListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
+          <div className={`space-y-0.5 px-0 pb-0 ${turnsListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
             {Object.keys(turnQueues || {}).length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>
             ) : (
@@ -220,7 +211,7 @@ export default function UserListPanel({
                       : queue[0]
                     : null;
                 return (
-                  <div key={roverId} className={`surface-muted flex flex-col gap-0.5 ${compact ? 'text-[0.8rem] py-0.25' : 'text-sm'}`}>
+                  <div key={roverId} className={`flex flex-col gap-0.5 ${compact ? 'text-[0.8rem] py-0.25' : 'text-sm'}`}>
                     <div className="flex items-center gap-0.5">
                       <p className="font-semibold text-slate-200">
                         <span
@@ -277,7 +268,7 @@ export default function UserListPanel({
         ) : null}
 
         {showUsersSection ? (
-          <div className={`surface space-y-0.5 px-0 pb-0 ${usersListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
+          <div className={`space-y-0.5 px-0 pb-0 ${usersListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
             {renderUserList()}
           </div>
         ) : null}
@@ -288,10 +279,10 @@ export default function UserListPanel({
               <span>Users</span>
               <span className="text-[0.7rem] text-slate-500">{sorted.length}</span>
             </div>
-            <div className={`surface space-y-0.5 px-0 pb-0 ${usersListClass}`}>{renderUserList()}</div>
+            <div className={`space-y-0.5 px-0 pb-0 ${usersListClass}`}>{renderUserList()}</div>
           </div>
         ) : null}
       </div>
-    </section>
+    </CardFrame>
   );
 }

@@ -8,6 +8,7 @@ import LlmCommentaryPanel from './LlmCommentaryPanel.jsx';
 import OverseerControlPanel from './OverseerControlPanel.jsx';
 import ReplaySnapshotHealth from './ReplaySnapshotHealth.jsx';
 import AdminIpLogPanel from './AdminIpLogPanel.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 
 const MODES = [
   { key: 'open', label: 'Open' },
@@ -279,10 +280,7 @@ export default function AdminPanelContent() {
 
   if (!isAdmin) return null;
 
-  return (
-    <section className="panel-section space-y-0.5 text-base">
-      <div className="flex items-center justify-between gap-0.5 text-sm">
-        <span>Admin controls</span>
+  const actions = (
         <select value={currentMode} onChange={handleModeChange} className="field-input text-sm">
           {MODES.map((mode) => (
             <option key={mode.key} value={mode.key}>
@@ -290,7 +288,10 @@ export default function AdminPanelContent() {
             </option>
           ))}
         </select>
-      </div>
+  );
+
+  return (
+    <CardFrame title="Admin controls" actions={actions} bodyClassName="space-y-0.5 text-base">
       <div className="flex gap-0.5 text-xs">
         <button
           type="button"
@@ -514,6 +515,6 @@ export default function AdminPanelContent() {
         clearingHistory={clearingOverseerHistory}
       />
       <AdminIpLogPanel entries={adminLogs} />
-    </section>
+    </CardFrame>
   );
 }

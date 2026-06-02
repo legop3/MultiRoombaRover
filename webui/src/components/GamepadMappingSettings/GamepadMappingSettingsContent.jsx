@@ -9,6 +9,7 @@ import {
   createProfileForPad,
 } from '../../controls/inputs/gamepadBindings.js';
 import { useGamepadHubState } from '../../controls/inputs/gamepadHub.js';
+import CardFrame from '../CardFrame/index.jsx';
 import SliderField from './SliderField.jsx';
 import { ACTIONS, NUMBER_FORMAT } from './constants.js';
 import {
@@ -222,20 +223,16 @@ export default function GamepadMappingSettings() {
   }, [activePad, activeProfile]);
 
   return (
-    <section className="panel-section space-y-0.5 text-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-slate-400">Controller</p>
-          <p className="text-[0.65rem] text-slate-500">
-            {activePad ? 'Move sticks or press buttons to bind' : 'Connect a controller to configure.'}
-          </p>
-          {captureAction && (
-            <p className="mt-0 text-[0.7rem] text-emerald-400">Capturing {captureAction.label}…</p>
-          )}
-        </div>
-      </div>
+    <CardFrame
+      title="Controller"
+      meta={activePad ? 'Move sticks or press buttons to bind' : 'Connect a controller to configure.'}
+      bodyClassName="space-y-0.5 text-sm"
+    >
+      {captureAction && (
+        <p className="mt-0 text-[0.7rem] text-emerald-400">Capturing {captureAction.label}…</p>
+      )}
 
-      <div className="space-y-0.5 surface">
+      <div className="space-y-0.5">
         <p className="text-[0.7rem] text-slate-500">Connected controller</p>
         {hubState.pads.length === 0 ? (
           <p className="text-[0.7rem] text-slate-400">No controller detected.</p>
@@ -257,7 +254,7 @@ export default function GamepadMappingSettings() {
         )}
       </div>
 
-      <div className="space-y-0.5 surface">
+      <div className="space-y-0.5">
         <p className="text-[0.7rem] text-slate-500">Calibration</p>
         <div className="space-y-0.5">
           <SliderField
@@ -296,7 +293,7 @@ export default function GamepadMappingSettings() {
             value={activeProfile.calibration?.auxSideScale ?? 0.55}
             onChange={(value) => updateCalibration({ auxSideScale: value })}
           />
-          <label className="surface-muted block p-0.5">
+          <label className="block p-0.5">
             <div className="flex items-center justify-between text-xs text-slate-300">
               <span className="font-semibold text-slate-100">Camera mode</span>
               <select
@@ -324,14 +321,14 @@ export default function GamepadMappingSettings() {
 
       <div className="space-y-0.5">
         {Object.entries(grouped).map(([section, actions]) => (
-          <div key={section} className="space-y-0.5 surface">
+          <div key={section} className="space-y-0.5">
             <p className="text-[0.7rem] text-slate-500">{section}</p>
             <div className="space-y-0.5">
               {actions.map((action) => {
                 const binding = activeProfile.bindings?.[action.id];
                 const source = binding?.sources?.[0] ?? null;
                 return (
-                  <div key={action.id} className="surface-muted flex items-center justify-between text-xs">
+                  <div key={action.id} className="flex items-center justify-between text-xs">
                     <div>
                       <p className="font-semibold text-slate-100">{action.label}</p>
                       <p className="text-[0.65rem] text-slate-400">{formatSource(source)}</p>
@@ -390,7 +387,7 @@ export default function GamepadMappingSettings() {
         ))}
       </div>
 
-      <div className="space-y-0.5 surface">
+      <div className="space-y-0.5">
         <p className="text-[0.7rem] text-slate-500">Diagnostics</p>
         {!activePad ? (
           <p className="text-[0.7rem] text-slate-400">No controller detected.</p>
@@ -435,6 +432,6 @@ export default function GamepadMappingSettings() {
           </div>
         )}
       </div>
-    </section>
+    </CardFrame>
   );
 }

@@ -3,6 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 import { useSocket } from '../../context/SocketContext.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 
 const MAX_ENTRIES = 300;
 const MAX_PAYLOAD_LENGTH = 240;
@@ -113,19 +114,19 @@ export default function SocketLogPanel() {
     };
   }, [socket]);
 
-  return (
-    <section className="panel-section space-y-0.5 text-base">
-      <div className="flex items-center justify-between text-sm text-slate-400">
-        <span>Socket activity</span>
+  const actions = (
         <div className="flex items-center gap-0.5 text-xs text-slate-400">
-          <span className="surface-muted">in {counters.in}</span>
-          <span className="surface-muted">out {counters.out}</span>
+          <span>in {counters.in}</span>
+          <span>out {counters.out}</span>
           <button type="button" className="button-dark text-xs" onClick={() => setEntries([])}>
             Clear
           </button>
         </div>
-      </div>
-      <div className="surface h-64 overflow-y-auto font-mono text-xs">
+  );
+
+  return (
+    <CardFrame title="Socket activity" actions={actions} bodyClassName="space-y-0.5 text-base">
+      <div className="h-64 overflow-y-auto font-mono text-xs">
         {entries.length === 0 ? (
           <p>No socket activity yet.</p>
         ) : (
@@ -133,7 +134,7 @@ export default function SocketLogPanel() {
             .slice()
             .reverse()
             .map((entry) => (
-              <div key={entry.id} className="surface">
+              <div key={entry.id}>
                 <span className="text-slate-400">{entry.timestamp}</span>{' '}
                 <span className={entry.direction === 'in' ? 'text-emerald-400' : 'text-amber-400'}>
                   [{entry.direction.toUpperCase()}]
@@ -145,6 +146,6 @@ export default function SocketLogPanel() {
         )}
       </div>
       <p className="text-xs text-slate-500">Logs are collected only while this panel is open.</p>
-    </section>
+    </CardFrame>
   );
 }

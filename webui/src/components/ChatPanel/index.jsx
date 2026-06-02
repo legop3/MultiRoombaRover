@@ -154,7 +154,7 @@ export default function ChatPanel({
       fillHeight={fillHeight}
       bodyClassName="space-y-0.5 text-base"
     >
-      <div className={`surface overflow-y-auto space-y-0.5 px-0 ${listClass}`} ref={listRef}>
+      <div className={`overflow-y-auto space-y-0.5 px-0 ${listClass}`} ref={listRef}>
         {sorted.length === 0 && typingRows.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet.</p>
         ) : (

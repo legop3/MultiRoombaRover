@@ -10,10 +10,10 @@ import CardFrame from '../CardFrame/index.jsx';
 
 function EmptyState() {
   return (
-    <div className="panel-section space-y-0.5 text-sm">
+    <CardFrame title="Room cameras" bodyClassName="space-y-0.5 text-sm">
       <p className="text-center text-slate-400">No room cameras configured.</p>
       <p className="text-center text-slate-500">Add entries to server config to populate this list.</p>
-    </div>
+    </CardFrame>
   );
 }
 
@@ -97,7 +97,7 @@ export default function RoomCameraPanel({
         {cameras.map((camera) => {
           const feed = feedMap[camera.id] || null;
           return (
-            <article key={camera.id} className="w-full space-y-0.5 rounded bg-zinc-950 p-0.5 shadow-inner shadow-black/40">
+            <article key={camera.id} className="w-full space-y-0.5 p-0.5">
               {/* <header className="space-y-0.5">
                 <p className="text-lg font-semibold text-white">{camera.name || camera.id}</p>
                 {camera.description && <p className="text-xs text-slate-500">{camera.description}</p>}

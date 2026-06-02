@@ -81,7 +81,7 @@ function DesktopLayout({ layout, onOpenHelpOverlay }) {
       <div className={`flex min-w-0 flex-[1.22] flex-col ${themeGapClass} overflow-y-auto pr-0`}>
         <DriverVideo />
         <TelemetryPanel />
-        <LogPanel />
+        {/* <LogPanel /> */}
       </div>
       <div className={`flex min-w-0 flex-1 flex-col ${themeGapClass} overflow-y-auto`}>
         <GlobalObjectiveBanner layout={layout} />

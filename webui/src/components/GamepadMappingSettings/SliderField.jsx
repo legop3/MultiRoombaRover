@@ -5,7 +5,7 @@ import { NUMBER_FORMAT } from './constants.js';
 
 export default function SliderField({ label, description, min, max, step, value, onChange }) {
   return (
-    <label className="surface-muted block p-0.5">
+    <label className="block p-0.5">
       <div className="flex items-center justify-between text-xs text-slate-300">
         <span className="font-semibold text-slate-100">{label}</span>
         <span className="font-mono text-slate-400">{NUMBER_FORMAT.format(value)}</span>
