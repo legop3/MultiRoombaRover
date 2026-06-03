@@ -250,7 +250,7 @@ function warningMessages(stats) {
 export default function PiHostStatsCard() {
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const frame = useTelemetryFrame(roverId);
-  const stats = frame?.hostStats || PLACEHOLDER_STATS;
+  const stats = frame?.hostStats || EMPTY_STATS;
   const wifi = stats.wifi || EMPTY_WIFI;
   const warnings = warningMessages(stats);
   const wifiQuality = wifiQualityPercent(wifi);
