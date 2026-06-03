@@ -134,6 +134,89 @@ function createRuntimeEngine(deps) {
     };
   }
 
+  async function setEntityLockedOnWhite(entityId, options = {}) {
+    const meta = entityConfig.get(entityId);
+    const source = String(options?.source || 'homeAssistant:setEntityLockedOnWhite');
+
+    // Lock-on is meant to make the real room visibly lit, so outlet-backed lamps
+    // still only need a plain turn_on command. Home Assistant exposes those as
+    // switch entities even though the user-facing object is a lamp.
+    if (!meta || meta.type !== 'light') {
+      return setEntityState(entityId, 'on', { source: `${source}:switch-on` });
+    }
+
+    try {
+      // Color-capable lights should be forced to white during the lock so the
+      // privacy/safety state is visually predictable instead of preserving the
+      // previous red/blue/etc. color. The white command also turns the light on.
+      await setLightWhite(entityId, haConfig?.whiteKelvin);
+      return { entityId, mode: 'white' };
+    } catch (err) {
+      // Some Home Assistant light integrations report themselves as lights but
+      // reject color temperature. Falling back to a plain turn_on preserves the
+      // most important part of the lock behavior: every lamp is still on.
+      logger.warn('Home Assistant lock white command failed; falling back to plain on', {
+        entityId,
+        error: err.message,
+        source,
+      });
+      await setEntityState(entityId, 'on', { source: `${source}:white-fallback-on` });
+      return { entityId, mode: 'fallback-on', whiteError: err.message };
+    }
+  }
+
+  async function setAllControllableEntitiesLockedOnWhite(options = {}) {
+    const source = String(options?.source || 'homeAssistant:setAllControllableEntitiesLockedOnWhite');
+    const ids = getControllableEntityIds();
+    if (!ids.length) {
+      logger.warn('Home Assistant lock-on-white skipped; no controllable entities configured', {
+        source,
+      });
+      return {
+        desiredState: 'on',
+        source,
+        total: 0,
+        succeeded: [],
+        failures: [],
+      };
+    }
+
+    logger.info('Issuing Home Assistant lock-on-white update', {
+      source,
+      total: ids.length,
+    });
+
+    // Each entity is settled independently because one flaky bulb should not
+    // prevent the rest of the room from entering the locked-on state.
+    const results = await Promise.allSettled(
+      ids.map((id) => setEntityLockedOnWhite(id, { source: `${source}:bulk` })),
+    );
+    const failures = results
+      .map((result, index) => ({ result, entityId: ids[index] }))
+      .filter(({ result }) => result.status === 'rejected')
+      .map(({ result, entityId }) => ({ entityId, error: result.reason?.message || 'unknown error' }));
+    const succeeded = results
+      .map((result, index) => ({ result, entityId: ids[index] }))
+      .filter(({ result }) => result.status === 'fulfilled')
+      .map(({ entityId }) => entityId);
+
+    if (failures.length) {
+      logger.warn('Some Home Assistant lock-on-white updates failed', {
+        total: ids.length,
+        failed: failures.length,
+        failures,
+      });
+    }
+
+    return {
+      desiredState: 'on',
+      source,
+      total: ids.length,
+      succeeded,
+      failures,
+    };
+  }
+
   function triggerMatches(trigger, raw, runtimeState) {
     if (!raw) return false;
     const nextState = raw?.state ?? null;
@@ -293,9 +376,18 @@ function createRuntimeEngine(deps) {
 
     if (runtime.lightsLockState != null) {
       if ((changed || forceApply) && enabled) {
-        await setAllControllableEntitiesState(runtime.lightsLockState, {
-          source: String(options?.source || 'homeAssistant:setLightsLockedOn'),
-        });
+        const source = String(options?.source || 'homeAssistant:setLightsLockedOn');
+        if (runtime.lightsLockState === 'on') {
+          // The lock-on path is intentionally stronger than a normal bulk
+          // turn_on. It makes actual light entities white while still turning
+          // outlet-backed lamp switches on, matching the user's "light lock"
+          // mental model for the room.
+          await setAllControllableEntitiesLockedOnWhite({ source });
+        } else {
+          await setAllControllableEntitiesState(runtime.lightsLockState, {
+            source,
+          });
+        }
       }
     } else {
       evaluateLightAutomation();
@@ -337,6 +429,7 @@ function createRuntimeEngine(deps) {
     setLightColor,
     setLightWhite,
     setAllControllableEntitiesState,
+    setAllControllableEntitiesLockedOnWhite,
     setLightsLockedOn,
     toggleLightsLockedOn,
   };

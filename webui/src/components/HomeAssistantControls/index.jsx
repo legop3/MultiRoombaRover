@@ -1,11 +1,20 @@
 // Home Assistant Controls
 // Purpose: Defines the Home Assistant Controls module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useControlSystem } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import CardFrame from '../CardFrame/index.jsx';
+
+const COLOR_SWATCHES = Object.freeze([
+  { id: 'white', label: 'White', rgb: [255, 255, 255], action: 'white' },
+  { id: 'red', label: 'Red', rgb: [255, 0, 0] },
+  { id: 'green', label: 'Green', rgb: [0, 255, 0] },
+  { id: 'cyan', label: 'Cyan', rgb: [0, 199, 190] },
+  { id: 'blue', label: 'Blue', rgb: [0, 0, 255] },
+  { id: 'purple', label: 'Purple', rgb: [191, 90, 242] },
+]);
 
 function StatusBadge({ label, tone = 'muted' }) {
   const styles =
@@ -21,31 +30,14 @@ function StatusBadge({ label, tone = 'muted' }) {
   );
 }
 
+function cx(...values) {
+  return values.filter(Boolean).join(' ');
+}
+
 function clampHue(value) {
   if (!Number.isFinite(value)) return 0;
   const wrapped = value % 360;
   return wrapped < 0 ? wrapped + 360 : wrapped;
-}
-
-function rgbToHue(rgb) {
-  if (!Array.isArray(rgb) || rgb.length < 3) return 0;
-  const [rRaw, gRaw, bRaw] = rgb;
-  const r = Math.max(0, Math.min(255, Number(rRaw))) / 255;
-  const g = Math.max(0, Math.min(255, Number(gRaw))) / 255;
-  const b = Math.max(0, Math.min(255, Number(bRaw))) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  if (delta === 0) return 0;
-  let hue = 0;
-  if (max === r) {
-    hue = ((g - b) / delta) % 6;
-  } else if (max === g) {
-    hue = (b - r) / delta + 2;
-  } else {
-    hue = (r - g) / delta + 4;
-  }
-  return clampHue(Math.round(hue * 60));
 }
 
 function hueToRgb(hue) {
@@ -77,18 +69,101 @@ function hueToRgb(hue) {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
-function getEntityHue(entity) {
-  if (!entity) return 0;
-  if (Array.isArray(entity.hsColor)) {
-    return clampHue(Number(entity.hsColor[0]));
+function getEntityRgb(entity) {
+  if (!entity) return null;
+  if (Array.isArray(entity.rgbColor) && entity.rgbColor.length >= 3) {
+    return entity.rgbColor.slice(0, 3).map((value) => {
+      const next = Number(value);
+      return Number.isFinite(next) ? Math.max(0, Math.min(255, Math.round(next))) : 0;
+    });
   }
-  if (Array.isArray(entity.rgbColor)) {
-    return rgbToHue(entity.rgbColor);
+  if (Array.isArray(entity.hsColor) && entity.hsColor.length >= 1) {
+    return hueToRgb(entity.hsColor[0]);
   }
-  return 0;
+  return null;
 }
 
-function EntityRow({ entity, connected, controlsLocked, onToggle, onSetColor, onSetWhite }) {
+function rgbToCss(rgb) {
+  return `rgb(${rgb.join(',')})`;
+}
+
+function rgbLuminance(rgb) {
+  const [r, g, b] = rgb.map((value) => Number(value) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function swatchMatchesEntity(entity, swatch) {
+  const current = getEntityRgb(entity);
+  if (!current || !Array.isArray(swatch.rgb)) return false;
+
+  // Exact Home Assistant color values vary by bulb and color space, so use a
+  // small distance threshold. This keeps the selected swatch useful without
+  // pretending bulbs report the same RGB values that the UI originally sent.
+  const distance = Math.sqrt(
+    current.reduce((sum, value, index) => sum + (value - swatch.rgb[index]) ** 2, 0),
+  );
+  return distance < 55;
+}
+
+function buildTileStyle(entity, { unavailable, isOn, supportsColor }) {
+  if (unavailable) return undefined;
+  if (!isOn) return undefined;
+  const rgb = supportsColor ? getEntityRgb(entity) : null;
+  if (!rgb) return undefined;
+
+  // Colored lights use their actual current color as the tile fill. Switches
+  // and non-color lights deliberately stay on the neutral Tailwind classes
+  // because their real-world lamps do not expose a useful color value.
+  return {
+    backgroundColor: rgbToCss(rgb),
+    borderColor: 'rgba(255,255,255,0.38)',
+    color: rgbLuminance(rgb) > 0.62 ? '#111827' : '#ffffff',
+  };
+}
+
+function LampSwatch({ entity, swatch, disabled, onSetColor, onSetWhite }) {
+  const selected = entity.state === 'on' && swatchMatchesEntity(entity, swatch);
+
+  const handleClick = (event) => {
+    // Swatches live inside a tile that toggles the lamp when clicked. Stop the
+    // event here so choosing a color is a single, unambiguous action instead of
+    // setting color and then also toggling the lamp off.
+    event.stopPropagation();
+    if (disabled) return;
+
+    // White gets its own server action because Home Assistant white/temperature
+    // mode is not the same as sending pure RGB white on many smart bulbs.
+    if (swatch.action === 'white') {
+      onSetWhite(entity.id).catch(() => {});
+      return;
+    }
+    onSetColor(entity.id, swatch.rgb).catch(() => {});
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      onKeyDown={(event) => {
+        // Keyboard activation on a swatch should follow the same isolation rule
+        // as pointer clicks: the swatch owns color selection, the tile owns
+        // lamp toggling.
+        event.stopPropagation();
+      }}
+      disabled={disabled}
+      title={`${swatch.label} ${entity.name || entity.id}`}
+      aria-label={`Set ${entity.name || entity.id} to ${swatch.label}`}
+      className={cx(
+        'h-5 w-6 shrink-0 rounded-sm border transition-transform disabled:cursor-not-allowed disabled:opacity-40',
+        selected ? 'border-white ring-1 ring-white/80' : 'border-white/35',
+        !disabled && 'hover:scale-110 hover:border-white',
+      )}
+      style={{ backgroundColor: rgbToCss(swatch.rgb) }}
+    />
+  );
+}
+
+function LampTile({ entity, connected, controlsLocked, onToggle, onSetColor, onSetWhite }) {
   const unavailable = entity.state === 'unavailable' || !entity.available;
   const isOn = entity.state === 'on';
   const supportsColor = entity.type === 'light' && entity.supportsColor;
@@ -96,147 +171,73 @@ function EntityRow({ entity, connected, controlsLocked, onToggle, onSetColor, on
   const statusLabel = unavailable ? 'Unavailable' : isOn ? 'On' : 'Off';
   const disableToggle = controlsLocked || !connected || unavailable;
   const disableColor = disableToggle || !supportsColor;
-  const [hue, setHue] = useState(() => getEntityHue(entity));
-  const hueRef = useRef(hue);
-  const draggingRef = useRef(false);
-  const toneStyles = unavailable
-    ? 'border-slate-800 bg-slate-900 text-slate-400 cursor-not-allowed'
+  const tileStyle = buildTileStyle(entity, { unavailable, isOn, supportsColor });
+  const tileTone = unavailable
+    ? 'border-slate-800 bg-slate-950 text-slate-500'
     : controlsLocked
-    ? 'border-slate-800 bg-slate-900 text-slate-300 cursor-not-allowed'
+    ? 'border-amber-700/60 bg-amber-950/70 text-amber-100'
     : isOn
-    ? 'border-emerald-700 bg-emerald-900 text-emerald-50 hover:bg-emerald-800'
-    : 'border-rose-800 bg-rose-900 text-rose-50 hover:bg-rose-800';
+    ? 'border-emerald-700/70 bg-emerald-900 text-white'
+    : 'border-neutral-700 bg-neutral-950 text-slate-300';
 
-  useEffect(() => {
-    if (!supportsColor || draggingRef.current) return;
-    const nextHue = getEntityHue(entity);
-    hueRef.current = nextHue;
-    setHue(nextHue);
-  }, [entity.rgbColor, entity.hsColor, supportsColor]);
-
-  const handleHueChange = (event) => {
-    const nextHue = clampHue(Number(event.target.value));
-    hueRef.current = nextHue;
-    setHue(nextHue);
+  const handleTileToggle = () => {
+    if (disableToggle) return;
+    onToggle(entity.id);
   };
 
-  const commitHue = () => {
-    if (disableColor || !onSetColor) return;
-    onSetColor(entity.id, hueToRgb(hueRef.current));
+  const handleTileKeyDown = (event) => {
+    // The outer element is intentionally the interactive tile because HTML
+    // cannot validly nest the color swatch buttons inside another button. Giving
+    // the tile button-like keyboard behavior keeps the larger click target
+    // accessible while preserving real buttons for swatches.
+    if (disableToggle) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleTileToggle();
   };
-
-  const stopPropagation = (event) => {
-    event.stopPropagation();
-  };
-
-  const handleSetWhite = (event) => {
-    stopPropagation(event);
-    if (disableColor || !onSetWhite) return;
-    onSetWhite(entity.id);
-  };
-
-  const displayRgb = supportsColor ? hueToRgb(hueRef.current) : [255, 255, 255];
-  const displayColor = `rgb(${displayRgb.join(',')})`;
 
   return (
-    <button
-      type="button"
-      onClick={() => onToggle(entity.id)}
-      disabled={disableToggle}
-      className={`relative flex min-w-[12rem] flex-[1_1_12rem] items-start justify-between gap-0.5 rounded px-1 py-0.5 text-left transition-colors ${toneStyles} disabled:opacity-60 disabled:hover:bg-inherit`}
+    <div
+      role="button"
+      tabIndex={disableToggle ? -1 : 0}
+      onClick={handleTileToggle}
+      onKeyDown={handleTileKeyDown}
+      aria-disabled={disableToggle}
+      className={cx(
+        // The parent grid owns row and column sizing so the room-controls panel
+        // never sprawls wider than three lamps per row. The tile only keeps a
+        // small minimum width so names and swatches remain readable.
+        'flex min-w-[9.5rem] flex-col gap-0.5 rounded border px-0.5 py-0.5 transition-colors',
+        disableToggle ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-white/60',
+        tileTone,
+      )}
+      style={tileStyle}
+      title={`${isOn ? 'Turn off' : 'Turn on'} ${entity.name || entity.id}`}
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-0.5 text-sm leading-normal">
-          <span className="truncate font-semibold text-white">{entity.name || entity.id}</span>
-          {supportsColor && (
-            <>
-              <StatusBadge label={statusLabel} tone={statusTone} />
-              {!connected && <span className="text-xs text-amber-200">Offline</span>}
-            </>
-          )}
-        </div>
-        {supportsColor ? (
-          <div
-            className="-mt-0.5 w-full"
-            onClick={stopPropagation}
-            onPointerDown={(event) => {
-              stopPropagation(event);
-              draggingRef.current = true;
-            }}
-            onPointerUp={(event) => {
-              stopPropagation(event);
-              draggingRef.current = false;
-              commitHue();
-            }}
-            onPointerCancel={(event) => {
-              stopPropagation(event);
-              draggingRef.current = false;
-              commitHue();
-            }}
-            onKeyUp={(event) => {
-              stopPropagation(event);
-              commitHue();
-            }}
-            onBlur={commitHue}
-          >
-            <div className="relative w-full">
-              <input
-                type="range"
-                min="0"
-                max="360"
-                step="1"
-                value={hue}
-                onChange={handleHueChange}
-                disabled={disableColor}
-                aria-label={`Set color for ${entity.name || entity.id}`}
-                className="ha-hue-slider w-full"
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-0.5 text-xs text-slate-400">
-            <StatusBadge label={statusLabel} tone={statusTone} />
-            {!connected && <span className="text-amber-200"> · Offline</span>}
-          </div>
-        )}
+      <div className="grid min-h-5 grid-cols-[minmax(0,1fr)_auto] items-center gap-0.5 text-left">
+        <span className="min-w-0 truncate text-[0.78rem] font-semibold leading-none">
+          {entity.name || entity.id}
+        </span>
+        <span className="flex items-center gap-0.5">
+          <StatusBadge label={statusLabel} tone={statusTone} />
+          {!connected ? <span className="text-[0.65rem] font-semibold text-amber-200">Offline</span> : null}
+        </span>
       </div>
-      {supportsColor && (
-        <div className="absolute right-1 top-1 flex items-center gap-0.5">
-          <span
-            role="button"
-            tabIndex={disableColor ? -1 : 0}
-            onClick={handleSetWhite}
-            onPointerDown={stopPropagation}
-            onKeyDown={(event) => {
-              if (disableColor) return;
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                handleSetWhite(event);
-              }
-            }}
-            title="Set white color temperature"
-            aria-label={`Set ${entity.name || entity.id} to white`}
-            aria-disabled={disableColor}
-            className={`inline-flex items-center justify-center rounded border border-slate-200 bg-white px-1 py-0.5 text-xs font-semibold leading-none text-slate-900 ${
-              disableColor
-                ? 'cursor-not-allowed opacity-60'
-                : 'cursor-pointer hover:bg-slate-100'
-            }`}
-          >
-            white
-          </span>
-          <span
-            className="pointer-events-none h-2.5 w-2.5 rounded-full border border-white/60"
-            style={{ backgroundColor: displayColor }}
-          />
+      {supportsColor ? (
+        <div className="flex flex-wrap justify-center gap-0.5">
+          {COLOR_SWATCHES.map((swatch) => (
+            <LampSwatch
+              key={swatch.id}
+              entity={entity}
+              swatch={swatch}
+              disabled={disableColor}
+              onSetColor={onSetColor}
+              onSetWhite={onSetWhite}
+            />
+          ))}
         </div>
-      )}
-      {!supportsColor && (
-        <div className="self-center text-xs font-semibold text-white/90">
-          {isOn ? 'Turn off' : 'Turn on'}
-        </div>
-      )}
-    </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -298,9 +299,9 @@ export default function HomeAssistantControls() {
             : 'Lights are locked on. Room controls are disabled.'}
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-0.5">
+      <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
         {entities.map((entity) => (
-          <EntityRow
+          <LampTile
             key={entity.id}
             entity={entity}
             connected={connected}
