@@ -118,8 +118,6 @@ run_pipeline() {
     --codec h264 \
     --profile baseline \
     --denoise auto \
-    --flush \
-    --buffer-count 1 \
     --nopreview \
     --metering centre \
     --ev 0.1 \
