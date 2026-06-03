@@ -117,11 +117,10 @@ run_pipeline() {
     --bitrate "${VIDEO_BITRATE}" \
     --codec h264 \
     --profile baseline \
-    --denoise off \
+    --denoise auto \
     --flush \
     --buffer-count 1 \
     --no-raw \
-    --exposure sport \
     --nopreview \
     --metering centre \
     --ev 0.1 \
