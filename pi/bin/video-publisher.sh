@@ -119,8 +119,8 @@ run_pipeline() {
     --profile baseline \
     --denoise auto \
     --flush \
-    --buffer-count 1 \
     --no-raw \
+    --buffer-count 1 \
     --nopreview \
     --metering centre \
     --ev 0.1 \
