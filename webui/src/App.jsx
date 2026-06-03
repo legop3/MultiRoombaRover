@@ -2,6 +2,7 @@
 // Purpose: Composes the primary rover control interface and page-level layout. Scope: Orchestrates high-level panels, overlays, and feature modules for the default route.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TelemetryPanel from './components/TelemetryPanel/index.jsx';
+import PiHostStatsCard from './components/PiHostStatsCard/index.jsx';
 import ReplaySourcesPanel from './components/ReplaySourcesPanel/index.jsx';
 import AlertFeed from './components/AlertFeed/index.jsx';
 import MobileControls, {
@@ -80,6 +81,7 @@ function DesktopLayout({ layout, onOpenHelpOverlay }) {
     <div className={`flex h-full ${themeGapClass} overflow-hidden`}>
       <div className={`flex min-w-0 flex-[1.22] flex-col ${themeGapClass} overflow-y-auto pr-0`}>
         <DriverVideo />
+        <PiHostStatsCard />
         <TelemetryPanel />
         {/* <LogPanel /> */}
       </div>
@@ -96,7 +98,6 @@ function MobileFeatureTabs({
   layout,
   onOpenHelpOverlay,
   roomPanelId,
-  showTelemetry = true,
 }) {
   const [activeTab, setActiveTab] = useState('chat');
   const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
@@ -229,7 +230,6 @@ function MobileLandscapeLayout({ onOpenHelpOverlay, swapMobileControlColumns = f
           layout="mobile-landscape"
           onOpenHelpOverlay={onOpenHelpOverlay}
           roomPanelId="mobile-landscape-room"
-          showTelemetry={false}
         />
       </div>
     </div>

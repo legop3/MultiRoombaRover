@@ -32,6 +32,11 @@ function handleMessage(roverId, msg) {
     case 'sensor':
       roverManager.handleSensorFrame(roverId, msg);
       break;
+    case 'hostStats':
+      // Host stats are periodic Pi metadata, not user-facing rover events, so
+      // they are routed directly to roverManager instead of becoming alerts.
+      roverManager.handleHostStats(roverId, msg);
+      break;
     case 'event': {
       const nightVisionOn = coerceBool(msg.data?.nightVisionOn);
       if (msg.event === 'nightVision.state' && nightVisionOn != null) {
@@ -88,6 +93,10 @@ roverWSS.on('connection', (ws) => {
     if (!roverId) return;
     if (msg.type === 'sensor') {
       roverManager.handleSensorFrame(roverId, msg);
+    } else if (msg.type === 'hostStats') {
+      // Keep the Pi health stream separate from both Roomba sensorFrame data
+      // and generic rover events, which are surfaced as alerts.
+      roverManager.handleHostStats(roverId, msg);
     } else if (msg.type === 'ack') {
       handleAck(msg);
     } else if (msg.type === 'event') {

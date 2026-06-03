@@ -61,9 +61,11 @@ export function TelemetryProvider({ children }) {
   useEffect(() => {
     function handleSensorFrame({ roverId, sensors = {}, frame = {} }) {
       if (!roverId) return;
+      const previous = framesRef.current[roverId] ?? {};
       framesRef.current = {
         ...framesRef.current,
         [roverId]: {
+          ...previous,
           roverId,
           sensors,
           raw: frame?.data || null,
@@ -73,9 +75,30 @@ export function TelemetryProvider({ children }) {
       notifyRover(roverId);
     }
 
+    function handleRoverHostStats({ roverId, stats = {}, receivedAt = null }) {
+      if (!roverId) return;
+      const previous = framesRef.current[roverId] ?? {};
+      const now = Date.now();
+      framesRef.current = {
+        ...framesRef.current,
+        [roverId]: {
+          ...previous,
+          roverId,
+          // Host stats are Pi/Linux metadata. They live beside sensors so UI
+          // consumers can render Pi health without treating it as raw Roomba
+          // sensor data.
+          hostStats: stats,
+          hostStatsReceivedAt: Number.isFinite(receivedAt) ? receivedAt : now,
+        },
+      };
+      notifyRover(roverId);
+    }
+
     socket.on('sensorFrame', handleSensorFrame);
+    socket.on('roverHostStats', handleRoverHostStats);
     return () => {
       socket.off('sensorFrame', handleSensorFrame);
+      socket.off('roverHostStats', handleRoverHostStats);
     };
   }, [socket]);
 

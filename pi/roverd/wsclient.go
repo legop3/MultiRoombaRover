@@ -109,6 +109,7 @@ func (c *WSClient) Run(ctx context.Context) error {
 	}()
 	go c.forwardSensors(ctx, conn)
 	go c.forwardEvents(ctx, conn)
+	go c.forwardHostStats(ctx, conn)
 
 	select {
 	case <-ctx.Done():
@@ -462,6 +463,43 @@ func (c *WSClient) forwardEvents(ctx context.Context, conn *websocket.Conn) {
 			}
 			if err := writeJSON(ctx, conn, evt); err != nil {
 				c.log.Printf("event send failed: %v", err)
+				return
+			}
+		}
+	}
+}
+
+func (c *WSClient) forwardHostStats(ctx context.Context, conn *websocket.Conn) {
+	send := func() bool {
+		// Host stats are collected on demand so each outbound message describes
+		// the current Pi state. Collection failures are encoded into the stats
+		// payload, which keeps this telemetry path from closing the rover socket.
+		msg := hostStatsMessage{
+			Type:      "hostStats",
+			Timestamp: time.Now().UnixMilli(),
+			Stats:     CollectHostStats(ctx),
+		}
+		if err := writeJSON(ctx, conn, msg); err != nil {
+			c.log.Printf("host stats send failed: %v", err)
+			return false
+		}
+		return true
+	}
+
+	// Send once immediately so a newly connected rover can populate the UI
+	// without waiting for the first ticker interval.
+	if !send() {
+		return
+	}
+
+	ticker := time.NewTicker(hostStatsInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if !send() {
 				return
 			}
 		}

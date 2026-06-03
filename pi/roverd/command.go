@@ -21,6 +21,15 @@ type sensorMessage struct {
 	Data      string `json:"data"`
 }
 
+// hostStatsMessage is intentionally separate from sensorMessage because sensor
+// frames are raw Roomba Open Interface data, while these values describe the
+// Raspberry Pi host that is running roverd.
+type hostStatsMessage struct {
+	Type      string    `json:"type"`
+	Timestamp int64     `json:"ts"`
+	Stats     HostStats `json:"stats"`
+}
+
 type inboundMessage struct {
 	Type         string               `json:"type"`
 	ID           string               `json:"id"`

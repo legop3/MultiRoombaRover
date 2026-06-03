@@ -127,6 +127,7 @@ const {
   getRosterForSocket,
   broadcastRoster,
   setNightVisionState,
+  handleHostStats,
   canSeeRover,
   canRequestControl,
 } = rosterLifecycle;
@@ -244,6 +245,7 @@ module.exports = {
   getRosterForSocket,
   broadcastRoster,
   setNightVisionState,
+  handleHostStats,
   handleSensorFrame,
   requestControl,
   releaseControl,

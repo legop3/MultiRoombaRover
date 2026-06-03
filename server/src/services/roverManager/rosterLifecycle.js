@@ -33,6 +33,7 @@ function createRosterLifecycle(deps) {
         meta: null,
         ws: null,
         lastSensor: null,
+        lastHostStats: null,
         docked: null,
         lastBumpAt: null,
         drivers: new Set(),
@@ -269,6 +270,30 @@ function createRosterLifecycle(deps) {
     managerEvents.emit('rover', { roverId, action: 'nightVision', record });
   }
 
+  function handleHostStats(roverId, msg = {}) {
+    const record = rovers.get(roverId);
+    if (!record) return;
+    const stats = msg && typeof msg.stats === 'object' && msg.stats ? msg.stats : {};
+    const receivedAt = Date.now();
+
+    // Host stats describe the Pi/Linux side of a rover, so they are stored
+    // separately from lastSensor and emitted on their own browser event. That
+    // keeps raw Roomba sensor frames from becoming a mixed metadata channel.
+    record.lastHostStats = {
+      raw: msg,
+      stats,
+      receivedAt,
+    };
+    record.lastSeen = receivedAt;
+
+    io.to(record.room).volatile.emit('roverHostStats', {
+      roverId,
+      stats,
+      receivedAt,
+    });
+    managerEvents.emit('hostStats', { roverId, stats, receivedAt });
+  }
+
   function canSeeRover(roverId, socket) {
     const record = rovers.get(String(roverId));
     return isRoverVisibleToSocket(record, socket);
@@ -292,6 +317,7 @@ function createRosterLifecycle(deps) {
     syncSpectatorRooms,
     broadcastRoster,
     setNightVisionState,
+    handleHostStats,
     canSeeRover,
     canRequestControl,
   };

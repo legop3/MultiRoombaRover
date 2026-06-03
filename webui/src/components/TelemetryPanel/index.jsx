@@ -40,7 +40,7 @@ export default function TelemetryPanel() {
   }, [activeDriverId, roverId, selfSocketId, users]);
 
   return (
-    <CardFrame hideHeader clipOverflow={false} bodyClassName="space-y-0.5 text-base text-slate-100">
+    <CardFrame title='Roomba sensor values' clipOverflow={false} bodyClassName="space-y-0.5 text-base text-slate-100">
       {/* <div className="text-sm text-slate-400">
         <span>{connected ? 'online' : 'offline'}</span>
         <span> · role {session?.role || 'unknown'}</span>
