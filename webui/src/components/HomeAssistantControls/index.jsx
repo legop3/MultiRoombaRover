@@ -92,19 +92,6 @@ function rgbLuminance(rgb) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-function swatchMatchesEntity(entity, swatch) {
-  const current = getEntityRgb(entity);
-  if (!current || !Array.isArray(swatch.rgb)) return false;
-
-  // Exact Home Assistant color values vary by bulb and color space, so use a
-  // small distance threshold. This keeps the selected swatch useful without
-  // pretending bulbs report the same RGB values that the UI originally sent.
-  const distance = Math.sqrt(
-    current.reduce((sum, value, index) => sum + (value - swatch.rgb[index]) ** 2, 0),
-  );
-  return distance < 55;
-}
-
 function buildTileStyle(entity, { unavailable, isOn, supportsColor }) {
   if (unavailable) return undefined;
   if (!isOn) return undefined;
@@ -122,8 +109,6 @@ function buildTileStyle(entity, { unavailable, isOn, supportsColor }) {
 }
 
 function LampSwatch({ entity, swatch, disabled, onSetColor, onSetWhite }) {
-  const selected = entity.state === 'on' && swatchMatchesEntity(entity, swatch);
-
   const handleClick = (event) => {
     // Swatches live inside a tile that toggles the lamp when clicked. Stop the
     // event here so choosing a color is a single, unambiguous action instead of
@@ -154,8 +139,9 @@ function LampSwatch({ entity, swatch, disabled, onSetColor, onSetWhite }) {
       title={`${swatch.label} ${entity.name || entity.id}`}
       aria-label={`Set ${entity.name || entity.id} to ${swatch.label}`}
       className={cx(
-        'h-5 w-6 shrink-0 rounded-sm border transition-transform disabled:cursor-not-allowed disabled:opacity-40',
-        selected ? 'border-white ring-1 ring-white/80' : 'border-white/35',
+        // The tile background already shows the Home Assistant-reported color,
+        // so swatches are plain presets rather than a selected-state indicator.
+        'h-5 w-6 shrink-0 rounded-sm border border-white/80 transition-transform disabled:cursor-not-allowed disabled:opacity-40',
         !disabled && 'hover:scale-110 hover:border-white',
       )}
       style={{ backgroundColor: rgbToCss(swatch.rgb) }}
