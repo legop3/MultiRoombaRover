@@ -26,6 +26,7 @@ export default function AdminPanelContent() {
     setGlobalObjective,
     setAdminReason,
     rebootRover,
+    updateRover,
     rebootServer,
     setAudioLevels,
     setPrivateSafety,
@@ -38,6 +39,7 @@ export default function AdminPanelContent() {
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
   const [lockStates, setLockStates] = useState({});
   const [rebootStates, setRebootStates] = useState({});
+  const [updateStates, setUpdateStates] = useState({});
   const [serverRebooting, setServerRebooting] = useState(false);
   const [clearingLlmHistory, setClearingLlmHistory] = useState(false);
   const [clearingOverseerHistory, setClearingOverseerHistory] = useState(false);
@@ -101,6 +103,27 @@ export default function AdminPanelContent() {
       alert(err.message);
     } finally {
       setRebootStates((prev) => ({ ...prev, [rover.id]: false }));
+    }
+  };
+
+  const handleUpdate = async (rover) => {
+    if (!rover?.id) return;
+    const ok = window.confirm(
+      `Update rover "${rover.name || rover.id}" now? The rover will git pull the repo, run the roverd installer, and may disconnect while services restart.`,
+    );
+    if (!ok) return;
+    setUpdateStates((prev) => ({ ...prev, [rover.id]: true }));
+    try {
+      // The rover acknowledges once the privileged self-update helper has been
+      // launched, not when the full install finishes. That is deliberate: a
+      // successful installer run restarts roverd, so waiting for completion over
+      // the same websocket would make the button look failed even when the
+      // update is doing exactly what it should.
+      await updateRover(rover.id);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUpdateStates((prev) => ({ ...prev, [rover.id]: false }));
     }
   };
 
@@ -434,6 +457,14 @@ export default function AdminPanelContent() {
               className="button-danger disabled:cursor-not-allowed disabled:opacity-60"
             >
               {rebootStates[rover.id] ? 'Rebooting...' : 'Reboot'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUpdate(rover)}
+              disabled={Boolean(updateStates[rover.id])}
+              className="button-danger disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {updateStates[rover.id] ? 'Updating...' : 'Update'}
             </button>
             {rover?.private?.enabled ? (
               <div className="w-full rounded border border-slate-700/70 p-0.5 space-y-0.5 text-[0.7rem]">

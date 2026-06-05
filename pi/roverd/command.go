@@ -45,6 +45,10 @@ type inboundMessage struct {
 	NightVision  *nightVisionPayload  `json:"nightVision,omitempty"`
 	Song         *songPayload         `json:"song,omitempty"`
 	Reboot       *rebootPayload       `json:"reboot,omitempty"`
+	// Update is intentionally just a marker payload. The server can request the
+	// fixed self-update workflow, but it cannot pass paths, commands, branches,
+	// or installer flags through the websocket into the privileged helper.
+	Update *updatePayload `json:"update,omitempty"`
 }
 
 type driveDirectPayload struct {
@@ -111,6 +115,8 @@ type songNote struct {
 type rebootPayload struct {
 	DelayMs int `json:"delayMs,omitempty"`
 }
+
+type updatePayload struct{}
 
 type ackMessage struct {
 	Type   string `json:"type"`

@@ -35,6 +35,7 @@ type WSClient struct {
 	rebootT      *time.Timer
 	seekIssued   bool
 	rebootIssued bool
+	updateIssued bool
 	audioLevels  AudioLevels
 	audioMu      sync.RWMutex
 }
@@ -244,20 +245,32 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		return c.adapter.PlaySong(slot, msg.Song.Notes)
 	case msg.Reboot != nil || msg.Type == "reboot":
 		return c.handleRebootCommand(msg.Reboot)
+	case msg.Update != nil || msg.Type == "update":
+		return c.handleUpdateCommand()
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
 	}
 }
 
-func (c *WSClient) handleRebootCommand(payload *rebootPayload) error {
+func (c *WSClient) stopMotionForSystemCommand(reason string) error {
+	// System-level commands can restart the process or the whole Pi. Stopping
+	// both wheel and auxiliary motors first leaves the Roomba in a predictable
+	// state before roverd hands control to systemd or the update helper.
 	if err := c.adapter.DriveDirect(0, 0); err != nil {
-		return fmt.Errorf("stop drive before reboot: %w", err)
+		return fmt.Errorf("stop drive before %s: %w", reason, err)
 	}
 	if err := c.adapter.MotorPWM(0, 0, 0); err != nil {
-		return fmt.Errorf("stop aux motors before reboot: %w", err)
+		return fmt.Errorf("stop aux motors before %s: %w", reason, err)
 	}
 	if err := c.adapter.StartOI(); err != nil {
-		return fmt.Errorf("enter passive mode before reboot: %w", err)
+		return fmt.Errorf("enter passive mode before %s: %w", reason, err)
+	}
+	return nil
+}
+
+func (c *WSClient) handleRebootCommand(payload *rebootPayload) error {
+	if err := c.stopMotionForSystemCommand("reboot"); err != nil {
+		return err
 	}
 
 	delay := 300 * time.Millisecond
@@ -287,6 +300,42 @@ func (c *WSClient) handleRebootCommand(payload *rebootPayload) error {
 		}
 	}()
 
+	return nil
+}
+
+func (c *WSClient) handleUpdateCommand() error {
+	if err := c.stopMotionForSystemCommand("self-update"); err != nil {
+		return err
+	}
+
+	c.connMu.Lock()
+	if c.updateIssued {
+		c.connMu.Unlock()
+		return fmt.Errorf("update already pending")
+	}
+	c.updateIssued = true
+	c.connMu.Unlock()
+
+	c.emitEvent("system.updateStarting", map[string]any{
+		"source": "remoteCommand",
+	})
+
+	// The helper is launched asynchronously because a successful update may
+	// restart roverd before this websocket command could stream progress back to
+	// the server. sudo is intentionally limited by /etc/sudoers.d/roverd-self-update
+	// to one root-owned helper with no caller-controlled arguments.
+	cmd := exec.Command("sudo", "-n", "/usr/local/sbin/roverd-self-update")
+	if err := cmd.Start(); err != nil {
+		c.connMu.Lock()
+		c.updateIssued = false
+		c.connMu.Unlock()
+		return fmt.Errorf("start self-update helper: %w", err)
+	}
+	if err := cmd.Process.Release(); err != nil {
+		c.log.Printf("release self-update helper process handle failed: %v", err)
+	}
+
+	c.log.Printf("started roverd self-update helper with pid %d", cmd.Process.Pid)
 	return nil
 }
 
@@ -576,6 +625,7 @@ func (c *WSClient) markConnected() {
 	c.connected = true
 	c.seekIssued = false
 	c.rebootIssued = false
+	c.updateIssued = false
 	if c.disconnectT != nil {
 		c.disconnectT.Stop()
 		c.disconnectT = nil

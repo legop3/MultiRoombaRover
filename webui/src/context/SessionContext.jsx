@@ -195,6 +195,11 @@ export function SessionProvider({ children }) {
       setAdminReason: (text) => emitWithAck('adminReason:set', { text }),
       rebootRover: (roverId) =>
         emitWithAck('command', { roverId, type: 'reboot', data: { reboot: {} } }),
+      // Rover updates are intentionally parameter-free from the browser. The Pi
+      // side owns the git pull + installer sequence so the admin UI can request
+      // maintenance without becoming a remote shell.
+      updateRover: (roverId) =>
+        emitWithAck('command', { roverId, type: 'update', data: { update: {} } }),
       rebootServer: () => emitWithAck('server:reboot'),
       playUploadedAudio: ({ roverId, name, mime, dataBase64 }) =>
         emitWithAck('audio:uploadPlay', { roverId, name, mime, dataBase64 }),

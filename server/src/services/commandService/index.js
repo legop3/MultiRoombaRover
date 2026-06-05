@@ -82,15 +82,20 @@ io.on('connection', (socket) => {
       }
       const payload = data ? { ...data } : {};
       const isRebootCommand = type === 'reboot';
+      const isUpdateCommand = type === 'update';
       const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));
       const isAdminSocket = isAdmin(socket);
       if (!isAdminSocket && isDeterred(socket)) {
         throw new Error('Not authorized');
       }
-      if (isRebootCommand && !isAdminSocket) {
+      // Rover updates run a privileged, root-owned helper on the Pi. Keep this
+      // in the same explicit admin-only branch as reboot instead of relying on
+      // drive ownership checks, because having a turn should not grant system
+      // maintenance privileges.
+      if ((isRebootCommand || isUpdateCommand) && !isAdminSocket) {
         throw new Error('Not authorized');
       }
-      if (!isSongCommand && !isRebootCommand && !roverManager.canDrive(roverId, socket)) {
+      if (!isSongCommand && !isRebootCommand && !isUpdateCommand && !roverManager.canDrive(roverId, socket)) {
         throw new Error('Not your turn or no control');
       }
       const driveDirect = payload?.driveDirect;
