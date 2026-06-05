@@ -44,7 +44,7 @@ func (c *WSClient) handleTTSPayload(ctx context.Context, payload *ttsPayload) er
 	}
 	espeakPitch = clampInt(espeakPitch, 0, 99)
 
-	runCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	runCtx, cancel := context.WithTimeout(ctx, 40*time.Second)
 	defer cancel()
 
 	var cmd *exec.Cmd
