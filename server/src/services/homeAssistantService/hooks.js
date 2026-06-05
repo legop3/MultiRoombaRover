@@ -67,7 +67,7 @@ function registerHomeAssistantHooks(deps) {
       }
     });
 
-    socket.on('homeAssistant:lightColor', async ({ entityId, rgbColor } = {}, cb = () => {}) => {
+    socket.on('homeAssistant:lightColor', async ({ entityId, colorHex, rgbColor } = {}, cb = () => {}) => {
       if (!hasPermission()) {
         return cb({ error: 'Insufficient permissions to control Home Assistant' });
       }
@@ -76,7 +76,10 @@ function registerHomeAssistantHooks(deps) {
       }
       try {
         if (!entityId) throw new Error('entityId required');
-        await setLightColor(entityId, rgbColor);
+        // New browser clients send colorHex because it is directly usable by
+        // React/CSS. rgbColor remains accepted for compatibility with any older
+        // client that still sends Home Assistant-style RGB arrays.
+        await setLightColor(entityId, colorHex ?? rgbColor);
         cb({ success: true });
       } catch (err) {
         cb({ error: err.message });

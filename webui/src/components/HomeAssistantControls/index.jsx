@@ -8,12 +8,12 @@ import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import CardFrame from '../CardFrame/index.jsx';
 
 const COLOR_SWATCHES = Object.freeze([
-  { id: 'white', label: 'White', rgb: [255, 255, 255], action: 'white' },
-  { id: 'red', label: 'Red', rgb: [255, 0, 0] },
-  { id: 'green', label: 'Green', rgb: [0, 255, 0] },
-  { id: 'cyan', label: 'Cyan', rgb: [0, 199, 190] },
-  { id: 'blue', label: 'Blue', rgb: [0, 0, 255] },
-  { id: 'purple', label: 'Purple', rgb: [191, 90, 242] },
+  { id: 'white', label: 'White', hex: '#ffffff', action: 'white' },
+  { id: 'red', label: 'Red', hex: '#ff0000' },
+  { id: 'green', label: 'Green', hex: '#00ff00' },
+  { id: 'cyan', label: 'Cyan', hex: '#00c7be' },
+  { id: 'blue', label: 'Blue', hex: '#0000ff' },
+  { id: 'purple', label: 'Purple', hex: '#bf5af2' },
 ]);
 
 function StatusBadge({ label, tone = 'muted' }) {
@@ -34,77 +34,18 @@ function cx(...values) {
   return values.filter(Boolean).join(' ');
 }
 
-function clampHue(value) {
-  if (!Number.isFinite(value)) return 0;
-  const wrapped = value % 360;
-  return wrapped < 0 ? wrapped + 360 : wrapped;
-}
-
-function hueToRgb(hue) {
-  const h = clampHue(hue);
-  const c = 1;
-  const x = 1 - Math.abs(((h / 60) % 2) - 1);
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  if (h < 60) {
-    r = c;
-    g = x;
-  } else if (h < 120) {
-    r = x;
-    g = c;
-  } else if (h < 180) {
-    g = c;
-    b = x;
-  } else if (h < 240) {
-    g = x;
-    b = c;
-  } else if (h < 300) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
-  }
-  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-}
-
-function getEntityRgb(entity) {
-  if (!entity) return null;
-  if (Array.isArray(entity.rgbColor) && entity.rgbColor.length >= 3) {
-    return entity.rgbColor.slice(0, 3).map((value) => {
-      const next = Number(value);
-      return Number.isFinite(next) ? Math.max(0, Math.min(255, Math.round(next))) : 0;
-    });
-  }
-  if (Array.isArray(entity.hsColor) && entity.hsColor.length >= 1) {
-    return hueToRgb(entity.hsColor[0]);
-  }
-  return null;
-}
-
-function rgbToCss(rgb) {
-  return `rgb(${rgb.join(',')})`;
-}
-
-function rgbLuminance(rgb) {
-  const [r, g, b] = rgb.map((value) => Number(value) / 255);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
 function buildTileStyle(entity, { unavailable, isOn, supportsColor }) {
   if (unavailable) return undefined;
   if (!isOn) return undefined;
-  const rgb = supportsColor ? getEntityRgb(entity) : null;
-  if (!rgb) return undefined;
+  const colorHex = supportsColor ? entity.colorHex : null;
+  if (!colorHex) return undefined;
 
-  // Colored lights use their actual current color as the tile fill. Switches
-  // and non-color lights deliberately stay on the neutral Tailwind classes
-  // because their real-world lamps do not expose a useful color value.
+  // The server owns Home Assistant color-format conversion and exposes a CSS
+  // hex string. React only uses it as a display value here, which keeps browser
+  // rendering decoupled from HA-specific rgb/hs attribute shapes.
   return {
-    backgroundColor: rgbToCss(rgb),
+    backgroundColor: colorHex,
     borderColor: 'rgba(255,255,255,0.38)',
-    color: rgbLuminance(rgb) > 0.62 ? '#111827' : '#ffffff',
   };
 }
 
@@ -122,7 +63,7 @@ function LampSwatch({ entity, swatch, disabled, onSetColor, onSetWhite }) {
       onSetWhite(entity.id).catch(() => {});
       return;
     }
-    onSetColor(entity.id, swatch.rgb).catch(() => {});
+    onSetColor(entity.id, swatch.hex).catch(() => {});
   };
 
   return (
@@ -144,7 +85,7 @@ function LampSwatch({ entity, swatch, disabled, onSetColor, onSetWhite }) {
         'h-5 w-6 shrink-0 rounded-sm border border-white/80 transition-transform disabled:cursor-not-allowed disabled:opacity-40',
         !disabled && 'hover:scale-110 hover:border-white',
       )}
-      style={{ backgroundColor: rgbToCss(swatch.rgb) }}
+      style={{ backgroundColor: swatch.hex }}
     />
   );
 }
@@ -200,7 +141,7 @@ function LampTile({ entity, connected, controlsLocked, onToggle, onSetColor, onS
       style={tileStyle}
       title={`${isOn ? 'Turn off' : 'Turn on'} ${entity.name || entity.id}`}
     >
-      <div className="grid min-h-5 grid-cols-[minmax(0,1fr)_auto] items-center gap-0.5 text-left">
+      <div className="-mx-0.5 -mt-0.5 grid min-h-5 grid-cols-[minmax(0,1fr)_auto] items-center gap-0.5 rounded-t bg-black/45 px-0.5 py-0.5 text-left text-white">
         <span className="min-w-0 truncate text-[0.78rem] font-semibold leading-none">
           {entity.name || entity.id}
         </span>

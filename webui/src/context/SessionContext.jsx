@@ -167,8 +167,10 @@ export function SessionProvider({ children }) {
       homeAssistantToggle: (entityId) => emitWithAck('homeAssistant:toggle', { entityId }),
       homeAssistantSetState: (entityId, state) =>
         emitWithAck('homeAssistant:setState', { entityId, state }),
-      homeAssistantSetLightColor: (entityId, rgbColor) =>
-        emitWithAck('homeAssistant:lightColor', { entityId, rgbColor }),
+      // The browser deals in CSS-friendly hex strings; the server converts that
+      // to Home Assistant's rgb_color service payload.
+      homeAssistantSetLightColor: (entityId, colorHex) =>
+        emitWithAck('homeAssistant:lightColor', { entityId, colorHex }),
       homeAssistantSetLightWhite: (entityId) =>
         emitWithAck('homeAssistant:lightWhite', { entityId }),
       neatoStart: () => emitWithAck('neato:start'),

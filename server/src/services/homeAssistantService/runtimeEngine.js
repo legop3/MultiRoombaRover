@@ -15,6 +15,68 @@ const {
 } = require('./state');
 const { normalizeConfigEntry, normalizeTriggerEntry, buildState } = require('./entityHelpers');
 
+function arrayValuesEqual(left, right) {
+  if (left === right) return true;
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => String(value) === String(right[index]));
+}
+
+function entityStateChanged(prev, next) {
+  if (!prev) return true;
+
+  // Home Assistant color changes often update attributes and last_updated
+  // without changing the entity's on/off state or last_changed timestamp. The
+  // web UI depends on those attribute updates for lamp tile colors, so the HA
+  // runtime must treat them as real sync-worthy changes.
+  return (
+    prev.state !== next.state ||
+    prev.available !== next.available ||
+    prev.lastChanged !== next.lastChanged ||
+    prev.lastUpdated !== next.lastUpdated ||
+    prev.colorMode !== next.colorMode ||
+    prev.colorHex !== next.colorHex ||
+    prev.supportsColor !== next.supportsColor ||
+    !arrayValuesEqual(prev.supportedColorModes, next.supportedColorModes) ||
+    !arrayValuesEqual(prev.rgbColor, next.rgbColor) ||
+    !arrayValuesEqual(prev.hsColor, next.hsColor)
+  );
+}
+
+function hexToRgbColor(hex) {
+  const raw = String(hex || '').trim();
+  const normalized = raw.startsWith('#') ? raw.slice(1) : raw;
+  if (!/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(normalized)) return null;
+  const expanded =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((char) => char + char)
+          .join('')
+      : normalized;
+  return [
+    Number.parseInt(expanded.slice(0, 2), 16),
+    Number.parseInt(expanded.slice(2, 4), 16),
+    Number.parseInt(expanded.slice(4, 6), 16),
+  ];
+}
+
+function normalizeRgbColor(color) {
+  const rawColor = typeof color === 'string' ? hexToRgbColor(color) : color;
+  if (!Array.isArray(rawColor) || rawColor.length !== 3) {
+    throw new Error('rgbColor hex string or [r,g,b] array required');
+  }
+
+  // The browser now sends hex because it is the simplest React/CSS format, but
+  // accepting arrays keeps older clients and internal callers working. Home
+  // Assistant still wants rgb_color, so the final conversion happens here.
+  return rawColor.map((value) => {
+    const next = Number(value);
+    if (Number.isNaN(next)) return 0;
+    return Math.max(0, Math.min(255, Math.round(next)));
+  });
+}
+
 function createRuntimeEngine(deps) {
   const { logger, enabled, haConfig, callHomeAssistantService } = deps;
 
@@ -316,7 +378,7 @@ function createRuntimeEngine(deps) {
       const raw = snapshot[id];
       const next = buildState(meta, raw);
       const prev = entityState.get(id);
-      if (!prev || prev.state !== next.state || prev.available !== next.available || prev.lastChanged !== next.lastChanged) {
+      if (entityStateChanged(prev, next)) {
         entityState.set(id, next);
         changed = true;
       }
@@ -332,18 +394,13 @@ function createRuntimeEngine(deps) {
     return setEntityState(entityId, nextState, { source });
   }
 
-  async function setLightColor(entityId, rgbColor) {
+  async function setLightColor(entityId, color) {
     if (!enabled) throw new Error('Home Assistant not configured');
     const meta = entityConfig.get(entityId);
     if (!meta || meta.type !== 'light') throw new Error('Home Assistant light required');
     if (!runtime.connection) throw new Error('Home Assistant not connected');
-    if (!Array.isArray(rgbColor) || rgbColor.length !== 3) throw new Error('rgbColor required');
 
-    const normalized = rgbColor.map((value) => {
-      const next = Number(value);
-      if (Number.isNaN(next)) return 0;
-      return Math.max(0, Math.min(255, Math.round(next)));
-    });
+    const normalized = normalizeRgbColor(color);
     await callHomeAssistantService('light', 'turn_on', { entity_id: entityId, rgb_color: normalized });
     logger.info('Issued Home Assistant color command', { entityId, rgbColor: normalized });
   }
