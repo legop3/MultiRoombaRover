@@ -20,8 +20,6 @@ const {
   PROMPT_PATH,
   DEFAULT_NAME,
   DEFAULT_GATE_INTERVAL_MS,
-  DEFAULT_HEARTBEAT_MS,
-  DEFAULT_POST_CHAT_DELAY_MS,
   MAX_RUN_HISTORY,
   MAX_CHAT_CONTEXT,
   MAX_BOT_CONTEXT,
@@ -40,9 +38,6 @@ const name = String(overseerConfig.name || DEFAULT_NAME).trim() || DEFAULT_NAME;
 const model = String(overseerConfig.model || '').trim();
 const ollamaUrl = String(overseerConfig.ollamaUrl || overseerConfig.ollamaServer || '').trim();
 const gateIntervalMs = normalizeMs(Number(overseerConfig.gateIntervalMs), DEFAULT_GATE_INTERVAL_MS);
-const heartbeatMs = normalizeMs(Number(overseerConfig.heartbeatMs), DEFAULT_HEARTBEAT_MS);
-const postChatDelayMs = normalizeMs(Number(overseerConfig.postChatDelayMs), DEFAULT_POST_CHAT_DELAY_MS);
-const alwaysRunModel = Boolean(overseerConfig.alwaysRunModel);
 const postToolsOnlyMessages = Boolean(overseerConfig.postToolsOnlyMessages);
 const tiebreakerEnable = Boolean(overseerConfig.tiebreakerEnable);
 const runWhileNoPeopleOnline = Boolean(overseerConfig.runWhileNoPeopleOnline);
@@ -53,7 +48,6 @@ const runtime = {
   timer: null,
   inFlight: false,
   tickCount: 0,
-  lastModelAt: 0,
   generationCount: 0,
   generationTotalMs: 0,
   runHistory: [],
@@ -70,9 +64,6 @@ let status = {
   ollamaUrl,
   promptPath: PROMPT_PATH,
   gateIntervalMs,
-  heartbeatMs,
-  postChatDelayMs,
-  alwaysRunModel,
   postToolsOnlyMessages,
   tiebreakerEnable,
   runWhileNoPeopleOnline,
@@ -213,20 +204,6 @@ function buildRosterSummary() {
         drivers,
       };
     });
-}
-
-function computeTriggerReason() {
-  if (alwaysRunModel) return 'loop_tick';
-  const recent = getRecentMessages(1, { includeSystem: false });
-  const last = recent[recent.length - 1];
-  if (last && Number(last.ts || 0) < runtime.contextResetAt) return null;
-  if (last && Date.now() - Number(last.ts || 0) < 5000) {
-    const txt = String(last.text || '').toLowerCase();
-    if (txt.includes(name.toLowerCase()) || txt.includes('overseer') || txt.includes('bot')) return 'direct_address';
-    return 'chat_activity';
-  }
-  if (!runtime.lastModelAt || Date.now() - runtime.lastModelAt >= heartbeatMs) return 'heartbeat';
-  return null;
 }
 
 function normalizeToolCalls(payload = null) {
@@ -385,7 +362,6 @@ async function runDecision(triggerReason) {
   runtime.generationCount += 1;
   runtime.generationTotalMs += generationMs;
   const avgGenerationMs = Math.round(runtime.generationTotalMs / runtime.generationCount);
-  runtime.lastModelAt = Date.now();
 
   const actionResults = [];
   const requestedActions = toolCalls;
@@ -472,21 +448,45 @@ async function runDecision(triggerReason) {
 }
 
 async function tick() {
+  // The scheduler is deliberately loop-only. Older versions mixed chat-triggered
+  // and heartbeat-triggered paths into this same timer, which made it possible
+  // for one slow model generation to be followed by another run that was still
+  // reasoning over the same chat message. In the loop model, every completed
+  // timer means exactly one model request, and the next timer is not installed
+  // until the current request has completely finished.
+  const startedAt = Date.now();
+
+  // setTimeout handles are one-shot. Clearing the reference at the beginning of
+  // the callback makes scheduler ownership obvious: if any gate reevaluation
+  // happens while this tick is running, startScheduler can see that work is
+  // already in-flight and will not create a competing timer.
+  runtime.timer = null;
+
+  if (runtime.inFlight) {
+    // This is a defensive guard for unusual event-loop races or manual calls.
+    // Sending the same model input twice is worse than skipping one interval,
+    // so a re-entrant tick is ignored and the active tick remains responsible
+    // for scheduling the next pass.
+    updateStatus({
+      phase: 'idle',
+      lastOutcome: 'skipped',
+      lastReason: 'loop tick skipped while model request is in flight',
+    });
+    return;
+  }
+
   runtime.tickCount += 1;
   runtime.inFlight = true;
-  updateStatus({ inFlight: true, tickCount: runtime.tickCount, lastTickAt: Date.now(), phase: 'gate_check' });
+  updateStatus({
+    inFlight: true,
+    tickCount: runtime.tickCount,
+    lastTickAt: startedAt,
+    phase: 'loop_tick',
+    lastTriggerReason: 'loop_tick',
+  });
 
-  let nextDelayMs = gateIntervalMs;
   try {
-    const triggerReason = computeTriggerReason();
-    if (!triggerReason) {
-      updateStatus({ phase: 'idle', lastOutcome: 'skipped', lastReason: 'gate not triggered' });
-    } else {
-      const runResult = await runDecision(triggerReason);
-      if (runResult?.postedChat) {
-        nextDelayMs = postChatDelayMs;
-      }
-    }
+    await runDecision('loop_tick');
   } catch (err) {
     const failure = buildFailureInfo(err);
     updateStatus({
@@ -500,8 +500,13 @@ async function tick() {
   } finally {
     runtime.inFlight = false;
     if (status.running) {
-      updateStatus({ inFlight: false, currentRunId: null, phase: 'idle', nextRunAt: Date.now() + nextDelayMs });
-      runtime.timer = setTimeout(tick, nextDelayMs);
+      const nextRunAt = Date.now() + gateIntervalMs;
+      updateStatus({ inFlight: false, currentRunId: null, phase: 'idle', nextRunAt });
+
+      // The next timer is installed after all async work completes. This keeps
+      // Ollama calls strictly serialized even when a generation takes longer
+      // than gateIntervalMs.
+      runtime.timer = setTimeout(tick, gateIntervalMs);
     } else {
       updateStatus({ inFlight: false, currentRunId: null, nextRunAt: null });
     }
@@ -521,7 +526,6 @@ function clearHistory(reason = 'admin requested clear history', options = {}) {
   runtime.liveToolCalls = [];
   runtime.generationCount = 0;
   runtime.generationTotalMs = 0;
-  runtime.lastModelAt = 0;
   if (resetPersistentMemory) {
     runtime.memoryStore = saveMemory(createDefaultMemory());
   }
@@ -567,14 +571,17 @@ function stopScheduler(reason = 'paused') {
 }
 
 function startScheduler(reason = null) {
-  if (runtime.timer) return;
-  updateStatus({ running: true, phase: 'idle', lastReason: reason });
+  // Gate changes can happen while a loop iteration is still waiting on Ollama.
+  // In that case we mark the service as running again, but let the active tick's
+  // finally block install the next timer. That preserves a single owner for
+  // scheduling and prevents overlapping model requests.
+  updateStatus({ running: true, phase: runtime.inFlight ? status.phase : 'idle', lastReason: reason });
+  if (runtime.timer || runtime.inFlight) return;
   runtime.timer = setTimeout(tick, gateIntervalMs);
 }
 
 function evaluateSchedulerGate(reason = 'gate reevaluated') {
   const voteStatus = buildVoteStatus();
-  const runningAllowed = Boolean(enabled && voteStatus.gatePassed && getMode() !== MODES.LOCKDOWN);
   updateStatus({ voteStatus });
   if (!enabled) {
     stopScheduler('overseerControl.enabled is false');
@@ -640,7 +647,7 @@ if (!enabled) {
     logger.info('overseerControl paused on startup due to lockdown mode');
   } else {
     evaluateSchedulerGate(observeOnly ? 'observe-only mode' : null);
-    logger.info('overseerControl enabled', { model, ollamaUrl, gateIntervalMs, heartbeatMs, observeOnly });
+    logger.info('overseerControl enabled', { model, ollamaUrl, gateIntervalMs, observeOnly });
   }
 }
 
