@@ -17,7 +17,11 @@ function createHandlers({ sendSystemMessage }) {
     const clean = normalized.trim();
     if (!clean) return cb({ error: 'Message required' });
     if (!withinRateLimit(socket.id)) return cb({ error: 'Slow down' });
-    if (clean.length > 400) return cb({ error: 'Message too long' });
+    // This service no longer enforces a character-count ceiling for chat text.
+    // The chat layer only rejects empty, rate-limited, or moderated content so
+    // users can send long messages without hitting an arbitrary local cap.
+    // Transport-specific integrations may still constrain their own payloads
+    // where an external API or rover-side feature has a real hard limit.
     if (hasProfanity(clean)) return cb({ error: 'Message blocked' });
 
     const roverId = resolveRoverId(socket?.id);
@@ -50,7 +54,13 @@ function createHandlers({ sendSystemMessage }) {
   function sendExternalMessage({ text, nickname = 'Discord', role = 'admin', roverId = null, discordGuildId = null, discordGuildName = null, discordGuildIconUrl = null, discordChannelId = null, discordUserId = null, discordUserName = null, discordUserAvatarUrl = null, bot = false, profileImage = null }) {
     const normalized = normalizeUserText(text);
     const clean = normalized.trim();
-    if (!clean || clean.length > 400) throw new Error('Message invalid');
+    // Direct socket chat and bridged external chat intentionally share the
+    // same validation posture: an empty message is invalid, but message length
+    // is not capped here. Keeping the character limit out of this service lets
+    // chat accept long user messages while the downstream integrations that
+    // have hard platform limits, such as Discord replies or rover TTS, continue
+    // to enforce their own transport-specific safeguards.
+    if (!clean) throw new Error('Message invalid');
     if (hasProfanity(clean)) throw new Error('Message blocked');
     if (isKeymash(clean)) throw new Error('Message looks like spam');
     if (isPrivateClosedRoverId(roverId)) throw new Error('Private rover chat is closed');
