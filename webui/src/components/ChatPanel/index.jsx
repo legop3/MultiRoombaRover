@@ -232,7 +232,7 @@ export default function ChatPanel({
               >
                 <option value="flite">flite</option>
                 <option value="espeak">espeak</option>
-                <option value="chromegtts">Google TTS</option>
+                <option value="chromegtts">Google TTS (Local!!)</option>
               </select>
               {engine === 'flite' || engine === 'chromegtts' ? (
                 <>
