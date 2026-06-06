@@ -1,0 +1,3 @@
+# The native Kinect worker is built on the target Fedora server because it links
+# against the locally installed libfreenect/libusb packages.
+/kinect_worker

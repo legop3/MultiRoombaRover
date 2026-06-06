@@ -40,6 +40,7 @@ require('./src/services/liftService');
 require('./src/services/audioLevelsService');
 require('./src/services/audioForwardService');
 require('./src/services/buttonBoxService');
+require('./src/services/kinectService');
 require('./src/services/sessionService');
 require('./src/services/batteryManager');
 require('./src/services/replayEngineV2');

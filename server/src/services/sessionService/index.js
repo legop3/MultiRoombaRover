@@ -13,6 +13,7 @@ const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
 const { getState: getNeatoState, neatoEvents } = require('../neatoService');
 const { getState: getLiftState, liftEvents } = require('../liftService');
+const { getState: getKinectState, kinectEvents } = require('../kinectService');
 const { getVoteStatus: getOverseerVoteStatus } = require('../overseerControlService');
 const { getNickname, nicknameEvents } = require('../nicknameService');
 const {
@@ -104,6 +105,7 @@ function buildSession(socket) {
     homeAssistant: getHomeAssistantState(),
     neato: getNeatoState(),
     lift: getLiftState(),
+    kinect: getKinectState(),
     replay: getReplayState(),
     replaySources: getReplaySources(socket),
     health: getHealthSnapshot(),
@@ -285,6 +287,11 @@ neatoEvents.on('update', () => {
 
 liftEvents.on('update', () => {
   logger.info('Lift state change; syncing all clients');
+  syncAll();
+});
+
+kinectEvents.on('change', () => {
+  logger.info('Kinect state change; syncing all clients');
   syncAll();
 });
 

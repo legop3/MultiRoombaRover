@@ -11,6 +11,7 @@ MEDIAMTX_SERVICE="/etc/systemd/system/mediamtx.service"
 MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
 SNAPSHOT_DIR="/var/lib/rover-snapshots"
 REPLAY_SEGMENT_DIR="/var/lib/replay-segments"
+KINECT_UDEV_RULE="/etc/udev/rules.d/99-kinect-world.rules"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This installer must be run with sudo/root." >&2
@@ -30,11 +31,44 @@ MEDIAMTX_TEMPLATE="$SERVER_DIR/mediamtx/mediamtx.yml"
 ROVER_SNAPSHOT_WRITER_TEMPLATE="$SERVER_DIR/mediamtx/rover-snapshot-writer.sh"
 
 echo "[1/6] Installing dependencies..."
-dnf install -y nodejs npm curl tar >/dev/null
+# The Kinect tooling uses a native libfreenect worker/probe rather than a
+# Python wrapper.  Install both runtime and development headers here so a fresh
+# Fedora server can build the worker locally and then run it under the same
+# normal user that owns the rover service.
+dnf install -y \
+  nodejs \
+  npm \
+  curl \
+  tar \
+  gcc-c++ \
+  make \
+  pkgconf-pkg-config \
+  libfreenect \
+  libfreenect-devel \
+  libusb1-devel >/dev/null
 NODE_BIN="$(command -v node)"
+
+echo "      Installing Kinect udev rule -> $KINECT_UDEV_RULE"
+cat > "$KINECT_UDEV_RULE" <<'EOF'
+# Xbox 360 / Kinect v1 exposes motor, audio, and camera as separate Microsoft
+# USB devices.  Fedora/OpenNI PrimeSense rules can leave the camera node as
+# root:primesense 0660, which makes libfreenect fail with LIBUSB_ERROR_ACCESS
+# when the rover server runs as the normal service user.  This late 99-* rule is
+# intentionally broad for local rover hardware: every Microsoft Kinect sibling
+# gets world read/write access so the native libfreenect worker can open the
+# camera without running the whole server as root.
+SUBSYSTEM=="usb", ATTR{idVendor}=="045e", MODE="0666", GROUP="root", TAG+="uaccess"
+EOF
+chmod 644 "$KINECT_UDEV_RULE"
+udevadm control --reload-rules
 
 echo "[2/6] Installing Node production deps..."
 runuser -u "$TARGET_USER" -- bash -c "cd '$SERVER_DIR' && npm install --production"
+
+if [[ -f "$SERVER_DIR/src/services/kinectService/native/Makefile" ]]; then
+  echo "      Building native Kinect worker..."
+  runuser -u "$TARGET_USER" -- bash -c "cd '$SERVER_DIR/src/services/kinectService/native' && make"
+fi
 
 if [[ ! -f "$CONFIG_PATH" ]]; then
   cp "$SERVER_DIR/config.example.yaml" "$CONFIG_PATH"
@@ -145,3 +179,5 @@ echo "  mediamtx.service (WebRTC fan-out)"
 echo "  multirover.service (Node.js control server)"
 echo
 echo "Update $CONFIG_PATH to set admins, lockdown settings, and media parameters."
+echo "Kinect/libfreenect packages and udev permissions were installed."
+echo "If a Kinect is already plugged in, unplug/replug its USB/power before testing so the new udev rule applies."

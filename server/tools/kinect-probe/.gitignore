@@ -1,0 +1,5 @@
+# Keep probe build products out of source control.  The probe is meant to be
+# rebuilt locally after libfreenect packages are installed, and captured frames
+# are machine-specific diagnostic artifacts rather than repo assets.
+/kinect_probe
+/kinect-probe-output/

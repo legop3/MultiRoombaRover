@@ -98,6 +98,13 @@ roomCameras:
     url: "http://192.168.0.51/snapshot.jpg"
     streamUrl: "http://192.168.0.51/stream.mjpg"
 
+kinect:
+  enabled: false
+  # Capture requests are global across 3d/color so one person cannot spam room
+  # uploads for everyone else.  This does not affect the native worker's local
+  # camera cache; it only gates browser-requested broadcasts.
+  captureCooldownMs: 10000
+
 discord:
   token: "DISCORD_BOT_TOKEN"
   guildId: "123456789012345678" # optional; bot works in any guild it's invited to

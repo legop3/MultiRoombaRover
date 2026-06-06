@@ -16,6 +16,7 @@ import {
   useControlSystem,
 } from './controls/index.js';
 import RoomCameraPanel from './components/RoomCameraPanel/index.jsx';
+import KinectPanel from './components/KinectPanel/index.jsx';
 import LogPanel from './components/LogPanel/index.jsx';
 import DriverVideo from './components/DriverVideo/index.jsx';
 import RightPaneTabs from './components/RightPaneTabs/index.jsx';
@@ -167,6 +168,7 @@ function MobileFeatureTabs({
               <HomeAssistantControls />
               <ButtonBoxPanel />
               <RoomCameraPanel panelId={roomPanelId} />
+              <KinectPanel />
             </div>
           </TabPanel>
           <TabPanel id="help">
