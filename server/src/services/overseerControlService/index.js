@@ -156,6 +156,27 @@ function updateStatus(patch = {}) {
   });
 }
 
+function buildMemorySnapshot() {
+  // The public UI only needs the same compact text summary that the overseer
+  // already reasons over. Keeping this as text avoids exposing the raw mutable
+  // store shape as a browser-facing contract.
+  return {
+    summary: summarizeMemory(runtime.memoryStore),
+    updatedAt: Number(runtime.memoryStore?.updatedAt) || Date.now(),
+  };
+}
+
+function emitMemoryToSocket(socket) {
+  if (!socket) return;
+  socket.emit('overseer:memory', buildMemorySnapshot());
+}
+
+function emitMemoryToAll() {
+  // Memory writes are rare and user-visible, so broadcast immediately instead
+  // of waiting for unrelated session sync events to refresh the popup.
+  io.sockets.sockets.forEach((socket) => emitMemoryToSocket(socket));
+}
+
 function pushRun(run = {}) {
   runtime.runHistory = [...runtime.runHistory.slice(-(MAX_RUN_HISTORY - 1)), run];
 }
@@ -391,6 +412,7 @@ async function runDecision(triggerReason) {
           });
           if (result?.memory && typeof result.memory === 'object') {
             runtime.memoryStore = saveMemory(result.memory);
+            emitMemoryToAll();
           }
           pushLiveToolCall({ phase: 'ok', tool: action.tool, result });
           actionResults.push({ kind: 'tool', tool: action.tool, ok: true, result });
@@ -528,6 +550,7 @@ function clearHistory(reason = 'admin requested clear history', options = {}) {
   runtime.generationTotalMs = 0;
   if (resetPersistentMemory) {
     runtime.memoryStore = saveMemory(createDefaultMemory());
+    emitMemoryToAll();
   }
   updateStatus({
     phase: 'idle',
@@ -600,6 +623,7 @@ function evaluateSchedulerGate(reason = 'gate reevaluated') {
 
 io.on('connection', (socket) => {
   emitStateToSocket(socket);
+  emitMemoryToSocket(socket);
   evaluateSchedulerGate('online vote update');
   socket.on('disconnect', () => evaluateSchedulerGate('online vote update'));
   socket.on('overseer:control', ({ controls } = {}, cb = () => {}) => {

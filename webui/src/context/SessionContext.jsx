@@ -13,6 +13,7 @@ const INITIAL_STATE = {
   llmCommentaryState: null,
   llmCommentaryStatus: null,
   overseerControlState: null,
+  overseerMemory: null,
   alerts: [],
 };
 
@@ -132,6 +133,12 @@ export function SessionProvider({ children }) {
       const state = payload && typeof payload === 'object' ? payload : null;
       setState((prev) => ({ ...prev, overseerControlState: state }));
     }
+    function handleOverseerMemory(payload = null) {
+      // Overseer memory is intentionally stored separately from session sync so
+      // the vote panel can refresh as soon as the overseer writes memory.
+      const memory = payload && typeof payload === 'object' ? payload : null;
+      setState((prev) => ({ ...prev, overseerMemory: memory }));
+    }
     socket.on('session:sync', handleSession);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
@@ -139,6 +146,7 @@ export function SessionProvider({ children }) {
     socket.on('adminlog:entry', handleAdminLogEntry);
     socket.on('llm:state', handleLlmState);
     socket.on('overseer:state', handleOverseerState);
+    socket.on('overseer:memory', handleOverseerMemory);
     socket.on('alert:new', handleAlertNew);
     return () => {
       socket.off('session:sync', handleSession);
@@ -148,6 +156,7 @@ export function SessionProvider({ children }) {
       socket.off('adminlog:entry', handleAdminLogEntry);
       socket.off('llm:state', handleLlmState);
       socket.off('overseer:state', handleOverseerState);
+      socket.off('overseer:memory', handleOverseerMemory);
       socket.off('alert:new', handleAlertNew);
     };
   }, [setState, socket]);
