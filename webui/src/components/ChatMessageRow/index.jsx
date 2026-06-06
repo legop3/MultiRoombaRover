@@ -32,11 +32,19 @@ function displayName(message) {
   return message.nickname || message.socketId?.slice(0, 6) || 'unknown';
 }
 
+// The chat rows use py-0.5 for their compact vertical rhythm, but the desired avatar
+// treatment is edge-to-edge inside that same row height. The negative vertical margin
+// lets the image cover the row padding visually without increasing the row's measured
+// height, while the matching calc() size keeps the avatar square after adding that
+// top/bottom coverage.
+const CHAT_ROW_FULL_HEIGHT_AVATAR_CLASS =
+  'my-[-0.125rem] flex h-[calc(1rem+0.25rem)] w-[calc(1rem+0.25rem)] shrink-0 overflow-hidden rounded-none border border-slate-700/80';
+
 function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
   if (!guildIconUrl && !userAvatarUrl) return null;
   return (
     <span
-      className="flex h-4 w-4 shrink-0 overflow-hidden rounded-none border border-slate-700/80"
+      className={CHAT_ROW_FULL_HEIGHT_AVATAR_CLASS}
       title={label}
     >
       <span
@@ -70,7 +78,10 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
 function ProfileAvatar({ imageUrl, label }) {
   if (!imageUrl) return null;
   return (
-    <span className="flex h-4 w-4 shrink-0 overflow-hidden rounded-none border border-slate-700/80" title={label}>
+    <span
+      className={CHAT_ROW_FULL_HEIGHT_AVATAR_CLASS}
+      title={label}
+    >
       <span
         className="h-full w-full bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${imageUrl})` }}
