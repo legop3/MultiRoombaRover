@@ -7,7 +7,7 @@ const liftUp = require('./liftUp');
 const liftDown = require('./liftDown');
 const neatoStart = require('./neatoStart');
 const neatoSendHome = require('./neatoSendHome');
-const neatoLocate = require('./neatoLocate');
+// const neatoLocate = require('./neatoLocate');
 const neatoClearErrors = require('./neatoClearErrors');
 const haSetEntity = require('./haSetEntity');
 const buttonBoxAddCount = require('./buttonBoxAddCount');
@@ -22,7 +22,7 @@ const TOOL_DEFINITIONS = [
   liftDown,
   neatoStart,
   neatoSendHome,
-  neatoLocate,
+  // neatoLocate,
   neatoClearErrors,
   haSetEntity,
   buttonBoxAddCount,

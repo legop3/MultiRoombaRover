@@ -8,15 +8,7 @@ const WATCHED_EVENT_TYPES = new Set([
   'mode.changed',
   'globalObjective.updated',
   'communityGoal.updated',
-  'rover.online',
-  'rover.offline',
-  'rover.locked',
-  'rover.unlocked',
   'rovers.allUnlocked',
-  'rover.privateOpened',
-  'rover.privateClosed',
-  'battery.locked',
-  'battery.unlocked',
 ]);
 
 function createUserAnnouncements(deps) {
@@ -35,6 +27,7 @@ function createUserAnnouncements(deps) {
   const siteUrl = discordConfig?.siteUrl ? String(discordConfig.siteUrl) : '';
 
   let previousSnapshot = buildSnapshot();
+  let skippedFirstModeChange = false;
 
   function isPublicMode(mode) {
     return PUBLIC_MODES.has(String(mode || ''));
@@ -42,12 +35,6 @@ function createUserAnnouncements(deps) {
 
   function getRecordName(record, fallback = 'A rover') {
     return String(record?.meta?.name || record?.id || fallback);
-  }
-
-  function getEventRoverName(payload = {}) {
-    const roverId = payload?.roverId ? String(payload.roverId) : '';
-    if (!roverId) return 'A rover';
-    return getRecordName(rovers.get(roverId), roverId);
   }
 
   function formatPercent(record) {
@@ -95,33 +82,45 @@ function createUserAnnouncements(deps) {
     const embed = new EmbedBuilder().setTitle(title).setColor(color).setTimestamp(new Date());
     if (description) embed.setDescription(description);
 
-    if (snapshot.readyRecords.length) {
-      embed.addFields({
-        name: 'Ready',
-        value: snapshot.readyRecords.map((record) => formatRecordLine(record)).join('\n').slice(0, 1024),
-        inline: false,
-      });
-    }
-
-    if (snapshot.unavailableRecords.length) {
-      embed.addFields({
-        name: 'Not Ready',
-        value: snapshot.unavailableRecords.map((record) => formatRecordLine(record, true)).join('\n').slice(0, 1024),
-        inline: false,
-      });
-    }
-
     embed.addFields({
       name: 'Mode',
       value: String(snapshot.mode || 'unknown'),
       inline: true,
     });
 
+    embed.addFields({
+      name: 'Ready Count',
+      value: `${snapshot.readyCount}/${snapshot.totalCount}`,
+      inline: true,
+    });
+
+    if (snapshot.readyRecords.length) {
+      embed.addFields({
+        name: 'Ready',
+        value: snapshot.readyRecords.map((record) => formatRecordLine(record)).join(', ').slice(0, 1024),
+        inline: true,
+      });
+    } else {
+      embed.addFields({
+        name: 'Ready',
+        value: 'none',
+        inline: true,
+      });
+    }
+
+    if (snapshot.unavailableRecords.length) {
+      embed.addFields({
+        name: 'Not Ready',
+        value: snapshot.unavailableRecords.map((record) => formatRecordLine(record, true)).join(', ').slice(0, 1024),
+        inline: true,
+      });
+    }
+
     if (snapshot.objectiveText) {
       embed.addFields({
         name: 'Objective',
         value: snapshot.objectiveText.slice(0, 1024),
-        inline: false,
+        inline: true,
       });
     }
 
@@ -149,122 +148,65 @@ function createUserAnnouncements(deps) {
     );
   }
 
-  function hasAnyReadyRover(snapshot) {
-    return snapshot.publicMode && snapshot.readyCount > 0;
-  }
-
-  function wasAnyReadyRover(snapshot) {
-    return snapshot?.publicMode && snapshot.readyCount > 0;
-  }
-
   function didObjectiveChange(prev, next) {
     return String(prev?.objectiveText || '') !== String(next?.objectiveText || '');
   }
 
-  function isPositiveReadyTransition(prev, next) {
-    return next.publicMode && prev?.readyCount === 0 && next.readyCount > 0;
-  }
-
-  function isNegativeReadyTransition(prev, next) {
-    return next.publicMode && prev?.readyCount > 0 && next.readyCount === 0;
-  }
-
-  function didPublicAccessClose(prev, next) {
-    return prev?.publicMode && !next.publicMode;
-  }
-
-  function findNewReadyRecord(prev, next) {
-    return next.readyRecords.find((record) => !prev?.readyIds?.has(String(record.id))) || next.readyRecords[0] || null;
-  }
-
-  // Positive availability messages: these are the only rover availability posts that ping subscribers.
-  async function maybeAnnounceRoversAvailable(event, prev, next) {
-    if (!isPositiveReadyTransition(prev, next)) return false;
-    const eventType = event?.type || '';
-    const record = eventType === 'mode.changed' ? null : findNewReadyRecord(prev, next);
-    const title = eventType === 'mode.changed'
-      ? 'Rovers Are Open'
-      : `${getRecordName(record)} Is Ready`;
-    const content = eventType === 'mode.changed'
-      ? `Rovers are open: ${next.readyCount} ready`
-      : `${getRecordName(record)} is ready`;
-    const description = `${next.readyCount}/${next.totalCount} public rovers ready.`;
+  // Mode-open pings: ping only when the server is switched to open/turns, never for the first mode event after startup.
+  async function maybeAnnouncePublicMode(event, next) {
+    if (event?.type !== 'mode.changed') return false;
+    if (!skippedFirstModeChange) {
+      skippedFirstModeChange = true;
+      return false;
+    }
+    if (!next.publicMode) return false;
 
     await sendAnnouncement({
-      content,
+      content: `Server mode changed to ${next.mode}.`,
       ping: true,
-      embeds: [buildAvailabilityEmbed({ title, description, snapshot: next, color: 0x4caf50 })],
-    });
-    return true;
-  }
-
-  // Public access closed messages: useful context, but never ping for negative server state.
-  async function maybeAnnounceAccessPaused(prev, next) {
-    if (!didPublicAccessClose(prev, next)) return false;
-    await sendAnnouncement({
-      content: 'Rovers are paused',
       embeds: [buildAvailabilityEmbed({
-        title: 'Rovers Are Paused',
-        description: 'Public driving is currently closed.',
+        title: `Server Mode Changed To ${next.mode}`,
+        description: `The server was switched to **${next.mode}** mode.`,
         snapshot: next,
-        color: 0xf0b651,
+        color: 0x4caf50,
       })],
     });
     return true;
   }
 
-  // All-ready-lost messages: useful context, but never ping for negative rover state.
-  async function maybeAnnounceNoReadyRovers(event, prev, next) {
-    if (!isNegativeReadyTransition(prev, next)) return false;
-    const roverName = event?.payload?.roverId ? getEventRoverName(event.payload) : null;
-    const content = roverName ? `${roverName} is not ready` : 'No rovers are ready right now';
-    const title = roverName ? `${roverName} Is Not Ready` : 'No Rovers Are Ready';
-
+  // All-unlocked pings: ping only when every rover has been unlocked.
+  async function maybeAnnounceAllUnlocked(event, next) {
+    if (event?.type !== 'rovers.allUnlocked') return false;
     await sendAnnouncement({
-      content,
+      content: 'All rovers are unlocked.',
+      ping: true,
       embeds: [buildAvailabilityEmbed({
-        title,
-        description: 'Public access is open, but there are no ready rovers.',
+        title: 'All Rovers Unlocked',
+        description: 'Every rover is now unlocked.',
         snapshot: next,
-        color: 0xf0b651,
+        color: 0x4caf50,
       })],
     });
     return true;
   }
 
-  // Objective messages: setting a useful objective pings only when there are usable public rovers.
+  // Objective pings: ping whenever the objective text changes, and say the objective in the message text.
   async function maybeAnnounceObjective(event, prev, next) {
     if (event?.type !== 'globalObjective.updated' && event?.type !== 'communityGoal.updated') return false;
     if (!didObjectiveChange(prev, next)) return false;
 
-    if (next.objectiveText && hasAnyReadyRover(next)) {
-      await sendAnnouncement({
-        content: 'New objective',
-        ping: true,
-        embeds: [buildAvailabilityEmbed({
-          title: 'New Objective',
-          description: next.objectiveText,
-          snapshot: next,
-          color: 0x8bc34a,
-        })],
-      });
-      return true;
-    }
-
-    if (!next.objectiveText && wasAnyReadyRover(prev)) {
-      await sendAnnouncement({
-        content: 'Objective cleared',
-        embeds: [buildAvailabilityEmbed({
-          title: 'Objective Cleared',
-          description: 'There is no current objective.',
-          snapshot: next,
-          color: 0x2196f3,
-        })],
-      });
-      return true;
-    }
-
-    return false;
+    const objectiveText = next.objectiveText || 'cleared';
+    await sendAnnouncement({
+      content: `Objective changed to: ${objectiveText}`,
+      ping: true,
+      embeds: [buildAvailabilityEmbed({
+        title: 'Objective Changed',
+        description: next.objectiveText ? `New objective: ${next.objectiveText}` : 'The objective was cleared.',
+        snapshot: next,
+        color: 0x8bc34a,
+      })],
+    });
+    return true;
   }
 
   async function handleBusEvent(event) {
@@ -277,9 +219,8 @@ function createUserAnnouncements(deps) {
 
     try {
       if (await maybeAnnounceObjective(event, prev, next)) return;
-      if (await maybeAnnounceRoversAvailable(event, prev, next)) return;
-      if (await maybeAnnounceAccessPaused(prev, next)) return;
-      await maybeAnnounceNoReadyRovers(event, prev, next);
+      if (await maybeAnnouncePublicMode(event, next)) return;
+      await maybeAnnounceAllUnlocked(event, next);
     } catch (err) {
       // The caller logs send failures; this catch keeps one announcement bug from breaking event dispatch.
       const logger = deps.logger;
