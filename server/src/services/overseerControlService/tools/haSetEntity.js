@@ -1,3 +1,5 @@
+const { resolveConfiguredEntity } = require('./haEntityLookup');
+
 module.exports = {
   id: 'ha_set_entity',
   signature: 'ha_set_entity(entity_id, state)',
@@ -23,18 +25,17 @@ module.exports = {
     return { available: true, reason: null };
   },
   async execute({ args = {}, homeAssistantService }) {
-    const entityId = String(args?.entity_id || args?.entityId || '').trim();
-    if (!entityId) throw new Error('ha_set_entity requires args.entity_id');
-
     // Configured Home Assistant entities are the room-control surface the
     // overseer is allowed to use. Some physical room lights are exposed by Home
     // Assistant as switches because they are outlet-backed lamps, so this tool
     // intentionally permits every configured entity for on/off control instead
     // of limiting itself to HA's light domain.
-    const allowed = new Set(
-      (homeAssistantService.getState()?.entities || []).map((entry) => String(entry?.id || '')).filter(Boolean),
+    const { entityId } = resolveConfiguredEntity(
+      homeAssistantService,
+      args?.entity_id || args?.entityId,
+      'ha_set_entity',
     );
-    if (!allowed.has(entityId)) throw new Error('ha_set_entity entity_id not configured');
+
     const state = String(args?.state || '').toLowerCase();
     if (state !== 'on' && state !== 'off') throw new Error('ha_set_entity requires args.state of on/off');
     await homeAssistantService.setEntityState(entityId, state, { source: 'overseerControl' });

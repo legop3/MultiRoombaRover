@@ -1,3 +1,5 @@
+const { resolveConfiguredEntity } = require('./haEntityLookup');
+
 function normalizeColorHex(value) {
   const raw = String(value || '').trim();
   const withoutHash = raw.startsWith('#') ? raw.slice(1) : raw;
@@ -22,15 +24,6 @@ function normalizeColorHex(value) {
           .join('')
       : withoutHash;
   return `#${expanded.toLowerCase()}`;
-}
-
-function findConfiguredEntity(homeAssistantService, entityId) {
-  const entities = homeAssistantService.getState()?.entities || [];
-
-  // The overseer only gets to act on entities that the local config already
-  // exposes. This mirrors ha_set_entity and prevents a model-generated entity id
-  // from becoming an arbitrary Home Assistant service call.
-  return entities.find((entry) => String(entry?.id || '') === entityId) || null;
 }
 
 module.exports = {
@@ -62,15 +55,17 @@ module.exports = {
     return { available: true, reason: null };
   },
   async execute({ args = {}, homeAssistantService }) {
-    const entityId = String(args?.entity_id || args?.entityId || '').trim();
-    if (!entityId) throw new Error('ha_set_light_color requires args.entity_id');
+    const resolved = resolveConfiguredEntity(
+      homeAssistantService,
+      args?.entity_id || args?.entityId,
+      'ha_set_light_color',
+    );
+    const { entity, entityId } = resolved;
 
     // Accepting args.color as a compatibility alias keeps manual/internal calls
     // forgiving, while the public tool schema still teaches the model to send
     // the clearer color_hex argument.
     const colorHex = normalizeColorHex(args?.color_hex ?? args?.colorHex ?? args?.color);
-    const entity = findConfiguredEntity(homeAssistantService, entityId);
-    if (!entity) throw new Error('ha_set_light_color entity_id not configured');
 
     // setLightColor already requires a HA light, but checking the normalized
     // entity state here gives the overseer a more specific error and blocks
