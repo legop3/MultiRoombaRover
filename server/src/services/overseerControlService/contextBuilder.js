@@ -21,9 +21,25 @@ function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster
   );
   const entities = Array.isArray(homeAssistantState?.entities) ? homeAssistantState.entities : [];
   if (entities.length) {
-    lines.push('home_assistant_entities:');
+    lines.push('home_assistant_room_lights:');
     entities.slice(0, 24).forEach((entity) => {
-      lines.push(`- ${entity.id} (${entity.type || 'entity'}) state=${entity.state || 'unknown'} available=${entity.available ? 'yes' : 'no'}`);
+      const haType = String(entity.type || 'entity');
+      const details = [
+        'kind=room_light',
+        `ha_domain=${haType}`,
+        `state=${entity.state || 'unknown'}`,
+        `available=${entity.available ? 'yes' : 'no'}`,
+      ];
+
+      // All configured Home Assistant controls in this list represent room
+      // lighting from the overseer's point of view, including outlet-backed
+      // lamps that Home Assistant exposes as switches. The original HA domain is
+      // still shown because only true light-domain entities can accept color
+      // payloads; switch-domain lamps remain valid on/off room lights.
+      details.push(`supports_color=${entity.supportsColor ? 'yes' : 'no'}`);
+      if (entity.colorHex) details.push(`color=${entity.colorHex}`);
+
+      lines.push(`- ${entity.id} ${details.join(' ')}`);
     });
   }
   const roverLines = (Array.isArray(roster) ? roster : []).slice(0, 6).map((rover) => {

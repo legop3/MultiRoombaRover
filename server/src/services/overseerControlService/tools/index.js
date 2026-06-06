@@ -10,6 +10,7 @@ const neatoSendHome = require('./neatoSendHome');
 // const neatoLocate = require('./neatoLocate');
 const neatoClearErrors = require('./neatoClearErrors');
 const haSetEntity = require('./haSetEntity');
+const haSetLightColor = require('./haSetLightColor');
 const buttonBoxAddCount = require('./buttonBoxAddCount');
 
 const TOOL_DEFINITIONS = [
@@ -25,6 +26,7 @@ const TOOL_DEFINITIONS = [
   // neatoLocate,
   neatoClearErrors,
   haSetEntity,
+  haSetLightColor,
   buttonBoxAddCount,
 ];
 const TOOL_BY_ID = new Map(TOOL_DEFINITIONS.map((tool) => [tool.id, tool]));

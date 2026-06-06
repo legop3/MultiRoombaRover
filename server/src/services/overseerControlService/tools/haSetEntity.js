@@ -1,7 +1,7 @@
 module.exports = {
   id: 'ha_set_entity',
   signature: 'ha_set_entity(entity_id, state)',
-  description: 'Set Home Assistant controllable entity on/off.',
+  description: 'Turn a configured room light or Home Assistant controllable entity on/off, including switch-backed lamps.',
   parameters: {
     type: 'object',
     properties: {
@@ -25,6 +25,12 @@ module.exports = {
   async execute({ args = {}, homeAssistantService }) {
     const entityId = String(args?.entity_id || args?.entityId || '').trim();
     if (!entityId) throw new Error('ha_set_entity requires args.entity_id');
+
+    // Configured Home Assistant entities are the room-control surface the
+    // overseer is allowed to use. Some physical room lights are exposed by Home
+    // Assistant as switches because they are outlet-backed lamps, so this tool
+    // intentionally permits every configured entity for on/off control instead
+    // of limiting itself to HA's light domain.
     const allowed = new Set(
       (homeAssistantService.getState()?.entities || []).map((entry) => String(entry?.id || '')).filter(Boolean),
     );
