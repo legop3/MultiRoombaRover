@@ -1,9 +1,11 @@
 1.  Overseer personality swapping.
-2.  make google tts the default everywhere but roverd
-3.  add faster way for admins to login, like an invisible button in top left or something
-4.  add discord bot typing thing for when someone requests a replay
-5.  change replay title for ones requested from discord, something other than "requester driving rover"
-6.  fix rover request spam queue cheat
+2.  set default camera speed to 90
+3.  fix chat UI 
+4.  make google tts the default everywhere but roverd
+5.  add faster way for admins to login, like an invisible button in top left or something
+6.  add discord bot typing thing for when someone requests a replay
+7.  change replay title for ones requested from discord, something other than "requester driving rover"
+8.  fix rover request spam queue cheat
 
 
 # relative pipe dreams:
