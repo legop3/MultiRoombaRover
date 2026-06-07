@@ -38,7 +38,7 @@ constexpr int kRgbBytes = kWidth * kHeight * 3;
 constexpr int kDepthPixels = kWidth * kHeight;
 constexpr int kFrameStaleMs = 5000;
 constexpr int kCommandFrameWaitMs = 3000;
-constexpr int kDepthHistoryFrames = 1000;
+constexpr int kDepthHistoryFrames = 100;
 constexpr int kDepthMinimumValidSamples = 5;
 
 struct FrameCache {

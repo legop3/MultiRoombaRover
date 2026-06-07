@@ -31,7 +31,10 @@ export default function KinectPanel() {
 
     const handlePointCloudFrame = (meta = {}, buffer) => {
       const normalized = normalizeBinaryPayload(buffer);
-      if (!normalized) return;
+      // The current 3D viewer only supports grid frames because the mesh needs
+      // the original Kinect pixel layout.  Ignore old packed-point cached
+      // frames so they cannot silently render as the retired dot-cloud view.
+      if (!normalized || !meta?.grid) return;
       setPointCloudFrame({ meta, buffer: normalized });
       setActiveView('3d');
       setRequestError(null);

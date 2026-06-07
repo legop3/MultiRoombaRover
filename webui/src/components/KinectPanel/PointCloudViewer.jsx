@@ -37,25 +37,25 @@ export default function PointCloudViewer({ frame }) {
     const THREE = threeRef.current;
     if (!scene || !THREE || !currentFrame?.buffer || !visibleRef.current) return;
 
-    const pointCount = Number(currentFrame.meta?.pointCount) || 0;
     const strideBytes = Number(currentFrame.meta?.strideBytes) || 16;
-    if (!pointCount || strideBytes < 16) return;
-
-    const view = new DataView(currentFrame.buffer);
     const width = Number(currentFrame.meta?.width) || 0;
     const height = Number(currentFrame.meta?.height) || 0;
     const gridPointCount = width * height;
-    const isGridFrame = Boolean(currentFrame.meta?.grid) && gridPointCount > 0;
-    const vertexCount = isGridFrame ? gridPointCount : pointCount;
-    const positions = new Float32Array(vertexCount * 3);
-    const colors = new Float32Array(vertexCount * 3);
-    const valid = isGridFrame ? new Uint8Array(vertexCount) : null;
-    const zValues = isGridFrame ? new Float32Array(vertexCount) : null;
+    if (!currentFrame.meta?.grid || !gridPointCount || strideBytes < 16) {
+      disposeRenderedObject();
+      return;
+    }
+
+    const view = new DataView(currentFrame.buffer);
+    const positions = new Float32Array(gridPointCount * 3);
+    const colors = new Float32Array(gridPointCount * 3);
+    const valid = new Uint8Array(gridPointCount);
+    const zValues = new Float32Array(gridPointCount);
 
     // The server sends x/y/z as little-endian floats followed by rgba bytes.
     // Building typed arrays only when the canvas is visible keeps expensive
     // browser-side point conversion from happening while the card is off-screen.
-    for (let index = 0; index < vertexCount; index += 1) {
+    for (let index = 0; index < gridPointCount; index += 1) {
       const source = index * strideBytes;
       const target = index * 3;
       positions[target + 0] = view.getFloat32(source + 0, true);
@@ -65,57 +65,45 @@ export default function PointCloudViewer({ frame }) {
       colors[target + 0] = view.getUint8(source + 12) / 255;
       colors[target + 1] = view.getUint8(source + 13) / 255;
       colors[target + 2] = view.getUint8(source + 14) / 255;
-      if (isGridFrame) {
-        valid[index] = view.getUint8(source + 15) > 0 ? 1 : 0;
-        zValues[index] = z;
-      }
+      valid[index] = view.getUint8(source + 15) > 0 ? 1 : 0;
+      zValues[index] = z;
     }
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    let object = null;
-    if (isGridFrame) {
-      const indices = [];
-      const maxDepthStepMeters = 0.12;
-      const canConnect = (a, b, c) => {
-        if (!valid[a] || !valid[b] || !valid[c]) return false;
-        const minZ = Math.min(zValues[a], zValues[b], zValues[c]);
-        const maxZ = Math.max(zValues[a], zValues[b], zValues[c]);
-        return maxZ - minZ <= maxDepthStepMeters;
-      };
+    const indices = [];
+    const maxDepthStepMeters = 0.12;
+    const canConnect = (a, b, c) => {
+      if (!valid[a] || !valid[b] || !valid[c]) return false;
+      const minZ = Math.min(zValues[a], zValues[b], zValues[c]);
+      const maxZ = Math.max(zValues[a], zValues[b], zValues[c]);
+      return maxZ - minZ <= maxDepthStepMeters;
+    };
 
-      // Kinect depth is a regular image.  Each 2x2 pixel cell can become two
-      // triangles, but only when all vertices are valid and close in depth.  The
-      // depth-step check prevents the mesh from drawing sheets across object
-      // edges, missing-depth holes, or foreground/background gaps.
-      for (let y = 0; y < height - 1; y += 1) {
-        for (let x = 0; x < width - 1; x += 1) {
-          const a = y * width + x;
-          const b = a + 1;
-          const c = a + width;
-          const d = c + 1;
-          if (canConnect(a, c, b)) indices.push(a, c, b);
-          if (canConnect(b, c, d)) indices.push(b, c, d);
-        }
+    // Kinect depth is a regular image.  Each 2x2 pixel cell can become two
+    // triangles, but only when all vertices are valid and close in depth.  The
+    // depth-step check prevents the mesh from drawing sheets across object
+    // edges, missing-depth holes, or foreground/background gaps.
+    for (let y = 0; y < height - 1; y += 1) {
+      for (let x = 0; x < width - 1; x += 1) {
+        const a = y * width + x;
+        const b = a + 1;
+        const c = a + width;
+        const d = c + 1;
+        if (canConnect(a, c, b)) indices.push(a, c, b);
+        if (canConnect(b, c, d)) indices.push(b, c, d);
       }
-
-      geometry.setIndex(indices);
-      geometry.computeVertexNormals();
-      const material = new THREE.MeshBasicMaterial({
-        vertexColors: true,
-        side: THREE.DoubleSide,
-      });
-      object = new THREE.Mesh(geometry, material);
-    } else {
-      const material = new THREE.PointsMaterial({
-        size: 0.018,
-        vertexColors: true,
-        sizeAttenuation: true,
-      });
-      object = new THREE.Points(geometry, material);
     }
+
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const material = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide,
+    });
+    const object = new THREE.Mesh(geometry, material);
 
     geometry.computeBoundingSphere();
     disposeRenderedObject();
