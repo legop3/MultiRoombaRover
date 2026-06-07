@@ -220,6 +220,12 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
           <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
         </div>
         <div className="space-y-0.5">
+          {error ? <div className="text-xs text-amber-400">{error}</div> : null}
+          {activeJobStatusText ? (
+            <div className={`text-xs ${activeReplayJob?.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
+              {activeJobStatusText}
+            </div>
+          ) : success ? <div className="text-xs text-emerald-300">{success}</div> : null}
           <div className="flex items-center gap-0.5">
             <label className="surface shrink-0 text-xs" htmlFor={`${panelId}-title`}>
               Replay title:
@@ -227,20 +233,20 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
             {/* The label has fixed-width content, while the input owns the remaining row space.
                 This keeps the title control compact without making the input compete with
                 other controls or wrapping unpredictably on narrow panel layouts. */}
-          <input
-            id={`${panelId}-title`}
-            type="text"
-            className="field-input min-w-0 flex-1 text-xs"
-            value={title}
-            onChange={(event) => {
-              const next = event.target.value;
-              setTitle(next);
-              setTitleDirty(true);
-              saveSettings((current) => ({ ...(current || {}), [`${panelId}:title`]: next }));
-            }}
-            placeholder={defaultTitle}
-            maxLength={120}
-          />
+            <input
+              id={`${panelId}-title`}
+              type="text"
+              className="field-input min-w-0 flex-1 text-xs"
+              value={title}
+              onChange={(event) => {
+                const next = event.target.value;
+                setTitle(next);
+                setTitleDirty(true);
+                saveSettings((current) => ({ ...(current || {}), [`${panelId}:title`]: next }));
+              }}
+              placeholder={defaultTitle}
+              maxLength={120}
+            />
           </div>
           <div className="flex items-center gap-0.5">
             <label className="surface flex shrink-0 items-center gap-0.5 text-xs">
@@ -267,12 +273,6 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
               {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
             </button>
           </div>
-          {error ? <div className="text-xs text-amber-400">{error}</div> : null}
-          {activeJobStatusText ? (
-            <div className={`text-xs ${activeReplayJob?.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
-              {activeJobStatusText}
-            </div>
-          ) : success ? <div className="text-xs text-emerald-300">{success}</div> : null}
         </div>
       </CardFrame>
     </div>
