@@ -112,6 +112,80 @@ body {
     @apply px-0.5 py-0.5 text-sm font-medium text-white transition-colors bg-rose-600 hover:bg-rose-500 rounded-md;
   }
 
+  .chat-composer {
+    /* The chat bar lives in several panel widths, so container queries are more
+       accurate than viewport media queries. The default narrow layout preserves
+       a usable chat row first, then moves all TTS controls to a second row. */
+    container-type: inline-size;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.125rem;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .chat-composer-nickname {
+    /* Keep nickname deliberately compact so the message input and Send button
+       remain usable on mobile while still allowing longer typed nicknames. */
+    flex: 0 0 5rem;
+    min-width: 0;
+    order: 2;
+  }
+
+  .chat-composer-input {
+    /* This input is the pressure valve for the first row. It can shrink to the
+       remaining space, but the TTS controls no longer steal that row on mobile. */
+    flex: 1 1 0%;
+    min-width: 0;
+    order: 1;
+  }
+
+  .chat-composer-send {
+    /* Send must stay with the message input in the narrow two-row layout. */
+    flex: 0 0 auto;
+    align-self: stretch;
+    order: 3;
+  }
+
+  .chat-composer-tts {
+    /* The full-width basis is what creates the second row when the composer is
+       narrow; the controls themselves still remain one compact TTS strip. */
+    display: flex;
+    flex: 1 1 100%;
+    align-items: center;
+    gap: 0.125rem;
+    min-width: 0;
+    overflow: hidden;
+    order: 4;
+  }
+
+  @container (min-width: 44rem) {
+    .chat-composer {
+      /* Once there is enough room for a meaningful message field, all controls
+         return to the single-row desktop layout. */
+      flex-wrap: nowrap;
+    }
+
+    .chat-composer-nickname {
+      flex-basis: 7rem;
+      order: 1;
+    }
+
+    .chat-composer-input {
+      order: 2;
+    }
+
+    .chat-composer-tts {
+      flex: 0 1 auto;
+      order: 3;
+    }
+
+    .chat-composer-send {
+      order: 4;
+    }
+  }
+
 }
 
 @layer utilities {

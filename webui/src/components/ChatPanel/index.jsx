@@ -144,16 +144,11 @@ export default function ChatPanel({
   }
 
   const listClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : 'h-48 overflow-y-auto';
-  const isStackedNickname = nicknameLayout === 'stacked';
-  // The composer stays as one horizontal row because this panel is used as a
-  // dense control strip. The chat input is the only control that should absorb
-  // tight-space pressure, so it gets no minimum width while the surrounding
-  // controls stay compact and predictable.
-  const composerClass = 'flex min-w-0 items-stretch gap-0.5 overflow-hidden';
-  // The nickname editor is deliberately narrow in compact chat bars. Users can
-  // still type longer names, but the field no longer reserves enough width to
-  // crowd out the always-visible TTS controls.
-  const nicknameClass = isStackedNickname ? 'w-[5rem] sm:w-[7rem] shrink-0' : 'w-[5rem] sm:w-[7rem] shrink-0';
+  // The composer class owns the responsive row behavior in CSS. A container
+  // query is used instead of JavaScript so the layout responds to the actual
+  // panel width, which matters because this component appears in sidebars and
+  // mobile layouts that do not map cleanly to viewport breakpoints.
+  const composerClass = 'chat-composer';
   // Native selects include generous built-in padding and try to preserve the
   // width of their longest option. Removing horizontal padding and forcing
   // min-w-0 lets the row stay intact while keeping labels readable.
@@ -179,11 +174,11 @@ export default function ChatPanel({
       </div>
       {!hideInput && (
         <form className={composerClass} onSubmit={handleSend}>
-          <div className={nicknameClass}>
+          <div className="chat-composer-nickname">
             <NicknameForm compact />
           </div>
           <input
-            className="field-input min-w-0 flex-[1_1_0%]"
+            className="field-input chat-composer-input"
             value={draft}
             onChange={(e) => {
               const next = e.target.value;
@@ -209,8 +204,15 @@ export default function ChatPanel({
             placeholder={canChat ? 'Type a message…' : hideSpectatorNotice ? '' : 'Spectators cannot chat'}
             disabled={!canChat}
           />
+          <button
+            type="submit"
+            disabled={!canChat || sending}
+            className="button-dark chat-composer-send disabled:opacity-50"
+          >
+            {sending ? '...' : 'Send'}
+          </button>
           {ttsSupported && (
-            <div className="flex min-w-0 shrink items-center gap-0.5 overflow-hidden">
+            <div className="chat-composer-tts">
               <label className="flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs text-slate-300">
                 <input
                   type="checkbox"
@@ -311,13 +313,6 @@ export default function ChatPanel({
               )}
             </div>
           )}
-          <button
-            type="submit"
-            disabled={!canChat || sending}
-            className="button-dark h-full shrink-0 self-stretch disabled:opacity-50"
-          >
-            {sending ? '...' : 'Send'}
-          </button>
         </form>
       )}
     </CardFrame>

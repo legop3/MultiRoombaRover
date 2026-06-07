@@ -102,6 +102,7 @@ function buildModelMessages({
     if (!message || !message.role || !message.content) return;
     message.content.replace("sourceMapping", "");
     message.content.replace("SourceMapping", "");
+    message.content.replace("sourcemapping", "");
     messages.push(message);
   });
   return messages;
