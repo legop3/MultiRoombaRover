@@ -8,6 +8,7 @@ const { publishEvent } = require('../eventBus');
 const assignmentService = require('../assignmentService');
 const { getNickname } = require('../nicknameService');
 const { loadConfig } = require('../../helpers/configLoader');
+const { buildReplayJobId, buildReplayTitle } = require('../discordBotService/replayWorkflow');
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
@@ -52,6 +53,7 @@ function registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefau
       const requester = buildRequesterLabel(socket);
       const title = normalizeReplayTitle(payload?.title);
       const includeSidebar = normalizeIncludeSidebar(payload?.includeSidebar);
+      const jobId = buildReplayJobId('web');
       const attempt = tryTriggerReplay({ by: { source: 'web', requester } });
       if (!attempt.ok) {
         cb({ error: 'Replay cooldown active', remainingMs: attempt.remainingMs, state: attempt.state });
@@ -62,6 +64,7 @@ function registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefau
         source: 'replaySocket',
         type: 'replay.requested',
         payload: {
+          jobId,
           channelId,
           requester,
           title,
@@ -70,8 +73,14 @@ function registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefau
           requestedBy: { socketId: socket.id },
         },
       });
-      logger.info('Replay requested via web', { socketId: socket.id });
-      cb({ success: true, state: attempt.state });
+      logger.info('Replay requested via web', { socketId: socket.id, jobId });
+      cb({
+        success: true,
+        jobId,
+        status: 'accepted',
+        title: buildReplayTitle({ explicitTitle: title, sources }),
+        state: attempt.state,
+      });
     };
 
     socket.on('replay:trigger', handleReplayTrigger);

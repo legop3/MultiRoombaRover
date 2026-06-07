@@ -15,6 +15,8 @@ const INITIAL_STATE = {
   overseerControlState: null,
   overseerMemory: null,
   alerts: [],
+  replayJobs: {},
+  latestReplay: null,
 };
 
 const SessionContext = createContext(null);
@@ -129,6 +131,72 @@ export function SessionProvider({ children }) {
         ],
       }));
     }
+    function handleReplayStatus(payload = {}) {
+      if (!payload?.jobId) return;
+      setState((prev) => {
+        const previous = prev.replayJobs?.[payload.jobId] || {};
+        const nextJob = {
+          ...previous,
+          ...payload,
+          updatedAt: Date.now(),
+        };
+        return {
+          ...prev,
+          // Keep status by job id because the replay panel receives the job id synchronously
+          // from the trigger acknowledgement, then later socket events update that same record.
+          replayJobs: {
+            ...(prev.replayJobs || {}),
+            [payload.jobId]: nextJob,
+          },
+        };
+      });
+    }
+    function handleReplayReady(payload = {}) {
+      if (!payload?.jobId || !payload?.url) return;
+      setState((prev) => {
+        const previous = prev.replayJobs?.[payload.jobId] || {};
+        const nextJob = {
+          ...previous,
+          ...payload,
+          status: 'ready',
+          media: payload,
+          updatedAt: Date.now(),
+        };
+        return {
+          ...prev,
+          replayJobs: {
+            ...(prev.replayJobs || {}),
+            [payload.jobId]: nextJob,
+          },
+          // Only the current replay popup is retained. Discord is the media host, so
+          // this state is intentionally short-lived and does not become a replay library.
+          latestReplay: {
+            ...payload,
+            receivedAt: Date.now(),
+          },
+        };
+      });
+    }
+    function handleReplayFailed(payload = {}) {
+      if (payload?.jobId) handleReplayStatus({ ...payload, status: 'failed' });
+      const message = typeof payload?.message === 'string' && payload.message.trim()
+        ? payload.message.trim()
+        : 'Replay failed after being accepted.';
+      setState((prev) => ({
+        ...prev,
+        alerts: [
+          ...prev.alerts.slice(-49),
+          {
+            id: payload?.jobId ? `replay-failed-${payload.jobId}` : `replay-failed-${Date.now()}`,
+            title: 'Replay failed',
+            message,
+            color: '#f59e0b',
+            receivedAt: Date.now(),
+            lifetimeMs: 6000,
+          },
+        ],
+      }));
+    }
     function handleOverseerState(payload = null) {
       const state = payload && typeof payload === 'object' ? payload : null;
       setState((prev) => ({ ...prev, overseerControlState: state }));
@@ -148,6 +216,9 @@ export function SessionProvider({ children }) {
     socket.on('overseer:state', handleOverseerState);
     socket.on('overseer:memory', handleOverseerMemory);
     socket.on('alert:new', handleAlertNew);
+    socket.on('replay:status', handleReplayStatus);
+    socket.on('replay:ready', handleReplayReady);
+    socket.on('replay:failed', handleReplayFailed);
     return () => {
       socket.off('session:sync', handleSession);
       socket.off('log:init', handleLogInit);
@@ -158,6 +229,9 @@ export function SessionProvider({ children }) {
       socket.off('overseer:state', handleOverseerState);
       socket.off('overseer:memory', handleOverseerMemory);
       socket.off('alert:new', handleAlertNew);
+      socket.off('replay:status', handleReplayStatus);
+      socket.off('replay:ready', handleReplayReady);
+      socket.off('replay:failed', handleReplayFailed);
     };
   }, [setState, socket]);
 
@@ -231,6 +305,8 @@ export function SessionProvider({ children }) {
             { ...alert, receivedAt: Date.now(), id: alert.id || Math.random().toString(36).slice(2) },
           ],
         })),
+      clearLatestReplay: () =>
+        setState((prev) => (prev.latestReplay ? { ...prev, latestReplay: null } : prev)),
     }),
     [emitWithAck, setState],
   );

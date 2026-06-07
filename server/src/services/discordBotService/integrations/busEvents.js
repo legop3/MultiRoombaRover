@@ -4,11 +4,26 @@
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const io = require('../../../globals/io');
 const { buildBatteryStatusEmbed, buildBatteryCaption } = require('../batteryEmbeds');
+const {
+  DEFAULT_ALLOWED_MENTIONS,
+  createReplayJob,
+  createJobStatusEmitter,
+  createReplayCaptionBuilder,
+  startDiscordTypingLoop,
+  sanitizeReplayTitleForFilename,
+  firstAttachmentFromMessage,
+  buildDiscordReplayMediaPayload,
+  buildAcceptedMessage,
+  buildStatusMessage,
+  normalizeUserError,
+} = require('../replayWorkflow');
 
 function createBusEventHandler(deps) {
-  const { logger, discordConfig, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel, buildReplayVideo, getActiveDrivers, getNickname } = deps;
+  const { logger, discordConfig, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel, fetchChannel, buildReplayVideo, getActiveDrivers, getNickname, sanitizeMentions } = deps;
   const ADMIN_ALERT_EVENT_TYPES = new Set(['rover.online', 'rover.offline', 'rover.dockGuard', 'battery.warn', 'battery.urgent', 'battery.docked', 'battery.undocked', 'battery.charging.start', 'battery.charging.stop', 'battery.locked', 'battery.unlocked']);
   let skippedFirstModeAnnouncement = false;
+  const jobStatus = createJobStatusEmitter({ io, logger, sanitizeMentions });
+  const replayCaption = createReplayCaptionBuilder({ io, rovers, getActiveDrivers, getNickname, sanitizeMentions });
 
   function buildEmbed({ title, description, color, includeSiteUrl = true }) {
     const embed = new EmbedBuilder().setTitle(title || 'Update').setColor(color || 0x2196f3);
@@ -40,83 +55,48 @@ function createBusEventHandler(deps) {
     await sendToChannel(channelId, `${prefix}${content || ''}`.trim(), { embeds: payloadEmbeds, files: Array.isArray(files) ? files : undefined }, { parse: [], roles: pingRoleId ? [pingRoleId] : [] }, !pingRoleId);
   }
 
-  function sanitizeReplayTitleForFilename(title) {
-    const cleaned = String(title || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 96);
-    return cleaned || 'replay';
-  }
-
-  function buildDefaultReplayTitle(requester, sources = []) {
-    const requesterLabel = String(requester || 'Someone').trim() || 'Someone';
-    const roverSource = (Array.isArray(sources) ? sources : []).find((entry) => entry?.type === 'rover');
-    const roverLabel = roverSource?.label || roverSource?.id || 'a rover';
-    return `${requesterLabel} driving ${roverLabel}`;
-  }
-
-  function buildReplayDriverLines(requester, sources = []) {
-    const activeDrivers = getActiveDrivers();
-    const roverSources = (Array.isArray(sources) ? sources : []).filter((entry) => entry?.type === 'rover');
-    const requestedRoverIds = new Set(roverSources.map((entry) => String(entry.id)));
-    const lines = [];
-    requestedRoverIds.forEach((roverId) => {
-      const socketId = activeDrivers?.[roverId];
-      if (!socketId) return;
-      const socket = io.sockets.sockets.get(socketId);
-      const nickname = getNickname(socket) || socket?.data?.user?.username || socketId;
-      const record = rovers.get(roverId);
-      const roverName = record?.meta?.name || record?.id || roverId;
-      const isAuthor = String(nickname).toLowerCase() === String(requester || '').toLowerCase();
-      lines.push(`${nickname} driving ${roverName}${isAuthor ? ' **author**' : ''}`);
-    });
-    return lines;
-  }
-
-  function buildDriverCaption() {
-    const activeDrivers = getActiveDrivers();
-    const roster = Array.from(rovers.values());
-    if (!roster.length) return 'Drivers: no rovers online.';
-    const entries = roster.map((record) => {
-      const driverId = activeDrivers[record.id];
-      if (!driverId) return `${record.meta?.name || record.id}: none`;
-      const socket = io.sockets.sockets.get(driverId);
-      const nickname = getNickname(socket) || socket?.data?.user?.username || driverId;
-      return `${record.meta?.name || record.id}: ${nickname}`;
-    });
-    return `Drivers: ${entries.join(', ')}`;
-  }
-
-  function buildReplayCaption({ requester, usedSources = [], missingSources = [], title }) {
-    const lines = [];
-    if (title) {
-      lines.push(`**${title}**`);
-      lines.push('');
-    }
-    const driverLines = buildReplayDriverLines(requester, usedSources);
-    if (driverLines.length) lines.push(...driverLines);
-    if (missingSources.length) {
-      if (driverLines.length) lines.push('');
-      lines.push(`Missing: ${missingSources.map((source) => source.label || `${source.type}:${source.id}`).join(', ')}`);
-    }
-    if (!lines.length) lines.push(buildDriverCaption());
-    return lines.join('\n');
-  }
-
-  async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '', includeSidebar = true) {
+  async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '', includeSidebar = true, jobId = null) {
     if (!channelId) throw new Error('Replay channel not configured');
-    const resolvedTitle = String(explicitTitle || '').trim() || buildDefaultReplayTitle(requester, sources);
-    const { buffer, usedSources = sources, missingSources = [] } = await buildReplayVideo({
-      sources,
-      title: resolvedTitle,
+    const job = createReplayJob({
+      id: jobId,
       requester,
+      source: 'web',
+      title: explicitTitle,
+      sources,
       includeSidebar,
     });
-    const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(resolvedTitle)}.mp4` });
-    const body = buildReplayCaption({
-      requester,
-      usedSources,
-      missingSources,
-      title: resolvedTitle,
-    });
-    await sendToChannel(channelId, body, { files: [attachment] }, { parse: [] });
+    jobStatus.emit(job, 'accepted', { message: buildAcceptedMessage(job) });
+    const progressMessage = await sendToChannel(channelId, buildAcceptedMessage(job), {}, DEFAULT_ALLOWED_MENTIONS);
+    const channel = await fetchChannel(channelId);
+    const stopTyping = startDiscordTypingLoop(channel, logger, 'web replay delivery');
+    try {
+      jobStatus.emit(job, 'building', { message: buildStatusMessage(job, 'building') });
+      if (progressMessage?.edit) await progressMessage.edit({ content: buildStatusMessage(job, 'building'), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
+      const { buffer, usedSources = job.sources, missingSources = [] } = await buildReplayVideo({
+        sources: job.sources,
+        title: job.title,
+        requester: job.requester,
+        includeSidebar: job.includeSidebar,
+      });
+      jobStatus.emit(job, 'uploading', { message: buildStatusMessage(job, 'uploading') });
+      if (progressMessage?.edit) await progressMessage.edit({ content: buildStatusMessage(job, 'uploading'), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
+      const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(job.title)}.mp4` });
+      const body = replayCaption.build({ job, usedSources, missingSources });
+      const uploadMessage = await sendToChannel(channelId, body, { files: [attachment] }, DEFAULT_ALLOWED_MENTIONS);
+      if (!uploadMessage) throw new Error('Discord upload did not return a message');
+      const uploadedAttachment = firstAttachmentFromMessage(uploadMessage);
+      const media = buildDiscordReplayMediaPayload({ message: uploadMessage, attachment: uploadedAttachment, job });
+      if (!media) throw new Error('Discord upload did not include a replay attachment URL');
+      jobStatus.emit(job, 'ready', { message: buildStatusMessage(job, 'ready'), media });
+      if (progressMessage?.edit) await progressMessage.edit({ content: buildStatusMessage(job, 'ready'), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
+    } catch (err) {
+      const message = normalizeUserError(err);
+      jobStatus.emit(job, 'failed', { message });
+      if (progressMessage?.edit) await progressMessage.edit({ content: sanitizeMentions(message), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
+      throw err;
+    } finally {
+      stopTyping();
+    }
   }
 
   function handleReplayRequested(event) {
@@ -127,6 +107,7 @@ function createBusEventHandler(deps) {
       payload?.sources || [],
       payload?.title || '',
       payload?.includeSidebar !== false,
+      payload?.jobId || null,
     ).catch((err) => {
       logger.warn('Replay send failed', { error: err.message });
     });

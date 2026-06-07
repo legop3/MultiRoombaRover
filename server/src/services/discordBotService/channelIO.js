@@ -24,13 +24,16 @@ function createChannelIO({ client, logger, sanitizeMentions }) {
 
   async function sendToChannel(id, content, options = {}, allowedMentions = { parse: [] }, sanitizeContent = true) {
     const channel = await fetchChannel(id);
-    if (!channel) return;
+    if (!channel) return null;
     try {
       const messageContent = sanitizeContent ? sanitizeMentions(content) : content;
-      await channel.send({ content: messageContent, allowedMentions, ...options });
+      // Replay uploads need the returned message so the server can extract Discord's attachment URL
+      // and broadcast it to the Web UI instead of streaming video from the home server.
+      return await channel.send({ content: messageContent, allowedMentions, ...options });
     } catch (err) {
       logger.warn('Failed to send Discord message', { id, error: err.message });
     }
+    return null;
   }
 
   function typingCacheKey(guildId, typingId) {

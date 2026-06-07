@@ -26,8 +26,6 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const replaySources = useSessionSelector((state) => state.session?.replaySources ?? []);
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const assignmentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
-  const users = useSessionSelector((state) => state.session?.users ?? []);
-  const selfSocketId = useSessionSelector((state) => state.session?.socketId || null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const replayState = useSessionSelector((state) => state.session?.replay || null);
   const { triggerReplay } = useSessionActions();
@@ -41,6 +39,10 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const [titleDirty, setTitleDirty] = useState(false);
   const [includeSidebar, setIncludeSidebar] = useState(true);
   const [remainingMs, setRemainingMs] = useState(0);
+  const [activeJobId, setActiveJobId] = useState(null);
+  const activeReplayJob = useSessionSelector((state) => (
+    activeJobId ? state.replayJobs?.[activeJobId] || null : null
+  ));
 
   const defaults = useMemo(() => {
     const roverId = assignmentRoverId;
@@ -51,17 +53,13 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   }, [assignmentRoverId]);
 
   const defaultTitle = useMemo(() => {
-    const self = Array.isArray(users)
-      ? users.find((entry) => entry?.socketId === selfSocketId)
-      : null;
-    const nickname = (self?.nickname || 'Someone').trim() || 'Someone';
     const roverId = assignmentRoverId || null;
     const roverName =
       roverId && Array.isArray(roster)
         ? roster.find((entry) => String(entry?.id) === String(roverId))?.name || roverId
-        : 'a rover';
-    return `${nickname} driving ${roverName}`;
-  }, [users, selfSocketId, assignmentRoverId, roster]);
+        : '';
+    return roverName ? `Replay: ${roverName}` : 'Replay';
+  }, [assignmentRoverId, roster]);
 
   useEffect(() => {
     setSelected(defaults);
@@ -119,6 +117,24 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   }, [replayState?.lastTriggeredAt, replayState?.cooldownMs, replayState?.remainingMs]);
 
   const replayDisabled = busy || mode === 'lockdown' || remainingMs > 0 || !selected.length;
+  const activeJobStatusText = useMemo(() => {
+    if (!activeReplayJob?.status) return null;
+    const titleText = activeReplayJob.title ? `: ${activeReplayJob.title}` : '';
+    switch (activeReplayJob.status) {
+      case 'accepted':
+        return `Replay accepted${titleText}`;
+      case 'building':
+        return `Replay building${titleText}`;
+      case 'uploading':
+        return `Replay uploading${titleText}`;
+      case 'ready':
+        return `Replay ready${titleText}`;
+      case 'failed':
+        return activeReplayJob.message || `Replay failed${titleText}`;
+      default:
+        return activeReplayJob.message || `Replay ${activeReplayJob.status}${titleText}`;
+    }
+  }, [activeReplayJob]);
 
   const toggleKey = (key) => {
     setSelected((prev) => {
@@ -132,14 +148,22 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     setBusy(true);
     setError(null);
     setSuccess(null);
+    setActiveJobId(null);
     try {
       const payload = selected.map((key) => {
         const [type, id] = key.split(':');
         return { type, id };
       });
       const resolvedTitle = String(title || '').trim() || defaultTitle;
-      await triggerReplay({ sources: payload, title: resolvedTitle, includeSidebar });
-      setSuccess('Replay sent. Check the Discord replay channel.');
+      const resp = await triggerReplay({ sources: payload, title: resolvedTitle, includeSidebar });
+      if (resp?.jobId) {
+        // The socket acknowledgement is only the start of the async job.
+        // Later replay:status events update this same job id as Discord builds and uploads the video.
+        setActiveJobId(resp.jobId);
+        setSuccess('Replay accepted.');
+      } else {
+        setSuccess('Replay accepted.');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -195,7 +219,11 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
           {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
         </button>
         {error ? <div className="text-xs text-amber-400">{error}</div> : null}
-        {success ? <div className="text-xs text-emerald-300">{success}</div> : null}
+        {activeJobStatusText ? (
+          <div className={`text-xs ${activeReplayJob?.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
+            {activeJobStatusText}
+          </div>
+        ) : success ? <div className="text-xs text-emerald-300">{success}</div> : null}
       </div>
     </CardFrame>
   );

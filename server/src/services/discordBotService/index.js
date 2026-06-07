@@ -182,10 +182,12 @@ const commands = createCommandHandlers({
   isAdminUser,
   isLockdownAdminUser,
   sendToChannel: channelIO.sendToChannel,
+  fetchChannel: channelIO.fetchChannel,
   clearTypingMessage: channelIO.clearTypingMessage,
   sendTypingMessage: channelIO.sendTypingMessage,
   schedulePresenceRotation: presence.schedulePresenceRotation,
   buildReplayVideo,
+  sanitizeMentions,
 });
 
 const integrationHandlers = integrations.register();
