@@ -8,6 +8,7 @@ import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
+import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
 import RoverMediaPlayer from '../../components/RoverMediaPlayer/index.jsx';
 import FitViewportFrame from './components/FitViewportFrame.jsx';
 import InfoColumn from './components/InfoColumn.jsx';
@@ -18,6 +19,10 @@ export default function MiniSummaryContent() {
   const { session } = useSession();
   const spectatorReady = useSpectatorMode();
   useDefaultNickname();
+  // Mini renders outside App.jsx, so it must run the same persisted identity
+  // heartbeat itself. This keeps cookie-backed identity and saved nickname
+  // metadata current without changing the mini page's layout or controls.
+  useUserIdentitySync();
   const inLockdown = session?.mode === 'lockdown';
   const canSpectateVideo = Boolean(session?.isLocalNetwork);
   const frames = useTelemetryFrames();
