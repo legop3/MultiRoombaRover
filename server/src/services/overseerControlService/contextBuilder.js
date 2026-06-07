@@ -100,6 +100,8 @@ function buildModelMessages({
   });
   (conversationMessages || []).forEach((message) => {
     if (!message || !message.role || !message.content) return;
+    message.content.replace("sourceMapping", "");
+    message.content.replace("SourceMapping", "");
     messages.push(message);
   });
   return messages;

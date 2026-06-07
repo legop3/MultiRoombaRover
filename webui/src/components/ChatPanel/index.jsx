@@ -145,20 +145,19 @@ export default function ChatPanel({
 
   const listClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : 'h-48 overflow-y-auto';
   const isStackedNickname = nicknameLayout === 'stacked';
-  // The composer is intentionally split into stable rows instead of one large
-  // wrapping flex line. Google TTS adds engine, voice, pitch, and speed selects;
-  // keeping those controls in their own bounded grid prevents their combined
-  // natural widths from pushing the nickname field or message input off-screen.
-  const composerClass = isStackedNickname
-    ? 'grid min-w-0 grid-cols-1 gap-0.5'
-    : 'grid min-w-0 grid-cols-[9rem_minmax(0,1fr)_auto] items-stretch gap-0.5 sm:grid-cols-[10rem_minmax(0,1fr)_auto]';
-  // Every select in this compact toolbar must be allowed to shrink below the
-  // width of its longest option text. Native selects otherwise preserve a large
-  // intrinsic width, which is what made the Google TTS option set break layout.
-  const compactSelectClass = 'field-input min-w-0 w-full max-w-full text-xs';
-  const ttsGridClass = engine === 'chromegtts'
-    ? 'grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] items-center gap-0.5'
-    : 'grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,0.8fr)] items-center gap-0.5';
+  // The composer stays as one horizontal row because this panel is used as a
+  // dense control strip. The chat input is the only control that should absorb
+  // tight-space pressure, so it gets no minimum width while the surrounding
+  // controls stay compact and predictable.
+  const composerClass = 'flex min-w-0 items-stretch gap-0.5 overflow-hidden';
+  // The nickname editor is deliberately narrow in compact chat bars. Users can
+  // still type longer names, but the field no longer reserves enough width to
+  // crowd out the always-visible TTS controls.
+  const nicknameClass = isStackedNickname ? 'w-[5rem] sm:w-[7rem] shrink-0' : 'w-[5rem] sm:w-[7rem] shrink-0';
+  // Native selects include generous built-in padding and try to preserve the
+  // width of their longest option. Removing horizontal padding and forcing
+  // min-w-0 lets the row stay intact while keeping labels readable.
+  const compactSelectClass = 'field-input min-w-0 max-w-full px-0 text-xs';
 
   return (
     <CardFrame
@@ -180,11 +179,11 @@ export default function ChatPanel({
       </div>
       {!hideInput && (
         <form className={composerClass} onSubmit={handleSend}>
-          <div className={isStackedNickname ? 'w-full' : 'w-[9rem] sm:w-[10rem] shrink-0'}>
+          <div className={nicknameClass}>
             <NicknameForm compact />
           </div>
           <input
-            className="field-input min-w-0 w-full"
+            className="field-input min-w-0 flex-[1_1_0%]"
             value={draft}
             onChange={(e) => {
               const next = e.target.value;
@@ -210,20 +209,9 @@ export default function ChatPanel({
             placeholder={canChat ? 'Type a message…' : hideSpectatorNotice ? '' : 'Spectators cannot chat'}
             disabled={!canChat}
           />
-          <button
-            type="submit"
-            disabled={!canChat || sending}
-            className={`button-dark shrink-0 disabled:opacity-50 ${isStackedNickname ? 'h-8 w-full' : 'h-full self-stretch'}`}
-          >
-            {sending ? '...' : 'Send'}
-          </button>
           {ttsSupported && (
-            <div
-              className={`${ttsGridClass} ${
-                isStackedNickname ? 'w-full' : 'col-span-full'
-              }`}
-            >
-              <label className="flex min-w-0 items-center gap-0.5 text-xs text-slate-300">
+            <div className="flex min-w-0 shrink items-center gap-0.5 overflow-hidden">
+              <label className="flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs text-slate-300">
                 <input
                   type="checkbox"
                   checked={speak}
@@ -246,11 +234,11 @@ export default function ChatPanel({
                   if (nextVoice !== voice) setVoice(nextVoice);
                   saveTtsSettings((current) => ({ ...(current || {}), engine: next, voice: nextVoice }));
                 }}
-                className={compactSelectClass}
+                className={`${compactSelectClass} w-[5.5rem] shrink`}
               >
                 <option value="flite">flite</option>
                 <option value="espeak">espeak</option>
-                <option value="chromegtts">Google</option>
+                <option value="chromegtts">Google TTS</option>
               </select>
               {engine === 'flite' || engine === 'chromegtts' ? (
                 <>
@@ -261,7 +249,7 @@ export default function ChatPanel({
                       setVoice(next);
                       saveTtsSettings((current) => ({ ...(current || {}), voice: next }));
                     }}
-                    className={compactSelectClass}
+                    className={`${compactSelectClass} w-[3.25rem] shrink`}
                   >
                     {(engine === 'chromegtts' ? CHROME_TTS_VOICES : FLITE_VOICES).map((v) => (
                       <option key={v} value={v}>
@@ -278,11 +266,11 @@ export default function ChatPanel({
                           setGooglePitch(next);
                           saveTtsSettings((current) => ({ ...(current || {}), googlePitch: next }));
                         }}
-                        className={compactSelectClass}
+                        className={`${compactSelectClass} w-[5rem] shrink`}
                       >
                         {GOOGLE_TTS_VALUES.map((value) => (
                           <option key={`pitch-${value}`} value={value}>
-                            P {value.toFixed(2)}
+                            pitch {value.toFixed(2)}
                           </option>
                         ))}
                       </select>
@@ -293,11 +281,11 @@ export default function ChatPanel({
                           setGoogleSpeed(next);
                           saveTtsSettings((current) => ({ ...(current || {}), googleSpeed: next }));
                         }}
-                        className={compactSelectClass}
+                        className={`${compactSelectClass} w-[5rem] shrink`}
                       >
                         {GOOGLE_TTS_VALUES.map((value) => (
                           <option key={`speed-${value}`} value={value}>
-                            S {value.toFixed(2)}
+                            speed {value.toFixed(2)}
                           </option>
                         ))}
                       </select>
@@ -312,7 +300,7 @@ export default function ChatPanel({
                     setPitch(next);
                     saveTtsSettings((current) => ({ ...(current || {}), pitch: next }));
                   }}
-                  className={compactSelectClass}
+                  className={`${compactSelectClass} w-[4.5rem] shrink`}
                 >
                   {ESPEAK_PITCHES.map((p) => (
                     <option key={p} value={p}>
@@ -323,6 +311,13 @@ export default function ChatPanel({
               )}
             </div>
           )}
+          <button
+            type="submit"
+            disabled={!canChat || sending}
+            className="button-dark h-full shrink-0 self-stretch disabled:opacity-50"
+          >
+            {sending ? '...' : 'Send'}
+          </button>
         </form>
       )}
     </CardFrame>
