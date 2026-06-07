@@ -115,6 +115,7 @@ function buildDiscordReplayMediaPayload({ message, attachment, job }) {
     status: 'ready',
     title: job.title,
     requester: job.requester,
+    requestedBy: job.requestedBy || null,
     url: attachment.url,
     proxyUrl: attachment.proxyURL || attachment.proxyUrl || null,
     messageUrl: message?.url || null,
@@ -131,7 +132,7 @@ function buildDiscordReplayMediaPayload({ message, attachment, job }) {
   };
 }
 
-function createReplayJob({ id = null, requester = 'Discord', source = 'discord', title = '', sources = [], includeSidebar = true } = {}) {
+function createReplayJob({ id = null, requester = 'Discord', source = 'discord', title = '', sources = [], includeSidebar = true, requestedBy = null } = {}) {
   const normalizedSources = normalizeReplaySources(sources);
   const resolvedTitle = buildReplayTitle({ explicitTitle: title, sources: normalizedSources });
   return {
@@ -141,6 +142,7 @@ function createReplayJob({ id = null, requester = 'Discord', source = 'discord',
     title: resolvedTitle,
     sources: normalizedSources,
     includeSidebar: includeSidebar !== false,
+    requestedBy: requestedBy && typeof requestedBy === 'object' ? { ...requestedBy } : null,
     createdAt: nowTs(),
   };
 }
@@ -152,6 +154,7 @@ function createJobStatusEmitter({ io, logger, sanitizeMentions }) {
       status,
       title: job.title,
       requester: job.requester,
+      requestedBy: job.requestedBy || null,
       sources: normalizeReplaySources(job.sources),
       message: extra.message ? sanitizeMentions(extra.message) : undefined,
       media: extra.media || undefined,

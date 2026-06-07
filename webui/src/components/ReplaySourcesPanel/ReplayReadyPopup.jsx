@@ -15,10 +15,11 @@ function formatBytes(value) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export default function ReplayReadyPopup({ replay, onClose }) {
+export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' }) {
   const videoUrl = normalizeUrl(replay?.url);
   if (!videoUrl) return null;
 
+  const isPanel = variant === 'panel';
   const title = String(replay?.title || 'Replay').trim() || 'Replay';
   const messageUrl = normalizeUrl(replay?.messageUrl);
   const meta = formatBytes(replay?.size) || null;
@@ -38,12 +39,35 @@ export default function ReplayReadyPopup({ replay, onClose }) {
     </div>
   );
 
-  return (
-    <div
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-1"
-      onClick={onClose}
-      role="presentation"
+  const card = (
+    <CardFrame
+      title={title}
+      meta={meta}
+      actions={actions}
+      fillHeight={isPanel}
+      clipOverflow={false}
+      bodyClassName={`${isPanel ? 'flex min-h-0 flex-1 flex-col' : ''} space-y-0.5 p-0.5 text-sm text-slate-200`}
     >
+      <div className={`${isPanel ? 'min-h-0 flex-1' : ''} overflow-hidden rounded bg-black`}>
+        <video
+          key={videoUrl}
+          src={videoUrl}
+          controls
+          autoPlay
+          preload="auto"
+          playsInline
+          className={`${isPanel ? 'h-full min-h-[10rem]' : 'aspect-video max-h-[72vh]'} w-full bg-black`}
+        />
+      </div>
+    </CardFrame>
+  );
+
+  if (isPanel) {
+    return <div className="flex h-full min-h-[14rem] flex-col">{card}</div>;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-1" onClick={onClose} role="presentation">
       <div
         className="pointer-events-auto w-full max-w-4xl"
         onClick={(event) => {
@@ -52,19 +76,7 @@ export default function ReplayReadyPopup({ replay, onClose }) {
         }}
         role="presentation"
       >
-        <CardFrame title={title} meta={meta} actions={actions} clipOverflow={false} bodyClassName="space-y-0.5 p-0.5 text-sm text-slate-200">
-          <div className="overflow-hidden rounded bg-black">
-            <video
-              key={videoUrl}
-              src={videoUrl}
-              controls
-              autoPlay
-              preload="auto"
-              playsInline
-              className="aspect-video max-h-[72vh] w-full bg-black"
-            />
-          </div>
-        </CardFrame>
+        {card}
       </div>
     </div>
   );

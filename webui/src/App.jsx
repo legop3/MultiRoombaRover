@@ -279,8 +279,8 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
   const swapMobileControlColumns = Boolean(pageSettings?.swapMobileControlColumns);
   const fullscreenButtonSide = swapMobileControlColumns ? 'left' : 'right';
   const showFloatingFullscreenButton = !isDesktop && (fullscreenIsIOS || fullscreenNativeSupported);
-  const latestReplay = useSessionSelector((state) => state.latestReplay);
-  const { clearLatestReplay } = useSessionActions();
+  const latestRequestedReplay = useSessionSelector((state) => state.latestRequestedReplay);
+  const { clearReplayModal } = useSessionActions();
   const [helpVisible, setHelpVisible] = useState(false);
   const [quickstartVisible, setQuickstartVisible] = useState(false);
 
@@ -363,7 +363,7 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
         onOpenHelp={openHelpFromQuickstart}
         onClose={closeQuickstart}
       />
-      <ReplayReadyPopup replay={latestReplay} onClose={clearLatestReplay} />
+      <ReplayReadyPopup replay={latestRequestedReplay} onClose={clearReplayModal} />
       {showFloatingFullscreenButton ? (
         <FloatingFullscreenButton
           side={fullscreenButtonSide}

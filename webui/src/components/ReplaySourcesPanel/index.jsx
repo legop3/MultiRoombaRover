@@ -6,6 +6,7 @@ import { useSessionActions, useSessionSelector } from '../../context/SessionCont
 import { useSettingsNamespace } from '../../settings/index.js';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverLabel from '../RoverLabel/index.jsx';
+import ReplayReadyPopup from './ReplayReadyPopup.jsx';
 
 function normalizeSources(list = []) {
   return list
@@ -26,8 +27,10 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const replaySources = useSessionSelector((state) => state.session?.replaySources ?? []);
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const assignmentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const selfSocketId = useSessionSelector((state) => state.session?.socketId || null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const replayState = useSessionSelector((state) => state.session?.replay || null);
+  const latestReplay = useSessionSelector((state) => state.latestReplay);
   const { triggerReplay } = useSessionActions();
   const sources = normalizeSources(replaySources || []);
   const { value: settings, save: saveSettings } = useSettingsNamespace('replaySources', {});
@@ -40,9 +43,24 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const [includeSidebar, setIncludeSidebar] = useState(true);
   const [remainingMs, setRemainingMs] = useState(0);
   const [activeJobId, setActiveJobId] = useState(null);
+  const [dismissedPanelReplayId, setDismissedPanelReplayId] = useState(null);
   const activeReplayJob = useSessionSelector((state) => (
     activeJobId ? state.replayJobs?.[activeJobId] || null : null
   ));
+  const latestReplayJobId = latestReplay?.jobId || null;
+  const latestReplayRequesterSocketId = latestReplay?.requestedBy?.socketId || null;
+  const latestReplayRequestedBySelf = Boolean(
+    latestReplayJobId &&
+    selfSocketId &&
+    latestReplayRequesterSocketId &&
+    String(latestReplayRequesterSocketId) === String(selfSocketId),
+  );
+  const showPanelReplay = Boolean(
+    latestReplay?.url &&
+    latestReplayJobId &&
+    !latestReplayRequestedBySelf &&
+    dismissedPanelReplayId !== latestReplayJobId,
+  );
 
   const defaults = useMemo(() => {
     const roverId = assignmentRoverId;
@@ -172,6 +190,16 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   };
 
   const listWrapClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : '';
+
+  if (showPanelReplay) {
+    return (
+      <ReplayReadyPopup
+        replay={latestReplay}
+        variant="panel"
+        onClose={() => setDismissedPanelReplayId(latestReplayJobId)}
+      />
+    );
+  }
 
   return (
     <CardFrame title="Replay Sources" fillHeight={fillHeight} bodyClassName="space-y-0.5 text-sm">

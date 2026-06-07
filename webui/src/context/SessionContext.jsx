@@ -17,6 +17,7 @@ const INITIAL_STATE = {
   alerts: [],
   replayJobs: {},
   latestReplay: null,
+  latestRequestedReplay: null,
 };
 
 const SessionContext = createContext(null);
@@ -155,6 +156,9 @@ export function SessionProvider({ children }) {
       if (!payload?.jobId || !payload?.url) return;
       setState((prev) => {
         const previous = prev.replayJobs?.[payload.jobId] || {};
+        const selfSocketId = String(prev.session?.socketId || '').trim();
+        const requesterSocketId = String(payload?.requestedBy?.socketId || '').trim();
+        const requestedByThisBrowser = Boolean(selfSocketId && requesterSocketId && selfSocketId === requesterSocketId);
         const nextJob = {
           ...previous,
           ...payload,
@@ -168,12 +172,18 @@ export function SessionProvider({ children }) {
             ...(prev.replayJobs || {}),
             [payload.jobId]: nextJob,
           },
-          // Only the current replay popup is retained. Discord is the media host, so
+          // Only the latest replay media is retained. Discord is the media host, so
           // this state is intentionally short-lived and does not become a replay library.
           latestReplay: {
             ...payload,
             receivedAt: Date.now(),
           },
+          latestRequestedReplay: requestedByThisBrowser
+            ? {
+                ...payload,
+                receivedAt: Date.now(),
+              }
+            : prev.latestRequestedReplay,
         };
       });
     }
@@ -307,6 +317,13 @@ export function SessionProvider({ children }) {
         })),
       clearLatestReplay: () =>
         setState((prev) => (prev.latestReplay ? { ...prev, latestReplay: null } : prev)),
+      showReplayModal: (replay) =>
+        setState((prev) => ({
+          ...prev,
+          latestRequestedReplay: replay ? { ...replay, receivedAt: Date.now() } : null,
+        })),
+      clearReplayModal: () =>
+        setState((prev) => (prev.latestRequestedReplay ? { ...prev, latestRequestedReplay: null } : prev)),
     }),
     [emitWithAck, setState],
   );

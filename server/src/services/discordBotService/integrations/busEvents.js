@@ -55,7 +55,7 @@ function createBusEventHandler(deps) {
     await sendToChannel(channelId, `${prefix}${content || ''}`.trim(), { embeds: payloadEmbeds, files: Array.isArray(files) ? files : undefined }, { parse: [], roles: pingRoleId ? [pingRoleId] : [] }, !pingRoleId);
   }
 
-  async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '', includeSidebar = true, jobId = null) {
+  async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '', includeSidebar = true, jobId = null, requestedBy = null) {
     if (!channelId) throw new Error('Replay channel not configured');
     const job = createReplayJob({
       id: jobId,
@@ -64,6 +64,7 @@ function createBusEventHandler(deps) {
       title: explicitTitle,
       sources,
       includeSidebar,
+      requestedBy,
     });
     jobStatus.emit(job, 'accepted', { message: buildAcceptedMessage(job) });
     const progressMessage = await sendToChannel(channelId, buildAcceptedMessage(job), {}, DEFAULT_ALLOWED_MENTIONS);
@@ -108,6 +109,7 @@ function createBusEventHandler(deps) {
       payload?.title || '',
       payload?.includeSidebar !== false,
       payload?.jobId || null,
+      payload?.requestedBy || null,
     ).catch((err) => {
       logger.warn('Replay send failed', { error: err.message });
     });
