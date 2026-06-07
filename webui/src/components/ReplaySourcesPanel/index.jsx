@@ -220,13 +220,17 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
           <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
         </div>
         <div className="space-y-0.5">
-          <label className="panel-muted block text-xs" htmlFor={`${panelId}-title`}>
-            Replay title
-          </label>
+          <div className="flex items-center gap-0.5">
+            <label className="panel-muted shrink-0 text-xs" htmlFor={`${panelId}-title`}>
+              Replay title
+            </label>
+            {/* The label has fixed-width content, while the input owns the remaining row space.
+                This keeps the title control compact without making the input compete with
+                other controls or wrapping unpredictably on narrow panel layouts. */}
           <input
             id={`${panelId}-title`}
             type="text"
-            className="field-input w-full text-xs"
+            className="field-input min-w-0 flex-1 text-xs"
             value={title}
             onChange={(event) => {
               const next = event.target.value;
@@ -237,27 +241,32 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
             placeholder={defaultTitle}
             maxLength={120}
           />
-          <label className="surface flex items-center gap-0.5 text-xs">
-            <input
-              type="checkbox"
-              checked={includeSidebar}
-              onChange={(event) => {
-                const next = Boolean(event.target.checked);
-                setIncludeSidebar(next);
-                saveSettings((current) => ({ ...(current || {}), [`${panelId}:includeSidebar`]: next }));
-              }}
-              className="accent-emerald-400"
-            />
-            <span>Include replay sidebar</span>
-          </label>
-          <button
-            type="button"
-            className="button-dark w-full text-xs disabled:opacity-40"
-            onClick={handleReplay}
-            disabled={replayDisabled}
-          >
-            {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
-          </button>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <label className="surface flex shrink-0 items-center gap-0.5 text-xs">
+              <input
+                type="checkbox"
+                checked={includeSidebar}
+                onChange={(event) => {
+                  const next = Boolean(event.target.checked);
+                  setIncludeSidebar(next);
+                  saveSettings((current) => ({ ...(current || {}), [`${panelId}:includeSidebar`]: next }));
+                }}
+                className="accent-emerald-400"
+              />
+              <span>Sidebar</span>
+            </label>
+            {/* The sidebar toggle is stable-width, so the replay button can expand into the
+                rest of the row and preserve the compact two-row control layout. */}
+            <button
+              type="button"
+              className="button-dark min-w-0 flex-1 text-xs disabled:opacity-40"
+              onClick={handleReplay}
+              disabled={replayDisabled}
+            >
+              {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
+            </button>
+          </div>
           {error ? <div className="text-xs text-amber-400">{error}</div> : null}
           {activeJobStatusText ? (
             <div className={`text-xs ${activeReplayJob?.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
