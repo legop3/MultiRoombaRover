@@ -323,7 +323,7 @@ function createReplayCaptionBuilder({ io, rovers, getActiveDrivers, getNickname,
   }
 
   function build({ job, usedSources = [], missingSources = [] }) {
-    const lines = [`**${job.title}**`, '', `Requested by ${job.requester}.`];
+    const lines = [`# ${job.title}`, '', `Requested by ${job.requester}.`];
     const driverLines = buildReplayDriverLines(job.requester, usedSources);
     if (driverLines.length) {
       lines.push('', ...driverLines);

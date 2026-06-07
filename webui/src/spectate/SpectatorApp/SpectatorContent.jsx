@@ -1,7 +1,7 @@
 // Spectator Content
 // Purpose: Defines the Spectator Content module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useSession } from '../../context/SessionContext.jsx';
+import { useSession, useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
@@ -12,6 +12,7 @@ import RoverQueuesPanel from '../../components/RoverQueuesPanel/index.jsx';
 import RawUserPilePanel from '../../components/RawUserPilePanel/index.jsx';
 import ButtonBoxPanel from '../../components/ButtonBoxPanel/index.jsx';
 import RewardRunOverlay from '../../components/RewardRunOverlay/index.jsx';
+import ReplayReadyPopup from '../../components/ReplaySourcesPanel/ReplayReadyPopup.jsx';
 import usePortraitLayout from './hooks/usePortraitLayout.js';
 import RoverRow from './components/RoverRow.jsx';
 import SecondaryRow from './components/SecondaryRow.jsx';
@@ -19,6 +20,8 @@ import LogsRow from './components/LogsRow.jsx';
 
 export default function SpectatorContent() {
   const { session } = useSession();
+  const latestReplay = useSessionSelector((state) => state.latestReplay);
+  const { clearLatestReplay } = useSessionActions();
   const inLockdown = session?.mode === 'lockdown';
   useDefaultNickname();
   // The spectator route is not rendered through App.jsx, so it must opt into
@@ -95,6 +98,11 @@ export default function SpectatorContent() {
       </main>
       <AlertFeed />
       <RewardRunOverlay />
+      {/* Spectators do not have the replay request panel that normal web users see, so
+          the spectator route listens to every ready replay directly. This intentionally
+          uses latestReplay instead of latestRequestedReplay because all spectators should
+          get the fullscreen replay when a Discord-hosted replay becomes available. */}
+      <ReplayReadyPopup replay={latestReplay} onClose={clearLatestReplay} />
     </div>
   );
 }
