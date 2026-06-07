@@ -36,10 +36,8 @@ export default function RawUserPilePanel({
   fillHeight = false,
   compact = false,
 }) {
-  const role = useSessionSelector((state) => state.session?.role || null);
   const users = useSessionSelector((state) => state.session?.users ?? []);
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
-  const canSetNickname = role !== 'spectator';
 
   const sorted = useMemo(
     () =>
@@ -76,7 +74,6 @@ export default function RawUserPilePanel({
             </div>
             <SocialButtonsGrid />
           </div>
-          {!canSetNickname && <p className="text-xs text-slate-500">Spectators cannot set nicknames.</p>}
         </div>
       )}
 

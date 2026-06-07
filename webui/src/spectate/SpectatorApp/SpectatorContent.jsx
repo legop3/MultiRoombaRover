@@ -4,6 +4,7 @@
 import { useSession } from '../../context/SessionContext.jsx';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
+import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
 import ChatPanel from '../../components/ChatPanel/index.jsx';
 import AlertFeed from '../../components/AlertFeed/index.jsx';
 import GlobalObjectiveBanner from '../../components/GlobalObjectiveBanner/index.jsx';
@@ -20,6 +21,11 @@ export default function SpectatorContent() {
   const { session } = useSession();
   const inLockdown = session?.mode === 'lockdown';
   useDefaultNickname();
+  // The spectator route is not rendered through App.jsx, so it must opt into
+  // the same persisted identity heartbeat here. That keeps the existing
+  // cookie-backed identity and saved nickname behavior active without adding a
+  // separate spectator identity path.
+  useUserIdentitySync();
   useSpectatorMode();
   const isPortraitLayout = usePortraitLayout();
   const roster = session?.roster ?? [];

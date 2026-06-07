@@ -100,10 +100,21 @@ function buildModelMessages({
   });
   (conversationMessages || []).forEach((message) => {
     if (!message || !message.role || !message.content) return;
-    message.content.replace("sourceMapping", "");
-    message.content.replace("SourceMapping", "");
-    message.content.replace("sourcemapping", "");
-    messages.push(message);
+    const content = String(message.content || '')
+      // The overseer can sometimes write plain-text lines that look like tool
+      // calls instead of returning real structured tool_calls to Ollama. If
+      // those fake calls are replayed in later context, the model sees its own
+      // malformed pattern as chat history and tends to repeat it. This removes
+      // any whole line shaped like "(tool_name {"json": "payload"})" regardless
+      // of the invented tool name, while leaving normal prose and legitimate
+      // structured tool metadata untouched.
+      .replace(/^\s*\([a-zA-Z_][a-zA-Z0-9_]*\s+\{.*\}\)\s*$/gm, '')
+      .replace(/sourceMapping/g, '')
+      .replace(/SourceMapping/g, '')
+      .replace(/sourcemapping/g, '')
+      .trim();
+    if (!content) return;
+    messages.push({ ...message, content });
   });
   return messages;
 }

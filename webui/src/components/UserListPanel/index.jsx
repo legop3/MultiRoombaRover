@@ -56,13 +56,11 @@ export default function UserListPanel({
   compact = false,
   showBothTurnsAndUsers = false,
 }) {
-  const role = useSessionSelector((state) => state.session?.role || null);
   const users = useSessionSelector((state) => state.session?.users ?? []);
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const turnQueues = useSessionSelector((state) => state.session?.turnQueues || {});
   const roster = useSessionSelector((state) => state.session?.roster || []);
-  const canSetNickname = role !== 'spectator';
   const isTurnsMode = mode === 'turns';
   const [turnView, setTurnView] = useState('queues');
 
@@ -168,7 +166,6 @@ export default function UserListPanel({
             </div>
             <SocialButtonsGrid />
           </div>
-          {!canSetNickname && <p className="text-xs text-slate-500">Spectators cannot set nicknames.</p>}
         </div>
       )}
 
