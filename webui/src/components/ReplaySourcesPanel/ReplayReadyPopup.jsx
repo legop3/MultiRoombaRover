@@ -1,7 +1,11 @@
 // Replay Ready Popup
 // Purpose: Presents the latest Discord-hosted replay video to web users as soon as upload completes.
 // Scope: Owns the ephemeral modal shell, immediate video loading, and click-outside close behavior.
+import { useCallback, useEffect, useRef } from 'react';
 import CardFrame from '../CardFrame/index.jsx';
+
+const CLOSE_AFTER_VIDEO_END_MS = 10000;
+const CLOSE_IF_VIDEO_NEVER_PLAYS_MS = 20000;
 
 function normalizeUrl(value) {
   const text = String(value || '').trim();
@@ -16,7 +20,66 @@ function formatBytes(value) {
 }
 
 export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' }) {
+  const fallbackCloseTimerRef = useRef(null);
+  const endedCloseTimerRef = useRef(null);
+  const onCloseRef = useRef(onClose);
   const videoUrl = normalizeUrl(replay?.url);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const clearCloseTimers = useCallback(() => {
+    if (fallbackCloseTimerRef.current) {
+      clearTimeout(fallbackCloseTimerRef.current);
+      fallbackCloseTimerRef.current = null;
+    }
+    if (endedCloseTimerRef.current) {
+      clearTimeout(endedCloseTimerRef.current);
+      endedCloseTimerRef.current = null;
+    }
+  }, []);
+
+  const closePopup = useCallback(() => {
+    // Timers are always cleared before closing so a stale timeout from a previous
+    // replay cannot close the next replay popup after React reuses this component.
+    clearCloseTimers();
+    onCloseRef.current?.();
+  }, [clearCloseTimers]);
+
+  useEffect(() => {
+    clearCloseTimers();
+    if (!videoUrl) return undefined;
+
+    // A Discord media URL can fail because the attachment URL expired, the browser
+    // cannot load the remote media, or autoplay never reaches actual playback. This
+    // fallback keeps both popup variants from getting stuck forever in those cases.
+    fallbackCloseTimerRef.current = setTimeout(closePopup, CLOSE_IF_VIDEO_NEVER_PLAYS_MS);
+    return clearCloseTimers;
+  }, [clearCloseTimers, closePopup, videoUrl]);
+
+  const handleVideoPlaying = useCallback(() => {
+    if (!fallbackCloseTimerRef.current) return;
+    // Once playback really starts, the video has proven useful. From this point on,
+    // the popup should stay open until the viewer finishes the replay or closes it.
+    clearTimeout(fallbackCloseTimerRef.current);
+    fallbackCloseTimerRef.current = null;
+  }, []);
+
+  const handleVideoEnded = useCallback(() => {
+    if (endedCloseTimerRef.current) {
+      clearTimeout(endedCloseTimerRef.current);
+    }
+    // Leaving the finished replay visible briefly gives people time to notice the
+    // final frame and use the Discord/open-video links before the popup cleans itself up.
+    endedCloseTimerRef.current = setTimeout(closePopup, CLOSE_AFTER_VIDEO_END_MS);
+  }, [closePopup]);
+
+  const videoLifecycleProps = {
+    onPlaying: handleVideoPlaying,
+    onEnded: handleVideoEnded,
+  };
+
   if (!videoUrl) return null;
 
   const isPanel = variant === 'panel';
@@ -57,6 +120,7 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
             autoPlay
             preload="auto"
             playsInline
+            {...videoLifecycleProps}
             // The floating panel is intentionally compact because it appears for users who
             // did not ask for the replay. It still loads the video immediately, but its
             // bounded height prevents the floating card from covering too much of the UI.
@@ -84,6 +148,7 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
           autoPlay
           preload="auto"
           playsInline
+          {...videoLifecycleProps}
           className={`${isPanel ? 'h-full min-h-[10rem]' : 'aspect-video max-h-[72vh]'} w-full bg-black`}
         />
       </div>

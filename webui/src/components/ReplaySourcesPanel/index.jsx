@@ -23,8 +23,6 @@ function normalizeSources(list = []) {
     .filter(Boolean);
 }
 
-const PANEL_REPLAY_AUTO_CLOSE_MS = 35000;
-
 export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHeight = false }) {
   const replaySources = useSessionSelector((state) => state.session?.replaySources ?? []);
   const mode = useSessionSelector((state) => state.session?.mode || null);
@@ -192,16 +190,6 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   };
 
   const listWrapClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : '';
-
-  useEffect(() => {
-    if (!showPanelReplay || !latestReplayJobId) return undefined;
-    // Non-requester replay previews are intentionally lightweight. They appear automatically
-    // so web-only users can catch the replay, then clear themselves before blocking the source controls.
-    const timeoutId = setTimeout(() => {
-      setDismissedPanelReplayId(latestReplayJobId);
-    }, PANEL_REPLAY_AUTO_CLOSE_MS);
-    return () => clearTimeout(timeoutId);
-  }, [showPanelReplay, latestReplayJobId]);
 
   return (
     <div className={`relative ${fillHeight ? 'flex h-full min-h-0 flex-col' : ''}`}>
