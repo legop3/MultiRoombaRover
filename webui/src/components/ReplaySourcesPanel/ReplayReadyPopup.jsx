@@ -4,8 +4,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import CardFrame from '../CardFrame/index.jsx';
 
-const CLOSE_AFTER_VIDEO_END_MS = 10000;
-const CLOSE_IF_VIDEO_NEVER_PLAYS_MS = 20000;
+const CLOSE_AFTER_VIDEO_END_MS = 5000;
+const CLOSE_IF_VIDEO_NEVER_PLAYS_MS = 10000;
 
 function normalizeUrl(value) {
   const text = String(value || '').trim();
