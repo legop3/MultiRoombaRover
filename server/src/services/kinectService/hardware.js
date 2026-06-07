@@ -206,6 +206,7 @@ async function capturePointCloud() {
       height: meta.height,
       pointCount: meta.pointCount,
       format: meta.format,
+      grid: Boolean(meta.grid),
       strideBytes: 16,
       rgbFrameAgeMs: meta.rgbFrameAgeMs,
       depthFrameAgeMs: meta.depthFrameAgeMs,

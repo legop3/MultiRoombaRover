@@ -68,6 +68,9 @@ function registerKinectSocketGateway({ config, hardware }) {
   }
 
   function sendCachedFrames(socket) {
+    if (!passesMode(socket)) {
+      return;
+    }
     // Cached-frame replay gives newly opened tabs the latest room snapshot
     // without starting a new Kinect capture or spending upload continuously.
     if (lastPointCloud?.buffer) {
@@ -76,6 +79,19 @@ function registerKinectSocketGateway({ config, hardware }) {
     if (lastColorImage?.buffer) {
       socket.emit('kinect:colorFrame', lastColorImage.meta, lastColorImage.buffer);
     }
+  }
+
+  function broadcastFrame(eventName, meta, buffer) {
+    // Kinect frames are room-privacy-sensitive, especially in lockdown mode.
+    // Do not use io.emit here: every frame must be checked against the current
+    // mode because lockdown is explicitly a privacy mode where only lockdown
+    // admins should receive camera-like data.
+    io.sockets.sockets.forEach((socket) => {
+      if (!passesMode(socket)) {
+        return;
+      }
+      socket.emit(eventName, meta, buffer);
+    });
   }
 
   function rejectDisabled() {
@@ -143,10 +159,10 @@ function registerKinectSocketGateway({ config, hardware }) {
       };
       if (kind === 'pointCloud') {
         lastPointCloud = { meta, buffer: capture.buffer };
-        io.emit('kinect:pointCloudFrame', meta, capture.buffer);
+        broadcastFrame('kinect:pointCloudFrame', meta, capture.buffer);
       } else {
         lastColorImage = { meta, buffer: capture.buffer };
-        io.emit('kinect:colorFrame', meta, capture.buffer);
+        broadcastFrame('kinect:colorFrame', meta, capture.buffer);
       }
       logger.info('Kinect capture broadcast', {
         kind,

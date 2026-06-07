@@ -262,29 +262,32 @@ void handle_pointcloud(int id) {
   };
 
   // Registered depth aligns with RGB, so each valid depth pixel can become a
-  // colored point without an additional calibration lookup.  Invalid zero-depth
-  // pixels are skipped to keep the payload and browser point count smaller.
+  // colored vertex without an additional calibration lookup.  Keep one fixed
+  // record for every 640x480 pixel, including invalid depth pixels, because the
+  // browser needs the original image grid to decide which neighboring vertices
+  // can be connected into triangles.  Invalid pixels get alpha 0 and zeroed
+  // coordinates; the viewer skips them when building the surface mesh.
   for (int y = 0; y < kHeight; y += 1) {
     for (int x = 0; x < kWidth; x += 1) {
       const int idx = y * kWidth + x;
       const uint16_t z_mm = depth[idx];
-      if (z_mm == 0) continue;
-      const float z = static_cast<float>(z_mm) / 1000.0f;
-      const float world_x = (static_cast<float>(x) - center_x) * z / focal_x;
-      const float world_y = -(static_cast<float>(y) - center_y) * z / focal_y;
+      const bool valid = z_mm != 0;
+      const float z = valid ? static_cast<float>(z_mm) / 1000.0f : 0.0f;
+      const float world_x = valid ? (static_cast<float>(x) - center_x) * z / focal_x : 0.0f;
+      const float world_y = valid ? -(static_cast<float>(y) - center_y) * z / focal_y : 0.0f;
       append_float(world_x);
       append_float(world_y);
       append_float(z);
       payload.push_back(rgb[idx * 3 + 0]);
       payload.push_back(rgb[idx * 3 + 1]);
       payload.push_back(rgb[idx * 3 + 2]);
-      payload.push_back(255);
-      point_count += 1;
+      payload.push_back(valid ? 255 : 0);
+      if (valid) point_count += 1;
     }
   }
 
   std::ostringstream meta;
-  meta << ",\"kind\":\"pointCloud\",\"format\":\"xyzrgb-f32-u8\",\"width\":" << kWidth
+  meta << ",\"kind\":\"pointCloud\",\"format\":\"xyzrgb-grid-f32-u8\",\"grid\":true,\"width\":" << kWidth
        << ",\"height\":" << kHeight << ",\"pointCount\":" << point_count
        << ",\"rgbFrameAgeMs\":" << rgb_age << ",\"depthFrameAgeMs\":" << depth_age;
   write_packet(id, meta.str(), payload);
