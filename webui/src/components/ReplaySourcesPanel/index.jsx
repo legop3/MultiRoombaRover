@@ -206,7 +206,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   return (
     <div className={`relative ${fillHeight ? 'flex h-full min-h-0 flex-col' : ''}`}>
       {showPanelReplay ? (
-        <div className="absolute bottom-[calc(100%+0.125rem)] left-0 z-[70] w-full max-w-full">
+        <div className="absolute bottom-[calc(100%+0.125rem)] left-1/2 z-[70] w-[min(42rem,calc(100vw-1rem))] -translate-x-1/2">
           <ReplayReadyPopup
             replay={latestReplay}
             variant="floating-panel"
@@ -221,8 +221,8 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
         </div>
         <div className="space-y-0.5">
           <div className="flex items-center gap-0.5">
-            <label className="panel-muted shrink-0 text-xs" htmlFor={`${panelId}-title`}>
-              Replay title
+            <label className="surface shrink-0 text-xs" htmlFor={`${panelId}-title`}>
+              Replay title:
             </label>
             {/* The label has fixed-width content, while the input owns the remaining row space.
                 This keeps the title control compact without making the input compete with
