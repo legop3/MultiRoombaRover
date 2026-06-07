@@ -47,9 +47,22 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
         meta={meta}
         actions={actions}
         clipOverflow={false}
-        bodyClassName="hidden"
+        bodyClassName="p-0.5"
       >
-        {null}
+        <div className="overflow-hidden rounded bg-black">
+          <video
+            key={videoUrl}
+            src={videoUrl}
+            controls
+            autoPlay
+            preload="auto"
+            playsInline
+            // The floating panel is intentionally compact because it appears for users who
+            // did not ask for the replay. It still loads the video immediately, but its
+            // bounded height prevents the floating card from covering too much of the UI.
+            className="aspect-video max-h-[12rem] w-full bg-black"
+          />
+        </div>
       </CardFrame>
     );
   }
