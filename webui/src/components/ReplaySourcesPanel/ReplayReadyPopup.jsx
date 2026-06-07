@@ -20,6 +20,7 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
   if (!videoUrl) return null;
 
   const isPanel = variant === 'panel';
+  const isFloatingPanel = variant === 'floating-panel';
   const title = String(replay?.title || 'Replay').trim() || 'Replay';
   const messageUrl = normalizeUrl(replay?.messageUrl);
   const meta = formatBytes(replay?.size) || null;
@@ -38,6 +39,20 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
       </button>
     </div>
   );
+
+  if (isFloatingPanel) {
+    return (
+      <CardFrame
+        title={title}
+        meta={meta}
+        actions={actions}
+        clipOverflow={false}
+        bodyClassName="hidden"
+      >
+        {null}
+      </CardFrame>
+    );
+  }
 
   const card = (
     <CardFrame

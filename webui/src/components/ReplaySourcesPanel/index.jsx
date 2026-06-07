@@ -23,6 +23,8 @@ function normalizeSources(list = []) {
     .filter(Boolean);
 }
 
+const PANEL_REPLAY_AUTO_CLOSE_MS = 35000;
+
 export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHeight = false }) {
   const replaySources = useSessionSelector((state) => state.session?.replaySources ?? []);
   const mode = useSessionSelector((state) => state.session?.mode || null);
@@ -191,69 +193,80 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
 
   const listWrapClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : '';
 
-  if (showPanelReplay) {
-    return (
-      <ReplayReadyPopup
-        replay={latestReplay}
-        variant="panel"
-        onClose={() => setDismissedPanelReplayId(latestReplayJobId)}
-      />
-    );
-  }
+  useEffect(() => {
+    if (!showPanelReplay || !latestReplayJobId) return undefined;
+    // Non-requester replay previews are intentionally lightweight. They appear automatically
+    // so web-only users can catch the replay, then clear themselves before blocking the source controls.
+    const timeoutId = setTimeout(() => {
+      setDismissedPanelReplayId(latestReplayJobId);
+    }, PANEL_REPLAY_AUTO_CLOSE_MS);
+    return () => clearTimeout(timeoutId);
+  }, [showPanelReplay, latestReplayJobId]);
 
   return (
-    <CardFrame title="Replay Sources" fillHeight={fillHeight} bodyClassName="space-y-0.5 text-sm">
-      <div className={`grid gap-0.5 md:grid-cols-2 ${listWrapClass}`}>
-        <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />
-        <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
-      </div>
-      <div className="space-y-0.5">
-        <label className="panel-muted block text-xs" htmlFor={`${panelId}-title`}>
-          Replay title
-        </label>
-        <input
-          id={`${panelId}-title`}
-          type="text"
-          className="field-input w-full text-xs"
-          value={title}
-          onChange={(event) => {
-            const next = event.target.value;
-            setTitle(next);
-            setTitleDirty(true);
-            saveSettings((current) => ({ ...(current || {}), [`${panelId}:title`]: next }));
-          }}
-          placeholder={defaultTitle}
-          maxLength={120}
-        />
-        <label className="surface flex items-center gap-0.5 text-xs">
-          <input
-            type="checkbox"
-            checked={includeSidebar}
-            onChange={(event) => {
-              const next = Boolean(event.target.checked);
-              setIncludeSidebar(next);
-              saveSettings((current) => ({ ...(current || {}), [`${panelId}:includeSidebar`]: next }));
-            }}
-            className="accent-emerald-400"
+    <div className={`relative ${fillHeight ? 'flex h-full min-h-0 flex-col' : ''}`}>
+      {showPanelReplay ? (
+        <div className="absolute bottom-[calc(100%+0.125rem)] left-0 z-[70] w-full max-w-full">
+          <ReplayReadyPopup
+            replay={latestReplay}
+            variant="floating-panel"
+            onClose={() => setDismissedPanelReplayId(latestReplayJobId)}
           />
-          <span>Include replay sidebar</span>
-        </label>
-        <button
-          type="button"
-          className="button-dark w-full text-xs disabled:opacity-40"
-          onClick={handleReplay}
-          disabled={replayDisabled}
-        >
-          {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
-        </button>
-        {error ? <div className="text-xs text-amber-400">{error}</div> : null}
-        {activeJobStatusText ? (
-          <div className={`text-xs ${activeReplayJob?.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
-            {activeJobStatusText}
-          </div>
-        ) : success ? <div className="text-xs text-emerald-300">{success}</div> : null}
-      </div>
-    </CardFrame>
+        </div>
+      ) : null}
+      <CardFrame title="Replay Sources" fillHeight={fillHeight} bodyClassName="space-y-0.5 text-sm">
+        <div className={`grid gap-0.5 md:grid-cols-2 ${listWrapClass}`}>
+          <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />
+          <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
+        </div>
+        <div className="space-y-0.5">
+          <label className="panel-muted block text-xs" htmlFor={`${panelId}-title`}>
+            Replay title
+          </label>
+          <input
+            id={`${panelId}-title`}
+            type="text"
+            className="field-input w-full text-xs"
+            value={title}
+            onChange={(event) => {
+              const next = event.target.value;
+              setTitle(next);
+              setTitleDirty(true);
+              saveSettings((current) => ({ ...(current || {}), [`${panelId}:title`]: next }));
+            }}
+            placeholder={defaultTitle}
+            maxLength={120}
+          />
+          <label className="surface flex items-center gap-0.5 text-xs">
+            <input
+              type="checkbox"
+              checked={includeSidebar}
+              onChange={(event) => {
+                const next = Boolean(event.target.checked);
+                setIncludeSidebar(next);
+                saveSettings((current) => ({ ...(current || {}), [`${panelId}:includeSidebar`]: next }));
+              }}
+              className="accent-emerald-400"
+            />
+            <span>Include replay sidebar</span>
+          </label>
+          <button
+            type="button"
+            className="button-dark w-full text-xs disabled:opacity-40"
+            onClick={handleReplay}
+            disabled={replayDisabled}
+          >
+            {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
+          </button>
+          {error ? <div className="text-xs text-amber-400">{error}</div> : null}
+          {activeJobStatusText ? (
+            <div className={`text-xs ${activeReplayJob?.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
+              {activeJobStatusText}
+            </div>
+          ) : success ? <div className="text-xs text-emerald-300">{success}</div> : null}
+        </div>
+      </CardFrame>
+    </div>
   );
 }
 
