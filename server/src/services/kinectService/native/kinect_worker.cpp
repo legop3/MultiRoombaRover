@@ -23,6 +23,7 @@
 #include <iomanip>
 #include <iostream>
 #include <mutex>
+#include <algorithm>
 #include <sstream>
 #include <string>
 #include <sys/time.h>
@@ -37,15 +38,21 @@ constexpr int kRgbBytes = kWidth * kHeight * 3;
 constexpr int kDepthPixels = kWidth * kHeight;
 constexpr int kFrameStaleMs = 5000;
 constexpr int kCommandFrameWaitMs = 3000;
+constexpr int kDepthHistoryFrames = 15;
+constexpr int kDepthMinimumValidSamples = 5;
 
 struct FrameCache {
   std::mutex mutex;
   std::condition_variable cv;
   std::vector<uint8_t> rgb = std::vector<uint8_t>(kRgbBytes);
   std::vector<uint16_t> depth = std::vector<uint16_t>(kDepthPixels);
+  std::vector<std::vector<uint16_t>> depth_history =
+      std::vector<std::vector<uint16_t>>(kDepthHistoryFrames, std::vector<uint16_t>(kDepthPixels));
   bool has_rgb = false;
   bool has_depth = false;
   uint32_t valid_depth_pixels = 0;
+  uint32_t depth_history_size = 0;
+  uint32_t depth_history_next = 0;
   uint64_t rgb_at_ms = 0;
   uint64_t depth_at_ms = 0;
   uint64_t rgb_frames = 0;
@@ -147,6 +154,14 @@ void depth_callback(freenect_device*, void* depth_data, uint32_t) {
   const auto* depth = static_cast<const uint16_t*>(depth_data);
   std::lock_guard<std::mutex> lock(cache.mutex);
   std::memcpy(cache.depth.data(), depth, kDepthPixels * sizeof(uint16_t));
+  std::memcpy(
+      cache.depth_history[cache.depth_history_next].data(),
+      depth,
+      kDepthPixels * sizeof(uint16_t));
+  cache.depth_history_next = (cache.depth_history_next + 1) % kDepthHistoryFrames;
+  if (cache.depth_history_size < kDepthHistoryFrames) {
+    cache.depth_history_size += 1;
+  }
   uint32_t valid_depth_pixels = 0;
   for (int index = 0; index < kDepthPixels; index += 1) {
     if (depth[index] != 0) valid_depth_pixels += 1;
@@ -156,6 +171,27 @@ void depth_callback(freenect_device*, void* depth_data, uint32_t) {
   cache.depth_at_ms = now_ms();
   cache.depth_frames += 1;
   cache.cv.notify_all();
+}
+
+uint16_t median_depth_for_pixel(const std::vector<std::vector<uint16_t>>& history, uint32_t history_size, int pixel_index) {
+  uint16_t samples[kDepthHistoryFrames];
+  uint32_t sample_count = 0;
+  for (uint32_t frame_index = 0; frame_index < history_size; frame_index += 1) {
+    const uint16_t value = history[frame_index][pixel_index];
+    if (value == 0) continue;
+    samples[sample_count] = value;
+    sample_count += 1;
+  }
+
+  if (sample_count < kDepthMinimumValidSamples) {
+    return 0;
+  }
+
+  // Kinect depth often has occasional one-frame spikes.  A median across a
+  // larger rolling history rejects those spikes better than a mean, while still
+  // preserving crisp room geometry better than aggressive smoothing.
+  std::nth_element(samples, samples + (sample_count / 2), samples + sample_count);
+  return samples[sample_count / 2];
 }
 
 void video_callback(freenect_device* device, void* rgb_data, uint32_t) {
@@ -236,12 +272,16 @@ void handle_pointcloud(int id) {
 
   std::vector<uint8_t> rgb;
   std::vector<uint16_t> depth;
+  std::vector<std::vector<uint16_t>> depth_history;
+  uint32_t depth_history_size = 0;
   uint64_t rgb_age = 0;
   uint64_t depth_age = 0;
   {
     std::lock_guard<std::mutex> lock(cache.mutex);
     rgb = cache.rgb;
     depth = cache.depth;
+    depth_history = cache.depth_history;
+    depth_history_size = cache.depth_history_size;
     const uint64_t now = now_ms();
     rgb_age = now - cache.rgb_at_ms;
     depth_age = now - cache.depth_at_ms;
@@ -270,7 +310,7 @@ void handle_pointcloud(int id) {
   for (int y = 0; y < kHeight; y += 1) {
     for (int x = 0; x < kWidth; x += 1) {
       const int idx = y * kWidth + x;
-      const uint16_t z_mm = depth[idx];
+      const uint16_t z_mm = median_depth_for_pixel(depth_history, depth_history_size, idx);
       const bool valid = z_mm != 0;
       const float z = valid ? static_cast<float>(z_mm) / 1000.0f : 0.0f;
       const float world_x = valid ? (static_cast<float>(x) - center_x) * z / focal_x : 0.0f;
@@ -289,6 +329,8 @@ void handle_pointcloud(int id) {
   std::ostringstream meta;
   meta << ",\"kind\":\"pointCloud\",\"format\":\"xyzrgb-grid-f32-u8\",\"grid\":true,\"width\":" << kWidth
        << ",\"height\":" << kHeight << ",\"pointCount\":" << point_count
+       << ",\"depthSamples\":" << depth_history_size
+       << ",\"depthMinimumValidSamples\":" << kDepthMinimumValidSamples
        << ",\"rgbFrameAgeMs\":" << rgb_age << ",\"depthFrameAgeMs\":" << depth_age;
   write_packet(id, meta.str(), payload);
 }
