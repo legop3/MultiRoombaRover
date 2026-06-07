@@ -130,7 +130,7 @@ body {
        remain usable on mobile while still allowing longer typed nicknames. */
     flex: 0 0 5rem;
     min-width: 0;
-    order: 2;
+    order: 1;
   }
 
   .chat-composer-input {
@@ -138,7 +138,7 @@ body {
        remaining space, but the TTS controls no longer steal that row on mobile. */
     flex: 1 1 0%;
     min-width: 0;
-    order: 1;
+    order: 2;
   }
 
   .chat-composer-send {
