@@ -49,7 +49,8 @@ export default function SocialButton({ id = null, label, url, icon, color, layou
       ) : (
         <span className="flex h-full w-full max-w-full flex-col items-center justify-between text-center leading-tight">
           <span className="flex min-h-0 flex-1 items-center justify-center">
-            <Icon className="shrink-0" style={{ fontSize: 'clamp(1rem, 2.2vh + 1.2vw, 3rem)' }} />
+            <Icon className="shrink-0" style={{ fontSize: 'clamp(1rem, 2.2vh + 1.2vw, 2rem)' }} />
+            {/* <Icon className="shrink-0" style={{ fontSize: '2vh' }} /> */}
           </span>
           <span className="w-full break-words leading-tight">{text}</span>
         </span>
