@@ -1,6 +1,8 @@
 1.  Overseer personality swapping.
-2.  make google tts the default everywhere but roverd
-3.  fix rover request spam queue cheat
+2.  make rs commands work from site chat, not just discord
+3.  FIX RS BRIDGE DISABLE FOR NON ADMINS AAAAAH
+4.  make google tts the default everywhere but roverd
+5.  fix rover request spam queue cheat
 
 
 # relative pipe dreams:

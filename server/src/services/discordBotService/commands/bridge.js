@@ -42,8 +42,14 @@ function createBridgeCommand({ getGuildConfig, setGuildConfig, removeGuildConfig
     if (mode && !VALID_MODES.has(mode)) return message.reply({ content: 'Invalid mode. Use `global` or `private`.', allowedMentions: { parse: [], repliedUser: false } });
 
     if (action === 'status') return message.reply({ content: status(getGuildConfig(guildId)), allowedMentions: { parse: [], repliedUser: false } });
-    if (action === 'off') { removeGuildConfig(guildId); return message.reply({ content: 'Chat bridge disabled for this server.', allowedMentions: { parse: [], repliedUser: false } }); }
+
+    // Every command below this point mutates the guild bridge configuration.
+    // Keeping the authorization check in one shared gate prevents destructive
+    // actions, especially `rs bridge off`, from accidentally bypassing the same
+    // Manage Server/admin requirement used by `here` and `mode`.
     if (!canManageBridge(message)) return message.reply({ content: 'You need Manage Server permissions to change the chat bridge.', allowedMentions: { parse: [], repliedUser: false } });
+
+    if (action === 'off') { removeGuildConfig(guildId); return message.reply({ content: 'Chat bridge disabled for this server.', allowedMentions: { parse: [], repliedUser: false } }); }
 
     if (action === 'here') {
       try {

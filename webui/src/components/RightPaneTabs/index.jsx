@@ -26,9 +26,14 @@ import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
 import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import { themeGapClass, themeStackClass } from '../../themeFlags.js';
+
+const CHAT_DOCK_INITIAL_HEIGHT = 224;
+const CHAT_DOCK_MIN_HEIGHT = 144;
+const CHAT_DOCK_MAX_HEIGHT = 300;
+const CHAT_DOCK_BOTTOM_INSET = 8;
 
 function TopDownMapPanel() {
   const {
@@ -133,6 +138,8 @@ function DriveDockPanel() {
 
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   const [activeTab, setActiveTab] = useState('telemetry');
+  const chatDockRef = useRef(null);
+  const [chatDockHeight, setChatDockHeight] = useState(CHAT_DOCK_INITIAL_HEIGHT);
   const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
   const ownRoverId = useSessionSelector((state) => String(state.session?.assignment?.roverId || '').trim());
   const ownAudioForward = useSessionSelector((state) => {
@@ -157,6 +164,90 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
       ownAudioForward?.source === 'upload' &&
       ownAudioForward?.state === 'playing',
   );
+
+  useLayoutEffect(() => {
+    const chatDock = chatDockRef.current;
+    if (!chatDock) return undefined;
+    let animationFrame = 0;
+    let settledFirstFrame = 0;
+    let settledSecondFrame = 0;
+
+    const measureChatDock = () => {
+      animationFrame = 0;
+      const { top } = chatDock.getBoundingClientRect();
+
+      /*
+        Keep this as pixels because getBoundingClientRect() and innerHeight are
+        pixel-based browser measurements. The row stays in normal document flow:
+        when its top moves upward during right-column scrolling, the available
+        viewport space grows and the chat panel expands until the max height.
+      */
+      const availableHeight = window.innerHeight - top - CHAT_DOCK_BOTTOM_INSET;
+      const nextHeight = Math.round(
+        Math.max(CHAT_DOCK_MIN_HEIGHT, Math.min(CHAT_DOCK_MAX_HEIGHT, availableHeight)),
+      );
+      setChatDockHeight((currentHeight) => (Math.abs(currentHeight - nextHeight) > 1 ? nextHeight : currentHeight));
+    };
+
+    const scheduleMeasure = () => {
+      if (animationFrame) return;
+      animationFrame = window.requestAnimationFrame(measureChatDock);
+    };
+
+    const scheduleSettledMeasure = () => {
+      settledFirstFrame = window.requestAnimationFrame(() => {
+        settledFirstFrame = 0;
+        settledSecondFrame = window.requestAnimationFrame(() => {
+          settledSecondFrame = 0;
+          measureChatDock();
+        });
+      });
+    };
+
+    const resizeObserver =
+      typeof ResizeObserver === 'function'
+        ? new ResizeObserver(() => {
+            /*
+              Some panels above chat settle after the first React commit as data,
+              images, or intrinsic layout measurements arrive. Watching the
+              parent group means those height changes recalculate the chat row
+              immediately instead of requiring a user scroll to repair the
+              initial bottom alignment.
+            */
+            scheduleMeasure();
+          })
+        : null;
+
+    scheduleMeasure();
+    scheduleSettledMeasure();
+    if (resizeObserver && chatDock.parentElement) {
+      resizeObserver.observe(chatDock.parentElement);
+    }
+    window.addEventListener('resize', scheduleMeasure);
+    /*
+      The desktop layout scrolls inside the right-column pane, not the window.
+      Capturing scroll events at the document level keeps the effect small while
+      still noticing that nested scroll movement without wiring a dedicated ref
+      through App.jsx just for this row.
+    */
+    document.addEventListener('scroll', scheduleMeasure, { capture: true, passive: true });
+
+    return () => {
+      if (animationFrame) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+      if (settledFirstFrame) {
+        window.cancelAnimationFrame(settledFirstFrame);
+      }
+      if (settledSecondFrame) {
+        window.cancelAnimationFrame(settledSecondFrame);
+      }
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', scheduleMeasure);
+      document.removeEventListener('scroll', scheduleMeasure, { capture: true });
+    };
+  }, [activeTab]);
+
   return (
     <section className="text-base">
       <Tabs defaultTab="telemetry" currentTab={activeTab} onTabChange={setActiveTab}>
@@ -177,21 +268,44 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
         </TabList>
         <TabPanels>
           <TabPanel id="telemetry">
-            <div className={themeStackClass}>
-              <div className={`grid items-stretch ${themeGapClass} grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]`}>
-                <TopDownMapPanel />
-                <DriveDockPanel />
-              </div>
-              <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.75fr)]`}>
-                <RoverQueuesPanel />
-                <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
-                <LinkButtonsPanel />
-              </div>
-              <div className={`grid items-stretch ${themeGapClass} grid-cols-[minmax(0,1.3fr)_minmax(0,0.22fr)] h-[14rem]`}>
-                <ChatPanel fillHeight />
-                <div className={`grid min-h-0 ${themeGapClass} grid-rows-[auto_minmax(0,1fr)]`}>
-                  <OverseerPreferencePanel />
-                  <RawUserPilePanel compact hideNicknameForm fillHeight />
+            <div className={`flex flex-col ${themeGapClass}`}>
+              {/*
+                The first desktop telemetry group is intentionally a viewport
+                filler instead of a sticky overlay. The rows above chat keep
+                their natural height, and the chat row receives only the
+                leftover room between those rows and the bottom of the visible
+                right column. That keeps the chat composer at the bottom of the
+                screen when space is available while still letting later panels
+                sit below it in normal scroll flow instead of being covered.
+              */}
+              <div className={`flex flex-col ${themeGapClass}`}>
+                <div className={`grid items-stretch ${themeGapClass} grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]`}>
+                  <TopDownMapPanel />
+                  <DriveDockPanel />
+                </div>
+                <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.75fr)]`}>
+                  <RoverQueuesPanel />
+                  <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
+                  <LinkButtonsPanel />
+                </div>
+                {/*
+                  This row gets an explicit measured height because the target
+                  behavior depends on the row's live viewport position during
+                  right-column scrolling. Pure CSS can size against the viewport
+                  itself, but it cannot calculate the remaining visible distance
+                  from this particular row's current top edge to the bottom of
+                  the nested scroll viewport.
+                */}
+                <div
+                  ref={chatDockRef}
+                  className={`grid min-h-0 items-stretch ${themeGapClass} grid-cols-[minmax(0,1.3fr)_minmax(0,0.22fr)]`}
+                  style={{ height: `${chatDockHeight}px` }}
+                >
+                  <ChatPanel fillHeight />
+                  <div className={`grid min-h-0 ${themeGapClass} grid-rows-[auto_minmax(0,1fr)]`}>
+                    <OverseerPreferencePanel />
+                    <RawUserPilePanel compact hideNicknameForm fillHeight />
+                  </div>
                 </div>
               </div>
               <HomeAssistantControls />
