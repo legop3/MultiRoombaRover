@@ -45,18 +45,18 @@ export default function DisplayRoverCell({ rover, session }) {
               fallback={rover?.id}
               as={AutoFitText}
               className="leading-none"
-              maxSize={76}
-              minSize={20}
+              maxSize={108}
+              minSize={26}
             />
           </div>
           {locked ? (
             // Keep the lock warning adjacent to the rover identity so the cell
             // remains readable while still making the locked state impossible
             // to miss at a glance.
-            <div className="max-w-[36vw] border-4 border-red-100 bg-red-700 px-[0.9vw] py-[0.45vh] text-center text-[clamp(1.6rem,4.2vh,4.4rem)] font-black leading-none text-white">
+            <div className="max-w-[40vw] border-4 border-red-100 bg-red-700 px-[1vw] py-[0.55vh] text-center text-[clamp(2rem,5vh,5.2rem)] font-black leading-none text-white">
               <div>LOCKED</div>
               {rover?.lockReason ? (
-                <div className="mt-[0.3vh] text-[clamp(1rem,2.4vh,2.5rem)] leading-none text-red-50">
+                <div className="mt-[0.35vh] text-[clamp(1.2rem,2.9vh,3rem)] leading-none text-red-50">
                   {rover.lockReason}
                 </div>
               ) : null}
@@ -70,8 +70,8 @@ export default function DisplayRoverCell({ rover, session }) {
                 'font-black leading-none',
                 active ? 'text-white' : 'text-slate-400',
               )}
-              maxSize={128}
-              minSize={28}
+              maxSize={172}
+              minSize={38}
             >
               {driver?.label || 'Idle'}
             </AutoFitText>
@@ -82,15 +82,15 @@ export default function DisplayRoverCell({ rover, session }) {
                 'font-black leading-none',
                 urgent ? 'text-red-100' : warn ? 'text-amber-100' : 'text-slate-100',
               )}
-              maxSize={100}
-              minSize={24}
+              maxSize={136}
+              minSize={32}
             >
               {batteryText}
             </AutoFitText>
           </div>
         </div>
         {stateText ? (
-          <div className="min-w-0 text-[clamp(0.95rem,1.8vh,1.8rem)] font-black leading-none text-amber-100">
+          <div className="min-w-0 text-[clamp(1.25rem,2.5vh,2.6rem)] font-black leading-none text-amber-100">
             {stateText}
           </div>
         ) : (
