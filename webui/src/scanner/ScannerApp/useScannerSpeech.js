@@ -5,23 +5,31 @@ import { useEffect, useRef } from 'react';
 
 const SPEECH_START_TIMEOUT_MS = 1500;
 const SPEECH_RETRY_DELAY_MS = 700;
-const PREFERRED_VOICE_PATTERN = /female|samantha|victoria|zira|karen|moira|serena|ava|susan|hazel|google uk english female/i;
+const PREFERRED_VOICE_PATTERN = /female|samantha|victoria|allison|zira|karen|moira|serena|ava|susan|hazel|google (us|uk) english/i;
+const NOVELTY_VOICE_PATTERN = /whisper|bubbles|bells|boing|bad news|bahh|cellos|deranged|good news|hysterical|pipe organ|trinoids|zarvox/i;
+
+function isNoveltyVoice(voice) {
+  return NOVELTY_VOICE_PATTERN.test(String(voice?.name || ''));
+}
 
 function pickScannerVoice(synth) {
   const voices = typeof synth?.getVoices === 'function' ? synth.getVoices() : [];
   if (!voices.length) return null;
 
-  const englishVoices = voices.filter((voice) => String(voice?.lang || '').toLowerCase().startsWith('en'));
+  const usableVoices = voices.filter((voice) => !isNoveltyVoice(voice));
+  const defaultVoice = usableVoices.find((voice) => voice?.default) || null;
+  const englishVoices = usableVoices.filter((voice) => String(voice?.lang || '').toLowerCase().startsWith('en'));
   // Browser voice lists vary by operating system and installed speech packs, so
   // this is intentionally a preference rather than a requirement. A recognized
   // female-sounding English voice is best for the scanner speaker, but any
-  // English voice is better than failing to speak, and the browser default is
-  // the final fallback.
+  // normal/default voice is better than accidentally choosing a novelty voice
+  // like Whisper just because it appears early in the browser's voice list.
   return (
     englishVoices.find((voice) => PREFERRED_VOICE_PATTERN.test(String(voice?.name || ''))) ||
-    voices.find((voice) => PREFERRED_VOICE_PATTERN.test(String(voice?.name || ''))) ||
+    usableVoices.find((voice) => PREFERRED_VOICE_PATTERN.test(String(voice?.name || ''))) ||
+    defaultVoice ||
     englishVoices[0] ||
-    voices[0] ||
+    usableVoices[0] ||
     null
   );
 }
@@ -77,7 +85,7 @@ export default function useScannerSpeech(scan) {
         utterance.voice = preferredVoice;
         utterance.lang = preferredVoice.lang;
       }
-      utterance.rate = 0.92;
+      utterance.rate = 1;
       utterance.pitch = 1;
       utterance.volume = 1;
       utterance.onstart = () => {

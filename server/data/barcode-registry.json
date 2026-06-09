@@ -2,9 +2,23 @@
   "codes": {
     "r001": {
       "type": "rover",
-      "entityId": "Freaky",
+      "entityId": "freaky",
       "label": "Freaky"
     },
+    "r002": {
+      "type": "rover",
+      "entityId": "walle",
+      "label": "WALL-E"
+    },
+    "r003": {
+      "type": "rover",
+      "entityId": "bweeble",
+      "label": "Bweeble"
+    },
+
+
+
+
     "o001": {
       "type": "object",
       "entityId": "woodblock",
