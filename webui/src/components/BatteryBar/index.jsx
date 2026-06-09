@@ -30,7 +30,6 @@ function BatteryBar({
         'absolute z-10',
         isVertical ? 'left-0 right-0 h-[2px]' : 'top-0 bottom-0 w-[2px]',
         'bg-black/70',
-        isWarn && !isUrgent && 'battery-tick-warn',
       );
       const markerStyle = isVertical ? { bottom: `${warnPercent}%` } : { left: `${warnPercent}%` };
       const containerClass = classNames('absolute inset-0 pointer-events-none', className);
@@ -51,7 +50,6 @@ function BatteryBar({
 
   const isUrgent = Boolean(visual.urgentActive);
   const isWarn = Boolean(visual.warnActive);
-  const shouldFlash = isUrgent || isWarn;
   const animationDuration = isUrgent ? `${URGENT_FLASH_MS}ms` : isWarn ? `${WARN_FLASH_MS}ms` : undefined;
 
   const fillColor = isUrgent || isWarn ? 'bg-red-500' : 'bg-emerald-500';
