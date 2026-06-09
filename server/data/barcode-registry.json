@@ -1,0 +1,14 @@
+{
+  "codes": {
+    "r001": {
+      "type": "rover",
+      "entityId": "Freaky",
+      "label": "Freaky"
+    },
+    "o001": {
+      "type": "object",
+      "entityId": "woodblock",
+      "label": "Wooden block"
+    }
+  }
+}

@@ -16,5 +16,7 @@ package-lock.json
 server/data/discord-guilds.json
 server/data/global-objective.json
 server/data/admin-reason.json
-server/data
+server/data/buttonbox-state.json
 webui/package-lock.json
+!server/data/
+!server/data/barcode-registry.json
