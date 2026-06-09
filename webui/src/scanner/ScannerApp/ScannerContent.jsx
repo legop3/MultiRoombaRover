@@ -44,7 +44,9 @@ function playSubmitBeep() {
 export default function ScannerContent() {
   const socket = useSocket();
   const inputRef = useRef(null);
+  const flashTimerRef = useRef(null);
   const [scannerState, setScannerState] = useState(EMPTY_SCANNER_STATE);
+  const [flashActive, setFlashActive] = useState(false);
 
   useDefaultNickname();
   useUserIdentitySync();
@@ -58,6 +60,12 @@ export default function ScannerContent() {
   useEffect(() => {
     focusInput();
   }, [focusInput]);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(flashTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     function handleScannerState(nextState = {}) {
@@ -81,6 +89,15 @@ export default function ScannerContent() {
     }
 
     if (scannerState.beepAllowed) {
+      // The flash is paired with the local submit beep so rovers get an
+      // immediate visual confirmation that the scanner computer accepted input.
+      // It is intentionally not a success indicator; the server result still
+      // arrives separately as the resolved text and spoken label.
+      window.clearTimeout(flashTimerRef.current);
+      setFlashActive(true);
+      flashTimerRef.current = window.setTimeout(() => {
+        setFlashActive(false);
+      }, 120);
       playSubmitBeep();
     }
 
@@ -97,7 +114,9 @@ export default function ScannerContent() {
 
   return (
     <main
-      className="flex min-h-screen cursor-default flex-col items-center justify-center overflow-hidden bg-black px-6 text-center text-white"
+      className={`flex min-h-screen cursor-default flex-col items-center justify-center overflow-hidden px-6 text-center ${
+        flashActive ? 'bg-white text-black' : 'bg-black text-white'
+      }`}
       onClick={focusInput}
     >
       <input
@@ -115,7 +134,7 @@ export default function ScannerContent() {
         }}
       />
       <section className="flex min-h-screen w-full items-center justify-center">
-        <h1 className="max-w-full break-words text-[18vw] font-black leading-none tracking-normal text-white">
+        <h1 className="max-w-full break-words text-[18vw] font-black leading-none tracking-normal">
           {label}
         </h1>
       </section>
