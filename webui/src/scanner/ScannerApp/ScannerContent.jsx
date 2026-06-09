@@ -3,10 +3,10 @@
 // Scope: Captures keyboard-style scanner input, emits raw scans, renders server state, and plays local beep/TTS output.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocket } from '../../context/SocketContext.jsx';
-import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
+import SocketConnectionPill from '../../components/SocketConnectionPill/index.jsx';
 import useScannerSpeech from './useScannerSpeech.js';
 
 const EMPTY_SCANNER_STATE = {
@@ -43,10 +43,8 @@ function playSubmitBeep() {
 
 export default function ScannerContent() {
   const socket = useSocket();
-  const connected = useSessionSelector((state) => state.connected);
   const inputRef = useRef(null);
   const [scannerState, setScannerState] = useState(EMPTY_SCANNER_STATE);
-  const [focused, setFocused] = useState(false);
 
   useDefaultNickname();
   useUserIdentitySync();
@@ -96,9 +94,6 @@ export default function ScannerContent() {
 
   const lastScan = scannerState.lastScan;
   const label = lastScan?.label || 'waiting';
-  const code = lastScan?.code || '';
-  const statusText = !connected ? 'offline' : focused ? 'scanner ready' : 'click page';
-  const showCode = Boolean(code && label !== 'waiting');
 
   return (
     <main
@@ -113,27 +108,18 @@ export default function ScannerContent() {
         autoComplete="off"
         autoCorrect="off"
         spellCheck={false}
-        onBlur={() => setFocused(false)}
-        onFocus={() => setFocused(true)}
         onKeyDown={(event) => {
           if (event.key !== 'Enter') return;
           event.preventDefault();
           submitScan();
         }}
       />
-      <section className="flex min-h-0 w-full flex-1 flex-col items-center justify-center">
-        <h1 className="max-w-full break-words text-[6rem] font-black leading-none tracking-normal text-white md:text-[9rem] lg:text-[11rem]">
+      <section className="flex min-h-screen w-full items-center justify-center">
+        <h1 className="max-w-full break-words text-[18vw] font-black leading-none tracking-normal text-white">
           {label}
         </h1>
-        {showCode ? (
-          <p className="mt-8 text-[3rem] font-bold leading-none tracking-normal text-white md:text-[4rem]">
-            {code}
-          </p>
-        ) : null}
       </section>
-      <footer className="flex h-20 w-full items-center justify-center text-[2rem] font-bold leading-none tracking-normal text-white">
-        {statusText}
-      </footer>
+      <SocketConnectionPill />
     </main>
   );
 }
