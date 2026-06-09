@@ -22,7 +22,7 @@ export default function ChatPanel({
   fillHeight = false,
   allowSpectatorInput = false,
   title = 'Chat and TTS',
-  nicknameLayout = 'inline',
+  minimal = false,
 }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
@@ -67,6 +67,8 @@ export default function ChatPanel({
     [currentRoverId, roster],
   );
   const ttsSupported = Boolean(rover?.audio?.ttsEnabled);
+  const effectiveHideInput = minimal || hideInput;
+  const effectiveTitle = minimal ? '' : title;
 
   const sorted = useMemo(() => messages.slice(-200), [messages]);
   const typingRows = useMemo(() => typing || [], [typing]);
@@ -125,7 +127,7 @@ export default function ChatPanel({
 
   async function handleSend(event) {
     event.preventDefault();
-    if (!canChat || hideInput) return;
+    if (!canChat || effectiveHideInput) return;
     // Allow users to type "\n" to represent a newline in messages
     const normalizedDraft = draft.replace(/\\n/g, '\n');
     const clean = normalizedDraft.trim();
@@ -156,9 +158,9 @@ export default function ChatPanel({
 
   return (
     <CardFrame
-      title={title}
+      title={effectiveTitle}
      
-      hideHeader={!title}
+      hideHeader={minimal || !effectiveTitle}
       fillHeight={fillHeight}
       bodyClassName="space-y-0.5 text-base"
     >
@@ -172,7 +174,7 @@ export default function ChatPanel({
           <ChatTypingRow key={`typing-${entry.typingId || entry.id}`} message={entry} />
         ))}
       </div>
-      {!hideInput && (
+      {!effectiveHideInput && (
         <form className={composerClass} onSubmit={handleSend}>
           <div className="chat-composer-nickname">
             <NicknameForm compact />
