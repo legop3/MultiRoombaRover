@@ -4,7 +4,7 @@
 import ChatPanel from '../../../components/ChatPanel/index.jsx';
 
 export default function DisplayChatFeed() {
-  const displayChatScale = 3.75;
+  const displayChatScale = 4.6;
 
   return (
     <section className="h-full min-h-0 overflow-hidden border-t border-slate-800 bg-black p-[0.45vw]">

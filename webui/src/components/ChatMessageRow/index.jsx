@@ -38,7 +38,7 @@ function displayName(message) {
 // height, while the matching calc() size keeps the avatar square after adding that
 // top/bottom coverage.
 const CHAT_ROW_FULL_HEIGHT_AVATAR_CLASS =
-  'my-[-0.125rem] flex h-[calc(1rem+0.25rem)] w-[calc(1rem+0.25rem)] shrink-0 overflow-hidden rounded-none'
+  'my-[-0.125rem] flex h-[calc(1rem+0.25rem)] w-[calc(1rem+0.25rem)] shrink-0 overflow-hidden rounded-none';
 
 function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
   if (!guildIconUrl && !userAvatarUrl) return null;
@@ -48,6 +48,11 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
       title={label}
     >
       <span
+        // Empty Discord icon halves stay transparent so missing image data does
+        // not draw a boxed placeholder behind the remaining chat row identity.
+        // The half-width spans are still kept because a Discord identity may
+        // provide only one side of the combined guild/user avatar, and preserving
+        // the split layout avoids changing the icon footprint between states.
         className={`h-full w-1/2 ${guildIconUrl ? 'bg-cover' : ''}`}
         style={
           guildIconUrl
@@ -60,7 +65,10 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
         }
       />
       <span
-        className={`h-full w-1/2${userAvatarUrl ? 'bg-cover' : ''}`}
+        // This side mirrors the guild half above: transparent when absent, but
+        // still occupying half the avatar slot so partial Discord avatar data
+        // does not cause the rendered identity row to shift horizontally.
+        className={`h-full w-1/2 ${userAvatarUrl ? 'bg-cover' : ''}`}
         style={
           userAvatarUrl
             ? {
@@ -150,11 +158,17 @@ export default function ChatMessageRow({ message }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const isSpectator = role === 'spectator';
   const [open, setOpen] = useState(false);
-  const isOpen = isSpectator || open;
   const toolCalls = Array.isArray(message?.toolCalls) ? message.toolCalls : [];
+  const hasToolCalls = toolCalls.length > 0;
+  // Spectator chat should expose tool details without requiring interaction, but
+  // only rows that actually contain tools need the expanded two-section layout.
+  // Without this guard, ordinary spectator chat messages render the sender and
+  // message body on separate lines simply because the spectator role forces the
+  // row open even when there is no dropdown content to show.
+  const isOpen = hasToolCalls && (isSpectator || open);
   const hasText = Boolean(String(message?.text || '').trim());
   const toolsToggle =
-    toolCalls.length > 0 ? (
+    hasToolCalls ? (
       <button
         type="button"
         className="shrink-0 rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
@@ -179,7 +193,7 @@ export default function ChatMessageRow({ message }) {
           {formatTime(message.ts)}
         </span>
       </div>
-      {isOpen && toolCalls.length > 0 ? (
+      {isOpen && hasToolCalls ? (
         <div className="w-full rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
           {toolCalls.map((entry, idx) => {
             const status = String(entry?.status || 'unknown');
