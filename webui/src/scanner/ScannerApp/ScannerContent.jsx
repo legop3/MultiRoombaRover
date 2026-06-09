@@ -8,6 +8,7 @@ import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
 import SocketConnectionPill from '../../components/SocketConnectionPill/index.jsx';
 import useScannerSpeech from './useScannerSpeech.js';
+import ScannerVoiceSetup from './ScannerVoiceSetup.jsx';
 
 const EMPTY_SCANNER_STATE = {
   beepAllowed: false,
@@ -43,6 +44,7 @@ function playSubmitBeep() {
 
 export default function ScannerContent() {
   const socket = useSocket();
+  const setupMode = new URLSearchParams(window.location.search).get('setup') === 'voice';
   const inputRef = useRef(null);
   const flashTimerRef = useRef(null);
   const [scannerState, setScannerState] = useState(EMPTY_SCANNER_STATE);
@@ -111,6 +113,10 @@ export default function ScannerContent() {
 
   const lastScan = scannerState.lastScan;
   const label = lastScan?.label || 'waiting';
+
+  if (setupMode) {
+    return <ScannerVoiceSetup />;
+  }
 
   return (
     <main

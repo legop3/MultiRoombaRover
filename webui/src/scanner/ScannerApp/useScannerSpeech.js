@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 
 const SPEECH_START_TIMEOUT_MS = 1500;
 const SPEECH_RETRY_DELAY_MS = 700;
+export const SCANNER_VOICE_STORAGE_KEY = 'scanner.preferredVoiceName';
 const PREFERRED_VOICE_PATTERN = /female|samantha|victoria|allison|zira|karen|moira|serena|ava|susan|hazel|google (us|uk) english/i;
 const NOVELTY_VOICE_PATTERN = /whisper|bubbles|bells|boing|bad news|bahh|cellos|deranged|good news|hysterical|pipe organ|trinoids|zarvox/i;
 
@@ -15,6 +16,15 @@ function isNoveltyVoice(voice) {
 function pickScannerVoice(synth) {
   const voices = typeof synth?.getVoices === 'function' ? synth.getVoices() : [];
   if (!voices.length) return null;
+
+  const savedVoiceName =
+    typeof window !== 'undefined'
+      ? String(window.localStorage.getItem(SCANNER_VOICE_STORAGE_KEY) || '').trim()
+      : '';
+  const savedVoice = savedVoiceName
+    ? voices.find((voice) => String(voice?.name || '') === savedVoiceName)
+    : null;
+  if (savedVoice) return savedVoice;
 
   const usableVoices = voices.filter((voice) => !isNoveltyVoice(voice));
   const defaultVoice = usableVoices.find((voice) => voice?.default) || null;
