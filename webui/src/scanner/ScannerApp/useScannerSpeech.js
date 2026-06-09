@@ -5,6 +5,26 @@ import { useEffect, useRef } from 'react';
 
 const SPEECH_START_TIMEOUT_MS = 1500;
 const SPEECH_RETRY_DELAY_MS = 700;
+const PREFERRED_VOICE_PATTERN = /female|samantha|victoria|zira|karen|moira|serena|ava|susan|hazel|google uk english female/i;
+
+function pickScannerVoice(synth) {
+  const voices = typeof synth?.getVoices === 'function' ? synth.getVoices() : [];
+  if (!voices.length) return null;
+
+  const englishVoices = voices.filter((voice) => String(voice?.lang || '').toLowerCase().startsWith('en'));
+  // Browser voice lists vary by operating system and installed speech packs, so
+  // this is intentionally a preference rather than a requirement. A recognized
+  // female-sounding English voice is best for the scanner speaker, but any
+  // English voice is better than failing to speak, and the browser default is
+  // the final fallback.
+  return (
+    englishVoices.find((voice) => PREFERRED_VOICE_PATTERN.test(String(voice?.name || ''))) ||
+    voices.find((voice) => PREFERRED_VOICE_PATTERN.test(String(voice?.name || ''))) ||
+    englishVoices[0] ||
+    voices[0] ||
+    null
+  );
+}
 
 export default function useScannerSpeech(scan) {
   const retryTimerRef = useRef(null);
@@ -52,6 +72,11 @@ export default function useScannerSpeech(scan) {
       // browser reports an error or never fires the expected start callback.
       synth.cancel();
       const utterance = new window.SpeechSynthesisUtterance(speechText);
+      const preferredVoice = pickScannerVoice(synth);
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+        utterance.lang = preferredVoice.lang;
+      }
       utterance.rate = 0.92;
       utterance.pitch = 1;
       utterance.volume = 1;
