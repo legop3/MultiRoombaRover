@@ -38,7 +38,7 @@ function displayName(message) {
 // height, while the matching calc() size keeps the avatar square after adding that
 // top/bottom coverage.
 const CHAT_ROW_FULL_HEIGHT_AVATAR_CLASS =
-  'my-[-0.125rem] flex h-[calc(1rem+0.25rem)] w-[calc(1rem+0.25rem)] shrink-0 overflow-hidden rounded-none border border-slate-700/80';
+  'my-[-0.125rem] flex h-[calc(1rem+0.25rem)] w-[calc(1rem+0.25rem)] shrink-0 overflow-hidden rounded-none'
 
 function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
   if (!guildIconUrl && !userAvatarUrl) return null;
@@ -48,7 +48,7 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
       title={label}
     >
       <span
-        className={`h-full w-1/2 bg-slate-700/70 ${guildIconUrl ? 'bg-cover' : ''}`}
+        className={`h-full w-1/2 ${guildIconUrl ? 'bg-cover' : ''}`}
         style={
           guildIconUrl
             ? {
@@ -60,7 +60,7 @@ function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
         }
       />
       <span
-        className={`h-full w-1/2 bg-slate-700/70 ${userAvatarUrl ? 'bg-cover' : ''}`}
+        className={`h-full w-1/2${userAvatarUrl ? 'bg-cover' : ''}`}
         style={
           userAvatarUrl
             ? {
