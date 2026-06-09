@@ -7,7 +7,7 @@ export default function DisplayChatFeed() {
   const displayChatScale = 4.6;
 
   return (
-    <section className="h-full min-h-0 overflow-hidden border-t border-slate-800 bg-black p-[0.45vw]">
+    <section className="h-full min-h-0 overflow-hidden border-t border-slate-800 bg-black">
       <div
         className="origin-top-left"
         style={{

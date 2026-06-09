@@ -53,7 +53,7 @@ export default function RoverLabel({
         'inline-block rounded border border-transparent px-1 py-[1px] font-semibold text-white',
         className,
       )}
-      style={{ ...(style || {}), ...(roverNameChromeStyle(resolvedColor, 0.26) || {}) }}
+      style={{ ...(style || {}), ...(roverNameChromeStyle(resolvedColor, 1) || {}) }}
       {...props}
     >
       {label}

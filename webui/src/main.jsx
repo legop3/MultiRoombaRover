@@ -12,6 +12,7 @@ import { ChatProvider } from './context/ChatContext.jsx'
 import SpectatorApp from './spectate/SpectatorApp/SpectatorAppRoot.jsx'
 import MiniSummaryApp from './mini/MiniSummaryApp/MiniSummaryAppRoot.jsx'
 import ServerDisplayApp from './display/ServerDisplayApp/ServerDisplayAppRoot.jsx'
+import ScannerApp from './scanner/ScannerApp/ScannerAppRoot.jsx'
 import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')).render(
                   <Route path="/spectate" element={<SpectatorApp />} />
                   <Route path="/mini" element={<MiniSummaryApp />} />
                   <Route path="/display" element={<ServerDisplayApp />} />
+                  <Route path="/scanner" element={<ScannerApp />} />
                 </Routes>
               </BrowserRouter>
             </ChatProvider>

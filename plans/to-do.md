@@ -1,6 +1,6 @@
 1.  Overseer personality swapping.
-2.  make rs commands work from site chat, not just discord
-3.  FIX RS BRIDGE DISABLE FOR NON ADMINS AAAAAH
+2.  make mobile joystick more betterer
+3.  make rs commands work from site chat, not just discord
 4.  make google tts the default everywhere but roverd
 5.  fix rover request spam queue cheat
 
