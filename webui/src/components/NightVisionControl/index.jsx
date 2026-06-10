@@ -1,7 +1,7 @@
 // Night Vision Control
 // Purpose: Defines the Night Vision Control module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 function isBoolean(value) {
   return typeof value === 'boolean';
@@ -18,6 +18,7 @@ export default function NightVisionControl({
   const [optimistic, setOptimistic] = useState(
     isBoolean(nightVisionOn) ? nightVisionOn : null,
   );
+  const suppressClickRef = useRef(false);
 
   useEffect(() => {
     if (isBoolean(nightVisionOn)) {
@@ -39,6 +40,32 @@ export default function NightVisionControl({
     onToggle?.(next);
   };
 
+  const handlePointerDown = (event) => {
+    if (disabled) return;
+    if (event.pointerType === 'mouse') return;
+
+    /*
+      Mobile browsers, especially Safari, do not always dispatch a reliable
+      synthetic click for a second finger while another finger is held on the
+      drive pad. Toggle on the real touch pointerdown instead, then suppress the
+      follow-up click so one tap cannot flip night vision twice.
+    */
+    event.preventDefault();
+    suppressClickRef.current = true;
+    handleToggle();
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+  };
+
+  const handleClick = (event) => {
+    if (suppressClickRef.current) {
+      event.preventDefault();
+      return;
+    }
+    handleToggle();
+  };
+
   const buttonClasses = useMemo(() => {
     // Night vision is used as a direct mobile press target, so selection and
     // Safari callout suppression live on the button itself rather than only on
@@ -55,7 +82,8 @@ export default function NightVisionControl({
   return (
     <button
       type="button"
-      onClick={handleToggle}
+      onPointerDown={handlePointerDown}
+      onClick={handleClick}
       onContextMenu={(event) => event.preventDefault()}
       disabled={disabled}
       aria-pressed={displayOn}

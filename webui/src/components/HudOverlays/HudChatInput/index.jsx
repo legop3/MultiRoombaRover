@@ -6,6 +6,22 @@ import { useChat } from '../../../context/ChatContext.jsx';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../../settings/index.js';
 
+function detectSafari() {
+  if (typeof navigator === 'undefined') return false;
+  const userAgent = navigator.userAgent || '';
+  const vendor = navigator.vendor || '';
+
+  /*
+    Safari is the browser that needs the 16px focused-input workaround. Chrome
+    and Firefox on iOS also use WebKit internally, but they identify themselves
+    in the user agent, so leave their HUD chat sizing alone unless they report
+    as Safari proper.
+  */
+  return /safari/i.test(userAgent) &&
+    /apple/i.test(vendor) &&
+    !/crios|fxios|edgios|opr|chrome|android/i.test(userAgent);
+}
+
 function HudChatInput({ compact = false }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
@@ -56,12 +72,13 @@ function HudChatInput({ compact = false }) {
   const containerClass = compact
     ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-[9rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.4 py-0.2'
     : 'pointer-events-auto absolute bottom-1 right-1 flex w-[12rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.5 py-0.25';
-  // Safari zooms focused inputs below 16px. The dedicated mobile-text-entry
-  // utility preserves normal text editing while keeping focus from changing the
-  // page zoom when the compact chat field is used over the camera feed.
-  const inputClass = compact
-    ? 'mobile-text-entry min-w-0 flex-1 bg-transparent text-slate-100 placeholder:text-slate-400 focus:outline-none'
-    : 'mobile-text-entry min-w-0 flex-1 bg-transparent text-slate-100 placeholder:text-slate-400 focus:outline-none';
+  const isSafari = useMemo(() => detectSafari(), []);
+  /*
+    Safari zooms focused inputs below 16px. Keep that workaround Safari-only so
+    other mobile browsers keep the deliberately tiny HUD typography.
+  */
+  const inputTextClass = isSafari ? 'mobile-text-entry' : compact ? 'text-[0.55rem]' : 'text-[0.7rem]';
+  const inputClass = `min-w-0 flex-1 bg-transparent ${inputTextClass} text-slate-100 placeholder:text-slate-400 focus:outline-none`;
   // The submit button is still a touch target even though the adjacent input must
   // remain editable, so it gets press suppression without inheriting input text
   // selection behavior.
