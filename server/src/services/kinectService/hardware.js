@@ -8,6 +8,7 @@ const sharp = require('sharp');
 const WORKER_PATH = process.env.KINECT_WORKER || path.join(__dirname, 'native', 'kinect_worker');
 const CAPTURE_TIMEOUT_MS = 12000;
 const WORKER_STDERR_LOG_INTERVAL_MS = 5000;
+const PROCESS_SIGNAL_EXIT_DELAY_MS = 1700;
 
 let worker = null;
 let stdoutBuffer = Buffer.alloc(0);
@@ -230,14 +231,23 @@ async function getWorkerStatus() {
 
 function installShutdownHooks() {
   const shutdown = () => stopWorker();
+  const exitAfterServiceCleanup = (code) => {
+    // Several services install signal handlers that synchronously start cleanup
+    // and schedule short force-kill fallbacks for child processes. Exiting here
+    // immediately would prevent those timers from running, so the Kinect bridge
+    // leaves a small process-wide grace window before forcing Node down.
+    setTimeout(() => {
+      process.exit(code);
+    }, PROCESS_SIGNAL_EXIT_DELAY_MS);
+  };
   process.once('exit', shutdown);
   process.once('SIGINT', () => {
     shutdown();
-    process.exit(130);
+    exitAfterServiceCleanup(130);
   });
   process.once('SIGTERM', () => {
     shutdown();
-    process.exit(143);
+    exitAfterServiceCleanup(143);
   });
 }
 

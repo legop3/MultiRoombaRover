@@ -80,14 +80,26 @@ function createAudioForwardWorkerEngine(deps) {
   }
 
   function stopProc(proc, graceMs = 1200) {
-    if (!proc || proc.killed) return;
+    if (!proc || proc.exitCode != null || proc.signalCode != null) return;
+    let exited = false;
+    const markExited = () => {
+      exited = true;
+    };
+    // ChildProcess.killed only means Node successfully sent a signal, not that
+    // ffmpeg actually exited. Track the real exit event so FIFO/SRT hangs still
+    // get escalated to SIGKILL instead of making systemd wait for its timeout.
+    proc.once('exit', markExited);
     try {
       proc.kill('SIGTERM');
     } catch {
+      proc.off('exit', markExited);
       return;
     }
     setTimeout(() => {
-      if (!proc.killed) {
+      // The timer intentionally checks our exit flag rather than proc.killed.
+      // proc.killed flips to true immediately after SIGTERM, which was the bug
+      // that prevented stubborn ffmpeg processes from being force-killed.
+      if (!exited) {
         try {
           proc.kill('SIGKILL');
         } catch {
@@ -394,6 +406,19 @@ function createAudioForwardWorkerEngine(deps) {
     setState(roverId, { state: 'offline', source: 'none', error: null, startedAt: null });
   }
 
+  function stopAllWorkers(reason = 'shutdown') {
+    // Copy the keys before stopping because stopWorker mutates the workers map.
+    // Shutdown is a process-wide lifecycle event, so every rover-owned ffmpeg
+    // process must be asked to exit before the parent Node process disappears.
+    const roverIds = Array.from(workers.keys());
+    if (roverIds.length) {
+      logger.info('Stopping all audio forward workers', { reason, roverIds });
+    }
+    roverIds.forEach((roverId) => {
+      stopWorker(roverId);
+    });
+  }
+
   function writeUploadFile(roverId, payload = {}) {
     const { name, mime, dataBase64 } = payload || {};
     const ext = extFromUpload(name, mime);
@@ -497,6 +522,7 @@ function createAudioForwardWorkerEngine(deps) {
   return {
     ensureWorker,
     stopWorker,
+    stopAllWorkers,
     playUploadedAudio,
     playServerAudioFile,
     stopPlayback,

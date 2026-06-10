@@ -31,15 +31,13 @@ function registerAudioForwardHooks(deps) {
       stopWorker(roverId);
       return;
     }
-    if (action === 'upsert' && serviceEnabled) {
-      if (whipOwners.has(roverId)) {
-        return;
-      }
-      try {
-        ensureWorker(roverId);
-      } catch (err) {
-        setState(roverId, { state: 'error', source: 'init', error: err.message, startedAt: null });
-      }
+    if (action === 'upsert' && serviceEnabled && !workers.has(roverId)) {
+      // A rover coming online should not create ffmpeg publishers by itself.
+      // The audio worker is intentionally lazy because uploads, mic forwarding,
+      // and automatic sounds are the moments that actually need a media pipe;
+      // keeping idle ffmpeg children around made restarts depend on processes
+      // that may never have been used by an operator.
+      setState(roverId, { state: 'offline', source: 'none', error: null, startedAt: null });
     }
   });
 

@@ -95,6 +95,7 @@ const workerEngine = createAudioForwardWorkerEngine({
 const {
   ensureWorker,
   stopWorker,
+  stopAllWorkers,
   playUploadedAudio,
   playServerAudioFile,
   stopPlayback,
@@ -103,6 +104,21 @@ const {
   stopOwnedAudioIfUnauthorized,
   startSilenceWriter,
 } = workerEngine;
+
+function installShutdownHooks() {
+  const shutdown = (signal) => {
+    // Audio forwarding owns long-lived ffmpeg publisher/writer pairs. Stop them
+    // synchronously on process signals so a systemd restart does not have to
+    // wait for orphaned media workers to notice that their parent is gone.
+    stopAllWorkers(signal || 'process-exit');
+  };
+
+  process.once('exit', () => shutdown('exit'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+installShutdownHooks();
 
 registerAudioForwardHooks({
   io,

@@ -158,6 +158,7 @@ Environment=REPLAY_SEGMENT_DIR=$REPLAY_SEGMENT_DIR
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
 Restart=on-failure
 RestartSec=2
+SuccessExitStatus=130 143
 
 [Install]
 WantedBy=multi-user.target
