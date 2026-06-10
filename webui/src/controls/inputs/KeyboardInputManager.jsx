@@ -16,6 +16,13 @@ import {
   SONG_NOTE_RANGE,
   SONG_REPEAT_MS,
 } from '../constants.js';
+import {
+  bindingActive,
+  computeKeyboardAuxMotors,
+  computeKeyboardDriveVector,
+  getKeyboardDriveSpeedOptions,
+  resolveKeyboardSpeeds,
+} from './driveIntent.js';
 
 const SOURCE = 'keyboard';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
@@ -42,12 +49,6 @@ function nextVideoFilter(value) {
   // The modulo wrap intentionally makes the shortcut a simple single-key cycle:
   // Color -> Gray -> Green -> Color. That is faster while driving than needing separate keys.
   return VIDEO_FILTER_SEQUENCE[(currentIndex + 1) % VIDEO_FILTER_SEQUENCE.length];
-}
-
-function clampSpeed(value, fallback) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.max(0, Math.min(500, num));
 }
 
 function clampTiltInterval(value, fallback) {
@@ -78,61 +79,6 @@ function mapTiltIntervalToSpeed(interval) {
 
 function shouldIgnoreEvent(event) {
   return isTextInputElement(event?.target);
-}
-
-function bindingActive(bindingSet, keys) {
-  if (!bindingSet || bindingSet.size === 0) return false;
-  for (const key of keys) {
-    if (bindingSet.has(key)) return true;
-  }
-  return false;
-}
-
-function computeDriveVector(keys, keymap) {
-  const forward = bindingActive(keymap.driveForward, keys);
-  const backward = bindingActive(keymap.driveBackward, keys);
-  const left = bindingActive(keymap.driveLeft, keys);
-  const right = bindingActive(keymap.driveRight, keys);
-  const boost = bindingActive(keymap.boostModifier, keys);
-  const slow = bindingActive(keymap.slowModifier, keys);
-
-  let y = 0;
-  if (forward && !backward) y = 1;
-  else if (backward && !forward) y = -1;
-
-  let x = 0;
-  if (left && !right) x = -1;
-  else if (right && !left) x = 1;
-
-  const scale = slow ? 0.4 : 1;
-  return {
-    x: x * scale,
-    y: y * scale,
-    boost: boost && !slow,
-  };
-}
-
-function computeAuxMotors(keys, keymap) {
-  const allForward = bindingActive(keymap.auxAllForward, keys);
-  if (allForward) {
-    return { main: 127, side: 127, vacuum: 127 };
-  }
-  const main = bindingActive(keymap.auxMainForward, keys)
-    ? 127
-    : bindingActive(keymap.auxMainReverse, keys)
-    ? -127
-    : 0;
-  const side = bindingActive(keymap.auxSideForward, keys)
-    ? 127
-    : bindingActive(keymap.auxSideReverse, keys)
-    ? -70
-    : 0;
-  const vacuum = bindingActive(keymap.auxVacuumFast, keys)
-    ? 127
-    : bindingActive(keymap.auxVacuumSlow, keys)
-    ? 50
-    : 0;
-  return { main, side, vacuum };
 }
 
 export default function KeyboardInputManager() {
@@ -170,14 +116,8 @@ export default function KeyboardInputManager() {
     return tokens;
   }, [keymap]);
   const keyboardSpeeds = useMemo(() => {
-    const defaults = INPUT_SETTINGS_DEFAULTS.keyboard;
-    const current = inputSettings?.keyboard ?? {};
-    return {
-      baseSpeed: clampSpeed(current.baseSpeed, defaults.baseSpeed),
-      turboSpeed: clampSpeed(current.turboSpeed, defaults.turboSpeed),
-      precisionSpeed: clampSpeed(current.precisionSpeed, defaults.precisionSpeed),
-    };
-  }, [inputSettings?.keyboard]);
+    return resolveKeyboardSpeeds(inputSettings);
+  }, [inputSettings]);
   const servoRepeatMs = useMemo(() => {
     const defaults = INPUT_SETTINGS_DEFAULTS.keyboard;
     const current = inputSettings?.keyboard ?? {};
@@ -205,12 +145,9 @@ export default function KeyboardInputManager() {
 
   const driveFromKeys = useCallback(() => {
     const tokensSnapshot = new Set(activeTokensRef.current);
-    const slowActive = bindingActive(keymap.slowModifier, tokensSnapshot);
-    const speedOptions = slowActive
-      ? { baseSpeed: keyboardSpeeds.precisionSpeed, boostSpeed: keyboardSpeeds.precisionSpeed }
-      : { baseSpeed: keyboardSpeeds.baseSpeed, boostSpeed: keyboardSpeeds.turboSpeed };
-    const vector = computeDriveVector(tokensSnapshot, keymap);
-    const aux = computeAuxMotors(tokensSnapshot, keymap);
+    const speedOptions = getKeyboardDriveSpeedOptions(tokensSnapshot, keymap, keyboardSpeeds);
+    const vector = computeKeyboardDriveVector(tokensSnapshot, keymap);
+    const aux = computeKeyboardAuxMotors(tokensSnapshot, keymap);
     if (
       vector.x !== lastVectorRef.current.x ||
       vector.y !== lastVectorRef.current.y ||

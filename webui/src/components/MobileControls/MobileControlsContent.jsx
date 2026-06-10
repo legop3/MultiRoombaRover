@@ -1,9 +1,14 @@
 // Mobile Controls Content
 // Purpose: Defines the Mobile Controls Content module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useControlSystem } from '../../controls/index.js';
-import { clampUnit } from '../../controls/controlMath.js';
+import { normalizeKeymapEntries } from '../../controls/keymapUtils.js';
+import {
+  computeKeyboardDriveVector,
+  getKeyboardDriveSpeedOptions,
+  resolveKeyboardSpeeds,
+} from '../../controls/inputs/driveIntent.js';
 import DriveDockAction, { useDriveDockState } from '../DriveDockAction/index.jsx';
 import NightVisionControl from '../NightVisionControl/index.jsx';
 import HornControl from '../HornControl/index.jsx';
@@ -12,129 +17,143 @@ import FloatingJoystick from './FloatingJoystick.jsx';
 import MobileAuxButton from './MobileAuxButton.jsx';
 import {
   SOURCE,
-  JOYSTICK_RADIUS,
-  JOYSTICK_SEND_INTERVAL_MS,
-  JOYSTICK_SMOOTHING,
+  DRIVE_PAD_REPEAT_MS,
+  DRIVE_PAD_SPEED_MODES,
   AUX_ZERO,
   AUX_ALL_FORWARD,
   AUX_ALL_BACKWARD,
 } from './constants.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
+import { useSettingsNamespace } from '../../settings/index.js';
+import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+
+function firstTokenForAction(keymap, actionId) {
+  const bindingSet = keymap?.[actionId];
+  if (!bindingSet || bindingSet.size === 0) return null;
+  return bindingSet.values().next().value ?? null;
+}
+
+function getSpeedModeConfig(speedMode) {
+  return DRIVE_PAD_SPEED_MODES.find((mode) => mode.id === speedMode) || DRIVE_PAD_SPEED_MODES[1];
+}
 
 function MobileJoystickPanel({ layout }) {
   const {
-    state: { roverId },
+    state: { roverId, keymap: rawKeymap },
     actions: { setDriveVector, registerInputState },
   } = useControlSystem();
+  const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const driveDockState = useDriveDockState(roverId);
   const dockedNotDriving = driveDockState.docked && !driveDockState.driving;
   const expandAction = dockedNotDriving || driveDockState.dockingInProgress;
   const disabled = !roverId;
-  const joystickRadius = JOYSTICK_RADIUS;
-  const smoothing = JOYSTICK_SMOOTHING;
-  const smoothedVectorRef = useRef({ x: 0, y: 0, boost: false });
-  const pendingVectorRef = useRef(null);
-  const sendTimerRef = useRef(null);
-  const lastSentAtRef = useRef(0);
+  const [speedMode, setSpeedMode] = useState('normal');
+  const speedModeRef = useRef('normal');
+  const activeCellRef = useRef(null);
+  const repeatTimerRef = useRef(null);
+  const keymap = useMemo(() => normalizeKeymapEntries(rawKeymap), [rawKeymap]);
+  const keyboardSpeeds = useMemo(() => resolveKeyboardSpeeds(inputSettings), [inputSettings]);
 
-  const clearPendingSend = useCallback(() => {
-    if (!sendTimerRef.current) return;
-    clearTimeout(sendTimerRef.current);
-    sendTimerRef.current = null;
+  const clearRepeatTimer = useCallback(() => {
+    if (!repeatTimerRef.current) return;
+    clearInterval(repeatTimerRef.current);
+    repeatTimerRef.current = null;
   }, []);
 
-  const sendMobileDriveVector = useCallback(
-    (vector, lastEvent = 'move') => {
-      lastSentAtRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      setDriveVector(vector, { source: SOURCE });
-      registerInputState(SOURCE, { vector, lastEvent });
+  const buildVirtualKeyTokens = useCallback(
+    (cell, modeId = speedModeRef.current) => {
+      const tokens = new Set();
+      const speedModeConfig = getSpeedModeConfig(modeId);
+      const actionIds = [
+        ...(Array.isArray(cell?.actions) ? cell.actions : []),
+        speedModeConfig.modifierAction,
+      ].filter(Boolean);
+
+      actionIds.forEach((actionId) => {
+        const token = firstTokenForAction(keymap, actionId);
+        if (token) tokens.add(token);
+      });
+
+      return tokens;
     },
-    [registerInputState, setDriveVector],
+    [keymap],
   );
 
-  const flushPendingDriveVector = useCallback(() => {
-    const pending = pendingVectorRef.current;
-    pendingVectorRef.current = null;
-    sendTimerRef.current = null;
-    if (!pending || disabled) return;
-    sendMobileDriveVector(pending, 'move');
-  }, [disabled, sendMobileDriveVector]);
+  const sendDriveCell = useCallback(
+    (cell, lastEvent = 'move', modeId = speedModeRef.current) => {
+      if (disabled) return;
+      const tokens = buildVirtualKeyTokens(cell, modeId);
+      const vector = computeKeyboardDriveVector(tokens, keymap);
+      const speedOptions = getKeyboardDriveSpeedOptions(tokens, keymap, keyboardSpeeds);
 
-  const queueDriveVector = useCallback(
-    (vector) => {
-      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      const elapsed = now - lastSentAtRef.current;
-
-      if (elapsed >= JOYSTICK_SEND_INTERVAL_MS) {
-        clearPendingSend();
-        pendingVectorRef.current = null;
-        sendMobileDriveVector(vector, 'move');
-        return;
-      }
-
-      // Keep only the newest shaped vector while the send gate is closed. This gives
-      // the rover a stable command rhythm without letting an older thumb position
-      // overwrite the driver's latest correction when the timer fires.
-      pendingVectorRef.current = vector;
-      if (sendTimerRef.current) return;
-      sendTimerRef.current = setTimeout(
-        flushPendingDriveVector,
-        Math.max(0, JOYSTICK_SEND_INTERVAL_MS - elapsed),
-      );
+      // Mobile deliberately routes through the keyboard vector/speed helpers. The
+      // thumb pad only chooses which virtual keys are down, so changes to keyboard
+      // drive behavior automatically stay matched here.
+      setDriveVector(vector, { source: SOURCE, speedOptions });
+      registerInputState(SOURCE, {
+        keys: Array.from(tokens),
+        vector,
+        activeCell: cell?.id ?? 'stop',
+        speedMode: modeId,
+        lastEvent,
+      });
     },
-    [clearPendingSend, flushPendingDriveVector, sendMobileDriveVector],
+    [
+      buildVirtualKeyTokens,
+      disabled,
+      keyboardSpeeds,
+      keymap,
+      registerInputState,
+      setDriveVector,
+    ],
+  );
+
+  const stopDrivePad = useCallback(
+    (lastEvent = 'stop') => {
+      clearRepeatTimer();
+      activeCellRef.current = null;
+      sendDriveCell({ id: 'stop', actions: [] }, lastEvent, 'normal');
+    },
+    [clearRepeatTimer, sendDriveCell],
+  );
+
+  const startRepeatTimer = useCallback(() => {
+    if (repeatTimerRef.current) return;
+    repeatTimerRef.current = setInterval(() => {
+      if (!activeCellRef.current) return;
+      sendDriveCell(activeCellRef.current, 'repeat');
+    }, DRIVE_PAD_REPEAT_MS);
+  }, [sendDriveCell]);
+
+  const handleCellChange = useCallback(
+    (cell) => {
+      if (disabled) return;
+      activeCellRef.current = cell;
+      sendDriveCell(cell, 'move');
+      startRepeatTimer();
+    },
+    [disabled, sendDriveCell, startRepeatTimer],
+  );
+
+  const handleSpeedModeChange = useCallback(
+    (nextMode) => {
+      setSpeedMode(nextMode);
+      speedModeRef.current = nextMode;
+      if (activeCellRef.current) {
+        sendDriveCell(activeCellRef.current, 'speed', nextMode);
+      }
+    },
+    [sendDriveCell],
   );
 
   useEffect(() => {
-    return () => clearPendingSend();
-  }, [clearPendingSend]);
+    return () => clearRepeatTimer();
+  }, [clearRepeatTimer]);
 
   useEffect(() => {
     if (!disabled) return;
-
-    // Losing the rover assignment or docking into a non-driving state must leave no
-    // delayed drive command behind. A queued non-zero vector sent after disable would
-    // be especially confusing because the visible joystick has already disappeared.
-    clearPendingSend();
-    pendingVectorRef.current = null;
-    smoothedVectorRef.current = { x: 0, y: 0, boost: false };
-  }, [clearPendingSend, disabled]);
-
-  const handleMove = useCallback(
-    (vector = {}) => {
-      if (disabled) return;
-      const next = {
-        x: clampUnit(vector.x ?? 0),
-        y: clampUnit(vector.y ?? 0),
-        boost: Boolean(vector.boost),
-      };
-      const applied =
-        smoothing > 0
-          ? {
-              x: smoothedVectorRef.current.x + (next.x - smoothedVectorRef.current.x) * (1 - smoothing),
-              y: smoothedVectorRef.current.y + (next.y - smoothedVectorRef.current.y) * (1 - smoothing),
-              boost: next.boost,
-            }
-          : next;
-
-      // This light low-pass filter removes high-frequency thumb tremor after the
-      // joystick has already applied its deadzone and straight corridor. It is kept
-      // small so the one-thumb control still responds quickly when the driver commits
-      // to a turn or releases back toward center.
-      smoothedVectorRef.current = applied;
-      queueDriveVector(applied);
-    },
-    [disabled, queueDriveVector, smoothing],
-  );
-
-  const handleStop = useCallback(() => {
-    if (disabled) return;
-    const zero = { x: 0, y: 0, boost: false };
-    clearPendingSend();
-    pendingVectorRef.current = null;
-    smoothedVectorRef.current = zero;
-    sendMobileDriveVector(zero, 'stop');
-  }, [clearPendingSend, disabled, sendMobileDriveVector]);
+    stopDrivePad('disabled');
+  }, [disabled, stopDrivePad]);
 
   const fillClass = dockedNotDriving ? 'max-h-screen self-start' : '';
   const containerClass = `flex h-full flex-col gap-0.5 text-slate-100 ${fillClass}`;
@@ -148,13 +167,41 @@ function MobileJoystickPanel({ layout }) {
         compactHeightClass="min-h-[5rem]"
       />
       {!expandAction ? (
-        <div className="flex-1 min-h-0">
-          <FloatingJoystick
-            disabled={disabled}
-            radius={joystickRadius}
-            onMove={handleMove}
-            onStop={handleStop}
-          />
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-100 shadow-md">
+          <div className="grid grid-cols-3 gap-0.5 border-b border-slate-700 bg-slate-950/80 p-0.5">
+            {DRIVE_PAD_SPEED_MODES.map((mode) => {
+              const active = speedMode === mode.id;
+              const speedValue =
+                mode.id === 'precision'
+                  ? keyboardSpeeds.precisionSpeed
+                  : mode.id === 'turbo'
+                  ? keyboardSpeeds.turboSpeed
+                  : keyboardSpeeds.baseSpeed;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  className={`min-h-9 rounded-md px-1 text-xs font-semibold ${
+                    active
+                      ? 'bg-cyan-300 text-slate-950'
+                      : 'bg-slate-800 text-slate-200'
+                  }`}
+                  onClick={() => handleSpeedModeChange(mode.id)}
+                  disabled={disabled}
+                >
+                  <span className="block leading-tight">{mode.label}</span>
+                  <span className="block font-mono text-[0.7rem] leading-tight">{speedValue}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="min-h-0 flex-1">
+            <FloatingJoystick
+              disabled={disabled}
+              onCellChange={handleCellChange}
+              onStop={() => stopDrivePad('stop')}
+            />
+          </div>
         </div>
       ) : null}
     </div>

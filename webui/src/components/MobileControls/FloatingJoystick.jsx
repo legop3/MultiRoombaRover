@@ -1,75 +1,154 @@
-// Floating Joystick
-// Purpose: Defines the Floating Joystick module and the local helpers/components used in this file.
-// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
+// Floating Drive Pad
+// Purpose: Provides a one-thumb mobile drive surface that emits keyboard-style fixed drive intents.
+// Scope: Owns pointer tracking, fixed overlay positioning, and active 3x3 drive-zone feedback.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { clampUnit } from '../../controls/controlMath.js';
+import { createPortal } from 'react-dom';
 
-const JOYSTICK_DEADZONE = 0.08;
-const STRAIGHT_GATE_MIN_Y = 0.28;
-const STRAIGHT_GATE_MIN_X = 0.10;
-const STRAIGHT_GATE_Y_RATIO = 0.24;
-const STEERING_CURVE = 1.25;
-const THROTTLE_CURVE = 1.08;
+const PAD_MARGIN = 12;
+const CELL_COUNT = 3;
+const DEFAULT_PAD_SIZE = 180;
 
-function applySignedCurve(value, exponent) {
-  if (!value) return 0;
-  return Math.sign(value) * Math.pow(Math.abs(value), exponent);
+const DRIVE_CELLS = [
+  { id: 'forward-left', label: 'fwd left', col: 0, row: 0, actions: ['driveForward', 'driveLeft'] },
+  { id: 'forward', label: 'fwd', col: 1, row: 0, actions: ['driveForward'] },
+  { id: 'forward-right', label: 'fwd right', col: 2, row: 0, actions: ['driveForward', 'driveRight'] },
+  { id: 'left', label: 'left', col: 0, row: 1, actions: ['driveLeft'] },
+  { id: 'stop', label: 'stop', col: 1, row: 1, actions: [] },
+  { id: 'right', label: 'right', col: 2, row: 1, actions: ['driveRight'] },
+  { id: 'back-left', label: 'back left', col: 0, row: 2, actions: ['driveBackward', 'driveLeft'] },
+  { id: 'back', label: 'back', col: 1, row: 2, actions: ['driveBackward'] },
+  { id: 'back-right', label: 'back right', col: 2, row: 2, actions: ['driveBackward', 'driveRight'] },
+];
+
+const DRIVE_CELL_BY_POSITION = DRIVE_CELLS.reduce((lookup, cell) => {
+  lookup[`${cell.row}:${cell.col}`] = cell;
+  return lookup;
+}, {});
+
+const STOP_CELL = DRIVE_CELLS.find((cell) => cell.id === 'stop');
+
+function clamp(value, min, max) {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
 }
 
-function applyRadialDeadzone(x, y) {
-  const magnitude = Math.hypot(x, y);
-  if (magnitude <= JOYSTICK_DEADZONE) return { x: 0, y: 0 };
-
-  // Rescaling the remaining travel keeps the joystick from feeling like it loses
-  // range after the deadzone. A thumb that reaches the outer ring still sends a
-  // full-strength command, but small center noise is ignored.
-  const scaledMagnitude = (magnitude - JOYSTICK_DEADZONE) / (1 - JOYSTICK_DEADZONE);
-  const ratio = scaledMagnitude / magnitude;
+function getViewportSize() {
+  if (typeof window === 'undefined') return { width: DEFAULT_PAD_SIZE, height: DEFAULT_PAD_SIZE };
   return {
-    x: clampUnit(x * ratio),
-    y: clampUnit(y * ratio),
+    width: window.innerWidth || DEFAULT_PAD_SIZE,
+    height: window.innerHeight || DEFAULT_PAD_SIZE,
   };
 }
 
-function applyStraightGate(x, y) {
-  const absY = Math.abs(y);
-  const absX = Math.abs(x);
-  if (absY < STRAIGHT_GATE_MIN_Y) return x;
+function getPadSize(container) {
+  if (!container) return DEFAULT_PAD_SIZE;
+  const rect = container.getBoundingClientRect();
+  const viewport = getViewportSize();
+  const availableWidth = Math.max(96, Math.min(rect.width, viewport.width - PAD_MARGIN * 2));
 
-  const gate = Math.min(0.45, Math.max(STRAIGHT_GATE_MIN_X, absY * STRAIGHT_GATE_Y_RATIO));
-  if (absX <= gate) return 0;
-
-  // Once the thumb clearly leaves the straight-ahead corridor, compress only the
-  // part that was reserved for accidental drift. This avoids a hard steering jump
-  // at the corridor edge while preserving full left/right authority.
-  return Math.sign(x) * ((absX - gate) / (1 - gate));
+  // The floating grid should match the visible drive card width instead of being a
+  // fixed global overlay size. That keeps the active pad visually connected to the
+  // card and prevents it from feeling oversized in portrait split-column layouts.
+  return Math.round(availableWidth);
 }
 
-function shapeDriveVector(rawX, rawY) {
-  const deadzoned = applyRadialDeadzone(clampUnit(rawX), clampUnit(rawY));
-  const gatedX = applyStraightGate(deadzoned.x, deadzoned.y);
+function clampPadCenter(clientX, clientY, padSize) {
+  const viewport = getViewportSize();
+  const halfPad = padSize / 2;
+  const minX = Math.min(viewport.width - halfPad, halfPad + PAD_MARGIN);
+  const maxX = Math.max(halfPad + PAD_MARGIN, viewport.width - halfPad - PAD_MARGIN);
+  const minY = Math.min(viewport.height - halfPad, halfPad + PAD_MARGIN);
+  const maxY = Math.max(halfPad + PAD_MARGIN, viewport.height - halfPad - PAD_MARGIN);
 
-  // Steering gets a stronger curve than throttle because accidental horizontal
-  // drift is the main problem when driving straight on glass. Intentional turns
-  // still reach full output as the thumb approaches the edge of the ring.
+  // The floating pad is fixed to the viewport instead of the card so overflow-hidden
+  // containers cannot clip it. Clamping keeps the visible 3x3 target usable even when
+  // the driver starts near the edge of a landscape phone screen.
   return {
-    x: clampUnit(applySignedCurve(gatedX, STEERING_CURVE)),
-    y: clampUnit(applySignedCurve(deadzoned.y, THROTTLE_CURVE)),
-    boost: false,
+    x: clamp(clientX, minX, maxX),
+    y: clamp(clientY, minY, maxY),
   };
 }
 
-export default function FloatingJoystick({ disabled, radius, onMove, onStop }) {
+function cellFromPointer(activePad, clientX, clientY) {
+  const padSize = activePad?.size || DEFAULT_PAD_SIZE;
+  const halfPad = padSize / 2;
+  const cellSize = padSize / CELL_COUNT;
+  const localX = clamp(clientX - activePad.center.x + halfPad, 0, padSize - 1);
+  const localY = clamp(clientY - activePad.center.y + halfPad, 0, padSize - 1);
+  const col = clamp(Math.floor(localX / cellSize), 0, CELL_COUNT - 1);
+  const row = clamp(Math.floor(localY / cellSize), 0, CELL_COUNT - 1);
+  return DRIVE_CELL_BY_POSITION[`${row}:${col}`] || STOP_CELL;
+}
+
+function FloatingPadOverlay({ center, size, activeCellId }) {
+  if (typeof document === 'undefined') return null;
+  const halfPad = size / 2;
+
+  return createPortal(
+    <div className="pointer-events-none fixed inset-0 z-[1000]" aria-hidden="true">
+      <div
+        className="absolute grid grid-cols-3 grid-rows-3 overflow-hidden rounded-lg border-2 border-cyan-300/80 bg-slate-950/90 shadow-2xl shadow-cyan-950/50 backdrop-blur-sm"
+        style={{
+          height: size,
+          left: center.x - halfPad,
+          top: center.y - halfPad,
+          width: size,
+        }}
+      >
+        {DRIVE_CELLS.map((cell) => {
+          const active = cell.id === activeCellId;
+          const isStop = cell.id === 'stop';
+          const baseClass =
+            'flex items-center justify-center border border-slate-700/80 px-1 text-center text-xs font-semibold leading-tight';
+          const activeClass = active
+            ? isStop
+              ? 'bg-rose-500 text-white'
+              : 'bg-cyan-300 text-slate-950'
+            : isStop
+            ? 'bg-slate-900 text-slate-300'
+            : 'bg-slate-800/80 text-slate-200';
+          return (
+            <div key={cell.id} className={`${baseClass} ${activeClass}`}>
+              {cell.label}
+            </div>
+          );
+        })}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+export default function FloatingJoystick({ disabled, onCellChange, onStop }) {
   const containerRef = useRef(null);
   const pointerIdRef = useRef(null);
-  const baseRef = useRef({ x: 0, y: 0 });
-  const [visual, setVisual] = useState({ active: false, base: { x: 0, y: 0 }, knob: { x: 0, y: 0 } });
+  const activePadRef = useRef(null);
+  const activeCellIdRef = useRef(null);
+  const [activePad, setActivePad] = useState(null);
 
   const stopTracking = useCallback(() => {
     pointerIdRef.current = null;
-    setVisual({ active: false, base: { x: 0, y: 0 }, knob: { x: 0, y: 0 } });
+    activeCellIdRef.current = null;
+    setActivePad(null);
     onStop?.();
   }, [onStop]);
+
+  const updateActiveCell = useCallback(
+    (event) => {
+      const currentPad = activePadRef.current;
+      if (!currentPad) return;
+      const cell = cellFromPointer(currentPad, event.clientX, event.clientY);
+      if (activeCellIdRef.current !== cell.id) {
+        activeCellIdRef.current = cell.id;
+        onCellChange?.(cell);
+      }
+      setActivePad({
+        ...currentPad,
+        activeCellId: cell.id,
+      });
+    },
+    [onCellChange],
+  );
 
   const handlePointerDown = useCallback(
     (event) => {
@@ -78,46 +157,39 @@ export default function FloatingJoystick({ disabled, radius, onMove, onStop }) {
       event.preventDefault();
       const container = containerRef.current;
       if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      baseRef.current = { x, y };
+
       pointerIdRef.current = event.pointerId;
+      const size = getPadSize(container);
+      const center = clampPadCenter(event.clientX, event.clientY, size);
+      activePadRef.current = { center, size, activeCellId: STOP_CELL.id };
       container.setPointerCapture?.(event.pointerId);
-      setVisual({ active: true, base: { x, y }, knob: { x: 0, y: 0 } });
+
+      // Starting in the center mirrors the old floating joystick behavior: putting
+      // a thumb down establishes the control origin, and movement after that chooses
+      // a direction. This prevents accidental drive commands from a simple touch.
+      activeCellIdRef.current = STOP_CELL.id;
+      setActivePad(activePadRef.current);
+      onCellChange?.(STOP_CELL);
     },
-    [disabled],
+    [disabled, onCellChange],
   );
 
   const handlePointerMove = useCallback(
     (event) => {
       if (disabled || pointerIdRef.current !== event.pointerId) return;
       event.preventDefault();
-      const container = containerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const currentX = event.clientX - rect.left;
-      const currentY = event.clientY - rect.top;
-      const dx = currentX - baseRef.current.x;
-      const dy = currentY - baseRef.current.y;
-      const distance = Math.min(Math.hypot(dx, dy), radius);
-      const angle = Math.atan2(dy, dx);
-      const knobX = Math.cos(angle) * distance;
-      const knobY = Math.sin(angle) * distance;
-      const vector = shapeDriveVector(knobX / radius, -knobY / radius);
-      setVisual((prev) => ({ ...prev, knob: { x: knobX, y: knobY } }));
-      onMove?.(vector);
+      updateActiveCell(event);
     },
-    [disabled, onMove, radius],
+    [disabled, updateActiveCell],
   );
 
   const handlePointerEnd = useCallback(
     (event) => {
       if (pointerIdRef.current !== event.pointerId) return;
       event.preventDefault();
-      const container = containerRef.current;
-      container?.releasePointerCapture?.(event.pointerId);
+      const pointerId = event.pointerId;
       stopTracking();
+      containerRef.current?.releasePointerCapture?.(pointerId);
     },
     [stopTracking],
   );
@@ -125,54 +197,43 @@ export default function FloatingJoystick({ disabled, radius, onMove, onStop }) {
   useEffect(() => {
     if (!disabled) return undefined;
 
-    // Defer the disabled cleanup out of the effect body so React's set-state-in-effect
-    // lint rule is satisfied while still clearing the active visual shortly after
-    // rover access is lost.
+    // Defer visual cleanup so this component stays compatible with the repo's strict
+    // React hook lint rules while still guaranteeing that losing rover access stops
+    // any active mobile drive gesture.
     const timer = setTimeout(stopTracking, 0);
     return () => clearTimeout(timer);
   }, [disabled, stopTracking]);
 
-  const heightClass = 'h-full';
-
   return (
-    <div
-      ref={containerRef}
-      role="presentation"
-      className={`relative w-full ${heightClass} select-none overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-100 shadow-md`}
-      style={{ touchAction: 'none' }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerLeave={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-      onContextMenu={(event) => event.preventDefault()}
-    >
-      {!visual.active && (
-        <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-0 text-center pt-0.5">
-          <span className="font-semibold text-slate-200">Joystick area</span>
-          <span className="text-sm text-slate-300">Touch and hold to use the joystick</span>
+    <>
+      <div
+        ref={containerRef}
+        role="presentation"
+        className="relative flex h-full min-h-[10rem] w-full select-none items-center justify-center overflow-hidden text-slate-100"
+        style={{ touchAction: 'none' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onLostPointerCapture={(event) => {
+          if (pointerIdRef.current === event.pointerId) stopTracking();
+        }}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        <div className="pointer-events-none flex flex-col items-center gap-0.5 text-center">
+          <span className="text-sm font-semibold text-slate-100">drive pad</span>
+          <span className="px-2 text-xs leading-tight text-slate-300">
+            hold and drag for keyboard-style driving
+          </span>
         </div>
-      )}
-      {visual.active && (
-        <>
-          <div
-            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 bg-cyan-400/10 outline outline-2 outline-cyan-400/60 [clip-path:circle(50%)]"
-            style={{
-              height: radius * 2,
-              left: visual.base.x,
-              top: visual.base.y,
-              width: radius * 2,
-            }}
-          />
-          <div
-            className="pointer-events-none absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 bg-cyan-300/80 shadow-lg [clip-path:circle(50%)]"
-            style={{
-              left: visual.base.x + visual.knob.x,
-              top: visual.base.y + visual.knob.y,
-            }}
-          />
-        </>
-      )}
-    </div>
+      </div>
+      {activePad ? (
+        <FloatingPadOverlay
+          center={activePad.center}
+          size={activePad.size}
+          activeCellId={activePad.activeCellId}
+        />
+      ) : null}
+    </>
   );
 }
