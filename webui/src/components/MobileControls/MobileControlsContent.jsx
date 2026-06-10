@@ -13,6 +13,7 @@ import MobileAuxButton from './MobileAuxButton.jsx';
 import {
   SOURCE,
   JOYSTICK_RADIUS,
+  JOYSTICK_SEND_INTERVAL_MS,
   JOYSTICK_SMOOTHING,
   AUX_ZERO,
   AUX_ALL_FORWARD,
@@ -32,10 +33,72 @@ function MobileJoystickPanel({ layout }) {
   const joystickRadius = JOYSTICK_RADIUS;
   const smoothing = JOYSTICK_SMOOTHING;
   const smoothedVectorRef = useRef({ x: 0, y: 0, boost: false });
+  const pendingVectorRef = useRef(null);
+  const sendTimerRef = useRef(null);
+  const lastSentAtRef = useRef(0);
+
+  const clearPendingSend = useCallback(() => {
+    if (!sendTimerRef.current) return;
+    clearTimeout(sendTimerRef.current);
+    sendTimerRef.current = null;
+  }, []);
+
+  const sendMobileDriveVector = useCallback(
+    (vector, lastEvent = 'move') => {
+      lastSentAtRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      setDriveVector(vector, { source: SOURCE });
+      registerInputState(SOURCE, { vector, lastEvent });
+    },
+    [registerInputState, setDriveVector],
+  );
+
+  const flushPendingDriveVector = useCallback(() => {
+    const pending = pendingVectorRef.current;
+    pendingVectorRef.current = null;
+    sendTimerRef.current = null;
+    if (!pending || disabled) return;
+    sendMobileDriveVector(pending, 'move');
+  }, [disabled, sendMobileDriveVector]);
+
+  const queueDriveVector = useCallback(
+    (vector) => {
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const elapsed = now - lastSentAtRef.current;
+
+      if (elapsed >= JOYSTICK_SEND_INTERVAL_MS) {
+        clearPendingSend();
+        pendingVectorRef.current = null;
+        sendMobileDriveVector(vector, 'move');
+        return;
+      }
+
+      // Keep only the newest shaped vector while the send gate is closed. This gives
+      // the rover a stable command rhythm without letting an older thumb position
+      // overwrite the driver's latest correction when the timer fires.
+      pendingVectorRef.current = vector;
+      if (sendTimerRef.current) return;
+      sendTimerRef.current = setTimeout(
+        flushPendingDriveVector,
+        Math.max(0, JOYSTICK_SEND_INTERVAL_MS - elapsed),
+      );
+    },
+    [clearPendingSend, flushPendingDriveVector, sendMobileDriveVector],
+  );
 
   useEffect(() => {
-    if (disabled) smoothedVectorRef.current = { x: 0, y: 0, boost: false };
-  }, [disabled]);
+    return () => clearPendingSend();
+  }, [clearPendingSend]);
+
+  useEffect(() => {
+    if (!disabled) return;
+
+    // Losing the rover assignment or docking into a non-driving state must leave no
+    // delayed drive command behind. A queued non-zero vector sent after disable would
+    // be especially confusing because the visible joystick has already disappeared.
+    clearPendingSend();
+    pendingVectorRef.current = null;
+    smoothedVectorRef.current = { x: 0, y: 0, boost: false };
+  }, [clearPendingSend, disabled]);
 
   const handleMove = useCallback(
     (vector = {}) => {
@@ -53,26 +116,31 @@ function MobileJoystickPanel({ layout }) {
               boost: next.boost,
             }
           : next;
+
+      // This light low-pass filter removes high-frequency thumb tremor after the
+      // joystick has already applied its deadzone and straight corridor. It is kept
+      // small so the one-thumb control still responds quickly when the driver commits
+      // to a turn or releases back toward center.
       smoothedVectorRef.current = applied;
-      setDriveVector(applied, { source: SOURCE });
-      registerInputState(SOURCE, { vector: applied, lastEvent: 'move' });
+      queueDriveVector(applied);
     },
-    [disabled, registerInputState, setDriveVector, smoothing],
+    [disabled, queueDriveVector, smoothing],
   );
 
   const handleStop = useCallback(() => {
     if (disabled) return;
     const zero = { x: 0, y: 0, boost: false };
+    clearPendingSend();
+    pendingVectorRef.current = null;
     smoothedVectorRef.current = zero;
-    setDriveVector(zero, { source: SOURCE });
-    registerInputState(SOURCE, { vector: zero, lastEvent: 'stop' });
-  }, [disabled, registerInputState, setDriveVector]);
+    sendMobileDriveVector(zero, 'stop');
+  }, [clearPendingSend, disabled, sendMobileDriveVector]);
 
   const fillClass = dockedNotDriving ? 'max-h-screen self-start' : '';
   const containerClass = `flex h-full flex-col gap-0.5 text-slate-100 ${fillClass}`;
 
   return (
-    <div className={containerClass}>
+    <div className={containerClass} data-mobile-layout={layout}>
       <DriveDockAction
         layout="mobile"
         expand={expandAction}
@@ -83,7 +151,6 @@ function MobileJoystickPanel({ layout }) {
         <div className="flex-1 min-h-0">
           <FloatingJoystick
             disabled={disabled}
-            layout={layout}
             radius={joystickRadius}
             onMove={handleMove}
             onStop={handleStop}
@@ -94,7 +161,7 @@ function MobileJoystickPanel({ layout }) {
   );
 }
 
-function MobileActionsColumnContent({ layout }) {
+function MobileActionsColumnContent() {
   const {
     state: { roverId, camera, horn },
     pipeline,
@@ -222,15 +289,15 @@ function MobileActionsColumnContent({ layout }) {
 
 export function MobileActionsColumn({ layout, className = '' }) {
   return (
-    <div className={`flex flex-col gap-0.5 ${className}`.trim()}>
-      <MobileActionsColumnContent layout={layout} />
+    <div className={`flex flex-col gap-0.5 ${className}`.trim()} data-mobile-layout={layout}>
+      <MobileActionsColumnContent />
     </div>
   );
 }
 
 export function MobileDriveColumn({ layout, className = '' }) {
   return (
-    <div className={`flex flex-col gap-0.5 ${className}`.trim()}>
+    <div className={`flex flex-col gap-0.5 ${className}`.trim()} data-mobile-layout={layout}>
       <MobileJoystickPanel layout={layout === 'landscape' ? 'landscape' : 'portrait'} />
     </div>
   );

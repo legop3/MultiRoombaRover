@@ -4,7 +4,62 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampUnit } from '../../controls/controlMath.js';
 
-export default function FloatingJoystick({ disabled, layout, radius, onMove, onStop }) {
+const JOYSTICK_DEADZONE = 0.08;
+const STRAIGHT_GATE_MIN_Y = 0.28;
+const STRAIGHT_GATE_MIN_X = 0.10;
+const STRAIGHT_GATE_Y_RATIO = 0.24;
+const STEERING_CURVE = 1.25;
+const THROTTLE_CURVE = 1.08;
+
+function applySignedCurve(value, exponent) {
+  if (!value) return 0;
+  return Math.sign(value) * Math.pow(Math.abs(value), exponent);
+}
+
+function applyRadialDeadzone(x, y) {
+  const magnitude = Math.hypot(x, y);
+  if (magnitude <= JOYSTICK_DEADZONE) return { x: 0, y: 0 };
+
+  // Rescaling the remaining travel keeps the joystick from feeling like it loses
+  // range after the deadzone. A thumb that reaches the outer ring still sends a
+  // full-strength command, but small center noise is ignored.
+  const scaledMagnitude = (magnitude - JOYSTICK_DEADZONE) / (1 - JOYSTICK_DEADZONE);
+  const ratio = scaledMagnitude / magnitude;
+  return {
+    x: clampUnit(x * ratio),
+    y: clampUnit(y * ratio),
+  };
+}
+
+function applyStraightGate(x, y) {
+  const absY = Math.abs(y);
+  const absX = Math.abs(x);
+  if (absY < STRAIGHT_GATE_MIN_Y) return x;
+
+  const gate = Math.min(0.45, Math.max(STRAIGHT_GATE_MIN_X, absY * STRAIGHT_GATE_Y_RATIO));
+  if (absX <= gate) return 0;
+
+  // Once the thumb clearly leaves the straight-ahead corridor, compress only the
+  // part that was reserved for accidental drift. This avoids a hard steering jump
+  // at the corridor edge while preserving full left/right authority.
+  return Math.sign(x) * ((absX - gate) / (1 - gate));
+}
+
+function shapeDriveVector(rawX, rawY) {
+  const deadzoned = applyRadialDeadzone(clampUnit(rawX), clampUnit(rawY));
+  const gatedX = applyStraightGate(deadzoned.x, deadzoned.y);
+
+  // Steering gets a stronger curve than throttle because accidental horizontal
+  // drift is the main problem when driving straight on glass. Intentional turns
+  // still reach full output as the thumb approaches the edge of the ring.
+  return {
+    x: clampUnit(applySignedCurve(gatedX, STEERING_CURVE)),
+    y: clampUnit(applySignedCurve(deadzoned.y, THROTTLE_CURVE)),
+    boost: false,
+  };
+}
+
+export default function FloatingJoystick({ disabled, radius, onMove, onStop }) {
   const containerRef = useRef(null);
   const pointerIdRef = useRef(null);
   const baseRef = useRef({ x: 0, y: 0 });
@@ -49,11 +104,7 @@ export default function FloatingJoystick({ disabled, layout, radius, onMove, onS
       const angle = Math.atan2(dy, dx);
       const knobX = Math.cos(angle) * distance;
       const knobY = Math.sin(angle) * distance;
-      const vector = {
-        x: clampUnit(knobX / radius),
-        y: clampUnit(-knobY / radius),
-        boost: false,
-      };
+      const vector = shapeDriveVector(knobX / radius, -knobY / radius);
       setVisual((prev) => ({ ...prev, knob: { x: knobX, y: knobY } }));
       onMove?.(vector);
     },
@@ -72,7 +123,13 @@ export default function FloatingJoystick({ disabled, layout, radius, onMove, onS
   );
 
   useEffect(() => {
-    if (disabled) stopTracking();
+    if (!disabled) return undefined;
+
+    // Defer the disabled cleanup out of the effect body so React's set-state-in-effect
+    // lint rule is satisfied while still clearing the active visual shortly after
+    // rover access is lost.
+    const timer = setTimeout(stopTracking, 0);
+    return () => clearTimeout(timer);
   }, [disabled, stopTracking]);
 
   const heightClass = 'h-full';
@@ -99,8 +156,13 @@ export default function FloatingJoystick({ disabled, layout, radius, onMove, onS
       {visual.active && (
         <>
           <div
-            className="pointer-events-none absolute h-28 w-28 -translate-x-1/2 -translate-y-1/2 bg-cyan-400/10 outline outline-2 outline-cyan-400/60 [clip-path:circle(50%)]"
-            style={{ left: visual.base.x, top: visual.base.y }}
+            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 bg-cyan-400/10 outline outline-2 outline-cyan-400/60 [clip-path:circle(50%)]"
+            style={{
+              height: radius * 2,
+              left: visual.base.x,
+              top: visual.base.y,
+              width: radius * 2,
+            }}
           />
           <div
             className="pointer-events-none absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 bg-cyan-300/80 shadow-lg [clip-path:circle(50%)]"
