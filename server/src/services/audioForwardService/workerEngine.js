@@ -158,7 +158,7 @@ function createAudioForwardWorkerEngine(deps) {
     ];
   }
 
-  function buildUploadWriterArgs(filePath) {
+  function buildFileWriterArgs(filePath) {
     return [
       '-hide_banner',
       '-loglevel',
@@ -253,21 +253,41 @@ function createAudioForwardWorkerEngine(deps) {
     setState(roverId, { state: 'idle', source: 'silence', error: null, startedAt: null });
   }
 
-  function startUploadWriter(roverId, filePath, ownerSocketId) {
+  function startFileWriter(roverId, filePath, options = {}) {
     const worker = workers.get(roverId);
     if (!worker || worker.stopping) return;
 
+    const source = options.source || 'upload';
+    const contentKind = options.contentKind || source;
+    const ownerSocketId = options.ownerSocketId || null;
+    const cleanupAfterPlayback = Boolean(options.cleanupAfterPlayback);
+
     stopContentProc(worker);
     cleanupUploadFile(worker);
-    worker.activeUploadPath = filePath;
-    worker.activeOwnerSocketId = ownerSocketId || null;
-    const proc = spawnFfmpeg(roverId, 'upload-writer', buildUploadWriterArgs(filePath), { captureStdout: true });
+
+    // Browser-uploaded files are temporary files that this service owns, so the
+    // worker remembers them and deletes them when playback is interrupted or
+    // replaced. Built-in server assets are deliberately not tracked here because
+    // they are checked-in files shared across all rovers and must survive after
+    // a single playback finishes.
+    if (cleanupAfterPlayback) {
+      worker.activeUploadPath = filePath;
+    } else {
+      worker.activeUploadPath = null;
+    }
+
+    // Socket ownership is meaningful only for user-started upload playback.
+    // Server-started sounds such as the charging-complete cue pass no owner so
+    // turn changes and browser disconnects do not treat the built-in sound as a
+    // stale client session.
+    worker.activeOwnerSocketId = ownerSocketId;
+    const proc = spawnFfmpeg(roverId, `${source}-writer`, buildFileWriterArgs(filePath), { captureStdout: true });
     worker.contentProc = proc;
-    worker.contentKind = 'upload';
+    worker.contentKind = contentKind;
     const seq = ++worker.writerSeq;
     attachWriterPipe(worker, proc);
 
-    setState(roverId, { state: 'playing', source: 'upload', error: null, startedAt: Date.now() });
+    setState(roverId, { state: 'playing', source, error: null, startedAt: Date.now() });
 
     proc.on('exit', (code, signal) => {
       const current = workers.get(roverId);
@@ -279,8 +299,8 @@ function createAudioForwardWorkerEngine(deps) {
       if (code != null && code !== 0 && signal !== 'SIGTERM') {
         setState(roverId, {
           state: 'error',
-          source: 'upload',
-          error: `upload writer exited code=${code} signal=${signal || 'none'}`,
+          source,
+          error: `${source} writer exited code=${code} signal=${signal || 'none'}`,
           startedAt: null,
         });
       }
@@ -414,7 +434,34 @@ function createAudioForwardWorkerEngine(deps) {
     stopWhipForRover(roverId, 'upload_override');
     ensureWorker(roverId);
     const uploadPath = writeUploadFile(roverId, payload);
-    startUploadWriter(roverId, uploadPath, ownerSocketId);
+    startFileWriter(roverId, uploadPath, {
+      source: 'upload',
+      contentKind: 'upload',
+      ownerSocketId,
+      cleanupAfterPlayback: true,
+    });
+  }
+
+  function playServerAudioFile(roverId, filePath, options = {}) {
+    const source = options.source || 'server-file';
+    const normalizedPath = path.resolve(filePath || '');
+    const stat = fs.statSync(normalizedPath);
+    if (!stat.isFile()) {
+      throw new Error(`Audio file is not a regular file: ${normalizedPath}`);
+    }
+
+    // Built-in sounds intentionally interrupt mic forwarding just like uploads
+    // do. The rover can only publish one forwarded audio stream at a time, so
+    // keeping WHIP alive would leave the automatic cue inaudible or mixed with
+    // a stale publisher process.
+    stopWhipForRover(roverId, `${source}_override`);
+    ensureWorker(roverId);
+    startFileWriter(roverId, normalizedPath, {
+      source,
+      contentKind: source,
+      ownerSocketId: null,
+      cleanupAfterPlayback: false,
+    });
   }
 
   function stopPlayback(roverId) {
@@ -451,6 +498,7 @@ function createAudioForwardWorkerEngine(deps) {
     ensureWorker,
     stopWorker,
     playUploadedAudio,
+    playServerAudioFile,
     stopPlayback,
     revokeWhipSessionForRover,
     stopWhipForRover,

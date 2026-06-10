@@ -13,6 +13,7 @@ const videoSessions = require('../videoSessions');
 const { createAudioForwardPolicy } = require('./policy');
 const { createAudioForwardWorkerEngine } = require('./workerEngine');
 const { registerAudioForwardHooks } = require('./hooks');
+const { registerChargeCompleteSound } = require('./chargeCompleteSound');
 
 const audioForwardEvents = new EventEmitter();
 const config = loadConfig();
@@ -95,6 +96,7 @@ const {
   ensureWorker,
   stopWorker,
   playUploadedAudio,
+  playServerAudioFile,
   stopPlayback,
   revokeWhipSessionForRover,
   stopWhipForRover,
@@ -123,6 +125,11 @@ registerAudioForwardHooks({
   buildWhipUrl,
   videoSessions,
   startSilenceWriter,
+});
+
+registerChargeCompleteSound({
+  logger,
+  playServerAudioFile,
 });
 
 module.exports = {

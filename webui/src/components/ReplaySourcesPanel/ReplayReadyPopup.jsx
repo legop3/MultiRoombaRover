@@ -84,6 +84,7 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
 
   const isPanel = variant === 'panel';
   const isFloatingPanel = variant === 'floating-panel';
+  const isModal = !isPanel && !isFloatingPanel;
   const title = String(replay?.title || 'Replay').trim() || 'Replay';
   const messageUrl = normalizeUrl(replay?.messageUrl);
   const meta = formatBytes(replay?.size) || null;
@@ -136,11 +137,12 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
       title={title}
       meta={meta}
       actions={actions}
-      fillHeight={isPanel}
+      fillHeight={isPanel || isModal}
       clipOverflow={false}
-      bodyClassName={`${isPanel ? 'flex min-h-0 flex-1 flex-col' : ''} space-y-0.5 p-0.5 text-sm text-slate-200`}
+      className={isModal ? 'h-full w-full' : ''}
+      bodyClassName={`${isPanel || isModal ? 'flex min-h-0 flex-1 flex-col' : ''} space-y-0.5 p-0.5 text-sm text-slate-200`}
     >
-      <div className={`${isPanel ? 'min-h-0 flex-1' : ''} overflow-hidden rounded bg-black`}>
+      <div className={`${isPanel || isModal ? 'min-h-0 flex-1' : ''} overflow-hidden rounded bg-black`}>
         <video
           key={videoUrl}
           src={videoUrl}
@@ -149,7 +151,11 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
           preload="auto"
           playsInline
           {...videoLifecycleProps}
-          className={`${isPanel ? 'h-full min-h-[10rem]' : 'aspect-video max-h-[72vh]'} w-full bg-black`}
+          // Spectator pages use the modal variant as the primary replay viewer, so
+          // that video should fill the available viewport instead of behaving like
+          // a centered dialog preview. object-contain preserves the replay frame
+          // without cropping if the browser viewport is not the same aspect ratio.
+          className={`${isPanel ? 'h-full min-h-[10rem]' : isModal ? 'h-full object-contain' : 'aspect-video max-h-[72vh]'} w-full bg-black`}
         />
       </div>
     </CardFrame>
@@ -160,11 +166,12 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-1" onClick={onClose} role="presentation">
+    <div className="fixed inset-0 z-[110] flex items-stretch justify-stretch bg-black" onClick={onClose} role="presentation">
       <div
-        className="pointer-events-auto w-full max-w-4xl"
+        className="pointer-events-auto h-full w-full"
         onClick={(event) => {
-          // The backdrop closes the popup, but clicks inside the card must leave video controls usable.
+          // The backdrop closes the popup, but clicks inside the fullscreen card
+          // must leave video controls and header actions usable.
           event.stopPropagation();
         }}
         role="presentation"

@@ -27,7 +27,6 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const replaySources = useSessionSelector((state) => state.session?.replaySources ?? []);
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const assignmentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
-  const selfSocketId = useSessionSelector((state) => state.session?.socketId || null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const replayState = useSessionSelector((state) => state.session?.replay || null);
   const latestReplay = useSessionSelector((state) => state.latestReplay);
@@ -48,17 +47,9 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     activeJobId ? state.replayJobs?.[activeJobId] || null : null
   ));
   const latestReplayJobId = latestReplay?.jobId || null;
-  const latestReplayRequesterSocketId = latestReplay?.requestedBy?.socketId || null;
-  const latestReplayRequestedBySelf = Boolean(
-    latestReplayJobId &&
-    selfSocketId &&
-    latestReplayRequesterSocketId &&
-    String(latestReplayRequesterSocketId) === String(selfSocketId),
-  );
   const showPanelReplay = Boolean(
     latestReplay?.url &&
     latestReplayJobId &&
-    !latestReplayRequestedBySelf &&
     dismissedPanelReplayId !== latestReplayJobId,
   );
 

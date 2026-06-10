@@ -10,6 +10,7 @@ import RewardRunOverlay from '../../components/RewardRunOverlay/index.jsx';
 import OnlinePeopleStrip from './components/OnlinePeopleStrip.jsx';
 import DisplayRoverGrid from './components/DisplayRoverGrid.jsx';
 import DisplayChatFeed from './components/DisplayChatFeed.jsx';
+import DisplayNoticeOverlay from './components/DisplayNoticeOverlay.jsx';
 
 export default function ServerDisplayContent() {
   const { session } = useSession();
@@ -43,6 +44,7 @@ export default function ServerDisplayContent() {
       <div className="min-h-0 flex-[1.28]">
         <DisplayChatFeed />
       </div>
+      <DisplayNoticeOverlay />
       <RewardRunOverlay />
       {/* Display is spectator-like: every Discord-hosted replay should take over
           this physical-room board, not only replays requested by this browser. */}

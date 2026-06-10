@@ -2,6 +2,7 @@
 // Purpose: Defines the human Alert Button Service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const sharp = require('sharp');
+const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('humanAlertButton');
 const { subscribe, publishEvent } = require('../eventBus');
 const { getMode, MODES, setMode } = require('../modeManager');
@@ -23,6 +24,7 @@ const LIGHTS_LOCKED_TTS = 'Room lights are now locked on.';
 const LIGHTS_UNLOCKED_TTS = 'Room lights are now unlocked.';
 const TILE_WIDTH = 480;
 const TILE_HEIGHT = 270;
+const DISPLAY_NOTICE_DURATION_MS = 4500;
 
 logger.info('HA button actions enabled', {
   actions: [HUMAN_ALERT_ACTION, MODE_TURNS_ACTION, MODE_ADMIN_ACTION, LIGHTS_LOCK_TOGGLE_ACTION],
@@ -48,6 +50,21 @@ function sendTtsToNonPrivateRovers(text) {
     } catch (err) {
       logger.warn('Failed to send mode TTS', { roverId: entry?.id, error: err.message });
     }
+  });
+}
+
+function emitDisplayNotice(text) {
+  const clean = String(text || '').trim();
+  if (!clean) return;
+  // The room display should show the same successful action feedback that the
+  // rovers speak. This socket event is intentionally display-specific so normal
+  // driver/admin pages do not inherit a large visual interruption.
+  io.emit('display:notice', {
+    id: `ha-button-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    text: clean,
+    source: 'ha-button',
+    durationMs: DISPLAY_NOTICE_DURATION_MS,
+    ts: Date.now(),
   });
 }
 
@@ -118,6 +135,7 @@ async function handleTrigger(event = {}) {
       { force: true },
     );
     sendTtsToNonPrivateRovers(MODE_TURNS_TTS);
+    emitDisplayNotice(MODE_TURNS_TTS);
     return;
   }
   if (action === MODE_ADMIN_ACTION) {
@@ -127,6 +145,7 @@ async function handleTrigger(event = {}) {
       { force: true },
     );
     sendTtsToNonPrivateRovers(MODE_ADMIN_TTS);
+    emitDisplayNotice(MODE_ADMIN_TTS);
     return;
   }
   if (action === LIGHTS_LOCK_TOGGLE_ACTION) {
@@ -134,7 +153,9 @@ async function handleTrigger(event = {}) {
       source: 'ha-button:lightsLockToggle',
       forceApply: true,
     });
-    sendTtsToNonPrivateRovers(lockedOn ? LIGHTS_LOCKED_TTS : LIGHTS_UNLOCKED_TTS);
+    const message = lockedOn ? LIGHTS_LOCKED_TTS : LIGHTS_UNLOCKED_TTS;
+    sendTtsToNonPrivateRovers(message);
+    emitDisplayNotice(message);
     return;
   }
   if (action !== HUMAN_ALERT_ACTION) {
@@ -161,6 +182,7 @@ async function handleTrigger(event = {}) {
       trigger: event?.payload || null,
     },
   });
+  emitDisplayNotice(HUMAN_ALERT_MESSAGE);
 }
 
 subscribe(HA_BUTTON_EVENT_TYPE, (event) => {

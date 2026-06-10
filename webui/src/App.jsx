@@ -41,11 +41,10 @@ import useUserIdentitySync from './hooks/useUserIdentitySync.js';
 import GlobalObjectiveBanner from './components/GlobalObjectiveBanner/index.jsx';
 import RoverQueuesPanel from './components/RoverQueuesPanel/index.jsx';
 import VipPanel from './components/VipPanel/index.jsx';
-import { useSessionActions, useSessionSelector } from './context/SessionContext.jsx';
+import { useSessionSelector } from './context/SessionContext.jsx';
 import ButtonBoxPanel from './components/ButtonBoxPanel/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
-import ReplayReadyPopup from './components/ReplaySourcesPanel/ReplayReadyPopup.jsx';
 import { pageBackgroundClass, themeGapClass, themeStackClass } from './themeFlags.js';
 
 function useLayoutMode() {
@@ -279,8 +278,6 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
   const swapMobileControlColumns = Boolean(pageSettings?.swapMobileControlColumns);
   const fullscreenButtonSide = swapMobileControlColumns ? 'left' : 'right';
   const showFloatingFullscreenButton = !isDesktop && (fullscreenIsIOS || fullscreenNativeSupported);
-  const latestRequestedReplay = useSessionSelector((state) => state.latestRequestedReplay);
-  const { clearReplayModal } = useSessionActions();
   const [helpVisible, setHelpVisible] = useState(false);
   const [quickstartVisible, setQuickstartVisible] = useState(false);
 
@@ -363,7 +360,6 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
         onOpenHelp={openHelpFromQuickstart}
         onClose={closeQuickstart}
       />
-      <ReplayReadyPopup replay={latestRequestedReplay} onClose={clearReplayModal} />
       {showFloatingFullscreenButton ? (
         <FloatingFullscreenButton
           side={fullscreenButtonSide}

@@ -6,6 +6,7 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('barcodeScannerService');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { getMode, MODES, modeEvents } = require('../modeManager');
+const { sendAlert } = require('../alertService');
 
 const DATA_DIR = resolveDataDir();
 const REGISTRY_PATH = resolveDataPath('barcode-registry.json');
@@ -138,6 +139,18 @@ function broadcastState() {
   io.emit('barcode:state', buildStatePayload());
 }
 
+function sendBarcodeScanAlert(result) {
+  if (!result) return;
+  // Barcode scan toasts use the existing alert feed so drivers/spectators get a
+  // lightweight system notice without adding any scanner-specific panels. The
+  // scanner page remains the source of the big local display and speech output.
+  sendAlert({
+    color: result.known ? '#22c55e' : '#f59e0b',
+    title: 'Barcode Scanned',
+    message: result.label || result.code || 'unknown',
+  });
+}
+
 function resolveScan(rawCode) {
   const code = normalizeCode(rawCode);
   const loaded = loadRegistryForScan();
@@ -179,8 +192,12 @@ function resolveScan(rawCode) {
       known: false,
       type: null,
       entityId: null,
-      label: 'unknown',
-      speechText: 'unknown',
+      // Unknown but well-formed barcodes should be visible/audible as the code
+      // itself. That makes mis-labeled objects and new unregistered barcodes
+      // debuggable from the rover-facing scanner page without adding any extra
+      // UI panels or registry-management logic to the browser.
+      label: `Unknown: ${code}`,
+      speechText: `Unknown: ${code}`,
       scannedAt,
       registryError: loaded.error || null,
       error: null,
@@ -211,6 +228,7 @@ function applyScan(rawCode) {
     registryError: result.registryError || null,
   };
   broadcastState();
+  sendBarcodeScanAlert(result);
   return result;
 }
 
