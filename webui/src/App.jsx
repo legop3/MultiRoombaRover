@@ -5,10 +5,8 @@ import TelemetryPanel from './components/TelemetryPanel/index.jsx';
 import PiHostStatsCard from './components/PiHostStatsCard/index.jsx';
 import ReplaySourcesPanel from './components/ReplaySourcesPanel/index.jsx';
 import AlertFeed from './components/AlertFeed/index.jsx';
-import MobileControls, {
-  MobileActionsColumn,
-  MobileDriveColumn,
-} from './components/MobileControls/index.jsx';
+import AuxColumn from './components/MobileControls/AuxColumn.jsx';
+import MovementColumn from './components/MobileControls/MovementColumn.jsx';
 import {
   ControlSystemProvider,
   KeyboardInputManager,
@@ -187,10 +185,25 @@ function MobileFeatureTabs({
 }
 
 function MobilePortraitLayout({ onOpenHelpOverlay, swapMobileControlColumns = false }) {
+  const columnHeight = 'h-[min(60svh,24rem)]';
+  const firstColumn = swapMobileControlColumns
+    ? <MovementColumn layout="portrait" className={columnHeight} />
+    : <AuxColumn layout="portrait" className={columnHeight} />;
+  const secondColumn = swapMobileControlColumns
+    ? <AuxColumn layout="portrait" className={columnHeight} />
+    : <MovementColumn layout="portrait" className={columnHeight} />;
+
   return (
     <div className={`flex flex-col ${themeGapClass}`}>
       <DriverVideo layoutFormat="mobile-portrait" />
-      <MobileControls swapColumns={swapMobileControlColumns} />
+      {/* Portrait owns the two-column placement because the same reusable mobile
+          columns sit in different grid contexts in portrait and landscape. */}
+      <section className="mobile-touch-control text-white">
+        <div className="mobile-touch-control grid grid-cols-2 gap-0.5 items-stretch">
+          {firstColumn}
+          {secondColumn}
+        </div>
+      </section>
       <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]`}>
         <ReplaySourcesPanel panelId="replay-sources-mobile-portrait" />
         <RoverQueuesPanel />
@@ -208,11 +221,11 @@ function MobilePortraitLayout({ onOpenHelpOverlay, swapMobileControlColumns = fa
 function MobileLandscapeLayout({ onOpenHelpOverlay, swapMobileControlColumns = false }) {
   const columnClass = 'self-start h-[min(100svh,32rem)]';
   const firstColumn = swapMobileControlColumns
-    ? <MobileDriveColumn layout="landscape" className={columnClass} />
-    : <MobileActionsColumn layout="landscape" className={columnClass} />;
+    ? <MovementColumn layout="landscape" className={columnClass} />
+    : <AuxColumn layout="landscape" className={columnClass} />;
   const secondColumn = swapMobileControlColumns
-    ? <MobileActionsColumn layout="landscape" className={columnClass} />
-    : <MobileDriveColumn layout="landscape" className={columnClass} />;
+    ? <AuxColumn layout="landscape" className={columnClass} />
+    : <MovementColumn layout="landscape" className={columnClass} />;
   return (
     <div className={`flex flex-col ${themeGapClass}`}>
       <section className={`grid min-h-screen grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] ${themeGapClass}`}>
