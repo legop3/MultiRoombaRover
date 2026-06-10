@@ -23,6 +23,16 @@
       "type": "object",
       "entityId": "woodblock",
       "label": "Wooden block"
+    },
+    "o002": {
+      "type":"object",
+      "entityId": "scanner",
+      "label": "Police scanner"
+    },
+    "o003": {
+      "type": "object",
+      "entityId": "neato",
+      "label": "The Neato"
     }
   }
 }
