@@ -3,7 +3,7 @@
 export const INPUT_SETTINGS_DEFAULTS = {
   keyboard: {
     baseSpeed: 250,
-    turboSpeed: 400,
+    turboSpeed: 500,
     precisionSpeed: 125,
     tiltSpeed: 90,
     tiltIntervalMs: 110,

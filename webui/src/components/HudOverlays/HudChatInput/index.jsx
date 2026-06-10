@@ -56,12 +56,18 @@ function HudChatInput({ compact = false }) {
   const containerClass = compact
     ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-[9rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.4 py-0.2'
     : 'pointer-events-auto absolute bottom-1 right-1 flex w-[12rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.5 py-0.25';
+  // Safari zooms focused inputs below 16px. The dedicated mobile-text-entry
+  // utility preserves normal text editing while keeping focus from changing the
+  // page zoom when the compact chat field is used over the camera feed.
   const inputClass = compact
-    ? 'min-w-0 flex-1 bg-transparent text-[0.55rem] text-slate-100 placeholder:text-slate-400 focus:outline-none'
-    : 'min-w-0 flex-1 bg-transparent text-[0.7rem] text-slate-100 placeholder:text-slate-400 focus:outline-none';
+    ? 'mobile-text-entry min-w-0 flex-1 bg-transparent text-slate-100 placeholder:text-slate-400 focus:outline-none'
+    : 'mobile-text-entry min-w-0 flex-1 bg-transparent text-slate-100 placeholder:text-slate-400 focus:outline-none';
+  // The submit button is still a touch target even though the adjacent input must
+  // remain editable, so it gets press suppression without inheriting input text
+  // selection behavior.
   const buttonClass = compact
-    ? 'rounded bg-cyan-500/80 px-0.35 py-0.2 text-[0.55rem] font-semibold text-black disabled:opacity-50'
-    : 'rounded bg-cyan-500/80 px-0.5 py-0.25 text-[0.7rem] font-semibold text-black disabled:opacity-50';
+    ? 'mobile-touch-control rounded bg-cyan-500/80 px-0.35 py-0.2 text-[0.55rem] font-semibold text-black disabled:opacity-50'
+    : 'mobile-touch-control rounded bg-cyan-500/80 px-0.5 py-0.25 text-[0.7rem] font-semibold text-black disabled:opacity-50';
 
   async function handleSend(event) {
     event.preventDefault();
@@ -109,7 +115,7 @@ function HudChatInput({ compact = false }) {
           }
         }}
         ref={(el) => registerInputRef(el, { target: 'hud' })}
-        placeholder={canChat ? 'Chat (TTS)' : 'Spectator'}
+        placeholder={canChat ? 'Chat (tts)' : 'Spectator'}
         disabled={!canChat}
       />
       <button type="submit" disabled={!canChat || sending} className={buttonClass}>

@@ -48,8 +48,10 @@ export default function HornControl({
   const isActive = Boolean(active);
   const clampedHeat = Math.max(0, Math.min(1, Number(heat) || 0));
   const buttonClasses = useMemo(() => {
+    // The horn can be held for continuous input, which makes it especially prone
+    // to long-press selection/callout behavior on mobile browsers.
     const base =
-      'group relative flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-1 py-1.5 text-xs font-semibold select-none no-touch-select';
+      'mobile-touch-control group relative flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-1 py-1.5 text-xs font-semibold select-none no-touch-select';
     const active = 'border-fuchsia-300/70 bg-fuchsia-700 text-fuchsia-50';
     const inactive = 'border-cyan-300/70 bg-cyan-900 text-cyan-50 hover:bg-cyan-800';
     return [base, isActive ? active : inactive, 'disabled:opacity-50', className]
@@ -147,7 +149,9 @@ export default function HornControl({
         event.preventDefault();
         setShowSettings((prev) => !prev);
       }}
-      className="rounded bg-black/40 px-1 py-0.5 text-[0.6rem] font-semibold text-white/90 hover:text-white"
+      // The settings toggle is a nested press target, so it gets the same touch
+      // suppression as the larger horn surface instead of relying on inheritance.
+      className="mobile-touch-control rounded bg-black/40 px-1 py-0.5 text-[0.6rem] font-semibold text-white/90 hover:text-white"
     >
       {showSettings ? 'Hide' : 'Settings'}
     </button>

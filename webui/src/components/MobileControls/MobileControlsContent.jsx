@@ -48,6 +48,7 @@ function MobileJoystickPanel({ layout }) {
   const expandAction = dockedNotDriving || driveDockState.dockingInProgress;
   const disabled = !roverId;
   const [speedMode, setSpeedMode] = useState('normal');
+  const [activeInputLabel, setActiveInputLabel] = useState('stop');
   const speedModeRef = useRef('normal');
   const activeCellRef = useRef(null);
   const repeatTimerRef = useRef(null);
@@ -112,6 +113,7 @@ function MobileJoystickPanel({ layout }) {
     (lastEvent = 'stop') => {
       clearRepeatTimer();
       activeCellRef.current = null;
+      setActiveInputLabel('stop');
       sendDriveCell({ id: 'stop', actions: [] }, lastEvent, 'normal');
     },
     [clearRepeatTimer, sendDriveCell],
@@ -129,6 +131,7 @@ function MobileJoystickPanel({ layout }) {
     (cell) => {
       if (disabled) return;
       activeCellRef.current = cell;
+      setActiveInputLabel(cell?.label || 'stop');
       sendDriveCell(cell, 'move');
       startRepeatTimer();
     },
@@ -155,8 +158,11 @@ function MobileJoystickPanel({ layout }) {
     stopDrivePad('disabled');
   }, [disabled, stopDrivePad]);
 
+  // The mobile control column itself also blocks selection because Safari can
+  // otherwise start selecting text from a child label before the child's pointer
+  // handler gets enough movement to claim the gesture.
   const fillClass = dockedNotDriving ? 'max-h-screen self-start' : '';
-  const containerClass = `flex h-full flex-col gap-0.5 text-slate-100 ${fillClass}`;
+  const containerClass = `mobile-touch-control flex h-full flex-col gap-0.5 text-slate-100 ${fillClass}`;
 
   return (
     <div className={containerClass} data-mobile-layout={layout}>
@@ -167,8 +173,10 @@ function MobileJoystickPanel({ layout }) {
         compactHeightClass="min-h-[5rem]"
       />
       {!expandAction ? (
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-100 shadow-md">
-          <div className="grid grid-cols-3 gap-0.5 border-b border-slate-700 bg-slate-950/80 p-0.5">
+        // Keep the drive launcher card fully opaque so camera video or page
+        // backgrounds never show through the target the driver is trying to hold.
+        <div className="mobile-touch-control flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900 text-slate-100 shadow-md">
+          <div className="mobile-touch-control grid grid-cols-3 gap-0.5 border-b border-slate-700 bg-slate-950 p-0.5">
             {DRIVE_PAD_SPEED_MODES.map((mode) => {
               const active = speedMode === mode.id;
               const speedValue =
@@ -181,7 +189,7 @@ function MobileJoystickPanel({ layout }) {
                 <button
                   key={mode.id}
                   type="button"
-                  className={`min-h-9 rounded-md px-1 text-xs font-semibold ${
+                  className={`mobile-touch-control min-h-9 rounded-md px-1 text-xs font-semibold ${
                     active
                       ? 'bg-cyan-300 text-slate-950'
                       : 'bg-slate-800 text-slate-200'
@@ -195,8 +203,9 @@ function MobileJoystickPanel({ layout }) {
               );
             })}
           </div>
-          <div className="min-h-0 flex-1">
+          <div className="mobile-touch-control min-h-0 flex-1">
             <FloatingJoystick
+              activeInputLabel={activeInputLabel}
               disabled={disabled}
               onCellChange={handleCellChange}
               onStop={() => stopDrivePad('stop')}
@@ -262,8 +271,8 @@ function MobileActionsColumnContent() {
   );
 
   return (
-    <div className="grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0.5 text-slate-100">
-      <div className="grid min-h-0 grid-rows-2 gap-0.5">
+    <div className="mobile-touch-control grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0.5 text-slate-100">
+      <div className="mobile-touch-control grid min-h-0 grid-rows-2 gap-0.5">
         <MobileAuxButton
           id="aux-vac-forward"
           label="Vacuum Forward"
@@ -283,9 +292,11 @@ function MobileActionsColumnContent() {
           onRelease={handleAuxRelease}
         />
       </div>
-      <div className="flex min-h-0 items-stretch gap-0.5">
+      <div className="mobile-touch-control flex min-h-0 items-stretch gap-0.5">
         {cameraEnabled ? (
-          <div className="flex-1 min-h-0 rounded bg-zinc-950 p-0.25">
+          // Match the desktop camera tilt card's emerald styling so the vertical
+          // mobile control reads as the same feature in a phone-sized layout.
+          <div className="mobile-touch-control flex-1 min-h-0 rounded-xl border-2 border-emerald-300/70 bg-emerald-900 px-1 py-1 text-emerald-50">
             <CameraTiltControl
               value={cameraValue}
               min={cameraMin}
@@ -294,13 +305,13 @@ function MobileActionsColumnContent() {
               disabled={cameraDisabled}
               onChange={setServoAngle}
               orientation="vertical"
-              label="Camera Tilt"
-              labelClass="text-sm font-semibold text-white [writing-mode:vertical-rl] rotate-180"
-              labelRowClass="text-[0.7rem] text-slate-300"
-              valueClass="font-mono text-slate-200"
+              label="Camera tilt"
+              labelClass="mobile-touch-control text-sm font-semibold text-emerald-50 [writing-mode:vertical-rl] rotate-180"
+              labelRowClass="mobile-touch-control text-[0.7rem] text-emerald-100"
+              valueClass="font-mono text-slate-100"
               className="h-full gap-0"
-              sliderClass="h-full w-7"
-              accentClass="accent-cyan-400"
+              sliderClass="mobile-touch-control mobile-drag-control h-full w-7"
+              accentClass="accent-emerald-400"
               showEndpoints={false}
               showValue={false}
             />
@@ -315,7 +326,7 @@ function MobileActionsColumnContent() {
           />
         ) : null}
       </div>
-      <div className="min-h-0">
+      <div className="mobile-touch-control min-h-0">
         {hornAvailable ? (
           <HornControl
             disabled={disabled || hornBlocked}
@@ -336,7 +347,7 @@ function MobileActionsColumnContent() {
 
 export function MobileActionsColumn({ layout, className = '' }) {
   return (
-    <div className={`flex flex-col gap-0.5 ${className}`.trim()} data-mobile-layout={layout}>
+    <div className={`mobile-touch-control flex flex-col gap-0.5 ${className}`.trim()} data-mobile-layout={layout}>
       <MobileActionsColumnContent />
     </div>
   );
@@ -344,7 +355,7 @@ export function MobileActionsColumn({ layout, className = '' }) {
 
 export function MobileDriveColumn({ layout, className = '' }) {
   return (
-    <div className={`flex flex-col gap-0.5 ${className}`.trim()} data-mobile-layout={layout}>
+    <div className={`mobile-touch-control flex flex-col gap-0.5 ${className}`.trim()} data-mobile-layout={layout}>
       <MobileJoystickPanel layout={layout === 'landscape' ? 'landscape' : 'portrait'} />
     </div>
   );
@@ -359,8 +370,10 @@ export default function MobilePortraitControls({ swapColumns = false }) {
     ? <MobileActionsColumn layout="portrait" className={columnHeight} />
     : <MobileDriveColumn layout="portrait" className={columnHeight} />;
   return (
-    <section className="panel">
-      <div className="grid grid-cols-2 gap-0.5 items-stretch">
+    // Portrait controls need layout grouping but no painted panel behind them;
+    // each child control owns its own visible surface.
+    <section className="mobile-touch-control text-white">
+      <div className="mobile-touch-control grid grid-cols-2 gap-0.5 items-stretch">
         {firstColumn}
         {secondColumn}
       </div>

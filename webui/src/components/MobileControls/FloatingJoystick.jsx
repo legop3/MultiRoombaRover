@@ -119,7 +119,7 @@ function FloatingPadOverlay({ center, size, activeCellId }) {
   );
 }
 
-export default function FloatingJoystick({ disabled, onCellChange, onStop }) {
+export default function FloatingJoystick({ activeInputLabel = 'stop', disabled, onCellChange, onStop }) {
   const containerRef = useRef(null);
   const pointerIdRef = useRef(null);
   const activePadRef = useRef(null);
@@ -209,7 +209,9 @@ export default function FloatingJoystick({ disabled, onCellChange, onStop }) {
       <div
         ref={containerRef}
         role="presentation"
-        className="relative flex h-full min-h-[10rem] w-full select-none items-center justify-center overflow-hidden text-slate-100"
+        className="mobile-touch-control mobile-drag-control relative flex h-full min-h-[10rem] w-full select-none items-center justify-center overflow-hidden text-slate-100"
+        // Pointer drags are the whole control model here, so this inline value
+        // reinforces the utility class even if future class churn changes it.
         style={{ touchAction: 'none' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -220,11 +222,16 @@ export default function FloatingJoystick({ disabled, onCellChange, onStop }) {
         }}
         onContextMenu={(event) => event.preventDefault()}
       >
-        <div className="pointer-events-none flex flex-col items-center gap-0.5 text-center">
-          <span className="text-sm font-semibold text-slate-100">drive pad</span>
-          <span className="px-2 text-xs leading-tight text-slate-300">
-            hold and drag for keyboard-style driving
+        <div className="pointer-events-none absolute inset-x-0 top-0 border-b border-slate-700 bg-slate-950 px-1.5 py-0.5 text-center">
+          {/* The readout lives inside the pointer target instead of above it, so the
+              visual indicator does not consume any non-drivable space on small phones. */}
+          <span className="font-mono text-xs font-semibold text-cyan-200">
+            {activeInputLabel}
           </span>
+        </div>
+        <div className="pointer-events-none flex flex-col items-center gap-0.5 px-2 pt-5 text-center">
+          <span className="text-sm font-semibold text-slate-100">drive pad</span>
+          <span className="text-xs leading-tight text-slate-300">hold and drag</span>
         </div>
       </div>
       {activePad ? (

@@ -225,4 +225,41 @@ body {
     -ms-user-select: none;
     -webkit-touch-callout: none;
   }
+
+  .mobile-touch-control {
+    /*
+      Mobile rover controls are press surfaces, not document text. These flags
+      deliberately stack the browser-specific knobs because iOS Safari can still
+      show callouts, selection handles, tap highlights, or delayed gesture behavior
+      when only the standard property is present.
+    */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    overscroll-behavior: contain;
+  }
+
+  .mobile-drag-control {
+    /*
+      Drag controls need the stricter touch-action value so the browser does not
+      reinterpret a held thumb as page pan, pinch zoom, double-tap zoom, or text
+      selection while the control is actively tracking pointer movement.
+    */
+    touch-action: none;
+  }
+
+  .mobile-text-entry {
+    /*
+      iOS Safari zooms focused form fields whose computed text size is below
+      16px. Keep HUD chat inputs at that threshold instead of fighting focus with
+      JavaScript, because the input still needs normal editing and caret behavior.
+    */
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
 }

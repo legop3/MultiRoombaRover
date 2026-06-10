@@ -40,8 +40,11 @@ export default function NightVisionControl({
   };
 
   const buttonClasses = useMemo(() => {
+    // Night vision is used as a direct mobile press target, so selection and
+    // Safari callout suppression live on the button itself rather than only on
+    // the surrounding mobile column.
     const base =
-      'group flex w-full flex-col items-center justify-center gap-0.35 rounded-xl border-2 px-1 py-0.75 text-center select-none no-touch-select';
+      'mobile-touch-control group flex w-full flex-col items-center justify-center gap-0.35 rounded-xl border-2 px-1 py-0.75 text-center select-none no-touch-select';
     const active = 'border-emerald-300/70 bg-emerald-800 text-emerald-50 hover:bg-emerald-700';
     const inactive = 'border-amber-300/70 bg-amber-900 text-amber-50 hover:bg-amber-800';
     return [base, displayOn ? active : inactive, 'disabled:opacity-50', heightClass, className]

@@ -194,8 +194,11 @@ export default function DriveDockAction({
     setConfirmOpen(true);
   };
 
+  // The drive/dock card appears inside the mobile controls and can be held or
+  // tapped repeatedly; attach mobile touch suppression directly to the card so
+  // Safari does not select labels or open callouts during those interactions.
   const baseCardClasses =
-    'flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-0.75 py-0.75 text-slate-100 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 select-none no-touch-select';
+    'mobile-touch-control flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-0.75 py-0.75 text-slate-100 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 select-none no-touch-select';
   const ctaText = 'text-center';
   const ctaLayout = 'items-center justify-between';
   const compactLayout = 'items-center justify-center';
