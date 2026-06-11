@@ -65,3 +65,6 @@ To install roverd on your pi:
 6. Roverd, along with the audio and video publishers should now be running. Roverd should have created it's default config file at `/etc/roverd.yaml`
 
 Edit the `/etc/roverd.yaml` config file to change settings like your rover's name, color, and set the server IP.
+
+
+## Setting up the server
