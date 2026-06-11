@@ -1,0 +1,334 @@
+{
+  "url": "https://rover.otter.land",
+  "runDir": "perf/results/2026-06-11T03-02-07-015Z",
+  "elapsedMs": 38584,
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/148.0.7778.96 Safari/537.36",
+  "title": "Roomba Rover",
+  "finalUrl": "https://rover.otter.land/",
+  "metrics": {
+    "afterLoad": {
+      "Timestamp": 38634.714754,
+      "Documents": 1,
+      "Frames": 1,
+      "JSEventListeners": 66899,
+      "Nodes": 2977,
+      "LayoutCount": 89,
+      "RecalcStyleCount": 274,
+      "LayoutDuration": 0.106766,
+      "RecalcStyleDuration": 0.065778,
+      "ScriptDuration": 4.06233,
+      "TaskDuration": 4.933287,
+      "JSHeapUsedSize": 35455032,
+      "JSHeapTotalSize": 80216064
+    },
+    "end": {
+      "Timestamp": 38667.823166,
+      "Documents": 1,
+      "Frames": 1,
+      "JSEventListeners": 75714,
+      "Nodes": 2955,
+      "LayoutCount": 654,
+      "RecalcStyleCount": 2517,
+      "LayoutDuration": 0.32419,
+      "RecalcStyleDuration": 0.312982,
+      "ScriptDuration": 32.06036,
+      "TaskDuration": 37.597822,
+      "JSHeapUsedSize": 39685520,
+      "JSHeapTotalSize": 86081536
+    },
+    "delta": {
+      "Timestamp": 33.10841200000141,
+      "Documents": 0,
+      "Frames": 0,
+      "JSEventListeners": 8815,
+      "Nodes": -22,
+      "LayoutCount": 565,
+      "RecalcStyleCount": 2243,
+      "LayoutDuration": 0.21742399999999998,
+      "RecalcStyleDuration": 0.24720399999999998,
+      "ScriptDuration": 27.998030000000004,
+      "TaskDuration": 32.664535,
+      "JSHeapUsedSize": 4230488,
+      "JSHeapTotalSize": 5865472
+    }
+  },
+  "cpuSummary": {
+    "totalProfileMs": 32896.945,
+    "sampleCount": 30557,
+    "topSelfTime": [
+      {
+        "url": "",
+        "functionName": "(program)",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 4657.831000000009,
+        "samples": 4273
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "C9",
+        "lineNumber": 8,
+        "columnNumber": 94304,
+        "selfMs": 2470.519000000005,
+        "samples": 2297
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "ad",
+        "lineNumber": 9,
+        "columnNumber": 7898,
+        "selfMs": 2383.6760000000036,
+        "samples": 2219
+      },
+      {
+        "url": "",
+        "functionName": "removeEventListener",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 1596.3859999999981,
+        "samples": 1476
+      },
+      {
+        "url": "",
+        "functionName": "addEventListener",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 1314.546999999998,
+        "samples": 1219
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "T9",
+        "lineNumber": 8,
+        "columnNumber": 115769,
+        "selfMs": 1280.09,
+        "samples": 1195
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "Q",
+        "lineNumber": 8,
+        "columnNumber": 39681,
+        "selfMs": 1246.5730000000015,
+        "samples": 1160
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "va",
+        "lineNumber": 8,
+        "columnNumber": 10653,
+        "selfMs": 1170.771,
+        "samples": 1088
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "Fl",
+        "lineNumber": 8,
+        "columnNumber": 101199,
+        "selfMs": 1028.4150000000006,
+        "samples": 954
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "n2",
+        "lineNumber": 8,
+        "columnNumber": 42234,
+        "selfMs": 1007.8280000000008,
+        "samples": 938
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "w1",
+        "lineNumber": 8,
+        "columnNumber": 40723,
+        "selfMs": 992.6080000000019,
+        "samples": 927
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "zl",
+        "lineNumber": 8,
+        "columnNumber": 80827,
+        "selfMs": 975.6390000000019,
+        "samples": 905
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "v9",
+        "lineNumber": 8,
+        "columnNumber": 71024,
+        "selfMs": 909.7280000000015,
+        "samples": 848
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "(anonymous)",
+        "lineNumber": 17,
+        "columnNumber": 5982,
+        "selfMs": 710.5740000000005,
+        "samples": 662
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "Eh",
+        "lineNumber": 8,
+        "columnNumber": 95724,
+        "selfMs": 656.2710000000002,
+        "samples": 613
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "w4",
+        "lineNumber": 11,
+        "columnNumber": 91309,
+        "selfMs": 544.7980000000002,
+        "samples": 508
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "Al",
+        "lineNumber": 8,
+        "columnNumber": 97450,
+        "selfMs": 485.71200000000005,
+        "samples": 453
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "kc",
+        "lineNumber": 11,
+        "columnNumber": 1388916,
+        "selfMs": 482.39700000000016,
+        "samples": 450
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "B6",
+        "lineNumber": 8,
+        "columnNumber": 34145,
+        "selfMs": 475.1790000000002,
+        "samples": 446
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "o1",
+        "lineNumber": 11,
+        "columnNumber": 70367,
+        "selfMs": 441.8229999999999,
+        "samples": 412
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "lt",
+        "lineNumber": 8,
+        "columnNumber": 7349,
+        "selfMs": 398.3480000000001,
+        "samples": 369
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "r",
+        "lineNumber": 1,
+        "columnNumber": 967,
+        "selfMs": 348.187,
+        "samples": 326
+      },
+      {
+        "url": "",
+        "functionName": "(idle)",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 319.7700000000001,
+        "samples": 297
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "X",
+        "lineNumber": 8,
+        "columnNumber": 40176,
+        "selfMs": 283.33400000000006,
+        "samples": 264
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "a2",
+        "lineNumber": 9,
+        "columnNumber": 71,
+        "selfMs": 258.0969999999999,
+        "samples": 239
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "n9",
+        "lineNumber": 8,
+        "columnNumber": 56257,
+        "selfMs": 216.19699999999995,
+        "samples": 202
+      },
+      {
+        "url": "",
+        "functionName": "(garbage collector)",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 214.13299999999995,
+        "samples": 195
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "t9",
+        "lineNumber": 8,
+        "columnNumber": 50605,
+        "selfMs": 207.45599999999985,
+        "samples": 194
+      },
+      {
+        "url": "",
+        "functionName": "now",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 202.39299999999992,
+        "samples": 189
+      },
+      {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "functionName": "po",
+        "lineNumber": 11,
+        "columnNumber": 214243,
+        "selfMs": 192.35299999999984,
+        "samples": 178
+      }
+    ]
+  },
+  "responsiveness": {
+    "longTaskCount": 1,
+    "topLongTasks": [
+      {
+        "name": "self",
+        "startTime": 5330.30000000447,
+        "duration": 83
+      }
+    ],
+    "frameCount": 2261,
+    "averageFrameMs": 16.83551525873507,
+    "p95FrameMs": 16.799999999999272,
+    "p99FrameMs": 16.80000000000291,
+    "intervalDriftCount": 152,
+    "averageIntervalDriftMs": 0.02039473680289168,
+    "p95IntervalDriftMs": 4.600000001490116,
+    "p99IntervalDriftMs": 23.399999998509884
+  },
+  "consoleMessages": [
+    {
+      "type": "info",
+      "text": "[socket] connecting to https://rover.otter.land",
+      "location": {
+        "url": "https://rover.otter.land/assets/index-l3JqdlyF.js",
+        "line": 11,
+        "column": 63768,
+        "lineNumber": 11,
+        "columnNumber": 63768
+      }
+    }
+  ],
+  "failedRequests": [],
+  "errorResponses": []
+}
