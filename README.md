@@ -8,6 +8,7 @@ https://rover.otter.land
 - Building rovers
 - Installing roverd on a rover's raspberry pi
 - Setting up the server
+- Configuration
 
 ## Building a rover
 You WILL need some common hobby electronics knowledge to build one of these, I will not be making a super detailed wiring or assembly guide, some of building your rover will be up to you, things such as a protective cage, camera and electronics mounting will not be covered in any great detail.
@@ -61,4 +62,6 @@ To install roverd on your pi:
 3. Install `git`, clone this repo into your home folder
 4. Move into the repo folder, run the roverd installer using `sudo pi/install_roverd.sh`
 5. Reboot your raspberry pi
-6. Roverd, along with the audio and video publishers should now be running. Roverd should have created it's default config file at `etc/roverd.yaml`
+6. Roverd, along with the audio and video publishers should now be running. Roverd should have created it's default config file at `/etc/roverd.yaml`
+
+Edit the `/etc/roverd.yaml` config file to change settings like your rover's name, color, and set the server IP.
