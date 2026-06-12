@@ -75,6 +75,15 @@ function bucketNumber(value, step) {
   return Math.round(Number(value) / step) * step;
 }
 
+function sensorNumber(value) {
+  // Some visual sensors, especially light bumps, need every reported value to
+  // be eligible for rendering because coarse bucketing can leave the UI looking
+  // stuck near object edges. This still benefits from selector equality because
+  // only the specific subscribed field can trigger its consumer.
+  if (value == null || !Number.isFinite(Number(value))) return value ?? null;
+  return Number(value);
+}
+
 export function mapTelemetryEqual(left, right) {
   return shallowObjectEqual(left, right);
 }
@@ -105,20 +114,20 @@ export function selectVisualMapTelemetry(frame) {
     rightWheelOvercurrent: Boolean(wheelOver.rightWheel),
     sideBrushOvercurrent: Boolean(wheelOver.sideBrush),
     mainBrushOvercurrent: Boolean(wheelOver.mainBrush),
-    wheelLeftCurrentMa: bucketNumber(sensors.wheelLeftCurrentMa ?? 0, 25),
-    wheelRightCurrentMa: bucketNumber(sensors.wheelRightCurrentMa ?? 0, 25),
-    sideBrushCurrentMa: bucketNumber(sensors.sideBrushCurrentMa ?? 0, 25),
-    mainBrushCurrentMa: bucketNumber(sensors.mainBrushCurrentMa ?? 0, 25),
-    lightBumpLeftSignal: bucketNumber(sensors.lightBumpLeftSignal, 25),
-    lightBumpFrontLeftSignal: bucketNumber(sensors.lightBumpFrontLeftSignal, 25),
-    lightBumpCenterLeftSignal: bucketNumber(sensors.lightBumpCenterLeftSignal, 25),
-    lightBumpCenterRightSignal: bucketNumber(sensors.lightBumpCenterRightSignal, 25),
-    lightBumpFrontRightSignal: bucketNumber(sensors.lightBumpFrontRightSignal, 25),
-    lightBumpRightSignal: bucketNumber(sensors.lightBumpRightSignal, 25),
-    cliffLeftSignal: bucketNumber(sensors.cliffLeftSignal, 25),
-    cliffFrontLeftSignal: bucketNumber(sensors.cliffFrontLeftSignal, 25),
-    cliffFrontRightSignal: bucketNumber(sensors.cliffFrontRightSignal, 25),
-    cliffRightSignal: bucketNumber(sensors.cliffRightSignal, 25),
+    wheelLeftCurrentMa: bucketNumber(sensors.wheelLeftCurrentMa ?? 0, 5),
+    wheelRightCurrentMa: bucketNumber(sensors.wheelRightCurrentMa ?? 0, 5),
+    sideBrushCurrentMa: bucketNumber(sensors.sideBrushCurrentMa ?? 0, 5),
+    mainBrushCurrentMa: bucketNumber(sensors.mainBrushCurrentMa ?? 0, 5),
+    lightBumpLeftSignal: sensorNumber(sensors.lightBumpLeftSignal),
+    lightBumpFrontLeftSignal: sensorNumber(sensors.lightBumpFrontLeftSignal),
+    lightBumpCenterLeftSignal: sensorNumber(sensors.lightBumpCenterLeftSignal),
+    lightBumpCenterRightSignal: sensorNumber(sensors.lightBumpCenterRightSignal),
+    lightBumpFrontRightSignal: sensorNumber(sensors.lightBumpFrontRightSignal),
+    lightBumpRightSignal: sensorNumber(sensors.lightBumpRightSignal),
+    cliffLeftSignal: bucketNumber(sensors.cliffLeftSignal, 5),
+    cliffFrontLeftSignal: bucketNumber(sensors.cliffFrontLeftSignal, 5),
+    cliffFrontRightSignal: bucketNumber(sensors.cliffFrontRightSignal, 5),
+    cliffRightSignal: bucketNumber(sensors.cliffRightSignal, 5),
     cliffLeft: Boolean(sensors.cliffLeft),
     cliffFrontLeft: Boolean(sensors.cliffFrontLeft),
     cliffFrontRight: Boolean(sensors.cliffFrontRight),
@@ -132,12 +141,12 @@ export function selectLightBumpTelemetry(frame) {
   const sensors = frame?.sensors;
   if (!sensors) return [];
   return [
-    bucketNumber(sensors.lightBumpLeftSignal, 25),
-    bucketNumber(sensors.lightBumpFrontLeftSignal, 25),
-    bucketNumber(sensors.lightBumpCenterLeftSignal, 25),
-    bucketNumber(sensors.lightBumpCenterRightSignal, 25),
-    bucketNumber(sensors.lightBumpFrontRightSignal, 25),
-    bucketNumber(sensors.lightBumpRightSignal, 25),
+    sensorNumber(sensors.lightBumpLeftSignal),
+    sensorNumber(sensors.lightBumpFrontLeftSignal),
+    sensorNumber(sensors.lightBumpCenterLeftSignal),
+    sensorNumber(sensors.lightBumpCenterRightSignal),
+    sensorNumber(sensors.lightBumpFrontRightSignal),
+    sensorNumber(sensors.lightBumpRightSignal),
   ];
 }
 

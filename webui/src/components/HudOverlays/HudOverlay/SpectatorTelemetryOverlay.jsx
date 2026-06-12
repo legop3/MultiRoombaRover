@@ -12,7 +12,7 @@ export default function SpectatorTelemetryOverlay({ sensors, telemetry = null, m
     ['Voltage', voltageMv != null ? `${(voltageMv / 1000).toFixed(2)} V` : '--'],
     ['Current', currentMa != null ? `${currentMa} mA` : '--'],
     ['Charge', batteryChargeMah != null ? `${batteryChargeMah}` : '--'],
-    ['Oi', oiLabel || '--'],
+    ['OI', oiLabel || '--'],
   ];
   const charging = Boolean(chargingLabel && chargingLabel.toLowerCase() !== 'not charging');
   const oiNormalized = oiLabel.toLowerCase();
@@ -41,7 +41,7 @@ export default function SpectatorTelemetryOverlay({ sensors, telemetry = null, m
           <span className={`rounded px-1.5 py-0.5 ${chargingTone}`}>
             {charging ? 'Charging' : docked ? 'Not charging' : 'Not charging'}
           </span>
-          <span className={`rounded px-1.5 py-0.5 ${oiTone}`}>Oi: {oiLabel}</span>
+          <span className={`rounded px-1.5 py-0.5 ${oiTone}`}>OI: {oiLabel}</span>
         </div>
         {telemetryEntries.map(([labelText, value]) => (
           <span key={labelText} className="flex items-center justify-between gap-0.5">

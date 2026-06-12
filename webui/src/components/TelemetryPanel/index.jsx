@@ -59,7 +59,7 @@ function TelemetrySummary({ sensors, voltage, current, batteryTemp, charge, capa
       <Metric label="Charge" value={charge != null ? `${charge} mAh` : '--'} />
       <Metric label="Capacity" value={capacity != null ? `${capacity} mAh` : '--'} />
       <Metric label="Charge" value={chargePct} />
-      <Metric label="Oi mode" value={oiMode} />
+      <Metric label="OI mode" value={oiMode} />
       <Metric label="Docked" value={docked} />
       <Metric label="Charging state" value={charging} />
     </div>

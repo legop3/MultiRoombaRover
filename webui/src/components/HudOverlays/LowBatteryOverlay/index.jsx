@@ -32,7 +32,7 @@ function LowBatteryOverlay({ roverId = null, sensors, batteryConfig, compact = f
   if (!battery.warnActive && !battery.urgentActive) return null;
 
   const message = battery.urgentActive
-    ? 'Battery very low, dock the rover and charge immediately!!'
+    ? 'BATTERY VERY LOW, DOCK THE ROVER AND CHARGE IMMEDIATELY!!'
     : 'Battery low! please dock and charge the rover soon.';
 
   const containerClass = compact ? 'p-2 top-6' : 'p-4 top-10';

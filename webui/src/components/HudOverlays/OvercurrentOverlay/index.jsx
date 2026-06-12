@@ -56,7 +56,7 @@ function OvercurrentOverlay({ roverId = null, sensors, overcurrentLimiter = null
           <div className="h-full bg-red-700/60" style={{ width: fillWidth }} />
         </div>
         <div className={`relative z-10 flex h-full w-full flex-col items-center justify-center text-center font-semibold text-white animate-pulse ${textClass} ${padClass}`}>
-          <div>Overcurrent</div>
+          <div>OVERCURRENT</div>
           <div className={`mt-0 font-medium text-white ${subTextClass}`}>{safeLabels.join(', ')}</div>
         </div>
       </div>

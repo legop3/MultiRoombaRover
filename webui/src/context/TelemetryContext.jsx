@@ -105,7 +105,7 @@ export function TelemetryProvider({ children }) {
       if (!entries) return;
       evaluateSelectorEntries(
         roverId,
-        [...entries].filter((entry) => entry.mode === 'visual' && entry.throttleMs > 0),
+        [...entries].filter((entry) => entry.mode === 'visual' && throttleMsForEntry(entry) > 0),
       );
     });
     if (visualAllPendingRef.current) {
