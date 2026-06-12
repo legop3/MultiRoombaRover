@@ -25,7 +25,6 @@ export default function HornControl({
   showSettingsToggle = false,
   compactSettings = false,
 }) {
-  const [pressed, setPressed] = useState(false);
   const [showSettings, setShowSettings] = useState(defaultShowSettings);
   const { value: hornSettings, save: saveHornSettings } = useSettingsNamespace(
     'horn',
@@ -59,27 +58,6 @@ export default function HornControl({
       .filter(Boolean)
       .join(' ');
   }, [className, isActive]);
-
-  const start = () => {
-    if (disabled) return;
-    if (!pressed) {
-      setPressed(true);
-      onStart?.();
-    }
-  };
-
-  const stop = () => {
-    if (pressed) {
-      setPressed(false);
-      onStop?.();
-    }
-  };
-
-  useEffect(() => {
-    if (!isActive && pressed) {
-      setPressed(false);
-    }
-  }, [isActive, pressed]);
 
   const formattedWaveform = waveform === 'sine' ? 'sine' : 'saw';
 
@@ -142,7 +120,7 @@ export default function HornControl({
     event.preventDefault();
     activePointerIdRef.current = event.pointerId;
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    start();
+    onStart?.();
   };
 
   const handlePointerUp = (event) => {
@@ -152,18 +130,19 @@ export default function HornControl({
     event.preventDefault();
     activePointerIdRef.current = null;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
-    stop();
+    onStop?.();
   };
 
   const handlePointerCancel = (event) => {
     if (activePointerIdRef.current !== event.pointerId) return;
     activePointerIdRef.current = null;
-    stop();
+    onStop?.();
   };
 
   const handleBlur = () => {
+    if (activePointerIdRef.current === null) return;
     activePointerIdRef.current = null;
-    stop();
+    onStop?.();
   };
 
   const settingsToggle = showSettingsToggle ? (
@@ -185,14 +164,14 @@ export default function HornControl({
     <div
       role="button"
       tabIndex={0}
-      aria-pressed={pressed}
+      aria-pressed={isActive}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       onLostPointerCapture={(event) => {
         if (activePointerIdRef.current === event.pointerId) {
           activePointerIdRef.current = null;
-          stop();
+          onStop?.();
         }
       }}
       onContextMenu={(event) => event.preventDefault()}

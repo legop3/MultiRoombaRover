@@ -254,7 +254,7 @@ function App() {
   const fullscreen = useFullscreenPrompt(layout);
 
   return (
-    <div className={`${pageBackgroundClass} text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
+    <div className={`${pageBackgroundClass} text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'ios-safe-screen min-h-screen'}`}>
       <AppWithProviders layout={layout} isDesktop={isDesktop} fullscreen={fullscreen} />
     </div>
   );

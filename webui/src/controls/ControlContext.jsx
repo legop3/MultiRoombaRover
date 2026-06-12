@@ -473,7 +473,12 @@ export function ControlSystemProvider({ children }) {
     (nightVisionOn) => {
       if (!pipeline.nightVision) return;
       if (typeof nightVisionOn === 'boolean') {
-        const action = nightVisionOn ? 'on' : 'off';
+        /*
+          Rover daemon command names describe the IR LED, while the UI state
+          describes camera visibility. LED "off" means nightVisionOn=true, and
+          LED "on" means nightVisionOn=false.
+        */
+        const action = nightVisionOn ? 'off' : 'on';
         pipeline.sendNightVision(action);
       } else {
         pipeline.sendNightVision('toggle');
