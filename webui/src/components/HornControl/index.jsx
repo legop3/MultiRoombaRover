@@ -33,6 +33,7 @@ export default function HornControl({
   );
   const [waveform, setWaveform] = useState(hornSettings?.waveform || HORN_SETTINGS_DEFAULTS.waveform);
   const settingsRootRef = useRef(null);
+  const activePointerIdRef = useRef(null);
   const [freqs, setFreqs] = useState(() => {
     const base = Array.isArray(hornSettings?.freqs) ? hornSettings.freqs : HORN_SETTINGS_DEFAULTS.freqs;
     return [...base, 0, 0, 0, 0].slice(0, 4).map((f) => clampFreq(f));
@@ -129,16 +130,39 @@ export default function HornControl({
 
   const handlePointerDown = (event) => {
     if (disabled) return;
+    if (activePointerIdRef.current !== null) return;
     const tag = event.target?.tagName?.toLowerCase();
     if (tag === 'input' || tag === 'select' || tag === 'option' || tag === 'label' || tag === 'button') return;
+
+    /*
+      Horn is a hold control, so it should claim exactly the finger that started
+      it. Capturing that pointer prevents tiny mobile finger drift or nearby
+      controls from making the horn feel delayed or randomly interrupted.
+    */
     event.preventDefault();
+    activePointerIdRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     start();
   };
 
   const handlePointerUp = (event) => {
+    if (activePointerIdRef.current !== event.pointerId) return;
     const tag = event.target?.tagName?.toLowerCase();
     if (tag === 'input' || tag === 'select' || tag === 'option' || tag === 'label' || tag === 'button') return;
     event.preventDefault();
+    activePointerIdRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    stop();
+  };
+
+  const handlePointerCancel = (event) => {
+    if (activePointerIdRef.current !== event.pointerId) return;
+    activePointerIdRef.current = null;
+    stop();
+  };
+
+  const handleBlur = () => {
+    activePointerIdRef.current = null;
     stop();
   };
 
@@ -164,10 +188,15 @@ export default function HornControl({
       aria-pressed={pressed}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
-      onPointerLeave={stop}
-      onPointerCancel={stop}
+      onPointerCancel={handlePointerCancel}
+      onLostPointerCapture={(event) => {
+        if (activePointerIdRef.current === event.pointerId) {
+          activePointerIdRef.current = null;
+          stop();
+        }
+      }}
       onContextMenu={(event) => event.preventDefault()}
-      onBlur={stop}
+      onBlur={handleBlur}
       className={buttonClasses}
     >
       <div

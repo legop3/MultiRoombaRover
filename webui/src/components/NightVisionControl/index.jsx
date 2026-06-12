@@ -19,12 +19,22 @@ export default function NightVisionControl({
     isBoolean(nightVisionOn) ? nightVisionOn : null,
   );
   const suppressClickRef = useRef(false);
+  const suppressClickTimerRef = useRef(null);
 
   useEffect(() => {
     if (isBoolean(nightVisionOn)) {
       setOptimistic(nightVisionOn);
     }
   }, [nightVisionOn]);
+
+  useEffect(
+    () => () => {
+      if (suppressClickTimerRef.current) {
+        clearTimeout(suppressClickTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const hasState = isBoolean(optimistic);
   const displayOn = hasState ? optimistic : false;
@@ -52,15 +62,29 @@ export default function NightVisionControl({
     */
     event.preventDefault();
     suppressClickRef.current = true;
-    handleToggle();
-    window.setTimeout(() => {
+    if (suppressClickTimerRef.current) {
+      clearTimeout(suppressClickTimerRef.current);
+    }
+    /*
+      The next click normally clears this flag, but Safari may suppress the click
+      completely after preventDefault(). The timer prevents a stale touch flag
+      from swallowing a later keyboard or desktop click.
+    */
+    suppressClickTimerRef.current = window.setTimeout(() => {
       suppressClickRef.current = false;
-    }, 0);
+      suppressClickTimerRef.current = null;
+    }, 800);
+    handleToggle();
   };
 
   const handleClick = (event) => {
     if (suppressClickRef.current) {
       event.preventDefault();
+      suppressClickRef.current = false;
+      if (suppressClickTimerRef.current) {
+        clearTimeout(suppressClickTimerRef.current);
+        suppressClickTimerRef.current = null;
+      }
       return;
     }
     handleToggle();

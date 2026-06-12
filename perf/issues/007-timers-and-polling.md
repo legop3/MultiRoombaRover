@@ -1,3 +1,4 @@
+# FIXED!
 # Issue 007: Timers and Polling Cleanup
 
 ## Summary

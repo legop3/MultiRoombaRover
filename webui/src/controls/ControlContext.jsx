@@ -473,7 +473,7 @@ export function ControlSystemProvider({ children }) {
     (nightVisionOn) => {
       if (!pipeline.nightVision) return;
       if (typeof nightVisionOn === 'boolean') {
-        const action = nightVisionOn ? 'off' : 'on';
+        const action = nightVisionOn ? 'on' : 'off';
         pipeline.sendNightVision(action);
       } else {
         pipeline.sendNightVision('toggle');

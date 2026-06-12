@@ -1,10 +1,10 @@
-1. # FIX ALL OF THE PERFORMANCE PROFILED ISSUES!!
-2. fix up ALL discord admin commands
+1. fix up ALL discord admin commands
    1. make sure all permissions are correct
    2. fuzzy search all the things
    3. dont break on multi word nicknames
    4. make all rs commands work form both the site chat and discord
       1. make sure all the permissions are correct
+2. make alert feed.jsx show more alerts at once
 3.  Overseer personality swapping.
 4.  maybe make a better joystick for mobile
 5.  make google tts the default everywhere but roverd
