@@ -1,13 +1,13 @@
 // Help Overlay
 // Purpose: Defines the Help Overlay module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useControlSystem } from '../../controls/index.js';
+import { useControlSelector } from '../../controls/index.js';
 import HelpContentView from '../HelpContentView/index.jsx';
 
 export default function HelpOverlay({ visible, layout, onClose, showOnLoad, onToggleShowOnLoad }) {
-  if (!visible) return null;
+  const keymap = useControlSelector((control) => control.state.keymap);
 
-  const { state } = useControlSystem();
+  if (!visible) return null;
 
   const handleCheckbox = (event) => {
     const keepShowing = !event.target.checked;
@@ -39,7 +39,7 @@ export default function HelpOverlay({ visible, layout, onClose, showOnLoad, onTo
           </div>
         </div>
         <div className="max-h-[85vh] overflow-y-auto p-0.5">
-          <HelpContentView layout={layout} keymap={state?.keymap || {}} />
+          <HelpContentView layout={layout} keymap={keymap || {}} />
         </div>
       </div>
     </div>

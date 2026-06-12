@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
 
 export function useManualDockAssist(options = {}) {
   const { manageLifecycle = false } = options;
-  const {
-    state: { roverId, manualDockAssist },
-    actions,
-  } = useControlSystem();
+  const roverId = useControlSelector((control) => control.state.roverId);
+  const active = useControlSelector((control) => Boolean(control.state.manualDockAssist?.active));
+  const actions = useControlActions();
   const frame = useTelemetryFrame(roverId);
   const sensors = frame?.sensors || {};
   const chargingLabel = sensors?.chargingState?.label || '';
   const docked = Boolean(sensors?.chargingSources?.homeBase);
   const charging = docked && chargingLabel.toLowerCase() !== 'not charging' && chargingLabel !== '';
-  const active = Boolean(manualDockAssist?.active);
   const wasDockedRef = useRef(false);
 
   const enterAssist = useCallback(() => {

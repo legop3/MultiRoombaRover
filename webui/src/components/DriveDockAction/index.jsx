@@ -2,7 +2,7 @@
 // Purpose: Defines the Drive Dock Action module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo, useState } from 'react';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
@@ -103,10 +103,9 @@ export default function DriveDockAction({
   compactHeightClass = '',
 }) {
   const isMobile = layout === 'mobile';
-  const {
-    state: { roverId, keymap },
-    actions,
-  } = useControlSystem();
+  const roverId = useControlSelector((control) => control.state.roverId);
+  const keymap = useControlSelector((control) => control.state.keymap);
+  const actions = useControlActions();
   const dockAssist = useManualDockAssist();
   const frame = useTelemetryFrame(roverId);
   const state = driveDockState ?? deriveDriveDockState(frame);

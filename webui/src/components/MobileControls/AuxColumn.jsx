@@ -2,7 +2,7 @@
 // Purpose: Assembles the mobile auxiliary controls column, which is the left column by default.
 // Scope: Owns mobile aux/camera/night vision/horn wiring while reusing desktop variation components where intended.
 import { useCallback, useRef } from 'react';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import HornControl from '../HornControl/index.jsx';
 import NightVisionControl from '../NightVisionControl/index.jsx';
@@ -11,19 +11,20 @@ import VacuumControls from './VacuumControls.jsx';
 import VerticalCameraTilt from './VerticalCameraTilt.jsx';
 
 function AuxColumnContent() {
-  const {
-    state: { roverId, camera, horn },
-    pipeline,
-    actions: { setServoAngle, setNightVision, setAuxMotors, startHorn, stopHorn },
-  } = useControlSystem();
+  const roverId = useControlSelector((control) => control.state.roverId);
+  const camera = useControlSelector((control) => control.state.camera);
+  const horn = useControlSelector((control) => control.state.horn);
+  const nightVision = useControlSelector((control) => control.pipeline?.nightVision);
+  const nightVisionState = useControlSelector((control) => control.pipeline?.nightVisionState);
+  const pipelineHorn = useControlSelector((control) => control.pipeline?.horn);
+  const { setServoAngle, setNightVision, setAuxMotors, startHorn, stopHorn } = useControlActions();
   const dockAssist = useManualDockAssist();
   const disabled = !roverId;
   const activeAuxButtonRef = useRef(null);
   const cameraConfig = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
-  const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
-  const nightVisionState = pipeline?.nightVisionState;
-  const hornAvailable = Boolean(roverId && pipeline?.horn);
+  const nightVisionAvailable = Boolean(roverId && nightVision);
+  const hornAvailable = Boolean(roverId && pipelineHorn);
   const hornBlocked = horn?.overheated;
   const cameraMin = typeof cameraConfig?.minAngle === 'number' ? cameraConfig.minAngle : -45;
   const cameraMax = typeof cameraConfig?.maxAngle === 'number' ? cameraConfig.maxAngle : 45;

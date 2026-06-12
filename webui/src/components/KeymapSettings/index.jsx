@@ -2,7 +2,7 @@
 // Purpose: Defines the Keymap Settings module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { DEFAULT_KEYMAP } from '../../controls/constants.js';
 import { canonicalizeKeyInput, formatKeyLabel } from '../../controls/keymapUtils.js';
 import { setKeyboardCaptureLocked } from '../../controls/inputs/keyboardCaptureLock.js';
@@ -191,10 +191,8 @@ function BindingRow({ action, value, isActive, onCaptureStart, onCancel, onCaptu
 }
 
 export default function KeymapSettings() {
-  const {
-    state: { keymap },
-    actions: { updateKeyBinding, resetKeyBindings },
-  } = useControlSystem();
+  const keymap = useControlSelector((control) => control.state.keymap);
+  const { updateKeyBinding, resetKeyBindings } = useControlActions();
   const { value: inputSettings, save: saveInputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const keyboardSettings = {
     ...INPUT_SETTINGS_DEFAULTS.keyboard,

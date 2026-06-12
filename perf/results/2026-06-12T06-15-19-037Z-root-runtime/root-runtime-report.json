@@ -1,0 +1,896 @@
+{
+  "url": "https://rover.otter.land/",
+  "runDir": "perf/results/2026-06-12T06-15-19-037Z-root-runtime",
+  "environment": {
+    "cpuThrottle": 8,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "isMobile": true,
+    "sampleMs": 30000
+  },
+  "metrics": {
+    "Timestamp": 23755.664379,
+    "AudioHandlers": 0,
+    "AudioWorkletProcessors": 0,
+    "Documents": 3,
+    "Frames": 1,
+    "JSEventListeners": 1280,
+    "LayoutObjects": 1996,
+    "MediaKeySessions": 0,
+    "MediaKeys": 0,
+    "Nodes": 2628,
+    "Resources": 20,
+    "ContextLifecycleStateObservers": 20,
+    "V8PerContextDatas": 4,
+    "WorkerGlobalScopes": 0,
+    "UACSSResources": 0,
+    "RTCPeerConnections": 4,
+    "ResourceFetchers": 3,
+    "AdSubframes": 0,
+    "DetachedScriptStates": 2,
+    "ArrayBufferContents": 14,
+    "LayoutCount": 43,
+    "RecalcStyleCount": 80,
+    "LayoutDuration": 1.465119,
+    "RecalcStyleDuration": 1.54029,
+    "DevToolsCommandDuration": 0.00038,
+    "ScriptDuration": 15.671196,
+    "V8CompileDuration": 0,
+    "TaskDuration": 30.021546,
+    "TaskOtherDuration": 11.344561,
+    "ThreadTime": 32.951976,
+    "ProcessTime": 39.43,
+    "JSHeapUsedSize": 7054604,
+    "JSHeapTotalSize": 13893632,
+    "FirstMeaningfulPaint": 0,
+    "DomContentLoaded": 23725.629234,
+    "NavigationStart": 23721.84567
+  },
+  "snapshot": {
+    "elapsedMs": 53572.199999999255,
+    "listeners": [
+      {
+        "key": "add:input:invalid",
+        "count": 18
+      },
+      {
+        "key": "add:window:online",
+        "count": 6
+      },
+      {
+        "key": "add:document:visibilitychange",
+        "count": 6
+      },
+      {
+        "key": "add:audio:canplay",
+        "count": 6
+      },
+      {
+        "key": "add:audio:ended",
+        "count": 6
+      },
+      {
+        "key": "add:audio:error",
+        "count": 6
+      },
+      {
+        "key": "add:audio:pause",
+        "count": 6
+      },
+      {
+        "key": "add:audio:play",
+        "count": 6
+      },
+      {
+        "key": "add:audio:stalled",
+        "count": 6
+      },
+      {
+        "key": "add:audio:waiting",
+        "count": 6
+      },
+      {
+        "key": "remove:window:online",
+        "count": 5
+      },
+      {
+        "key": "remove:document:visibilitychange",
+        "count": 5
+      },
+      {
+        "key": "remove:audio:play",
+        "count": 4
+      },
+      {
+        "key": "remove:audio:pause",
+        "count": 4
+      },
+      {
+        "key": "remove:audio:ended",
+        "count": 4
+      },
+      {
+        "key": "remove:audio:error",
+        "count": 4
+      },
+      {
+        "key": "remove:audio:waiting",
+        "count": 4
+      },
+      {
+        "key": "remove:audio:canplay",
+        "count": 4
+      },
+      {
+        "key": "remove:audio:stalled",
+        "count": 4
+      },
+      {
+        "key": "add:WebSocket:message",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:auxclick",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:click",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:contextmenu",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:copy",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:cut",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:drag",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragend",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragenter",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragexit",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragleave",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragover",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragstart",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:drop",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:gotpointercapture",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:input",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:keydown",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:keypress",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:keyup",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:lostpointercapture",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mousedown",
+        "count": 2
+      }
+    ],
+    "timers": [
+      {
+        "key": "timeout:0",
+        "count": 5
+      },
+      {
+        "key": "timeout:12000",
+        "count": 4
+      },
+      {
+        "key": "interval:60000",
+        "count": 4
+      },
+      {
+        "key": "interval:250",
+        "count": 4
+      },
+      {
+        "key": "interval:200",
+        "count": 4
+      },
+      {
+        "key": "timeout:2000",
+        "count": 4
+      },
+      {
+        "key": "timeout:15000",
+        "count": 2
+      },
+      {
+        "key": "timeout:4000",
+        "count": 2
+      },
+      {
+        "key": "interval:3000",
+        "count": 2
+      },
+      {
+        "key": "interval:1000",
+        "count": 1
+      },
+      {
+        "key": "interval:2000",
+        "count": 1
+      },
+      {
+        "key": "timeout:10000",
+        "count": 1
+      },
+      {
+        "key": "timeout:1491",
+        "count": 1
+      }
+    ],
+    "timeouts": 19,
+    "intervals": 16,
+    "timeoutFires": 11,
+    "intervalFires": 136,
+    "webSocketMessageCount": 498,
+    "webSocketBytes": 11209457,
+    "webSocketEvents": [
+      {
+        "event": "log:entry",
+        "count": 269,
+        "bytes": 62887
+      },
+      {
+        "event": "sensorFrame",
+        "count": 99,
+        "bytes": 185012
+      },
+      {
+        "event": "session:sync",
+        "count": 31,
+        "bytes": 526178
+      },
+      {
+        "event": "commandAck",
+        "count": 30,
+        "bytes": 2833
+      },
+      {
+        "event": "",
+        "count": 15,
+        "bytes": 10168579
+      },
+      {
+        "event": "roverSnapshot:frame",
+        "count": 11,
+        "bytes": 1067
+      },
+      {
+        "event": "mode",
+        "count": 2,
+        "bytes": 54
+      },
+      {
+        "event": "controlGranted",
+        "count": 2,
+        "bytes": 83
+      },
+      {
+        "event": "alert",
+        "count": 2,
+        "bytes": 257
+      },
+      {
+        "event": "alert:new",
+        "count": 2,
+        "bytes": 330
+      },
+      {
+        "event": "auth:role",
+        "count": 2,
+        "bytes": 62
+      },
+      {
+        "event": "rovers",
+        "count": 2,
+        "bytes": 10906
+      },
+      {
+        "event": "chat:init",
+        "count": 2,
+        "bytes": 155226
+      },
+      {
+        "event": "overseer:memory",
+        "count": 2,
+        "bytes": 1040
+      },
+      {
+        "event": "log:init",
+        "count": 2,
+        "bytes": 88662
+      },
+      {
+        "event": "barcode:state",
+        "count": 2,
+        "bytes": 3254
+      },
+      {
+        "event": "kinect:pointCloudFrame",
+        "count": 2,
+        "bytes": 524
+      },
+      {
+        "event": "kinect:colorFrame",
+        "count": 2,
+        "bytes": 338
+      },
+      {
+        "event": "2",
+        "count": 2,
+        "bytes": 2
+      },
+      {
+        "event": "roverSnapshot:status",
+        "count": 2,
+        "bytes": 159
+      },
+      {
+        "event": "0{\"sid\":\"v0f",
+        "count": 1,
+        "bytes": 106
+      },
+      {
+        "event": "40{\"sid\":\"5t",
+        "count": 1,
+        "bytes": 32
+      },
+      {
+        "event": "430[{\"succes",
+        "count": 1,
+        "bytes": 39
+      },
+      {
+        "event": "431[{\"url\":\"",
+        "count": 1,
+        "bytes": 133
+      },
+      {
+        "event": "432[{\"url\":\"",
+        "count": 1,
+        "bytes": 145
+      },
+      {
+        "event": "Freaky",
+        "count": 1,
+        "bytes": 40
+      },
+      {
+        "event": "434[{\"succes",
+        "count": 1,
+        "bytes": 194
+      },
+      {
+        "event": "0{\"sid\":\"t1y",
+        "count": 1,
+        "bytes": 106
+      },
+      {
+        "event": "40{\"sid\":\"Bu",
+        "count": 1,
+        "bytes": 32
+      },
+      {
+        "event": "436[{\"error\"",
+        "count": 1,
+        "bytes": 41
+      },
+      {
+        "event": "437[{\"error\"",
+        "count": 1,
+        "bytes": 41
+      },
+      {
+        "event": "438[{\"url\":\"",
+        "count": 1,
+        "bytes": 135
+      },
+      {
+        "event": "439[{\"url\":\"",
+        "count": 1,
+        "bytes": 147
+      },
+      {
+        "event": "Bweeble",
+        "count": 1,
+        "bytes": 42
+      },
+      {
+        "event": "roverHostStats",
+        "count": 1,
+        "bytes": 771
+      }
+    ],
+    "mutationsTotal": {
+      "records": 7648,
+      "added": 227,
+      "removed": 34,
+      "attrs": 7351,
+      "text": 36
+    },
+    "mutationTargets": [
+      {
+        "key": "input.accent-emerald-400:attributes:name",
+        "count": 2612
+      },
+      {
+        "key": "input.accent-emerald-400:attributes:type",
+        "count": 1306
+      },
+      {
+        "key": "input.field-input.flex-1:attributes:name",
+        "count": 432
+      },
+      {
+        "key": "input.field-input.w-full:attributes:name",
+        "count": 432
+      },
+      {
+        "key": "input.accent-cyan-500:attributes:name",
+        "count": 428
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:name",
+        "count": 330
+      },
+      {
+        "key": "div.h-full:attributes:style",
+        "count": 278
+      },
+      {
+        "key": "input.field-input.chat-composer-input:attributes:name",
+        "count": 216
+      },
+      {
+        "key": "input:attributes:name",
+        "count": 216
+      },
+      {
+        "key": "input.field-input.w-full:attributes:type",
+        "count": 216
+      },
+      {
+        "key": "input.accent-cyan-500:attributes:type",
+        "count": 214
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:type",
+        "count": 165
+      },
+      {
+        "key": "path.[object.SVGAnimatedString]:attributes:d",
+        "count": 145
+      },
+      {
+        "key": "path.[object.SVGAnimatedString]:attributes:fill",
+        "count": 139
+      },
+      {
+        "key": "input:attributes:type",
+        "count": 108
+      },
+      {
+        "key": "Text:characterData:",
+        "count": 36
+      },
+      {
+        "key": "section.panel-section.border:attributes:style",
+        "count": 20
+      },
+      {
+        "key": "header.flex.items-center:attributes:style",
+        "count": 18
+      },
+      {
+        "key": "path.[object.SVGAnimatedString]:attributes:stroke",
+        "count": 18
+      },
+      {
+        "key": "input.min-w-0.flex-1:attributes:name",
+        "count": 14
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:value",
+        "count": 3
+      },
+      {
+        "key": "span.inline-flex.items-center:attributes:class",
+        "count": 3
+      },
+      {
+        "key": "div.rounded-sm.px-2:attributes:class",
+        "count": 3
+      },
+      {
+        "key": "button.mobile-touch-control.flex:attributes:disabled",
+        "count": 3
+      },
+      {
+        "key": "button.mobile-touch-control.min-h-9:attributes:disabled",
+        "count": 3
+      },
+      {
+        "key": "div.fixed.bottom-2:attributes:class",
+        "count": 3
+      },
+      {
+        "key": "button.mobile-touch-control.flex:attributes:class",
+        "count": 3
+      },
+      {
+        "key": "div.mobile-touch-control.flex:attributes:class",
+        "count": 3
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:placeholder",
+        "count": 2
+      },
+      {
+        "key": "video.h-full.w-full:attributes:playsinline",
+        "count": 2
+      },
+      {
+        "key": "video.h-full.w-full:attributes:autoplay",
+        "count": 2
+      },
+      {
+        "key": "video.h-full.w-full:attributes:disableremoteplayback",
+        "count": 2
+      },
+      {
+        "key": "audio:attributes:autoplay",
+        "count": 2
+      },
+      {
+        "key": "audio:attributes:disableremoteplayback",
+        "count": 2
+      },
+      {
+        "key": "input.field-input.flex-1:attributes:value",
+        "count": 2
+      },
+      {
+        "key": "span.inline-block.rounded:attributes:style",
+        "count": 2
+      },
+      {
+        "key": "div.flex.flex-col:attributes:class",
+        "count": 1
+      },
+      {
+        "key": "button.button-dark.min-w-0:attributes:disabled",
+        "count": 1
+      },
+      {
+        "key": "input.field-input.w-full:attributes:value",
+        "count": 1
+      },
+      {
+        "key": "button.button-dark.text-sm:attributes:disabled",
+        "count": 1
+      }
+    ],
+    "mutationBursts": [
+      {
+        "at": 10155,
+        "records": 164,
+        "added": 105,
+        "removed": 1,
+        "attrs": 58,
+        "text": 0
+      },
+      {
+        "at": 28081,
+        "records": 103,
+        "added": 7,
+        "removed": 12,
+        "attrs": 79,
+        "text": 5
+      },
+      {
+        "at": 31972,
+        "records": 83,
+        "added": 13,
+        "removed": 3,
+        "attrs": 65,
+        "text": 2
+      },
+      {
+        "at": 18426,
+        "records": 82,
+        "added": 11,
+        "removed": 2,
+        "attrs": 66,
+        "text": 3
+      },
+      {
+        "at": 8027,
+        "records": 69,
+        "added": 19,
+        "removed": 5,
+        "attrs": 42,
+        "text": 3
+      },
+      {
+        "at": 16714,
+        "records": 66,
+        "added": 2,
+        "removed": 2,
+        "attrs": 53,
+        "text": 9
+      },
+      {
+        "at": 40645,
+        "records": 64,
+        "added": 0,
+        "removed": 0,
+        "attrs": 64,
+        "text": 0
+      },
+      {
+        "at": 40951,
+        "records": 64,
+        "added": 0,
+        "removed": 0,
+        "attrs": 64,
+        "text": 0
+      },
+      {
+        "at": 42708,
+        "records": 64,
+        "added": 0,
+        "removed": 0,
+        "attrs": 64,
+        "text": 0
+      },
+      {
+        "at": 36974,
+        "records": 61,
+        "added": 0,
+        "removed": 0,
+        "attrs": 61,
+        "text": 0
+      },
+      {
+        "at": 24109,
+        "records": 60,
+        "added": 0,
+        "removed": 0,
+        "attrs": 60,
+        "text": 0
+      },
+      {
+        "at": 28572,
+        "records": 60,
+        "added": 2,
+        "removed": 4,
+        "attrs": 53,
+        "text": 1
+      },
+      {
+        "at": 36595,
+        "records": 60,
+        "added": 0,
+        "removed": 0,
+        "attrs": 60,
+        "text": 0
+      },
+      {
+        "at": 42135,
+        "records": 60,
+        "added": 0,
+        "removed": 0,
+        "attrs": 60,
+        "text": 0
+      },
+      {
+        "at": 43257,
+        "records": 60,
+        "added": 0,
+        "removed": 0,
+        "attrs": 60,
+        "text": 0
+      },
+      {
+        "at": 48207,
+        "records": 60,
+        "added": 0,
+        "removed": 0,
+        "attrs": 60,
+        "text": 0
+      },
+      {
+        "at": 48500,
+        "records": 60,
+        "added": 0,
+        "removed": 0,
+        "attrs": 60,
+        "text": 0
+      },
+      {
+        "at": 50368,
+        "records": 60,
+        "added": 0,
+        "removed": 0,
+        "attrs": 60,
+        "text": 0
+      },
+      {
+        "at": 51568,
+        "records": 60,
+        "added": 0,
+        "removed": 0,
+        "attrs": 60,
+        "text": 0
+      },
+      {
+        "at": 52146,
+        "records": 60,
+        "added": 0,
+        "removed": 0,
+        "attrs": 60,
+        "text": 0
+      }
+    ],
+    "frames": {
+      "count": 241,
+      "average": 202.06639004149378,
+      "p95": 399.8999999999978,
+      "p99": 1633.199999999999
+    },
+    "longTasks": {
+      "count": 133,
+      "top": [
+        {
+          "startTime": 1510.7999999970198,
+          "duration": 2281,
+          "name": "self"
+        },
+        {
+          "startTime": 10156.89999999851,
+          "duration": 1493,
+          "name": "self"
+        },
+        {
+          "startTime": 3806,
+          "duration": 1311,
+          "name": "self"
+        },
+        {
+          "startTime": 30277.099999997765,
+          "duration": 932,
+          "name": "self"
+        },
+        {
+          "startTime": 14996,
+          "duration": 931,
+          "name": "self"
+        },
+        {
+          "startTime": 9269.89999999851,
+          "duration": 886,
+          "name": "self"
+        },
+        {
+          "startTime": 7147,
+          "duration": 880,
+          "name": "self"
+        },
+        {
+          "startTime": 14298,
+          "duration": 698,
+          "name": "self"
+        },
+        {
+          "startTime": 29581.099999997765,
+          "duration": 696,
+          "name": "self"
+        },
+        {
+          "startTime": 8029.599999997765,
+          "duration": 689,
+          "name": "self"
+        },
+        {
+          "startTime": 5117.39999999851,
+          "duration": 534,
+          "name": "self"
+        },
+        {
+          "startTime": 31587,
+          "duration": 385,
+          "name": "self"
+        },
+        {
+          "startTime": 18074,
+          "duration": 356,
+          "name": "self"
+        },
+        {
+          "startTime": 25434.39999999851,
+          "duration": 344,
+          "name": "self"
+        },
+        {
+          "startTime": 16382.29999999702,
+          "duration": 333,
+          "name": "self"
+        },
+        {
+          "startTime": 12463.199999999255,
+          "duration": 300,
+          "name": "self"
+        },
+        {
+          "startTime": 6124.79999999702,
+          "duration": 285,
+          "name": "self"
+        },
+        {
+          "startTime": 5657.199999999255,
+          "duration": 283,
+          "name": "self"
+        },
+        {
+          "startTime": 18655.79999999702,
+          "duration": 242,
+          "name": "self"
+        },
+        {
+          "startTime": 19023.5,
+          "duration": 236,
+          "name": "self"
+        }
+      ]
+    },
+    "consoleErrors": []
+  }
+}

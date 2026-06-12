@@ -1,0 +1,849 @@
+{
+  "url": "http://127.0.0.1:4173/",
+  "runDir": "perf/results/2026-06-12T06-07-57-124Z-root-runtime",
+  "environment": {
+    "cpuThrottle": 6,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "isMobile": true,
+    "sampleMs": 10000
+  },
+  "metrics": {
+    "Timestamp": 23292.158609,
+    "AudioHandlers": 0,
+    "AudioWorkletProcessors": 0,
+    "Documents": 3,
+    "Frames": 1,
+    "JSEventListeners": 398,
+    "LayoutObjects": 1945,
+    "MediaKeySessions": 0,
+    "MediaKeys": 0,
+    "Nodes": 2266,
+    "Resources": 18,
+    "ContextLifecycleStateObservers": 13,
+    "V8PerContextDatas": 4,
+    "WorkerGlobalScopes": 0,
+    "UACSSResources": 0,
+    "RTCPeerConnections": 0,
+    "ResourceFetchers": 3,
+    "AdSubframes": 0,
+    "DetachedScriptStates": 2,
+    "ArrayBufferContents": 3,
+    "LayoutCount": 12,
+    "RecalcStyleCount": 30,
+    "LayoutDuration": 0.928481,
+    "RecalcStyleDuration": 0.991796,
+    "DevToolsCommandDuration": 0.000323,
+    "ScriptDuration": 6.326745,
+    "V8CompileDuration": 0,
+    "TaskDuration": 11.079249,
+    "TaskOtherDuration": 2.831904,
+    "ThreadTime": 11.911973,
+    "ProcessTime": 14.42,
+    "JSHeapUsedSize": 8961292,
+    "JSHeapTotalSize": 12058624,
+    "FirstMeaningfulPaint": 0,
+    "DomContentLoaded": 23282.130574,
+    "NavigationStart": 23279.964199
+  },
+  "snapshot": {
+    "elapsedMs": 20101.5,
+    "listeners": [
+      {
+        "key": "add:input:invalid",
+        "count": 18
+      },
+      {
+        "key": "add:window:online",
+        "count": 5
+      },
+      {
+        "key": "add:document:visibilitychange",
+        "count": 5
+      },
+      {
+        "key": "remove:window:online",
+        "count": 4
+      },
+      {
+        "key": "remove:document:visibilitychange",
+        "count": 4
+      },
+      {
+        "key": "add:audio:canplay",
+        "count": 3
+      },
+      {
+        "key": "add:audio:ended",
+        "count": 3
+      },
+      {
+        "key": "add:audio:error",
+        "count": 3
+      },
+      {
+        "key": "add:audio:pause",
+        "count": 3
+      },
+      {
+        "key": "add:audio:play",
+        "count": 3
+      },
+      {
+        "key": "add:audio:stalled",
+        "count": 3
+      },
+      {
+        "key": "add:audio:waiting",
+        "count": 3
+      },
+      {
+        "key": "add:div#root:auxclick",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:click",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:contextmenu",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:copy",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:cut",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:drag",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragend",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragenter",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragexit",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragleave",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragover",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragstart",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:drop",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:gotpointercapture",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:input",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:keydown",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:keypress",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:keyup",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:lostpointercapture",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mousedown",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mousemove",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mouseout",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mouseover",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mouseup",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:paste",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:pointercancel",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:pointerdown",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:pointermove",
+        "count": 2
+      }
+    ],
+    "timers": [
+      {
+        "key": "timeout:0",
+        "count": 5
+      },
+      {
+        "key": "interval:250",
+        "count": 4
+      },
+      {
+        "key": "interval:60000",
+        "count": 3
+      },
+      {
+        "key": "timeout:12000",
+        "count": 2
+      },
+      {
+        "key": "interval:200",
+        "count": 2
+      },
+      {
+        "key": "timeout:15000",
+        "count": 1
+      },
+      {
+        "key": "interval:1000",
+        "count": 1
+      },
+      {
+        "key": "interval:2000",
+        "count": 1
+      },
+      {
+        "key": "timeout:4000",
+        "count": 1
+      },
+      {
+        "key": "timeout:10000",
+        "count": 1
+      },
+      {
+        "key": "interval:3000",
+        "count": 1
+      }
+    ],
+    "timeouts": 10,
+    "intervals": 12,
+    "timeoutFires": 4,
+    "intervalFires": 45,
+    "webSocketMessageCount": 285,
+    "webSocketBytes": 5610397,
+    "webSocketEvents": [
+      {
+        "event": "log:entry",
+        "count": 150,
+        "bytes": 35714
+      },
+      {
+        "event": "sensorFrame",
+        "count": 76,
+        "bytes": 142196
+      },
+      {
+        "event": "session:sync",
+        "count": 18,
+        "bytes": 306294
+      },
+      {
+        "event": "commandAck",
+        "count": 12,
+        "bytes": 1128
+      },
+      {
+        "event": "",
+        "count": 4,
+        "bytes": 4992972
+      },
+      {
+        "event": "roverSnapshot:frame",
+        "count": 3,
+        "bytes": 291
+      },
+      {
+        "event": "0{\"sid\":\"CQG",
+        "count": 1,
+        "bytes": 106
+      },
+      {
+        "event": "40{\"sid\":\"-s",
+        "count": 1,
+        "bytes": 32
+      },
+      {
+        "event": "mode",
+        "count": 1,
+        "bytes": 27
+      },
+      {
+        "event": "controlGranted",
+        "count": 1,
+        "bytes": 41
+      },
+      {
+        "event": "alert",
+        "count": 1,
+        "bytes": 128
+      },
+      {
+        "event": "alert:new",
+        "count": 1,
+        "bytes": 165
+      },
+      {
+        "event": "auth:role",
+        "count": 1,
+        "bytes": 31
+      },
+      {
+        "event": "rovers",
+        "count": 1,
+        "bytes": 5453
+      },
+      {
+        "event": "chat:init",
+        "count": 1,
+        "bytes": 77613
+      },
+      {
+        "event": "overseer:memory",
+        "count": 1,
+        "bytes": 520
+      },
+      {
+        "event": "log:init",
+        "count": 1,
+        "bytes": 44230
+      },
+      {
+        "event": "barcode:state",
+        "count": 1,
+        "bytes": 1627
+      },
+      {
+        "event": "kinect:pointCloudFrame",
+        "count": 1,
+        "bytes": 262
+      },
+      {
+        "event": "kinect:colorFrame",
+        "count": 1,
+        "bytes": 169
+      },
+      {
+        "event": "430[{\"succes",
+        "count": 1,
+        "bytes": 40
+      },
+      {
+        "event": "431[{\"succes",
+        "count": 1,
+        "bytes": 194
+      },
+      {
+        "event": "432[{\"url\":\"",
+        "count": 1,
+        "bytes": 133
+      },
+      {
+        "event": "roverHostStats",
+        "count": 1,
+        "bytes": 766
+      },
+      {
+        "event": "2",
+        "count": 1,
+        "bytes": 1
+      },
+      {
+        "event": "433[{\"url\":\"",
+        "count": 1,
+        "bytes": 145
+      },
+      {
+        "event": "roverSnapshot:status",
+        "count": 1,
+        "bytes": 79
+      },
+      {
+        "event": "WALL-E",
+        "count": 1,
+        "bytes": 40
+      }
+    ],
+    "mutationsTotal": {
+      "records": 4729,
+      "added": 175,
+      "removed": 11,
+      "attrs": 4524,
+      "text": 19
+    },
+    "mutationTargets": [
+      {
+        "key": "input.accent-emerald-400:attributes:name",
+        "count": 1866
+      },
+      {
+        "key": "input.accent-emerald-400:attributes:type",
+        "count": 933
+      },
+      {
+        "key": "div.h-full:attributes:style",
+        "count": 580
+      },
+      {
+        "key": "path.[object.SVGAnimatedString]:attributes:d",
+        "count": 292
+      },
+      {
+        "key": "path.[object.SVGAnimatedString]:attributes:fill",
+        "count": 290
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:name",
+        "count": 242
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:type",
+        "count": 121
+      },
+      {
+        "key": "input.field-input.flex-1:attributes:name",
+        "count": 28
+      },
+      {
+        "key": "input.field-input.w-full:attributes:name",
+        "count": 28
+      },
+      {
+        "key": "Text:characterData:",
+        "count": 19
+      },
+      {
+        "key": "input.field-input.chat-composer-input:attributes:name",
+        "count": 18
+      },
+      {
+        "key": "input.accent-cyan-500:attributes:name",
+        "count": 18
+      },
+      {
+        "key": "input:attributes:name",
+        "count": 14
+      },
+      {
+        "key": "input.field-input.w-full:attributes:type",
+        "count": 14
+      },
+      {
+        "key": "section.panel-section.border:attributes:style",
+        "count": 10
+      },
+      {
+        "key": "input.min-w-0.flex-1:attributes:name",
+        "count": 10
+      },
+      {
+        "key": "input.accent-cyan-500:attributes:type",
+        "count": 9
+      },
+      {
+        "key": "header.flex.items-center:attributes:style",
+        "count": 9
+      },
+      {
+        "key": "input:attributes:type",
+        "count": 7
+      },
+      {
+        "key": "path.[object.SVGAnimatedString]:attributes:stroke",
+        "count": 6
+      },
+      {
+        "key": "button.mobile-touch-control.flex:attributes:disabled",
+        "count": 3
+      },
+      {
+        "key": "button.mobile-touch-control.min-h-9:attributes:disabled",
+        "count": 3
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:value",
+        "count": 2
+      },
+      {
+        "key": "span.inline-flex.items-center:attributes:class",
+        "count": 2
+      },
+      {
+        "key": "input.field-input.flex-1:attributes:value",
+        "count": 2
+      },
+      {
+        "key": "video.h-full.w-full:attributes:playsinline",
+        "count": 2
+      },
+      {
+        "key": "video.h-full.w-full:attributes:autoplay",
+        "count": 2
+      },
+      {
+        "key": "video.h-full.w-full:attributes:disableremoteplayback",
+        "count": 2
+      },
+      {
+        "key": "div.rounded-sm.px-2:attributes:class",
+        "count": 1
+      },
+      {
+        "key": "div.flex.flex-col:attributes:class",
+        "count": 1
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:placeholder",
+        "count": 1
+      },
+      {
+        "key": "button.button-dark.min-w-0:attributes:disabled",
+        "count": 1
+      },
+      {
+        "key": "div.fixed.bottom-2:attributes:class",
+        "count": 1
+      },
+      {
+        "key": "button.mobile-touch-control.flex:attributes:class",
+        "count": 1
+      },
+      {
+        "key": "div.mobile-touch-control.flex:attributes:class",
+        "count": 1
+      },
+      {
+        "key": "input.field-input.w-full:attributes:value",
+        "count": 1
+      },
+      {
+        "key": "button.button-dark.text-sm:attributes:disabled",
+        "count": 1
+      },
+      {
+        "key": "audio:attributes:autoplay",
+        "count": 1
+      },
+      {
+        "key": "audio:attributes:disableremoteplayback",
+        "count": 1
+      }
+    ],
+    "mutationBursts": [
+      {
+        "at": 7974,
+        "records": 241,
+        "added": 123,
+        "removed": 6,
+        "attrs": 110,
+        "text": 2
+      },
+      {
+        "at": 11575,
+        "records": 147,
+        "added": 11,
+        "removed": 2,
+        "attrs": 132,
+        "text": 2
+      },
+      {
+        "at": 12385,
+        "records": 131,
+        "added": 0,
+        "removed": 0,
+        "attrs": 127,
+        "text": 4
+      },
+      {
+        "at": 12981,
+        "records": 119,
+        "added": 0,
+        "removed": 0,
+        "attrs": 119,
+        "text": 0
+      },
+      {
+        "at": 18332,
+        "records": 117,
+        "added": 0,
+        "removed": 0,
+        "attrs": 116,
+        "text": 1
+      },
+      {
+        "at": 17140,
+        "records": 111,
+        "added": 0,
+        "removed": 0,
+        "attrs": 111,
+        "text": 0
+      },
+      {
+        "at": 13371,
+        "records": 51,
+        "added": 0,
+        "removed": 0,
+        "attrs": 51,
+        "text": 0
+      },
+      {
+        "at": 13636,
+        "records": 51,
+        "added": 0,
+        "removed": 0,
+        "attrs": 51,
+        "text": 0
+      },
+      {
+        "at": 13804,
+        "records": 51,
+        "added": 0,
+        "removed": 0,
+        "attrs": 51,
+        "text": 0
+      },
+      {
+        "at": 14271,
+        "records": 51,
+        "added": 0,
+        "removed": 0,
+        "attrs": 51,
+        "text": 0
+      },
+      {
+        "at": 15643,
+        "records": 51,
+        "added": 0,
+        "removed": 0,
+        "attrs": 51,
+        "text": 0
+      },
+      {
+        "at": 15909,
+        "records": 51,
+        "added": 0,
+        "removed": 0,
+        "attrs": 51,
+        "text": 0
+      },
+      {
+        "at": 18503,
+        "records": 51,
+        "added": 0,
+        "removed": 0,
+        "attrs": 51,
+        "text": 0
+      },
+      {
+        "at": 15238,
+        "records": 47,
+        "added": 0,
+        "removed": 0,
+        "attrs": 47,
+        "text": 0
+      },
+      {
+        "at": 15283,
+        "records": 47,
+        "added": 0,
+        "removed": 0,
+        "attrs": 47,
+        "text": 0
+      },
+      {
+        "at": 15415,
+        "records": 47,
+        "added": 0,
+        "removed": 0,
+        "attrs": 47,
+        "text": 0
+      },
+      {
+        "at": 15495,
+        "records": 47,
+        "added": 0,
+        "removed": 0,
+        "attrs": 47,
+        "text": 0
+      },
+      {
+        "at": 15947,
+        "records": 47,
+        "added": 0,
+        "removed": 0,
+        "attrs": 47,
+        "text": 0
+      },
+      {
+        "at": 16169,
+        "records": 47,
+        "added": 0,
+        "removed": 0,
+        "attrs": 47,
+        "text": 0
+      },
+      {
+        "at": 16317,
+        "records": 47,
+        "added": 0,
+        "removed": 0,
+        "attrs": 47,
+        "text": 0
+      }
+    ],
+    "frames": {
+      "count": 86,
+      "average": 206.1918604651163,
+      "p95": 566.5999999999995,
+      "p99": 3399.8999999999996
+    },
+    "longTasks": {
+      "count": 61,
+      "top": [
+        {
+          "startTime": 5290.5,
+          "duration": 2689,
+          "name": "self"
+        },
+        {
+          "startTime": 365.4000000022352,
+          "duration": 1807,
+          "name": "self"
+        },
+        {
+          "startTime": 2182.900000002235,
+          "duration": 1038,
+          "name": "self"
+        },
+        {
+          "startTime": 10371.10000000149,
+          "duration": 709,
+          "name": "self"
+        },
+        {
+          "startTime": 9852,
+          "duration": 519,
+          "name": "self"
+        },
+        {
+          "startTime": 8202.60000000149,
+          "duration": 394,
+          "name": "self"
+        },
+        {
+          "startTime": 3221.699999999255,
+          "duration": 385,
+          "name": "self"
+        },
+        {
+          "startTime": 3882.5,
+          "duration": 356,
+          "name": "self"
+        },
+        {
+          "startTime": 11221.5,
+          "duration": 353,
+          "name": "self"
+        },
+        {
+          "startTime": 18042.900000002235,
+          "duration": 292,
+          "name": "self"
+        },
+        {
+          "startTime": 12110.900000002235,
+          "duration": 276,
+          "name": "self"
+        },
+        {
+          "startTime": 12738.800000000745,
+          "duration": 243,
+          "name": "self"
+        },
+        {
+          "startTime": 16946.5,
+          "duration": 195,
+          "name": "self"
+        },
+        {
+          "startTime": 11575.5,
+          "duration": 186,
+          "name": "self"
+        },
+        {
+          "startTime": 3615.60000000149,
+          "duration": 185,
+          "name": "self"
+        },
+        {
+          "startTime": 14671.699999999255,
+          "duration": 160,
+          "name": "self"
+        },
+        {
+          "startTime": 4239.199999999255,
+          "duration": 130,
+          "name": "self"
+        },
+        {
+          "startTime": 14837.5,
+          "duration": 110,
+          "name": "self"
+        },
+        {
+          "startTime": 15717.60000000149,
+          "duration": 108,
+          "name": "self"
+        },
+        {
+          "startTime": 17352.400000002235,
+          "duration": 107,
+          "name": "self"
+        }
+      ]
+    },
+    "consoleErrors": []
+  }
+}

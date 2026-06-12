@@ -13,7 +13,7 @@ import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../Tabs/index.jsx';
 import TopDownMap from '../TopDownMap/index.jsx';
 import DriveDockAction, { useDriveDockState } from '../DriveDockAction/index.jsx';
 import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlActions, useControlSelector } from '../../controls/index.js';
 import RoverQueuesPanel from '../RoverQueuesPanel/index.jsx';
 import RawUserPilePanel from '../RawUserPilePanel/index.jsx';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
@@ -36,9 +36,7 @@ const CHAT_DOCK_MAX_HEIGHT = 300;
 const CHAT_DOCK_BOTTOM_INSET = 8;
 
 function TopDownMapPanel() {
-  const {
-    state: { roverId },
-  } = useControlSystem();
+  const roverId = useControlSelector((control) => control.state.roverId);
   const frame = useTelemetryFrame(roverId);
   const sensors = frame?.sensors || {};
 
@@ -54,20 +52,22 @@ function TopDownMapPanel() {
 }
 
 function DriveDockPanel() {
-  const {
-    state: { roverId, keymap, camera, horn },
-    pipeline,
-    actions: { setServoAngle, setNightVision, startHorn, stopHorn },
-  } = useControlSystem();
+  const roverId = useControlSelector((control) => control.state.roverId);
+  const keymap = useControlSelector((control) => control.state.keymap);
+  const camera = useControlSelector((control) => control.state.camera);
+  const horn = useControlSelector((control) => control.state.horn);
+  const nightVision = useControlSelector((control) => control.pipeline?.nightVision);
+  const nightVisionState = useControlSelector((control) => control.pipeline?.nightVisionState);
+  const pipelineHorn = useControlSelector((control) => control.pipeline?.horn);
+  const { setServoAngle, setNightVision, startHorn, stopHorn } = useControlActions();
   const dockAssist = useManualDockAssist();
   const driveDockState = useDriveDockState(roverId);
   const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
   const config = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && config);
-  const nightVisionAvailable = Boolean(roverId && pipeline?.nightVision);
-  const nightVisionState = pipeline?.nightVisionState;
-  const hornAvailable = Boolean(roverId && pipeline?.horn);
+  const nightVisionAvailable = Boolean(roverId && nightVision);
+  const hornAvailable = Boolean(roverId && pipelineHorn);
   const hornBlocked = horn?.overheated;
   const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
   const max = typeof config?.maxAngle === 'number' ? config.maxAngle : 30;
@@ -146,10 +146,9 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
     const roverId = String(state.session?.assignment?.roverId || '').trim();
     return roverId ? state.session?.audioForward?.[roverId] || null : null;
   });
-  const { state: controlState } = useControlSystem();
+  const pttActive = useControlSelector((control) => Boolean(control.state.mic?.pttActive));
   const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
   const vipDotClass = isVerified ? 'bg-emerald-400' : 'bg-red-600';
-  const pttActive = Boolean(controlState?.mic?.pttActive);
   const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
   const pttMode = vipAudio?.pttMode === 'clip' ? 'clip' : 'live';
   const vipMicActive = Boolean(

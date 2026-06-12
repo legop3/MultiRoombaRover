@@ -1,0 +1,529 @@
+{
+  "url": "http://127.0.0.1:4173/",
+  "runDir": "perf/results/2026-06-12T06-11-56-994Z",
+  "elapsedMs": 83940,
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/148.0.7778.96 Safari/537.36",
+  "title": "Roomba Rover",
+  "finalUrl": "http://127.0.0.1:4173/",
+  "environment": {
+    "cpuThrottle": 8,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "isMobile": true
+  },
+  "metrics": {
+    "afterLoad": {
+      "Timestamp": 23527.948042,
+      "Documents": 3,
+      "Frames": 1,
+      "JSEventListeners": 267,
+      "Nodes": 651,
+      "LayoutCount": 5,
+      "RecalcStyleCount": 7,
+      "LayoutDuration": 0.500736,
+      "RecalcStyleDuration": 0.283234,
+      "ScriptDuration": 5.693685,
+      "TaskDuration": 7.662781,
+      "JSHeapUsedSize": 4764568,
+      "JSHeapTotalSize": 7077888
+    },
+    "end": {
+      "Timestamp": 23593.417486,
+      "Documents": 1,
+      "Frames": 1,
+      "JSEventListeners": 1032,
+      "Nodes": 2696,
+      "LayoutCount": 137,
+      "RecalcStyleCount": 280,
+      "LayoutDuration": 3.566888,
+      "RecalcStyleDuration": 3.703827,
+      "ScriptDuration": 27.965461,
+      "TaskDuration": 67.992237,
+      "JSHeapUsedSize": 12832824,
+      "JSHeapTotalSize": 19759104
+    },
+    "delta": {
+      "Timestamp": 65.46944399999848,
+      "Documents": -2,
+      "Frames": 0,
+      "JSEventListeners": 765,
+      "Nodes": 2045,
+      "LayoutCount": 132,
+      "RecalcStyleCount": 273,
+      "LayoutDuration": 3.066152,
+      "RecalcStyleDuration": 3.420593,
+      "ScriptDuration": 22.271776000000003,
+      "TaskDuration": 60.329456,
+      "JSHeapUsedSize": 8068256,
+      "JSHeapTotalSize": 12681216
+    }
+  },
+  "cpuSummary": {
+    "totalProfileMs": 55106.451,
+    "sampleCount": 40511,
+    "topSelfTime": [
+      {
+        "url": "",
+        "functionName": "(program)",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 26825.782999999923,
+        "samples": 18512
+      },
+      {
+        "url": "",
+        "functionName": "(idle)",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 4815.981000000005,
+        "samples": 3701
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "(anonymous)",
+        "lineNumber": 11,
+        "columnNumber": 40267,
+        "selfMs": 2656.4819999999972,
+        "samples": 2026
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "ad",
+        "lineNumber": 9,
+        "columnNumber": 7898,
+        "selfMs": 1032.9479999999999,
+        "samples": 818
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "Kt",
+        "lineNumber": 8,
+        "columnNumber": 48104,
+        "selfMs": 951.7199999999993,
+        "samples": 747
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "Ce",
+        "lineNumber": 8,
+        "columnNumber": 94317,
+        "selfMs": 905.2510000000005,
+        "samples": 727
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "tryParse",
+        "lineNumber": 11,
+        "columnNumber": 49539,
+        "selfMs": 592.3200000000003,
+        "samples": 480
+      },
+      {
+        "url": "",
+        "functionName": "(garbage collector)",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 578.5280000000001,
+        "samples": 430
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "start",
+        "lineNumber": 11,
+        "columnNumber": 1485400,
+        "selfMs": 445.5410000000001,
+        "samples": 322
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "G4",
+        "lineNumber": 8,
+        "columnNumber": 28256,
+        "selfMs": 432.7939999999998,
+        "samples": 325
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "lt",
+        "lineNumber": 8,
+        "columnNumber": 7348,
+        "selfMs": 360.4799999999999,
+        "samples": 279
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "ga",
+        "lineNumber": 8,
+        "columnNumber": 10651,
+        "selfMs": 330.2019999999997,
+        "samples": 260
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "r",
+        "lineNumber": 1,
+        "columnNumber": 967,
+        "selfMs": 323.32300000000004,
+        "samples": 239
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "Rl",
+        "lineNumber": 8,
+        "columnNumber": 101212,
+        "selfMs": 308.80500000000006,
+        "samples": 225
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "S1",
+        "lineNumber": 8,
+        "columnNumber": 40721,
+        "selfMs": 305.08099999999996,
+        "samples": 243
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "C2",
+        "lineNumber": 8,
+        "columnNumber": 49311,
+        "selfMs": 304.76900000000006,
+        "samples": 250
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "ws.onmessage",
+        "lineNumber": 11,
+        "columnNumber": 33453,
+        "selfMs": 284.5850000000001,
+        "samples": 204
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "N2.emit",
+        "lineNumber": 11,
+        "columnNumber": 25371,
+        "selfMs": 275.96699999999987,
+        "samples": 219
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "Xl",
+        "lineNumber": 8,
+        "columnNumber": 117224,
+        "selfMs": 260.1920000000001,
+        "samples": 208
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "pa",
+        "lineNumber": 8,
+        "columnNumber": 10399,
+        "selfMs": 249.32600000000016,
+        "samples": 180
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "S4",
+        "lineNumber": 11,
+        "columnNumber": 91365,
+        "selfMs": 237.0250000000001,
+        "samples": 179
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "N6",
+        "lineNumber": 8,
+        "columnNumber": 34144,
+        "selfMs": 234.33099999999988,
+        "samples": 188
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "bl",
+        "lineNumber": 8,
+        "columnNumber": 80838,
+        "selfMs": 228.66600000000017,
+        "samples": 171
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "o2",
+        "lineNumber": 8,
+        "columnNumber": 42232,
+        "selfMs": 219.2690000000001,
+        "samples": 182
+      },
+      {
+        "url": "",
+        "functionName": "setAttribute",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 213.44599999999997,
+        "samples": 178
+      },
+      {
+        "url": "",
+        "functionName": "(anonymous)",
+        "lineNumber": 29,
+        "columnNumber": 16,
+        "selfMs": 194.01300000000003,
+        "samples": 148
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "s2",
+        "lineNumber": 9,
+        "columnNumber": 71,
+        "selfMs": 189.78200000000004,
+        "samples": 160
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "na",
+        "lineNumber": 8,
+        "columnNumber": 3730,
+        "selfMs": 184.6409999999999,
+        "samples": 146
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "Eh",
+        "lineNumber": 8,
+        "columnNumber": 95737,
+        "selfMs": 179.85799999999998,
+        "samples": 138
+      },
+      {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "functionName": "Oh",
+        "lineNumber": 8,
+        "columnNumber": 116259,
+        "selfMs": 179.09700000000007,
+        "samples": 134
+      }
+    ]
+  },
+  "responsiveness": {
+    "longTaskCount": 333,
+    "topLongTasks": [
+      {
+        "name": "self",
+        "startTime": 7254.699999999255,
+        "duration": 3731
+      },
+      {
+        "name": "self",
+        "startTime": 409.19999999925494,
+        "duration": 2518
+      },
+      {
+        "name": "unknown",
+        "startTime": 13437.400000002235,
+        "duration": 1801
+      },
+      {
+        "name": "self",
+        "startTime": 2960.199999999255,
+        "duration": 1382
+      },
+      {
+        "name": "self",
+        "startTime": 24715.300000000745,
+        "duration": 1038
+      },
+      {
+        "name": "self",
+        "startTime": 54470.699999999255,
+        "duration": 1002
+      },
+      {
+        "name": "self",
+        "startTime": 53685.199999999255,
+        "duration": 785
+      },
+      {
+        "name": "self",
+        "startTime": 23959.699999999255,
+        "duration": 755
+      },
+      {
+        "name": "self",
+        "startTime": 50997,
+        "duration": 747
+      },
+      {
+        "name": "self",
+        "startTime": 4343.10000000149,
+        "duration": 621
+      },
+      {
+        "name": "self",
+        "startTime": 27087.5,
+        "duration": 597
+      },
+      {
+        "name": "self",
+        "startTime": 22357.300000000745,
+        "duration": 554
+      },
+      {
+        "name": "unknown",
+        "startTime": 15496,
+        "duration": 478
+      },
+      {
+        "name": "self",
+        "startTime": 5324.5,
+        "duration": 474
+      },
+      {
+        "name": "self",
+        "startTime": 11302.300000000745,
+        "duration": 448
+      },
+      {
+        "name": "self",
+        "startTime": 40393.300000000745,
+        "duration": 435
+      },
+      {
+        "name": "self",
+        "startTime": 55742.5,
+        "duration": 405
+      },
+      {
+        "name": "self",
+        "startTime": 25906.300000000745,
+        "duration": 323
+      },
+      {
+        "name": "self",
+        "startTime": 38613.5,
+        "duration": 303
+      },
+      {
+        "name": "self",
+        "startTime": 46738.5,
+        "duration": 286
+      }
+    ],
+    "frameCount": 358,
+    "averageFrameMs": 207.5804469273743,
+    "p95FrameMs": 483.3000000000029,
+    "p99FrameMs": 2016.6,
+    "intervalDriftCount": 43,
+    "averageIntervalDriftMs": 1537.434883720913,
+    "p95IntervalDriftMs": 7938.5,
+    "p99IntervalDriftMs": 8055.300000000745
+  },
+  "consoleMessages": [
+    {
+      "type": "info",
+      "text": "[socket] connecting to https://rover.otter.land",
+      "location": {
+        "url": "http://127.0.0.1:4173/assets/index-BcKZ4JVW.js",
+        "line": 11,
+        "column": 63824,
+        "lineNumber": 11,
+        "columnNumber": 63824
+      }
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()",
+      "location": {
+        "url": "https://media.discordapp.net/attachments/1424887548622405672/1512626709692682340/cat2.PNG?ex=6a24c6e6&is=6a237566&hm=baeec4c8e666888d89711065b1dbcb391c3415f9c28d1917bdd286776b60c867&=&format=webp&quality=lossless",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 400 ()",
+      "location": {
+        "url": "https://rover.otter.land/video/Bweeble/whep",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 400 ()",
+      "location": {
+        "url": "https://rover.otter.land/video/Bweeble-audio/whep",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 400 ()",
+      "location": {
+        "url": "https://rover.otter.land/video/Bweeble/whep",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 400 ()",
+      "location": {
+        "url": "https://rover.otter.land/video/Bweeble/whep",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    }
+  ],
+  "failedRequests": [
+    {
+      "url": "https://rover.otter.land/video/Bweeble/whep",
+      "method": "POST",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://rover.otter.land/video/Bweeble-audio/whep",
+      "method": "POST",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://rover.otter.land/video/Bweeble/whep",
+      "method": "POST",
+      "failure": "net::ERR_ABORTED"
+    }
+  ],
+  "errorResponses": [
+    {
+      "url": "https://media.discordapp.net/attachments/1424887548622405672/1512626709692682340/cat2.PNG?ex=6a24c6e6&is=6a237566&hm=baeec4c8e666888d89711065b1dbcb391c3415f9c28d1917bdd286776b60c867&=&format=webp&quality=lossless",
+      "status": 404
+    },
+    {
+      "url": "https://rover.otter.land/video/Bweeble/whep",
+      "status": 400
+    },
+    {
+      "url": "https://rover.otter.land/video/Bweeble-audio/whep",
+      "status": 400
+    },
+    {
+      "url": "https://rover.otter.land/video/Bweeble/whep",
+      "status": 400
+    },
+    {
+      "url": "https://rover.otter.land/video/Bweeble/whep",
+      "status": 400
+    }
+  ]
+}

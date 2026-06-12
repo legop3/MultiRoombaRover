@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
-import { useControlSystem } from '../../../controls/index.js';
+import { useControlSelector } from '../../../controls/index.js';
 import SocialButton from '../../SocialButton/index.jsx';
 
 function TurnsOverlay({
@@ -15,9 +15,7 @@ function TurnsOverlay({
   const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
-  const {
-    state: { lastControlIntentAt },
-  } = useControlSystem();
+  const lastControlIntentAt = useControlSelector((control) => control.state.lastControlIntentAt);
   const [now, setNow] = useState(() => Date.now());
   const [showTurnCue, setShowTurnCue] = useState(false);
   const [turnCueStartAt, setTurnCueStartAt] = useState(null);

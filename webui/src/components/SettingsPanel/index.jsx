@@ -2,7 +2,7 @@
 // Purpose: Defines the Settings Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlActions, useControlSelector } from '../../controls/index.js';
 import AuthPanel from '../AuthPanel/index.jsx';
 import AdminPanel from '../AdminPanel/index.jsx';
 import KeymapSettings from '../KeymapSettings/index.jsx';
@@ -91,10 +91,9 @@ function RangeSetting({ label, value, disabled = false, onChange }) {
 }
 
 export default function SettingsPanel() {
-  const {
-    state: { keymap, roverId },
-    actions: { sendOiCommand, setSensorStream },
-  } = useControlSystem();
+  const keymap = useControlSelector((control) => control.state.keymap);
+  const roverId = useControlSelector((control) => control.state.roverId);
+  const { sendOiCommand, setSensorStream } = useControlActions();
   const canControl = Boolean(roverId);
   const [hudMapDesktop, setHudMapDesktop] = useHudMapSetting();
   const socket = useSocket();

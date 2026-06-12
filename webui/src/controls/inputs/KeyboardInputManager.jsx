@@ -1,7 +1,7 @@
 // Keyboard Input Manager
 // Purpose: Captures and translates keyboard events into normalized control intents. Scope: Owns keydown/keyup listeners and dispatch coordination for drive controls.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { useControlSystem } from '../ControlContext.jsx';
+import { useControlActions, useControlSelector } from '../ControlContext.jsx';
 import { useChat } from '../../context/ChatContext.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
@@ -83,30 +83,32 @@ function shouldIgnoreEvent(event) {
 
 export default function KeyboardInputManager() {
   const {
-    state,
-    actions: {
-      setMode,
-      setDriveVector,
-      setAuxMotors,
-      nudgeServo,
-      runMacro,
-      stopAllMotion,
-      registerInputState,
-      toggleNightVision,
-      startHorn,
-      stopHorn,
-      setMicPttActive,
-      setSongNote,
-      sendSong,
-    },
-  } = useControlSystem();
+    setMode,
+    setDriveVector,
+    setAuxMotors,
+    nudgeServo,
+    runMacro,
+    stopAllMotion,
+    registerInputState,
+    toggleNightVision,
+    startHorn,
+    stopHorn,
+    setMicPttActive,
+    setSongNote,
+    sendSong,
+  } = useControlActions();
+  const rawKeymap = useControlSelector((control) => control.state.keymap);
+  const cameraNudgeDegrees = useControlSelector((control) => control.state.camera?.config?.nudgeDegrees);
+  const songNote = useControlSelector((control) => control.state.song?.note);
+  const roverId = useControlSelector((control) => control.state.roverId);
+  const hornActive = useControlSelector((control) => Boolean(control.state.horn?.active));
   const homeAssistant = useSessionSelector((state) => state.session?.homeAssistant || null);
   const dockAssist = useManualDockAssist();
   const { homeAssistantSetState } = useSessionActions();
   const { focusChat, isChatFocused } = useChat();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const { save: saveVideoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
-  const keymap = useMemo(() => normalizeKeymapEntries(state.keymap), [state.keymap]);
+  const keymap = useMemo(() => normalizeKeymapEntries(rawKeymap), [rawKeymap]);
   const actionTokens = useMemo(() => {
     const tokens = new Set();
     Object.values(keymap).forEach((bindingSet) => {
@@ -132,8 +134,8 @@ export default function KeyboardInputManager() {
     return mapTiltSpeedToInterval(tiltSpeed);
   }, [inputSettings?.keyboard]);
   const servoStep = useMemo(
-    () => Math.abs(state.camera?.config?.nudgeDegrees || 1),
-    [state.camera?.config?.nudgeDegrees],
+    () => Math.abs(cameraNudgeDegrees || 1),
+    [cameraNudgeDegrees],
   );
 
   const activeTokensRef = useRef(new Set());
@@ -352,7 +354,7 @@ export default function KeyboardInputManager() {
       setMicPttActive,
       setMode,
       setSongNote,
-      songNote: state.song?.note,
+      songNote,
       startHorn,
       stopAllMotion,
       stopHorn,
@@ -455,11 +457,11 @@ export default function KeyboardInputManager() {
 
   useEffect(() => {
     latestResetAllRef.current();
-  }, [state.roverId]);
+  }, [roverId]);
 
   useEffect(() => {
-    hornActiveRef.current = Boolean(state.horn?.active);
-  }, [state.horn?.active]);
+    hornActiveRef.current = hornActive;
+  }, [hornActive]);
 
   useEffect(
     () => () => {

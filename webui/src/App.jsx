@@ -11,7 +11,7 @@ import {
   ControlSystemProvider,
   KeyboardInputManager,
   GamepadInputManager,
-  useControlSystem,
+  useControlSelector,
 } from './controls/index.js';
 import RoomCameraPanel from './components/RoomCameraPanel/index.jsx';
 import KinectPanel from './components/KinectPanel/index.jsx';
@@ -105,10 +105,9 @@ function MobileFeatureTabs({
     const roverId = String(state.session?.assignment?.roverId || '').trim();
     return roverId ? state.session?.audioForward?.[roverId] || null : null;
   });
-  const { state: controlState } = useControlSystem();
+  const pttActive = useControlSelector((control) => Boolean(control.state.mic?.pttActive));
   const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
   const vipDotClass = isVerified ? 'bg-emerald-400' : 'bg-amber-400';
-  const pttActive = Boolean(controlState?.mic?.pttActive);
   const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
   const pttMode = vipAudio?.pttMode === 'clip' ? 'clip' : 'live';
   const vipMicActive = Boolean(

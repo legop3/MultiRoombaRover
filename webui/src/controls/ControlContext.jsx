@@ -1,6 +1,17 @@
 // Control Context Provider
 // Purpose: Exposes control-system state/actions to control-capable components. Scope: Owns reducer wiring, pipeline integration, and top-level provider hooks.
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { controlReducer, initialControlState } from './controlReducer.js';
 import { computeDifferentialSpeeds, clamp } from './controlMath.js';
 import { useCommandPipeline } from './commandPipeline.js';
@@ -26,6 +37,35 @@ import {
 } from './overcurrentLimiter.js';
 
 const ControlSystemContext = createContext(null);
+
+function normalizeSelector(selector) {
+  return typeof selector === 'function' ? selector : (snapshot) => snapshot;
+}
+
+const CONTROL_ACTION_NAMES = [
+  'setMode',
+  'setDriveVector',
+  'setAuxMotors',
+  'setServoAngle',
+  'nudgeServo',
+  'goServoHome',
+  'runMacro',
+  'stopAllMotion',
+  'sendOiCommand',
+  'setSensorStream',
+  'setNightVision',
+  'toggleNightVision',
+  'updateKeyBinding',
+  'resetKeyBindings',
+  'registerInputState',
+  'setManualDockAssistActive',
+  'toggleManualDockAssist',
+  'setSongNote',
+  'sendSong',
+  'startHorn',
+  'stopHorn',
+  'setMicPttActive',
+];
 
 function cloneKeymap(map) {
   return Object.fromEntries(
@@ -59,6 +99,53 @@ function removeDriveSequenceBackoff(steps = []) {
 
 export function ControlSystemProvider({ children }) {
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
+  const snapshotRef = useRef(null);
+  const subscribersRef = useRef(new Set());
+  const actionImplementationsRef = useRef({});
+  const [stableActions] = useState(() => {
+    /*
+      Public action functions intentionally keep stable identities. Each wrapper
+      reads the current implementation at call time, so consumers can depend on
+      actions without re-rendering just because the real implementation now
+      closes over a new state slice, pipeline object, or settings value.
+    */
+    return Object.fromEntries(
+      CONTROL_ACTION_NAMES.map((name) => [
+        name,
+        (...args) => actionImplementationsRef.current[name]?.(...args),
+      ]),
+    );
+  }, []);
+  const getControlSnapshot = useCallback(() => snapshotRef.current, []);
+  const subscribeControlSnapshot = useCallback((selector, listener, equalityFn = Object.is) => {
+    const normalizedSelector = normalizeSelector(selector);
+    const currentSnapshot = snapshotRef.current;
+    const subscriber = {
+      selector: normalizedSelector,
+      equalityFn,
+      listener,
+      current: normalizedSelector(currentSnapshot),
+    };
+    subscribersRef.current.add(subscriber);
+    return () => {
+      subscribersRef.current.delete(subscriber);
+    };
+  }, []);
+  const notifyControlSubscribers = useCallback((nextSnapshot) => {
+    /*
+      The provider context value below is stable, so React will not fan out an
+      update to every consumer automatically. This loop is the replacement: it
+      asks each subscribed component whether the exact value it selected changed
+      and only wakes that component when its selected value is different.
+    */
+    subscribersRef.current.forEach((subscriber) => {
+      const nextSelected = subscriber.selector(nextSnapshot);
+      if (!subscriber.equalityFn(subscriber.current, nextSelected)) {
+        subscriber.current = nextSelected;
+        subscriber.listener(nextSelected);
+      }
+    });
+  }, []);
   const prevModeRef = useRef(null);
   const pendingLightsRef = useRef(false);
   const servoAngleRef = useRef(initialControlState.camera.angle);
@@ -166,7 +253,7 @@ export function ControlSystemProvider({ children }) {
     if (pipeline.roverId) {
       pipeline.enableSensorStream();
     }
-  }, [pipeline.roverId, pipeline.enableSensorStream]);
+  }, [pipeline]);
 
   const setMode = useCallback(
     (mode) => {
@@ -430,6 +517,8 @@ export function ControlSystemProvider({ children }) {
     return { waveform, freqs: normalized };
   }, [hornSettings]);
 
+  const stopHornRef = useRef(null);
+
   const startHorn = useCallback(() => {
     if (!pipeline.horn) return;
     if (state.horn?.overheated) return false;
@@ -445,7 +534,7 @@ export function ControlSystemProvider({ children }) {
       hornAutoStopRef.current = null;
     }
     hornAutoStopRef.current = setTimeout(() => {
-      stopHorn();
+      stopHornRef.current?.();
     }, HORN_MAX_MS);
     recordControlIntent();
     return true;
@@ -474,15 +563,13 @@ export function ControlSystemProvider({ children }) {
       }
       dispatch({ type: 'control/set-horn-heat', payload: { heat: nextHeat, overheated: nextOverheated } });
     }
-  }, [dispatch, pipeline, state.horn?.heat, state.horn?.overheated, HORN_HEAT_UP_PER_SEC]);
+  }, [dispatch, pipeline, state.horn?.heat, state.horn?.overheated]);
 
   const hornStateRef = useRef({
     active: Boolean(state.horn?.active),
     heat: state.horn?.heat ?? 0,
     overheated: Boolean(state.horn?.overheated),
   });
-  const stopHornRef = useRef(stopHorn);
-
   useEffect(() => {
     hornStateRef.current = {
       active: Boolean(state.horn?.active),
@@ -525,7 +612,7 @@ export function ControlSystemProvider({ children }) {
       }
     }, tickMs);
     return () => clearInterval(interval);
-  }, [dispatch, hornNeedsTick, HORN_HEAT_COOL_PER_SEC, HORN_HEAT_RESUME_THRESHOLD, HORN_HEAT_UP_PER_SEC]);
+  }, [dispatch, hornNeedsTick]);
 
   const setManualDockAssistActive = useCallback(
     (active) => {
@@ -561,41 +648,32 @@ export function ControlSystemProvider({ children }) {
     dispatch({ type: 'control/set-mic-ptt', payload: Boolean(active) });
   }, []);
 
-  const contextValue = useMemo(
+  const actionImplementations = useMemo(
     () => ({
-      state,
-      dispatch,
-      pipeline,
-      overcurrentLimiter,
-      actions: {
-        setMode,
-        setDriveVector,
-        setAuxMotors,
-        setServoAngle,
-        nudgeServo,
-        goServoHome,
-        runMacro,
-        stopAllMotion,
-        sendOiCommand,
-        setSensorStream,
-        setNightVision,
-        toggleNightVision,
-        updateKeyBinding,
-        resetKeyBindings,
-        registerInputState,
-        setManualDockAssistActive,
-        toggleManualDockAssist,
-        setSongNote,
-        sendSong,
-        startHorn,
-        stopHorn,
-        setMicPttActive,
-      },
+      setMode,
+      setDriveVector,
+      setAuxMotors,
+      setServoAngle,
+      nudgeServo,
+      goServoHome,
+      runMacro,
+      stopAllMotion,
+      sendOiCommand,
+      setSensorStream,
+      setNightVision,
+      toggleNightVision,
+      updateKeyBinding,
+      resetKeyBindings,
+      registerInputState,
+      setManualDockAssistActive,
+      toggleManualDockAssist,
+      setSongNote,
+      sendSong,
+      startHorn,
+      stopHorn,
+      setMicPttActive,
     }),
     [
-      state,
-      pipeline,
-      overcurrentLimiter,
       setMode,
       setDriveVector,
       setAuxMotors,
@@ -621,13 +699,106 @@ export function ControlSystemProvider({ children }) {
     ],
   );
 
-  return <ControlSystemContext.Provider value={contextValue}>{children}</ControlSystemContext.Provider>;
+  const snapshot = useMemo(
+    () => ({
+      state,
+      dispatch,
+      pipeline,
+      overcurrentLimiter,
+      actions: stableActions,
+    }),
+    [state, pipeline, overcurrentLimiter, stableActions],
+  );
+
+  if (snapshotRef.current == null) {
+    /*
+      The first render has to make a snapshot available synchronously because
+      descendants can call selector hooks during that same render pass. Later
+      renders publish updates from the layout effect below, after React has
+      committed the provider's new state.
+    */
+    snapshotRef.current = snapshot;
+  }
+
+  useLayoutEffect(() => {
+    actionImplementationsRef.current = actionImplementations;
+  }, [actionImplementations]);
+
+  useLayoutEffect(() => {
+    if (snapshotRef.current === snapshot) return;
+    snapshotRef.current = snapshot;
+    notifyControlSubscribers(snapshot);
+  }, [notifyControlSubscribers, snapshot]);
+
+  const store = useMemo(
+    () => ({
+      getSnapshot: getControlSnapshot,
+      subscribe: subscribeControlSnapshot,
+      actions: stableActions,
+    }),
+    [getControlSnapshot, stableActions, subscribeControlSnapshot],
+  );
+
+  return <ControlSystemContext.Provider value={store}>{children}</ControlSystemContext.Provider>;
+}
+
+export function useControlSelector(selector, equalityFn = Object.is) {
+  const store = useContext(ControlSystemContext);
+  if (!store) {
+    throw new Error('useControlSelector must be used within ControlSystemProvider');
+  }
+  const selectorRef = useRef(selector);
+  const equalityRef = useRef(equalityFn);
+
+  const [selected, setSelected] = useState(() => selector(store.getSnapshot()));
+
+  useEffect(() => {
+    /*
+      Selector functions are often declared inline at the call site. Refreshing
+      these refs from an effect keeps the subscription callback pointed at the
+      newest selector/equality pair without making render mutate refs.
+    */
+    selectorRef.current = selector;
+    equalityRef.current = equalityFn;
+  }, [equalityFn, selector]);
+
+  useEffect(() => {
+    /*
+      Recheck once after subscribing because the provider may have published a
+      newer snapshot between this component's render and its effect. The equality
+      guard keeps that synchronization from causing a redundant render.
+    */
+    setSelected((prev) => {
+      const next = selectorRef.current(store.getSnapshot());
+      return equalityRef.current(prev, next) ? prev : next;
+    });
+
+    return store.subscribe(
+      (snapshot) => selectorRef.current(snapshot),
+      (nextSelected) => {
+        setSelected((prev) => (equalityRef.current(prev, nextSelected) ? prev : nextSelected));
+      },
+      (a, b) => equalityRef.current(a, b),
+    );
+  }, [store]);
+
+  return selected;
+}
+
+export function useControlActions() {
+  const store = useContext(ControlSystemContext);
+  if (!store) {
+    throw new Error('useControlActions must be used within ControlSystemProvider');
+  }
+  return store.actions;
 }
 
 export function useControlSystem() {
-  const context = useContext(ControlSystemContext);
-  if (!context) {
-    throw new Error('useControlSystem must be used within ControlSystemProvider');
-  }
-  return context;
+  /*
+    This compatibility hook intentionally selects the whole snapshot, so it has
+    the same broad update behavior as the old context API. New and migrated
+    consumers should prefer useControlSelector/useControlActions so they only
+    re-render for data they actually read.
+  */
+  return useControlSelector((snapshot) => snapshot);
 }

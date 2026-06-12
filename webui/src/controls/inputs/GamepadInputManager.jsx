@@ -1,7 +1,7 @@
 // Gamepad Input Manager
 // Purpose: Converts polled gamepad state into normalized control actions/commands. Scope: Integrates bindings, deadzone math, and dispatch callbacks for driving.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { useControlSystem } from '../ControlContext.jsx';
+import { useControlActions, useControlSelector } from '../ControlContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { GAMEPAD_SETTINGS_DEFAULTS, GAMEPAD_PROFILE_DEFAULT } from '../../settings/namespaces.js';
 import {
@@ -48,17 +48,16 @@ function pickActivePad(pads, activeSignature) {
 
 export default function GamepadInputManager() {
   const {
-    state,
-    actions: {
-      setMode,
-      setDriveVector,
-      setAuxMotors,
-      setServoAngle,
-      runMacro,
-      toggleNightVision,
-      registerInputState,
-    },
-  } = useControlSystem();
+    setMode,
+    setDriveVector,
+    setAuxMotors,
+    setServoAngle,
+    runMacro,
+    toggleNightVision,
+    registerInputState,
+  } = useControlActions();
+  const cameraAngle = useControlSelector((control) => control.state.camera?.angle);
+  const cameraConfig = useControlSelector((control) => control.state.camera?.config);
   const dockAssist = useManualDockAssist();
   const { value: gamepadSettings, save: saveGamepadSettings } = useSettingsNamespace(
     'gamepad',
@@ -162,8 +161,8 @@ export default function GamepadInputManager() {
     // with the newest settings and control actions without resubscribing to the hub.
     latestRef.current = {
       activeSignature,
-      cameraAngle: state.camera?.angle,
-      cameraConfig: state.camera?.config,
+      cameraAngle,
+      cameraConfig,
       dockAssist,
       gamepadSettings,
       registerInputState,

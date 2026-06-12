@@ -3,7 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlSelector } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import CardFrame from '../CardFrame/index.jsx';
 
@@ -169,9 +169,7 @@ function LampTile({ entity, connected, controlsLocked, onToggle, onSetColor, onS
 }
 
 export default function HomeAssistantControls() {
-  const {
-    state: { keymap },
-  } = useControlSystem();
+  const keymap = useControlSelector((control) => control.state.keymap);
   const ha = useSessionSelector((state) => state.session?.homeAssistant || null);
   const { homeAssistantToggle, homeAssistantSetLightColor, homeAssistantSetLightWhite } =
     useSessionActions();

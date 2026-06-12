@@ -2,7 +2,7 @@
 // Purpose: Defines the Overcurrent Limiter Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlSelector } from '../../controls/index.js';
 import { OVERCURRENT_GROUPS } from '../../controls/overcurrentLimiter.js';
 import CardFrame from '../CardFrame/index.jsx';
 
@@ -26,10 +26,8 @@ function ProgressBar({ value, color = 'bg-emerald-500' }) {
 }
 
 export default function OvercurrentLimiterPanel() {
-  const {
-    state: { roverId },
-    overcurrentLimiter,
-  } = useControlSystem();
+  const roverId = useControlSelector((control) => control.state.roverId);
+  const overcurrentLimiter = useControlSelector((control) => control.overcurrentLimiter);
   const groups = useMemo(() => OVERCURRENT_GROUPS.map((group) => group.key), []);
 
   return (

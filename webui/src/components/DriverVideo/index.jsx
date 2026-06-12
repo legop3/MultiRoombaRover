@@ -1,6 +1,6 @@
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import RoverMediaPlayer from '../RoverMediaPlayer/index.jsx';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlSelector } from '../../controls/index.js';
 import { useDriverVideoModePolicy } from '../../hooks/useDriverVideoModePolicy.js';
 import TurnsOverlay from '../HudOverlays/TurnsOverlay/index.jsx';
 import HudOverlay from '../HudOverlays/HudOverlay/index.jsx';
@@ -15,9 +15,7 @@ import CardFrame from '../CardFrame/index.jsx';
 export default function DriverVideo({ layoutFormat = 'desktop' }) {
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const videoMode = useDriverVideoModePolicy(roverId);
-  const {
-    state: { lastControlIntentAt },
-  } = useControlSystem();
+  const lastControlIntentAt = useControlSelector((control) => control.state.lastControlIntentAt);
 
   if (!roverId) {
     return (

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlSelector } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButton from '../SocialButton/index.jsx';
@@ -53,9 +53,9 @@ export default function QuickstartOverlay({
   onOpenHelp,
   onClose,
 }) {
-  const { state } = useControlSystem();
+  const rawKeymap = useControlSelector((control) => control.state.keymap);
   const isDesktop = layout === 'desktop';
-  const keymap = useMemo(() => state?.keymap || {}, [state?.keymap]);
+  const keymap = useMemo(() => rawKeymap || {}, [rawKeymap]);
 
   if (!visible) return null;
 

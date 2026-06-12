@@ -3,7 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fieldClass } from '../constants.js';
-import { useControlSystem } from '../../../controls/index.js';
+import { useControlSelector } from '../../../controls/index.js';
 import { formatKeyLabel } from '../../../controls/keymapUtils.js';
 import { useSettingsNamespace } from '../../../settings/index.js';
 import { MAX_UPLOAD_BYTES, TARGET_SAMPLE_RATE, RTC_CONFIG } from './constants.js';
@@ -28,7 +28,8 @@ export default function VipAudioUploadCard({
   readyMicWhip,
   stopMicWhip,
 }) {
-  const { state: controlState } = useControlSystem();
+  const keymap = useControlSelector((control) => control.state.keymap);
+  const pttActive = useControlSelector((control) => Boolean(control.state.mic?.pttActive));
   const { value: vipAudio, save: saveVipAudio } = useSettingsNamespace('vipAudio', {
     openMicEnabled: false,
     pttMode: 'live',
@@ -60,7 +61,6 @@ export default function VipAudioUploadCard({
   const clipRecordingRef = useRef(false);
   const clipSampleRateRef = useRef(TARGET_SAMPLE_RATE);
 
-  const pttActive = Boolean(controlState?.mic?.pttActive);
 
   const selectedForwardState = useMemo(
     () => (roverId ? audioForwardByRover?.[roverId] || null : null),
@@ -81,7 +81,7 @@ export default function VipAudioUploadCard({
   const whipLinkActive = !clipMode && (micState === 'live' || micState === 'starting');
   const clipRecording = clipMode && clipState === 'recording';
   const clipSending = clipMode && clipState === 'sending';
-  const pttKeyLabel = formatKeyLabel(controlState?.keymap?.micPtt?.[0]) || 'M';
+  const pttKeyLabel = formatKeyLabel(keymap?.micPtt?.[0]) || 'M';
 
   const setPttMode = useCallback(
     (nextMode) => {

@@ -1,14 +1,12 @@
 // Movement Column
 // Purpose: Assembles the mobile movement column, which is the right column by default.
 // Scope: Integrates drive/dock actions with the mobile control pad without hiding that dependency inside the pad.
-import { useControlSystem } from '../../controls/index.js';
+import { useControlSelector } from '../../controls/index.js';
 import DriveDockAction, { useDriveDockState } from '../DriveDockAction/index.jsx';
 import ControlPadPanel from './ControlPadPanel.jsx';
 
 function MovementColumnContent({ layout }) {
-  const {
-    state: { roverId },
-  } = useControlSystem();
+  const roverId = useControlSelector((control) => control.state.roverId);
   const driveDockState = useDriveDockState(roverId);
   const dockedNotDriving = driveDockState.docked && !driveDockState.driving;
   const expandAction = dockedNotDriving || driveDockState.dockingInProgress;

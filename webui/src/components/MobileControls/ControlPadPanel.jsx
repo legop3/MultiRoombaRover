@@ -2,7 +2,7 @@
 // Purpose: Provides the mobile movement control pad and speed mode selector.
 // Scope: Converts touch pad cells into keyboard-style drive vectors; movement column owns drive/dock placement.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useControlSystem } from '../../controls/index.js';
+import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { normalizeKeymapEntries } from '../../controls/keymapUtils.js';
 import {
   computeKeyboardDriveVector,
@@ -29,10 +29,8 @@ function getSpeedModeConfig(speedMode) {
 }
 
 export default function ControlPadPanel({ disabled = false }) {
-  const {
-    state: { keymap: rawKeymap },
-    actions: { setDriveVector, registerInputState },
-  } = useControlSystem();
+  const rawKeymap = useControlSelector((control) => control.state.keymap);
+  const { setDriveVector, registerInputState } = useControlActions();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const [speedMode, setSpeedMode] = useState('normal');
   const [activeInputLabel, setActiveInputLabel] = useState('stop');
