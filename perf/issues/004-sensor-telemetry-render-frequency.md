@@ -1,3 +1,4 @@
+# FIXED!
 # Issue 004: Sensor Telemetry Render Frequency
 
 ## Summary

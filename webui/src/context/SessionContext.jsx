@@ -42,6 +42,65 @@ function normalizeSelector(selector) {
   return typeof selector === 'function' ? selector : (state) => state;
 }
 
+function isPlainObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function shareUnchangedTree(previous, next) {
+  if (Object.is(previous, next)) return previous;
+
+  if (Array.isArray(previous) && Array.isArray(next)) {
+    if (previous.length !== next.length) {
+      // Different lengths mean the array shape changed. We still reconcile each
+      // shared index because unchanged entries should keep their identity even
+      // when siblings are added or removed.
+      return next.map((value, idx) => shareUnchangedTree(previous[idx], value));
+    }
+
+    let changed = false;
+    const reconciled = next.map((value, idx) => {
+      const sharedValue = shareUnchangedTree(previous[idx], value);
+      if (sharedValue !== previous[idx]) changed = true;
+      return sharedValue;
+    });
+
+    // Returning the previous array is the key optimization: selectors that read
+    // this slice use Object.is by default, so preserving the array reference
+    // prevents subscribers from updating when the server sent equivalent data.
+    return changed ? reconciled : previous;
+  }
+
+  if (isPlainObject(previous) && isPlainObject(next)) {
+    const previousKeys = Object.keys(previous);
+    const nextKeys = Object.keys(next);
+    const sameKeyCount = previousKeys.length === nextKeys.length;
+    let changed = !sameKeyCount;
+    const reconciled = {};
+
+    for (const key of nextKeys) {
+      const hadKey = Object.prototype.hasOwnProperty.call(previous, key);
+      const sharedValue = shareUnchangedTree(previous[key], next[key]);
+      reconciled[key] = sharedValue;
+
+      // A new key or a different child reference means this object must get a
+      // new reference, but unchanged child objects are still reused. This keeps
+      // updates precise without hardcoding any knowledge of session fields.
+      if (!hadKey || sharedValue !== previous[key]) {
+        changed = true;
+      }
+    }
+
+    return changed ? reconciled : previous;
+  }
+
+  // Socket payloads should be JSON-shaped, but primitives and any non-plain
+  // objects that reach this helper are safest treated as replace-by-value. That
+  // avoids accidentally reusing mutable class instances or browser objects.
+  return next;
+}
+
 export function SessionProvider({ children }) {
   const socket = useSocket();
   const emitWithAck = useAckEmitter(socket);
@@ -96,7 +155,14 @@ export function SessionProvider({ children }) {
 
   useEffect(() => {
     function handleSession(payload) {
-      setState((prev) => ({ ...prev, session: payload }));
+      setState((prev) => {
+        const nextSession = shareUnchangedTree(prev.session, payload);
+
+        // If the server sync is equivalent to the current session tree, keep the
+        // entire app state reference. That skips the subscriber loop completely
+        // instead of relying on each component to reject no-op updates itself.
+        return nextSession === prev.session ? prev : { ...prev, session: nextSession };
+      });
     }
     function handleLogInit(entries = []) {
       setState((prev) => ({ ...prev, logs: entries }));
@@ -346,11 +412,18 @@ export function useSessionSelector(selector, equalityFn = Object.is) {
     throw new Error('useSessionSelector must be used within SessionProvider');
   }
   const selectorRef = useRef(selector);
-  selectorRef.current = selector;
   const equalityRef = useRef(equalityFn);
-  equalityRef.current = equalityFn;
 
   const [selected, setSelected] = useState(() => selector(store.getState()));
+
+  useEffect(() => {
+    // Selectors are often passed inline, so the subscription callback needs to
+    // read the latest selector/equality pair without tearing down and rebuilding
+    // the subscription on every render. Updating refs after commit satisfies
+    // React's purity rules while preserving the existing stable subscription.
+    selectorRef.current = selector;
+    equalityRef.current = equalityFn;
+  });
 
   useEffect(() => {
     setSelected((prev) => {

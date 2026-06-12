@@ -1,7 +1,7 @@
 // Replay Sources Panel
 // Purpose: Defines the Replay Sources Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import CardFrame from '../CardFrame/index.jsx';
@@ -23,6 +23,17 @@ function normalizeSources(list = []) {
     .filter(Boolean);
 }
 
+function selectedKeysEqual(left, right) {
+  if (Object.is(left, right)) return true;
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+
+  for (let idx = 0; idx < left.length; idx += 1) {
+    if (left[idx] !== right[idx]) return false;
+  }
+
+  return true;
+}
+
 export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHeight = false }) {
   const replaySources = useSessionSelector((state) => state.session?.replaySources ?? []);
   const mode = useSessionSelector((state) => state.session?.mode || null);
@@ -31,7 +42,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const replayState = useSessionSelector((state) => state.session?.replay || null);
   const latestReplay = useSessionSelector((state) => state.latestReplay);
   const { triggerReplay } = useSessionActions();
-  const sources = normalizeSources(replaySources || []);
+  const sources = useMemo(() => normalizeSources(replaySources || []), [replaySources]);
   const { value: settings, save: saveSettings } = useSettingsNamespace('replaySources', {});
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -43,6 +54,14 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const [remainingMs, setRemainingMs] = useState(0);
   const [activeJobId, setActiveJobId] = useState(null);
   const [dismissedPanelReplayId, setDismissedPanelReplayId] = useState(null);
+  // Settings keys include the panel id because the same replay source control is
+  // mounted in desktop, portrait, and landscape layouts with independent saved UI
+  // preferences. Pulling the values into named constants also gives hook
+  // dependencies primitive values instead of hard-to-analyze computed expressions.
+  const includeSidebarSettingKey = `${panelId}:includeSidebar`;
+  const titleSettingKey = `${panelId}:title`;
+  const savedIncludeSidebar = settings?.[includeSidebarSettingKey];
+  const savedTitle = settings?.[titleSettingKey];
   const activeReplayJob = useSessionSelector((state) => (
     activeJobId ? state.replayJobs?.[activeJobId] || null : null
   ));
@@ -71,27 +90,28 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   }, [assignmentRoverId, roster]);
 
   useEffect(() => {
-    setSelected(defaults);
+    // Assignment changes replace the default selection, but identical defaults
+    // should not create a fresh array because that would force all source
+    // checkboxes to commit with the same checked values.
+    setSelected((prev) => (selectedKeysEqual(prev, defaults) ? prev : defaults));
   }, [defaults]);
 
   useEffect(() => {
-    const saved = settings?.[`${panelId}:includeSidebar`];
-    if (typeof saved === 'boolean') {
-      setIncludeSidebar(saved);
+    if (typeof savedIncludeSidebar === 'boolean') {
+      setIncludeSidebar(savedIncludeSidebar);
       return;
     }
     setIncludeSidebar(true);
-  }, [settings?.[`${panelId}:includeSidebar`], panelId]);
+  }, [savedIncludeSidebar]);
 
   useEffect(() => {
-    const saved = settings?.[`${panelId}:title`];
-    if (typeof saved === 'string') {
-      setTitle(saved);
+    if (typeof savedTitle === 'string') {
+      setTitle(savedTitle);
       setTitleDirty(true);
       return;
     }
     setTitleDirty(false);
-  }, [settings?.[`${panelId}:title`], panelId]);
+  }, [savedTitle]);
 
   useEffect(() => {
     if (!titleDirty) {
@@ -101,7 +121,14 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
 
   useEffect(() => {
     const allowed = new Set(sources.map((source) => source.key));
-    setSelected((prev) => prev.filter((key) => allowed.has(key)));
+    setSelected((prev) => {
+      const next = prev.filter((key) => allowed.has(key));
+
+      // Pruning is only meaningful when a selected source disappeared. Returning
+      // the existing array for the common no-op path stops this effect from
+      // scheduling a render after every parent/session render.
+      return selectedKeysEqual(prev, next) ? prev : next;
+    });
   }, [sources]);
 
   const grouped = useMemo(() => {
@@ -126,6 +153,12 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   }, [replayState?.lastTriggeredAt, replayState?.cooldownMs, replayState?.remainingMs]);
 
   const replayDisabled = busy || mode === 'lockdown' || remainingMs > 0 || !selected.length;
+  const selectedSet = useMemo(() => {
+    // Checkbox rendering asks the same membership question for every source.
+    // A Set avoids repeated linear scans and, more importantly, gives memoized
+    // child lists a stable value while the selected keys have not changed.
+    return new Set(selected);
+  }, [selected]);
   const activeJobStatusText = useMemo(() => {
     if (!activeReplayJob?.status) return null;
     const titleText = activeReplayJob.title ? `: ${activeReplayJob.title}` : '';
@@ -145,14 +178,14 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     }
   }, [activeReplayJob]);
 
-  const toggleKey = (key) => {
+  const toggleKey = useCallback((key) => {
     setSelected((prev) => {
       return prev.includes(key) ? prev.filter((value) => value !== key) : [...prev, key];
     });
     setSuccess(null);
-  };
+  }, []);
 
-  const handleReplay = async () => {
+  const handleReplay = useCallback(async () => {
     if (replayDisabled) return;
     setBusy(true);
     setError(null);
@@ -178,7 +211,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     } finally {
       setBusy(false);
     }
-  };
+  }, [defaultTitle, includeSidebar, replayDisabled, selected, title, triggerReplay]);
 
   const listWrapClass = fillHeight ? 'flex-1 min-h-0 overflow-y-auto' : '';
 
@@ -195,8 +228,8 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
       ) : null}
       <CardFrame title="Replay Sources" fillHeight={fillHeight} bodyClassName="space-y-0.5 text-sm">
         <div className={`grid gap-0.5 md:grid-cols-2 ${listWrapClass}`}>
-          <GroupList title="Rovers" items={grouped.rovers} selected={selected} onToggle={toggleKey} />
-          <GroupList title="Room Cams" items={grouped.rooms} selected={selected} onToggle={toggleKey} />
+          <GroupList title="Rovers" items={grouped.rovers} selectedSet={selectedSet} onToggle={toggleKey} />
+          <GroupList title="Room Cams" items={grouped.rooms} selectedSet={selectedSet} onToggle={toggleKey} />
         </div>
         <div className="space-y-0.5">
           {error ? <div className="text-xs text-amber-400">{error}</div> : null}
@@ -221,7 +254,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
                 const next = event.target.value;
                 setTitle(next);
                 setTitleDirty(true);
-                saveSettings((current) => ({ ...(current || {}), [`${panelId}:title`]: next }));
+                saveSettings((current) => ({ ...(current || {}), [titleSettingKey]: next }));
               }}
               placeholder={defaultTitle}
               maxLength={120}
@@ -235,7 +268,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
                 onChange={(event) => {
                   const next = Boolean(event.target.checked);
                   setIncludeSidebar(next);
-                  saveSettings((current) => ({ ...(current || {}), [`${panelId}:includeSidebar`]: next }));
+                  saveSettings((current) => ({ ...(current || {}), [includeSidebarSettingKey]: next }));
                 }}
                 className="accent-emerald-400"
               />
@@ -258,7 +291,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   );
 }
 
-function GroupList({ title, items, selected, onToggle }) {
+const GroupList = React.memo(function GroupList({ title, items, selectedSet, onToggle }) {
   if (!items.length) return null;
   return (
     <div className="space-y-0.5">
@@ -268,7 +301,7 @@ function GroupList({ title, items, selected, onToggle }) {
           <label key={item.key} className="surface flex items-center gap-0.5 text-xs">
             <input
               type="checkbox"
-              checked={selected.includes(item.key)}
+              checked={selectedSet.has(item.key)}
               onChange={() => onToggle(item.key)}
               className="accent-emerald-400"
             />
@@ -282,4 +315,4 @@ function GroupList({ title, items, selected, onToggle }) {
       </div>
     </div>
   );
-}
+});
