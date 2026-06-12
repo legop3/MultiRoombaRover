@@ -1,0 +1,858 @@
+{
+  "url": "https://rover.otter.land/spectate",
+  "runDir": "perf/results/2026-06-12T04-55-16-888Z-root-runtime",
+  "environment": {
+    "cpuThrottle": 6,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "isMobile": true,
+    "sampleMs": 30000
+  },
+  "metrics": {
+    "Timestamp": 29302.703615,
+    "AudioHandlers": 0,
+    "AudioWorkletProcessors": 0,
+    "Documents": 1,
+    "Frames": 1,
+    "JSEventListeners": 379,
+    "LayoutObjects": 6150,
+    "MediaKeySessions": 0,
+    "MediaKeys": 0,
+    "Nodes": 7059,
+    "Resources": 40,
+    "ContextLifecycleStateObservers": 21,
+    "V8PerContextDatas": 2,
+    "WorkerGlobalScopes": 0,
+    "UACSSResources": 0,
+    "RTCPeerConnections": 6,
+    "ResourceFetchers": 1,
+    "AdSubframes": 0,
+    "DetachedScriptStates": 0,
+    "ArrayBufferContents": 28,
+    "LayoutCount": 243,
+    "RecalcStyleCount": 248,
+    "LayoutDuration": 0.840302,
+    "RecalcStyleDuration": 1.699961,
+    "DevToolsCommandDuration": 0.000155,
+    "ScriptDuration": 12.114687,
+    "V8CompileDuration": 0,
+    "TaskDuration": 28.48339,
+    "TaskOtherDuration": 13.828285,
+    "ThreadTime": 30.190528,
+    "ProcessTime": 39.47,
+    "JSHeapUsedSize": 22447504,
+    "JSHeapTotalSize": 42467328,
+    "FirstMeaningfulPaint": 0,
+    "DomContentLoaded": 29272.696156,
+    "NavigationStart": 29272.010802
+  },
+  "snapshot": {
+    "elapsedMs": 30914.699999999255,
+    "listeners": [
+      {
+        "key": "add:audio:canplay",
+        "count": 9
+      },
+      {
+        "key": "add:audio:ended",
+        "count": 9
+      },
+      {
+        "key": "add:audio:error",
+        "count": 9
+      },
+      {
+        "key": "add:audio:pause",
+        "count": 9
+      },
+      {
+        "key": "add:audio:play",
+        "count": 9
+      },
+      {
+        "key": "add:audio:stalled",
+        "count": 9
+      },
+      {
+        "key": "add:audio:waiting",
+        "count": 9
+      },
+      {
+        "key": "add:window:online",
+        "count": 4
+      },
+      {
+        "key": "add:document:visibilitychange",
+        "count": 4
+      },
+      {
+        "key": "add:img:error",
+        "count": 4
+      },
+      {
+        "key": "add:img:load",
+        "count": 4
+      },
+      {
+        "key": "add:input:invalid",
+        "count": 3
+      },
+      {
+        "key": "remove:window:online",
+        "count": 3
+      },
+      {
+        "key": "remove:document:visibilitychange",
+        "count": 3
+      },
+      {
+        "key": "add:audio:abort",
+        "count": 3
+      },
+      {
+        "key": "add:audio:canplaythrough",
+        "count": 3
+      },
+      {
+        "key": "add:audio:durationchange",
+        "count": 3
+      },
+      {
+        "key": "add:audio:emptied",
+        "count": 3
+      },
+      {
+        "key": "add:audio:encrypted",
+        "count": 3
+      },
+      {
+        "key": "add:audio:loadeddata",
+        "count": 3
+      },
+      {
+        "key": "add:audio:loadedmetadata",
+        "count": 3
+      },
+      {
+        "key": "add:audio:loadstart",
+        "count": 3
+      },
+      {
+        "key": "add:audio:playing",
+        "count": 3
+      },
+      {
+        "key": "add:audio:progress",
+        "count": 3
+      },
+      {
+        "key": "add:audio:ratechange",
+        "count": 3
+      },
+      {
+        "key": "add:audio:resize",
+        "count": 3
+      },
+      {
+        "key": "add:audio:seeked",
+        "count": 3
+      },
+      {
+        "key": "add:audio:seeking",
+        "count": 3
+      },
+      {
+        "key": "add:audio:suspend",
+        "count": 3
+      },
+      {
+        "key": "add:audio:timeupdate",
+        "count": 3
+      },
+      {
+        "key": "add:audio:volumechange",
+        "count": 3
+      },
+      {
+        "key": "add:video:abort",
+        "count": 3
+      },
+      {
+        "key": "add:video:canplay",
+        "count": 3
+      },
+      {
+        "key": "add:video:canplaythrough",
+        "count": 3
+      },
+      {
+        "key": "add:video:durationchange",
+        "count": 3
+      },
+      {
+        "key": "add:video:emptied",
+        "count": 3
+      },
+      {
+        "key": "add:video:encrypted",
+        "count": 3
+      },
+      {
+        "key": "add:video:ended",
+        "count": 3
+      },
+      {
+        "key": "add:video:error",
+        "count": 3
+      },
+      {
+        "key": "add:video:loadeddata",
+        "count": 3
+      }
+    ],
+    "timers": [
+      {
+        "key": "interval:3000",
+        "count": 12
+      },
+      {
+        "key": "timeout:12000",
+        "count": 6
+      },
+      {
+        "key": "timeout:1200",
+        "count": 4
+      },
+      {
+        "key": "interval:60000",
+        "count": 3
+      },
+      {
+        "key": "timeout:0",
+        "count": 3
+      },
+      {
+        "key": "interval:200",
+        "count": 2
+      },
+      {
+        "key": "timeout:15000",
+        "count": 1
+      },
+      {
+        "key": "interval:2000",
+        "count": 1
+      }
+    ],
+    "timeouts": 14,
+    "intervals": 18,
+    "timeoutFires": 7,
+    "intervalFires": 112,
+    "webSocketMessageCount": 1000,
+    "webSocketBytes": 4207474,
+    "webSocketEvents": [
+      {
+        "event": "sensorFrame",
+        "count": 1354,
+        "bytes": 2531090
+      },
+      {
+        "event": "log:entry",
+        "count": 634,
+        "bytes": 150179
+      },
+      {
+        "event": "",
+        "count": 126,
+        "bytes": 11048477
+      },
+      {
+        "event": "roomCamera:frame",
+        "count": 117,
+        "bytes": 10413
+      },
+      {
+        "event": "commandAck",
+        "count": 68,
+        "bytes": 6412
+      },
+      {
+        "event": "session:sync",
+        "count": 54,
+        "bytes": 914000
+      },
+      {
+        "event": "roverHostStats",
+        "count": 17,
+        "bytes": 13058
+      },
+      {
+        "event": "roverSnapshot:frame",
+        "count": 7,
+        "bytes": 682
+      },
+      {
+        "event": "2",
+        "count": 5,
+        "bytes": 5
+      },
+      {
+        "event": "auth:role",
+        "count": 4,
+        "bytes": 139
+      },
+      {
+        "event": "roomCamera:status",
+        "count": 4,
+        "bytes": 284
+      },
+      {
+        "event": "roverSnapshot:status",
+        "count": 3,
+        "bytes": 238
+      },
+      {
+        "event": "alert",
+        "count": 2,
+        "bytes": 256
+      },
+      {
+        "event": "alert:new",
+        "count": 2,
+        "bytes": 330
+      },
+      {
+        "event": "0{\"sid\":\"3a5",
+        "count": 1,
+        "bytes": 106
+      },
+      {
+        "event": "40{\"sid\":\"lE",
+        "count": 1,
+        "bytes": 32
+      },
+      {
+        "event": "mode",
+        "count": 1,
+        "bytes": 27
+      },
+      {
+        "event": "controlGranted",
+        "count": 1,
+        "bytes": 41
+      },
+      {
+        "event": "rovers",
+        "count": 1,
+        "bytes": 5485
+      },
+      {
+        "event": "chat:init",
+        "count": 1,
+        "bytes": 77415
+      },
+      {
+        "event": "overseer:memory",
+        "count": 1,
+        "bytes": 520
+      },
+      {
+        "event": "log:init",
+        "count": 1,
+        "bytes": 44530
+      },
+      {
+        "event": "barcode:state",
+        "count": 1,
+        "bytes": 1627
+      },
+      {
+        "event": "kinect:pointCloudFrame",
+        "count": 1,
+        "bytes": 262
+      },
+      {
+        "event": "kinect:colorFrame",
+        "count": 1,
+        "bytes": 169
+      },
+      {
+        "event": "430[{\"succes",
+        "count": 1,
+        "bytes": 40
+      },
+      {
+        "event": "431[{\"succes",
+        "count": 1,
+        "bytes": 41
+      },
+      {
+        "event": "432[{\"succes",
+        "count": 1,
+        "bytes": 194
+      },
+      {
+        "event": "433[{\"succes",
+        "count": 1,
+        "bytes": 40
+      },
+      {
+        "event": "434[{\"url\":\"",
+        "count": 1,
+        "bytes": 133
+      },
+      {
+        "event": "435[{\"url\":\"",
+        "count": 1,
+        "bytes": 145
+      },
+      {
+        "event": "WALL-E",
+        "count": 1,
+        "bytes": 40
+      },
+      {
+        "event": "437[{\"url\":\"",
+        "count": 1,
+        "bytes": 133
+      },
+      {
+        "event": "438[{\"url\":\"",
+        "count": 1,
+        "bytes": 145
+      },
+      {
+        "event": "Freaky",
+        "count": 1,
+        "bytes": 40
+      },
+      {
+        "event": "4310[{\"url\":",
+        "count": 1,
+        "bytes": 136
+      },
+      {
+        "event": "4311[{\"url\":",
+        "count": 1,
+        "bytes": 148
+      },
+      {
+        "event": "Bweeble",
+        "count": 1,
+        "bytes": 42
+      },
+      {
+        "event": "carpet",
+        "count": 1,
+        "bytes": 68
+      },
+      {
+        "event": "4314[{\"succe",
+        "count": 1,
+        "bytes": 41
+      },
+      {
+        "event": "4315[{\"succe",
+        "count": 1,
+        "bytes": 22
+      },
+      {
+        "event": "4316[{\"succe",
+        "count": 1,
+        "bytes": 22
+      },
+      {
+        "event": "4317[{\"succe",
+        "count": 1,
+        "bytes": 195
+      },
+      {
+        "event": "4318[{\"succe",
+        "count": 1,
+        "bytes": 22
+      },
+      {
+        "event": "4319[{\"succe",
+        "count": 1,
+        "bytes": 22
+      }
+    ],
+    "mutationsTotal": {
+      "records": 5868,
+      "added": 440,
+      "removed": 440,
+      "attrs": 4921,
+      "text": 67
+    },
+    "mutationTargets": [
+      {
+        "key": "path.[object.SVGAnimatedString]:attributes:d",
+        "count": 2688
+      },
+      {
+        "key": "path.[object.SVGAnimatedString]:attributes:fill",
+        "count": 2682
+      },
+      {
+        "key": "Text:characterData:",
+        "count": 164
+      },
+      {
+        "key": "img.h-full.w-full:attributes:src",
+        "count": 117
+      },
+      {
+        "key": "span.h-2.w-2:attributes:class",
+        "count": 117
+      },
+      {
+        "key": "input.field-input.flex-1:attributes:name",
+        "count": 102
+      },
+      {
+        "key": "input.field-input.chat-composer-input:attributes:name",
+        "count": 102
+      },
+      {
+        "key": "path.[object.SVGAnimatedString]:attributes:stroke",
+        "count": 18
+      },
+      {
+        "key": "section.panel-section.border:attributes:style",
+        "count": 11
+      },
+      {
+        "key": "span.rounded.px-1.5:attributes:class",
+        "count": 9
+      },
+      {
+        "key": "header.flex.items-center:attributes:style",
+        "count": 8
+      },
+      {
+        "key": "article.surface.px-0.5:attributes:class",
+        "count": 8
+      },
+      {
+        "key": "li.surface.flex:attributes:class",
+        "count": 3
+      },
+      {
+        "key": "video.h-full.w-full:attributes:playsinline",
+        "count": 3
+      },
+      {
+        "key": "video.h-full.w-full:attributes:autoplay",
+        "count": 3
+      },
+      {
+        "key": "video.h-full.w-full:attributes:disableremoteplayback",
+        "count": 3
+      },
+      {
+        "key": "audio:attributes:autoplay",
+        "count": 3
+      },
+      {
+        "key": "audio:attributes:disableremoteplayback",
+        "count": 3
+      },
+      {
+        "key": "input.accent-cyan-500:attributes:name",
+        "count": 2
+      },
+      {
+        "key": "div.panel-section.flex:attributes:style",
+        "count": 2
+      },
+      {
+        "key": "span.rounded.px-1:attributes:class",
+        "count": 2
+      },
+      {
+        "key": "input.accent-cyan-500:attributes:type",
+        "count": 1
+      },
+      {
+        "key": "input.field-input.flex-1:attributes:value",
+        "count": 1
+      }
+    ],
+    "mutationBursts": [
+      {
+        "at": 13575,
+        "records": 119,
+        "added": 57,
+        "removed": 58,
+        "attrs": 4,
+        "text": 0
+      },
+      {
+        "at": 18089,
+        "records": 117,
+        "added": 52,
+        "removed": 53,
+        "attrs": 12,
+        "text": 0
+      },
+      {
+        "at": 27878,
+        "records": 113,
+        "added": 52,
+        "removed": 52,
+        "attrs": 8,
+        "text": 1
+      },
+      {
+        "at": 22882,
+        "records": 102,
+        "added": 49,
+        "removed": 49,
+        "attrs": 4,
+        "text": 0
+      },
+      {
+        "at": 9538,
+        "records": 100,
+        "added": 48,
+        "removed": 48,
+        "attrs": 4,
+        "text": 0
+      },
+      {
+        "at": 14782,
+        "records": 84,
+        "added": 37,
+        "removed": 35,
+        "attrs": 12,
+        "text": 0
+      },
+      {
+        "at": 15222,
+        "records": 83,
+        "added": 39,
+        "removed": 39,
+        "attrs": 5,
+        "text": 0
+      },
+      {
+        "at": 9811,
+        "records": 68,
+        "added": 28,
+        "removed": 28,
+        "attrs": 12,
+        "text": 0
+      },
+      {
+        "at": 13733,
+        "records": 36,
+        "added": 13,
+        "removed": 13,
+        "attrs": 10,
+        "text": 0
+      },
+      {
+        "at": 19439,
+        "records": 26,
+        "added": 10,
+        "removed": 10,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 23034,
+        "records": 18,
+        "added": 3,
+        "removed": 3,
+        "attrs": 12,
+        "text": 0
+      },
+      {
+        "at": 23113,
+        "records": 18,
+        "added": 4,
+        "removed": 4,
+        "attrs": 10,
+        "text": 0
+      },
+      {
+        "at": 28037,
+        "records": 18,
+        "added": 4,
+        "removed": 4,
+        "attrs": 10,
+        "text": 0
+      },
+      {
+        "at": 10169,
+        "records": 16,
+        "added": 4,
+        "removed": 4,
+        "attrs": 8,
+        "text": 0
+      },
+      {
+        "at": 18258,
+        "records": 16,
+        "added": 4,
+        "removed": 4,
+        "attrs": 8,
+        "text": 0
+      },
+      {
+        "at": 13903,
+        "records": 15,
+        "added": 4,
+        "removed": 4,
+        "attrs": 7,
+        "text": 0
+      },
+      {
+        "at": 14108,
+        "records": 15,
+        "added": 2,
+        "removed": 2,
+        "attrs": 10,
+        "text": 1
+      },
+      {
+        "at": 16376,
+        "records": 15,
+        "added": 2,
+        "removed": 2,
+        "attrs": 11,
+        "text": 0
+      },
+      {
+        "at": 11700,
+        "records": 14,
+        "added": 0,
+        "removed": 0,
+        "attrs": 14,
+        "text": 0
+      },
+      {
+        "at": 13012,
+        "records": 14,
+        "added": 0,
+        "removed": 0,
+        "attrs": 13,
+        "text": 1
+      }
+    ],
+    "frames": {
+      "count": 264,
+      "average": 113.8840909090909,
+      "p95": 233.29999999999927,
+      "p99": 300
+    },
+    "longTasks": {
+      "count": 81,
+      "top": [
+        {
+          "startTime": 311.5999999977648,
+          "duration": 375,
+          "name": "self"
+        },
+        {
+          "startTime": 1978.699999999255,
+          "duration": 299,
+          "name": "self"
+        },
+        {
+          "startTime": 1254.5999999977648,
+          "duration": 229,
+          "name": "self"
+        },
+        {
+          "startTime": 1772,
+          "duration": 206,
+          "name": "self"
+        },
+        {
+          "startTime": 1485.3999999985099,
+          "duration": 170,
+          "name": "self"
+        },
+        {
+          "startTime": 2646.800000000745,
+          "duration": 165,
+          "name": "self"
+        },
+        {
+          "startTime": 2507.5,
+          "duration": 139,
+          "name": "self"
+        },
+        {
+          "startTime": 693.8000000007451,
+          "duration": 125,
+          "name": "self"
+        },
+        {
+          "startTime": 3026.800000000745,
+          "duration": 119,
+          "name": "self"
+        },
+        {
+          "startTime": 4148.39999999851,
+          "duration": 113,
+          "name": "self"
+        },
+        {
+          "startTime": 3461.099999997765,
+          "duration": 109,
+          "name": "self"
+        },
+        {
+          "startTime": 9812.89999999851,
+          "duration": 106,
+          "name": "self"
+        },
+        {
+          "startTime": 14821.39999999851,
+          "duration": 100,
+          "name": "self"
+        },
+        {
+          "startTime": 3145.800000000745,
+          "duration": 97,
+          "name": "self"
+        },
+        {
+          "startTime": 4447.39999999851,
+          "duration": 96,
+          "name": "self"
+        },
+        {
+          "startTime": 9551,
+          "duration": 96,
+          "name": "self"
+        },
+        {
+          "startTime": 9939.300000000745,
+          "duration": 95,
+          "name": "self"
+        },
+        {
+          "startTime": 18100.89999999851,
+          "duration": 92,
+          "name": "self"
+        },
+        {
+          "startTime": 23114.89999999851,
+          "duration": 92,
+          "name": "self"
+        },
+        {
+          "startTime": 18302.800000000745,
+          "duration": 88,
+          "name": "self"
+        }
+      ]
+    },
+    "consoleErrors": []
+  }
+}
