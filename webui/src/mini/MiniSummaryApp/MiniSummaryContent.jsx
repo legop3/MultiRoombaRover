@@ -3,7 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
-import { useTelemetryFrames } from '../../context/TelemetryContext.jsx';
+import { useVisualTelemetryFrames } from '../../context/TelemetryContext.jsx';
 import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
@@ -25,7 +25,7 @@ export default function MiniSummaryContent() {
   useUserIdentitySync();
   const inLockdown = session?.mode === 'lockdown';
   const canSpectateVideo = Boolean(session?.isLocalNetwork);
-  const frames = useTelemetryFrames();
+  const frames = useVisualTelemetryFrames();
   const roster = session?.roster ?? [];
   const [index, setIndex] = useState(0);
   const activeDrivers = session?.activeDrivers || {};

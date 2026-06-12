@@ -2,7 +2,8 @@
 // Purpose: Renders Raspberry Pi host health for the assigned rover. Scope: Uses the separate roverHostStats stream, not Roomba sensorFrame data.
 import CardFrame from '../CardFrame/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
-import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
+import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
+import { hostStatsEqual, selectHostStats } from '../../context/telemetryViews.js';
 
 const EMPTY_STATS = Object.freeze({});
 const EMPTY_WIFI = Object.freeze({});
@@ -249,8 +250,7 @@ function warningMessages(stats) {
 
 export default function PiHostStatsCard() {
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
-  const frame = useTelemetryFrame(roverId);
-  const stats = frame?.hostStats || EMPTY_STATS;
+  const stats = useTelemetrySelector(roverId, selectHostStats, hostStatsEqual) || EMPTY_STATS;
   const wifi = stats.wifi || EMPTY_WIFI;
   const warnings = warningMessages(stats);
   const wifiQuality = wifiQualityPercent(wifi);

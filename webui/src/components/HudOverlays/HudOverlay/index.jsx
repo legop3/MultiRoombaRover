@@ -4,7 +4,13 @@
 import React from 'react';
 import { useHudMapSetting } from '../../../hooks/useHudMapSetting.js';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
-import { useTelemetryFrame } from '../../../context/TelemetryContext.jsx';
+import { useVisualTelemetrySelector } from '../../../context/TelemetryContext.jsx';
+import {
+  mapTelemetryEqual,
+  selectSpectatorTelemetry,
+  selectVisualMapTelemetry,
+  spectatorTelemetryEqual,
+} from '../../../context/telemetryViews.js';
 import RoverLabelOverlay from './RoverLabelOverlay.jsx';
 import SpectatorTelemetryOverlay from './SpectatorTelemetryOverlay.jsx';
 import HudMapOverlay from './HudMapOverlay.jsx';
@@ -24,7 +30,8 @@ function HudOverlay({
 }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const effectiveRoverId = roverId ?? assignedRoverId;
-  const frame = useTelemetryFrame(effectiveRoverId);
+  const mapTelemetry = useVisualTelemetrySelector(effectiveRoverId, selectVisualMapTelemetry, mapTelemetryEqual);
+  const spectatorTelemetry = useVisualTelemetrySelector(effectiveRoverId, selectSpectatorTelemetry, spectatorTelemetryEqual);
   const rosterInfo = useSessionSelector((state) => {
     if (!effectiveRoverId) return { label: null, roverColor: null };
     const roster = state.session?.roster || [];
@@ -41,7 +48,8 @@ function HudOverlay({
     const match = users.find((u) => String(u.socketId || '') === String(activeId || ''));
     return match?.nickname || match?.name || null;
   });
-  const resolvedSensors = sensors ?? frame?.sensors ?? null;
+  const resolvedMapTelemetry = sensors ? null : mapTelemetry;
+  const resolvedSensors = sensors ?? null;
   const resolvedLabel = label ?? rosterInfo.label ?? null;
   const resolvedRoverColor = roverColor ?? rosterInfo.roverColor ?? null;
   const resolvedDriverLabel = driverLabel ?? derivedDriverLabel;
@@ -66,7 +74,7 @@ function HudOverlay({
     return (
       <>
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <SpectatorTelemetryOverlay sensors={resolvedSensors} mobileHud={isMobile} />
+          <SpectatorTelemetryOverlay sensors={resolvedSensors} telemetry={sensors ? null : spectatorTelemetry} mobileHud={isMobile} />
           <RoverLabelOverlay
             variant="spectator"
             label={resolvedLabel}
@@ -78,6 +86,7 @@ function HudOverlay({
         </div>
         <HudMapOverlay
           sensors={resolvedSensors}
+          mapTelemetry={resolvedMapTelemetry}
           show={resolvedShowTopDown}
           mapPosition={resolvedMapPosition}
           layoutFormat={layoutFormat}
@@ -98,6 +107,7 @@ function HudOverlay({
       />
       <HudMapOverlay
         sensors={resolvedSensors}
+        mapTelemetry={resolvedMapTelemetry}
         show={resolvedShowTopDown && variant !== 'spectator'}
         mapPosition={resolvedMapPosition}
         layoutFormat={layoutFormat}

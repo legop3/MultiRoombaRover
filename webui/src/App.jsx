@@ -39,6 +39,7 @@ import GlobalObjectiveBanner from './components/GlobalObjectiveBanner/index.jsx'
 import RoverQueuesPanel from './components/RoverQueuesPanel/index.jsx';
 import VipPanel from './components/VipPanel/index.jsx';
 import { useSessionSelector } from './context/SessionContext.jsx';
+import { useTelemetryVisualPolicy } from './context/TelemetryContext.jsx';
 import ButtonBoxPanel from './components/ButtonBoxPanel/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
@@ -262,6 +263,7 @@ function App() {
 function AppWithProviders({ layout, isDesktop, fullscreen }) {
   useDefaultNickname();
   useUserIdentitySync();
+  useTelemetryVisualPolicy({ mobile: !isDesktop });
   const {
     visible: fullscreenVisible,
     mode: fullscreenMode,

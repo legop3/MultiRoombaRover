@@ -1,7 +1,8 @@
 // Display Rover Cell
 // Purpose: Shows one rover's room-readable driver and battery status.
 // Scope: Reuses shared rover/battery presentation primitives while avoiding controls, queues, and video.
-import { useTelemetryFrame } from '../../../context/TelemetryContext.jsx';
+import { useVisualTelemetrySelector } from '../../../context/TelemetryContext.jsx';
+import { batteryTelemetryEqual, selectBatteryTelemetry } from '../../../context/telemetryViews.js';
 import BatteryBar from '../../../components/BatteryBar/index.jsx';
 import RoverLabel from '../../../components/RoverLabel/index.jsx';
 import AutoFitText from '../../../mini/MiniSummaryApp/components/AutoFitText.jsx';
@@ -17,7 +18,8 @@ function classNames(...values) {
 }
 
 export default function DisplayRoverCell({ rover, session }) {
-  const frame = useTelemetryFrame(rover?.id);
+  const batteryTelemetry = useVisualTelemetrySelector(rover?.id, selectBatteryTelemetry, batteryTelemetryEqual);
+  const frame = { sensors: batteryTelemetry };
   const visual = getDisplayBatteryVisual({ rover, frame });
   const driver = findDriverForRover({ roverId: rover?.id, session });
   const stateText = buildRoverStateText(rover, visual);

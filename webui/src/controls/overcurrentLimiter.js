@@ -1,7 +1,8 @@
 // Overcurrent Limiter Hook/Utility
 // Purpose: Applies client-side overcurrent guard logic to reduce harmful command spikes. Scope: Tracks limiter state and exposes gated dispatch behavior to controls.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTelemetryFrame } from '../context/TelemetryContext.jsx';
+import { useTelemetrySelector } from '../context/TelemetryContext.jsx';
+import { overcurrentFlagsEqual, selectOvercurrentFlags } from '../context/telemetryViews.js';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 
 export const OVERCURRENT_GROUPS = [
@@ -30,9 +31,7 @@ function clampUnit(value) {
 
 export function useOvercurrentLimiter(roverId, options = {}) {
   const role = useSessionSelector((state) => state.session?.role || null);
-  const frame = useTelemetryFrame(roverId);
-  const sensors = frame?.sensors || {};
-  const overcurrentFlags = sensors?.wheelOvercurrents || {};
+  const overcurrentFlags = useTelemetrySelector(roverId, selectOvercurrentFlags, overcurrentFlagsEqual);
   const config = useMemo(
     () => ({ ...DEFAULT_OVERCURRENT_LIMITS, ...(options.config || {}) }),
     [options.config],

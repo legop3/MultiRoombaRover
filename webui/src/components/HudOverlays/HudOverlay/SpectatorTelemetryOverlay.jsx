@@ -1,17 +1,20 @@
-export default function SpectatorTelemetryOverlay({ sensors, mobileHud = false }) {
+export default function SpectatorTelemetryOverlay({ sensors, telemetry = null, mobileHud = false }) {
+  const voltageMv = telemetry?.voltageMv ?? sensors?.voltageMv ?? null;
+  const currentMa = telemetry?.currentMa ?? sensors?.currentMa ?? null;
+  const batteryChargeMah = telemetry?.batteryChargeMah ?? sensors?.batteryChargeMah ?? null;
+  const oiLabel = telemetry?.oiModeLabel ?? sensors?.oiMode?.label ?? 'Unknown';
+  const docked = telemetry?.homeBase ?? Boolean(sensors?.chargingSources?.homeBase);
+  const chargingLabel = telemetry?.chargingStateLabel ?? sensors?.chargingState?.label ?? '';
   const statusPadClass = mobileHud ? 'px-0.25 py-0.25' : 'px-1 py-0.5';
   const telemetryPosClass = mobileHud ? 'left-0.5 top-1/2' : 'left-1 top-1/2';
   const telemetryTextClass = mobileHud ? 'text-[0.45rem]' : 'text-[0.65rem]';
   const telemetryEntries = [
-    ['Voltage', sensors?.voltageMv != null ? `${(sensors.voltageMv / 1000).toFixed(2)} V` : '--'],
-    ['Current', sensors?.currentMa != null ? `${sensors.currentMa} mA` : '--'],
-    ['Charge', sensors?.batteryChargeMah != null ? `${sensors.batteryChargeMah}` : '--'],
-    ['OI', sensors?.oiMode?.label || '--'],
+    ['Voltage', voltageMv != null ? `${(voltageMv / 1000).toFixed(2)} V` : '--'],
+    ['Current', currentMa != null ? `${currentMa} mA` : '--'],
+    ['Charge', batteryChargeMah != null ? `${batteryChargeMah}` : '--'],
+    ['Oi', oiLabel || '--'],
   ];
-  const docked = Boolean(sensors?.chargingSources?.homeBase);
-  const chargingLabel = sensors?.chargingState?.label || '';
   const charging = Boolean(chargingLabel && chargingLabel.toLowerCase() !== 'not charging');
-  const oiLabel = sensors?.oiMode?.label || 'Unknown';
   const oiNormalized = oiLabel.toLowerCase();
   const oiTone =
     oiNormalized === 'full'
@@ -38,7 +41,7 @@ export default function SpectatorTelemetryOverlay({ sensors, mobileHud = false }
           <span className={`rounded px-1.5 py-0.5 ${chargingTone}`}>
             {charging ? 'Charging' : docked ? 'Not charging' : 'Not charging'}
           </span>
-          <span className={`rounded px-1.5 py-0.5 ${oiTone}`}>OI: {oiLabel}</span>
+          <span className={`rounded px-1.5 py-0.5 ${oiTone}`}>Oi: {oiLabel}</span>
         </div>
         {telemetryEntries.map(([labelText, value]) => (
           <span key={labelText} className="flex items-center justify-between gap-0.5">

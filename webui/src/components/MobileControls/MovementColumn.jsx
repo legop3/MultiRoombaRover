@@ -2,7 +2,8 @@
 // Purpose: Assembles the mobile movement column, which is the right column by default.
 // Scope: Integrates drive/dock actions with the mobile control pad without hiding that dependency inside the pad.
 import { useControlSelector } from '../../controls/index.js';
-import DriveDockAction, { useDriveDockState } from '../DriveDockAction/index.jsx';
+import DriveDockAction from '../DriveDockAction/index.jsx';
+import { useDriveDockState } from '../DriveDockAction/driveDockState.js';
 import ControlPadPanel from './ControlPadPanel.jsx';
 
 function MovementColumnContent({ layout }) {

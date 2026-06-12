@@ -4,26 +4,26 @@
 import React from 'react';
 import { useMemo } from 'react';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
-import { useTelemetryFrame } from '../../../context/TelemetryContext.jsx';
+import { useVisualTelemetrySelector } from '../../../context/TelemetryContext.jsx';
+import { overcurrentFlagsEqual, selectOvercurrentFlags } from '../../../context/telemetryViews.js';
 import { useOvercurrentLimiter } from '../../../controls/index.js';
 import { OVERCURRENT_LABELS } from './constants.js';
 
 function OvercurrentOverlay({ roverId = null, sensors, overcurrentLimiter = null, compact = false }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const effectiveRoverId = roverId ?? assignedRoverId;
-  const frame = useTelemetryFrame(effectiveRoverId);
+  const selectedOvercurrents = useVisualTelemetrySelector(effectiveRoverId, selectOvercurrentFlags, overcurrentFlagsEqual);
   const internalLimiter = useOvercurrentLimiter(effectiveRoverId);
-  const resolvedSensors = sensors ?? frame?.sensors ?? null;
+  const resolvedOvercurrents = sensors?.wheelOvercurrents ?? selectedOvercurrents;
   const resolvedOvercurrentLimiter = overcurrentLimiter ?? internalLimiter ?? null;
-  const wheelOvercurrents = resolvedSensors?.wheelOvercurrents || null;
   const overcurrentMotors = useMemo(
     () =>
-      wheelOvercurrents == null
+      resolvedOvercurrents == null
         ? []
-        : Object.entries(wheelOvercurrents)
+        : Object.entries(resolvedOvercurrents)
             .filter(([, active]) => Boolean(active))
             .map(([key]) => key),
-    [wheelOvercurrents],
+    [resolvedOvercurrents],
   );
   const limiterCaps = resolvedOvercurrentLimiter?.caps || null;
   const limiterFill = useMemo(() => {
@@ -56,7 +56,7 @@ function OvercurrentOverlay({ roverId = null, sensors, overcurrentLimiter = null
           <div className="h-full bg-red-700/60" style={{ width: fillWidth }} />
         </div>
         <div className={`relative z-10 flex h-full w-full flex-col items-center justify-center text-center font-semibold text-white animate-pulse ${textClass} ${padClass}`}>
-          <div>OVERCURRENT</div>
+          <div>Overcurrent</div>
           <div className={`mt-0 font-medium text-white ${subTextClass}`}>{safeLabels.join(', ')}</div>
         </div>
       </div>

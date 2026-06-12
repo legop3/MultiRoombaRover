@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
-import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
+import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
+import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
 
 export function useManualDockAssist(options = {}) {
   const { manageLifecycle = false } = options;
   const roverId = useControlSelector((control) => control.state.roverId);
   const active = useControlSelector((control) => Boolean(control.state.manualDockAssist?.active));
   const actions = useControlActions();
-  const frame = useTelemetryFrame(roverId);
-  const sensors = frame?.sensors || {};
-  const chargingLabel = sensors?.chargingState?.label || '';
-  const docked = Boolean(sensors?.chargingSources?.homeBase);
+  const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
+  const chargingLabel = dockTelemetry.chargingStateLabel || '';
+  const docked = Boolean(dockTelemetry.homeBase);
   const charging = docked && chargingLabel.toLowerCase() !== 'not charging' && chargingLabel !== '';
   const wasDockedRef = useRef(false);
 

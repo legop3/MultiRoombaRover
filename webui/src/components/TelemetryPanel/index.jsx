@@ -1,27 +1,15 @@
 // Telemetry Panel
 // Purpose: Defines the Telemetry Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useMemo } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
-import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
+import { useVisualTelemetrySelector } from '../../context/TelemetryContext.jsx';
+import { selectFrameForDisplay } from '../../context/telemetryViews.js';
 import { useDockIr } from '../../hooks/useDockIr.js';
 import CardFrame from '../CardFrame/index.jsx';
 
-function formatMetric(value, fallback = '--') {
-  if (value == null || value === '') return fallback;
-  return value;
-}
-
 export default function TelemetryPanel() {
-  const connected = useSessionSelector((state) => state.connected);
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
-  const activeDriverId = useSessionSelector((state) => {
-    const id = state.session?.assignment?.roverId;
-    return id ? state.session?.activeDrivers?.[id] || null : null;
-  });
-  const selfSocketId = useSessionSelector((state) => state.session?.socketId || null);
-  const users = useSessionSelector((state) => state.session?.users ?? []);
-  const frame = useTelemetryFrame(roverId);
+  const frame = useVisualTelemetrySelector(roverId, selectFrameForDisplay);
   const sensors = frame?.sensors || {};
   const dockIr = useDockIr(sensors);
   const voltage = sensors.voltageMv != null ? `${(sensors.voltageMv / 1000).toFixed(2)} V` : null;
@@ -29,15 +17,7 @@ export default function TelemetryPanel() {
   const batteryTemp = sensors.batteryTemperatureC != null ? `${sensors.batteryTemperatureC} °C` : null;
   const charge = sensors.batteryChargeMah;
   const capacity = sensors.batteryCapacityMah;
-  const updated = frame?.receivedAt ? new Date(frame.receivedAt).toLocaleTimeString() : null;
   const rawSnippet = frame?.raw ? frame.raw : null;
-  const driverLabel = useMemo(() => {
-    if (!roverId) return 'n/a';
-    if (!activeDriverId) return 'Available';
-    if (activeDriverId === selfSocketId) return 'You';
-    const user = users.find((entry) => entry.socketId === activeDriverId);
-    return user?.nickname || activeDriverId.slice(0, 6);
-  }, [activeDriverId, roverId, selfSocketId, users]);
 
   return (
     <CardFrame title='Roomba sensor values' clipOverflow={false} bodyClassName="space-y-0.5 text-base text-slate-100">
@@ -79,7 +59,7 @@ function TelemetrySummary({ sensors, voltage, current, batteryTemp, charge, capa
       <Metric label="Charge" value={charge != null ? `${charge} mAh` : '--'} />
       <Metric label="Capacity" value={capacity != null ? `${capacity} mAh` : '--'} />
       <Metric label="Charge" value={chargePct} />
-      <Metric label="OI mode" value={oiMode} />
+      <Metric label="Oi mode" value={oiMode} />
       <Metric label="Docked" value={docked} />
       <Metric label="Charging state" value={charging} />
     </div>

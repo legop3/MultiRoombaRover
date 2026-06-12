@@ -1,31 +1,15 @@
 // Drive Dock Action
 // Purpose: Defines the Drive Dock Action module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
-import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
+import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
+import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
+import { deriveDriveDockStateFromTelemetry } from './driveDockState.js';
 
-export function deriveDriveDockState(frame) {
-  const sensors = frame?.sensors || {};
-  const oiLabel = sensors.oiMode?.label || 'Unknown';
-  const oiNormalized = oiLabel.toLowerCase();
-  const chargingLabel = sensors.chargingState?.label || '';
-  const docked = Boolean(sensors.chargingSources?.homeBase);
-  const charging = docked && chargingLabel.toLowerCase() !== 'not charging' && chargingLabel !== '';
-  const driving = oiNormalized === 'full';
-  const dockedNotCharging = docked && !charging;
-  const dockingInProgress = !docked && !charging && oiNormalized === 'passive';
-  return { driving, docked, charging, dockedNotCharging, dockingInProgress, oiLabel, chargingLabel };
-}
-
-export function useDriveDockState(roverId) {
-  const frame = useTelemetryFrame(roverId);
-  return useMemo(() => deriveDriveDockState(frame), [frame]);
-}
-
-function StatusRow({ label, value, tone = 'neutral' }) {
+function StatusRow({ value, tone = 'neutral' }) {
   const toneClasses =
     tone === 'good'
       ? 'border-emerald-200 bg-emerald-600 text-white'
@@ -107,8 +91,8 @@ export default function DriveDockAction({
   const keymap = useControlSelector((control) => control.state.keymap);
   const actions = useControlActions();
   const dockAssist = useManualDockAssist();
-  const frame = useTelemetryFrame(roverId);
-  const state = driveDockState ?? deriveDriveDockState(frame);
+  const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
+  const state = driveDockState ?? deriveDriveDockStateFromTelemetry(dockTelemetry);
   const { driving, docked, charging, dockingInProgress } = state;
   const [pending, setPending] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);

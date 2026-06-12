@@ -1,13 +1,16 @@
 // visuals
 // Purpose: Defines the visuals module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import React from 'react';
-import { clamp01, currentColor, describeArc, lightBumpColor, cliffColor, polarToCartesian, toRad } from './helpers.js';
+import React, { useMemo } from 'react';
+import { clamp01, currentColor, describeArc, polarToCartesian, toRad } from './helpers.js';
 
-export function ArcSegment({ cx, cy, rInner, rOuter, startDeg, endDeg, color, pulse = false, opacity = 1 }) {
+export const ArcSegment = React.memo(function ArcSegment({ cx, cy, rInner, rOuter, startDeg, endDeg, color, pulse = false, opacity = 1 }) {
   const rMid = (rInner + rOuter) / 2;
   const strokeWidth = rOuter - rInner;
-  const path = describeArc(cx, cy, rMid, startDeg, endDeg);
+  const path = useMemo(
+    () => describeArc(cx, cy, rMid, startDeg, endDeg),
+    [cx, cy, endDeg, rMid, startDeg],
+  );
   return (
     <>
       <path d={path} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" fill="none" opacity={opacity} />
@@ -24,23 +27,28 @@ export function ArcSegment({ cx, cy, rInner, rOuter, startDeg, endDeg, color, pu
       ) : null}
     </>
   );
-}
+});
 
-export function ConeSegment({ cx, cy, rBase, rTip, startDeg, endDeg, color, value, max }) {
+export const ConeSegment = React.memo(function ConeSegment({ cx, cy, rBase, rTip, startDeg, endDeg, color, value, max }) {
   const mid = (startDeg + endDeg) / 2;
-  const tip = polarToCartesian(cx, cy, rTip, mid);
   const norm = clamp01(value != null ? value / (max || 1) : 0);
   const eased = Math.pow(norm, 0.35);
   const filledR = rBase - (rBase - rTip) * eased;
   const barR = Math.max(rTip, Math.min(filledR, rBase));
-  const filledA = polarToCartesian(cx, cy, barR, startDeg);
-  const filledB = polarToCartesian(cx, cy, barR, endDeg);
-  const fg = `M ${tip.x} ${tip.y} L ${filledA.x} ${filledA.y} L ${filledB.x} ${filledB.y} Z`;
+  const fg = useMemo(() => {
+    // The cone geometry is still dynamic because the filled radius changes
+    // with light-bump strength, but the memo prevents unrelated parent renders
+    // from rebuilding the SVG path string for every cone.
+    const tip = polarToCartesian(cx, cy, rTip, mid);
+    const filledA = polarToCartesian(cx, cy, barR, startDeg);
+    const filledB = polarToCartesian(cx, cy, barR, endDeg);
+    return `M ${tip.x} ${tip.y} L ${filledA.x} ${filledA.y} L ${filledB.x} ${filledB.y} Z`;
+  }, [barR, cx, cy, endDeg, mid, rTip, startDeg]);
 
   return <path d={fg} fill={color} opacity={1} stroke="none" />;
-}
+});
 
-export function WheelVisual({ cx, cy, current, drop, overcurrent, label }) {
+export const WheelVisual = React.memo(function WheelVisual({ cx, cy, current, drop, overcurrent, label }) {
   const mag = Math.abs(current);
   const pct = clamp01(mag / 1200);
   const color = currentColor(current, overcurrent);
@@ -63,9 +71,9 @@ export function WheelVisual({ cx, cy, current, drop, overcurrent, label }) {
       <text x={0} y={barH / 2 + 10} textAnchor="middle" className="fill-slate-200 text-[0.7rem]">{label}</text>
     </g>
   );
-}
+});
 
-export function SideBrushVisual({ cx, cy, current, overcurrent }) {
+export const SideBrushVisual = React.memo(function SideBrushVisual({ cx, cy, current, overcurrent }) {
   let mag = Math.abs(current);
   if (mag < 10) mag = 0;
   const color = currentColor(current * 3, overcurrent);
@@ -91,9 +99,9 @@ export function SideBrushVisual({ cx, cy, current, overcurrent }) {
       {overcurrent ? <circle cx={cx} cy={cy} r={armLength + 8} stroke="#ef4444" strokeWidth="3" fill="none" className="animate-pulse" /> : null}
     </g>
   );
-}
+});
 
-export function MainBrushVisual({ cx, cy, current, overcurrent, variant, dirtLeft, dirtRight }) {
+export const MainBrushVisual = React.memo(function MainBrushVisual({ cx, cy, current, overcurrent, variant }) {
   const mag = Math.abs(current);
   const color = currentColor(current, overcurrent);
   const opacity = 1;
@@ -135,6 +143,4 @@ export function MainBrushVisual({ cx, cy, current, overcurrent, variant, dirtLef
       ) : null}
     </g>
   );
-}
-
-export { lightBumpColor, cliffColor };
+});

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { WhepPlayer } from '../../lib/whepPlayer.js';
-import { useTelemetryFrame } from '../../context/TelemetryContext.jsx';
+import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
+import {
+  mainBrushAudioTelemetryEqual,
+  selectMainBrushAudioTelemetry,
+} from '../../context/telemetryViews.js';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
@@ -82,8 +86,17 @@ export default function RoverMediaPlayer({
     snapshotFeed ?? (effectiveRoverId ? autoSnapshots[effectiveRoverId] || null : null);
   const resolvedLabel =
     label || rosterEntry?.name || (effectiveRoverId ? `Rover ${effectiveRoverId}` : 'Rover');
-  const frame = useTelemetryFrame(effectiveRoverId);
-  const resolvedSensors = sensors ?? frame?.sensors ?? null;
+  const mainBrushTelemetry = useTelemetrySelector(
+    effectiveRoverId,
+    selectMainBrushAudioTelemetry,
+    mainBrushAudioTelemetryEqual,
+  );
+  const resolvedMainBrushTelemetry = sensors
+    ? {
+        mainBrushCurrentMa: sensors?.mainBrushCurrentMa ?? 0,
+        mainBrushOvercurrent: Boolean(sensors?.wheelOvercurrents?.mainBrush),
+      }
+    : mainBrushTelemetry;
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const restartTimer = useRef(null);
@@ -129,8 +142,8 @@ export default function RoverMediaPlayer({
     : AUDIO_SETTINGS_DEFAULTS.mainBrushDuckAmount;
   const baseRoverGain = Math.max(0, Math.min(1, masterVolume * roverVolume));
   const mainBrushActive = Boolean(
-    (Number(resolvedSensors?.mainBrushCurrentMa) || 0) > BRUSH_CURRENT_THRESHOLD_MA ||
-      resolvedSensors?.wheelOvercurrents?.mainBrush,
+    (Number(resolvedMainBrushTelemetry?.mainBrushCurrentMa) || 0) > BRUSH_CURRENT_THRESHOLD_MA ||
+      resolvedMainBrushTelemetry?.mainBrushOvercurrent,
   );
   const duckGain = mainBrushDuckEnabled && mainBrushActive ? 1 - mainBrushDuckAmount : 1;
   const effectiveRoverGain = Math.max(0, Math.min(1, baseRoverGain * duckGain));

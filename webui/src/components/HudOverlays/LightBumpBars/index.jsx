@@ -3,21 +3,23 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React from 'react';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
-import { useTelemetryFrame } from '../../../context/TelemetryContext.jsx';
+import { useVisualTelemetrySelector } from '../../../context/TelemetryContext.jsx';
+import { lightBumpTelemetryEqual, selectLightBumpTelemetry } from '../../../context/telemetryViews.js';
 
 function LightBumpBars({ roverId = null, sensors }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const effectiveRoverId = roverId ?? assignedRoverId;
-  const frame = useTelemetryFrame(effectiveRoverId);
-  const resolvedSensors = sensors ?? frame?.sensors ?? null;
-  const values = [
-    resolvedSensors?.lightBumpLeftSignal,
-    resolvedSensors?.lightBumpFrontLeftSignal,
-    resolvedSensors?.lightBumpCenterLeftSignal,
-    resolvedSensors?.lightBumpCenterRightSignal,
-    resolvedSensors?.lightBumpFrontRightSignal,
-    resolvedSensors?.lightBumpRightSignal,
-  ];
+  const selectedValues = useVisualTelemetrySelector(effectiveRoverId, selectLightBumpTelemetry, lightBumpTelemetryEqual);
+  const values = sensors
+    ? [
+        sensors?.lightBumpLeftSignal,
+        sensors?.lightBumpFrontLeftSignal,
+        sensors?.lightBumpCenterLeftSignal,
+        sensors?.lightBumpCenterRightSignal,
+        sensors?.lightBumpFrontRightSignal,
+        sensors?.lightBumpRightSignal,
+      ]
+    : selectedValues;
   const max = values.filter((v) => v != null).reduce((acc, v) => Math.max(acc, v), 1200);
   const eased = (v) => Math.pow(Math.max(0, Math.min(1, (v ?? 0) / max)), 0.35);
   const hueFor = (v) => {
