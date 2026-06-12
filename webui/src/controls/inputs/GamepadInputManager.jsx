@@ -1,6 +1,6 @@
 // Gamepad Input Manager
 // Purpose: Converts polled gamepad state into normalized control actions/commands. Scope: Integrates bindings, deadzone math, and dispatch callbacks for driving.
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { GAMEPAD_SETTINGS_DEFAULTS, GAMEPAD_PROFILE_DEFAULT } from '../../settings/namespaces.js';
@@ -73,30 +73,33 @@ export default function GamepadInputManager() {
   const lastAuxSentAtRef = useRef(0);
   const lastServoAtRef = useRef(0);
   const lastServoAngleRef = useRef(null);
+  // The hub subscription is intentionally stable, so this ref is the bridge back to the latest
+  // React values. Rewriting it after each commit is cheaper than tearing down browser gamepad
+  // listeners every time settings, camera state, or control callbacks change.
+  const latestRef = useRef(null);
 
-  const ensureProfile = useCallback(
-    (padState) => {
-      const signature = padState.signature ?? getPadSignature(padState);
-      if (gamepadSettings?.profiles?.[signature] || profileCacheRef.current.has(signature)) {
-        return;
-      }
-      profileCacheRef.current.add(signature);
-      saveGamepadSettings((prev) => {
-        const current = prev ?? GAMEPAD_SETTINGS_DEFAULTS;
-        if (current.profiles?.[signature]) return current;
-        const base = current?.defaults?.profile ?? GAMEPAD_PROFILE_DEFAULT;
-        const nextProfile = createProfileForPad(padState, base);
-        return {
-          ...current,
-          profiles: {
-            ...(current.profiles ?? {}),
-            [signature]: nextProfile,
-          },
-        };
-      });
-    },
-    [gamepadSettings?.profiles, saveGamepadSettings],
-  );
+  const ensureProfile = useCallback((padState) => {
+    const latest = latestRef.current;
+    if (!latest) return;
+    const signature = padState.signature ?? getPadSignature(padState);
+    if (latest.gamepadSettings?.profiles?.[signature] || profileCacheRef.current.has(signature)) {
+      return;
+    }
+    profileCacheRef.current.add(signature);
+    latest.saveGamepadSettings((prev) => {
+      const current = prev ?? GAMEPAD_SETTINGS_DEFAULTS;
+      if (current.profiles?.[signature]) return current;
+      const base = current?.defaults?.profile ?? GAMEPAD_PROFILE_DEFAULT;
+      const nextProfile = createProfileForPad(padState, base);
+      return {
+        ...current,
+        profiles: {
+          ...(current.profiles ?? {}),
+          [signature]: nextProfile,
+        },
+      };
+    });
+  }, []);
 
   const handleButtonEdge = useCallback((key, pressed) => {
     const prev = buttonStateRef.current.get(key) || false;
@@ -104,97 +107,118 @@ export default function GamepadInputManager() {
     return pressed && !prev;
   }, []);
 
-  const handleCameraAxis = useCallback(
-    (axisValue, calibration) => {
-      const config = state.camera?.config;
-      if (!config) return;
-      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      const cameraMode = calibration?.cameraMode ?? 'absolute';
-      const sensitivity = Math.max(1, Math.min(180, calibration?.cameraSensitivity ?? 60));
-      if (cameraMode === 'velocity') {
-        const dt = Math.min(50, now - lastServoAtRef.current || 16);
-        const delta = axisValue * sensitivity * (dt / 1000);
-        if (Math.abs(delta) < 0.01) return;
-        const baseline =
-          typeof lastServoAngleRef.current === 'number'
-            ? lastServoAngleRef.current
-            : typeof state.camera?.angle === 'number'
-            ? state.camera.angle
-            : typeof config.homeAngle === 'number'
-            ? config.homeAngle
-            : 0;
-        const nextAngle = baseline + delta;
-        setServoAngle(nextAngle);
-        lastServoAngleRef.current = nextAngle;
-        lastServoAtRef.current = now;
-        return;
-      }
-      const min = typeof config.minAngle === 'number' ? config.minAngle : -45;
-      const max = typeof config.maxAngle === 'number' ? config.maxAngle : 45;
-      const home = typeof config.homeAngle === 'number' ? config.homeAngle : (min + max) / 2;
-      const angle =
-        axisValue < 0
-          ? home + axisValue * (home - min)
-          : home + axisValue * (max - home);
-      if (
-        typeof lastServoAngleRef.current === 'number' &&
-        Math.abs(lastServoAngleRef.current - angle) < 0.35 &&
-        now - lastServoAtRef.current < 80
-      ) {
-        return;
-      }
+  const handleCameraAxis = useCallback((axisValue, calibration) => {
+    const latest = latestRef.current;
+    const config = latest?.cameraConfig;
+    if (!latest || !config) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const cameraMode = calibration?.cameraMode ?? 'absolute';
+    const sensitivity = Math.max(1, Math.min(180, calibration?.cameraSensitivity ?? 60));
+    if (cameraMode === 'velocity') {
+      const dt = Math.min(50, now - lastServoAtRef.current || 16);
+      const delta = axisValue * sensitivity * (dt / 1000);
+      if (Math.abs(delta) < 0.01) return;
+      const baseline =
+        typeof lastServoAngleRef.current === 'number'
+          ? lastServoAngleRef.current
+          : typeof latest.cameraAngle === 'number'
+          ? latest.cameraAngle
+          : typeof config.homeAngle === 'number'
+          ? config.homeAngle
+          : 0;
+      const nextAngle = baseline + delta;
+      latest.setServoAngle(nextAngle);
+      lastServoAngleRef.current = nextAngle;
       lastServoAtRef.current = now;
-      lastServoAngleRef.current = angle;
-      setServoAngle(angle);
-    },
-    [setServoAngle, state.camera?.angle, state.camera?.config],
-  );
+      return;
+    }
+    const min = typeof config.minAngle === 'number' ? config.minAngle : -45;
+    const max = typeof config.maxAngle === 'number' ? config.maxAngle : 45;
+    const home = typeof config.homeAngle === 'number' ? config.homeAngle : (min + max) / 2;
+    const angle =
+      axisValue < 0
+        ? home + axisValue * (home - min)
+        : home + axisValue * (max - home);
+    if (
+      typeof lastServoAngleRef.current === 'number' &&
+      Math.abs(lastServoAngleRef.current - angle) < 0.35 &&
+      now - lastServoAtRef.current < 80
+    ) {
+      return;
+    }
+    lastServoAtRef.current = now;
+    lastServoAngleRef.current = angle;
+    latest.setServoAngle(angle);
+  }, []);
 
   const activeSignature = useMemo(
     () => gamepadSettings?.activeSignature ?? null,
     [gamepadSettings?.activeSignature],
   );
 
+  useLayoutEffect(() => {
+    // Layout timing matters because the requestAnimationFrame gamepad poll can run immediately
+    // after React commits. Updating this ref before paint keeps the stable hub callback aligned
+    // with the newest settings and control actions without resubscribing to the hub.
+    latestRef.current = {
+      activeSignature,
+      cameraAngle: state.camera?.angle,
+      cameraConfig: state.camera?.config,
+      dockAssist,
+      gamepadSettings,
+      registerInputState,
+      runMacro,
+      saveGamepadSettings,
+      setAuxMotors,
+      setDriveVector,
+      setMode,
+      setServoAngle,
+      toggleNightVision,
+    };
+  });
+
   useEffect(() => {
     return subscribeGamepadHub((hubState) => {
-      const activePad = pickActivePad(hubState.pads, activeSignature);
+      const latest = latestRef.current;
+      if (!latest) return;
+      const activePad = pickActivePad(hubState.pads, latest.activeSignature);
       if (!activePad) {
         if (!areVectorsEqual(lastVectorRef.current, ZERO_VECTOR)) {
           lastVectorRef.current = ZERO_VECTOR;
-          setDriveVector(ZERO_VECTOR, { source: SOURCE });
+          latest.setDriveVector(ZERO_VECTOR, { source: SOURCE });
         }
         if (!areAuxEqual(lastAuxRef.current, ZERO_AUX)) {
           lastAuxRef.current = ZERO_AUX;
-          setAuxMotors(ZERO_AUX);
+          latest.setAuxMotors(ZERO_AUX);
         }
         buttonStateRef.current = new Map();
         reverseStateRef.current = { main: false, side: false };
         lastDriveSentAtRef.current = 0;
         lastAuxSentAtRef.current = 0;
-        registerInputState(SOURCE, { connected: false });
+        latest.registerInputState(SOURCE, { connected: false });
         return;
       }
 
       if (isTextEntryActive()) {
         if (!areVectorsEqual(lastVectorRef.current, ZERO_VECTOR)) {
           lastVectorRef.current = ZERO_VECTOR;
-          setDriveVector(ZERO_VECTOR, { source: SOURCE });
+          latest.setDriveVector(ZERO_VECTOR, { source: SOURCE });
         }
         if (!areAuxEqual(lastAuxRef.current, ZERO_AUX)) {
           lastAuxRef.current = ZERO_AUX;
-          setAuxMotors(ZERO_AUX);
+          latest.setAuxMotors(ZERO_AUX);
         }
         buttonStateRef.current = new Map();
         reverseStateRef.current = { main: false, side: false };
-        registerInputState(SOURCE, { connected: true, blocked: true });
+        latest.registerInputState(SOURCE, { connected: true, blocked: true });
         return;
       }
 
       ensureProfile(activePad);
       const signature = activePad.signature;
       const profile =
-        gamepadSettings?.profiles?.[signature] ??
-        gamepadSettings?.defaults?.profile ??
+        latest.gamepadSettings?.profiles?.[signature] ??
+        latest.gamepadSettings?.defaults?.profile ??
         GAMEPAD_PROFILE_DEFAULT;
       const outputs = computeGamepadOutputs(activePad, profile);
 
@@ -204,7 +228,7 @@ export default function GamepadInputManager() {
         if (idle || now - lastDriveSentAtRef.current >= DRIVE_RATE_MS) {
           lastVectorRef.current = outputs.driveVector;
           lastDriveSentAtRef.current = now;
-          setDriveVector(outputs.driveVector, { source: SOURCE });
+          latest.setDriveVector(outputs.driveVector, { source: SOURCE });
         }
       }
 
@@ -228,7 +252,7 @@ export default function GamepadInputManager() {
         if (isAuxIdle(aux) || now - lastAuxSentAtRef.current >= AUX_RATE_MS) {
           lastAuxRef.current = aux;
           lastAuxSentAtRef.current = now;
-          setAuxMotors(aux);
+          latest.setAuxMotors(aux);
         }
       }
 
@@ -245,21 +269,21 @@ export default function GamepadInputManager() {
       }
 
       if (outputs.buttons.driveMacro && handleButtonEdge('driveMacro', true)) {
-        dockAssist.exitAssist();
-        setMode('drive');
-        runMacro('drive-sequence');
+        latest.dockAssist.exitAssist();
+        latest.setMode('drive');
+        latest.runMacro('drive-sequence');
       } else if (!outputs.buttons.driveMacro) {
         handleButtonEdge('driveMacro', false);
       }
 
       if (outputs.buttons.dockMacro && handleButtonEdge('dockMacro', true)) {
-        dockAssist.toggleAssist();
+        latest.dockAssist.toggleAssist();
       } else if (!outputs.buttons.dockMacro) {
         handleButtonEdge('dockMacro', false);
       }
 
       if (outputs.buttons.nightVisionToggle && handleButtonEdge('nightVisionToggle', true)) {
-        toggleNightVision();
+        latest.toggleNightVision();
       } else if (!outputs.buttons.nightVisionToggle) {
         handleButtonEdge('nightVisionToggle', false);
       }
@@ -268,7 +292,7 @@ export default function GamepadInputManager() {
         handleCameraAxis(outputs.cameraAxis, profile.calibration);
       }
 
-      registerInputState(SOURCE, {
+      latest.registerInputState(SOURCE, {
         connected: true,
         signature,
         id: activePad.id,
@@ -281,21 +305,7 @@ export default function GamepadInputManager() {
         bindings: outputs.sources,
       });
     });
-  }, [
-    activeSignature,
-    ensureProfile,
-    gamepadSettings?.defaults?.profile,
-    gamepadSettings?.profiles,
-    handleButtonEdge,
-    handleCameraAxis,
-    registerInputState,
-    runMacro,
-    setAuxMotors,
-    setDriveVector,
-    setMode,
-    toggleNightVision,
-    dockAssist,
-  ]);
+  }, [ensureProfile, handleButtonEdge, handleCameraAxis]);
 
   return null;
 }

@@ -1,0 +1,486 @@
+{
+  "url": "http://127.0.0.1:5173/",
+  "runDir": "perf/results/2026-06-12T05-30-10-213Z",
+  "elapsedMs": 184508,
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/148.0.7778.96 Safari/537.36",
+  "title": "Roomba Rover",
+  "finalUrl": "http://127.0.0.1:5173/",
+  "environment": {
+    "cpuThrottle": 8,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "isMobile": true
+  },
+  "metrics": {
+    "afterLoad": {
+      "Timestamp": 21026.536855,
+      "Documents": 3,
+      "Frames": 1,
+      "JSEventListeners": 213,
+      "Nodes": 310,
+      "LayoutCount": 4,
+      "RecalcStyleCount": 6,
+      "LayoutDuration": 0.351349,
+      "RecalcStyleDuration": 0.164,
+      "ScriptDuration": 8.025346,
+      "TaskDuration": 12.3993,
+      "JSHeapUsedSize": 8055732,
+      "JSHeapTotalSize": 9846784
+    },
+    "end": {
+      "Timestamp": 21172.00552,
+      "Documents": 1,
+      "Frames": 1,
+      "JSEventListeners": 776,
+      "Nodes": 2366,
+      "LayoutCount": 28,
+      "RecalcStyleCount": 51,
+      "LayoutDuration": 2.921363,
+      "RecalcStyleDuration": 2.465639,
+      "ScriptDuration": 125.009213,
+      "TaskDuration": 154.711298,
+      "JSHeapUsedSize": 49187212,
+      "JSHeapTotalSize": 81772544
+    },
+    "delta": {
+      "Timestamp": 145.46866500000033,
+      "Documents": -2,
+      "Frames": 0,
+      "JSEventListeners": 563,
+      "Nodes": 2056,
+      "LayoutCount": 24,
+      "RecalcStyleCount": 45,
+      "LayoutDuration": 2.570014,
+      "RecalcStyleDuration": 2.3016389999999998,
+      "ScriptDuration": 116.983867,
+      "TaskDuration": 142.311998,
+      "JSHeapUsedSize": 41131480,
+      "JSHeapTotalSize": 71925760
+    }
+  },
+  "cpuSummary": {
+    "totalProfileMs": 109222.492,
+    "sampleCount": 82521,
+    "topSelfTime": [
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=7eee8a21",
+        "functionName": "exports.jsxDEV",
+        "lineNumber": 238,
+        "columnNumber": 31,
+        "selfMs": 50684.10400000017,
+        "samples": 40987
+      },
+      {
+        "url": "",
+        "functionName": "(program)",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 11988.050000000003,
+        "samples": 3951
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/chunk-YX2XZWS3.js?v=7eee8a21",
+        "functionName": "exports.createElement",
+        "lineNumber": 760,
+        "columnNumber": 38,
+        "selfMs": 6174.760000000029,
+        "samples": 5020
+      },
+      {
+        "url": "",
+        "functionName": "createTask",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 4341.4680000000035,
+        "samples": 3581
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=7eee8a21",
+        "functionName": "ReactElement",
+        "lineNumber": 126,
+        "columnNumber": 27,
+        "selfMs": 4147.347000000001,
+        "samples": 3387
+      },
+      {
+        "url": "",
+        "functionName": "run",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 2896.0120000000024,
+        "samples": 2303
+      },
+      {
+        "url": "",
+        "functionName": "(idle)",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 1528.1939999999993,
+        "samples": 1205
+      },
+      {
+        "url": "",
+        "functionName": "(garbage collector)",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 1454.5849999999996,
+        "samples": 1076
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=7eee8a21",
+        "functionName": "getTaskName",
+        "lineNumber": 80,
+        "columnNumber": 26,
+        "selfMs": 1229.8500000000001,
+        "samples": 1028
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "runWithFiberInDEV",
+        "lineNumber": 992,
+        "columnNumber": 32,
+        "selfMs": 982.0620000000005,
+        "samples": 808
+      },
+      {
+        "url": "",
+        "functionName": "now",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 786.4740000000004,
+        "samples": 634
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "validateProperty",
+        "lineNumber": 2344,
+        "columnNumber": 31,
+        "selfMs": 754.6519999999999,
+        "samples": 611
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "updatedAncestorInfoDev",
+        "lineNumber": 1990,
+        "columnNumber": 37,
+        "selfMs": 746.4530000000003,
+        "samples": 607
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=7eee8a21",
+        "functionName": "jsxDEVImpl",
+        "lineNumber": 167,
+        "columnNumber": 25,
+        "selfMs": 731.4129999999996,
+        "samples": 598
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "react_stack_bottom_frame",
+        "lineNumber": 18504,
+        "columnNumber": 42,
+        "selfMs": 652.937,
+        "samples": 533
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/chunk-YX2XZWS3.js?v=7eee8a21",
+        "functionName": "ReactElement",
+        "lineNumber": 165,
+        "columnNumber": 27,
+        "selfMs": 580.7530000000002,
+        "samples": 462
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "updateProperties",
+        "lineNumber": 14785,
+        "columnNumber": 31,
+        "selfMs": 517.7620000000002,
+        "samples": 424
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "createWorkInProgress",
+        "lineNumber": 3630,
+        "columnNumber": 35,
+        "selfMs": 508.02600000000007,
+        "samples": 409
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "ReactStrictModeWarnings.recordLegacyContextWarning",
+        "lineNumber": 18468,
+        "columnNumber": 67,
+        "selfMs": 495.80399999999986,
+        "samples": 409
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "commitUpdate",
+        "lineNumber": 15886,
+        "columnNumber": 27,
+        "selfMs": 477.684,
+        "samples": 370
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "beginWork",
+        "lineNumber": 8415,
+        "columnNumber": 24,
+        "selfMs": 446.36999999999983,
+        "samples": 356
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "reconcileChildrenArray",
+        "lineNumber": 4935,
+        "columnNumber": 39,
+        "selfMs": 436.57999999999987,
+        "samples": 350
+      },
+      {
+        "url": "http://127.0.0.1:5173/src/components/ChatMessageRow/index.jsx",
+        "functionName": "ChatMessageRow",
+        "lineNumber": 195,
+        "columnNumber": 38,
+        "selfMs": 413.4399999999997,
+        "samples": 344
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=7eee8a21",
+        "functionName": "getComponentNameFromType",
+        "lineNumber": 12,
+        "columnNumber": 39,
+        "selfMs": 408.42100000000005,
+        "samples": 327
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "addObjectDiffToProperties",
+        "lineNumber": 3080,
+        "columnNumber": 40,
+        "selfMs": 388.74499999999983,
+        "samples": 298
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "setValueForStyles",
+        "lineNumber": 2231,
+        "columnNumber": 32,
+        "selfMs": 388.087,
+        "samples": 311
+      },
+      {
+        "url": "",
+        "functionName": "measure",
+        "lineNumber": -1,
+        "columnNumber": -1,
+        "selfMs": 382.2370000000001,
+        "samples": 317
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "(anonymous)",
+        "lineNumber": 5231,
+        "columnNumber": 23,
+        "selfMs": 372.06799999999976,
+        "samples": 277
+      },
+      {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "functionName": "logComponentRender",
+        "lineNumber": 3166,
+        "columnNumber": 33,
+        "selfMs": 342.3039999999999,
+        "samples": 277
+      },
+      {
+        "url": "http://127.0.0.1:5173/src/context/SessionContext.jsx",
+        "functionName": "(anonymous)",
+        "lineNumber": 331,
+        "columnNumber": 20,
+        "selfMs": 337.47,
+        "samples": 275
+      }
+    ]
+  },
+  "responsiveness": {
+    "longTaskCount": 83,
+    "topLongTasks": [
+      {
+        "name": "self",
+        "startTime": 81802.5,
+        "duration": 17746
+      },
+      {
+        "name": "self",
+        "startTime": 54463,
+        "duration": 6694
+      },
+      {
+        "name": "self",
+        "startTime": 99677.39999999851,
+        "duration": 6024
+      },
+      {
+        "name": "self",
+        "startTime": 21612.599999997765,
+        "duration": 5858
+      },
+      {
+        "name": "self",
+        "startTime": 110758.5,
+        "duration": 5803
+      },
+      {
+        "name": "self",
+        "startTime": 62108,
+        "duration": 5772
+      },
+      {
+        "name": "self",
+        "startTime": 76151.89999999851,
+        "duration": 5650
+      },
+      {
+        "name": "self",
+        "startTime": 125421.19999999925,
+        "duration": 5648
+      },
+      {
+        "name": "self",
+        "startTime": 145249.3999999985,
+        "duration": 5587
+      },
+      {
+        "name": "self",
+        "startTime": 132005.09999999776,
+        "duration": 5514
+      },
+      {
+        "name": "self",
+        "startTime": 68337.5,
+        "duration": 5496
+      },
+      {
+        "name": "self",
+        "startTime": 118182.59999999776,
+        "duration": 5266
+      },
+      {
+        "name": "self",
+        "startTime": 40730,
+        "duration": 5224
+      },
+      {
+        "name": "self",
+        "startTime": 138897,
+        "duration": 5148
+      },
+      {
+        "name": "self",
+        "startTime": 151428.19999999925,
+        "duration": 5134
+      },
+      {
+        "name": "self",
+        "startTime": 106092.80000000075,
+        "duration": 4665
+      },
+      {
+        "name": "self",
+        "startTime": 32223.39999999851,
+        "duration": 4328
+      },
+      {
+        "name": "self",
+        "startTime": 4601.89999999851,
+        "duration": 3794
+      },
+      {
+        "name": "self",
+        "startTime": 8585.39999999851,
+        "duration": 3021
+      },
+      {
+        "name": "self",
+        "startTime": 16030.39999999851,
+        "duration": 2773
+      }
+    ],
+    "frameCount": 152,
+    "averageFrameMs": 1041.5151315789474,
+    "p95FrameMs": 5816.499999999985,
+    "p99FrameMs": 10849.5,
+    "intervalDriftCount": 37,
+    "averageIntervalDriftMs": 3979.5216216216418,
+    "p95IntervalDriftMs": 13818.400000002235,
+    "p99IntervalDriftMs": 29643.89999999851
+  },
+  "consoleMessages": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting...",
+      "location": {
+        "url": "http://127.0.0.1:5173/@vite/client",
+        "line": 732,
+        "column": 8,
+        "lineNumber": 732,
+        "columnNumber": 8
+      }
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected.",
+      "location": {
+        "url": "http://127.0.0.1:5173/@vite/client",
+        "line": 826,
+        "column": 11,
+        "lineNumber": 826,
+        "columnNumber": 11
+      }
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+      "location": {
+        "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=7eee8a21",
+        "line": 20102,
+        "column": 53,
+        "lineNumber": 20102,
+        "columnNumber": 53
+      }
+    },
+    {
+      "type": "info",
+      "text": "[socket] connecting to https://rover.otter.land",
+      "location": {
+        "url": "http://127.0.0.1:5173/src/lib/socket.js",
+        "line": 7,
+        "column": 8,
+        "lineNumber": 7,
+        "columnNumber": 8
+      }
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()",
+      "location": {
+        "url": "https://media.discordapp.net/attachments/1424887548622405672/1512626709692682340/cat2.PNG?ex=6a24c6e6&is=6a237566&hm=baeec4c8e666888d89711065b1dbcb391c3415f9c28d1917bdd286776b60c867&=&format=webp&quality=lossless",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    }
+  ],
+  "failedRequests": [],
+  "errorResponses": [
+    {
+      "url": "https://media.discordapp.net/attachments/1424887548622405672/1512626709692682340/cat2.PNG?ex=6a24c6e6&is=6a237566&hm=baeec4c8e666888d89711065b1dbcb391c3415f9c28d1917bdd286776b60c867&=&format=webp&quality=lossless",
+      "status": 404
+    }
+  ]
+}

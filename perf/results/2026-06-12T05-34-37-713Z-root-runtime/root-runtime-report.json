@@ -1,0 +1,532 @@
+{
+  "url": "http://127.0.0.1:4173/",
+  "runDir": "perf/results/2026-06-12T05-34-37-713Z-root-runtime",
+  "environment": {
+    "cpuThrottle": 6,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "isMobile": true,
+    "sampleMs": 30000
+  },
+  "metrics": {
+    "Timestamp": 21313.290308,
+    "AudioHandlers": 0,
+    "AudioWorkletProcessors": 0,
+    "Documents": 1,
+    "Frames": 1,
+    "JSEventListeners": 1405,
+    "LayoutObjects": 243,
+    "MediaKeySessions": 0,
+    "MediaKeys": 0,
+    "Nodes": 353,
+    "Resources": 0,
+    "ContextLifecycleStateObservers": 7,
+    "V8PerContextDatas": 2,
+    "WorkerGlobalScopes": 0,
+    "UACSSResources": 0,
+    "RTCPeerConnections": 0,
+    "ResourceFetchers": 1,
+    "AdSubframes": 0,
+    "DetachedScriptStates": 2,
+    "ArrayBufferContents": 1,
+    "LayoutCount": 5,
+    "RecalcStyleCount": 6,
+    "LayoutDuration": 0.274398,
+    "RecalcStyleDuration": 0.205702,
+    "DevToolsCommandDuration": 0.000402,
+    "ScriptDuration": 22.219943,
+    "V8CompileDuration": 0,
+    "TaskDuration": 31.430573,
+    "TaskOtherDuration": 8.730128,
+    "ThreadTime": 31.88879,
+    "ProcessTime": 36.72,
+    "JSHeapUsedSize": 5442836,
+    "JSHeapTotalSize": 9699328,
+    "FirstMeaningfulPaint": 0,
+    "DomContentLoaded": 21283.254568,
+    "NavigationStart": 21280.58028
+  },
+  "snapshot": {
+    "elapsedMs": 32642,
+    "listeners": [
+      {
+        "key": "add:input:invalid",
+        "count": 9
+      },
+      {
+        "key": "add:WebSocket:message",
+        "count": 7
+      },
+      {
+        "key": "add:div#root:auxclick",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:click",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:contextmenu",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:copy",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:cut",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:drag",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragend",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragenter",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragexit",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragleave",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragover",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:dragstart",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:drop",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:gotpointercapture",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:input",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:keydown",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:keypress",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:keyup",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:lostpointercapture",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mousedown",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mousemove",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mouseout",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mouseover",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:mouseup",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:paste",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:pointercancel",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:pointerdown",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:pointermove",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:pointerout",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:pointerover",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:pointerup",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:reset",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:submit",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:touchcancel",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:touchend",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:touchstart",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:touchmove",
+        "count": 2
+      },
+      {
+        "key": "add:div#root:wheel",
+        "count": 2
+      }
+    ],
+    "timers": [
+      {
+        "key": "timeout:15000",
+        "count": 7
+      },
+      {
+        "key": "timeout:5000",
+        "count": 5
+      },
+      {
+        "key": "timeout:0",
+        "count": 3
+      },
+      {
+        "key": "interval:1000",
+        "count": 1
+      },
+      {
+        "key": "interval:2000",
+        "count": 1
+      },
+      {
+        "key": "timeout:1299",
+        "count": 1
+      },
+      {
+        "key": "timeout:1507",
+        "count": 1
+      }
+    ],
+    "timeouts": 17,
+    "intervals": 2,
+    "timeoutFires": 9,
+    "intervalFires": 42,
+    "webSocketMessageCount": 0,
+    "webSocketBytes": 0,
+    "webSocketEvents": [],
+    "mutationsTotal": {
+      "records": 6000,
+      "added": 0,
+      "removed": 0,
+      "attrs": 6000,
+      "text": 0
+    },
+    "mutationTargets": [
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:name",
+        "count": 8054
+      },
+      {
+        "key": "input.accent-emerald-400:attributes:name",
+        "count": 8054
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:type",
+        "count": 4027
+      },
+      {
+        "key": "input.accent-emerald-400:attributes:type",
+        "count": 4027
+      },
+      {
+        "key": "input.field-input.w-full:attributes:name",
+        "count": 8
+      },
+      {
+        "key": "input.field-input.flex-1:attributes:name",
+        "count": 4
+      },
+      {
+        "key": "input.field-input.chat-composer-input:attributes:name",
+        "count": 4
+      },
+      {
+        "key": "input:attributes:name",
+        "count": 4
+      },
+      {
+        "key": "input.field-input.w-full:attributes:type",
+        "count": 4
+      },
+      {
+        "key": "Text:characterData:",
+        "count": 2
+      },
+      {
+        "key": "input:attributes:type",
+        "count": 2
+      },
+      {
+        "key": "input#replay-sources-mobile-portrait-title.field-input.min-w-0:attributes:value",
+        "count": 1
+      }
+    ],
+    "mutationBursts": [
+      {
+        "at": 26663,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26667,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26670,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26676,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26679,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26682,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26684,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26689,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26696,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26700,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26704,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26711,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26715,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26719,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26726,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26730,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26732,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26737,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26744,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      },
+      {
+        "at": 26748,
+        "records": 6,
+        "added": 0,
+        "removed": 0,
+        "attrs": 6,
+        "text": 0
+      }
+    ],
+    "frames": {
+      "count": 1678,
+      "average": 19.307985697258644,
+      "p95": 16.700000000000728,
+      "p99": 16.80000000000291
+    },
+    "longTasks": {
+      "count": 8,
+      "top": [
+        {
+          "startTime": 625.4000000022352,
+          "duration": 2057,
+          "name": "self"
+        },
+        {
+          "startTime": 2705.400000002235,
+          "duration": 1120,
+          "name": "self"
+        },
+        {
+          "startTime": 3825.900000002235,
+          "duration": 400,
+          "name": "self"
+        },
+        {
+          "startTime": 4491.699999999255,
+          "duration": 196,
+          "name": "self"
+        },
+        {
+          "startTime": 4237.300000000745,
+          "duration": 158,
+          "name": "self"
+        },
+        {
+          "startTime": 4931.5,
+          "duration": 115,
+          "name": "self"
+        },
+        {
+          "startTime": 4828.699999999255,
+          "duration": 101,
+          "name": "self"
+        },
+        {
+          "startTime": 25127.300000000745,
+          "duration": 67,
+          "name": "self"
+        }
+      ]
+    },
+    "consoleErrors": [
+      "connect_error undefined websocket error undefined",
+      "connect_error undefined websocket error undefined",
+      "connect_error undefined websocket error undefined",
+      "connect_error undefined websocket error undefined",
+      "connect_error undefined websocket error undefined",
+      "connect_error undefined websocket error undefined",
+      "connect_error undefined websocket error undefined"
+    ]
+  }
+}

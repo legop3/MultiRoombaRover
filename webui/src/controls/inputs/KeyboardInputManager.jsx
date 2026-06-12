@@ -1,6 +1,6 @@
 // Keyboard Input Manager
 // Purpose: Captures and translates keyboard events into normalized control intents. Scope: Owns keydown/keyup listeners and dispatch coordination for drive controls.
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useControlSystem } from '../ControlContext.jsx';
 import { useChat } from '../../context/ChatContext.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
@@ -103,7 +103,7 @@ export default function KeyboardInputManager() {
   const homeAssistant = useSessionSelector((state) => state.session?.homeAssistant || null);
   const dockAssist = useManualDockAssist();
   const { homeAssistantSetState } = useSessionActions();
-  const { focusChat, blurChat, isChatFocused } = useChat();
+  const { focusChat, isChatFocused } = useChat();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const { save: saveVideoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
   const keymap = useMemo(() => normalizeKeymapEntries(state.keymap), [state.keymap]);
@@ -142,19 +142,25 @@ export default function KeyboardInputManager() {
   const servoIntervalRef = useRef(null);
   const songIntervalRef = useRef(null);
   const hornActiveRef = useRef(false);
+  // Global keyboard listeners must stay mounted while React state churns underneath them. This
+  // ref is rewritten after every commit so the stable handlers can still use fresh settings,
+  // keymaps, and action callbacks without making listener registration depend on those values.
+  const latestRef = useRef(null);
 
   const driveFromKeys = useCallback(() => {
+    const latest = latestRef.current;
+    if (!latest) return;
     const tokensSnapshot = new Set(activeTokensRef.current);
-    const speedOptions = getKeyboardDriveSpeedOptions(tokensSnapshot, keymap, keyboardSpeeds);
-    const vector = computeKeyboardDriveVector(tokensSnapshot, keymap);
-    const aux = computeKeyboardAuxMotors(tokensSnapshot, keymap);
+    const speedOptions = getKeyboardDriveSpeedOptions(tokensSnapshot, latest.keymap, latest.keyboardSpeeds);
+    const vector = computeKeyboardDriveVector(tokensSnapshot, latest.keymap);
+    const aux = computeKeyboardAuxMotors(tokensSnapshot, latest.keymap);
     if (
       vector.x !== lastVectorRef.current.x ||
       vector.y !== lastVectorRef.current.y ||
       vector.boost !== lastVectorRef.current.boost
     ) {
       lastVectorRef.current = vector;
-      setDriveVector(vector, { source: SOURCE, speedOptions });
+      latest.setDriveVector(vector, { source: SOURCE, speedOptions });
     }
     if (
       aux.main !== lastAuxRef.current.main ||
@@ -162,14 +168,14 @@ export default function KeyboardInputManager() {
       aux.vacuum !== lastAuxRef.current.vacuum
     ) {
       lastAuxRef.current = aux;
-      setAuxMotors(aux);
+      latest.setAuxMotors(aux);
     }
-    registerInputState(SOURCE, {
+    latest.registerInputState(SOURCE, {
       keys: Array.from(tokensSnapshot),
       vector,
       aux,
     });
-  }, [keymap, keyboardSpeeds, registerInputState, setAuxMotors, setDriveVector]);
+  }, []);
 
   const stopServoLoop = useCallback(() => {
     if (servoIntervalRef.current) {
@@ -179,11 +185,13 @@ export default function KeyboardInputManager() {
   }, []);
 
   const computeServoDirection = useCallback(() => {
+    const latest = latestRef.current;
+    if (!latest) return 0;
     const tokensSnapshot = new Set(activeTokensRef.current);
-    const up = bindingActive(keymap.cameraUp, tokensSnapshot);
-    const down = bindingActive(keymap.cameraDown, tokensSnapshot);
+    const up = bindingActive(latest.keymap.cameraUp, tokensSnapshot);
+    const down = bindingActive(latest.keymap.cameraDown, tokensSnapshot);
     return (up ? 1 : 0) - (down ? 1 : 0);
-  }, [keymap]);
+  }, []);
 
   const ensureServoLoop = useCallback(() => {
     const direction = computeServoDirection();
@@ -200,11 +208,16 @@ export default function KeyboardInputManager() {
         stopServoLoop();
         return;
       }
-      nudgeServo(nextDirection * servoStep);
-      servoIntervalRef.current = setTimeout(tick, servoRepeatMs);
+      const latest = latestRef.current;
+      if (!latest) {
+        stopServoLoop();
+        return;
+      }
+      latest.nudgeServo(nextDirection * latest.servoStep);
+      servoIntervalRef.current = setTimeout(tick, latest.servoRepeatMs);
     };
     servoIntervalRef.current = setTimeout(tick, 0);
-  }, [computeServoDirection, nudgeServo, servoRepeatMs, servoStep, stopServoLoop]);
+  }, [computeServoDirection, stopServoLoop]);
 
   const stopSongLoop = useCallback(() => {
     if (songIntervalRef.current) {
@@ -214,27 +227,27 @@ export default function KeyboardInputManager() {
   }, []);
 
   const computeSongDirection = useCallback(() => {
+    const latest = latestRef.current;
+    if (!latest) return 0;
     const tokensSnapshot = new Set(activeTokensRef.current);
-    const up = bindingActive(keymap.songNoteUp, tokensSnapshot);
-    const down = bindingActive(keymap.songNoteDown, tokensSnapshot);
+    const up = bindingActive(latest.keymap.songNoteUp, tokensSnapshot);
+    const down = bindingActive(latest.keymap.songNoteDown, tokensSnapshot);
     return (up ? 1 : 0) - (down ? 1 : 0);
-  }, [keymap]);
+  }, []);
 
-  const triggerSongChange = useCallback(
-    (direction) => {
-      if (direction === 0) return;
-      const current = typeof state.song?.note === 'number' ? state.song.note : SONG_DEFAULT_NOTE;
-      let next = current + direction;
-      if (next > NOTE_MAX) {
-        next = NOTE_MIN;
-      } else if (next < NOTE_MIN) {
-        next = NOTE_MAX;
-      }
-      const finalNote = setSongNote(next);
-      sendSong([{ note: finalNote, duration: SONG_DEFAULT_DURATION }], { slot: 0 });
-    },
-    [sendSong, setSongNote, state.song],
-  );
+  const triggerSongChange = useCallback((direction) => {
+    const latest = latestRef.current;
+    if (!latest || direction === 0) return;
+    const current = typeof latest.songNote === 'number' ? latest.songNote : SONG_DEFAULT_NOTE;
+    let next = current + direction;
+    if (next > NOTE_MAX) {
+      next = NOTE_MIN;
+    } else if (next < NOTE_MIN) {
+      next = NOTE_MAX;
+    }
+    const finalNote = latest.setSongNote(next);
+    latest.sendSong([{ note: finalNote, duration: SONG_DEFAULT_DURATION }], { slot: 0 });
+  }, []);
 
   const ensureSongLoop = useCallback(() => {
     const direction = computeSongDirection();
@@ -258,6 +271,7 @@ export default function KeyboardInputManager() {
   }, [computeSongDirection, stopSongLoop, triggerSongChange]);
 
   const resetAll = useCallback(() => {
+    const latest = latestRef.current;
     activeTokensRef.current.clear();
     lastVectorRef.current = ZERO_VECTOR;
     lastAuxRef.current = ZERO_AUX;
@@ -265,97 +279,131 @@ export default function KeyboardInputManager() {
     stopSongLoop();
     if (hornActiveRef.current) {
       hornActiveRef.current = false;
-      stopHorn();
+      latest?.stopHorn();
     }
-    setMicPttActive(false);
-    stopAllMotion();
-    registerInputState(SOURCE, { keys: [], vector: ZERO_VECTOR, aux: ZERO_AUX });
-  }, [registerInputState, setMicPttActive, stopAllMotion, stopHorn, stopServoLoop, stopSongLoop]);
+    latest?.setMicPttActive(false);
+    latest?.stopAllMotion();
+    latest?.registerInputState(SOURCE, { keys: [], vector: ZERO_VECTOR, aux: ZERO_AUX });
+  }, [stopServoLoop, stopSongLoop]);
 
-  const triggerHomeAssistantCycle = useCallback(
-    (targetState) => {
-      const ha = homeAssistant;
-      if (!ha?.enabled || !ha?.connected) return;
-      if (ha?.lightPolicy?.locked || ha?.lightPolicy?.lockedOn) return;
-      const entities = ha.entities || [];
-      const eligible = entities.filter(
-        (ent) =>
-          (ent.type === 'light' || ent.type === 'switch') &&
-          ent.available !== false &&
-          ent.state !== 'unavailable',
-      );
-      if (eligible.length === 0) return;
-      if (targetState === 'on') {
-        const next = eligible.find((ent) => ent.state !== 'on');
-        if (next) {
-          homeAssistantSetState(next.id, 'on').catch(() => {});
-        }
-        return;
+  const triggerHomeAssistantCycle = useCallback((targetState) => {
+    const latest = latestRef.current;
+    const ha = latest?.homeAssistant;
+    if (!ha?.enabled || !ha?.connected) return;
+    if (ha?.lightPolicy?.locked || ha?.lightPolicy?.lockedOn) return;
+    const entities = ha.entities || [];
+    const eligible = entities.filter(
+      (ent) =>
+        (ent.type === 'light' || ent.type === 'switch') &&
+        ent.available !== false &&
+        ent.state !== 'unavailable',
+    );
+    if (eligible.length === 0) return;
+    if (targetState === 'on') {
+      const next = eligible.find((ent) => ent.state !== 'on');
+      if (next) {
+        latest.homeAssistantSetState(next.id, 'on').catch(() => {});
       }
-      if (targetState === 'off') {
-        for (let idx = eligible.length - 1; idx >= 0; idx -= 1) {
-          const ent = eligible[idx];
-          if (ent.state === 'on') {
-            homeAssistantSetState(ent.id, 'off').catch(() => {});
-            break;
-          }
+      return;
+    }
+    if (targetState === 'off') {
+      for (let idx = eligible.length - 1; idx >= 0; idx -= 1) {
+        const ent = eligible[idx];
+        if (ent.state === 'on') {
+          latest.homeAssistantSetState(ent.id, 'off').catch(() => {});
+          break;
         }
       }
-    },
-    [homeAssistantSetState, homeAssistant],
-  );
+    }
+  }, []);
 
   const cycleVideoFilter = useCallback(() => {
     // Update through the same settings namespace as the Page settings dropdown so the keyboard
     // shortcut and menu never maintain separate copies of the selected filter.
-    saveVideoSettings((current) => ({
+    const latest = latestRef.current;
+    latest?.saveVideoSettings((current) => ({
       ...(current ?? {}),
       colorFilter: nextVideoFilter(current?.colorFilter),
     }));
-  }, [saveVideoSettings]);
+  }, []);
+
+  useLayoutEffect(() => {
+    // The assignment lives in a layout effect instead of render because the current React lint
+    // rules reserve refs for effects and event handlers. Layout timing keeps the ref current
+    // before the browser can deliver the next keyboard event after a committed render.
+    latestRef.current = {
+      actionTokens,
+      dockAssist,
+      focusChat,
+      homeAssistant,
+      homeAssistantSetState,
+      isChatFocused,
+      keyboardSpeeds,
+      keymap,
+      nudgeServo,
+      registerInputState,
+      runMacro,
+      saveVideoSettings,
+      sendSong,
+      servoRepeatMs,
+      servoStep,
+      setAuxMotors,
+      setDriveVector,
+      setMicPttActive,
+      setMode,
+      setSongNote,
+      songNote: state.song?.note,
+      startHorn,
+      stopAllMotion,
+      stopHorn,
+      toggleNightVision,
+    };
+  });
 
   useEffect(() => {
     function handleKeyDown(event) {
+      const latest = latestRef.current;
+      if (!latest) return;
       if (isKeyboardCaptureLocked()) return;
       if (shouldIgnoreEvent(event)) return;
       const tokens = tokensForEvent(event);
       if (tokens.length === 0) return;
       const tokenSet = new Set(tokens);
-      if (bindingActive(keymap.chatFocus, tokenSet)) {
+      if (bindingActive(latest.keymap.chatFocus, tokenSet)) {
         event.preventDefault();
         resetAll();
-        if (!isChatFocused) {
-          focusChat();
+        if (!latest.isChatFocused) {
+          latest.focusChat();
         }
         return;
       }
-      if (tokens.some((token) => actionTokens.has(token))) {
+      if (tokens.some((token) => latest.actionTokens.has(token))) {
         event.preventDefault();
       }
       const newlyPressed = tokens.filter((token) => !activeTokensRef.current.has(token));
       newlyPressed.forEach((token) => activeTokensRef.current.add(token));
 
       if (newlyPressed.length > 0) {
-        if (newlyPressed.some((token) => keymap.driveMacro?.has(token))) {
-          dockAssist.exitAssist();
-          setMode('drive');
-          runMacro('drive-sequence');
-        } else if (newlyPressed.some((token) => keymap.dockMacro?.has(token))) {
-          dockAssist.toggleAssist();
-        } else if (newlyPressed.some((token) => keymap.nightVisionToggle?.has(token))) {
-          toggleNightVision();
-        } else if (newlyPressed.some((token) => keymap.videoFilterCycle?.has(token))) {
+        if (newlyPressed.some((token) => latest.keymap.driveMacro?.has(token))) {
+          latest.dockAssist.exitAssist();
+          latest.setMode('drive');
+          latest.runMacro('drive-sequence');
+        } else if (newlyPressed.some((token) => latest.keymap.dockMacro?.has(token))) {
+          latest.dockAssist.toggleAssist();
+        } else if (newlyPressed.some((token) => latest.keymap.nightVisionToggle?.has(token))) {
+          latest.toggleNightVision();
+        } else if (newlyPressed.some((token) => latest.keymap.videoFilterCycle?.has(token))) {
           cycleVideoFilter();
-        } else if (newlyPressed.some((token) => keymap.hornHonk?.has(token))) {
+        } else if (newlyPressed.some((token) => latest.keymap.hornHonk?.has(token))) {
           if (!hornActiveRef.current) {
-            const started = startHorn();
+            const started = latest.startHorn();
             hornActiveRef.current = Boolean(started);
           }
-        } else if (newlyPressed.some((token) => keymap.micPtt?.has(token))) {
-          setMicPttActive(true);
-        } else if (newlyPressed.some((token) => keymap.homeAssistantOn?.has(token))) {
+        } else if (newlyPressed.some((token) => latest.keymap.micPtt?.has(token))) {
+          latest.setMicPttActive(true);
+        } else if (newlyPressed.some((token) => latest.keymap.homeAssistantOn?.has(token))) {
           triggerHomeAssistantCycle('on');
-        } else if (newlyPressed.some((token) => keymap.homeAssistantOff?.has(token))) {
+        } else if (newlyPressed.some((token) => latest.keymap.homeAssistantOff?.has(token))) {
           triggerHomeAssistantCycle('off');
         }
       }
@@ -366,15 +414,17 @@ export default function KeyboardInputManager() {
     }
 
     function handleKeyUp(event) {
+      const latest = latestRef.current;
+      if (!latest) return;
       if (isKeyboardCaptureLocked()) return;
       const tokens = tokensForEvent(event);
       tokens.forEach((token) => activeTokensRef.current.delete(token));
-      if (hornActiveRef.current && !bindingActive(keymap.hornHonk, activeTokensRef.current)) {
+      if (hornActiveRef.current && !bindingActive(latest.keymap.hornHonk, activeTokensRef.current)) {
         hornActiveRef.current = false;
-        stopHorn();
+        latest.stopHorn();
       }
-      if (!bindingActive(keymap.micPtt, activeTokensRef.current)) {
-        setMicPttActive(false);
+      if (!bindingActive(latest.keymap.micPtt, activeTokensRef.current)) {
+        latest.setMicPttActive(false);
       }
       ensureServoLoop();
       ensureSongLoop();
@@ -385,6 +435,9 @@ export default function KeyboardInputManager() {
       resetAll();
     }
 
+    // The global listeners are intentionally registered through stable handlers. High-frequency
+    // control context updates should refresh latestRef.current, not force the browser to detach
+    // and reattach window listeners while someone may be driving.
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     window.addEventListener('keyup', handleKeyUp, { capture: true });
     window.addEventListener('blur', handleBlur);
@@ -393,36 +446,7 @@ export default function KeyboardInputManager() {
       window.removeEventListener('keyup', handleKeyUp, { capture: true });
       window.removeEventListener('blur', handleBlur);
     };
-  }, [
-    actionTokens,
-    blurChat,
-    driveFromKeys,
-    ensureServoLoop,
-    ensureSongLoop,
-    focusChat,
-    isChatFocused,
-    keymap.chatFocus,
-    keymap.dockMacro,
-    keymap.driveMacro,
-    keymap.hornHonk,
-    keymap.homeAssistantOff,
-    keymap.homeAssistantOn,
-    keymap.micPtt,
-    keymap.nightVisionToggle,
-    keymap.videoFilterCycle,
-    resetAll,
-    runMacro,
-    setMicPttActive,
-    setMode,
-    stopAllMotion,
-    stopSongLoop,
-    startHorn,
-    stopHorn,
-    toggleNightVision,
-    triggerHomeAssistantCycle,
-    cycleVideoFilter,
-    dockAssist,
-  ]);
+  }, [cycleVideoFilter, driveFromKeys, ensureServoLoop, ensureSongLoop, resetAll, triggerHomeAssistantCycle]);
 
   const latestResetAllRef = useRef(resetAll);
   useEffect(() => {
