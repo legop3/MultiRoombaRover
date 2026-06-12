@@ -3,7 +3,7 @@
 module.exports = {
   id: 'discordPingEveryone',
   name: 'PING @EVERYONE',
-  goal: 7567,
+  goal: 10000,
   async run(ctx) {
     ctx.publishEvent({
       source: 'buttonBoxReward',
