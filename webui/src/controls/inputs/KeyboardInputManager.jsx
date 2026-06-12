@@ -2,7 +2,7 @@
 // Purpose: Captures and translates keyboard events into normalized control intents. Scope: Owns keydown/keyup listeners and dispatch coordination for drive controls.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useControlActions, useControlSelector } from '../ControlContext.jsx';
-import { useChat } from '../../context/ChatContext.jsx';
+import { useChatActions, useChatFocus } from '../../context/ChatContext.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
 import { isKeyboardCaptureLocked } from './keyboardCaptureLock.js';
@@ -105,7 +105,8 @@ export default function KeyboardInputManager() {
   const homeAssistant = useSessionSelector((state) => state.session?.homeAssistant || null);
   const dockAssist = useManualDockAssist();
   const { homeAssistantSetState } = useSessionActions();
-  const { focusChat, isChatFocused } = useChat();
+  const { focusChat } = useChatActions();
+  const { isChatFocused } = useChatFocus();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const { save: saveVideoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
   const keymap = useMemo(() => normalizeKeymapEntries(rawKeymap), [rawKeymap]);

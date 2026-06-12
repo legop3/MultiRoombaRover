@@ -1,7 +1,7 @@
 1. # FIX ALL OF THE PERFORMANCE PROFILED ISSUES!!
 2. fix up ALL discord admin commands
    1. make sure all permissions are correct
-   2. fuzzy search
+   2. fuzzy search all the things
    3. dont break on multi word nicknames
    4. make all rs commands work form both the site chat and discord
       1. make sure all the permissions are correct

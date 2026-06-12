@@ -2,7 +2,7 @@
 // Purpose: Defines the Hud Chat Input module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { memo, useMemo, useState } from 'react';
-import { useChat } from '../../../context/ChatContext.jsx';
+import { useChatActions } from '../../../context/ChatContext.jsx';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../../settings/index.js';
 
@@ -26,7 +26,7 @@ function HudChatInput({ compact = false }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
   const roverRoster = useSessionSelector((state) => state.session?.roster || []);
-  const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef, setTypingActive } = useChat();
+  const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef, setTypingActive } = useChatActions();
   const { value: ttsSettings } = useSettingsNamespace('tts', {
     engine: 'flite',
     voice: 'rms',

@@ -9,9 +9,12 @@ import messageSound from '../assets/message.mp3';
 import { useSettingsNamespace } from '../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 
-const ChatContext = createContext({
+const CHAT_TIMELINE_DEFAULT = {
   messages: [],
   typing: [],
+};
+
+const CHAT_ACTIONS_DEFAULT = {
   sendMessage: async () => {},
   focusChat: () => {},
   blurChat: () => {},
@@ -19,7 +22,31 @@ const ChatContext = createContext({
   onInputFocus: () => {},
   onInputBlur: () => {},
   setTypingActive: () => {},
+};
+
+const CHAT_FOCUS_DEFAULT = {
   isChatFocused: false,
+  selfSocketId: null,
+};
+
+// Chat messages and typing indicators are the highest-churn chat data. Keeping
+// them in their own context lets transcript components update without forcing
+// controlled composer inputs to re-render and re-commit unchanged attributes.
+const ChatTimelineContext = createContext(CHAT_TIMELINE_DEFAULT);
+
+// Actions are intentionally separate from timeline state. Consumers such as the
+// HUD composer only need stable command functions, so subscribing them to the
+// message array would recreate the performance issue this provider is avoiding.
+const ChatActionsContext = createContext(CHAT_ACTIONS_DEFAULT);
+
+// Focus state is used by keyboard input capture. It changes for input focus and
+// blur events, but it should not be tied to incoming chat traffic either.
+const ChatFocusContext = createContext(CHAT_FOCUS_DEFAULT);
+
+const ChatContext = createContext({
+  ...CHAT_TIMELINE_DEFAULT,
+  ...CHAT_ACTIONS_DEFAULT,
+  ...CHAT_FOCUS_DEFAULT,
 });
 
 export function ChatProvider({ children }) {
@@ -91,7 +118,7 @@ export function ChatProvider({ children }) {
     return () => {
       socket.off('chat:message', handleMessage);
     };
-  }, [playSound, session?.socketId, socket]);
+  }, [playSound, pushAlert, session?.socketId, socket]);
 
   useEffect(() => {
     function handleTyping(payload = {}) {
@@ -221,9 +248,18 @@ export function ChatProvider({ children }) {
   const onInputFocus = useCallback(() => setIsChatFocused(true), []);
   const onInputBlur = useCallback(() => setIsChatFocused(false), []);
 
-  const value = useMemo(
+  // Each published value is memoized independently so React only wakes the
+  // consumers attached to the slice that actually changed.
+  const timelineValue = useMemo(
     () => ({
       messages,
+      typing,
+    }),
+    [messages, typing],
+  );
+
+  const actionsValue = useMemo(
+    () => ({
       sendMessage,
       focusChat,
       blurChat,
@@ -231,20 +267,68 @@ export function ChatProvider({ children }) {
       onInputFocus,
       onInputBlur,
       setTypingActive,
-      typing,
+    }),
+    [blurChat, focusChat, onInputBlur, onInputFocus, registerInputRef, sendMessage, setTypingActive],
+  );
+
+  const focusValue = useMemo(
+    () => ({
       isChatFocused,
       selfSocketId: session?.socketId || null,
     }),
-    [blurChat, focusChat, isChatFocused, messages, onInputBlur, onInputFocus, registerInputRef, sendMessage, session?.socketId, setTypingActive, typing],
+    [isChatFocused, session?.socketId],
   );
 
-  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+  const value = useMemo(
+    () => ({
+      ...timelineValue,
+      ...actionsValue,
+      ...focusValue,
+    }),
+    [actionsValue, focusValue, timelineValue],
+  );
+
+  return (
+    // Nesting the focused providers keeps the public provider API unchanged for
+    // callers while giving individual consumers smaller subscriptions.
+    <ChatTimelineContext.Provider value={timelineValue}>
+      <ChatActionsContext.Provider value={actionsValue}>
+        <ChatFocusContext.Provider value={focusValue}>
+          <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
+        </ChatFocusContext.Provider>
+      </ChatActionsContext.Provider>
+    </ChatTimelineContext.Provider>
+  );
 }
 
 export function useChat() {
   const ctx = useContext(ChatContext);
   if (!ctx) {
     throw new Error('useChat must be used inside ChatProvider');
+  }
+  return ctx;
+}
+
+export function useChatTimeline() {
+  const ctx = useContext(ChatTimelineContext);
+  if (!ctx) {
+    throw new Error('useChatTimeline must be used inside ChatProvider');
+  }
+  return ctx;
+}
+
+export function useChatActions() {
+  const ctx = useContext(ChatActionsContext);
+  if (!ctx) {
+    throw new Error('useChatActions must be used inside ChatProvider');
+  }
+  return ctx;
+}
+
+export function useChatFocus() {
+  const ctx = useContext(ChatFocusContext);
+  if (!ctx) {
+    throw new Error('useChatFocus must be used inside ChatProvider');
   }
   return ctx;
 }
