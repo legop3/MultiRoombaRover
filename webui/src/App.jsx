@@ -15,7 +15,6 @@ import {
 } from './controls/index.js';
 import RoomCameraPanel from './components/RoomCameraPanel/index.jsx';
 import KinectPanel from './components/KinectPanel/index.jsx';
-import LogPanel from './components/LogPanel/index.jsx';
 import DriverVideo from './components/DriverVideo/index.jsx';
 import RightPaneTabs from './components/RightPaneTabs/index.jsx';
 import ModeGateOverlay from './components/ModeGateOverlay/index.jsx';
@@ -82,7 +81,6 @@ function DesktopLayout({ layout, onOpenHelpOverlay }) {
         <DriverVideo />
         <PiHostStatsCard />
         <TelemetryPanel />
-        {/* <LogPanel /> */}
       </div>
       <div className={`flex min-w-0 flex-1 flex-col ${themeGapClass} overflow-y-auto`}>
         <GlobalObjectiveBanner layout={layout} />
@@ -174,7 +172,6 @@ function MobileFeatureTabs({
           <TabPanel id="settings">
             <div className={themeStackClass}>
               <SettingsPanel />
-              <LogPanel />
             </div>
           </TabPanel>
         </TabPanels>

@@ -7,6 +7,7 @@ const loggerRoot = require('../../globals/logger');
 const logger = loggerRoot.child('logStream');
 
 const MAX_HISTORY = 200;
+const LOG_ROOM = 'log:subscribers';
 const history = [];
 
 function pushEntry(entry) {
@@ -17,11 +18,22 @@ function pushEntry(entry) {
 }
 
 function broadcast(entry) {
-  io.emit('log:entry', entry);
+  /*
+    The raw server log stream can produce dozens of socket messages per second.
+    Sending those messages only to sockets that joined the diagnostic log room
+    keeps ordinary driver pages from spending network, parsing, and session-store
+    work on logs they never render.
+  */
+  io.to(LOG_ROOM).emit('log:entry', entry);
 }
 
 function hydrateSocket(socket) {
   if (!socket) return;
+  /*
+    Hydration is tied to an explicit subscription instead of connection startup.
+    This preserves the existing "latest 200 logs" operator view while avoiding
+    a large initial payload for pages that do not mount the log panel.
+  */
   socket.emit('log:init', history);
 }
 
@@ -38,6 +50,23 @@ loggerRoot.registerSink(({ level, label, message, timestamp }) => {
 });
 
 io.on('connection', (socket) => {
-  logger.info('Hydrating log history for', socket.id);
-  hydrateSocket(socket);
+  socket.on('log:subscribe', () => {
+    /*
+      Joining before hydration means a log emitted during the same event loop
+      turn cannot be missed between "send history" and "start live stream".
+      A duplicate edge entry is less harmful than a hidden gap in diagnostics,
+      and entries have stable ids for React keys if that ever occurs.
+    */
+    socket.join(LOG_ROOM);
+    hydrateSocket(socket);
+  });
+
+  socket.on('log:unsubscribe', () => {
+    /*
+      Leaving the room is enough to stop future log entries. The retained server
+      history remains global so the next subscriber can still hydrate from the
+      same rolling diagnostic buffer.
+    */
+    socket.leave(LOG_ROOM);
+  });
 });
