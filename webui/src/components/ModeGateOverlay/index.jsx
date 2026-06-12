@@ -1,9 +1,10 @@
 // Mode Gate Overlay
 // Purpose: Defines the Mode Gate Overlay module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import AuthPanel from '../AuthPanel/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
+import { useSharedClock } from '../../hooks/useSharedClock.js';
 import SocialButton from '../SocialButton/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
 
@@ -30,13 +31,18 @@ export default function ModeGateOverlay() {
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const role = useSessionSelector((state) => state.session?.role || null);
   const reason = useSessionSelector((state) => state.session?.adminReason?.text || '');
-  const reasonUpdatedAt = useSessionSelector((state) => state.session?.adminReason?.updatedAt || null);
   const timezone = useSessionSelector((state) => state.session?.timezone || 'UTC');
   const restricted = RESTRICTED_MODES.has(mode);
   const privileged = mode === 'lockdown' ? LOCKDOWN_ROLES.has(role) : PRIVILEGED_ROLES.has(role);
-  const [now, setNow] = useState(() => new Date());
+  /*
+    The overlay is mounted for the whole app, but the server-time display is
+    only visible while access is actually blocked. Gating the shared clock here
+    prevents the hidden overlay from registering a permanent interval.
+  */
+  const nowMs = useSharedClock(1000, restricted && !privileged);
 
   const serverTime = useMemo(() => {
+    const now = new Date(nowMs);
     try {
       return new Intl.DateTimeFormat('en-US', {
         timeZone: timezone,
@@ -44,15 +50,10 @@ export default function ModeGateOverlay() {
         minute: '2-digit',
         second: '2-digit',
       }).format(now);
-    } catch (err) {
+    } catch {
       return now.toLocaleTimeString();
     }
-  }, [now, timezone]);
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  }, [nowMs, timezone]);
 
   if (!restricted || privileged) {
     return null;
@@ -73,11 +74,6 @@ export default function ModeGateOverlay() {
             {reason ? reason : 'No reason set.'}
           </p>
           <p className="text-center text-sm text-slate-300">Server time: {serverTime}</p>
-          {/* {reasonUpdatedAt ? (
-            <p className="text-[0.7rem] text-slate-500">
-              Updated {new Date(reasonUpdatedAt).toLocaleString()}
-            </p>
-          ) : null} */}
         </div>
         <div className="surface-muted">
           <AuthPanel />

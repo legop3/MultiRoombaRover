@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import { useControlSelector } from '../../../controls/index.js';
+import { useSharedClock } from '../../../hooks/useSharedClock.js';
 import SocialButton from '../../SocialButton/index.jsx';
 
 function TurnsOverlay({
@@ -16,7 +17,6 @@ function TurnsOverlay({
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
   const lastControlIntentAt = useControlSelector((control) => control.state.lastControlIntentAt);
-  const [now, setNow] = useState(() => Date.now());
   const [showTurnCue, setShowTurnCue] = useState(false);
   const [turnCueStartAt, setTurnCueStartAt] = useState(null);
   const [noticeFlashActive, setNoticeFlashActive] = useState(false);
@@ -32,19 +32,20 @@ function TurnsOverlay({
   const turnInfo = effectiveRoverId ? turnQueues?.[effectiveRoverId] : null;
   const activeDriverId = effectiveRoverId ? activeDrivers?.[effectiveRoverId] : null;
   const isActiveDriver = Boolean(socketId && activeDriverId === socketId);
+  const isTurnsMode = mode === 'turns';
+  const now = useSharedClock(1000, isTurnsMode);
   const nextDriverId = useMemo(() => {
     const queue = turnInfo?.queue || [];
     if (!queue.length || !turnInfo?.current || queue.length <= 1) return null;
     const idx = queue.findIndex((id) => id === turnInfo.current);
     if (idx === -1) return queue[0] || null;
     return queue[(idx + 1) % queue.length] || null;
-  }, [turnInfo?.queue, turnInfo?.current]);
+  }, [turnInfo]);
   const isNextDriver = Boolean(socketId && nextDriverId === socketId);
   const deadline = turnInfo?.deadline || null;
   const idleDeadline = turnInfo?.idleDeadline || null;
   const msUntilTurn = deadline ? deadline - now : null;
   const msUntilIdleSkip = idleDeadline ? idleDeadline - now : null;
-  const isTurnsMode = mode === 'turns';
   const totalRovers = roster.length;
   const totalDrivers = useMemo(() => {
     const unique = new Set();
@@ -79,12 +80,6 @@ function TurnsOverlay({
   }, [showNotTurnNotice, isNextDriver, turnSeconds]);
   const showCountdown = isActiveDriver && typeof idleSkipSeconds === 'number';
   const turnTimerFlashActive = noticeFlashActive;
-
-  useEffect(() => {
-    if (mode !== 'turns') return undefined;
-    const timer = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(timer);
-  }, [mode]);
 
   useEffect(() => {
     if (mode !== 'turns') {

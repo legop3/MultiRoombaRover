@@ -3,6 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
+import { useSharedClock } from '../../hooks/useSharedClock.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverLabel from '../RoverLabel/index.jsx';
@@ -51,7 +52,6 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const [title, setTitle] = useState('');
   const [titleDirty, setTitleDirty] = useState(false);
   const [includeSidebar, setIncludeSidebar] = useState(true);
-  const [remainingMs, setRemainingMs] = useState(0);
   const [activeJobId, setActiveJobId] = useState(null);
   const [dismissedPanelReplayId, setDismissedPanelReplayId] = useState(null);
   // Settings keys include the panel id because the same replay source control is
@@ -138,19 +138,22 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
     };
   }, [sources]);
 
-  useEffect(() => {
-    if (!replayState?.lastTriggeredAt || !replayState?.cooldownMs) {
-      setRemainingMs(0);
-      return undefined;
-    }
-    const update = () => {
-      const next = replayState.lastTriggeredAt + replayState.cooldownMs - Date.now();
-      setRemainingMs(Math.max(0, next));
-    };
-    update();
-    const interval = setInterval(update, 250);
-    return () => clearInterval(interval);
-  }, [replayState?.lastTriggeredAt, replayState?.cooldownMs, replayState?.remainingMs]);
+  const hasReplayCooldown = Boolean(replayState?.lastTriggeredAt && replayState?.cooldownMs);
+  const replayCooldownEndsAt = hasReplayCooldown
+    ? replayState.lastTriggeredAt + replayState.cooldownMs
+    : 0;
+  const cooldownNow = useSharedClock(1000, hasReplayCooldown);
+  const remainingMs = useMemo(() => {
+    if (!hasReplayCooldown) return 0;
+    /*
+      The button only shows whole seconds, so a shared one-second clock gives the
+      same useful information without each mounted replay panel owning a 250ms
+      interval. The exact server cooldown still decides whether the action is
+      accepted; this value is only the local disabled-state/display estimate.
+    */
+    const next = replayCooldownEndsAt - cooldownNow;
+    return Math.max(0, next);
+  }, [cooldownNow, hasReplayCooldown, replayCooldownEndsAt]);
 
   const replayDisabled = busy || mode === 'lockdown' || remainingMs > 0 || !selected.length;
   const selectedSet = useMemo(() => {

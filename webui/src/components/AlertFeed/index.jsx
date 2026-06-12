@@ -53,21 +53,44 @@ export default function AlertFeed({ scale = 1 }) {
 
   const latest = useMemo(() => alerts.slice(-12).map((alert) => ({ alert, key: buildKey(alert) })), [alerts]);
 
-  useEffect(() => {
-    if (!latest.length) return undefined;
-    const interval = setInterval(() => setNow(Date.now()), 200);
-    return () => clearInterval(interval);
-  }, [latest.length]);
+  const { visible, nextExpiryAt } = useMemo(() => {
+    const visibleByKey = new Map();
+    let soonestExpiryAt = null;
 
-  const visibleByKey = new Map();
-  latest.forEach((item) => {
-    const age = now - (item.alert.receivedAt ?? item.alert.timestamp ?? 0);
-    const lifetimeMs = Number.isFinite(item.alert.lifetimeMs) ? item.alert.lifetimeMs : LIFETIME_MS;
-    if (age <= lifetimeMs) {
-      visibleByKey.set(item.key, { ...item, age });
-    }
-  });
-  const visible = Array.from(visibleByKey.values()).slice(-3);
+    latest.forEach((item) => {
+      const receivedAt = item.alert.receivedAt ?? item.alert.timestamp ?? 0;
+      const age = now - receivedAt;
+      const lifetimeMs = Number.isFinite(item.alert.lifetimeMs) ? item.alert.lifetimeMs : LIFETIME_MS;
+      const expiryAt = receivedAt + lifetimeMs;
+
+      if (age <= lifetimeMs) {
+        visibleByKey.set(item.key, { ...item, age });
+        /*
+          Alerts do not render a live progress value, so polling every 200ms is
+          unnecessary. Tracking the earliest expiry lets this component sleep
+          until one visible toast actually needs to disappear.
+        */
+        soonestExpiryAt = soonestExpiryAt == null ? expiryAt : Math.min(soonestExpiryAt, expiryAt);
+      }
+    });
+
+    return {
+      visible: Array.from(visibleByKey.values()).slice(-3),
+      nextExpiryAt: soonestExpiryAt,
+    };
+  }, [latest, now]);
+
+  useEffect(() => {
+    if (nextExpiryAt == null) return undefined;
+    /*
+      The small padding avoids waking a few milliseconds before the browser's
+      current Date.now value crosses the expiry boundary. Without it, React can
+      render the same alert once more and schedule a second near-immediate timer.
+    */
+    const delayMs = Math.max(0, nextExpiryAt - Date.now()) + 25;
+    const timer = setTimeout(() => setNow(Date.now()), delayMs);
+    return () => clearTimeout(timer);
+  }, [nextExpiryAt]);
 
   if (!visible.length) return null;
 

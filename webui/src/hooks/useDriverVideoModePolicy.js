@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSessionSelector } from '../context/SessionContext.jsx';
+import { useSharedClock } from './useSharedClock.js';
 
 export function useDriverVideoModePolicy(roverId) {
   const mode = useSessionSelector((state) => state.session?.mode || null);
@@ -8,7 +9,13 @@ export function useDriverVideoModePolicy(roverId) {
   const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
-  const [now, setNow] = useState(() => Date.now());
+  const isTurnsMode = mode === 'turns';
+  /*
+    This policy only switches preview/full video around a multi-second turn
+    boundary. A shared one-second clock is responsive enough for that UI policy
+    and avoids running a separate 250ms timer beside the TurnsOverlay countdown.
+  */
+  const now = useSharedClock(1000, isTurnsMode);
 
   const turnInfo = roverId ? turnQueues?.[roverId] || null : null;
   const activeDriverId = roverId ? activeDrivers?.[roverId] || null : null;
@@ -19,11 +26,10 @@ export function useDriverVideoModePolicy(roverId) {
     const idx = queue.findIndex((id) => id === turnInfo.current);
     if (idx === -1) return queue[0] || null;
     return queue[(idx + 1) % queue.length] || null;
-  }, [turnInfo?.queue, turnInfo?.current]);
+  }, [turnInfo]);
   const isNextDriver = Boolean(socketId && nextDriverId === socketId);
   const deadline = turnInfo?.deadline || null;
   const msUntilTurn = deadline ? deadline - now : null;
-  const isTurnsMode = mode === 'turns';
   const totalRovers = roster.length;
   const totalDrivers = useMemo(() => {
     const unique = new Set();
@@ -42,12 +48,6 @@ export function useDriverVideoModePolicy(roverId) {
     isTurnsMode && isNextDriver && msUntilTurn != null && msUntilTurn <= 5000 && msUntilTurn > 0;
   const showNotTurnNotice = isTurnsMode && !isActiveDriver;
   const forceSnapshotByTurnPolicy = showNotTurnNotice && !isPreSwitchWindow && shouldUsePreviewByLoad;
-
-  useEffect(() => {
-    if (mode !== 'turns') return undefined;
-    const timer = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(timer);
-  }, [mode]);
 
   return forceSnapshotByTurnPolicy ? 'snapshot' : null;
 }

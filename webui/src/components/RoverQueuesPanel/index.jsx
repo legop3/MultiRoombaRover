@@ -1,8 +1,9 @@
 // Rover Queues Panel
 // Purpose: Defines the Rover Queues Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
+import { useSharedClock } from '../../hooks/useSharedClock.js';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverLabel from '../RoverLabel/index.jsx';
 
@@ -61,7 +62,6 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
   const { requestControl, rebootOwnRover } = useSessionActions();
   const [pending, setPending] = useState({});
   const [rebootPending, setRebootPending] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
 
   const canRequest = useMemo(() => role && role !== 'spectator', [role]);
   const adminCapable = useMemo(
@@ -72,14 +72,12 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
     () => Object.values(turnQueues || {}).some((info) => info?.deadline || info?.idleDeadline),
     [turnQueues],
   );
-
-  useEffect(() => {
-    if (!hasDeadlines) return undefined;
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [hasDeadlines]);
+  /*
+    Queue timers are shown in whole seconds, and several queue panels can be
+    mounted across desktop/mobile/spectator layouts. Sharing the one-second
+    clock keeps those labels in sync while using a single interval globally.
+  */
+  const now = useSharedClock(1000, hasDeadlines);
 
   const rosterItems = useMemo(() => {
     const known = new Set(roster.map((rover) => String(rover.id)));
