@@ -33,6 +33,11 @@
       "type": "object",
       "entityId": "neato",
       "label": "The Neato"
+    },
+    "o004": {
+      "type": "object",
+      "entityId": "macbook",
+      "label": "MacBook"
     }
   }
 }
