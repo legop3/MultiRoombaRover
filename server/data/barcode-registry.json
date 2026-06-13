@@ -38,6 +38,11 @@
       "type": "object",
       "entityId": "macbook",
       "label": "MacBook"
+    },
+    "o005": {
+      "type": "object",
+      "entityId": "laptop",
+      "label": "Broken Laptop"
     }
   }
 }
