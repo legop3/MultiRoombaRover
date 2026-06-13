@@ -48,6 +48,11 @@
       "type": "object",
       "entityId": "radio",
       "label": "S. I. M. card properly"
+    },
+    "o007": {
+      "type": "object",
+      "entityId": "printer",
+      "label": "Medical thermal printer"
     }
   }
 }
