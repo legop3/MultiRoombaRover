@@ -8,7 +8,6 @@ import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
 import SocketConnectionPill from '../../components/SocketConnectionPill/index.jsx';
 import useScannerSpeech from './useScannerSpeech.js';
-import ScannerVoiceSetup from './ScannerVoiceSetup.jsx';
 
 const EMPTY_SCANNER_STATE = {
   beepAllowed: false,
@@ -44,16 +43,16 @@ function playSubmitBeep() {
 
 export default function ScannerContent() {
   const socket = useSocket();
-  const setupMode = new URLSearchParams(window.location.search).get('setup') === 'voice';
   const inputRef = useRef(null);
   const flashTimerRef = useRef(null);
   const [scannerState, setScannerState] = useState(EMPTY_SCANNER_STATE);
+  const [scanAudioEvent, setScanAudioEvent] = useState(null);
   const [flashActive, setFlashActive] = useState(false);
 
   useDefaultNickname();
   useUserIdentitySync();
   useSpectatorMode();
-  useScannerSpeech(scannerState.lastScan);
+  useScannerSpeech(scannerState.lastScan, scanAudioEvent);
 
   const focusInput = useCallback(() => {
     inputRef.current?.focus();
@@ -76,10 +75,16 @@ export default function ScannerContent() {
         ...(nextState && typeof nextState === 'object' ? nextState : {}),
       });
     }
+    function handleScanAudio(payload = null) {
+      setScanAudioEvent(payload && typeof payload === 'object' ? payload : null);
+    }
 
+    socket.emit('barcode:subscribe', {}, () => {});
     socket.on('barcode:state', handleScannerState);
+    socket.on('barcode:scanAudio', handleScanAudio);
     return () => {
       socket.off('barcode:state', handleScannerState);
+      socket.off('barcode:scanAudio', handleScanAudio);
     };
   }, [socket]);
 
@@ -113,10 +118,6 @@ export default function ScannerContent() {
 
   const lastScan = scannerState.lastScan;
   const label = lastScan?.label || 'waiting';
-
-  if (setupMode) {
-    return <ScannerVoiceSetup />;
-  }
 
   return (
     <main

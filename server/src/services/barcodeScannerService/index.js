@@ -7,14 +7,17 @@ const logger = require('../../globals/logger').child('barcodeScannerService');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { sendAlert } = require('../alertService');
+const { ensureAudioForText, warmAudioForTexts } = require('./ttsCache');
 
 const DATA_DIR = resolveDataDir();
 const REGISTRY_PATH = resolveDataPath('barcode-registry.json');
 const RECENT_SCAN_LIMIT = 8;
 const VALID_CODE_PATTERN = /^[a-z][0-9]{3}$/;
+const SCANNER_SOCKET_ROOM = 'barcode-scanner';
 
 let lastKnownGoodRegistry = null;
 let lastRegistryError = null;
+let lastPrewarmKey = '';
 let state = {
   lastScan: null,
   recentScans: [],
@@ -103,6 +106,16 @@ function validateRegistry(rawRegistry) {
   return { codes: normalizedCodes };
 }
 
+function prewarmRegistryAudio(registry) {
+  const labels = Object.values(registry?.codes || {})
+    .map((entry) => entry?.label)
+    .filter(Boolean);
+  const nextPrewarmKey = labels.slice().sort().join('\n');
+  if (!nextPrewarmKey || nextPrewarmKey === lastPrewarmKey) return;
+  lastPrewarmKey = nextPrewarmKey;
+  warmAudioForTexts(labels);
+}
+
 function loadRegistryForScan() {
   try {
     ensureRegistryFile();
@@ -111,6 +124,7 @@ function loadRegistryForScan() {
     const registry = validateRegistry(parsed);
     lastKnownGoodRegistry = registry;
     lastRegistryError = null;
+    prewarmRegistryAudio(registry);
     return { registry, error: null };
   } catch (err) {
     lastRegistryError = err.message;
@@ -136,7 +150,10 @@ function buildStatePayload() {
 }
 
 function broadcastState() {
-  io.emit('barcode:state', buildStatePayload());
+  // Scanner state is scoped to scanner clients because scan-specific packets can
+  // include generated audio. Driver/spectator/display pages should not receive
+  // barcode audio or scanner-only state traffic.
+  io.to(SCANNER_SOCKET_ROOM).emit('barcode:state', buildStatePayload());
 }
 
 function sendBarcodeScanAlert(result) {
@@ -217,7 +234,19 @@ function resolveScan(rawCode) {
   };
 }
 
-function applyScan(rawCode) {
+async function buildScanAudio(result) {
+  const text = String(result?.speechText || '').trim();
+  if (!text) return null;
+  const audio = await ensureAudioForText(text);
+  if (!audio?.buffer) return null;
+  return {
+    cacheKey: audio.cacheKey,
+    mime: audio.mime,
+    buffer: audio.buffer,
+  };
+}
+
+async function applyScan(rawCode) {
   const result = resolveScan(rawCode);
   // The latest result is the canonical display state. Recent scans are retained
   // only for debugging and future scanner-page variants; the rover-facing first
@@ -228,15 +257,33 @@ function applyScan(rawCode) {
     registryError: result.registryError || null,
   };
   broadcastState();
+  buildScanAudio(result)
+    .then((audio) => {
+      io.to(SCANNER_SOCKET_ROOM).emit('barcode:scanAudio', {
+        scan: result,
+        audio,
+      });
+    })
+    .catch((err) => {
+      logger.warn('Barcode scan audio emission failed', {
+        code: result.code,
+        error: err.message,
+      });
+    });
   sendBarcodeScanAlert(result);
-  return result;
+  return { result };
 }
 
 io.on('connection', (socket) => {
-  socket.emit('barcode:state', buildStatePayload());
-  socket.on('barcode:scan', ({ code } = {}, cb = () => {}) => {
+  socket.on('barcode:subscribe', (_payload = {}, cb = () => {}) => {
+    socket.join(SCANNER_SOCKET_ROOM);
+    socket.emit('barcode:state', buildStatePayload());
+    cb({ success: true, state: buildStatePayload() });
+  });
+
+  socket.on('barcode:scan', async ({ code } = {}, cb = () => {}) => {
     try {
-      const result = applyScan(code);
+      const { result } = await applyScan(code);
       cb({ success: true, result, state: buildStatePayload() });
     } catch (err) {
       // Socket handlers should never let a malformed scan or registry edge case
