@@ -2,6 +2,7 @@
 // Purpose: Speaks server-provided scan labels on the scanner computer.
 // Scope: Keeps browser TTS as a local output device while leaving scan meaning and phrase selection on the server.
 import { useEffect, useRef } from 'react';
+import { speakWithKokoro, stopKokoroSpeech } from './scannerTts/kokoroBrowserTts.js';
 
 const SPEECH_START_TIMEOUT_MS = 1500;
 const SPEECH_RETRY_DELAY_MS = 700;
@@ -53,6 +54,7 @@ export default function useScannerSpeech(scan) {
     return () => {
       window.clearTimeout(retryTimerRef.current);
       window.clearTimeout(startTimerRef.current);
+      stopKokoroSpeech();
     };
   }, []);
 
@@ -77,8 +79,7 @@ export default function useScannerSpeech(scan) {
       retryTimerRef.current = window.setTimeout(() => speakOnce(), SPEECH_RETRY_DELAY_MS);
     }
 
-    function speakOnce() {
-      if (cancelled) return;
+    function speakWithBrowserFallback() {
       const synth = window.speechSynthesis;
       if (!synth || typeof window.SpeechSynthesisUtterance !== 'function') {
         retryLater();
@@ -119,11 +120,25 @@ export default function useScannerSpeech(scan) {
       }, SPEECH_START_TIMEOUT_MS);
     }
 
+    function speakOnce() {
+      if (cancelled) return;
+      clearSpeechTimers();
+      stopKokoroSpeech();
+      // Kokoro is attempted first because it gives the scanner page a consistent
+      // local model voice instead of relying on the OS/browser Web Speech voice
+      // list. The old browser TTS path remains the reliability fallback.
+      speakWithKokoro(speechText).then((spoken) => {
+        if (cancelled || spoken) return;
+        speakWithBrowserFallback();
+      });
+    }
+
     speakOnce();
 
     return () => {
       cancelled = true;
       clearSpeechTimers();
+      stopKokoroSpeech();
     };
   }, [scan]);
 }

@@ -43,6 +43,11 @@
       "type": "object",
       "entityId": "laptop",
       "label": "Broken Laptop"
+    },
+    "o006": {
+      "type": "object",
+      "entityId": "radio",
+      "label": "S. I. M. card properly"
     }
   }
 }
