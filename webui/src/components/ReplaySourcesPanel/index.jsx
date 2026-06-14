@@ -221,7 +221,7 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   return (
     <div className={`relative ${fillHeight ? 'flex h-full min-h-0 flex-col' : ''}`}>
       {showPanelReplay ? (
-        <div className="absolute bottom-[calc(100%+0.125rem)] left-1/2 z-[70] w-[min(42rem,calc(100vw-1rem))] -translate-x-1/2">
+        <div className="absolute bottom-[calc(100%+0.125rem)] left-1/2 z-[70] w-[min(20rem,calc(100vw-1rem))] -translate-x-1/2">
           <ReplayReadyPopup
             replay={latestReplay}
             variant="floating-panel"

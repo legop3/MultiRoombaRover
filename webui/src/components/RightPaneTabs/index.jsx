@@ -253,6 +253,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
       <Tabs defaultTab="telemetry" currentTab={activeTab} onTabChange={setActiveTab}>
         <TabList>
           <Tab id="telemetry">Controls</Tab>
+          <Tab id="activities">Activities</Tab> 
           <Tab id="vip" highlight={vipClipPlaying ? 'green' : vipMicActive ? 'pink' : 'none'}>
             <span className="inline-flex items-center gap-2">
               <span>VIP</span>
@@ -309,17 +310,29 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
                 </div>
               </div>
               <HomeAssistantControls />
-              <ButtonBoxPanel />
               <RoomCameraPanel defaultOrientation="horizontal" panelId="rightpane-telemetry" />
+            </div>
+          </TabPanel>
+
+          {/* activities tab */}
+          <TabPanel id="activities">
+            <div className={`flex flex-col ${themeGapClass}`}>
+              <ButtonBoxPanel />
               <KinectPanel />
             </div>
           </TabPanel>
+
+          {/* VIP tab */}
           <TabPanel id="vip" keepMounted>
             <VipPanel isActive={activeTab === 'vip'} />
           </TabPanel>
+
+          {/* help tab */}
           <TabPanel id="help">
             <HelpPanel layout={layout} onOpenOverlay={onOpenHelpOverlay} />
           </TabPanel>
+
+          {/* settings tab */}
           <TabPanel id="settings">
             <SettingsPanel />
           </TabPanel>

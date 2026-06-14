@@ -126,6 +126,7 @@ function MobileFeatureTabs({
       <Tabs defaultTab="chat" currentTab={activeTab} onTabChange={setActiveTab}>
         <TabList>
           <Tab id="chat">Chat</Tab>
+          <Tab id="activities">Activities</Tab> 
           <Tab id="vip" highlight={vipClipPlaying ? 'green' : vipMicActive ? 'pink' : 'none'}>
             <span className="inline-flex items-center gap-0.5">
               <span>VIP</span>
@@ -155,6 +156,13 @@ function MobileFeatureTabs({
               </div>
             </div>
           </TabPanel>
+          {/* activities tab */}
+          <TabPanel id="activities">
+            <div className={`flex flex-col ${themeGapClass}`}>
+              <ButtonBoxPanel />
+              <KinectPanel />
+            </div>
+          </TabPanel>
           <TabPanel id="vip" keepMounted>
             <VipPanel isActive={activeTab === 'vip'} />
           </TabPanel>
@@ -162,9 +170,7 @@ function MobileFeatureTabs({
             <div className={themeStackClass}>
               {/* {showTelemetry ? <TelemetryPanel /> : null} */}
               <HomeAssistantControls />
-              <ButtonBoxPanel />
               <RoomCameraPanel panelId={roomPanelId} />
-              <KinectPanel />
             </div>
           </TabPanel>
           <TabPanel id="help">
