@@ -5,7 +5,10 @@
    4. make all rs commands work form both the site chat and discord
       1. make sure all the permissions are correct
 2. make alert feed.jsx show more alerts at once
-3. actual barcode stuff fun
+3. roomba odometer
+   1. use wheel encoders
+   2. run averages, like 2 meters and how many encoder counts, 20 times
+4. actual barcode stuff fun
    1. games
       1. all games are global and initiated by a user
          1. all games will require you to scan yourself to keep going sometimes too
@@ -14,10 +17,10 @@
       3. most scanned items
          1. global counters
          2. you have to 
-4.  Overseer personality swapping.
-5.  maybe make a better joystick for mobile
-6.  make google tts the default everywhere but roverd
-7.  fix rover request spam queue cheat
+5.  Overseer personality swapping.
+6.  maybe make a better joystick for mobile
+7.  make google tts the default everywhere but roverd
+8.  fix rover request spam queue cheat
 
 
 # relative pipe dreams:
