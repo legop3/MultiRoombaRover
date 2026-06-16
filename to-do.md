@@ -5,11 +5,6 @@
    4. make all rs commands work form both the site chat and discord
       1. make sure all the permissions are correct
 2. make alert feed.jsx show more alerts at once
-3. roomba odometer
-   1. in activities tab
-   2. use wheel encoders
-   3. run averages, like 2 meters and how many encoder counts, 20 times
-   4. have global odometers for each rover, tagged based on name
 4. actual barcode stuff fun
    1. games
       1. all games are global and initiated by a user
@@ -19,10 +14,19 @@
       3. most scanned items
          1. global counters
          2. you have to 
-5.  Overseer personality swapping.
-6.  maybe make a better joystick for mobile
-7.  make google tts the default everywhere but roverd
-8.  fix rover request spam queue cheat
+5. overseer improvements
+   1. make it able to see rover activity
+      1. when they are docked / undocked
+      2. whos driving them
+      3. their battery levels / low
+6. roomba odometer
+   1. in activities tab
+   2. use wheel encoders
+   3. run averages, like 2 meters and how many encoder counts, 20 times
+   4. have global odometers for each rover, tagged based on name
+7.  maybe make a better joystick for mobile
+8.  make google tts the default everywhere but roverd
+9.  fix rover request spam queue cheat
 
 
 # relative pipe dreams:
