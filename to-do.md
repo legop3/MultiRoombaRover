@@ -6,8 +6,10 @@
       1. make sure all the permissions are correct
 2. make alert feed.jsx show more alerts at once
 3. roomba odometer
-   1. use wheel encoders
-   2. run averages, like 2 meters and how many encoder counts, 20 times
+   1. in activities tab
+   2. use wheel encoders
+   3. run averages, like 2 meters and how many encoder counts, 20 times
+   4. have global odometers for each rover, tagged based on name
 4. actual barcode stuff fun
    1. games
       1. all games are global and initiated by a user

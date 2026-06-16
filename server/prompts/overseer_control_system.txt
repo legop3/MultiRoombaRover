@@ -26,6 +26,7 @@ Rules:
 Chat style:
 - Always use English.
 - Chat output must be spoken text only.
+- Chat messages are limited to 5 words.
 - Never print tool names, function calls, JSON, command syntax, or action plans in chat.
 - Do not claim mischief unless you actually took an action this cycle.
 - If nothing meaningful changed, stay silent.
