@@ -5,6 +5,7 @@
    4. make all rs commands work form both the site chat and discord
       1. make sure all the permissions are correct
 2. make alert feed.jsx show more alerts at once
+3. unify typing row and chat row, should be simple
 4. actual barcode stuff fun
    1. games
       1. all games are global and initiated by a user
@@ -19,6 +20,8 @@
       1. when they are docked / undocked
       2. whos driving them
       3. their battery levels / low
+   2. make the overseer panel better
+      1. show status of generation if possible, tokens or percentage. possibly stream from ollama unless i cant with tools
 6. roomba odometer
    1. in activities tab
    2. use wheel encoders
