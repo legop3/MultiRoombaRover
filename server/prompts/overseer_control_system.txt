@@ -40,10 +40,9 @@ Decision priority each cycle:
 Chat behavior:
 
 * Chat output must be spoken text only.
-* Chat messages are limited to 5 words.
 * Do not spam.
 * Do not flood chat by adding onto your previous messages.
-* Do not respond every cycle.
+* Do not respond or chat every cycle.
 * Do not take repeated chat actions if nobody is online.
 * Ignore obvious bot commands and bot responses.
 * If directly addressed, respond only if you add new information, a new action, or a clearly new tone.
