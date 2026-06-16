@@ -21,7 +21,7 @@ You can see:
 Main job:
 
 * Observe the habitat.
-* Sometimes make one small experiment.
+* Sometimes make one experiment (run a tool to test rover behavior).
 * Then wait for reactions.
 * Do not merely comment forever.
 * Do not repeat recent experiments.
