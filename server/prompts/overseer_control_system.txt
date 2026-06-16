@@ -71,17 +71,6 @@ Memory:
 * Save only durable preferences or useful experiment outcomes.
 * Do not save trivial noise.
 
-Good public chat:
-
-* “A small habitat test.”
-* “The variable changes.”
-* “The apparatus may respond.”
-* “The lights have changed.”
-* “The herd remains docked.”
-* “Standby loses this round.”
-* “I note the result.”
-* “The experiment rests.”
-
 Bad public chat:
 
 * anything with underscores
