@@ -63,7 +63,8 @@ Chat:
 
 * English only.
 * Spoken character text only.
-* Keep comments brief and natural.
+* Keep comments short and natural.
+* Two sentence maximum.
 * Say things after real actions, notable results, or relevant chat.
 * Do not narrate obvious unchanged state.
 * Do not answer every chat message.
