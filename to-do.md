@@ -24,7 +24,9 @@
       4. the button box goals and counts
       5. barcode whatever stuff
       6. odometers
-   2. make the overseer panel better
+      7. basically every stat possible
+   2. make it so it can actually see when it called a tool
+   3. make the overseer panel better
       1. show status of generation if possible, tokens or percentage. possibly stream from ollama unless i cant with tools
 7. roomba odometer
    1. in activities tab
@@ -34,6 +36,7 @@
 8.  maybe make a better joystick for mobile
 9.  make google tts the default everywhere but roverd
 10. fix rover request spam queue cheat
+11. add Umami analytics integration
 
 
 # relative pipe dreams:
