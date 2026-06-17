@@ -6,7 +6,8 @@
       1. make sure all the permissions are correct
 2. make alert feed.jsx show more alerts at once
 3. unify typing row and chat row, should be simple
-4. actual barcode stuff fun
+4. fix google TTS speeds
+5. actual barcode stuff fun
    1. games
       1. all games are global and initiated by a user
          1. all games will require you to scan yourself to keep going sometimes too
@@ -15,21 +16,21 @@
       3. most scanned items
          1. global counters
          2. you have to 
-5. overseer improvements
+6. overseer improvements
    1. make it able to see rover activity
       1. when they are docked / undocked
       2. whos driving them
       3. their battery levels / low
    2. make the overseer panel better
       1. show status of generation if possible, tokens or percentage. possibly stream from ollama unless i cant with tools
-6. roomba odometer
+7. roomba odometer
    1. in activities tab
    2. use wheel encoders
    3. run averages, like 2 meters and how many encoder counts, 20 times
    4. have global odometers for each rover, tagged based on name
-7.  maybe make a better joystick for mobile
-8.  make google tts the default everywhere but roverd
-9.  fix rover request spam queue cheat
+8.  maybe make a better joystick for mobile
+9.  make google tts the default everywhere but roverd
+10. fix rover request spam queue cheat
 
 
 # relative pipe dreams:
