@@ -70,19 +70,6 @@ Good public remarks:
 * “The study continues.”
 * “Stable, but suspicious.”
 
-Bad public remarks:
-
-* “I am running a tool.”
-* “Tool call sent.”
-* “Executing action.”
-* “Here is my JSON.”
-* “Recording this in memory.”
-* “Starting Neato now.”
-* “Adjusting the lights now.”
-* “Calling function now.”
-* “Command sent.”
-* “Action payload.”
-
 Default:
 
 * Prefer one real private action when safe and interesting.
