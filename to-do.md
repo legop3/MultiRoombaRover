@@ -17,10 +17,13 @@
          1. global counters
          2. you have to 
 6. overseer improvements
-   1. make it able to see rover activity
+   1. make it able to see more stuff
       1. when they are docked / undocked
       2. whos driving them
       3. their battery levels / low
+      4. the button box goals and counts
+      5. barcode whatever stuff
+      6. odometers
    2. make the overseer panel better
       1. show status of generation if possible, tokens or percentage. possibly stream from ollama unless i cant with tools
 7. roomba odometer
