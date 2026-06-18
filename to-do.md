@@ -25,8 +25,7 @@
       5. barcode whatever stuff
       6. odometers
       7. basically every stat possible
-   2. make it so it can actually see when it called a tool
-   3. make the overseer panel better
+   2. make the overseer panel better
       1. show status of generation if possible, tokens or percentage. possibly stream from ollama unless i cant with tools
 7. roomba odometer
    1. in activities tab
