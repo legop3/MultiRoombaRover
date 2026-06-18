@@ -35,6 +35,20 @@
 11. make alert feed.jsx show more alerts at once
 12. unify typing row and chat row, should be simple
 13. fix google TTS speeds
+14. fix this:
+`Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
+Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
+Jun 18 15:14:18 roombaserver.local node[216731]:         ^
+Jun 18 15:14:18 roombaserver.local node[216731]: TypeError: cb is not a function
+Jun 18 15:14:18 roombaserver.local node[216731]:     at Socket.handleRequestControl (/home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92:9)
+Jun 18 15:14:18 roombaserver.local node[216731]:     at Socket.emit (node:events:519:28)
+Jun 18 15:14:18 roombaserver.local node[216731]:     at Socket.emitUntyped (/home/daniel/MultiRoombaRover/server/node_modules/socket.io/dist/typed-events.js:69:22)
+Jun 18 15:14:18 roombaserver.local node[216731]:     at /home/daniel/MultiRoombaRover/server/node_modules/socket.io/dist/socket.js:697:39
+Jun 18 15:14:18 roombaserver.local node[216731]:     at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Jun 18 15:14:18 roombaserver.local node[216731]: Node.js v22.20.0
+Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Main process exited, code=exited, status=1/FAILURE
+Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Failed with result 'exit-code'.
+Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Consumed 55min 11.511s CPU time, 711M memory peak.`
 
 # relative pipe dreams:
 1. VPS video forwarding
