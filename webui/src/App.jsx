@@ -1,6 +1,5 @@
 // Main Application Shell
 // Purpose: Composes the primary rover control interface and page-level layout. Scope: Orchestrates high-level panels, overlays, and feature modules for the default route.
-import DriverAnalytics from './components/DriverAnalytics/index.jsx';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TelemetryPanel from './components/TelemetryPanel/index.jsx';
 import PiHostStatsCard from './components/PiHostStatsCard/index.jsx';
