@@ -7,6 +7,7 @@ import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
 import SocketConnectionPill from '../../components/SocketConnectionPill/index.jsx';
+import useBarcodeGameState from '../../barcodeGames/useBarcodeGameState.js';
 import useScannerSpeech from './useScannerSpeech.js';
 
 const EMPTY_SCANNER_STATE = {
@@ -48,6 +49,7 @@ export default function ScannerContent() {
   const [scannerState, setScannerState] = useState(EMPTY_SCANNER_STATE);
   const [scanAudioEvent, setScanAudioEvent] = useState(null);
   const [flashActive, setFlashActive] = useState(false);
+  const { state: barcodeGameState } = useBarcodeGameState();
 
   useDefaultNickname();
   useUserIdentitySync();
@@ -117,7 +119,9 @@ export default function ScannerContent() {
   }, [focusInput, scannerState.beepAllowed, socket]);
 
   const lastScan = scannerState.lastScan;
-  const label = lastScan?.label || 'waiting';
+  const activeGame = barcodeGameState.activeGame;
+  const label = activeGame?.headline || lastScan?.label || 'waiting';
+  const detail = activeGame?.detail || '';
 
   return (
     <main
@@ -141,9 +145,16 @@ export default function ScannerContent() {
         }}
       />
       <section className="flex min-h-screen w-full items-center justify-center">
-        <h1 className="max-w-full break-words text-[18vw] font-black leading-none tracking-normal">
-          {label}
-        </h1>
+        <div className="flex max-w-full flex-col items-center gap-[4vh]">
+          <h1 className="max-w-full break-words text-[15vw] font-black leading-none tracking-normal">
+            {label}
+          </h1>
+          {detail ? (
+            <p className="max-w-full break-words text-[5vw] font-bold leading-tight tracking-normal">
+              {detail}
+            </p>
+          ) : null}
+        </div>
       </section>
       <SocketConnectionPill />
     </main>

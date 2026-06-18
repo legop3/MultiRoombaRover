@@ -41,6 +41,7 @@ require('./src/services/audioLevelsService');
 require('./src/services/audioForwardService');
 require('./src/services/buttonBoxService');
 require('./src/services/barcodeScannerService');
+require('./src/services/barcodeGameService');
 require('./src/services/kinectService');
 require('./src/services/sessionService');
 require('./src/services/batteryManager');

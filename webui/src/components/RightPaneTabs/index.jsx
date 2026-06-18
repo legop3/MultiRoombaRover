@@ -26,6 +26,7 @@ import VipPanel from '../VipPanel/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
+import BarcodeGamesPanel from '../BarcodeGamesPanel/index.jsx';
 import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import { useLayoutEffect, useRef, useState } from 'react';
@@ -317,6 +318,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
           {/* activities tab */}
           <TabPanel id="activities">
             <div className={`flex flex-col ${themeGapClass}`}>
+              <BarcodeGamesPanel />
               <ButtonBoxPanel />
               <KinectPanel />
             </div>

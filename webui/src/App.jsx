@@ -41,6 +41,7 @@ import VipPanel from './components/VipPanel/index.jsx';
 import { useSessionSelector } from './context/SessionContext.jsx';
 import { useTelemetryVisualPolicy } from './context/TelemetryContext.jsx';
 import ButtonBoxPanel from './components/ButtonBoxPanel/index.jsx';
+import BarcodeGamesPanel from './components/BarcodeGamesPanel/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
 import { pageBackgroundClass, themeGapClass, themeStackClass } from './themeFlags.js';
@@ -159,6 +160,7 @@ function MobileFeatureTabs({
           {/* activities tab */}
           <TabPanel id="activities">
             <div className={`flex flex-col ${themeGapClass}`}>
+              <BarcodeGamesPanel />
               <ButtonBoxPanel />
               <KinectPanel />
             </div>

@@ -7,6 +7,7 @@ const logger = require('../../globals/logger').child('barcodeScannerService');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { sendAlert } = require('../alertService');
+const { publishEvent } = require('../eventBus');
 const { ensureAudioForText, warmAudioForTexts } = require('./ttsCache');
 
 const DATA_DIR = resolveDataDir();
@@ -139,6 +140,14 @@ function loadRegistryForScan() {
   }
 }
 
+function getRegistrySnapshot() {
+  const loaded = loadRegistryForScan();
+  return {
+    registry: loaded.registry,
+    error: loaded.error || null,
+  };
+}
+
 function buildStatePayload() {
   return {
     mode: getMode(),
@@ -257,6 +266,14 @@ async function applyScan(rawCode) {
     registryError: result.registryError || null,
   };
   broadcastState();
+  // Barcode games listen to the normalized scan event instead of being called
+  // directly from this service. That keeps the scanner station's IO concerns
+  // separate from optional game rules, scoring, voting, and player attribution.
+  publishEvent({
+    source: 'barcodeScanner',
+    type: 'barcode.scanned',
+    payload: result,
+  });
   buildScanAudio(result)
     .then((audio) => {
       io.to(SCANNER_SOCKET_ROOM).emit('barcode:scanAudio', {
@@ -308,4 +325,5 @@ module.exports = {
   REGISTRY_PATH,
   applyScan,
   buildStatePayload,
+  getRegistrySnapshot,
 };
