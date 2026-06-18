@@ -21,3 +21,4 @@ webui/package-lock.json
 !server/data/
 !server/data/barcode-registry.json
 webui/src/config/analytics.jsx
+webui/src/config/driverAnalytics.json
