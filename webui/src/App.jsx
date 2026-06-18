@@ -1,5 +1,6 @@
 // Main Application Shell
 // Purpose: Composes the primary rover control interface and page-level layout. Scope: Orchestrates high-level panels, overlays, and feature modules for the default route.
+import DriverAnalytics from './config/analytics.jsx';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TelemetryPanel from './components/TelemetryPanel/index.jsx';
 import PiHostStatsCard from './components/PiHostStatsCard/index.jsx';
@@ -261,9 +262,7 @@ function App() {
 
   return (
     <div className={`${pageBackgroundClass} text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'ios-safe-screen min-h-screen'}`}>
-      {/* <!-- otterlytics (if you see this and you dont like it please let me know. These are local analytics run by Umami, not a giant corpo thing) --> */}
-      <script defer src="https://analytics.otter.land/script.js" data-website-id="82dd56a5-db44-4279-bd1e-a4d9fee39af7"></script>
-      <script defer src="https://analytics.otter.land/recorder.js" data-website-id="82dd56a5-db44-4279-bd1e-a4d9fee39af7" data-sample-rate="0.4" data-mask-level="moderate" data-max-duration="300000"></script>
+      <DriverAnalytics />
       <AppWithProviders layout={layout} isDesktop={isDesktop} fullscreen={fullscreen} />
     </div>
   );

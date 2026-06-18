@@ -20,3 +20,4 @@ server/data/buttonbox-state.json
 webui/package-lock.json
 !server/data/
 !server/data/barcode-registry.json
+webui/src/config/analytics.jsx

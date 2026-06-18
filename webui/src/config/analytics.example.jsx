@@ -1,0 +1,8 @@
+export default function DriverAnalytics() {
+    return(
+        <>
+            <script defer src="https://analytics.otter.land/script.js" data-website-id="82dd56a5-db44-4279-bd1e-a4d9fee39af7"></script>
+            <script defer src="https://analytics.otter.land/recorder.js" data-website-id="82dd56a5-db44-4279-bd1e-a4d9fee39af7" data-sample-rate="0.4" data-mask-level="moderate" data-max-duration="300000"></script>
+        </>
+    )
+}
