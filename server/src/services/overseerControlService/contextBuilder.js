@@ -9,4 +9,5 @@ function normalizeNeatoIssue(value) {
 
 function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason }) {
   const lines = [];
-  lines.push(`trigger: ${triggerReason || '
+  lines.push(`trigger: ${triggerReason || 'heartbeat'}`);
+  lines.push(`mode: ${mode || 'unknown'}`);
