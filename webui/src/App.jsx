@@ -261,7 +261,6 @@ function App() {
 
   return (
     <div className={`${pageBackgroundClass} text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'ios-safe-screen min-h-screen'}`}>
-      <DriverAnalytics />
       <AppWithProviders layout={layout} isDesktop={isDesktop} fullscreen={fullscreen} />
     </div>
   );
