@@ -1,12 +1,3 @@
-1. fix up ALL discord admin commands
-   1. make sure all permissions are correct
-   2. fuzzy search all the things
-   3. dont break on multi word nicknames
-   4. make all rs commands work form both the site chat and discord
-      1. make sure all the permissions are correct
-2. make alert feed.jsx show more alerts at once
-3. unify typing row and chat row, should be simple
-4. fix google TTS speeds
 5. actual barcode stuff fun
    1. games
       1. all games are global and initiated by a user
@@ -18,13 +9,14 @@
          2. you have to 
 6. overseer improvements
    1. make it able to see more stuff
-      1. when they are docked / undocked
-      2. whos driving them
-      3. their battery levels / low
-      4. the button box goals and counts
-      5. barcode whatever stuff
-      6. odometers
-      7. basically every stat possible
+      1. mark a stat as CHANGED FROM (oldstata) if it changed since the last cycle
+      2. when rovers are docked / undocked
+      3. whos driving rovers
+      4. rover battery levels / low
+      5. the button box rewards and counts
+      6. barcode whatever stuff
+      7. odometers
+      8. basically every stat possible
    2. make the overseer panel better
       1. show status of generation if possible, tokens or percentage. possibly stream from ollama unless i cant with tools
 7. roomba odometer
@@ -32,11 +24,17 @@
    2. use wheel encoders
    3. run averages, like 2 meters and how many encoder counts, 20 times
    4. have global odometers for each rover, tagged based on name
-8.  maybe make a better joystick for mobile
-9.  make google tts the default everywhere but roverd
-10. fix rover request spam queue cheat
-11. add Umami analytics integration
-
+8.  make google tts the default everywhere but roverd
+9.  fix rover request spam queue cheat
+10. fix up ALL discord admin commands
+   1. make sure all permissions are correct
+   2. fuzzy search all the things
+   3. dont break on multi word nicknames
+   4. make all rs commands work form both the site chat and discord
+      1. make sure all the permissions are correct
+11. make alert feed.jsx show more alerts at once
+12. unify typing row and chat row, should be simple
+13. fix google TTS speeds
 
 # relative pipe dreams:
 1. VPS video forwarding
