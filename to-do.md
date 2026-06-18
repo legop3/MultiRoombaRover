@@ -7,7 +7,8 @@
       3. most scanned items
          1. global counters
          2. you have to 
-6. overseer improvements
+6. implement multitabbing prevention using the identity system
+7. overseer improvements
    1. make it able to see more stuff
       1. mark a stat as CHANGED FROM (oldstata) if it changed since the last cycle
       2. when rovers are docked / undocked
@@ -19,23 +20,23 @@
       8. basically every stat possible
    2. make the overseer panel better
       1. show status of generation if possible, tokens or percentage. possibly stream from ollama unless i cant with tools
-7. roomba odometer
+8. roomba odometer
    1. in activities tab
    2. use wheel encoders
    3. run averages, like 2 meters and how many encoder counts, 20 times
    4. have global odometers for each rover, tagged based on name
-8.  make google tts the default everywhere but roverd
-9.  fix rover request spam queue cheat
-10. fix up ALL discord admin commands
+9.  make google tts the default everywhere but roverd
+10. fix rover request spam queue cheat
+11. fix up ALL discord admin commands
    1. make sure all permissions are correct
    2. fuzzy search all the things
    3. dont break on multi word nicknames
    4. make all rs commands work form both the site chat and discord
       1. make sure all the permissions are correct
-11. make alert feed.jsx show more alerts at once
-12. unify typing row and chat row, should be simple
-13. fix google TTS speeds
-14. fix this:
+12. make alert feed.jsx show more alerts at once
+13. unify typing row and chat row, should be simple
+14. fix google TTS speeds
+15. fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^

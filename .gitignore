@@ -23,3 +23,4 @@ webui/package-lock.json
 webui/src/config/analytics.jsx
 webui/src/config/driverAnalytics.json
 webui/src/config/analytics.html
+plans/barcodegames.txt
