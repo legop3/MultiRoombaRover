@@ -11,3 +11,140 @@ function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster
   const lines = [];
   lines.push(`trigger: ${triggerReason || 'heartbeat'}`);
   lines.push(`mode: ${mode || 'unknown'}`);
+  lines.push(`home_assistant_connected: ${homeAssistantState?.connected ? 'yes' : 'no'}`);
+  lines.push(`lights_locked_on: ${homeAssistantState?.lightPolicy?.lockedOn ? 'yes' : 'no'}`);
+  lines.push(`lift: ${liftState?.connected ? 'connected' : 'offline'} busy=${liftState?.busy ? 'yes' : 'no'}`);
+  const neatoError = normalizeNeatoIssue(neatoState?.telemetry?.robotError);
+  const neatoAlert = normalizeNeatoIssue(neatoState?.telemetry?.robotAlert);
+  lines.push(
+    `neato: ${neatoState?.connected ? 'connected' : 'offline'} state=${neatoState?.telemetry?.robotState || 'unknown'} error=${neatoError} alert=${neatoAlert}`,
+  );
+  const entities = Array.isArray(homeAssistantState?.entities) ? homeAssistantState.entities : [];
+  if (entities.length) {
+    lines.push('home_assistant_room_lights:');
+    entities.slice(0, 24).forEach((entity) => {
+      const haType = String(entity.type || 'entity');
+      const details = [
+        'kind=room_light',
+        `ha_domain=${haType}`,
+        `state=${entity.state || 'unknown'}`,
+        `available=${entity.available ? 'yes' : 'no'}`,
+      ];
+
+      // All configured Home Assistant controls in this list represent room
+      // lighting from the overseer's point of view, including outlet-backed
+      // lamps that Home Assistant exposes as switches. The original HA domain is
+      // still shown because only true light-domain entities can accept color
+      // payloads; switch-domain lamps remain valid on/off room lights.
+      details.push(`supports_color=${entity.supportsColor ? 'yes' : 'no'}`);
+      if (entity.colorHex) details.push(`color=${entity.colorHex}`);
+
+      lines.push(`- ${entity.id} ${details.join(' ')}`);
+    });
+  }
+  const roverLines = (Array.isArray(roster) ? roster : []).slice(0, 6).map((rover) => {
+    const roverId = rover?.id || 'unknown';
+    const drivers = Array.isArray(rover?.drivers) ? rover.drivers.filter(Boolean) : [];
+    const driver = drivers.length ? drivers.join(',') : 'none';
+    const status = rover?.statusTag || 'unknown';
+    return `- ${roverId} status=${status} drivers=${driver}`;
+  });
+  if (roverLines.length) {
+    lines.push('rovers:');
+    lines.push(...roverLines);
+  }
+  return lines.join('\n');
+}
+
+function buildToolState({ mode, homeAssistantState, neatoState, liftState }) {
+  return evaluateTools({ mode, homeAssistantState, neatoState, liftState });
+}
+
+function formatToolResultMessages(toolCalls) {
+  const lines = [];
+  (Array.isArray(toolCalls) ? toolCalls : []).forEach((call) => {
+    const tool = String(call?.tool || '').trim();
+    if (!tool) return;
+
+    const status = String(call?.status || call?.phase || '').trim().toLowerCase();
+    if (status === 'ok' || status === 'success' || status === 'succeeded') {
+      lines.push(`${tool}: success`);
+      return;
+    }
+
+    if (status === 'error' || status === 'failed') {
+      const error = String(call?.error || 'unknown').replace(/\s+/g, ' ').trim();
+      lines.push(`${tool}: error: ${error}`);
+      return;
+    }
+
+    if (status === 'blocked') {
+      const reason = String(call?.error || call?.reason || 'blocked').replace(/\s+/g, ' ').trim();
+      lines.push(`${tool}: blocked: ${reason}`);
+    }
+  });
+
+  if (!lines.length) return [];
+  return [{ role: 'system', content: ['TOOL_RESULT', ...lines].join('\n') }];
+}
+
+function buildConversation({ recentMessages, name }) {
+  const messages = [];
+  (recentMessages || []).forEach((entry) => {
+    const text = String(entry?.text || '').trim();
+    const toolResultMessages = formatToolResultMessages(entry?.toolCalls);
+    if (!text && !toolResultMessages.length) return;
+
+    const isAssistant = Boolean(entry?.bot);
+    const nickname = String(entry?.nickname || (isAssistant ? name || 'Overseer' : 'user')).trim();
+    if (isAssistant) {
+      if (text) messages.push({ role: 'assistant', content: text });
+      messages.push(...toolResultMessages);
+      return;
+    }
+    if (text) messages.push({ role: 'user', content: `${nickname}: ${text}` });
+  });
+  return messages;
+}
+
+function buildModelMessages({
+  systemPrompt,
+  stateUpdate,
+  memorySummary,
+  recentEvents,
+  conversationMessages,
+  availableTools,
+  blockedTools,
+}) {
+  const messages = [];
+  messages.push({ role: 'system', content: systemPrompt });
+  messages.push({ role: 'system', content: `ROOM_SNAPSHOT\n${stateUpdate}` });
+  if (memorySummary) {
+    messages.push({ role: 'system', content: `MEMORY_SUMMARY\n${memorySummary}` });
+  }
+  if (recentEvents) {
+    messages.push({ role: 'system', content: `RECENT_EVENTS\n${recentEvents}` });
+  }
+  messages.push({
+    role: 'system',
+    content: `TOOL_CONSTRAINTS\n${blockedTools.map((entry) => `- blocked: ${entry.tool} reason=${entry.reason}`).join('\n') || '- none'}`,
+  });
+  (conversationMessages || []).forEach((message) => {
+    if (!message || !message.role || !message.content) return;
+    const content = String(message.content || '')
+      .replace(/sourceMapping/g, '')
+      .replace(/SourceMapping/g, '')
+      .replace(/sourcemapping/g, '')
+      .trim();
+    if (!content) return;
+    messages.push({ ...message, content });
+  });
+  return messages;
+}
+
+module.exports = {
+  toStateUpdate,
+  buildToolState,
+  buildConversation,
+  buildModelMessages,
+};
