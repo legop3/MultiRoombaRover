@@ -5,7 +5,9 @@
 // remain thin IO surfaces that subscribe to state and send votes/scans.
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('barcodeGameService');
+const { loadConfig } = require('../../helpers/configLoader');
 const { subscribe } = require('../eventBus');
+const { sendSystemMessage } = require('../chatService');
 const { getActiveDrivers } = require('../turnService');
 const { getIdentitySummary } = require('../verificationService');
 const { getRegistrySnapshot } = require('../barcodeScannerService');
@@ -23,6 +25,23 @@ const RESULTS_WINDOW_MS = 45 * 1000;
 
 const GAME_DEFINITIONS = [scanQuest, scansPerSecond];
 const GAMES_BY_ID = Object.fromEntries(GAME_DEFINITIONS.map((game) => [game.id, game]));
+const config = loadConfig();
+const barcodeGamesConfig = config.barcodeGames || {};
+const botName = String(barcodeGamesConfig.botName || barcodeGamesConfig.name || 'Barcode Games').trim() || 'Barcode Games';
+const botProfileImageUrl = String(barcodeGamesConfig.profileImageUrl || '').trim() || null;
+
+function sendBarcodeGameChat(text) {
+  const message = String(text || '').trim();
+  if (!message) return null;
+  // Barcode game lifecycle messages use the same internal chat path as the
+  // Overseer bot. Keeping this as a local helper makes the transition code
+  // explicit while preserving the chat service's normal bot/profile handling.
+  return sendSystemMessage(message, {
+    nickname: botName,
+    bot: true,
+    profileImage: botProfileImageUrl,
+  });
+}
 
 function getGameDefinition(gameId) {
   return GAMES_BY_ID[String(gameId || '')] || null;
@@ -274,6 +293,7 @@ function startGame(draft, gameId, now) {
     gameId,
     title: definition.title,
   });
+  sendBarcodeGameChat(`${definition.title} has started.`);
   return true;
 }
 
@@ -352,6 +372,7 @@ function setVote(socket, gameId) {
       draft.activeGameId = null;
       draft.resultsUntil = null;
       draft.resultDisplay = null;
+      sendBarcodeGameChat(`Voting has started for ${definition.title}. Vote in the Activities tab.`);
     } else if (draft.phase === 'voting') {
       draft.voteEndsAt = Math.max(draft.voteEndsAt || 0, now + VOTING_WINDOW_MS);
     }
@@ -368,7 +389,8 @@ function settleActiveGameIfNeeded() {
 
   if (phase === 'voting' && store.voteEndsAt && now >= store.voteEndsAt) {
     const winner = chooseVoteWinner(store) || store.selectedGameId;
-    if (!getGameDefinition(winner)) return false;
+    const winnerDefinition = getGameDefinition(winner);
+    if (!winnerDefinition) return false;
     withGameStore((draft) => {
       draft.selectedGameId = winner;
       draft.phase = 'starting';
@@ -377,8 +399,9 @@ function settleActiveGameIfNeeded() {
       addRecentEvent(draft, {
         kind: 'gameStarting',
         gameId: winner,
-        title: getGameDefinition(winner)?.title,
+        title: winnerDefinition.title,
       });
+      sendBarcodeGameChat(`Voting ended. ${winnerDefinition.title} was selected.`);
     });
     return true;
   }
@@ -434,6 +457,7 @@ function settleActiveGameIfNeeded() {
       draft.startsAt = null;
       draft.voteEndsAt = null;
       draft.votes = {};
+      sendBarcodeGameChat(`${definition.title} ended. Results are now showing.`);
     }
   });
   return true;
@@ -470,6 +494,7 @@ function handleScan(scan) {
         draft.startsAt = null;
         draft.voteEndsAt = null;
         draft.votes = {};
+        sendBarcodeGameChat(`${definition.title} ended. Results are now showing.`);
       }
     }
 

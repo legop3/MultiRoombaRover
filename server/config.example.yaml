@@ -24,6 +24,9 @@ overseerControl:
   ollamaServer: "http://127.0.0.1:11434"
   profileImageUrl: "https://example.com/overseer.png"
   gateIntervalMs: 2000
+barcodeGames:
+  botName: "Barcode Games"
+  profileImageUrl: "https://example.com/barcode-games.png"
 media:
   # Base address for mediaMTX (scheme + host + optional port/path). The UI will always request
   #   http://<base>/<roverId>/whep
