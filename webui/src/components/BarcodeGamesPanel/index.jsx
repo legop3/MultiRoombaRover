@@ -154,32 +154,34 @@ function Leaderboard({ players, ownPlayer }) {
   const hasOwnPoints = ownPlayer && Number.isFinite(ownPlayer.totalPoints);
   return (
     <div className="space-y-1">
-      <div className="surface grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1 py-0.75">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-neutral-300">Your points</p>
-          <p className="truncate text-[0.7rem] text-neutral-400">
-            {ownPlayer?.rank ? `Rank ${ownPlayer.rank}` : 'No rank yet'}
+      <div className="grid gap-0.5 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <div className="surface grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1 py-0.75">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-neutral-300">Your points</p>
+            <p className="truncate text-[0.7rem] text-neutral-400">
+              {ownPlayer?.rank ? `Rank ${ownPlayer.rank}` : 'No rank yet'}
+            </p>
+          </div>
+          <p className="font-mono text-xl font-semibold leading-tight text-neutral-50">
+            {hasOwnPoints ? ownPlayer.totalPoints : 0}
           </p>
         </div>
-        <p className="font-mono text-xl font-semibold leading-tight text-neutral-50">
-          {hasOwnPoints ? ownPlayer.totalPoints : 0}
-        </p>
-      </div>
-      <div className="surface px-1 py-0.75">
-        <p className="mb-0.5 text-xs font-semibold text-neutral-300">Leaderboard</p>
-        {Array.isArray(players) && players.length ? (
-          <div className="grid gap-0.5">
-            {players.slice(0, 4).map((player, idx) => (
-              <div key={player.playerKey} className="surface-muted grid grid-cols-[1.5rem_minmax(0,1fr)_3rem] items-center gap-0.5 px-1 py-0.5 text-xs">
-                <span className="font-mono text-neutral-500">{idx + 1}</span>
-                <span className="truncate text-neutral-200">{player.nickname}</span>
-                <span className="text-right font-mono text-neutral-200">{player.totalPoints}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-neutral-500">No points yet</p>
-        )}
+        <div className="surface px-1 py-0.75">
+          <p className="mb-0.5 text-xs font-semibold text-neutral-300">Leaderboard</p>
+          {Array.isArray(players) && players.length ? (
+            <div className="grid gap-0.5">
+              {players.slice(0, 4).map((player, idx) => (
+                <div key={player.playerKey} className="surface-muted grid grid-cols-[1.5rem_minmax(0,1fr)_3rem] items-center gap-0.5 px-1 py-0.5 text-xs">
+                  <span className="font-mono text-neutral-500">{idx + 1}</span>
+                  <span className="truncate text-neutral-200">{player.nickname}</span>
+                  <span className="text-right font-mono text-neutral-200">{player.totalPoints}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-500">No points yet</p>
+          )}
+        </div>
       </div>
     </div>
   );
