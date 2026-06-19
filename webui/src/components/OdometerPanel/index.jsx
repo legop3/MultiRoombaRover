@@ -36,17 +36,6 @@ function formatCount(value) {
   return Number.isFinite(Number(value)) ? String(Math.round(Number(value))) : '--';
 }
 
-function formatSignedDistance(mm) {
-  const value = Number(mm);
-  if (!Number.isFinite(value)) return '--';
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${value < 0 ? '-' : ''}${formatDistance(Math.abs(value))}`;
-}
-
-function formatPercent(value) {
-  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)}%` : '--';
-}
-
 function formatAge(timestamp, now) {
   const value = Number(timestamp);
   if (!Number.isFinite(value)) return '--';
@@ -124,9 +113,8 @@ export default function OdometerPanel() {
       ) : (
         <>
           <OdometerSummary odometer={primary} rover={primaryRover} now={now} />
-          <div className="grid gap-0.5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-0.5 md:grid-cols-2">
             <EncoderDetails odometer={primary} />
-            <DistancePacketComparison odometer={primary} />
             <CalibrationDetails odometer={primary} now={now} />
           </div>
           <RoverOdometerList rows={visibleRows} primaryRoverId={primaryRoverId} />
@@ -174,22 +162,6 @@ function EncoderDetails({ odometer }) {
       <ValueRow label="Center delta" value={formatDistance(delta?.distanceMm)} />
       <ValueRow label="Rollover events" value={formatCount(odometer?.rolloverEvents)} />
       <ValueRow label="Ignored samples" value={formatCount(odometer?.ignoredSamples)} />
-    </DetailCard>
-  );
-}
-
-function DistancePacketComparison({ odometer }) {
-  const comparison = odometer?.comparison || null;
-  const last = comparison?.last || null;
-  return (
-    <DetailCard title="Distance packet comparison">
-      <ValueRow label="Last encoder" value={formatSignedDistance(last?.encoderCenterMm)} />
-      <ValueRow label="Last packet" value={formatSignedDistance(last?.distancePacketMm)} />
-      <ValueRow label="Last signed diff" value={`${formatSignedDistance(last?.signedDifferenceMm)} · ${formatPercent(last?.signedDifferencePct)}`} />
-      <ValueRow label="Session encoder" value={formatDistance(comparison?.encoderSessionMm)} />
-      <ValueRow label="Session packet" value={formatDistance(comparison?.distancePacketSessionMm)} />
-      <ValueRow label="Session diff" value={`${formatSignedDistance(comparison?.sessionDifferenceMm)} · ${formatPercent(comparison?.sessionDifferencePct)}`} />
-      <ValueRow label="Samples" value={`${formatCount(comparison?.sampleCount)} compared · ${formatCount(comparison?.missingDistanceSamples)} missing`} />
     </DetailCard>
   );
 }

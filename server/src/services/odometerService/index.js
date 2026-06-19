@@ -35,19 +35,6 @@ function safeNumber(value, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
-function createInitialComparison() {
-  return {
-    sampleCount: 0,
-    missingDistanceSamples: 0,
-    ignoredSamples: 0,
-    encoderSessionMm: 0,
-    distancePacketSessionMm: 0,
-    signedEncoderSessionMm: 0,
-    signedDistancePacketSessionMm: 0,
-    last: null,
-  };
-}
-
 function normalizeStoredEntry(entry = {}) {
   const totalMm = Math.max(0, safeNumber(entry.totalMm, 0));
   const calibrationMultiplier = Math.max(0.01, safeNumber(entry.calibrationMultiplier, DEFAULT_CALIBRATION_MULTIPLIER));
@@ -82,7 +69,6 @@ function ensureLoaded() {
         ignoredSamples: 0,
         status: 'waiting',
         statusReason: 'waiting for encoder sample',
-        comparison: createInitialComparison(),
         lastEmittedAt: 0,
         lastEmittedStatus: null,
         updatedAt: normalized.updatedAt,
@@ -114,7 +100,6 @@ function ensureState(roverId) {
       ignoredSamples: 0,
       status: 'waiting',
       statusReason: 'waiting for encoder sample',
-      comparison: createInitialComparison(),
       lastEmittedAt: 0,
       lastEmittedStatus: null,
       updatedAt: null,
@@ -186,28 +171,6 @@ function saveNow() {
   }
 }
 
-function percentDifference(differenceMm, referenceMm) {
-  const reference = Math.abs(safeNumber(referenceMm, 0));
-  if (reference < 1) return null;
-  return Math.round((Math.abs(differenceMm) / reference) * 1000) / 10;
-}
-
-function snapshotComparison(comparison = createInitialComparison()) {
-  const sessionDifferenceMm = comparison.distancePacketSessionMm - comparison.encoderSessionMm;
-  return {
-    sampleCount: comparison.sampleCount,
-    missingDistanceSamples: comparison.missingDistanceSamples,
-    ignoredSamples: comparison.ignoredSamples,
-    encoderSessionMm: Math.round(comparison.encoderSessionMm),
-    distancePacketSessionMm: Math.round(comparison.distancePacketSessionMm),
-    signedEncoderSessionMm: Math.round(comparison.signedEncoderSessionMm),
-    signedDistancePacketSessionMm: Math.round(comparison.signedDistancePacketSessionMm),
-    sessionDifferenceMm: Math.round(sessionDifferenceMm),
-    sessionDifferencePct: percentDifference(sessionDifferenceMm, comparison.encoderSessionMm),
-    last: comparison.last,
-  };
-}
-
 function snapshotState(state) {
   if (!state) return null;
   return {
@@ -226,49 +189,9 @@ function snapshotState(state) {
     lastDelta: state.lastDelta,
     rolloverEvents: state.rolloverEvents,
     ignoredSamples: state.ignoredSamples,
-    comparison: snapshotComparison(state.comparison),
     status: state.status,
     statusReason: state.statusReason,
     updatedAt: state.updatedAt,
-  };
-}
-
-function updateDistancePacketComparison(state, sensors, encoderCenterMm, encoderDistanceMm, options = {}) {
-  const comparison = state.comparison || createInitialComparison();
-  state.comparison = comparison;
-  const packetMm = Number(sensors?.distanceMm);
-  const ignored = Boolean(options.ignored);
-  if (!Number.isFinite(packetMm)) {
-    comparison.missingDistanceSamples += 1;
-    return;
-  }
-
-  const packetDistanceMm = Math.abs(packetMm);
-  const signedDifferenceMm = packetMm - encoderCenterMm;
-  const distanceDifferenceMm = packetDistanceMm - encoderDistanceMm;
-  comparison.sampleCount += 1;
-  if (ignored) {
-    // Ignored encoder deltas are still recorded as a point-in-time diagnostic,
-    // but they are not folded into the session totals. That keeps reconnect
-    // edges from making the distance-packet comparison look worse than the
-    // odometer's own accepted movement stream.
-    comparison.ignoredSamples += 1;
-  } else {
-    comparison.encoderSessionMm += encoderDistanceMm;
-    comparison.distancePacketSessionMm += packetDistanceMm;
-    comparison.signedEncoderSessionMm += encoderCenterMm;
-    comparison.signedDistancePacketSessionMm += packetMm;
-  }
-  comparison.last = {
-    encoderCenterMm: Math.round(encoderCenterMm),
-    encoderDistanceMm: Math.round(encoderDistanceMm),
-    distancePacketMm: Math.round(packetMm),
-    distancePacketAbsMm: Math.round(packetDistanceMm),
-    signedDifferenceMm: Math.round(signedDifferenceMm),
-    distanceDifferenceMm: Math.round(distanceDifferenceMm),
-    signedDifferencePct: percentDifference(signedDifferenceMm, encoderCenterMm),
-    distanceDifferencePct: percentDifference(distanceDifferenceMm, encoderDistanceMm),
-    ignored,
   };
 }
 
@@ -359,7 +282,6 @@ function processSensorFrame(roverId, sensors = {}) {
       elapsedMs,
       ignored: true,
     };
-    updateDistancePacketComparison(state, sensors, centerMm, distanceMm, { ignored: true });
     state.updatedAt = sampleAt;
     const snapshot = snapshotState(state);
     emitSnapshot(state, snapshot);
@@ -368,7 +290,6 @@ function processSensorFrame(roverId, sensors = {}) {
 
   state.totalMm += distanceMm;
   state.sessionMm += distanceMm;
-  updateDistancePacketComparison(state, sensors, centerMm, distanceMm);
   state.lastIntegratedAt = sampleAt;
   state.status = 'tracking';
   state.statusReason = distanceMm > 0 ? 'integrated encoder delta' : 'no movement';
@@ -393,7 +314,6 @@ function resetSession(roverId) {
   const state = ensureState(roverId);
   if (!state) return null;
   state.sessionMm = 0;
-  state.comparison = createInitialComparison();
   state.updatedAt = nowMs();
   const snapshot = snapshotState(state);
   emitSnapshot(state, snapshot, { force: true });
