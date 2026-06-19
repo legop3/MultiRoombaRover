@@ -29,7 +29,7 @@ import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
 import BarcodeGamesPanel from '../BarcodeGamesPanel/index.jsx';
 import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import { themeGapClass, themeStackClass } from '../../themeFlags.js';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
@@ -85,6 +85,20 @@ function DriveDockPanel() {
   const upLabel = formatKeyLabel(keymap?.cameraUp?.[0]);
   const downLabel = formatKeyLabel(keymap?.cameraDown?.[0]);
   const cameraDisabled = Boolean(!roverId || dockAssist.cameraLocked);
+  const trackedControls = useMemo(
+    () => ({
+      setNightVision: (nextOn) => {
+        trackAnalyticsEvent('night_vision_toggle', { roverId, source: 'desktop_control', enabled: Boolean(nextOn) });
+        setNightVision(nextOn);
+      },
+      startHorn: () => {
+        trackAnalyticsEvent('horn_start', { roverId, source: 'desktop_control' });
+        return startHorn();
+      },
+      stopHorn,
+    }),
+    [roverId, setNightVision, startHorn, stopHorn],
+  );
 
   return (
     <CardFrame
@@ -100,15 +114,15 @@ function DriveDockPanel() {
             <NightVisionControl
               nightVisionOn={nightVisionState?.nightVisionOn}
               disabled={!roverId}
-              onToggle={setNightVision}
+              onToggle={trackedControls.setNightVision}
               keyLabel={nightVisionLabel}
             />
           )}
           {hornAvailable && (
             <HornControl
               disabled={!roverId || hornBlocked}
-              onStart={startHorn}
-              onStop={stopHorn}
+              onStart={trackedControls.startHorn}
+              onStop={trackedControls.stopHorn}
               keyLabel={hornLabel}
               active={horn?.active}
               heat={horn?.heat}

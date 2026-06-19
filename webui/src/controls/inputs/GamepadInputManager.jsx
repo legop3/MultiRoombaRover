@@ -12,6 +12,7 @@ import {
 import { subscribeGamepadHub } from './gamepadHub.js';
 import { isTextEntryActive } from './inputFocusUtils.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
+import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 const SOURCE = 'gamepad';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
@@ -58,6 +59,7 @@ export default function GamepadInputManager() {
   } = useControlActions();
   const cameraAngle = useControlSelector((control) => control.state.camera?.angle);
   const cameraConfig = useControlSelector((control) => control.state.camera?.config);
+  const roverId = useControlSelector((control) => control.state.roverId);
   const dockAssist = useManualDockAssist();
   const { value: gamepadSettings, save: saveGamepadSettings } = useSettingsNamespace(
     'gamepad',
@@ -166,6 +168,7 @@ export default function GamepadInputManager() {
       dockAssist,
       gamepadSettings,
       registerInputState,
+      roverId,
       runMacro,
       saveGamepadSettings,
       setAuxMotors,
@@ -268,6 +271,7 @@ export default function GamepadInputManager() {
       }
 
       if (outputs.buttons.driveMacro && handleButtonEdge('driveMacro', true)) {
+        trackAnalyticsEvent('drive_start', { roverId: latest.roverId || '', source: 'gamepad' });
         latest.dockAssist.exitAssist();
         latest.setMode('drive');
         latest.runMacro('drive-sequence');
@@ -276,12 +280,14 @@ export default function GamepadInputManager() {
       }
 
       if (outputs.buttons.dockMacro && handleButtonEdge('dockMacro', true)) {
+        trackAnalyticsEvent('dock_assist_toggle', { roverId: latest.roverId || '', source: 'gamepad' });
         latest.dockAssist.toggleAssist();
       } else if (!outputs.buttons.dockMacro) {
         handleButtonEdge('dockMacro', false);
       }
 
       if (outputs.buttons.nightVisionToggle && handleButtonEdge('nightVisionToggle', true)) {
+        trackAnalyticsEvent('night_vision_toggle', { roverId: latest.roverId || '', source: 'gamepad' });
         latest.toggleNightVision();
       } else if (!outputs.buttons.nightVisionToggle) {
         handleButtonEdge('nightVisionToggle', false);

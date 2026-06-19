@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSocket } from '../../context/SocketContext.jsx';
+import { trackAnalyticsEvent, trackAnalyticsEventThrottled } from '../../analytics/index.js';
 
 const CONNECTED_FADE_DELAY_MS = 4000;
 
@@ -41,23 +42,35 @@ export default function SocketConnectionPill() {
       setLastReason('');
       show();
       scheduleFade();
+      trackAnalyticsEvent('socket_connect');
     };
 
     const onDisconnect = (reason) => {
       setConnected(false);
       setLastReason(typeof reason === 'string' ? reason : 'disconnected');
       show();
+      trackAnalyticsEventThrottled(
+        'socket_disconnect',
+        { reason: typeof reason === 'string' ? reason : 'disconnected' },
+        { key: `disconnect:${reason || 'unknown'}`, throttleMs: 30 * 1000 },
+      );
     };
 
     const onConnectError = (err) => {
       setConnected(false);
       setLastReason(err?.message || 'connect error');
       show();
+      trackAnalyticsEventThrottled(
+        'socket_connect_error',
+        { message: err?.message || 'connect error' },
+        { key: `connect_error:${err?.message || 'unknown'}`, throttleMs: 30 * 1000 },
+      );
     };
 
     const onReconnectAttempt = () => {
       setConnected(false);
       show();
+      trackAnalyticsEventThrottled('socket_reconnect_attempt', {}, { key: 'socket_reconnect_attempt', throttleMs: 30 * 1000 });
     };
 
     socket.on('connect', onConnect);

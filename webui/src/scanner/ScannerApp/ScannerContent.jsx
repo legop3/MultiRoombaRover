@@ -9,6 +9,7 @@ import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
 import SocketConnectionPill from '../../components/SocketConnectionPill/index.jsx';
 import useBarcodeGameState from '../../barcodeGames/useBarcodeGameState.js';
 import useScannerSpeech from './useScannerSpeech.js';
+import { trackAnalyticsEvent, trackAnalyticsEventThrottled } from '../../analytics/index.js';
 
 const EMPTY_SCANNER_STATE = {
   beepAllowed: false,
@@ -70,6 +71,7 @@ export default function ScannerContent() {
   const socket = useSocket();
   const inputRef = useRef(null);
   const flashTimerRef = useRef(null);
+  const scannerReadyTrackedRef = useRef(false);
   const [scannerState, setScannerState] = useState(EMPTY_SCANNER_STATE);
   const [scannerConnectionState, setScannerConnectionState] = useState({
     connected: Boolean(socket.connected),
@@ -108,6 +110,12 @@ export default function ScannerContent() {
     function handleScannerState(nextState = {}) {
       if (disposed) return;
       lastReceivedAt = Date.now();
+      if (!scannerReadyTrackedRef.current) {
+        scannerReadyTrackedRef.current = true;
+        trackAnalyticsEvent('scanner_route_ready', {
+          beepAllowed: Boolean(nextState?.beepAllowed),
+        });
+      }
       setScannerState({
         ...EMPTY_SCANNER_STATE,
         ...(nextState && typeof nextState === 'object' ? nextState : {}),
@@ -121,6 +129,9 @@ export default function ScannerContent() {
 
     function handleScanAudio(payload = null) {
       setScanAudioEvent(payload && typeof payload === 'object' ? payload : null);
+      trackAnalyticsEvent('barcode_scan_audio_play', {
+        hasPayload: Boolean(payload && typeof payload === 'object'),
+      });
     }
 
     function subscribeToScannerState() {
@@ -166,6 +177,13 @@ export default function ScannerContent() {
 
     staleTimer = window.setInterval(() => {
       const isStale = !lastReceivedAt || Date.now() - lastReceivedAt > SCANNER_STATE_STALE_MS;
+      if (isStale && lastReceivedAt) {
+        trackAnalyticsEventThrottled(
+          'scanner_state_stale',
+          { connected: Boolean(socket.connected) },
+          { key: `scanner_state_stale:${Boolean(socket.connected)}`, throttleMs: 60 * 1000 },
+        );
+      }
       setScannerConnectionState((previous) => ({
         ...previous,
         connected: Boolean(socket.connected),
@@ -214,6 +232,10 @@ export default function ScannerContent() {
     // The page intentionally sends only raw scanner text. The server reloads
     // the barcode registry, resolves labels/types, applies access policy, and
     // broadcasts the display state back to every scanner page.
+    trackAnalyticsEvent('barcode_scan_submit', {
+      length: code.length,
+      beepAllowed: scannerState.beepAllowed,
+    });
     socket.emit('barcode:scan', { code }, () => {});
     inputRef.current.value = '';
     focusInput();

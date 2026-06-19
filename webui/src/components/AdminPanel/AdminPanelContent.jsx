@@ -9,6 +9,7 @@ import OverseerControlPanel from './OverseerControlPanel.jsx';
 import ReplaySnapshotHealth from './ReplaySnapshotHealth.jsx';
 import AdminIpLogPanel from './AdminIpLogPanel.jsx';
 import CardFrame from '../CardFrame/index.jsx';
+import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 const MODES = [
   { key: 'open', label: 'Open' },
@@ -77,17 +78,23 @@ export default function AdminPanelContent() {
 
   const handleModeChange = async (event) => {
     const mode = event.target.value;
+    trackAnalyticsEvent('admin_mode_change', { mode, status: 'started' });
     try {
       await setMode(mode);
+      trackAnalyticsEvent('admin_mode_change', { mode, status: 'accepted' });
     } catch (err) {
+      trackAnalyticsEvent('admin_mode_change', { mode, status: 'failed', reason: err?.message || 'unknown' });
       alert(err.message);
     }
   };
 
   const handleForceControl = async (roverId) => {
+    trackAnalyticsEvent('admin_force_control', { roverId, status: 'started' });
     try {
       await requestControl(roverId, { force: true });
+      trackAnalyticsEvent('admin_force_control', { roverId, status: 'accepted' });
     } catch (err) {
+      trackAnalyticsEvent('admin_force_control', { roverId, status: 'failed', reason: err?.message || 'unknown' });
       alert(err.message);
     }
   };
@@ -97,9 +104,12 @@ export default function AdminPanelContent() {
     const ok = window.confirm(`Reboot rover "${rover.name || rover.id}" now?`);
     if (!ok) return;
     setRebootStates((prev) => ({ ...prev, [rover.id]: true }));
+    trackAnalyticsEvent('rover_reboot_click', { roverId: rover.id, scope: 'admin' });
     try {
       await rebootRover(rover.id);
+      trackAnalyticsEvent('rover_reboot_result', { roverId: rover.id, scope: 'admin', status: 'accepted' });
     } catch (err) {
+      trackAnalyticsEvent('rover_reboot_result', { roverId: rover.id, scope: 'admin', status: 'failed', reason: err?.message || 'unknown' });
       alert(err.message);
     } finally {
       setRebootStates((prev) => ({ ...prev, [rover.id]: false }));
@@ -113,6 +123,7 @@ export default function AdminPanelContent() {
     );
     if (!ok) return;
     setUpdateStates((prev) => ({ ...prev, [rover.id]: true }));
+    trackAnalyticsEvent('rover_update_click', { roverId: rover.id });
     try {
       // The rover acknowledges once the privileged self-update helper has been
       // launched, not when the full install finishes. That is deliberate: a
@@ -120,7 +131,9 @@ export default function AdminPanelContent() {
       // the same websocket would make the button look failed even when the
       // update is doing exactly what it should.
       await updateRover(rover.id);
+      trackAnalyticsEvent('rover_update_result', { roverId: rover.id, status: 'accepted' });
     } catch (err) {
+      trackAnalyticsEvent('rover_update_result', { roverId: rover.id, status: 'failed', reason: err?.message || 'unknown' });
       alert(err.message);
     } finally {
       setUpdateStates((prev) => ({ ...prev, [rover.id]: false }));
@@ -131,9 +144,12 @@ export default function AdminPanelContent() {
     const ok = window.confirm('Reboot the server host now? This will disconnect all users.');
     if (!ok) return;
     setServerRebooting(true);
+    trackAnalyticsEvent('server_reboot_click', { status: 'started' });
     try {
       await rebootServer();
+      trackAnalyticsEvent('server_reboot_click', { status: 'accepted' });
     } catch (err) {
+      trackAnalyticsEvent('server_reboot_click', { status: 'failed', reason: err?.message || 'unknown' });
       alert(err.message);
       setServerRebooting(false);
     }

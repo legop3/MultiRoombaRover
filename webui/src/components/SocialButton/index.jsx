@@ -5,6 +5,7 @@ import * as FaIcons from 'react-icons/fa';
 import { FaLink } from 'react-icons/fa';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { getSocialById } from '../../lib/socials.js';
+import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 function sanitizeCssColor(value) {
   if (typeof value !== 'string') return null;
@@ -38,6 +39,16 @@ export default function SocialButton({ id = null, label, url, icon, color, layou
       target="_blank"
       rel="noopener noreferrer"
       aria-label={text}
+      onClick={() => {
+        trackAnalyticsEvent('social_link_click', {
+          id: id || '',
+          label: text,
+          layout,
+        });
+        if (id === 'discord') {
+          trackAnalyticsEvent('discord_click', { layout });
+        }
+      }}
       className={`grid h-full min-h-0 w-full place-items-center rounded-md bg-slate-700 px-0.5 ${isInline ? 'py-0.5' : 'pb-3'} text-center text-sm font-medium text-white transition hover:opacity-90 ${className}`}
       style={bgColor ? { backgroundColor: bgColor } : undefined}
     >

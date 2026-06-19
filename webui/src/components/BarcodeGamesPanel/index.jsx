@@ -1,7 +1,7 @@
 // Barcode Games Panel
 // Purpose: Shows barcode game selection, current game status, and player points in the Activities tab.
 // Scope: Keeps the driver-side UI compact but informative; game-specific rules stay in server game modules.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useBarcodeGameState from '../../barcodeGames/useBarcodeGameState.js';
 import CardFrame from '../CardFrame/index.jsx';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
@@ -192,6 +192,8 @@ function Leaderboard({ players, ownPlayer }) {
 export default function BarcodeGamesPanel() {
   const { state, connectionState, voteForGame } = useBarcodeGameState();
   const [pendingGameId, setPendingGameId] = useState(null);
+  const activeSignatureRef = useRef('');
+  const participantCountRef = useRef(0);
   const activeGame = state.activeGame;
   const display = activeGame?.display || {};
   // Voting should stop once the shared game system has moved past selection.
@@ -217,6 +219,42 @@ export default function BarcodeGamesPanel() {
       phase: state.phase || 'unknown',
     });
   }, [connectionState.connected, connectionState.lastReceivedAt, connectionState.stale, state.phase]);
+
+  useEffect(() => {
+    const signature = `${activeGame?.id || 'none'}:${activeGame?.status || state.phase || 'unknown'}`;
+    if (activeSignatureRef.current === signature) return;
+    activeSignatureRef.current = signature;
+
+    /*
+      Game lifecycle events are derived from server state instead of button
+      clicks so they still report games started by another user or by a scanner
+      workflow outside this panel.
+    */
+    trackAnalyticsEvent('barcode_game_active_change', {
+      gameId: activeGame?.id || '',
+      status: activeGame?.status || '',
+      phase: state.phase || 'unknown',
+    });
+
+    if (activeGame?.status === 'ending' || state.phase === 'ending') {
+      trackAnalyticsEvent('barcode_game_round_end', {
+        gameId: activeGame?.id || '',
+        participantCount: participants.length,
+      });
+    }
+  }, [activeGame?.id, activeGame?.status, participants.length, state.phase]);
+
+  useEffect(() => {
+    if (participants.length <= participantCountRef.current) {
+      participantCountRef.current = participants.length;
+      return;
+    }
+    participantCountRef.current = participants.length;
+    trackAnalyticsEvent('barcode_game_player_join', {
+      gameId: activeGame?.id || '',
+      participantCount: participants.length,
+    });
+  }, [activeGame?.id, participants.length]);
 
   const handleVote = async (gameId) => {
     setPendingGameId(gameId);

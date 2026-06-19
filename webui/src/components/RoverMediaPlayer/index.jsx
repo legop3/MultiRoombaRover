@@ -10,6 +10,7 @@ import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import { trackAnalyticsEventThrottled } from '../../analytics/index.js';
 import {
   RESTART_DELAY_MS,
   UNMUTE_RETRY_MS,
@@ -323,6 +324,20 @@ export default function RoverMediaPlayer({
         ensurePlayback();
       }
       if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
+        /*
+          WHEP status changes can repeat during automatic restart attempts. The
+          throttled event keeps media reliability visible in analytics without
+          reporting every retry loop as a separate user action.
+        */
+        trackAnalyticsEventThrottled(
+          'whep_player_error',
+          {
+            roverId: effectiveRoverId,
+            status: nextStatus,
+            detail: info || '',
+          },
+          { key: `${effectiveRoverId || 'unknown'}:${nextStatus}:${info || ''}`, throttleMs: 60 * 1000 },
+        );
         scheduleRestart();
       }
     };
@@ -339,6 +354,15 @@ export default function RoverMediaPlayer({
       if (!active) return;
       setStatus('error');
       setDetail(err.message);
+      trackAnalyticsEventThrottled(
+        'whep_player_error',
+        {
+          roverId: effectiveRoverId,
+          status: 'start_failed',
+          detail: err.message,
+        },
+        { key: `${effectiveRoverId || 'unknown'}:start_failed:${err.message}`, throttleMs: 60 * 1000 },
+      );
       scheduleRestart();
     });
 
@@ -356,6 +380,7 @@ export default function RoverMediaPlayer({
     ensurePlayback,
     hasDedicatedAudio,
     logAudio,
+    effectiveRoverId,
   ]);
 
   useEffect(() => {

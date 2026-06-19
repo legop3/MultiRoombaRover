@@ -9,6 +9,7 @@ import NightVisionControl from '../NightVisionControl/index.jsx';
 import { AUX_ZERO } from './constants.js';
 import VacuumControls from './VacuumControls.jsx';
 import VerticalCameraTilt from './VerticalCameraTilt.jsx';
+import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 function AuxColumnContent() {
   const roverId = useControlSelector((control) => control.state.roverId);
@@ -39,10 +40,16 @@ function AuxColumnContent() {
   const handleNightVisionToggle = useCallback(
     (nextOn) => {
       if (!nightVisionAvailable) return;
+      trackAnalyticsEvent('night_vision_toggle', { roverId, source: 'mobile_control', enabled: Boolean(nextOn) });
       setNightVision(nextOn);
     },
-    [nightVisionAvailable, setNightVision],
+    [nightVisionAvailable, roverId, setNightVision],
   );
+
+  const handleHornStart = useCallback(() => {
+    trackAnalyticsEvent('horn_start', { roverId, source: 'mobile_control' });
+    return startHorn();
+  }, [roverId, startHorn]);
 
   const handleAuxPress = useCallback(
     (id, values) => {
@@ -99,7 +106,7 @@ function AuxColumnContent() {
         {hornAvailable ? (
           <HornControl
             disabled={disabled || hornBlocked}
-            onStart={startHorn}
+            onStart={handleHornStart}
             onStop={stopHorn}
             active={horn?.active}
             heat={horn?.heat}

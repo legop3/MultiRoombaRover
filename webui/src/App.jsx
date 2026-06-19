@@ -343,6 +343,11 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
     trackAnalyticsEvent('fullscreen_prompt_show', { layout, mode: fullscreenMode });
   }, [fullscreenMode, fullscreenVisible, layout]);
 
+  useEffect(() => {
+    if (!quickstartVisible) return;
+    trackAnalyticsEvent('quickstart_open', { layout });
+  }, [layout, quickstartVisible]);
+
   const openHelp = useCallback(() => {
     setHelpVisible(true);
     trackAnalyticsEvent('help_open', { layout, source: 'panel' });

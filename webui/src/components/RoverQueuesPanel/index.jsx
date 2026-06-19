@@ -6,6 +6,7 @@ import { useSessionActions, useSessionSelector } from '../../context/SessionCont
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverLabel from '../RoverLabel/index.jsx';
+import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -90,9 +91,22 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
   async function handleRequest(targetRoverId) {
     if (!targetRoverId) return;
     setPending((prev) => ({ ...prev, [targetRoverId]: true }));
+    trackAnalyticsEvent('rover_queue_join', {
+      roverId: targetRoverId,
+      alreadyAssigned: assignedRoverId === String(targetRoverId),
+    });
     try {
       await requestControl(targetRoverId);
+      trackAnalyticsEvent('rover_queue_join_result', {
+        roverId: targetRoverId,
+        status: 'accepted',
+      });
     } catch (err) {
+      trackAnalyticsEvent('rover_queue_join_result', {
+        roverId: targetRoverId,
+        status: 'failed',
+        reason: err?.message || 'unknown',
+      });
       alert(err.message);
     } finally {
       setPending((prev) => ({ ...prev, [targetRoverId]: false }));
@@ -107,10 +121,18 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
     const ok = window.confirm(`Reboot your rover "${assignedRoverName}" now?`);
     if (!ok) return;
     setRebootPending(true);
+    trackAnalyticsEvent('rover_reboot_click', { roverId: assignedRoverId, scope: 'own_rover' });
     try {
       await rebootOwnRover();
+      trackAnalyticsEvent('rover_reboot_result', { roverId: assignedRoverId, scope: 'own_rover', status: 'accepted' });
       alert('Reboot command sent.');
     } catch (err) {
+      trackAnalyticsEvent('rover_reboot_result', {
+        roverId: assignedRoverId,
+        scope: 'own_rover',
+        status: 'failed',
+        reason: err?.message || 'unknown',
+      });
       alert(err.message);
     } finally {
       setRebootPending(false);
