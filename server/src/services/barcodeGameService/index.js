@@ -14,6 +14,7 @@ const { getRegistrySnapshot } = require('../barcodeScannerService');
 const { loadStore, withGameStore } = require('./store');
 const scanQuest = require('./games/scanQuest');
 const scansPerSecond = require('./games/scansPerSecond');
+const mostItems = require('./games/mostItems');
 
 const GAME_SOCKET_ROOM = 'barcode-game';
 const RECENT_EVENT_LIMIT = 20;
@@ -24,7 +25,7 @@ const JOIN_WINDOW_MS = 30 * 1000;
 const STARTING_WINDOW_MS = 5 * 1000;
 const RESULTS_WINDOW_MS = 45 * 1000;
 
-const GAME_DEFINITIONS = [scanQuest, scansPerSecond];
+const GAME_DEFINITIONS = [scanQuest, scansPerSecond, mostItems];
 const GAMES_BY_ID = Object.fromEntries(GAME_DEFINITIONS.map((game) => [game.id, game]));
 const config = loadConfig();
 const barcodeGamesConfig = config.barcodeGames || {};
@@ -42,6 +43,152 @@ function sendBarcodeGameChat(text) {
     bot: true,
     profileImage: botProfileImageUrl,
   });
+}
+
+function formatList(items = [], limit = 5) {
+  // Chat messages should stay readable in the normal feed. This helper keeps
+  // every lifecycle message to a short list while still making it obvious when
+  // more players or stats existed than could fit comfortably in one message.
+  const values = items
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  if (!values.length) return '';
+
+  const visible = values.slice(0, limit);
+  const extraCount = values.length - visible.length;
+  const suffix = extraCount > 0 ? `, and ${extraCount} more` : '';
+  return `${visible.join(', ')}${suffix}`;
+}
+
+function getParticipantName(participant = {}) {
+  return participant.nickname || participant.roverId || participant.participantKey || '';
+}
+
+function formatParticipantSummary(participants = []) {
+  const names = formatList(participants.map(getParticipantName));
+  return names || 'no counted rovers yet';
+}
+
+function formatVoteSummary(votes = {}, selectedGameId = null) {
+  const counts = countVotes(votes);
+  const selectedVotes = selectedGameId ? counts[selectedGameId] || 0 : 0;
+  const totalVotes = Object.values(counts).reduce((sum, count) => sum + count, 0);
+
+  // The selected vote count matters more than a full per-game breakdown in
+  // chat. The detailed vote buttons still show every game, while the bot gives
+  // enough context to explain why this specific game moved to joining.
+  if (!totalVotes) return 'No votes were counted';
+  if (selectedVotes === totalVotes) {
+    return `${selectedVotes} ${selectedVotes === 1 ? 'vote' : 'votes'}`;
+  }
+  return `${selectedVotes} of ${totalVotes} ${totalVotes === 1 ? 'vote' : 'votes'}`;
+}
+
+function normalizeAwardSummaries(awards = []) {
+  const totalsByPlayer = {};
+
+  awards.forEach((award) => {
+    const playerKey = award?.playerKey;
+    const points = Number.isFinite(award?.points) ? Math.max(0, Math.floor(award.points)) : 0;
+    // applyPointAwards uses this same identity-only rule. Repeating it here
+    // prevents the bot from claiming that a rover-only participant earned
+    // leaderboard points when the persistent ledger intentionally ignored it.
+    if (!playerKey || !String(playerKey).startsWith('identity:') || !points) return;
+    const previous = totalsByPlayer[playerKey] || {};
+    totalsByPlayer[playerKey] = {
+      playerKey,
+      nickname: award.nickname || previous.nickname || award.roverId || 'unknown player',
+      roverId: award.roverId || previous.roverId || null,
+      points: (Number.isFinite(previous.points) ? previous.points : 0) + points,
+    };
+  });
+
+  return Object.values(totalsByPlayer).sort((a, b) => (b.points || 0) - (a.points || 0));
+}
+
+function formatAwardSummary(awards = []) {
+  const summaries = normalizeAwardSummaries(awards);
+  if (!summaries.length) return '';
+
+  // Award packets are the most authoritative source for point changes because
+  // they are what the shared ledger actually applies. The formatter groups
+  // multiple awards per player so chat does not spam one line per scan.
+  return formatList(
+    summaries.map((award) => `${award.nickname || award.roverId} scored ${award.points} ${award.points === 1 ? 'point' : 'points'}`),
+    5,
+  );
+}
+
+function formatPublicScoreSummary(publicState = {}) {
+  const scoreEntries = Array.isArray(publicState?.scores)
+    ? publicState.scores
+    : Array.isArray(publicState?.finalResult?.participants)
+      ? publicState.finalResult.participants
+      : [];
+
+  const summaries = scoreEntries
+    .map((entry) => {
+      // Public game state is less authoritative than award packets, but it is
+      // still valuable for games that award throughout the round. The formatter
+      // accepts both point-shaped and scan-count-shaped entries so game modules
+      // can expose natural result data without chat-specific contracts.
+      const points = Number.isFinite(entry?.points) ? Math.max(0, Math.floor(entry.points)) : null;
+      const scanCount = Number.isFinite(entry?.scanCount) ? Math.max(0, Math.floor(entry.scanCount)) : null;
+      const name = entry?.nickname || entry?.roverId || entry?.playerKey || '';
+
+      if (!name) return null;
+      if (points !== null && points > 0) {
+        return `${name} scored ${points} ${points === 1 ? 'point' : 'points'}`;
+      }
+      if (scanCount !== null && scanCount > 0) {
+        return `${name} made ${scanCount} ${scanCount === 1 ? 'scan' : 'scans'}`;
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  // Some games, like scan quest, award during the round instead of returning a
+  // final award packet. Their public state still carries round scores, so this
+  // gives the bot a useful end summary without making each game hand-write chat.
+  return formatList(summaries, 5);
+}
+
+function formatResultSummary(display = {}) {
+  const primary = String(display?.primary || '').trim();
+  const usefulStats = Array.isArray(display?.stats)
+    ? display.stats
+        .map((stat) => {
+          const label = String(stat?.label || '').trim();
+          const value = String(stat?.value ?? '').trim();
+          if (!label || !value) return '';
+          return `${label}: ${value}`;
+        })
+        .filter(Boolean)
+    : [];
+
+  return formatList([primary, ...usefulStats], 3);
+}
+
+function sendGameStartChat(definition, participants = []) {
+  const title = definition?.title || 'Barcode game';
+  const participantSummary = formatParticipantSummary(participants);
+  sendBarcodeGameChat(`${title} has started with ${participantSummary}.`);
+}
+
+function sendGameEndChat(definition, { display = null, publicState = null, awards = [], participants = [] } = {}) {
+  const title = definition?.title || 'Barcode game';
+  const awardSummary = formatAwardSummary(awards) || formatPublicScoreSummary(publicState);
+  const resultSummary = formatResultSummary(display || publicState?.display || {});
+  const participantSummary = formatParticipantSummary(participants);
+  const details = [
+    resultSummary,
+    awardSummary || `Played by ${participantSummary}`,
+  ].filter(Boolean);
+
+  // End messages intentionally combine game-provided results with shared ledger
+  // awards. That keeps the bot useful for both end-scored games and games that
+  // score during play while still avoiding game-specific chat code.
+  sendBarcodeGameChat(`${title} ended. ${details.join(' ') || 'Results are now showing.'}`);
 }
 
 function getGameDefinition(gameId) {
@@ -340,7 +487,7 @@ function startGame(draft, gameId, now) {
     gameId,
     title: definition.title,
   });
-  sendBarcodeGameChat(`${definition.title} has started.`);
+  sendGameStartChat(definition, getRoundParticipants(draft));
   return true;
 }
 
@@ -421,7 +568,7 @@ function setVote(socket, gameId) {
       draft.resultsUntil = null;
       draft.resultDisplay = null;
       draft.roundParticipants = {};
-      sendBarcodeGameChat(`Voting has started for ${definition.title}. Vote in the Activities tab.`);
+      sendBarcodeGameChat(`Voting has started. Current pick: ${definition.title}. Vote in the Activities tab.`);
     } else if (draft.phase === 'voting') {
       draft.voteEndsAt = Math.max(draft.voteEndsAt || 0, now + VOTING_WINDOW_MS);
     }
@@ -452,7 +599,7 @@ function settleActiveGameIfNeeded() {
         gameId: winner,
         title: winnerDefinition.title,
       });
-      sendBarcodeGameChat(`Voting ended. ${winnerDefinition.title} was selected.`);
+      sendBarcodeGameChat(`Voting ended. ${winnerDefinition.title} was selected with ${formatVoteSummary(draft.votes, winner)}. Scan a rover to join.`);
     });
     return true;
   }
@@ -475,6 +622,7 @@ function settleActiveGameIfNeeded() {
       draft.resultDisplay = null;
       draft.votes = {};
       draft.roundParticipants = {};
+      sendBarcodeGameChat('No rover joined in time. The selected barcode game was cancelled.');
     });
     return true;
   }
@@ -523,6 +671,7 @@ function settleActiveGameIfNeeded() {
       const publicState = definition.getPublicState
         ? definition.getPublicState(nextState, buildGameContext(draft, { now }))
         : null;
+      const participants = getRoundParticipants(draft);
       draft.phase = 'results';
       draft.resultGameId = activeGameId;
       draft.resultDisplay = display || publicState?.display || null;
@@ -533,7 +682,12 @@ function settleActiveGameIfNeeded() {
       draft.voteEndsAt = null;
       draft.joinEndsAt = null;
       draft.votes = {};
-      sendBarcodeGameChat(`${definition.title} ended. Results are now showing.`);
+      sendGameEndChat(definition, {
+        display: draft.resultDisplay,
+        publicState,
+        awards,
+        participants,
+      });
     }
   });
   return true;
@@ -590,6 +744,7 @@ function handleScan(scan) {
         const publicState = definition.getPublicState
           ? definition.getPublicState(nextState, buildGameContext(draft, { now }))
           : null;
+        const finalParticipants = getRoundParticipants(draft);
         draft.phase = 'results';
         draft.resultGameId = activeGameId;
         draft.resultDisplay = display || publicState?.display || null;
@@ -600,7 +755,12 @@ function handleScan(scan) {
         draft.voteEndsAt = null;
         draft.joinEndsAt = null;
         draft.votes = {};
-        sendBarcodeGameChat(`${definition.title} ended. Results are now showing.`);
+        sendGameEndChat(definition, {
+          display: draft.resultDisplay,
+          publicState,
+          awards,
+          participants: finalParticipants,
+        });
       }
     }
 

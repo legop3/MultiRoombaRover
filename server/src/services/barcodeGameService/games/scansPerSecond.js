@@ -6,6 +6,7 @@
 const GAME_ID = 'scansPerSecond';
 const ROUND_DURATION_MS = 5 * 60 * 1000;
 const RESULT_IDLE_MS = 60 * 1000;
+const MAX_ROUND_POINTS = 30;
 
 function createInitialState() {
   return {
@@ -89,7 +90,10 @@ function finishRound(state, endedAt = Date.now()) {
 
 function buildAwards(result, state) {
   if (!result?.participants?.length || !result.scanCount) return [];
-  const basePoints = Math.max(1, Math.round(result.scansPerSecond * 10));
+  // The rate can get silly if people discover a very fast scanning technique.
+  // Capping the shared point pool keeps this speed game comparable to the
+  // objective games while preserving the uncapped scan-rate record separately.
+  const basePoints = Math.min(MAX_ROUND_POINTS, Math.max(1, Math.round(result.scansPerSecond * 10)));
   return result.participants
     .filter((participant) => participant?.playerKey)
     .map((participant) => {

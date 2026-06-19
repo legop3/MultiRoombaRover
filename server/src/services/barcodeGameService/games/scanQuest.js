@@ -5,8 +5,9 @@
 
 const GAME_ID = 'scanQuest';
 const QUEST_LENGTH_OPTIONS = [1, 2];
-const REQUEST_TIMEOUT_MS = 3.5 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 90 * 1000;
 const ROUND_DURATION_MS = 5 * 60 * 1000;
+const POINTS_PER_STEP = 5;
 
 function createInitialState() {
   return {
@@ -196,7 +197,10 @@ function handleScan(rawState, scan, context = {}) {
     return { state, awards: [] };
   }
 
-  const points = state.currentQuest.steps.length;
+  // A completed quest is worth more than a raw scan because it asks the driver
+  // to find a specific object, stay in order, and finish within the per-request
+  // window. Keeping this in a constant makes future game-balance passes obvious.
+  const points = state.currentQuest.steps.length * POINTS_PER_STEP;
   state.completedQuests += 1;
   addScore(state, context.participants || [], points);
   addRecentEvent(state, {
