@@ -14,11 +14,71 @@
     <!-- place analytics tags here and they will be injected into <head> of index.html at build time of the web UI. -->
 <!-- these tags are loaded PAGE-WIDE, this means /, /spectate, /mini, etc. -->
 
+<script>
+  /*
+    Build-time analytics adapter for the rover UI.
+
+    React only calls window.roverAnalytics.track/identify. Keeping the Umami
+    adapter here means analytics can still be removed, replaced, or configured
+    by changing this injected file instead of rebuilding app logic around a
+    specific analytics provider.
+  */
+  (function () {
+    var pendingCalls = [];
+    var flushTimer = null;
+
+    function callUmami(method, args) {
+      if (!window.umami || typeof window.umami[method] !== 'function') return false;
+      window.umami[method].apply(window.umami, args);
+      return true;
+    }
+
+    function flushPendingCalls() {
+      if (!pendingCalls.length) return;
+      if (!window.umami) return;
+
+      pendingCalls = pendingCalls.filter(function (call) {
+        return !callUmami(call.method, call.args);
+      });
+
+      if (!pendingCalls.length && flushTimer) {
+        window.clearInterval(flushTimer);
+        flushTimer = null;
+      }
+    }
+
+    function enqueue(method, args) {
+      if (callUmami(method, args)) return;
+      pendingCalls.push({ method: method, args: args });
+
+      /*
+        The React app may fire route/session events before Umami's deferred
+        script has executed. Queueing preserves those early events while still
+        letting the whole adapter no-op harmlessly if the script is blocked.
+      */
+      if (!flushTimer) {
+        flushTimer = window.setInterval(flushPendingCalls, 500);
+      }
+    }
+
+    window.roverAnalytics = {
+      track: function (name, data) {
+        enqueue('track', [name, data || {}]);
+      },
+      identify: function (data) {
+        enqueue('identify', [data || {}]);
+      },
+    };
+
+    window.addEventListener('load', flushPendingCalls);
+  })();
+</script>
+
 <!-- otterlytics testing for blocking local -->
 <script defer src="https://analytics.otter.land/script.js" data-website-id="82dd56a5-db44-4279-bd1e-a4d9fee39af7" data-domains="rover.otter.land"></script>
 <script defer src="https://analytics.otter.land/recorder.js" data-website-id="82dd56a5-db44-4279-bd1e-a4d9fee39af7" data-domains="rover.otter.land" data-sample-rate="0.15" data-mask-level="moderate" data-max-duration="300000"></script>
     <title>Roomba Rover</title>
-    <script type="module" crossorigin src="/assets/index-C4SKjZW7.js"></script>
+    <script type="module" crossorigin src="/assets/index-CL-6TNyJ.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-C6VExJdW.css">
   </head>
   <body>

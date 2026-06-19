@@ -15,6 +15,7 @@ import ServerDisplayApp from './display/ServerDisplayApp/ServerDisplayAppRoot.js
 import ScannerApp from './scanner/ScannerApp/ScannerAppRoot.jsx'
 import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
+import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')).render(
             <ChatProvider>
               <DeterrenceChaos />
               <BrowserRouter>
+                <AnalyticsReporter />
                 <Routes>
                   <Route path="/" element={<App />} />
                   <Route path="/spectate" element={<SpectatorApp />} />

@@ -45,6 +45,7 @@ import BarcodeGamesPanel from './components/BarcodeGamesPanel/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
 import { pageBackgroundClass, themeGapClass, themeStackClass } from './themeFlags.js';
+import { trackAnalyticsEvent } from './analytics/index.js';
 
 function useLayoutMode() {
   const [mode, setMode] = useState(() => {
@@ -130,9 +131,21 @@ function MobileFeatureTabs({
     // disabled service and direct-address mode.
     return Boolean(vote?.votingEnabled);
   });
+  const handleTabChange = useCallback(
+    (tab) => {
+      /*
+        Tab changes are one of the highest-signal UI events because the app is a
+        dense single-page control surface. Recording the selected panel gives
+        Umami useful journeys without tracking every button inside each panel.
+      */
+      setActiveTab(tab);
+      trackAnalyticsEvent('tab_change', { tab, layout, surface: 'mobile_features' });
+    },
+    [layout],
+  );
   return (
     <section className="text-base">
-      <Tabs defaultTab="chat" currentTab={activeTab} onTabChange={setActiveTab}>
+      <Tabs defaultTab="chat" currentTab={activeTab} onTabChange={handleTabChange}>
         <TabList>
           <Tab id="chat">Chat</Tab>
           <Tab id="activities">Activities</Tab> 
@@ -325,33 +338,66 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
     }
   }, [quickstartStatus, quickstartSettings?.showOnLoad]);
 
-  const openHelp = useCallback(() => setHelpVisible(true), []);
-  const closeHelp = useCallback(() => setHelpVisible(false), []);
-  const closeQuickstart = useCallback(() => setQuickstartVisible(false), []);
+  useEffect(() => {
+    if (!fullscreenVisible) return;
+    trackAnalyticsEvent('fullscreen_prompt_show', { layout, mode: fullscreenMode });
+  }, [fullscreenMode, fullscreenVisible, layout]);
+
+  const openHelp = useCallback(() => {
+    setHelpVisible(true);
+    trackAnalyticsEvent('help_open', { layout, source: 'panel' });
+  }, [layout]);
+  const closeHelp = useCallback(() => {
+    setHelpVisible(false);
+    trackAnalyticsEvent('help_close', { layout });
+  }, [layout]);
+  const closeQuickstart = useCallback(() => {
+    setQuickstartVisible(false);
+    trackAnalyticsEvent('quickstart_close', { layout });
+  }, [layout]);
   const handleFloatingFullscreen = useCallback(async () => {
     if (fullscreenIsIOS) {
+      trackAnalyticsEvent('fullscreen_prompt_manual_open', { layout, mode: 'pwa-hint', source: 'floating_button' });
       showPrompt();
       return;
     }
     const entered = await enterFullscreen();
+    trackAnalyticsEvent(entered ? 'fullscreen_enter' : 'fullscreen_enter_failed', {
+      layout,
+      source: 'floating_button',
+    });
     if (!entered) {
       showPrompt();
     }
-  }, [enterFullscreen, fullscreenIsIOS, showPrompt]);
+  }, [enterFullscreen, fullscreenIsIOS, layout, showPrompt]);
   const setQuickstartShowOnLoad = useCallback(
     (enabled) => {
       const next = Boolean(enabled);
       saveQuickstartSettings((current) => ({ ...(current ?? {}), showOnLoad: next }));
+      trackAnalyticsEvent('quickstart_show_on_load_change', { layout, enabled: next });
       if (!next) {
         setQuickstartVisible(false);
       }
     },
-    [saveQuickstartSettings],
+    [layout, saveQuickstartSettings],
   );
   const openHelpFromQuickstart = useCallback(() => {
     setQuickstartVisible(false);
     setHelpVisible(true);
-  }, []);
+    trackAnalyticsEvent('help_open', { layout, source: 'quickstart' });
+  }, [layout]);
+  const handleFullscreenPromptEnter = useCallback(async () => {
+    const entered = await enterFullscreen();
+    trackAnalyticsEvent(entered ? 'fullscreen_enter' : 'fullscreen_enter_failed', {
+      layout,
+      source: 'prompt',
+    });
+    return entered;
+  }, [enterFullscreen, layout]);
+  const handleFullscreenPromptDismiss = useCallback(() => {
+    dismiss();
+    trackAnalyticsEvent('fullscreen_dismiss', { layout, mode: fullscreenMode });
+  }, [dismiss, fullscreenMode, layout]);
 
   const renderedLayout = useMemo(
     () =>
@@ -387,8 +433,8 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
       <FullscreenPrompt
         visible={fullscreenVisible}
         mode={fullscreenMode}
-        onEnterFullscreen={enterFullscreen}
-        onDismiss={dismiss}
+        onEnterFullscreen={handleFullscreenPromptEnter}
+        onDismiss={handleFullscreenPromptDismiss}
       />
       <QuickstartOverlay
         visible={quickstartVisible}

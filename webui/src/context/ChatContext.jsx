@@ -8,6 +8,7 @@ import { useSessionActions, useSessionSelector } from './SessionContext.jsx';
 import messageSound from '../assets/message.mp3';
 import { useSettingsNamespace } from '../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
+import { trackAnalyticsEvent } from '../analytics/index.js';
 
 const CHAT_TIMELINE_DEFAULT = {
   messages: [],
@@ -218,6 +219,15 @@ export function ChatProvider({ children }) {
           if (resp.error) {
             reject(new Error(resp.error));
           } else {
+            /*
+              Count successful chat sends without forwarding chat text. The
+              centralized analytics session identity can still attach nickname
+              when the build-time adapter is configured to include it.
+            */
+            trackAnalyticsEvent('chat_send', {
+              hasTts: Boolean(tts),
+              length: typeof text === 'string' ? text.trim().length : 0,
+            });
             resolve(resp);
           }
         });

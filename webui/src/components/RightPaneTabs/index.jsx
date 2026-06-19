@@ -29,9 +29,10 @@ import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
 import BarcodeGamesPanel from '../BarcodeGamesPanel/index.jsx';
 import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import { themeGapClass, themeStackClass } from '../../themeFlags.js';
+import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 const CHAT_DOCK_INITIAL_HEIGHT = 224;
 const CHAT_DOCK_MIN_HEIGHT = 144;
@@ -173,6 +174,18 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
     // unavailable, including disabled service and direct-address mode.
     return Boolean(vote?.votingEnabled);
   });
+  const handleTabChange = useCallback(
+    (tab) => {
+      /*
+        Desktop users spend most of their time on this one route, so panel
+        changes are the cleanest way to understand feature usage without adding
+        analytics calls to every nested control in the rover dashboard.
+      */
+      setActiveTab(tab);
+      trackAnalyticsEvent('tab_change', { tab, layout, surface: 'desktop_right_pane' });
+    },
+    [layout],
+  );
 
   useLayoutEffect(() => {
     const chatDock = chatDockRef.current;
@@ -259,7 +272,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
 
   return (
     <section className="text-base">
-      <Tabs defaultTab="telemetry" currentTab={activeTab} onTabChange={setActiveTab}>
+      <Tabs defaultTab="telemetry" currentTab={activeTab} onTabChange={handleTabChange}>
         <TabList>
           <Tab id="telemetry">Controls</Tab>
           <Tab id="activities">Activities</Tab> 

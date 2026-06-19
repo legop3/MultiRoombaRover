@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import useBarcodeGameState from '../../barcodeGames/useBarcodeGameState.js';
 import CardFrame from '../CardFrame/index.jsx';
+import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 function clampRgbChannel(value) {
   if (!Number.isFinite(value)) return null;
@@ -189,7 +190,7 @@ function Leaderboard({ players, ownPlayer }) {
 }
 
 export default function BarcodeGamesPanel() {
-  const { state, voteForGame } = useBarcodeGameState();
+  const { state, connectionState, voteForGame } = useBarcodeGameState();
   const [pendingGameId, setPendingGameId] = useState(null);
   const activeGame = state.activeGame;
   const display = activeGame?.display || {};
@@ -204,10 +205,41 @@ export default function BarcodeGamesPanel() {
   const participants = Array.isArray(state.participants) ? state.participants : [];
   const activeTheme = getGameTheme(activeGame?.themeColor);
 
+  useEffect(() => {
+    if (!connectionState.stale || !connectionState.lastReceivedAt) return;
+    /*
+      Stale barcode-game state is worth tracking because it points to a real
+      interaction problem: users can be looking at old game choices or scores
+      even though the rest of the page appears loaded.
+    */
+    trackAnalyticsEvent('barcode_game_state_stale', {
+      connected: connectionState.connected,
+      phase: state.phase || 'unknown',
+    });
+  }, [connectionState.connected, connectionState.lastReceivedAt, connectionState.stale, state.phase]);
+
   const handleVote = async (gameId) => {
     setPendingGameId(gameId);
+    trackAnalyticsEvent('barcode_game_vote', {
+      gameId,
+      phase: state.phase || 'unknown',
+      status: 'started',
+    });
     try {
       await voteForGame(gameId);
+      trackAnalyticsEvent('barcode_game_vote', {
+        gameId,
+        phase: state.phase || 'unknown',
+        status: 'accepted',
+      });
+    } catch (error) {
+      trackAnalyticsEvent('barcode_game_vote', {
+        gameId,
+        phase: state.phase || 'unknown',
+        status: 'failed',
+        reason: error?.message || 'unknown',
+      });
+      throw error;
     } finally {
       setPendingGameId(null);
     }

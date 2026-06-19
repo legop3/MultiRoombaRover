@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useSessionActions } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
+import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 export default function NicknameForm({ compact = false }) {
   const { setNickname } = useSessionActions();
@@ -26,6 +27,14 @@ export default function NicknameForm({ compact = false }) {
       // the driver UI so chat/user-list labels stay consistent across routes.
       await setNickname(trimmed);
       save({ nickname: trimmed });
+      /*
+        The event records that a nickname was saved, while the shared analytics
+        session reporter owns the actual nickname field. Keeping that split
+        prevents every form call site from needing to know privacy/config rules.
+      */
+      trackAnalyticsEvent('nickname_set', {
+        length: trimmed.length,
+      });
     } catch (err) {
       alert(err.message);
     } finally {
