@@ -42,6 +42,7 @@ import { useSessionSelector } from './context/SessionContext.jsx';
 import { useTelemetryVisualPolicy } from './context/TelemetryContext.jsx';
 import ButtonBoxPanel from './components/ButtonBoxPanel/index.jsx';
 import BarcodeGamesPanel from './components/BarcodeGamesPanel/index.jsx';
+import OdometerPanel from './components/OdometerPanel/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
 import { pageBackgroundClass, themeGapClass, themeStackClass } from './themeFlags.js';
@@ -192,6 +193,7 @@ function MobileFeatureTabs({
           {/* activities tab */}
           <TabPanel id="activities">
             <div className={`flex flex-col ${themeGapClass}`}>
+              <OdometerPanel />
               <BarcodeGamesPanel />
               <ButtonBoxPanel />
               <KinectPanel />

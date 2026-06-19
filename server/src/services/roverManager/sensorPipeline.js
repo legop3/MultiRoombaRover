@@ -29,6 +29,7 @@ function createSensorPipeline(deps) {
     ALERT_COLOR,
     sendAlert,
     publishEvent,
+    processOdometerFrame,
     isPrivateRecord,
     isPrivateOpen,
     getPrivateSafety,
@@ -364,6 +365,9 @@ function createSensorPipeline(deps) {
     const decoded = parseSensorFrame(frame.data);
     record.lastSensor = { raw: frame, decoded };
     record.batteryState = computeBatteryState(record, decoded);
+    if (typeof processOdometerFrame === 'function') {
+      processOdometerFrame(roverId, decoded);
+    }
     updateMovement(record, decoded);
     const hasDockInfo = decoded?.chargingSources != null;
     if (hasDockInfo) {

@@ -94,6 +94,7 @@ function buildSession(socket) {
     mode: getMode(),
     isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
     roster,
+    odometers: roverManager.getOdometersForSocket(socket),
     assignment: {
       ...assignment,
       roverId: assignmentRoverId,

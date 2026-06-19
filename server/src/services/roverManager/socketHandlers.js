@@ -28,6 +28,7 @@ function registerSocketHandlers(deps) {
     setPrivateOpen,
     lockRover,
     setPrivateSafety,
+    getOdometersForSocket,
   } = deps;
 
   io.on('connection', (socket) => {
@@ -177,6 +178,14 @@ function registerSocketHandlers(deps) {
       cb({ success: true });
     }
 
+    function handleOdometerSubscribe(_, cb = () => {}) {
+      try {
+        cb({ success: true, odometers: getOdometersForSocket(socket) });
+      } catch (err) {
+        cb({ error: err.message });
+      }
+    }
+
     socket.on('requestControl', handleRequestControl);
     socket.on('session:requestControl', handleRequestControl);
     socket.on('releaseControl', handleReleaseControl);
@@ -187,6 +196,7 @@ function registerSocketHandlers(deps) {
     socket.on('session:privateSafety:set', handlePrivateSafetySet);
     socket.on('subscribeAll', handleSubscribeAll);
     socket.on('session:subscribeAll', handleSubscribeAll);
+    socket.on('odometer:subscribe', handleOdometerSubscribe);
 
     socket.on('disconnecting', () => {
       logger.info('Socket disconnecting', socket.id);

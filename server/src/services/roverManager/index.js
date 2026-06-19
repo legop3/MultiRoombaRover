@@ -5,6 +5,7 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('roverManager');
 const { sendAlert } = require('../alertService');
 const { parseSensorFrame } = require('../../helpers/sensorDecoder');
+const odometerService = require('../odometerService');
 const { MODES, getMode } = require('../modeManager');
 const { isAdmin, isLockdownAdmin, roleEvents } = require('../roleService');
 const { publishEvent } = require('../eventBus');
@@ -174,6 +175,7 @@ const sensorPipeline = createSensorPipeline({
   ALERT_COLOR,
   sendAlert,
   publishEvent,
+  processOdometerFrame: odometerService.processSensorFrame,
   isPrivateRecord,
   isPrivateOpen,
   getPrivateSafety,
@@ -195,6 +197,11 @@ function canReplayRoverId(roverId, socket = null) {
   if (!isPrivateRecord(record)) return true;
   if (isPrivateOpen(record)) return true;
   return socket ? isRoverVisibleToSocket(record, socket) : false;
+}
+
+function getOdometersForSocket(socket) {
+  const visibleIds = getRosterForSocket(socket).map((entry) => entry.id);
+  return odometerService.getSnapshots(visibleIds);
 }
 
 roleEvents.on('change', ({ socket, role }) => {
@@ -231,6 +238,16 @@ registerSocketHandlers({
   setPrivateOpen,
   lockRover,
   setPrivateSafety,
+  getOdometersForSocket,
+});
+
+odometerService.odometerEvents.on('update', ({ roverId, odometer }) => {
+  io.sockets.sockets.forEach((socket) => {
+    const record = rovers.get(String(roverId));
+    if (isRoverVisibleToSocket(record, socket)) {
+      socket.volatile.emit('odometer:update', { roverId, odometer });
+    }
+  });
 });
 
 setInterval(tickPrivateAutoClose, PRIVATE_AUTO_CLOSE_TICK_MS);
@@ -262,4 +279,5 @@ module.exports = {
   canRequestControl,
   applyPrivateDriveSafety,
   canReplayRoverId,
+  getOdometersForSocket,
 };
