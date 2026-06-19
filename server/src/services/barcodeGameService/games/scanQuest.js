@@ -4,9 +4,8 @@
 // the shared barcode game service.
 
 const GAME_ID = 'scanQuest';
-const QUEST_LENGTH_OPTIONS = [1, 2];
-const REQUEST_TIMEOUT_MS = 90 * 1000;
-const ROUND_DURATION_MS = 5 * 60 * 1000;
+const QUEST_LENGTH = 5;
+const REQUEST_TIMEOUT_MS = 3 * 60 * 1000;
 const POINTS_PER_STEP = 5;
 
 function createInitialState() {
@@ -17,7 +16,8 @@ function createInitialState() {
     roundEndsAt: null,
     progressIndex: 0,
     scores: {},
-    completedQuests: 0,
+    completedItems: 0,
+    skippedItems: 0,
     stepStartedAt: null,
     recentEvents: [],
     lastMessage: 'vote to start scan quest',
@@ -34,7 +34,12 @@ function normalizeState(rawState = {}) {
     roundEndsAt: Number.isFinite(rawState.roundEndsAt) ? rawState.roundEndsAt : null,
     progressIndex: Number.isFinite(rawState.progressIndex) ? Math.max(0, Math.floor(rawState.progressIndex)) : 0,
     scores: rawState.scores && typeof rawState.scores === 'object' ? rawState.scores : {},
-    completedQuests: Number.isFinite(rawState.completedQuests) ? Math.max(0, Math.floor(rawState.completedQuests)) : 0,
+    completedItems: Number.isFinite(rawState.completedItems)
+      ? Math.max(0, Math.floor(rawState.completedItems))
+      : Number.isFinite(rawState.completedQuests)
+        ? Math.max(0, Math.floor(rawState.completedQuests))
+        : 0,
+    skippedItems: Number.isFinite(rawState.skippedItems) ? Math.max(0, Math.floor(rawState.skippedItems)) : 0,
     stepStartedAt: Number.isFinite(rawState.stepStartedAt) ? rawState.stepStartedAt : null,
     recentEvents: Array.isArray(rawState.recentEvents) ? rawState.recentEvents.slice(-12) : [],
     lastMessage: typeof rawState.lastMessage === 'string' ? rawState.lastMessage : base.lastMessage,
@@ -44,24 +49,22 @@ function normalizeState(rawState = {}) {
 function pickQuest(objects = []) {
   const candidates = objects.filter((entry) => entry?.code && entry?.label);
   if (!candidates.length) return null;
-  const length = QUEST_LENGTH_OPTIONS[Math.floor(Math.random() * QUEST_LENGTH_OPTIONS.length)];
-  const steps = [];
-
-  for (let idx = 0; idx < length; idx += 1) {
-    // Reusing objects is allowed because physical rooms often start with only a
-    // small number of labeled props. The game still stays readable because the
-    // sequence is short and order-specific.
-    const entry = candidates[Math.floor(Math.random() * candidates.length)];
-    steps.push({
-      code: entry.code,
-      entityId: entry.entityId,
-      label: entry.label,
-    });
-  }
+  const shuffled = candidates
+    .map((entry) => ({ entry, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .map(({ entry }) => entry);
+  const selected = shuffled.slice(0, Math.min(QUEST_LENGTH, shuffled.length));
 
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    steps,
+    // The entire route is chosen up front so players can see the ordered list
+    // and plan rover movement. Items are unique when possible because repeated
+    // entries make the list harder to reason about from the scanner display.
+    steps: selected.map((entry) => ({
+      code: entry.code,
+      entityId: entry.entityId,
+      label: entry.label,
+    })),
     createdAt: Date.now(),
   };
 }
@@ -70,7 +73,6 @@ function formatQuestPrompt(state) {
   const quest = state.currentQuest;
   if (!quest?.steps?.length) return 'scan quest needs objects';
   const step = quest.steps[state.progressIndex] || quest.steps[0];
-  if (quest.steps.length === 1) return `scan ${step.label}`;
   return `scan ${step.label} ${state.progressIndex + 1} of ${quest.steps.length}`;
 }
 
@@ -130,7 +132,7 @@ function start(_rawState, context = {}) {
   const state = createInitialState();
   state.status = 'running';
   state.roundStartedAt = now;
-  state.roundEndsAt = now + ROUND_DURATION_MS;
+  state.roundEndsAt = null;
   ensureQuest(state, context);
   return state;
 }
@@ -144,19 +146,26 @@ function skipExpiredQuest(state, context = {}) {
   if (!state.currentQuest?.steps?.length || !state.stepStartedAt) return state;
   if (now - state.stepStartedAt < REQUEST_TIMEOUT_MS) return state;
 
-  // A timeout generates a fresh request instead of continuing a half-complete
-  // sequence. If an item is physically unreachable or the barcode is damaged,
-  // the room gets unstuck without punishing anyone or making the next prompt
-  // depend on a failed previous step.
+  // A timeout advances to the next item instead of generating a new quest. The
+  // whole ordered list stays stable, but a bad or unreachable barcode cannot
+  // trap the game forever on one physical object.
   const skippedStep = state.currentQuest.steps[state.progressIndex] || state.currentQuest.steps[0];
   addRecentEvent(state, {
     kind: 'timeout',
     label: skippedStep?.label || null,
   });
-  state.currentQuest = pickQuest(context.objects || []);
-  state.progressIndex = 0;
-  state.stepStartedAt = state.currentQuest ? now : null;
-  state.lastMessage = state.currentQuest ? `skipped. ${formatQuestPrompt(state)}` : 'scan quest needs objects';
+  state.skippedItems += 1;
+  state.progressIndex += 1;
+
+  if (state.progressIndex >= state.currentQuest.steps.length) {
+    state.status = 'ended';
+    state.stepStartedAt = null;
+    state.lastMessage = `finished ${state.completedItems} items`;
+    return state;
+  }
+
+  state.stepStartedAt = now;
+  state.lastMessage = `skipped. ${formatQuestPrompt(state)}`;
   return state;
 }
 
@@ -165,6 +174,14 @@ function handleScan(rawState, scan, context = {}) {
   if (state.status !== 'running') return { state, awards: [] };
   ensureQuest(state, context);
   skipExpiredQuest(state, context);
+  if (state.status === 'ended') {
+    return {
+      state,
+      awards: [],
+      done: true,
+      display: getPublicState(state, context).display,
+    };
+  }
 
   if (!state.currentQuest?.steps?.length) return { state, awards: [] };
   if (!scan?.known || scan.type !== 'object') return { state, awards: [] };
@@ -187,54 +204,56 @@ function handleScan(rawState, scan, context = {}) {
 
   state.progressIndex += 1;
   state.stepStartedAt = context.now || Date.now();
+  state.completedItems += 1;
   addRecentEvent(state, {
     kind: 'hit',
     label: scan.label,
   });
 
-  if (state.progressIndex < state.currentQuest.steps.length) {
-    state.lastMessage = formatQuestPrompt(state);
-    return { state, awards: [] };
-  }
-
-  // A completed quest is worth more than a raw scan because it asks the driver
+  // A completed item is worth more than a raw scan because it asks the driver
   // to find a specific object, stay in order, and finish within the per-request
   // window. Keeping this in a constant makes future game-balance passes obvious.
-  const points = state.currentQuest.steps.length * POINTS_PER_STEP;
-  state.completedQuests += 1;
+  const points = POINTS_PER_STEP;
   addScore(state, context.participants || [], points);
   addRecentEvent(state, {
     kind: 'complete',
     points,
     participants: (context.participants || []).map((participant) => participant.nickname || participant.roverId).filter(Boolean),
   });
-  state.currentQuest = pickQuest(context.objects || []);
-  state.progressIndex = 0;
-  state.stepStartedAt = state.currentQuest ? context.now || Date.now() : null;
-  state.lastMessage = state.currentQuest ? `scored ${points}. ${formatQuestPrompt(state)}` : `scored ${points}`;
+
+  if (state.progressIndex >= state.currentQuest.steps.length) {
+    state.status = 'ended';
+    state.stepStartedAt = null;
+    state.lastMessage = `finished ${state.completedItems} items`;
+    return {
+      state,
+      awards: buildAwards(context.participants || [], points, 'scan quest item completed'),
+      done: true,
+      display: getPublicState(state, context).display,
+    };
+  }
+
+  state.lastMessage = `scored ${points}. ${formatQuestPrompt(state)}`;
   return {
     state,
-    awards: buildAwards(context.participants || [], points, 'scan quest completed'),
+    awards: buildAwards(context.participants || [], points, 'scan quest item completed'),
   };
 }
 
 function tick(rawState, context = {}) {
   const state = normalizeState(rawState);
-  const now = context.now || Date.now();
-  if (state.status === 'running' && state.roundEndsAt && now >= state.roundEndsAt) {
+  if (state.status !== 'running') return state;
+  ensureQuest(state, context);
+  const nextState = skipExpiredQuest(state, context);
+  if (nextState.status === 'ended') {
     return {
-      state: {
-        ...state,
-        status: 'ended',
-        lastMessage: `finished ${state.completedQuests} quests`,
-      },
+      state: nextState,
       awards: [],
       done: true,
-      display: getPublicState({ ...state, status: 'ended' }, context).display,
+      display: getPublicState(nextState, context).display,
     };
   }
-  ensureQuest(state, context);
-  return skipExpiredQuest(state, context);
+  return nextState;
 }
 
 function getTopScores(state) {
@@ -253,15 +272,16 @@ function getPublicState(rawState, context = {}) {
     : 0;
   const currentStep = state.currentQuest?.steps?.[state.progressIndex] || null;
   const totalSteps = state.currentQuest?.steps?.length || 0;
-  const stepLabel = totalSteps > 1 ? `Step ${state.progressIndex + 1} of ${totalSteps}` : 'Find the object';
+  const stepLabel = totalSteps ? `Item ${Math.min(state.progressIndex + 1, totalSteps)} of ${totalSteps}` : 'Find the object';
+  const orderedList = state.currentQuest?.steps?.length
+    ? state.currentQuest.steps.map((step, idx) => `${idx + 1}. ${step.label}`).join(' -> ')
+    : 'add object barcodes to the registry';
   return {
     id: GAME_ID,
     title: 'Scan quest',
     status: state.status === 'running' && state.currentQuest ? 'running' : state.status,
     headline: state.lastMessage || formatQuestPrompt(state),
-    detail: state.currentQuest?.steps?.length
-      ? state.currentQuest.steps.map((step) => step.label).join(' then ')
-      : 'add object barcodes to the registry',
+    detail: orderedList,
     progress: {
       current: state.progressIndex,
       total: state.currentQuest?.steps?.length || 0,
@@ -282,9 +302,9 @@ function getPublicState(rawState, context = {}) {
           }
         : null,
       stats: [
-        { label: 'Completed', value: state.completedQuests },
+        { label: 'Completed', value: state.completedItems },
+        { label: 'Skipped', value: state.skippedItems },
         { label: 'Quest points', value: getTopScores(state)[0]?.points || 0 },
-        { label: 'Round', value: state.status === 'ended' ? 'Done' : 'Running' },
       ],
       results: state.recentEvents.slice(0, 3).map((event) => ({
         label: event.kind === 'timeout' ? 'Skipped' : event.kind,
@@ -292,7 +312,8 @@ function getPublicState(rawState, context = {}) {
       })),
     },
     scores: getTopScores(state),
-    completedQuests: state.completedQuests,
+    completedItems: state.completedItems,
+    skippedItems: state.skippedItems,
     recentEvents: state.recentEvents,
   };
 }
