@@ -15,6 +15,8 @@ const EMPTY_SCANNER_STATE = {
   lastScan: null,
   registryError: null,
 };
+const SCANNER_STATE_STALE_MS = 10 * 1000;
+const SCANNER_RESUBSCRIBE_MS = 5 * 1000;
 
 function useClock(enabled) {
   const [now, setNow] = useState(() => Date.now());
@@ -69,9 +71,14 @@ export default function ScannerContent() {
   const inputRef = useRef(null);
   const flashTimerRef = useRef(null);
   const [scannerState, setScannerState] = useState(EMPTY_SCANNER_STATE);
+  const [scannerConnectionState, setScannerConnectionState] = useState({
+    connected: Boolean(socket.connected),
+    stale: true,
+    lastReceivedAt: null,
+  });
   const [scanAudioEvent, setScanAudioEvent] = useState(null);
   const [flashActive, setFlashActive] = useState(false);
-  const { state: barcodeGameState } = useBarcodeGameState();
+  const { state: barcodeGameState, connectionState: barcodeGameConnectionState } = useBarcodeGameState();
 
   useDefaultNickname();
   useUserIdentitySync();
@@ -93,22 +100,94 @@ export default function ScannerContent() {
   }, []);
 
   useEffect(() => {
+    let disposed = false;
+    let staleTimer = null;
+    let retryTimer = null;
+    let lastReceivedAt = 0;
+
     function handleScannerState(nextState = {}) {
+      if (disposed) return;
+      lastReceivedAt = Date.now();
       setScannerState({
         ...EMPTY_SCANNER_STATE,
         ...(nextState && typeof nextState === 'object' ? nextState : {}),
       });
+      setScannerConnectionState({
+        connected: Boolean(socket.connected),
+        stale: false,
+        lastReceivedAt,
+      });
     }
+
     function handleScanAudio(payload = null) {
       setScanAudioEvent(payload && typeof payload === 'object' ? payload : null);
     }
 
-    socket.emit('barcode:subscribe', {}, () => {});
+    function subscribeToScannerState() {
+      // The scan input path is intentionally independent from display state, so
+      // the page can beep/flash even if it missed a previous status broadcast.
+      // This subscribe is idempotent and gives the rover-facing page a way to
+      // repair its display after reconnects or quiet periods.
+      socket.emit('barcode:subscribe', {}, (response = {}) => {
+        if (response.state) {
+          handleScannerState(response.state);
+          return;
+        }
+        setScannerConnectionState((previous) => ({
+          ...previous,
+          connected: Boolean(socket.connected),
+          stale: !lastReceivedAt,
+        }));
+      });
+    }
+
+    function handleConnect() {
+      setScannerConnectionState((previous) => ({
+        ...previous,
+        connected: true,
+        stale: !lastReceivedAt,
+      }));
+      subscribeToScannerState();
+    }
+
+    function handleDisconnect() {
+      setScannerConnectionState((previous) => ({
+        ...previous,
+        connected: false,
+        stale: true,
+      }));
+    }
+
     socket.on('barcode:state', handleScannerState);
     socket.on('barcode:scanAudio', handleScanAudio);
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    subscribeToScannerState();
+
+    staleTimer = window.setInterval(() => {
+      const isStale = !lastReceivedAt || Date.now() - lastReceivedAt > SCANNER_STATE_STALE_MS;
+      setScannerConnectionState((previous) => ({
+        ...previous,
+        connected: Boolean(socket.connected),
+        stale: isStale,
+      }));
+    }, 1000);
+
+    retryTimer = window.setInterval(() => {
+      if (!socket.connected) return;
+      if (!lastReceivedAt || Date.now() - lastReceivedAt > SCANNER_STATE_STALE_MS) {
+        subscribeToScannerState();
+      }
+    }, SCANNER_RESUBSCRIBE_MS);
+
     return () => {
+      disposed = true;
+      window.clearInterval(staleTimer);
+      window.clearInterval(retryTimer);
       socket.off('barcode:state', handleScannerState);
       socket.off('barcode:scanAudio', handleScanAudio);
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
     };
   }, [socket]);
 
@@ -146,8 +225,19 @@ export default function ScannerContent() {
   const timerEndsAt = display.timer?.endsAt;
   const now = useClock(Number.isFinite(timerEndsAt));
   const timerText = formatTimer(timerEndsAt, now);
-  const label = display.primary || activeGame?.headline || lastScan?.label || 'waiting';
-  const detail = display.secondary || activeGame?.detail || '';
+  const showGameDisplay = activeGame?.status && activeGame.status !== 'idle';
+  // Idle game state is useful for the Activities panel, but the scanner page's
+  // normal job is still showing the resolved barcode text. Only active lifecycle
+  // states take over the large rover-facing display.
+  const title = showGameDisplay ? display.title || activeGame?.title || 'Barcode games' : lastScan?.label || 'Waiting';
+  const label = showGameDisplay ? display.primary || activeGame?.headline || '' : '';
+  const detail = showGameDisplay ? display.secondary || activeGame?.detail || '' : '';
+  const participants = Array.isArray(barcodeGameState.participants) ? barcodeGameState.participants : [];
+  const syncMessage = !scannerConnectionState.connected
+    ? 'scanner offline'
+    : scannerConnectionState.stale || barcodeGameConnectionState.stale
+      ? 'syncing'
+      : '';
 
   return (
     <main
@@ -171,22 +261,35 @@ export default function ScannerContent() {
         }}
       />
       <section className="flex min-h-screen w-full items-center justify-center">
-        <div className="flex max-w-full flex-col items-center gap-[4vh]">
-          <h1 className="max-w-full break-words text-[15vw] font-black leading-none tracking-normal">
-            {label}
+        <div className="flex max-w-full flex-col items-center gap-[3vh]">
+          <h1 className="max-w-full break-words text-[17vw] font-black leading-none tracking-normal">
+            {title}
           </h1>
+          <p className="max-w-full break-words text-[6vw] font-bold leading-tight tracking-normal">
+            {label}
+          </p>
           {detail ? (
-            <p className="max-w-full break-words text-[5vw] font-bold leading-tight tracking-normal">
+            <p className="max-w-full break-words text-[4vw] font-bold leading-tight tracking-normal">
               {detail}
             </p>
           ) : null}
           {timerText ? (
-            <p className="font-mono text-[6vw] font-black leading-none tracking-normal">
+            <p className="font-mono text-[7vw] font-black leading-none tracking-normal">
               {timerText}
+            </p>
+          ) : null}
+          {participants.length ? (
+            <p className="max-w-full truncate text-[3vw] font-semibold leading-tight tracking-normal">
+              {participants.map((participant) => participant.nickname || participant.roverId).filter(Boolean).join(' / ')}
             </p>
           ) : null}
         </div>
       </section>
+      {syncMessage ? (
+        <div className="absolute bottom-4 left-4 text-left text-[2.5vw] font-bold leading-none tracking-normal opacity-80 md:text-xl">
+          {syncMessage}
+        </div>
+      ) : null}
       <SocketConnectionPill />
     </main>
   );

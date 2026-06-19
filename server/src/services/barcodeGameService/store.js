@@ -17,6 +17,7 @@ function createDefaultStore() {
     selectedGameId: null,
     runningGameId: null,
     voteEndsAt: null,
+    joinEndsAt: null,
     startsAt: null,
     resultsUntil: null,
     resultGameId: null,
@@ -29,6 +30,11 @@ function createDefaultStore() {
       rovers: {},
     },
     recentRoverSightings: {},
+    // roundParticipants persists only the current round's joined rovers/users.
+    // It is separate from recentRoverSightings because the UI needs stable
+    // participants for the whole round, while sightings expire quickly for
+    // proximity attribution.
+    roundParticipants: {},
     players: {},
     games: {},
     recentEvents: [],
@@ -97,7 +103,7 @@ function normalizeStoreShape(raw = {}) {
     if (vote) votes[key] = { ...vote, voterKey: vote.voterKey || key };
   });
 
-  const phase = ['idle', 'voting', 'starting', 'running', 'results'].includes(raw.phase)
+  const phase = ['idle', 'voting', 'joining', 'starting', 'running', 'results'].includes(raw.phase)
     ? raw.phase
     : raw.activeGameId
       ? 'running'
@@ -116,6 +122,7 @@ function normalizeStoreShape(raw = {}) {
     selectedGameId: typeof raw.selectedGameId === 'string' ? raw.selectedGameId : runningGameId,
     runningGameId,
     voteEndsAt: Number.isFinite(raw.voteEndsAt) ? raw.voteEndsAt : null,
+    joinEndsAt: Number.isFinite(raw.joinEndsAt) ? raw.joinEndsAt : null,
     startsAt: Number.isFinite(raw.startsAt) ? raw.startsAt : null,
     resultsUntil: Number.isFinite(raw.resultsUntil) ? raw.resultsUntil : null,
     resultGameId: typeof raw.resultGameId === 'string' ? raw.resultGameId : null,
@@ -131,6 +138,7 @@ function normalizeStoreShape(raw = {}) {
       raw.recentRoverSightings && typeof raw.recentRoverSightings === 'object'
         ? raw.recentRoverSightings
         : {},
+    roundParticipants: raw.roundParticipants && typeof raw.roundParticipants === 'object' ? raw.roundParticipants : {},
     players: normalizePlayers(raw.players),
     games: raw.games && typeof raw.games === 'object' ? raw.games : {},
     recentEvents: Array.isArray(raw.recentEvents) ? raw.recentEvents.slice(-25) : [],

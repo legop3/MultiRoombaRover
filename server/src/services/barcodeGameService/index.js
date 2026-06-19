@@ -20,6 +20,7 @@ const RECENT_EVENT_LIMIT = 20;
 const ROVER_ATTRIBUTION_WINDOW_MS = 60 * 1000;
 const GAME_TICK_MS = 5 * 1000;
 const VOTING_WINDOW_MS = 10 * 1000;
+const JOIN_WINDOW_MS = 30 * 1000;
 const STARTING_WINDOW_MS = 5 * 1000;
 const RESULTS_WINDOW_MS = 45 * 1000;
 
@@ -87,6 +88,11 @@ function resolveRoverParticipant(roverId) {
   const playerKey = normalizeIdentityPlayerKey(identity);
 
   return {
+    // participantKey is the runtime round key. It can fall back to the rover ID
+    // so the UI can show that a physical rover joined even if the driver has no
+    // verified identity yet. playerKey stays identity-only because persistent
+    // scoring should not create separate leaderboard rows for sockets or rovers.
+    participantKey: playerKey || `rover:${normalizedRoverId}`,
     playerKey,
     roverId: normalizedRoverId,
     socketId,
@@ -108,7 +114,7 @@ function pruneRecentRoverSightings(draft, now) {
 function recordRoverSighting(draft, scan, now) {
   if (!scan?.known || scan.type !== 'rover' || !scan.entityId) return null;
   const participant = resolveRoverParticipant(scan.entityId);
-  if (!participant?.playerKey) return null;
+  if (!participant?.participantKey) return null;
 
   draft.recentRoverSightings = {
     ...(draft.recentRoverSightings || {}),
@@ -120,11 +126,51 @@ function recordRoverSighting(draft, scan, now) {
   return participant;
 }
 
+function recordRoundParticipant(draft, participant, now) {
+  if (!participant?.participantKey) return null;
+  const previous = draft.roundParticipants?.[participant.participantKey] || {};
+
+  draft.roundParticipants = {
+    ...(draft.roundParticipants || {}),
+    [participant.participantKey]: {
+      participantKey: participant.participantKey,
+      playerKey: participant.playerKey || previous.playerKey || null,
+      roverId: participant.roverId || previous.roverId || null,
+      socketId: participant.socketId || previous.socketId || null,
+      cookieUserId: participant.cookieUserId || previous.cookieUserId || null,
+      nickname: participant.nickname || previous.nickname || participant.roverId || 'unknown player',
+      joinedAt: Number.isFinite(previous.joinedAt) ? previous.joinedAt : now,
+      lastSeenAt: now,
+      scanCount: (Number.isFinite(previous.scanCount) ? previous.scanCount : 0) + 1,
+    },
+  };
+
+  return draft.roundParticipants[participant.participantKey];
+}
+
+function getRoundParticipants(draft) {
+  return Object.values(draft.roundParticipants || {})
+    .filter((participant) => participant?.participantKey)
+    .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0))
+    .map((participant) => ({
+      participantKey: participant.participantKey,
+      playerKey: participant.playerKey || null,
+      roverId: participant.roverId || null,
+      socketId: participant.socketId || null,
+      cookieUserId: participant.cookieUserId || null,
+      nickname: participant.nickname || participant.roverId || 'unknown player',
+      joinedAt: Number.isFinite(participant.joinedAt) ? participant.joinedAt : null,
+      lastSeenAt: Number.isFinite(participant.lastSeenAt) ? participant.lastSeenAt : null,
+      scanCount: Number.isFinite(participant.scanCount) ? participant.scanCount : 0,
+    }));
+}
+
 function getProximityParticipants(draft, now) {
   pruneRecentRoverSightings(draft, now);
   return Object.values(draft.recentRoverSightings || {})
-    .filter((sighting) => sighting?.playerKey && now - sighting.scannedAt <= ROVER_ATTRIBUTION_WINDOW_MS)
+    .filter((sighting) => sighting?.participantKey && now - sighting.scannedAt <= ROVER_ATTRIBUTION_WINDOW_MS)
     .map((sighting) => ({
+      participantKey: sighting.participantKey,
       playerKey: sighting.playerKey,
       roverId: sighting.roverId,
       socketId: sighting.socketId || null,
@@ -265,7 +311,7 @@ function buildGameContext(draft, extras = {}) {
   return {
     now: extras.now || Date.now(),
     objects: getKnownObjects(),
-    participants: extras.participants || [],
+    participants: extras.participants || getRoundParticipants(draft),
   };
 }
 
@@ -284,6 +330,7 @@ function startGame(draft, gameId, now) {
   draft.selectedGameId = gameId;
   draft.activeGameId = gameId;
   draft.voteEndsAt = null;
+  draft.joinEndsAt = null;
   draft.startsAt = null;
   draft.resultsUntil = null;
   draft.resultGameId = null;
@@ -348,7 +395,7 @@ function setVote(socket, gameId) {
   const voterKey = getVoterKey(socket);
   const identity = getIdentitySummary(socket);
   const current = loadStore();
-  if (current.phase === 'running' || current.phase === 'starting') {
+  if (current.phase === 'joining' || current.phase === 'starting' || current.phase === 'running') {
     return { error: 'a barcode game is already starting or running' };
   }
 
@@ -367,11 +414,13 @@ function setVote(socket, gameId) {
     if (draft.phase === 'idle' || draft.phase === 'results') {
       draft.phase = 'voting';
       draft.voteEndsAt = now + VOTING_WINDOW_MS;
+      draft.joinEndsAt = null;
       draft.startsAt = null;
       draft.runningGameId = null;
       draft.activeGameId = null;
       draft.resultsUntil = null;
       draft.resultDisplay = null;
+      draft.roundParticipants = {};
       sendBarcodeGameChat(`Voting has started for ${definition.title}. Vote in the Activities tab.`);
     } else if (draft.phase === 'voting') {
       draft.voteEndsAt = Math.max(draft.voteEndsAt || 0, now + VOTING_WINDOW_MS);
@@ -393,15 +442,39 @@ function settleActiveGameIfNeeded() {
     if (!winnerDefinition) return false;
     withGameStore((draft) => {
       draft.selectedGameId = winner;
-      draft.phase = 'starting';
-      draft.startsAt = now + STARTING_WINDOW_MS;
+      draft.phase = 'joining';
+      draft.joinEndsAt = now + JOIN_WINDOW_MS;
+      draft.startsAt = null;
       draft.voteEndsAt = null;
+      draft.roundParticipants = {};
       addRecentEvent(draft, {
-        kind: 'gameStarting',
+        kind: 'gameJoining',
         gameId: winner,
         title: winnerDefinition.title,
       });
       sendBarcodeGameChat(`Voting ended. ${winnerDefinition.title} was selected.`);
+    });
+    return true;
+  }
+
+  if (phase === 'joining' && store.joinEndsAt && now >= store.joinEndsAt) {
+    withGameStore((draft) => {
+      // Joining exists so a real rover has to physically opt into a round. If
+      // nobody scans a rover in time, the selected game is discarded and the
+      // system returns to idle instead of starting an empty round that cannot
+      // award points to anyone.
+      draft.phase = 'idle';
+      draft.selectedGameId = null;
+      draft.runningGameId = null;
+      draft.activeGameId = null;
+      draft.voteEndsAt = null;
+      draft.joinEndsAt = null;
+      draft.startsAt = null;
+      draft.resultsUntil = null;
+      draft.resultGameId = null;
+      draft.resultDisplay = null;
+      draft.votes = {};
+      draft.roundParticipants = {};
     });
     return true;
   }
@@ -422,11 +495,13 @@ function settleActiveGameIfNeeded() {
       draft.runningGameId = null;
       draft.activeGameId = null;
       draft.voteEndsAt = null;
+      draft.joinEndsAt = null;
       draft.startsAt = null;
       draft.resultsUntil = null;
       draft.resultGameId = null;
       draft.resultDisplay = null;
       draft.votes = {};
+      draft.roundParticipants = {};
     });
     return true;
   }
@@ -456,6 +531,7 @@ function settleActiveGameIfNeeded() {
       draft.activeGameId = null;
       draft.startsAt = null;
       draft.voteEndsAt = null;
+      draft.joinEndsAt = null;
       draft.votes = {};
       sendBarcodeGameChat(`${definition.title} ended. Results are now showing.`);
     }
@@ -467,8 +543,37 @@ function handleScan(scan) {
   const now = Number.isFinite(scan?.scannedAt) ? scan.scannedAt : Date.now();
   withGameStore((draft) => {
     updateGlobalCounters(draft, scan, now);
-    recordRoverSighting(draft, scan, now);
-    const participants = getProximityParticipants(draft, now);
+    const scannedRoverParticipant = recordRoverSighting(draft, scan, now);
+
+    if (draft.phase === 'joining' && scannedRoverParticipant) {
+      const selectedDefinition = getGameDefinition(draft.selectedGameId);
+      const joinedParticipant = recordRoundParticipant(draft, scannedRoverParticipant, now);
+
+      if (selectedDefinition && joinedParticipant) {
+        // The first rover scan is the physical confirmation that a real player
+        // is at the scanner and wants this voted game to start. The short
+        // starting phase gives the room and chat display a predictable countdown
+        // before game rules begin consuming object scans.
+        draft.phase = 'starting';
+        draft.startsAt = now + STARTING_WINDOW_MS;
+        draft.joinEndsAt = null;
+        addRecentEvent(draft, {
+          kind: 'gameStarting',
+          gameId: selectedDefinition.id,
+          title: selectedDefinition.title,
+          participant: joinedParticipant.nickname,
+        });
+      }
+    } else if ((draft.phase === 'starting' || draft.phase === 'running') && scannedRoverParticipant) {
+      // Rovers scanned during the countdown or action are counted as active participants too.
+      // This supports the physical reality of the station: a rover may be seen
+      // just before or during useful object scans, and that should be enough to
+      // associate the driver with the current round.
+      recordRoundParticipant(draft, scannedRoverParticipant, now);
+    }
+
+    const proximityParticipants = getProximityParticipants(draft, now);
+    const participants = getRoundParticipants(draft);
     const activeGameId = draft.phase === 'running' ? draft.runningGameId : null;
     const definition = getGameDefinition(activeGameId);
 
@@ -493,6 +598,7 @@ function handleScan(scan) {
         draft.activeGameId = null;
         draft.startsAt = null;
         draft.voteEndsAt = null;
+        draft.joinEndsAt = null;
         draft.votes = {};
         sendBarcodeGameChat(`${definition.title} ended. Results are now showing.`);
       }
@@ -504,7 +610,9 @@ function handleScan(scan) {
       label: scan?.label || scan?.code || 'unknown',
       known: Boolean(scan?.known),
       type: scan?.type || null,
-      participants: participants.map((participant) => participant.nickname || participant.roverId).filter(Boolean),
+      participants: (participants.length ? participants : proximityParticipants)
+        .map((participant) => participant.nickname || participant.roverId)
+        .filter(Boolean),
     });
   });
   broadcastState();
@@ -550,7 +658,8 @@ function buildStatePayload(socket = null) {
   const voteCounts = countVotes(store.votes);
   const selectedDefinition = getGameDefinition(store.selectedGameId);
   const runningDefinition = getGameDefinition(store.runningGameId);
-  const context = buildGameContext(store, { now });
+  const participants = getRoundParticipants(store);
+  const context = buildGameContext(store, { now, participants });
   const runningGame = runningDefinition
     ? runningDefinition.getPublicState(ensureReadonlyGameState(store, runningDefinition.id), context)
     : null;
@@ -568,6 +677,7 @@ function buildStatePayload(socket = null) {
     selectedGameId: store.selectedGameId,
     runningGameId: store.runningGameId,
     activeGameId: store.runningGameId,
+    participants,
     games: GAME_DEFINITIONS.map((game) => ({
       id: game.id,
       title: game.title,
@@ -575,7 +685,12 @@ function buildStatePayload(socket = null) {
       voteCount: voteCounts[game.id] || 0,
       active: game.id === store.runningGameId,
       selected: game.id === store.selectedGameId,
-      actionLabel: store.phase === 'idle' || store.phase === 'results' ? 'Vote' : game.id === store.selectedGameId ? 'Selected' : 'Vote',
+      actionLabel:
+        store.phase === 'idle' || store.phase === 'results'
+          ? 'Vote'
+          : game.id === store.selectedGameId
+            ? 'Selected'
+            : 'Vote',
     })),
     activeGame,
     leaderboard,
@@ -590,12 +705,19 @@ function buildStatePayload(socket = null) {
 }
 
 function buildLifecycleGameState(store, { now, selectedDefinition, runningDefinition, runningGame, voteCounts }) {
-  if (store.phase === 'running' && runningGame) return runningGame;
+  const participants = getRoundParticipants(store);
+  if (store.phase === 'running' && runningGame) {
+    return {
+      ...runningGame,
+      participants,
+    };
+  }
   if (store.phase === 'results') {
     return {
       id: store.resultGameId,
       title: getGameDefinition(store.resultGameId)?.title || 'Results',
       status: 'results',
+      participants,
       display: {
         title: 'Results',
         primary: store.resultDisplay?.primary || 'Round complete',
@@ -611,11 +733,29 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
       id: store.selectedGameId,
       title: selectedDefinition?.title || 'Starting',
       status: 'starting',
+      participants,
       display: {
-        title: 'Starting',
+        title: selectedDefinition?.title || 'Starting',
         primary: selectedDefinition ? `${selectedDefinition.title} starts soon` : 'Game starts soon',
         secondary: 'Get ready',
         timer: store.startsAt ? { label: 'Starts in', endsAt: store.startsAt } : null,
+        stats: [],
+        results: [],
+      },
+    };
+  }
+  if (store.phase === 'joining') {
+    const selectedTitle = selectedDefinition?.title || 'the selected game';
+    return {
+      id: store.selectedGameId,
+      title: selectedDefinition?.title || 'Join game',
+      status: 'joining',
+      participants,
+      display: {
+        title: selectedDefinition?.title || 'Join game',
+        primary: 'Scan your rover to start',
+        secondary: `${selectedTitle} needs at least one rover`,
+        timer: store.joinEndsAt ? { label: 'Join by', endsAt: store.joinEndsAt } : null,
         stats: [],
         results: [],
       },
@@ -627,6 +767,7 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
       id: store.selectedGameId,
       title: 'Voting',
       status: 'voting',
+      participants,
       display: {
         title: 'Voting',
         primary: `Voting for ${selectedTitle}`,
@@ -644,6 +785,7 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
     id: null,
     title: 'Barcode games',
     status: 'idle',
+    participants,
     display: {
       title: 'Barcode games',
       primary: 'Choose a game',
