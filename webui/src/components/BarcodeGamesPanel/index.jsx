@@ -44,6 +44,7 @@ function getGameTheme(themeColor) {
     },
     selectedButtonStyle: {
       borderLeftColor: rgba(rgb, 1),
+      backgroundColor: rgba(rgb, 0.12),
     },
     titleBoxStyle: {
       borderLeftColor: rgba(rgb, 0.88),
@@ -81,15 +82,15 @@ function GameChoice({ game, disabled, onVote }) {
       type="button"
       disabled={disabled || game.active}
       onClick={() => onVote(game.id)}
-      className="button-dark flex min-h-[3.5rem] flex-col items-start justify-between border-l-4 px-1 py-0.75 text-left disabled:opacity-70"
+      className="surface flex min-h-[3.5rem] flex-col items-start justify-between border-l-4 border-l-neutral-600 px-1 py-0.75 text-left transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-70"
       style={style}
     >
       <span className="flex w-full items-start justify-between gap-1">
         <span className="text-sm font-semibold leading-tight text-neutral-50" style={theme.textStyle}>{game.title}</span>
-        <span className="shrink-0 font-mono text-[0.72rem] text-neutral-300">{game.voteCount || 0}</span>
+        <span className="surface-muted shrink-0 px-1 py-0 text-center font-mono text-[0.72rem] text-neutral-200">{game.voteCount || 0}</span>
       </span>
       <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-neutral-300">{game.description}</span>
-      <span className="mt-0.5 text-[0.7rem] font-semibold text-neutral-200">
+      <span className="mt-0.5 text-[0.7rem] font-semibold text-neutral-400">
         {game.active ? 'Active' : game.selected ? 'Selected' : game.actionLabel || 'Vote'}
       </span>
     </button>
@@ -101,9 +102,9 @@ function StatGrid({ stats, theme }) {
   return (
     <div className="grid gap-0.5 sm:grid-cols-3">
       {stats.slice(0, 6).map((stat) => (
-        <div key={stat.label} className="surface px-1 py-0.75">
+        <div key={stat.label} className="surface px-1 py-0.75 text-center">
           <p className="truncate text-[0.68rem] text-neutral-400">{stat.label}</p>
-          <p className="truncate text-sm font-semibold text-neutral-100" style={theme.textStyle}>{stat.value}</p>
+          <p className="mt-0.25 truncate text-base font-semibold leading-tight text-neutral-100" style={theme.textStyle}>{stat.value}</p>
         </div>
       ))}
     </div>
@@ -137,11 +138,11 @@ function CounterList({ title, entries }) {
   return (
     <div>
       <p className="mb-0.5 text-xs font-semibold text-neutral-300">{title}</p>
-      <div className="space-y-0.5">
+      <div className="grid gap-0.5">
         {entries.slice(0, 4).map((entry) => (
-          <div key={`${entry.entityId || entry.code}-${entry.type || 'counter'}`} className="flex justify-between gap-2 text-xs">
+          <div key={`${entry.entityId || entry.code}-${entry.type || 'counter'}`} className="surface-muted grid grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-0.5 px-1 py-0.5 text-xs">
             <span className="min-w-0 truncate text-neutral-200">{entry.label || entry.entityId || entry.code}</span>
-            <span className="font-mono text-neutral-300">{entry.count || 0}</span>
+            <span className="text-right font-mono text-neutral-200">{entry.count || 0}</span>
           </div>
         ))}
       </div>
