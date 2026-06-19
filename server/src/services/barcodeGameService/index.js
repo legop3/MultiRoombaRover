@@ -16,6 +16,7 @@ const scansPerSecond = require('./games/scansPerSecond');
 const GAME_SOCKET_ROOM = 'barcode-game';
 const RECENT_EVENT_LIMIT = 20;
 const ROVER_ATTRIBUTION_WINDOW_MS = 60 * 1000;
+const GAME_TICK_MS = 5 * 1000;
 
 const GAME_DEFINITIONS = [scanQuest, scansPerSecond];
 const GAMES_BY_ID = Object.fromEntries(GAME_DEFINITIONS.map((game) => [game.id, game]));
@@ -160,6 +161,7 @@ function recordPlayerParticipation(draft, gameId, participants, now) {
       cookieUserId: participant.cookieUserId || previous.cookieUserId || null,
       nickname: participant.nickname || previous.nickname || null,
       lastRoverId: participant.roverId || previous.lastRoverId || null,
+      totalPoints: Number.isFinite(previous.totalPoints) ? previous.totalPoints : 0,
       lastSeenAt: now,
       games: {
         ...previousGames,
@@ -170,6 +172,54 @@ function recordPlayerParticipation(draft, gameId, participants, now) {
         },
       },
     };
+  });
+}
+
+function applyPointAwards(draft, gameId, awards = [], now) {
+  if (!gameId || !Array.isArray(awards) || !awards.length) return;
+  draft.players = draft.players || {};
+
+  awards.forEach((award) => {
+    const playerKey = award?.playerKey;
+    const points = Number.isFinite(award?.points) ? Math.max(0, Math.floor(award.points)) : 0;
+    if (!playerKey || !points) return;
+
+    const previous = draft.players[playerKey] || {};
+    const previousGames = previous.games || {};
+    const previousGame = previousGames[gameId] || {};
+
+    // Global points are applied only here so individual game files cannot drift
+    // into different player-ledger formats. A game simply returns awards, and
+    // the shared service records identity, total points, and per-game totals in
+    // one persistent place.
+    draft.players[playerKey] = {
+      playerKey,
+      cookieUserId: award.cookieUserId || previous.cookieUserId || null,
+      nickname: award.nickname || previous.nickname || null,
+      lastRoverId: award.roverId || previous.lastRoverId || null,
+      totalPoints: (Number.isFinite(previous.totalPoints) ? previous.totalPoints : 0) + points,
+      lastSeenAt: now,
+      games: {
+        ...previousGames,
+        [gameId]: {
+          ...previousGame,
+          gameId,
+          points: (Number.isFinite(previousGame.points) ? previousGame.points : 0) + points,
+          awards: (Number.isFinite(previousGame.awards) ? previousGame.awards : 0) + 1,
+          lastAwardAt: now,
+          lastReason: award.reason || null,
+        },
+      },
+    };
+
+    addRecentEvent(draft, {
+      kind: 'pointsAwarded',
+      gameId,
+      playerKey,
+      nickname: award.nickname || previous.nickname || null,
+      points,
+      reason: award.reason || null,
+    });
   });
 }
 
@@ -195,8 +245,8 @@ function activateGame(draft, gameId, now) {
   const definition = getGameDefinition(gameId);
   if (!definition) return false;
   const currentState = ensureGameState(draft, gameId);
-  const nextState = definition.onActivated
-    ? definition.onActivated(currentState, buildGameContext(draft, { now }))
+  const nextState = definition.activate
+    ? definition.activate(currentState, buildGameContext(draft, { now }))
     : currentState;
   draft.games[gameId] = nextState;
   draft.activeGameId = gameId;
@@ -206,6 +256,36 @@ function activateGame(draft, gameId, now) {
     title: definition.title,
   });
   return true;
+}
+
+function resetGame(draft, gameId, now) {
+  const definition = getGameDefinition(gameId);
+  if (!definition) return false;
+  const currentState = ensureGameState(draft, gameId);
+  const nextState = definition.reset
+    ? definition.reset(currentState, buildGameContext(draft, { now }))
+    : definition.createInitialState();
+  draft.games[gameId] = nextState;
+  draft.activeGameId = gameId;
+  addRecentEvent(draft, {
+    kind: 'gameReset',
+    gameId,
+    title: definition.title,
+  });
+  return true;
+}
+
+function normalizeGameResult(result, fallbackState) {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    return { state: fallbackState, awards: [] };
+  }
+  if (Object.prototype.hasOwnProperty.call(result, 'state')) {
+    return {
+      state: result.state,
+      awards: Array.isArray(result.awards) ? result.awards : [],
+    };
+  }
+  return { state: result, awards: [] };
 }
 
 function countVotes(votes = {}) {
@@ -278,14 +358,18 @@ function settleActiveGameIfNeeded() {
   const definition = getGameDefinition(activeGameId);
   const currentState = activeGameId ? store.games?.[activeGameId] : null;
   const now = Date.now();
-  if (!definition?.onTick || currentState?.status !== 'running' || !currentState?.endsAt || now < currentState.endsAt) {
-    return;
-  }
+  if (!definition?.tick || !currentState) return false;
+
+  const normalizedState = ensureReadonlyGameState(store, activeGameId);
+  const gameResult = definition.tick(normalizedState, buildGameContext(store, { now }));
+  const { state: nextState, awards } = normalizeGameResult(gameResult, normalizedState);
+  if (JSON.stringify(nextState) === JSON.stringify(normalizedState)) return false;
 
   withGameStore((draft) => {
-    const state = ensureGameState(draft, activeGameId);
-    draft.games[activeGameId] = definition.onTick(state, buildGameContext(draft, { now }));
+    draft.games[activeGameId] = nextState;
+    applyPointAwards(draft, activeGameId, awards, now);
   });
+  return true;
 }
 
 function handleScan(scan) {
@@ -299,11 +383,13 @@ function handleScan(scan) {
 
     if (definition) {
       const currentState = ensureGameState(draft, activeGameId);
-      const nextState = definition.onScan
-        ? definition.onScan(currentState, scan, buildGameContext(draft, { now, participants }))
+      const gameResult = definition.handleScan
+        ? definition.handleScan(currentState, scan, buildGameContext(draft, { now, participants }))
         : currentState;
+      const { state: nextState, awards } = normalizeGameResult(gameResult, currentState);
       draft.games[activeGameId] = nextState;
       recordPlayerParticipation(draft, activeGameId, participants, now);
+      applyPointAwards(draft, activeGameId, awards, now);
     }
 
     addRecentEvent(draft, {
@@ -316,6 +402,22 @@ function handleScan(scan) {
     });
   });
   broadcastState();
+}
+
+function resetActiveGame() {
+  const now = Date.now();
+  let resetGameId = null;
+
+  withGameStore((draft) => {
+    const gameId = draft.activeGameId;
+    if (!getGameDefinition(gameId)) return;
+    resetGameId = gameId;
+    resetGame(draft, gameId, now);
+  });
+
+  if (!resetGameId) return { error: 'no active barcode game' };
+  broadcastState();
+  return { success: true, state: buildStatePayload() };
 }
 
 function topCounters(bucket = {}, limit = 5) {
@@ -334,6 +436,7 @@ function buildStatePayload() {
   const activeGame = activeDefinition
     ? activeDefinition.getPublicState(ensureReadonlyGameState(store, activeDefinition.id), context)
     : null;
+  const leaderboard = topPlayers(store.players);
 
   return {
     activeGameId: store.activeGameId,
@@ -343,8 +446,12 @@ function buildStatePayload() {
       description: game.description,
       voteCount: voteCounts[game.id] || 0,
       active: game.id === store.activeGameId,
+      actionLabel: game.id === store.activeGameId && activeGame?.actionLabel
+        ? activeGame.actionLabel
+        : 'Start',
     })),
     activeGame,
+    leaderboard,
     counters: {
       objects: topCounters(store.globalCounters?.objects),
       rovers: topCounters(store.globalCounters?.rovers),
@@ -352,6 +459,19 @@ function buildStatePayload() {
     },
     recentEvents: Array.isArray(store.recentEvents) ? store.recentEvents.slice(0, 8) : [],
   };
+}
+
+function topPlayers(players = {}, limit = 6) {
+  return Object.values(players || {})
+    .filter((player) => Number.isFinite(player?.totalPoints) && player.totalPoints > 0)
+    .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0))
+    .slice(0, limit)
+    .map((player) => ({
+      playerKey: player.playerKey,
+      nickname: player.nickname || player.lastRoverId || 'unknown player',
+      totalPoints: player.totalPoints || 0,
+      lastRoverId: player.lastRoverId || null,
+    }));
 }
 
 function ensureReadonlyGameState(store, gameId) {
@@ -380,6 +500,15 @@ io.on('connection', (socket) => {
       cb({ error: err.message || 'barcode game vote failed' });
     }
   });
+
+  socket.on('barcodeGame:resetActive', (_payload = {}, cb = () => {}) => {
+    try {
+      cb(resetActiveGame(socket));
+    } catch (err) {
+      logger.warn('Barcode game reset failed', { error: err.message });
+      cb({ error: err.message || 'barcode game reset failed' });
+    }
+  });
 });
 
 subscribe('barcode.scanned', (event) => {
@@ -395,5 +524,12 @@ subscribe('barcode.scanned', (event) => {
 module.exports = {
   buildStatePayload,
   handleScan,
+  resetActiveGame,
   setVote,
 };
+
+setInterval(() => {
+  if (settleActiveGameIfNeeded()) {
+    broadcastState();
+  }
+}, GAME_TICK_MS).unref?.();

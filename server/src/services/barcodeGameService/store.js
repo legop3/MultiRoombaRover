@@ -64,6 +64,23 @@ function normalizeVote(rawVote = {}) {
   };
 }
 
+function normalizePlayers(rawPlayers = {}) {
+  const players = {};
+  Object.entries(rawPlayers && typeof rawPlayers === 'object' ? rawPlayers : {}).forEach(([key, rawPlayer]) => {
+    if (!key || !rawPlayer || typeof rawPlayer !== 'object') return;
+    players[key] = {
+      playerKey: typeof rawPlayer.playerKey === 'string' ? rawPlayer.playerKey : key,
+      cookieUserId: typeof rawPlayer.cookieUserId === 'string' ? rawPlayer.cookieUserId : null,
+      nickname: typeof rawPlayer.nickname === 'string' ? rawPlayer.nickname : null,
+      lastRoverId: typeof rawPlayer.lastRoverId === 'string' ? rawPlayer.lastRoverId : null,
+      totalPoints: Number.isFinite(rawPlayer.totalPoints) ? Math.max(0, Math.floor(rawPlayer.totalPoints)) : 0,
+      lastSeenAt: Number.isFinite(rawPlayer.lastSeenAt) ? rawPlayer.lastSeenAt : null,
+      games: rawPlayer.games && typeof rawPlayer.games === 'object' ? rawPlayer.games : {},
+    };
+  });
+  return players;
+}
+
 function normalizeStoreShape(raw = {}) {
   const base = createDefaultStore();
   const votes = {};
@@ -87,7 +104,7 @@ function normalizeStoreShape(raw = {}) {
       raw.recentRoverSightings && typeof raw.recentRoverSightings === 'object'
         ? raw.recentRoverSightings
         : {},
-    players: raw.players && typeof raw.players === 'object' ? raw.players : {},
+    players: normalizePlayers(raw.players),
     games: raw.games && typeof raw.games === 'object' ? raw.games : {},
     recentEvents: Array.isArray(raw.recentEvents) ? raw.recentEvents.slice(-25) : [],
   };

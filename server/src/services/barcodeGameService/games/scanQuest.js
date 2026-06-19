@@ -5,6 +5,7 @@
 
 const GAME_ID = 'scanQuest';
 const QUEST_LENGTH_OPTIONS = [1, 2];
+const REQUEST_TIMEOUT_MS = 90 * 1000;
 
 function createInitialState() {
   return {
@@ -12,6 +13,7 @@ function createInitialState() {
     progressIndex: 0,
     scores: {},
     completedQuests: 0,
+    stepStartedAt: null,
     recentEvents: [],
     lastMessage: 'vote to start scan quest',
   };
@@ -25,6 +27,7 @@ function normalizeState(rawState = {}) {
     progressIndex: Number.isFinite(rawState.progressIndex) ? Math.max(0, Math.floor(rawState.progressIndex)) : 0,
     scores: rawState.scores && typeof rawState.scores === 'object' ? rawState.scores : {},
     completedQuests: Number.isFinite(rawState.completedQuests) ? Math.max(0, Math.floor(rawState.completedQuests)) : 0,
+    stepStartedAt: Number.isFinite(rawState.stepStartedAt) ? rawState.stepStartedAt : null,
     recentEvents: Array.isArray(rawState.recentEvents) ? rawState.recentEvents.slice(-12) : [],
     lastMessage: typeof rawState.lastMessage === 'string' ? rawState.lastMessage : base.lastMessage,
   };
@@ -68,6 +71,7 @@ function ensureQuest(state, context = {}) {
   const nextQuest = pickQuest(context.objects || []);
   state.currentQuest = nextQuest;
   state.progressIndex = 0;
+  state.stepStartedAt = nextQuest ? context.now || Date.now() : null;
   state.lastMessage = nextQuest ? formatQuestPrompt(state) : 'scan quest needs objects';
   return state;
 }
@@ -97,18 +101,62 @@ function addScore(state, participants = [], points) {
   });
 }
 
-function onActivated(rawState, context = {}) {
+function buildAwards(participants = [], points, reason) {
+  // Awards are returned to the shared barcode game service instead of mutating
+  // the global player ledger here. That keeps this file responsible only for
+  // scan quest rules while all cross-game points accounting stays centralized.
+  return participants
+    .filter((participant) => participant?.playerKey)
+    .map((participant) => ({
+      playerKey: participant.playerKey,
+      nickname: participant.nickname || null,
+      roverId: participant.roverId || null,
+      cookieUserId: participant.cookieUserId || null,
+      points,
+      reason,
+    }));
+}
+
+function activate(rawState, context = {}) {
   const state = normalizeState(rawState);
   ensureQuest(state, context);
   return state;
 }
 
-function onScan(rawState, scan, context = {}) {
+function reset(_rawState, context = {}) {
+  const state = createInitialState();
+  ensureQuest(state, context);
+  return state;
+}
+
+function skipExpiredQuest(state, context = {}) {
+  const now = context.now || Date.now();
+  if (!state.currentQuest?.steps?.length || !state.stepStartedAt) return state;
+  if (now - state.stepStartedAt < REQUEST_TIMEOUT_MS) return state;
+
+  // A timeout generates a fresh request instead of continuing a half-complete
+  // sequence. If an item is physically unreachable or the barcode is damaged,
+  // the room gets unstuck without punishing anyone or making the next prompt
+  // depend on a failed previous step.
+  const skippedStep = state.currentQuest.steps[state.progressIndex] || state.currentQuest.steps[0];
+  addRecentEvent(state, {
+    kind: 'timeout',
+    label: skippedStep?.label || null,
+  });
+  state.currentQuest = pickQuest(context.objects || []);
+  state.progressIndex = 0;
+  state.stepStartedAt = state.currentQuest ? now : null;
+  state.lastMessage = state.currentQuest ? `skipped. ${formatQuestPrompt(state)}` : 'scan quest needs objects';
+  return state;
+}
+
+function handleScan(rawState, scan, context = {}) {
   const state = normalizeState(rawState);
   ensureQuest(state, context);
+  skipExpiredQuest(state, context);
 
-  if (!state.currentQuest?.steps?.length) return state;
-  if (!scan?.known || scan.type !== 'object') return state;
+  if (!state.currentQuest?.steps?.length) return { state, awards: [] };
+  if (!scan?.known || scan.type !== 'object') return { state, awards: [] };
 
   const expected = state.currentQuest.steps[state.progressIndex];
   const matched = Boolean(expected && scan.code === expected.code);
@@ -123,10 +171,11 @@ function onScan(rawState, scan, context = {}) {
       label: scan.label,
       expected: expected.label,
     });
-    return state;
+    return { state, awards: [] };
   }
 
   state.progressIndex += 1;
+  state.stepStartedAt = context.now || Date.now();
   addRecentEvent(state, {
     kind: 'hit',
     label: scan.label,
@@ -134,7 +183,7 @@ function onScan(rawState, scan, context = {}) {
 
   if (state.progressIndex < state.currentQuest.steps.length) {
     state.lastMessage = formatQuestPrompt(state);
-    return state;
+    return { state, awards: [] };
   }
 
   const points = state.currentQuest.steps.length;
@@ -147,8 +196,18 @@ function onScan(rawState, scan, context = {}) {
   });
   state.currentQuest = pickQuest(context.objects || []);
   state.progressIndex = 0;
+  state.stepStartedAt = state.currentQuest ? context.now || Date.now() : null;
   state.lastMessage = state.currentQuest ? `scored ${points}. ${formatQuestPrompt(state)}` : `scored ${points}`;
-  return state;
+  return {
+    state,
+    awards: buildAwards(context.participants || [], points, 'scan quest completed'),
+  };
+}
+
+function tick(rawState, context = {}) {
+  const state = normalizeState(rawState);
+  ensureQuest(state, context);
+  return skipExpiredQuest(state, context);
 }
 
 function getTopScores(state) {
@@ -160,6 +219,11 @@ function getTopScores(state) {
 function getPublicState(rawState, context = {}) {
   const state = normalizeState(rawState);
   ensureQuest(state, context);
+  skipExpiredQuest(state, context);
+  const now = context.now || Date.now();
+  const remainingMs = state.stepStartedAt
+    ? Math.max(0, REQUEST_TIMEOUT_MS - (now - state.stepStartedAt))
+    : 0;
   return {
     id: GAME_ID,
     title: 'Scan quest',
@@ -172,6 +236,8 @@ function getPublicState(rawState, context = {}) {
       current: state.progressIndex,
       total: state.currentQuest?.steps?.length || 0,
     },
+    remainingMs,
+    actionLabel: 'Start quest',
     scores: getTopScores(state),
     completedQuests: state.completedQuests,
     recentEvents: state.recentEvents,
@@ -184,7 +250,12 @@ module.exports = {
   description: 'Scan one or two requested objects in order.',
   createInitialState,
   normalizeState,
-  onActivated,
-  onScan,
+  activate,
+  reset,
+  handleScan,
+  tick,
+  onActivated: activate,
+  onScan: (state, scan, context) => handleScan(state, scan, context).state,
+  onTick: tick,
   getPublicState,
 };

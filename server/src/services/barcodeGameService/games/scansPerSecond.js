@@ -5,6 +5,7 @@
 
 const GAME_ID = 'scansPerSecond';
 const ROUND_DURATION_MS = 5 * 60 * 1000;
+const RESULT_IDLE_MS = 60 * 1000;
 
 function createInitialState() {
   return {
@@ -17,6 +18,7 @@ function createInitialState() {
     worldRecord: null,
     recentRounds: [],
     participantCounts: {},
+    endedAt: null,
     lastMessage: 'vote to start scans per second',
   };
 }
@@ -35,6 +37,7 @@ function normalizeState(rawState = {}) {
     recentRounds: Array.isArray(rawState.recentRounds) ? rawState.recentRounds.slice(-10) : [],
     participantCounts:
       rawState.participantCounts && typeof rawState.participantCounts === 'object' ? rawState.participantCounts : {},
+    endedAt: Number.isFinite(rawState.endedAt) ? rawState.endedAt : null,
     lastMessage: typeof rawState.lastMessage === 'string' ? rawState.lastMessage : base.lastMessage,
   };
 }
@@ -65,6 +68,7 @@ function finishRound(state, endedAt = Date.now()) {
   const isWorldRecord = !previousRecord || result.scansPerSecond > (previousRecord.scansPerSecond || 0);
 
   state.status = 'ended';
+  state.endedAt = endedAt;
   state.finalResult = {
     ...result,
     isWorldRecord,
@@ -75,6 +79,27 @@ function finishRound(state, endedAt = Date.now()) {
     ? `new record ${result.scansPerSecond} scans per second`
     : `finished ${result.scansPerSecond} scans per second`;
   return state;
+}
+
+function buildAwards(result, state) {
+  if (!result?.participants?.length || !result.scanCount) return [];
+  const basePoints = Math.max(1, Math.round(result.scansPerSecond * 10));
+  return result.participants
+    .filter((participant) => participant?.playerKey)
+    .map((participant) => {
+      const share = result.scanCount > 0 ? participant.scanCount / result.scanCount : 0;
+      return {
+        playerKey: participant.playerKey,
+        nickname: participant.nickname || null,
+        roverId: participant.roverId || null,
+        points: Math.max(1, Math.round(basePoints * share)),
+        reason: 'scans per second round',
+        gameMeta: {
+          scansPerSecond: result.scansPerSecond,
+          roundId: state.roundId,
+        },
+      };
+    });
 }
 
 function startRound(rawState, now = Date.now()) {
@@ -88,17 +113,23 @@ function startRound(rawState, now = Date.now()) {
     scans: [],
     finalResult: null,
     participantCounts: {},
+    endedAt: null,
     lastMessage: 'scan anything',
   };
 }
 
-function onActivated(rawState, context = {}) {
+function activate(rawState, context = {}) {
   const state = normalizeState(rawState);
   const now = context.now || Date.now();
-  // Voting for an ended or idle challenge starts a fresh five-minute round. If
-  // the round is already running, activation is a no-op so vote churn does not
-  // accidentally reset an active challenge.
+  // Activation is game-defined, but the shared service calls it generically.
+  // For this game, active rounds keep running while idle or ended rounds start
+  // cleanly so returning to the game always produces a playable challenge.
   return state.status === 'running' ? state : startRound(state, now);
+}
+
+function reset(rawState, context = {}) {
+  const state = normalizeState(rawState);
+  return startRound(state, context.now || Date.now());
 }
 
 function addParticipants(state, participants = []) {
@@ -116,13 +147,15 @@ function addParticipants(state, participants = []) {
   });
 }
 
-function onScan(rawState, scan, context = {}) {
+function handleScan(rawState, scan, context = {}) {
   const now = context.now || Date.now();
   let state = normalizeState(rawState);
+  let awards = [];
   if (state.status === 'running' && state.endsAt && now >= state.endsAt) {
     state = finishRound(state, state.endsAt);
+    awards = buildAwards(state.finalResult, state);
   }
-  if (state.status !== 'running') return state;
+  if (state.status !== 'running') return { state, awards };
 
   // This game deliberately counts every submitted scan, including unknown and
   // invalid barcodes, because the challenge is about physically getting scans
@@ -138,19 +171,42 @@ function onScan(rawState, scan, context = {}) {
   addParticipants(state, context.participants || []);
 
   if (state.endsAt && now >= state.endsAt) {
-    return finishRound(state, state.endsAt);
+    state = finishRound(state, state.endsAt);
+    return {
+      state,
+      awards: buildAwards(state.finalResult, state),
+    };
   }
 
   const currentRate = calculateRate(state.scans.length, state.startedAt, now);
   state.lastMessage = `${currentRate.toFixed(2)} scans per second`;
-  return state;
+  return { state, awards: [] };
 }
 
-function onTick(rawState, context = {}) {
+function tick(rawState, context = {}) {
   const now = context.now || Date.now();
   const state = normalizeState(rawState);
   if (state.status === 'running' && state.endsAt && now >= state.endsAt) {
-    return finishRound(state, state.endsAt);
+    const finished = finishRound(state, state.endsAt);
+    return {
+      state: finished,
+      awards: buildAwards(finished.finalResult, finished),
+    };
+  }
+  if (state.status === 'ended' && state.endedAt && now - state.endedAt >= RESULT_IDLE_MS) {
+    // Timed result screens are useful for celebration, but the game should not
+    // remain permanently stuck in a completed state. After a short display
+    // window the module returns itself to idle, preserving records and history.
+    return {
+      ...state,
+      status: 'idle',
+      roundId: null,
+      startedAt: null,
+      endsAt: null,
+      scans: [],
+      participantCounts: {},
+      lastMessage: 'vote to start scans per second',
+    };
   }
   return state;
 }
@@ -185,6 +241,7 @@ function getPublicState(rawState, context = {}) {
     worldRecord: state.worldRecord,
     participants: Object.values(state.participantCounts || {}).sort((a, b) => (b.scanCount || 0) - (a.scanCount || 0)),
     recentRounds: state.recentRounds,
+    actionLabel: state.status === 'running' ? 'Running' : 'Start round',
   };
 }
 
@@ -194,8 +251,12 @@ module.exports = {
   description: 'Count every scan for five minutes and save the world record.',
   createInitialState,
   normalizeState,
-  onActivated,
-  onScan,
-  onTick,
+  activate,
+  reset,
+  handleScan,
+  tick,
+  onActivated: activate,
+  onScan: (state, scan, context) => handleScan(state, scan, context).state,
+  onTick: tick,
   getPublicState,
 };
