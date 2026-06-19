@@ -32,10 +32,6 @@ function formatDistance(mm) {
   return `${Math.round(value)} mm`;
 }
 
-function formatCount(value) {
-  return Number.isFinite(Number(value)) ? String(Math.round(Number(value))) : '--';
-}
-
 function formatAge(timestamp, now) {
   const value = Number(timestamp);
   if (!Number.isFinite(value)) return '--';
@@ -113,10 +109,6 @@ export default function OdometerPanel() {
       ) : (
         <>
           <OdometerSummary odometer={primary} rover={primaryRover} now={now} />
-          <div className="grid gap-0.5 md:grid-cols-2">
-            <EncoderDetails odometer={primary} />
-            <CalibrationDetails odometer={primary} now={now} />
-          </div>
           <RoverOdometerList rows={visibleRows} primaryRoverId={primaryRoverId} />
         </>
       )}
@@ -126,17 +118,15 @@ export default function OdometerPanel() {
 
 function OdometerSummary({ odometer, rover, now }) {
   const status = odometer?.status || 'waiting';
-  const statusReason = odometer?.statusReason || 'waiting for encoder sample';
+  const ignoredSamples = Number(odometer?.ignoredSamples) || 0;
   return (
     <div className="space-y-0.5">
       <div className="text-sm font-semibold text-slate-200">{roverLabel(rover)}</div>
       <div className="grid grid-cols-2 gap-0.5 md:grid-cols-3">
         <Metric label="Total distance" value={formatDistance(odometer?.totalMm)} />
-        <Metric label="Session distance" value={formatDistance(odometer?.sessionMm)} />
         <Metric label="Last update" value={formatAge(odometer?.updatedAt, now)} />
         <Metric label="Status" value={status} />
-        <Metric label="Reason" value={statusReason} />
-        <Metric label="Calibration" value={`${Number(odometer?.calibrationMultiplier || 1).toFixed(3)}x`} />
+        {ignoredSamples > 0 ? <Metric label="Ignored samples" value={String(ignoredSamples)} /> : null}
       </div>
     </div>
   );
@@ -148,34 +138,6 @@ function Metric({ label, value }) {
       <span className="text-slate-400">{label}</span>
       <span className="min-w-0 truncate text-right text-slate-100">{value ?? '--'}</span>
     </div>
-  );
-}
-
-function EncoderDetails({ odometer }) {
-  const delta = odometer?.lastDelta || null;
-  return (
-    <DetailCard title="Wheel encoders">
-      <ValueRow label="Left count" value={formatCount(odometer?.lastLeftCount)} />
-      <ValueRow label="Right count" value={formatCount(odometer?.lastRightCount)} />
-      <ValueRow label="Left delta" value={formatCount(delta?.leftCounts)} />
-      <ValueRow label="Right delta" value={formatCount(delta?.rightCounts)} />
-      <ValueRow label="Center delta" value={formatDistance(delta?.distanceMm)} />
-      <ValueRow label="Rollover events" value={formatCount(odometer?.rolloverEvents)} />
-      <ValueRow label="Ignored samples" value={formatCount(odometer?.ignoredSamples)} />
-    </DetailCard>
-  );
-}
-
-function CalibrationDetails({ odometer, now }) {
-  return (
-    <DetailCard title="Conversion">
-      <ValueRow label="Source" value="wheel encoders" />
-      <ValueRow label="Wheel diameter" value={`${formatCount(odometer?.wheelDiameterMm)} mm`} />
-      <ValueRow label="Counts per rev" value={formatCount(odometer?.countsPerRevolution)} />
-      <ValueRow label="Base mm per count" value={Number(odometer?.rawMmPerCount || 0).toFixed(4)} />
-      <ValueRow label="Active mm per count" value={Number(odometer?.mmPerCount || 0).toFixed(4)} />
-      <ValueRow label="Last sample" value={formatAge(odometer?.lastSampleAt, now)} />
-    </DetailCard>
   );
 }
 
