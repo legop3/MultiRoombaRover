@@ -2,17 +2,17 @@
   "codes": {
     "r001": {
       "type": "rover",
-      "entityId": "freaky",
+      "entityId": "Freaky",
       "label": "Freaky"
     },
     "r002": {
       "type": "rover",
-      "entityId": "walle",
+      "entityId": "WALL-E",
       "label": "WALL-E"
     },
     "r003": {
       "type": "rover",
-      "entityId": "bweeble",
+      "entityId": "Bweeble",
       "label": "Bweeble"
     },
 
