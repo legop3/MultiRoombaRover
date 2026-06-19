@@ -1,4 +1,5 @@
 const fsp = require('fs/promises');
+const Fuse = require('fuse.js');
 const { Ollama } = require('ollama');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('overseerControl');
@@ -35,6 +36,7 @@ const overseerConfig = config.overseerControl || {};
 const RUN_MODE_AUTONOMOUS = 'autonomous';
 const RUN_MODE_DIRECT_ADDRESS = 'directAddress';
 const RUN_MODES = new Set([RUN_MODE_AUTONOMOUS, RUN_MODE_DIRECT_ADDRESS]);
+const DIRECT_ADDRESS_FUZZY_THRESHOLD = 0.3;
 const enabled = Boolean(overseerConfig.enabled);
 const observeOnly = overseerConfig.observeOnly !== false;
 const name = String(overseerConfig.name || DEFAULT_NAME).trim() || DEFAULT_NAME;
@@ -50,6 +52,43 @@ const tiebreakerEnable = Boolean(overseerConfig.tiebreakerEnable);
 const runWhileNoPeopleOnline = Boolean(overseerConfig.runWhileNoPeopleOnline);
 const profileImageUrl = String(overseerConfig.profileImageUrl || '').trim() || null;
 const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
+
+function normalizeDirectAddressText(value) {
+  return String(value || '')
+    .toLowerCase()
+    // Direct-address matching is intentionally word-oriented. Replacing
+    // punctuation with spaces lets "overseer," and "overseer:" behave like the
+    // same invocation phrase without letting punctuation affect Fuse scores.
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+const directAddressName = normalizeDirectAddressText(name);
+const directAddressNameWords = directAddressName.split(' ').filter(Boolean);
+const directAddressAliases = (() => {
+  const aliases = new Set();
+  if (directAddressName) aliases.add(directAddressName);
+
+  // The default name includes a leading article, but users naturally shorten
+  // "The Overseer" to "Overseer". Keeping this as an alias makes the direct
+  // invocation humane while still requiring the match to be at the very start
+  // of the chat message.
+  if (directAddressNameWords[0] === 'the' && directAddressNameWords.length > 1) {
+    aliases.add(directAddressNameWords.slice(1).join(' '));
+  }
+
+  return Array.from(aliases).map((label) => ({
+    label,
+    wordCount: label.split(' ').filter(Boolean).length,
+  }));
+})();
+const directAddressFuse = new Fuse(directAddressAliases, {
+  includeScore: true,
+  ignoreLocation: true,
+  threshold: DIRECT_ADDRESS_FUZZY_THRESHOLD,
+  keys: [{ name: 'label', weight: 1 }],
+});
 
 const runtime = {
   timer: null,
@@ -300,6 +339,51 @@ function isConfiguredNameAddress(text) {
   // the rest of the message. This keeps "The Overseer, help" and "the overseer
   // help" valid while preventing accidental triggers such as "The Overseerish".
   return /[\s,.:;!?-]/.test(nextChar);
+}
+
+function buildLeadingDirectAddressCandidates(text) {
+  const words = normalizeDirectAddressText(text).split(' ').filter(Boolean);
+  if (!words.length) return [];
+
+  const maxAliasWords = directAddressAliases.reduce((max, alias) => Math.max(max, alias.wordCount), 1);
+  const maxWords = Math.min(words.length, Math.max(2, maxAliasWords + 1));
+  const candidates = [];
+
+  for (let count = 1; count <= maxWords; count += 1) {
+    // Each candidate is made only from the start of the message. This preserves
+    // the "starts with the bot name" contract even though the actual comparison
+    // is fuzzy.
+    candidates.push(words.slice(0, count).join(' '));
+  }
+
+  return candidates;
+}
+
+function isFuzzyConfiguredNameAddress(text) {
+  if (!directAddressAliases.length) return false;
+
+  const candidates = buildLeadingDirectAddressCandidates(text);
+  for (const candidate of candidates) {
+    const exactAlias = directAddressAliases.find((alias) => alias.label === candidate);
+    if (exactAlias) return true;
+
+    const best = directAddressFuse.search(candidate)[0];
+    if (!best || Number(best.score) > DIRECT_ADDRESS_FUZZY_THRESHOLD) continue;
+
+    const alias = best.item;
+    const candidateWords = candidate.split(' ').filter(Boolean);
+    if (candidateWords.length !== alias.wordCount) continue;
+
+    // Fuse can rate very short partial phrases surprisingly well. Requiring the
+    // candidate to be close to the alias length keeps first words like "the" or
+    // "over" from waking a multi-word bot while still allowing typos such as
+    // "overseer" -> "oversear" or "the overseer" -> "teh overseer".
+    if (Math.abs(candidate.length - alias.label.length) > 2) continue;
+
+    return true;
+  }
+
+  return false;
 }
 
 function summarizeResult(result) {
@@ -766,7 +850,7 @@ subscribe('chat:message', ({ payload } = {}) => {
     return;
   }
   if (!directAddressMode) return;
-  if (!isConfiguredNameAddress(text)) return;
+  if (!isConfiguredNameAddress(text) && !isFuzzyConfiguredNameAddress(text)) return;
   void runDirectAddressCycle('direct_address_chat');
 });
 verificationEvents.on('change', () => evaluateSchedulerGate('online vote update'));
