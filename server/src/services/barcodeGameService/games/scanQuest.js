@@ -5,7 +5,7 @@
 
 const GAME_ID = 'scanQuest';
 const QUEST_LENGTH_OPTIONS = [1, 2];
-const REQUEST_TIMEOUT_MS = 90 * 1000;
+const REQUEST_TIMEOUT_MS = 3.5 * 60 * 1000;
 const ROUND_DURATION_MS = 5 * 60 * 1000;
 
 function createInitialState() {
