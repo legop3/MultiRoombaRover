@@ -17,6 +17,7 @@ function buildAdminState(status, runHistory) {
     },
     config: {
       enabled: status.enabled,
+      runMode: status.runMode,
       name: status.name,
       model: status.model,
       ollamaUrl: status.ollamaUrl,

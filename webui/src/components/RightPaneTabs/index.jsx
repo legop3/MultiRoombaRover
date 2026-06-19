@@ -165,6 +165,14 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
       ownAudioForward?.source === 'upload' &&
       ownAudioForward?.state === 'playing',
   );
+  const showOverseerPreferencePanel = useSessionSelector((state) => {
+    const vote = state.session?.overseerVote;
+
+    // Match the panel's server-owned voting gate so the measured desktop chat
+    // dock can give the side-column height to the user pile when voting is
+    // unavailable, including disabled service and direct-address mode.
+    return Boolean(vote?.votingEnabled);
+  });
 
   useLayoutEffect(() => {
     const chatDock = chatDockRef.current;
@@ -304,8 +312,20 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
                   style={{ height: `${chatDockHeight}px` }}
                 >
                   <ChatPanel fillHeight />
-                  <div className={`grid min-h-0 ${themeGapClass} grid-rows-[auto_minmax(0,1fr)]`}>
-                    <OverseerPreferencePanel />
+                  <div
+                    className={`grid min-h-0 ${themeGapClass} ${
+                      showOverseerPreferencePanel
+                        ? 'grid-rows-[auto_minmax(0,1fr)]'
+                        : 'grid-rows-[minmax(0,1fr)]'
+                    }`}
+                  >
+                    {/*
+                      This side column is height-constrained by the measured
+                      chat dock row. When overseer voting is unavailable on the
+                      server, the user pile becomes the only child and should
+                      receive the whole side-column height.
+                    */}
+                    {showOverseerPreferencePanel ? <OverseerPreferencePanel /> : null}
                     <RawUserPilePanel compact hideNicknameForm fillHeight />
                   </div>
                 </div>

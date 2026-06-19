@@ -1,12 +1,4 @@
-5. actual barcode stuff fun
-   1. games
-      1. all games are global and initiated by a user
-         1. all games will require you to scan yourself to keep going sometimes too
-         2. only one game at a time
-      2. scan quest mode, scan 2 items in specific order or something
-      3. most scanned items
-         1. global counters
-         2. you have to 
+5. barcode wiki links
 6. implement multitabbing prevention using the identity system
 7. overseer improvements
    1. make it able to see more stuff

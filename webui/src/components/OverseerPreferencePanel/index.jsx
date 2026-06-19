@@ -40,7 +40,7 @@ function OverseerMemoryPopup({ memory, onClose }) {
   );
 }
 
-export default function OverseerPreferencePanel() {
+function OverseerPreferencePanelBody() {
   const { identifySession } = useSessionActions();
   const vote = useSessionSelector((state) => state.session?.overseerVote || null);
   const overseerMemory = useSessionSelector((state) => state.overseerMemory || null);
@@ -101,4 +101,22 @@ export default function OverseerPreferencePanel() {
       {memoryOpen ? <OverseerMemoryPopup memory={overseerMemory} onClose={() => setMemoryOpen(false)} /> : null}
     </>
   );
+}
+
+export default function OverseerPreferencePanel() {
+  const visible = useSessionSelector((state) => {
+    const vote = state.session?.overseerVote;
+
+    // The server owns whether voting has any effect. The panel appears only
+    // when the autonomous vote-gated scheduler is active; direct-address mode
+    // is intentionally hidden because users invoke it by starting a chat
+    // message with the configured overseer name instead of voting it on.
+    return Boolean(vote?.votingEnabled);
+  });
+
+  if (!visible) {
+    return null;
+  }
+
+  return <OverseerPreferencePanelBody />;
 }

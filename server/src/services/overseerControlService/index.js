@@ -32,9 +32,16 @@ const { loadMemory, saveMemory, createDefaultMemory, summarizeMemory } = require
 
 const config = loadConfig();
 const overseerConfig = config.overseerControl || {};
+const RUN_MODE_AUTONOMOUS = 'autonomous';
+const RUN_MODE_DIRECT_ADDRESS = 'directAddress';
+const RUN_MODES = new Set([RUN_MODE_AUTONOMOUS, RUN_MODE_DIRECT_ADDRESS]);
 const enabled = Boolean(overseerConfig.enabled);
 const observeOnly = overseerConfig.observeOnly !== false;
 const name = String(overseerConfig.name || DEFAULT_NAME).trim() || DEFAULT_NAME;
+const configuredRunMode = String(overseerConfig.mode || RUN_MODE_AUTONOMOUS).trim();
+const runMode = RUN_MODES.has(configuredRunMode) ? configuredRunMode : RUN_MODE_AUTONOMOUS;
+const autonomousMode = runMode === RUN_MODE_AUTONOMOUS;
+const directAddressMode = runMode === RUN_MODE_DIRECT_ADDRESS;
 const model = String(overseerConfig.model || '').trim();
 const ollamaUrl = String(overseerConfig.ollamaUrl || overseerConfig.ollamaServer || '').trim();
 const gateIntervalMs = normalizeMs(Number(overseerConfig.gateIntervalMs), DEFAULT_GATE_INTERVAL_MS);
@@ -52,12 +59,14 @@ const runtime = {
   generationTotalMs: 0,
   runHistory: [],
   liveToolCalls: [],
+  pendingDirectAddressRun: false,
   memoryStore: loadMemory(),
   contextResetAt: Date.now(),
 };
 
 let status = {
   enabled,
+  runMode,
   observeOnly,
   name,
   model,
@@ -138,12 +147,24 @@ function buildVoteStatus() {
     gatePassed = yesCount > noCount;
   }
   return {
+    // This flag is part of the public vote snapshot because the browser needs
+    // to distinguish "the service is disabled in server config" from "the
+    // service is available but currently stopped by votes or lockdown mode."
+    // Without this explicit value, the UI can only infer stopped/running state
+    // and will keep showing vote controls that cannot actually start anything.
+    enabled,
+    runMode,
+    // Voting is only meaningful for the autonomous scheduler. Direct-address
+    // mode is server-controlled and runs only after a user intentionally starts
+    // a chat message with the configured overseer name, so the public vote UI
+    // should hide instead of offering controls that do not affect execution.
+    votingEnabled: Boolean(enabled && autonomousMode),
     yesCount,
     noCount,
     onlineCount,
     eligibleCount,
     gatePassed,
-    running: Boolean(enabled && gatePassed && getMode() !== MODES.LOCKDOWN),
+    running: Boolean(enabled && autonomousMode && gatePassed && getMode() !== MODES.LOCKDOWN),
   };
 }
 
@@ -262,6 +283,23 @@ function normalizeChatDraft(text) {
   if (!next) return null;
   if (next.toUpperCase() === 'SKIP') return null;
   return next;
+}
+
+function isConfiguredNameAddress(text) {
+  const clean = String(text || '').trimStart();
+  if (!clean) return false;
+
+  const lowerText = clean.toLowerCase();
+  const lowerName = name.toLowerCase();
+  if (!lowerText.startsWith(lowerName)) return false;
+
+  const nextChar = clean.charAt(name.length);
+  if (!nextChar) return true;
+
+  // The character after the configured name must separate the invocation from
+  // the rest of the message. This keeps "The Overseer, help" and "the overseer
+  // help" valid while preventing accidental triggers such as "The Overseerish".
+  return /[\s,.:;!?-]/.test(nextChar);
 }
 
 function summarizeResult(result) {
@@ -535,6 +573,77 @@ async function tick() {
   }
 }
 
+function getDirectAddressSkipReason() {
+  if (!enabled) return 'overseerControl.enabled is false';
+  if (!directAddressMode) return 'overseerControl.mode is not directAddress';
+  if (getMode() === MODES.LOCKDOWN) return 'paused during lockdown';
+  return null;
+}
+
+async function runDirectAddressCycle(triggerReason = 'direct_address') {
+  const skipReason = getDirectAddressSkipReason();
+  if (skipReason) {
+    updateStatus({
+      lastOutcome: 'skipped',
+      lastReason: skipReason,
+    });
+    return;
+  }
+
+  if (runtime.inFlight) {
+    // Direct-address mode should not create overlapping Ollama requests. If a
+    // user addresses the overseer while a generation is active, remember that a
+    // follow-up pass is needed and collapse any additional mentions into that
+    // single pending pass. This keeps chat responsive without stampeding the
+    // local model server.
+    runtime.pendingDirectAddressRun = true;
+    updateStatus({
+      lastOutcome: 'queued',
+      lastReason: 'direct-address request queued while model request is in flight',
+    });
+    return;
+  }
+
+  do {
+    runtime.pendingDirectAddressRun = false;
+    const startedAt = Date.now();
+    runtime.tickCount += 1;
+    runtime.inFlight = true;
+    updateStatus({
+      running: true,
+      inFlight: true,
+      tickCount: runtime.tickCount,
+      lastTickAt: startedAt,
+      phase: 'direct_address_tick',
+      lastTriggerReason: triggerReason,
+      nextRunAt: null,
+    });
+
+    try {
+      await runDecision(triggerReason);
+    } catch (err) {
+      const failure = buildFailureInfo(err);
+      updateStatus({
+        phase: 'failed',
+        lastError: failure.message,
+        lastErrorDetails: failure.details,
+        lastFailedAt: Date.now(),
+        lastOutcome: 'failed',
+        lastReason: 'exception',
+      });
+    } finally {
+      runtime.inFlight = false;
+      updateStatus({
+        running: false,
+        inFlight: false,
+        currentRunId: null,
+        nextRunAt: null,
+        phase: getDirectAddressSkipReason() ? 'paused' : 'idle',
+      });
+    }
+  } while (runtime.pendingDirectAddressRun && !getDirectAddressSkipReason());
+}
+
 function emitStateToSocket(socket) {
   if (!socket || !isAdminRole(getRole(socket))) return;
   socket.emit('overseer:state', buildAdminState(status, runtime.runHistory));
@@ -584,10 +693,14 @@ function stopScheduler(reason = 'paused') {
   }
   updateStatus({
     running: false,
-    inFlight: false,
-    currentRunId: null,
+    // Stopping the scheduler cancels future work, but an already-started model
+    // request may still be finishing. Preserve the in-flight flag/current run
+    // so admin state does not briefly claim the service is idle while a direct
+    // or autonomous decision is still awaiting Ollama.
+    inFlight: runtime.inFlight,
+    currentRunId: runtime.inFlight ? status.currentRunId : null,
     nextRunAt: null,
-    phase: 'paused',
+    phase: runtime.inFlight ? status.phase : 'paused',
     lastOutcome: 'paused',
     lastReason: reason,
   });
@@ -608,6 +721,10 @@ function evaluateSchedulerGate(reason = 'gate reevaluated') {
   updateStatus({ voteStatus });
   if (!enabled) {
     stopScheduler('overseerControl.enabled is false');
+    return;
+  }
+  if (directAddressMode) {
+    stopScheduler('direct-address mode waits for configured name mention');
     return;
   }
   if (getMode() === MODES.LOCKDOWN) {
@@ -643,9 +760,14 @@ roleEvents.on('change', ({ socket }) => {
 });
 subscribe('chat:message', ({ payload } = {}) => {
   const text = String(payload?.text || '').trim();
-  if (text !== 'CLEAR') return;
   if (payload?.bot) return;
-  clearHistory('chat CLEAR command', { resetPersistentMemory: false, sendConfirmation: true });
+  if (text === 'CLEAR') {
+    clearHistory('chat CLEAR command', { resetPersistentMemory: false, sendConfirmation: true });
+    return;
+  }
+  if (!directAddressMode) return;
+  if (!isConfiguredNameAddress(text)) return;
+  void runDirectAddressCycle('direct_address_chat');
 });
 verificationEvents.on('change', () => evaluateSchedulerGate('online vote update'));
 homeAssistantEvents.on('update', () => updateStatus({ phase: status.phase }));
@@ -669,9 +791,12 @@ if (!enabled) {
   if (getMode() === MODES.LOCKDOWN) {
     stopScheduler('paused during lockdown');
     logger.info('overseerControl paused on startup due to lockdown mode');
+  } else if (directAddressMode) {
+    evaluateSchedulerGate('direct-address mode');
+    logger.info('overseerControl direct-address mode enabled', { model, ollamaUrl, observeOnly, name });
   } else {
     evaluateSchedulerGate(observeOnly ? 'observe-only mode' : null);
-    logger.info('overseerControl enabled', { model, ollamaUrl, gateIntervalMs, observeOnly });
+    logger.info('overseerControl enabled', { model, ollamaUrl, gateIntervalMs, observeOnly, runMode });
   }
 }
 

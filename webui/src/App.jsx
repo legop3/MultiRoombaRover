@@ -122,6 +122,14 @@ function MobileFeatureTabs({
       ownAudioForward?.source === 'upload' &&
       ownAudioForward?.state === 'playing',
   );
+  const showOverseerPreferencePanel = useSessionSelector((state) => {
+    const vote = state.session?.overseerVote;
+
+    // Match the panel's server-owned voting gate so the mobile chat row can
+    // collapse to a single-column layout when voting is unavailable, including
+    // disabled service and direct-address mode.
+    return Boolean(vote?.votingEnabled);
+  });
   return (
     <section className="text-base">
       <Tabs defaultTab="chat" currentTab={activeTab} onTabChange={setActiveTab}>
@@ -150,8 +158,19 @@ function MobileFeatureTabs({
                 <div className={`grid ${themeGapClass} md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]`}>
                   <SocialButtonsGrid />
                 </div>
-                <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,1fr)]`}>
-                  <OverseerPreferencePanel />
+                <div
+                  className={`grid ${themeGapClass} ${
+                    showOverseerPreferencePanel
+                      ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'
+                      : 'grid-cols-[minmax(0,1fr)]'
+                  }`}
+                >
+                  {/*
+                    The overseer vote panel is server-vote-gated. When voting
+                    is unavailable, the raw user pile should reclaim the row
+                    instead of sitting in a half-empty two-column layout.
+                  */}
+                  {showOverseerPreferencePanel ? <OverseerPreferencePanel /> : null}
                   <RawUserPilePanel hideNicknameForm />
                 </div>
               </div>
