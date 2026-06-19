@@ -42,7 +42,7 @@ export default function SocketConnectionPill() {
       setLastReason('');
       show();
       scheduleFade();
-      trackAnalyticsEvent('socket_connect');
+      trackAnalyticsEvent('socket_connect', { connected: true });
     };
 
     const onDisconnect = (reason) => {
@@ -70,7 +70,11 @@ export default function SocketConnectionPill() {
     const onReconnectAttempt = () => {
       setConnected(false);
       show();
-      trackAnalyticsEventThrottled('socket_reconnect_attempt', {}, { key: 'socket_reconnect_attempt', throttleMs: 30 * 1000 });
+      trackAnalyticsEventThrottled(
+        'socket_reconnect_attempt',
+        { connected: false },
+        { key: 'socket_reconnect_attempt', throttleMs: 30 * 1000 },
+      );
     };
 
     socket.on('connect', onConnect);

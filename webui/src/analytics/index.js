@@ -63,6 +63,7 @@ export function trackAnalyticsEvent(name, payload = {}) {
   if (!eventName) return;
   const adapter = getAdapter();
   if (!adapter || typeof adapter.track !== 'function') return;
+  const cleanPayload = normalizePayload(payload);
 
   try {
     /*
@@ -70,7 +71,16 @@ export function trackAnalyticsEvent(name, payload = {}) {
       broken or blocked third-party script from interfering with rover driving,
       scanner input, chat, or any other live-control UI.
     */
-    adapter.track(eventName, normalizePayload(payload));
+    /*
+      Umami accepts an event name without a data object. Avoid forwarding `{}` so
+      events that only need counting do not create noisy empty-property requests
+      in the dashboard or the network payload.
+    */
+    if (Object.keys(cleanPayload).length) {
+      adapter.track(eventName, cleanPayload);
+    } else {
+      adapter.track(eventName);
+    }
   } catch (error) {
     console.warn('Analytics event failed', error);
   }

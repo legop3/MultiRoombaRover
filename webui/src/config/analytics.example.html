@@ -40,7 +40,7 @@
 
     window.roverAnalytics = {
       track: function (name, data) {
-        enqueue('track', [name, data || {}]);
+        enqueue('track', typeof data === 'undefined' ? [name] : [name, data]);
       },
       identify: function (data) {
         enqueue('identify', [data || {}]);
