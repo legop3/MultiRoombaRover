@@ -1,69 +1,79 @@
 // Barcode Games Panel
-// Purpose: Shows global barcode game state and voting controls inside the driver's Activities tab.
-// Scope: Gives drivers a readable control/status surface while the scanner page remains the room-facing display.
-import { useMemo, useState } from 'react';
+// Purpose: Shows barcode game selection, current game status, and player points in the Activities tab.
+// Scope: Keeps the driver-side UI compact but informative; game-specific rules stay in server game modules.
+import { useEffect, useMemo, useState } from 'react';
 import useBarcodeGameState from '../../barcodeGames/useBarcodeGameState.js';
 import CardFrame from '../CardFrame/index.jsx';
 
-function formatSeconds(ms) {
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  const totalSeconds = Math.ceil(ms / 1000);
+function useClock(enabled) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [enabled]);
+
+  return now;
+}
+
+function formatTimer(endsAt, now) {
+  if (!Number.isFinite(endsAt)) return null;
+  const totalSeconds = Math.max(0, Math.ceil((endsAt - now) / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return minutes > 0 ? `${minutes}:${String(seconds).padStart(2, '0')}` : `${seconds}s`;
 }
 
-function formatCounter(entry) {
-  const label = typeof entry?.label === 'string' && entry.label.trim() ? entry.label.trim() : 'unknown';
-  const count = Number.isFinite(entry?.count) ? entry.count : 0;
-  return { label, count };
-}
-
-function formatRecord(activeGame) {
-  const record = activeGame?.worldRecord;
-  if (!record) return null;
-  const rate = Number.isFinite(record.scansPerSecond) ? record.scansPerSecond.toFixed(2) : '0.00';
-  return `${rate} scans per second`;
-}
-
-function GameVoteButton({ game, disabled, onVote }) {
+function GameChoice({ game, disabled, onVote }) {
   return (
     <button
       type="button"
-      disabled={disabled}
+      disabled={disabled || game.active}
       onClick={() => onVote(game.id)}
       className={[
-        'button-dark min-h-[5.5rem] min-w-0 px-2 py-1.5 text-left disabled:opacity-50',
-        game.active ? 'border-emerald-300 bg-emerald-950/80 text-emerald-50' : 'bg-neutral-950/80',
+        'button-dark flex min-h-[4.25rem] flex-col items-start justify-between px-1.5 py-1 text-left disabled:opacity-70',
+        game.active ? 'border-emerald-500/70' : '',
       ].filter(Boolean).join(' ')}
     >
-      <span className="flex items-start justify-between gap-1">
-        <span className="text-base font-semibold leading-tight">{game.title}</span>
-        <span className="shrink-0 rounded border border-neutral-600 px-1 py-0.5 text-xs text-slate-200">
-          {game.voteCount || 0} votes
-        </span>
+      <span className="flex w-full items-start justify-between gap-1">
+        <span className="text-sm font-semibold leading-tight text-neutral-50">{game.title}</span>
+        <span className="shrink-0 font-mono text-[0.72rem] text-neutral-300">{game.voteCount || 0}</span>
       </span>
-      <span className="mt-1 block text-sm leading-snug text-slate-300">{game.description}</span>
-      <span className="mt-1 block text-xs font-semibold text-emerald-200">
+      <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-neutral-300">{game.description}</span>
+      <span className="mt-0.5 text-[0.7rem] font-semibold text-neutral-200">
         {game.active ? 'Active' : game.actionLabel || 'Start'}
       </span>
     </button>
   );
 }
 
+function StatGrid({ stats }) {
+  if (!Array.isArray(stats) || !stats.length) return null;
+  return (
+    <div className="grid gap-1 sm:grid-cols-3">
+      {stats.slice(0, 6).map((stat) => (
+        <div key={stat.label} className="border border-neutral-700 px-1.5 py-1">
+          <p className="truncate text-[0.68rem] text-neutral-400">{stat.label}</p>
+          <p className="truncate text-sm font-semibold text-neutral-100">{stat.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CounterList({ title, entries }) {
   if (!Array.isArray(entries) || !entries.length) return null;
   return (
-    <div className="min-w-0">
-      <p className="mb-1 text-sm font-semibold text-slate-200">{title}</p>
-      <div className="space-y-1">
-        {entries.slice(0, 3).map((entry) => (
-          <div
-            key={`${entry.entityId || entry.code}-${entry.type || 'counter'}`}
-            className="flex items-center justify-between gap-2 rounded border border-neutral-700 bg-neutral-950/70 px-2 py-1"
-          >
-            <span className="min-w-0 truncate text-sm text-slate-100">{formatCounter(entry).label}</span>
-            <span className="font-mono text-sm font-semibold text-slate-200">{formatCounter(entry).count}</span>
+    <div>
+      <p className="mb-0.5 text-xs font-semibold text-neutral-300">{title}</p>
+      <div className="space-y-0.5">
+        {entries.slice(0, 4).map((entry) => (
+          <div key={`${entry.entityId || entry.code}-${entry.type || 'counter'}`} className="flex justify-between gap-2 text-xs">
+            <span className="min-w-0 truncate text-neutral-200">{entry.label || entry.entityId || entry.code}</span>
+            <span className="font-mono text-neutral-300">{entry.count || 0}</span>
           </div>
         ))}
       </div>
@@ -71,36 +81,48 @@ function CounterList({ title, entries }) {
   );
 }
 
-function Leaderboard({ players }) {
-  if (!Array.isArray(players) || !players.length) return null;
+function Leaderboard({ players, ownPlayer }) {
+  const hasOwnPoints = ownPlayer && Number.isFinite(ownPlayer.totalPoints);
   return (
-    <div>
-      <p className="mb-1 text-sm font-semibold text-slate-200">Player points</p>
-      <div className="space-y-1">
-        {players.slice(0, 5).map((player, idx) => (
-          <div
-            key={player.playerKey}
-            className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 rounded border border-neutral-700 bg-neutral-950/70 px-2 py-1"
-          >
-            <span className="font-mono text-sm text-slate-400">{idx + 1}</span>
-            <span className="truncate text-sm font-semibold text-white">{player.nickname}</span>
-            <span className="font-mono text-sm text-emerald-200">{player.totalPoints}</span>
-          </div>
-        ))}
+    <div className="space-y-1">
+      <div className="grid gap-1 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <div className="border border-neutral-700 px-1.5 py-1">
+          <p className="text-xs text-neutral-400">Your points</p>
+          <p className="text-lg font-semibold leading-tight text-neutral-50">
+            {hasOwnPoints ? ownPlayer.totalPoints : 0}
+          </p>
+          {ownPlayer?.rank ? <p className="text-[0.7rem] text-neutral-400">Rank {ownPlayer.rank}</p> : null}
+        </div>
+        <div className="border border-neutral-700 px-1.5 py-1">
+          <p className="mb-0.5 text-xs font-semibold text-neutral-300">Leaderboard</p>
+          {Array.isArray(players) && players.length ? (
+            <div className="space-y-0.5">
+              {players.slice(0, 4).map((player, idx) => (
+                <div key={player.playerKey} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] gap-1 text-xs">
+                  <span className="font-mono text-neutral-500">{idx + 1}</span>
+                  <span className="truncate text-neutral-200">{player.nickname}</span>
+                  <span className="font-mono text-neutral-300">{player.totalPoints}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-500">No points yet</p>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 export default function BarcodeGamesPanel() {
-  const { state, resetActiveGame, voteForGame } = useBarcodeGameState();
+  const { state, voteForGame } = useBarcodeGameState();
   const [pendingGameId, setPendingGameId] = useState(null);
-  const [resetPending, setResetPending] = useState(false);
   const activeGame = state.activeGame;
-  const recordText = formatRecord(activeGame);
-  const remainingText = formatSeconds(activeGame?.remainingMs);
-  const counters = state.counters || {};
-  const voteButtons = useMemo(() => (Array.isArray(state.games) ? state.games : []), [state.games]);
+  const display = activeGame?.display || {};
+  const timerEndsAt = display.timer?.endsAt;
+  const now = useClock(Number.isFinite(timerEndsAt));
+  const timerText = formatTimer(timerEndsAt, now);
+  const games = useMemo(() => (Array.isArray(state.games) ? state.games : []), [state.games]);
 
   const handleVote = async (gameId) => {
     setPendingGameId(gameId);
@@ -111,35 +133,11 @@ export default function BarcodeGamesPanel() {
     }
   };
 
-  const handleReset = async () => {
-    setResetPending(true);
-    try {
-      await resetActiveGame();
-    } finally {
-      setResetPending(false);
-    }
-  };
-
   return (
-    <CardFrame
-      title="Barcode games"
-      bodyClassName="space-y-3 p-2 text-sm"
-      actions={
-        activeGame ? (
-          <button
-            type="button"
-            className="button-dark px-2 py-1 text-xs disabled:opacity-50"
-            disabled={resetPending}
-            onClick={handleReset}
-          >
-            Reset active game
-          </button>
-        ) : null
-      }
-    >
-      <div className="grid gap-2 md:grid-cols-2">
-        {voteButtons.map((game) => (
-          <GameVoteButton
+    <CardFrame title="Barcode games" bodyClassName="space-y-2 p-1.5 text-sm">
+      <div className="grid gap-1 sm:grid-cols-2">
+        {games.map((game) => (
+          <GameChoice
             key={game.id}
             game={game}
             disabled={Boolean(pendingGameId)}
@@ -148,38 +146,32 @@ export default function BarcodeGamesPanel() {
         ))}
       </div>
 
-      <div className="rounded border border-neutral-700 bg-neutral-950/80 p-3">
-        <p className="truncate text-xl font-bold leading-tight text-white">
-          {activeGame?.title || 'No barcode game'}
-        </p>
-        <p className="mt-1 text-lg font-semibold leading-snug text-slate-100">
-          {activeGame?.headline || 'vote for a game to start'}
-        </p>
-        {activeGame?.detail ? (
-          <p className="mt-1 text-sm leading-snug text-slate-300">{activeGame.detail}</p>
-        ) : null}
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {remainingText ? (
-            <div className="rounded border border-neutral-700 bg-black/30 px-2 py-1">
-              <p className="text-xs text-slate-400">Time left</p>
-              <p className="font-mono text-lg font-semibold text-white">{remainingText}</p>
-            </div>
-          ) : null}
-          {recordText ? (
-            <div className="rounded border border-neutral-700 bg-black/30 px-2 py-1 sm:col-span-2">
-              <p className="text-xs text-slate-400">World record</p>
-              <p className="text-lg font-semibold text-emerald-200">{recordText}</p>
+      <section className="space-y-1 border-t border-neutral-700 pt-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-neutral-400">{display.title || activeGame?.title || 'No game active'}</p>
+            <p className="break-words text-lg font-semibold leading-tight text-neutral-50">
+              {display.primary || 'Vote for a game to start'}
+            </p>
+            {display.secondary ? (
+              <p className="mt-0.5 break-words text-sm leading-snug text-neutral-300">{display.secondary}</p>
+            ) : null}
+          </div>
+          {timerText ? (
+            <div className="shrink-0 text-right">
+              <p className="text-[0.68rem] text-neutral-400">{display.timer?.label || 'Time'}</p>
+              <p className="font-mono text-base font-semibold text-neutral-50">{timerText}</p>
             </div>
           ) : null}
         </div>
-      </div>
+        <StatGrid stats={display.stats} />
+      </section>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Leaderboard players={state.leaderboard} />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-          <CounterList title="Most scanned objects" entries={counters.objects} />
-          <CounterList title="Most scanned rovers" entries={counters.rovers} />
-        </div>
+      <Leaderboard players={state.leaderboard} ownPlayer={state.ownPlayer} />
+
+      <div className="grid gap-2 border-t border-neutral-700 pt-1.5 sm:grid-cols-2">
+        <CounterList title="Most scanned objects" entries={state.counters?.objects} />
+        <CounterList title="Most scanned rovers" entries={state.counters?.rovers} />
       </div>
     </CardFrame>
   );

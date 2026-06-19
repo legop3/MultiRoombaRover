@@ -258,23 +258,6 @@ function activateGame(draft, gameId, now) {
   return true;
 }
 
-function resetGame(draft, gameId, now) {
-  const definition = getGameDefinition(gameId);
-  if (!definition) return false;
-  const currentState = ensureGameState(draft, gameId);
-  const nextState = definition.reset
-    ? definition.reset(currentState, buildGameContext(draft, { now }))
-    : definition.createInitialState();
-  draft.games[gameId] = nextState;
-  draft.activeGameId = gameId;
-  addRecentEvent(draft, {
-    kind: 'gameReset',
-    gameId,
-    title: definition.title,
-  });
-  return true;
-}
-
 function normalizeGameResult(result, fallbackState) {
   if (!result || typeof result !== 'object' || Array.isArray(result)) {
     return { state: fallbackState, awards: [] };
@@ -349,7 +332,7 @@ function setVote(socket, gameId) {
   });
 
   broadcastState();
-  return { success: true, state: buildStatePayload() };
+  return { success: true, state: buildStatePayload(socket) };
 }
 
 function settleActiveGameIfNeeded() {
@@ -404,29 +387,40 @@ function handleScan(scan) {
   broadcastState();
 }
 
-function resetActiveGame() {
-  const now = Date.now();
-  let resetGameId = null;
-
-  withGameStore((draft) => {
-    const gameId = draft.activeGameId;
-    if (!getGameDefinition(gameId)) return;
-    resetGameId = gameId;
-    resetGame(draft, gameId, now);
-  });
-
-  if (!resetGameId) return { error: 'no active barcode game' };
-  broadcastState();
-  return { success: true, state: buildStatePayload() };
-}
-
 function topCounters(bucket = {}, limit = 5) {
   return Object.values(bucket || {})
     .sort((a, b) => (b.count || 0) - (a.count || 0))
     .slice(0, limit);
 }
 
-function buildStatePayload() {
+function getPlayerForSocket(store, socket) {
+  if (!socket) return null;
+  const identity = getIdentitySummary(socket);
+  const playerKey = normalizePlayerKey(identity, socket.id, '');
+  const player = playerKey ? store.players?.[playerKey] || null : null;
+  if (!player) {
+    return {
+      playerKey,
+      nickname: identity.nickname || null,
+      totalPoints: 0,
+      rank: null,
+      games: {},
+    };
+  }
+  const rankedPlayers = Object.values(store.players || {})
+    .filter((entry) => Number.isFinite(entry?.totalPoints) && entry.totalPoints > 0)
+    .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+  const rank = rankedPlayers.findIndex((entry) => entry.playerKey === player.playerKey) + 1;
+  return {
+    playerKey: player.playerKey,
+    nickname: player.nickname || identity.nickname || null,
+    totalPoints: player.totalPoints || 0,
+    rank: rank > 0 ? rank : null,
+    games: player.games || {},
+  };
+}
+
+function buildStatePayload(socket = null) {
   settleActiveGameIfNeeded();
   const store = loadStore();
   const now = Date.now();
@@ -452,6 +446,7 @@ function buildStatePayload() {
     })),
     activeGame,
     leaderboard,
+    ownPlayer: getPlayerForSocket(store, socket),
     counters: {
       objects: topCounters(store.globalCounters?.objects),
       rovers: topCounters(store.globalCounters?.rovers),
@@ -481,13 +476,20 @@ function ensureReadonlyGameState(store, gameId) {
 }
 
 function broadcastState() {
-  io.to(GAME_SOCKET_ROOM).emit('barcodeGame:state', buildStatePayload());
+  const room = io.sockets.adapter.rooms.get(GAME_SOCKET_ROOM);
+  if (!room) return;
+  room.forEach((socketId) => {
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket) {
+      socket.emit('barcodeGame:state', buildStatePayload(socket));
+    }
+  });
 }
 
 io.on('connection', (socket) => {
   socket.on('barcodeGame:subscribe', (_payload = {}, cb = () => {}) => {
     socket.join(GAME_SOCKET_ROOM);
-    const state = buildStatePayload();
+    const state = buildStatePayload(socket);
     socket.emit('barcodeGame:state', state);
     cb({ success: true, state });
   });
@@ -501,14 +503,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('barcodeGame:resetActive', (_payload = {}, cb = () => {}) => {
-    try {
-      cb(resetActiveGame(socket));
-    } catch (err) {
-      logger.warn('Barcode game reset failed', { error: err.message });
-      cb({ error: err.message || 'barcode game reset failed' });
-    }
-  });
 });
 
 subscribe('barcode.scanned', (event) => {
@@ -524,7 +518,6 @@ subscribe('barcode.scanned', (event) => {
 module.exports = {
   buildStatePayload,
   handleScan,
-  resetActiveGame,
   setVote,
 };
 

@@ -15,6 +15,7 @@ const EMPTY_BARCODE_GAME_STATE = {
     codes: [],
   },
   recentEvents: [],
+  ownPlayer: null,
 };
 
 function normalizeState(payload = {}) {
@@ -67,29 +68,11 @@ export default function useBarcodeGameState() {
     [socket],
   );
 
-  const resetActiveGame = useCallback(
-    () =>
-      new Promise((resolve, reject) => {
-        socket.emit('barcodeGame:resetActive', {}, (response = {}) => {
-          if (response.error) {
-            reject(new Error(response.error));
-            return;
-          }
-          if (response.state) {
-            setState(normalizeState(response.state));
-          }
-          resolve(response);
-        });
-      }),
-    [socket],
-  );
-
   return useMemo(
     () => ({
       state,
-      resetActiveGame,
       voteForGame,
     }),
-    [resetActiveGame, state, voteForGame],
+    [state, voteForGame],
   );
 }

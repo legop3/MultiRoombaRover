@@ -223,6 +223,14 @@ function getPublicState(rawState, context = {}) {
     ? calculateRate(state.scans.length, state.startedAt, elapsedEnd)
     : state.finalResult?.scansPerSecond || 0;
   const remainingMs = state.status === 'running' ? Math.max(0, (state.endsAt || now) - now) : 0;
+  const worldRecordText = state.worldRecord
+    ? `${Number(state.worldRecord.scansPerSecond || 0).toFixed(2)} scans per second`
+    : 'none yet';
+  const primary = state.status === 'running'
+    ? `${Number(currentRate).toFixed(2)} scans per second`
+    : state.finalResult
+      ? `${Number(state.finalResult.scansPerSecond || 0).toFixed(2)} scans per second`
+      : 'Scan anything';
 
   return {
     id: GAME_ID,
@@ -242,6 +250,33 @@ function getPublicState(rawState, context = {}) {
     participants: Object.values(state.participantCounts || {}).sort((a, b) => (b.scanCount || 0) - (a.scanCount || 0)),
     recentRounds: state.recentRounds,
     actionLabel: state.status === 'running' ? 'Running' : 'Start round',
+    display: {
+      // This display description lets the scanner page and the driver panel
+      // render the same game state at different scales without hardcoding
+      // scans-per-second-specific UI branches in shared React components.
+      title: 'Scans per second',
+      primary,
+      secondary: state.status === 'running'
+        ? `${state.scans.length} scans counted`
+        : state.finalResult
+          ? `${state.finalResult.scanCount} scans in the last round`
+          : 'Five minute scan challenge',
+      timer: state.status === 'running' && state.endsAt
+        ? {
+            label: 'Time left',
+            endsAt: state.endsAt,
+          }
+        : null,
+      stats: [
+        { label: 'Scans', value: state.scans.length },
+        { label: 'Current rate', value: Number(currentRate).toFixed(2) },
+        { label: 'World record', value: worldRecordText },
+      ],
+      results: state.recentRounds.slice(0, 3).map((round) => ({
+        label: 'Round',
+        value: `${Number(round.scansPerSecond || 0).toFixed(2)} scans per second`,
+      })),
+    },
   };
 }
 

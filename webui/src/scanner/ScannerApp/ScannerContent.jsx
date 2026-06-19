@@ -16,6 +16,28 @@ const EMPTY_SCANNER_STATE = {
   registryError: null,
 };
 
+function useClock(enabled) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [enabled]);
+
+  return now;
+}
+
+function formatTimer(endsAt, now) {
+  if (!Number.isFinite(endsAt)) return '';
+  const totalSeconds = Math.max(0, Math.ceil((endsAt - now) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}:${String(seconds).padStart(2, '0')}` : `${seconds}s`;
+}
+
 function playSubmitBeep() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) return;
@@ -120,8 +142,12 @@ export default function ScannerContent() {
 
   const lastScan = scannerState.lastScan;
   const activeGame = barcodeGameState.activeGame;
-  const label = activeGame?.headline || lastScan?.label || 'waiting';
-  const detail = activeGame?.detail || '';
+  const display = activeGame?.display || {};
+  const timerEndsAt = display.timer?.endsAt;
+  const now = useClock(Number.isFinite(timerEndsAt));
+  const timerText = formatTimer(timerEndsAt, now);
+  const label = display.primary || activeGame?.headline || lastScan?.label || 'waiting';
+  const detail = display.secondary || activeGame?.detail || '';
 
   return (
     <main
@@ -152,6 +178,11 @@ export default function ScannerContent() {
           {detail ? (
             <p className="max-w-full break-words text-[5vw] font-bold leading-tight tracking-normal">
               {detail}
+            </p>
+          ) : null}
+          {timerText ? (
+            <p className="font-mono text-[6vw] font-black leading-none tracking-normal">
+              {timerText}
             </p>
           ) : null}
         </div>

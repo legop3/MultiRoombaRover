@@ -224,6 +224,9 @@ function getPublicState(rawState, context = {}) {
   const remainingMs = state.stepStartedAt
     ? Math.max(0, REQUEST_TIMEOUT_MS - (now - state.stepStartedAt))
     : 0;
+  const currentStep = state.currentQuest?.steps?.[state.progressIndex] || null;
+  const totalSteps = state.currentQuest?.steps?.length || 0;
+  const stepLabel = totalSteps > 1 ? `Step ${state.progressIndex + 1} of ${totalSteps}` : 'Find the object';
   return {
     id: GAME_ID,
     title: 'Scan quest',
@@ -238,6 +241,28 @@ function getPublicState(rawState, context = {}) {
     },
     remainingMs,
     actionLabel: 'Start quest',
+    display: {
+      // The display payload is intentionally structured instead of HTML or
+      // React component names. Games describe what should be shown, while each
+      // client surface decides how large or compact that information should be.
+      title: 'Scan quest',
+      primary: currentStep ? `Scan ${currentStep.label}` : 'Add object barcodes',
+      secondary: currentStep ? stepLabel : 'The registry needs at least one object',
+      timer: state.stepStartedAt
+        ? {
+            label: 'Time left',
+            endsAt: state.stepStartedAt + REQUEST_TIMEOUT_MS,
+          }
+        : null,
+      stats: [
+        { label: 'Completed', value: state.completedQuests },
+        { label: 'Quest points', value: getTopScores(state)[0]?.points || 0 },
+      ],
+      results: state.recentEvents.slice(0, 3).map((event) => ({
+        label: event.kind === 'timeout' ? 'Skipped' : event.kind,
+        value: event.label || event.points || '',
+      })),
+    },
     scores: getTopScores(state),
     completedQuests: state.completedQuests,
     recentEvents: state.recentEvents,
