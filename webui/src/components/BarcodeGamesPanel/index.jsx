@@ -40,21 +40,13 @@ function getGameTheme(themeColor) {
   return {
     textStyle: { color: rgba(rgb, 0.96) },
     buttonStyle: {
-      borderColor: rgba(rgb, 0.62),
       borderLeftColor: rgba(rgb, 0.9),
-      backgroundColor: rgba(rgb, 0.1),
     },
     selectedButtonStyle: {
-      borderColor: rgba(rgb, 0.86),
       borderLeftColor: rgba(rgb, 1),
-      backgroundColor: rgba(rgb, 0.14),
     },
     titleBoxStyle: {
       borderLeftColor: rgba(rgb, 0.88),
-      backgroundColor: rgba(rgb, 0.06),
-    },
-    boxStyle: {
-      borderColor: rgba(rgb, 0.62),
     },
   };
 }
@@ -89,7 +81,7 @@ function GameChoice({ game, disabled, onVote }) {
       type="button"
       disabled={disabled || game.active}
       onClick={() => onVote(game.id)}
-      className="button-dark flex min-h-[3.5rem] flex-col items-start justify-between border-l-4 border-neutral-600 bg-neutral-800 px-1 py-0.75 text-left hover:bg-neutral-700 disabled:opacity-70"
+      className="button-dark flex min-h-[3.5rem] flex-col items-start justify-between border-l-4 px-1 py-0.75 text-left disabled:opacity-70"
       style={style}
     >
       <span className="flex w-full items-start justify-between gap-1">
@@ -109,9 +101,9 @@ function StatGrid({ stats, theme }) {
   return (
     <div className="grid gap-0.5 sm:grid-cols-3">
       {stats.slice(0, 6).map((stat) => (
-        <div key={stat.label} className="surface border border-neutral-700 px-1 py-0.75" style={theme.boxStyle}>
+        <div key={stat.label} className="surface px-1 py-0.75">
           <p className="truncate text-[0.68rem] text-neutral-400">{stat.label}</p>
-          <p className="truncate text-sm font-semibold text-neutral-100">{stat.value}</p>
+          <p className="truncate text-sm font-semibold text-neutral-100" style={theme.textStyle}>{stat.value}</p>
         </div>
       ))}
     </div>
@@ -128,9 +120,9 @@ function ParticipantsBlock({ participants, theme }) {
     .filter(Boolean);
 
   return (
-    <div className="surface min-w-0 border border-neutral-700 px-1 py-0.75" style={theme.boxStyle}>
+    <div className="surface min-w-0 px-1 py-0.75">
       <p className="text-sm font-semibold text-neutral-400">Participants</p>
-      <p className="font-mono text-xl font-semibold leading-tight text-neutral-50">
+      <p className="font-mono text-xl font-semibold leading-tight text-neutral-50" style={theme.textStyle}>
         {knownParticipants.length}
       </p>
       <p className="truncate text-sm leading-tight text-neutral-300">
@@ -162,14 +154,14 @@ function Leaderboard({ players, ownPlayer }) {
   return (
     <div className="space-y-1">
       <div className="grid gap-0.5 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <div className="surface border border-neutral-700 px-1 py-0.75">
+        <div className="surface px-1 py-0.75">
           <p className="text-xs text-neutral-400">Your points</p>
           <p className="text-lg font-semibold leading-tight text-neutral-50">
             {hasOwnPoints ? ownPlayer.totalPoints : 0}
           </p>
           {ownPlayer?.rank ? <p className="text-[0.7rem] text-neutral-400">Rank {ownPlayer.rank}</p> : null}
         </div>
-        <div className="surface border border-neutral-700 px-1 py-0.75">
+        <div className="surface px-1 py-0.75">
           <p className="mb-0.5 text-xs font-semibold text-neutral-300">Leaderboard</p>
           {Array.isArray(players) && players.length ? (
             <div className="space-y-0.5">
@@ -310,9 +302,9 @@ export default function BarcodeGamesPanel() {
               <p className="mt-0.5 break-words text-xs leading-snug text-neutral-300">{display.secondary}</p>
             ) : null}
           </div>
-          <div className="surface border border-neutral-700 px-1 py-0.75 text-left lg:text-right" style={activeTheme.boxStyle}>
+          <div className="surface px-1 py-0.75 text-left lg:text-right">
             <p className="text-xs font-semibold text-neutral-400">{display.timer?.label || 'Time'}</p>
-            <p className="font-mono text-xl font-semibold leading-tight text-neutral-50">
+            <p className="font-mono text-xl font-semibold leading-tight text-neutral-50" style={activeTheme.textStyle}>
               {timerText || '--'}
             </p>
             <p className="text-xs leading-tight text-neutral-500">
