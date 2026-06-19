@@ -13,6 +13,14 @@ function createDefaultStore() {
   return {
     version: STORE_VERSION,
     updatedAt: Date.now(),
+    phase: 'idle',
+    selectedGameId: null,
+    runningGameId: null,
+    voteEndsAt: null,
+    startsAt: null,
+    resultsUntil: null,
+    resultGameId: null,
+    resultDisplay: null,
     activeGameId: null,
     votes: {},
     globalCounters: {
@@ -89,11 +97,30 @@ function normalizeStoreShape(raw = {}) {
     if (vote) votes[key] = { ...vote, voterKey: vote.voterKey || key };
   });
 
+  const phase = ['idle', 'voting', 'starting', 'running', 'results'].includes(raw.phase)
+    ? raw.phase
+    : raw.activeGameId
+      ? 'running'
+      : 'idle';
+  const runningGameId = typeof raw.runningGameId === 'string'
+    ? raw.runningGameId
+    : typeof raw.activeGameId === 'string'
+      ? raw.activeGameId
+      : null;
+
   return {
     ...base,
     version: STORE_VERSION,
     updatedAt: Number.isFinite(raw.updatedAt) ? raw.updatedAt : Date.now(),
-    activeGameId: typeof raw.activeGameId === 'string' ? raw.activeGameId : null,
+    phase,
+    selectedGameId: typeof raw.selectedGameId === 'string' ? raw.selectedGameId : runningGameId,
+    runningGameId,
+    voteEndsAt: Number.isFinite(raw.voteEndsAt) ? raw.voteEndsAt : null,
+    startsAt: Number.isFinite(raw.startsAt) ? raw.startsAt : null,
+    resultsUntil: Number.isFinite(raw.resultsUntil) ? raw.resultsUntil : null,
+    resultGameId: typeof raw.resultGameId === 'string' ? raw.resultGameId : null,
+    resultDisplay: raw.resultDisplay && typeof raw.resultDisplay === 'object' ? raw.resultDisplay : null,
+    activeGameId: runningGameId,
     votes,
     globalCounters: {
       codes: normalizeCounterBucket(raw.globalCounters?.codes),

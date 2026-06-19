@@ -6,10 +6,14 @@
 const GAME_ID = 'scanQuest';
 const QUEST_LENGTH_OPTIONS = [1, 2];
 const REQUEST_TIMEOUT_MS = 90 * 1000;
+const ROUND_DURATION_MS = 5 * 60 * 1000;
 
 function createInitialState() {
   return {
     currentQuest: null,
+    status: 'idle',
+    roundStartedAt: null,
+    roundEndsAt: null,
     progressIndex: 0,
     scores: {},
     completedQuests: 0,
@@ -24,6 +28,9 @@ function normalizeState(rawState = {}) {
   return {
     ...base,
     currentQuest: rawState.currentQuest && typeof rawState.currentQuest === 'object' ? rawState.currentQuest : null,
+    status: rawState.status === 'running' || rawState.status === 'ended' ? rawState.status : 'idle',
+    roundStartedAt: Number.isFinite(rawState.roundStartedAt) ? rawState.roundStartedAt : null,
+    roundEndsAt: Number.isFinite(rawState.roundEndsAt) ? rawState.roundEndsAt : null,
     progressIndex: Number.isFinite(rawState.progressIndex) ? Math.max(0, Math.floor(rawState.progressIndex)) : 0,
     scores: rawState.scores && typeof rawState.scores === 'object' ? rawState.scores : {},
     completedQuests: Number.isFinite(rawState.completedQuests) ? Math.max(0, Math.floor(rawState.completedQuests)) : 0,
@@ -117,16 +124,18 @@ function buildAwards(participants = [], points, reason) {
     }));
 }
 
-function activate(rawState, context = {}) {
-  const state = normalizeState(rawState);
+function start(_rawState, context = {}) {
+  const now = context.now || Date.now();
+  const state = createInitialState();
+  state.status = 'running';
+  state.roundStartedAt = now;
+  state.roundEndsAt = now + ROUND_DURATION_MS;
   ensureQuest(state, context);
   return state;
 }
 
-function reset(_rawState, context = {}) {
-  const state = createInitialState();
-  ensureQuest(state, context);
-  return state;
+function activate(rawState, context = {}) {
+  return start(rawState, context);
 }
 
 function skipExpiredQuest(state, context = {}) {
@@ -152,6 +161,7 @@ function skipExpiredQuest(state, context = {}) {
 
 function handleScan(rawState, scan, context = {}) {
   const state = normalizeState(rawState);
+  if (state.status !== 'running') return { state, awards: [] };
   ensureQuest(state, context);
   skipExpiredQuest(state, context);
 
@@ -206,6 +216,19 @@ function handleScan(rawState, scan, context = {}) {
 
 function tick(rawState, context = {}) {
   const state = normalizeState(rawState);
+  const now = context.now || Date.now();
+  if (state.status === 'running' && state.roundEndsAt && now >= state.roundEndsAt) {
+    return {
+      state: {
+        ...state,
+        status: 'ended',
+        lastMessage: `finished ${state.completedQuests} quests`,
+      },
+      awards: [],
+      done: true,
+      display: getPublicState({ ...state, status: 'ended' }, context).display,
+    };
+  }
   ensureQuest(state, context);
   return skipExpiredQuest(state, context);
 }
@@ -230,7 +253,7 @@ function getPublicState(rawState, context = {}) {
   return {
     id: GAME_ID,
     title: 'Scan quest',
-    status: state.currentQuest ? 'running' : 'needs_objects',
+    status: state.status === 'running' && state.currentQuest ? 'running' : state.status,
     headline: state.lastMessage || formatQuestPrompt(state),
     detail: state.currentQuest?.steps?.length
       ? state.currentQuest.steps.map((step) => step.label).join(' then ')
@@ -257,6 +280,7 @@ function getPublicState(rawState, context = {}) {
       stats: [
         { label: 'Completed', value: state.completedQuests },
         { label: 'Quest points', value: getTopScores(state)[0]?.points || 0 },
+        { label: 'Round', value: state.status === 'ended' ? 'Done' : 'Running' },
       ],
       results: state.recentEvents.slice(0, 3).map((event) => ({
         label: event.kind === 'timeout' ? 'Skipped' : event.kind,
@@ -276,7 +300,7 @@ module.exports = {
   createInitialState,
   normalizeState,
   activate,
-  reset,
+  start,
   handleScan,
   tick,
   onActivated: activate,

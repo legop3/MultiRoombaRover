@@ -17,6 +17,9 @@ const GAME_SOCKET_ROOM = 'barcode-game';
 const RECENT_EVENT_LIMIT = 20;
 const ROVER_ATTRIBUTION_WINDOW_MS = 60 * 1000;
 const GAME_TICK_MS = 5 * 1000;
+const VOTING_WINDOW_MS = 10 * 1000;
+const STARTING_WINDOW_MS = 5 * 1000;
+const RESULTS_WINDOW_MS = 45 * 1000;
 
 const GAME_DEFINITIONS = [scanQuest, scansPerSecond];
 const GAMES_BY_ID = Object.fromEntries(GAME_DEFINITIONS.map((game) => [game.id, game]));
@@ -49,6 +52,12 @@ function normalizePlayerKey(identity = {}, socketId = '', roverId = '') {
   return null;
 }
 
+function normalizeIdentityPlayerKey(identity = {}) {
+  // Permanent scoring is identity-only. Socket and rover IDs are useful runtime
+  // evidence, but they are unstable and should not create leaderboard entries.
+  return identity.cookieUserId ? `identity:${identity.cookieUserId}` : null;
+}
+
 function resolveRoverParticipant(roverId) {
   const normalizedRoverId = String(roverId || '').trim();
   if (!normalizedRoverId) return null;
@@ -56,7 +65,7 @@ function resolveRoverParticipant(roverId) {
   const socketId = activeDrivers?.[normalizedRoverId] || null;
   const socket = socketId ? io.sockets.sockets.get(socketId) : null;
   const identity = socket ? getIdentitySummary(socket) : {};
-  const playerKey = normalizePlayerKey(identity, socketId, normalizedRoverId);
+  const playerKey = normalizeIdentityPlayerKey(identity);
 
   return {
     playerKey,
@@ -152,7 +161,7 @@ function recordPlayerParticipation(draft, gameId, participants, now) {
   if (!gameId || !Array.isArray(participants) || !participants.length) return;
   draft.players = draft.players || {};
   participants.forEach((participant) => {
-    if (!participant?.playerKey) return;
+    if (!participant?.playerKey || !String(participant.playerKey).startsWith('identity:')) return;
     const previous = draft.players[participant.playerKey] || {};
     const previousGames = previous.games || {};
     const previousGame = previousGames[gameId] || {};
@@ -182,7 +191,7 @@ function applyPointAwards(draft, gameId, awards = [], now) {
   awards.forEach((award) => {
     const playerKey = award?.playerKey;
     const points = Number.isFinite(award?.points) ? Math.max(0, Math.floor(award.points)) : 0;
-    if (!playerKey || !points) return;
+    if (!playerKey || !String(playerKey).startsWith('identity:') || !points) return;
 
     const previous = draft.players[playerKey] || {};
     const previousGames = previous.games || {};
@@ -241,17 +250,27 @@ function buildGameContext(draft, extras = {}) {
   };
 }
 
-function activateGame(draft, gameId, now) {
+function startGame(draft, gameId, now) {
   const definition = getGameDefinition(gameId);
   if (!definition) return false;
   const currentState = ensureGameState(draft, gameId);
-  const nextState = definition.activate
-    ? definition.activate(currentState, buildGameContext(draft, { now }))
+  const nextState = definition.start
+    ? definition.start(currentState, buildGameContext(draft, { now }))
+    : definition.activate
+      ? definition.activate(currentState, buildGameContext(draft, { now }))
     : currentState;
   draft.games[gameId] = nextState;
+  draft.phase = 'running';
+  draft.runningGameId = gameId;
+  draft.selectedGameId = gameId;
   draft.activeGameId = gameId;
+  draft.voteEndsAt = null;
+  draft.startsAt = null;
+  draft.resultsUntil = null;
+  draft.resultGameId = null;
+  draft.resultDisplay = null;
   addRecentEvent(draft, {
-    kind: 'gameActivated',
+    kind: 'gameStarted',
     gameId,
     title: definition.title,
   });
@@ -266,9 +285,11 @@ function normalizeGameResult(result, fallbackState) {
     return {
       state: result.state,
       awards: Array.isArray(result.awards) ? result.awards : [],
+      done: Boolean(result.done),
+      display: result.display && typeof result.display === 'object' ? result.display : null,
     };
   }
-  return { state: result, awards: [] };
+  return { state: result, awards: [], done: false, display: null };
 }
 
 function countVotes(votes = {}) {
@@ -285,11 +306,11 @@ function chooseVoteWinner(draft) {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   if (!entries.length) return null;
   const [topGameId, topCount] = entries[0];
-  const activeCount = draft.activeGameId ? counts[draft.activeGameId] || 0 : 0;
+  const selectedCount = draft.selectedGameId ? counts[draft.selectedGameId] || 0 : 0;
 
-  // Ties keep the current game so a single equalizing vote does not cause the
-  // room display to flicker back and forth between games.
-  if (draft.activeGameId && activeCount === topCount) return draft.activeGameId;
+  // Ties keep the currently selected pending game so a single equalizing vote
+  // does not make the room display flicker during the voting window.
+  if (draft.selectedGameId && selectedCount === topCount) return draft.selectedGameId;
   return topGameId;
 }
 
@@ -306,6 +327,10 @@ function setVote(socket, gameId) {
   const now = Date.now();
   const voterKey = getVoterKey(socket);
   const identity = getIdentitySummary(socket);
+  const current = loadStore();
+  if (current.phase === 'running' || current.phase === 'starting') {
+    return { error: 'a barcode game is already starting or running' };
+  }
 
   withGameStore((draft) => {
     draft.votes = draft.votes || {};
@@ -317,17 +342,18 @@ function setVote(socket, gameId) {
       votedAt: now,
     };
 
-    const winner = chooseVoteWinner(draft);
-    const existingWinnerState = winner ? draft.games?.[winner] : null;
-    const shouldActivateWinner = Boolean(
-      winner &&
-        (!draft.activeGameId ||
-          winner !== draft.activeGameId ||
-          existingWinnerState?.status === 'ended' ||
-          existingWinnerState?.status === 'idle'),
-    );
-    if (shouldActivateWinner) {
-      activateGame(draft, winner, now);
+    const winner = chooseVoteWinner(draft) || definition.id;
+    draft.selectedGameId = winner;
+    if (draft.phase === 'idle' || draft.phase === 'results') {
+      draft.phase = 'voting';
+      draft.voteEndsAt = now + VOTING_WINDOW_MS;
+      draft.startsAt = null;
+      draft.runningGameId = null;
+      draft.activeGameId = null;
+      draft.resultsUntil = null;
+      draft.resultDisplay = null;
+    } else if (draft.phase === 'voting') {
+      draft.voteEndsAt = Math.max(draft.voteEndsAt || 0, now + VOTING_WINDOW_MS);
     }
   });
 
@@ -337,20 +363,78 @@ function setVote(socket, gameId) {
 
 function settleActiveGameIfNeeded() {
   const store = loadStore();
-  const activeGameId = store.activeGameId;
+  const now = Date.now();
+  const phase = store.phase || 'idle';
+
+  if (phase === 'voting' && store.voteEndsAt && now >= store.voteEndsAt) {
+    const winner = chooseVoteWinner(store) || store.selectedGameId;
+    if (!getGameDefinition(winner)) return false;
+    withGameStore((draft) => {
+      draft.selectedGameId = winner;
+      draft.phase = 'starting';
+      draft.startsAt = now + STARTING_WINDOW_MS;
+      draft.voteEndsAt = null;
+      addRecentEvent(draft, {
+        kind: 'gameStarting',
+        gameId: winner,
+        title: getGameDefinition(winner)?.title,
+      });
+    });
+    return true;
+  }
+
+  if (phase === 'starting' && store.startsAt && now >= store.startsAt) {
+    const gameId = store.selectedGameId;
+    if (!getGameDefinition(gameId)) return false;
+    withGameStore((draft) => {
+      startGame(draft, gameId, now);
+    });
+    return true;
+  }
+
+  if (phase === 'results' && store.resultsUntil && now >= store.resultsUntil) {
+    withGameStore((draft) => {
+      draft.phase = 'idle';
+      draft.selectedGameId = null;
+      draft.runningGameId = null;
+      draft.activeGameId = null;
+      draft.voteEndsAt = null;
+      draft.startsAt = null;
+      draft.resultsUntil = null;
+      draft.resultGameId = null;
+      draft.resultDisplay = null;
+      draft.votes = {};
+    });
+    return true;
+  }
+
+  const activeGameId = store.phase === 'running' ? store.runningGameId : null;
   const definition = getGameDefinition(activeGameId);
   const currentState = activeGameId ? store.games?.[activeGameId] : null;
-  const now = Date.now();
   if (!definition?.tick || !currentState) return false;
 
   const normalizedState = ensureReadonlyGameState(store, activeGameId);
   const gameResult = definition.tick(normalizedState, buildGameContext(store, { now }));
-  const { state: nextState, awards } = normalizeGameResult(gameResult, normalizedState);
-  if (JSON.stringify(nextState) === JSON.stringify(normalizedState)) return false;
+  const { state: nextState, awards, done, display } = normalizeGameResult(gameResult, normalizedState);
+  if (JSON.stringify(nextState) === JSON.stringify(normalizedState) && !done) return false;
 
   withGameStore((draft) => {
     draft.games[activeGameId] = nextState;
     applyPointAwards(draft, activeGameId, awards, now);
+    if (done) {
+      const publicState = definition.getPublicState
+        ? definition.getPublicState(nextState, buildGameContext(draft, { now }))
+        : null;
+      draft.phase = 'results';
+      draft.resultGameId = activeGameId;
+      draft.resultDisplay = display || publicState?.display || null;
+      draft.resultsUntil = now + RESULTS_WINDOW_MS;
+      draft.runningGameId = null;
+      draft.activeGameId = null;
+      draft.startsAt = null;
+      draft.voteEndsAt = null;
+      draft.votes = {};
+    }
   });
   return true;
 }
@@ -361,7 +445,7 @@ function handleScan(scan) {
     updateGlobalCounters(draft, scan, now);
     recordRoverSighting(draft, scan, now);
     const participants = getProximityParticipants(draft, now);
-    const activeGameId = draft.activeGameId;
+    const activeGameId = draft.phase === 'running' ? draft.runningGameId : null;
     const definition = getGameDefinition(activeGameId);
 
     if (definition) {
@@ -369,10 +453,24 @@ function handleScan(scan) {
       const gameResult = definition.handleScan
         ? definition.handleScan(currentState, scan, buildGameContext(draft, { now, participants }))
         : currentState;
-      const { state: nextState, awards } = normalizeGameResult(gameResult, currentState);
+      const { state: nextState, awards, done, display } = normalizeGameResult(gameResult, currentState);
       draft.games[activeGameId] = nextState;
       recordPlayerParticipation(draft, activeGameId, participants, now);
       applyPointAwards(draft, activeGameId, awards, now);
+      if (done) {
+        const publicState = definition.getPublicState
+          ? definition.getPublicState(nextState, buildGameContext(draft, { now }))
+          : null;
+        draft.phase = 'results';
+        draft.resultGameId = activeGameId;
+        draft.resultDisplay = display || publicState?.display || null;
+        draft.resultsUntil = now + RESULTS_WINDOW_MS;
+        draft.runningGameId = null;
+        draft.activeGameId = null;
+        draft.startsAt = null;
+        draft.voteEndsAt = null;
+        draft.votes = {};
+      }
     }
 
     addRecentEvent(draft, {
@@ -396,7 +494,7 @@ function topCounters(bucket = {}, limit = 5) {
 function getPlayerForSocket(store, socket) {
   if (!socket) return null;
   const identity = getIdentitySummary(socket);
-  const playerKey = normalizePlayerKey(identity, socket.id, '');
+  const playerKey = normalizeIdentityPlayerKey(identity);
   const player = playerKey ? store.players?.[playerKey] || null : null;
   if (!player) {
     return {
@@ -408,7 +506,7 @@ function getPlayerForSocket(store, socket) {
     };
   }
   const rankedPlayers = Object.values(store.players || {})
-    .filter((entry) => Number.isFinite(entry?.totalPoints) && entry.totalPoints > 0)
+    .filter((entry) => String(entry?.playerKey || '').startsWith('identity:') && Number.isFinite(entry?.totalPoints) && entry.totalPoints > 0)
     .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
   const rank = rankedPlayers.findIndex((entry) => entry.playerKey === player.playerKey) + 1;
   return {
@@ -425,24 +523,34 @@ function buildStatePayload(socket = null) {
   const store = loadStore();
   const now = Date.now();
   const voteCounts = countVotes(store.votes);
-  const activeDefinition = getGameDefinition(store.activeGameId);
+  const selectedDefinition = getGameDefinition(store.selectedGameId);
+  const runningDefinition = getGameDefinition(store.runningGameId);
   const context = buildGameContext(store, { now });
-  const activeGame = activeDefinition
-    ? activeDefinition.getPublicState(ensureReadonlyGameState(store, activeDefinition.id), context)
+  const runningGame = runningDefinition
+    ? runningDefinition.getPublicState(ensureReadonlyGameState(store, runningDefinition.id), context)
     : null;
+  const activeGame = buildLifecycleGameState(store, {
+    now,
+    selectedDefinition,
+    runningDefinition,
+    runningGame,
+    voteCounts,
+  });
   const leaderboard = topPlayers(store.players);
 
   return {
-    activeGameId: store.activeGameId,
+    phase: store.phase,
+    selectedGameId: store.selectedGameId,
+    runningGameId: store.runningGameId,
+    activeGameId: store.runningGameId,
     games: GAME_DEFINITIONS.map((game) => ({
       id: game.id,
       title: game.title,
       description: game.description,
       voteCount: voteCounts[game.id] || 0,
-      active: game.id === store.activeGameId,
-      actionLabel: game.id === store.activeGameId && activeGame?.actionLabel
-        ? activeGame.actionLabel
-        : 'Start',
+      active: game.id === store.runningGameId,
+      selected: game.id === store.selectedGameId,
+      actionLabel: store.phase === 'idle' || store.phase === 'results' ? 'Vote' : game.id === store.selectedGameId ? 'Selected' : 'Vote',
     })),
     activeGame,
     leaderboard,
@@ -456,9 +564,75 @@ function buildStatePayload(socket = null) {
   };
 }
 
+function buildLifecycleGameState(store, { now, selectedDefinition, runningDefinition, runningGame, voteCounts }) {
+  if (store.phase === 'running' && runningGame) return runningGame;
+  if (store.phase === 'results') {
+    return {
+      id: store.resultGameId,
+      title: getGameDefinition(store.resultGameId)?.title || 'Results',
+      status: 'results',
+      display: {
+        title: 'Results',
+        primary: store.resultDisplay?.primary || 'Round complete',
+        secondary: store.resultDisplay?.secondary || 'Vote to start another game',
+        timer: store.resultsUntil ? { label: 'Results clear in', endsAt: store.resultsUntil } : null,
+        stats: store.resultDisplay?.stats || [],
+        results: store.resultDisplay?.results || [],
+      },
+    };
+  }
+  if (store.phase === 'starting') {
+    return {
+      id: store.selectedGameId,
+      title: selectedDefinition?.title || 'Starting',
+      status: 'starting',
+      display: {
+        title: 'Starting',
+        primary: selectedDefinition ? `${selectedDefinition.title} starts soon` : 'Game starts soon',
+        secondary: 'Get ready',
+        timer: store.startsAt ? { label: 'Starts in', endsAt: store.startsAt } : null,
+        stats: [],
+        results: [],
+      },
+    };
+  }
+  if (store.phase === 'voting') {
+    const selectedTitle = selectedDefinition?.title || 'a barcode game';
+    return {
+      id: store.selectedGameId,
+      title: 'Voting',
+      status: 'voting',
+      display: {
+        title: 'Voting',
+        primary: `Voting for ${selectedTitle}`,
+        secondary: 'Most votes starts the next game',
+        timer: store.voteEndsAt ? { label: 'Voting ends in', endsAt: store.voteEndsAt } : null,
+        stats: GAME_DEFINITIONS.map((game) => ({
+          label: game.title,
+          value: voteCounts[game.id] || 0,
+        })),
+        results: [],
+      },
+    };
+  }
+  return {
+    id: null,
+    title: 'Barcode games',
+    status: 'idle',
+    display: {
+      title: 'Barcode games',
+      primary: 'Choose a game',
+      secondary: 'Vote to start the next round',
+      timer: null,
+      stats: [],
+      results: [],
+    },
+  };
+}
+
 function topPlayers(players = {}, limit = 6) {
   return Object.values(players || {})
-    .filter((player) => Number.isFinite(player?.totalPoints) && player.totalPoints > 0)
+    .filter((player) => String(player?.playerKey || '').startsWith('identity:') && Number.isFinite(player?.totalPoints) && player.totalPoints > 0)
     .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0))
     .slice(0, limit)
     .map((player) => ({

@@ -36,6 +36,7 @@ function GameChoice({ game, disabled, onVote }) {
       className={[
         'button-dark flex min-h-[4.25rem] flex-col items-start justify-between px-1.5 py-1 text-left disabled:opacity-70',
         game.active ? 'border-emerald-500/70' : '',
+        game.selected && !game.active ? 'border-cyan-500/60' : '',
       ].filter(Boolean).join(' ')}
     >
       <span className="flex w-full items-start justify-between gap-1">
@@ -44,7 +45,7 @@ function GameChoice({ game, disabled, onVote }) {
       </span>
       <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-neutral-300">{game.description}</span>
       <span className="mt-0.5 text-[0.7rem] font-semibold text-neutral-200">
-        {game.active ? 'Active' : game.actionLabel || 'Start'}
+        {game.active ? 'Active' : game.selected ? 'Selected' : game.actionLabel || 'Vote'}
       </span>
     </button>
   );
@@ -119,6 +120,7 @@ export default function BarcodeGamesPanel() {
   const [pendingGameId, setPendingGameId] = useState(null);
   const activeGame = state.activeGame;
   const display = activeGame?.display || {};
+  const votingDisabled = state.phase === 'starting' || state.phase === 'running';
   const timerEndsAt = display.timer?.endsAt;
   const now = useClock(Number.isFinite(timerEndsAt));
   const timerText = formatTimer(timerEndsAt, now);
@@ -140,7 +142,7 @@ export default function BarcodeGamesPanel() {
           <GameChoice
             key={game.id}
             game={game}
-            disabled={Boolean(pendingGameId)}
+            disabled={Boolean(pendingGameId) || votingDisabled}
             onVote={handleVote}
           />
         ))}

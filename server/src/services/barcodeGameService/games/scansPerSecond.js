@@ -14,6 +14,8 @@ function createInitialState() {
     startedAt: null,
     endsAt: null,
     scans: [],
+    bestRate: 0,
+    bestRateAt: null,
     finalResult: null,
     worldRecord: null,
     recentRounds: [],
@@ -32,6 +34,8 @@ function normalizeState(rawState = {}) {
     startedAt: Number.isFinite(rawState.startedAt) ? rawState.startedAt : null,
     endsAt: Number.isFinite(rawState.endsAt) ? rawState.endsAt : null,
     scans: Array.isArray(rawState.scans) ? rawState.scans.filter((entry) => Number.isFinite(entry?.at)) : [],
+    bestRate: Number.isFinite(rawState.bestRate) ? Math.max(0, rawState.bestRate) : 0,
+    bestRateAt: Number.isFinite(rawState.bestRateAt) ? rawState.bestRateAt : null,
     finalResult: rawState.finalResult && typeof rawState.finalResult === 'object' ? rawState.finalResult : null,
     worldRecord: rawState.worldRecord && typeof rawState.worldRecord === 'object' ? rawState.worldRecord : null,
     recentRounds: Array.isArray(rawState.recentRounds) ? rawState.recentRounds.slice(-10) : [],
@@ -49,12 +53,14 @@ function calculateRate(scanCount, startedAt, endedAt) {
 
 function buildResult(state, endedAt = Date.now()) {
   const scanCount = state.scans.length;
-  const rate = calculateRate(scanCount, state.startedAt, endedAt);
+  const finalRate = calculateRate(scanCount, state.startedAt, endedAt);
+  const bestRate = Math.max(Number(state.bestRate || 0), finalRate);
   return {
     roundId: state.roundId,
     scanCount,
     durationMs: Math.max(0, endedAt - (state.startedAt || endedAt)),
-    scansPerSecond: Number(rate.toFixed(3)),
+    scansPerSecond: Number(bestRate.toFixed(3)),
+    finalScansPerSecond: Number(finalRate.toFixed(3)),
     startedAt: state.startedAt,
     endedAt,
     participants: Object.values(state.participantCounts || {}).sort((a, b) => (b.scanCount || 0) - (a.scanCount || 0)),
@@ -111,6 +117,8 @@ function startRound(rawState, now = Date.now()) {
     startedAt: now,
     endsAt: now + ROUND_DURATION_MS,
     scans: [],
+    bestRate: 0,
+    bestRateAt: null,
     finalResult: null,
     participantCounts: {},
     endedAt: null,
@@ -118,13 +126,17 @@ function startRound(rawState, now = Date.now()) {
   };
 }
 
-function activate(rawState, context = {}) {
+function start(rawState, context = {}) {
   const state = normalizeState(rawState);
   const now = context.now || Date.now();
-  // Activation is game-defined, but the shared service calls it generically.
-  // For this game, active rounds keep running while idle or ended rounds start
-  // cleanly so returning to the game always produces a playable challenge.
-  return state.status === 'running' ? state : startRound(state, now);
+  // Starting a game should always produce a fresh playable round. The global
+  // service owns when a round starts, so this module does not need to preserve a
+  // prior ended/running state across lifecycle transitions.
+  return startRound(state, now);
+}
+
+function activate(rawState, context = {}) {
+  return start(rawState, context);
 }
 
 function reset(rawState, context = {}) {
@@ -155,7 +167,14 @@ function handleScan(rawState, scan, context = {}) {
     state = finishRound(state, state.endsAt);
     awards = buildAwards(state.finalResult, state);
   }
-  if (state.status !== 'running') return { state, awards };
+  if (state.status !== 'running') {
+    return {
+      state,
+      awards,
+      done: Boolean(awards.length),
+      display: awards.length ? getPublicState(state, { ...context, now }).display : null,
+    };
+  }
 
   // This game deliberately counts every submitted scan, including unknown and
   // invalid barcodes, because the challenge is about physically getting scans
@@ -175,10 +194,16 @@ function handleScan(rawState, scan, context = {}) {
     return {
       state,
       awards: buildAwards(state.finalResult, state),
+      done: true,
+      display: getPublicState(state, { ...context, now }).display,
     };
   }
 
   const currentRate = calculateRate(state.scans.length, state.startedAt, now);
+  if (currentRate > (state.bestRate || 0)) {
+    state.bestRate = Number(currentRate.toFixed(3));
+    state.bestRateAt = now;
+  }
   state.lastMessage = `${currentRate.toFixed(2)} scans per second`;
   return { state, awards: [] };
 }
@@ -191,6 +216,8 @@ function tick(rawState, context = {}) {
     return {
       state: finished,
       awards: buildAwards(finished.finalResult, finished),
+      done: true,
+      display: getPublicState(finished, { ...context, now }).display,
     };
   }
   if (state.status === 'ended' && state.endedAt && now - state.endedAt >= RESULT_IDLE_MS) {
@@ -204,6 +231,8 @@ function tick(rawState, context = {}) {
       startedAt: null,
       endsAt: null,
       scans: [],
+      bestRate: 0,
+      bestRateAt: null,
       participantCounts: {},
       lastMessage: 'vote to start scans per second',
     };
@@ -226,8 +255,9 @@ function getPublicState(rawState, context = {}) {
   const worldRecordText = state.worldRecord
     ? `${Number(state.worldRecord.scansPerSecond || 0).toFixed(2)} scans per second`
     : 'none yet';
+  const bestRate = Math.max(Number(state.bestRate || 0), state.finalResult?.scansPerSecond || 0);
   const primary = state.status === 'running'
-    ? `${Number(currentRate).toFixed(2)} scans per second`
+    ? `${Number(bestRate).toFixed(2)} scans per second`
     : state.finalResult
       ? `${Number(state.finalResult.scansPerSecond || 0).toFixed(2)} scans per second`
       : 'Scan anything';
@@ -244,6 +274,7 @@ function getPublicState(rawState, context = {}) {
         : 'five minute scan challenge',
     scanCount: state.scans.length,
     scansPerSecond: Number(currentRate.toFixed(3)),
+    bestRate: Number(bestRate.toFixed(3)),
     remainingMs,
     finalResult: state.finalResult,
     worldRecord: state.worldRecord,
@@ -269,7 +300,7 @@ function getPublicState(rawState, context = {}) {
         : null,
       stats: [
         { label: 'Scans', value: state.scans.length },
-        { label: 'Current rate', value: Number(currentRate).toFixed(2) },
+        { label: 'Live rate', value: Number(currentRate).toFixed(2) },
         { label: 'World record', value: worldRecordText },
       ],
       results: state.recentRounds.slice(0, 3).map((round) => ({
@@ -287,6 +318,7 @@ module.exports = {
   createInitialState,
   normalizeState,
   activate,
+  start,
   reset,
   handleScan,
   tick,
