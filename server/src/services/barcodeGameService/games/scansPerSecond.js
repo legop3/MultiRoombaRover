@@ -319,6 +319,7 @@ module.exports = {
   id: GAME_ID,
   title: 'Scans per second',
   description: 'Count every scan for five minutes and save the world record.',
+  themeColor: { r: 245, g: 158, b: 11 },
   createInitialState,
   normalizeState,
   activate,

@@ -301,6 +301,7 @@ module.exports = {
   id: GAME_ID,
   title: 'Scan quest',
   description: 'Scan one or two requested objects in order.',
+  themeColor: { r: 34, g: 211, b: 238 },
   createInitialState,
   normalizeState,
   activate,

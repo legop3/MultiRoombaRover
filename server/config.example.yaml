@@ -16,7 +16,7 @@ llmCommentary:
 overseerControl:
   enabled: false
   # autonomous runs the existing vote-gated loop forever; directAddress only
-  # runs one cycle when a chat message starts with the configured name.
+  # runs one cycle when a chat message mentions the configured name.
   mode: "autonomous"
   observeOnly: true
   postToolsOnlyMessages: false

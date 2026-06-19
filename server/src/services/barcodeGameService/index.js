@@ -195,6 +195,24 @@ function getGameDefinition(gameId) {
   return GAMES_BY_ID[String(gameId || '')] || null;
 }
 
+function normalizeRgbChannel(value) {
+  if (!Number.isFinite(value)) return null;
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function getGameThemeColor(definition) {
+  const raw = definition?.themeColor;
+  const r = normalizeRgbChannel(raw?.r);
+  const g = normalizeRgbChannel(raw?.g);
+  const b = normalizeRgbChannel(raw?.b);
+
+  // Games own their visual identity, but the socket payload should always be a
+  // small safe RGB object. Invalid or missing values fall back to neutral text
+  // colors in the browser instead of leaking arbitrary styling data into React.
+  if (r === null || g === null || b === null) return null;
+  return { r, g, b };
+}
+
 function getKnownObjects() {
   try {
     const snapshot = getRegistrySnapshot();
@@ -842,6 +860,7 @@ function buildStatePayload(socket = null) {
       id: game.id,
       title: game.title,
       description: game.description,
+      themeColor: getGameThemeColor(game),
       voteCount: voteCounts[game.id] || 0,
       active: game.id === store.runningGameId,
       selected: game.id === store.selectedGameId,
@@ -869,13 +888,16 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
   if (store.phase === 'running' && runningGame) {
     return {
       ...runningGame,
+      themeColor: getGameThemeColor(runningDefinition),
       participants,
     };
   }
   if (store.phase === 'results') {
+    const resultDefinition = getGameDefinition(store.resultGameId);
     return {
       id: store.resultGameId,
-      title: getGameDefinition(store.resultGameId)?.title || 'Results',
+      title: resultDefinition?.title || 'Results',
+      themeColor: getGameThemeColor(resultDefinition),
       status: 'results',
       participants,
       display: {
@@ -892,6 +914,7 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
     return {
       id: store.selectedGameId,
       title: selectedDefinition?.title || 'Starting',
+      themeColor: getGameThemeColor(selectedDefinition),
       status: 'starting',
       participants,
       display: {
@@ -909,6 +932,7 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
     return {
       id: store.selectedGameId,
       title: selectedDefinition?.title || 'Join game',
+      themeColor: getGameThemeColor(selectedDefinition),
       status: 'joining',
       participants,
       display: {
@@ -926,6 +950,7 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
     return {
       id: store.selectedGameId,
       title: 'Voting',
+      themeColor: getGameThemeColor(selectedDefinition),
       status: 'voting',
       participants,
       display: {
@@ -944,6 +969,7 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
   return {
     id: null,
     title: 'Barcode games',
+    themeColor: null,
     status: 'idle',
     participants,
     display: {

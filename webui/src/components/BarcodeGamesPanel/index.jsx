@@ -5,6 +5,58 @@ import { useEffect, useMemo, useState } from 'react';
 import useBarcodeGameState from '../../barcodeGames/useBarcodeGameState.js';
 import CardFrame from '../CardFrame/index.jsx';
 
+function clampRgbChannel(value) {
+  if (!Number.isFinite(value)) return null;
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function normalizeRgb(themeColor) {
+  const r = clampRgbChannel(themeColor?.r);
+  const g = clampRgbChannel(themeColor?.g);
+  const b = clampRgbChannel(themeColor?.b);
+  if (r === null || g === null || b === null) return null;
+  return { r, g, b };
+}
+
+function rgba(rgb, alpha) {
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+}
+
+function getGameTheme(themeColor) {
+  const rgb = normalizeRgb(themeColor);
+  if (!rgb) {
+    return {
+      textStyle: undefined,
+      buttonStyle: undefined,
+      titleBoxStyle: undefined,
+      boxStyle: undefined,
+    };
+  }
+
+  // The game supplies only identity color. This component chooses opacity and
+  // placement so every game stays visually consistent with the dark CardFrame
+  // UI while still being recognizable at a glance.
+  return {
+    textStyle: { color: rgba(rgb, 0.96) },
+    buttonStyle: {
+      borderColor: rgba(rgb, 0.62),
+      borderLeftColor: rgba(rgb, 0.9),
+      backgroundColor: rgba(rgb, 0.1),
+    },
+    selectedButtonStyle: {
+      borderColor: rgba(rgb, 0.86),
+      borderLeftColor: rgba(rgb, 1),
+      backgroundColor: rgba(rgb, 0.16),
+    },
+    titleBoxStyle: {
+      borderLeftColor: rgba(rgb, 0.88),
+    },
+    boxStyle: {
+      borderColor: rgba(rgb, 0.62),
+    },
+  };
+}
+
 function useClock(enabled) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -28,19 +80,18 @@ function formatTimer(endsAt, now) {
 }
 
 function GameChoice({ game, disabled, onVote }) {
+  const theme = getGameTheme(game.themeColor);
+  const style = game.active || game.selected ? theme.selectedButtonStyle || theme.buttonStyle : theme.buttonStyle;
   return (
     <button
       type="button"
       disabled={disabled || game.active}
       onClick={() => onVote(game.id)}
-      className={[
-        'button-dark flex min-h-[4.25rem] flex-col items-start justify-between px-1.5 py-1 text-left disabled:opacity-70',
-        game.active ? 'border-emerald-500/70' : '',
-        game.selected && !game.active ? 'border-cyan-500/60' : '',
-      ].filter(Boolean).join(' ')}
+      className="button-dark flex min-h-[4.25rem] flex-col items-start justify-between border-l-4 px-1.5 py-1 text-left disabled:opacity-70"
+      style={style}
     >
       <span className="flex w-full items-start justify-between gap-1">
-        <span className="text-sm font-semibold leading-tight text-neutral-50">{game.title}</span>
+        <span className="text-sm font-semibold leading-tight text-neutral-50" style={theme.textStyle}>{game.title}</span>
         <span className="shrink-0 font-mono text-[0.72rem] text-neutral-300">{game.voteCount || 0}</span>
       </span>
       <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-neutral-300">{game.description}</span>
@@ -51,12 +102,12 @@ function GameChoice({ game, disabled, onVote }) {
   );
 }
 
-function StatGrid({ stats }) {
+function StatGrid({ stats, theme }) {
   if (!Array.isArray(stats) || !stats.length) return null;
   return (
     <div className="grid gap-1 sm:grid-cols-3">
       {stats.slice(0, 6).map((stat) => (
-        <div key={stat.label} className="border border-neutral-700 px-1.5 py-1">
+        <div key={stat.label} className="border border-neutral-700 px-1.5 py-1" style={theme.boxStyle}>
           <p className="truncate text-[0.68rem] text-neutral-400">{stat.label}</p>
           <p className="truncate text-sm font-semibold text-neutral-100">{stat.value}</p>
         </div>
@@ -65,7 +116,7 @@ function StatGrid({ stats }) {
   );
 }
 
-function ParticipantsBlock({ participants }) {
+function ParticipantsBlock({ participants, theme }) {
   const knownParticipants = Array.isArray(participants) ? participants : [];
   // Participants are server-owned because rover scans, identity lookup, and
   // score eligibility all happen outside this panel. The UI only formats the
@@ -75,7 +126,7 @@ function ParticipantsBlock({ participants }) {
     .filter(Boolean);
 
   return (
-    <div className="min-w-0 border border-neutral-700 px-2 py-1.5">
+    <div className="min-w-0 border border-neutral-700 px-2 py-1.5" style={theme.boxStyle}>
       <p className="text-sm font-semibold text-neutral-400">Participants</p>
       <p className="font-mono text-2xl font-semibold leading-tight text-neutral-50">
         {knownParticipants.length}
@@ -151,6 +202,7 @@ export default function BarcodeGamesPanel() {
   const timerText = formatTimer(timerEndsAt, now);
   const games = useMemo(() => (Array.isArray(state.games) ? state.games : []), [state.games]);
   const participants = Array.isArray(state.participants) ? state.participants : [];
+  const activeTheme = getGameTheme(activeGame?.themeColor);
 
   const handleVote = async (gameId) => {
     setPendingGameId(gameId);
@@ -176,8 +228,8 @@ export default function BarcodeGamesPanel() {
 
       <section className="space-y-2 border-t border-neutral-700 pt-2">
         <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_15rem_15rem]">
-          <div className="min-w-0">
-            <p className="break-words text-2xl font-bold leading-tight text-neutral-50">
+          <div className="min-w-0 border-l-4 border-neutral-700 pl-2" style={activeTheme.titleBoxStyle}>
+            <p className="break-words text-2xl font-bold leading-tight text-neutral-50" style={activeTheme.textStyle}>
               {display.title || activeGame?.title || 'No game active'}
             </p>
             <p className="mt-0.5 break-words text-lg font-semibold leading-tight text-neutral-200">
@@ -187,7 +239,7 @@ export default function BarcodeGamesPanel() {
               <p className="mt-1 break-words text-base leading-snug text-neutral-300">{display.secondary}</p>
             ) : null}
           </div>
-          <div className="border border-neutral-700 px-2 py-1.5 text-left lg:text-right">
+          <div className="border border-neutral-700 px-2 py-1.5 text-left lg:text-right" style={activeTheme.boxStyle}>
             <p className="text-sm font-semibold text-neutral-400">{display.timer?.label || 'Time'}</p>
             <p className="font-mono text-2xl font-semibold leading-tight text-neutral-50">
               {timerText || '--'}
@@ -196,9 +248,9 @@ export default function BarcodeGamesPanel() {
               {timerText ? 'active timer' : 'no timer'}
             </p>
           </div>
-          <ParticipantsBlock participants={participants} />
+          <ParticipantsBlock participants={participants} theme={activeTheme} />
         </div>
-        <StatGrid stats={display.stats} />
+        <StatGrid stats={display.stats} theme={activeTheme} />
       </section>
 
       <Leaderboard players={state.leaderboard} ownPlayer={state.ownPlayer} />

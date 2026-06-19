@@ -316,6 +316,7 @@ module.exports = {
   id: GAME_ID,
   title: 'Most items',
   description: 'Scan as many different known objects as possible.',
+  themeColor: { r: 16, g: 185, b: 129 },
   createInitialState,
   normalizeState,
   activate,
