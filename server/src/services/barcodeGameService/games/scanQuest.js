@@ -300,7 +300,7 @@ function getPublicState(rawState, context = {}) {
 module.exports = {
   id: GAME_ID,
   title: 'Scan quest',
-  description: 'Scan one or two requested objects in order.',
+  description: 'Scan requested objects for points.',
   themeColor: { r: 255, g: 150, b: 252 },
   createInitialState,
   normalizeState,

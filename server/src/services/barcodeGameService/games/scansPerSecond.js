@@ -304,7 +304,7 @@ function getPublicState(rawState, context = {}) {
         : null,
       stats: [
         { label: 'Scans', value: state.scans.length },
-        { label: 'Live rate', value: Number(currentRate).toFixed(2) },
+        { label: 'Live scan rate', value: Number(currentRate).toFixed(2) },
         { label: 'World record', value: worldRecordText },
       ],
       results: state.recentRounds.slice(0, 3).map((round) => ({
@@ -318,7 +318,7 @@ function getPublicState(rawState, context = {}) {
 module.exports = {
   id: GAME_ID,
   title: 'Scans per second',
-  description: 'Count every scan for five minutes and save the world record.',
+  description: 'Count every scan for five minutes, beat the world record of scans per second.',
   themeColor: { r: 72, g: 245, b: 66 },
   createInitialState,
   normalizeState,
