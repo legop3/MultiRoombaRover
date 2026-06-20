@@ -13,6 +13,7 @@ const roverManager = require('../roverManager');
 const { getRoster, lockRover, rovers } = roverManager;
 const { MODES, getMode, setMode } = require('../modeManager');
 const { sendExternalMessage, sendExternalTyping } = require('../chatService');
+const { commandReplyToText } = require('../chatService/commandResultFormatter');
 const { buildReplayVideo, getReplaySources, getDefaultDiscordSources, validateSources, tryTriggerReplay } = require('../replayEngineV2');
 const { getActiveDrivers } = require('../turnService');
 const { getNickname } = require('../nicknameService');
@@ -192,10 +193,54 @@ const commands = createCommandHandlers({
 
 const integrationHandlers = integrations.register();
 
+function isTextCommand(content) {
+  const clean = String(content || '').trim();
+  return clean.toLowerCase() === 'ts' || /^rs(?:\s|$)/i.test(clean);
+}
+
+function isBridgeChannelMessage(message) {
+  if (!message?.guild?.id || !message?.channelId) return false;
+  const guildConfig = getGuildConfig(message.guild.id);
+  return Boolean(guildConfig?.channelId && String(message.channelId) === String(guildConfig.channelId));
+}
+
+function createBridgeMirroredCommandMessage(message) {
+  if (!isBridgeChannelMessage(message) || !isTextCommand(message.content)) return message;
+  const originalReply = message.reply.bind(message);
+  return Object.assign(Object.create(message), {
+    reply: async (payload) => {
+      const sent = await originalReply(payload);
+      const text = sanitizeMentions(commandReplyToText(payload));
+      if (text) {
+        // Discord command replies are mirrored to web chat by the Discord
+        // command adapter, not by the chat bridge. The bridge continues to
+        // ignore bot-authored Discord messages, which prevents typing helper
+        // messages and bot replies from feeding back into chat.
+        sendExternalMessage({
+          text,
+          nickname: client.user?.username || 'Rover bot',
+          role: 'admin',
+          roverId: null,
+          discordGuildId: message.guild.id,
+          discordGuildName: message.guild.name,
+          discordGuildIconUrl: message.guild.iconURL?.({ extension: 'png', size: 64 }) || null,
+          discordChannelId: message.channelId,
+          discordUserId: client.user?.id || null,
+          discordUserName: client.user?.username || 'Rover bot',
+          discordUserAvatarUrl: client.user?.displayAvatarURL?.({ extension: 'png', size: 64 }) || null,
+          bot: true,
+          profileImage: client.user?.displayAvatarURL?.({ extension: 'png', size: 64 }) || null,
+        });
+      }
+      return sent;
+    },
+  });
+}
+
 client.on('messageCreate', async (message) => {
   try {
     await integrationHandlers.handleBridgeInbound(message);
-    await commands.handleCommand(message);
+    await commands.handleCommand(createBridgeMirroredCommandMessage(message));
   } catch (err) {
     logger.warn('Error handling Discord message', err.message);
   }

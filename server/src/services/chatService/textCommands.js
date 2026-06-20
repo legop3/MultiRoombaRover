@@ -20,6 +20,7 @@ const { publishEvent } = require('../eventBus');
 const assignmentService = require('../assignmentService');
 const { loadConfig } = require('../../helpers/configLoader');
 const { createCommandHandlers } = require('../discordBotService/commands');
+const { commandReplyToText } = require('./commandResultFormatter');
 const {
   buildReplayJobId,
   buildReplayTitle,
@@ -45,7 +46,7 @@ function buildRequesterLabel(socket) {
   return getNickname(socket) || socket?.data?.user?.username || socket?.id || 'unknown';
 }
 
-function createWebReplayTextCommand(socket, replayApi) {
+function createWebReplayTextCommand(socket, sendSystemMessage, replayApi) {
   return function createReplayHandler({
     rovers,
     getReplaySources: getAllReplaySources,
@@ -106,12 +107,12 @@ function createWebReplayTextCommand(socket, replayApi) {
         },
       });
       const title = buildReplayTitle({ explicitTitle: '', sources: resolved.sources || [] });
-      await message.reply({ content: `Replay accepted: ${title}` });
+      sendSystemMessage(`Replay accepted: ${title}`, { nickname: 'Rover bot', bot: true });
     };
   };
 }
 
-function createChatCommandMessage({ socket, text }) {
+function createChatCommandMessage({ socket, text, sendSystemMessage }) {
   const nickname = buildRequesterLabel(socket);
   return {
     content: String(text || '').trim(),
@@ -124,32 +125,20 @@ function createChatCommandMessage({ socket, text }) {
       nickname,
     },
     reply: async (payload) => {
-      const replyPayload = typeof payload === 'string'
-        ? { content: sanitizeMentions(payload) }
-        : {
-            content: sanitizeMentions(payload?.content || ''),
-            options: {
-              embeds: payload?.embeds || undefined,
-              files: payload?.files || undefined,
-            },
-          };
-      // Web chat does not get a private shortcut for command results. The bot
-      // posts the Discord-shaped reply into the configured bridge channel, and
-      // the normal bridge inbound path decides how that Discord message appears
-      // in web chat.
-      publishEvent({ source: 'chatCommand', type: 'discord.bridgeSend', payload: replyPayload });
-      return null;
+      const response = sanitizeMentions(commandReplyToText(payload));
+      if (!response) return null;
+      return sendSystemMessage(response, { nickname: 'Rover bot', bot: true });
     },
   };
 }
 
-async function runChatTextCommand({ text, socket }) {
+async function runChatTextCommand({ text, socket, sendSystemMessage }) {
   if (!isTextCommand(text)) return false;
   // ReplayEngineV2 has startup side effects by design. Loading it lazily here
   // keeps ordinary chatService initialization from changing the service boot
   // order, while still letting `rs replay` use the existing replay pipeline.
   const replayApi = require('../replayEngineV2');
-  const message = createChatCommandMessage({ socket, text });
+  const message = createChatCommandMessage({ socket, text, sendSystemMessage });
   const commands = createCommandHandlers({
     logger: null,
     client: null,
@@ -189,20 +178,17 @@ async function runChatTextCommand({ text, socket }) {
     isLockdownAdminUser: (id) => String(id) === String(socket.id) && isLockdownAdmin(socket),
     discordConfig,
     config,
-    createReplayTextCommand: createWebReplayTextCommand(socket, replayApi),
+    createReplayTextCommand: createWebReplayTextCommand(socket, sendSystemMessage, replayApi),
   });
 
   // Let the shared router perform normal command permission checks. Site chat
-  // has already broadcast the user's command text; any command reply is posted
-  // into Discord and returns to web chat through the ordinary bridge inbound path.
+  // has already broadcast the user's command text, so command replies become a
+  // local bot chat message instead of being routed through Discord as an
+  // internal transport.
   try {
     await commands.handleCommand(message);
   } catch (err) {
-    publishEvent({
-      source: 'chatCommand',
-      type: 'discord.bridgeSend',
-      payload: { content: sanitizeMentions(`Command failed: ${err.message || 'unknown error'}`) },
-    });
+    sendSystemMessage(`Command failed: ${sanitizeMentions(err.message || 'unknown error')}`, { nickname: 'Rover bot', bot: true });
   }
   return true;
 }

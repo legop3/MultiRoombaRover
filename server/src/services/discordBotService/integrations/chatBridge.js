@@ -19,45 +19,6 @@ function formatToolCallsCodeBlock(toolCalls = []) {
   return `\`\`\`txt\nTool calls:\n${rows.join('\n')}\n\`\`\``;
 }
 
-function discordPayloadToBridgeText(payload = {}) {
-  if (typeof payload === 'string') return payload;
-  if (!payload || typeof payload !== 'object') return '';
-  const parts = [];
-  if (payload.content) parts.push(String(payload.content));
-  (Array.isArray(payload.embeds) ? payload.embeds : []).forEach((embed) => {
-    const data = embed?.data || embed || {};
-    const rows = [];
-    if (data.title) rows.push(String(data.title));
-    if (data.description) rows.push(String(data.description));
-    (Array.isArray(data.fields) ? data.fields : []).forEach((field) => {
-      if (!field) return;
-      // The bridge stays straight-through for plain Discord content. Embeds are
-      // the only Discord-specific shape that web chat cannot show directly, so
-      // flatten only the readable embed text here at the bridge boundary.
-      rows.push(`${field.name || 'Field'}\n${field.value || ''}`.trim());
-    });
-    if (data.footer?.text) rows.push(String(data.footer.text));
-    if (rows.length) parts.push(rows.join('\n\n'));
-  });
-  (Array.isArray(payload.attachments) ? payload.attachments : []).forEach((attachment) => {
-    const name = attachment?.name || attachment?.filename || 'attachment';
-    const url = attachment?.url || attachment?.proxyURL || attachment?.proxyUrl || '';
-    parts.push(url ? `${name}: ${url}` : String(name));
-  });
-  return parts.join('\n\n').trim();
-}
-
-function discordMessageToBridgeText(message) {
-  const attachments = message?.attachments?.values
-    ? Array.from(message.attachments.values())
-    : [];
-  return discordPayloadToBridgeText({
-    content: message?.content || '',
-    embeds: message?.embeds || [],
-    attachments,
-  });
-}
-
 function createChatBridgeHandlers(deps) {
   const {
     logger,
@@ -65,7 +26,6 @@ function createChatBridgeHandlers(deps) {
     roverManager,
     getGuildConfig,
     listGuildConfigs,
-    sendToChannel,
     sendExternalMessage,
     sendExternalTyping,
     isAdminUser,
@@ -80,35 +40,20 @@ function createChatBridgeHandlers(deps) {
     const guildConfig = getGuildConfig(message.guild.id);
     if (!guildConfig?.channelId) return;
     if (String(message.channelId) !== String(guildConfig.channelId)) return;
-    if (message.webhookId) return;
-    const isRoverBotMessage = message.author?.bot && client.user?.id && String(message.author.id) === String(client.user.id);
-    if (message.author.bot && !isRoverBotMessage) return;
+    if (message.author.bot) return;
     const content = (message.content || '').trim();
-    const bridgedText = isRoverBotMessage ? discordMessageToBridgeText(message) : content;
-    if (!bridgedText.trim()) return;
+    if (!content) return;
 
-    const nickname = isRoverBotMessage
-      ? client.user?.username || 'Rover bot'
-      : message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
+    const nickname = message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
     const role = isAdminUser(message.author.id) ? 'admin' : 'user';
     const guildIconUrl = message.guild.iconURL?.({ extension: 'png', size: 64 }) || null;
     const userAvatarUrl = message.author.displayAvatarURL?.({ extension: 'png', size: 64 }) || null;
 
     try {
-      sendExternalMessage({ text: bridgedText, nickname, role, roverId: null, discordGuildId: message.guild.id, discordGuildName: message.guild.name, discordGuildIconUrl: guildIconUrl, discordChannelId: message.channelId, discordUserId: message.author?.id || null, discordUserName: message.author?.globalName || message.author?.username || null, discordUserAvatarUrl: userAvatarUrl, bot: isRoverBotMessage, profileImage: isRoverBotMessage ? userAvatarUrl : null });
+      sendExternalMessage({ text: content, nickname, role, roverId: null, discordGuildId: message.guild.id, discordGuildName: message.guild.name, discordGuildIconUrl: guildIconUrl, discordChannelId: message.channelId, discordUserId: message.author?.id || null, discordUserName: message.author?.globalName || message.author?.username || null, discordUserAvatarUrl: userAvatarUrl });
     } catch (err) {
       logger.warn('Failed to bridge inbound Discord chat', err.message);
     }
-  }
-
-  async function handleBridgeSendRequest(event) {
-    const payload = event?.payload || {};
-    const guildConfigs = listGuildConfigs();
-    if (!guildConfigs.length) return;
-    await Promise.all(guildConfigs.map(async (entry) => {
-      if (!entry?.channelId) return;
-      await sendToChannel(entry.channelId, payload.content || '', payload.options || {}, { parse: [] }, false);
-    }));
   }
 
   function handleChatBridgeOutbound(event) {
@@ -184,11 +129,7 @@ function createChatBridgeHandlers(deps) {
     handleChatBridgeOutbound,
     handleChatTypingOutbound,
     handleDiscordTypingStart,
-    handleBridgeSendRequest,
   };
 }
 
-module.exports = {
-  createChatBridgeHandlers,
-  discordPayloadToBridgeText,
-};
+module.exports = { createChatBridgeHandlers };

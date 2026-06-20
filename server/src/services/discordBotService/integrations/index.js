@@ -39,7 +39,6 @@ function createIntegrations(deps) {
     subscribe('privateRoverAccess.requested', dm.sendPrivateRoverAccessRequestDms);
     subscribe('chat:message', chat.handleChatBridgeOutbound);
     subscribe('chat:typing', chat.handleChatTypingOutbound);
-    subscribe('discord.bridgeSend', chat.handleBridgeSendRequest);
 
     return {
       handleBridgeInbound: chat.handleBridgeInbound,

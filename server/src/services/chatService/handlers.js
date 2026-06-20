@@ -55,7 +55,7 @@ function createHandlers({ sendSystemMessage }) {
       // messages. Running the command after broadcast preserves the user-visible
       // transcript while keeping permissions and command execution entirely on
       // the server.
-      const ranCommand = await runChatTextCommand({ text: clean, socket });
+      const ranCommand = await runChatTextCommand({ text: clean, socket, sendSystemMessage });
       cb({ success: true, command: ranCommand });
       return;
     } catch (err) {
