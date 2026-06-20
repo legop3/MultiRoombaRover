@@ -270,12 +270,6 @@ function getPublicState(rawState, context = {}) {
     id: GAME_ID,
     title: 'Scans per second',
     status: state.status,
-    headline: state.lastMessage,
-    detail: state.status === 'running'
-      ? `${state.scans.length} scans, ${Math.ceil(remainingMs / 1000)} seconds left`
-      : state.finalResult
-        ? `${state.finalResult.scanCount} scans in last round`
-        : 'five minute scan challenge',
     scanCount: state.scans.length,
     scansPerSecond: Number(currentRate.toFixed(3)),
     bestRate: Number(bestRate.toFixed(3)),
@@ -306,6 +300,21 @@ function getPublicState(rawState, context = {}) {
         { label: 'Scans', value: state.scans.length },
         { label: 'Live scan rate', value: Number(currentRate).toFixed(2) },
         { label: 'World record', value: worldRecordText },
+      ],
+      sections: [
+        {
+          title: 'Round',
+          // The section carries the richer explanatory text that used to live
+          // in top-level detail. Keeping it under display means clients have a
+          // single place to look for all visible game-status information.
+          items: [
+            state.status === 'running'
+              ? `${state.scans.length} scans, ${Math.ceil(remainingMs / 1000)} seconds left`
+              : state.finalResult
+                ? `${state.finalResult.scanCount} scans in last round`
+                : 'five minute scan challenge',
+          ],
+        },
       ],
       results: state.recentRounds.slice(0, 3).map((round) => ({
         label: 'Round',

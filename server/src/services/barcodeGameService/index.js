@@ -56,7 +56,13 @@ function formatList(items = [], limit = 5) {
 
   const visible = values.slice(0, limit);
   const extraCount = values.length - visible.length;
-  const suffix = extraCount > 0 ? `, and ${extraCount} more` : '';
+  if (extraCount === 1) {
+    // A single hidden item reads badly as "and 1 more" in chat, especially for
+    // result summaries where the omitted item is usually just one normal stat.
+    // Including it is still short and avoids making the bot sound confused.
+    return values.slice(0, limit + 1).join(', ');
+  }
+  const suffix = extraCount > 1 ? `, plus ${extraCount} more` : '';
   return `${visible.join(', ')}${suffix}`;
 }
 
@@ -166,7 +172,11 @@ function formatResultSummary(display = {}) {
         .filter(Boolean)
     : [];
 
-  return formatList([primary, ...usefulStats], 3);
+  // Result summaries are already compact because games normally publish one
+  // primary line and a few stats. Joining them all avoids vague bot messages
+  // like "and 1 more" while still leaving the heavier participant lists to the
+  // bounded formatList helper above.
+  return [primary, ...usefulStats].filter(Boolean).join('. ');
 }
 
 function sendGameStartChat(definition, participants = []) {
@@ -906,6 +916,7 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
         secondary: store.resultDisplay?.secondary || 'Vote to start another game',
         timer: store.resultsUntil ? { label: 'Results clear in', endsAt: store.resultsUntil } : null,
         stats: store.resultDisplay?.stats || [],
+        sections: store.resultDisplay?.sections || [],
         results: store.resultDisplay?.results || [],
       },
     };
@@ -923,6 +934,17 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
         secondary: 'Get ready',
         timer: store.startsAt ? { label: 'Starts in', endsAt: store.startsAt } : null,
         stats: [],
+        sections: [
+          {
+            title: 'Players',
+            // Joining and starting are shared lifecycle states, so they expose
+            // their own display sections here instead of asking each game to
+            // explain the same startup flow.
+            items: participants.length
+              ? participants.map((participant) => getParticipantName(participant)).filter(Boolean)
+              : ['waiting for counted rovers'],
+          },
+        ],
         results: [],
       },
     };
@@ -941,6 +963,12 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
         secondary: `${selectedTitle} needs at least one rover`,
         timer: store.joinEndsAt ? { label: 'Join by', endsAt: store.joinEndsAt } : null,
         stats: [],
+        sections: [
+          {
+            title: 'How to join',
+            items: ['scan your rover barcode at the station'],
+          },
+        ],
         results: [],
       },
     };
@@ -962,6 +990,7 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
           label: game.title,
           value: voteCounts[game.id] || 0,
         })),
+        sections: [],
         results: [],
       },
     };
@@ -978,6 +1007,7 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
       secondary: 'Vote to start the next round',
       timer: null,
       stats: [],
+      sections: [],
       results: [],
     },
   };

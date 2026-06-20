@@ -258,17 +258,16 @@ function getPublicState(rawState, context = {}) {
   const participantResults = state.status === 'ended' && state.finalResult
     ? state.finalResult.participants
     : getParticipantList(state);
+  const scannedObjects = Object.values(state.seenObjects || {})
+    .sort((a, b) => (a.firstScannedAt || 0) - (b.firstScannedAt || 0))
+    .slice(-5)
+    .map((object) => object.label || object.entityId || object.code)
+    .filter(Boolean);
 
   return {
     id: GAME_ID,
     title: 'Most items',
     status: state.status,
-    headline: state.lastMessage,
-    detail: state.status === 'running'
-      ? `${uniqueItems} unique items, ${Math.ceil(remainingMs / 1000)} seconds left`
-      : state.finalResult
-        ? `${state.finalResult.uniqueItems} unique items in last round`
-        : 'scan different known objects',
     uniqueItems,
     totalObjectScans: state.totalObjectScans,
     duplicateObjectScans: state.duplicateObjectScans,
@@ -303,6 +302,25 @@ function getPublicState(rawState, context = {}) {
         { label: 'Unique items', value: uniqueItems },
         { label: 'Object scans', value: state.totalObjectScans },
         { label: 'World record', value: worldRecordText },
+      ],
+      sections: [
+        {
+          title: 'Progress',
+          // This replaces the older top-level detail text with a display-owned
+          // section so every client renders game explanations from the same
+          // structured field instead of guessing between headline/detail.
+          items: [
+            state.status === 'running'
+              ? `${uniqueItems} unique items, ${Math.ceil(remainingMs / 1000)} seconds left`
+              : state.finalResult
+                ? `${state.finalResult.uniqueItems} unique items in last round`
+                : 'scan different known objects',
+          ],
+        },
+        {
+          title: 'Recent items',
+          items: scannedObjects.length ? scannedObjects : ['no objects scanned yet'],
+        },
       ],
       results: Object.values(state.seenObjects || {}).slice(-3).map((object) => ({
         label: 'Item',

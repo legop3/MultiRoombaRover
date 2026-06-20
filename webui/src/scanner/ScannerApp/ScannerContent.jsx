@@ -41,6 +41,35 @@ function formatTimer(endsAt, now) {
   return minutes > 0 ? `${minutes}:${String(seconds).padStart(2, '0')}` : `${seconds}s`;
 }
 
+function getSectionItemText(item) {
+  if (typeof item === 'string') return item;
+  if (!item || typeof item !== 'object') return '';
+  return String(item.label || item.value || item.text || '').trim();
+}
+
+function normalizeDisplaySections(sections) {
+  if (!Array.isArray(sections)) return [];
+
+  // The scanner screen is intentionally a dumb renderer: games describe their
+  // own rich status through display.sections, and this page only normalizes the
+  // shape enough to avoid crashing on a malformed server payload. That keeps
+  // game-specific logic out of the rover-facing IO page.
+  return sections
+    .map((section) => ({
+      title: String(section?.title || '').trim(),
+      items: Array.isArray(section?.items)
+        ? section.items
+            .map((item) => ({
+              text: getSectionItemText(item),
+              status: typeof item === 'object' && item ? item.status : null,
+            }))
+            .filter((item) => item.text)
+        : [],
+    }))
+    .filter((section) => section.title || section.items.length)
+    .slice(0, 3);
+}
+
 function playSubmitBeep() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) return;
@@ -252,8 +281,9 @@ export default function ScannerContent() {
   // normal job is still showing the resolved barcode text. Only active lifecycle
   // states take over the large rover-facing display.
   const title = showGameDisplay ? display.title || activeGame?.title || 'Barcode games' : lastScan?.label || 'Waiting';
-  const label = showGameDisplay ? display.primary || activeGame?.headline || '' : '';
-  const detail = showGameDisplay ? display.secondary || activeGame?.detail || '' : '';
+  const label = showGameDisplay ? display.primary || '' : '';
+  const secondary = showGameDisplay ? display.secondary || '' : '';
+  const displaySections = showGameDisplay ? normalizeDisplaySections(display.sections) : [];
   const participants = Array.isArray(barcodeGameState.participants) ? barcodeGameState.participants : [];
   const syncMessage = !scannerConnectionState.connected
     ? 'scanner offline'
@@ -290,10 +320,39 @@ export default function ScannerContent() {
           <p className="max-w-full break-words text-[6vw] font-bold leading-tight tracking-normal">
             {label}
           </p>
-          {detail ? (
+          {secondary ? (
             <p className="max-w-full break-words text-[4vw] font-bold leading-tight tracking-normal">
-              {detail}
+              {secondary}
             </p>
+          ) : null}
+          {displaySections.length ? (
+            <div className="flex max-w-full flex-col items-center gap-[1vh]">
+              {displaySections.map((section, sectionIndex) => (
+                <div key={`${section.title || 'section'}-${sectionIndex}`} className="max-w-full">
+                  {section.title ? (
+                    <p className="text-[2.6vw] font-bold leading-tight tracking-normal opacity-80">
+                      {section.title}
+                    </p>
+                  ) : null}
+                  <div className="flex max-w-full flex-col items-center gap-[0.4vh]">
+                    {section.items.slice(0, 8).map((item, itemIndex) => (
+                      <p
+                        key={`${item.text}-${itemIndex}`}
+                        className={`max-w-full break-words text-[3.1vw] leading-tight tracking-normal ${
+                          item.status === 'active'
+                            ? 'font-black'
+                            : item.status === 'complete'
+                              ? 'font-semibold opacity-45'
+                              : 'font-bold opacity-85'
+                        }`}
+                      >
+                        {item.text}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : null}
           {timerText ? (
             <p className="font-mono text-[7vw] font-black leading-none tracking-normal">

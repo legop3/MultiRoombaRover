@@ -111,6 +111,66 @@ function StatGrid({ stats, theme }) {
   );
 }
 
+function getSectionItemText(item) {
+  // Game modules may send section items as simple strings or as objects with a
+  // status flag. The panel accepts both so games can stay lightweight until
+  // they need richer per-row state like scan quest's active route item.
+  if (typeof item === 'string') return item;
+  if (!item || typeof item !== 'object') return '';
+  return String(item.label || item.value || item.text || '').trim();
+}
+
+function DisplaySections({ sections }) {
+  // display.sections is the shared rich-status contract for barcode games. This
+  // renderer deliberately stays generic: game modules decide the content, while
+  // the Activities panel only applies compact CardFrame-style formatting.
+  const visibleSections = Array.isArray(sections)
+    ? sections
+        .map((section) => ({
+          title: String(section?.title || '').trim(),
+          items: Array.isArray(section?.items)
+            ? section.items
+                .map((item) => ({
+                  text: getSectionItemText(item),
+                  status: typeof item === 'object' && item ? item.status : null,
+                }))
+                .filter((item) => item.text)
+            : [],
+        }))
+        .filter((section) => section.title || section.items.length)
+    : [];
+
+  if (!visibleSections.length) return null;
+
+  return (
+    <div className="mt-0.75 grid gap-0.5">
+      {visibleSections.map((section, sectionIndex) => (
+        <div key={`${section.title || 'section'}-${sectionIndex}`} className="surface-muted px-1 py-0.75">
+          {section.title ? (
+            <p className="mb-0.5 text-xs font-semibold text-neutral-300">{section.title}</p>
+          ) : null}
+          <div className="grid gap-0.25">
+            {section.items.slice(0, 8).map((item, itemIndex) => (
+              <p
+                key={`${item.text}-${itemIndex}`}
+                className={`break-words text-xs leading-snug ${
+                  item.status === 'active'
+                    ? 'font-semibold text-neutral-50'
+                    : item.status === 'complete'
+                      ? 'text-neutral-500'
+                      : 'text-neutral-300'
+                }`}
+              >
+                {item.text}
+              </p>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ParticipantsBlock({ participants, theme }) {
   const knownParticipants = Array.isArray(participants) ? participants : [];
   // Participants are server-owned because rover scans, identity lookup, and
@@ -305,6 +365,7 @@ export default function BarcodeGamesPanel() {
             {display.secondary ? (
               <p className="mt-0.5 break-words text-xs leading-snug text-neutral-300">{display.secondary}</p>
             ) : null}
+            <DisplaySections sections={display.sections} />
           </div>
           <div className="surface px-1 py-0.75 text-left lg:text-right">
             <p className="text-xs font-semibold text-neutral-400">{display.timer?.label || 'Time'}</p>

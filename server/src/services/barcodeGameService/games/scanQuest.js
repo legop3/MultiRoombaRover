@@ -273,15 +273,24 @@ function getPublicState(rawState, context = {}) {
   const currentStep = state.currentQuest?.steps?.[state.progressIndex] || null;
   const totalSteps = state.currentQuest?.steps?.length || 0;
   const stepLabel = totalSteps ? `Item ${Math.min(state.progressIndex + 1, totalSteps)} of ${totalSteps}` : 'Find the object';
-  const orderedList = state.currentQuest?.steps?.length
-    ? state.currentQuest.steps.map((step, idx) => `${idx + 1}. ${step.label}`).join(' -> ')
-    : 'add object barcodes to the registry';
+  const routeItems = state.currentQuest?.steps?.length
+    ? state.currentQuest.steps.map((step, idx) => ({
+        // The item label is already numbered here because the same payload is
+        // shown on both the far-away scanner screen and the compact Activities
+        // panel. Keeping the ordering text server-side prevents every client
+        // from inventing its own route numbering rules.
+        label: `${idx + 1}. ${step.label}`,
+        status: idx < state.progressIndex
+          ? 'complete'
+          : idx === state.progressIndex
+            ? 'active'
+            : 'pending',
+      }))
+    : [];
   return {
     id: GAME_ID,
     title: 'Scan quest',
     status: state.status === 'running' && state.currentQuest ? 'running' : state.status,
-    headline: state.lastMessage || formatQuestPrompt(state),
-    detail: orderedList,
     progress: {
       current: state.progressIndex,
       total: state.currentQuest?.steps?.length || 0,
@@ -305,6 +314,16 @@ function getPublicState(rawState, context = {}) {
         { label: 'Completed', value: state.completedItems },
         { label: 'Skipped', value: state.skippedItems },
         { label: 'Quest points', value: getTopScores(state)[0]?.points || 0 },
+      ],
+      sections: [
+        {
+          title: 'Route',
+          // This section is the important part of scan quest: players need to
+          // know the entire ordered route before they drive across the room.
+          // It is intentionally structured instead of folded into secondary
+          // text so clients can show progress and the route at the same time.
+          items: routeItems.length ? routeItems : [{ label: 'add object barcodes to the registry', status: 'pending' }],
+        },
       ],
       results: state.recentEvents.slice(0, 3).map((event) => ({
         label: event.kind === 'timeout' ? 'Skipped' : event.kind,
