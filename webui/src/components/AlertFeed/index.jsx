@@ -178,46 +178,38 @@ function getSafeWikiUrl(rawUrl) {
 function BarcodeScanToast({ payload }) {
   const wikiUrl = getSafeWikiUrl(payload?.wikiUrl);
   const label = payload?.label || payload?.code || 'unknown barcode';
-  const descriptor = [payload?.type, payload?.code].filter(Boolean).join(' · ');
 
   return (
-    <div className="pointer-events-auto w-[min(34rem,92vw)] rounded-md bg-neutral-950/95 px-2 py-1.5 text-slate-100 shadow-lg shadow-black/40">
+    <div className="pointer-events-auto max-w-[80vw] rounded-md bg-neutral-800 px-1.5 py-0.5 text-[0.78rem] leading-tight text-slate-100">
       <style>
         {`
-          @keyframes barcode-wiki-hard-flash {
+          @keyframes barcode-wiki-flat-flash {
             0%, 100% {
-              background: #ffffff;
-              color: #020617;
-              box-shadow: 0 0 0 2px rgba(255,255,255,0.95), 0 0 28px rgba(255,255,255,0.75);
+              background: rgb(14 165 233);
+              color: white;
             }
             50% {
-              background: #facc15;
-              color: #020617;
-              box-shadow: 0 0 0 2px rgba(250,204,21,0.95), 0 0 32px rgba(250,204,21,0.9);
+              background: rgb(226 232 240);
+              color: rgb(15 23 42);
             }
           }
         `}
       </style>
-      <div className="flex flex-col gap-1">
-        <div>
-          <p className="text-[0.72rem] font-semibold leading-tight text-slate-400">Barcode scan</p>
-          <p className="break-words text-lg font-bold leading-tight text-white">{label}</p>
-          {descriptor ? (
-            <p className="mt-0.25 text-xs leading-tight text-slate-400">{descriptor}</p>
-          ) : null}
-        </div>
+      <p className="flex flex-wrap items-center gap-0.5 text-slate-100">
+        <span className="font-semibold text-slate-300">Barcode scanned:</span>
+        <span className="font-semibold text-white">{label}</span>
         {wikiUrl ? (
           <a
             href={wikiUrl}
             target="_blank"
             rel="noreferrer"
-            className="block rounded px-1.5 py-1 text-center text-base font-black leading-tight tracking-normal"
-            style={{ animation: 'barcode-wiki-hard-flash 0.22s steps(1, end) infinite' }}
+            className="rounded-md px-0.75 py-0.25 text-[0.72rem] font-semibold leading-tight tracking-normal"
+            style={{ animation: 'barcode-wiki-flat-flash 0.35s steps(1, end) infinite' }}
           >
-            Open wiki
+            Wiki
           </a>
         ) : null}
-      </div>
+      </p>
     </div>
   );
 }
