@@ -194,8 +194,8 @@ const integrationHandlers = integrations.register();
 
 client.on('messageCreate', async (message) => {
   try {
-    await commands.handleCommand(message);
     await integrationHandlers.handleBridgeInbound(message);
+    await commands.handleCommand(message);
   } catch (err) {
     logger.warn('Error handling Discord message', err.message);
   }

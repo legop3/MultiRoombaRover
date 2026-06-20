@@ -41,39 +41,11 @@ function sanitizeMentions(text) {
     .replace(/@here/gi, '[here]');
 }
 
-function embedToText(embed) {
-  const data = embed?.data || embed || {};
-  const lines = [];
-  if (data.title) lines.push(String(data.title));
-  if (data.description) lines.push(String(data.description));
-  (Array.isArray(data.fields) ? data.fields : []).forEach((field) => {
-    if (!field) return;
-    // Discord embeds have structured fields. Chat is plain text, so flattening
-    // name/value pairs keeps the command result readable without creating any
-    // new web-specific UI or payload contract.
-    lines.push(`${field.name || 'Field'}\n${field.value || ''}`.trim());
-  });
-  if (data.footer?.text) lines.push(String(data.footer.text));
-  return lines.filter(Boolean).join('\n\n');
-}
-
-function replyPayloadToText(payload) {
-  if (typeof payload === 'string') return payload;
-  if (!payload || typeof payload !== 'object') return '';
-  const parts = [];
-  if (payload.content) parts.push(String(payload.content));
-  (Array.isArray(payload.embeds) ? payload.embeds : []).forEach((embed) => {
-    const text = embedToText(embed);
-    if (text) parts.push(text);
-  });
-  return parts.join('\n\n').trim();
-}
-
 function buildRequesterLabel(socket) {
   return getNickname(socket) || socket?.data?.user?.username || socket?.id || 'unknown';
 }
 
-function createWebReplayTextCommand(socket, sendSystemMessage, replayApi) {
+function createWebReplayTextCommand(socket, replayApi) {
   return function createReplayHandler({
     rovers,
     getReplaySources: getAllReplaySources,
@@ -134,12 +106,12 @@ function createWebReplayTextCommand(socket, sendSystemMessage, replayApi) {
         },
       });
       const title = buildReplayTitle({ explicitTitle: '', sources: resolved.sources || [] });
-      sendSystemMessage(`Replay accepted: ${title}`, { nickname: 'Rover bot', bot: true });
+      await message.reply({ content: `Replay accepted: ${title}` });
     };
   };
 }
 
-function createChatCommandMessage({ socket, text, sendSystemMessage }) {
+function createChatCommandMessage({ socket, text }) {
   const nickname = buildRequesterLabel(socket);
   return {
     content: String(text || '').trim(),
@@ -152,20 +124,32 @@ function createChatCommandMessage({ socket, text, sendSystemMessage }) {
       nickname,
     },
     reply: async (payload) => {
-      const response = sanitizeMentions(replyPayloadToText(payload));
-      if (!response) return null;
-      return sendSystemMessage(response, { nickname: 'Rover bot', bot: true });
+      const replyPayload = typeof payload === 'string'
+        ? { content: sanitizeMentions(payload) }
+        : {
+            content: sanitizeMentions(payload?.content || ''),
+            options: {
+              embeds: payload?.embeds || undefined,
+              files: payload?.files || undefined,
+            },
+          };
+      // Web chat does not get a private shortcut for command results. The bot
+      // posts the Discord-shaped reply into the configured bridge channel, and
+      // the normal bridge inbound path decides how that Discord message appears
+      // in web chat.
+      publishEvent({ source: 'chatCommand', type: 'discord.bridgeSend', payload: replyPayload });
+      return null;
     },
   };
 }
 
-async function runChatTextCommand({ text, socket, sendSystemMessage }) {
+async function runChatTextCommand({ text, socket }) {
   if (!isTextCommand(text)) return false;
   // ReplayEngineV2 has startup side effects by design. Loading it lazily here
   // keeps ordinary chatService initialization from changing the service boot
   // order, while still letting `rs replay` use the existing replay pipeline.
   const replayApi = require('../replayEngineV2');
-  const message = createChatCommandMessage({ socket, text, sendSystemMessage });
+  const message = createChatCommandMessage({ socket, text });
   const commands = createCommandHandlers({
     logger: null,
     client: null,
@@ -205,13 +189,21 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     isLockdownAdminUser: (id) => String(id) === String(socket.id) && isLockdownAdmin(socket),
     discordConfig,
     config,
-    createReplayTextCommand: createWebReplayTextCommand(socket, sendSystemMessage, replayApi),
+    createReplayTextCommand: createWebReplayTextCommand(socket, replayApi),
   });
 
-  // Let the shared router perform normal command permission checks. Returning
-  // true tells chatService that the text was consumed as a command and should
-  // not be broadcast as a regular user chat message.
-  await commands.handleCommand(message);
+  // Let the shared router perform normal command permission checks. Site chat
+  // has already broadcast the user's command text; any command reply is posted
+  // into Discord and returns to web chat through the ordinary bridge inbound path.
+  try {
+    await commands.handleCommand(message);
+  } catch (err) {
+    publishEvent({
+      source: 'chatCommand',
+      type: 'discord.bridgeSend',
+      payload: { content: sanitizeMentions(`Command failed: ${err.message || 'unknown error'}`) },
+    });
+  }
   return true;
 }
 

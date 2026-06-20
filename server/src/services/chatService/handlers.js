@@ -55,12 +55,11 @@ function createHandlers({ sendSystemMessage }) {
       // messages. Running the command after broadcast preserves the user-visible
       // transcript while keeping permissions and command execution entirely on
       // the server.
-      const ranCommand = await runChatTextCommand({ text: clean, socket, sendSystemMessage });
+      const ranCommand = await runChatTextCommand({ text: clean, socket });
       cb({ success: true, command: ranCommand });
       return;
     } catch (err) {
       logger.warn('Chat command failed after broadcast', { socket: socket?.id, error: err.message });
-      sendSystemMessage(`Command failed: ${err.message || 'unknown error'}`, { nickname: 'Rover bot', bot: true });
       cb({ success: true, command: true, commandError: err.message || 'Command failed' });
       return;
     }
