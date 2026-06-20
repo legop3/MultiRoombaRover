@@ -8,9 +8,10 @@ const { hasProfanity, isKeymash, normalizeUserText } = require('./contentFilters
 const { buildMessage, buildTypingPayload, resolveRoverId, isPrivateClosedRoverId, buildRoverCtxSnapshot } = require('./contextBuilders');
 const { broadcastMessage, broadcastTyping } = require('./broadcast');
 const { playTypingNote, normalizeTtsOptions, maybeSendAccessNotice, maybeSpeak, TYPING_SEND_NOTE } = require('./notifications');
+const { runChatTextCommand } = require('./textCommands');
 
 function createHandlers({ sendSystemMessage }) {
-  function handleIncoming({ text, tts, bot = false, profileImage = null } = {}, socket, cb = () => {}) {
+  async function handleIncoming({ text, tts, bot = false, profileImage = null } = {}, socket, cb = () => {}) {
     const role = getRole(socket);
     void role;
     const normalized = normalizeUserText(text);
@@ -23,6 +24,21 @@ function createHandlers({ sendSystemMessage }) {
     // Transport-specific integrations may still constrain their own payloads
     // where an external API or rover-side feature has a real hard limit.
     if (hasProfanity(clean)) return cb({ error: 'Message blocked' });
+
+    try {
+      const consumedAsCommand = await runChatTextCommand({ text: clean, socket, sendSystemMessage });
+      if (consumedAsCommand) {
+        cb({ success: true, command: true });
+        return;
+      }
+    } catch (err) {
+      // Command errors are returned through the existing chat acknowledgement
+      // contract. This keeps command execution server-side and avoids adding a
+      // new client pathway just to display failures.
+      logger.warn('Chat command failed', { socket: socket?.id, error: err.message });
+      cb({ error: err.message || 'Command failed' });
+      return;
+    }
 
     const roverId = resolveRoverId(socket?.id);
     const ttsOptions = normalizeTtsOptions(tts);

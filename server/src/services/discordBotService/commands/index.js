@@ -22,7 +22,9 @@ function createCommandHandlers(deps) {
   } = deps;
 
   const handleStatusCommand = createStatusCommand(deps);
-  const handleReplayCommand = createReplayCommand(deps);
+  const handleReplayCommand = deps.createReplayTextCommand
+    ? deps.createReplayTextCommand(deps)
+    : createReplayCommand(deps);
   const handleLockCommand = createLockCommand(deps);
   const handleModeCommand = createModeCommand(deps);
   const handleReasonCommand = createReasonCommand(deps);
@@ -36,18 +38,24 @@ function createCommandHandlers(deps) {
     if (message.author.bot) return;
     const content = (message.content || '').trim();
     const lower = content.toLowerCase();
-    if (lower === 'ts' || lower.startsWith('ts')) return handleTimeStatusCommand(message);
-    if (!lower.startsWith('rs')) return;
+    // Commands are intentionally matched as whole prefixes. The previous
+    // startsWith checks made ordinary messages such as "rsvp" or "tshirt" look
+    // like commands, which is especially bad now that web chat will run the
+    // same server-side dispatcher before broadcasting user text.
+    if (lower === 'ts') return handleTimeStatusCommand(message);
+    if (!/^rs(?:\s|$)/i.test(content)) return;
 
     const tokens = content.split(/\s+/);
     tokens.shift();
     const action = (tokens.shift() || '').toLowerCase();
+    const rest = tokens.join(' ').trim();
     const isAdmin = isAdminUser(message.author.id);
     const isLockdownAdmin = isLockdownAdminUser(message.author.id);
     const mode = getMode();
     const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter']);
 
     if (!isAdmin && action !== '' && action !== 'status' && action !== 'help' && action !== 'replay' && action !== 'bridge' && action !== 'goal' && action !== 'reason' && action !== 'verify' && action !== 'deter') {
+      await message.reply({ content: 'Only admins can run that command.', allowedMentions: { parse: [], repliedUser: false } });
       return;
     }
 
@@ -59,7 +67,7 @@ function createCommandHandlers(deps) {
     switch (action) {
       case '':
       case 'status':
-        return handleStatusCommand(message, tokens[0]);
+        return handleStatusCommand(message, rest);
       case 'help':
         return message.reply(formatHelp());
       case 'replay':
@@ -67,9 +75,9 @@ function createCommandHandlers(deps) {
       case 'bridge':
         return handleBridgeCommand(message, tokens);
       case 'lock':
-        return handleLockCommand(message, tokens[0], true);
+        return handleLockCommand(message, rest, true);
       case 'unlock':
-        return handleLockCommand(message, tokens[0], false);
+        return handleLockCommand(message, rest, false);
       case 'mode':
         return handleModeCommand(message, tokens);
       case 'goal':
