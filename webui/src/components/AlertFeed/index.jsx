@@ -180,7 +180,7 @@ function BarcodeScanToast({ payload }) {
   const label = payload?.label || payload?.code || 'unknown barcode';
 
   return (
-    <div className="pointer-events-auto max-w-[80vw] rounded-md bg-neutral-800 px-2 py-1 text-2xl leading-tight text-slate-100">
+    <div className="pointer-events-auto max-w-[80vw] rounded-md bg-neutral-800 px-2 py-1 text-xl leading-tight text-slate-100">
       <style>
         {`
           @keyframes barcode-wiki-flat-flash {
@@ -196,17 +196,17 @@ function BarcodeScanToast({ payload }) {
         `}
       </style>
       <p className="flex flex-wrap items-center gap-0.5 text-slate-100">
-        <span className="font-semibold text-slate-300">Barcode scanned:</span>
+        <span className="font-semibold text-slate-300 pr-2">Barcode scanned:</span>
         <span className="font-semibold text-white">{label}</span>
         {wikiUrl ? (
           <a
             href={wikiUrl}
             target="_blank"
             rel="noreferrer"
-            className="rounded-md px-0.75 py-0.25 text-[0.72rem] font-semibold leading-tight tracking-normal"
+            className="rounded-md px-1 py-2 text-2xl font-semibold leading-tight tracking-normal"
             style={{ animation: 'barcode-wiki-flat-flash 0.35s steps(1, end) infinite' }}
           >
-            Wiki
+            Wiki link
           </a>
         ) : null}
       </p>
