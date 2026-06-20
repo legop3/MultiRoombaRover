@@ -180,17 +180,17 @@ function BarcodeScanToast({ payload }) {
   const label = payload?.label || payload?.code || 'unknown barcode';
 
   return (
-    <div className="pointer-events-auto max-w-[80vw] rounded-md bg-neutral-800 px-1.5 py-0.5 text-[0.78rem] leading-tight text-slate-100">
+    <div className="pointer-events-auto max-w-[80vw] rounded-md bg-neutral-800 px-2 py-1 text-2xl leading-tight text-slate-100">
       <style>
         {`
           @keyframes barcode-wiki-flat-flash {
             0%, 100% {
-              background: rgb(14 165 233);
-              color: white;
+              background: rgb(233, 186, 14);
+              color: rgb(71, 144, 253);
             }
             50% {
-              background: rgb(226 232 240);
-              color: rgb(15 23 42);
+              background: rgb(125, 49, 255);
+              color: rgb(246, 250, 211);
             }
           }
         `}
