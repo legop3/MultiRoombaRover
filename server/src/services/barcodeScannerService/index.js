@@ -6,7 +6,6 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('barcodeScannerService');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { getMode, MODES, modeEvents } = require('../modeManager');
-const { sendAlert } = require('../alertService');
 const { publishEvent } = require('../eventBus');
 const { ensureAudioForText, warmAudioForTexts } = require('./ttsCache');
 
@@ -49,11 +48,13 @@ function createDefaultRegistry() {
         type: 'rover',
         entityId: 'rover1',
         label: 'rover 1',
+        wikiUrl: '',
       },
       o001: {
         type: 'object',
         entityId: 'object1',
         label: 'object 1',
+        wikiUrl: '',
       },
     },
   };
@@ -91,6 +92,7 @@ function validateRegistry(rawRegistry) {
     }
     const entityId = String(rawEntry.entityId || '').trim();
     const label = String(rawEntry.label || '').replace(/\s+/g, ' ').trim();
+    const wikiUrl = String(rawEntry.wikiUrl || rawEntry.wiki || '').trim();
     if (!entityId) {
       throw new Error(`registry entry ${code} needs entityId`);
     }
@@ -101,6 +103,11 @@ function validateRegistry(rawRegistry) {
       type,
       entityId,
       label,
+      // wikiUrl is optional because existing physical labels may be scanned
+      // before their wiki pages are written. Keeping the field empty instead
+      // of rejecting the registry lets operators add links gradually while the
+      // rest of the barcode system keeps working.
+      wikiUrl,
     };
   });
 
@@ -165,16 +172,27 @@ function broadcastState() {
   io.to(SCANNER_SOCKET_ROOM).emit('barcode:state', buildStatePayload());
 }
 
-function sendBarcodeScanAlert(result) {
+function buildPublicScanPayload(result) {
+  // Public clients only need resolved metadata for display. This intentionally
+  // omits scanner-only state and generated audio buffers so normal web UI pages
+  // can listen for scans without inheriting the heavy scanner-page concerns.
+  return {
+    code: result?.code || '',
+    known: Boolean(result?.known),
+    type: result?.type || null,
+    entityId: result?.entityId || null,
+    label: result?.label || result?.code || 'unknown',
+    wikiUrl: result?.wikiUrl || '',
+    scannedAt: Number.isFinite(result?.scannedAt) ? result.scannedAt : Date.now(),
+  };
+}
+
+function broadcastPublicScan(result) {
   if (!result) return;
-  // Barcode scan toasts use the existing alert feed so drivers/spectators get a
-  // lightweight system notice without adding any scanner-specific panels. The
-  // scanner page remains the source of the big local display and speech output.
-  sendAlert({
-    color: result.known ? '#22c55e' : '#f59e0b',
-    title: 'Barcode Scanned',
-    message: result.label || result.code || 'unknown',
-  });
+  // Use a distinct event name from the client-to-server barcode:scan command.
+  // That keeps packet direction obvious when debugging socket traffic and lets
+  // AlertFeed subscribe without joining the scanner-only state/audio room.
+  io.emit('barcode:scanned', buildPublicScanPayload(result));
 }
 
 function resolveScan(rawCode) {
@@ -236,6 +254,7 @@ function resolveScan(rawCode) {
     type: entry.type,
     entityId: entry.entityId,
     label: entry.label,
+    wikiUrl: entry.wikiUrl || '',
     speechText: entry.label,
     scannedAt,
     registryError: loaded.error || null,
@@ -266,6 +285,7 @@ async function applyScan(rawCode) {
     registryError: result.registryError || null,
   };
   broadcastState();
+  broadcastPublicScan(result);
   // Barcode games listen to the normalized scan event instead of being called
   // directly from this service. That keeps the scanner station's IO concerns
   // separate from optional game rules, scoring, voting, and player attribution.
@@ -287,7 +307,6 @@ async function applyScan(rawCode) {
         error: err.message,
       });
     });
-  sendBarcodeScanAlert(result);
   return { result };
 }
 

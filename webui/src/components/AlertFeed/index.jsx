@@ -9,7 +9,8 @@ import ChatTypingRow from '../ChatTypingRow/index.jsx';
 import ButtonBoxTile from '../ButtonBoxTile/index.jsx';
 
 const LIFETIME_MS = 3000;
-const BUTTONBOX_LIFETIME_MS = 3500;
+const BUTTONBOX_LIFETIME_MS = 5000;
+const BARCODE_SCAN_LIFETIME_MS = 10 * 1000;
 const DEFAULT_COLOR = '#2196f3';
 
 function buildKey(alert) {
@@ -50,6 +51,34 @@ export default function AlertFeed({ scale = 1 }) {
       socket.off('buttonBox:increment', onButtonIncrement);
     };
   }, [pushAlert, buttonBoxButtons, socket]);
+
+  useEffect(() => {
+    function onBarcodeScanned(payload = {}) {
+      const label = typeof payload.label === 'string' && payload.label.trim()
+        ? payload.label.trim()
+        : payload.code || 'unknown barcode';
+      /*
+        Barcode scans use a fixed alert id because the scanner can fire quickly
+        during games. Reusing the id makes the newest scan replace the previous
+        barcode popup in AlertFeed's keyed visible map instead of building a
+        stack of old scan cards that would hide the current wiki link.
+      */
+      pushAlert({
+        id: 'barcode-scan-active',
+        kind: 'barcode-scan',
+        lifetimeMs: BARCODE_SCAN_LIFETIME_MS,
+        payload: {
+          ...payload,
+          label,
+        },
+      });
+    }
+
+    socket.on('barcode:scanned', onBarcodeScanned);
+    return () => {
+      socket.off('barcode:scanned', onBarcodeScanned);
+    };
+  }, [pushAlert, socket]);
 
   const latest = useMemo(() => alerts.slice(-12).map((alert) => ({ alert, key: buildKey(alert) })), [alerts]);
 
@@ -127,6 +156,72 @@ function hexToRgb(hex) {
   };
 }
 
+function getSafeWikiUrl(rawUrl) {
+  const text = String(rawUrl || '').trim();
+  if (!text) return '';
+
+  try {
+    /*
+      Wiki links are operator-authored registry data, but this still normalizes
+      them before rendering an anchor. Allowing only http/https avoids turning a
+      barcode registry typo into a javascript: link while still supporting both
+      absolute URLs and local wiki paths such as /wiki/object-name.
+    */
+    const parsed = new URL(text, window.location.origin);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    return parsed.href;
+  } catch {
+    return '';
+  }
+}
+
+function BarcodeScanToast({ payload }) {
+  const wikiUrl = getSafeWikiUrl(payload?.wikiUrl);
+  const label = payload?.label || payload?.code || 'unknown barcode';
+  const descriptor = [payload?.type, payload?.code].filter(Boolean).join(' · ');
+
+  return (
+    <div className="pointer-events-auto w-[min(34rem,92vw)] rounded-md bg-neutral-950/95 px-2 py-1.5 text-slate-100 shadow-lg shadow-black/40">
+      <style>
+        {`
+          @keyframes barcode-wiki-hard-flash {
+            0%, 100% {
+              background: #ffffff;
+              color: #020617;
+              box-shadow: 0 0 0 2px rgba(255,255,255,0.95), 0 0 28px rgba(255,255,255,0.75);
+            }
+            50% {
+              background: #facc15;
+              color: #020617;
+              box-shadow: 0 0 0 2px rgba(250,204,21,0.95), 0 0 32px rgba(250,204,21,0.9);
+            }
+          }
+        `}
+      </style>
+      <div className="flex flex-col gap-1">
+        <div>
+          <p className="text-[0.72rem] font-semibold leading-tight text-slate-400">Barcode scan</p>
+          <p className="break-words text-lg font-bold leading-tight text-white">{label}</p>
+          {descriptor ? (
+            <p className="mt-0.25 text-xs leading-tight text-slate-400">{descriptor}</p>
+          ) : null}
+        </div>
+        {wikiUrl ? (
+          <a
+            href={wikiUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="block rounded px-1.5 py-1 text-center text-base font-black leading-tight tracking-normal"
+            style={{ animation: 'barcode-wiki-hard-flash 0.22s steps(1, end) infinite' }}
+          >
+            Open wiki
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function AlertToast({ alert }) {
   if (alert.kind === 'buttonbox-active' && alert.payload) {
     const payload = alert.payload;
@@ -148,6 +243,9 @@ function AlertToast({ alert }) {
   }
   if (alert.kind === 'chat-typing' && alert.payload) {
     return <ChatTypingRow message={alert.payload} />;
+  }
+  if (alert.kind === 'barcode-scan' && alert.payload) {
+    return <BarcodeScanToast payload={alert.payload} />;
   }
   const rgb = hexToRgb(alert.color) || hexToRgb(DEFAULT_COLOR);
   const backgroundColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)` : 'rgba(33, 150, 243, 0.18)';

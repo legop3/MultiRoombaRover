@@ -3,17 +3,20 @@
     "r001": {
       "type": "rover",
       "entityId": "Freaky",
-      "label": "Freaky"
+      "label": "Freaky",
+      "wikiUrl": "https://wiki.otter.land/Roombas/Freaky%20(Roomba)%20(Aka%20Freakier)"
     },
     "r002": {
       "type": "rover",
       "entityId": "WALL-E",
-      "label": "WALL-E"
+      "label": "WALL-E",
+      "wikiUrl": "https://wiki.otter.land/Roombas/WALL-E%20(roomba)"
     },
     "r003": {
       "type": "rover",
       "entityId": "Bweeble",
-      "label": "Bweeble"
+      "label": "Bweeble",
+      "wikiUrl": "https://wiki.otter.land/Roombas/Bweeble%20(Roomba)"
     },
 
 
@@ -22,7 +25,8 @@
     "o001": {
       "type": "object",
       "entityId": "woodblock",
-      "label": "Wooden block"
+      "label": "Wooden block",
+      "wikiUrl": "https://wiki.otter.land/Room%20Objects/Wooden%20Block"
     },
     "o002": {
       "type":"object",
