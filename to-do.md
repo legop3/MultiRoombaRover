@@ -1,16 +1,10 @@
 1. implement multitabbing prevention using the identity system
 2.  make google tts the default everywhere but roverd
 3.  fix rover request spam queue cheat
-4.  fix up ALL discord admin commands
-   1. make sure all permissions are correct
-   2. fuzzy search all the things
-   3. dont break on multi word nicknames
-   4. make all rs commands work form both the site chat and discord
-      1. make sure all the permissions are correct
-5.  make alert feed.jsx show more alerts at once
-6.  unify typing row and chat row, should be simple
-7.  fix google TTS speeds
-8.  fix this:
+4.  make alert feed.jsx show more alerts at once
+5.  unify typing row and chat row, should be simple
+6.  fix google TTS speeds
+7.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^

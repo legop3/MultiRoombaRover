@@ -25,21 +25,6 @@ function createHandlers({ sendSystemMessage }) {
     // where an external API or rover-side feature has a real hard limit.
     if (hasProfanity(clean)) return cb({ error: 'Message blocked' });
 
-    try {
-      const consumedAsCommand = await runChatTextCommand({ text: clean, socket, sendSystemMessage });
-      if (consumedAsCommand) {
-        cb({ success: true, command: true });
-        return;
-      }
-    } catch (err) {
-      // Command errors are returned through the existing chat acknowledgement
-      // contract. This keeps command execution server-side and avoids adding a
-      // new client pathway just to display failures.
-      logger.warn('Chat command failed', { socket: socket?.id, error: err.message });
-      cb({ error: err.message || 'Command failed' });
-      return;
-    }
-
     const roverId = resolveRoverId(socket?.id);
     const ttsOptions = normalizeTtsOptions(tts);
     const message = buildMessage(socket, clean, {
@@ -64,6 +49,22 @@ function createHandlers({ sendSystemMessage }) {
     broadcastMessage(message);
     maybeSendAccessNotice(message, sendSystemMessage);
     maybeSpeak(socket, message, ttsOptions);
+
+    try {
+      // Commands sent from site chat should still be visible as normal chat
+      // messages. Running the command after broadcast preserves the user-visible
+      // transcript while keeping permissions and command execution entirely on
+      // the server.
+      const ranCommand = await runChatTextCommand({ text: clean, socket, sendSystemMessage });
+      cb({ success: true, command: ranCommand });
+      return;
+    } catch (err) {
+      logger.warn('Chat command failed after broadcast', { socket: socket?.id, error: err.message });
+      sendSystemMessage(`Command failed: ${err.message || 'unknown error'}`, { nickname: 'Rover bot', bot: true });
+      cb({ success: true, command: true, commandError: err.message || 'Command failed' });
+      return;
+    }
+
     cb({ success: true });
   }
 
