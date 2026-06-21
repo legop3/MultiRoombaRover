@@ -30,6 +30,7 @@ const { registerVerificationHooks } = require('./hooks');
 const verificationEvents = new EventEmitter();
 const IDENTITY_TIMEOUT_MS = 2 * 60 * 1000;
 const IDENTITY_SWEEP_INTERVAL_MS = 15 * 1000;
+const DUPLICATE_IDENTITY_DISCONNECT_DELAY_MS = 250;
 
 function emitChange(reason, payload = {}) {
   verificationEvents.emit('change', { reason, ...payload });
@@ -119,8 +120,17 @@ function identifySocket(socket, payload = {}) {
     data.overseerEnabled = true;
   }
 
+  /*
+    Spectator-style pages send the same identity heartbeat as the driver page,
+    but they should not participate in multitabbing prevention. The page surface
+    flag makes that distinction explicit before role changes finish, which avoids
+    a race where a spectator route briefly looks like a normal user connection.
+  */
+  data.identitySurface = payload.identitySurface === 'driver' ? 'driver' : 'passive';
+
   const verification = reevaluateSocketVerification(socket);
   const deterrence = reevaluateSocketDeterrence(socket);
+  enforceSingleUnverifiedSocketPerIdentity(socket);
   emitChange('identify', { socketId: socket.id });
   return {
     cookieUserId: data.cookieUserId,
@@ -130,6 +140,92 @@ function identifySocket(socket, payload = {}) {
     reason: verification.reason,
     identifiedAt: Date.now(),
   };
+}
+
+function emitDuplicateIdentityAndDisconnect(socket, payload = {}) {
+  if (!socket?.id || socket.disconnected) return;
+
+  /*
+    The browser needs a small amount of time to render the blocking overlay
+    before the transport closes. Socket.IO does not guarantee that an immediate
+    disconnect after emit will be visible to the client, so the short timer is
+    intentionally used as an event-delivery grace period rather than a retry or
+    background worker.
+  */
+  socket.emit('session:duplicateIdentity', {
+    reason: 'duplicate_identity',
+    message: 'This driver session is already active in another tab.',
+    ...payload,
+  });
+  setTimeout(() => {
+    if (!socket.disconnected) {
+      socket.disconnect(true);
+    }
+  }, DUPLICATE_IDENTITY_DISCONNECT_DELAY_MS);
+}
+
+function enforceSingleUnverifiedSocketPerIdentity(currentSocket) {
+  const currentKey = normalizeCookieUserId(currentSocket?.data?.cookieUserId);
+  if (
+    !currentSocket?.id ||
+    !currentKey ||
+    currentSocket.data?.isVerified ||
+    currentSocket.data?.identitySurface !== 'driver'
+  ) {
+    return;
+  }
+
+  /*
+    Verification status is evaluated before this function runs. That ordering is
+    important because verified users are immune to duplicate-tab enforcement:
+    a verified socket is never disconnected here, and a verified current socket
+    never causes older tabs to be removed.
+  */
+  const duplicates = Array.from(io.sockets.sockets.values()).filter((candidate) => {
+    if (!candidate?.id || candidate.id === currentSocket.id || candidate.disconnected) return false;
+    if (candidate?.data?.identitySurface !== 'driver') return false;
+    const candidateKey = normalizeCookieUserId(candidate?.data?.cookieUserId);
+    return Boolean(candidateKey && candidateKey === currentKey);
+  });
+
+  if (duplicates.length === 0) {
+    return;
+  }
+
+  const verifiedDuplicate = duplicates.find((candidate) => candidate?.data?.isVerified);
+  if (verifiedDuplicate) {
+    /*
+      A verified tab is allowed to keep running, but the non-verified tab that
+      collided with it should still be blocked. This keeps the immunity attached
+      to verified users instead of turning a verified identity key into a bypass
+      for unverified browser sessions.
+    */
+    logger.info('Disconnecting non-verified socket because its identity is already active on a verified socket', {
+      socketId: currentSocket.id,
+      retainedSocketId: verifiedDuplicate.id,
+      cookieUserId: currentKey,
+    });
+    emitDuplicateIdentityAndDisconnect(currentSocket, {
+      retainedSocketId: verifiedDuplicate.id,
+    });
+    return;
+  }
+
+  /*
+    When all duplicates are non-verified, the newest socket wins. Opening a new
+    tab should move the user to that tab instead of leaving an older background
+    tab with rover control, chat identity, or game participation.
+  */
+  duplicates.forEach((duplicate) => {
+    logger.info('Disconnecting older non-verified duplicate identity socket', {
+      socketId: duplicate.id,
+      retainedSocketId: currentSocket.id,
+      cookieUserId: currentKey,
+    });
+    emitDuplicateIdentityAndDisconnect(duplicate, {
+      retainedSocketId: currentSocket.id,
+    });
+  });
 }
 
 function getVerificationStateForSocket(socket) {

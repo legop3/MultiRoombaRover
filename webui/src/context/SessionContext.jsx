@@ -18,6 +18,7 @@ const INITIAL_STATE = {
   replayJobs: {},
   latestReplay: null,
   latestRequestedReplay: null,
+  duplicateIdentityBlock: null,
 };
 
 const SessionContext = createContext(null);
@@ -283,6 +284,26 @@ export function SessionProvider({ children }) {
       const memory = payload && typeof payload === 'object' ? payload : null;
       setState((prev) => ({ ...prev, overseerMemory: memory }));
     }
+    function handleDuplicateIdentity(payload = {}) {
+      /*
+        The server sends this event immediately before closing an older duplicate
+        tab. Persisting the reason in app state lets the UI replace the whole
+        page with a clear blocking screen instead of leaving users on a normal
+        disconnected interface that looks recoverable.
+      */
+      const message =
+        typeof payload?.message === 'string' && payload.message.trim()
+          ? payload.message.trim()
+          : 'This driver session is already active in another tab.';
+      setState((prev) => ({
+        ...prev,
+        duplicateIdentityBlock: {
+          ...payload,
+          message,
+          receivedAt: Date.now(),
+        },
+      }));
+    }
     socket.on('session:sync', handleSession);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
@@ -295,6 +316,7 @@ export function SessionProvider({ children }) {
     socket.on('replay:status', handleReplayStatus);
     socket.on('replay:ready', handleReplayReady);
     socket.on('replay:failed', handleReplayFailed);
+    socket.on('session:duplicateIdentity', handleDuplicateIdentity);
     return () => {
       socket.off('session:sync', handleSession);
       socket.off('log:init', handleLogInit);
@@ -308,14 +330,15 @@ export function SessionProvider({ children }) {
       socket.off('replay:status', handleReplayStatus);
       socket.off('replay:ready', handleReplayReady);
       socket.off('replay:failed', handleReplayFailed);
+      socket.off('session:duplicateIdentity', handleDuplicateIdentity);
     };
   }, [setState, socket]);
 
   const actions = useMemo(
     () => ({
       login: (username, password) => emitWithAck('auth:login', { username, password }),
-      identifySession: ({ cookieUserId, nickname, overseerEnabled } = {}) =>
-        emitWithAck('session:identify', { cookieUserId, nickname, overseerEnabled }),
+      identifySession: ({ cookieUserId, nickname, overseerEnabled, identitySurface } = {}) =>
+        emitWithAck('session:identify', { cookieUserId, nickname, overseerEnabled, identitySurface }),
       setRole: (role) => emitWithAck('session:setRole', { role }),
       requestControl: (roverId, options = {}) =>
         emitWithAck('session:requestControl', { roverId, ...options }),

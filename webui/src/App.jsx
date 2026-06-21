@@ -45,6 +45,7 @@ import BarcodeGamesPanel from './components/BarcodeGamesPanel/index.jsx';
 import OdometerPanel from './components/OdometerPanel/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
+import DuplicateIdentityOverlay from './components/DuplicateIdentityOverlay/index.jsx';
 import { pageBackgroundClass, themeGapClass, themeStackClass } from './themeFlags.js';
 import { trackAnalyticsEvent } from './analytics/index.js';
 
@@ -304,7 +305,7 @@ function App() {
 
 function AppWithProviders({ layout, isDesktop, fullscreen }) {
   useDefaultNickname();
-  useUserIdentitySync();
+  useUserIdentitySync({ identitySurface: 'driver' });
   useTelemetryVisualPolicy({ mobile: !isDesktop });
   const {
     visible: fullscreenVisible,
@@ -425,6 +426,7 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
         {renderedLayout}
       </main>
       <AlertFeed />
+      <DuplicateIdentityOverlay />
       <RewardRunOverlay />
       <TurnAlertListener />
       <ModeGateOverlay />

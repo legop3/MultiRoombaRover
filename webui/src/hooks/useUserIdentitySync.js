@@ -5,7 +5,7 @@ import { useSessionActions, useSessionSelector } from '../context/SessionContext
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
 
-export default function useUserIdentitySync() {
+export default function useUserIdentitySync({ identitySurface = 'passive' } = {}) {
   const socket = useSocket();
   const connected = useSessionSelector((state) => state.connected);
   const { identifySession } = useSessionActions();
@@ -27,6 +27,7 @@ export default function useUserIdentitySync() {
   const cookieUserId = (identity?.cookieUserId || '').trim();
   const nickname = (profile?.nickname || '').trim();
   const overseerEnabled = Boolean(overseerPreference?.enabled);
+  const normalizedIdentitySurface = identitySurface === 'driver' ? 'driver' : 'passive';
 
   const clearRetry = useCallback(() => {
     if (retryTimerRef.current) {
@@ -39,7 +40,18 @@ export default function useUserIdentitySync() {
     if (!ready || !connected || !socket?.id || inFlightRef.current) return;
     inFlightRef.current = true;
     try {
-      const resp = await identifySession({ cookieUserId, nickname, overseerEnabled });
+      /*
+        Every route shares the same persisted identity key, but only the main
+        driver page should trigger duplicate-tab prevention. Sending the surface
+        with the heartbeat lets the server make that decision before spectator
+        pages finish their role switch.
+      */
+      const resp = await identifySession({
+        cookieUserId,
+        nickname,
+        overseerEnabled,
+        identitySurface: normalizedIdentitySurface,
+      });
       const nextKey = (resp?.cookieUserId || '').trim();
       if (nextKey && nextKey !== cookieUserId) {
         saveIdentity((current) => ({ ...(current || {}), cookieUserId: nextKey }));
@@ -59,6 +71,7 @@ export default function useUserIdentitySync() {
     connected,
     cookieUserId,
     identifySession,
+    normalizedIdentitySurface,
     nickname,
     overseerEnabled,
     ready,
@@ -75,7 +88,7 @@ export default function useUserIdentitySync() {
   useEffect(() => {
     if (!ready || !connected || !socket?.id) return;
     sendIdentify();
-  }, [ready, connected, socket?.id, cookieUserId, nickname, overseerEnabled, sendIdentify]);
+  }, [ready, connected, socket?.id, cookieUserId, nickname, overseerEnabled, normalizedIdentitySurface, sendIdentify]);
 
   useEffect(() => {
     const handleOnline = () => {
