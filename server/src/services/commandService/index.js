@@ -13,16 +13,37 @@ const pendingCommands = new Map(); // id -> { roverId }
 const lastDriveActivity = new Map(); // roverId -> { ts, socketId, direction, speed, isAdmin }
 const driveCooldowns = new Map(); // roverId -> blockedUntil
 
+function normalizeOutboundCommandPayload(payload = {}) {
+  if (payload?.type !== 'tts') return payload;
+
+  const tts = payload.tts && typeof payload.tts === 'object' ? payload.tts : {};
+  const configuredEngine = typeof tts.engine === 'string' ? tts.engine.trim() : '';
+  if (configuredEngine) return payload;
+
+  // The server owns the default for commands it sends. Roverd still keeps its
+  // own local default for payloads that omit an engine from some other source,
+  // but normal server-issued TTS should prefer Google speech without requiring
+  // every caller to remember that policy.
+  return {
+    ...payload,
+    tts: {
+      ...tts,
+      engine: 'chromegtts',
+    },
+  };
+}
+
 function issueCommand(roverId, payload) {
   const record = roverManager.rovers.get(roverId);
   if (!record || !record.ws) {
     throw new Error('Rover offline');
   }
   const id = uuidv4();
-  const message = { ...payload, id };
+  const normalizedPayload = normalizeOutboundCommandPayload(payload);
+  const message = { ...normalizedPayload, id };
   record.ws.send(JSON.stringify(message));
-  pendingCommands.set(id, { roverId, ts: Date.now(), type: payload.type });
-  logger.info('Issued command', roverId, payload.type, id);
+  pendingCommands.set(id, { roverId, ts: Date.now(), type: normalizedPayload.type });
+  logger.info('Issued command', roverId, normalizedPayload.type, id);
   return id;
 }
 

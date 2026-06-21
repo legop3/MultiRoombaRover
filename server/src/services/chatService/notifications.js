@@ -36,7 +36,11 @@ function normalizeTtsOptions(raw = {}) {
   const speak = raw.speak !== false;
   if (!speak) return null;
   const rawEngine = typeof raw.engine === 'string' ? raw.engine.toLowerCase() : '';
-  const engine = rawEngine === 'espeak' ? 'espeak' : rawEngine === 'chromegtts' ? 'chromegtts' : 'flite';
+  // Chat payloads come from browsers and bridged command paths, so this is the
+  // chat-specific copy of the server TTS default. Unknown or missing engines
+  // become Google speech here instead of falling through to flite before the
+  // shared command service gets a chance to apply its own default.
+  const engine = rawEngine === 'espeak' ? 'espeak' : rawEngine === 'flite' ? 'flite' : 'chromegtts';
   const voice = typeof raw.voice === 'string' ? raw.voice.trim() : undefined;
   let pitch = Number.isFinite(raw.pitch) ? raw.pitch : undefined;
   let speed = Number.isFinite(raw.speed) ? raw.speed : undefined;

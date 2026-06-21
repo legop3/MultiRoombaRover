@@ -28,8 +28,11 @@ function HudChatInput({ compact = false }) {
   const roverRoster = useSessionSelector((state) => state.session?.roster || []);
   const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef, setTypingActive } = useChatActions();
   const { value: ttsSettings } = useSettingsNamespace('tts', {
-    engine: 'flite',
-    voice: 'rms',
+    // HUD chat shares the normal browser TTS defaults, but it has no visible
+    // controls of its own. Keeping the fallback here on Google speech prevents
+    // the compact HUD path from silently reverting to flite for fresh users.
+    engine: 'chromegtts',
+    voice: 'tpf',
     pitch: 50,
     googlePitch: 1,
     googleSpeed: 1,
@@ -46,7 +49,7 @@ function HudChatInput({ compact = false }) {
   const ttsPayload = useMemo(() => {
     if (!ttsSupported) return null;
     const engine =
-      ttsSettings?.engine === 'espeak' ? 'espeak' : ttsSettings?.engine === 'chromegtts' ? 'chromegtts' : 'flite';
+      ttsSettings?.engine === 'espeak' ? 'espeak' : ttsSettings?.engine === 'flite' ? 'flite' : 'chromegtts';
     if (engine === 'espeak') {
       let pitch = Number.isFinite(ttsSettings?.pitch) ? Math.round(ttsSettings.pitch) : undefined;
       if (typeof pitch === 'number') {

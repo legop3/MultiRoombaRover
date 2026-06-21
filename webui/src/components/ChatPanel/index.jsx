@@ -16,14 +16,23 @@ const CHROME_TTS_VOICES = ['sfg', 'iob', 'iog', 'iol', 'iom', 'tpc', 'tpd', 'tpf
 const ESPEAK_PITCHES = Array.from({ length: 10 }, (_, idx) => idx * 10);
 const GOOGLE_TTS_VALUES = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 const DEFAULT_GOOGLE_TTS_VALUE = 1.0;
+const DEFAULT_GOOGLE_TTS_VOICE = 'tpf';
 
 const TTS_SETTINGS_DEFAULTS = {
-  engine: 'flite',
-  voice: 'rms',
+  engine: 'chromegtts',
+  voice: DEFAULT_GOOGLE_TTS_VOICE,
   pitch: 50,
   googlePitch: DEFAULT_GOOGLE_TTS_VALUE,
   googleSpeed: DEFAULT_GOOGLE_TTS_VALUE,
 };
+
+function formatGoogleSpeedLabel(engineSpeed) {
+  // Chrome's local Google TTS model treats this parameter like a duration
+  // multiplier, so larger raw values sound slower. Keep the raw saved value and
+  // rover payload unchanged, but show the reciprocal so the dropdown reads like
+  // a normal user-facing speed control where larger means faster.
+  return (1 / engineSpeed).toFixed(2);
+}
 
 function resolveTtsSettings(settings) {
   return {
@@ -122,7 +131,7 @@ function TtsControls({
           const next = event.target.value;
           const nextVoice =
             next === 'chromegtts' && !CHROME_TTS_VOICES.includes(voice)
-              ? 'tpf'
+              ? DEFAULT_GOOGLE_TTS_VOICE
               : next === 'flite' && !FLITE_VOICES.includes(voice)
                 ? 'rms'
                 : voice;
@@ -176,7 +185,7 @@ function TtsControls({
               >
                 {GOOGLE_TTS_VALUES.map((value) => (
                   <option key={`speed-${value}`} value={value}>
-                    speed {value.toFixed(2)}
+                    speed {formatGoogleSpeedLabel(value)}
                   </option>
                 ))}
               </select>

@@ -40,7 +40,10 @@ function createHandlers({ sendSystemMessage }) {
     playTypingNote(roverId, TYPING_SEND_NOTE, socket?.id);
 
     if (isPrivateClosedRoverId(message.roverId)) {
-      const forcedTts = ttsOptions || { speak: true, engine: 'flite' };
+      // Private-closed chat does not broadcast the text, so TTS is the only
+      // delivery path. Use the same Google speech default as normal chat when
+      // the sender did not provide explicit TTS settings.
+      const forcedTts = ttsOptions || { speak: true, engine: 'chromegtts' };
       maybeSpeak(socket, message, forcedTts);
       cb({ success: true, privateOnly: true });
       return;
