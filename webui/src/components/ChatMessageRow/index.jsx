@@ -138,7 +138,15 @@ export function ChatIdentity({ message, toolsToggle = null }) {
   );
 }
 
-function chatRowClass(message) {
+function chatRowClass(message, variant = 'message') {
+  // Typing indicators intentionally reuse the normal chat row shell so avatar,
+  // nickname, rover identity, and Discord identity all stay visually aligned
+  // with real chat messages. The darker slate treatment separates the temporary
+  // "typing..." state without requiring a second component with duplicated
+  // identity markup.
+  if (variant === 'typing') {
+    return 'flex flex-col gap-0.5 rounded-md border border-slate-600/40 bg-slate-900/40 px-0.5 py-0.5 text-sm text-neutral-100 italic opacity-80';
+  }
   if (isBotMessage(message)) {
     return 'flex flex-col gap-0.5 rounded-md border border-emerald-500/40 bg-emerald-950 px-0.5 py-0.5 text-sm text-neutral-100';
   }
@@ -153,12 +161,17 @@ function chatRowClass(message) {
   }`;
 }
 
-export default function ChatMessageRow({ message }) {
+export default function ChatMessageRow({ message, variant = 'message' }) {
   const isBot = isBotMessage(message);
+  const isTyping = variant === 'typing';
   const role = useSessionSelector((state) => state.session?.role || null);
   const isSpectator = role === 'spectator';
   const [open, setOpen] = useState(false);
-  const toolCalls = Array.isArray(message?.toolCalls) ? message.toolCalls : [];
+  // Typing payloads are transient presence events, not persisted chat messages.
+  // Treating them as a row variant prevents tool expansion and message-specific
+  // controls from appearing if a future typing payload happens to carry fields
+  // that overlap with stored chat message data.
+  const toolCalls = !isTyping && Array.isArray(message?.toolCalls) ? message.toolCalls : [];
   const hasToolCalls = toolCalls.length > 0;
   // Spectator chat should expose tool details without requiring interaction, but
   // only rows that actually contain tools need the expanded two-section layout.
@@ -167,6 +180,7 @@ export default function ChatMessageRow({ message }) {
   // row open even when there is no dropdown content to show.
   const isOpen = hasToolCalls && (isSpectator || open);
   const hasText = Boolean(String(message?.text || '').trim());
+  const rowText = isTyping ? 'typing...' : message.text;
   const toolsToggle =
     hasToolCalls ? (
       <button
@@ -181,17 +195,19 @@ export default function ChatMessageRow({ message }) {
       </button>
     ) : null;
   return (
-    <div className={chatRowClass(message)}>
+    <div className={chatRowClass(message, variant)}>
       <div className="flex w-full items-start gap-0.5">
         <span
           className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
         >
           <ChatIdentity message={message} toolsToggle={toolsToggle} />
-          {!isOpen && hasText ? ` ${message.text}` : ''}
+          {!isOpen && (hasText || isTyping) ? ` ${rowText}` : ''}
         </span>
-        <span className="shrink-0 text-[0.65rem] text-slate-400/60">
-          {formatTime(message.ts)}
-        </span>
+        {!isTyping ? (
+          <span className="shrink-0 text-[0.65rem] text-slate-400/60">
+            {formatTime(message.ts)}
+          </span>
+        ) : null}
       </div>
       {isOpen && hasToolCalls ? (
         <div className="w-full rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
@@ -216,5 +232,3 @@ export default function ChatMessageRow({ message }) {
     </div>
   );
 }
-
-export { chatRowClass };

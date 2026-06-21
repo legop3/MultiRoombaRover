@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSocket } from '../../context/SocketContext.jsx';
 import ChatMessageRow from '../ChatMessageRow/index.jsx';
-import ChatTypingRow from '../ChatTypingRow/index.jsx';
 import ButtonBoxTile from '../ButtonBoxTile/index.jsx';
 
 const LIFETIME_MS = 3000;
@@ -104,7 +103,7 @@ export default function AlertFeed({ scale = 1 }) {
     });
 
     return {
-      visible: Array.from(visibleByKey.values()).slice(-3),
+      visible: Array.from(visibleByKey.values()).slice(-6),
       nextExpiryAt: soonestExpiryAt,
     };
   }, [latest, now]);
@@ -234,7 +233,7 @@ function AlertToast({ alert }) {
     return <ChatMessageRow message={alert.payload} />;
   }
   if (alert.kind === 'chat-typing' && alert.payload) {
-    return <ChatTypingRow message={alert.payload} />;
+    return <ChatMessageRow message={alert.payload} variant="typing" />;
   }
   if (alert.kind === 'barcode-scan' && alert.payload) {
     return <BarcodeScanToast payload={alert.payload} />;

@@ -1,9 +1,5 @@
-1.  make google tts the default everywhere but roverd
-2.  fix rover request spam queue cheat
-3.  make alert feed.jsx show more alerts at once
-4.  unify typing row and chat row, should be simple
-5.  fix google TTS speeds
-6.  fix this:
+1.  fix rover request spam queue cheat
+2.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^

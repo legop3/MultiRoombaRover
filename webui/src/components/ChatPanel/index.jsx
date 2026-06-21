@@ -7,7 +7,6 @@ import { useChatActions, useChatTimeline } from '../../context/ChatContext.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import ChatMessageRow from '../ChatMessageRow/index.jsx';
-import ChatTypingRow from '../ChatTypingRow/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
 
@@ -88,7 +87,7 @@ function ChatMessageList({ fillHeight = false }) {
         sorted.map((msg) => <ChatMessageRow key={msg.id} message={msg} />)
       )}
       {typingRows.map((entry) => (
-        <ChatTypingRow key={`typing-${entry.typingId || entry.id}`} message={entry} />
+        <ChatMessageRow key={`typing-${entry.typingId || entry.id}`} message={entry} variant="typing" />
       ))}
     </div>
   );
