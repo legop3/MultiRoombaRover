@@ -105,11 +105,12 @@ export default function KeyboardInputManager() {
   const hornActive = useControlSelector((control) => Boolean(control.state.horn?.active));
   const homeAssistant = useSessionSelector((state) => state.session?.homeAssistant || null);
   const dockAssist = useManualDockAssist();
-  const { homeAssistantSetState } = useSessionActions();
+  const { homeAssistantSetState, pushAlert } = useSessionActions();
   const { focusChat } = useChatActions();
   const { isChatFocused } = useChatFocus();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
-  const { save: saveVideoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
+  const { value: videoSettings, save: saveVideoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
+  const videoColorFilter = normalizeVideoFilter(videoSettings?.colorFilter);
   const keymap = useMemo(() => normalizeKeymapEntries(rawKeymap), [rawKeymap]);
   const actionTokens = useMemo(() => {
     const tokens = new Set();
@@ -325,10 +326,23 @@ export default function KeyboardInputManager() {
     // Update through the same settings namespace as the Page settings dropdown so the keyboard
     // shortcut and menu never maintain separate copies of the selected filter.
     const latest = latestRef.current;
-    latest?.saveVideoSettings((current) => ({
+    if (!latest) return;
+    const nextFilter = nextVideoFilter(latest.videoColorFilter);
+    latest.saveVideoSettings((current) => ({
       ...(current ?? {}),
-      colorFilter: nextVideoFilter(current?.colorFilter),
+      colorFilter: nextFilter,
     }));
+    latest.pushAlert({
+      // Reuse one alert lane for filter changes so fast key-repeat-like cycling refreshes the
+      // indicator instead of covering the interface with a stack of filter toasts.
+      id: 'video-filter-active',
+      title: 'Video filter',
+      // The message intentionally uses the raw filter key; no label mapping is needed because
+      // these are the same keys persisted in the setting and cycled by the shortcut.
+      message: `Rover video filter: ${nextFilter}`,
+      color: '#38bdf8',
+      lifetimeMs: 1600,
+    });
   }, []);
 
   useLayoutEffect(() => {
@@ -345,6 +359,7 @@ export default function KeyboardInputManager() {
       keyboardSpeeds,
       keymap,
       nudgeServo,
+      pushAlert,
       registerInputState,
       roverId,
       runMacro,
@@ -362,6 +377,7 @@ export default function KeyboardInputManager() {
       stopAllMotion,
       stopHorn,
       toggleNightVision,
+      videoColorFilter,
     };
   });
 
