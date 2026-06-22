@@ -253,7 +253,7 @@ export function ControlSystemProvider({ children }) {
     if (pipeline.roverId) {
       pipeline.enableSensorStream();
     }
-  }, [pipeline]);
+  }, [pipeline.roverId, pipeline.enableSensorStream]);
 
   const setMode = useCallback(
     (mode) => {

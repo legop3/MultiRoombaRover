@@ -76,6 +76,68 @@ function setDriveCooldown(roverId, durationMs) {
   driveCooldowns.set(roverId, Date.now() + durationMs);
 }
 
+function getCommandMotionMagnitude(type, payload = {}) {
+  if (type === 'drive') {
+    const driveDirect = payload?.driveDirect || {};
+    const left = Math.abs(Number(driveDirect.left) || 0);
+    const right = Math.abs(Number(driveDirect.right) || 0);
+    return Math.max(left, right);
+  }
+
+  if (type === 'motors') {
+    const motorPwm = payload?.motorPwm || {};
+    const main = Math.abs(Number(motorPwm.main) || 0);
+    const side = Math.abs(Number(motorPwm.side) || 0);
+    const vacuum = Math.abs(Number(motorPwm.vacuum) || 0);
+    return Math.max(main, side, vacuum);
+  }
+
+  return 0;
+}
+
+function shouldRecordTurnActivity(type, payload = {}) {
+  /*
+    The turn idle-skip timer is a user-intent timer, not a generic command timer.
+    Some commands are emitted by the browser as setup/cleanup work while the
+    driver is literally doing nothing. Counting those commands as activity lets
+    a totally idle client keep a turn forever, because recordActivity disarms
+    the idle skip for the rest of that turn.
+  */
+  if (type === 'sensorStream') {
+    /*
+      Sensor streaming is enabled automatically when the UI has a rover
+      assignment and can also be resent after harmless React/session churn.
+      It is not proof that the driver touched a control.
+    */
+    return false;
+  }
+
+  if (type === 'drive' || type === 'motors') {
+    /*
+      Zero drive/motor packets are safety cleanup packets. The keyboard manager,
+      gamepad manager, blur handlers, and turn transitions can all send zeros
+      without human intent, so only non-zero motion should disarm idle skip.
+    */
+    return getCommandMotionMagnitude(type, payload) > 0;
+  }
+
+  if (type === 'horn') {
+    /*
+      Starting the horn is a deliberate action. Stopping it can be automatic
+      after a timeout or key release, so the stop packet should not be the event
+      that proves the driver is active.
+    */
+    return payload?.horn?.action !== 'stop';
+  }
+
+  /*
+    Other accepted commands are left as activity because they are tied to an
+    explicit user control: servo moves, night vision toggles, raw OI commands,
+    songs, reboot/update admin actions, and similar commands.
+  */
+  return true;
+}
+
 module.exports = {
   issueCommand,
   handleAck,
@@ -154,11 +216,13 @@ io.on('connection', (socket) => {
       }
       const id = issueCommand(roverId, { type, ...payload });
       logger.info('Queued command', socket.id, roverId, type);
-      try {
-        const { recordActivity } = require('../turnService');
-        recordActivity(roverId, socket.id);
-      } catch (err) {
-        // best effort; ignore activity update errors
+      if (shouldRecordTurnActivity(type, payload)) {
+        try {
+          const { recordActivity } = require('../turnService');
+          recordActivity(roverId, socket.id);
+        } catch (err) {
+          // Activity recording is best-effort because command delivery should not fail if turn bookkeeping has a transient issue.
+        }
       }
       reply({ id });
     } catch (err) {
