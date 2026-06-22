@@ -1,5 +1,7 @@
-1.  fix rover request spam queue cheat
-2.  fix this:
+1. add camera filter indicator for when youre changing it
+2. make alert feed better with fadeout and stuff and it stays when you hover over one
+3.  fix rover request spam queue cheat
+4.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^
