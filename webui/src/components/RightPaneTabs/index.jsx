@@ -28,6 +28,8 @@ import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
 import BarcodeGamesPanel from '../BarcodeGamesPanel/index.jsx';
 import OdometerPanel from '../OdometerPanel/index.jsx';
+import LiftCard from '../LiftCard/index.jsx';
+import NeatoCard from '../NeatoCard/index.jsx';
 import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -367,6 +369,8 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
           <TabPanel id="activities">
             <div className={`flex flex-col ${themeGapClass}`}>
               <BarcodeGamesPanel />
+              <LiftCard />
+              <NeatoCard />
               <OdometerPanel />
               <ButtonBoxPanel />
               <KinectPanel />

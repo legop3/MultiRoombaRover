@@ -43,6 +43,8 @@ import { useTelemetryVisualPolicy } from './context/TelemetryContext.jsx';
 import ButtonBoxPanel from './components/ButtonBoxPanel/index.jsx';
 import BarcodeGamesPanel from './components/BarcodeGamesPanel/index.jsx';
 import OdometerPanel from './components/OdometerPanel/index.jsx';
+import LiftCard from './components/LiftCard/index.jsx';
+import NeatoCard from './components/NeatoCard/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
 import DuplicateIdentityOverlay from './components/DuplicateIdentityOverlay/index.jsx';
@@ -195,6 +197,8 @@ function MobileFeatureTabs({
           <TabPanel id="activities">
             <div className={`flex flex-col ${themeGapClass}`}>
               <BarcodeGamesPanel />
+              <LiftCard />
+              <NeatoCard />
               <OdometerPanel />
               <ButtonBoxPanel />
               <KinectPanel />

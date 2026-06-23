@@ -1,7 +1,8 @@
-// Vip Neato Card
-// Purpose: Defines the Vip Neato Card module and the local helpers/components used in this file.
-// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
+// Neato Card
+// Purpose: Defines the public Neato activity card and the local helpers/components used in this file.
+// Scope: Keeps Neato state display and commands together because each button's availability depends on the same shared robot telemetry.
 import { useState } from 'react';
+import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 
 function normalizeState(value) {
@@ -39,17 +40,21 @@ function StatusTile({ label, value, tone = 'muted', valueClass = '', hideLabel =
   );
 }
 
-export default function VipNeatoCard({
-  neato,
-  onStart,
-  onSendHome,
-  onLocate,
-  onClearErrors,
-  onPowerCycle,
-  fullWidth = false,
-}) {
+export default function NeatoCard() {
+  /*
+    Neato is a standalone public activity card. It owns its session selector and
+    command actions so callers do not need to know the socket event names or
+    keep a parallel list of Neato props in every tab layout.
+  */
+  const neato = useSessionSelector((state) => state.session?.neato || null);
+  const {
+    neatoStart,
+    neatoSendHome,
+    neatoLocate,
+    neatoClearErrors,
+    neatoPowerCycle,
+  } = useSessionActions();
   const [working, setWorking] = useState('');
-  const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const configured = Boolean(neato?.configured);
   const connected = Boolean(neato?.enabled && neato?.connected);
@@ -102,7 +107,7 @@ export default function VipNeatoCard({
     <CardFrame
       title="Neato Controls"
      
-      className={wrapClass}
+      className="w-full"
       bodyClassName="text-sm text-slate-200"
       actions={
         <span className={`inline-flex w-auto rounded px-1 py-0.25 text-xs font-semibold ${metricToneClass(headerTone)}`}>
@@ -121,7 +126,7 @@ export default function VipNeatoCard({
             <button
               type="button"
               disabled={!canRunStart || Boolean(working)}
-              onClick={() => runAction('start', onStart)}
+              onClick={() => runAction('start', neatoStart)}
               className="rounded-md border border-sky-300 bg-emerald-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-emerald-500 disabled:opacity-50"
             >
               {working === 'start' ? 'Starting...' : 'Start cleaning'}
@@ -129,7 +134,7 @@ export default function VipNeatoCard({
             <button
               type="button"
               disabled={!canRunSendHome || Boolean(working)}
-              onClick={() => runAction('sendHome', onSendHome)}
+              onClick={() => runAction('sendHome', neatoSendHome)}
               className="rounded-md border border-sky-300 bg-sky-600 px-1 py-1 text-base font-semibold text-white transition hover:border-sky-500 hover:bg-sky-500 disabled:opacity-50"
             >
               {working === 'sendHome' ? 'Sending...' : 'Send to dock'}
@@ -138,7 +143,7 @@ export default function VipNeatoCard({
               <button
                 type="button"
                 disabled={!canRunLocate || Boolean(working)}
-                onClick={() => runAction('locate', onLocate)}
+                onClick={() => runAction('locate', neatoLocate)}
                 className="w-full rounded-md border border-sky-300 bg-fuchsia-600 px-1 py-0.5 text-xs font-semibold text-white transition hover:border-sky-500 hover:bg-fuchsia-500 disabled:opacity-50"
               >
                 {working === 'locate' ? 'Playing...' : 'Play sound'}
@@ -146,7 +151,7 @@ export default function VipNeatoCard({
               <button
                 type="button"
                 disabled={!canRunClearErrors || Boolean(working)}
-                onClick={() => runAction('clearErrors', onClearErrors)}
+                onClick={() => runAction('clearErrors', neatoClearErrors)}
                 className="w-full rounded-md border border-sky-300 bg-amber-500 px-1 py-0.5 text-xs font-semibold text-slate-900 transition hover:border-sky-500 hover:bg-amber-400 disabled:opacity-50"
               >
                 {working === 'clearErrors' ? 'Clearing...' : 'Clear errors'}
@@ -154,7 +159,7 @@ export default function VipNeatoCard({
               <button
                 type="button"
                 disabled={!canRunPowerCycle || Boolean(working)}
-                onClick={() => runAction('powerCycle', onPowerCycle)}
+                onClick={() => runAction('powerCycle', neatoPowerCycle)}
                 className="w-full rounded-md border border-rose-300 bg-rose-600 px-1 py-0.5 text-xs font-semibold text-white transition hover:border-rose-500 hover:bg-rose-500 disabled:opacity-50"
               >
                 {working === 'powerCycle' ? 'Cycling...' : 'Power cycle'}

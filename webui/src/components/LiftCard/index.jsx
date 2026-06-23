@@ -1,7 +1,8 @@
-// Vip Lift Card
+// Lift Card
 // Purpose: Renders a shared lift controller panel synced from server session state.
-// Scope: Presents verified-user controls while reflecting global busy/position/cooldown state.
+// Scope: Presents public activity controls while reflecting global busy/position/cooldown state.
 import { useEffect, useMemo, useState } from 'react';
+import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 
 function badgeClass(tone) {
@@ -19,10 +20,17 @@ function positionLabel(value) {
   return '--';
 }
 
-export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
+export default function LiftCard() {
+  /*
+    The lift card is a complete Activities-tab feature, so it reads the shared
+    lift state and socket actions directly. Keeping that wiring inside the card
+    means each tab only decides where the card appears, and the command policy
+    cannot accidentally diverge between mobile and desktop layouts.
+  */
+  const lift = useSessionSelector((state) => state.session?.lift || null);
+  const { liftUp, liftDown } = useSessionActions();
   const [working, setWorking] = useState('');
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const wrapClass = fullWidth ? 'w-full' : 'w-full max-w-xl';
 
   const configured = Boolean(lift?.configured);
   const connected = Boolean(lift?.enabled && lift?.connected);
@@ -71,7 +79,7 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
     <CardFrame
       title="Lift Controls"
      
-      className={`relative ${wrapClass}`}
+      className="relative w-full"
       bodyClassName="text-sm text-slate-200"
       actions={
         <span className={`inline-flex w-auto rounded px-1 py-0.25 text-xs font-semibold ${badgeClass(statusTone)}`}>
@@ -108,7 +116,7 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
             <button
               type="button"
               disabled={!canRun}
-              onClick={() => run('down', onDown)}
+              onClick={() => run('down', liftDown)}
               className={`button-dark w-full text-sm disabled:opacity-50 ${position === 'down' || activeTarget === 'down' ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
             >
               {working === 'down' || activeTarget === 'down' ? 'Lowering...' : 'Down'}
@@ -116,7 +124,7 @@ export default function VipLiftCard({ lift, onUp, onDown, fullWidth = false }) {
             <button
               type="button"
               disabled={!canRun}
-              onClick={() => run('up', onUp)}
+              onClick={() => run('up', liftUp)}
               className={`button-dark w-full text-sm disabled:opacity-50 ${position === 'up' || activeTarget === 'up' ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
             >
               {working === 'up' || activeTarget === 'up' ? 'Raising...' : 'Up'}

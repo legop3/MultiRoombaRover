@@ -9,8 +9,6 @@ import VipAudioUploadCard from '../vip/VipAudioUploadCard/index.jsx';
 import VipVerificationCard from '../vip/VipVerificationCard.jsx';
 import VipIdentityCard from '../vip/VipIdentityCard.jsx';
 import VipPrivateRoverAccessCard from '../vip/VipPrivateRoverAccessCard.jsx';
-import VipNeatoCard from '../vip/VipNeatoCard.jsx';
-import VipLiftCard from '../vip/VipLiftCard.jsx';
 import VipProfileImageCard from '../vip/VipProfileImageCard.jsx';
 
 export default function VipPanel({ isActive = true }) {
@@ -24,13 +22,6 @@ export default function VipPanel({ isActive = true }) {
     startMicWhip,
     readyMicWhip,
     stopMicWhip,
-    neatoStart,
-    neatoSendHome,
-    neatoLocate,
-    neatoClearErrors,
-    neatoPowerCycle,
-    liftUp,
-    liftDown,
   } = useSessionActions();
   const { value: identity, save: saveIdentity } = useSettingsNamespace('identity', { cookieUserId: '' });
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
@@ -77,21 +68,6 @@ export default function VipPanel({ isActive = true }) {
         <div className="lg:col-span-2">
           {isVerified ? (
             <div className="space-y-2">
-              <VipNeatoCard
-                neato={session?.neato || null}
-                onStart={neatoStart}
-                onSendHome={neatoSendHome}
-                onLocate={neatoLocate}
-                onClearErrors={neatoClearErrors}
-                onPowerCycle={neatoPowerCycle}
-                fullWidth
-              />
-              <VipLiftCard
-                lift={session?.lift || null}
-                onUp={liftUp}
-                onDown={liftDown}
-                fullWidth
-              />
               <VipAudioUploadCard
                 ownRoverId={ownRoverId}
                 audioForwardByRover={session?.audioForward || {}}
@@ -105,7 +81,7 @@ export default function VipPanel({ isActive = true }) {
           ) : (
             <section className="surface h-full">
               <div className="flex h-full flex-col items-center justify-center text-center text-xs text-slate-400">
-                Verify your account to unlock VIP controls.
+                Verify your account to unlock VIP features.
               </div>
             </section>
           )}

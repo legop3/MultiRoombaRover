@@ -1,11 +1,10 @@
 // Lift Service
-// Purpose: Provides a single global, verified-gated lift controller with serialized interlocked motion.
+// Purpose: Provides a single global lift controller with serialized interlocked motion.
 // Scope: Owns lift command sequencing, anti-spam controls, HA wiring, and shared state publication for UI sync.
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('liftService');
 const { loadConfig } = require('../../helpers/configLoader');
-const { isVerified } = require('../verificationService');
 const { getMode, MODES } = require('../modeManager');
 const { isLockdownAdmin } = require('../roleService');
 const {
@@ -183,7 +182,8 @@ io.on('connection', (socket) => {
       if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
         throw new Error('Server in lockdown');
       }
-      if (!isVerified(socket)) throw new Error('VIP verification required');
+      // Lift movement is now a public activity feature. Lockdown still wins
+      // above because that mode is the global safety/admin gate for the room.
       const resp = await moveUp(socket.id || 'socket');
       cb({ success: true, ...resp });
     } catch (err) {
@@ -196,7 +196,8 @@ io.on('connection', (socket) => {
       if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
         throw new Error('Server in lockdown');
       }
-      if (!isVerified(socket)) throw new Error('VIP verification required');
+      // Public access intentionally mirrors lift:up so both directions share
+      // the same policy and cannot drift into different permission behavior.
       const resp = await moveDown(socket.id || 'socket');
       cb({ success: true, ...resp });
     } catch (err) {
