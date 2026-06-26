@@ -21,6 +21,12 @@ export const DEFAULT_LIVE_NOTE_TICKS = 8;
 export const DEFAULT_FILE_NOTE_TICKS = 10;
 export const DEFAULT_ARPEGGIO_NOTE_TICKS = 4;
 export const DEFAULT_ARPEGGIO_NOTE_LIMIT = 6;
+export const DEFAULT_ARRANGER_DENSITY = 3;
+
+// OI accepts smaller duration bytes, but this app targets audible rover music,
+// not theoretical byte validity. Values below this have not been useful on the
+// physical beeper, so arrangement controls clamp to the practical floor.
+export const PRACTICAL_MIN_NOTE_TICKS = 4;
 
 // Long held MIDI notes sound bad on the Roomba and block following notes. This
 // cap keeps playback responsive while still preserving rough note lengths.
@@ -32,7 +38,8 @@ export const MAX_FILE_NOTE_TICKS = 48;
 export const FILE_CHUNK_GAP_THRESHOLD_MS = 45;
 
 export const PLAYBACK_MODES = [
-  { id: 'mono', label: 'Monophonic' },
+  { id: 'arranged', label: 'Arranged' },
+  { id: 'mono', label: 'Lead line' },
   { id: 'arpeggio', label: 'Arpeggio' },
 ];
 

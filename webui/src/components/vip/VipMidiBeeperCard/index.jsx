@@ -10,18 +10,19 @@ import {
   BEEPER_READY_GUARD_MS,
   DEFAULT_ARPEGGIO_NOTE_LIMIT,
   DEFAULT_ARPEGGIO_NOTE_TICKS,
+  DEFAULT_ARRANGER_DENSITY,
   DEFAULT_FILE_NOTE_TICKS,
   DEFAULT_LIVE_NOTE_TICKS,
   LIVE_DEVICE_EMPTY_VALUE,
   MAX_FILE_NOTE_TICKS,
   PLAYBACK_MODES,
+  PRACTICAL_MIN_NOTE_TICKS,
 } from './constants.js';
 import {
-  buildBeeperEvents,
+  arrangeRoombaBeeperEvents,
   buildRoombaSongChunks,
   clampRoombaDurationTicks,
   clampRoombaNote,
-  collectNotesForParts,
   getDefaultSelectedPartIds,
   getPresetPartIds,
   parseMidiFile,
@@ -40,10 +41,11 @@ export default function VipMidiBeeperCard() {
   const [selectedFileName, setSelectedFileName] = useState('');
   const [parsedMidi, setParsedMidi] = useState(null);
   const [selectedPartIds, setSelectedPartIds] = useState([]);
-  const [playbackMode, setPlaybackMode] = useState('mono');
+  const [playbackMode, setPlaybackMode] = useState('arranged');
   const [monoMaxTicks, setMonoMaxTicks] = useState(MAX_FILE_NOTE_TICKS);
   const [arpeggioNoteTicks, setArpeggioNoteTicks] = useState(DEFAULT_ARPEGGIO_NOTE_TICKS);
   const [arpeggioNoteLimit, setArpeggioNoteLimit] = useState(DEFAULT_ARPEGGIO_NOTE_LIMIT);
+  const [arrangerDensity, setArrangerDensity] = useState(DEFAULT_ARRANGER_DENSITY);
   const [liveNoteTicks, setLiveNoteTicks] = useState(DEFAULT_LIVE_NOTE_TICKS);
   const [message, setMessage] = useState('');
   const [playbackState, setPlaybackState] = useState('idle');
@@ -64,25 +66,21 @@ export default function VipMidiBeeperCard() {
 
   const playableParts = useMemo(() => parsedMidi?.parts || [], [parsedMidi]);
 
-  const selectedPartNotes = useMemo(
-    () => collectNotesForParts(playableParts, selectedPartIds),
-    [playableParts, selectedPartIds],
-  );
-
   const beeperOptions = useMemo(
     () => ({
       monoFallbackTicks: DEFAULT_FILE_NOTE_TICKS,
       monoMaxTicks,
       arpeggioTicks: arpeggioNoteTicks,
       arpeggioLimit: arpeggioNoteLimit,
+      density: arrangerDensity,
     }),
-    [arpeggioNoteLimit, arpeggioNoteTicks, monoMaxTicks],
+    [arpeggioNoteLimit, arpeggioNoteTicks, arrangerDensity, monoMaxTicks],
   );
 
   const beeperEvents = useMemo(() => {
-    if (!selectedPartNotes.length) return [];
-    return buildBeeperEvents(selectedPartNotes, playbackMode, beeperOptions);
-  }, [beeperOptions, playbackMode, selectedPartNotes]);
+    if (!playableParts.length || !selectedPartIds.length) return [];
+    return arrangeRoombaBeeperEvents(playableParts, selectedPartIds, playbackMode, beeperOptions);
+  }, [beeperOptions, playableParts, playbackMode, selectedPartIds]);
 
   const songChunks = useMemo(() => buildRoombaSongChunks(beeperEvents), [beeperEvents]);
 
@@ -223,8 +221,7 @@ export default function VipMidiBeeperCard() {
     const partIds = Array.isArray(config.selectedPartIds) ? config.selectedPartIds : [];
     if (!parts.length || partIds.length === 0) return null;
 
-    const notes = collectNotesForParts(parts, partIds);
-    const events = buildBeeperEvents(notes, config.playbackMode, config.beeperOptions)
+    const events = arrangeRoombaBeeperEvents(parts, partIds, config.playbackMode, config.beeperOptions)
       .filter((event) => event.atMs >= playbackCursorMsRef.current - 0.5);
     const chunks = buildRoombaSongChunks(events);
     return chunks[0] || null;
@@ -498,31 +495,37 @@ export default function VipMidiBeeperCard() {
 
               <div className="mx-auto grid w-full max-w-sm gap-0.5 text-xs text-slate-300 text-center">
                 <span>Playback shape</span>
-                <div className="grid grid-cols-3 gap-0.5">
+                <div className="grid grid-cols-2 gap-0.5 sm:grid-cols-4">
                   <label className="grid gap-0.5">
-                    <span>Mono max</span>
+                    <span>Max note</span>
                     <input
                       className={fieldClass}
                       type="number"
-                      min="1"
+                      min={PRACTICAL_MIN_NOTE_TICKS}
                       max="96"
                       value={monoMaxTicks}
-                      onChange={(event) => setMonoMaxTicks(clampRoombaDurationTicks(Number(event.target.value) || MAX_FILE_NOTE_TICKS))}
+                      onChange={(event) => {
+                        const next = Math.max(PRACTICAL_MIN_NOTE_TICKS, clampRoombaDurationTicks(Number(event.target.value) || MAX_FILE_NOTE_TICKS));
+                        setMonoMaxTicks(next);
+                      }}
                     />
                   </label>
                   <label className="grid gap-0.5">
-                    <span>Arp len</span>
+                    <span>Arp note</span>
                     <input
                       className={fieldClass}
                       type="number"
-                      min="1"
+                      min={PRACTICAL_MIN_NOTE_TICKS}
                       max="32"
                       value={arpeggioNoteTicks}
-                      onChange={(event) => setArpeggioNoteTicks(clampRoombaDurationTicks(Number(event.target.value) || DEFAULT_ARPEGGIO_NOTE_TICKS))}
+                      onChange={(event) => {
+                        const next = Math.max(PRACTICAL_MIN_NOTE_TICKS, clampRoombaDurationTicks(Number(event.target.value) || DEFAULT_ARPEGGIO_NOTE_TICKS));
+                        setArpeggioNoteTicks(next);
+                      }}
                     />
                   </label>
                   <label className="grid gap-0.5">
-                    <span>Arp notes</span>
+                    <span>Arp parts</span>
                     <input
                       className={fieldClass}
                       type="number"
@@ -532,6 +535,20 @@ export default function VipMidiBeeperCard() {
                       onChange={(event) => {
                         const next = Math.max(1, Math.min(16, Math.round(Number(event.target.value) || DEFAULT_ARPEGGIO_NOTE_LIMIT)));
                         setArpeggioNoteLimit(next);
+                      }}
+                    />
+                  </label>
+                  <label className="grid gap-0.5">
+                    <span>Density</span>
+                    <input
+                      className={fieldClass}
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={arrangerDensity}
+                      onChange={(event) => {
+                        const next = Math.max(1, Math.min(5, Math.round(Number(event.target.value) || DEFAULT_ARRANGER_DENSITY)));
+                        setArrangerDensity(next);
                       }}
                     />
                   </label>

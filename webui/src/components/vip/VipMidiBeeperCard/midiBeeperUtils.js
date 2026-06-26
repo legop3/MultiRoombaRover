@@ -5,9 +5,11 @@ import { parseMidi } from 'midi-file';
 import {
   DEFAULT_ARPEGGIO_NOTE_TICKS,
   DEFAULT_ARPEGGIO_NOTE_LIMIT,
+  DEFAULT_ARRANGER_DENSITY,
   DEFAULT_FILE_NOTE_TICKS,
   FILE_CHUNK_GAP_THRESHOLD_MS,
   MAX_FILE_NOTE_TICKS,
+  PRACTICAL_MIN_NOTE_TICKS,
   ROOMBA_SONG_MAX_NOTES,
   ROOMBA_DURATION_TICK_MS,
   ROOMBA_NOTE_MAX,
@@ -26,6 +28,10 @@ export function clampRoombaNote(note) {
 
 export function clampRoombaDurationTicks(ticks) {
   return clamp(Math.round(ticks), 1, 255);
+}
+
+function clampPracticalDurationTicks(ticks) {
+  return clamp(Math.round(ticks), PRACTICAL_MIN_NOTE_TICKS, 255);
 }
 
 export function roombaTicksToMs(ticks) {
@@ -222,7 +228,11 @@ function buildPlayableParts(tracks = []) {
         maxNote: channelInfo.maxNote,
         averageNote: channelInfo.averageNote,
         isPercussion: Boolean(channelInfo.isPercussion),
-        notes,
+        role: inferPartRole(channelInfo),
+        notes: notes.map((note) => ({
+          ...note,
+          partId: `${track.index}:${channelInfo.channel}`,
+        })),
       });
     });
   });
@@ -231,6 +241,21 @@ function buildPlayableParts(tracks = []) {
     if (a.isPercussion !== b.isPercussion) return a.isPercussion ? 1 : -1;
     return b.noteCount - a.noteCount || a.trackIndex - b.trackIndex || a.channel - b.channel;
   });
+}
+
+function inferPartRole(channelInfo) {
+  if (channelInfo?.isPercussion) return 'drums';
+  const average = Number(channelInfo?.averageNote) || 0;
+  const max = Number(channelInfo?.maxNote) || 0;
+
+  /*
+    MIDI files do not reliably tell us instrument intent, so this is deliberately
+    heuristic. Low average pitch behaves well as bass, high maximum pitch often
+    carries melody, and everything else becomes harmony/fill material.
+  */
+  if (average > 0 && average < 52) return 'bass';
+  if (max >= 72 || average >= 64) return 'melody';
+  return 'harmony';
 }
 
 export function getDefaultSelectedPartIds(parts = []) {
@@ -298,10 +323,25 @@ function groupNotesByStart(notes = []) {
   return groups;
 }
 
+function groupNotesForArrangement(notes = [], toleranceMs = 24) {
+  const groups = [];
+  let current = null;
+
+  notes.forEach((note) => {
+    if (!current || Math.abs(note.startMs - current.startMs) > toleranceMs) {
+      current = { startMs: note.startMs, notes: [] };
+      groups.push(current);
+    }
+    current.notes.push(note);
+  });
+
+  return groups;
+}
+
 function noteDurationToRoombaTicks(note, fallbackTicks, maxTicks) {
   const naturalTicks = note.durationMs / ROOMBA_DURATION_TICK_MS;
-  const cap = clampRoombaDurationTicks(maxTicks || MAX_FILE_NOTE_TICKS);
-  return clampRoombaDurationTicks(Math.min(cap, naturalTicks || fallbackTicks));
+  const cap = clampPracticalDurationTicks(maxTicks || MAX_FILE_NOTE_TICKS);
+  return clampPracticalDurationTicks(Math.min(cap, naturalTicks || fallbackTicks));
 }
 
 export function filterNotesByChannels(notes = [], selectedChannels = []) {
@@ -313,10 +353,10 @@ export function filterNotesByChannels(notes = [], selectedChannels = []) {
 export function buildBeeperEvents(notes = [], mode = 'mono', options = {}) {
   const groups = groupNotesByStart(notes);
   const events = [];
-  const arpeggioTicks = clampRoombaDurationTicks(options.arpeggioTicks || DEFAULT_ARPEGGIO_NOTE_TICKS);
+  const arpeggioTicks = clampPracticalDurationTicks(options.arpeggioTicks || DEFAULT_ARPEGGIO_NOTE_TICKS);
   const arpeggioLimit = clamp(Math.round(options.arpeggioLimit || DEFAULT_ARPEGGIO_NOTE_LIMIT), 1, 16);
-  const monoFallbackTicks = clampRoombaDurationTicks(options.monoFallbackTicks || DEFAULT_FILE_NOTE_TICKS);
-  const monoMaxTicks = clampRoombaDurationTicks(options.monoMaxTicks || MAX_FILE_NOTE_TICKS);
+  const monoFallbackTicks = clampPracticalDurationTicks(options.monoFallbackTicks || DEFAULT_FILE_NOTE_TICKS);
+  const monoMaxTicks = clampPracticalDurationTicks(options.monoMaxTicks || MAX_FILE_NOTE_TICKS);
 
   groups.forEach((group) => {
     const playableNotes = [...group.notes].sort((a, b) => {
@@ -350,6 +390,144 @@ export function buildBeeperEvents(notes = [], mode = 'mono', options = {}) {
   });
 
   return events.sort((a, b) => a.atMs - b.atMs || b.note - a.note);
+}
+
+function sortBestLeadNotes(a, b) {
+  return b.velocity - a.velocity || b.noteNumber - a.noteNumber;
+}
+
+function sortBestBassNotes(a, b) {
+  return b.velocity - a.velocity || a.noteNumber - b.noteNumber;
+}
+
+function chooseBestNote(notes = [], role = 'melody') {
+  if (!notes.length) return null;
+  const sorted = [...notes].sort(role === 'bass' ? sortBestBassNotes : sortBestLeadNotes);
+  return sorted[0] || null;
+}
+
+function selectedPartsById(parts = [], selectedPartIds = []) {
+  const selected = new Set((selectedPartIds || []).map((id) => String(id)));
+  return (parts || []).filter((part) => selected.has(String(part.id)));
+}
+
+function makeEvent(note, atMs, durationTicks) {
+  return {
+    atMs,
+    note: clampRoombaNote(note.noteNumber),
+    duration: clampPracticalDurationTicks(durationTicks),
+    partId: note.partId || '',
+  };
+}
+
+function suppressNoisyRepeats(events = [], minGapMs) {
+  const lastByNote = new Map();
+  return events.filter((event) => {
+    const key = event.note;
+    const lastAt = lastByNote.get(key);
+    if (typeof lastAt === 'number' && event.atMs - lastAt < minGapMs) {
+      return false;
+    }
+    lastByNote.set(key, event.atMs);
+    return true;
+  });
+}
+
+export function arrangeRoombaBeeperEvents(parts = [], selectedPartIds = [], mode = 'arranged', options = {}) {
+  const selectedParts = selectedPartsById(parts, selectedPartIds).filter((part) => !part.isPercussion);
+  const fallbackParts = selectedParts.length ? selectedParts : selectedPartsById(parts, selectedPartIds);
+  const notes = fallbackParts
+    .flatMap((part) => part.notes || [])
+    .sort((a, b) => a.startMs - b.startMs || b.velocity - a.velocity || b.noteNumber - a.noteNumber);
+
+  if (!notes.length) return [];
+
+  const density = clamp(Math.round(options.density || DEFAULT_ARRANGER_DENSITY), 1, 5);
+  const monoFallbackTicks = clampPracticalDurationTicks(options.monoFallbackTicks || DEFAULT_FILE_NOTE_TICKS);
+  const monoMaxTicks = clampPracticalDurationTicks(options.monoMaxTicks || MAX_FILE_NOTE_TICKS);
+  const arpeggioTicks = clampPracticalDurationTicks(options.arpeggioTicks || DEFAULT_ARPEGGIO_NOTE_TICKS);
+  const arpeggioLimit = clamp(Math.round(options.arpeggioLimit || DEFAULT_ARPEGGIO_NOTE_LIMIT), 1, 16);
+  const groups = groupNotesForArrangement(notes, density >= 4 ? 36 : 24);
+  const partCountCap = Math.max(1, Math.min(arpeggioLimit, fallbackParts.length || arpeggioLimit));
+  const events = [];
+  let lastBassAt = -Infinity;
+  let groupIndex = 0;
+
+  groups.forEach((group) => {
+    const byPart = new Map();
+    group.notes.forEach((note) => {
+      const partId = String(note.partId || '');
+      if (!partId) return;
+      if (!byPart.has(partId)) byPart.set(partId, []);
+      byPart.get(partId).push(note);
+    });
+
+    if (mode === 'arpeggio') {
+      const onePerPart = Array.from(byPart.entries())
+        .map(([partId, partNotes]) => {
+          const part = fallbackParts.find((entry) => String(entry.id) === partId);
+          return {
+            part,
+            note: chooseBestNote(partNotes, part?.role === 'bass' ? 'bass' : 'melody'),
+          };
+        })
+        .filter((entry) => entry.note)
+        .sort((a, b) => {
+          const roleRank = { bass: 0, harmony: 1, melody: 2, drums: 3 };
+          return (roleRank[a.part?.role] ?? 2) - (roleRank[b.part?.role] ?? 2) || b.note.velocity - a.note.velocity;
+        });
+
+      onePerPart.slice(0, partCountCap).forEach((entry, index) => {
+        events.push(makeEvent(entry.note, group.startMs + index * roombaTicksToMs(arpeggioTicks), arpeggioTicks));
+      });
+      return;
+    }
+
+    const bassNotes = [];
+    const melodyNotes = [];
+    const harmonyNotes = [];
+
+    group.notes.forEach((note) => {
+      const part = fallbackParts.find((entry) => String(entry.id) === String(note.partId || ''));
+      if (part?.role === 'bass') {
+        bassNotes.push(note);
+      } else if (part?.role === 'harmony') {
+        harmonyNotes.push(note);
+      } else {
+        melodyNotes.push(note);
+      }
+    });
+
+    const leadNote = chooseBestNote(melodyNotes.length ? melodyNotes : group.notes, 'melody');
+    if (leadNote) {
+      events.push(makeEvent(leadNote, group.startMs, noteDurationToRoombaTicks(leadNote, monoFallbackTicks, monoMaxTicks)));
+    }
+
+    if (mode === 'arranged') {
+      const bassSpacingMs = density >= 4 ? 320 : density >= 3 ? 460 : 700;
+      const shouldAddBass = bassNotes.length && group.startMs - lastBassAt >= bassSpacingMs;
+      if (shouldAddBass) {
+        const bassNote = chooseBestNote(bassNotes, 'bass');
+        if (bassNote) {
+          events.push(makeEvent(bassNote, group.startMs + roombaTicksToMs(arpeggioTicks), Math.max(arpeggioTicks, 6)));
+          lastBassAt = group.startMs;
+        }
+      }
+
+      const shouldAddHarmony = density >= 4 || (density >= 3 && groupIndex % 2 === 0);
+      if (shouldAddHarmony && harmonyNotes.length) {
+        const harmonyNote = chooseBestNote(harmonyNotes, 'melody');
+        if (harmonyNote) {
+          events.push(makeEvent(harmonyNote, group.startMs + roombaTicksToMs(arpeggioTicks) * 2, arpeggioTicks));
+        }
+      }
+    }
+
+    groupIndex += 1;
+  });
+
+  const repeatGapMs = density >= 4 ? 55 : density >= 3 ? 80 : 120;
+  return suppressNoisyRepeats(events, repeatGapMs).sort((a, b) => a.atMs - b.atMs || b.note - a.note);
 }
 
 function createChunk(startMs) {
