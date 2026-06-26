@@ -6,12 +6,13 @@ import { useSessionActions, useSessionSelector } from '../../context/SessionCont
 import { useSettingsNamespace } from '../../settings/index.js';
 import { COOKIE_KEY_REGEX, flowWrapClass } from '../vip/constants.js';
 import VipAudioUploadCard from '../vip/VipAudioUploadCard/index.jsx';
+import VipMidiBeeperCard from '../vip/VipMidiBeeperCard/index.jsx';
 import VipVerificationCard from '../vip/VipVerificationCard.jsx';
 import VipIdentityCard from '../vip/VipIdentityCard.jsx';
 import VipPrivateRoverAccessCard from '../vip/VipPrivateRoverAccessCard.jsx';
 import VipProfileImageCard from '../vip/VipProfileImageCard.jsx';
 
-export default function VipPanel({ isActive = true }) {
+export default function VipPanel() {
   const session = useSessionSelector((state) => state.session);
   const {
     identifySession,
@@ -68,6 +69,7 @@ export default function VipPanel({ isActive = true }) {
         <div className="lg:col-span-2">
           {isVerified ? (
             <div className="space-y-2">
+              <VipMidiBeeperCard />
               <VipAudioUploadCard
                 ownRoverId={ownRoverId}
                 audioForwardByRover={session?.audioForward || {}}

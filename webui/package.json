@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "midi-file": "^1.2.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",
