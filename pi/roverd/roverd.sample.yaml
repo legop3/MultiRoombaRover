@@ -44,9 +44,6 @@ audio:
   captureEnabled: false
   captureDevice: hw:0,0
   playbackDevice: forward
-  sampleRate: 48000
-  channels: 2
-  bitrate: 24000
   ttsEnabled: false
   defaultEngine: flite
   defaultVoice: rms

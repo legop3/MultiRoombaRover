@@ -59,9 +59,6 @@ type AudioConfig struct {
 	CaptureEnabled bool   `yaml:"captureEnabled" json:"captureEnabled"`
 	CaptureDevice  string `yaml:"captureDevice" json:"captureDevice,omitempty"`
 	PlaybackDevice string `yaml:"playbackDevice" json:"playbackDevice,omitempty"`
-	SampleRate     int    `yaml:"sampleRate" json:"sampleRate,omitempty"`
-	Channels       int    `yaml:"channels" json:"channels,omitempty"`
-	Bitrate        int    `yaml:"bitrate" json:"bitrate,omitempty"`
 	TTSEnabled     bool   `yaml:"ttsEnabled" json:"ttsEnabled"`
 	DefaultEngine  string `yaml:"defaultEngine" json:"defaultEngine,omitempty"`
 	DefaultVoice   string `yaml:"defaultVoice" json:"defaultVoice,omitempty"`
@@ -199,9 +196,6 @@ func LoadConfig(path string) (*Config, error) {
 			CaptureEnabled: false,
 			CaptureDevice:  "rovermic",
 			PlaybackDevice: "forward",
-			SampleRate:     48000,
-			Channels:       2,
-			Bitrate:        24000,
 			TTSEnabled:     false,
 			DefaultEngine:  "flite",
 			DefaultVoice:   "rms",
@@ -363,15 +357,6 @@ func validateAudioConfig(cfg *AudioConfig) {
 	}
 	if cfg.PlaybackDevice == "" || cfg.PlaybackDevice == "default" {
 		cfg.PlaybackDevice = "forward"
-	}
-	if cfg.SampleRate <= 0 {
-		cfg.SampleRate = 48000
-	}
-	if cfg.Channels <= 0 {
-		cfg.Channels = 2
-	}
-	if cfg.Bitrate <= 0 {
-		cfg.Bitrate = 64000
 	}
 	if cfg.DefaultEngine == "" {
 		cfg.DefaultEngine = "flite"

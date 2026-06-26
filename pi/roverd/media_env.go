@@ -45,12 +45,6 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 	if audioDevice == "" || audioDevice == "rovermic" {
 		audioDevice = "hw:0,0"
 	}
-	if audio.SampleRate <= 0 {
-		audio.SampleRate = 48000
-	}
-	if audio.Channels <= 0 {
-		audio.Channels = 2
-	}
 	fmt.Fprintf(&buf, "AUDIO_ENABLE=%d\n", boolToInt(audio.CaptureEnabled))
 	fmt.Fprintf(&buf, "AUDIO_DEVICE=%s\n", audioDevice)
 	playbackDevice := audio.PlaybackDevice
@@ -58,8 +52,6 @@ func UpdatePublisherEnv(media MediaConfig, audio AudioConfig) error {
 		playbackDevice = "forward"
 	}
 	fmt.Fprintf(&buf, "AUDIO_PLAYBACK_DEVICE=%s\n", playbackDevice)
-	fmt.Fprintf(&buf, "AUDIO_RATE=%d\n", audio.SampleRate)
-	fmt.Fprintf(&buf, "AUDIO_CHANNELS=%d\n", audio.Channels)
 	if err := os.WriteFile(publisherEnvPath, buf.Bytes(), 0o640); err != nil {
 		return err
 	}

@@ -19,8 +19,6 @@ fi
 : "${AUDIO_PUBLISH_URL:?AUDIO_PUBLISH_URL not set in ${ENV_FILE}}"
 
 AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
-AUDIO_RATE="${AUDIO_RATE:-48000}"
-AUDIO_CHANNELS="${AUDIO_CHANNELS:-2}"
 
 if [[ -n "${FFMPEG_BIN:-}" ]]; then
 	FFMPEG_BIN_PATH="$FFMPEG_BIN"
@@ -32,27 +30,50 @@ else
 fi
 
 run_pipeline() {
-	arecord -D "${AUDIO_DEVICE}" -f S32_LE -c "${AUDIO_CHANNELS}" -r "${AUDIO_RATE}" -B 65536 -F 2048 -q -t raw \
-		| "${FFMPEG_BIN_PATH}" \
-			-hide_banner \
-			-loglevel warning \
-			-fflags nobuffer \
-			-rtbufsize 0 \
-			-thread_queue_size 4096 \
-			-f s32le \
-			-ar "${AUDIO_RATE}" \
-			-ac "${AUDIO_CHANNELS}" \
-			-i pipe:0 \
-			-af "aresample=16000,pan=mono|c0=0.5*FL+0.5*FR,volume=25dB" \
-			-c:a libopus \
-			-b:a 24000 \
-			-ar:a 16000 \
-			-ac:a 1 \
-			-application lowdelay \
-			-frame_duration 20 \
-			-compression_level 0 \
-			-f mpegts \
-			"${AUDIO_PUBLISH_URL}"
+	local ffmpeg_args=(
+		-hide_banner
+		-loglevel warning
+		-fflags nobuffer
+		-rtbufsize 0
+		-thread_queue_size 4096
+
+		# Match the raw ALSA stream exactly so ffmpeg does not guess the pipe
+		# format and so the published audio stays full-band stereo before the
+		# Opus encoder sees it.
+		-f s32le
+		-ar 48000
+		-ac 2
+		-i pipe:0
+
+		# Keep the known-required microphone boost, but remove the old
+		# resample/downmix filter. That old filter threw away stereo and
+		# limited the stream to narrow 16 kHz mono before encoding.
+		-af "volume=25dB"
+
+		# Opus supports up to 510 kbps. Using that ceiling keeps the stream at
+		# the highest practical quality browsers and MediaMTX can carry without
+		# trying to push raw PCM through the live path.
+		-c:a libopus
+		-b:a 510000
+		-ar:a 48000
+		-ac:a 2
+
+		# Use the audio profile for quality. Latency is still controlled by the
+		# 20 ms Opus frame size and the low-buffering capture/publish options
+		# around the encoder.
+		-application audio
+		-frame_duration 20
+		-compression_level 0
+		-f mpegts
+		"${AUDIO_PUBLISH_URL}"
+	)
+
+	# The Google Voice HAT microphone path is intentionally fixed instead of
+	# configurable. The previous env-driven sample rate/channel knobs made it
+	# easy for the rover config and the actual ffmpeg pipeline to drift apart,
+	# while the hardware path we install is always 48 kHz stereo capture.
+	arecord -D "${AUDIO_DEVICE}" -f S32_LE -c 2 -r 48000 -B 65536 -F 2048 -q -t raw \
+		| "${FFMPEG_BIN_PATH}" "${ffmpeg_args[@]}"
 }
 
 trap 'kill 0 2>/dev/null' EXIT INT TERM
