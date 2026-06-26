@@ -20,6 +20,16 @@ fi
 
 AUDIO_DEVICE="${AUDIO_DEVICE:-hw:0,0}"
 
+# The old 65,536-byte ALSA buffer represented about 171 ms before ffmpeg could
+# even publish the microphone audio:
+#   65,536 / (48,000 samples * 2 channels * 4 bytes) = 0.1707 seconds
+# Keep the defaults much smaller because this publisher feeds an interactive
+# rover stream, where late-but-smooth audio is less useful than fresher audio.
+# These remain environment-overridable so a noisy Pi or sound card can be tuned
+# in the field without changing the installed script.
+AUDIO_ALSA_BUFFER_BYTES="${AUDIO_ALSA_BUFFER_BYTES:-16384}"
+AUDIO_ALSA_PERIOD_BYTES="${AUDIO_ALSA_PERIOD_BYTES:-1024}"
+
 if [[ -n "${FFMPEG_BIN:-}" ]]; then
 	FFMPEG_BIN_PATH="$FFMPEG_BIN"
 elif command -v ffmpeg >/dev/null 2>&1; then
@@ -48,7 +58,7 @@ run_pipeline() {
 		# Keep the known-required microphone boost, but remove the old
 		# resample/downmix filter. That old filter threw away stereo and
 		# limited the stream to narrow 16 kHz mono before encoding.
-		-af "volume=25dB"
+		-af "volume=20dB"
 
 		# Opus supports up to 510 kbps. Using that ceiling keeps the stream at
 		# the highest practical quality browsers and MediaMTX can carry without
@@ -64,6 +74,13 @@ run_pipeline() {
 		-application audio
 		-frame_duration 20
 		-compression_level 0
+
+		# Mirror the video publisher's MPEG-TS low-latency settings. Without
+		# these, ffmpeg is allowed to hold packets for mux timing, which is
+		# exactly the wrong tradeoff for live rover feedback.
+		-flush_packets 1
+		-muxdelay 0
+		-muxpreload 0
 		-f mpegts
 		"${AUDIO_PUBLISH_URL}"
 	)
@@ -72,7 +89,14 @@ run_pipeline() {
 	# configurable. The previous env-driven sample rate/channel knobs made it
 	# easy for the rover config and the actual ffmpeg pipeline to drift apart,
 	# while the hardware path we install is always 48 kHz stereo capture.
-	arecord -D "${AUDIO_DEVICE}" -f S32_LE -c 2 -r 48000 -B 65536 -F 2048 -q -t raw \
+	#
+	# The buffer and period are byte counts because arecord interprets -B/-F in
+	# microseconds only when the value has an explicit time suffix. Keeping them
+	# as byte-sized chunks gives direct control over the capture queue. The new
+	# defaults are roughly 43 ms total buffer and 2.7 ms wakeup periods at
+	# 48 kHz stereo S32_LE, which removes about 128 ms of avoidable capture
+	# latency compared with the old 65,536-byte buffer.
+	arecord -D "${AUDIO_DEVICE}" -f S32_LE -c 2 -r 48000 -B "${AUDIO_ALSA_BUFFER_BYTES}" -F "${AUDIO_ALSA_PERIOD_BYTES}" -q -t raw \
 		| "${FFMPEG_BIN_PATH}" "${ffmpeg_args[@]}"
 }
 
