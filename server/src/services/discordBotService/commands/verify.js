@@ -13,7 +13,7 @@ function createVerifyCommand({ listVerifiedUsers, removeVerifiedUser, isLockdown
     if (action === 'list') {
       const users = listVerifiedUsers();
       if (!users.length) return message.reply({ content: 'No verified users.', allowedMentions: { parse: [], repliedUser: false } });
-      const lines = users.map((entry, idx) => `${idx + 1}. ${entry.nickname || 'unknown'} | ${mask(entry.cookieUserId)}`);
+      const lines = users.map((entry, idx) => `${idx + 1}. ${entry.nickname || 'unknown'} | ${entry.userId || entry.id} | ${mask(entry.cookieUserId)}`);
       return message.reply({ content: ['Verified users:', ...lines].join('\n').slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });
     }
     if (action === 'remove') {
@@ -26,7 +26,7 @@ function createVerifyCommand({ listVerifiedUsers, removeVerifiedUser, isLockdown
         // The command resolver only turns a human-friendly or fuzzy nickname
         // into the stable cookie id so the service does not need Discord/Web
         // command concerns baked into its storage API.
-        const removed = removeVerifiedUser(resolved.record.cookieUserId, message.author?.id || null);
+        const removed = removeVerifiedUser(resolved.record.userId || resolved.record.id || resolved.record.cookieUserId, message.author?.id || null);
         return message.reply({ content: `Removed verified user ${sanitizeMentions(removed.nickname || 'unknown')} (${mask(removed.cookieUserId)}).`, allowedMentions: { parse: [], repliedUser: false } });
       } catch (err) {
         return message.reply({ content: sanitizeMentions(`Failed to remove verified user: ${err.message}`), allowedMentions: { parse: [], repliedUser: false } });

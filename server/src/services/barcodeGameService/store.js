@@ -84,6 +84,7 @@ function normalizePlayers(rawPlayers = {}) {
     if (!key || !rawPlayer || typeof rawPlayer !== 'object') return;
     players[key] = {
       playerKey: typeof rawPlayer.playerKey === 'string' ? rawPlayer.playerKey : key,
+      userId: typeof rawPlayer.userId === 'string' ? rawPlayer.userId : null,
       cookieUserId: typeof rawPlayer.cookieUserId === 'string' ? rawPlayer.cookieUserId : null,
       nickname: typeof rawPlayer.nickname === 'string' ? rawPlayer.nickname : null,
       lastRoverId: typeof rawPlayer.lastRoverId === 'string' ? rawPlayer.lastRoverId : null,

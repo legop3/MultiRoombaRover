@@ -89,19 +89,25 @@ function resolveRoverSelector(selector, rovers) {
 function createIdentityCandidates(records = [], { includeId = true } = {}) {
   return (Array.isArray(records) ? records : []).map((record) => {
     const id = normalizeText(record?.id);
+    const userId = normalizeText(record?.userId);
     const cookieUserId = normalizeText(record?.cookieUserId);
+    const fingerprintId = normalizeText(record?.fingerprintId);
     const nickname = normalizeText(record?.nickname);
     const knownIps = Array.isArray(record?.knownIps) ? record.knownIps.map(normalizeText).filter(Boolean) : [];
     return {
-      key: id || cookieUserId || nickname,
+      key: userId || id || cookieUserId || fingerprintId || nickname,
       id,
+      userId,
       cookieUserId,
+      fingerprintId,
       nickname,
       knownIps,
-      label: compactJoin([nickname || 'unknown', includeId && id ? id : '', cookieUserId ? mask(cookieUserId) : '']),
+      label: compactJoin([nickname || 'unknown', includeId && (userId || id) ? (userId || id) : '', cookieUserId ? mask(cookieUserId) : '']),
       record,
       searchId: normalizeSearchText(id),
+      searchUserId: normalizeSearchText(userId),
       searchCookie: normalizeSearchText(cookieUserId),
+      searchFingerprint: normalizeSearchText(fingerprintId),
       searchNickname: normalizeSearchText(nickname),
       searchIps: knownIps.map(normalizeSearchText),
     };
@@ -118,7 +124,9 @@ function resolveIdentitySelector(selector, records = [], options = {}) {
 
   const exact = candidates.filter((entry) => (
     entry.searchId === normalized ||
+    entry.searchUserId === normalized ||
     entry.searchCookie === normalized ||
+    entry.searchFingerprint === normalized ||
     entry.searchNickname === normalized ||
     (ip && entry.searchIps.includes(normalizeSearchText(ip)))
   ));
@@ -132,6 +140,7 @@ function resolveIdentitySelector(selector, records = [], options = {}) {
     keys: [
       { name: 'nickname', weight: 0.78 },
       { name: 'cookieUserId', weight: 0.12 },
+      { name: 'fingerprintId', weight: 0.08 },
       { name: 'id', weight: 0.08 },
       { name: 'knownIps', weight: 0.02 },
     ],

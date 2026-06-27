@@ -133,7 +133,7 @@ function buildVoteStatus() {
 
   sockets.forEach((socket) => {
     if (!isEligibleVoter(socket)) return;
-    const identityKey = String(socket?.data?.cookieUserId || '').trim() || `socket:${socket.id}`;
+    const identityKey = String(socket?.data?.userId || '').trim() || String(socket?.data?.cookieUserId || '').trim() || `socket:${socket.id}`;
     const pref = typeof socket?.data?.overseerEnabled === 'boolean' ? socket.data.overseerEnabled : true;
     const prev = votesByIdentity.get(identityKey);
     if (typeof prev === 'boolean') {

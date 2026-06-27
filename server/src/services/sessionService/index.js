@@ -61,6 +61,7 @@ function buildUserEntry(socket) {
   const primaryRover = roverManager.getPrimaryRoverForSocket(socket.id);
   return {
     socketId: socket.id,
+    userId: socket?.data?.userId || null,
     nickname: getNickname(socket) || null,
     role,
     roverId: primaryRover || assignment?.roverId || null,

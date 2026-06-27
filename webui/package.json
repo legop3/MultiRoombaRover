@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@thumbmarkjs/thumbmarkjs": "^1.10.0",
     "midi-file": "^1.2.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

@@ -337,8 +337,8 @@ export function SessionProvider({ children }) {
   const actions = useMemo(
     () => ({
       login: (username, password) => emitWithAck('auth:login', { username, password }),
-      identifySession: ({ cookieUserId, nickname, overseerEnabled, identitySurface } = {}) =>
-        emitWithAck('session:identify', { cookieUserId, nickname, overseerEnabled, identitySurface }),
+      identifySession: ({ cookieUserId, fingerprintId, nickname, overseerEnabled, identitySurface } = {}) =>
+        emitWithAck('session:identify', { cookieUserId, fingerprintId, nickname, overseerEnabled, identitySurface }),
       setRole: (role) => emitWithAck('session:setRole', { role }),
       requestControl: (roverId, options = {}) =>
         emitWithAck('session:requestControl', { roverId, ...options }),

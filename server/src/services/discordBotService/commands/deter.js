@@ -14,7 +14,7 @@ function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, u
     if (action === 'list') {
       const users = listDeterredUsers();
       if (!users.length) return message.reply({ content: 'No deterred users.', allowedMentions: { parse: [], repliedUser: false } });
-      const lines = users.map((entry, idx) => `${idx + 1}. ${entry.id} | ${entry.nickname || 'unknown'} | ${mask(entry.cookieUserId)}`);
+      const lines = users.map((entry, idx) => `${idx + 1}. ${entry.userId || entry.id} | ${entry.nickname || 'unknown'} | ${mask(entry.cookieUserId)}`);
       return message.reply({ content: ['Deterred users:', ...lines].join('\n').slice(0, 1900), allowedMentions: { parse: [], repliedUser: false } });
     }
     if (action === 'ban') {
@@ -28,7 +28,7 @@ function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, u
         // Ban reasons were deliberately removed from the command grammar. The
         // full remaining text is now always the selector, which lets lockdown
         // admins deter multi-word nicknames without quoting or delimiter rules.
-        const stableSelector = verifiedMatch.record?.cookieUserId || selector;
+        const stableSelector = verifiedMatch.record?.userId || verifiedMatch.record?.id || verifiedMatch.record?.cookieUserId || selector;
         const deterred = deterUser(stableSelector, { actor: message.author?.id || null });
         return message.reply({ content: sanitizeMentions(`${deterred.created ? 'Deterred' : 'Updated deterrence for'} ${deterred.nickname || 'unknown'} (${mask(deterred.cookieUserId)}).`), allowedMentions: { parse: [], repliedUser: false } });
       } catch (err) {

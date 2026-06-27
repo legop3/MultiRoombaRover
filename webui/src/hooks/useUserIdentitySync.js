@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
+import { getBrowserFingerprintId } from '../lib/browserFingerprint.js';
 import { useSettingsNamespace } from '../settings/index.js';
 
 export default function useUserIdentitySync({ identitySurface = 'passive' } = {}) {
@@ -21,6 +22,7 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
   const inFlightRef = useRef(false);
   const lastAckSocketRef = useRef(null);
   const retryTimerRef = useRef(null);
+  const fingerprintRef = useRef('');
 
   const ready =
     identityStatus === 'ready' && profileStatus === 'ready' && overseerPreferenceStatus === 'ready';
@@ -40,6 +42,14 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
     if (!ready || !connected || !socket?.id || inFlightRef.current) return;
     inFlightRef.current = true;
     try {
+      if (!fingerprintRef.current) {
+        /*
+          The portable cookie key is still the cross-device identity signal.
+          Thumbmark adds a same-device signal that survives cookie clearing, so
+          both are sent together whenever the heartbeat identifies this socket.
+        */
+        fingerprintRef.current = await getBrowserFingerprintId();
+      }
       /*
         Every route shares the same persisted identity key, but only the main
         driver page should trigger duplicate-tab prevention. Sending the surface
@@ -48,6 +58,7 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
       */
       const resp = await identifySession({
         cookieUserId,
+        fingerprintId: fingerprintRef.current,
         nickname,
         overseerEnabled,
         identitySurface: normalizedIdentitySurface,

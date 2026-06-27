@@ -10,6 +10,7 @@ const { subscribe } = require('../eventBus');
 const { sendSystemMessage } = require('../chatService');
 const { getActiveDrivers } = require('../turnService');
 const { getIdentitySummary } = require('../verificationService');
+const { getFeatureState, listFeatureStates, updateFeatureState } = require('../identityService');
 const { getRegistrySnapshot } = require('../barcodeScannerService');
 const { loadStore, withGameStore } = require('./store');
 const scanQuest = require('./games/scanQuest');
@@ -241,7 +242,7 @@ function getKnownObjects() {
 }
 
 function normalizePlayerKey(identity = {}, socketId = '', roverId = '') {
-  if (identity.cookieUserId) return `identity:${identity.cookieUserId}`;
+  if (identity.userId) return `identity:${identity.userId}`;
   if (socketId) return `socket:${socketId}`;
   if (roverId) return `rover:${roverId}`;
   return null;
@@ -250,7 +251,7 @@ function normalizePlayerKey(identity = {}, socketId = '', roverId = '') {
 function normalizeIdentityPlayerKey(identity = {}) {
   // Permanent scoring is identity-only. Socket and rover IDs are useful runtime
   // evidence, but they are unstable and should not create leaderboard entries.
-  return identity.cookieUserId ? `identity:${identity.cookieUserId}` : null;
+  return identity.userId ? `identity:${identity.userId}` : null;
 }
 
 function resolveRoverParticipant(roverId) {
@@ -271,6 +272,7 @@ function resolveRoverParticipant(roverId) {
     playerKey,
     roverId: normalizedRoverId,
     socketId,
+    userId: identity.userId || null,
     cookieUserId: identity.cookieUserId || null,
     nickname: identity.nickname || normalizedRoverId,
   };
@@ -312,6 +314,7 @@ function recordRoundParticipant(draft, participant, now) {
       playerKey: participant.playerKey || previous.playerKey || null,
       roverId: participant.roverId || previous.roverId || null,
       socketId: participant.socketId || previous.socketId || null,
+      userId: participant.userId || previous.userId || null,
       cookieUserId: participant.cookieUserId || previous.cookieUserId || null,
       nickname: participant.nickname || previous.nickname || participant.roverId || 'unknown player',
       joinedAt: Number.isFinite(previous.joinedAt) ? previous.joinedAt : now,
@@ -332,6 +335,7 @@ function getRoundParticipants(draft) {
       playerKey: participant.playerKey || null,
       roverId: participant.roverId || null,
       socketId: participant.socketId || null,
+      userId: participant.userId || null,
       cookieUserId: participant.cookieUserId || null,
       nickname: participant.nickname || participant.roverId || 'unknown player',
       joinedAt: Number.isFinite(participant.joinedAt) ? participant.joinedAt : null,
@@ -349,6 +353,7 @@ function getProximityParticipants(draft, now) {
       playerKey: sighting.playerKey,
       roverId: sighting.roverId,
       socketId: sighting.socketId || null,
+      userId: sighting.userId || null,
       cookieUserId: sighting.cookieUserId || null,
       nickname: sighting.nickname || sighting.roverId,
       scannedAt: sighting.scannedAt,
@@ -407,6 +412,7 @@ function recordPlayerParticipation(draft, gameId, participants, now) {
     const previousGame = previousGames[gameId] || {};
     draft.players[participant.playerKey] = {
       playerKey: participant.playerKey,
+      userId: participant.userId || previous.userId || null,
       cookieUserId: participant.cookieUserId || previous.cookieUserId || null,
       nickname: participant.nickname || previous.nickname || null,
       lastRoverId: participant.roverId || previous.lastRoverId || null,
@@ -422,6 +428,11 @@ function recordPlayerParticipation(draft, gameId, participants, now) {
       },
     };
   });
+}
+
+function userIdFromPlayerKey(playerKey) {
+  const value = String(playerKey || '').trim();
+  return value.startsWith('identity:usr_') ? value.slice('identity:'.length) : null;
 }
 
 function applyPointAwards(draft, gameId, awards = [], now) {
@@ -443,6 +454,7 @@ function applyPointAwards(draft, gameId, awards = [], now) {
     // one persistent place.
     draft.players[playerKey] = {
       playerKey,
+      userId: award.userId || previous.userId || userIdFromPlayerKey(playerKey),
       cookieUserId: award.cookieUserId || previous.cookieUserId || null,
       nickname: award.nickname || previous.nickname || null,
       lastRoverId: award.roverId || previous.lastRoverId || null,
@@ -460,6 +472,38 @@ function applyPointAwards(draft, gameId, awards = [], now) {
         },
       },
     };
+
+    const userId = draft.players[playerKey].userId;
+    if (userId) {
+      /*
+        The game store still owns current game state, but long-lived per-person
+        scoring is mirrored into identityService so future features can read one
+        canonical user object instead of scraping barcode-games.json.
+      */
+      updateFeatureState(userId, 'barcodeGames', (current) => {
+        const currentGames = current?.games || {};
+        const currentGame = currentGames[gameId] || {};
+        return {
+          ...(current || {}),
+          playerKeys: Array.from(new Set([...(current?.playerKeys || []), playerKey])),
+          nickname: draft.players[playerKey].nickname || current?.nickname || null,
+          lastRoverId: draft.players[playerKey].lastRoverId || current?.lastRoverId || null,
+          totalPoints: (Number.isFinite(current?.totalPoints) ? current.totalPoints : 0) + points,
+          lastSeenAt: now,
+          games: {
+            ...currentGames,
+            [gameId]: {
+              ...currentGame,
+              gameId,
+              points: (Number.isFinite(currentGame.points) ? currentGame.points : 0) + points,
+              awards: (Number.isFinite(currentGame.awards) ? currentGame.awards : 0) + 1,
+              lastAwardAt: now,
+              lastReason: award.reason || null,
+            },
+          },
+        };
+      }, {});
+    }
 
     addRecentEvent(draft, {
       kind: 'pointsAwarded',
@@ -816,8 +860,9 @@ function getPlayerForSocket(store, socket) {
   if (!socket) return null;
   const identity = getIdentitySummary(socket);
   const playerKey = normalizeIdentityPlayerKey(identity);
+  const featurePlayer = identity.userId ? getFeatureState(identity.userId, 'barcodeGames', null) : null;
   const player = playerKey ? store.players?.[playerKey] || null : null;
-  if (!player) {
+  if (!player && !featurePlayer) {
     return {
       playerKey,
       nickname: identity.nickname || null,
@@ -826,16 +871,26 @@ function getPlayerForSocket(store, socket) {
       games: {},
     };
   }
-  const rankedPlayers = Object.values(store.players || {})
-    .filter((entry) => String(entry?.playerKey || '').startsWith('identity:') && Number.isFinite(entry?.totalPoints) && entry.totalPoints > 0)
+  const rankedPlayers = listBarcodePlayers(store.players)
     .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
-  const rank = rankedPlayers.findIndex((entry) => entry.playerKey === player.playerKey) + 1;
+  const effectivePlayer = {
+    ...(player || {}),
+    ...(featurePlayer || {}),
+    playerKey: player?.playerKey || playerKey || featurePlayer?.playerKeys?.[0],
+    nickname: player?.nickname || featurePlayer?.nickname || identity.nickname || null,
+    totalPoints: Math.max(Number(player?.totalPoints || 0), Number(featurePlayer?.totalPoints || 0)),
+    games: {
+      ...(featurePlayer?.games || {}),
+      ...(player?.games || {}),
+    },
+  };
+  const rank = rankedPlayers.findIndex((entry) => entry.playerKey === effectivePlayer.playerKey) + 1;
   return {
-    playerKey: player.playerKey,
-    nickname: player.nickname || identity.nickname || null,
-    totalPoints: player.totalPoints || 0,
+    playerKey: effectivePlayer.playerKey,
+    nickname: effectivePlayer.nickname,
+    totalPoints: effectivePlayer.totalPoints || 0,
     rank: rank > 0 ? rank : null,
-    games: player.games || {},
+    games: effectivePlayer.games || {},
   };
 }
 
@@ -1013,9 +1068,31 @@ function buildLifecycleGameState(store, { now, selectedDefinition, runningDefini
   };
 }
 
-function topPlayers(players = {}, limit = 6) {
-  return Object.values(players || {})
+function listBarcodePlayers(players = {}) {
+  const byKey = new Map();
+  Object.values(players || {})
     .filter((player) => String(player?.playerKey || '').startsWith('identity:') && Number.isFinite(player?.totalPoints) && player.totalPoints > 0)
+    .forEach((player) => byKey.set(player.playerKey, player));
+
+  listFeatureStates('barcodeGames').forEach(({ userId, state }) => {
+    const playerKey = `identity:${userId}`;
+    const previous = byKey.get(playerKey) || {};
+    byKey.set(playerKey, {
+      ...previous,
+      ...state,
+      playerKey,
+      userId,
+      totalPoints: Math.max(Number(previous.totalPoints || 0), Number(state?.totalPoints || 0)),
+      nickname: previous.nickname || state?.nickname || null,
+      lastRoverId: previous.lastRoverId || state?.lastRoverId || null,
+    });
+  });
+
+  return Array.from(byKey.values()).filter((player) => Number.isFinite(player?.totalPoints) && player.totalPoints > 0);
+}
+
+function topPlayers(players = {}, limit = 6) {
+  return listBarcodePlayers(players)
     .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0))
     .slice(0, limit)
     .map((player) => ({

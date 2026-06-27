@@ -10,6 +10,8 @@ function normalizeRoverId(value) {
 }
 
 function buildRequesterKey(socket) {
+  const userId = String(socket?.data?.userId || '').trim();
+  if (userId) return `user:${userId}`;
   const cookieUserId = normalizeCookieUserId(socket?.data?.cookieUserId);
   if (cookieUserId) return `cookie:${cookieUserId}`;
   return `socket:${socket?.id || 'unknown'}`;
@@ -43,6 +45,14 @@ function getSocketByRequesterKey(requesterKey) {
   if (requesterKey.startsWith('socket:')) {
     const socketId = requesterKey.slice('socket:'.length);
     return io.sockets.sockets.get(socketId) || null;
+  }
+  if (requesterKey.startsWith('user:')) {
+    const userId = requesterKey.slice('user:'.length);
+    for (const socket of io.sockets.sockets.values()) {
+      if (String(socket?.data?.userId || '').trim() === userId) {
+        return socket;
+      }
+    }
   }
   if (requesterKey.startsWith('cookie:')) {
     const cookieUserId = requesterKey.slice('cookie:'.length);

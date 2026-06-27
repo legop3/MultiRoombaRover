@@ -17,6 +17,7 @@ server/data/discord-guilds.json
 server/data/global-objective.json
 server/data/admin-reason.json
 server/data/buttonbox-state.json
+server/data/barcode-tts-cache/
 webui/package-lock.json
 !server/data/
 !server/data/barcode-registry.json
@@ -24,3 +25,8 @@ webui/src/config/analytics.jsx
 webui/src/config/driverAnalytics.json
 webui/src/config/analytics.html
 plans/barcodegames.txt
+.gitignore
+server/data/identity.sqlite
+server/data/barcode-games.json
+server/data/identity.sqlite-shm
+server/data/identity.sqlite-wal

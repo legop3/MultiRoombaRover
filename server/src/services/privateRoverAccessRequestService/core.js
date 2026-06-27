@@ -9,7 +9,7 @@ const roverManager = require('../roverManager');
 const { getNickname } = require('../nicknameService');
 const { getRole, isLockdownAdmin } = require('../roleService');
 const { getSocketIp, normalizeIp } = require('../../helpers/ipResolver');
-const { normalizeCookieUserId } = require('../identityService');
+const { getIdentitySummary, normalizeCookieUserId } = require('../identityService');
 const {
   REQUEST_COOLDOWN_MS,
   GRANT_TTL_MS,
@@ -55,6 +55,7 @@ function pruneExpiredGrantsAndRefresh(reason = 'grant_expired') {
 
 function listPendingForRequester(socket) {
   const requesterKey = buildRequesterKey(socket);
+  const identity = getIdentitySummary(socket);
   const pending = [];
   for (const request of pendingRequests.values()) {
     if (request.requesterKey !== requesterKey) continue;
@@ -333,7 +334,9 @@ function createRequest(socket, roverIdRaw) {
       nickname: getNickname(socket) || null,
       role: getRole(socket),
       isVerified: Boolean(socket?.data?.isVerified),
+      userId: identity.userId || null,
       cookieUserId: normalizeCookieUserId(socket?.data?.cookieUserId) || null,
+      fingerprintId: identity.fingerprintId || null,
       ip: normalizeIp(getSocketIp(socket)) || null,
     },
   };

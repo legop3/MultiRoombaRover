@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.11.1",
     "discord.js": "^14.25.1",
     "express": "^4.19.2",
     "fuse.js": "^7.4.2",
