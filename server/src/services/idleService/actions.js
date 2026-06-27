@@ -9,6 +9,7 @@ const neatoService = require('../neatoService');
 const liftService = require('../liftService');
 const {
   HEADLIGHT_DISABLE_ACTION,
+  LASER_DISABLE_ACTION,
   DOCK_COMMAND_BASE64,
 } = require('./constants');
 
@@ -79,6 +80,29 @@ async function disableAllRoverHeadlights() {
   return { action: 'disableRoverHeadlights', attempted, failed };
 }
 
+async function disableAllRoverLasers() {
+  const attempted = [];
+  const failed = [];
+  roverManager.rovers.forEach((record) => {
+    if (!record?.ws || !record?.meta?.laser?.enabled) return;
+    const roverId = String(record.id);
+    try {
+      // Idle cleanup is allowed to send an explicit off command even when
+      // other laser commands are policy-blocked. The point of this action is
+      // to leave the rover in a non-emitting state when nobody is actively
+      // driving it.
+      issueCommand(roverId, {
+        type: 'laser',
+        laser: { action: LASER_DISABLE_ACTION },
+      });
+      attempted.push(roverId);
+    } catch (err) {
+      failed.push({ roverId, error: err.message });
+    }
+  });
+  return { action: 'disableRoverLasers', attempted, failed };
+}
+
 async function sendNeatoHome() {
   try {
     await neatoService.sendHome();
@@ -101,6 +125,7 @@ const idleActions = [
   turnOffRoomControls,
   // dockAllRovers,
   disableAllRoverHeadlights,
+  disableAllRoverLasers,
   sendNeatoHome,
   raiseLift,
 ];

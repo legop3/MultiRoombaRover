@@ -8,10 +8,53 @@ const { isAdmin, isLockdownAdmin } = require('../roleService');
 const { isDeterred } = require('../verificationService');
 const logger = require('../../globals/logger').child('commandService');
 const { isHeadlightBlocked } = require('../../rewards/definitions/darkness');
+const homeAssistantService = require('../homeAssistantService');
 
 const pendingCommands = new Map(); // id -> { roverId }
 const lastDriveActivity = new Map(); // roverId -> { ts, socketId, direction, speed, isAdmin }
 const driveCooldowns = new Map(); // roverId -> blockedUntil
+let roomLightsWereLockedOn = Boolean(homeAssistantService.getLightPolicyState?.()?.lockedOn);
+
+function isRoomLightsLockedOn() {
+  return Boolean(homeAssistantService.getLightPolicyState?.()?.lockedOn);
+}
+
+function getLaserAction(payload = {}) {
+  return String(payload?.laser?.action || 'toggle').trim().toLowerCase() || 'toggle';
+}
+
+function isLaserCommandBlockedByRoomLightLock(payload = {}) {
+  if (!isRoomLightsLockedOn()) return false;
+  // A locked-on room-light policy means the laser must not emit. Explicit off
+  // commands are still allowed so cleanup paths can force a safe state.
+  return getLaserAction(payload) !== 'off';
+}
+
+function forceAllRoverLasersOff(reason) {
+  const attempted = [];
+  const failed = [];
+  roverManager.rovers.forEach((record) => {
+    if (!record?.ws || !record?.meta?.laser?.enabled) return;
+    const roverId = String(record.id);
+    try {
+      issueCommand(roverId, {
+        type: 'laser',
+        laser: { action: 'off' },
+      });
+      attempted.push(roverId);
+    } catch (err) {
+      failed.push({ roverId, error: err.message });
+    }
+  });
+  if (attempted.length || failed.length) {
+    logger.info('Forced rover lasers off', { reason, attempted, failed });
+  }
+}
+
+function enforceLaserRoomLightLock(reason) {
+  if (!isRoomLightsLockedOn()) return;
+  forceAllRoverLasersOff(reason);
+}
 
 function normalizeOutboundCommandPayload(payload = {}) {
   if (payload?.type !== 'tts') return payload;
@@ -37,6 +80,9 @@ function issueCommand(roverId, payload) {
   const record = roverManager.rovers.get(roverId);
   if (!record || !record.ws) {
     throw new Error('Rover offline');
+  }
+  if (payload?.type === 'laser' && isLaserCommandBlockedByRoomLightLock(payload)) {
+    throw new Error('Laser disabled while room lights are locked on');
   }
   const id = uuidv4();
   const normalizedPayload = normalizeOutboundCommandPayload(payload);
@@ -158,12 +204,21 @@ io.on('connection', (socket) => {
       if (type === 'audioLevels') {
         throw new Error('audioLevels command is service-managed');
       }
+      const payload = data ? { ...data } : {};
       if (type === 'headlight' && isHeadlightBlocked()) {
         logger.info('Ignoring headlight command while darkness lock is active', { socketId: socket.id, roverId });
         reply({ ignored: true, reason: 'darknessActive' });
         return;
       }
-      const payload = data ? { ...data } : {};
+      if (type === 'laser' && isLaserCommandBlockedByRoomLightLock(payload)) {
+        logger.info('Ignoring laser command while room lights are locked on', {
+          socketId: socket.id,
+          roverId,
+          action: getLaserAction(payload),
+        });
+        reply({ ignored: true, reason: 'roomLightsLockedOn' });
+        return;
+      }
       const isRebootCommand = type === 'reboot';
       const isUpdateCommand = type === 'update';
       const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));
@@ -233,6 +288,23 @@ io.on('connection', (socket) => {
 
   socket.on('command', handleCommand);
   socket.on('command:issue', handleCommand);
+});
+
+homeAssistantService.homeAssistantEvents.on('update', () => {
+  const lockedOn = isRoomLightsLockedOn();
+  if (lockedOn && !roomLightsWereLockedOn) {
+    enforceLaserRoomLightLock('roomLightsLockedOn');
+  }
+  roomLightsWereLockedOn = lockedOn;
+});
+
+roverManager.managerEvents.on('rover', (event = {}) => {
+  // A rover can reconnect with laser.initialOn enabled or stale hardware state.
+  // When room lights are locked on, every newly upserted rover gets an explicit
+  // off command so the lock policy is true even across reconnects.
+  if (event.action === 'upsert') {
+    enforceLaserRoomLightLock('roverUpsertWhileRoomLightsLockedOn');
+  }
 });
 
 function isSongRawPayload(payload) {

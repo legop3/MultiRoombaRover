@@ -59,6 +59,7 @@ function TopDownMapPanel() {
 
 function DriveDockPanel() {
   const roverId = useControlSelector((control) => control.state.roverId);
+  const roomLightsLockedOn = useSessionSelector((state) => Boolean(state.session?.homeAssistant?.lightPolicy?.lockedOn));
   const keymap = useControlSelector((control) => control.state.keymap);
   const camera = useControlSelector((control) => control.state.camera);
   const horn = useControlSelector((control) => control.state.horn);
@@ -136,7 +137,7 @@ function DriveDockPanel() {
                 <GPIOToggleControl
                   label="Laser"
                   on={laserState?.laserOn}
-                  disabled={!roverId}
+                  disabled={!roverId || roomLightsLockedOn}
                   onToggle={trackedControls.setLaser}
                   keyLabel={laserLabel}
                 />

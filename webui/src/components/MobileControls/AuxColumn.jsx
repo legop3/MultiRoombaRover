@@ -10,9 +10,11 @@ import { AUX_ZERO } from './constants.js';
 import VacuumControls from './VacuumControls.jsx';
 import VerticalCameraTilt from './VerticalCameraTilt.jsx';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
 
 function AuxColumnContent() {
   const roverId = useControlSelector((control) => control.state.roverId);
+  const roomLightsLockedOn = useSessionSelector((state) => Boolean(state.session?.homeAssistant?.lightPolicy?.lockedOn));
   const camera = useControlSelector((control) => control.state.camera);
   const horn = useControlSelector((control) => control.state.horn);
   const headlight = useControlSelector((control) => control.pipeline?.headlight);
@@ -120,7 +122,7 @@ function AuxColumnContent() {
               <GPIOToggleControl
                 label="Laser"
                 on={laserState?.laserOn}
-                disabled={disabled}
+                disabled={disabled || roomLightsLockedOn}
                 onToggle={handleLaserToggle}
                 heightClass="h-full"
               />

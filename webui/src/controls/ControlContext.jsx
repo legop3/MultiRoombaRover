@@ -166,6 +166,7 @@ export function ControlSystemProvider({ children }) {
       : true;
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const homeAssistantEntities = useSessionSelector((state) => state.session?.homeAssistant?.entities ?? []);
+  const roomLightsLockedOn = useSessionSelector((state) => Boolean(state.session?.homeAssistant?.lightPolicy?.lockedOn));
   const { homeAssistantSetState } = useSessionActions();
   const overcurrentLimiter = useOvercurrentLimiter(roverId);
   const driveTransform = useCallback(
@@ -491,13 +492,14 @@ export function ControlSystemProvider({ children }) {
   const setLaser = useCallback(
     (laserOn) => {
       if (!pipeline.laser) return;
+      if (roomLightsLockedOn && laserOn !== false) return;
       // The laser shares the same logical toggle contract as the headlight; it
       // is separate only because it has its own GPIO pin, UI control, and keybind.
       const action = typeof laserOn === 'boolean' ? (laserOn ? 'on' : 'off') : 'toggle';
       pipeline.sendLaser(action);
       recordControlIntent();
     },
-    [pipeline, recordControlIntent],
+    [pipeline, recordControlIntent, roomLightsLockedOn],
   );
 
   const toggleLaser = useCallback(() => {
