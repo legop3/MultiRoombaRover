@@ -3,15 +3,15 @@
 // Scope: Keeps runtime behavior unchanged while centralizing mutable session-sync state in one module.
 let lastActivitySync = 0;
 let pendingActivitySync = null;
-let lastNightVisionSync = 0;
-let pendingNightVisionSync = null;
+let lastGPIOToggleSync = 0;
+let pendingGPIOToggleSync = null;
 
 function getState() {
   return {
     lastActivitySync,
     pendingActivitySync,
-    lastNightVisionSync,
-    pendingNightVisionSync,
+    lastGPIOToggleSync,
+    pendingGPIOToggleSync,
   };
 }
 
@@ -22,11 +22,11 @@ function setState(patch = {}) {
   if (Object.prototype.hasOwnProperty.call(patch, 'pendingActivitySync')) {
     pendingActivitySync = patch.pendingActivitySync;
   }
-  if (Object.prototype.hasOwnProperty.call(patch, 'lastNightVisionSync')) {
-    lastNightVisionSync = patch.lastNightVisionSync;
+  if (Object.prototype.hasOwnProperty.call(patch, 'lastGPIOToggleSync')) {
+    lastGPIOToggleSync = patch.lastGPIOToggleSync;
   }
-  if (Object.prototype.hasOwnProperty.call(patch, 'pendingNightVisionSync')) {
-    pendingNightVisionSync = patch.pendingNightVisionSync;
+  if (Object.prototype.hasOwnProperty.call(patch, 'pendingGPIOToggleSync')) {
+    pendingGPIOToggleSync = patch.pendingGPIOToggleSync;
   }
 }
 

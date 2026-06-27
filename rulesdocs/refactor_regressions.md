@@ -4,6 +4,6 @@
   - idle service will trigger, after 2 minutes of no drivers:
     - all room lights (room controls) off
     - tell all rovers to dock
-    - turn off all rover night vision lights
+    - turn off all rover headlights
     - tell the neato to return to home
   - the idle service should be easily expandable to add more things in the future

@@ -21,7 +21,8 @@ type WSClient struct {
 	media        *MediaSupervisor
 	servo        *CameraServo
 	horn         *HornSynth
-	nightVision  *NightVisionLight
+	headlight    *GPIOToggle
+	laser        *GPIOToggle
 	log          *log.Logger
 	recoverMu    sync.Mutex
 	recovering   bool
@@ -40,7 +41,7 @@ type WSClient struct {
 	audioMu      sync.RWMutex
 }
 
-func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, nightVision *NightVisionLight, logger *log.Logger) *WSClient {
+func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, headlight *GPIOToggle, laser *GPIOToggle, logger *log.Logger) *WSClient {
 	var ttsQueue chan *ttsPayload
 	if cfg.Audio.TTSEnabled {
 		ttsQueue = make(chan *ttsPayload, 2)
@@ -61,7 +62,8 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		media:        media,
 		servo:        servo,
 		horn:         horn,
-		nightVision:  nightVision,
+		headlight:    headlight,
+		laser:        laser,
 		log:          logger,
 		ttsQueue:     ttsQueue,
 		chromeTTS:    chromeTTS,
@@ -133,7 +135,8 @@ func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
 		CameraServo:   c.cfg.CameraServo,
 		Audio:         c.cfg.Audio,
 		Horn:          c.cfg.Horn,
-		NightVision:   c.cfg.NightVision,
+		Headlight:     c.cfg.Headlight,
+		Laser:         c.cfg.Laser,
 		Private:       c.cfg.Private,
 	}
 	c.log.Printf("sending hello (camera servo enabled=%v pin=%d)", msg.CameraServo.Enabled, msg.CameraServo.Pin)
@@ -226,17 +229,10 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		return c.horn.HandlePayload(msg.Horn)
 	case msg.AudioLevels != nil:
 		return c.handleAudioLevels(msg.AudioLevels)
-	case msg.NightVision != nil:
-		if c.nightVision == nil {
-			return fmt.Errorf("night vision disabled")
-		}
-		if err := c.nightVision.HandleAction(msg.NightVision.Action); err != nil {
-			return err
-		}
-		c.emitEvent("nightVision.state", map[string]any{
-			"nightVisionOn": c.nightVision.NightVisionOn(),
-		})
-		return nil
+	case msg.Headlight != nil:
+		return c.handleToggleCommand("headlight", c.headlight, msg.Headlight)
+	case msg.Laser != nil:
+		return c.handleToggleCommand("laser", c.laser, msg.Laser)
 	case msg.Song != nil:
 		slot := 0
 		if msg.Song.Slot != nil {
@@ -250,6 +246,22 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	default:
 		return fmt.Errorf("unsupported command type: %s", msg.Type)
 	}
+}
+
+func (c *WSClient) handleToggleCommand(name string, toggle *GPIOToggle, payload *togglePayload) error {
+	if toggle == nil {
+		return fmt.Errorf("%s disabled", name)
+	}
+	if err := toggle.HandleAction(payload.Action); err != nil {
+		return err
+	}
+	// Event names and payload keys use logical device names. GPIO polarity has
+	// already been handled inside GPIOToggle, so the server only sees whether
+	// the headlight or laser should be considered on.
+	c.emitEvent(fmt.Sprintf("%s.state", name), map[string]any{
+		fmt.Sprintf("%sOn", name): toggle.On(),
+	})
+	return nil
 }
 
 func (c *WSClient) stopMotionForSystemCommand(reason string) error {

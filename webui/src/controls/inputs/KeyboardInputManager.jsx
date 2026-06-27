@@ -91,7 +91,8 @@ export default function KeyboardInputManager() {
     runMacro,
     stopAllMotion,
     registerInputState,
-    toggleNightVision,
+    toggleHeadlight,
+    toggleLaser,
     startHorn,
     stopHorn,
     setMicPttActive,
@@ -376,7 +377,8 @@ export default function KeyboardInputManager() {
       startHorn,
       stopAllMotion,
       stopHorn,
-      toggleNightVision,
+      toggleHeadlight,
+      toggleLaser,
       videoColorFilter,
     };
   });
@@ -413,9 +415,12 @@ export default function KeyboardInputManager() {
         } else if (newlyPressed.some((token) => latest.keymap.dockMacro?.has(token))) {
           trackAnalyticsEvent('dock_assist_toggle', { roverId: latest.roverId || '', source: 'keyboard' });
           latest.dockAssist.toggleAssist();
-        } else if (newlyPressed.some((token) => latest.keymap.nightVisionToggle?.has(token))) {
-          trackAnalyticsEvent('night_vision_toggle', { roverId: latest.roverId || '', source: 'keyboard' });
-          latest.toggleNightVision();
+        } else if (newlyPressed.some((token) => latest.keymap.headlightToggle?.has(token))) {
+          trackAnalyticsEvent('headlight_toggle', { roverId: latest.roverId || '', source: 'keyboard' });
+          latest.toggleHeadlight();
+        } else if (newlyPressed.some((token) => latest.keymap.laserToggle?.has(token))) {
+          trackAnalyticsEvent('laser_toggle', { roverId: latest.roverId || '', source: 'keyboard' });
+          latest.toggleLaser();
         } else if (newlyPressed.some((token) => latest.keymap.videoFilterCycle?.has(token))) {
           cycleVideoFilter();
         } else if (newlyPressed.some((token) => latest.keymap.hornHonk?.has(token))) {

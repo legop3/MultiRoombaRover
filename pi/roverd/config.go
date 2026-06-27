@@ -109,11 +109,22 @@ type CameraServoConfig struct {
 	Invert        bool    `yaml:"invert" json:"invert"`
 }
 
-type NightVisionConfig struct {
+type GPIOToggleConfig struct {
 	Enabled   bool   `yaml:"enabled" json:"enabled"`
 	GPIOPin   int    `yaml:"gpioPin" json:"gpioPin"`
 	GPIOChip  string `yaml:"gpioChip" json:"gpioChip"`
 	InitialOn bool   `yaml:"initialOn" json:"initialOn"`
+	ActiveLow bool   `yaml:"activeLow" json:"activeLow"`
+}
+
+func (g GPIOToggleConfig) LogicalToGPIO(on bool) int {
+	// activeLow is the single hardware-inversion point for GPIO toggles. The
+	// rest of the daemon, server, and web UI can use normal logical on/off
+	// semantics without knowing whether the driver is active-high or active-low.
+	if on == g.ActiveLow {
+		return 0
+	}
+	return 1
 }
 
 type AutoSideBrushConfig struct {
@@ -153,7 +164,8 @@ type Config struct {
 	CameraServo   CameraServoConfig   `yaml:"cameraServo"`
 	Audio         AudioConfig         `yaml:"audio"`
 	Horn          HornConfig          `yaml:"horn"`
-	NightVision   NightVisionConfig   `yaml:"nightVision" json:"nightVision"`
+	Headlight     GPIOToggleConfig    `yaml:"headlight" json:"headlight"`
+	Laser         GPIOToggleConfig    `yaml:"laser" json:"laser"`
 	AutoSideBrush AutoSideBrushConfig `yaml:"autoSideBrush"`
 	Private       PrivateConfig       `yaml:"private" json:"private"`
 }
@@ -210,11 +222,19 @@ func LoadConfig(path string) (*Config, error) {
 			SawGain:     0.7,
 			MaxDuration: Duration{Duration: 10000 * time.Millisecond},
 		},
-		NightVision: NightVisionConfig{
+		Headlight: GPIOToggleConfig{
 			Enabled:   true,
 			GPIOPin:   22,
 			GPIOChip:  "gpiochip0",
-			InitialOn: true,
+			InitialOn: false,
+			ActiveLow: true,
+		},
+		Laser: GPIOToggleConfig{
+			Enabled:   false,
+			GPIOPin:   27,
+			GPIOChip:  "gpiochip0",
+			InitialOn: false,
+			ActiveLow: false,
 		},
 		AutoSideBrush: AutoSideBrushConfig{
 			Enabled: true,
@@ -302,8 +322,11 @@ func LoadConfig(path string) (*Config, error) {
 	if err := validateServoConfig(&cfg.CameraServo); err != nil {
 		return nil, fmt.Errorf("cameraServo: %w", err)
 	}
-	if err := validateNightVisionConfig(&cfg.NightVision); err != nil {
-		return nil, fmt.Errorf("nightVision: %w", err)
+	if err := validateGPIOToggleConfig(&cfg.Headlight); err != nil {
+		return nil, fmt.Errorf("headlight: %w", err)
+	}
+	if err := validateGPIOToggleConfig(&cfg.Laser); err != nil {
+		return nil, fmt.Errorf("laser: %w", err)
 	}
 	validateAudioConfig(&cfg.Audio)
 	validateHornConfig(&cfg.Horn)
@@ -396,7 +419,7 @@ func validateHornConfig(cfg *HornConfig) {
 	}
 }
 
-func validateNightVisionConfig(cfg *NightVisionConfig) error {
+func validateGPIOToggleConfig(cfg *GPIOToggleConfig) error {
 	if !cfg.Enabled {
 		return nil
 	}

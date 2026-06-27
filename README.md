@@ -28,13 +28,14 @@ You WILL need some common hobby electronics knowledge to build one of these, I w
 | ----CAMERA STUFF---- | ----Below here is all camera related things that youll need---- |
 | A pi camera v2 (ov5647) | The video publisher in this project is only designed for the ov5647, though it would be totally possible to make your own publisher for other sensors. |
 | Cheap 5v servo | Unless you have a VERY wide camera lens, you will want to have a servo plugged into the pi to be able to tilt the camera up and down. |
-| LED for toggling night vision | I use white LEDs attached to one of the "driver" pins on the AIY hat to trick one of those generic pi camera LED floodlights into turning on / off on demand.|
+| LED for toggling the headlight | I use white LEDs attached to one of the "driver" pins on the AIY hat to trick one of those generic pi camera LED floodlights into turning on / off on demand.|
+| Optional laser pointer | A laser pointer can be wired to another high-current-capable GPIO driver, with GPIO 27 used by default in the rover config. |
 | Pi zero camera cable | The pi zero has a smaller version of the camera ribbon connector, you will need the right cable for your camera |
 
 I do not have any exact numbers, but with cheap used Roombas it seems like on average one of my rovers takes about $100 USD to build from scratch.
 
 ### Physical assembly of the rover  
-This is going to be the very loose section of this guide, the way yout build your rover is up to you. I have mine built out with durable protective metal cages as they are open to the internet and people like breaking things. The electronics on top of the roomba can be as simple as a pi, level shifter, and a camera if you just want to run it around yourself, things like a speaker, microphone, servo, night vision LED, are all totally optional and can be disabled in the configuration on the raspberry pi.
+This is going to be the very loose section of this guide, the way yout build your rover is up to you. I have mine built out with durable protective metal cages as they are open to the internet and people like breaking things. The electronics on top of the roomba can be as simple as a pi, level shifter, and a camera if you just want to run it around yourself, things like a speaker, microphone, servo, headlight, laser pointer, are all totally optional and can be disabled in the configuration on the raspberry pi.
 
 These are the basics of how evertything is connected on my rovers, this is hard to organize and illustrate through text but hopefully it will give you a good idea:
 1. 7 pin mini DIN cable
@@ -50,6 +51,7 @@ These are the basics of how evertything is connected on my rovers, this is hard 
    1. ov5647 camera
    2. full size to pi zero style camera ribbon cable, plug camera into pi
    3. an LED connected to a high current driver output on the AIY hat, GPIO 22 by default. This is meant to be poked into the LDR sensor on a pi camera IR floodlight to make it toggleable by the driver.
+   4. optionally, a laser pointer connected to another high current driver output, GPIO 27 by default.
 
 ### Software on your rover
 Raspberry pi OS installation:

@@ -67,7 +67,8 @@ export const HELP_CONTENT = {
             items: [
               { action: 'cameraUp', label: 'Tilt up' },
               { action: 'cameraDown', label: 'Tilt down' },
-              { action: 'nightVisionToggle', label: 'Toggle night vision' },
+              { action: 'headlightToggle', label: 'Toggle headlight' },
+              { action: 'laserToggle', label: 'Toggle laser' },
             ],
           },
           {
@@ -202,7 +203,8 @@ export const HELP_CONTENT = {
     //         items: [
     //           { action: 'driveMacro', label: 'Drive macro' },
     //           { action: 'dockMacro', label: 'Dock macro' },
-    //           { action: 'nightVisionToggle', label: 'Toggle night vision' },
+    //           { action: 'headlightToggle', label: 'Toggle headlight' },
+    //           { action: 'laserToggle', label: 'Toggle laser' },
     //           { action: 'chatFocus', label: 'Chat focus' },
     //         ],
     //       },

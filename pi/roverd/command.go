@@ -11,7 +11,8 @@ type helloMessage struct {
 	CameraServo   CameraServoConfig `json:"cameraServo"`
 	Audio         AudioConfig       `json:"audio"`
 	Horn          HornConfig        `json:"horn"`
-	NightVision   NightVisionConfig `json:"nightVision"`
+	Headlight     GPIOToggleConfig  `json:"headlight"`
+	Laser         GPIOToggleConfig  `json:"laser"`
 	Private       PrivateConfig     `json:"private"`
 }
 
@@ -42,7 +43,8 @@ type inboundMessage struct {
 	TTS          *ttsPayload          `json:"tts,omitempty"`
 	Horn         *hornPayload         `json:"horn,omitempty"`
 	AudioLevels  *audioLevelsPayload  `json:"audioLevels,omitempty"`
-	NightVision  *nightVisionPayload  `json:"nightVision,omitempty"`
+	Headlight    *togglePayload       `json:"headlight,omitempty"`
+	Laser        *togglePayload       `json:"laser,omitempty"`
 	Song         *songPayload         `json:"song,omitempty"`
 	Reboot       *rebootPayload       `json:"reboot,omitempty"`
 	// Update is intentionally just a marker payload. The server can request the
@@ -97,7 +99,7 @@ type audioLevelsPayload struct {
 	ForwardGain *float64 `json:"forwardGain,omitempty"`
 }
 
-type nightVisionPayload struct {
+type togglePayload struct {
 	Action string `json:"action"`
 }
 

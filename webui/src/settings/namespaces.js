@@ -73,9 +73,13 @@ export const GAMEPAD_PROFILE_DEFAULT = {
       kind: 'button',
       sources: [{ kind: 'button', index: 3 }],
     },
-    nightVisionToggle: {
+    headlightToggle: {
       kind: 'button',
       sources: [{ kind: 'button', index: 9 }],
+    },
+    laserToggle: {
+      kind: 'button',
+      sources: [],
     },
   },
 };

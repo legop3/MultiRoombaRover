@@ -1,14 +1,15 @@
-// Night Vision Control
-// Purpose: Defines the Night Vision Control module and the local helpers/components used in this file.
-// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
+// GPIO Toggle Control
+// Purpose: Renders a direct press target for rover GPIO-backed toggles such as the headlight and laser.
+// Scope: Owns optimistic button state and touch/click de-duplication while callers provide device labels and actions.
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 function isBoolean(value) {
   return typeof value === 'boolean';
 }
 
-export default function NightVisionControl({
-  nightVisionOn,
+export default function GPIOToggleControl({
+  label,
+  on,
   disabled,
   onToggle,
   keyLabel,
@@ -16,16 +17,21 @@ export default function NightVisionControl({
   heightClass = '',
 }) {
   const [optimistic, setOptimistic] = useState(
-    isBoolean(nightVisionOn) ? nightVisionOn : null,
+    isBoolean(on) ? on : null,
   );
   const suppressClickRef = useRef(false);
   const suppressClickTimerRef = useRef(null);
 
   useEffect(() => {
-    if (isBoolean(nightVisionOn)) {
-      setOptimistic(nightVisionOn);
+    if (isBoolean(on)) {
+      // Server-confirmed state can arrive after an optimistic click. Defer the
+      // reconciliation one tick so this effect stays a synchronization point
+      // instead of triggering React's synchronous set-state-in-effect lint rule.
+      const timer = window.setTimeout(() => setOptimistic(on), 0);
+      return () => window.clearTimeout(timer);
     }
-  }, [nightVisionOn]);
+    return undefined;
+  }, [on]);
 
   useEffect(
     () => () => {
@@ -58,7 +64,7 @@ export default function NightVisionControl({
       Mobile browsers, especially Safari, do not always dispatch a reliable
       synthetic click for a second finger while another finger is held on the
       drive pad. Toggle on the real touch pointerdown instead, then suppress the
-      follow-up click so one tap cannot flip night vision twice.
+      follow-up click so one tap cannot flip the GPIO-backed device twice.
     */
     event.preventDefault();
     suppressClickRef.current = true;
@@ -91,7 +97,7 @@ export default function NightVisionControl({
   };
 
   const buttonClasses = useMemo(() => {
-    // Night vision is used as a direct mobile press target, so selection and
+    // This control is used as a direct mobile press target, so selection and
     // Safari callout suppression live on the button itself rather than only on
     // the surrounding mobile column.
     const base =
@@ -114,7 +120,7 @@ export default function NightVisionControl({
       className={buttonClasses}
     >
       <span className="flex items-center gap-0.5">
-        <span className="text-sm font-semibold">Night Vision</span>
+        <span className="text-sm font-semibold">{label}</span>
         {keyLabel ? (
           <span className="rounded bg-slate-800 px-1 py-0.5 text-[0.6rem] font-semibold text-slate-200">
             {keyLabel}

@@ -41,7 +41,7 @@ const {
   serverTimezone,
   configuredSocials,
   ACTIVITY_SYNC_COOLDOWN_MS,
-  NIGHT_VISION_SYNC_COOLDOWN_MS,
+  GPIO_TOGGLE_SYNC_COOLDOWN_MS,
   PERIODIC_SYNC_MS,
 } = require('./constants');
 const { getState, setState } = require('./state');
@@ -175,29 +175,29 @@ modeEvents.on('change', () => {
 
 managerEvents.on('rover', (event = {}) => {
   const state = getState();
-  if (event.action === 'nightVision') {
+  if (event.action === 'headlight' || event.action === 'laser') {
     const now = Date.now();
-    const elapsed = now - state.lastNightVisionSync;
-    if (elapsed >= NIGHT_VISION_SYNC_COOLDOWN_MS) {
-      setState({ lastNightVisionSync: now });
-      logger.info('Night vision update; syncing all clients (immediate)');
+    const elapsed = now - state.lastGPIOToggleSync;
+    if (elapsed >= GPIO_TOGGLE_SYNC_COOLDOWN_MS) {
+      setState({ lastGPIOToggleSync: now });
+      logger.info('GPIO toggle update; syncing all clients (immediate)');
       syncAll();
       return;
     }
-    if (!state.pendingNightVisionSync) {
-      const delay = NIGHT_VISION_SYNC_COOLDOWN_MS - elapsed;
+    if (!state.pendingGPIOToggleSync) {
+      const delay = GPIO_TOGGLE_SYNC_COOLDOWN_MS - elapsed;
       const timer = setTimeout(() => {
-        setState({ lastNightVisionSync: Date.now(), pendingNightVisionSync: null });
-        logger.info('Night vision update; syncing all clients (delayed)');
+        setState({ lastGPIOToggleSync: Date.now(), pendingGPIOToggleSync: null });
+        logger.info('GPIO toggle update; syncing all clients (delayed)');
         syncAll();
       }, delay);
-      setState({ pendingNightVisionSync: timer });
+      setState({ pendingGPIOToggleSync: timer });
     }
     return;
   }
-  if (state.pendingNightVisionSync) {
-    clearTimeout(state.pendingNightVisionSync);
-    setState({ pendingNightVisionSync: null });
+  if (state.pendingGPIOToggleSync) {
+    clearTimeout(state.pendingGPIOToggleSync);
+    setState({ pendingGPIOToggleSync: null });
   }
   logger.info('Rover roster change; syncing all clients');
   syncAll();

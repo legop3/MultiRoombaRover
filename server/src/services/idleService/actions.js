@@ -8,7 +8,7 @@ const homeAssistantService = require('../homeAssistantService');
 const neatoService = require('../neatoService');
 const liftService = require('../liftService');
 const {
-  NIGHT_VISION_DISABLE_ACTION,
+  HEADLIGHT_DISABLE_ACTION,
   DOCK_COMMAND_BASE64,
 } = require('./constants');
 
@@ -60,7 +60,7 @@ async function dockAllRovers() {
   return { action: 'dockAllRovers', attempted, failed };
 }
 
-async function disableAllRoverNightVision() {
+async function disableAllRoverHeadlights() {
   const attempted = [];
   const failed = [];
   roverManager.rovers.forEach((record) => {
@@ -68,15 +68,15 @@ async function disableAllRoverNightVision() {
     const roverId = String(record.id);
     try {
       issueCommand(roverId, {
-        type: 'nightVision',
-        nightVision: { action: NIGHT_VISION_DISABLE_ACTION },
+        type: 'headlight',
+        headlight: { action: HEADLIGHT_DISABLE_ACTION },
       });
       attempted.push(roverId);
     } catch (err) {
       failed.push({ roverId, error: err.message });
     }
   });
-  return { action: 'disableRoverNightVision', attempted, failed };
+  return { action: 'disableRoverHeadlights', attempted, failed };
 }
 
 async function sendNeatoHome() {
@@ -100,7 +100,7 @@ async function raiseLift() {
 const idleActions = [
   turnOffRoomControls,
   // dockAllRovers,
-  disableAllRoverNightVision,
+  disableAllRoverHeadlights,
   sendNeatoHome,
   raiseLift,
 ];

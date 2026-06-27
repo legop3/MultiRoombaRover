@@ -40,7 +40,8 @@ function createRosterLifecycle(deps) {
         locked: false,
         lockReason: null,
         batteryState: null,
-        nightVisionState: null,
+        headlightState: null,
+        laserState: null,
         room: `rover:${id}`,
         lastSeen: Date.now(),
         lastMovementAt: Date.now(),
@@ -73,10 +74,19 @@ function createRosterLifecycle(deps) {
     } else {
       record.privateOpen = true;
     }
-    if (record.nightVisionState == null && meta?.nightVision?.enabled) {
-      const ledOn = Boolean(meta.nightVision.initialOn);
-      record.nightVisionState = {
-        nightVisionOn: !ledOn,
+    if (!meta?.headlight?.enabled) {
+      record.headlightState = null;
+    } else if (record.headlightState == null) {
+      record.headlightState = {
+        headlightOn: Boolean(meta.headlight.initialOn),
+        updatedAt: Date.now(),
+      };
+    }
+    if (!meta?.laser?.enabled) {
+      record.laserState = null;
+    } else if (record.laserState == null) {
+      record.laserState = {
+        laserOn: Boolean(meta.laser.initialOn),
         updatedAt: Date.now(),
       };
     }
@@ -221,9 +231,12 @@ function createRosterLifecycle(deps) {
       cameraServo: record.meta?.cameraServo,
       audio: record.meta?.audio,
       horn: record.meta?.horn,
-      nightVision: record.meta?.nightVision
-        ? { ...record.meta.nightVision, state: record.nightVisionState }
-        : record.meta?.nightVision,
+      headlight: record.meta?.headlight
+        ? { ...record.meta.headlight, state: record.headlightState }
+        : record.meta?.headlight,
+      laser: record.meta?.laser
+        ? { ...record.meta.laser, state: record.laserState }
+        : record.meta?.laser,
       locked: record.locked || (isPrivateRecord(record) && !isPrivateOpen(record)),
       lockReason: record.lockReason || (isPrivateRecord(record) && !isPrivateOpen(record) ? 'private' : null),
       lastSeen: record.lastSeen,
@@ -258,16 +271,19 @@ function createRosterLifecycle(deps) {
     });
   }
 
-  function setNightVisionState(roverId, nightVisionOn) {
+  function setToggleState(roverId, device, on) {
     const record = rovers.get(roverId);
     if (!record) return;
-    if (typeof nightVisionOn !== 'boolean') return;
-    record.nightVisionState = {
-      nightVisionOn,
+    if (typeof on !== 'boolean') return;
+    if (device !== 'headlight' && device !== 'laser') return;
+    const stateKey = device === 'headlight' ? 'headlightState' : 'laserState';
+    const onKey = `${device}On`;
+    record[stateKey] = {
+      [onKey]: on,
       updatedAt: Date.now(),
     };
     broadcastRoster();
-    managerEvents.emit('rover', { roverId, action: 'nightVision', record });
+    managerEvents.emit('rover', { roverId, action: device, record });
   }
 
   function handleHostStats(roverId, msg = {}) {
@@ -316,7 +332,7 @@ function createRosterLifecycle(deps) {
     getRosterForSocket,
     syncSpectatorRooms,
     broadcastRoster,
-    setNightVisionState,
+    setToggleState,
     handleHostStats,
     canSeeRover,
     canRequestControl,

@@ -56,11 +56,18 @@ horn:
   sineGain: 1.0
   sawGain: 0.7
   maxDuration: 1.2s
-nightVision:
+headlight:
   enabled: true
   gpioPin: 22
   gpioChip: gpiochip0
-  initialOn: true
+  initialOn: false
+  activeLow: true
+laser:
+  enabled: false
+  gpioPin: 27
+  gpioChip: gpiochip0
+  initialOn: false
+  activeLow: false
 autoSideBrush:
   enabled: true
   speed: 20

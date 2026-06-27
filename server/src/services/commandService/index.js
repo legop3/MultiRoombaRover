@@ -7,7 +7,7 @@ const roverManager = require('../roverManager');
 const { isAdmin, isLockdownAdmin } = require('../roleService');
 const { isDeterred } = require('../verificationService');
 const logger = require('../../globals/logger').child('commandService');
-const { isNightVisionBlocked } = require('../../rewards/definitions/darkness');
+const { isHeadlightBlocked } = require('../../rewards/definitions/darkness');
 
 const pendingCommands = new Map(); // id -> { roverId }
 const lastDriveActivity = new Map(); // roverId -> { ts, socketId, direction, speed, isAdmin }
@@ -132,7 +132,7 @@ function shouldRecordTurnActivity(type, payload = {}) {
 
   /*
     Other accepted commands are left as activity because they are tied to an
-    explicit user control: servo moves, night vision toggles, raw OI commands,
+    explicit user control: servo moves, headlight/laser toggles, raw OI commands,
     songs, reboot/update admin actions, and similar commands.
   */
   return true;
@@ -158,8 +158,8 @@ io.on('connection', (socket) => {
       if (type === 'audioLevels') {
         throw new Error('audioLevels command is service-managed');
       }
-      if (type === 'nightVision' && isNightVisionBlocked()) {
-        logger.info('Ignoring night vision command while darkness lock is active', { socketId: socket.id, roverId });
+      if (type === 'headlight' && isHeadlightBlocked()) {
+        logger.info('Ignoring headlight command while darkness lock is active', { socketId: socket.id, roverId });
         reply({ ignored: true, reason: 'darknessActive' });
         return;
       }

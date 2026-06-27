@@ -1,11 +1,11 @@
 // Aux Column
 // Purpose: Assembles the mobile auxiliary controls column, which is the left column by default.
-// Scope: Owns mobile aux/camera/night vision/horn wiring while reusing desktop variation components where intended.
+// Scope: Owns mobile aux/camera/headlight/laser/horn wiring while reusing desktop variation components where intended.
 import { useCallback, useRef } from 'react';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import HornControl from '../HornControl/index.jsx';
-import NightVisionControl from '../NightVisionControl/index.jsx';
+import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
 import { AUX_ZERO } from './constants.js';
 import VacuumControls from './VacuumControls.jsx';
 import VerticalCameraTilt from './VerticalCameraTilt.jsx';
@@ -15,16 +15,19 @@ function AuxColumnContent() {
   const roverId = useControlSelector((control) => control.state.roverId);
   const camera = useControlSelector((control) => control.state.camera);
   const horn = useControlSelector((control) => control.state.horn);
-  const nightVision = useControlSelector((control) => control.pipeline?.nightVision);
-  const nightVisionState = useControlSelector((control) => control.pipeline?.nightVisionState);
+  const headlight = useControlSelector((control) => control.pipeline?.headlight);
+  const headlightState = useControlSelector((control) => control.pipeline?.headlightState);
+  const laser = useControlSelector((control) => control.pipeline?.laser);
+  const laserState = useControlSelector((control) => control.pipeline?.laserState);
   const pipelineHorn = useControlSelector((control) => control.pipeline?.horn);
-  const { setServoAngle, setNightVision, setAuxMotors, startHorn, stopHorn } = useControlActions();
+  const { setServoAngle, setHeadlight, setLaser, setAuxMotors, startHorn, stopHorn } = useControlActions();
   const dockAssist = useManualDockAssist();
   const disabled = !roverId;
   const activeAuxButtonRef = useRef(null);
   const cameraConfig = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
-  const nightVisionAvailable = Boolean(roverId && nightVision);
+  const headlightAvailable = Boolean(roverId && headlight);
+  const laserAvailable = Boolean(roverId && laser);
   const hornAvailable = Boolean(roverId && pipelineHorn);
   const hornBlocked = horn?.overheated;
   const cameraMin = typeof cameraConfig?.minAngle === 'number' ? cameraConfig.minAngle : -45;
@@ -37,13 +40,22 @@ function AuxColumnContent() {
         : (cameraMin + cameraMax) / 2;
   const cameraDisabled = Boolean(disabled || dockAssist.cameraLocked);
 
-  const handleNightVisionToggle = useCallback(
+  const handleHeadlightToggle = useCallback(
     (nextOn) => {
-      if (!nightVisionAvailable) return;
-      trackAnalyticsEvent('night_vision_toggle', { roverId, source: 'mobile_control', enabled: Boolean(nextOn) });
-      setNightVision(nextOn);
+      if (!headlightAvailable) return;
+      trackAnalyticsEvent('headlight_toggle', { roverId, source: 'mobile_control', enabled: Boolean(nextOn) });
+      setHeadlight(nextOn);
     },
-    [nightVisionAvailable, roverId, setNightVision],
+    [headlightAvailable, roverId, setHeadlight],
+  );
+
+  const handleLaserToggle = useCallback(
+    (nextOn) => {
+      if (!laserAvailable) return;
+      trackAnalyticsEvent('laser_toggle', { roverId, source: 'mobile_control', enabled: Boolean(nextOn) });
+      setLaser(nextOn);
+    },
+    [laserAvailable, roverId, setLaser],
   );
 
   const handleHornStart = useCallback(() => {
@@ -93,13 +105,27 @@ function AuxColumnContent() {
             />
           </div>
         ) : null}
-        {nightVisionAvailable ? (
-          <NightVisionControl
-            nightVisionOn={nightVisionState?.nightVisionOn}
-            disabled={disabled}
-            onToggle={handleNightVisionToggle}
-            heightClass="h-full"
-          />
+        {(headlightAvailable || laserAvailable) ? (
+          <div className="mobile-touch-control flex min-h-0 flex-1 flex-col gap-0.5">
+            {headlightAvailable ? (
+              <GPIOToggleControl
+                label="Headlight"
+                on={headlightState?.headlightOn}
+                disabled={disabled}
+                onToggle={handleHeadlightToggle}
+                heightClass="h-full"
+              />
+            ) : null}
+            {laserAvailable ? (
+              <GPIOToggleControl
+                label="Laser"
+                on={laserState?.laserOn}
+                disabled={disabled}
+                onToggle={handleLaserToggle}
+                heightClass="h-full"
+              />
+            ) : null}
+          </div>
         ) : null}
       </div>
       <div className="mobile-touch-control min-h-0">

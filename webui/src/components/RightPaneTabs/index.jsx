@@ -19,7 +19,7 @@ import { useControlActions, useControlSelector } from '../../controls/index.js';
 import RoverQueuesPanel from '../RoverQueuesPanel/index.jsx';
 import RawUserPilePanel from '../RawUserPilePanel/index.jsx';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
-import NightVisionControl from '../NightVisionControl/index.jsx';
+import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
 import HornControl from '../HornControl/index.jsx';
 import CameraTiltControl from '../CameraTiltControl/index.jsx';
 import VipPanel from '../VipPanel/index.jsx';
@@ -62,17 +62,20 @@ function DriveDockPanel() {
   const keymap = useControlSelector((control) => control.state.keymap);
   const camera = useControlSelector((control) => control.state.camera);
   const horn = useControlSelector((control) => control.state.horn);
-  const nightVision = useControlSelector((control) => control.pipeline?.nightVision);
-  const nightVisionState = useControlSelector((control) => control.pipeline?.nightVisionState);
+  const headlight = useControlSelector((control) => control.pipeline?.headlight);
+  const headlightState = useControlSelector((control) => control.pipeline?.headlightState);
+  const laser = useControlSelector((control) => control.pipeline?.laser);
+  const laserState = useControlSelector((control) => control.pipeline?.laserState);
   const pipelineHorn = useControlSelector((control) => control.pipeline?.horn);
-  const { setServoAngle, setNightVision, startHorn, stopHorn } = useControlActions();
+  const { setServoAngle, setHeadlight, setLaser, startHorn, stopHorn } = useControlActions();
   const dockAssist = useManualDockAssist();
   const driveDockState = useDriveDockState(roverId);
   const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
   const config = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && config);
-  const nightVisionAvailable = Boolean(roverId && nightVision);
+  const headlightAvailable = Boolean(roverId && headlight);
+  const laserAvailable = Boolean(roverId && laser);
   const hornAvailable = Boolean(roverId && pipelineHorn);
   const hornBlocked = horn?.overheated;
   const min = typeof config?.minAngle === 'number' ? config.minAngle : -30;
@@ -83,16 +86,21 @@ function DriveDockPanel() {
       : typeof config?.homeAngle === 'number'
         ? config.homeAngle
         : (min + max) / 2;
-  const nightVisionLabel = formatKeyLabel(keymap?.nightVisionToggle?.[0]);
+  const headlightLabel = formatKeyLabel(keymap?.headlightToggle?.[0]);
+  const laserLabel = formatKeyLabel(keymap?.laserToggle?.[0]);
   const hornLabel = formatKeyLabel(keymap?.hornHonk?.[0]);
   const upLabel = formatKeyLabel(keymap?.cameraUp?.[0]);
   const downLabel = formatKeyLabel(keymap?.cameraDown?.[0]);
   const cameraDisabled = Boolean(!roverId || dockAssist.cameraLocked);
   const trackedControls = useMemo(
     () => ({
-      setNightVision: (nextOn) => {
-        trackAnalyticsEvent('night_vision_toggle', { roverId, source: 'desktop_control', enabled: Boolean(nextOn) });
-        setNightVision(nextOn);
+      setHeadlight: (nextOn) => {
+        trackAnalyticsEvent('headlight_toggle', { roverId, source: 'desktop_control', enabled: Boolean(nextOn) });
+        setHeadlight(nextOn);
+      },
+      setLaser: (nextOn) => {
+        trackAnalyticsEvent('laser_toggle', { roverId, source: 'desktop_control', enabled: Boolean(nextOn) });
+        setLaser(nextOn);
       },
       startHorn: () => {
         trackAnalyticsEvent('horn_start', { roverId, source: 'desktop_control' });
@@ -100,7 +108,7 @@ function DriveDockPanel() {
       },
       stopHorn,
     }),
-    [roverId, setNightVision, startHorn, stopHorn],
+    [roverId, setHeadlight, setLaser, startHorn, stopHorn],
   );
 
   return (
@@ -113,13 +121,27 @@ function DriveDockPanel() {
       <DriveDockAction layout="desktop" expand driveDockState={driveDockState} />
       {!hideInlineControls ? (
         <div className={`${themeStackClass} p-0 text-sm text-slate-200`}>
-          {nightVisionAvailable && (
-            <NightVisionControl
-              nightVisionOn={nightVisionState?.nightVisionOn}
-              disabled={!roverId}
-              onToggle={trackedControls.setNightVision}
-              keyLabel={nightVisionLabel}
-            />
+          {(headlightAvailable || laserAvailable) && (
+            <div className="grid grid-cols-2 gap-1">
+              {headlightAvailable && (
+                <GPIOToggleControl
+                  label="Headlight"
+                  on={headlightState?.headlightOn}
+                  disabled={!roverId}
+                  onToggle={trackedControls.setHeadlight}
+                  keyLabel={headlightLabel}
+                />
+              )}
+              {laserAvailable && (
+                <GPIOToggleControl
+                  label="Laser"
+                  on={laserState?.laserOn}
+                  disabled={!roverId}
+                  onToggle={trackedControls.setLaser}
+                  keyLabel={laserLabel}
+                />
+              )}
+            </div>
           )}
           {hornAvailable && (
             <HornControl

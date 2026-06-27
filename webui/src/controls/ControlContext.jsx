@@ -53,8 +53,10 @@ const CONTROL_ACTION_NAMES = [
   'stopAllMotion',
   'sendOiCommand',
   'setSensorStream',
-  'setNightVision',
-  'toggleNightVision',
+  'setHeadlight',
+  'toggleHeadlight',
+  'setLaser',
+  'toggleLaser',
   'updateKeyBinding',
   'resetKeyBindings',
   'registerInputState',
@@ -469,28 +471,38 @@ export function ControlSystemProvider({ children }) {
     [pipeline],
   );
 
-  const setNightVision = useCallback(
-    (nightVisionOn) => {
-      if (!pipeline.nightVision) return;
-      if (typeof nightVisionOn === 'boolean') {
-        /*
-          Rover daemon command names describe the IR LED, while the UI state
-          describes camera visibility. LED "off" means nightVisionOn=true, and
-          LED "on" means nightVisionOn=false.
-        */
-        const action = nightVisionOn ? 'off' : 'on';
-        pipeline.sendNightVision(action);
-      } else {
-        pipeline.sendNightVision('toggle');
-      }
+  const setHeadlight = useCallback(
+    (headlightOn) => {
+      if (!pipeline.headlight) return;
+      // Web controls now speak in logical device state. Any electrical
+      // inversion needed by the actual GPIO driver is handled by roverd's
+      // activeLow config, so this command stays readable and direct.
+      const action = typeof headlightOn === 'boolean' ? (headlightOn ? 'on' : 'off') : 'toggle';
+      pipeline.sendHeadlight(action);
       recordControlIntent();
     },
     [pipeline, recordControlIntent],
   );
 
-  const toggleNightVision = useCallback(() => {
-    setNightVision();
-  }, [setNightVision]);
+  const toggleHeadlight = useCallback(() => {
+    setHeadlight();
+  }, [setHeadlight]);
+
+  const setLaser = useCallback(
+    (laserOn) => {
+      if (!pipeline.laser) return;
+      // The laser shares the same logical toggle contract as the headlight; it
+      // is separate only because it has its own GPIO pin, UI control, and keybind.
+      const action = typeof laserOn === 'boolean' ? (laserOn ? 'on' : 'off') : 'toggle';
+      pipeline.sendLaser(action);
+      recordControlIntent();
+    },
+    [pipeline, recordControlIntent],
+  );
+
+  const toggleLaser = useCallback(() => {
+    setLaser();
+  }, [setLaser]);
 
   const setSongNote = useCallback(
     (note) => {
@@ -665,8 +677,10 @@ export function ControlSystemProvider({ children }) {
       stopAllMotion,
       sendOiCommand,
       setSensorStream,
-      setNightVision,
-      toggleNightVision,
+      setHeadlight,
+      toggleHeadlight,
+      setLaser,
+      toggleLaser,
       updateKeyBinding,
       resetKeyBindings,
       registerInputState,
@@ -689,8 +703,10 @@ export function ControlSystemProvider({ children }) {
       stopAllMotion,
       sendOiCommand,
       setSensorStream,
-      setNightVision,
-      toggleNightVision,
+      setHeadlight,
+      toggleHeadlight,
+      setLaser,
+      toggleLaser,
       updateKeyBinding,
       resetKeyBindings,
       registerInputState,

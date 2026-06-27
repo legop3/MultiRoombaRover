@@ -54,7 +54,8 @@ export default function GamepadInputManager() {
     setAuxMotors,
     setServoAngle,
     runMacro,
-    toggleNightVision,
+    toggleHeadlight,
+    toggleLaser,
     registerInputState,
   } = useControlActions();
   const cameraAngle = useControlSelector((control) => control.state.camera?.angle);
@@ -175,7 +176,8 @@ export default function GamepadInputManager() {
       setDriveVector,
       setMode,
       setServoAngle,
-      toggleNightVision,
+      toggleHeadlight,
+      toggleLaser,
     };
   });
 
@@ -286,11 +288,18 @@ export default function GamepadInputManager() {
         handleButtonEdge('dockMacro', false);
       }
 
-      if (outputs.buttons.nightVisionToggle && handleButtonEdge('nightVisionToggle', true)) {
-        trackAnalyticsEvent('night_vision_toggle', { roverId: latest.roverId || '', source: 'gamepad' });
-        latest.toggleNightVision();
-      } else if (!outputs.buttons.nightVisionToggle) {
-        handleButtonEdge('nightVisionToggle', false);
+      if (outputs.buttons.headlightToggle && handleButtonEdge('headlightToggle', true)) {
+        trackAnalyticsEvent('headlight_toggle', { roverId: latest.roverId || '', source: 'gamepad' });
+        latest.toggleHeadlight();
+      } else if (!outputs.buttons.headlightToggle) {
+        handleButtonEdge('headlightToggle', false);
+      }
+
+      if (outputs.buttons.laserToggle && handleButtonEdge('laserToggle', true)) {
+        trackAnalyticsEvent('laser_toggle', { roverId: latest.roverId || '', source: 'gamepad' });
+        latest.toggleLaser();
+      } else if (!outputs.buttons.laserToggle) {
+        handleButtonEdge('laserToggle', false);
       }
 
       if (Math.abs(outputs.cameraAxis) > 0.001) {

@@ -10,7 +10,7 @@ const serverTimezone = config.timezone || null;
 const configuredSocials = Array.isArray(config.socials) ? config.socials : null;
 
 const ACTIVITY_SYNC_COOLDOWN_MS = 3000;
-const NIGHT_VISION_SYNC_COOLDOWN_MS = 1000;
+const GPIO_TOGGLE_SYNC_COOLDOWN_MS = 1000;
 const PERIODIC_SYNC_MS = 20000;
 
 module.exports = {
@@ -19,6 +19,6 @@ module.exports = {
   serverTimezone,
   configuredSocials,
   ACTIVITY_SYNC_COOLDOWN_MS,
-  NIGHT_VISION_SYNC_COOLDOWN_MS,
+  GPIO_TOGGLE_SYNC_COOLDOWN_MS,
   PERIODIC_SYNC_MS,
 };

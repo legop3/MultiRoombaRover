@@ -32,6 +32,18 @@ cameraServo:
   homeAngle: 0
   nudgeDegrees: 2
   allowRawPulse: false
+headlight:
+  enabled: true
+  gpioPin: 22
+  gpioChip: gpiochip0
+  initialOn: false
+  activeLow: true
+laser:
+  enabled: false
+  gpioPin: 27
+  gpioChip: gpiochip0
+  initialOn: false
+  activeLow: false
 autoSideBrush:
   enabled: true
   speed: 20

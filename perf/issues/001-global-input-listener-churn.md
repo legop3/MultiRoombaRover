@@ -143,7 +143,7 @@ useEffect(() => {
   setAuxMotors,
   setDriveVector,
   setMode,
-  toggleNightVision,
+  toggleHeadlight,
   dockAssist,
 ]);
 ```
@@ -276,4 +276,3 @@ Expected improvements:
   can fire.
 - Verify horn hold, mic push-to-talk, chat focus, drive macro, dock assist, camera tilt, song
   controls, and Home Assistant shortcuts.
-

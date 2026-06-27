@@ -18,5 +18,7 @@ media:
   service: mediamtx.service
   healthUrl: http://127.0.0.1:9997/v3/paths/list
   healthInterval: 30s
-nightVision:
+headlight:
+  enabled: false
+laser:
   enabled: false

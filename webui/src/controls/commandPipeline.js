@@ -29,9 +29,14 @@ export function useCommandPipeline(options = {}) {
     return rosterEntry.cameraServo;
   }, [rosterEntry]);
 
-  const nightVision = useMemo(() => {
-    if (!rosterEntry?.nightVision || !rosterEntry.nightVision.enabled) return null;
-    return rosterEntry.nightVision;
+  const headlight = useMemo(() => {
+    if (!rosterEntry?.headlight || !rosterEntry.headlight.enabled) return null;
+    return rosterEntry.headlight;
+  }, [rosterEntry]);
+
+  const laser = useMemo(() => {
+    if (!rosterEntry?.laser || !rosterEntry.laser.enabled) return null;
+    return rosterEntry.laser;
   }, [rosterEntry]);
 
   const horn = useMemo(() => {
@@ -39,7 +44,8 @@ export function useCommandPipeline(options = {}) {
     return rosterEntry.horn;
   }, [rosterEntry]);
 
-  const nightVisionState = useMemo(() => rosterEntry?.nightVision?.state ?? null, [rosterEntry]);
+  const headlightState = useMemo(() => rosterEntry?.headlight?.state ?? null, [rosterEntry]);
+  const laserState = useMemo(() => rosterEntry?.laser?.state ?? null, [rosterEntry]);
 
   const emitCommand = useCallback(
     (payload, cb) => {
@@ -167,16 +173,28 @@ export function useCommandPipeline(options = {}) {
     [roverId, sendOiCommand, sendDriveDirect, sendAuxMotors, sendServoAngle],
   );
 
-  const sendNightVision = useCallback(
+  const sendHeadlight = useCallback(
     (action = 'toggle') => {
-      if (!roverId || !nightVision) return null;
+      if (!roverId || !headlight) return null;
       emitCommand({
-        type: 'nightVision',
-        data: { nightVision: { action } },
+        type: 'headlight',
+        data: { headlight: { action } },
       });
       return action;
     },
-    [emitCommand, nightVision, roverId],
+    [emitCommand, headlight, roverId],
+  );
+
+  const sendLaser = useCallback(
+    (action = 'toggle') => {
+      if (!roverId || !laser) return null;
+      emitCommand({
+        type: 'laser',
+        data: { laser: { action } },
+      });
+      return action;
+    },
+    [emitCommand, laser, roverId],
   );
 
   const sendHorn = useCallback(
@@ -222,8 +240,10 @@ export function useCommandPipeline(options = {}) {
       roverId,
       rosterEntry,
       servoConfig,
-      nightVision,
-      nightVisionState,
+      headlight,
+      headlightState,
+      laser,
+      laserState,
       horn,
       emitCommand,
       enableSensorStream,
@@ -231,7 +251,8 @@ export function useCommandPipeline(options = {}) {
       sendAuxMotors,
       sendServoAngle,
       sendOiCommand,
-      sendNightVision,
+      sendHeadlight,
+      sendLaser,
       sendHorn,
       sendSong,
       runMacroSteps,
@@ -240,8 +261,10 @@ export function useCommandPipeline(options = {}) {
       roverId,
       rosterEntry,
       servoConfig,
-      nightVision,
-      nightVisionState,
+      headlight,
+      headlightState,
+      laser,
+      laserState,
       horn,
       emitCommand,
       enableSensorStream,
@@ -249,7 +272,8 @@ export function useCommandPipeline(options = {}) {
       sendAuxMotors,
       sendServoAngle,
       sendOiCommand,
-      sendNightVision,
+      sendHeadlight,
+      sendLaser,
       sendHorn,
       runMacroSteps,
     ],

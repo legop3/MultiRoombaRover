@@ -2,19 +2,13 @@
 // Purpose: Defines the darkness reward that alters visibility/lighting behavior. Scope: Encapsulates reward metadata and effect configuration for runtime execution.
 const DURATION_MS = 15 * 60 * 1000;
 const LIGHT_ENFORCE_TICK_MS = 3000;
-// Rover daemon semantics are inverted:
-// action "on" => IR LED on => nightVisionOn=false
-// action "off" => IR LED off => nightVisionOn=true
-function actionForNightVisionState(nightVisionOn) {
-  return nightVisionOn ? 'off' : 'on';
-}
 
 let activeTimer = null;
 let enforceLightsTimer = null;
-let nightVisionLockUntil = 0;
+let headlightLockUntil = 0;
 
-function isNightVisionBlocked() {
-  return Date.now() < nightVisionLockUntil;
+function isHeadlightBlocked() {
+  return Date.now() < headlightLockUntil;
 }
 
 function clearTimers() {
@@ -43,7 +37,7 @@ async function forceAllLightsOff(ctx) {
 
 async function stopDarkness(ctx, effect = {}) {
   clearTimers();
-  nightVisionLockUntil = 0;
+  headlightLockUntil = 0;
 
   const prevLights = Array.isArray(effect.prevLights) ? effect.prevLights : [];
   await Promise.all(
@@ -73,17 +67,17 @@ async function stopDarkness(ctx, effect = {}) {
     ctx.logger.warn('darkness restore light lock failed', { error: err.message });
   }
 
-  const prevNightVision = effect.prevNightVision && typeof effect.prevNightVision === 'object'
-    ? effect.prevNightVision
+  const prevHeadlights = effect.prevHeadlights && typeof effect.prevHeadlights === 'object'
+    ? effect.prevHeadlights
     : {};
-  Object.entries(prevNightVision).forEach(([roverId, wasOn]) => {
+  Object.entries(prevHeadlights).forEach(([roverId, wasOn]) => {
     try {
       ctx.issueCommand(String(roverId), {
-        type: 'nightVision',
-        nightVision: { action: actionForNightVisionState(Boolean(wasOn)) },
+        type: 'headlight',
+        headlight: { action: Boolean(wasOn) ? 'on' : 'off' },
       });
     } catch (err) {
-      ctx.logger.warn('darkness restore nightVision failed', { roverId, error: err.message });
+      ctx.logger.warn('darkness restore headlight failed', { roverId, error: err.message });
     }
   });
 
@@ -94,7 +88,7 @@ async function startDarkness(ctx, effect) {
   clearTimers();
   const endsAt = Number(effect.endsAt || Date.now() + DURATION_MS);
   const remaining = Math.max(0, endsAt - Date.now());
-  nightVisionLockUntil = endsAt;
+  headlightLockUntil = endsAt;
   try {
     await ctx.setHomeAssistantLightsLockedOn(true, {
       source: 'buttonbox:darkness',
@@ -122,31 +116,31 @@ async function startDarkness(ctx, effect) {
 module.exports = {
   id: 'darkness',
   name: 'Darkness',
-  isNightVisionBlocked,
+  isHeadlightBlocked,
   goal: 400,
   async run(ctx) {
     const entities = ctx.getHomeAssistantEntities();
     const prevLights = entities.map((entity) => ({ id: entity.id, state: entity.state === 'on' ? 'on' : 'off' }));
     await forceAllLightsOff(ctx);
 
-    const prevNightVision = {};
+    const prevHeadlights = {};
     ctx.listOnlineRovers().forEach((rover) => {
-      const state = rover?.nightVision?.state;
-      const nightVisionOn = Boolean(state && state.nightVisionOn === true);
-      prevNightVision[String(rover.id)] = nightVisionOn;
+      const state = rover?.headlight?.state;
+      const headlightOn = Boolean(state && state.headlightOn === true);
+      prevHeadlights[String(rover.id)] = headlightOn;
       try {
         ctx.issueCommand(String(rover.id), {
-          type: 'nightVision',
-          nightVision: { action: actionForNightVisionState(false) },
+          type: 'headlight',
+          headlight: { action: 'off' },
         });
       } catch (err) {
-        ctx.logger.warn('darkness nightVision off failed', { roverId: rover.id, error: err.message });
+        ctx.logger.warn('darkness headlight off failed', { roverId: rover.id, error: err.message });
       }
     });
 
     const prevPolicy = ctx.getHomeAssistantLightPolicy?.() || null;
     const prevLightLockState = prevPolicy?.lockState || (prevPolicy?.lockedOn ? 'on' : null);
-    const effect = { endsAt: Date.now() + DURATION_MS, prevLights, prevNightVision, prevLightLockState };
+    const effect = { endsAt: Date.now() + DURATION_MS, prevLights, prevHeadlights, prevLightLockState };
     await startDarkness(ctx, effect);
     ctx.sendAlert({ color: '#212121', title: 'Darkness', message: 'Darkness effect active for 120 seconds.' });
   },

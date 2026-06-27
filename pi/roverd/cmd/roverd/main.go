@@ -69,19 +69,28 @@ func main() {
 		defer cameraServo.Close()
 	}
 
-	var nightVision *roverd.NightVisionLight
-	if cfg.NightVision.Enabled {
-		nightVision, err = roverd.NewNightVisionLight(cfg.NightVision, logger)
+	var headlight *roverd.GPIOToggle
+	if cfg.Headlight.Enabled {
+		headlight, err = roverd.NewGPIOToggle("headlight", cfg.Headlight, logger)
 		if err != nil {
-			logger.Fatalf("init night vision: %v", err)
+			logger.Fatalf("init headlight: %v", err)
 		}
-		defer nightVision.Close()
+		defer headlight.Close()
+	}
+
+	var laser *roverd.GPIOToggle
+	if cfg.Laser.Enabled {
+		laser, err = roverd.NewGPIOToggle("laser", cfg.Laser, logger)
+		if err != nil {
+			logger.Fatalf("init laser: %v", err)
+		}
+		defer laser.Close()
 	}
 
 	autoCharge := roverd.NewAutoChargeController(adapter, eventStream, logger)
 	go autoCharge.Run(ctx, sensorSamples)
 
-	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, nightVision, logger)
+	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, headlight, laser, logger)
 
 	retryDelay := time.Second
 	for ctx.Err() == nil {
