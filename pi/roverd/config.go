@@ -296,6 +296,9 @@ func LoadConfig(path string) (*Config, error) {
 		}
 		cfg.Media.AudioForwardURL = derived
 	}
+	cfg.Media.PublishURL = normalizeSRTURLForLowLatency(cfg.Media.PublishURL)
+	cfg.Media.AudioPublishURL = normalizeSRTURLForLowLatency(cfg.Media.AudioPublishURL)
+	cfg.Media.AudioForwardURL = normalizeSRTURLForLowLatency(cfg.Media.AudioForwardURL)
 	if err := validateServoConfig(&cfg.CameraServo); err != nil {
 		return nil, fmt.Errorf("cameraServo: %w", err)
 	}
@@ -440,9 +443,40 @@ func deriveSRTURL(serverURL, streamName string, port int, mode string) (string, 
 		port = 9000
 	}
 	escaped := url.PathEscape(streamName)
-	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=%s&latency=10&mode=caller&transtype=live&pkt_size=1316", host, port, escaped, mode), nil
+	return fmt.Sprintf("srt://%s:%d?streamid=%%23%%21::r=%s,m=%s&latency=20000&mode=caller&transtype=live&pkt_size=1316", host, port, escaped, mode), nil
 }
 
+func normalizeSRTURLForLowLatency(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || !strings.HasPrefix(trimmed, "srt://") {
+		return raw
+	}
+
+	// SRT stream IDs commonly start with "#!::". In a URL, a literal "#"
+	// begins the fragment section, so ffmpeg/libsrt can ignore query options
+	// placed after it. MediaMTX then falls back to the SRT default latency,
+	// which showed up in diagnostics as a 120 ms receive delay even though the
+	// URL text contained latency=10. Percent-encoding only the "#!" prefix keeps
+	// MediaMTX's stream ID parser behavior while allowing latency/mode/transtype
+	// to remain real SRT query parameters.
+	normalized := strings.ReplaceAll(trimmed, "streamid=#!::", "streamid=%23%21::")
+
+	// ffmpeg's SRT latency URL option is expressed in microseconds. Use 20 ms as
+	// the default interactive rover target: much lower than the 120 ms fallback,
+	// but not so aggressive that tiny LAN jitter immediately causes drops.
+	if srtLegacyLatencyRe.MatchString(normalized) {
+		normalized = srtLegacyLatencyRe.ReplaceAllString(normalized, "${1}20000${2}")
+	} else if !strings.Contains(normalized, "latency=") {
+		separator := "&"
+		if !strings.Contains(normalized, "?") {
+			separator = "?"
+		}
+		normalized += separator + "latency=20000"
+	}
+	return normalized
+}
+
+var srtLegacyLatencyRe = regexp.MustCompile(`([?&]latency=)10($|&)`)
 var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
 func normalizeHexColor(raw string) (string, error) {
