@@ -1,5 +1,7 @@
 1.  fix rover request spam queue cheat
-2.  fix this:
+2. add lockdown admin only page for managing the user db
+3. put rover power stats / bars / graph in corners of top-down view
+4.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^
