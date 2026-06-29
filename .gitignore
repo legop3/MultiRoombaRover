@@ -18,6 +18,7 @@ server/data/global-objective.json
 server/data/admin-reason.json
 server/data/buttonbox-state.json
 server/data/barcode-tts-cache/
+server/data/rover-odometers.json
 webui/package-lock.json
 !server/data/
 !server/data/barcode-registry.json
