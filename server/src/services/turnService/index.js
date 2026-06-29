@@ -26,11 +26,118 @@ const {
 } = require('./state');
 const { stopRover, removeDriverCompletely } = require('./actions');
 
-function driverAdded(roverId, socketId, force) {
+function normalizeDriverAddOptions(options = {}) {
+  if (typeof options === 'boolean') {
+    return { force: options, pauseQueue: false };
+  }
+  return {
+    force: Boolean(options?.force),
+    pauseQueue: Boolean(options?.pauseQueue),
+  };
+}
+
+function clearTurnTimer(roverId, queue) {
+  /*
+    Timer cleanup is centralized because normal turn end, non-turn modes, admin
+    pauses, and empty queues all need the same invariant: no stale timeout should
+    be left behind that can rotate the queue later.
+  */
+  if (queue) clearTimeout(queue.timer);
+  turnDeadlines.delete(roverId);
+}
+
+function clearIdleTimer(roverId) {
+  /*
+    The idle timer is separate from the turn timer because idle skips are about
+    user activity inside a turn. Admin takeover pauses both systems, while normal
+    activity only disarms the idle timer for the current turn.
+  */
+  clearTimeout(idleTimers.get(roverId));
+  idleDeadlines.delete(roverId);
+  idleTimers.delete(roverId);
+}
+
+function clearQueueTimers(roverId, queue) {
+  clearTurnTimer(roverId, queue);
+  clearIdleTimer(roverId);
+}
+
+function isQueuePaused(queue) {
+  return Boolean(
+    queue &&
+    queue.pausedByAdminSocketId &&
+    queue.current === queue.pausedByAdminSocketId &&
+    queue.queue.includes(queue.pausedByAdminSocketId),
+  );
+}
+
+function clearInvalidAdminPause(queue) {
+  /*
+    A pause only means something while that admin socket is still in the queue.
+    Disconnect cleanup and release paths remove sockets first, so this guard lets
+    the rest of the turn code safely resume without needing special stale-state
+    branches everywhere.
+  */
+  if (!queue?.pausedByAdminSocketId) return;
+  if (queue.queue.includes(queue.pausedByAdminSocketId)) return;
+  queue.pausedByAdminSocketId = null;
+}
+
+function syncPausedQueue(roverId, queue) {
+  /*
+    During admin takeover, the queue is deliberately frozen: the admin stays at
+    the front and active, existing users keep their order behind the admin, and
+    no turn or idle timeout is allowed to remove the admin from control.
+  */
+  setActiveDriver(roverId, queue.pausedByAdminSocketId);
+  clearQueueTimers(roverId, queue);
+  idleDisarmed.delete(roverId);
+  turnEvents.emit('queue', { roverId, reason: 'admin-pause' });
+}
+
+function applyAdminQueuePause(roverId, socketId, queue) {
+  /*
+    Force-control should be a takeover, not a destructive queue reset. Moving the
+    admin to index 0 makes the visible queue match control ownership, while the
+    filter preserves every other driver's relative order for when the admin
+    releases the rover.
+  */
+  queue.queue = [socketId, ...queue.queue.filter((id) => id !== socketId)];
+  queue.current = socketId;
+  queue.pausedByAdminSocketId = socketId;
+  syncPausedQueue(roverId, queue);
+}
+
+function driverAdded(roverId, socketId, options = {}) {
+  const { force, pauseQueue } = normalizeDriverAddOptions(options);
   const queue = ensureQueue(roverId);
-  if (!queue.queue.includes(socketId)) {
+  const alreadyQueued = queue.queue.includes(socketId);
+
+  if (pauseQueue) {
+    applyAdminQueuePause(roverId, socketId, queue);
+    return;
+  }
+
+  if (!alreadyQueued) {
     queue.queue.push(socketId);
   }
+
+  /*
+    Re-requesting the same rover must not be treated as a fresh queue mutation.
+    The old behavior always called syncState(), which always rebuilt the turn
+    timeout in multi-driver turns mode and let the current driver extend a turn
+    forever by clicking their rover again.
+  */
+  if (alreadyQueued && queue.current && !force) {
+    clearInvalidAdminPause(queue);
+    if (isQueuePaused(queue)) {
+      syncPausedQueue(roverId, queue);
+    } else {
+      turnEvents.emit('queue', { roverId, reason: 'duplicate-driver-request' });
+    }
+    return;
+  }
+
   if (!queue.current || force) {
     queue.current = socketId;
   }
@@ -41,6 +148,16 @@ function driverRemoved(roverId, socketId) {
   const queue = driverQueues.get(roverId);
   if (!queue) return;
   queue.queue = queue.queue.filter((id) => id !== socketId);
+  if (queue.pausedByAdminSocketId === socketId) {
+    /*
+      Releasing or disconnecting the pausing admin is the handoff point back to
+      normal turns. The users were never removed, so advanceTurn() can resume at
+      the first preserved user after the admin has been filtered out above.
+    */
+    queue.pausedByAdminSocketId = null;
+  } else {
+    clearInvalidAdminPause(queue);
+  }
   const skips = idleSkips.get(roverId);
   if (skips) {
     skips.delete(socketId);
@@ -62,12 +179,10 @@ function cleanupRover(roverId) {
   if (queue) {
     clearTimeout(queue.timer);
   }
-  clearTimeout(idleTimers.get(roverId));
+  clearIdleTimer(roverId);
   driverQueues.delete(roverId);
   activeDrivers.delete(roverId);
   turnDeadlines.delete(roverId);
-  idleDeadlines.delete(roverId);
-  idleTimers.delete(roverId);
   idleSkips.delete(roverId);
   idleDisarmed.delete(roverId);
 }
@@ -91,13 +206,15 @@ function isQueuedDriver(roverId, socketId) {
 function syncState(roverId) {
   const mode = getMode();
   const queue = ensureQueue(roverId);
+  clearInvalidAdminPause(queue);
+  if (isQueuePaused(queue)) {
+    syncPausedQueue(roverId, queue);
+    return;
+  }
   if (mode !== MODES.TURNS || queue.queue.length <= 1) {
     queue.current = queue.queue[0] || null;
     setActiveDriver(roverId, queue.current);
-    clearTimeout(queue.timer);
-    turnDeadlines.delete(roverId);
-    clearTimeout(idleTimers.get(roverId));
-    idleDeadlines.delete(roverId);
+    clearQueueTimers(roverId, queue);
     idleDisarmed.delete(roverId);
     turnEvents.emit('queue', { roverId });
     return;
@@ -115,6 +232,10 @@ function syncState(roverId) {
 function scheduleNextTurn(roverId) {
   const queue = driverQueues.get(roverId);
   if (!queue) return;
+  if (isQueuePaused(queue)) {
+    syncPausedQueue(roverId, queue);
+    return;
+  }
   clearTimeout(queue.timer);
   const deadline = Date.now() + TURN_DURATION_MS;
   turnDeadlines.set(roverId, deadline);
@@ -124,10 +245,10 @@ function scheduleNextTurn(roverId) {
 
 function scheduleIdleTimer(roverId) {
   const queue = driverQueues.get(roverId);
-  clearTimeout(idleTimers.get(roverId));
-  idleDeadlines.delete(roverId);
+  clearIdleTimer(roverId);
   if (
     !queue ||
+    isQueuePaused(queue) ||
     getMode() !== MODES.TURNS ||
     queue.queue.length <= 1 ||
     !queue.current ||
@@ -188,14 +309,16 @@ function handleIdleTimeout(roverId, expectedDriver) {
 function advanceTurn(roverId) {
   const queue = driverQueues.get(roverId);
   if (!queue) return;
+  clearInvalidAdminPause(queue);
+  if (isQueuePaused(queue)) {
+    syncPausedQueue(roverId, queue);
+    return;
+  }
   if (queue.queue.length === 0) {
     stopRover(roverId);
-    clearTimeout(queue.timer);
+    clearTurnTimer(roverId, queue);
     setActiveDriver(roverId, null);
-    turnDeadlines.delete(roverId);
-    idleDeadlines.delete(roverId);
-    clearTimeout(idleTimers.get(roverId));
-    idleTimers.delete(roverId);
+    clearIdleTimer(roverId);
     idleDisarmed.delete(roverId);
     turnEvents.emit('queue', { roverId });
     return;
@@ -204,11 +327,7 @@ function advanceTurn(roverId) {
   if (mode !== MODES.TURNS || queue.queue.length <= 1) {
     queue.current = queue.queue[0] || null;
     setActiveDriver(roverId, queue.current);
-    clearTimeout(queue.timer);
-    turnDeadlines.delete(roverId);
-    idleDeadlines.delete(roverId);
-    clearTimeout(idleTimers.get(roverId));
-    idleTimers.delete(roverId);
+    clearQueueTimers(roverId, queue);
     idleDisarmed.delete(roverId);
     turnEvents.emit('queue', { roverId });
     return;
@@ -234,6 +353,7 @@ function getTurnQueues() {
       current: queue.current,
       deadline: turnDeadlines.get(roverId) || null,
       idleDeadline: idleDeadlines.get(roverId) || null,
+      pausedByAdminSocketId: queue.pausedByAdminSocketId || null,
     };
   });
   return payload;

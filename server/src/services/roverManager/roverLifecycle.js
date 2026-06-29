@@ -51,7 +51,16 @@ function createRoverLifecycle(deps) {
     }
     socketToRovers.get(socket.id).add(roverId);
     socket.join(record.room);
-    turnService.driverAdded(roverId, socket.id, (force && isAdmin(socket)) || forceTurn);
+    const adminForceControl = force && isAdmin(socket);
+    turnService.driverAdded(roverId, socket.id, {
+      /*
+        `forceTurn` is used by private-rover approval to grant a user the next
+        active slot, but it should not freeze the public turn queue. Only an
+        explicit admin force-control request is a takeover that pauses rotation.
+      */
+      force: adminForceControl || forceTurn,
+      pauseQueue: adminForceControl,
+    });
     socket.emit('controlGranted', { roverId });
     managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'add' });
     sendAlert({

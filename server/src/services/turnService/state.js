@@ -14,7 +14,17 @@ const idleDisarmed = new Map();
 
 function ensureQueue(roverId) {
   if (!driverQueues.has(roverId)) {
-    driverQueues.set(roverId, { queue: [], current: null, timer: null });
+    driverQueues.set(roverId, {
+      queue: [],
+      current: null,
+      timer: null,
+      /*
+        Admin force-control is intentionally modeled as a queue pause instead of
+        a queue replacement. That keeps every regular driver's relative place
+        intact while making the admin takeover immune to normal turn rotation.
+      */
+      pausedByAdminSocketId: null,
+    });
   }
   return driverQueues.get(roverId);
 }
