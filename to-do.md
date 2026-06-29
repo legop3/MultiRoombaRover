@@ -1,7 +1,7 @@
 1.  fix rover request spam queue cheat
-2. add lockdown admin only page for managing the user db
-3. put rover power stats / bars / graph in corners of top-down view
-4. maybe add better camera control? a complete rework or maybe just a precision mode
+2. maybe add better camera control? a complete rework or maybe just a precision mode
+3. improve spectator page, options on what to see and what not to see
+4. make it so the room camera panel stops when its out of view for bandwidth
 5.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });

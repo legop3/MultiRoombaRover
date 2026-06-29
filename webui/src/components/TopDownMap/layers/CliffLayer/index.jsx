@@ -52,8 +52,8 @@ function CliffLayer({ roverId, sensors, geometry }) {
           startDeg={seg.start}
           endDeg={seg.end}
           percent={cliffSignalPercent(telemetry[seg.valueKey])}
-          backgroundColor={telemetry[seg.activeKey] ? '#334155' : '#7f1d1d'}
-          fillColor={telemetry[seg.activeKey] ? '#f59e0b' : '#fbbf24'}
+          backgroundColor={telemetry[seg.activeKey] ? '#7f1d1d' : '#334155'}
+          fillColor={telemetry[seg.activeKey] ? '#fbbf24' : '#f59e0b'}
           fillFromEnd={seg.fillFromEnd}
         />
       ))}
