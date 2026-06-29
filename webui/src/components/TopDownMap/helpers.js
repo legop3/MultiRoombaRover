@@ -44,15 +44,6 @@ export function lightBumpColor(value, max) {
   return `hsl(${hue} 100% 60%)`;
 }
 
-export function cliffColor(value, active) {
-  if (active) return '#ef4444';
-  const t = clamp01(value == null ? 0 : value / 4095);
-  const start = [47, 55, 69];
-  const end = [245, 158, 11];
-  const [r, g, b] = start.map((s, i) => Math.round(s + (end[i] - s) * t));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 export function buildSegments({ count, totalSpan, gap, startAngle }) {
   const usable = totalSpan - gap * (count - 1);
   const width = usable / count;

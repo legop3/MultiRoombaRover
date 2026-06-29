@@ -13,8 +13,6 @@ import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../Tabs/index.jsx';
 import TopDownMap from '../TopDownMap/index.jsx';
 import DriveDockAction from '../DriveDockAction/index.jsx';
 import { useDriveDockState } from '../DriveDockAction/driveDockState.js';
-import { useVisualTelemetrySelector } from '../../context/TelemetryContext.jsx';
-import { mapTelemetryEqual, selectVisualMapTelemetry } from '../../context/telemetryViews.js';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import RoverQueuesPanel from '../RoverQueuesPanel/index.jsx';
 import RawUserPilePanel from '../RawUserPilePanel/index.jsx';
@@ -44,14 +42,13 @@ const CHAT_DOCK_BOTTOM_INSET = 8;
 
 function TopDownMapPanel() {
   const roverId = useControlSelector((control) => control.state.roverId);
-  const mapTelemetry = useVisualTelemetrySelector(roverId, selectVisualMapTelemetry, mapTelemetryEqual);
 
   return (
     <CardFrame
       title = "Roomba sensor view"
     >
       <div className="aspect-square w-full">
-        <TopDownMap mapTelemetry={mapTelemetry} />
+        <TopDownMap roverId={roverId} />
       </div>
     </CardFrame>
   );

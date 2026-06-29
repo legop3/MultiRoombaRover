@@ -6,9 +6,7 @@ import { useHudMapSetting } from '../../../hooks/useHudMapSetting.js';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import { useVisualTelemetrySelector } from '../../../context/TelemetryContext.jsx';
 import {
-  mapTelemetryEqual,
   selectSpectatorTelemetry,
-  selectVisualMapTelemetry,
   spectatorTelemetryEqual,
 } from '../../../context/telemetryViews.js';
 import RoverLabelOverlay from './RoverLabelOverlay.jsx';
@@ -30,7 +28,6 @@ function HudOverlay({
 }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const effectiveRoverId = roverId ?? assignedRoverId;
-  const mapTelemetry = useVisualTelemetrySelector(effectiveRoverId, selectVisualMapTelemetry, mapTelemetryEqual);
   const spectatorTelemetry = useVisualTelemetrySelector(effectiveRoverId, selectSpectatorTelemetry, spectatorTelemetryEqual);
   const rosterInfo = useSessionSelector((state) => {
     if (!effectiveRoverId) return { label: null, roverColor: null };
@@ -48,7 +45,6 @@ function HudOverlay({
     const match = users.find((u) => String(u.socketId || '') === String(activeId || ''));
     return match?.nickname || match?.name || null;
   });
-  const resolvedMapTelemetry = sensors ? null : mapTelemetry;
   const resolvedSensors = sensors ?? null;
   const resolvedLabel = label ?? rosterInfo.label ?? null;
   const resolvedRoverColor = roverColor ?? rosterInfo.roverColor ?? null;
@@ -85,8 +81,8 @@ function HudOverlay({
           />
         </div>
         <HudMapOverlay
+          roverId={effectiveRoverId}
           sensors={resolvedSensors}
-          mapTelemetry={resolvedMapTelemetry}
           show={resolvedShowTopDown}
           mapPosition={resolvedMapPosition}
           layoutFormat={layoutFormat}
@@ -106,8 +102,8 @@ function HudOverlay({
         labelScale={labelScale}
       />
       <HudMapOverlay
+        roverId={effectiveRoverId}
         sensors={resolvedSensors}
-        mapTelemetry={resolvedMapTelemetry}
         show={resolvedShowTopDown && variant !== 'spectator'}
         mapPosition={resolvedMapPosition}
         layoutFormat={layoutFormat}

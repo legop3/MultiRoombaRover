@@ -4,37 +4,6 @@
 
 import { shallowArrayEqual, shallowObjectEqual } from './TelemetryContext.jsx';
 
-export const EMPTY_MAP_TELEMETRY = Object.freeze({
-  bumpLeft: false,
-  bumpRight: false,
-  wheelDropLeft: false,
-  wheelDropRight: false,
-  leftWheelOvercurrent: false,
-  rightWheelOvercurrent: false,
-  sideBrushOvercurrent: false,
-  mainBrushOvercurrent: false,
-  wheelLeftCurrentMa: 0,
-  wheelRightCurrentMa: 0,
-  sideBrushCurrentMa: 0,
-  mainBrushCurrentMa: 0,
-  lightBumpLeftSignal: null,
-  lightBumpFrontLeftSignal: null,
-  lightBumpCenterLeftSignal: null,
-  lightBumpCenterRightSignal: null,
-  lightBumpFrontRightSignal: null,
-  lightBumpRightSignal: null,
-  cliffLeftSignal: null,
-  cliffFrontLeftSignal: null,
-  cliffFrontRightSignal: null,
-  cliffRightSignal: null,
-  cliffLeft: false,
-  cliffFrontLeft: false,
-  cliffFrontRight: false,
-  cliffRight: false,
-  dirtDetectLeft: null,
-  dirtDetect: null,
-});
-
 const EMPTY_BATTERY_TELEMETRY = Object.freeze({
   batteryChargeMah: null,
   batteryCapacityMah: null,
@@ -84,10 +53,6 @@ function sensorNumber(value) {
   return Number(value);
 }
 
-export function mapTelemetryEqual(left, right) {
-  return shallowObjectEqual(left, right);
-}
-
 export function batteryTelemetryEqual(left, right) {
   return shallowObjectEqual(left, right);
 }
@@ -98,43 +63,6 @@ export function dockTelemetryEqual(left, right) {
 
 export function hostStatsEqual(left, right) {
   return shallowObjectEqual(left, right);
-}
-
-export function selectVisualMapTelemetry(frame) {
-  const sensors = frame?.sensors;
-  if (!sensors) return EMPTY_MAP_TELEMETRY;
-  const bumps = sensors.bumpsAndWheelDrops || {};
-  const wheelOver = sensors.wheelOvercurrents || {};
-  return {
-    bumpLeft: Boolean(bumps.bumpLeft),
-    bumpRight: Boolean(bumps.bumpRight),
-    wheelDropLeft: Boolean(bumps.wheelDropLeft),
-    wheelDropRight: Boolean(bumps.wheelDropRight),
-    leftWheelOvercurrent: Boolean(wheelOver.leftWheel),
-    rightWheelOvercurrent: Boolean(wheelOver.rightWheel),
-    sideBrushOvercurrent: Boolean(wheelOver.sideBrush),
-    mainBrushOvercurrent: Boolean(wheelOver.mainBrush),
-    wheelLeftCurrentMa: bucketNumber(sensors.wheelLeftCurrentMa ?? 0, 5),
-    wheelRightCurrentMa: bucketNumber(sensors.wheelRightCurrentMa ?? 0, 5),
-    sideBrushCurrentMa: bucketNumber(sensors.sideBrushCurrentMa ?? 0, 5),
-    mainBrushCurrentMa: bucketNumber(sensors.mainBrushCurrentMa ?? 0, 5),
-    lightBumpLeftSignal: sensorNumber(sensors.lightBumpLeftSignal),
-    lightBumpFrontLeftSignal: sensorNumber(sensors.lightBumpFrontLeftSignal),
-    lightBumpCenterLeftSignal: sensorNumber(sensors.lightBumpCenterLeftSignal),
-    lightBumpCenterRightSignal: sensorNumber(sensors.lightBumpCenterRightSignal),
-    lightBumpFrontRightSignal: sensorNumber(sensors.lightBumpFrontRightSignal),
-    lightBumpRightSignal: sensorNumber(sensors.lightBumpRightSignal),
-    cliffLeftSignal: bucketNumber(sensors.cliffLeftSignal, 5),
-    cliffFrontLeftSignal: bucketNumber(sensors.cliffFrontLeftSignal, 5),
-    cliffFrontRightSignal: bucketNumber(sensors.cliffFrontRightSignal, 5),
-    cliffRightSignal: bucketNumber(sensors.cliffRightSignal, 5),
-    cliffLeft: Boolean(sensors.cliffLeft),
-    cliffFrontLeft: Boolean(sensors.cliffFrontLeft),
-    cliffFrontRight: Boolean(sensors.cliffFrontRight),
-    cliffRight: Boolean(sensors.cliffRight),
-    dirtDetectLeft: bucketNumber(sensors.dirtDetectLeft, 1),
-    dirtDetect: bucketNumber(sensors.dirtDetect, 1),
-  };
 }
 
 export function selectLightBumpTelemetry(frame) {

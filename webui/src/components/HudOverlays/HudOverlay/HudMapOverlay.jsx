@@ -1,8 +1,8 @@
 import TopDownMap from '../../TopDownMap/index.jsx';
 
 export default function HudMapOverlay({
+  roverId = null,
   sensors,
-  mapTelemetry = null,
   show = true,
   mapPosition = 'top-center',
   layoutFormat = 'desktop',
@@ -33,7 +33,7 @@ export default function HudMapOverlay({
 
   return (
     <div className="pointer-events-none absolute rounded" style={mapStyle}>
-      <TopDownMap sensors={sensors} mapTelemetry={mapTelemetry} size={240} overlay />
+      <TopDownMap roverId={roverId} sensors={sensors} size={240} overlay />
     </div>
   );
 }

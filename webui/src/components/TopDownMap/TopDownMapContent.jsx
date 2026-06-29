@@ -2,15 +2,15 @@
 // Purpose: Defines the Top Down Map Content module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React, { useMemo } from 'react';
-import { selectVisualMapTelemetry } from '../../context/telemetryViews.js';
-import { buildSegments, cliffColor, lightBumpColor } from './helpers.js';
-import {
-  ArcSegment,
-  ConeSegment,
-  WheelVisual,
-  SideBrushVisual,
-  MainBrushVisual,
-} from './visuals.jsx';
+import { buildSegments } from './helpers.js';
+import BumpLayer from './layers/BumpLayer/index.jsx';
+import CliffLayer from './layers/CliffLayer/index.jsx';
+import ElectricalReadoutLayer from './layers/ElectricalReadoutLayer/index.jsx';
+import LightBumpLayer from './layers/LightBumpLayer/index.jsx';
+import MainBrushLayer from './layers/MainBrushLayer/index.jsx';
+// import RawFrameStripLayer from './layers/RawFrameStripLayer/index.jsx';
+import SideBrushLayer from './layers/SideBrushLayer/index.jsx';
+import WheelLayer from './layers/WheelLayer/index.jsx';
 
 const LIGHT_LABELS = ['L', 'FL', 'CL', 'CR', 'FR', 'R'];
 
@@ -26,6 +26,18 @@ function buildGeometry(size, variant) {
   const cliffRingOuter = innerCircle - 6;
   const wheelLineOffset = innerCircle * 0.65;
   const lightAngles = buildSegments({ count: 6, totalSpan: 140, gap: 6, startAngle: -70 });
+  // The body circle consumes almost the whole square, especially in the HUD
+  // overlay where the map is scaled down. The bottom corners are the only
+  // reliable empty spaces, so new telemetry is anchored there instead of adding
+  // separate HUD/non-HUD layouts that would drift apart over time.
+  const maxCornerReadoutWidth = size * 0.46;
+  const readoutWidth = Math.min(maxCornerReadoutWidth, Math.max(96, size * 0.42));
+  const readoutHeight = Math.max(18, size * 0.08);
+  const readoutInset = Math.max(6, size * 0.03);
+  const bottomReadoutY = size - readoutInset - readoutHeight;
+  const rawFrameStripWidth = innerCircle * 1.05;
+  const rawFrameStripHeight = Math.max(13, size * 0.055);
+  const rawFrameStripY = centerY + innerCircle * 0.38;
 
   return {
     size,
@@ -38,47 +50,41 @@ function buildGeometry(size, variant) {
     cliffRingInner,
     cliffRingOuter,
     wheelLineOffset,
+    voltageReadout: {
+      x: readoutInset,
+      y: bottomReadoutY,
+      width: readoutWidth,
+      height: readoutHeight,
+    },
+    currentReadout: {
+      x: size - readoutInset - readoutWidth,
+      y: bottomReadoutY,
+      width: readoutWidth,
+      height: readoutHeight,
+    },
+    // rawFrameStrip: {
+    //   x: centerX - rawFrameStripWidth / 2,
+    //   y: rawFrameStripY,
+    //   width: rawFrameStripWidth,
+    //   height: rawFrameStripHeight,
+    // },
     lightSegments: lightAngles.map((angle, idx) => ({
       label: LIGHT_LABELS[idx],
       start: angle.start,
       end: angle.end,
     })),
     cliffSegments: [
-      { label: 'Cliff L', start: -60, end: -46, valueKey: 'cliffLeftSignal', activeKey: 'cliffLeft' },
-      { label: 'Cliff FL', start: -32, end: -16, valueKey: 'cliffFrontLeftSignal', activeKey: 'cliffFrontLeft' },
-      { label: 'Cliff FR', start: 16, end: 32, valueKey: 'cliffFrontRightSignal', activeKey: 'cliffFrontRight' },
-      { label: 'Cliff R', start: 46, end: 60, valueKey: 'cliffRightSignal', activeKey: 'cliffRight' },
+      { label: 'Cliff L', start: -60, end: -46, valueKey: 'cliffLeftSignal', activeKey: 'cliffLeft', fillFromEnd: true },
+      { label: 'Cliff FL', start: -32, end: -16, valueKey: 'cliffFrontLeftSignal', activeKey: 'cliffFrontLeft', fillFromEnd: true },
+      { label: 'Cliff FR', start: 16, end: 32, valueKey: 'cliffFrontRightSignal', activeKey: 'cliffFrontRight', fillFromEnd: false },
+      { label: 'Cliff R', start: 46, end: 60, valueKey: 'cliffRightSignal', activeKey: 'cliffRight', fillFromEnd: false },
     ],
   };
 }
 
-function TopDownMapContent({ sensors = {}, mapTelemetry = null, variant = 'full', size: overrideSize, overlay = false }) {
+function TopDownMapContent({ roverId = null, sensors = null, variant = 'full', size: overrideSize, overlay = false }) {
   const size = overrideSize || (variant === 'mini' ? 190 : 260);
   const geometry = useMemo(() => buildGeometry(size, variant), [size, variant]);
-
-  // The map accepts either the new selector-produced telemetry shape or the old
-  // raw sensors prop. Keeping this translation local lets existing non-hot paths
-  // continue to render while high-frequency callers move to targeted selectors.
-  const telemetry = mapTelemetry ?? selectVisualMapTelemetry({ sensors });
-  const wheelCurrentLeft = telemetry.wheelLeftCurrentMa ?? 0;
-  const wheelCurrentRight = telemetry.wheelRightCurrentMa ?? 0;
-  const sideBrushCurrent = telemetry.sideBrushCurrentMa ?? 0;
-  const mainBrushCurrent = telemetry.mainBrushCurrentMa ?? 0;
-  const bumpDepress = 6;
-  const bumpLeftOffset = telemetry.bumpLeft ? bumpDepress : 0;
-  const bumpRightOffset = telemetry.bumpRight ? bumpDepress : 0;
-
-  const lightValues = [
-    telemetry.lightBumpLeftSignal,
-    telemetry.lightBumpFrontLeftSignal,
-    telemetry.lightBumpCenterLeftSignal,
-    telemetry.lightBumpCenterRightSignal,
-    telemetry.lightBumpFrontRightSignal,
-    telemetry.lightBumpRightSignal,
-  ];
-
-  const lightMaxSamples = lightValues.filter((v) => v != null);
-  const maxLight = lightMaxSamples.length ? Math.max(...lightMaxSamples, 1200) : 1200;
 
   return (
     <div
@@ -87,72 +93,14 @@ function TopDownMapContent({ sensors = {}, mapTelemetry = null, variant = 'full'
     >
       <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} preserveAspectRatio="xMidYMid meet" className="mx-auto block">
         <circle cx={geometry.centerX} cy={geometry.centerY} r={geometry.innerCircle} fill="#0f172a" stroke="#334155" strokeWidth="2" />
-        <WheelVisual cx={geometry.centerX - geometry.wheelLineOffset} cy={geometry.centerY} current={wheelCurrentLeft} drop={telemetry.wheelDropLeft} overcurrent={telemetry.leftWheelOvercurrent} label="L" />
-        <WheelVisual cx={geometry.centerX + geometry.wheelLineOffset} cy={geometry.centerY} current={wheelCurrentRight} drop={telemetry.wheelDropRight} overcurrent={telemetry.rightWheelOvercurrent} label="R" />
-        <SideBrushVisual cx={geometry.centerX + geometry.innerCircle * 0.65} cy={geometry.centerY - geometry.innerCircle * 0.55} current={sideBrushCurrent} overcurrent={telemetry.sideBrushOvercurrent} />
-        <MainBrushVisual
-          cx={geometry.centerX}
-          cy={geometry.centerY}
-          current={mainBrushCurrent}
-          overcurrent={telemetry.mainBrushOvercurrent}
-          variant={variant}
-        />
-        {geometry.lightSegments.map((seg, idx) => {
-          const value = lightValues[idx];
-          const color = lightBumpColor(value, maxLight);
-          const tipR = geometry.lightRingOuter + 4;
-          const baseR = tipR + 28;
-          return (
-            <ConeSegment
-              key={seg.label}
-              cx={geometry.centerX}
-              cy={geometry.centerY}
-              rBase={baseR}
-              rTip={tipR}
-              startDeg={seg.start}
-              endDeg={seg.end}
-              color={color}
-              value={value}
-              max={maxLight}
-            />
-          );
-        })}
-        {geometry.cliffSegments.map((seg) => (
-          <ArcSegment
-            key={seg.label}
-            cx={geometry.centerX}
-            cy={geometry.centerY}
-            rInner={geometry.cliffRingInner}
-            rOuter={geometry.cliffRingOuter}
-            startDeg={seg.start}
-            endDeg={seg.end}
-            color={cliffColor(telemetry[seg.valueKey], telemetry[seg.activeKey])}
-            opacity={1}
-            pulse={Boolean(telemetry[seg.activeKey])}
-          />
-        ))}
-        <ArcSegment
-          cx={geometry.centerX}
-          cy={geometry.centerY}
-          rInner={geometry.lightRingInner - bumpLeftOffset}
-          rOuter={geometry.lightRingOuter - bumpLeftOffset}
-          startDeg={-70}
-          endDeg={-6}
-          color={telemetry.bumpLeft ? '#ef4444' : '#475569'}
-          opacity={1}
-          pulse={Boolean(telemetry.bumpLeft)}
-        />
-        <ArcSegment
-          cx={geometry.centerX}
-          cy={geometry.centerY}
-          rInner={geometry.lightRingInner - bumpRightOffset}
-          rOuter={geometry.lightRingOuter - bumpRightOffset}
-          startDeg={6}
-          endDeg={70}
-          color={telemetry.bumpRight ? '#ef4444' : '#475569'}
-          opacity={1}
-          pulse={Boolean(telemetry.bumpRight)}
-        />
+        <WheelLayer roverId={roverId} sensors={sensors} geometry={geometry} />
+        <SideBrushLayer roverId={roverId} sensors={sensors} geometry={geometry} />
+        <MainBrushLayer roverId={roverId} sensors={sensors} geometry={geometry} variant={variant} />
+        {/* <RawFrameStripLayer roverId={sensors ? null : roverId} geometry={geometry} /> */}
+        <LightBumpLayer roverId={roverId} sensors={sensors} geometry={geometry} />
+        <CliffLayer roverId={roverId} sensors={sensors} geometry={geometry} />
+        <BumpLayer roverId={roverId} sensors={sensors} geometry={geometry} />
+        <ElectricalReadoutLayer roverId={roverId} sensors={sensors} geometry={geometry} />
       </svg>
     </div>
   );

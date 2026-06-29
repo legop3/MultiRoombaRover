@@ -29,6 +29,46 @@ export const ArcSegment = React.memo(function ArcSegment({ cx, cy, rInner, rOute
   );
 });
 
+export const CurvedArcBar = React.memo(function CurvedArcBar({
+  cx,
+  cy,
+  rInner,
+  rOuter,
+  startDeg,
+  endDeg,
+  percent,
+  backgroundColor,
+  fillColor,
+  fillFromEnd = false,
+}) {
+  const safePercent = clamp01(percent ?? 0);
+  const rMid = (rInner + rOuter) / 2;
+  const strokeWidth = rOuter - rInner;
+  const backgroundPath = useMemo(
+    () => describeArc(cx, cy, rMid, startDeg, endDeg),
+    [cx, cy, endDeg, rMid, startDeg],
+  );
+  const fillPath = useMemo(() => {
+    // The foreground bar uses the same arc geometry as the background pill.
+    // Mirroring is done by anchoring the fill to the opposite end of the arc,
+    // which keeps left/right cliff sensors visually symmetric around the robot.
+    const span = endDeg - startDeg;
+    const fillSpan = span * safePercent;
+    const fillStart = fillFromEnd ? endDeg - fillSpan : startDeg;
+    const fillEnd = fillFromEnd ? endDeg : startDeg + fillSpan;
+    return describeArc(cx, cy, rMid, fillStart, fillEnd);
+  }, [cx, cy, endDeg, fillFromEnd, rMid, safePercent, startDeg]);
+
+  return (
+    <>
+      <path d={backgroundPath} stroke={backgroundColor} strokeWidth={strokeWidth} strokeLinecap="round" fill="none" opacity="0.95" />
+      {safePercent > 0 ? (
+        <path d={fillPath} stroke={fillColor} strokeWidth={strokeWidth} strokeLinecap="round" fill="none" opacity="1" />
+      ) : null}
+    </>
+  );
+});
+
 export const ConeSegment = React.memo(function ConeSegment({ cx, cy, rBase, rTip, startDeg, endDeg, color, value, max }) {
   const mid = (startDeg + endDeg) / 2;
   const norm = clamp01(value != null ? value / (max || 1) : 0);
@@ -60,6 +100,7 @@ export const WheelVisual = React.memo(function WheelVisual({ cx, cy, current, dr
   const sign = label === 'L' ? -1 : 1;
   const currentCenterX = sign * (-dropW / 2 - gap / 2);
   const dropCenterX = sign * (currentW / 2 + gap / 2);
+  const dropLabelRotation = label === 'L' ? -90 : 90;
   const groupWidth = currentW + dropW + gap + 2;
   const groupHeight = barH + 4;
   return (
@@ -68,6 +109,18 @@ export const WheelVisual = React.memo(function WheelVisual({ cx, cy, current, dr
       <rect x={currentCenterX - currentW / 2} y={-barH / 2} width={currentW} height={barH} fill="#0f172a" stroke="#0f172a" strokeWidth="1" rx="2" />
       <rect x={currentCenterX - currentW / 2} y={barH / 2 - currentFill} width={currentW} height={currentFill} fill={color} className={overcurrent ? 'animate-pulse' : ''} />
       <rect x={dropCenterX - dropW / 2} y={-barH / 2} width={dropW} height={barH} fill={drop ? '#ef4444' : '#475569'} className={drop ? 'animate-pulse' : ''} rx="2" />
+      {drop ? (
+        <text
+          x={dropCenterX}
+          y={0}
+          textAnchor="middle"
+          dominantBaseline="central"
+          transform={`rotate(${dropLabelRotation} ${dropCenterX} 0)`}
+          className="pointer-events-none fill-white text-[0.48rem] font-bold"
+        >
+          Dropped
+        </text>
+      ) : null}
       <text x={0} y={barH / 2 + 10} textAnchor="middle" className="fill-slate-200 text-[0.7rem]">{label}</text>
     </g>
   );
@@ -101,7 +154,67 @@ export const SideBrushVisual = React.memo(function SideBrushVisual({ cx, cy, cur
   );
 });
 
-export const MainBrushVisual = React.memo(function MainBrushVisual({ cx, cy, current, overcurrent, variant }) {
+export const ReadoutBar = React.memo(function ReadoutBar({
+  x,
+  y,
+  width,
+  height,
+  label,
+  valueText,
+  percent,
+  color = '#38bdf8',
+  missing = false,
+}) {
+  const safePercent = clamp01(percent ?? 0);
+  const fillWidth = width * safePercent;
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <rect width={width} height={height} rx="4" fill="#020617" opacity="0.9" stroke="#334155" strokeWidth="1" />
+      <rect x="2" y={height - 5} width={width - 4} height="3" rx="1.5" fill="#1e293b" />
+      <rect x="2" y={height - 5} width={Math.max(0, fillWidth - 4)} height="3" rx="1.5" fill={missing ? '#475569' : color} />
+      <text x="5" y="9" className="fill-slate-400 text-[0.48rem] font-semibold">{label}</text>
+      <text x={width - 5} y="10" textAnchor="end" className="fill-slate-100 text-[0.55rem] font-semibold">{valueText}</text>
+    </g>
+  );
+});
+
+export const RawFrameStrip = React.memo(function RawFrameStrip({ x, y, width, height, bytes }) {
+  const safeBytes = Array.isArray(bytes) ? bytes : [];
+  const count = safeBytes.length;
+  const gap = 0;
+  const cellWidth = count > 0 ? Math.max(0.8, (width - gap * (count - 1)) / count) : width;
+
+  return (
+    <g transform={`translate(${x},${y})`} opacity="0.72">
+      {safeBytes.map((byte, idx) => {
+        // This strip intentionally visualizes the raw decoded frame bytes
+        // instead of decoded sensor meanings. Hue makes byte identity visible,
+        // while bar height makes quiet/low and loud/high byte values distinct.
+        const value = Number.isFinite(byte) ? Math.max(0, Math.min(255, byte)) : 0;
+        const normalized = value / 255;
+        const barHeight = 2 + normalized * (height - 5);
+        const hue = Math.round(normalized * 300 + 35);
+        const barX = idx * (cellWidth + gap);
+        const barY = height - 2 - barHeight;
+
+        return (
+          <rect
+            key={idx}
+            x={barX + 1}
+            y={barY}
+            width={Math.max(0.6, cellWidth)}
+            height={barHeight}
+            rx="0.8"
+            fill={`hsl(${hue} 95% 58%)`}
+          />
+        );
+      })}
+    </g>
+  );
+});
+
+export const MainBrushVisual = React.memo(function MainBrushVisual({ cx, cy, current, overcurrent, variant, dirtLeft, dirtRight }) {
   const mag = Math.abs(current);
   const color = currentColor(current, overcurrent);
   const opacity = 1;
@@ -111,6 +224,30 @@ export const MainBrushVisual = React.memo(function MainBrushVisual({ cx, cy, cur
   const patternB = `main-brush-pattern-b-${variant}`;
   const dur = mag > 0 ? 0.6 : null;
   const dir = current >= 0 ? 1 : -1;
+
+  const renderDirtDot = (dotCx, dotCy, value) => {
+    // The Create dirt packets are impulse-style 0-255 counters rather than a
+    // calibrated percentage. A low divisor keeps small real hits visible, while
+    // clamp01 prevents rare large values from growing beyond the brush layout.
+    const numericValue = Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
+    const strength = clamp01(numericValue / 80);
+    const radius = 2.5 + strength * 5.5;
+    const fill = numericValue > 0 ? '#fbbf24' : '#475569';
+    const stroke = numericValue > 0 ? '#fde68a' : '#1e293b';
+    return (
+      <circle
+        cx={dotCx}
+        cy={dotCy}
+        r={radius}
+        fill={fill}
+        stroke={stroke}
+        strokeWidth="1"
+        opacity={numericValue > 0 ? 0.95 : 0.45}
+        className={numericValue > 0 ? 'animate-pulse' : ''}
+      />
+    );
+  };
+
   return (
     <g>
       <defs>
@@ -126,8 +263,8 @@ export const MainBrushVisual = React.memo(function MainBrushVisual({ cx, cy, cur
       </defs>
       <rect x={cx - rollerWidth / 2} y={cy - 14} width={rollerWidth} height={rollerHeight} rx="3" fill={`url(#${patternA})`} stroke="#64748b" strokeWidth="1" />
       <rect x={cx - rollerWidth / 2} y={cy + 4} width={rollerWidth} height={rollerHeight} rx="3" fill={`url(#${patternB})`} stroke="#64748b" strokeWidth="1" />
-      <circle cx={cx - rollerWidth / 4} cy={cy - 8} r={3.5} fill="#fbbf24" />
-      <circle cx={cx + rollerWidth / 4} cy={cy + 8} r={3.5} fill="#fbbf24" />
+      {renderDirtDot(cx - rollerWidth / 4, cy - 8, dirtLeft)}
+      {renderDirtDot(cx + rollerWidth / 4, cy + 8, dirtRight)}
       {overcurrent ? (
         <rect
           x={cx - rollerWidth / 2 - 4}
