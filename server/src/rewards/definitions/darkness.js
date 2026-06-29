@@ -116,6 +116,7 @@ async function startDarkness(ctx, effect) {
 module.exports = {
   id: 'darkness',
   name: 'Darkness',
+  description: 'Disables room lights and headlights for 15 minutes.',
   isHeadlightBlocked,
   goal: 400,
   async run(ctx) {

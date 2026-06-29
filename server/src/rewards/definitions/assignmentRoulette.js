@@ -3,6 +3,7 @@
 module.exports = {
   id: 'assignmentRoulette',
   name: 'Rover Reassignment',
+  description: 'Scrambles who is driving which rover.',
   goal: 300,
   async run(ctx) {
     const moved = ctx.rerollAssignments();

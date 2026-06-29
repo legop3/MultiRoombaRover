@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "unit": "millimeters",
+  "source": "roomba wheel encoders",
+  "mmPerCount": 0.444564998149499,
+  "rovers": {}
+}

@@ -127,17 +127,51 @@ export default function AlertFeed({ scale = 1 }) {
       const buttons = Array.isArray(buttonBoxButtons) ? buttonBoxButtons : [];
       const button = buttons.find((entry) => Number(entry?.id) === buttonId) || {};
       const count = Number.isFinite(payload.count) ? payload.count : Number(button.count) || 0;
-      const goal = Number.isFinite(button.goal) ? button.goal : 0;
+      /*
+        Event fields win over session fields because the button-box event is the
+        exact outcome of this press. Session sync follows immediately after, but
+        using it first can make fast toasts briefly show stale count/limit data.
+      */
+      const goal = Number.isFinite(payload.goal) ? payload.goal : Number.isFinite(button.goal) ? button.goal : 0;
+      const dailyCount = Number.isFinite(payload.dailyCount)
+        ? payload.dailyCount
+        : Number.isFinite(button.dailyCount)
+          ? button.dailyCount
+          : 0;
+      const dailyLimit = Number.isFinite(payload.dailyLimit)
+        ? payload.dailyLimit
+        : Number.isFinite(button.dailyLimit)
+          ? button.dailyLimit
+          : null;
       const rewardNumber = Number.isFinite(button.rewardNumber) ? button.rewardNumber : '?';
       const rewardName =
         typeof button.rewardName === 'string' && button.rewardName.trim()
           ? button.rewardName.trim()
           : 'Unassigned';
+      const rewardDescription =
+        typeof button.rewardDescription === 'string' && button.rewardDescription.trim()
+          ? button.rewardDescription.trim()
+          : null;
+      const description =
+        typeof payload.description === 'string' && payload.description.trim()
+          ? payload.description.trim()
+          : null;
       pushAlert({
         id: `buttonbox-active-${buttonId}`,
         kind: 'buttonbox-active',
         lifetimeMs: BUTTONBOX_LIFETIME_MS,
-        payload: { buttonId, count, goal, rewardNumber, rewardName },
+        payload: {
+          buttonId,
+          count,
+          goal,
+          dailyCount,
+          dailyLimit,
+          limited: Boolean(payload.limited),
+          description,
+          rewardNumber,
+          rewardName,
+          rewardDescription,
+        },
       });
     }
     socket.on('buttonBox:increment', onButtonIncrement);
@@ -458,8 +492,17 @@ function AlertToast({ alert }) {
           goal={payload.goal}
           rewardNumber={payload.rewardNumber}
           rewardName={payload.rewardName}
-          className="bg-cyan-900/45"
+          rewardDescription={payload.rewardDescription}
+          dailyCount={payload.dailyCount}
+          dailyLimit={payload.dailyLimit}
+          limited={payload.limited}
+          className={payload.limited ? 'bg-red-950/70 ring-1 ring-red-500/70' : 'bg-cyan-900/45'}
         />
+        {payload.description ? (
+          <p className={['mt-1 text-center text-xs font-semibold', payload.limited ? 'text-red-200' : 'text-cyan-100'].join(' ')}>
+            {payload.description}
+          </p>
+        ) : null}
       </div>
     );
   }

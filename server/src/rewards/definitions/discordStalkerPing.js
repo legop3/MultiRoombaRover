@@ -3,7 +3,9 @@
 module.exports = {
   id: 'discordStalkerPing',
   name: 'Discord Ping',
-  goal: 9000,
+  description: 'Pings the stalker role in Discord.',
+  dailyLimited: true,
+  goal: 2000,
   async run(ctx) {
     ctx.publishEvent({
       source: 'buttonBoxReward',

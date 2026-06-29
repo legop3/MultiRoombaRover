@@ -16,6 +16,7 @@ function sleep(ms) {
 module.exports = {
   id: 'ghostTypingSpam',
   name: 'Typing Spam',
+  description: 'Fills chat with fake typing indicators.',
   goal: 220,
   async run(ctx) {
     const active = new Set();

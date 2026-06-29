@@ -53,7 +53,8 @@ function scheduleRestore(ctx, effect = {}) {
 module.exports = {
   id: 'modeJam',
   name: 'Admin Lock',
-  goal: 900,
+  description: 'Temporarily puts the server in admin mode.',
+  goal: 3000,
   async run(ctx) {
     const durationMs =
       MIN_DURATION_MS + Math.floor(Math.random() * (MAX_DURATION_MS - MIN_DURATION_MS + 1));

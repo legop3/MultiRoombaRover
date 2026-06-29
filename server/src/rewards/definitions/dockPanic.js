@@ -5,6 +5,7 @@ const DOCK_COMMAND_BASE64 = Buffer.from([143]).toString('base64');
 module.exports = {
   id: 'dockPanic',
   name: 'All Dock',
+  description: 'Forces all rovers into docking mode.',
   goal: 180,
   async run(ctx) {
     const rovers = ctx.listOnlineRovers();

@@ -11,6 +11,7 @@ import CardFrame from '../CardFrame/index.jsx';
 
 const FLASH_MS = 420;
 const REWARD_FLASH_MS = 1200;
+const LIMIT_FLASH_MS = 800;
 const BUTTON_TONES = {
   1: 262,
   2: 330,
@@ -37,15 +38,20 @@ export default function ButtonBoxPanel() {
       count: 0,
       goal: 0,
       rewardName: null,
+      rewardDescription: null,
       rewardId: null,
       rewardNumber: null,
+      dailyCount: 0,
+      dailyLimit: null,
       lastRewardAt: null,
     });
   }, [buttonBoxButtons]);
 
   const [incFlash, setIncFlash] = useState({});
+  const [limitFlash, setLimitFlash] = useState({});
   const [rewardFlash, setRewardFlash] = useState({});
   const timersRef = useRef(new Map());
+  const limitTimersRef = useRef(new Map());
   const rewardTimersRef = useRef(new Map());
   const prevRewardAtRef = useRef({});
   const audioCtxRef = useRef(null);
@@ -107,6 +113,24 @@ export default function ButtonBoxPanel() {
     function onIncrement(payload = {}) {
       const buttonId = Number(payload.buttonId);
       if (!Number.isFinite(buttonId) || buttonId < 1 || buttonId > 4) return;
+      if (payload.limited) {
+        /*
+          Capped presses are intentionally visible but not celebratory: red
+          feedback tells users the physical press was received, while skipping
+          the tone keeps it distinct from real reward progress.
+        */
+        setLimitFlash((current) => ({ ...current, [buttonId]: true }));
+        const oldTimer = limitTimersRef.current.get(buttonId);
+        if (oldTimer) {
+          clearTimeout(oldTimer);
+        }
+        const timer = setTimeout(() => {
+          setLimitFlash((current) => ({ ...current, [buttonId]: false }));
+          limitTimersRef.current.delete(buttonId);
+        }, LIMIT_FLASH_MS);
+        limitTimersRef.current.set(buttonId, timer);
+        return;
+      }
       setIncFlash((current) => ({ ...current, [buttonId]: true }));
       const oldTimer = timersRef.current.get(buttonId);
       if (oldTimer) {
@@ -126,6 +150,23 @@ export default function ButtonBoxPanel() {
     };
   }, [effectiveAlertVolume, socket]);
 
+  useEffect(
+    () => () => {
+      /*
+        The panel owns short visual timers for press feedback. Clearing them on
+        unmount avoids leaving stale timeout callbacks behind if the panel is
+        hidden during a burst of button-box activity.
+      */
+      timersRef.current.forEach((timer) => clearTimeout(timer));
+      timersRef.current.clear();
+      limitTimersRef.current.forEach((timer) => clearTimeout(timer));
+      limitTimersRef.current.clear();
+      rewardTimersRef.current.forEach((timer) => clearTimeout(timer));
+      rewardTimersRef.current.clear();
+    },
+    [],
+  );
+
   return (
     <CardFrame title="Button Box" bodyClassName="space-y-0.5 text-base">
       <div className="grid grid-cols-4 gap-0.5">
@@ -133,11 +174,17 @@ export default function ButtonBoxPanel() {
           const id = Number(button.id);
           const count = Number.isFinite(button.count) ? button.count : 0;
           const goal = Number.isFinite(button.goal) ? button.goal : 0;
+          const dailyCount = Number.isFinite(button.dailyCount) ? button.dailyCount : 0;
+          const dailyLimit = Number.isFinite(button.dailyLimit) ? button.dailyLimit : null;
           const rewardName = typeof button.rewardName === 'string' && button.rewardName.trim()
             ? button.rewardName.trim()
             : 'Unassigned';
+          const rewardDescription = typeof button.rewardDescription === 'string' && button.rewardDescription.trim()
+            ? button.rewardDescription.trim()
+            : null;
           const rewardNumber = Number.isFinite(button.rewardNumber) ? button.rewardNumber : '?';
           const incActive = Boolean(incFlash[id]);
+          const limitActive = Boolean(limitFlash[id]);
           const rewardActive = Boolean(rewardFlash[id]);
 
           return (
@@ -146,9 +193,17 @@ export default function ButtonBoxPanel() {
               buttonId={id}
               count={count}
               goal={goal}
+              dailyCount={dailyCount}
+              dailyLimit={dailyLimit}
               rewardNumber={rewardNumber}
               rewardName={rewardName}
-              className={[incActive ? 'bg-cyan-900/45' : '', rewardActive ? 'bg-fuchsia-900/45' : ''].filter(Boolean).join(' ')}
+              rewardDescription={rewardDescription}
+              limited={limitActive}
+              className={[
+                incActive ? 'bg-cyan-900/45' : '',
+                limitActive ? 'bg-red-950/70 ring-1 ring-red-500/70' : '',
+                rewardActive ? 'bg-fuchsia-900/45' : '',
+              ].filter(Boolean).join(' ')}
             />
           );
         })}

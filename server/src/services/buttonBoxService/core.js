@@ -25,6 +25,137 @@ function createButtonBoxCore(deps) {
     store,
   } = deps;
 
+  function getTodayKey(now = Date.now()) {
+    /*
+      The daily cap is intentionally based on the server's local calendar day.
+      This matches the operational reality of the deployed server and avoids
+      storing per-user timezone state for a physical shared button box.
+    */
+    const date = new Date(now);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function getDailyLimit(button) {
+    /*
+      Ceil lets a reward complete in five daily windows even when its goal is
+      not evenly divisible by five. The minimum of one keeps tiny goals usable.
+    */
+    if (button?.dailyLimited !== true) {
+      return null;
+    }
+    const goal = Number.isFinite(button?.goal) ? Math.max(1, Math.floor(button.goal)) : 1;
+    return Math.max(1, Math.ceil(goal / 5));
+  }
+
+  function resetDailyBucketIfNeeded(button, now = Date.now()) {
+    const today = getTodayKey(now);
+    if (button.dailyDate !== today) {
+      /*
+        Date rollover is handled lazily on the next press/add-count request.
+        That keeps the persisted state correct without needing a background
+        timer that would sit around on the development machine.
+      */
+      button.dailyDate = today;
+      button.dailyCount = 0;
+    }
+    if (!Number.isFinite(button.dailyCount) || button.dailyCount < 0) {
+      button.dailyCount = 0;
+    }
+    return today;
+  }
+
+  function buildIncrementDescription({ appliedCount, limited }) {
+    if (limited && appliedCount <= 0) {
+      return 'Daily limit reached';
+    }
+    return 'Progress added';
+  }
+
+  function buildIncrementPayload({ button, requestedCount, appliedCount, limited, now }) {
+    const dailyLimit = getDailyLimit(button);
+    return {
+      buttonId: button.id,
+      count: button.count,
+      goal: button.goal,
+      dailyLimited: button.dailyLimited === true,
+      limited,
+      appliedCount,
+      requestedCount,
+      dailyCount: button.dailyCount,
+      dailyLimit,
+      description: buildIncrementDescription({ appliedCount, limited }),
+      ts: now,
+    };
+  }
+
+  function cloneButtonForResponse(button) {
+    /*
+      HTTP callers and overseer tools receive a direct button response instead
+      of waiting for session sync. Include the derived daily limit there too so
+      every public button shape describes the same daily-cap state.
+    */
+    return {
+      ...store.clone(button),
+      dailyLimit: getDailyLimit(button),
+    };
+  }
+
+  async function applyProgress(buttonId, requestedCount = 1) {
+    const state = store.getState();
+    const button = state.buttons.find((entry) => entry.id === buttonId);
+    if (!button) {
+      throw new Error('Unknown button');
+    }
+
+    const now = Date.now();
+    resetDailyBucketIfNeeded(button, now);
+
+    const requested = Math.max(1, Math.floor(Number(requestedCount) || 0));
+    const dailyLimited = button.dailyLimited === true;
+    const dailyLimit = getDailyLimit(button);
+    /*
+      Most rewards are intentionally uncapped so button-box chaos can still be
+      built up quickly. The daily bucket only constrains rewards that opt into
+      it, currently the Discord pings that can bother people off-site.
+    */
+    const dailyRemaining = dailyLimited ? Math.max(0, dailyLimit - button.dailyCount) : requested;
+    const appliedCount = dailyLimited ? Math.min(requested, dailyRemaining) : requested;
+    const limited = dailyLimited && appliedCount < requested;
+
+    if (appliedCount > 0) {
+      button.count += appliedCount;
+      if (dailyLimited) {
+        button.dailyCount += appliedCount;
+      }
+      button.lastIncrementAt = now;
+    }
+
+    store.writeState();
+
+    io.emit('buttonBox:increment', buildIncrementPayload({
+      button,
+      requestedCount: requested,
+      appliedCount,
+      limited,
+      now,
+    }));
+
+    while (button.count >= button.goal) {
+      await runRewardForButton(button);
+      /*
+        Reward assignment resets the daily bucket because the new reward should
+        start clean instead of inheriting the just-completed reward's cap usage.
+      */
+      store.writeState();
+    }
+
+    publishUpdated();
+    return cloneButtonForResponse(button);
+  }
+
   function publishUpdated() {
     publishEvent({
       source: 'buttonBox',
@@ -117,55 +248,12 @@ function createButtonBoxCore(deps) {
   }
 
   async function applyPress(buttonId) {
-    const state = store.getState();
-    const button = state.buttons.find((entry) => entry.id === buttonId);
-    if (!button) {
-      throw new Error('Unknown button');
-    }
-
-    button.count += 1;
-    button.lastIncrementAt = Date.now();
-    store.writeState();
-
-    io.emit('buttonBox:increment', {
-      buttonId,
-      count: button.count,
-      ts: button.lastIncrementAt,
-    });
-
-    if (button.count >= button.goal) {
-      await runRewardForButton(button);
-      store.writeState();
-    }
-
-    publishUpdated();
-    return store.clone(button);
+    return applyProgress(buttonId, 1);
   }
 
   async function addCount(buttonId, amount = 1) {
-    const state = store.getState();
-    const button = state.buttons.find((entry) => entry.id === buttonId);
-    if (!button) {
-      throw new Error('Unknown button');
-    }
     const inc = Math.max(1, Math.floor(Number(amount) || 0));
-    button.count += inc;
-    button.lastIncrementAt = Date.now();
-    store.writeState();
-
-    io.emit('buttonBox:increment', {
-      buttonId,
-      count: button.count,
-      ts: button.lastIncrementAt,
-    });
-
-    while (button.count >= button.goal) {
-      await runRewardForButton(button);
-      store.writeState();
-    }
-
-    publishUpdated();
-    return store.clone(button);
+    return applyProgress(buttonId, inc);
   }
 
   async function recoverEffects() {

@@ -22,6 +22,7 @@ function sleep(ms) {
 module.exports = {
   id: 'chatSpam',
   name: 'Chat Spam',
+  description: 'Floods chat with nonsense messages.',
   goal: 320,
   async run(ctx) {
     const nickname = randLetter();

@@ -1,12 +1,13 @@
 // Reward Definition: Camera Whiplash
 // Purpose: Defines the camera-whiplash deterrence reward and timing/strength settings. Scope: Supplies reusable reward metadata and execution parameters for chaos triggers.
 const STEP_MS = 220;
-const DURATION_MS = 30 * 1000;
+const DURATION_MS = 60 * 1000;
 const STEPS = Math.ceil(DURATION_MS / STEP_MS);
 
 module.exports = {
   id: 'cameraWhiplash',
   name: 'Camera Wiggle',
+  description: 'Makes the rover cameras wiggle around.',
   goal: 100,
   async run(ctx) {
     const rovers = ctx
