@@ -18,6 +18,7 @@ require('./src/services/assignmentService');
 require('./src/services/roverRebootService');
 require('./src/services/nicknameService');
 require('./src/services/verificationService');
+require('./src/services/identityAdminService');
 require('./src/services/privateRoverAccessRequestService');
 require('./src/services/chatService');
 require('./src/services/llmCommentaryService');

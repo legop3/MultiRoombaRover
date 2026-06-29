@@ -473,6 +473,106 @@ function getUserById(userId, { conn = getDb(), includeFeatures = true } = {}) {
   };
 }
 
+function listUsersForAdmin() {
+  const conn = getDb();
+  return conn.prepare('select id from users order by coalesce(last_seen_at, updated_at, created_at) desc').all()
+    .map((row) => getUserById(row.id, { conn, includeFeatures: true }))
+    .filter(Boolean)
+    .map((user) => ({
+      ...user,
+      featureNamespaces: Object.keys(user.features || {}).sort(),
+    }));
+}
+
+function getUserForAdmin(userId) {
+  const user = getUserById(userId, { includeFeatures: true });
+  return user ? { ...user, featureNamespaces: Object.keys(user.features || {}).sort() } : null;
+}
+
+function normalizeAdminSignal(type, value) {
+  const normalizedType = String(type || '').trim();
+  if (normalizedType === 'cookieUserId') {
+    const cookieUserId = normalizeCookieUserId(value);
+    if (!isValidCookieUserId(cookieUserId)) throw new Error('Invalid cookie identity key.');
+    return { type: normalizedType, value: cookieUserId };
+  }
+  if (normalizedType === 'fingerprintId') {
+    const fingerprintId = normalizeFingerprintId(value);
+    if (!isValidFingerprintId(fingerprintId)) throw new Error('Invalid fingerprint id.');
+    return { type: normalizedType, value: fingerprintId };
+  }
+  if (normalizedType === 'nickname') {
+    const nickname = sanitizeNickname(value);
+    if (!nickname) throw new Error('Nickname required.');
+    return { type: normalizedType, value: nickname };
+  }
+  if (normalizedType === 'knownIp') {
+    const ip = normalizeIp(value);
+    if (!ip) throw new Error('Valid IP required.');
+    return { type: normalizedType, value: ip };
+  }
+  throw new Error('Unknown identity signal type.');
+}
+
+function addUserSignal(userId, type, value) {
+  const id = String(userId || '').trim();
+  const user = getUserById(id);
+  if (!user) throw new Error('User not found.');
+  const signal = normalizeAdminSignal(type, value);
+
+  /*
+    Adding a strong signal is allowed to merge users. If the new cookie key or
+    fingerprint already belongs to another user, the same global equality rule
+    applies here and the two records converge under the selected user id.
+  */
+  const conn = getDb();
+  const nextUser = conn.transaction(() => {
+    const matchedUserId =
+      signal.type === 'cookieUserId'
+        ? findUserIdByCookie(conn, signal.value)
+        : signal.type === 'fingerprintId'
+          ? findUserIdByFingerprint(conn, signal.value)
+          : null;
+    const targetUserId = matchedUserId && matchedUserId !== id ? mergeUsers(conn, id, matchedUserId) : id;
+    const identity = {
+      cookieUserId: signal.type === 'cookieUserId' ? signal.value : '',
+      fingerprintId: signal.type === 'fingerprintId' ? signal.value : '',
+      nickname: signal.type === 'nickname' ? signal.value : '',
+      ip: signal.type === 'knownIp' ? signal.value : '',
+    };
+    return attachIdentitySignals(targetUserId, identity, { conn, ts: nowMs() });
+  })();
+
+  identityEvents.emit('change', { reason: 'admin_signal_add', userId: nextUser.id, signalType: signal.type });
+  return getUserForAdmin(nextUser.id);
+}
+
+function removeUserSignal(userId, type, value) {
+  const id = String(userId || '').trim();
+  if (!getUserById(id)) throw new Error('User not found.');
+  const signal = normalizeAdminSignal(type, value);
+  const conn = getDb();
+
+  /*
+    Removing a signal only detaches that one identifier. The canonical user row
+    remains because verification, deterrence, feature state, and legacy imports
+    may still refer to it even if all strong signals are removed.
+  */
+  if (signal.type === 'cookieUserId') {
+    conn.prepare('delete from user_cookie_ids where user_id = ? and cookie_user_id = ?').run(id, signal.value);
+  } else if (signal.type === 'fingerprintId') {
+    conn.prepare('delete from user_fingerprint_ids where user_id = ? and fingerprint_id = ?').run(id, signal.value);
+  } else if (signal.type === 'nickname') {
+    conn.prepare('delete from user_nicknames where user_id = ? and nickname = ?').run(id, signal.value);
+  } else if (signal.type === 'knownIp') {
+    conn.prepare('delete from user_known_ips where user_id = ? and ip = ?').run(id, signal.value);
+  }
+
+  conn.prepare('update users set updated_at = ? where id = ?').run(nowMs(), id);
+  identityEvents.emit('change', { reason: 'admin_signal_remove', userId: id, signalType: signal.type });
+  return getUserForAdmin(id);
+}
+
 function getUserForSocket(socket) {
   if (!socket?.data?.userId) return null;
   return getUserById(socket.data.userId);
@@ -514,6 +614,15 @@ function setFeatureState(userId, namespace, nextState) {
   `).run(id, ns, encodeJson(nextState || {}), ts, ts);
   identityEvents.emit('change', { reason: 'feature_state', userId: id, namespace: ns });
   return nextState || {};
+}
+
+function deleteFeatureState(userId, namespace) {
+  const id = String(userId || '').trim();
+  const ns = String(namespace || '').trim();
+  if (!id || !ns) throw new Error('userId and namespace required');
+  getDb().prepare('delete from user_feature_state where user_id = ? and namespace = ?').run(id, ns);
+  identityEvents.emit('change', { reason: 'feature_state_delete', userId: id, namespace: ns });
+  return getUserForAdmin(id);
 }
 
 function updateFeatureState(userId, namespace, updater, defaults = {}) {
@@ -846,11 +955,16 @@ module.exports = {
   resolveUserIdForIdentity,
   attachIdentitySignals,
   getUserById,
+  listUsersForAdmin,
+  getUserForAdmin,
+  addUserSignal,
+  removeUserSignal,
   getUserForSocket,
   getUserIdForSocket,
   getIdentitySummary,
   getFeatureState,
   setFeatureState,
+  deleteFeatureState,
   updateFeatureState,
   listFeatureStates,
   setVerified,

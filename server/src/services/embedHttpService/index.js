@@ -4,7 +4,7 @@
 const { app } = require('../../globals/http');
 const { renderIndexHtml, renderOgImage } = require('../embedService');
 
-app.get(['/', '/spectate', '/mini', '/display', '/scanner'], async (req, res) => {
+app.get(['/', '/spectate', '/mini', '/display', '/scanner', '/database'], async (req, res) => {
   try {
     const html = await renderIndexHtml(req);
     res.type('html').send(html);

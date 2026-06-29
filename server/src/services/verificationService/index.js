@@ -9,6 +9,7 @@ const { publishEvent } = require('../eventBus');
 const { getNickname, setNickname } = require('../nicknameService');
 const { getRole, roleEvents } = require('../roleService');
 const {
+  identityEvents,
   getDb,
   identifySocket: identifyCanonicalSocket,
   getUserById,
@@ -511,6 +512,12 @@ roleEvents.on('change', ({ socket }) => {
   } catch (err) {
     logger.warn('Failed to reevaluate verification on role change', err.message);
   }
+});
+
+identityEvents.on('change', ({ userId, reason } = {}) => {
+  if (!userId) return;
+  refreshSocketsForUser(userId);
+  emitChange('identity_change', { userId, reason });
 });
 
 setInterval(() => {

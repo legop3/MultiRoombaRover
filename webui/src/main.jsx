@@ -13,6 +13,7 @@ import SpectatorApp from './spectate/SpectatorApp/SpectatorAppRoot.jsx'
 import MiniSummaryApp from './mini/MiniSummaryApp/MiniSummaryAppRoot.jsx'
 import ServerDisplayApp from './display/ServerDisplayApp/ServerDisplayAppRoot.jsx'
 import ScannerApp from './scanner/ScannerApp/ScannerAppRoot.jsx'
+import DatabaseAdminApp from './database/DatabaseAdminApp.jsx'
 import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
@@ -33,6 +34,7 @@ createRoot(document.getElementById('root')).render(
                   <Route path="/mini" element={<MiniSummaryApp />} />
                   <Route path="/display" element={<ServerDisplayApp />} />
                   <Route path="/scanner" element={<ScannerApp />} />
+                  <Route path="/database" element={<DatabaseAdminApp />} />
                 </Routes>
               </BrowserRouter>
             </ChatProvider>
