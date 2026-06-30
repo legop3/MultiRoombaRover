@@ -130,7 +130,7 @@ export function useOvercurrentLimiter(roverId, options = {}) {
     return { motors, groups };
   }, [overcurrentFlags]);
 
-  const adminImmune = role === 'admin' || role === 'lockdown' || role === 'lockdown-admin';
+  const adminImmune = role === 'admin' || role === 'lockdown';
 
   return useMemo(
     () => ({

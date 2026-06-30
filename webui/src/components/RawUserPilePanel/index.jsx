@@ -11,7 +11,6 @@ function roleColors(role) {
   switch (role) {
     case 'admin':
     case 'lockdown':
-    case 'lockdown-admin':
       return 'text-amber-300';
     case 'spectator':
       return 'text-slate-400';

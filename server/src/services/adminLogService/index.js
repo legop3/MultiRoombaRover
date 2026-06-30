@@ -6,7 +6,7 @@ const io = require('../../globals/io');
 const { getRole, roleEvents } = require('../roleService');
 const { getSocketIp } = require('../../helpers/ipResolver');
 
-const ADMIN_ROLES = new Set(['admin', 'lockdown', 'lockdown-admin']);
+const ADMIN_ROLES = new Set(['admin', 'lockdown']);
 const MAX_HISTORY = 200;
 const history = [];
 

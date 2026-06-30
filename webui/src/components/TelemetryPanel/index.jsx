@@ -4,14 +4,12 @@
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useVisualTelemetrySelector } from '../../context/TelemetryContext.jsx';
 import { selectFrameForDisplay } from '../../context/telemetryViews.js';
-import { useDockIr } from '../../hooks/useDockIr.js';
 import CardFrame from '../CardFrame/index.jsx';
 
 export default function TelemetryPanel() {
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const frame = useVisualTelemetrySelector(roverId, selectFrameForDisplay);
   const sensors = frame?.sensors || {};
-  const dockIr = useDockIr(sensors);
   const voltage = sensors.voltageMv != null ? `${(sensors.voltageMv / 1000).toFixed(2)} V` : null;
   const current = sensors.currentMa != null ? `${sensors.currentMa} mA` : null;
   const batteryTemp = sensors.batteryTemperatureC != null ? `${sensors.batteryTemperatureC} °C` : null;
@@ -35,7 +33,7 @@ export default function TelemetryPanel() {
       ) : (
         <>
           <TelemetrySummary sensors={sensors} voltage={voltage} current={current} batteryTemp={batteryTemp} charge={charge} capacity={capacity} />
-          <SensorDetails sensors={sensors} dockState={dockIr} />
+          <SensorDetails sensors={sensors} />
         </>
       )}
       {rawSnippet && (
@@ -75,7 +73,7 @@ function Metric({ label, value }) {
   );
 }
 
-function SensorDetails({ sensors, dockState }) {
+function SensorDetails({ sensors }) {
   const bumps = sensors?.bumpsAndWheelDrops || {};
   const over = sensors?.wheelOvercurrents || {};
 
@@ -104,11 +102,6 @@ function SensorDetails({ sensors, dockState }) {
 
   return (
     <div className="grid gap-0.5 md:grid-cols-2">
-      <DetailCard title="Dock IR">
-        <DockMiniStatus sensors={sensors} />
-        <DockDebug state={dockState} />
-      </DetailCard>
-
       <DetailCard title="Bumps & drops">
         <ValueRow label="Bump L" value={<Pill active={bumps.bumpLeft} />} />
         <ValueRow label="Bump R" value={<Pill active={bumps.bumpRight} />} />
@@ -189,50 +182,4 @@ function Pill({ active, tone = 'green', label }) {
 function formatNumber(value, unit) {
   if (value == null || Number.isNaN(value)) return '--';
   return unit ? `${value} ${unit}` : value;
-}
-
-function DockMiniStatus({ sensors }) {
-  const left = sensors?.infraredCharacterLeft;
-  const right = sensors?.infraredCharacterRight;
-  const omni = sensors?.infraredCharacterOmni;
-  const badge = (code) => (
-    <span className={`rounded px-1 py-0.25 text-[0.7rem] font-semibold ${code ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
-      {code || '--'}
-    </span>
-  );
-  return (
-    <div className="flex items-center justify-between gap-0.5 text-xs text-slate-200">
-      <div className="flex items-center gap-0.5">
-        <span className="text-slate-400">L</span>
-        {badge(left)}
-      </div>
-      <div className="flex items-center gap-0.5">
-        <span className="text-slate-400">O</span>
-        {badge(omni)}
-      </div>
-      <div className="flex items-center gap-0.5">
-        <span className="text-slate-400">R</span>
-        {badge(right)}
-      </div>
-    </div>
-  );
-}
-
-function DockDebug({ state }) {
-  if (!state) return null;
-  const label = (entry) => {
-    const parts = [];
-    if (entry?.red) parts.push('R');
-    if (entry?.green) parts.push('G');
-    if (entry?.force) parts.push('F');
-    return parts.length ? parts.join('') : 'none';
-  };
-  const age = (entry) => (entry?.age != null ? `${entry.age}ms` : '--');
-  return (
-    <div className="text-[0.7rem] text-slate-400">
-      <div>{`Left: ${state.left.code ?? '--'} (${label(state.left)}) · age ${age(state.left)}`}</div>
-      <div>{`Omni: ${state.omni.code ?? '--'} (${label(state.omni)}) · age ${age(state.omni)}`}</div>
-      <div>{`Right: ${state.right.code ?? '--'} (${label(state.right)}) · age ${age(state.right)}`}</div>
-    </div>
-  );
 }

@@ -1,5 +1,5 @@
 function isAdminRole(role) {
-  return role === 'admin' || role === 'lockdown' || role === 'lockdown-admin';
+  return role === 'admin' || role === 'lockdown';
 }
 
 function buildAdminState(status, runHistory) {

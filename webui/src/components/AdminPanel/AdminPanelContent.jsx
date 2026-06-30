@@ -61,9 +61,8 @@ export default function AdminPanelContent() {
 
   const isAdmin =
     session?.role === 'admin' ||
-    session?.role === 'lockdown' ||
-    session?.role === 'lockdown-admin';
-  const isLockdownAdmin = session?.role === 'lockdown' || session?.role === 'lockdown-admin';
+    session?.role === 'lockdown';
+  const isLockdownAdmin = session?.role === 'lockdown';
 
   const currentMode = session?.mode ?? 'open';
 

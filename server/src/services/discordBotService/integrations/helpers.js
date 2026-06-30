@@ -19,7 +19,7 @@ function formatWebhookUsername(payload) {
   const name = payload.nickname || payload.socketId?.slice(0, 6) || 'unknown';
   const botTag = payload.bot ? ' [BOT]' : '';
   const spectatorTag = payload.role === 'spectator' && !payload.bot ? ' [SPECTATOR]' : '';
-  const adminTag = payload.role === 'admin' || payload.role === 'lockdown' || payload.role === 'lockdown-admin' ? ' [Rover Admin]' : '';
+  const adminTag = payload.role === 'admin' || payload.role === 'lockdown' ? ' [Rover Admin]' : '';
   if (payload.fromDiscord) {
     const origin = payload.discordGuildName ? ` (From: ${payload.discordGuildName})` : '';
     return `${name}${origin}${botTag}${spectatorTag}${adminTag}`;

@@ -1,5 +1,5 @@
 // Identity Database Panel
-// Purpose: Implements the lockdown-admin identity database editor UI for the /database route.
+// Purpose: Implements the lockdown admin identity database editor UI for the /database route.
 // Scope: Keeps list, detail, signal, status, feature-state, and raw JSON editing local to this feature.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import CardFrame from '../components/CardFrame/index.jsx';

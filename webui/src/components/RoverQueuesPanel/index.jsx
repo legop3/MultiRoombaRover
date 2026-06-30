@@ -29,7 +29,6 @@ function roleColors(role) {
   switch (role) {
     case 'admin':
     case 'lockdown':
-    case 'lockdown-admin':
       return 'text-amber-300';
     case 'spectator':
       return 'text-slate-400';
@@ -66,7 +65,7 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
 
   const canRequest = useMemo(() => role && role !== 'spectator', [role]);
   const adminCapable = useMemo(
-    () => role === 'admin' || role === 'lockdown' || role === 'lockdown-admin',
+    () => role === 'admin' || role === 'lockdown',
     [role],
   );
   const hasDeadlines = useMemo(

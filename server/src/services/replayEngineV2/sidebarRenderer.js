@@ -39,7 +39,6 @@ function createSidebarRenderer({ execFileAsync, ensureDir }) {
     switch (String(role)) {
       case 'admin':
       case 'lockdown':
-      case 'lockdown-admin':
         return '#FCD34D';
       case 'spectator':
         return '#94A3B8';

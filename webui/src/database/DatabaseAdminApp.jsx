@@ -1,5 +1,5 @@
 // Database Admin App
-// Purpose: Provides the dedicated /database route for lockdown-admin identity database management.
+// Purpose: Provides the dedicated /database route for lockdown admin identity database management.
 // Scope: Handles route-level identity sync, access gating, and composition of the self-contained database panel.
 import AuthPanel from '../components/AuthPanel/index.jsx';
 import CardFrame from '../components/CardFrame/index.jsx';
@@ -10,7 +10,7 @@ import { pageBackgroundClass } from '../themeFlags.js';
 import IdentityDatabasePanel from './IdentityDatabasePanel.jsx';
 
 function isLockdownAdminRole(role) {
-  return role === 'lockdown' || role === 'lockdown-admin';
+  return role === 'lockdown';
 }
 
 export default function DatabaseAdminApp() {

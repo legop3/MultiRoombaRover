@@ -1,5 +1,5 @@
 // Identity Admin Service
-// Purpose: Exposes lockdown-admin socket operations for inspecting and editing the central identity database.
+// Purpose: Exposes lockdown admin socket operations for inspecting and editing the central identity database.
 // Scope: Owns transport-level authorization and delegates every database mutation to identityService.
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('identityAdminService');
@@ -19,7 +19,7 @@ const MAX_FEATURE_STATE_JSON_BYTES = 64 * 1024;
 
 function isLockdownAdminSocket(socket) {
   const role = getRole(socket);
-  return role === 'lockdown' || role === 'lockdown-admin';
+  return role === 'lockdown';
 }
 
 function requireLockdownAdmin(socket) {

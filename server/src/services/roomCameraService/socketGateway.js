@@ -8,7 +8,7 @@ const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
 
 const SUBSCRIBE_LIMIT = 50;
 const SUBSCRIBE_WINDOW_MS = 10000;
-const STREAM_INTERVAL_MS = 1000;
+const STREAM_INTERVAL_MS = 2000;
 
 function passesMode(socket) {
   const mode = getMode();

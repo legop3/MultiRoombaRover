@@ -42,7 +42,7 @@ function emitChange(reason, payload = {}) {
 }
 
 function isAdminRole(role) {
-  return role === 'admin' || role === 'lockdown' || role === 'lockdown-admin';
+  return role === 'admin' || role === 'lockdown';
 }
 
 function refreshSocketIdentityFlags(socket) {
