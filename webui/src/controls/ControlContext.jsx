@@ -49,6 +49,7 @@ const CONTROL_ACTION_NAMES = [
   'setServoAngle',
   'nudgeServo',
   'goServoHome',
+  'setCameraPrecisionMode',
   'runMacro',
   'stopAllMotion',
   'sendOiCommand',
@@ -411,6 +412,15 @@ export function ControlSystemProvider({ children }) {
     setServoAngle(target);
   }, [pipeline.servoConfig, setServoAngle]);
 
+  const setCameraPrecisionMode = useCallback((active) => {
+    /*
+      This action only changes how the browser chooses servo increments. The Pi
+      already accepts decimal angle targets, so no server or rover command shape
+      changes are needed for precision camera mode.
+    */
+    dispatch({ type: 'control/set-camera-precision-mode', payload: Boolean(active) });
+  }, []);
+
   const runMacro = useCallback(
     async (macroId) => {
       const macro = state.macros.find((item) => item.id === macroId) || null;
@@ -675,6 +685,7 @@ export function ControlSystemProvider({ children }) {
       setServoAngle,
       nudgeServo,
       goServoHome,
+      setCameraPrecisionMode,
       runMacro,
       stopAllMotion,
       sendOiCommand,
@@ -701,6 +712,7 @@ export function ControlSystemProvider({ children }) {
       setServoAngle,
       nudgeServo,
       goServoHome,
+      setCameraPrecisionMode,
       runMacro,
       stopAllMotion,
       sendOiCommand,

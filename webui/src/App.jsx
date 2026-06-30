@@ -196,9 +196,9 @@ function MobileFeatureTabs({
           {/* activities tab */}
           <TabPanel id="activities">
             <div className={`flex flex-col ${themeGapClass}`}>
-              <BarcodeGamesPanel />
-              <LiftCard />
               <NeatoCard />
+              <LiftCard />
+              <BarcodeGamesPanel />
               <OdometerPanel />
               <ButtonBoxPanel />
               <KinectPanel />

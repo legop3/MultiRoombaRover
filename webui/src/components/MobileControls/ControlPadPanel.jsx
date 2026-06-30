@@ -30,7 +30,7 @@ function getSpeedModeConfig(speedMode) {
 
 export default function ControlPadPanel({ disabled = false }) {
   const rawKeymap = useControlSelector((control) => control.state.keymap);
-  const { setDriveVector, registerInputState } = useControlActions();
+  const { setCameraPrecisionMode, setDriveVector, registerInputState } = useControlActions();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
   const [speedMode, setSpeedMode] = useState('normal');
   const [activeInputLabel, setActiveInputLabel] = useState('stop');
@@ -71,10 +71,18 @@ export default function ControlPadPanel({ disabled = false }) {
       const tokens = buildVirtualKeyTokens(cell, modeId);
       const vector = computeKeyboardDriveVector(tokens, keymap);
       const speedOptions = getKeyboardDriveSpeedOptions(tokens, keymap, keyboardSpeeds);
+      const precisionActive = modeId === 'precision';
 
       // Mobile deliberately routes through the keyboard vector/speed helpers. The
       // thumb pad only chooses which virtual keys are down, so changes to keyboard
       // drive behavior automatically stay matched here.
+      /*
+        The selected mobile speed mode is persistent, unlike the keyboard's held
+        Shift modifier. Publishing camera precision here makes the servo tilt
+        controls follow the mobile movement mode even before the driver starts
+        dragging on the pad.
+      */
+      setCameraPrecisionMode(precisionActive);
       setDriveVector(vector, { source: SOURCE, speedOptions });
       registerInputState(SOURCE, {
         keys: Array.from(tokens),
@@ -90,6 +98,7 @@ export default function ControlPadPanel({ disabled = false }) {
       keyboardSpeeds,
       keymap,
       registerInputState,
+      setCameraPrecisionMode,
       setDriveVector,
     ],
   );
@@ -99,7 +108,7 @@ export default function ControlPadPanel({ disabled = false }) {
       clearRepeatTimer();
       activeCellRef.current = null;
       setActiveInputLabel('stop');
-      sendDriveCell({ id: 'stop', actions: [] }, lastEvent, 'normal');
+      sendDriveCell({ id: 'stop', actions: [] }, lastEvent, speedModeRef.current);
     },
     [clearRepeatTimer, sendDriveCell],
   );
@@ -127,21 +136,31 @@ export default function ControlPadPanel({ disabled = false }) {
     (nextMode) => {
       setSpeedMode(nextMode);
       speedModeRef.current = nextMode;
+      setCameraPrecisionMode(nextMode === 'precision');
       if (activeCellRef.current) {
         sendDriveCell(activeCellRef.current, 'speed', nextMode);
       }
     },
-    [sendDriveCell],
+    [sendDriveCell, setCameraPrecisionMode],
   );
 
   useEffect(() => {
-    return () => clearRepeatTimer();
-  }, [clearRepeatTimer]);
+    return () => {
+      clearRepeatTimer();
+      /*
+        Mobile controls can unmount when layouts change or the driver leaves the
+        control surface. Clear the shared flag so a stale mobile precision choice
+        cannot leave desktop/keyboard camera tilt in fine-step mode.
+      */
+      setCameraPrecisionMode(false);
+    };
+  }, [clearRepeatTimer, setCameraPrecisionMode]);
 
   useEffect(() => {
     if (!disabled) return;
     stopDrivePad('disabled');
-  }, [disabled, stopDrivePad]);
+    setCameraPrecisionMode(false);
+  }, [disabled, setCameraPrecisionMode, stopDrivePad]);
 
   return (
     <div className="mobile-touch-control flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900 text-slate-100 shadow-md">

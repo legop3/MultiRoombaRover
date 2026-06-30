@@ -12,6 +12,9 @@ import VerticalCameraTilt from './VerticalCameraTilt.jsx';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 
+const CAMERA_TILT_STEP_DEGREES = 0.5;
+const CAMERA_TILT_PRECISION_STEP_DEGREES = 0.1;
+
 function AuxColumnContent() {
   const roverId = useControlSelector((control) => control.state.roverId);
   const roomLightsLockedOn = useSessionSelector((state) => Boolean(state.session?.homeAssistant?.lightPolicy?.lockedOn));
@@ -41,6 +44,14 @@ function AuxColumnContent() {
         ? cameraConfig.homeAngle
         : (cameraMin + cameraMax) / 2;
   const cameraDisabled = Boolean(disabled || dockAssist.cameraLocked);
+  /*
+    The mobile tilt track shares the same precision flag as desktop tilt. This
+    keeps the servo fine-step behavior tied to the selected movement mode rather
+    than inventing a separate mobile-only camera setting.
+  */
+  const cameraTiltStep = camera?.precisionMode
+    ? CAMERA_TILT_PRECISION_STEP_DEGREES
+    : CAMERA_TILT_STEP_DEGREES;
 
   const handleHeadlightToggle = useCallback(
     (nextOn) => {
@@ -101,7 +112,7 @@ function AuxColumnContent() {
               value={cameraValue}
               min={cameraMin}
               max={cameraMax}
-              step={0.5}
+              step={cameraTiltStep}
               disabled={cameraDisabled}
               onChange={setServoAngle}
             />

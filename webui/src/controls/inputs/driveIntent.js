@@ -54,6 +54,16 @@ export function computeKeyboardDriveVector(keys, keymap) {
   };
 }
 
+export function isPrecisionDriveActive(keys, keymap) {
+  /*
+    The slow modifier is the canonical precision-drive signal shared by physical
+    keyboard input and the mobile pad's virtual-key path. Centralizing the check
+    keeps camera precision coupled to the same driver intent instead of copying
+    modifier-specific knowledge into each caller.
+  */
+  return bindingActive(keymap?.slowModifier, keys);
+}
+
 export function computeKeyboardAuxMotors(keys, keymap) {
   const allForward = bindingActive(keymap.auxAllForward, keys);
   if (allForward) {
@@ -78,7 +88,7 @@ export function computeKeyboardAuxMotors(keys, keymap) {
 }
 
 export function getKeyboardDriveSpeedOptions(keys, keymap, keyboardSpeeds) {
-  const slowActive = bindingActive(keymap.slowModifier, keys);
+  const slowActive = isPrecisionDriveActive(keys, keymap);
   return slowActive
     ? { baseSpeed: keyboardSpeeds.precisionSpeed, boostSpeed: keyboardSpeeds.precisionSpeed }
     : { baseSpeed: keyboardSpeeds.baseSpeed, boostSpeed: keyboardSpeeds.turboSpeed };

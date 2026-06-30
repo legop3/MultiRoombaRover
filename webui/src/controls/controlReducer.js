@@ -20,6 +20,12 @@ function createCameraState() {
     enabled: false,
     angle: null,
     config: null,
+    /*
+      Servo precision is UI/control state, not rover hardware state. Keeping it
+      beside the camera angle lets every camera-tilt surface use the same
+      precision setting while still sending the normal decimal angle commands.
+    */
+    precisionMode: false,
   };
 }
 
@@ -110,6 +116,7 @@ export function controlReducer(state, action) {
           ...state.camera,
           enabled: Boolean(action.payload?.config),
           config: action.payload?.config ?? null,
+          precisionMode: action.payload?.config ? state.camera.precisionMode : false,
           angle:
             typeof action.payload?.angle === 'number'
               ? action.payload.angle
@@ -122,6 +129,22 @@ export function controlReducer(state, action) {
       return {
         ...state,
         camera: { ...state.camera, angle: action.payload },
+      };
+    case 'control/set-camera-precision-mode':
+      if (state.camera.precisionMode === Boolean(action.payload)) {
+        return state;
+      }
+      return {
+        ...state,
+        camera: {
+          ...state.camera,
+          /*
+            Movement inputs own this flag because precision camera mode is meant
+            to follow movement precision mode automatically instead of becoming a
+            separate toggle the driver has to remember to reset.
+          */
+          precisionMode: Boolean(action.payload),
+        },
       };
     case 'control/register-input-state': {
       const sourceKey = action.payload?.source || 'unknown';

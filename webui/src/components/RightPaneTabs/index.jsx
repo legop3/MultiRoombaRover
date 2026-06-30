@@ -39,6 +39,8 @@ const CHAT_DOCK_INITIAL_HEIGHT = 224;
 const CHAT_DOCK_MIN_HEIGHT = 144;
 const CHAT_DOCK_MAX_HEIGHT = 300;
 const CHAT_DOCK_BOTTOM_INSET = 8;
+const CAMERA_TILT_STEP_DEGREES = 0.5;
+const CAMERA_TILT_PRECISION_STEP_DEGREES = 0.1;
 
 function TopDownMapPanel() {
   const roverId = useControlSelector((control) => control.state.roverId);
@@ -90,6 +92,14 @@ function DriveDockPanel() {
   const upLabel = formatKeyLabel(keymap?.cameraUp?.[0]);
   const downLabel = formatKeyLabel(keymap?.cameraDown?.[0]);
   const cameraDisabled = Boolean(!roverId || dockAssist.cameraLocked);
+  /*
+    Precision movement mode also tightens the servo slider step. The command
+    path still sends ordinary angle targets; only the UI increment changes while
+    precision mode is active.
+  */
+  const cameraTiltStep = camera?.precisionMode
+    ? CAMERA_TILT_PRECISION_STEP_DEGREES
+    : CAMERA_TILT_STEP_DEGREES;
   const trackedControls = useMemo(
     () => ({
       setHeadlight: (nextOn) => {
@@ -156,6 +166,7 @@ function DriveDockPanel() {
               value={value}
               min={min}
               max={max}
+              step={cameraTiltStep}
               label="Camera tilt"
               disabled={cameraDisabled}
               onChange={setServoAngle}
@@ -388,9 +399,9 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
           {/* activities tab */}
           <TabPanel id="activities">
             <div className={`flex flex-col ${themeGapClass}`}>
-              <BarcodeGamesPanel />
-              <LiftCard />
               <NeatoCard />
+              <LiftCard />
+              <BarcodeGamesPanel />
               <OdometerPanel />
               <ButtonBoxPanel />
               <KinectPanel />

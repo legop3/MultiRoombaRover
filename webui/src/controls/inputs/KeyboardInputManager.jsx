@@ -21,6 +21,7 @@ import {
   computeKeyboardAuxMotors,
   computeKeyboardDriveVector,
   getKeyboardDriveSpeedOptions,
+  isPrecisionDriveActive,
   resolveKeyboardSpeeds,
 } from './driveIntent.js';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
@@ -34,6 +35,7 @@ const TILT_INTERVAL_MIN = 5;
 const TILT_INTERVAL_MAX = 500;
 const TILT_SPEED_MIN = 1;
 const TILT_SPEED_MAX = 100;
+const PRECISION_SERVO_NUDGE_DEGREES = 0.25;
 const VIDEO_FILTER_SEQUENCE = ['none', 'grayscale', 'greenscale'];
 
 function normalizeVideoFilter(value) {
@@ -91,6 +93,7 @@ export default function KeyboardInputManager() {
     runMacro,
     stopAllMotion,
     registerInputState,
+    setCameraPrecisionMode,
     toggleHeadlight,
     toggleLaser,
     startHorn,
@@ -157,9 +160,16 @@ export default function KeyboardInputManager() {
     const latest = latestRef.current;
     if (!latest) return;
     const tokensSnapshot = new Set(activeTokensRef.current);
+    const precisionActive = isPrecisionDriveActive(tokensSnapshot, latest.keymap);
     const speedOptions = getKeyboardDriveSpeedOptions(tokensSnapshot, latest.keymap, latest.keyboardSpeeds);
     const vector = computeKeyboardDriveVector(tokensSnapshot, latest.keymap);
     const aux = computeKeyboardAuxMotors(tokensSnapshot, latest.keymap);
+    /*
+      Keyboard precision is a held modifier, so publish the camera precision
+      state from the same token snapshot that drives movement. This keeps the
+      servo UI in lockstep with the actual precision-driving intent.
+    */
+    latest.setCameraPrecisionMode(precisionActive);
     if (
       vector.x !== lastVectorRef.current.x ||
       vector.y !== lastVectorRef.current.y ||
@@ -219,7 +229,10 @@ export default function KeyboardInputManager() {
         stopServoLoop();
         return;
       }
-      latest.nudgeServo(nextDirection * latest.servoStep);
+      const tokensSnapshot = new Set(activeTokensRef.current);
+      const precisionActive = isPrecisionDriveActive(tokensSnapshot, latest.keymap);
+      const servoStep = precisionActive ? PRECISION_SERVO_NUDGE_DEGREES : latest.servoStep;
+      latest.nudgeServo(nextDirection * servoStep);
       servoIntervalRef.current = setTimeout(tick, latest.servoRepeatMs);
     };
     servoIntervalRef.current = setTimeout(tick, 0);
@@ -288,6 +301,7 @@ export default function KeyboardInputManager() {
       latest?.stopHorn();
     }
     latest?.setMicPttActive(false);
+    latest?.setCameraPrecisionMode(false);
     latest?.stopAllMotion();
     latest?.registerInputState(SOURCE, { keys: [], vector: ZERO_VECTOR, aux: ZERO_AUX });
   }, [stopServoLoop, stopSongLoop]);
@@ -369,6 +383,7 @@ export default function KeyboardInputManager() {
       servoRepeatMs,
       servoStep,
       setAuxMotors,
+      setCameraPrecisionMode,
       setDriveVector,
       setMicPttActive,
       setMode,
