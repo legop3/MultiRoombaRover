@@ -1,5 +1,5 @@
-1. maybe add better camera control? a complete rework or maybe just a precision mode
-2. improve spectator page, options on what to see and what not to see
+1. improve spectator page, options on what to see and what not to see
+2. fix private rover requests not working.....
 3.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
