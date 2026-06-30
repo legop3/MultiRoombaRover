@@ -1,4 +1,4 @@
-addition to roverd to make it possible to use a normal linux laptop + usb serial adapter as a rover, instead of a raspberry pi
+addition to / variant of roverd to make it possible to use a normal linux laptop + usb serial adapter as a rover, instead of a raspberry pi
 
 
 - USE THIS AS AN OPPURTINITY TO:

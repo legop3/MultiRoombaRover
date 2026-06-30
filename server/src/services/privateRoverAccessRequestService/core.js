@@ -55,7 +55,6 @@ function pruneExpiredGrantsAndRefresh(reason = 'grant_expired') {
 
 function listPendingForRequester(socket) {
   const requesterKey = buildRequesterKey(socket);
-  const identity = getIdentitySummary(socket);
   const pending = [];
   for (const request of pendingRequests.values()) {
     if (request.requesterKey !== requesterKey) continue;
@@ -320,6 +319,15 @@ function createRequest(socket, roverIdRaw) {
     const remaining = Math.ceil((REQUEST_COOLDOWN_MS - (now - lastAt)) / 1000);
     throw new Error(`Please wait ${remaining}s before sending another request`);
   }
+
+  /*
+    Private rover requests are forwarded to lockdown admins through Discord, so
+    the request record should carry the canonical identity fields that admins
+    need for moderation and audit context. The requester key above decides
+    dedupe/cooldown behavior, while this summary keeps the human-facing payload
+    aligned with the newer identity service state on the socket.
+  */
+  const identity = getIdentitySummary(socket);
 
   const request = {
     id: `prr_${crypto.randomBytes(8).toString('hex')}`,
