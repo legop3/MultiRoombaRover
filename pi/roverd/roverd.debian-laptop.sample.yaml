@@ -50,17 +50,27 @@ media:
   audioPlayback:
     enabled: true
     service: audio-forward-listener.service
-    device: default
+    # The Debian laptop installer creates a named "forward" ALSA device so
+    # browser-forwarded audio has its own ForwardMaster mixer control instead
+    # of sharing the TTS default output path.
+    device: forward
     normalize: true
 
 cameraServo:
   enabled: false
 
 audio:
-  ttsEnabled: false
+  # TTS does not need Pi-specific hardware. The laptop ALSA profile maps the
+  # normal default playback device through the TTSMaster softvol control, so
+  # the existing flite/espeak execution path can stay unchanged.
+  ttsEnabled: true
+  defaultEngine: flite
 
 horn:
-  enabled: false
+  # Horn audio is generated locally by roverd and plays through the named
+  # "horn" ALSA device by default, which the laptop installer wires to a
+  # separate HornMaster softvol control.
+  enabled: true
 
 headlight:
   enabled: false
