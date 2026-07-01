@@ -58,10 +58,16 @@
       "entityId": "printer",
       "label": "Medical thermal printer"
     },
-        "o008": {
+    "o008": {
       "type": "object",
       "entityId": "brick",
       "label": "BRICK"
+    },
+    "o009": {
+      "type": "object",
+      "entityId": "gbc",
+      "label": "Green Ball Container",
+      "wikiUrl": "https://wiki.otter.land/notyet"
     }
   }
 }
