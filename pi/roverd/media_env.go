@@ -36,6 +36,7 @@ func UpdatePublisherEnv(media MediaConfig) error {
 	fmt.Fprintf(&buf, "ROVERD_VIDEO_PUBLISHER=%s\n", media.Video.Publisher)
 	fmt.Fprintf(&buf, "ROVERD_VIDEO_PUBLISH_URL=%s\n", media.Video.PublishURL)
 	fmt.Fprintf(&buf, "ROVERD_VIDEO_DEVICE=%s\n", media.Video.Device)
+	fmt.Fprintf(&buf, "ROVERD_VIDEO_INPUT_FORMAT=%s\n", media.Video.InputFormat)
 	fmt.Fprintf(&buf, "ROVERD_VIDEO_WIDTH=%d\n", media.Video.Width)
 	fmt.Fprintf(&buf, "ROVERD_VIDEO_HEIGHT=%d\n", media.Video.Height)
 	fmt.Fprintf(&buf, "ROVERD_VIDEO_FPS=%d\n", media.Video.FPS)

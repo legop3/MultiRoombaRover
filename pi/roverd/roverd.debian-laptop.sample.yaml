@@ -31,6 +31,10 @@ media:
     service: debian-laptop-video-publisher.service
     publisher: debian-laptop-v4l2
     device: /dev/video0
+    # Check supported values with:
+    #   v4l2-ctl --device=/dev/video0 --list-formats-ext
+    # Common working values are mjpeg and yuyv422.
+    inputFormat: mjpeg
     width: 640
     height: 480
     fps: 30

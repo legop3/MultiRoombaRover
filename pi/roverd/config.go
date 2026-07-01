@@ -93,17 +93,18 @@ type VideoMediaConfig struct {
 	// Publisher selects the installed publisher script/pipeline family. The
 	// first pass uses pi-libcamera for current rovers; laptop-v4l2 can be added
 	// without changing the server-facing media shape again.
-	Enabled    bool   `yaml:"enabled" json:"enabled"`
-	Service    string `yaml:"service" json:"service,omitempty"`
-	Publisher  string `yaml:"publisher" json:"publisher,omitempty"`
-	PublishURL string `yaml:"publishUrl" json:"publishUrl,omitempty"`
-	Device     string `yaml:"device" json:"device,omitempty"`
-	Width      int    `yaml:"width" json:"-"`
-	Height     int    `yaml:"height" json:"-"`
-	FPS        int    `yaml:"fps" json:"-"`
-	Bitrate    int    `yaml:"bitrate" json:"-"`
-	Inverted   bool   `yaml:"inverted" json:"-"`
-	SensorMode string `yaml:"sensorMode" json:"-"`
+	Enabled     bool   `yaml:"enabled" json:"enabled"`
+	Service     string `yaml:"service" json:"service,omitempty"`
+	Publisher   string `yaml:"publisher" json:"publisher,omitempty"`
+	PublishURL  string `yaml:"publishUrl" json:"publishUrl,omitempty"`
+	Device      string `yaml:"device" json:"device,omitempty"`
+	InputFormat string `yaml:"inputFormat" json:"-"`
+	Width       int    `yaml:"width" json:"-"`
+	Height      int    `yaml:"height" json:"-"`
+	FPS         int    `yaml:"fps" json:"-"`
+	Bitrate     int    `yaml:"bitrate" json:"-"`
+	Inverted    bool   `yaml:"inverted" json:"-"`
+	SensorMode  string `yaml:"sensorMode" json:"-"`
 }
 
 type AudioCaptureConfig struct {
@@ -450,6 +451,10 @@ func validateVideoMediaConfig(cfg *VideoMediaConfig, serverURL string, roverName
 	if cfg.Publisher == "" {
 		cfg.Publisher = "pi-libcamera"
 	}
+	// V4L2 input formats are consumed by ffmpeg as lowercase names such as
+	// mjpeg or yuyv422. Normalizing here keeps the publisher script simple and
+	// makes hand-edited Debian laptop configs less sensitive to capitalization.
+	cfg.InputFormat = strings.ToLower(strings.TrimSpace(cfg.InputFormat))
 	if cfg.Width <= 0 {
 		cfg.Width = 640
 	}

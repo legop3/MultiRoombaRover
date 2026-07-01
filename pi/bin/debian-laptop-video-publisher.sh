@@ -58,6 +58,7 @@ load_env_file
 : "${ROVERD_VIDEO_ENABLE:?ROVERD_VIDEO_ENABLE not set in ${ENV_FILE}}"
 : "${ROVERD_VIDEO_PUBLISH_URL:?ROVERD_VIDEO_PUBLISH_URL not set in ${ENV_FILE}}"
 : "${ROVERD_VIDEO_DEVICE:?ROVERD_VIDEO_DEVICE not set in ${ENV_FILE}}"
+: "${ROVERD_VIDEO_INPUT_FORMAT:?ROVERD_VIDEO_INPUT_FORMAT not set in ${ENV_FILE}}"
 : "${ROVERD_VIDEO_WIDTH:?ROVERD_VIDEO_WIDTH not set in ${ENV_FILE}}"
 : "${ROVERD_VIDEO_HEIGHT:?ROVERD_VIDEO_HEIGHT not set in ${ENV_FILE}}"
 : "${ROVERD_VIDEO_FPS:?ROVERD_VIDEO_FPS not set in ${ENV_FILE}}"
@@ -72,6 +73,16 @@ fi
 if [[ -z "${ROVERD_VIDEO_DEVICE}" ]]; then
 	echo "ROVERD_VIDEO_DEVICE is required for the debian-laptop V4L2 publisher" >&2
 	exit 1
+fi
+
+INPUT_FORMAT_ARGS=()
+if [[ -n "${ROVERD_VIDEO_INPUT_FORMAT}" ]]; then
+	# Many laptop webcams expose both compressed MJPEG and raw YUYV modes. The
+	# wrong negotiated format can still produce a decodable stream, but the
+	# picture appears as green/noisy mush because ffmpeg is interpreting the
+	# frame bytes with the wrong pixel format. Passing input_format pins V4L2 to
+	# the camera mode selected in roverd.yaml.
+	INPUT_FORMAT_ARGS=(-input_format "${ROVERD_VIDEO_INPUT_FORMAT}")
 fi
 
 if [[ -n "${FFMPEG_BIN:-}" ]]; then
@@ -99,6 +110,7 @@ run_pipeline() {
 		-flags low_delay \
 		-thread_queue_size 4096 \
 		-f v4l2 \
+		"${INPUT_FORMAT_ARGS[@]}" \
 		-framerate "${ROVERD_VIDEO_FPS}" \
 		-video_size "${ROVERD_VIDEO_WIDTH}x${ROVERD_VIDEO_HEIGHT}" \
 		-i "${ROVERD_VIDEO_DEVICE}" \
