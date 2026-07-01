@@ -15,6 +15,12 @@ import InfoColumn from './components/InfoColumn.jsx';
 import { ROTATE_MS } from './constants.js';
 import { formatDriverLabel } from './utils.js';
 
+function hasRoverAudioCapture(rover) {
+  // Mini uses the same media contract as the full rover player: audio exists
+  // only when the nested microphone publisher block is enabled and publishable.
+  return Boolean(rover?.media?.audioCapture?.enabled && rover?.media?.audioCapture?.publishUrl);
+}
+
 export default function MiniSummaryContent() {
   const { session } = useSession();
   const spectatorReady = useSpectatorMode();
@@ -53,7 +59,7 @@ export default function MiniSummaryContent() {
   const audioEntries = useMemo(
     () =>
       driverRoster.flatMap((rover) => {
-        if (!rover?.id || !rover.media?.audioPublishUrl) return [];
+        if (!rover?.id || !hasRoverAudioCapture(rover)) return [];
         const id = String(rover.id);
         return [{ type: 'rover', id: `${id}-audio`, key: `${id}-audio` }];
       }),

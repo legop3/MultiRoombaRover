@@ -13,17 +13,16 @@ import (
 
 type MediaSupervisor struct {
 	cfg           MediaConfig
-	audio         AudioConfig
 	logger        *log.Logger
 	client        *http.Client
 	checkInterval time.Duration
 }
 
-func NewMediaSupervisor(cfg MediaConfig, audio AudioConfig, logger *log.Logger) *MediaSupervisor {
-	if err := UpdatePublisherEnv(cfg, audio); err != nil {
+func NewMediaSupervisor(cfg MediaConfig, logger *log.Logger) *MediaSupervisor {
+	if err := UpdatePublisherEnv(cfg); err != nil {
 		logger.Printf("media supervisor: update env failed: %v", err)
 	}
-	if !cfg.Manage || cfg.Service == "" {
+	if !cfg.Manage {
 		return nil
 	}
 	interval := cfg.HealthInterval.Duration
@@ -36,7 +35,6 @@ func NewMediaSupervisor(cfg MediaConfig, audio AudioConfig, logger *log.Logger) 
 	}
 	return &MediaSupervisor{
 		cfg:           cfg,
-		audio:         audio,
 		logger:        logger,
 		client:        client,
 		checkInterval: interval,
@@ -47,7 +45,7 @@ func (m *MediaSupervisor) Start(ctx context.Context) {
 	if m == nil {
 		return
 	}
-	if err := UpdatePublisherEnv(m.cfg, m.audio); err != nil {
+	if err := UpdatePublisherEnv(m.cfg); err != nil {
 		m.logger.Printf("media supervisor: update env failed: %v", err)
 	}
 	if m.cfg.HealthURL == "" || m.client == nil {
@@ -78,7 +76,7 @@ func (m *MediaSupervisor) HandleAction(ctx context.Context, action string) error
 	if m == nil {
 		return errors.New("media supervisor disabled")
 	}
-	if err := UpdatePublisherEnv(m.cfg, m.audio); err != nil {
+	if err := UpdatePublisherEnv(m.cfg); err != nil {
 		return err
 	}
 	switch action {
@@ -96,9 +94,9 @@ func (m *MediaSupervisor) checkAndRepair() error {
 	if m.checkHealth(ctx) {
 		return nil
 	}
-	m.logger.Printf("media supervisor: health check failed, restarting %s", m.cfg.Service)
+	m.logger.Printf("media supervisor: health check failed, restarting configured media services")
 	if err := m.runSystemctl(ctx, "restart"); err != nil {
-		return fmt.Errorf("restart mediamtx: %w", err)
+		return fmt.Errorf("restart media services: %w", err)
 	}
 	return nil
 }
@@ -127,16 +125,39 @@ func (m *MediaSupervisor) checkHealth(ctx context.Context) bool {
 }
 
 func (m *MediaSupervisor) runSystemctl(ctx context.Context, action string) error {
-	if m.cfg.Service == "" {
-		return errors.New("no media service configured")
+	services := m.managedServices()
+	if len(services) == 0 {
+		return errors.New("no media services configured")
 	}
 	runCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(runCtx, "systemctl", action, m.cfg.Service)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("systemctl %s %s: %w (%s)", action, m.cfg.Service, err, string(output))
+	for _, service := range services {
+		cmd := exec.CommandContext(runCtx, "systemctl", action, service)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("systemctl %s %s: %w (%s)", action, service, err, string(output))
+		}
 	}
 	return nil
+}
+
+func (m *MediaSupervisor) managedServices() []string {
+	/*
+		Only enabled streams are service-managed. This matters for audio capture:
+		the service may be installed everywhere, but a rover with capture disabled
+		should not have remote media commands starting a publisher that the config
+		says should stay off.
+	*/
+	services := []string{}
+	if m.cfg.Video.Enabled && m.cfg.Video.Service != "" {
+		services = append(services, m.cfg.Video.Service)
+	}
+	if m.cfg.AudioCapture.Enabled && m.cfg.AudioCapture.Service != "" {
+		services = append(services, m.cfg.AudioCapture.Service)
+	}
+	if m.cfg.AudioPlayback.Enabled && m.cfg.AudioPlayback.Service != "" {
+		services = append(services, m.cfg.AudioPlayback.Service)
+	}
+	return services
 }

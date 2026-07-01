@@ -40,6 +40,14 @@ function normalizeVideoFilter(value) {
     : VIDEO_SETTINGS_DEFAULTS.colorFilter;
 }
 
+function hasRoverAudioCapture(rover) {
+  // The browser asks for the separate "<rover>-audio" WHEP source only when
+  // roverd's media config says the microphone publisher is enabled and has a
+  // concrete publish URL. That keeps UI media setup aligned with the daemon
+  // config instead of probing for streams that should not exist.
+  return Boolean(rover?.media?.audioCapture?.enabled && rover?.media?.audioCapture?.publishUrl);
+}
+
 export default function RoverMediaPlayer({
   roverId = null,
   sessionInfo = null,
@@ -58,7 +66,7 @@ export default function RoverMediaPlayer({
       ? state.session.roster.find((item) => String(item.id) === String(effectiveRoverId)) || null
       : null,
   );
-  const hasAudio = Boolean(rosterEntry?.media?.audioPublishUrl);
+  const hasAudio = hasRoverAudioCapture(rosterEntry);
   const autoVideoEnabled = videoMode ? videoMode === 'whep' : true;
   const autoAudioEnabled = hasAudio;
   const autoEntries = useMemo(() => {

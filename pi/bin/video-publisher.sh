@@ -4,7 +4,7 @@ set -euo pipefail
 # Keep history expansion off so values containing "!" are safe.
 set +H
 
-ENV_FILE="${VIDEO_ENV_FILE:-/var/lib/roverd/video.env}"
+ENV_FILE="${ROVERD_MEDIA_ENV_FILE:-/var/lib/roverd/media.env}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Environment file ${ENV_FILE} missing; cannot publish" >&2
@@ -64,25 +64,29 @@ load_env_file() {
 }
 
 load_env_file
-: "${PUBLISH_URL:?PUBLISH_URL not set in ${ENV_FILE}}"
+: "${ROVERD_VIDEO_ENABLE:?ROVERD_VIDEO_ENABLE not set in ${ENV_FILE}}"
+: "${ROVERD_VIDEO_PUBLISH_URL:?ROVERD_VIDEO_PUBLISH_URL not set in ${ENV_FILE}}"
+: "${ROVERD_VIDEO_WIDTH:?ROVERD_VIDEO_WIDTH not set in ${ENV_FILE}}"
+: "${ROVERD_VIDEO_HEIGHT:?ROVERD_VIDEO_HEIGHT not set in ${ENV_FILE}}"
+: "${ROVERD_VIDEO_FPS:?ROVERD_VIDEO_FPS not set in ${ENV_FILE}}"
+: "${ROVERD_VIDEO_BITRATE:?ROVERD_VIDEO_BITRATE not set in ${ENV_FILE}}"
+: "${ROVERD_VIDEO_INVERT:?ROVERD_VIDEO_INVERT not set in ${ENV_FILE}}"
 
-# Defaults tuned for OV5647: use 4:3 output and force the common 2x2 binned full-FOV mode.
-VIDEO_WIDTH="640"
-VIDEO_HEIGHT="480"
-VIDEO_FPS="30"
-VIDEO_BITRATE="${VIDEO_BITRATE:-3000000}"
-VIDEO_INVERT="${VIDEO_INVERT:-1}"
-VIDEO_SENSOR_MODE="${VIDEO_SENSOR_MODE:-1296:972}"
+if [[ "${ROVERD_VIDEO_ENABLE}" -ne 1 ]]; then
+  echo "Video publisher disabled by roverd media config; skipping" >&2
+  exit 0
+fi
 
-# Flip the camera 180deg by default; allow upright camera mounts via VIDEO_INVERT=0.
+# The inversion decision is made in roverd.yaml and written into media.env, so
+# this script only converts the configured logical value into libcamera flags.
 FLIP_ARGS=()
-if [[ "${VIDEO_INVERT}" -ne 0 ]]; then
+if [[ "${ROVERD_VIDEO_INVERT}" -ne 0 ]]; then
   FLIP_ARGS=(--rotation 180)
 fi
 
 MODE_ARGS=()
-if [[ -n "${VIDEO_SENSOR_MODE}" ]]; then
-  MODE_ARGS=(--mode "${VIDEO_SENSOR_MODE}")
+if [[ -n "${ROVERD_VIDEO_SENSOR_MODE:-}" ]]; then
+  MODE_ARGS=(--mode "${ROVERD_VIDEO_SENSOR_MODE}")
 fi
 
 if [[ -n "${LIBCAMERA_BIN:-}" ]]; then
@@ -110,11 +114,11 @@ run_pipeline() {
     --inline \
     --timeout 0 \
     "${MODE_ARGS[@]}" \
-    --width "${VIDEO_WIDTH}" \
-    --height "${VIDEO_HEIGHT}" \
+    --width "${ROVERD_VIDEO_WIDTH}" \
+    --height "${ROVERD_VIDEO_HEIGHT}" \
     "${FLIP_ARGS[@]}" \
-    --framerate "${VIDEO_FPS}" \
-    --bitrate "${VIDEO_BITRATE}" \
+    --framerate "${ROVERD_VIDEO_FPS}" \
+    --bitrate "${ROVERD_VIDEO_BITRATE}" \
     --codec h264 \
     --profile baseline \
     --denoise auto \
@@ -138,7 +142,7 @@ run_pipeline() {
       -muxdelay 0 \
       -muxpreload 0 \
       -f mpegts \
-      "${PUBLISH_URL}"
+      "${ROVERD_VIDEO_PUBLISH_URL}"
 }
 
 while true; do
