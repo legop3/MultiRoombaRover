@@ -37,7 +37,10 @@ function createAudioForwardPolicy(deps) {
 
   function resolveForwardUrl(roverId) {
     const record = roverManager.rovers.get(roverId);
-    const configured = record?.meta?.media?.audioForwardUrl;
+    // Rovers listen to the playback stream with a request/read URL. The VIP
+    // upload path needs to publish into that same stream, so the configured
+    // nested playback URL is converted to publish mode below.
+    const configured = record?.meta?.media?.audioPlayback?.forwardUrl;
     if (configured) return forcePublishStreamMode(configured);
     return `srt://127.0.0.1:9000?streamid=#!::r=${encodeURIComponent(
       roverId + streamSuffix,

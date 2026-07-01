@@ -17,9 +17,18 @@ battery:
 maxWheelSpeed: 350
 media:
   manage: false
-  service: mediamtx.service
   healthUrl: http://127.0.0.1:9997/v3/paths/list
   healthInterval: 30s
+  video:
+    enabled: true
+    service: video-publisher.service
+    publisher: pi-libcamera
+  audioCapture:
+    enabled: false
+    service: audio-only-publisher.service
+  audioPlayback:
+    enabled: true
+    service: audio-forward-listener.service
 cameraServo:
   enabled: false
   pin: 19

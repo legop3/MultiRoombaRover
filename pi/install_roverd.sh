@@ -312,18 +312,32 @@ install -D -o root -g root -m 0755 pi/bin/audio-forward-listener.sh /usr/local/b
 install -m 0644 pi/systemd/audio-forward-listener.service /etc/systemd/system/audio-forward-listener.service
 log "Installed audio-forward listener helper + systemd unit"
 install -d -o roverd -g roverd /var/lib/roverd
-cat > /var/lib/roverd/video.env <<'ENV'
+cat > /var/lib/roverd/media.env <<'ENV'
 # Managed by roverd; placeholder values will be overwritten at runtime.
-PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
-AUDIO_PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-audio,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
-AUDIO_FORWARD_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-fwd,m=request&latency=10&mode=caller&transtype=live&pkt_size=1316
-VIDEO_BITRATE=2000000
-AUDIO_ENABLE=0
-AUDIO_DEVICE=hw:0,0
-AUDIO_PLAYBACK_DEVICE=forward
+ROVERD_VIDEO_ENABLE=1
+ROVERD_VIDEO_PUBLISHER=pi-libcamera
+ROVERD_VIDEO_PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
+ROVERD_VIDEO_DEVICE=
+ROVERD_VIDEO_WIDTH=640
+ROVERD_VIDEO_HEIGHT=480
+ROVERD_VIDEO_FPS=30
+ROVERD_VIDEO_BITRATE=2000000
+ROVERD_VIDEO_INVERT=1
+ROVERD_VIDEO_SENSOR_MODE=1296:972
+ROVERD_AUDIO_CAPTURE_ENABLE=0
+ROVERD_AUDIO_CAPTURE_PUBLISH_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-audio,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
+ROVERD_AUDIO_CAPTURE_DEVICE=hw:0,0
+ROVERD_AUDIO_CAPTURE_SAMPLE_RATE=48000
+ROVERD_AUDIO_CAPTURE_CHANNELS=2
+ROVERD_AUDIO_CAPTURE_BITRATE=510000
+ROVERD_AUDIO_PLAYBACK_ENABLE=1
+ROVERD_AUDIO_PLAYBACK_FORWARD_URL=srt://192.168.0.86:9000?streamid=#!::r=CHANGE_ME-fwd,m=request&latency=10&mode=caller&transtype=live&pkt_size=1316
+ROVERD_AUDIO_PLAYBACK_DEVICE=forward
+ROVERD_AUDIO_PLAYBACK_NORMALIZE=1
+ROVERD_AUDIO_PLAYBACK_NORMALIZE_FILTER=dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled
 ENV
-chown roverd:roverd /var/lib/roverd/video.env
-chmod 0640 /var/lib/roverd/video.env
+chown roverd:roverd /var/lib/roverd/media.env
+chmod 0640 /var/lib/roverd/media.env
 # Create persistent audio FIFO for capture -> publisher
 FIFO_PATH="/var/lib/roverd/audio.pcm"
 if [[ -p "$FIFO_PATH" ]]; then

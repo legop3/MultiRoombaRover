@@ -25,12 +25,19 @@ function getRoomCameraStream(camera) {
   return null;
 }
 
+function hasRoverAudioCapture(rover) {
+  // The replay worker only records a rover microphone stream when roverd says
+  // capture is both enabled and publishable. That mirrors the media publisher
+  // contract instead of guessing from stream naming conventions alone.
+  return Boolean(rover?.media?.audioCapture?.enabled && rover?.media?.audioCapture?.publishUrl);
+}
+
 function listDesiredSources() {
   const sources = [];
   for (const rover of roverManager.getRoster()) {
     const roverId = String(rover.id);
     sources.push({ id: roverId, sourceType: 'rover', kind: 'video', label: rover.name || roverId, inputUrl: toSrtReadPath(roverId) });
-    if (rover?.media?.audioPublishUrl) {
+    if (hasRoverAudioCapture(rover)) {
       sources.push({ id: `${roverId}-audio`, sourceType: 'rover', roverId, kind: 'audio', label: `${rover.name || roverId} audio`, inputUrl: toSrtReadPath(`${roverId}-audio`) });
     }
   }
