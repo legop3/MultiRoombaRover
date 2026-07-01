@@ -1,4 +1,4 @@
-//go:build !dummy
+//go:build !dummy && !debian_laptop
 
 package roverd
 
