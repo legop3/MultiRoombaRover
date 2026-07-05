@@ -8,6 +8,7 @@ import { useSettingsNamespace } from '../../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import ButtonBoxTile from '../ButtonBoxTile/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 
 const FLASH_MS = 420;
 const REWARD_FLASH_MS = 1200;
@@ -20,6 +21,18 @@ const BUTTON_TONES = {
 };
 
 export default function ButtonBoxPanel() {
+  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'buttonBox'));
+
+  /*
+    The physical button box should vanish by owning its own feature gate. Routes
+    can keep mounting this component without leaking empty reward panels.
+  */
+  if (!enabled) return null;
+
+  return <ButtonBoxPanelContent />;
+}
+
+function ButtonBoxPanelContent() {
   const buttonBoxButtons = useSessionSelector((state) => state.session?.buttonBox?.buttons ?? []);
   const socket = useSocket();
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);

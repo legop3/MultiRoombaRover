@@ -6,6 +6,7 @@ import { useSessionActions, useSessionSelector } from '../../context/SessionCont
 import { useControlSelector } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import CardFrame from '../CardFrame/index.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 
 const COLOR_SWATCHES = Object.freeze([
   { id: 'white', label: 'White', hex: '#ffffff', action: 'white' },
@@ -169,6 +170,19 @@ function LampTile({ entity, connected, controlsLocked, onToggle, onSetColor, onS
 }
 
 export default function HomeAssistantControls() {
+  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'homeAssistant'));
+
+  /*
+    Feature existence is owned here, not by each layout that happens to mount
+    room controls. Disabled integrations render nothing; enabled integrations
+    can still show offline/configuration states inside the panel.
+  */
+  if (!enabled) return null;
+
+  return <HomeAssistantControlsContent />;
+}
+
+function HomeAssistantControlsContent() {
   const keymap = useControlSelector((control) => control.state.keymap);
   const ha = useSessionSelector((state) => state.session?.homeAssistant || null);
   const { homeAssistantToggle, homeAssistantSetLightColor, homeAssistantSetLightWhite } =

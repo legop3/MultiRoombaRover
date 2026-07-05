@@ -195,9 +195,12 @@ function TurnsOverlay({
                 Video switched to preview mode to save bandwidth.
               </div>
             ) : null}
-            <div className="pointer-events-auto mt-0.5">
-              <SocialButton id="discord" label="Join our Discord while you wait!" layout='inline'/>
-            </div>
+            <SocialButton
+              id="discord"
+              label="Join our Discord while you wait!"
+              layout="inline"
+              className="pointer-events-auto mt-0.5"
+            />
           </div>
         </div>
       ) : null}

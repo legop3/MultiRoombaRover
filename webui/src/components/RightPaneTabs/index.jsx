@@ -187,6 +187,25 @@ function DriveDockPanel() {
   );
 }
 
+function QueueReplayLinksRow() {
+  /*
+    Flex ratios match the old grid proportions when the Links panel exists. If
+    LinkButtonsPanel returns null because socials are disabled, flex naturally
+    removes that item instead of preserving an empty grid column.
+  */
+  return (
+    <div className={`flex ${themeGapClass}`}>
+      <div className="min-w-0 basis-0 grow-[1]">
+        <RoverQueuesPanel />
+      </div>
+      <div className="min-w-0 basis-0 grow-[0.9]">
+        <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
+      </div>
+      <LinkButtonsPanel className="min-w-0 basis-0 grow-[0.75]" />
+    </div>
+  );
+}
+
 export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   const [activeTab, setActiveTab] = useState('telemetry');
   const chatDockRef = useRef(null);
@@ -354,11 +373,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
                   <TopDownMapPanel />
                   <DriveDockPanel />
                 </div>
-                <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.75fr)]`}>
-                  <RoverQueuesPanel />
-                  <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
-                  <LinkButtonsPanel />
-                </div>
+                <QueueReplayLinksRow />
                 {/*
                   This row gets an explicit measured height because the target
                   behavior depends on the row's live viewport position during

@@ -4,6 +4,8 @@ import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButton from '../SocialButton/index.jsx';
 import KeyPill from '../vip/VipAudioUploadCard/KeyPill.jsx';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
+import { getSocialById } from '../../lib/socials.js';
 
 function ControlRow({ label, keyLabel }) {
   return (
@@ -41,6 +43,25 @@ function MobileQuickstart() {
       <p>2. Touch and hold in Joystick area to move.</p>
       <p>3. Use the other column for motor, horn, and camera controls.</p>
       <p>4. When done, enter "Docking Assist" and line up the front sensor with the dock sensor.</p>
+    </div>
+  );
+}
+
+function DiscordQuickstartCard() {
+  const discord = useSessionSelector((state) => getSocialById(state, 'discord'));
+
+  /*
+    The section has explanatory text around the actual button, so SocialButton's
+    own null return is not enough here. Keep the whole Discord prompt self-
+    contained so layouts do not need a separate social feature check.
+  */
+  if (!discord?.url) return null;
+
+  return (
+    <div className="surface p-0.5">
+      <p className="text-xl font-semibold text-slate-200">Join our Discord server!</p>
+      <p className="text-sm font-semibold text-slate-200">We have an active and welcoming community :3</p>
+      <SocialButton id="discord" label="Join Discord" />
     </div>
   );
 }
@@ -85,11 +106,7 @@ export default function QuickstartOverlay({
               <p className="text-sm font-semibold text-slate-200">Nicknames are assigned randomly by default, you can change yours here.</p>
               <NicknameForm compact />
             </div>
-            <div className="surface p-0.5">
-              <p className="text-xl font-semibold text-slate-200">Join our Discord server!</p>
-              <p className="text-sm font-semibold text-slate-200">We have an active and welcoming community :3</p>
-              <SocialButton id="discord" label="Join Discord" />
-            </div>
+            <DiscordQuickstartCard />
           </section>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-0.5 border-t border-slate-700 px-0.5 py-0.35 text-[0.8rem]">

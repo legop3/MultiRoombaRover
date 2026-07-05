@@ -5,6 +5,7 @@ const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('neatoService');
 const { loadConfig } = require('../../helpers/configLoader');
+const { isFeatureEnabled } = require('../../helpers/features');
 const { isVerified } = require('../verificationService');
 const { getMode, MODES } = require('../modeManager');
 const { isLockdownAdmin } = require('../roleService');
@@ -20,6 +21,7 @@ const events = new EventEmitter();
 const config = loadConfig();
 const haConfig = config.homeAssistant || {};
 const neatoConfig = haConfig.neato || {};
+const featureEnabled = isFeatureEnabled('neato');
 
 function normalizeDeviceName(value) {
   const raw = String(value || '').trim().toLowerCase();
@@ -117,7 +119,7 @@ function buildState() {
   const requiredIds = requiredEntityIds();
   const entitiesAvailable = requiredIds.length > 0 && requiredIds.every((id) => isEntityAvailable(id));
   const connected = Boolean(haConnected && entitiesAvailable);
-  const enabled = Boolean(homeAssistantEnabled && configured);
+  const enabled = Boolean(featureEnabled && homeAssistantEnabled && configured);
 
   const controls = {
     start: {
@@ -189,15 +191,25 @@ function emitUpdate() {
   }
 }
 
-homeAssistantEvents.on('snapshot', () => {
-  emitUpdate();
-});
+if (featureEnabled) {
+  /*
+    Neato telemetry is derived from Home Assistant entities. Disabled installs
+    should keep the exported API inert instead of tracking HA snapshots for a
+    robot vacuum feature that does not exist on that server.
+  */
+  homeAssistantEvents.on('snapshot', () => {
+    emitUpdate();
+  });
 
-homeAssistantEvents.on('status', () => {
-  emitUpdate();
-});
+  homeAssistantEvents.on('status', () => {
+    emitUpdate();
+  });
+}
 
 function assertConfiguredAndConnected() {
+  if (!featureEnabled) {
+    throw new Error('Neato is disabled');
+  }
   if (!device) {
     throw new Error('Neato not configured');
   }
@@ -255,7 +267,8 @@ function hasVerifiedSockets() {
   return false;
 }
 
-io.on('connection', (socket) => {
+if (featureEnabled) {
+  io.on('connection', (socket) => {
   function assertLockdownAccess() {
     if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
       throw new Error('Server in lockdown');
@@ -319,7 +332,10 @@ io.on('connection', (socket) => {
       cb({ error: err.message });
     }
   });
-});
+  });
+} else {
+  logger.info('Neato disabled by config');
+}
 
 emitUpdate();
 

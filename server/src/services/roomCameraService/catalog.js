@@ -4,6 +4,7 @@
 const EventEmitter = require('events');
 const logger = require('../../globals/logger').child('roomCameraService');
 const { loadConfig } = require('../../helpers/configLoader');
+const { getRoomCameraEntries } = require('../../helpers/features');
 
 const events = new EventEmitter();
 const config = loadConfig();
@@ -40,7 +41,7 @@ function getRoomCamera(id) {
 
 function loadFromConfig() {
   cameraMap.clear();
-  const list = Array.isArray(config.roomCameras) ? config.roomCameras : [];
+  const list = getRoomCameraEntries(config);
   list.forEach((camera) => {
     const normalized = normalizeCamera(camera);
     if (normalized) cameraMap.set(normalized.id, normalized);

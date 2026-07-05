@@ -5,18 +5,34 @@ const { loadFromConfig, getRoomCameras, getRoomCamera, roomCameraEvents } = requ
 const { createSnapshotEngine } = require('./snapshotEngine');
 const { registerRoomCameraSocketGateway } = require('./socketGateway');
 const replay = require('../replayEngineV2/roomCameraReplayBuilder');
+const { isFeatureEnabled } = require('../../helpers/features');
+
+const enabled = isFeatureEnabled('roomCameras');
 
 const snapshotEngine = createSnapshotEngine({ getRoomCameras, roomCameraEvents });
-snapshotEngine.startAll();
+if (enabled) {
+  /*
+    Room cameras are optional local hardware/network devices. The service module
+    can still be imported by replay, health, and session code, but disabled
+    installs must not start polling LAN cameras in the background.
+  */
+  loadFromConfig();
+  snapshotEngine.startAll();
+}
 
-registerRoomCameraSocketGateway({
-  getRoomCamera,
-  getRoomCameras,
-  getRoomCameraState: snapshotEngine.getRoomCameraState,
-  roomCameraStreamEvents: snapshotEngine.roomCameraStreamEvents,
-});
-
-loadFromConfig();
+if (enabled) {
+  /*
+    Camera frame sockets are part of the room-camera feature surface. Keeping
+    them behind the same gate prevents disabled features from being callable by
+    hand even though server/index.js still imports this module.
+  */
+  registerRoomCameraSocketGateway({
+    getRoomCamera,
+    getRoomCameras,
+    getRoomCameraState: snapshotEngine.getRoomCameraState,
+    roomCameraStreamEvents: snapshotEngine.roomCameraStreamEvents,
+  });
+}
 
 function buildRoomCameraReplayVideo(options = {}) {
   return replay.buildRoomCameraReplayVideo(options, { getRoomCamera, getRoomCameras });

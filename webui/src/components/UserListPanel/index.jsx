@@ -3,6 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButtonsGrid from '../SocialButtonsGrid/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
@@ -18,9 +19,23 @@ export function NicknameEntryPanel({ compact = false }) {
   );
 }
 
-export function LinkButtonsPanel() {
+export function LinkButtonsPanel({ className = '' }) {
+  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'socials'));
+
+  /*
+    This component is the actual Links panel shell. SocialButtonsGrid already
+    hides the buttons when socials are disabled, but the shell must also hide
+    itself so the UI does not leave an empty "Links!" card behind.
+  */
+  if (!enabled) return null;
+
   return (
-    <CardFrame title="Links!" fillHeight bodyClassName="flex flex-1 min-h-0 flex-col gap-0.5 text-base">
+    <CardFrame
+      title="Links!"
+      fillHeight
+      className={className}
+      bodyClassName="flex flex-1 min-h-0 flex-col gap-0.5 text-base"
+    >
       <SocialButtonsGrid className="flex-1 min-h-0" />
     </CardFrame>
   );

@@ -4,6 +4,7 @@
 const { app } = require('../../globals/http');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('buttonBoxService');
+const { isFeatureEnabled } = require('../../helpers/features');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { publishEvent } = require('../eventBus');
 const { getRewardById, listRewards } = require('../../rewards');
@@ -28,6 +29,7 @@ const DATA_DIR = resolveDataDir();
 const STORE_PATH = resolveDataPath('buttonbox-state.json');
 const BUTTON_COUNT = 4;
 const STORE_VERSION = 1;
+const enabled = isFeatureEnabled('buttonBox');
 
 const store = createButtonBoxStore({
   logger,
@@ -62,21 +64,39 @@ const core = createButtonBoxCore({
   store,
 });
 
-registerButtonBoxRoute({
-  app,
-  logger,
-  buttonCount: BUTTON_COUNT,
-  normalizeIp,
-  isLocalNetwork,
-  applyPress: core.applyPress,
-});
+if (enabled) {
+  /*
+    The button box is physical local hardware, so disabled public installs
+    should not expose its LAN-only press endpoint or initialize its reward file.
+  */
+  registerButtonBoxRoute({
+    app,
+    logger,
+    buttonCount: BUTTON_COUNT,
+    normalizeIp,
+    isLocalNetwork,
+    applyPress: core.applyPress,
+  });
 
-store.loadState();
-core.recoverEffects().catch((err) => {
-  logger.warn('Button box effect recovery failed', err.message);
-});
+  store.loadState();
+  core.recoverEffects().catch((err) => {
+    logger.warn('Button box effect recovery failed', err.message);
+  });
+} else {
+  logger.info('Button box disabled by config');
+}
 
 module.exports = {
-  getButtonBoxState: store.getStateClone,
-  addButtonBoxCount: core.addCount,
+  getButtonBoxState: () => {
+    /*
+      Session sync still includes a buttonBox key for a stable payload shape,
+      but disabled mode must not create/read the persisted button-box store.
+    */
+    if (!enabled) return { buttons: [] };
+    return store.getStateClone();
+  },
+  addButtonBoxCount: (...args) => {
+    if (!enabled) throw new Error('Button box is disabled');
+    return core.addCount(...args);
+  },
 };

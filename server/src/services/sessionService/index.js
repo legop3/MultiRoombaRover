@@ -32,6 +32,7 @@ const { getGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason } = require('../adminReasonService');
 const { subscribe } = require('../eventBus');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
+const { getFeatureFlags } = require('../../helpers/features');
 const { getAudioForwardState, audioForwardEvents } = require('../audioForwardService');
 const { getAudioLevels, audioLevelsEvents } = require('../audioLevelsService');
 const { getButtonBoxState } = require('../buttonBoxService');
@@ -70,6 +71,7 @@ function buildUserEntry(socket) {
 
 function buildSession(socket) {
   const overseerVote = getOverseerVoteStatus();
+  const features = getFeatureFlags();
   const users = Array.from(io.sockets.sockets.values())
     .map((sock) => buildUserEntry(sock))
     .filter(Boolean)
@@ -82,18 +84,18 @@ function buildSession(socket) {
   const assignmentRoverId = filterVisibleRoverId(socket, assignment?.roverId);
   const activeDrivers = filterActiveDriversForSocket(getActiveDrivers(), socket);
   const turnQueues = filterTurnQueuesForSocket(getTurnQueues(), socket);
-  const socials =
-    configuredSocials?.length
-      ? configuredSocials
-      : [
-          ...(discordInvite ? [{ id: 'discord', label: 'Discord', url: discordInvite }] : []),
-          ...(kofiLink ? [{ id: 'kofi', label: 'Ko-fi', url: kofiLink }] : []),
-        ];
+  const socials = features.socials && configuredSocials?.length ? configuredSocials : [];
   return {
     socketId: socket?.id || null,
     role: getRole(socket),
     mode: getMode(),
     isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
+    /*
+      Features is the single UI contract for optional server capabilities. A
+      disabled feature should be absent from navigation/layout decisions even
+      though the service module may still be loaded on the Node side.
+    */
+    features,
     roster,
     odometers: roverManager.getOdometersForSocket(socket),
     assignment: {

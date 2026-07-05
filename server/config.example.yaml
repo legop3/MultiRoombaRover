@@ -7,12 +7,15 @@ admins:
     password_hash: "$2b$10$n0L0oe1ZQy7IgM.FvVAzb.aXz43uaZWFiT0wr.05uNoVIDLawmrCG" # password: lockdownpass
     discord_id: "0987654321"
     lockdown: true
+
 timezone: "America/New_York"
+
 llmCommentary:
   enabled: false
   model: "qwen2.5:7b-instruct"
   ollamaServer: "http://127.0.0.1:11434"
   frequency: 120000
+
 overseerControl:
   enabled: false
   # autonomous runs the existing vote-gated loop forever; directAddress only
@@ -27,9 +30,12 @@ overseerControl:
   ollamaServer: "http://127.0.0.1:11434"
   profileImageUrl: "https://example.com/overseer.png"
   gateIntervalMs: 2000
+
 barcodeGames:
+  enabled: false
   botName: "Barcode Games"
   profileImageUrl: "https://example.com/barcode-games.png"
+
 media:
   # Base address for mediaMTX (scheme + host + optional port/path). The UI will always request
   #   http://<base>/<roverId>/whep
@@ -49,13 +55,16 @@ audioLevels:
   forwardGain: 1.0
 
 homeAssistant:
+  enabled: false
   url: "http://homeassistant.local:8123"
   token: "REPLACE_WITH_LONG_LIVED_TOKEN"
   neato:
+    enabled: false
     # ESPHome device name, used to derive gen3 entities:
     # button.<device>_house_clean, button.<device>_send_to_base, button.<device>_locate_robot, etc.
     device: "neato_vacuum"
   lift:
+    enabled: false
     # Two Home Assistant switches controlling lift direction.
     # Raise sequence: down off -> wait interlockMs -> up on
     # Lower sequence: up off -> wait interlockMs -> down on
@@ -92,17 +101,20 @@ homeAssistant:
       stateEquals: "toggle"
       cooldownMs: 1000
       action: "lightsLockToggle"
+      
 roomCameras:
-  - id: "lobby"
-    name: "Lobby Camera"
-    description: "Wide shot of the staging area."
-    url: "http://192.168.0.50/snapshot.jpg"
-    streamUrl: "http://192.168.0.50/stream.mjpg"
-  - id: "workshop"
-    name: "Workshop Bench"
-    description: "Shows the workbench and charging docks."
-    url: "http://192.168.0.51/snapshot.jpg"
-    streamUrl: "http://192.168.0.51/stream.mjpg"
+  enabled: false
+  cameras:
+    - id: "lobby"
+      name: "Lobby Camera"
+      description: "Wide shot of the staging area."
+      url: "http://192.168.0.50/snapshot.jpg"
+      streamUrl: "http://192.168.0.50/stream.mjpg"
+    - id: "workshop"
+      name: "Workshop Bench"
+      description: "Shows the workbench and charging docks."
+      url: "http://192.168.0.51/snapshot.jpg"
+      streamUrl: "http://192.168.0.51/stream.mjpg"
 
 kinect:
   enabled: false
@@ -110,6 +122,12 @@ kinect:
   # uploads for everyone else.  This does not affect the native worker's local
   # camera cache; it only gates browser-requested broadcasts.
   captureCooldownMs: 10000
+
+buttonBox:
+  enabled: false
+
+barcodeScanner:
+  enabled: false
 
 discord:
   token: "DISCORD_BOT_TOKEN"
@@ -129,23 +147,15 @@ discord:
     humanAlertPing: "123456789012345678"
 
 socials:
-  - id: "discord"
-    label: "Discord"
-    url: "https://discord.gg/your-invite"
-    icon: "FaDiscord"
-    color: "#5865F2"
-  - id: "kofi"
-    label: "Ko-fi"
-    url: "https://ko-fi.com/your-handle"
-    icon: "FaCoffee"
-    color: "#29ABE0"
-  - id: "wiki"
-    label: "Wiki"
-    url: "https://wiki.example.com"
-    icon: "FaBook"
-    color: "#475569"
-  - id: "throne"
-    label: "Throne"
-    url: "https://throne.me/yourname"
-    icon: "FaCrown"
-    color: "#334155"
+  enabled: false
+  links:
+    - id: "discord"
+      label: "Discord"
+      url: "https://discord.gg/your-invite"
+      icon: "FaDiscord"
+      color: "#5865F2"
+    - id: "kofi"
+      label: "Ko-fi"
+      url: "https://ko-fi.com/your-handle"
+      icon: "FaCoffee"
+      color: "#29ABE0"

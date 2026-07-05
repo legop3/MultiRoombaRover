@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import CardFrame from '../CardFrame/index.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 
 function normalizeState(value) {
   return String(value || '').trim();
@@ -41,6 +42,18 @@ function StatusTile({ label, value, tone = 'muted', valueClass = '', hideLabel =
 }
 
 export default function NeatoCard() {
+  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'neato'));
+
+  /*
+    Neato support is optional hardware surfaced through Home Assistant. Keeping
+    the feature gate in this card avoids scattered checks in each route layout.
+  */
+  if (!enabled) return null;
+
+  return <NeatoCardContent />;
+}
+
+function NeatoCardContent() {
   /*
     Neato is a standalone public activity card. It owns its session selector and
     command actions so callers do not need to know the socket event names or

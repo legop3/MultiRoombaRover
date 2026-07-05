@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import CardFrame from '../CardFrame/index.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 
 function badgeClass(tone) {
   if (tone === 'good') return 'bg-emerald-600 text-white';
@@ -21,6 +22,18 @@ function positionLabel(value) {
 }
 
 export default function LiftCard() {
+  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'lift'));
+
+  /*
+    Lift is an optional Home Assistant-backed hardware feature. The card owns
+    that existence check so disabled installs do not need layout-level guards.
+  */
+  if (!enabled) return null;
+
+  return <LiftCardContent />;
+}
+
+function LiftCardContent() {
   /*
     The lift card is a complete Activities-tab feature, so it reads the shared
     lift state and socket actions directly. Keeping that wiring inside the card

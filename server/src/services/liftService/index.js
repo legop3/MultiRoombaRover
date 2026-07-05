@@ -5,6 +5,7 @@ const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('liftService');
 const { loadConfig } = require('../../helpers/configLoader');
+const { isFeatureEnabled } = require('../../helpers/features');
 const { getMode, MODES } = require('../modeManager');
 const { isLockdownAdmin } = require('../roleService');
 const {
@@ -19,6 +20,7 @@ const events = new EventEmitter();
 const config = loadConfig();
 const haConfig = config.homeAssistant || {};
 const liftConfig = haConfig.lift || {};
+const featureEnabled = isFeatureEnabled('lift');
 
 const upSwitchId = String(liftConfig.upSwitch || '').trim();
 const downSwitchId = String(liftConfig.downSwitch || '').trim();
@@ -71,7 +73,7 @@ function getState() {
   const configured = isConfigured();
   const connected = isHomeAssistantConnected();
   return {
-    enabled: Boolean(homeAssistantEnabled && configured),
+    enabled: Boolean(featureEnabled && homeAssistantEnabled && configured),
     configured,
     connected,
     entities: {
@@ -102,6 +104,7 @@ function emitUpdate() {
 }
 
 function assertReady() {
+  if (!featureEnabled) throw new Error('Lift is disabled');
   if (!isConfigured()) throw new Error('Lift not configured');
   if (!homeAssistantEnabled) throw new Error('Home Assistant not configured');
   if (!isHomeAssistantConnected()) throw new Error('Home Assistant not connected');
@@ -173,38 +176,47 @@ async function moveDown(actor = 'unknown') {
   return requestPosition('down', actor);
 }
 
-homeAssistantEvents.on('snapshot', emitUpdate);
-homeAssistantEvents.on('status', emitUpdate);
+if (featureEnabled) {
+  /*
+    Lift state depends on Home Assistant switch snapshots. Subscribe only when
+    the lift exists so disabled installs do not maintain hardware-specific UI
+    sync paths.
+  */
+  homeAssistantEvents.on('snapshot', emitUpdate);
+  homeAssistantEvents.on('status', emitUpdate);
 
-io.on('connection', (socket) => {
-  socket.on('lift:up', async (_, cb = () => {}) => {
-    try {
-      if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
-        throw new Error('Server in lockdown');
+  io.on('connection', (socket) => {
+    socket.on('lift:up', async (_, cb = () => {}) => {
+      try {
+        if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
+          throw new Error('Server in lockdown');
+        }
+        // Lift movement is now a public activity feature. Lockdown still wins
+        // above because that mode is the global safety/admin gate for the room.
+        const resp = await moveUp(socket.id || 'socket');
+        cb({ success: true, ...resp });
+      } catch (err) {
+        cb({ error: err.message });
       }
-      // Lift movement is now a public activity feature. Lockdown still wins
-      // above because that mode is the global safety/admin gate for the room.
-      const resp = await moveUp(socket.id || 'socket');
-      cb({ success: true, ...resp });
-    } catch (err) {
-      cb({ error: err.message });
-    }
-  });
+    });
 
-  socket.on('lift:down', async (_, cb = () => {}) => {
-    try {
-      if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
-        throw new Error('Server in lockdown');
+    socket.on('lift:down', async (_, cb = () => {}) => {
+      try {
+        if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
+          throw new Error('Server in lockdown');
+        }
+        // Public access intentionally mirrors lift:up so both directions share
+        // the same policy and cannot drift into different permission behavior.
+        const resp = await moveDown(socket.id || 'socket');
+        cb({ success: true, ...resp });
+      } catch (err) {
+        cb({ error: err.message });
       }
-      // Public access intentionally mirrors lift:up so both directions share
-      // the same policy and cannot drift into different permission behavior.
-      const resp = await moveDown(socket.id || 'socket');
-      cb({ success: true, ...resp });
-    } catch (err) {
-      cb({ error: err.message });
-    }
+    });
   });
-});
+} else {
+  logger.info('Lift disabled by config');
+}
 
 emitUpdate();
 

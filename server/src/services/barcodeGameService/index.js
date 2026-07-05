@@ -6,6 +6,7 @@
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('barcodeGameService');
 const { loadConfig } = require('../../helpers/configLoader');
+const { isFeatureEnabled } = require('../../helpers/features');
 const { subscribe } = require('../eventBus');
 const { sendSystemMessage } = require('../chatService');
 const { getActiveDrivers } = require('../turnService');
@@ -30,6 +31,7 @@ const GAME_DEFINITIONS = [scanQuest, scansPerSecond, mostItems];
 const GAMES_BY_ID = Object.fromEntries(GAME_DEFINITIONS.map((game) => [game.id, game]));
 const config = loadConfig();
 const barcodeGamesConfig = config.barcodeGames || {};
+const enabled = isFeatureEnabled('barcodeGames');
 const botName = String(barcodeGamesConfig.botName || barcodeGamesConfig.name || 'Barcode Games').trim() || 'Barcode Games';
 const botProfileImageUrl = String(barcodeGamesConfig.profileImageUrl || '').trim() || null;
 
@@ -1120,34 +1122,43 @@ function broadcastState() {
   });
 }
 
-io.on('connection', (socket) => {
-  socket.on('barcodeGame:subscribe', (_payload = {}, cb = () => {}) => {
-    socket.join(GAME_SOCKET_ROOM);
-    const state = buildStatePayload(socket);
-    socket.emit('barcodeGame:state', state);
-    cb({ success: true, state });
+if (enabled) {
+  /*
+    Barcode games are an optional layer on top of the physical scanner station.
+    Keep sockets and scan subscriptions behind the feature gate so disabled
+    installs do not run invisible game state.
+  */
+  io.on('connection', (socket) => {
+    socket.on('barcodeGame:subscribe', (_payload = {}, cb = () => {}) => {
+      socket.join(GAME_SOCKET_ROOM);
+      const state = buildStatePayload(socket);
+      socket.emit('barcodeGame:state', state);
+      cb({ success: true, state });
+    });
+
+    socket.on('barcodeGame:vote', ({ gameId } = {}, cb = () => {}) => {
+      try {
+        cb(setVote(socket, gameId));
+      } catch (err) {
+        logger.warn('Barcode game vote failed', { error: err.message, gameId });
+        cb({ error: err.message || 'barcode game vote failed' });
+      }
+    });
+
   });
 
-  socket.on('barcodeGame:vote', ({ gameId } = {}, cb = () => {}) => {
+  subscribe('barcode.scanned', (event) => {
     try {
-      cb(setVote(socket, gameId));
+      handleScan(event.payload);
     } catch (err) {
-      logger.warn('Barcode game vote failed', { error: err.message, gameId });
-      cb({ error: err.message || 'barcode game vote failed' });
+      // Scanner input should never be able to take down the server. Game failures
+      // are logged and skipped so the scanner page can keep resolving barcodes.
+      logger.warn('Barcode game scan handling failed', { error: err.message });
     }
   });
-
-});
-
-subscribe('barcode.scanned', (event) => {
-  try {
-    handleScan(event.payload);
-  } catch (err) {
-    // Scanner input should never be able to take down the server. Game failures
-    // are logged and skipped so the scanner page can keep resolving barcodes.
-    logger.warn('Barcode game scan handling failed', { error: err.message });
-  }
-});
+} else {
+  logger.info('Barcode games disabled by config');
+}
 
 module.exports = {
   buildStatePayload,
@@ -1155,8 +1166,10 @@ module.exports = {
   setVote,
 };
 
-setInterval(() => {
-  if (settleActiveGameIfNeeded()) {
-    broadcastState();
-  }
-}, GAME_TICK_MS).unref?.();
+if (enabled) {
+  setInterval(() => {
+    if (settleActiveGameIfNeeded()) {
+      broadcastState();
+    }
+  }, GAME_TICK_MS).unref?.();
+}

@@ -78,9 +78,7 @@ export default function ModeGateOverlay() {
         <div className="surface-muted">
           <AuthPanel />
         </div>
-        <div className="w-full justify-center items-center">
-          <SocialButton id="discord" label="Join our Discord server for updates!"/>
-        </div>
+        <SocialButton id="discord" label="Join our Discord server for updates!" />
         You can still use the chat while the server is locked:
         {/* set max height of this box */}
         <div className='max-h-80 overflow-y-auto'>

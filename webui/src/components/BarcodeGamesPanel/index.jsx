@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import useBarcodeGameState from '../../barcodeGames/useBarcodeGameState.js';
 import CardFrame from '../CardFrame/index.jsx';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 
 function clampRgbChannel(value) {
   if (!Number.isFinite(value)) return null;
@@ -247,6 +249,18 @@ function Leaderboard({ players, ownPlayer }) {
   );
 }
 export default function BarcodeGamesPanel() {
+  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'barcodeGames'));
+
+  /*
+    Barcode games depend on the optional scanner station. The panel owns the
+    feature gate so disabled installs do not show empty game voting controls.
+  */
+  if (!enabled) return null;
+
+  return <BarcodeGamesPanelContent />;
+}
+
+function BarcodeGamesPanelContent() {
   const { state, connectionState, voteForGame } = useBarcodeGameState();
   const [pendingGameId, setPendingGameId] = useState(null);
   const activeSignatureRef = useRef('');

@@ -5,6 +5,7 @@ const fs = require('fs');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('barcodeScannerService');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
+const { isFeatureEnabled } = require('../../helpers/features');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { publishEvent } = require('../eventBus');
 const { ensureAudioForText, warmAudioForTexts } = require('./ttsCache');
@@ -14,6 +15,7 @@ const REGISTRY_PATH = resolveDataPath('barcode-registry.json');
 const RECENT_SCAN_LIMIT = 8;
 const VALID_CODE_PATTERN = /^[a-z][0-9]{3}$/;
 const SCANNER_SOCKET_ROOM = 'barcode-scanner';
+const enabled = isFeatureEnabled('barcodeScanner');
 
 let lastKnownGoodRegistry = null;
 let lastRegistryError = null;
@@ -310,39 +312,53 @@ async function applyScan(rawCode) {
   return { result };
 }
 
-io.on('connection', (socket) => {
-  socket.on('barcode:subscribe', (_payload = {}, cb = () => {}) => {
-    socket.join(SCANNER_SOCKET_ROOM);
-    socket.emit('barcode:state', buildStatePayload());
-    cb({ success: true, state: buildStatePayload() });
+if (enabled) {
+  /*
+    Barcode scanning is tied to a physical scanner station. Disabled installs
+    should not create the registry file or expose scanner socket commands.
+  */
+  io.on('connection', (socket) => {
+    socket.on('barcode:subscribe', (_payload = {}, cb = () => {}) => {
+      socket.join(SCANNER_SOCKET_ROOM);
+      socket.emit('barcode:state', buildStatePayload());
+      cb({ success: true, state: buildStatePayload() });
+    });
+
+    socket.on('barcode:scan', async ({ code } = {}, cb = () => {}) => {
+      try {
+        const { result } = await applyScan(code);
+        cb({ success: true, result, state: buildStatePayload() });
+      } catch (err) {
+        // Socket handlers should never let a malformed scan or registry edge case
+        // bubble out to the process. The page gets a normal failed acknowledgement
+        // and the service keeps running for the next scan.
+        logger.warn('Barcode scan failed unexpectedly', err);
+        cb({ error: err.message || 'barcode scan failed' });
+      }
+    });
   });
 
-  socket.on('barcode:scan', async ({ code } = {}, cb = () => {}) => {
-    try {
-      const { result } = await applyScan(code);
-      cb({ success: true, result, state: buildStatePayload() });
-    } catch (err) {
-      // Socket handlers should never let a malformed scan or registry edge case
-      // bubble out to the process. The page gets a normal failed acknowledgement
-      // and the service keeps running for the next scan.
-      logger.warn('Barcode scan failed unexpectedly', err);
-      cb({ error: err.message || 'barcode scan failed' });
-    }
+  modeEvents.on('change', () => {
+    // Access-mode changes affect whether the scanner page should beep when it
+    // submits a code, so scanner clients need a fresh state packet even without a
+    // new scan.
+    broadcastState();
   });
-});
 
-modeEvents.on('change', () => {
-  // Access-mode changes affect whether the scanner page should beep when it
-  // submits a code, so scanner clients need a fresh state packet even without a
-  // new scan.
-  broadcastState();
-});
-
-loadRegistryForScan();
+  loadRegistryForScan();
+} else {
+  logger.info('Barcode scanner disabled by config');
+}
 
 module.exports = {
   REGISTRY_PATH,
-  applyScan,
+  applyScan: (...args) => {
+    if (!enabled) throw new Error('Barcode scanner is disabled');
+    return applyScan(...args);
+  },
   buildStatePayload,
-  getRegistrySnapshot,
+  getRegistrySnapshot: () => {
+    if (!enabled) return { registry: null, error: 'barcode scanner disabled' };
+    return getRegistrySnapshot();
+  },
 };

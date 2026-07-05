@@ -11,8 +11,21 @@ import {
   normalizeBinaryPayload,
   normalizeKinectStatus,
 } from './utils.js';
+import { isFeatureEnabled } from '../../lib/features.js';
 
 export default function KinectPanel() {
+  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'kinect'));
+
+  /*
+    Kinect is optional local hardware. Keep the feature gate inside the panel so
+    disabled installs do not need special cases in every Activities layout.
+  */
+  if (!enabled) return null;
+
+  return <KinectPanelContent />;
+}
+
+function KinectPanelContent() {
   const socket = useSocket();
   const status = useSessionSelector((state) => normalizeKinectStatus(state.session?.kinect));
   const [activeView, setActiveView] = useState('3d');

@@ -7,6 +7,7 @@ import { useSettingsNamespace } from '../../settings/index.js';
 import { useRoomCameraSnapshots } from '../../hooks/useRoomCameraSnapshots.js';
 import RoomCameraFeed from '../RoomCameraFeed/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 
 function EmptyState() {
   return (
@@ -103,7 +104,19 @@ function useCameraPanelSubscriptionGate() {
   return { panelRef, isPanelVisible };
 }
 
-export default function RoomCameraPanel({
+export default function RoomCameraPanel(props) {
+  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'roomCameras'));
+
+  /*
+    Room-camera visibility belongs with the room-camera panel. This keeps every
+    route free to mount the panel without duplicating the server feature rule.
+  */
+  if (!enabled) return null;
+
+  return <RoomCameraPanelContent {...props} />;
+}
+
+function RoomCameraPanelContent({
   defaultOrientation = 'horizontal',
   orientation: forcedOrientation,
   hideLayoutToggle = false,
