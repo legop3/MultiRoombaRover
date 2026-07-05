@@ -9,6 +9,7 @@ const { getActiveDrivers } = require('../turnService');
 const { getNickname } = require('../nicknameService');
 const { getGlobalObjective, setGlobalObjective, clearGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
+const homeAssistantService = require('../homeAssistantService');
 const {
   listVerifiedUsers,
   removeVerifiedUser,
@@ -162,6 +163,11 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     getAdminReason,
     setAdminReason,
     clearAdminReason,
+    // Web chat builds its own command-router instance for the sending socket.
+    // Supplying the same Home Assistant service used by Discord keeps `rs
+    // lights lock/unlock` from becoming transport-specific, and it preserves
+    // the existing session update path for all connected browsers.
+    homeAssistantService,
     getGuildConfig: () => null,
     setGuildConfig: () => null,
     removeGuildConfig: () => null,

@@ -19,6 +19,7 @@ const { getActiveDrivers } = require('../turnService');
 const { getNickname } = require('../nicknameService');
 const { getGlobalObjective, setGlobalObjective, clearGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
+const homeAssistantService = require('../homeAssistantService');
 const {
   getGuildConfig,
   listGuildConfigs,
@@ -136,6 +137,11 @@ const commands = createCommandHandlers({
   getAdminReason,
   setAdminReason,
   clearAdminReason,
+  // Room-light lock commands must use the same Home Assistant service instance
+  // as sockets, HA button triggers, and idle/darkness policies. Passing the
+  // service into the shared command router keeps Discord and mirrored web-chat
+  // command behavior aligned without duplicating Home Assistant calls here.
+  homeAssistantService,
   getGuildConfig,
   setGuildConfig,
   removeGuildConfig,

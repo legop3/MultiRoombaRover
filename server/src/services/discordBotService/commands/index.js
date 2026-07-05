@@ -12,6 +12,7 @@ const { createVerifyCommand } = require('./verify');
 const { createDeterCommand } = require('./deter');
 const { createBridgeCommand } = require('./bridge');
 const { createTimeStatusCommand } = require('./timeStatus');
+const { createLightsCommand } = require('./lights');
 
 function createCommandHandlers(deps) {
   const {
@@ -33,6 +34,7 @@ function createCommandHandlers(deps) {
   const handleDeterCommand = createDeterCommand(deps);
   const handleBridgeCommand = createBridgeCommand(deps);
   const handleTimeStatusCommand = createTimeStatusCommand(deps);
+  const handleLightsCommand = createLightsCommand(deps);
 
   async function handleCommand(message) {
     if (message.author.bot) return;
@@ -52,7 +54,11 @@ function createCommandHandlers(deps) {
     const isAdmin = isAdminUser(message.author.id);
     const isLockdownAdmin = isLockdownAdminUser(message.author.id);
     const mode = getMode();
-    const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter']);
+    // Actions in this set can change operational safety or access policy, so
+    // lockdown mode narrows them from normal admins to lockdown admins. Room
+    // light locking belongs here because it can force the physical room lights
+    // on and disables ordinary Home Assistant room controls for everyone else.
+    const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'lights']);
 
     if (!isAdmin && action !== '' && action !== 'status' && action !== 'help' && action !== 'replay' && action !== 'bridge' && action !== 'goal' && action !== 'reason' && action !== 'verify' && action !== 'deter') {
       await message.reply({ content: 'Only admins can run that command.', allowedMentions: { parse: [], repliedUser: false } });
@@ -74,6 +80,8 @@ function createCommandHandlers(deps) {
         return handleReplayCommand(message, tokens.join(' '));
       case 'bridge':
         return handleBridgeCommand(message, tokens);
+      case 'lights':
+        return handleLightsCommand(message, tokens);
       case 'lock':
         return handleLockCommand(message, rest, true);
       case 'unlock':
