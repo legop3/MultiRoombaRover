@@ -1,10 +1,12 @@
 1. improve spectator page, options on what to see and what not to see
-2. pagewide system for "why was i removed from a rover", instead of the link to spectator page thing
-3. admin command for kicking people off of rovers. just a kick, nothing persistent
-4. kick people off rover after 3 consecurtive bump-off attempts
-5. make signaling more clear for idle skips and idle skip kicks
-6. add a kick command that disconnects sockets with a message
-7.  fix this:
+2. for private rovers, add virtual wall support and add that as a default-on safety.
+3. synthesize wheel speed sensors based on encoder readings server side, add them to json sensor data, show them in topdown
+4. pagewide system for "why was i removed from a rover", instead of the link to spectator page thing
+5. admin command for kicking people off of rovers. just a kick, nothing persistent
+6. kick people off rover after 3 consecurtive bump-off attempts
+7. make signaling more clear for idle skips and idle skip kicks
+8. add a kick command that disconnects sockets with a message
+9.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^
