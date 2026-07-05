@@ -1,0 +1,17 @@
+[Unit]
+Description=Rover Debian Laptop Video Publisher (V4L2 -> SRT)
+After=network-online.target roverd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=roverd
+Group=roverd
+WorkingDirectory=/var/lib/roverd
+EnvironmentFile=/var/lib/roverd/media.env
+ExecStart=/usr/local/bin/debian-laptop-video-publisher
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

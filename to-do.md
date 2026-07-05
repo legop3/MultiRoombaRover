@@ -1,6 +1,10 @@
 1. improve spectator page, options on what to see and what not to see
-2. fix private rover requests not working.....
-3.  fix this:
+2. pagewide system for "why was i removed from a rover", instead of the link to spectator page thing
+3. admin command for kicking people off of rovers. just a kick, nothing persistent
+4. kick people off rover after 3 consecurtive bump-off attempts
+5. add rs admin command for controlling light lock
+6. make signaling more clear for idle skips and idle skip kicks
+7.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^

@@ -1,0 +1,98 @@
+# Sample configuration for roverd on a Debian laptop rover.
+name: laptop-rover
+description: "Debian laptop rover using USB serial, webcam, mic, and speakers."
+color: "#4DB6AC"
+serverUrl: ws://control-server.local:8080/rover
+
+serial:
+  device: /dev/ttyUSB0
+  baud: 115200
+
+# BRC is disabled in the first Debian laptop profile because USB serial
+# RTS/DTR wake-pulse support needs adapter-specific testing before it should be
+# trusted to keep a Roomba awake.
+brc:
+  gpioPin: -1
+
+battery:
+  full: 2068
+  warn: 1700
+  urgent: 1650
+
+maxWheelSpeed: 350
+
+media:
+  publishPort: 9000
+  manage: true
+  healthUrl: ""
+  healthInterval: 30s
+  video:
+    enabled: true
+    service: debian-laptop-video-publisher.service
+    publisher: debian-laptop-v4l2
+    device: /dev/video0
+    # Check supported values with:
+    #   v4l2-ctl --device=/dev/video0 --list-formats-ext
+    # Common working values are mjpeg and yuyv422.
+    inputFormat: mjpeg
+    width: 640
+    height: 480
+    fps: 30
+    bitrate: 2000000
+    inverted: false
+  audioCapture:
+    enabled: true
+    service: audio-only-publisher.service
+    device: default
+    sampleRate: 48000
+    channels: 2
+    bitrate: 510000
+  audioPlayback:
+    enabled: true
+    service: audio-forward-listener.service
+    # The Debian laptop installer creates a named "forward" ALSA device so
+    # browser-forwarded audio has its own ForwardMaster mixer control instead
+    # of sharing the TTS default output path.
+    device: forward
+    normalize: true
+
+cameraServo:
+  enabled: false
+
+audio:
+  # TTS does not need Pi-specific hardware. The laptop ALSA profile maps the
+  # normal default playback device through the TTSMaster softvol control, so
+  # the existing flite/espeak execution path can stay unchanged.
+  ttsEnabled: true
+  defaultEngine: flite
+
+horn:
+  # Horn audio is generated locally by roverd and plays through the named
+  # "horn" ALSA device by default, which the laptop installer wires to a
+  # separate HornMaster softvol control.
+  enabled: true
+
+headlight:
+  enabled: false
+
+laser:
+  enabled: false
+
+autoSideBrush:
+  enabled: true
+  speed: 20
+
+private:
+  enabled: false
+  safety:
+    speedLimitEnabled: false
+    speedLimitMaxWheelSpeed: 250
+    hardOvercurrentEnabled: false
+    overcurrentStopMs: 300
+    hardBumpEnabled: false
+    bumpBackoffSpeed: 250
+    bumpBackoffMs: 350
+    cliffEnabled: false
+    cliffBackoffSpeed: 250
+    cliffBackoffMs: 500
+    triggerCooldownMs: 800
