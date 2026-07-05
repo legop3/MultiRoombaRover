@@ -177,17 +177,20 @@ type PrivateConfig struct {
 }
 
 type PrivateSafetyConfig struct {
-	SpeedLimitEnabled      bool `yaml:"speedLimitEnabled" json:"speedLimitEnabled"`
-	SpeedLimitMaxWheelMMs  int  `yaml:"speedLimitMaxWheelSpeed" json:"speedLimitMaxWheelSpeed"`
-	HardOvercurrentEnabled bool `yaml:"hardOvercurrentEnabled" json:"hardOvercurrentEnabled"`
-	OvercurrentStopMs      int  `yaml:"overcurrentStopMs" json:"overcurrentStopMs"`
-	HardBumpEnabled        bool `yaml:"hardBumpEnabled" json:"hardBumpEnabled"`
-	BumpBackoffSpeed       int  `yaml:"bumpBackoffSpeed" json:"bumpBackoffSpeed"`
-	BumpBackoffMs          int  `yaml:"bumpBackoffMs" json:"bumpBackoffMs"`
-	CliffEnabled           bool `yaml:"cliffEnabled" json:"cliffEnabled"`
-	CliffBackoffSpeed      int  `yaml:"cliffBackoffSpeed" json:"cliffBackoffSpeed"`
-	CliffBackoffMs         int  `yaml:"cliffBackoffMs" json:"cliffBackoffMs"`
-	TriggerCooldownMs      int  `yaml:"triggerCooldownMs" json:"triggerCooldownMs"`
+	SpeedLimitEnabled       bool `yaml:"speedLimitEnabled" json:"speedLimitEnabled"`
+	SpeedLimitMaxWheelMMs   int  `yaml:"speedLimitMaxWheelSpeed" json:"speedLimitMaxWheelSpeed"`
+	HardOvercurrentEnabled  bool `yaml:"hardOvercurrentEnabled" json:"hardOvercurrentEnabled"`
+	OvercurrentStopMs       int  `yaml:"overcurrentStopMs" json:"overcurrentStopMs"`
+	HardBumpEnabled         bool `yaml:"hardBumpEnabled" json:"hardBumpEnabled"`
+	BumpBackoffSpeed        int  `yaml:"bumpBackoffSpeed" json:"bumpBackoffSpeed"`
+	BumpBackoffMs           int  `yaml:"bumpBackoffMs" json:"bumpBackoffMs"`
+	CliffEnabled            bool `yaml:"cliffEnabled" json:"cliffEnabled"`
+	CliffBackoffSpeed       int  `yaml:"cliffBackoffSpeed" json:"cliffBackoffSpeed"`
+	CliffBackoffMs          int  `yaml:"cliffBackoffMs" json:"cliffBackoffMs"`
+	VirtualWallEnabled      bool `yaml:"virtualWallEnabled" json:"virtualWallEnabled"`
+	VirtualWallBackoffSpeed int  `yaml:"virtualWallBackoffSpeed" json:"virtualWallBackoffSpeed"`
+	VirtualWallBackoffMs    int  `yaml:"virtualWallBackoffMs" json:"virtualWallBackoffMs"`
+	TriggerCooldownMs       int  `yaml:"triggerCooldownMs" json:"triggerCooldownMs"`
 }
 
 type Config struct {
@@ -303,17 +306,20 @@ func LoadConfig(path string) (*Config, error) {
 		Private: PrivateConfig{
 			Enabled: false,
 			Safety: PrivateSafetyConfig{
-				SpeedLimitEnabled:      false,
-				SpeedLimitMaxWheelMMs:  250,
-				HardOvercurrentEnabled: false,
-				OvercurrentStopMs:      300,
-				HardBumpEnabled:        false,
-				BumpBackoffSpeed:       250,
-				BumpBackoffMs:          350,
-				CliffEnabled:           false,
-				CliffBackoffSpeed:      250,
-				CliffBackoffMs:         500,
-				TriggerCooldownMs:      800,
+				SpeedLimitEnabled:       false,
+				SpeedLimitMaxWheelMMs:   250,
+				HardOvercurrentEnabled:  false,
+				OvercurrentStopMs:       300,
+				HardBumpEnabled:         false,
+				BumpBackoffSpeed:        250,
+				BumpBackoffMs:           350,
+				CliffEnabled:            false,
+				CliffBackoffSpeed:       250,
+				CliffBackoffMs:          500,
+				VirtualWallEnabled:      true,
+				VirtualWallBackoffSpeed: 250,
+				VirtualWallBackoffMs:    500,
+				TriggerCooldownMs:       800,
 			},
 		},
 	}

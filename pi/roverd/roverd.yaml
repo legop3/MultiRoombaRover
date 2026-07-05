@@ -69,4 +69,10 @@ private:
     cliffEnabled: false
     cliffBackoffSpeed: 250
     cliffBackoffMs: 500
+    # Virtual walls are default-on for private rovers because they mark a
+    # deliberate boundary, and the server can escape by reversing the last
+    # commanded wheel directions instead of always backing straight up.
+    virtualWallEnabled: true
+    virtualWallBackoffSpeed: 250
+    virtualWallBackoffMs: 500
     triggerCooldownMs: 800

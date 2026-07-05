@@ -18,6 +18,47 @@ const MODES = [
   { key: 'lockdown', label: 'Lockdown' },
 ];
 
+function buildPrivateSafetyDraft(rover) {
+  const safety = rover?.private?.safety || {};
+  return {
+    speedLimitEnabled: Boolean(safety.speedLimitEnabled),
+    speedLimitMaxWheelSpeed: Number.isFinite(safety.speedLimitMaxWheelSpeed)
+      ? safety.speedLimitMaxWheelSpeed
+      : 250,
+    hardOvercurrentEnabled: Boolean(safety.hardOvercurrentEnabled),
+    overcurrentStopMs: Number.isFinite(safety.overcurrentStopMs)
+      ? safety.overcurrentStopMs
+      : 300,
+    hardBumpEnabled: Boolean(safety.hardBumpEnabled),
+    bumpBackoffSpeed: Number.isFinite(safety.bumpBackoffSpeed)
+      ? safety.bumpBackoffSpeed
+      : 250,
+    bumpBackoffMs: Number.isFinite(safety.bumpBackoffMs)
+      ? safety.bumpBackoffMs
+      : 350,
+    cliffEnabled: Boolean(safety.cliffEnabled),
+    cliffBackoffSpeed: Number.isFinite(safety.cliffBackoffSpeed)
+      ? safety.cliffBackoffSpeed
+      : 250,
+    cliffBackoffMs: Number.isFinite(safety.cliffBackoffMs)
+      ? safety.cliffBackoffMs
+      : 500,
+    // Virtual wall is default-on for private rovers. Older rover hellos will
+    // not include this field, so the admin form mirrors the server default
+    // instead of rendering an unchecked box that would accidentally disable it.
+    virtualWallEnabled: safety.virtualWallEnabled == null ? true : Boolean(safety.virtualWallEnabled),
+    virtualWallBackoffSpeed: Number.isFinite(safety.virtualWallBackoffSpeed)
+      ? safety.virtualWallBackoffSpeed
+      : 250,
+    virtualWallBackoffMs: Number.isFinite(safety.virtualWallBackoffMs)
+      ? safety.virtualWallBackoffMs
+      : 500,
+    triggerCooldownMs: Number.isFinite(safety.triggerCooldownMs)
+      ? safety.triggerCooldownMs
+      : 800,
+  };
+}
+
 export default function AdminPanelContent() {
   const {
     session,
@@ -58,6 +99,7 @@ export default function AdminPanelContent() {
     forwardGain: Number.isFinite(currentAudioLevels.forwardGain) ? currentAudioLevels.forwardGain : 1,
   });
   const [privateSafetyDrafts, setPrivateSafetyDrafts] = useState({});
+  const [privateSafetyDirty, setPrivateSafetyDirty] = useState({});
 
   const isAdmin =
     session?.role === 'admin' ||
@@ -257,39 +299,21 @@ export default function AdminPanelContent() {
 
 
   useEffect(() => {
-    const next = {};
-    (roster || []).forEach((rover) => {
-      if (!rover?.private?.enabled) return;
-      next[rover.id] = {
-        speedLimitEnabled: Boolean(rover?.private?.safety?.speedLimitEnabled),
-        speedLimitMaxWheelSpeed: Number.isFinite(rover?.private?.safety?.speedLimitMaxWheelSpeed)
-          ? rover.private.safety.speedLimitMaxWheelSpeed
-          : 250,
-        hardOvercurrentEnabled: Boolean(rover?.private?.safety?.hardOvercurrentEnabled),
-        overcurrentStopMs: Number.isFinite(rover?.private?.safety?.overcurrentStopMs)
-          ? rover.private.safety.overcurrentStopMs
-          : 300,
-        hardBumpEnabled: Boolean(rover?.private?.safety?.hardBumpEnabled),
-        bumpBackoffSpeed: Number.isFinite(rover?.private?.safety?.bumpBackoffSpeed)
-          ? rover.private.safety.bumpBackoffSpeed
-          : 250,
-        bumpBackoffMs: Number.isFinite(rover?.private?.safety?.bumpBackoffMs)
-          ? rover.private.safety.bumpBackoffMs
-          : 350,
-        cliffEnabled: Boolean(rover?.private?.safety?.cliffEnabled),
-        cliffBackoffSpeed: Number.isFinite(rover?.private?.safety?.cliffBackoffSpeed)
-          ? rover.private.safety.cliffBackoffSpeed
-          : 250,
-        cliffBackoffMs: Number.isFinite(rover?.private?.safety?.cliffBackoffMs)
-          ? rover.private.safety.cliffBackoffMs
-          : 500,
-        triggerCooldownMs: Number.isFinite(rover?.private?.safety?.triggerCooldownMs)
-          ? rover.private.safety.triggerCooldownMs
-          : 800,
-      };
+    setPrivateSafetyDrafts((currentDrafts) => {
+      const next = {};
+      (roster || []).forEach((rover) => {
+        if (!rover?.private?.enabled) return;
+        // Session syncs can arrive while an admin is focused in one of these
+        // inputs. Preserve that rover's local draft once touched; otherwise the
+        // server roster remains the source of truth for newly connected rovers
+        // and for rovers whose form is not being edited.
+        next[rover.id] = privateSafetyDirty?.[rover.id]
+          ? currentDrafts?.[rover.id] || buildPrivateSafetyDraft(rover)
+          : buildPrivateSafetyDraft(rover);
+      });
+      return next;
     });
-    setPrivateSafetyDrafts(next);
-  }, [roster]);
+  }, [privateSafetyDirty, roster]);
 
   const lockMap = useMemo(() => {
     const map = {};
@@ -304,13 +328,25 @@ export default function AdminPanelContent() {
       ...(current || {}),
       [roverId]: { ...(current?.[roverId] || {}), ...(patch || {}) },
     }));
+    // Mark the whole rover draft dirty rather than individual fields. The form
+    // is saved as one object, so protecting it as one unit avoids partial
+    // server refreshes that mix old roster values with the user's unsaved edit.
+    setPrivateSafetyDirty((current) => ({ ...(current || {}), [roverId]: true }));
   };
 
   const handlePrivateSafetySave = async (roverId) => {
     try {
       const draft = privateSafetyDrafts?.[roverId];
       if (!draft) return;
-      await setPrivateSafety(roverId, draft);
+      const resp = await setPrivateSafety(roverId, draft);
+      if (resp?.safety) {
+        setPrivateSafetyDrafts((current) => ({ ...(current || {}), [roverId]: resp.safety }));
+      }
+      setPrivateSafetyDirty((current) => {
+        const next = { ...(current || {}) };
+        delete next[roverId];
+        return next;
+      });
     } catch (err) {
       alert(err.message);
     }
@@ -535,6 +571,16 @@ export default function AdminPanelContent() {
                       updatePrivateSafetyDraft(rover.id, { cliffEnabled: Boolean(event.target.checked) })}
                   />
                   <span>Cliff safety</span>
+                </label>
+                <label className="flex items-center gap-0.5">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(privateSafetyDrafts?.[rover.id]?.virtualWallEnabled)}
+                    disabled={!isLockdownAdmin}
+                    onChange={(event) =>
+                      updatePrivateSafetyDraft(rover.id, { virtualWallEnabled: Boolean(event.target.checked) })}
+                  />
+                  <span>Virtual wall</span>
                 </label>
                 <button
                   type="button"

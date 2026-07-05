@@ -26,6 +26,13 @@ const DEFAULT_PRIVATE_SAFETY = Object.freeze({
   cliffEnabled: false,
   cliffBackoffSpeed: 250,
   cliffBackoffMs: 500,
+  // Private rovers live in the sensitive area, so the virtual wall guard is
+  // default-on even though the older safety features remain opt-in. A missing
+  // value from an older rover config should therefore behave like "enabled",
+  // not like a deliberate disabled setting.
+  virtualWallEnabled: true,
+  virtualWallBackoffSpeed: 250,
+  virtualWallBackoffMs: 500,
   triggerCooldownMs: 800,
 });
 

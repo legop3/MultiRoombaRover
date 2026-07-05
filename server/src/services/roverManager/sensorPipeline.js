@@ -45,6 +45,8 @@ function createSensorPipeline(deps) {
         lastOvercurrent: false,
         lastBump: false,
         lastCliff: false,
+        lastVirtualWall: false,
+        lastDriveDirection: null,
       });
     }
     return privateSafetyStates.get(roverId);
@@ -63,6 +65,9 @@ function createSensorPipeline(deps) {
     const cooldownMs = clampInt(options.cooldownMs, 100, 10000, DEFAULT_PRIVATE_SAFETY.triggerCooldownMs);
     const backoffMs = clampInt(options.backoffMs, 50, 5000, 0);
     const backoffSpeed = clampInt(options.backoffSpeed, 0, 500, 0);
+    const explicitBackoffDrive = options.backoffDrive && typeof options.backoffDrive === 'object'
+      ? options.backoffDrive
+      : null;
     try {
       issueCommand(roverId, { type: 'drive', driveDirect: { left: 0, right: 0 } });
       issueCommand(roverId, { type: 'motors', motorPwm: { main: 0, side: 0, vacuum: 0 } });
@@ -70,10 +75,14 @@ function createSensorPipeline(deps) {
       logger.warn('Private safety stop failed', { roverId, mode, error: err.message });
     }
     stopSafetyBackoffTimer(roverId);
-    if (backoffMs > 0 && backoffSpeed > 0) {
+    if (backoffMs > 0 && (backoffSpeed > 0 || explicitBackoffDrive)) {
+      // Bump and cliff safety only need a simple straight reverse. Virtual wall
+      // safety can be hit while turning or arcing, so it may pass an explicit
+      // per-wheel escape command that reverses the last commanded wheel signs.
       const speed = Math.max(SAFETY_BACKOFF_MIN, Math.min(SAFETY_BACKOFF_MAX, -Math.abs(backoffSpeed)));
+      const backoffDrive = explicitBackoffDrive || { left: speed, right: speed };
       try {
-        issueCommand(roverId, { type: 'drive', driveDirect: { left: speed, right: speed } });
+        issueCommand(roverId, { type: 'drive', driveDirect: backoffDrive });
       } catch (err) {
         logger.warn('Private safety backoff failed', { roverId, mode, error: err.message });
       }
@@ -100,8 +109,52 @@ function createSensorPipeline(deps) {
     publishEvent({
       source: 'roverManager',
       type: 'rover.privateSafetyTriggered',
-      payload: { roverId, mode, cooldownMs, backoffMs, backoffSpeed },
+      payload: { roverId, mode, cooldownMs, backoffMs, backoffSpeed, backoffDrive: explicitBackoffDrive },
     });
+  }
+
+  function rememberPrivateDriveDirection(roverId, driveDirect = null) {
+    if (!roverId || !driveDirect || typeof driveDirect !== 'object') return;
+    const left = clampInt(driveDirect.left, -500, 500, 0);
+    const right = clampInt(driveDirect.right, -500, 500, 0);
+    if (left === 0 && right === 0) return;
+    const state = getPrivateSafetyState(String(roverId));
+    // Store signs instead of raw speeds because safety escape speed is its own
+    // configured value. The thing we need from the driver command is direction,
+    // not magnitude, so later speed-limit changes cannot make the remembered
+    // state stale or unsafe.
+    state.lastDriveDirection = {
+      left: Math.sign(left),
+      right: Math.sign(right),
+      updatedAt: Date.now(),
+    };
+  }
+
+  function getOppositePrivateDrive(record, speed) {
+    const state = getPrivateSafetyState(record.id);
+    const direction = state.lastDriveDirection || null;
+    const safeSpeed = clampInt(speed, 1, 500, DEFAULT_PRIVATE_SAFETY.virtualWallBackoffSpeed);
+    if (!direction) {
+      // If the rover has not received a remembered drive command yet, straight
+      // reverse is the least surprising escape because virtual walls are meant
+      // to block forward travel into a restricted area.
+      return { left: -safeSpeed, right: -safeSpeed };
+    }
+
+    let leftSign = Number(direction.left) || 0;
+    let rightSign = Number(direction.right) || 0;
+    if (leftSign === 0 && rightSign === 0) {
+      leftSign = 1;
+      rightSign = 1;
+    } else if (leftSign === 0) {
+      leftSign = rightSign;
+    } else if (rightSign === 0) {
+      rightSign = leftSign;
+    }
+    return {
+      left: -leftSign * safeSpeed,
+      right: -rightSign * safeSpeed,
+    };
   }
 
   function evaluatePrivateSafety(record, sensors) {
@@ -118,14 +171,17 @@ function createSensorPipeline(deps) {
     const cliff = Boolean(
       sensors?.cliffLeft || sensors?.cliffFrontLeft || sensors?.cliffFrontRight || sensors?.cliffRight,
     );
+    const virtualWall = Boolean(sensors?.virtualWall);
     const currentOver = overcurrent;
     const currentBump = bump;
     const currentCliff = cliff;
+    const currentVirtualWall = virtualWall;
     if (!shouldApplyPrivateSensorSafety(record)) {
       state.blockedUntil = 0;
       state.lastOvercurrent = currentOver;
       state.lastBump = currentBump;
       state.lastCliff = currentCliff;
+      state.lastVirtualWall = currentVirtualWall;
       return;
     }
     const safety = getPrivateSafety(record);
@@ -134,6 +190,7 @@ function createSensorPipeline(deps) {
       state.lastOvercurrent = currentOver;
       state.lastBump = currentBump;
       state.lastCliff = currentCliff;
+      state.lastVirtualWall = currentVirtualWall;
       return;
     }
     let triggered = false;
@@ -158,11 +215,20 @@ function createSensorPipeline(deps) {
         backoffSpeed: safety.cliffBackoffSpeed,
       });
       triggered = true;
+    } else if (safety.virtualWallEnabled && currentVirtualWall && !state.lastVirtualWall) {
+      triggerSafetyAction(record, 'virtualWall', {
+        cooldownMs: safety.triggerCooldownMs,
+        backoffMs: safety.virtualWallBackoffMs,
+        backoffSpeed: safety.virtualWallBackoffSpeed,
+        backoffDrive: getOppositePrivateDrive(record, safety.virtualWallBackoffSpeed),
+      });
+      triggered = true;
     }
     if (!triggered) state.blockedUntil = 0;
     state.lastOvercurrent = currentOver;
     state.lastBump = currentBump;
     state.lastCliff = currentCliff;
+    state.lastVirtualWall = currentVirtualWall;
   }
 
   function applyPrivateDriveSafety(roverId, socket, driveDirect = null) {
@@ -170,11 +236,20 @@ function createSensorPipeline(deps) {
     if (!record || !driveDirect || typeof driveDirect !== 'object') return driveDirect;
     if (!shouldApplyPrivateSafety(record, socket)) return driveDirect;
     const safety = getPrivateSafety(record);
-    if (!safety.speedLimitEnabled) return driveDirect;
+    if (!safety.speedLimitEnabled) {
+      rememberPrivateDriveDirection(roverId, driveDirect);
+      return driveDirect;
+    }
     const limit = clampInt(safety.speedLimitMaxWheelSpeed, 1, 500, DEFAULT_PRIVATE_SAFETY.speedLimitMaxWheelSpeed);
     const left = clampInt(driveDirect.left, -500, 500, 0);
     const right = clampInt(driveDirect.right, -500, 500, 0);
-    return { ...driveDirect, left: Math.max(-limit, Math.min(limit, left)), right: Math.max(-limit, Math.min(limit, right)) };
+    const safeDrive = {
+      ...driveDirect,
+      left: Math.max(-limit, Math.min(limit, left)),
+      right: Math.max(-limit, Math.min(limit, right)),
+    };
+    rememberPrivateDriveDirection(roverId, safeDrive);
+    return safeDrive;
   }
 
   function handlePrivateButtonHold(record, sensors) {

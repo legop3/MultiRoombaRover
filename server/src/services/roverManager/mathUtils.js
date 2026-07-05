@@ -52,6 +52,26 @@ function normalizePrivateSafety(raw = {}) {
       5000,
       DEFAULT_PRIVATE_SAFETY.cliffBackoffMs,
     ),
+    // Unlike most private safety toggles, virtual wall support is meant to be
+    // enabled by default for private rovers. The nullish check preserves that
+    // default for older rover configs while still allowing lockdown admins to
+    // explicitly turn the guard off.
+    virtualWallEnabled:
+      source.virtualWallEnabled == null
+        ? DEFAULT_PRIVATE_SAFETY.virtualWallEnabled
+        : Boolean(source.virtualWallEnabled),
+    virtualWallBackoffSpeed: clampInt(
+      source.virtualWallBackoffSpeed,
+      1,
+      500,
+      DEFAULT_PRIVATE_SAFETY.virtualWallBackoffSpeed,
+    ),
+    virtualWallBackoffMs: clampInt(
+      source.virtualWallBackoffMs,
+      100,
+      5000,
+      DEFAULT_PRIVATE_SAFETY.virtualWallBackoffMs,
+    ),
     triggerCooldownMs: clampInt(
       source.triggerCooldownMs,
       100,
