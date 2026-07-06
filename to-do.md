@@ -4,9 +4,8 @@
 5. admin command for kicking people off of rovers. just a kick, nothing persistent
 6. kick people off rover after 3 consecurtive bump-off attempts
 7. make signaling more clear for idle skips and idle skip kicks
-8. add a kick command that disconnects sockets with a message
-9. add more background gap themes
-10. fix this:
+8. add more background gap themes
+9.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^
