@@ -10,6 +10,18 @@ admins:
 
 timezone: "America/New_York"
 
+interInstance:
+  enabled: false
+  directoryUrls:
+    - "https://raw.githubusercontent.com/legop3/multi-roomba-rover-instance-directory/refs/heads/main/directory.json"
+  pollIntervalMs: 30000
+  requestTimeoutMs: 5000
+  profile:
+    publicUrl: "https://rover.example.com"
+    name: "Example Rover Server"
+    description: "A short public description of this rover server."
+    color: "#38bdf8"
+
 llmCommentary:
   enabled: false
   model: "qwen2.5:7b-instruct"

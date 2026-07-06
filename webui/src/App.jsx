@@ -35,6 +35,7 @@ import SettingsPanel from './components/SettingsPanel/index.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from './components/Tabs/index.jsx';
 import useDefaultNickname from './hooks/useDefaultNickname.js';
 import useUserIdentitySync from './hooks/useUserIdentitySync.js';
+import useIncomingInterInstanceTransfer from './hooks/useIncomingInterInstanceTransfer.js';
 import GlobalObjectiveBanner from './components/GlobalObjectiveBanner/index.jsx';
 import RoverQueuesPanel from './components/RoverQueuesPanel/index.jsx';
 import VipPanel from './components/VipPanel/index.jsx';
@@ -250,7 +251,9 @@ function MobilePortraitLayout({ onOpenHelpOverlay, swapMobileControlColumns = fa
       </section>
       <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]`}>
         <ReplaySourcesPanel panelId="replay-sources-mobile-portrait" />
-        <RoverQueuesPanel />
+        <div className="space-y-0.5">
+          <RoverQueuesPanel />
+        </div>
       </div>
       {/* <ControlSummary /> */}
       <MobileFeatureTabs
@@ -278,7 +281,9 @@ function MobileLandscapeLayout({ onOpenHelpOverlay, swapMobileControlColumns = f
           <DriverVideo layoutFormat="mobile-landscape" />
           <div className={`grid ${themeGapClass} grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]`}>
             <ReplaySourcesPanel panelId="replay-sources-mobile-landscape" />
-            <RoverQueuesPanel />
+            <div className="space-y-0.5">
+              <RoverQueuesPanel />
+            </div>
           </div>
           {/* <TelemetryPanel /> */}
         </div>
@@ -309,6 +314,7 @@ function App() {
 
 function AppWithProviders({ layout, isDesktop, fullscreen }) {
   useDefaultNickname();
+  useIncomingInterInstanceTransfer();
   useUserIdentitySync({ identitySurface: 'driver' });
   useTelemetryVisualPolicy({ mobile: !isDesktop });
   const {

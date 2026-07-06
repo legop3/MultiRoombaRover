@@ -48,6 +48,7 @@ function buildFeatureFlags(config = loadConfig()) {
   const barcodeScannerConfig = config.barcodeScanner || {};
   const barcodeGamesConfig = config.barcodeGames || {};
   const socialsConfig = config.socials || {};
+  const interInstanceConfig = config.interInstance || {};
   const homeAssistant = Boolean(
     asBoolean(homeAssistantConfig.enabled) &&
       asTrimmedString(homeAssistantConfig.url) &&
@@ -78,6 +79,7 @@ function buildFeatureFlags(config = loadConfig()) {
         asTrimmedString(homeAssistantConfig.neato?.device),
     ),
     socials: Boolean(asBoolean(socialsConfig.enabled) && getConfiguredSocials(config).length > 0),
+    interInstance: asBoolean(interInstanceConfig.enabled),
   };
 }
 

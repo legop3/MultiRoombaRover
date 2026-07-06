@@ -7,6 +7,9 @@ import { useSharedClock } from '../../hooks/useSharedClock.js';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverLabel from '../RoverLabel/index.jsx';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
+import { openExternalRoverWithPrompt } from '../../lib/interInstanceTransfer.js';
+import { ExternalInstancesCompact } from '../InterInstancePanel/index.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -46,11 +49,18 @@ function formatLabel(user, selfId) {
   return base;
 }
 
-export default function RoverQueuesPanel({ title = 'Rovers' }) {
+export default function RoverQueuesPanel({
+  title = 'Rovers',
+  roster: rosterOverride = null,
+  turnQueues: turnQueuesOverride = null,
+  users: usersOverride = null,
+  externalInstance = null,
+}) {
   const role = useSessionSelector((state) => state.session?.role || null);
-  const roster = useSessionSelector((state) => state.session?.roster ?? []);
-  const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
-  const users = useSessionSelector((state) => state.session?.users ?? []);
+  const localRoster = useSessionSelector((state) => state.session?.roster ?? []);
+  const localTurnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
+  const localUsers = useSessionSelector((state) => state.session?.users ?? []);
+  const interInstanceEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'interInstance'));
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const assignedRoverId = useSessionSelector((state) => String(state.session?.assignment?.roverId || '').trim());
   const assignedRoverName = useSessionSelector((state) => {
@@ -62,8 +72,12 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
   const { requestControl, rebootOwnRover } = useSessionActions();
   const [pending, setPending] = useState({});
   const [rebootPending, setRebootPending] = useState(false);
+  const externalMode = Boolean(externalInstance);
+  const roster = Array.isArray(rosterOverride) ? rosterOverride : localRoster;
+  const turnQueues = turnQueuesOverride && typeof turnQueuesOverride === 'object' ? turnQueuesOverride : localTurnQueues;
+  const users = Array.isArray(usersOverride) ? usersOverride : localUsers;
 
-  const canRequest = useMemo(() => role && role !== 'spectator', [role]);
+  const canRequest = useMemo(() => externalMode || (role && role !== 'spectator'), [externalMode, role]);
   const adminCapable = useMemo(
     () => role === 'admin' || role === 'lockdown',
     [role],
@@ -89,6 +103,15 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
 
   async function handleRequest(targetRoverId) {
     if (!targetRoverId) return;
+    if (externalMode) {
+      /*
+        External queue cards deliberately reuse the local row layout, but their
+        action cannot go through this Socket.IO server. The row opens the remote
+        instance, optionally carrying settings after the source-page prompt.
+      */
+      openExternalRoverWithPrompt(externalInstance, targetRoverId);
+      return;
+    }
     setPending((prev) => ({ ...prev, [targetRoverId]: true }));
     trackAnalyticsEvent('rover_queue_join', {
       roverId: targetRoverId,
@@ -139,7 +162,7 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
   }
 
   const headerActions =
-    role !== 'spectator' && assignedRoverId ? (
+    !externalMode && role !== 'spectator' && assignedRoverId ? (
       <button
         type="button"
         onClick={handleRebootOwnRover}
@@ -153,11 +176,12 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
 
   return (
     <CardFrame title={title} actions={headerActions} bodyClassName="space-y-0.5 text-sm">
-      {rosterItems.length === 0 ? (
-        <p className="text-sm text-slate-500">No rovers registered.</p>
-      ) : (
-        <ul className="space-y-0.5 text-sm">
-          {rosterItems.map((rover) => {
+      <div className="space-y-0.5">
+        {rosterItems.length === 0 ? (
+          <p className="text-sm text-slate-500">No rovers registered.</p>
+        ) : (
+          <ul className="space-y-0.5 text-sm">
+            {rosterItems.map((rover) => {
             const roverId = String(rover.id);
             const info = turnQueues?.[roverId] || null;
             const queue = info?.queue || [];
@@ -178,10 +202,12 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
             const isPrivateOpen = Boolean(rover?.private?.enabled && rover?.private?.open);
             const isGrantedClosedPrivate = Boolean(rover?.private?.enabled && !rover?.private?.open);
             const locked = Boolean(rover.locked);
-            const lockedBlocked = locked && !adminCapable && !isGrantedClosedPrivate;
+            const lockedBlocked = !externalMode && locked && !adminCapable && !isGrantedClosedPrivate;
             const lockLabel = rover.lockReason ? `locked: ${rover.lockReason}` : 'locked';
             const buttonLabel = pending[roverId]
               ? '...'
+              : externalMode
+              ? 'Open'
               : locked && !isGrantedClosedPrivate
               ? lockLabel
               : 'request';
@@ -271,9 +297,11 @@ export default function RoverQueuesPanel({ title = 'Rovers' }) {
                 ) : null}
               </li>
             );
-          })}
-        </ul>
-      )}
+            })}
+          </ul>
+        )}
+        {!externalMode && interInstanceEnabled ? <ExternalInstancesCompact /> : null}
+      </div>
     </CardFrame>
   );
 }

@@ -195,7 +195,7 @@ function QueueReplayLinksRow() {
   */
   return (
     <div className={`flex ${themeGapClass}`}>
-      <div className="min-w-0 basis-0 grow-[1]">
+      <div className={`min-w-0 basis-0 grow-[1] space-y-0.5`}>
         <RoverQueuesPanel />
       </div>
       <div className="min-w-0 basis-0 grow-[0.9]">

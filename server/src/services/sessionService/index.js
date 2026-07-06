@@ -36,6 +36,7 @@ const { getFeatureFlags } = require('../../helpers/features');
 const { getAudioForwardState, audioForwardEvents } = require('../audioForwardService');
 const { getAudioLevels, audioLevelsEvents } = require('../audioLevelsService');
 const { getButtonBoxState } = require('../buttonBoxService');
+const { getState: getInterInstanceState, interInstanceEvents } = require('../interInstanceService');
 const {
   discordInvite,
   kofiLink,
@@ -132,6 +133,12 @@ function buildSession(socket) {
     audioForward: getAudioForwardState(),
     audioLevels: getAudioLevels(),
     buttonBox: getButtonBoxState(),
+    /*
+      Inter-instance state is a read-only directory snapshot. It is included in
+      session sync because the UI already treats session payloads as the source
+      of truth for rovers, queues, and public feature availability.
+    */
+    interInstances: getInterInstanceState(),
     overseerVote: {
       ...overseerVote,
       preference: typeof socket?.data?.overseerEnabled === 'boolean' ? socket.data.overseerEnabled : true,
@@ -344,6 +351,10 @@ audioForwardEvents.on('change', () => {
 });
 
 audioLevelsEvents.on('change', () => {
+  syncAll();
+});
+
+interInstanceEvents.on('change', () => {
   syncAll();
 });
 

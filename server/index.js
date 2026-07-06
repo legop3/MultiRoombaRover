@@ -30,6 +30,7 @@ require('./src/services/videoAuthService');
 require('./src/services/videoSocketService');
 require('./src/services/roomCameraService');
 require('./src/services/roverSnapshotService');
+require('./src/services/interInstanceService');
 require('./src/services/humanAlertButtonService');
 require('./src/services/embedHttpService');
 require('./src/services/logStreamService');

@@ -7,6 +7,8 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import SocialButton from '../SocialButton/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
+import InterInstancePanel from '../InterInstancePanel/index.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 
 const PRIVILEGED_ROLES = new Set(['admin', 'lockdown']);
 const LOCKDOWN_ROLES = new Set(['lockdown']);
@@ -32,6 +34,7 @@ export default function ModeGateOverlay() {
   const role = useSessionSelector((state) => state.session?.role || null);
   const reason = useSessionSelector((state) => state.session?.adminReason?.text || '');
   const timezone = useSessionSelector((state) => state.session?.timezone || 'UTC');
+  const interInstanceEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'interInstance'));
   const restricted = RESTRICTED_MODES.has(mode);
   const privileged = mode === 'lockdown' ? LOCKDOWN_ROLES.has(role) : PRIVILEGED_ROLES.has(role);
   /*
@@ -62,33 +65,40 @@ export default function ModeGateOverlay() {
   const details = getModeDetails(mode);
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black px-0.5 py-0.5">
-      <div className="surface w-full max-w-md space-y-0.5 text-slate-100 shadow-2xl">
-        <div className="space-y-0.5">
-          <p className="text-lg font-semibold">{details.title}</p>
-          <p className="text-sm text-slate-300">{details.description}</p>
+    <div className="pointer-events-auto fixed inset-0 z-50 overflow-y-auto bg-black px-0.5 py-0.5">
+      <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col items-center justify-center gap-0.5">
+        <div className="surface w-full max-w-md space-y-0.5 text-slate-100 shadow-2xl">
+          <div className="space-y-0.5">
+            <p className="text-lg font-semibold">{details.title}</p>
+            <p className="text-sm text-slate-300">{details.description}</p>
+          </div>
+          <div className="surface-muted space-y-0.5">
+            <p className="text-[0.7rem] tracking-wide text-slate-400">Reason for locking:</p>
+            <p className="text-lg font-semibold text-slate-100">
+              {reason ? reason : 'No reason set.'}
+            </p>
+            <p className="text-center text-sm text-slate-300">Server time: {serverTime}</p>
+          </div>
+          <div className="surface-muted">
+            <AuthPanel />
+          </div>
+          <SocialButton id="discord" label="Join our Discord server for updates!" />
+          You can still use the chat while the server is locked:
+          {/* set max height of this box */}
+          <div className='max-h-80 overflow-y-auto'>
+            <ChatPanel nicknameLayout="stacked" />
+          </div>
+          
+          {/* <p className="text-xs text-slate-500">
+            Your controls are paused until access is granted. You will automatically regain the interface once the mode
+            changes or after a successful login.
+          </p> */}
         </div>
-        <div className="surface-muted space-y-0.5">
-          <p className="text-[0.7rem] tracking-wide text-slate-400">Reason for locking:</p>
-          <p className="text-lg font-semibold text-slate-100">
-            {reason ? reason : 'No reason set.'}
-          </p>
-          <p className="text-center text-sm text-slate-300">Server time: {serverTime}</p>
-        </div>
-        <div className="surface-muted">
-          <AuthPanel />
-        </div>
-        <SocialButton id="discord" label="Join our Discord server for updates!" />
-        You can still use the chat while the server is locked:
-        {/* set max height of this box */}
-        <div className='max-h-80 overflow-y-auto'>
-          <ChatPanel nicknameLayout="stacked" />
-        </div>
-        
-        {/* <p className="text-xs text-slate-500">
-          Your controls are paused until access is granted. You will automatically regain the interface once the mode
-          changes or after a successful login.
-        </p> */}
+        {interInstanceEnabled ? (
+          <div className="w-full">
+            <InterInstancePanel centered />
+          </div>
+        ) : null}
       </div>
     </div>
   );
