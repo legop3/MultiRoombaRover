@@ -137,11 +137,26 @@ function buildRoomCameraInfo(camera) {
   };
 }
 
+function isClosedPrivateRover(rover) {
+  return Boolean(rover?.private?.enabled && !rover?.private?.open);
+}
+
+function getPublicRoster() {
+  return roverManager
+    .getRoster()
+    /*
+      Closed private rovers are intentionally absent from the public
+      inter-instance contract. If a rover is private and closed, other servers
+      should not see its row or receive any derived snapshot URL for it.
+    */
+    .filter((rover) => !isClosedPrivateRover(rover));
+}
+
 function buildLocalInfo() {
   const mode = getMode();
   const lockdown = isLockdownMode();
   const features = getFeatureFlags();
-  const roster = roverManager.getRoster().map((rover) => (lockdown ? rover : addRoverSnapshotLinks(rover)));
+  const roster = getPublicRoster().map((rover) => (lockdown ? rover : addRoverSnapshotLinks(rover)));
   const roomCameras = lockdown || !features.roomCameras ? [] : getRoomCameras().map(buildRoomCameraInfo);
   return {
     instance: {
@@ -184,6 +199,16 @@ app.get('/api/inter-instance/rover-snapshots/:roverId/latest', (req, res) => {
     return;
   }
   const roverId = String(req.params.roverId || '');
+  const publicRover = getPublicRoster().find((rover) => String(rover.id) === roverId);
+  if (!publicRover) {
+    /*
+      Do not rely on "not advertising the URL" as the privacy boundary. Public
+      snapshot hosting must also reject direct requests for closed-private or
+      unknown rovers because old URLs, logs, or guesses can outlive roster state.
+    */
+    res.status(404).json({ error: 'Rover snapshot unavailable' });
+    return;
+  }
   sendJpegState(res, getRoverSnapshotState(roverId), 'Rover snapshot unavailable');
 });
 

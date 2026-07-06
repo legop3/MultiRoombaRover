@@ -94,29 +94,13 @@ function InstanceMetadata({ remote }) {
 }
 
 function RemoteMediaStrip({ remote }) {
-  const roverSnapshots = (remote.roster || [])
-    .map((rover) => ({
-      id: rover.id,
-      name: rover.name || rover.id,
-      url: rover.snapshots?.latestUrl,
-      updatedAt: rover.snapshots?.updatedAt,
-    }))
-    .filter((entry) => entry.url);
   const roomCameras = Array.isArray(remote.roomCameras) ? remote.roomCameras.filter((camera) => camera.snapshotUrl) : [];
-  const items = [
-    ...roverSnapshots.map((entry) => ({ ...entry, kind: 'Rover' })),
-    ...roomCameras.map((entry) => ({ ...entry, name: entry.name || entry.id, url: entry.snapshotUrl, kind: 'Room' })),
-  ];
-  if (!items.length) return null;
+  if (!roomCameras.length) return null;
   return (
-    <div className="grid grid-cols-2 gap-0.5 md:grid-cols-3">
-      {items.map((item) => (
-        <div key={`${item.kind}-${item.id}`} className="surface-muted overflow-hidden text-xs">
-          <img src={item.url} alt={item.name} className="aspect-video w-full bg-black object-cover" loading="lazy" />
-          <div className="flex items-center justify-between gap-0.5 p-0.5">
-            <span className="truncate text-slate-200">{item.name}</span>
-            <span className="text-[0.65rem] text-slate-500">{item.kind}</span>
-          </div>
+    <div className="flex gap-0.5 overflow-x-auto pb-0.5">
+      {roomCameras.map((camera) => (
+        <div key={camera.id} className="surface-muted w-28 shrink-0 overflow-hidden">
+          <img src={camera.snapshotUrl} alt={camera.name || camera.id} className="h-14 w-full bg-black object-cover" loading="lazy" />
         </div>
       ))}
     </div>

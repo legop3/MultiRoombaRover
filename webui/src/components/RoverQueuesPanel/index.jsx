@@ -229,6 +229,14 @@ export default function RoverQueuesPanel({
                   handleRequest(rover.id);
                 }}
               >
+                {externalMode && rover?.snapshots?.latestUrl ? (
+                  <img
+                    src={rover.snapshots.latestUrl}
+                    alt=""
+                    className="h-8 w-10 shrink-0 rounded border border-slate-700 bg-black object-cover"
+                    loading="lazy"
+                  />
+                ) : null}
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-center justify-between gap-0.5">
                     <div className="flex min-w-0 items-center gap-0.5">
