@@ -19,6 +19,7 @@ const INITIAL_STATE = {
   latestReplay: null,
   latestRequestedReplay: null,
   duplicateIdentityBlock: null,
+  roverRemovalNotice: null,
 };
 
 const SessionContext = createContext(null);
@@ -304,6 +305,31 @@ export function SessionProvider({ children }) {
         },
       }));
     }
+    function handleRoverRemovalNotice(payload = {}) {
+      /*
+        Removal reasons arrive as socket events because the next normal session
+        sync only says "not assigned". Keeping the explanation outside the
+        session tree lets the no-rover video panel tell the user why control was
+        removed after admin, safety, or idle-removal actions.
+      */
+      const message =
+        typeof payload?.message === 'string' && payload.message.trim()
+          ? payload.message.trim()
+          : 'You were removed from the rover.';
+      const title =
+        typeof payload?.title === 'string' && payload.title.trim()
+          ? payload.title.trim()
+          : 'Removed from rover';
+      setState((prev) => ({
+        ...prev,
+        roverRemovalNotice: {
+          ...payload,
+          title,
+          message,
+          receivedAt: Date.now(),
+        },
+      }));
+    }
     socket.on('session:sync', handleSession);
     socket.on('log:init', handleLogInit);
     socket.on('log:entry', handleLogEntry);
@@ -317,6 +343,7 @@ export function SessionProvider({ children }) {
     socket.on('replay:ready', handleReplayReady);
     socket.on('replay:failed', handleReplayFailed);
     socket.on('session:duplicateIdentity', handleDuplicateIdentity);
+    socket.on('session:roverRemovalNotice', handleRoverRemovalNotice);
     return () => {
       socket.off('session:sync', handleSession);
       socket.off('log:init', handleLogInit);
@@ -331,6 +358,7 @@ export function SessionProvider({ children }) {
       socket.off('replay:ready', handleReplayReady);
       socket.off('replay:failed', handleReplayFailed);
       socket.off('session:duplicateIdentity', handleDuplicateIdentity);
+      socket.off('session:roverRemovalNotice', handleRoverRemovalNotice);
     };
   }, [setState, socket]);
 

@@ -11,9 +11,18 @@ function stopRover(roverId) {
   }
 }
 
-function removeDriverCompletely(roverId, socketId) {
+function removeDriverCompletely(roverId, socketId, notice = null) {
   try {
     const assignmentService = require('../assignmentService');
+    /*
+      Turn-service removals should explain themselves to the affected browser
+      when a caller provides notice metadata. Plain forceRelease remains the
+      fallback for old internal cleanup paths that only need to mutate state.
+    */
+    if (notice && typeof assignmentService.forceReleaseWithNotice === 'function') {
+      assignmentService.forceReleaseWithNotice(roverId, socketId, notice);
+      return;
+    }
     assignmentService.forceRelease(roverId, socketId);
   } catch (err) {
     // best effort; log elsewhere if needed

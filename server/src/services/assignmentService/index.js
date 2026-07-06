@@ -13,6 +13,37 @@ const assignments = new Map(); // socketId -> roverId
 const waiting = new Set(); // socketIds waiting for placement
 const assignmentEvents = new EventEmitter();
 
+function normalizeRemovalMessage(message, fallback) {
+  /*
+    Removal notices are shown directly in the driving UI, so the server trims
+    caller-provided text before emitting it. Keeping this normalization close to
+    the release helper makes every forced-removal path use the same readable
+    fallback instead of forcing each caller to duplicate defensive string checks.
+  */
+  const clean = String(message || '').trim();
+  return clean || fallback;
+}
+
+function emitRemovalNotice(socket, notice = {}) {
+  /*
+    The browser may lose its rover assignment in the same server tick that the
+    reason is generated. Sending a dedicated event before releasing control lets
+    the client preserve the explanation even after normal session sync says the
+    user no longer has an assigned rover.
+  */
+  if (!socket) return;
+  const roverId = String(notice.roverId || '').trim() || null;
+  const message = normalizeRemovalMessage(notice.message, 'You were removed from the rover.');
+  socket.emit('session:roverRemovalNotice', {
+    roverId,
+    title: normalizeRemovalMessage(notice.title, 'Removed from rover'),
+    message,
+    reasonCode: String(notice.reasonCode || 'removed').trim() || 'removed',
+    actor: notice.actor || null,
+    ts: Date.now(),
+  });
+}
+
 io.on('connection', (socket) => {
   socketRefs.set(socket.id, socket);
   socket.on('disconnect', () => {
@@ -176,6 +207,18 @@ function forceRelease(roverId, socketId) {
   assignmentEvents.emit('update', socketId);
 }
 
+function forceReleaseWithNotice(roverId, socketId, notice = {}) {
+  /*
+    This is the one public path for moderation-style removals. It deliberately
+    emits the explanation before forceRelease mutates assignment state, because
+    session sync listeners can update the UI immediately after the release and
+    the UI needs the reason to already be in local state.
+  */
+  const socket = socketRefs.get(socketId) || io.sockets.sockets.get(socketId);
+  emitRemovalNotice(socket, { ...notice, roverId });
+  forceRelease(roverId, socketId);
+}
+
 function pickRover(socket, options = {}) {
   const mode = getMode();
   if (mode === MODES.ADMIN || mode === MODES.LOCKDOWN) {
@@ -266,6 +309,7 @@ module.exports = {
   assignmentEvents,
   describeAssignment,
   forceRelease,
+  forceReleaseWithNotice,
   rerollAssignments,
   getAssignedRover: (socketId) => assignments.get(socketId) || null,
   moveAssignment: (socket, roverId, { releasePrevious = true } = {}) => {

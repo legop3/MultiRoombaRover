@@ -290,12 +290,17 @@ function handleIdleTimeout(roverId, expectedDriver) {
   const skips = incrementSkip(roverId, expectedDriver);
   stopRover(roverId);
   if (skips >= MAX_IDLE_SKIPS) {
+    const removalMessage = `You were removed from ${roverId} after ${skips} idle skips because no driving input was detected during your turns.`;
     sendAlert({
       color: ALERT_COLOR,
       title: 'Driver removed',
       message: `${expectedDriver} removed from ${roverId} after ${skips} idle skips`,
     });
-    removeDriverCompletely(roverId, expectedDriver);
+    removeDriverCompletely(roverId, expectedDriver, {
+      title: 'Removed for inactivity',
+      message: removalMessage,
+      reasonCode: 'idle-removal',
+    });
     return;
   }
   sendAlert({

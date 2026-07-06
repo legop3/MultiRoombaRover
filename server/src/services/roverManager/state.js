@@ -9,6 +9,7 @@ const spectatorSockets = new Set();
 const managerEvents = new EventEmitter();
 const backoffTimers = new Map();
 const dockGuardStates = new Map();
+const dockProtectionStrikeStates = new Map();
 const privateButtonStates = new Map();
 const privateNoUsersSince = new Map();
 const privateSafetyTimers = new Map();
@@ -21,6 +22,7 @@ module.exports = {
   managerEvents,
   backoffTimers,
   dockGuardStates,
+  dockProtectionStrikeStates,
   privateButtonStates,
   privateNoUsersSince,
   privateSafetyTimers,

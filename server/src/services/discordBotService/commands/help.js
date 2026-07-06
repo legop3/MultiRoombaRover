@@ -12,6 +12,7 @@ function formatHelp() {
     '`rs bridge mode <global|private>` — change chat bridge mode',
     '`rs bridge off` — disable chat bridge for this server',
     '`rs lights <status|lock|unlock>` — show or change room light lock state',
+    '`rs kick <user> [reason]` — remove a user from their current rover; use `user | reason` for multi-word names',
     '`rs lock <rover>` — lock a rover; rover names can be fuzzy',
     '`rs unlock <rover>` — unlock a rover; rover names can be fuzzy',
     '`rs mode <open|turns|admin|lockdown>` — change server mode',

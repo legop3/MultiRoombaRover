@@ -8,6 +8,7 @@ function createSensorPipeline(deps) {
     rovers,
     managerEvents,
     dockGuardStates,
+    dockProtectionStrikeStates,
     backoffTimers,
     privateButtonStates,
     privateSafetyTimers,
@@ -37,6 +38,9 @@ function createSensorPipeline(deps) {
     shouldApplyPrivateSafety,
     shouldApplyPrivateSensorSafety,
   } = deps;
+
+  const DOCK_PROTECTION_MAX_STRIKES = 3;
+  const DOCK_PROTECTION_STRIKE_RESET_MS = 5 * 60 * 1000;
 
   function getPrivateSafetyState(roverId) {
     if (!privateSafetyStates.has(roverId)) {
@@ -416,6 +420,68 @@ function createSensorPipeline(deps) {
     );
   }
 
+  function getDockProtectionStrikeState(socketId) {
+    /*
+      The strike record is keyed by driver socket because the moderation action
+      removes a person from control, not a rover from service. The last rover is
+      still tracked so "three in a row" means repeated bump-off-dock incidents
+      by the same browser session without a different rover resetting context.
+    */
+    const key = String(socketId || '').trim();
+    if (!key) return null;
+    if (!dockProtectionStrikeStates.has(key)) {
+      dockProtectionStrikeStates.set(key, {
+        count: 0,
+        lastRoverId: null,
+        updatedAt: 0,
+      });
+    }
+    return dockProtectionStrikeStates.get(key);
+  }
+
+  function recordDockProtectionStrike(suspect) {
+    const socketId = String(suspect?.socketId || '').trim();
+    const roverId = String(suspect?.roverId || '').trim();
+    const state = getDockProtectionStrikeState(socketId);
+    if (!state || !roverId) return 0;
+    const now = Date.now();
+    const previousIsFresh = state.updatedAt && now - state.updatedAt <= DOCK_PROTECTION_STRIKE_RESET_MS;
+    /*
+      Consecutive protection hits should punish repeated behavior, not stale
+      memory from some unrelated rover interaction. Switching suspect rover
+      resets the count because the dock-protection heuristic has a different
+      physical context and should earn its own three-strike sequence.
+    */
+    state.count = previousIsFresh && state.lastRoverId === roverId ? state.count + 1 : 1;
+    state.lastRoverId = roverId;
+    state.updatedAt = now;
+    return state.count;
+  }
+
+  function clearDockProtectionStrikes(socketId) {
+    const key = String(socketId || '').trim();
+    if (key) dockProtectionStrikeStates.delete(key);
+  }
+
+  function removeDriverForDockProtection(suspect, strikes) {
+    const socketId = String(suspect?.socketId || '').trim();
+    const roverId = String(suspect?.roverId || '').trim();
+    if (!socketId || !roverId) return false;
+    const assignmentService = require('../assignmentService');
+    /*
+      Release through assignmentService so rover membership, turn queues, and
+      the browser-facing removal notice all move together. Directly editing
+      roverManager sets here would skip queue cleanup and produce stale UI.
+    */
+    assignmentService.forceReleaseWithNotice(roverId, socketId, {
+      title: 'Removed for dock protection',
+      message: `You were removed from ${roverId} after triggering bump-off-dock protection ${strikes} times in a row.`,
+      reasonCode: 'dock-protection',
+    });
+    clearDockProtectionStrikes(socketId);
+    return true;
+  }
+
   function handleIdleUndock(undockedRecord) {
     if (!undockedRecord || undockedRecord.drivers.size > 0) return;
     const now = Date.now();
@@ -435,10 +501,11 @@ function createSensorPipeline(deps) {
     const suspectRecord = rovers.get(suspect.roverId);
     if (!suspectRecord) return;
     const bumpRecent = suspectRecord.lastBumpAt && now - suspectRecord.lastBumpAt <= DOCK_GUARD_WINDOW_MS;
+    const strikes = recordDockProtectionStrike(suspect);
     sendAlert({
       color: ALERT_COLOR,
       title: 'Dock protection',
-      message: `${undockedRecord.id} undocked while idle; stopping ${suspect.roverId}.`,
+      message: `${undockedRecord.id} undocked while idle; stopping ${suspect.roverId}${strikes ? ` (${strikes}/${DOCK_PROTECTION_MAX_STRIKES})` : ''}.`,
     });
     try {
       issueCommand(suspect.roverId, { type: 'drive', driveDirect: { left: 0, right: 0 } });
@@ -449,6 +516,13 @@ function createSensorPipeline(deps) {
     setDriveCooldown(suspect.roverId, DOCK_GUARD_WINDOW_MS);
     if (bumpRecent) nudgeRover(suspect.roverId, 'backward');
     else nudgeRover(suspect.roverId, 'forward');
+    if (strikes >= DOCK_PROTECTION_MAX_STRIKES && removeDriverForDockProtection(suspect, strikes)) {
+      sendAlert({
+        color: ALERT_COLOR,
+        title: 'Driver removed',
+        message: `${suspect.socketId} removed from ${suspect.roverId} after ${strikes} dock-protection triggers.`,
+      });
+    }
   }
 
   function handleSensorFrame(roverId, frame) {
