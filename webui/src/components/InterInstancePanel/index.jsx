@@ -26,15 +26,38 @@ function featureEntries(features = {}) {
     .map(([name]) => name);
 }
 
-function InstanceStatus({ remote }) {
+function getRemoteAvailability(remote) {
   const mode = remote?.instance?.mode || 'unknown';
-  const online = Boolean(remote?.online);
+  if (!remote?.online) return { blocked: true, label: 'Offline', overlay: 'This server is offline', tone: 'red' };
+  if (mode === 'lockdown') return { blocked: true, label: 'Lockdown', overlay: 'This server is in lockdown', tone: 'red' };
+  if (mode === 'admin') return { blocked: true, label: 'Admin only', overlay: 'This server is admin only', tone: 'amber' };
+  if (mode === 'turns') return { blocked: false, label: 'Turns', tone: 'sky' };
+  if (mode === 'open') return { blocked: false, label: 'Open', tone: 'emerald' };
+  return { blocked: false, label: mode, tone: 'slate' };
+}
+
+function statusClass(tone) {
+  switch (tone) {
+    case 'emerald':
+      return 'bg-emerald-700/70 text-emerald-50 ring-1 ring-emerald-300/50';
+    case 'sky':
+      return 'bg-sky-700/70 text-sky-50 ring-1 ring-sky-300/50';
+    case 'amber':
+      return 'bg-amber-600/80 text-amber-50 ring-1 ring-amber-200/60';
+    case 'red':
+      return 'bg-red-700/80 text-red-50 ring-1 ring-red-300/60';
+    default:
+      return 'bg-slate-700/80 text-slate-50 ring-1 ring-slate-400/40';
+  }
+}
+
+function InstanceStatus({ remote }) {
+  const availability = getRemoteAvailability(remote);
   return (
     <div className="flex flex-wrap items-center gap-0.5 text-[0.7rem]">
-      <span className={classNames('rounded px-1', online ? 'bg-emerald-700/60 text-emerald-100' : 'bg-red-800/60 text-red-100')}>
-        {online ? 'Online' : 'Offline'}
+      <span className={classNames('rounded px-1.5 py-0.5 text-xs font-semibold', statusClass(availability.tone))}>
+        {availability.label}
       </span>
-      <span className="rounded bg-slate-800 px-1 text-slate-200">{mode}</span>
       {remote?.latencyMs != null ? (
         <span className="rounded bg-slate-800 px-1 text-slate-300">{remote.latencyMs}ms</span>
       ) : null}
@@ -42,38 +65,30 @@ function InstanceStatus({ remote }) {
   );
 }
 
-function OfflineInstanceCard({ remote }) {
-  const name = remote?.instance?.name || remote?.url || 'External server';
-  return (
-    <CardFrame title={name} meta="Offline" bodyClassName="space-y-0.5 p-0.5 text-sm">
-      <p className="text-slate-400">{remote?.url || 'No URL available.'}</p>
-      {remote?.lastError ? <p className="text-red-300">{remote.lastError}</p> : null}
-    </CardFrame>
-  );
-}
-
-function InstanceMetadata({ remote }) {
+function InstancePanel({ remote, children = null }) {
   const instance = remote?.instance || {};
   const features = featureEntries(instance.features);
   const color = instance.color || '#64748b';
+  const availability = getRemoteAvailability(remote);
   return (
     <CardFrame
       title={instance.name || remote.url || 'External server'}
-      meta={<InstanceStatus remote={remote} />}
       bodyClassName="space-y-0.5 p-0.5 text-sm"
     >
-      <div className="flex items-start gap-0.5">
-        <span
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border border-white/20"
-          style={{ backgroundColor: color }}
-          title={color}
-        />
-        <div className="min-w-0 flex-1 space-y-0.5">
-          {instance.description ? <p className="text-slate-200">{instance.description}</p> : null}
+      <div className="h-1 w-full" style={{ backgroundColor: color }} title={color} />
+
+      <div className="space-y-0.5">
+        <div className="flex items-start justify-between gap-0.5">
+          <div className="min-w-0 flex-1 space-y-0.5">
+            {instance.description ? <p className="text-slate-200">{instance.description}</p> : null}
+          </div>
+          <InstanceStatus remote={remote} />
+        </div>
+        <div className="min-w-0 space-y-0.5">
           <div className="flex flex-wrap items-center gap-0.5">
             {instance.publicUrl ? <span className="truncate text-slate-400">{instance.publicUrl}</span> : null}
             <button type="button" className="button-dark" onClick={() => openExternalRoverWithPrompt(remote, '')}>
-              Open server
+              Visit server
             </button>
           </div>
           {features.length ? (
@@ -89,6 +104,19 @@ function InstanceMetadata({ remote }) {
           )}
         </div>
       </div>
+      {remote.online ? children : (
+        /*
+          Offline servers still belong in the same instance card so the large
+          inter-instance UI has one visual unit per directory entry. Keeping the
+          failure details here also avoids presenting a separate rover panel for
+          a server that cannot currently provide one.
+        */
+        <div className="surface-muted space-y-0.5 text-sm">
+          <p className="font-semibold text-slate-200">{availability.overlay}</p>
+          <p className="break-all text-slate-400">{remote?.url || 'No URL available.'}</p>
+          {remote?.lastError ? <p className="text-red-300">{remote.lastError}</p> : null}
+        </div>
+      )}
     </CardFrame>
   );
 }
@@ -136,9 +164,10 @@ export function ExternalInstancesCompact() {
                 turnQueues={remote.turnQueues}
                 users={remote.users}
                 externalInstance={remote}
+                disabledOverlay={getRemoteAvailability(remote).blocked ? getRemoteAvailability(remote).overlay : ''}
               />
             ) : (
-              <OfflineInstanceCard key={remote.url} remote={remote} />
+              <InstancePanel key={remote.url} remote={remote} />
             ),
           )}
         </div>
@@ -189,21 +218,25 @@ export default function InterInstancePanel({ compact = false, centered = false }
     )}>
       {instances.map((remote) => (
         <div key={remote.url} className="w-full max-w-md flex-1 basis-80 space-y-0.5">
-          <InstanceMetadata remote={remote} />
-          {remote.online ? (
+          <InstancePanel remote={remote}>
+            {/*
+              The large browser should read as one card per external server:
+              the server metadata, room snapshots, and the exact existing rover
+              queues panel are grouped together here. RoverQueuesPanel keeps its
+              own CardFrame and default title, so this component only controls
+              where that already-existing panel is placed.
+            */}
             <>
               <RemoteMediaStrip remote={remote} />
               <RoverQueuesPanel
-                title={remote.instance?.name || remote.url}
                 roster={remote.roster}
                 turnQueues={remote.turnQueues}
                 users={remote.users}
                 externalInstance={remote}
+                disabledOverlay={getRemoteAvailability(remote).blocked ? getRemoteAvailability(remote).overlay : ''}
               />
             </>
-          ) : (
-            <OfflineInstanceCard remote={remote} />
-          )}
+          </InstancePanel>
         </div>
       ))}
     </div>

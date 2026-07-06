@@ -55,6 +55,7 @@ export default function RoverQueuesPanel({
   turnQueues: turnQueuesOverride = null,
   users: usersOverride = null,
   externalInstance = null,
+  disabledOverlay = '',
 }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const localRoster = useSessionSelector((state) => state.session?.roster ?? []);
@@ -73,11 +74,15 @@ export default function RoverQueuesPanel({
   const [pending, setPending] = useState({});
   const [rebootPending, setRebootPending] = useState(false);
   const externalMode = Boolean(externalInstance);
+  const externalBlocked = Boolean(externalMode && disabledOverlay);
   const roster = Array.isArray(rosterOverride) ? rosterOverride : localRoster;
   const turnQueues = turnQueuesOverride && typeof turnQueuesOverride === 'object' ? turnQueuesOverride : localTurnQueues;
   const users = Array.isArray(usersOverride) ? usersOverride : localUsers;
 
-  const canRequest = useMemo(() => externalMode || (role && role !== 'spectator'), [externalMode, role]);
+  const canRequest = useMemo(
+    () => (externalMode ? !externalBlocked : role && role !== 'spectator'),
+    [externalBlocked, externalMode, role],
+  );
   const adminCapable = useMemo(
     () => role === 'admin' || role === 'lockdown',
     [role],
@@ -103,6 +108,7 @@ export default function RoverQueuesPanel({
 
   async function handleRequest(targetRoverId) {
     if (!targetRoverId) return;
+    if (externalBlocked) return;
     if (externalMode) {
       /*
         External queue cards deliberately reuse the local row layout, but their
@@ -176,7 +182,7 @@ export default function RoverQueuesPanel({
 
   return (
     <CardFrame title={title} actions={headerActions} bodyClassName="space-y-0.5 text-sm">
-      <div className="space-y-0.5">
+      <div className="relative space-y-0.5">
         {rosterItems.length === 0 ? (
           <p className="text-sm text-slate-500">No rovers registered.</p>
         ) : (
@@ -308,6 +314,11 @@ export default function RoverQueuesPanel({
             })}
           </ul>
         )}
+        {externalBlocked ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded bg-black/70 px-2 text-center text-sm font-semibold text-slate-100">
+            {disabledOverlay}
+          </div>
+        ) : null}
         {!externalMode && interInstanceEnabled ? <ExternalInstancesCompact /> : null}
       </div>
     </CardFrame>
