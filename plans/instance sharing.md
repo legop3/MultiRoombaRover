@@ -40,9 +40,23 @@ In the end once its all working, users will be able to see rovers from other ins
   - MAYBE could even have images that are derived from that instance's URL that the web UI can use to show room cameras if they exist or rover snapshots
 
 ## what will this look like in the web UI?
-- a button at the bottom of the rover roster that says show more instances or something
-- opens a popup cardframe, which will be a component shared in multiple spots. contains:
+- a button at the bottom of the rover roster that says show external rovers or something
+  - when you hit this button it shows the external rovers in the same roster stuff as the local instance rovres
+  - when this is expanded theres a button to open the shared inter-instance component in a popup
+- a new component, a cardframe, which will be a component shared in multiple spots. contains:
   - the instances
     - the instance info, name, description, etc
     - the rovers in the instances and their statuses
     - the features that the instance has
+- ALSO show this same cardframe on the admin lock overlay, so people can see other instances while their current one is locked
+- all new UI has to be mobile friendly.
+
+
+## switching to a different instance from a previous one
+- users should be able to click on a rover from the listing of another instance, and be put on that rover on that instance.
+  - this should just be a thing that takes you to a new link to the new instance, with a couple of URL params.
+- when switching, have a URL param for the rover that theyre requesting, 
+  - this URL param should just make the web UI automatically request the rover from the param.
+- and another URL param, which:
+  - takes their ENTIRE identity / settings cookie over to the new instance, by encoding the json in base64 in the URL. 
+    - when the web UI takes this URL in, it should replace the cookie with the one from the URL. maybe with a popup first that asks to transfer your identity from previous instance to the new one?
