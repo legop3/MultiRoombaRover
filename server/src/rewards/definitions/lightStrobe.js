@@ -1,7 +1,7 @@
 // Reward Definition: Light Strobe
 // Purpose: Defines the light-strobe deterrence reward and activation contract. Scope: Encapsulates reward identity, labels, and effect parameters for runtime dispatch.
-const STROBE_MS = 30 * 1000;
-const TICK_MS = 500;
+const STROBE_MS = 60 * 1000;
+const TICK_MS = 1500;
 
 let activeTimer = null;
 
@@ -44,7 +44,7 @@ module.exports = {
   goal: 400,
   async run(ctx) {
     startStrobe(ctx, { endsAt: Date.now() + STROBE_MS, on: false });
-    ctx.sendAlert({ color: '#ffc107', title: 'Light Strobe', message: 'All room controls strobing for 30 seconds.' });
+    ctx.sendAlert({ color: '#ffc107', title: 'Light Strobe', message: 'All room controls strobing for 60 seconds.' });
   },
   async recover(ctx, effect) {
     if (!effect || Number(effect.endsAt || 0) <= Date.now()) {

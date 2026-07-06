@@ -69,7 +69,8 @@ function InstancePanel({ remote, children = null }) {
   const instance = remote?.instance || {};
   const features = featureEntries(instance.features);
   const color = instance.color || '#64748b';
-  const availability = getRemoteAvailability(remote);
+  const online = Boolean(remote?.online);
+  const publicUrl = instance.publicUrl || remote?.url || '';
   return (
     <CardFrame
       title={instance.name || remote.url || 'External server'}
@@ -77,46 +78,41 @@ function InstancePanel({ remote, children = null }) {
     >
       <div className="h-1 w-full" style={{ backgroundColor: color }} title={color} />
 
-      <div className="space-y-0.5">
-        <div className="flex items-start justify-between gap-0.5">
-          <div className="min-w-0 flex-1 space-y-0.5">
-            {instance.description ? <p className="text-slate-200">{instance.description}</p> : null}
-          </div>
+      <div className="space-y-1 text-center">
+        {/*
+          The status is the main operational signal for a remote instance, so it
+          is placed in the body as a primary row instead of competing with the
+          card title. Offline cards stop after this small header/action area so
+          the user only sees one offline message and one way to visit the server.
+        */}
+        <div className="flex justify-center">
           <InstanceStatus remote={remote} />
         </div>
-        <div className="min-w-0 space-y-0.5">
-          <div className="flex flex-wrap items-center gap-0.5">
-            {instance.publicUrl ? <span className="truncate text-slate-400">{instance.publicUrl}</span> : null}
-            <button type="button" className="button-dark" onClick={() => openExternalRoverWithPrompt(remote, '')}>
-              Visit server
-            </button>
+
+        {online && instance.description ? <p className="text-slate-200">{instance.description}</p> : null}
+
+        <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 sm:flex-row sm:gap-2">
+          {publicUrl ? (
+            <span className="max-w-full truncate text-slate-400" title={publicUrl}>
+              {publicUrl}
+            </span>
+          ) : null}
+          <button type="button" className="button-dark" onClick={() => openExternalRoverWithPrompt(remote, '')}>
+            Visit server
+          </button>
+        </div>
+
+        {online && features.length ? (
+          <div className="flex flex-wrap justify-center gap-0.5">
+            {features.map((feature) => (
+              <span key={feature} className="rounded bg-slate-800 px-1 text-[0.7rem] text-slate-200">
+                {feature}
+              </span>
+            ))}
           </div>
-          {features.length ? (
-            <div className="flex flex-wrap gap-0.5">
-              {features.map((feature) => (
-                <span key={feature} className="rounded bg-slate-800 px-1 text-[0.7rem] text-slate-200">
-                  {feature}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[0.75rem] text-slate-500">No advertised feature flags.</p>
-          )}
-        </div>
+        ) : null}
       </div>
-      {remote.online ? children : (
-        /*
-          Offline servers still belong in the same instance card so the large
-          inter-instance UI has one visual unit per directory entry. Keeping the
-          failure details here also avoids presenting a separate rover panel for
-          a server that cannot currently provide one.
-        */
-        <div className="surface-muted space-y-0.5 text-sm">
-          <p className="font-semibold text-slate-200">{availability.overlay}</p>
-          <p className="break-all text-slate-400">{remote?.url || 'No URL available.'}</p>
-          {remote?.lastError ? <p className="text-red-300">{remote.lastError}</p> : null}
-        </div>
-      )}
+      {online ? children : null}
     </CardFrame>
   );
 }
