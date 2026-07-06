@@ -1,5 +1,4 @@
 1. improve spectator page, options on what to see and what not to see
-2. for private rovers, add virtual wall support and add that as a default-on safety.
 3. synthesize wheel speed sensors based on encoder readings server side, add them to json sensor data, show them in topdown
 4. pagewide system for "why was i removed from a rover", instead of the link to spectator page thing
 5. admin command for kicking people off of rovers. just a kick, nothing persistent
