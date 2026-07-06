@@ -68,6 +68,7 @@ function createSensorPipeline(deps) {
     const explicitBackoffDrive = options.backoffDrive && typeof options.backoffDrive === 'object'
       ? options.backoffDrive
       : null;
+    const notify = options.notify !== false;
     try {
       issueCommand(roverId, { type: 'drive', driveDirect: { left: 0, right: 0 } });
       issueCommand(roverId, { type: 'motors', motorPwm: { main: 0, side: 0, vacuum: 0 } });
@@ -101,16 +102,18 @@ function createSensorPipeline(deps) {
     setDriveCooldown(roverId, Math.max(cooldownMs, backoffMs));
     const state = getPrivateSafetyState(roverId);
     state.blockedUntil = now + Math.max(cooldownMs, backoffMs);
-    sendAlert({
-      color: ALERT_COLOR,
-      title: 'Private Safety',
-      message: `${roverId} ${mode} safety triggered.`,
-    });
-    publishEvent({
-      source: 'roverManager',
-      type: 'rover.privateSafetyTriggered',
-      payload: { roverId, mode, cooldownMs, backoffMs, backoffSpeed, backoffDrive: explicitBackoffDrive },
-    });
+    if (notify) {
+      sendAlert({
+        color: ALERT_COLOR,
+        title: 'Private Safety',
+        message: `${roverId} ${mode} safety triggered.`,
+      });
+      publishEvent({
+        source: 'roverManager',
+        type: 'rover.privateSafetyTriggered',
+        payload: { roverId, mode, cooldownMs, backoffMs, backoffSpeed, backoffDrive: explicitBackoffDrive },
+      });
+    }
   }
 
   function rememberPrivateDriveDirection(roverId, driveDirect = null) {
@@ -186,6 +189,29 @@ function createSensorPipeline(deps) {
     }
     const safety = getPrivateSafety(record);
     const now = Date.now();
+    if (safety.virtualWallEnabled && currentVirtualWall) {
+      const wasAlreadyBlocked = now < Number(state.blockedUntil || 0);
+      /*
+        Virtual walls are different from bump/cliff edges: staying in the beam
+        is itself unsafe, so the guard must keep asserting the stop/backoff
+        command even while the normal private-safety cooldown is active. The
+        repeated command path is intentional; only duplicate alerts/events are
+        suppressed during the existing blocked window so a held wall signal does
+        not flood chat/log surfaces at sensor-frame rate.
+      */
+      triggerSafetyAction(record, 'virtualWall', {
+        cooldownMs: safety.triggerCooldownMs,
+        backoffMs: safety.virtualWallBackoffMs,
+        backoffSpeed: safety.virtualWallBackoffSpeed,
+        backoffDrive: getOppositePrivateDrive(record, safety.virtualWallBackoffSpeed),
+        notify: !wasAlreadyBlocked,
+      });
+      state.lastOvercurrent = currentOver;
+      state.lastBump = currentBump;
+      state.lastCliff = currentCliff;
+      state.lastVirtualWall = currentVirtualWall;
+      return;
+    }
     if (now < Number(state.blockedUntil || 0)) {
       state.lastOvercurrent = currentOver;
       state.lastBump = currentBump;
@@ -213,14 +239,6 @@ function createSensorPipeline(deps) {
         cooldownMs: safety.triggerCooldownMs,
         backoffMs: safety.cliffBackoffMs,
         backoffSpeed: safety.cliffBackoffSpeed,
-      });
-      triggered = true;
-    } else if (safety.virtualWallEnabled && currentVirtualWall && !state.lastVirtualWall) {
-      triggerSafetyAction(record, 'virtualWall', {
-        cooldownMs: safety.triggerCooldownMs,
-        backoffMs: safety.virtualWallBackoffMs,
-        backoffSpeed: safety.virtualWallBackoffSpeed,
-        backoffDrive: getOppositePrivateDrive(record, safety.virtualWallBackoffSpeed),
       });
       triggered = true;
     }
