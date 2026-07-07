@@ -29,8 +29,8 @@ function featureEntries(features = {}) {
 function getRemoteAvailability(remote) {
   const mode = remote?.instance?.mode || 'unknown';
   if (!remote?.online) return { blocked: true, label: 'Offline', overlay: 'This server is offline', tone: 'red' };
-  if (mode === 'lockdown') return { blocked: true, label: 'Lockdown', overlay: 'This server is in lockdown', tone: 'red' };
-  if (mode === 'admin') return { blocked: true, label: 'Admin only', overlay: 'This server is admin only', tone: 'red' };
+  if (mode === 'lockdown') return { blocked: true, label: 'Lockdown', overlay: 'This server is currently in lockdown mode', tone: 'red' };
+  if (mode === 'admin') return { blocked: true, label: 'Admin only', overlay: 'This server is currently admin locked', tone: 'red' };
   if (mode === 'turns') return { blocked: false, label: 'Turns mode (open)', tone: 'emerald' };
   if (mode === 'open') return { blocked: false, label: 'Open mode', tone: 'emerald' };
   return { blocked: false, label: mode, tone: 'slate' };
