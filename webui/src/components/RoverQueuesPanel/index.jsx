@@ -208,14 +208,14 @@ export default function RoverQueuesPanel({
             const isPrivateOpen = Boolean(rover?.private?.enabled && rover?.private?.open);
             const isGrantedClosedPrivate = Boolean(rover?.private?.enabled && !rover?.private?.open);
             const locked = Boolean(rover.locked);
-            const lockedBlocked = !externalMode && locked && !adminCapable && !isGrantedClosedPrivate;
+            const lockedBlocked = locked && (externalMode || (!adminCapable && !isGrantedClosedPrivate));
             const lockLabel = rover.lockReason ? `locked: ${rover.lockReason}` : 'locked';
             const buttonLabel = pending[roverId]
               ? '...'
+              : lockedBlocked
+              ? lockLabel
               : externalMode
               ? 'Open'
-              : locked && !isGrantedClosedPrivate
-              ? lockLabel
               : 'request';
             const canClickRow = canRequest && !lockedBlocked && !pending[roverId];
             return (

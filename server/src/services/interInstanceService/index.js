@@ -152,11 +152,48 @@ function getPublicRoster() {
     .filter((rover) => !isClosedPrivateRover(rover));
 }
 
+function publicRoverIdSet(roster = []) {
+  return new Set(roster.map((rover) => String(rover?.id || '')).filter(Boolean));
+}
+
+function filterPublicTurnQueues(turnQueues = {}, publicIds) {
+  const visible = publicIds instanceof Set ? publicIds : new Set();
+  const next = {};
+  /*
+    RoverQueuesPanel creates fallback rows for queue ids that are not present in
+    the roster, so the public payload must filter queues with the exact same
+    privacy boundary as the roster. Otherwise a closed-private rover can leak as
+    an orphan queue row after a private access grant assigns someone to it.
+  */
+  Object.entries(turnQueues || {}).forEach(([roverId, info]) => {
+    if (!visible.has(String(roverId))) return;
+    next[roverId] = info;
+  });
+  return next;
+}
+
+function filterPublicUsers(users = [], publicIds) {
+  const visible = publicIds instanceof Set ? publicIds : new Set();
+  /*
+    A user's current rover id is also part of the public inter-instance surface.
+    If that rover is not in the public roster, scrub only that association while
+    leaving the rest of the public user entry intact for normal queue display.
+  */
+  return users.map((user) => {
+    const roverId = user?.roverId ? String(user.roverId) : '';
+    if (!roverId || visible.has(roverId)) return user;
+    return { ...user, roverId: null };
+  });
+}
+
 function buildLocalInfo() {
   const mode = getMode();
   const lockdown = isLockdownMode();
   const features = getFeatureFlags();
-  const roster = getPublicRoster().map((rover) => (lockdown ? rover : addRoverSnapshotLinks(rover)));
+  const publicRoster = getPublicRoster();
+  const publicIds = publicRoverIdSet(publicRoster);
+  const roster = publicRoster.map((rover) => (lockdown ? rover : addRoverSnapshotLinks(rover)));
+  const users = filterPublicUsers(Array.from(io.sockets.sockets.values()).map(buildUserEntry), publicIds);
   const roomCameras = lockdown || !features.roomCameras ? [] : getRoomCameras().map(buildRoomCameraInfo);
   return {
     instance: {
@@ -167,8 +204,8 @@ function buildLocalInfo() {
       updatedAt: Date.now(),
     },
     roster,
-    turnQueues: getTurnQueues(),
-    users: Array.from(io.sockets.sockets.values()).map(buildUserEntry),
+    turnQueues: filterPublicTurnQueues(getTurnQueues(), publicIds),
+    users,
     roomCameras,
     socials: features.socials ? getConfiguredSocials(config) : [],
   };

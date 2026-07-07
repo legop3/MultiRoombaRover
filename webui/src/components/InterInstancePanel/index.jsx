@@ -30,8 +30,8 @@ function getRemoteAvailability(remote) {
   const mode = remote?.instance?.mode || 'unknown';
   if (!remote?.online) return { blocked: true, label: 'Offline', overlay: 'This server is offline', tone: 'red' };
   if (mode === 'lockdown') return { blocked: true, label: 'Lockdown', overlay: 'This server is in lockdown', tone: 'red' };
-  if (mode === 'admin') return { blocked: true, label: 'Admin only', overlay: 'This server is admin only', tone: 'amber' };
-  if (mode === 'turns') return { blocked: false, label: 'Turns', tone: 'sky' };
+  if (mode === 'admin') return { blocked: true, label: 'Admin only', overlay: 'This server is admin only', tone: 'red' };
+  if (mode === 'turns') return { blocked: false, label: 'Turns', tone: 'emerald' };
   if (mode === 'open') return { blocked: false, label: 'Open', tone: 'emerald' };
   return { blocked: false, label: mode, tone: 'slate' };
 }
@@ -54,15 +54,17 @@ function statusClass(tone) {
 function InstanceStatus({ remote }) {
   const availability = getRemoteAvailability(remote);
   return (
-    <div className="flex flex-wrap items-center gap-0.5 text-[0.7rem]">
+    <div className="flex shrink-0 flex-wrap items-center gap-0.5 text-[0.7rem]">
       <span className={classNames('rounded px-1.5 py-0.5 text-xs font-semibold', statusClass(availability.tone))}>
         {availability.label}
       </span>
-      {remote?.latencyMs != null ? (
-        <span className="rounded bg-slate-800 px-1 text-slate-300">{remote.latencyMs}ms</span>
-      ) : null}
     </div>
   );
+}
+
+function InstanceLatency({ remote }) {
+  if (remote?.latencyMs == null) return null;
+  return <span className="text-[0.7rem] font-normal text-slate-500">{remote.latencyMs}ms</span>;
 }
 
 function InstancePanel({ remote, children = null }) {
@@ -74,22 +76,22 @@ function InstancePanel({ remote, children = null }) {
   return (
     <CardFrame
       title={instance.name || remote.url || 'External server'}
+      meta={<InstanceLatency remote={remote} />}
       bodyClassName="space-y-0.5 p-0.5 text-sm"
     >
       <div className="h-1 w-full" style={{ backgroundColor: color }} title={color} />
 
-      <div className="space-y-1 text-center">
+      <div className="space-y-1">
         {/*
           The status is the main operational signal for a remote instance, so it
-          is placed in the body as a primary row instead of competing with the
-          card title. Offline cards stop after this small header/action area so
-          the user only sees one offline message and one way to visit the server.
+          stays beside the human-facing description where users naturally scan
+          the server summary. Latency is intentionally moved to the title bar as
+          quiet metadata because it is useful detail, not the primary decision.
         */}
-        <div className="flex justify-center">
+        <div className="flex flex-wrap items-center justify-center gap-1 text-center">
           <InstanceStatus remote={remote} />
+          {online && instance.description ? <p className="min-w-0 text-slate-200">{instance.description}</p> : null}
         </div>
-
-        {online && instance.description ? <p className="text-slate-200">{instance.description}</p> : null}
 
         <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 sm:flex-row sm:gap-2">
           {publicUrl ? (
@@ -174,46 +176,25 @@ export function ExternalInstancesCompact() {
 }
 
 export function InterInstancePopup({ onClose }) {
-  const enabled = useInterInstanceEnabled();
-  if (!enabled) return null;
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-0.5">
-      <CardFrame
-        title="External instances"
-        actions={
-          <button type="button" className="button-dark" onClick={onClose}>
-            Close
-          </button>
-        }
-        className="w-full max-w-6xl"
+      <InterInstanceBrowserFrame
+        onClose={onClose}
+        className="max-w-[calc(100vw-0.5rem)]"
         bodyClassName="max-h-[82vh] overflow-y-auto p-0.5"
-        clipOverflow={false}
-      >
-        <InterInstancePanel />
-      </CardFrame>
+      />
     </div>
   );
 }
 
-export default function InterInstancePanel({ compact = false, centered = false }) {
-  const enabled = useInterInstanceEnabled();
-  const instances = useRemoteInstances();
-  if (!enabled) return null;
-  if (compact) return <ExternalInstancesCompact />;
-  if (!instances.length) {
-    return (
-      <CardFrame title="External instances" bodyClassName="p-0.5 text-sm">
-        <p className="text-slate-500">No external instances discovered.</p>
-      </CardFrame>
-    );
-  }
+function InterInstanceCards({ instances, centered = false }) {
   return (
     <div className={classNames(
       'flex flex-wrap justify-center gap-0.5',
       centered && 'mx-auto w-full max-w-3xl',
     )}>
       {instances.map((remote) => (
-        <div key={remote.url} className="w-full max-w-md flex-1 basis-80 space-y-0.5">
+        <div key={remote.url} className="w-80 max-w-full shrink-0 space-y-0.5">
           <InstancePanel remote={remote}>
             {/*
               The large browser should read as one card per external server:
@@ -237,4 +218,57 @@ export default function InterInstancePanel({ compact = false, centered = false }
       ))}
     </div>
   );
+}
+
+export function InterInstanceBrowserFrame({
+  onClose = null,
+  hideWhenEmpty = false,
+  className = '',
+  bodyClassName = 'p-0.5',
+  centered = false,
+}) {
+  const enabled = useInterInstanceEnabled();
+  const instances = useRemoteInstances();
+  if (!enabled) return null;
+  if (!instances.length && hideWhenEmpty) return null;
+  const actions = onClose ? (
+    <button type="button" className="button-dark" onClick={onClose}>
+      Close
+    </button>
+  ) : null;
+  /*
+    This frame is shared by the popup and the admin/lockdown overlay. Keeping
+    the wrapper here means those surfaces get the same external-instance card
+    without placing it inside the login card or duplicating layout behavior.
+  */
+  return (
+    <CardFrame
+      title="External instances"
+      actions={actions}
+      className={className}
+      bodyClassName={bodyClassName}
+      clipOverflow={false}
+    >
+      {instances.length ? (
+        <InterInstanceCards instances={instances} centered={centered} />
+      ) : (
+        <p className="text-sm text-slate-500">No external instances discovered.</p>
+      )}
+    </CardFrame>
+  );
+}
+
+export default function InterInstancePanel({ compact = false, centered = false }) {
+  const enabled = useInterInstanceEnabled();
+  const instances = useRemoteInstances();
+  if (!enabled) return null;
+  if (compact) return <ExternalInstancesCompact />;
+  if (!instances.length) {
+    return (
+      <CardFrame title="External instances" bodyClassName="p-0.5 text-sm">
+        <p className="text-slate-500">No external instances discovered.</p>
+      </CardFrame>
+    );
+  }
+  return <InterInstanceCards instances={instances} centered={centered} />;
 }

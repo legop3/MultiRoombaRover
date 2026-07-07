@@ -7,7 +7,7 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import SocialButton from '../SocialButton/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
-import InterInstancePanel from '../InterInstancePanel/index.jsx';
+import { InterInstanceBrowserFrame } from '../InterInstancePanel/index.jsx';
 import { isFeatureEnabled } from '../../lib/features.js';
 
 const PRIVILEGED_ROLES = new Set(['admin', 'lockdown']);
@@ -66,8 +66,8 @@ export default function ModeGateOverlay() {
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-50 overflow-y-auto bg-black px-0.5 py-0.5">
-      <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col items-center justify-center gap-0.5">
-        <div className="surface w-full max-w-md space-y-0.5 text-slate-100 shadow-2xl">
+      <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col items-center justify-center gap-0.5 lg:flex-row lg:items-center">
+        <div className="surface w-full max-w-md shrink-0 space-y-0.5 text-slate-100 shadow-2xl">
           <div className="space-y-0.5">
             <p className="text-lg font-semibold">{details.title}</p>
             <p className="text-sm text-slate-300">{details.description}</p>
@@ -95,9 +95,16 @@ export default function ModeGateOverlay() {
           </p> */}
         </div>
         {interInstanceEnabled ? (
-          <div className="w-full">
-            <InterInstancePanel centered />
-          </div>
+          /*
+            The external browser is a sibling of the login card, not content
+            inside it. hideWhenEmpty lets the login card remain centered when
+            the directory has no other servers to offer.
+          */
+          <InterInstanceBrowserFrame
+            hideWhenEmpty
+            className="max-w-[calc(100vw-0.5rem)]"
+            bodyClassName="max-h-[86vh] overflow-y-auto p-0.5"
+          />
         ) : null}
       </div>
     </div>
