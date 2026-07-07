@@ -88,40 +88,123 @@ export const ConeSegment = React.memo(function ConeSegment({ cx, cy, rBase, rTip
   return <path d={fg} fill={color} opacity={1} stroke="none" />;
 });
 
-export const WheelVisual = React.memo(function WheelVisual({ cx, cy, current, drop, overcurrent, label }) {
-  const mag = Math.abs(current);
-  const pct = clamp01(mag / 1200);
-  const color = currentColor(current, overcurrent);
-  const barH = 56;
-  const currentW = 14;
-  const dropW = 9;
+export const WheelVisual = React.memo(function WheelVisual({ cx, cy, current, speed, drop, overcurrent, label }) {
+  const currentMagnitude = Math.abs(current);
+  const currentPercent = clamp01(currentMagnitude / 1200);
+  const currentFillColor = currentColor(current, overcurrent);
+  const hasSpeed = Number.isFinite(Number(speed));
+  const speedValue = hasSpeed ? Number(speed) : 0;
+  const speedMagnitude = Math.abs(speedValue);
+  const speedPercent = clamp01(speedMagnitude / 500);
+  const barH = 52;
+  const barW = 8;
   const gap = 3;
-  const currentFill = barH * pct;
-  const sign = label === 'L' ? -1 : 1;
-  const currentCenterX = sign * (-dropW / 2 - gap / 2);
-  const dropCenterX = sign * (currentW / 2 + gap / 2);
+  const groupWidth = 24;
+  const groupHeight = 58;
+  const barTop = -barH / 2;
+  const barBottom = barH / 2;
+  const outsideSign = label === 'L' ? -1 : 1;
+  const insideSign = -outsideSign;
+  /*
+    The wheel glyphs mirror each other around the robot body. Current belongs
+    on the inside edge because it is a motor/load signal tied to the chassis,
+    while speed belongs on the outside edge where wheel motion is easiest to
+    read at a glance.
+  */
+  const speedCenterX = outsideSign * (barW / 2 + gap / 2);
+  const currentCenterX = insideSign * (barW / 2 + gap / 2);
+  const currentFill = barH * currentPercent;
+  const speedFill = (barH / 2) * speedPercent;
+  const speedIsForward = speedValue >= 0;
+  const speedFillY = speedIsForward ? -speedFill : 0;
+  const speedColor = hasSpeed ? (speedIsForward ? '#38bdf8' : '#f59e0b') : '#475569';
   const dropLabelRotation = label === 'L' ? -90 : 90;
-  const groupWidth = currentW + dropW + gap + 2;
-  const groupHeight = barH + 4;
+
   return (
     <g transform={`translate(${cx},${cy})`}>
-      <rect x={-groupWidth / 2} y={-groupHeight / 2} width={groupWidth} height={groupHeight} rx="4" fill="none" stroke="#64748b" strokeWidth="1" />
-      <rect x={currentCenterX - currentW / 2} y={-barH / 2} width={currentW} height={barH} fill="#0f172a" stroke="#0f172a" strokeWidth="1" rx="2" />
-      <rect x={currentCenterX - currentW / 2} y={barH / 2 - currentFill} width={currentW} height={currentFill} fill={color} className={overcurrent ? 'animate-pulse' : ''} />
-      <rect x={dropCenterX - dropW / 2} y={-barH / 2} width={dropW} height={barH} fill={drop ? '#ef4444' : '#475569'} className={drop ? 'animate-pulse' : ''} rx="2" />
-      {drop ? (
-        <text
-          x={dropCenterX}
-          y={0}
-          textAnchor="middle"
-          dominantBaseline="central"
-          transform={`rotate(${dropLabelRotation} ${dropCenterX} 0)`}
-          className="pointer-events-none fill-white text-[0.48rem] font-bold"
-        >
-          Dropped
-        </text>
+      <rect
+        x={-groupWidth / 2}
+        y={-groupHeight / 2}
+        width={groupWidth}
+        height={groupHeight}
+        rx="4"
+        fill="none"
+        stroke={overcurrent ? '#ef4444' : '#64748b'}
+        strokeWidth={overcurrent ? '2' : '1'}
+        className={overcurrent ? 'animate-pulse' : ''}
+      />
+
+      {/*
+        Keep the speed bar in the same compact visual language as the original
+        wheel current bar. The only extra cue is the zero line: encoder-derived
+        forward speed fills above it, while reverse speed fills below it.
+      */}
+      <rect x={speedCenterX - barW / 2} y={barTop} width={barW} height={barH} fill="#0f172a" stroke="#1e293b" strokeWidth="1" rx="2" />
+      <line
+        x1={speedCenterX - barW / 2}
+        y1="0"
+        x2={speedCenterX + barW / 2}
+        y2="0"
+        stroke="#64748b"
+        strokeWidth="1"
+      />
+      {hasSpeed && speedFill > 0 ? (
+        <rect
+          x={speedCenterX - barW / 2}
+          y={speedFillY}
+          width={barW}
+          height={speedFill}
+          fill={speedColor}
+          rx="1.5"
+        />
       ) : null}
-      <text x={0} y={barH / 2 + 10} textAnchor="middle" className="fill-slate-200 text-[0.7rem]">{label}</text>
+
+      {/*
+        Current stays as the familiar bottom-up load meter. Keeping both bars
+        narrow avoids turning this layer into a dashboard and preserves the
+        original top-down sensor-map density.
+      */}
+      <rect x={currentCenterX - barW / 2} y={barTop} width={barW} height={barH} fill="#0f172a" stroke="#1e293b" strokeWidth="1" rx="2" />
+      <rect
+        x={currentCenterX - barW / 2}
+        y={barBottom - currentFill}
+        width={barW}
+        height={currentFill}
+        fill={currentFillColor}
+        className={overcurrent ? 'animate-pulse' : ''}
+        rx="1.5"
+      />
+
+      {drop ? (
+        <>
+          {/*
+            The dropped state covers the existing compact wheel visual instead
+            of adding another status column. This satisfies the "whole wheel is
+            dropped" meaning without increasing the layer footprint.
+          */}
+          <rect
+            x={-groupWidth / 2}
+            y={-groupHeight / 2}
+            width={groupWidth}
+            height={groupHeight}
+            rx="4"
+            fill="#ef4444"
+            opacity="0.36"
+            className="animate-pulse"
+          />
+          <text
+            x="0"
+            y="2"
+            textAnchor="middle"
+            dominantBaseline="central"
+            transform={`rotate(${dropLabelRotation} 0 2)`}
+            className="pointer-events-none fill-white text-[0.52rem] font-bold"
+          >
+            Dropped
+          </text>
+        </>
+      ) : null}
+      <text x={0} y={barBottom + 10} textAnchor="middle" className="fill-slate-200 text-[0.7rem]">{label}</text>
     </g>
   );
 });

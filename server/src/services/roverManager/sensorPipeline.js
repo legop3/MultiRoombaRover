@@ -529,11 +529,27 @@ function createSensorPipeline(deps) {
     const record = rovers.get(roverId);
     if (!record) return;
     record.lastSeen = Date.now();
-    const decoded = parseSensorFrame(frame.data);
+    let decoded = parseSensorFrame(frame.data);
     record.lastSensor = { raw: frame, decoded };
     record.batteryState = computeBatteryState(record, decoded);
+    let odometer = null;
     if (typeof processOdometerFrame === 'function') {
-      processOdometerFrame(roverId, decoded);
+      odometer = processOdometerFrame(roverId, decoded);
+    }
+    if (decoded && odometer?.wheelSpeedsMmPerSecond) {
+      /*
+        Wheel speed is not a native packet in the Roomba sensor stream; it is a
+        synthesized sensor produced from the same encoder deltas that drive the
+        persistent odometer. Merging it into the decoded sensor object keeps the
+        public socket contract simple: clients still read one JSON `sensors`
+        payload per frame, with calculated values clearly grouped under their
+        own wheel-speed key.
+      */
+      decoded = {
+        ...decoded,
+        wheelSpeedsMmPerSecond: odometer.wheelSpeedsMmPerSecond,
+      };
+      record.lastSensor = { raw: frame, decoded };
     }
     updateMovement(record, decoded);
     const hasDockInfo = decoded?.chargingSources != null;

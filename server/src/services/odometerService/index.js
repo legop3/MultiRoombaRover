@@ -65,6 +65,11 @@ function ensureLoaded() {
         lastSampleAt: null,
         lastIntegratedAt: null,
         lastDelta: null,
+        wheelSpeedsMmPerSecond: {
+          left: null,
+          right: null,
+          center: null,
+        },
         rolloverEvents: 0,
         ignoredSamples: 0,
         status: 'waiting',
@@ -96,6 +101,11 @@ function ensureState(roverId) {
       lastSampleAt: null,
       lastIntegratedAt: null,
       lastDelta: null,
+      wheelSpeedsMmPerSecond: {
+        left: null,
+        right: null,
+        center: null,
+      },
       rolloverEvents: 0,
       ignoredSamples: 0,
       status: 'waiting',
@@ -187,6 +197,11 @@ function snapshotState(state) {
     lastSampleAt: state.lastSampleAt,
     lastIntegratedAt: state.lastIntegratedAt,
     lastDelta: state.lastDelta,
+    wheelSpeedsMmPerSecond: state.wheelSpeedsMmPerSecond || {
+      left: null,
+      right: null,
+      center: null,
+    },
     rolloverEvents: state.rolloverEvents,
     ignoredSamples: state.ignoredSamples,
     status: state.status,
@@ -228,6 +243,16 @@ function processSensorFrame(roverId, sensors = {}) {
   if (!Number.isInteger(left) || !Number.isInteger(right)) {
     state.status = 'waiting';
     state.statusReason = 'encoder counts missing';
+    /*
+      Speed is derived from consecutive encoder samples. When either encoder is
+      absent, keeping stale speed values would make the socket payload look like
+      a live sensor even though the required source data is missing.
+    */
+    state.wheelSpeedsMmPerSecond = {
+      left: null,
+      right: null,
+      center: null,
+    };
     return snapshotState(state);
   }
 
@@ -241,6 +266,16 @@ function processSensorFrame(roverId, sensors = {}) {
     state.lastSampleAt = sampleAt;
     state.status = 'tracking';
     state.statusReason = 'baseline ready';
+    /*
+      The baseline frame has valid encoder positions, but no previous sample to
+      compare against. Reporting zero here is intentional: it gives clients a
+      stable wheel-speed sensor shape immediately without inventing movement.
+    */
+    state.wheelSpeedsMmPerSecond = {
+      left: 0,
+      right: 0,
+      center: 0,
+    };
     state.updatedAt = sampleAt;
     const snapshot = snapshotState(state);
     emitSnapshot(state, snapshot, { force: true });
@@ -258,6 +293,30 @@ function processSensorFrame(roverId, sensors = {}) {
   const reasonableLimit = maxReasonableDeltaMm(elapsedMs);
   const leftRolled = crossedRollover(state.lastLeftCount, left, leftCounts);
   const rightRolled = crossedRollover(state.lastRightCount, right, rightCounts);
+  const elapsedSeconds = elapsedMs > 0 ? elapsedMs / 1000 : null;
+  /*
+    The Roomba Open Interface encoder packets are cumulative wheel counts. The
+    odometer already converts each signed count delta into millimeters using the
+    configured Create wheel diameter/counts-per-revolution constants, so wheel
+    speed is the same per-wheel millimeter delta divided by the wall-clock time
+    between accepted sensor frames.
+  */
+  const rawWheelSpeedsMmPerSecond = elapsedSeconds
+    ? {
+        left: leftMm / elapsedSeconds,
+        right: rightMm / elapsedSeconds,
+        center: centerMm / elapsedSeconds,
+      }
+    : {
+        left: 0,
+        right: 0,
+        center: 0,
+      };
+  const wheelSpeedsMmPerSecond = {
+    left: Math.round(rawWheelSpeedsMmPerSecond.left),
+    right: Math.round(rawWheelSpeedsMmPerSecond.right),
+    center: Math.round(rawWheelSpeedsMmPerSecond.center),
+  };
 
   state.lastLeftCount = left;
   state.lastRightCount = right;
@@ -272,6 +331,16 @@ function processSensorFrame(roverId, sensors = {}) {
     state.ignoredSamples += 1;
     state.status = 'ignored';
     state.statusReason = `ignored ${Math.round(distanceMm)} mm jump`;
+    /*
+      Rejected encoder jumps are deliberately not surfaced as speed. They are
+      most often reconnect/corruption edges, and showing their implied velocity
+      would produce a dramatic but false wheel-speed sensor spike in the UI.
+    */
+    state.wheelSpeedsMmPerSecond = {
+      left: null,
+      right: null,
+      center: null,
+    };
     state.lastDelta = {
       leftCounts,
       rightCounts,
@@ -280,6 +349,9 @@ function processSensorFrame(roverId, sensors = {}) {
       centerMm: Math.round(centerMm),
       distanceMm: 0,
       elapsedMs,
+      leftSpeedMmPerSecond: null,
+      rightSpeedMmPerSecond: null,
+      centerSpeedMmPerSecond: null,
       ignored: true,
     };
     state.updatedAt = sampleAt;
@@ -293,6 +365,7 @@ function processSensorFrame(roverId, sensors = {}) {
   state.lastIntegratedAt = sampleAt;
   state.status = 'tracking';
   state.statusReason = distanceMm > 0 ? 'integrated encoder delta' : 'no movement';
+  state.wheelSpeedsMmPerSecond = wheelSpeedsMmPerSecond;
   state.lastDelta = {
     leftCounts,
     rightCounts,
@@ -301,6 +374,9 @@ function processSensorFrame(roverId, sensors = {}) {
     centerMm: Math.round(centerMm),
     distanceMm: Math.round(distanceMm),
     elapsedMs,
+    leftSpeedMmPerSecond: wheelSpeedsMmPerSecond.left,
+    rightSpeedMmPerSecond: wheelSpeedsMmPerSecond.right,
+    centerSpeedMmPerSecond: wheelSpeedsMmPerSecond.center,
     ignored: false,
   };
   state.updatedAt = sampleAt;
