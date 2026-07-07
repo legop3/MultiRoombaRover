@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import ctypes
+import ctypes.util
 import json
 import os
 import struct
@@ -33,6 +34,40 @@ MAX_PITCH = 2.0
 MIN_SPEED = 0.5
 MAX_SPEED = 2.0
 
+_runtime_handles = []
+
+
+def load_shared_library(path):
+    mode = ctypes.RTLD_GLOBAL | getattr(os, "RTLD_NOW", 0)
+    return ctypes.CDLL(path, mode=mode)
+
+
+def preload_runtime_libraries():
+    # Some ChromeOS libchrometts builds reference compiler helper symbols such
+    # as __udivmodti4 without declaring the runtime library as an ELF dependency.
+    # Loading common compiler runtimes globally first makes those symbols visible
+    # before ctypes loads /opt/roverd/googletts/libchrometts.so.
+    candidates = [
+        "gcc_s",
+        "atomic",
+        "stdc++",
+        "c++",
+        "c++abi",
+    ]
+    for name in candidates:
+        lib = ctypes.util.find_library(name)
+        if not lib:
+            continue
+        try:
+            _runtime_handles.append(load_shared_library(lib))
+        except OSError:
+            pass
+
+
+# Load the runtime helpers at module import time so daemon readiness fails only
+# when libchrometts itself is still unusable after the best-effort preloads.
+preload_runtime_libraries()
+
 
 def varint(value):
     out = bytearray()
@@ -64,7 +99,7 @@ def build_speaker(name, gender):
 
 class ChromeTTS:
     def __init__(self):
-        self.lib = ctypes.CDLL(LIB_PATH)
+        self.lib = load_shared_library(LIB_PATH)
         self.lib.GoogleTtsInit.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
         self.lib.GoogleTtsInit.restype = ctypes.c_bool
         self.lib.GoogleTtsInitBuffered.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
