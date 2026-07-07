@@ -111,11 +111,11 @@ function registerRoomCameraSocketGateway({ getRoomCamera, getRoomCameras, getRoo
         if (!passesMode(socket)) throw new Error('Not authorized for room camera');
         const validIds = uniqueIds.filter((id) => !!getRoomCamera(id));
         validIds.forEach((cameraId) => addSubscription(socket, cameraId));
-        validIds.forEach((cameraId) => {
-          const state = getRoomCameraState(cameraId);
-          if (state?.frame) sendFrame(socket, cameraId, { ts: state.ts }, state.frame);
-          sendStatus(socket, cameraId, { ts: state?.ts || null, error: state?.error || null });
-        });
+        // validIds.forEach((cameraId) => {
+          // const state = getRoomCameraState(cameraId);
+          // if (state?.frame) sendFrame(socket, cameraId, { ts: state.ts }, state.frame);
+          // sendStatus(socket, cameraId, { ts: state?.ts || null, error: state?.error || null });
+        // });
         cb({ ok: true, subscribed: validIds });
       } catch (err) {
         logger.warn('Room camera subscribe failed', { socketId: socket.id, err: err.message });
