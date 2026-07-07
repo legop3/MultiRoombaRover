@@ -15,6 +15,8 @@ install_debian_laptop_deps() {
 		&& command -v curl >/dev/null 2>&1 \
 		&& command -v xz >/dev/null 2>&1 \
 		&& command -v unzip >/dev/null 2>&1 \
+		&& ldconfig -p 2>/dev/null | grep -q 'libgcc_s\.so\.1' \
+		&& ldconfig -p 2>/dev/null | grep -q 'libstdc\+\+\.so\.6' \
 		&& ldconfig -p 2>/dev/null | grep -q 'libc++\.so\.1' \
 		&& ldconfig -p 2>/dev/null | grep -q 'libc++abi\.so\.1'; then
 		log "Debian laptop media/audio/TTS dependencies already installed; skipping apt install"
@@ -24,9 +26,9 @@ install_debian_laptop_deps() {
 	log "Installing Debian laptop rover dependencies (ffmpeg, ALSA tools, V4L2 tools, flite/espeak, Chrome TTS runtime deps)..."
 	apt-get update
 	apt-get install -y --no-install-recommends \
-		ffmpeg alsa-utils v4l-utils ca-certificates flite espeak python3 curl xz-utils unzip libasound2-plugins libc++1 libc++abi1 \
+		ffmpeg alsa-utils v4l-utils ca-certificates flite espeak python3 curl xz-utils unzip libasound2-plugins libgcc-s1 libstdc++6 libc++1 libc++abi1 \
 		|| apt-get install -y --no-install-recommends \
-			ffmpeg alsa-utils v4l-utils ca-certificates flite espeak python3 curl xz-utils unzip libasound2-plugins libc++1-14 libc++abi1-14
+			ffmpeg alsa-utils v4l-utils ca-certificates flite espeak python3 curl xz-utils unzip libasound2-plugins libgcc-s1 libstdc++6 libc++1-14 libc++abi1-14
 }
 
 disable_debian_laptop_desktop_audio_stack() {
