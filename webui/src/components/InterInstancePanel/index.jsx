@@ -31,8 +31,8 @@ function getRemoteAvailability(remote) {
   if (!remote?.online) return { blocked: true, label: 'Offline', overlay: 'This server is offline', tone: 'red' };
   if (mode === 'lockdown') return { blocked: true, label: 'Lockdown', overlay: 'This server is in lockdown', tone: 'red' };
   if (mode === 'admin') return { blocked: true, label: 'Admin only', overlay: 'This server is admin only', tone: 'red' };
-  if (mode === 'turns') return { blocked: false, label: 'Turns', tone: 'emerald' };
-  if (mode === 'open') return { blocked: false, label: 'Open', tone: 'emerald' };
+  if (mode === 'turns') return { blocked: false, label: 'Turns mode (open)', tone: 'emerald' };
+  if (mode === 'open') return { blocked: false, label: 'Open mode', tone: 'emerald' };
   return { blocked: false, label: mode, tone: 'slate' };
 }
 
@@ -72,7 +72,6 @@ function InstancePanel({ remote, children = null }) {
   const features = featureEntries(instance.features);
   const color = instance.color || '#64748b';
   const online = Boolean(remote?.online);
-  const publicUrl = instance.publicUrl || remote?.url || '';
   return (
     <CardFrame
       title={instance.name || remote.url || 'External server'}
@@ -89,16 +88,10 @@ function InstancePanel({ remote, children = null }) {
           quiet metadata because it is useful detail, not the primary decision.
         */}
         <div className="flex flex-wrap items-center justify-center gap-1 text-center">
-          <InstanceStatus remote={remote} />
           {online && instance.description ? <p className="min-w-0 text-slate-200">{instance.description}</p> : null}
         </div>
-
-        <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 sm:flex-row sm:gap-2">
-          {publicUrl ? (
-            <span className="max-w-full truncate text-slate-400" title={publicUrl}>
-              {publicUrl}
-            </span>
-          ) : null}
+        <div className="flex flex-wrap items-center justify-center gap-1 text-center">
+          <InstanceStatus remote={remote} />
           <button type="button" className="button-dark" onClick={() => openExternalRoverWithPrompt(remote, '')}>
             Visit server
           </button>
