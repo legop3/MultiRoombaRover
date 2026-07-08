@@ -1,5 +1,5 @@
 1. improve spectator page, options on what to see and what not to see
-2. synthesize wheel speed sensors based on encoder readings server side, add them to json sensor data, show them in topdown
+2. assign rovers based on battery percentage, give people highest one
 3. add more background gap themes
 4.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
