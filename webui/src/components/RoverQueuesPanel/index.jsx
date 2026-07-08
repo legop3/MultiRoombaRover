@@ -7,9 +7,10 @@ import { useSharedClock } from '../../hooks/useSharedClock.js';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverLabel from '../RoverLabel/index.jsx';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
-import { openExternalRoverWithPrompt } from '../../lib/interInstanceTransfer.js';
+import { openExternalRover } from '../../lib/interInstanceTransfer.js';
 import { ExternalInstancesCompact } from '../InterInstancePanel/index.jsx';
 import { isFeatureEnabled } from '../../lib/features.js';
+import { useSettingsNamespace } from '../../settings/index.js';
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -62,6 +63,7 @@ export default function RoverQueuesPanel({
   const localTurnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const localUsers = useSessionSelector((state) => state.session?.users ?? []);
   const interInstanceEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'interInstance'));
+  const { value: pageSettings } = useSettingsNamespace('page', { interInstanceTransferSettings: true });
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const assignedRoverId = useSessionSelector((state) => String(state.session?.assignment?.roverId || '').trim());
   const assignedRoverName = useSessionSelector((state) => {
@@ -75,6 +77,7 @@ export default function RoverQueuesPanel({
   const [rebootPending, setRebootPending] = useState(false);
   const externalMode = Boolean(externalInstance);
   const externalBlocked = Boolean(externalMode && disabledOverlay);
+  const includeInterInstanceSettings = pageSettings?.interInstanceTransferSettings !== false;
   const roster = Array.isArray(rosterOverride) ? rosterOverride : localRoster;
   const turnQueues = turnQueuesOverride && typeof turnQueuesOverride === 'object' ? turnQueuesOverride : localTurnQueues;
   const users = Array.isArray(usersOverride) ? usersOverride : localUsers;
@@ -113,9 +116,10 @@ export default function RoverQueuesPanel({
       /*
         External queue cards deliberately reuse the local row layout, but their
         action cannot go through this Socket.IO server. The row opens the remote
-        instance, optionally carrying settings after the source-page prompt.
+        instance and follows the saved Page setting for cookie/settings transfer
+        instead of interrupting each click with a confirmation popup.
       */
-      openExternalRoverWithPrompt(externalInstance, targetRoverId);
+      openExternalRover(externalInstance, targetRoverId, { includeSettings: includeInterInstanceSettings });
       return;
     }
     setPending((prev) => ({ ...prev, [targetRoverId]: true }));

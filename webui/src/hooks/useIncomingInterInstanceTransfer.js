@@ -25,9 +25,9 @@ export default function useIncomingInterInstanceTransfer() {
     }
     try {
       /*
-        The source page already asked before adding settingsTransfer. A present
-        transfer param is therefore an explicit instruction to replace the local
-        settings cookie without asking again on the destination server.
+        The source page only adds settingsTransfer when its saved Page setting
+        allows it. A present transfer param is therefore an explicit instruction
+        to replace the local settings cookie without asking again here.
       */
       const nextSettings = base64UrlDecodeJson(transfer);
       settings.saveAll(nextSettings && typeof nextSettings === 'object' ? nextSettings : {});

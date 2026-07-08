@@ -17,6 +17,8 @@ export const DEFAULT_OVERCURRENT_LIMITS = {
   outputRateMs: 250,
 };
 
+const RECOVERED_CAP_THRESHOLD = 0.999;
+
 function createInitialCaps() {
   return OVERCURRENT_GROUPS.reduce((acc, group) => {
     acc[group.key] = { cap: 1, clearSec: 0 };
@@ -54,7 +56,17 @@ export function useOvercurrentLimiter(roverId, options = {}) {
     [overcurrentFlags],
   );
   const needsRecoveryTick = useMemo(
-    () => Object.values(caps || {}).some((entry) => (Number.isFinite(entry?.cap) ? entry.cap : 1) < 0.999),
+    () =>
+      Object.values(caps || {}).some((entry) => {
+        /*
+          Recovery intentionally completes at a tiny tolerance below exactly 1.
+          The limiter advances in timed floating-point steps, so requiring an
+          exact 1 can strand the UI at a visually empty bar while the limiter is
+          still technically active at a value like 0.9992.
+        */
+        const cap = Number.isFinite(entry?.cap) ? entry.cap : 1;
+        return cap < RECOVERED_CAP_THRESHOLD;
+      }),
     [caps],
   );
   const shouldTick = Boolean(roverId) && (hasAnyOvercurrent || needsRecoveryTick);
@@ -81,9 +93,15 @@ export function useOvercurrentLimiter(roverId, options = {}) {
           const over = group.motors.some((motor) => Boolean(flagsRef.current?.[motor]));
           const nextClear = over ? 0 : prevClear + deltaSec;
           const allowRecover = !over && nextClear >= releaseDelay;
-          const nextCap = clampUnit(
+          const rawNextCap = clampUnit(
             over ? prevCap - downRate * deltaSec : allowRecover ? prevCap + upRate * deltaSec : prevCap,
           );
+          /*
+            Once recovery reaches the shared completion threshold, snap the cap
+            to exactly full strength. This keeps the tick loop, command scaling,
+            and HUD visibility from disagreeing over a harmless fractional tail.
+          */
+          const nextCap = !over && rawNextCap >= RECOVERED_CAP_THRESHOLD ? 1 : rawNextCap;
           if (Math.abs(nextCap - prevCap) > 0.0001 || Math.abs(nextClear - prevClear) > 0.0001) {
             changed = true;
           }
@@ -137,7 +155,17 @@ export function useOvercurrentLimiter(roverId, options = {}) {
       caps,
       overcurrent,
       scales,
-      isActive: (scales?.drive?.left ?? 1) < 1 || (scales?.drive?.right ?? 1) < 1 || (scales?.aux?.main ?? 1) < 1 || (scales?.aux?.side ?? 1) < 1,
+      /*
+        HUD and resend behavior should only remain active while the limiter has
+        meaningful scale left to recover. Using the same threshold as the tick
+        loop prevents an empty overcurrent overlay from staying mounted after
+        recovery has already stopped.
+      */
+      isActive:
+        (scales?.drive?.left ?? 1) < RECOVERED_CAP_THRESHOLD ||
+        (scales?.drive?.right ?? 1) < RECOVERED_CAP_THRESHOLD ||
+        (scales?.aux?.main ?? 1) < RECOVERED_CAP_THRESHOLD ||
+        (scales?.aux?.side ?? 1) < RECOVERED_CAP_THRESHOLD,
       config,
       adminImmune,
     }),

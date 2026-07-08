@@ -91,6 +91,18 @@ function RangeSetting({ label, value, disabled = false, onChange }) {
   );
 }
 
+function reconnectSocketWithTransport(socket, transport) {
+  if (!socket?.io?.opts) return;
+  /*
+    Socket.IO reads its manager options when reconnecting. Keep this mutation in
+    one helper instead of inside the component body so the settings handler only
+    expresses the user-facing action: save preference, then reconnect.
+  */
+  socket.io.opts.transports = transport === 'polling' ? ['polling'] : ['websocket', 'polling'];
+  socket.disconnect();
+  socket.connect();
+}
+
 export default function SettingsPanel() {
   const keymap = useControlSelector((control) => control.state.keymap);
   const roverId = useControlSelector((control) => control.state.roverId);
@@ -103,6 +115,7 @@ export default function SettingsPanel() {
     connectionTransport: 'websocket',
     swapMobileControlColumns: false,
     driveMacroBackoffEnabled: true,
+    interInstanceTransferSettings: true,
   });
   const { value: audioSettings, save: saveAudioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const { value: videoSettings, save: saveVideoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
@@ -112,6 +125,7 @@ export default function SettingsPanel() {
     typeof pageSettings?.driveMacroBackoffEnabled === 'boolean'
       ? pageSettings.driveMacroBackoffEnabled
       : true;
+  const interInstanceTransferSettings = pageSettings?.interInstanceTransferSettings !== false;
   const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
   const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
   const roverVolume = Number.isFinite(audioSettings?.roverVolume) ? audioSettings.roverVolume : AUDIO_SETTINGS_DEFAULTS.roverVolume;
@@ -144,10 +158,7 @@ export default function SettingsPanel() {
     const next = event.target.value;
     savePageSettings((current) => ({ ...(current ?? {}), connectionTransport: next }));
     trackAnalyticsEvent('settings_change', { setting: 'connection_transport', value: next });
-    if (!socket?.io?.opts) return;
-    socket.io.opts.transports = next === 'polling' ? ['polling'] : ['websocket', 'polling'];
-    socket.disconnect();
-    socket.connect();
+    reconnectSocketWithTransport(socket, next);
   };
 
   const handleAudioRange = (key) => (event) => {
@@ -178,6 +189,17 @@ export default function SettingsPanel() {
     const checked = Boolean(event.target.checked);
     savePageSettings((current) => ({ ...(current ?? {}), driveMacroBackoffEnabled: checked }));
     trackAnalyticsEvent('settings_change', { setting: 'driveMacroBackoffEnabled', value: checked });
+  };
+
+  const handleInterInstanceTransferSettings = (event) => {
+    const checked = Boolean(event.target.checked);
+    /*
+      This replaces the old per-click transfer confirmation. Keeping the choice
+      in Page settings makes external-server navigation immediate while still
+      letting users opt out of sending their current settings cookie.
+    */
+    savePageSettings((current) => ({ ...(current ?? {}), interInstanceTransferSettings: checked }));
+    trackAnalyticsEvent('settings_change', { setting: 'interInstanceTransferSettings', value: checked });
   };
 
   const handleVideoFilterChange = (event) => {
@@ -328,6 +350,20 @@ export default function SettingsPanel() {
                 </select>
               </SettingRow>
               <SettingHelp>Switching reconnects your session.</SettingHelp>
+            </CardFrame>
+            <CardFrame title="Inter-instance" bodyClassName="space-y-1 p-1 text-sm">
+              <SettingRow className="grid-cols-[auto_minmax(0,1fr)] max-[420px]:grid-cols-[auto_minmax(0,1fr)]">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-emerald-500"
+                  checked={interInstanceTransferSettings}
+                  onChange={handleInterInstanceTransferSettings}
+                />
+                <span className="font-semibold text-white">Transfer settings when opening external servers</span>
+              </SettingRow>
+              <SettingHelp>
+                Sends this browser's saved identity and page settings to the destination server automatically.
+              </SettingHelp>
             </CardFrame>
           </div>
         </TabPanel>

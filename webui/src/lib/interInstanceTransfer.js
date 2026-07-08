@@ -1,5 +1,5 @@
 // Inter-Instance Transfer Helpers
-// Purpose: Builds cross-server links and moves the local settings cookie only when the user opts in before leaving.
+// Purpose: Builds cross-server links and optionally carries the local settings cookie when page settings allow it.
 // Scope: Keeps URL encoding and settings-transfer behavior out of the rover queue rendering code.
 import { loadSettings } from '../settings/persistence.js';
 
@@ -27,8 +27,9 @@ export function buildExternalRoverUrl(instance, roverId, { includeSettings = fal
   const url = new URL(publicUrl);
   if (roverId) url.searchParams.set('rover', String(roverId));
   /*
-    The destination always applies settingsTransfer if present, so this helper
-    only adds it after the current page has already asked for consent.
+    The destination always applies settingsTransfer if present. Whether this
+    source page includes the payload is controlled by the persistent Page
+    settings toggle, so cross-server navigation does not need a per-click popup.
   */
   if (includeSettings) {
     url.searchParams.set('settingsTransfer', base64UrlEncodeJson(loadSettings()));
@@ -36,13 +37,8 @@ export function buildExternalRoverUrl(instance, roverId, { includeSettings = fal
   return url.toString();
 }
 
-export function openExternalRoverWithPrompt(instance, roverId) {
-  const withoutTransfer = buildExternalRoverUrl(instance, roverId);
-  if (!withoutTransfer) return;
-  const instanceName = String(instance?.instance?.name || instance?.url || 'that server');
-  const includeSettings = window.confirm(
-    `Transfer your identity and settings to ${instanceName}? Press Cancel to open without transferring them.`,
-  );
+export function openExternalRover(instance, roverId, { includeSettings = true } = {}) {
   const targetUrl = buildExternalRoverUrl(instance, roverId, { includeSettings });
-  window.location.href = targetUrl || withoutTransfer;
+  if (!targetUrl) return;
+  window.location.href = targetUrl;
 }

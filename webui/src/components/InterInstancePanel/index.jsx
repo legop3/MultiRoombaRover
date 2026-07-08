@@ -5,8 +5,9 @@ import { useMemo, useState } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverQueuesPanel from '../RoverQueuesPanel/index.jsx';
-import { openExternalRoverWithPrompt } from '../../lib/interInstanceTransfer.js';
+import { openExternalRover } from '../../lib/interInstanceTransfer.js';
 import { isFeatureEnabled } from '../../lib/features.js';
+import { useSettingsNamespace } from '../../settings/index.js';
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -72,6 +73,8 @@ function InstancePanel({ remote, children = null }) {
   const features = featureEntries(instance.features);
   const color = instance.color || '#64748b';
   const online = Boolean(remote?.online);
+  const { value: pageSettings } = useSettingsNamespace('page', { interInstanceTransferSettings: true });
+  const includeSettings = pageSettings?.interInstanceTransferSettings !== false;
   return (
     <CardFrame
       title={instance.name || remote.url || 'External server'}
@@ -92,7 +95,11 @@ function InstancePanel({ remote, children = null }) {
         </div>
         <div className="flex flex-wrap items-center justify-center gap-1 text-center">
           <InstanceStatus remote={remote} />
-          <button type="button" className="button-dark" onClick={() => openExternalRoverWithPrompt(remote, '')}>
+          <button
+            type="button"
+            className="button-dark"
+            onClick={() => openExternalRover(remote, '', { includeSettings })}
+          >
             Visit server
           </button>
         </div>
