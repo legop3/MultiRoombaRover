@@ -11,7 +11,10 @@
   - if you are a spectator, you can see the snapshots for it
     - local spectators should get full video like they already do now though
 - the camera needs to be a replay source
+- camera video needs to go through the same pipeline as rover video does and get to the client over webRTC
 
+## camera learnings
+- scan for all onvif features that the camera has
 
 ## UI flow:
 - whole UI should be very technical and utilitarian
@@ -24,13 +27,16 @@
   - a big button to open the camera controller
 - the fullscreen camera interface
   - the rest of the site needs to go away when this is open
+  - when its open, it takes over your rover controls. whatever they are
+    - easy route for this could be to intercept it right before the control goes to the server, so any control gets converted to a ptz control
   - desktop
-    - takes over rover controls
-      - movement controls pan and tilt
-      - camera up / down controls zoom
-      - headlight and laser buttons hopefully control spotlight and IR light or something
+    - movement controls pan and tilt
+    - camera up / down controls zoom
+    - headlight and laser buttons hopefully control spotlight and IR light or something
     - fullscreen inteface
     - right sidebar with info and controls info
   - mobile
     - uhhh idk
-    - 
+    - obviously, camera on the screen
+    - probably add a variant of the mobile controls just to retitle the things from the rover controls to the camera controls
+    - and just use the same control columns
