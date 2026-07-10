@@ -3,7 +3,10 @@
 // Scope: Supports list and remove subcommands.
 const { mask, resolveIdentitySelector } = require('./resolvers');
 
-function createVerifyCommand({ listVerifiedUsers, removeVerifiedUser, isLockdownAdminUser, sanitizeMentions }) {
+function createVerifyCommand({ listVerifiedUsers, removeVerifiedUser, isLockdownAdminUser, sanitizeMentions, discordConfig }) {
+  // Verification usage text follows the configured prefix for the same reason
+  // as the command router: each bot instance needs its own command namespace.
+  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
   return async function handleVerifyCommand(message, tokens) {
     if (!isLockdownAdminUser(message.author?.id)) {
       await message.reply({ content: 'Only lockdown admins can manage verified users.', allowedMentions: { parse: [], repliedUser: false } });
@@ -18,7 +21,7 @@ function createVerifyCommand({ listVerifiedUsers, removeVerifiedUser, isLockdown
     }
     if (action === 'remove') {
       const selector = tokens.join(' ').trim();
-      if (!selector) return message.reply({ content: 'Usage: `rs verify remove <cookieUserId|nickname>`', allowedMentions: { parse: [], repliedUser: false } });
+      if (!selector) return message.reply({ content: `Usage: \`${commandPrefix} verify remove <cookieUserId|nickname>\``, allowedMentions: { parse: [], repliedUser: false } });
       try {
         const resolved = resolveIdentitySelector(selector, listVerifiedUsers(), { includeId: false });
         if (resolved.error) return message.reply({ content: sanitizeMentions(resolved.error), allowedMentions: { parse: [], repliedUser: false } });
@@ -32,7 +35,7 @@ function createVerifyCommand({ listVerifiedUsers, removeVerifiedUser, isLockdown
         return message.reply({ content: sanitizeMentions(`Failed to remove verified user: ${err.message}`), allowedMentions: { parse: [], repliedUser: false } });
       }
     }
-    return message.reply({ content: 'Unknown verify command. Use `rs verify list` or `rs verify remove <cookieUserId|nickname>`.', allowedMentions: { parse: [], repliedUser: false } });
+    return message.reply({ content: `Unknown verify command. Use \`${commandPrefix} verify list\` or \`${commandPrefix} verify remove <cookieUserId|nickname>\`.`, allowedMentions: { parse: [], repliedUser: false } });
   };
 }
 

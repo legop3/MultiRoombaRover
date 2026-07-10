@@ -54,6 +54,15 @@ const { createIntegrations } = require('./integrations');
 const config = loadConfig();
 const discordConfig = config.discord || {};
 const enabled = Boolean(discordConfig.token);
+// These normalized command names mirror the command router. Bridge-channel
+// command replies are mirrored into web chat, so this entrypoint needs to know
+// the configured command names before it wraps message.reply.
+const commandPrefix = String(discordConfig.commandPrefix || 'rs').trim() || 'rs';
+const timeStatusCommand = discordConfig.timeStatusCommand === null
+  ? ''
+  : String(discordConfig.timeStatusCommand || 'ts').trim();
+const normalizedCommandPrefix = commandPrefix.toLowerCase();
+const normalizedTimeStatusCommand = timeStatusCommand.toLowerCase();
 const adminIds = new Set((config.admins || []).map((a) => String(a.discord_id || '').trim()).filter(Boolean));
 const lockdownAdminIds = new Set((config.admins || []).filter((admin) => admin.lockdown).map((admin) => String(admin.discord_id || '').trim()).filter(Boolean));
 
@@ -201,7 +210,15 @@ const integrationHandlers = integrations.register();
 
 function isTextCommand(content) {
   const clean = String(content || '').trim();
-  return clean.toLowerCase() === 'ts' || /^rs(?:\s|$)/i.test(clean);
+  const lower = clean.toLowerCase();
+  if (normalizedTimeStatusCommand && lower === normalizedTimeStatusCommand) return true;
+  if (!lower.startsWith(normalizedCommandPrefix)) return false;
+
+  const nextCharacter = clean.charAt(commandPrefix.length);
+  // Mirrored bridge commands must use the exact same whole-token prefix rule
+  // as the command router. If this check is looser than the router, normal
+  // bridge chat can be wrapped as a command reply even though no command runs.
+  return !nextCharacter || /\s/.test(nextCharacter);
 }
 
 function isBridgeChannelMessage(message) {

@@ -1,5 +1,5 @@
 // Discord Mode Command
-// Purpose: Handles `rs mode` updates from Discord admins.
+// Purpose: Handles mode updates from Discord admins through the configured bot prefix.
 // Scope: Validates mode values and applies mode changes with optional reason text.
 function createModeCommand({ MODES, setMode, setAdminReason, isLockdownAdminUser, sanitizeMentions }) {
   return async function handleModeCommand(message, tokens = []) {

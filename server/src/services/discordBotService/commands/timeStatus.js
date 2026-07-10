@@ -1,5 +1,5 @@
 // Discord Time Status Command
-// Purpose: Handles `ts` command to show timezone snapshots.
+// Purpose: Handles the configured time-status shortcut to show timezone snapshots.
 // Scope: Builds a concise time embed for common zones and server local zone.
 const { EmbedBuilder } = require('discord.js');
 

@@ -145,11 +145,19 @@ discord:
   token: "DISCORD_BOT_TOKEN"
   guildId: "123456789012345678" # optional; bot works in any guild it's invited to
   siteUrl: "https://rover.example.com"
+  # Give each bot instance a unique command prefix when several rover servers
+  # share one Discord server. Commands are matched as whole tokens, so "rs"
+  # handles "rs status" but ignores normal words like "rsvp".
+  commandPrefix: "rs"
+  # Set this to null to disable the bare time-status shortcut. It is separate
+  # from commandPrefix because the legacy command is just "ts", and multiple
+  # bots in the same Discord server should not all answer the same bare word.
+  timeStatusCommand: "ts"
   channels:
     general: "123456789012345678"
     announcements: "123456789012345678"
     adminAlerts: "123456789012345678"
-    # chat bridge is configured per guild via `rs bridge` commands
+    # chat bridge is configured per guild via `<commandPrefix> bridge` commands
     replay: "123456789012345678"
     humanAlerts: "123456789012345678"
   roles:

@@ -4,7 +4,8 @@
 4. add config to disable client snapshot forcing, disable bandwidth saving
 5. add admin ui for VIP and private requests instead of only through discord
 6. make discord bots that can be fine with multiple in one server
-7. add more background gap themes
+7. pull page / tab title from session, use the name from profile of interinstance if enabled, if not just default to old one
+8. add more background gap themes
 8.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });

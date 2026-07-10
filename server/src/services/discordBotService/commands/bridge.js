@@ -3,7 +3,10 @@
 // Scope: Manages bridge channel, mode, and webhook provisioning.
 const { PermissionsBitField } = require('discord.js');
 
-function createBridgeCommand({ getGuildConfig, setGuildConfig, removeGuildConfig, normalizeMode, VALID_MODES, isAdminUser }) {
+function createBridgeCommand({ getGuildConfig, setGuildConfig, removeGuildConfig, normalizeMode, VALID_MODES, isAdminUser, discordConfig }) {
+  // Error text should name the active prefix because bridge setup is one of the
+  // first commands an admin runs when a bot instance joins a shared Discord.
+  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
   function canManageBridge(message) {
     if (isAdminUser(message.author.id)) return true;
     if (!message.guild || !message.member) return false;
@@ -45,7 +48,7 @@ function createBridgeCommand({ getGuildConfig, setGuildConfig, removeGuildConfig
 
     // Every command below this point mutates the guild bridge configuration.
     // Keeping the authorization check in one shared gate prevents destructive
-    // actions, especially `rs bridge off`, from accidentally bypassing the same
+    // actions, especially bridge disable, from accidentally bypassing the same
     // Manage Server/admin requirement used by `here` and `mode`.
     if (!canManageBridge(message)) return message.reply({ content: 'You need Manage Server permissions to change the chat bridge.', allowedMentions: { parse: [], repliedUser: false } });
 
@@ -64,14 +67,14 @@ function createBridgeCommand({ getGuildConfig, setGuildConfig, removeGuildConfig
 
     if (action === 'mode') {
       const current = getGuildConfig(guildId);
-      if (!current?.channelId) return message.reply({ content: 'No chat bridge channel set. Use `rs bridge here <global|private>` first.', allowedMentions: { parse: [], repliedUser: false } });
+      if (!current?.channelId) return message.reply({ content: `No chat bridge channel set. Use \`${commandPrefix} bridge here <global|private>\` first.`, allowedMentions: { parse: [], repliedUser: false } });
       const nextMode = normalizeMode(mode, null);
       if (!VALID_MODES.has(nextMode)) return message.reply({ content: 'Invalid mode. Use `global` or `private`.', allowedMentions: { parse: [], repliedUser: false } });
       const entry = setGuildConfig(guildId, { channelId: current.channelId, mode: nextMode, webhookId: current.webhookId, webhookToken: current.webhookToken });
       return message.reply({ content: `Chat bridge mode updated to **${entry.mode}** in <#${entry.channelId}>.`, allowedMentions: { parse: [], repliedUser: false } });
     }
 
-    return message.reply({ content: 'Unknown bridge command. Try `rs bridge`.', allowedMentions: { parse: [], repliedUser: false } });
+    return message.reply({ content: `Unknown bridge command. Try \`${commandPrefix} bridge\`.`, allowedMentions: { parse: [], repliedUser: false } });
   };
 }
 

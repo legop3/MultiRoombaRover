@@ -3,7 +3,11 @@
 // Scope: Supports list, ban, and unban subcommands.
 const { mask, resolveIdentitySelector } = require('./resolvers');
 
-function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, undeterUser, isLockdownAdminUser, sanitizeMentions }) {
+function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, undeterUser, isLockdownAdminUser, sanitizeMentions, discordConfig }) {
+  // Moderation errors often get copied into Discord chat, so they should show
+  // the configured bot prefix instead of the legacy default when several bots
+  // are present in the same server.
+  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
 
   return async function handleDeterCommand(message, tokens) {
     if (!isLockdownAdminUser(message.author?.id)) {
@@ -19,7 +23,7 @@ function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, u
     }
     if (action === 'ban') {
       const selector = tokens.join(' ').trim();
-      if (!selector) return message.reply({ content: 'Usage: `rs deter ban <cookieUserId|nickname|ip>`', allowedMentions: { parse: [], repliedUser: false } });
+      if (!selector) return message.reply({ content: `Usage: \`${commandPrefix} deter ban <cookieUserId|nickname|ip>\``, allowedMentions: { parse: [], repliedUser: false } });
       try {
         const verifiedMatch = resolveIdentitySelector(selector, listVerifiedUsers(), { includeId: false });
         if (verifiedMatch.error && !/not found/i.test(verifiedMatch.error)) {
@@ -37,7 +41,7 @@ function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, u
     }
     if (action === 'unban') {
       const selector = tokens.join(' ').trim();
-      if (!selector) return message.reply({ content: 'Usage: `rs deter unban <id|cookieUserId|nickname|ip>`', allowedMentions: { parse: [], repliedUser: false } });
+      if (!selector) return message.reply({ content: `Usage: \`${commandPrefix} deter unban <id|cookieUserId|nickname|ip>\``, allowedMentions: { parse: [], repliedUser: false } });
       try {
         const resolved = resolveIdentitySelector(selector, listDeterredUsers(), { includeId: true });
         if (resolved.error) return message.reply({ content: sanitizeMentions(resolved.error), allowedMentions: { parse: [], repliedUser: false } });
@@ -47,7 +51,7 @@ function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, u
         return message.reply({ content: sanitizeMentions(`Failed to remove deterrence: ${err.message}`), allowedMentions: { parse: [], repliedUser: false } });
       }
     }
-    return message.reply({ content: 'Unknown deter command. Use `rs deter list`, `rs deter ban <selector>`, or `rs deter unban <selector>`.', allowedMentions: { parse: [], repliedUser: false } });
+    return message.reply({ content: `Unknown deter command. Use \`${commandPrefix} deter list\`, \`${commandPrefix} deter ban <selector>\`, or \`${commandPrefix} deter unban <selector>\`.`, allowedMentions: { parse: [], repliedUser: false } });
   };
 }
 

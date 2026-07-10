@@ -1,12 +1,15 @@
 // Discord Lock Command
-// Purpose: Handles `rs lock` and `rs unlock` operations for rover availability control.
+// Purpose: Handles lock and unlock operations for rover availability control.
 // Scope: Applies lock state updates for a single rover ID.
 const { resolveRoverSelector } = require('./resolvers');
 
-function createLockCommand({ lockRover, sanitizeMentions, rovers }) {
+function createLockCommand({ lockRover, sanitizeMentions, rovers, discordConfig }) {
+  // Only the user-facing example depends on the prefix. The actual lock logic
+  // still receives the already-parsed rover selector from the shared router.
+  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
   return async function handleLockCommand(message, roverId, locked) {
     if (!roverId) {
-      await message.reply({ content: 'Specify a rover ID. Example: `rs lock alpha`', allowedMentions: { parse: [], repliedUser: false } });
+      await message.reply({ content: `Specify a rover ID. Example: \`${commandPrefix} lock alpha\``, allowedMentions: { parse: [], repliedUser: false } });
       return;
     }
     try {

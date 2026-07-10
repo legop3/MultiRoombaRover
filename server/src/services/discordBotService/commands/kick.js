@@ -21,7 +21,8 @@ function splitSelectorAndReason(rawText) {
     /*
       A pipe delimiter is the escape hatch for multi-word nicknames. Without a
       delimiter the command intentionally treats the first token as the selector
-      so quick admin commands stay short: `rs kick bob being reckless`.
+      so quick admin commands stay short, for example:
+      `<configured-prefix> kick bob being reckless`.
     */
     return {
       selector: normalizeText(text.slice(0, pipeIndex)),
@@ -61,9 +62,9 @@ function buildKickCandidates({ io, roverManager, assignmentService, getNickname 
     .filter(Boolean);
 }
 
-function resolveKickTarget(selector, candidates) {
+function resolveKickTarget(selector, candidates, commandPrefix = 'rs') {
   const query = normalizeSearchText(selector);
-  if (!query) return { error: 'Specify a user to kick. Example: `rs kick nickname reason`' };
+  if (!query) return { error: `Specify a user to kick. Example: \`${commandPrefix} kick nickname reason\`` };
   const exact = candidates.filter((entry) => (
     entry.searchSocketId === query ||
     entry.searchShortSocketId === query ||
@@ -96,7 +97,11 @@ function resolveKickTarget(selector, candidates) {
   return { target: first.item };
 }
 
-function createKickCommand({ io, roverManager, getNickname, sanitizeMentions }) {
+function createKickCommand({ io, roverManager, getNickname, sanitizeMentions, discordConfig }) {
+  // The kick parser itself does not need the prefix, but its validation message
+  // does. Keeping this local avoids passing display-only config through the
+  // lower-level fuzzy target resolver except when an error string is needed.
+  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
   return async function handleKickCommand(message, rawText) {
     const { selector, reason } = splitSelectorAndReason(rawText);
     const assignmentService = require('../../assignmentService');
@@ -106,7 +111,7 @@ function createKickCommand({ io, roverManager, getNickname, sanitizeMentions }) 
       assignmentService,
       getNickname,
     });
-    const resolved = resolveKickTarget(selector, candidates);
+    const resolved = resolveKickTarget(selector, candidates, commandPrefix);
     if (resolved.error) {
       await message.reply({ content: sanitizeMentions(resolved.error), allowedMentions: { parse: [], repliedUser: false } });
       return;

@@ -12,10 +12,15 @@ function describeLightPolicy(lightPolicy = {}) {
   return 'Room lights are unlocked.';
 }
 
-function createLightsCommand({ homeAssistantService, sanitizeMentions }) {
+function createLightsCommand({ homeAssistantService, sanitizeMentions, discordConfig }) {
+  // The HA policy behavior is prefix-agnostic; this value is only used so
+  // invalid-command guidance points admins at this bot instance's namespace.
+  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
   return async function handleLightsCommand(message, tokens = []) {
-    // Defaulting to status makes `rs lights` safe to type while still exposing
-    // the explicit mutating forms as `rs lights lock` and `rs lights unlock`.
+    // Defaulting to status makes the bare lights command safe to type while
+    // still exposing explicit mutating forms under the configured prefix. This
+    // matters when several bot instances share a Discord server and each one
+    // needs its own command namespace.
     const action = String(tokens.shift() || 'status').trim().toLowerCase();
 
     if (!homeAssistantService) {
@@ -36,7 +41,7 @@ function createLightsCommand({ homeAssistantService, sanitizeMentions }) {
 
     if (action !== 'lock' && action !== 'unlock') {
       await message.reply({
-        content: 'Invalid lights command. Use `rs lights lock`, `rs lights unlock`, or `rs lights status`.',
+        content: `Invalid lights command. Use \`${commandPrefix} lights lock\`, \`${commandPrefix} lights unlock\`, or \`${commandPrefix} lights status\`.`,
         allowedMentions: { parse: [], repliedUser: false },
       });
       return;

@@ -22,6 +22,21 @@ function createCommandHandlers(deps) {
     isAdminUser,
     isLockdownAdminUser,
   } = deps;
+  // Each running rover server can bring its own Discord bot into the same
+  // guild, so the primary command prefix must come from config instead of
+  // being hard-coded globally. The fallback preserves existing installs.
+  const commandPrefix = String(deps.discordConfig?.commandPrefix || 'rs').trim() || 'rs';
+  // The legacy time command is a bare word rather than a prefixed command. It
+  // therefore needs its own configurable value, and `null` intentionally
+  // disables it so multiple bots do not all answer `ts` in the same channel.
+  const timeStatusCommand = deps.discordConfig?.timeStatusCommand === null
+    ? ''
+    : String(deps.discordConfig?.timeStatusCommand || 'ts').trim();
+  // Lowercase cached copies avoid re-normalizing every message and keep command
+  // matching case-insensitive without changing the original configured text
+  // that is shown in help output.
+  const normalizedCommandPrefix = commandPrefix.toLowerCase();
+  const normalizedTimeStatusCommand = timeStatusCommand.toLowerCase();
 
   const handleStatusCommand = createStatusCommand(deps);
   const handleReplayCommand = deps.createReplayTextCommand
@@ -38,6 +53,20 @@ function createCommandHandlers(deps) {
   const handleLightsCommand = createLightsCommand(deps);
   const handleKickCommand = createKickCommand(deps);
 
+  function stripCommandPrefix(content) {
+    const trimmed = String(content || '').trim();
+    const lower = trimmed.toLowerCase();
+    if (!lower.startsWith(normalizedCommandPrefix)) return null;
+
+    const nextCharacter = trimmed.charAt(commandPrefix.length);
+    // Prefixes are matched as whole command tokens so an instance using `rs`
+    // still ignores ordinary words such as `rsvp`. This mirrors the old regex
+    // behavior while letting each Discord bot instance use its own prefix.
+    if (nextCharacter && !/\s/.test(nextCharacter)) return null;
+
+    return trimmed.slice(commandPrefix.length).trim();
+  }
+
   async function handleCommand(message) {
     if (message.author.bot) return;
     const content = (message.content || '').trim();
@@ -46,11 +75,12 @@ function createCommandHandlers(deps) {
     // startsWith checks made ordinary messages such as "rsvp" or "tshirt" look
     // like commands, which is especially bad now that web chat will run the
     // same server-side dispatcher before broadcasting user text.
-    if (lower === 'ts') return handleTimeStatusCommand(message);
-    if (!/^rs(?:\s|$)/i.test(content)) return;
+    if (normalizedTimeStatusCommand && lower === normalizedTimeStatusCommand) return handleTimeStatusCommand(message);
 
-    const tokens = content.split(/\s+/);
-    tokens.shift();
+    const commandBody = stripCommandPrefix(content);
+    if (commandBody === null) return;
+
+    const tokens = commandBody ? commandBody.split(/\s+/) : [];
     const action = (tokens.shift() || '').toLowerCase();
     const rest = tokens.join(' ').trim();
     const isAdmin = isAdminUser(message.author.id);
@@ -77,7 +107,7 @@ function createCommandHandlers(deps) {
       case 'status':
         return handleStatusCommand(message, rest);
       case 'help':
-        return message.reply(formatHelp());
+        return message.reply(formatHelp({ commandPrefix, timeStatusCommand }));
       case 'replay':
         return handleReplayCommand(message, tokens.join(' '));
       case 'bridge':
@@ -101,7 +131,7 @@ function createCommandHandlers(deps) {
       case 'deter':
         return handleDeterCommand(message, tokens);
       default:
-        return message.reply(formatHelp());
+        return message.reply(formatHelp({ commandPrefix, timeStatusCommand }));
     }
   }
 
