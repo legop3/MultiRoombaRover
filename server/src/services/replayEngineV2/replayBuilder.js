@@ -75,6 +75,33 @@ function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo
     await execFileAsync(FFMPEG_BIN, ['-y','-hide_banner','-loglevel','error','-f','concat','-safe','0','-i',listPath,'-c','copy',outPath]);
   }
 
+  async function pinSegmentFiles(entries, tmpDir, prefix) {
+    /*
+      Replay segment files live in a rolling buffer, so cleanup can unlink one
+      while a slower replay build is still working. Pinning selected files into
+      the per-build temp directory gives ffmpeg stable paths for the whole build.
+      A hard link is preferred because it is cheap and keeps the inode alive even
+      when cleanup removes the original directory entry; copyFile is the fallback
+      for filesystems that do not support linking across the involved paths.
+    */
+    const pinned = [];
+    for (let i = 0; i < entries.length; i += 1) {
+      const entry = entries[i];
+      const pinnedPath = path.join(tmpDir, `${prefix}-${String(i).padStart(4, '0')}.mp4`);
+      try {
+        await fsp.link(entry.filePath, pinnedPath);
+      } catch (linkErr) {
+        try {
+          await fsp.copyFile(entry.filePath, pinnedPath);
+        } catch (copyErr) {
+          continue;
+        }
+      }
+      pinned.push({ ...entry, filePath: pinnedPath });
+    }
+    return pinned;
+  }
+
   async function probeMaxFrameSize(paths) {
     let maxWidth = 0, maxHeight = 0;
     for (const filePath of paths) {
@@ -108,7 +135,11 @@ function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo
       for (let i = 0; i < sources.length; i += 1) {
         const source = sources[i];
         const sourceId = String(source.id);
-        const videoEntries = overlapping(getVideoEntriesForSource({ type: String(source.type), id: sourceId }), tStart, tEnd);
+        const videoEntries = await pinSegmentFiles(
+          overlapping(getVideoEntriesForSource({ type: String(source.type), id: sourceId }), tStart, tEnd),
+          tmpDir,
+          `video-${i}-seg`,
+        );
         if (!videoEntries.length) { missingSources.push({ ...source, reason: 'no video coverage in replay window' }); continue; }
 
         const videoConcat = path.join(tmpDir, `video-${i}.mp4`);
@@ -122,7 +153,11 @@ function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo
         normalizedVideos.push({ path: videoTrimmed, source });
         usedSources.push(source);
 
-        const audioEntries = overlapping(getAudioEntriesForSource(source), tStart, tEnd);
+        const audioEntries = await pinSegmentFiles(
+          overlapping(getAudioEntriesForSource(source), tStart, tEnd),
+          tmpDir,
+          `audio-${i}-seg`,
+        );
         if (audioEntries.length) {
           /*
             Audio workers are separate from selected video sources, even for PTZ
