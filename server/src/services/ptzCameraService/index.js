@@ -226,22 +226,52 @@ function startPublisher() {
   const input = addCredentialsToRtsp(state.rtspUri);
   const output = `srt://127.0.0.1:9000?streamid=publish:${encodeURIComponent(PTZ_STREAM_PATH)}`;
   /*
-    MediaMTX should receive the camera feed exactly as the camera provides it.
-    The WHEP 404 issue is a path mismatch, not a codec problem, so this publisher
-    keeps the autotrack stream untouched and lets playback compatibility be
-    handled separately if it actually becomes the blocker.
+    The full-quality autotrack profile is H265, which is the right camera-side
+    feed but has been unreliable through browser WHEP playback. Re-encoding is
+    intentionally kept here, at the single camera publisher boundary, so the
+    rest of the video auth/session/UI code still sees one normal MediaMTX path.
+
+    Audio is dropped for now because the camera sends AAC on this stream and
+    MediaMTX/WHEP clients in this setup negotiate Opus/G711-style audio, not
+    AAC. Keeping only H264 video gives the browser one compatible codec to
+    negotiate instead of letting an unsupported audio track poison playback.
+
+    These encoder settings trade compression efficiency for control latency:
+    ultrafast avoids deep analysis, zerolatency disables x264 buffering, bf=0
+    removes B-frames, and the 20-frame GOP matches the camera's observed 20fps
+    autotrack stream so the browser gets frequent keyframes without forcing a
+    huge bitrate spike.
   */
   const proc = spawn('ffmpeg', [
     '-hide_banner',
     '-loglevel',
     'warning',
     '-nostdin',
+    '-fflags',
+    'nobuffer',
+    '-flags',
+    'low_delay',
     '-rtsp_transport',
     'tcp',
     '-i',
     input,
-    '-c',
-    'copy',
+    '-an',
+    '-c:v',
+    'libx264',
+    '-preset',
+    'ultrafast',
+    '-tune',
+    'zerolatency',
+    '-bf',
+    '0',
+    '-g',
+    '20',
+    '-keyint_min',
+    '20',
+    '-sc_threshold',
+    '0',
+    '-pix_fmt',
+    'yuv420p',
     '-f',
     'mpegts',
     output,
