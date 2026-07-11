@@ -271,7 +271,7 @@ function PtzLightingControls({ ptz, disabled = false }) {
   };
 
   return (
-    <CardFrame title="Lights" bodyClassName="grid grid-cols-2 gap-0.5 p-1 text-sm">
+    <div className="mobile-touch-control grid grid-cols-2 gap-0.5 text-sm">
       <GPIOToggleControl
         label="Spotlight"
         on={spotlightOn}
@@ -288,7 +288,7 @@ function PtzLightingControls({ ptz, disabled = false }) {
         <span className="text-sm font-semibold">Infrared</span>
         <span className="rounded bg-cyan-300 px-1 py-0.5 text-[0.7rem] font-semibold text-cyan-950">{irMode}</span>
       </button>
-    </CardFrame>
+    </div>
   );
 }
 
