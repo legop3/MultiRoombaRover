@@ -29,6 +29,7 @@ const DEFAULT_REPLAY_ENABLED = false;
 const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
 const SNAPSHOT_POLL_MS = 300;
 const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
+const SPOTLIGHT_VERIFY_DELAY_MS = 1200;
 
 const events = new EventEmitter();
 const config = loadConfig();
@@ -59,6 +60,7 @@ let blockedTimer = null;
 let publisherProcess = null;
 let publisherRestartTimer = null;
 let snapshotTimer = null;
+let spotlightVerifyTimer = null;
 let vendorStatePromise = Promise.resolve();
 let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
@@ -107,6 +109,20 @@ function isSpotlightOn(light = {}) {
 function normalizeSpotlightState(light) {
   if (!light || typeof light !== 'object') return light || null;
   return { ...light, on: isSpotlightOn(light) };
+}
+
+function normalizeSpotlightPayloadState(rawState) {
+  /*
+    Socket payloads can arrive as booleans, numbers, or strings depending on
+    which control path produced them. Boolean("0") is true in JavaScript, so do
+    an explicit conversion here before building the Reolink payload.
+  */
+  if (typeof rawState === 'string') {
+    const normalized = rawState.trim().toLowerCase();
+    if (['1', 'on', 'true', 'yes'].includes(normalized)) return true;
+    if (['0', 'off', 'false', 'no'].includes(normalized)) return false;
+  }
+  return Boolean(Number(rawState));
 }
 
 function passesMode(socket) {
@@ -354,6 +370,34 @@ async function refreshVendorState() {
   state.ir = ir?.IrLights || ir || null;
 }
 
+async function refreshSpotlightState() {
+  const client = await ensureReolinkClient();
+  const white = await client.api('GetWhiteLed', { channel: 0 });
+  state.light = normalizeSpotlightState(white?.WhiteLed || white || null);
+  emitChange('light');
+  return state.light;
+}
+
+function scheduleSpotlightVerification() {
+  /*
+    This camera acknowledges SetWhiteLed before GetWhiteLed catches up. A read
+    immediately after a successful write returns the old value for roughly one
+    second, which made the UI appear inverted or flaky. Replace any pending
+    verification with one delayed read so rapid toggles settle on the newest
+    requested state instead of racing stale camera state back into the session.
+  */
+  if (spotlightVerifyTimer) {
+    clearTimeout(spotlightVerifyTimer);
+    spotlightVerifyTimer = null;
+  }
+  spotlightVerifyTimer = setTimeout(() => {
+    spotlightVerifyTimer = null;
+    serializeVendorState(() => refreshSpotlightState()).catch((err) => {
+      logger.warn('spotlight verification failed', { error: err.message });
+    });
+  }, SPOTLIGHT_VERIFY_DELAY_MS);
+}
+
 function serializeVendorState(operation) {
   /*
     The Reolink HTTP API can return stale light state when reads and writes are
@@ -562,27 +606,43 @@ async function setSpotlight(socket, payload = {}) {
   requireOperator(socket);
   return serializeVendorState(async () => {
     const client = await ensureReolinkClient();
-    const current = normalizeSpotlightState((await client.api('GetWhiteLed', { channel: 0 })).WhiteLed || {});
-    const logicalOn = payload.state === undefined ? !current.on : Boolean(payload.state);
-    const next = {
-      ...current,
+    let current = state.light ? normalizeSpotlightState(state.light) : null;
+    if (payload.state === undefined && !current) {
+      /*
+        Toggle requests need a base state. Normal button paths send an explicit
+        state, so this read only happens for rare generic toggle callers or
+        startup races before the initial vendor state has arrived.
+      */
+      current = await refreshSpotlightState();
+    }
+    const logicalOn = payload.state === undefined
+      ? !isSpotlightOn(current || {})
+      : normalizeSpotlightPayloadState(payload.state);
+    const cameraState = spotlightCameraStateForLogicalOn(logicalOn);
+    const cameraPayload = {
       channel: 0,
-      state: spotlightCameraStateForLogicalOn(logicalOn),
+      state: cameraState,
+    };
+    const next = {
+      ...(current || {}),
+      ...cameraPayload,
       on: logicalOn,
     };
     if (Number.isFinite(Number(payload.bright))) {
-      next.bright = Math.max(0, Math.min(100, Number(payload.bright)));
+      const bright = Math.max(0, Math.min(100, Number(payload.bright)));
+      cameraPayload.bright = bright;
+      next.bright = bright;
     }
     /*
-      Update local state optimistically before the refresh. That makes the
-      headlight button feel deterministic while the follow-up read still lets
-      the camera correct anything it refused or normalized.
+      The camera accepts a minimal WhiteLed payload and reports success before
+      GetWhiteLed reflects the new state. Send only the fields we intend to
+      change, then keep the optimistic state until the delayed verification read
+      has a real chance to observe the update.
     */
     state.light = next;
     emitChange('light-pending');
-    await client.api('SetWhiteLed', { WhiteLed: next });
-    await refreshVendorState();
-    emitChange('light');
+    await client.api('SetWhiteLed', { WhiteLed: cameraPayload });
+    scheduleSpotlightVerification();
     return state.light;
   });
 }
