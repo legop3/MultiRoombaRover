@@ -134,7 +134,9 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const grouped = useMemo(() => {
     return {
       rovers: sources.filter((source) => source.type === 'rover'),
-      rooms: sources.filter((source) => source.type === 'room'),
+      // PTZ is presented with room cameras because there is only one fixed room
+      // PTZ camera and it should not create a separate source category.
+      rooms: sources.filter((source) => source.type === 'room' || source.type === 'ptz'),
     };
   }, [sources]);
 

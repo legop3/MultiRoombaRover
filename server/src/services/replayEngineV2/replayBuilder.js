@@ -51,7 +51,7 @@ function buildChatEventsForWindow(startMs, endMs, limit = 22, preWindowCount = 1
   return [...beforeWindow, ...inWindow].sort((a, b) => a.ts - b.ts);
 }
 
-function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo, getVideoEntriesForSource, getAudioEntriesForRover, overlapping }) {
+function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo, getVideoEntriesForSource, getAudioEntriesForSource, overlapping }) {
   function resolveReplayWindow({ sources = [], nowMs, guardMs, durationMs }) {
     const tentativeEnd = nowMs - guardMs;
     const sourceEnds = [];
@@ -122,18 +122,22 @@ function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo
         normalizedVideos.push({ path: videoTrimmed, source });
         usedSources.push(source);
 
-        if (source.type === 'rover') {
-          const audioEntries = overlapping(getAudioEntriesForRover(sourceId), tStart, tEnd);
-          if (audioEntries.length) {
-            const audioConcat = path.join(tmpDir, `audio-${i}.m4a`);
-            await concatFiles(audioEntries.map((entry) => entry.filePath), audioConcat);
-            const audioTrimmed = path.join(tmpDir, `audio-${i}.trim.m4a`);
-            const firstAudioStartMs = audioEntries[0].startMs;
-            const ass = Math.max(0, (tStart - firstAudioStartMs) / 1000);
-            const ato = Math.max(ass + 0.1, (tEnd - firstAudioStartMs) / 1000);
-            await execFileAsync(FFMPEG_BIN, ['-y','-hide_banner','-loglevel','error','-ss',ass.toFixed(3),'-to',ato.toFixed(3),'-i',audioConcat,'-vn','-ac','1','-ar','48000','-c:a','aac','-b:a','96k',audioTrimmed]);
-            normalizedAudios.push(audioTrimmed);
-          }
+        const audioEntries = overlapping(getAudioEntriesForSource(source), tStart, tEnd);
+        if (audioEntries.length) {
+          /*
+            Audio workers are separate from selected video sources, even for PTZ
+            where the live camera path carries inline Opus. Trim the matching
+            source-owned audio window here and let the final graph mix every
+            selected source's audio together.
+          */
+          const audioConcat = path.join(tmpDir, `audio-${i}.m4a`);
+          await concatFiles(audioEntries.map((entry) => entry.filePath), audioConcat);
+          const audioTrimmed = path.join(tmpDir, `audio-${i}.trim.m4a`);
+          const firstAudioStartMs = audioEntries[0].startMs;
+          const ass = Math.max(0, (tStart - firstAudioStartMs) / 1000);
+          const ato = Math.max(ass + 0.1, (tEnd - firstAudioStartMs) / 1000);
+          await execFileAsync(FFMPEG_BIN, ['-y','-hide_banner','-loglevel','error','-ss',ass.toFixed(3),'-to',ato.toFixed(3),'-i',audioConcat,'-vn','-ac','1','-ar','48000','-c:a','aac','-b:a','96k',audioTrimmed]);
+          normalizedAudios.push(audioTrimmed);
         }
       }
 

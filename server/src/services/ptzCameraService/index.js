@@ -25,7 +25,9 @@ const DEFAULT_ONVIF_PORT = 8000;
 const DEFAULT_PROFILE_TOKEN = '003';
 const DEFAULT_TURN_DURATION_MS = 5 * 60 * 1000;
 const DOCK_GRACE_MS = 60 * 1000;
-const DEFAULT_REPLAY_ENABLED = false;
+// PTZ is a normal replay source now, so capture should be on unless the feature
+// explicitly disables replay for the camera.
+const DEFAULT_REPLAY_ENABLED = true;
 const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
 const SNAPSHOT_POLL_MS = 300;
 const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
@@ -899,21 +901,36 @@ module.exports = {
   getReplaySource: () => enabled && isReplayEnabled()
     ? { type: 'ptz', id: PTZ_CAMERA_ID, label: cameraConfig.name || 'PTZ Camera' }
     : null,
-  getReplayWorkerSource: () => {
+  getReplayWorkerSources: () => {
     /*
-      PTZ replay capture is optional because the server ffmpeg build must be
-      able to produce browser/Discord-friendly replay segments. The camera live
-      feed can remain raw for MediaMTX while replay capture is left off until
-      the actual server has a working encoder or a copy-only PTZ replay path is
-      intentionally designed.
+      PTZ replay uses two internal workers from the same MediaMTX path. The
+      selectable replay source stays "ptz:ptz-camera", while the segment engine
+      records video and audio separately so replayBuilder can mix PTZ microphone
+      audio the same way it already mixes rover audio.
     */
-    if (!enabled || !isReplayEnabled()) return null;
-    return {
-      id: PTZ_CAMERA_ID,
-      sourceType: 'ptz',
-      kind: 'video',
-      label: cameraConfig.name || 'PTZ Camera',
-      inputUrl: `srt://127.0.0.1:9000?streamid=read:${encodeURIComponent(PTZ_STREAM_PATH)}`,
-    };
+    if (!enabled || !isReplayEnabled()) return [];
+    const inputUrl = `srt://127.0.0.1:9000?streamid=read:${encodeURIComponent(PTZ_STREAM_PATH)}`;
+    const label = cameraConfig.name || 'PTZ Camera';
+    return [
+      {
+        id: PTZ_CAMERA_ID,
+        sourceType: 'ptz',
+        kind: 'video',
+        label,
+        inputUrl,
+      },
+      {
+        id: `${PTZ_CAMERA_ID}-audio`,
+        sourceType: 'ptz',
+        sourceId: PTZ_CAMERA_ID,
+        kind: 'audio',
+        label: `${label} audio`,
+        inputUrl,
+      },
+    ];
+  },
+  getReplayWorkerSource: () => {
+    const [videoSource] = module.exports.getReplayWorkerSources();
+    return videoSource || null;
   },
 };

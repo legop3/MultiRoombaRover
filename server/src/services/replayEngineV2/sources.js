@@ -47,8 +47,10 @@ function listDesiredSources() {
     if (!streamUrl) continue;
     sources.push({ id: String(camera.id), sourceType: 'room', kind: 'video', label: camera.name || camera.id, inputUrl: streamUrl });
   }
-  const ptzSource = ptzCameraService.getReplayWorkerSource();
-  if (ptzSource) sources.push(ptzSource);
+  // The PTZ service owns its own worker list because video and microphone audio
+  // both come from the same live MediaMTX path, unlike rovers where audio is a
+  // separate published stream.
+  sources.push(...ptzCameraService.getReplayWorkerSources());
   return sources;
 }
 

@@ -97,6 +97,24 @@ function createSegmentStore({ getActiveSegmentRoot }) {
     return segmentIndex.get(key) || [];
   }
 
+  function getAudioEntriesForSource(source) {
+    /*
+      Rover audio is published as a separate "<rover>-audio" stream, while PTZ
+      replay audio is split into an internal "ptz-camera-audio" worker from the
+      same live camera stream. Keep this mapping close to the segment index so
+      replayBuilder can ask for "audio that belongs to this selected source"
+      without knowing every worker naming convention.
+    */
+    const type = String(source?.type || '');
+    const id = String(source?.id || '');
+    if (type === 'rover') return getAudioEntriesForRover(id);
+    if (type === 'ptz') {
+      const key = sourceKey({ sourceType: 'ptz', kind: 'audio', id: `${id}-audio` });
+      return segmentIndex.get(key) || [];
+    }
+    return [];
+  }
+
   function overlapping(entries, startMs, endMs) {
     return entries.filter((entry) => entry.endMs > startMs && entry.startMs < endMs);
   }
@@ -157,6 +175,7 @@ function createSegmentStore({ getActiveSegmentRoot }) {
     cleanupOldFiles,
     getVideoEntriesForSource,
     getAudioEntriesForRover,
+    getAudioEntriesForSource,
     overlapping,
     bootstrapIndexFromDisk,
     getReplayHealthSnapshot,

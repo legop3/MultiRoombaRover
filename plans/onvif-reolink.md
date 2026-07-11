@@ -143,3 +143,4 @@ Input/control implementation:
 - client-side input interception is only for UX; server-side operator checks are the real authority
 - all movement controls should send stop commands on key/button release, blur, disconnect, controller close, or turn loss
 
+## NEW UI STUFF
