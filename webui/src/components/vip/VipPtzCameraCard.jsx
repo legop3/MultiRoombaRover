@@ -77,6 +77,22 @@ function StatusRow({ label, value, tone = '' }) {
   );
 }
 
+function formatPublisherProgress(progress = null) {
+  /*
+    ffmpeg progress is intentionally shown as raw operational numbers instead
+    of translated prose. When the PTZ video feels delayed, fps/speed/drop/out
+    time make it obvious whether ffmpeg itself is keeping up or the delay is
+    somewhere before/after the transcoder.
+  */
+  if (!progress) return null;
+  return [
+    progress.fps ? `fps ${progress.fps}` : null,
+    progress.speed ? `speed ${progress.speed}` : null,
+    progress.drop_frames ? `drop ${progress.drop_frames}` : null,
+    progress.out_time ? `out ${progress.out_time}` : null,
+  ].filter(Boolean).join(' | ');
+}
+
 function PtzQueueList({ queue = [], operatorLabel = '' }) {
   const hasQueue = Array.isArray(queue) && queue.length > 0;
   return (
@@ -111,6 +127,7 @@ function PtzStatePanel({ ptz, onClose, onRelease, releaseDisabled = false }) {
     : publisher.restartAt
       ? 'restarting'
       : publisher.lastEvent || 'stopped';
+  const publisherProgress = formatPublisherProgress(publisher.progress);
   const statusTone = ptz?.error ? 'text-amber-300' : ptz?.isOperator ? 'text-emerald-300' : 'text-slate-100';
 
   return (
@@ -126,6 +143,7 @@ function PtzStatePanel({ ptz, onClose, onRelease, releaseDisabled = false }) {
       <StatusRow label="Infrared mode" value={irMode} />
       <StatusRow label="Stream" value={ptz?.status || ptz?.error || 'idle'} tone={ptz?.error ? 'text-amber-300' : ''} />
       <StatusRow label="Transcoder" value={publisherStatus} tone={publisher.running ? 'text-emerald-300' : 'text-amber-300'} />
+      {publisherProgress ? <StatusRow label="Progress" value={publisherProgress} /> : null}
       {publisher.lastStderr ? (
         <div className="surface max-h-24 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[0.68rem] leading-tight text-slate-200">
           {publisher.lastStderr}

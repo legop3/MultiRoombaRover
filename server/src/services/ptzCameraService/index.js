@@ -63,6 +63,7 @@ const state = {
     exitSignal: null,
     exitedAt: null,
     lastStderr: '',
+    progress: null,
     lastEvent: 'idle',
   },
 };
@@ -106,6 +107,65 @@ function updatePublisherState(patch = {}, reason = 'publisher') {
     ...patch,
   };
   emitChange(reason);
+}
+
+function parsePublisherProgressLine(line) {
+  /*
+    ffmpeg's "-progress pipe:2" emits simple key=value telemetry on stderr.
+    Warning lines also arrive on stderr, so keep parsing narrow: only accept the
+    known progress keys and let everything else remain user-visible stderr.
+    This gives the UI enough signal to tell whether the transcoder is actually
+    falling behind without flooding normal server logs.
+  */
+  const match = String(line || '').match(/^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$/);
+  if (!match) return false;
+  const [, key, rawValue] = match;
+  const allowed = new Set([
+    'frame',
+    'fps',
+    'stream_0_0_q',
+    'bitrate',
+    'total_size',
+    'out_time_us',
+    'out_time_ms',
+    'out_time',
+    'dup_frames',
+    'drop_frames',
+    'speed',
+    'progress',
+  ]);
+  if (!allowed.has(key)) return false;
+  state.publisher = {
+    ...(state.publisher || {}),
+    progress: {
+      ...(state.publisher?.progress || {}),
+      [key]: rawValue,
+      updatedAt: Date.now(),
+    },
+    lastEvent: 'progress',
+  };
+  return true;
+}
+
+function handlePublisherStderr(chunk) {
+  const text = String(chunk || '').trim();
+  if (!text) return;
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const warningLines = [];
+
+  lines.forEach((line) => {
+    if (!parsePublisherProgressLine(line)) warningLines.push(line);
+  });
+
+  if (warningLines.length) {
+    state.publisher = {
+      ...(state.publisher || {}),
+      lastStderr: warningLines.join('\n').slice(-1000),
+      lastEvent: 'stderr',
+    };
+  }
+
+  schedulePublisherStateSync(warningLines.length ? 'publisher-stderr' : 'publisher-progress');
 }
 
 function clampUnit(value) {
@@ -322,12 +382,21 @@ function startPublisher() {
     flags caused this camera stream to freeze after running for a while, so the
     safer latency knob is to keep the encoder light and avoid building delay
     inside x264 itself.
+
+    The mpegts muxer can also hold packets briefly before writing them to SRT.
+    flush_packets/muxdelay/muxpreload are output-side latency knobs; they do not
+    ask the camera or demuxer to discard frames, so they are a safer next step
+    than the stale-frame dropping experiments that made the Reolink feed freeze.
   */
   const proc = spawn('ffmpeg', [
     '-hide_banner',
     '-loglevel',
     'warning',
     '-nostdin',
+    '-progress',
+    'pipe:2',
+    '-stats_period',
+    '2',
     '-fflags',
     'nobuffer',
     '-flags',
@@ -374,6 +443,12 @@ function startPublisher() {
     '48000',
     '-strict',
     '-2',
+    '-flush_packets',
+    '1',
+    '-muxdelay',
+    '0',
+    '-muxpreload',
+    '0',
     '-f',
     'mpegts',
     output,
@@ -389,17 +464,7 @@ function startPublisher() {
     exitedAt: null,
     lastEvent: 'started',
   }, 'publisher-start');
-  proc.stderr.on('data', (chunk) => {
-    const text = String(chunk || '').trim();
-    if (!text) return;
-    const lastStderr = text.slice(-1000);
-    state.publisher = {
-      ...(state.publisher || {}),
-      lastStderr,
-      lastEvent: 'stderr',
-    };
-    schedulePublisherStateSync('publisher-stderr');
-  });
+  proc.stderr.on('data', handlePublisherStderr);
   proc.on('exit', (code, signal) => {
     if (publisherProcess === proc) publisherProcess = null;
     logger.warn('publisher exited', { code, signal });

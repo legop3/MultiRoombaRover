@@ -40,6 +40,19 @@ function InfoRow({ label, value, tone = '' }) {
   );
 }
 
+function formatPublisherProgress(progress = null) {
+  /*
+    Keep the spectator card dense, but expose enough ffmpeg progress to tell if
+    the PTZ transcoder is running behind when the live feed looks delayed.
+  */
+  if (!progress) return null;
+  return [
+    progress.fps ? `fps ${progress.fps}` : null,
+    progress.speed ? `speed ${progress.speed}` : null,
+    progress.drop_frames ? `drop ${progress.drop_frames}` : null,
+  ].filter(Boolean).join(' | ');
+}
+
 function PtzSnapshotFallback({ label, source }) {
   const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: true });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
@@ -85,6 +98,7 @@ export default function PtzSpectatorCard() {
     : publisher.restartAt
       ? 'restarting'
       : publisher.lastEvent || 'stopped';
+  const publisherProgress = formatPublisherProgress(publisher.progress);
   const queueCount = Array.isArray(ptz?.queue) ? ptz.queue.length : 0;
   const label = ptz?.name || 'PTZ Camera';
 
@@ -98,6 +112,7 @@ export default function PtzSpectatorCard() {
         <InfoRow label="Spotlight" value={isSpotlightOn(ptz?.light) ? 'On' : 'Off'} />
         <InfoRow label="Infrared" value={normalizeInfraredMode(ptz?.ir?.state)} />
         <InfoRow label="Transcoder" value={publisherStatus} tone={publisher.running ? 'text-emerald-300' : 'text-amber-300'} />
+        {publisherProgress ? <InfoRow label="Progress" value={publisherProgress} /> : null}
         {publisher.lastStderr ? (
           <div className="line-clamp-2 break-words font-mono text-[0.65rem] leading-tight text-slate-400">
             {publisher.lastStderr}
