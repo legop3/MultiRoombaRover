@@ -2,7 +2,6 @@
 // Purpose: Provides the verified-user entry point and fullscreen controller for the single Reolink PTZ camera.
 // Scope: Owns PTZ UI state only; server-side PTZ ownership, rover handoff, and command authorization remain authoritative.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FaArrowDown, FaArrowLeft, FaArrowRight, FaArrowUp, FaSearchMinus, FaSearchPlus, FaStop } from 'react-icons/fa';
 import CardFrame from '../CardFrame/index.jsx';
 import CameraTiltControl from '../CameraTiltControl/index.jsx';
 import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
@@ -14,7 +13,6 @@ import { usePtzCameraSnapshot } from '../../hooks/usePtzCameraSnapshot.js';
 import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { WhepPlayer } from '../../lib/whepPlayer.js';
 import { isFeatureEnabled } from '../../lib/features.js';
-import { innerFlowClass } from './constants.js';
 
 const PTZ_CAMERA_ID = 'ptz-camera';
 const PTZ_AUDIO_RETRY_MS = 1000;
@@ -102,44 +100,6 @@ function PtzQueueList({ queue = [], operatorLabel = '' }) {
         )}
       </div>
     </div>
-  );
-}
-
-function ControlButton({ title, children, onHold, className = '' }) {
-  const activeRef = useRef(false);
-
-  const start = useCallback(
-    (event) => {
-      event.preventDefault();
-      activeRef.current = true;
-      onHold?.('start');
-    },
-    [onHold],
-  );
-
-  const stop = useCallback(
-    (event) => {
-      event?.preventDefault?.();
-      if (!activeRef.current) return;
-      activeRef.current = false;
-      onHold?.('stop');
-    },
-    [onHold],
-  );
-
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      onPointerDown={start}
-      onPointerUp={stop}
-      onPointerCancel={stop}
-      onPointerLeave={stop}
-      className={`button-dark flex h-10 min-w-10 items-center justify-center text-sm ${className}`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -331,46 +291,6 @@ function PtzLightingControls({ ptz, disabled = false }) {
   );
 }
 
-function PtzManualControls({ disabled = false }) {
-  const { ptzMove, ptzStop } = useSessionActions();
-  const stopMotion = useCallback(() => {
-    ptzStop().catch(() => {});
-  }, [ptzStop]);
-  const holdMove = useCallback(
-    (payload) => (phase) => {
-      /*
-        These visible controls are only a fallback/secondary surface. Keyboard,
-        gamepad, and mobile drive input still route through the PTZ control
-        adapter so all normal movement mixing stays in the camera layer.
-      */
-      if (disabled) return;
-      if (phase === 'start') ptzMove(payload).catch(() => {});
-      else stopMotion();
-    },
-    [disabled, ptzMove, stopMotion],
-  );
-
-  return (
-    <CardFrame title="Manual controls" bodyClassName="space-y-0.5 p-1 text-sm">
-      <div className="grid grid-cols-3 gap-0.5">
-        <div />
-        <ControlButton title="Tilt up" onHold={holdMove({ tilt: 0.55 })} className="h-9"><FaArrowUp /></ControlButton>
-        <div />
-        <ControlButton title="Pan left" onHold={holdMove({ pan: -0.55 })} className="h-9"><FaArrowLeft /></ControlButton>
-        <ControlButton title="Stop" onHold={(phase) => phase === 'start' && !disabled && stopMotion()} className="h-9"><FaStop /></ControlButton>
-        <ControlButton title="Pan right" onHold={holdMove({ pan: 0.55 })} className="h-9"><FaArrowRight /></ControlButton>
-        <div />
-        <ControlButton title="Tilt down" onHold={holdMove({ tilt: -0.55 })} className="h-9"><FaArrowDown /></ControlButton>
-        <div />
-      </div>
-      <div className="grid grid-cols-2 gap-0.5">
-        <ControlButton title="Zoom in" onHold={holdMove({ zoom: 0.55 })} className="h-9"><FaSearchPlus /></ControlButton>
-        <ControlButton title="Zoom out" onHold={holdMove({ zoom: -0.55 })} className="h-9"><FaSearchMinus /></ControlButton>
-      </div>
-    </CardFrame>
-  );
-}
-
 function PtzZoomControl({ disabled = false }) {
   const { ptzMove, ptzStop } = useSessionActions();
   const sendZoom = useCallback(
@@ -460,33 +380,52 @@ function PtzController({ open, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[110] bg-black text-slate-100">
-      <CardFrame hideHeader fillHeight clipOverflow={false} className="h-screen w-screen border-0" bodyClassName="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_8.75rem] md:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className="fixed inset-0 z-[110] h-[100dvh] w-[100vw] overflow-hidden bg-black text-slate-100">
+      <CardFrame
+        hideHeader
+        fillHeight
+        clipOverflow={false}
+        className="h-[100dvh] w-[100vw] rounded-none border-0 !bg-black"
+        bodyClassName="grid h-full min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)_12rem] md:grid-cols-[minmax(0,1fr)_20rem]"
+      >
         <main className="relative min-h-0 min-w-0 bg-black">
           {isOperator ? <PtzLiveVideo enabled /> : <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />}
         </main>
-        <aside className="flex min-h-0 flex-col gap-0.5 overflow-y-auto border-l border-neutral-600 bg-neutral-950 p-0.5 text-sm">
-          <PtzStatePanel
-            ptz={ptz}
-            onClose={onClose}
-            onRelease={isOperator ? releaseAndClose : null}
-            releaseDisabled={releasePending}
-          />
-          <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
-          {isOperator ? (
-            <>
-              <PtzLightingControls ptz={ptz} />
-              <PtzZoomControl />
-              <PtzManualControls />
-            </>
-          ) : (
-            <CardFrame title="Controls" bodyClassName="p-1 text-xs text-slate-400">
-              Live PTZ controls unlock when your camera turn is active.
-            </CardFrame>
-          )}
-          <PtzControlReference />
-          <div className="min-h-[18rem]">
-            <ReplaySourcesPanel panelId="ptz-controller-replay" fillHeight />
+        <aside className="flex h-full min-h-0 items-stretch overflow-hidden border-l border-neutral-600 bg-neutral-950 text-sm">
+          <div className="flex min-h-0 w-full flex-col gap-0.5 overflow-y-auto p-0.5">
+            <div className="shrink-0">
+              <PtzStatePanel
+                ptz={ptz}
+                onClose={onClose}
+                onRelease={isOperator ? releaseAndClose : null}
+                releaseDisabled={releasePending}
+              />
+            </div>
+            <div className="shrink-0">
+              <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
+            </div>
+            {isOperator ? (
+              <>
+                <div className="shrink-0">
+                  <PtzLightingControls ptz={ptz} />
+                </div>
+                <div className="shrink-0">
+                  <PtzZoomControl />
+                </div>
+              </>
+            ) : (
+              <div className="shrink-0">
+                <CardFrame title="Controls" bodyClassName="p-1 text-xs text-slate-400">
+                  Live PTZ controls unlock when your camera turn is active.
+                </CardFrame>
+              </div>
+            )}
+            <div className="shrink-0">
+              <PtzControlReference />
+            </div>
+            <div className="shrink-0">
+              <ReplaySourcesPanel panelId="ptz-controller-replay" />
+            </div>
           </div>
         </aside>
       </CardFrame>
@@ -548,7 +487,7 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false }) {
   return (
     <>
       <CardFrame title="PTZ camera" className={wrapClass} bodyClassName="text-sm text-slate-300">
-        <div className={`${innerFlowClass} md:grid md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] md:items-start`}>
+        <div className="grid w-full gap-0.5 md:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.2fr)] md:items-start">
           <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
           <div className="flex w-full min-w-0 flex-col gap-0.5">
             <div className="grid w-full grid-cols-2 gap-0.5 text-left text-xs">
