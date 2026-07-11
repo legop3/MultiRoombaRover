@@ -120,7 +120,6 @@ function PtzLiveVideo({ enabled }) {
           scheduleRetry();
         }
       },
-      receiveAudio: false,
     });
     playerRef.current = player;
     player.start().catch((err) => {
@@ -144,7 +143,7 @@ function PtzLiveVideo({ enabled }) {
 
   return (
     <div className="relative h-full w-full bg-black">
-      <video ref={videoRef} className="h-full w-full object-contain" muted playsInline autoPlay />
+      <video ref={videoRef} className="h-full w-full object-contain" playsInline autoPlay />
       <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs text-slate-100">
         {source?.error || status}
       </div>

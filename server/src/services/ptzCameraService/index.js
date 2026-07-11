@@ -231,10 +231,11 @@ function startPublisher() {
     intentionally kept here, at the single camera publisher boundary, so the
     rest of the video auth/session/UI code still sees one normal MediaMTX path.
 
-    Audio is dropped for now because the camera sends AAC on this stream and
-    MediaMTX/WHEP clients in this setup negotiate Opus/G711-style audio, not
-    AAC. Keeping only H264 video gives the browser one compatible codec to
-    negotiate instead of letting an unsupported audio track poison playback.
+    The camera audio is AAC LC at 16 kHz mono. Keep it inline with the video so
+    the PTZ camera remains one MediaMTX/WHEP source, but transcode it to Opus
+    because that is the WebRTC-friendly audio codec browsers should negotiate
+    through MediaMTX. This avoids creating a rover-style separate audio stream
+    for a camera that already provides synchronized audio in the RTSP feed.
 
     These encoder settings trade compression efficiency for control latency:
     ultrafast avoids deep analysis, zerolatency disables x264 buffering, bf=0
@@ -258,7 +259,10 @@ function startPublisher() {
     'tcp',
     '-i',
     input,
-    '-an',
+    '-map',
+    '0:v:0',
+    '-map',
+    '0:a:0',
     '-c:v',
     'libx264',
     '-preset',
@@ -279,6 +283,20 @@ function startPublisher() {
     '0',
     '-pix_fmt',
     'yuv420p',
+    '-c:a',
+    'libopus',
+    '-application',
+    'lowdelay',
+    '-frame_duration',
+    '10',
+    '-b:a',
+    '32k',
+    '-ac',
+    '1',
+    '-ar',
+    '48000',
+    '-strict',
+    '-2',
     '-f',
     'mpegts',
     output,
