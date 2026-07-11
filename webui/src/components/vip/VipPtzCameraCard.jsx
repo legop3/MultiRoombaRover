@@ -107,6 +107,12 @@ function PtzQueueList({ queue = [], operatorLabel = '' }) {
 function PtzStatePanel({ ptz, onClose, onRelease, releaseDisabled = false }) {
   const spotlightOn = isSpotlightOn(ptz?.light);
   const irMode = normalizeIrMode(ptz?.ir?.state);
+  const publisher = ptz?.publisher || {};
+  const publisherStatus = publisher.running
+    ? `running${publisher.pid ? ` ${publisher.pid}` : ''}`
+    : publisher.restartAt
+      ? 'restarting'
+      : publisher.lastEvent || 'stopped';
   const statusTone = ptz?.error ? 'text-amber-300' : ptz?.isOperator ? 'text-emerald-300' : 'text-slate-100';
 
   return (
@@ -121,6 +127,12 @@ function PtzStatePanel({ ptz, onClose, onRelease, releaseDisabled = false }) {
       <StatusRow label="Spotlight" value={spotlightOn ? 'On' : 'Off'} tone={spotlightOn ? 'text-emerald-300' : 'text-slate-200'} />
       <StatusRow label="Infrared mode" value={irMode} />
       <StatusRow label="Stream" value={ptz?.status || ptz?.error || 'idle'} tone={ptz?.error ? 'text-amber-300' : ''} />
+      <StatusRow label="Transcoder" value={publisherStatus} tone={publisher.running ? 'text-emerald-300' : 'text-amber-300'} />
+      {publisher.lastStderr ? (
+        <div className="surface max-h-24 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[0.68rem] leading-tight text-slate-200">
+          {publisher.lastStderr}
+        </div>
+      ) : null}
       {ptz?.blocked?.message ? (
         <div className="rounded border border-amber-500/50 bg-amber-950/40 p-1 text-xs text-amber-100">
           {ptz.blocked.message}

@@ -52,6 +52,18 @@ const state = {
   status: null,
   light: null,
   ir: null,
+  publisher: {
+    running: false,
+    pid: null,
+    startedAt: null,
+    restartAt: null,
+    restartCount: 0,
+    exitCode: null,
+    exitSignal: null,
+    exitedAt: null,
+    lastStderr: '',
+    lastEvent: 'idle',
+  },
 };
 
 let onvifCam = null;
@@ -61,6 +73,7 @@ let turnTimer = null;
 let blockedTimer = null;
 let publisherProcess = null;
 let publisherRestartTimer = null;
+let publisherStderrSyncTimer = null;
 let snapshotTimer = null;
 let spotlightVerifyTimer = null;
 let vendorStatePromise = Promise.resolve();
@@ -71,6 +84,27 @@ const snapshotLastSentBySocket = new Map();
 
 function emitChange(reason = 'change') {
   events.emit('change', { reason, state: getPublicState() });
+}
+
+function schedulePublisherStateSync(reason = 'publisher') {
+  /*
+    ffmpeg can print many warning/progress lines in bursts. Keep the latest text
+    in state immediately, but debounce session sync so one noisy transcoder does
+    not force every connected client to resync for each stderr chunk.
+  */
+  if (publisherStderrSyncTimer) return;
+  publisherStderrSyncTimer = setTimeout(() => {
+    publisherStderrSyncTimer = null;
+    emitChange(reason);
+  }, 500);
+}
+
+function updatePublisherState(patch = {}, reason = 'publisher') {
+  state.publisher = {
+    ...(state.publisher || {}),
+    ...patch,
+  };
+  emitChange(reason);
 }
 
 function clampUnit(value) {
@@ -186,6 +220,7 @@ function getPublicState(socket = null) {
     status: state.status,
     light: state.light,
     ir: state.ir,
+    publisher: state.publisher,
     isOperator: Boolean(socketId && state.operatorSocketId === socketId),
     queuedPosition: socketId ? state.queue.indexOf(socketId) + 1 || null : null,
     canUse: socket ? canUsePtzFeature(socket) : false,
@@ -249,6 +284,12 @@ function stopPublisher() {
     } catch {}
     publisherProcess = null;
   }
+  updatePublisherState({
+    running: false,
+    pid: null,
+    restartAt: null,
+    lastEvent: 'stopped',
+  }, 'publisher-stop');
 }
 
 function startPublisher() {
@@ -337,13 +378,42 @@ function startPublisher() {
     output,
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   publisherProcess = proc;
+  updatePublisherState({
+    running: true,
+    pid: proc.pid || null,
+    startedAt: Date.now(),
+    restartAt: null,
+    exitCode: null,
+    exitSignal: null,
+    exitedAt: null,
+    lastEvent: 'started',
+  }, 'publisher-start');
   proc.stderr.on('data', (chunk) => {
     const text = String(chunk || '').trim();
-    if (text) logger.warn('publisher stderr', { text: text.slice(0, 500) });
+    if (!text) return;
+    const lastStderr = text.slice(-1000);
+    state.publisher = {
+      ...(state.publisher || {}),
+      lastStderr,
+      lastEvent: 'stderr',
+    };
+    logger.warn('publisher stderr', { text: text.slice(0, 500) });
+    schedulePublisherStateSync('publisher-stderr');
   });
   proc.on('exit', (code, signal) => {
     if (publisherProcess === proc) publisherProcess = null;
     logger.warn('publisher exited', { code, signal });
+    const restartAt = enabled && state.rtspUri ? Date.now() + 1500 : null;
+    updatePublisherState({
+      running: false,
+      pid: null,
+      restartAt,
+      restartCount: Number(state.publisher?.restartCount || 0) + (restartAt ? 1 : 0),
+      exitCode: code,
+      exitSignal: signal,
+      exitedAt: Date.now(),
+      lastEvent: restartAt ? 'restarting' : 'exited',
+    }, 'publisher-exit');
     if (enabled && state.rtspUri) {
       publisherRestartTimer = setTimeout(() => {
         publisherRestartTimer = null;
