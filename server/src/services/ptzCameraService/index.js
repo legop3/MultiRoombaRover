@@ -88,6 +88,27 @@ function isReplayEnabled() {
   return cameraConfig.replayEnabled === undefined ? DEFAULT_REPLAY_ENABLED : Boolean(cameraConfig.replayEnabled);
 }
 
+function spotlightCameraStateForLogicalOn(logicalOn) {
+  return Boolean(logicalOn) ? 1 : 0;
+}
+
+function isSpotlightOn(light = {}) {
+  const raw = light?.state;
+  let rawOn = false;
+  if (typeof raw === 'string') {
+    const normalized = raw.trim().toLowerCase();
+    rawOn = !['', '0', 'off', 'false'].includes(normalized);
+  } else {
+    rawOn = Boolean(Number(raw));
+  }
+  return rawOn;
+}
+
+function normalizeSpotlightState(light) {
+  if (!light || typeof light !== 'object') return light || null;
+  return { ...light, on: isSpotlightOn(light) };
+}
+
 function passesMode(socket) {
   const mode = getMode();
   if (mode === MODES.LOCKDOWN) return isLockdownAdmin(socket);
@@ -274,7 +295,7 @@ async function refreshVendorState() {
     client.api('GetWhiteLed', { channel: 0 }).catch((err) => ({ error: err.message })),
     client.api('GetIrLights', { channel: 0 }).catch((err) => ({ error: err.message })),
   ]);
-  state.light = white?.WhiteLed || white || null;
+  state.light = normalizeSpotlightState(white?.WhiteLed || white || null);
   state.ir = ir?.IrLights || ir || null;
 }
 
@@ -486,11 +507,13 @@ async function setSpotlight(socket, payload = {}) {
   requireOperator(socket);
   return serializeVendorState(async () => {
     const client = await ensureReolinkClient();
-    const current = (await client.api('GetWhiteLed', { channel: 0 })).WhiteLed || {};
+    const current = normalizeSpotlightState((await client.api('GetWhiteLed', { channel: 0 })).WhiteLed || {});
+    const logicalOn = payload.state === undefined ? !current.on : Boolean(payload.state);
     const next = {
       ...current,
       channel: 0,
-      state: payload.state === undefined ? (current.state ? 0 : 1) : Number(Boolean(payload.state)),
+      state: spotlightCameraStateForLogicalOn(logicalOn),
+      on: logicalOn,
     };
     if (Number.isFinite(Number(payload.bright))) {
       next.bright = Math.max(0, Math.min(100, Number(payload.bright)));
