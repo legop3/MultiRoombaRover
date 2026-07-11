@@ -2,9 +2,11 @@
 // Purpose: Provides the verified-user entry point and fullscreen controller for the single Reolink PTZ camera.
 // Scope: Owns PTZ UI state only; server-side PTZ ownership, rover handoff, and command authorization remain authoritative.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import CardFrame from '../CardFrame/index.jsx';
 import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
+import KeyPill from './VipAudioUploadCard/KeyPill.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useControlSelector } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
@@ -356,31 +358,34 @@ function keyLabelFor(keymap, actionId) {
 function PtzControlReference() {
   const keymap = useControlSelector((control) => control.state.keymap);
   const rows = [
-    ['Tilt up', keyLabelFor(keymap, 'driveForward')],
-    ['Tilt down', keyLabelFor(keymap, 'driveBackward')],
-    ['Pan left', keyLabelFor(keymap, 'driveLeft')],
-    ['Pan right', keyLabelFor(keymap, 'driveRight')],
-    ['Zoom in', keyLabelFor(keymap, 'cameraUp')],
-    ['Zoom out', keyLabelFor(keymap, 'cameraDown')],
-    ['Spotlight', keyLabelFor(keymap, 'headlightToggle')],
-    ['Infrared mode', keyLabelFor(keymap, 'laserToggle')],
+    ['Tilt up', 'driveForward'],
+    ['Tilt down', 'driveBackward'],
+    ['Pan left', 'driveLeft'],
+    ['Pan right', 'driveRight'],
+    ['Zoom in', 'cameraUp'],
+    ['Zoom out', 'cameraDown'],
+    ['Spotlight', 'headlightToggle'],
+    ['Infrared mode', 'laserToggle'],
   ];
 
   return (
     <CardFrame title="Controls" bodyClassName="space-y-0.5 p-1 text-xs">
-      {rows.map(([label, value]) => (
+      {rows.map(([label, actionId]) => (
         <div key={label} className="surface flex items-center justify-between gap-1">
           <span className="text-slate-400">{label}</span>
-          <span className="truncate text-slate-100">{value}</span>
+          {/* Use the same key display component as the rest of the UI so PTZ
+              controls read as normal mapped controls instead of custom labels. */}
+          <KeyPill label={keyLabelFor(keymap, actionId)} />
         </div>
       ))}
     </CardFrame>
   );
 }
 
-function PtzController({ open, onClose }) {
+function PtzController({ open, onClose, layout = 'desktop' }) {
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isOperator = Boolean(ptz?.isOperator);
+  const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape';
   const { ptzRelease } = useSessionActions();
   const snapshot = usePtzCameraSnapshot({ enabled: open && !isOperator });
   const [releasePending, setReleasePending] = useState(false);
@@ -397,61 +402,109 @@ function PtzController({ open, onClose }) {
     }
   };
 
-  return (
+  const desktopSidebar = (
+    <>
+      <div className="shrink-0">
+        <PtzStatePanel
+          ptz={ptz}
+          onClose={onClose}
+          onRelease={isOperator ? releaseAndClose : null}
+          releaseDisabled={releasePending}
+        />
+      </div>
+      <div className="shrink-0">
+        <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
+      </div>
+      {isOperator ? (
+        <div className="shrink-0">
+          <PtzLightingControls ptz={ptz} />
+        </div>
+      ) : (
+        <div className="shrink-0">
+          <CardFrame title="Controls" bodyClassName="p-1 text-xs text-slate-400">
+            Live PTZ controls unlock when your camera turn is active.
+          </CardFrame>
+        </div>
+      )}
+      <div className="shrink-0">
+        <PtzControlReference />
+      </div>
+      <div className="shrink-0">
+        <ReplaySourcesPanel panelId="ptz-controller-replay" />
+      </div>
+    </>
+  );
+
+  const mobileSidebar = (
+    <>
+      <div className="shrink-0">
+        <PtzStatePanel
+          ptz={ptz}
+          onClose={onClose}
+          onRelease={isOperator ? releaseAndClose : null}
+          releaseDisabled={releasePending}
+        />
+      </div>
+      {isOperator ? (
+        <>
+          <div className="shrink-0">
+            <PtzLightingControls ptz={ptz} />
+          </div>
+          <div className="shrink-0">
+            <PtzMobileZoomButtons />
+          </div>
+        </>
+      ) : (
+        <div className="shrink-0">
+          <CardFrame title="Controls" bodyClassName="p-1 text-xs text-slate-400">
+            Live PTZ controls unlock when your camera turn is active.
+          </CardFrame>
+        </div>
+      )}
+      <div className="shrink-0">
+        <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
+      </div>
+      <div className="shrink-0">
+        <ReplaySourcesPanel panelId="ptz-controller-replay-mobile" />
+      </div>
+    </>
+  );
+
+  const sidebarWidthClass = isMobile
+    ? 'grid-cols-[minmax(0,1fr)_12rem]'
+    : 'grid-cols-[minmax(0,1fr)_20rem]';
+
+  const controller = (
     <div className="fixed inset-0 z-[110] h-[100dvh] w-[100vw] overflow-hidden bg-black text-slate-100">
       <CardFrame
         hideHeader
         fillHeight
         clipOverflow={false}
         className="h-[100dvh] w-[100vw] rounded-none border-0 !bg-black"
-        bodyClassName="grid h-full min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)_12rem] md:grid-cols-[minmax(0,1fr)_20rem]"
+        bodyClassName={`grid h-full min-h-0 overflow-hidden ${sidebarWidthClass}`}
       >
         <main className="relative min-h-0 min-w-0 bg-black">
           {isOperator ? <PtzLiveVideo enabled /> : <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />}
         </main>
         <aside className="flex h-full min-h-0 items-stretch overflow-hidden border-l border-neutral-600 bg-neutral-950 text-sm">
           <div className="flex min-h-0 w-full flex-col gap-0.5 overflow-y-auto p-0.5">
-            <div className="shrink-0">
-              <PtzStatePanel
-                ptz={ptz}
-                onClose={onClose}
-                onRelease={isOperator ? releaseAndClose : null}
-                releaseDisabled={releasePending}
-              />
-            </div>
-            <div className="shrink-0">
-              <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
-            </div>
-            {isOperator ? (
-              <>
-                <div className="shrink-0">
-                  <PtzLightingControls ptz={ptz} />
-                </div>
-                <div className="shrink-0">
-                  <PtzMobileZoomButtons />
-                </div>
-              </>
-            ) : (
-              <div className="shrink-0">
-                <CardFrame title="Controls" bodyClassName="p-1 text-xs text-slate-400">
-                  Live PTZ controls unlock when your camera turn is active.
-                </CardFrame>
-              </div>
-            )}
-            <div className="shrink-0">
-              <PtzControlReference />
-            </div>
-            <div className="shrink-0">
-              <ReplaySourcesPanel panelId="ptz-controller-replay" />
-            </div>
+            {isMobile ? mobileSidebar : desktopSidebar}
           </div>
         </aside>
       </CardFrame>
     </div>
   );
+
+  /*
+    The controller is a true fullscreen surface, so mount it directly under
+    document.body instead of inside the VIP tab/card tree. That keeps tab panel
+    spacing, mobile banners, and parent overflow rules from creating visible
+    gaps around a fixed-position camera interface.
+  */
+  return createPortal(controller, document.body);
 }
 
-export default function VipPtzCameraCard({ onMessage, fullWidth = false }) {
+export default function VipPtzCameraCard({ onMessage, fullWidth = false, layout = 'desktop' }) {
   const featureEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'ptzCamera'));
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
@@ -556,7 +609,7 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false }) {
           </div>
         </div>
       </CardFrame>
-      <PtzController open={controllerOpen} onClose={() => setControllerOpen(false)} />
+      <PtzController open={controllerOpen} onClose={() => setControllerOpen(false)} layout={layout} />
     </>
   );
 }

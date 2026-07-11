@@ -425,7 +425,7 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
 
           {/* VIP tab */}
           <TabPanel id="vip" keepMounted>
-            <VipPanel isActive={activeTab === 'vip'} />
+            <VipPanel isActive={activeTab === 'vip'} layout={layout} />
           </TabPanel>
 
           {/* help tab */}

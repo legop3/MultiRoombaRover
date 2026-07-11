@@ -206,7 +206,7 @@ function MobileFeatureTabs({
             </div>
           </TabPanel>
           <TabPanel id="vip" keepMounted>
-            <VipPanel isActive={activeTab === 'vip'} />
+            <VipPanel isActive={activeTab === 'vip'} layout={layout} />
           </TabPanel>
           <TabPanel id="roomcontrols">
             <div className={themeStackClass}>
