@@ -12,6 +12,7 @@ import { isFeatureEnabled } from '../../lib/features.js';
 import { innerFlowClass } from './constants.js';
 
 const PTZ_CAMERA_ID = 'ptz-camera';
+const PTZ_AUDIO_RETRY_MS = 1000;
 
 function formatRemaining(deadline) {
   const remaining = Math.max(0, Math.ceil((Number(deadline || 0) - Date.now()) / 1000));
@@ -81,6 +82,7 @@ function PtzLiveVideo({ enabled }) {
   const videoRef = useRef(null);
   const playerRef = useRef(null);
   const retryTimerRef = useRef(null);
+  const playTimerRef = useRef(null);
   const [status, setStatus] = useState('idle');
   const [retryVersion, setRetryVersion] = useState(0);
   const sources = useVideoRequests(
@@ -114,6 +116,7 @@ function PtzLiveVideo({ enabled }) {
       url: source.url,
       token: source.token,
       video: videoRef.current,
+      startMuted: false,
       onStatus: (nextStatus) => {
         setStatus(nextStatus);
         if (['error', 'failed', 'disconnected', 'closed'].includes(String(nextStatus || '').toLowerCase())) {
@@ -133,10 +136,43 @@ function PtzLiveVideo({ enabled }) {
   }, [enabled, scheduleRetry, source?.token, source?.url]);
 
   useEffect(() => {
+    const video = videoRef.current;
+    if (!enabled || !source?.url || !video) {
+      if (playTimerRef.current) clearInterval(playTimerRef.current);
+      playTimerRef.current = null;
+      return undefined;
+    }
+    /*
+      The server now publishes inline Opus audio on the PTZ WHEP stream. The
+      shared WHEP helper starts playback once, but browsers can still reject or
+      pause audible media depending on the exact timing of the fullscreen/user
+      gesture. Retry the same element with muted=false so unmuting is not a
+      manual DevTools-only operation.
+    */
+    const attemptPlay = () => {
+      const target = videoRef.current;
+      if (!target) return;
+      target.muted = false;
+      if (!target.paused && !target.ended) return;
+      target.play().catch(() => {});
+    };
+    attemptPlay();
+    playTimerRef.current = setInterval(attemptPlay, PTZ_AUDIO_RETRY_MS);
+    return () => {
+      if (playTimerRef.current) clearInterval(playTimerRef.current);
+      playTimerRef.current = null;
+    };
+  }, [enabled, source?.url, status]);
+
+  useEffect(() => {
     return () => {
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
+      }
+      if (playTimerRef.current) {
+        clearInterval(playTimerRef.current);
+        playTimerRef.current = null;
       }
     };
   }, []);
