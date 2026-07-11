@@ -347,7 +347,7 @@ function startPublisher() {
     '-tune',
     'zerolatency',
     '-threads',
-    '2',
+    '8',
     '-x264-params',
     'sliced-threads=1:sync-lookahead=0:rc-lookahead=0:keyint=20:min-keyint=20:scenecut=0',
     '-bf',
