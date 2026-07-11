@@ -4,7 +4,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaArrowDown, FaArrowLeft, FaArrowRight, FaArrowUp, FaSearchMinus, FaSearchPlus, FaStop } from 'react-icons/fa';
 import CardFrame from '../CardFrame/index.jsx';
+import CameraTiltControl from '../CameraTiltControl/index.jsx';
+import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
+import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
+import { useControlSelector } from '../../controls/index.js';
+import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { usePtzCameraSnapshot } from '../../hooks/usePtzCameraSnapshot.js';
 import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { WhepPlayer } from '../../lib/whepPlayer.js';
@@ -13,6 +18,8 @@ import { innerFlowClass } from './constants.js';
 
 const PTZ_CAMERA_ID = 'ptz-camera';
 const PTZ_AUDIO_RETRY_MS = 1000;
+const PTZ_ZOOM_SLIDER_MIN = -1;
+const PTZ_ZOOM_SLIDER_MAX = 1;
 
 function formatRemaining(deadline) {
   const remaining = Math.max(0, Math.ceil((Number(deadline || 0) - Date.now()) / 1000));
@@ -20,6 +27,30 @@ function formatRemaining(deadline) {
   const minutes = Math.floor(remaining / 60);
   const seconds = remaining % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function isSpotlightOn(light = {}) {
+  if (typeof light?.on === 'boolean') return light.on;
+  const raw = light?.state;
+  if (typeof raw === 'string') {
+    const normalized = raw.trim().toLowerCase();
+    return !['', '0', 'off', 'false'].includes(normalized);
+  }
+  return Boolean(Number(raw));
+}
+
+function normalizeIrMode(mode) {
+  const normalized = String(mode || '').trim().toLowerCase();
+  if (normalized === 'on') return 'On';
+  if (normalized === 'off') return 'Off';
+  return 'Auto';
+}
+
+function nextIrMode(currentMode) {
+  const current = normalizeIrMode(currentMode);
+  if (current === 'Auto') return 'On';
+  if (current === 'On') return 'Off';
+  return 'Auto';
 }
 
 function PtzSnapshotPreview({ feed, label = 'PTZ Camera' }) {
@@ -35,6 +66,40 @@ function PtzSnapshotPreview({ feed, label = 'PTZ Camera' }) {
       </div>
       <div className="pointer-events-none absolute bottom-0 left-0 m-1 rounded bg-black/70 px-1 py-0.5 text-[0.7rem] text-slate-100">
         {feed?.error ? `Error: ${feed.error}` : feed?.status || 'connecting'}
+      </div>
+    </div>
+  );
+}
+
+function StatusRow({ label, value, tone = '' }) {
+  return (
+    <div className="flex items-center justify-between gap-1 text-xs">
+      <span className="text-slate-400">{label}</span>
+      <span className={`min-w-0 truncate font-medium ${tone || 'text-slate-100'}`}>{value}</span>
+    </div>
+  );
+}
+
+function PtzQueueList({ queue = [], operatorLabel = '' }) {
+  const hasQueue = Array.isArray(queue) && queue.length > 0;
+  return (
+    <div className="space-y-0.5">
+      <div className="panel-muted text-xs">Turn queue</div>
+      <div className="space-y-0.5">
+        {operatorLabel ? (
+          <div className="surface flex items-center justify-between gap-1 text-xs">
+            <span className="text-slate-400">Now</span>
+            <span className="min-w-0 truncate text-emerald-200">{operatorLabel}</span>
+          </div>
+        ) : null}
+        {hasQueue ? queue.map((entry, index) => (
+          <div key={entry.socketId || `${entry.label}-${index}`} className="surface flex items-center justify-between gap-1 text-xs">
+            <span className="text-slate-400">{index + 1}</span>
+            <span className="min-w-0 truncate text-slate-100">{entry.label || entry.socketId || 'queued user'}</span>
+          </div>
+        )) : (
+          <div className="surface text-xs text-slate-400">No one waiting</div>
+        )}
       </div>
     </div>
   );
@@ -75,6 +140,37 @@ function ControlButton({ title, children, onHold, className = '' }) {
     >
       {children}
     </button>
+  );
+}
+
+function PtzStatePanel({ ptz, onClose, onRelease, releaseDisabled = false }) {
+  const spotlightOn = isSpotlightOn(ptz?.light);
+  const irMode = normalizeIrMode(ptz?.ir?.state);
+  const statusTone = ptz?.error ? 'text-amber-300' : ptz?.isOperator ? 'text-emerald-300' : 'text-slate-100';
+
+  return (
+    <CardFrame
+      title="Camera state"
+      actions={onClose ? <button type="button" className="button-dark text-xs" onClick={onClose}>Close</button> : null}
+      bodyClassName="space-y-0.5 p-1 text-sm"
+    >
+      <StatusRow label="Mode" value={ptz?.isOperator ? 'operator' : ptz?.queuedPosition ? `queued ${ptz.queuedPosition}` : 'spectator'} tone={statusTone} />
+      <StatusRow label="Operator" value={ptz?.operatorLabel || 'none'} />
+      <StatusRow label="Remaining" value={formatRemaining(ptz?.deadline)} />
+      <StatusRow label="Spotlight" value={spotlightOn ? 'On' : 'Off'} tone={spotlightOn ? 'text-emerald-300' : 'text-slate-200'} />
+      <StatusRow label="Infrared mode" value={irMode} />
+      <StatusRow label="Stream" value={ptz?.status || ptz?.error || 'idle'} tone={ptz?.error ? 'text-amber-300' : ''} />
+      {ptz?.blocked?.message ? (
+        <div className="rounded border border-amber-500/50 bg-amber-950/40 p-1 text-xs text-amber-100">
+          {ptz.blocked.message}
+        </div>
+      ) : null}
+      {onRelease ? (
+        <button type="button" className="button-dark w-full text-xs" disabled={releaseDisabled} onClick={onRelease}>
+          Release camera
+        </button>
+      ) : null}
+    </CardFrame>
   );
 }
 
@@ -187,104 +283,213 @@ function PtzLiveVideo({ enabled }) {
   );
 }
 
-function PtzController({ open, onClose }) {
-  const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
-  const isOperator = Boolean(ptz?.isOperator);
-  const { ptzMove, ptzStop, ptzSpotlight, ptzIr, ptzRelease } = useSessionActions();
-  const snapshot = usePtzCameraSnapshot({ enabled: open && !isOperator });
+function PtzLightingControls({ ptz, disabled = false }) {
+  const { ptzSpotlight, ptzIr } = useSessionActions();
   const [busy, setBusy] = useState('');
+  const spotlightOn = isSpotlightOn(ptz?.light);
+  const irMode = normalizeIrMode(ptz?.ir?.state);
 
-  const sendMove = useCallback(
-    (payload) => {
-      ptzMove(payload).catch(() => {});
-    },
-    [ptzMove],
-  );
-
-  const stopMotion = useCallback(() => {
-    ptzStop().catch(() => {});
-  }, [ptzStop]);
-
-  const holdMove = useCallback(
-    (payload) => (phase) => {
-      if (phase === 'start') sendMove(payload);
-      else stopMotion();
-    },
-    [sendMove, stopMotion],
-  );
-
-  if (!open) return null;
-
-  const toggleSpotlight = async () => {
+  const toggleSpotlight = async (nextOn) => {
+    if (disabled) return;
     setBusy('spotlight');
     try {
-      await ptzSpotlight({ state: ptz?.light?.state ? 0 : 1 });
+      await ptzSpotlight({ state: nextOn ? 1 : 0 });
     } finally {
       setBusy('');
     }
   };
 
-  const toggleIr = async () => {
+  const cycleIr = async () => {
+    if (disabled) return;
     setBusy('ir');
     try {
-      await ptzIr({ state: ptz?.ir?.state === 'Off' ? 'Auto' : 'Off' });
+      await ptzIr({ state: nextIrMode(irMode) });
     } finally {
       setBusy('');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex bg-black text-slate-100">
-      <main className="relative flex min-w-0 flex-1 items-center justify-center bg-black">
-        {isOperator ? <PtzLiveVideo enabled /> : <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />}
-      </main>
-      <aside className="flex w-72 shrink-0 flex-col gap-1 border-l border-slate-700 bg-neutral-950 p-2 text-sm">
-        <div className="flex items-center justify-between gap-1">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">{ptz?.name || 'PTZ Camera'}</p>
-            <p className="truncate text-xs text-slate-400">{isOperator ? 'operator' : 'snapshot view'}</p>
+    <CardFrame title="Lights" bodyClassName="grid grid-cols-2 gap-0.5 p-1 text-sm">
+      <GPIOToggleControl
+        label="Spotlight"
+        on={spotlightOn}
+        disabled={disabled || busy === 'spotlight'}
+        onToggle={toggleSpotlight}
+        heightClass="min-h-14"
+      />
+      <button
+        type="button"
+        className="mobile-touch-control flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl border-2 border-cyan-300/70 bg-cyan-900 px-1 py-0.75 text-center text-cyan-50 disabled:opacity-50"
+        disabled={disabled || busy === 'ir'}
+        onClick={cycleIr}
+      >
+        <span className="text-sm font-semibold">Infrared</span>
+        <span className="rounded bg-cyan-300 px-1 py-0.5 text-[0.7rem] font-semibold text-cyan-950">{irMode}</span>
+      </button>
+    </CardFrame>
+  );
+}
+
+function PtzManualControls({ disabled = false }) {
+  const { ptzMove, ptzStop } = useSessionActions();
+  const stopMotion = useCallback(() => {
+    ptzStop().catch(() => {});
+  }, [ptzStop]);
+  const holdMove = useCallback(
+    (payload) => (phase) => {
+      /*
+        These visible controls are only a fallback/secondary surface. Keyboard,
+        gamepad, and mobile drive input still route through the PTZ control
+        adapter so all normal movement mixing stays in the camera layer.
+      */
+      if (disabled) return;
+      if (phase === 'start') ptzMove(payload).catch(() => {});
+      else stopMotion();
+    },
+    [disabled, ptzMove, stopMotion],
+  );
+
+  return (
+    <CardFrame title="Manual controls" bodyClassName="space-y-0.5 p-1 text-sm">
+      <div className="grid grid-cols-3 gap-0.5">
+        <div />
+        <ControlButton title="Tilt up" onHold={holdMove({ tilt: 0.55 })} className="h-9"><FaArrowUp /></ControlButton>
+        <div />
+        <ControlButton title="Pan left" onHold={holdMove({ pan: -0.55 })} className="h-9"><FaArrowLeft /></ControlButton>
+        <ControlButton title="Stop" onHold={(phase) => phase === 'start' && !disabled && stopMotion()} className="h-9"><FaStop /></ControlButton>
+        <ControlButton title="Pan right" onHold={holdMove({ pan: 0.55 })} className="h-9"><FaArrowRight /></ControlButton>
+        <div />
+        <ControlButton title="Tilt down" onHold={holdMove({ tilt: -0.55 })} className="h-9"><FaArrowDown /></ControlButton>
+        <div />
+      </div>
+      <div className="grid grid-cols-2 gap-0.5">
+        <ControlButton title="Zoom in" onHold={holdMove({ zoom: 0.55 })} className="h-9"><FaSearchPlus /></ControlButton>
+        <ControlButton title="Zoom out" onHold={holdMove({ zoom: -0.55 })} className="h-9"><FaSearchMinus /></ControlButton>
+      </div>
+    </CardFrame>
+  );
+}
+
+function PtzZoomControl({ disabled = false }) {
+  const { ptzMove, ptzStop } = useSessionActions();
+  const sendZoom = useCallback(
+    (value) => {
+      if (disabled) return;
+      const zoom = Math.max(-1, Math.min(1, Number(value) || 0));
+      if (!zoom) {
+        ptzStop().catch(() => {});
+        return;
+      }
+      ptzMove({ pan: 0, tilt: 0, zoom }).catch(() => {});
+    },
+    [disabled, ptzMove, ptzStop],
+  );
+  const stopZoom = useCallback(() => {
+    ptzStop().catch(() => {});
+  }, [ptzStop]);
+
+  return (
+    <CardFrame title="Zoom" bodyClassName="p-1 text-sm">
+      <CameraTiltControl
+        value={0}
+        min={PTZ_ZOOM_SLIDER_MIN}
+        max={PTZ_ZOOM_SLIDER_MAX}
+        step={1}
+        label="Zoom"
+        disabled={disabled}
+        onChange={sendZoom}
+        onCommit={stopZoom}
+        className="rounded-xl border-2 border-emerald-300/70 bg-emerald-900 px-1 py-1 text-emerald-50"
+        labelRowClass="text-xs text-emerald-100"
+        labelClass="text-sm font-semibold"
+        valueClass="hidden"
+        sliderClass="w-full"
+        accentClass="accent-emerald-400"
+        endpointClass="text-[0.7rem] text-emerald-100/80"
+        endpointLabelClass="w-14"
+      />
+      <div className="mt-0.5 flex justify-between text-[0.7rem] text-slate-400">
+        <span>out</span>
+        <span>release stops</span>
+        <span>in</span>
+      </div>
+    </CardFrame>
+  );
+}
+
+function PtzControlReference() {
+  const keymap = useControlSelector((control) => control.state.keymap);
+  const rows = [
+    ['Pan / tilt', 'Drive movement'],
+    ['Zoom in', formatKeyLabel(keymap?.cameraUp?.[0]) || 'camera up'],
+    ['Zoom out', formatKeyLabel(keymap?.cameraDown?.[0]) || 'camera down'],
+    ['Spotlight', formatKeyLabel(keymap?.headlightToggle?.[0]) || 'headlight'],
+    ['Infrared mode', formatKeyLabel(keymap?.laserToggle?.[0]) || 'laser'],
+  ];
+
+  return (
+    <CardFrame title="Controls" bodyClassName="space-y-0.5 p-1 text-xs">
+      {rows.map(([label, value]) => (
+        <div key={label} className="surface flex items-center justify-between gap-1">
+          <span className="text-slate-400">{label}</span>
+          <span className="truncate text-slate-100">{value}</span>
+        </div>
+      ))}
+    </CardFrame>
+  );
+}
+
+function PtzController({ open, onClose }) {
+  const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
+  const isOperator = Boolean(ptz?.isOperator);
+  const { ptzRelease } = useSessionActions();
+  const snapshot = usePtzCameraSnapshot({ enabled: open && !isOperator });
+  const [releasePending, setReleasePending] = useState(false);
+
+  if (!open) return null;
+
+  const releaseAndClose = async () => {
+    setReleasePending(true);
+    try {
+      await ptzRelease();
+      onClose();
+    } finally {
+      setReleasePending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[110] bg-black text-slate-100">
+      <CardFrame hideHeader fillHeight clipOverflow={false} className="h-screen w-screen border-0" bodyClassName="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_8.75rem] md:grid-cols-[minmax(0,1fr)_18rem]">
+        <main className="relative min-h-0 min-w-0 bg-black">
+          {isOperator ? <PtzLiveVideo enabled /> : <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />}
+        </main>
+        <aside className="flex min-h-0 flex-col gap-0.5 overflow-y-auto border-l border-neutral-600 bg-neutral-950 p-0.5 text-sm">
+          <PtzStatePanel
+            ptz={ptz}
+            onClose={onClose}
+            onRelease={isOperator ? releaseAndClose : null}
+            releaseDisabled={releasePending}
+          />
+          <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
+          {isOperator ? (
+            <>
+              <PtzLightingControls ptz={ptz} />
+              <PtzZoomControl />
+              <PtzManualControls />
+            </>
+          ) : (
+            <CardFrame title="Controls" bodyClassName="p-1 text-xs text-slate-400">
+              Live PTZ controls unlock when your camera turn is active.
+            </CardFrame>
+          )}
+          <PtzControlReference />
+          <div className="min-h-[18rem]">
+            <ReplaySourcesPanel panelId="ptz-controller-replay" fillHeight />
           </div>
-          <button type="button" className="button-dark text-xs" onClick={onClose}>Close</button>
-        </div>
-        <div className="surface-muted space-y-0.5 p-1 text-xs">
-          <div className="flex justify-between gap-1"><span>Operator</span><span className="truncate text-slate-200">{ptz?.operatorLabel || 'none'}</span></div>
-          <div className="flex justify-between gap-1"><span>Remaining</span><span>{formatRemaining(ptz?.deadline)}</span></div>
-          <div className="flex justify-between gap-1"><span>Spotlight</span><span>{ptz?.light?.state ? 'On' : 'Off'}</span></div>
-          <div className="flex justify-between gap-1"><span>IR</span><span>{ptz?.ir?.state || '--'}</span></div>
-        </div>
-        {isOperator ? (
-          <>
-            <div className="grid grid-cols-3 gap-1">
-              <div />
-              <ControlButton title="Tilt up" onHold={holdMove({ tilt: 0.55 })}><FaArrowUp /></ControlButton>
-              <div />
-              <ControlButton title="Pan left" onHold={holdMove({ pan: -0.55 })}><FaArrowLeft /></ControlButton>
-              <ControlButton title="Stop" onHold={(phase) => phase === 'start' && stopMotion()}><FaStop /></ControlButton>
-              <ControlButton title="Pan right" onHold={holdMove({ pan: 0.55 })}><FaArrowRight /></ControlButton>
-              <div />
-              <ControlButton title="Tilt down" onHold={holdMove({ tilt: -0.55 })}><FaArrowDown /></ControlButton>
-              <div />
-            </div>
-            <div className="grid grid-cols-2 gap-1">
-              <ControlButton title="Zoom in" onHold={holdMove({ zoom: 0.55 })}><FaSearchPlus /></ControlButton>
-              <ControlButton title="Zoom out" onHold={holdMove({ zoom: -0.55 })}><FaSearchMinus /></ControlButton>
-            </div>
-            <div className="grid grid-cols-2 gap-1">
-              <button type="button" className="button-dark text-xs" disabled={busy === 'spotlight'} onClick={toggleSpotlight}>
-                Spotlight {ptz?.light?.state ? 'off' : 'on'}
-              </button>
-              <button type="button" className="button-dark text-xs" disabled={busy === 'ir'} onClick={toggleIr}>
-                IR {ptz?.ir?.state === 'Off' ? 'auto' : 'off'}
-              </button>
-            </div>
-            <button type="button" className="button-dark mt-auto text-xs" onClick={() => ptzRelease().finally(onClose)}>
-              Release camera
-            </button>
-          </>
-        ) : (
-          <p className="surface-muted p-2 text-xs text-slate-400">Live PTZ controls unlock when your camera turn is active.</p>
-        )}
-      </aside>
+        </aside>
+      </CardFrame>
     </div>
   );
 }
@@ -313,6 +518,12 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false }) {
     onMessage?.('');
     try {
       const response = await ptzClaim();
+      /*
+        Requesting the PTZ camera is also the user's intent to enter camera mode.
+        Open the controller immediately for operators and queued users so the
+        camera surface does not require a second, redundant "open" click.
+      */
+      setControllerOpen(true);
       if (response?.state?.isOperator) onMessage?.('PTZ camera turn active.');
       else if (response?.state?.queuedPosition) onMessage?.(`Joined PTZ queue at position ${response.state.queuedPosition}.`);
     } catch (err) {
@@ -337,43 +548,54 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false }) {
   return (
     <>
       <CardFrame title="PTZ camera" className={wrapClass} bodyClassName="text-sm text-slate-300">
-        <div className={innerFlowClass}>
+        <div className={`${innerFlowClass} md:grid md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] md:items-start`}>
           <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
-          <div className="grid w-full grid-cols-2 gap-1 text-left text-xs">
-            <div className="surface-muted p-1">
-              <p className="text-slate-500">State</p>
-              <p className="truncate text-slate-100">{queueText}</p>
+          <div className="flex w-full min-w-0 flex-col gap-0.5">
+            <div className="grid w-full grid-cols-2 gap-0.5 text-left text-xs">
+              <div className="surface-muted p-1">
+                <p className="text-slate-500">State</p>
+                <p className="truncate text-slate-100">{queueText}</p>
+              </div>
+              <div className="surface-muted p-1">
+                <p className="text-slate-500">Remaining</p>
+                <p className="text-slate-100">{formatRemaining(ptz?.deadline)}</p>
+              </div>
+              <div className="surface-muted p-1">
+                <p className="text-slate-500">Spotlight</p>
+                <p className="truncate text-slate-100">{isSpotlightOn(ptz?.light) ? 'On' : 'Off'}</p>
+              </div>
+              <div className="surface-muted p-1">
+                <p className="text-slate-500">Infrared</p>
+                <p className="truncate text-slate-100">{normalizeIrMode(ptz?.ir?.state)}</p>
+              </div>
             </div>
-            <div className="surface-muted p-1">
-              <p className="text-slate-500">Remaining</p>
-              <p className="text-slate-100">{formatRemaining(ptz?.deadline)}</p>
+            <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
+            {ptz?.blocked?.message ? (
+              <p className="w-full rounded border border-amber-500/50 bg-amber-950/40 p-1 text-xs text-amber-100">
+                {ptz.blocked.message}
+              </p>
+            ) : null}
+            <div className="grid w-full grid-cols-2 gap-0.5">
+              {ptz?.isOperator ? (
+                <>
+                  <button type="button" className="button-dark text-xs" onClick={() => setControllerOpen(true)}>
+                    Open controller
+                  </button>
+                  <button type="button" className="button-dark text-xs" disabled={pending} onClick={handleRelease}>
+                    Release
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="button-dark col-span-2 text-xs"
+                  disabled={pending || !isVerified}
+                  onClick={ptz?.queuedPosition ? handleRelease : handleClaim}
+                >
+                  {ptz?.queuedPosition ? 'Leave queue' : pending ? 'Requesting...' : 'Claim camera'}
+                </button>
+              )}
             </div>
-          </div>
-          {ptz?.blocked?.message ? (
-            <p className="w-full rounded border border-amber-500/50 bg-amber-950/40 p-1 text-xs text-amber-100">
-              {ptz.blocked.message}
-            </p>
-          ) : null}
-          <div className="flex w-full flex-wrap justify-center gap-1">
-            {ptz?.isOperator ? (
-              <>
-                <button type="button" className="button-dark text-xs" onClick={() => setControllerOpen(true)}>
-                  Open controller
-                </button>
-                <button type="button" className="button-dark text-xs" disabled={pending} onClick={handleRelease}>
-                  Release
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="button-dark text-xs"
-                disabled={pending || !isVerified}
-                onClick={ptz?.queuedPosition ? handleRelease : handleClaim}
-              >
-                {ptz?.queuedPosition ? 'Leave queue' : pending ? 'Requesting...' : 'Claim camera'}
-              </button>
-            )}
           </div>
         </div>
       </CardFrame>

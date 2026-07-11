@@ -149,3 +149,23 @@ Input/control implementation:
   - replay panel in sidebar
   - better indicators of light and OR modes
   - list of controls using keybind things
+- mobile:
+  - one sidebar on the right
+  - reuse rover drive control panel for camera movement
+  - reuse gpio toggle buttons for spotlight and IR
+  - reuse camera tilt slider for zoom
+  - relabeled variants where needed for reused mobile controls
+  - scroll sidebar down to see replay panel
+- both:
+  - the VIP panel
+    - sucks. 
+    - wasted space
+      - put snapshot and everything else side by side
+    - add a display of ptz's turn queue
+    - camera should open when you request control over it. no need to have it be another button to press
+    - should show state of camera
+  - the fullscreen interface
+    - should be inside a cardframe, with no title bar
+    - reuse anything whereever possible
+    - needs to be ACTUALLY FULLSCREEN, not with space around the edges anywhere
+    - needs to match the global styling, and use cardframes internally for stuff.
