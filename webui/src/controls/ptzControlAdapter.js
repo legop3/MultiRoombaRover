@@ -8,7 +8,7 @@ import { useSessionSelector } from '../context/SessionContext.jsx';
 
 const PTZ_STOP = { pan: 0, tilt: 0, zoom: 0 };
 const PTZ_SPEEDS = {
-  slow: 0.07,
+  slow: 0.05,
   medium: 0.5,
   fast: 1,
 };
