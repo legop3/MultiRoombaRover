@@ -28,7 +28,7 @@ function getSpeedModeConfig(speedMode) {
   return DRIVE_PAD_SPEED_MODES.find((mode) => mode.id === speedMode) || DRIVE_PAD_SPEED_MODES[1];
 }
 
-export default function ControlPadPanel({ disabled = false }) {
+export default function ControlPadPanel({ compact = false, disabled = false }) {
   const rawKeymap = useControlSelector((control) => control.state.keymap);
   const { setCameraPrecisionMode, setDriveVector, registerInputState } = useControlActions();
   const { value: inputSettings } = useSettingsNamespace('inputs', INPUT_SETTINGS_DEFAULTS);
@@ -163,8 +163,8 @@ export default function ControlPadPanel({ disabled = false }) {
   }, [disabled, setCameraPrecisionMode, stopDrivePad]);
 
   return (
-    <div className="mobile-touch-control flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900 text-slate-100 shadow-md">
-      <div className="mobile-touch-control grid grid-cols-3 gap-0.5 border-b border-slate-700 bg-slate-950 p-0.5">
+    <div className={`mobile-touch-control flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900 text-slate-100 shadow-md ${compact ? 'h-full' : ''}`}>
+      <div className={`mobile-touch-control grid grid-cols-3 gap-0.5 border-b border-slate-700 bg-slate-950 ${compact ? 'p-0.25' : 'p-0.5'}`}>
         {DRIVE_PAD_SPEED_MODES.map((mode) => {
           const active = speedMode === mode.id;
           const speedValue =
@@ -177,7 +177,7 @@ export default function ControlPadPanel({ disabled = false }) {
             <button
               key={mode.id}
               type="button"
-              className={`mobile-touch-control min-h-9 rounded-md px-1 text-xs font-semibold ${
+              className={`mobile-touch-control rounded-md px-1 text-xs font-semibold ${compact ? 'min-h-7' : 'min-h-9'} ${
                 active
                   ? 'bg-cyan-300 text-slate-950'
                   : 'bg-slate-800 text-slate-200'
@@ -186,7 +186,7 @@ export default function ControlPadPanel({ disabled = false }) {
               disabled={disabled}
             >
               <span className="block leading-tight">{mode.label}</span>
-              <span className="block font-mono text-[0.7rem] leading-tight">{speedValue}</span>
+              {!compact ? <span className="block font-mono text-[0.7rem] leading-tight">{speedValue}</span> : null}
             </button>
           );
         })}
@@ -194,6 +194,7 @@ export default function ControlPadPanel({ disabled = false }) {
       <div className="mobile-touch-control min-h-0 flex-1">
         <FloatingJoystick
           activeInputLabel={activeInputLabel}
+          compact={compact}
           disabled={disabled}
           onCellChange={handleCellChange}
           onStop={() => stopDrivePad('stop')}

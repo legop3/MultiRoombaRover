@@ -320,10 +320,10 @@ function PtzMobileZoomButtons({ disabled = false }) {
   );
 
   return (
-    <CardFrame title="Zoom" className="md:hidden" bodyClassName="grid grid-cols-2 gap-0.5 p-1 text-sm">
+    <div className="mobile-touch-control grid grid-cols-2 gap-0.5 text-sm">
       <button
         type="button"
-        className="mobile-touch-control button-dark min-h-12 text-xs disabled:opacity-50"
+        className="mobile-touch-control button-dark min-h-10 text-xs disabled:opacity-50"
         disabled={disabled}
         onPointerDown={startZoom(-1)}
         onPointerUp={stopFromPointer}
@@ -335,7 +335,7 @@ function PtzMobileZoomButtons({ disabled = false }) {
       </button>
       <button
         type="button"
-        className="mobile-touch-control button-dark min-h-12 text-xs disabled:opacity-50"
+        className="mobile-touch-control button-dark min-h-10 text-xs disabled:opacity-50"
         disabled={disabled}
         onPointerDown={startZoom(1)}
         onPointerUp={stopFromPointer}
@@ -345,29 +345,26 @@ function PtzMobileZoomButtons({ disabled = false }) {
       >
         Zoom in
       </button>
-      <div className="col-span-2 text-center text-[0.7rem] text-slate-400">
-        Hold to zoom, release to stop
-      </div>
-    </CardFrame>
+    </div>
   );
 }
 
 function PtzMobileControlsPanel({ ptz, disabled = false }) {
   return (
-    <>
+    <div className="mobile-touch-control space-y-0.5">
       <PtzMobileZoomButtons disabled={disabled} />
-      <CardFrame title="Movement" bodyClassName="h-56 min-h-0 p-0.5">
+      <div className="mobile-touch-control h-44 min-h-0">
         {/*
           Reuse the rover mobile movement card instead of building a second PTZ
           joystick. Its drive vector goes through the shared internal control
           layer, where the PTZ adapter already converts movement plus speed mode
           into camera pan/tilt commands.
         */}
-        <ControlPadPanel disabled={disabled} />
-      </CardFrame>
+        <ControlPadPanel compact disabled={disabled} />
+      </div>
       <PtzMobileZoomButtons disabled={disabled} />
       <PtzLightingControls ptz={ptz} disabled={disabled} />
-    </>
+    </div>
   );
 }
 
