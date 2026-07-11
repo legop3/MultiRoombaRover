@@ -144,3 +144,6 @@ Input/control implementation:
 - all movement controls should send stop commands on key/button release, blur, disconnect, controller close, or turn loss
 
 ## NEW UI STUFF
+- desktop:
+  - sidebar like there is now
+  - 
