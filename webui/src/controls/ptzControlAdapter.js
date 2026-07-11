@@ -77,6 +77,25 @@ function isSpotlightOn(light = {}) {
   return Boolean(Number(raw));
 }
 
+function normalizeIrMode(mode) {
+  const normalized = String(mode || '').trim().toLowerCase();
+  if (normalized === 'on') return 'On';
+  if (normalized === 'off') return 'Off';
+  return 'Auto';
+}
+
+function nextIrMode(currentMode) {
+  /*
+    The rover laser button becomes the PTZ camera's IR mode control while the
+    PTZ camera is active. Cycle all three modes exposed by this Reolink camera
+    instead of reducing the control to a two-state toggle.
+  */
+  const current = normalizeIrMode(currentMode);
+  if (current === 'Auto') return 'On';
+  if (current === 'On') return 'Off';
+  return 'Auto';
+}
+
 export function usePtzControlAdapter() {
   const socket = useSocket();
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
@@ -176,8 +195,9 @@ export function usePtzControlAdapter() {
   const setIr = useCallback(
     (nextOn) => {
       if (!isActive) return false;
-      const currentOff = String(ptz?.ir?.state || '').toLowerCase() === 'off';
-      const desiredState = typeof nextOn === 'boolean' ? (nextOn ? 'Auto' : 'Off') : currentOff ? 'Auto' : 'Off';
+      const desiredState = typeof nextOn === 'boolean'
+        ? (nextOn ? 'On' : 'Off')
+        : nextIrMode(ptz?.ir?.state);
       emitPtz('ptzCamera:ir', { state: desiredState });
       return true;
     },

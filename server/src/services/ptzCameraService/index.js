@@ -125,6 +125,18 @@ function normalizeSpotlightPayloadState(rawState) {
   return Boolean(Number(rawState));
 }
 
+function normalizeIrState(rawState) {
+  /*
+    Reolink accepts exactly Auto, On, and Off for this camera's IR LED control.
+    Normalize UI payloads at the server boundary so keyboard, mobile, and any
+    future direct socket callers all hit the same camera API contract.
+  */
+  const normalized = String(rawState || '').trim().toLowerCase();
+  if (normalized === 'on' || normalized === '1' || normalized === 'true') return 'On';
+  if (normalized === 'off' || normalized === '0' || normalized === 'false') return 'Off';
+  return 'Auto';
+}
+
 function passesMode(socket) {
   const mode = getMode();
   if (mode === MODES.LOCKDOWN) return isLockdownAdmin(socket);
@@ -650,11 +662,17 @@ async function setSpotlight(socket, payload = {}) {
 async function setIr(socket, payload = {}) {
   requireOperator(socket);
   return serializeVendorState(async () => {
-    const nextState = String(payload.state || '').toLowerCase() === 'off' ? 'Off' : 'Auto';
+    const nextState = normalizeIrState(payload.state);
     const client = await ensureReolinkClient();
-    state.ir = { ...(state.ir || {}), state: nextState };
+    /*
+      The camera requires channel inside IrLights. Without it, SetIrLights
+      returns param error (-4), while the optimistic local state makes the UI
+      look like the command worked. Keep the optimistic state, but send the
+      minimal payload the camera actually accepts.
+    */
+    state.ir = { ...(state.ir || {}), channel: 0, state: nextState };
     emitChange('ir-pending');
-    await client.api('SetIrLights', { IrLights: { state: nextState } });
+    await client.api('SetIrLights', { IrLights: { channel: 0, state: nextState } });
     await refreshVendorState();
     emitChange('ir');
     return state.ir;
