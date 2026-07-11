@@ -9,7 +9,7 @@ import { RESTART_DELAY_MS } from '../RoverMediaPlayer/constants.js';
 export const PTZ_CAMERA_ID = 'ptz-camera';
 
 const PTZ_AUDIO_RETRY_MS = 1000;
-const TERMINAL_WHEP_STATES = new Set(['error', 'failed', 'disconnected', 'closed', 'stopped']);
+const TERMINAL_WHEP_STATES = new Set(['error', 'failed', 'disconnected', 'closed']);
 const AUTHORIZATION_ERROR_RE = /not authorized/i;
 
 function isAuthorizationError(error) {
