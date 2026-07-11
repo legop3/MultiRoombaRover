@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import CardFrame from '../CardFrame/index.jsx';
 import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
+import ControlPadPanel from '../MobileControls/ControlPadPanel.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import KeyPill from './VipAudioUploadCard/KeyPill.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
@@ -351,6 +352,25 @@ function PtzMobileZoomButtons({ disabled = false }) {
   );
 }
 
+function PtzMobileControlsPanel({ ptz, disabled = false }) {
+  return (
+    <>
+      <PtzMobileZoomButtons disabled={disabled} />
+      <CardFrame title="Movement" bodyClassName="h-56 min-h-0 p-0.5">
+        {/*
+          Reuse the rover mobile movement card instead of building a second PTZ
+          joystick. Its drive vector goes through the shared internal control
+          layer, where the PTZ adapter already converts movement plus speed mode
+          into camera pan/tilt commands.
+        */}
+        <ControlPadPanel disabled={disabled} />
+      </CardFrame>
+      <PtzMobileZoomButtons disabled={disabled} />
+      <PtzLightingControls ptz={ptz} disabled={disabled} />
+    </>
+  );
+}
+
 function keyLabelFor(keymap, actionId) {
   return formatKeyLabel(keymap?.[actionId]?.[0]);
 }
@@ -438,6 +458,12 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
   const mobileSidebar = (
     <>
       <div className="shrink-0">
+        <PtzMobileControlsPanel ptz={ptz} disabled={!isOperator} />
+      </div>
+      <div className="shrink-0">
+        <ReplaySourcesPanel panelId="ptz-controller-replay-mobile" />
+      </div>
+      <div className="shrink-0">
         <PtzStatePanel
           ptz={ptz}
           onClose={onClose}
@@ -445,33 +471,14 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
           releaseDisabled={releasePending}
         />
       </div>
-      {isOperator ? (
-        <>
-          <div className="shrink-0">
-            <PtzLightingControls ptz={ptz} />
-          </div>
-          <div className="shrink-0">
-            <PtzMobileZoomButtons />
-          </div>
-        </>
-      ) : (
-        <div className="shrink-0">
-          <CardFrame title="Controls" bodyClassName="p-1 text-xs text-slate-400">
-            Live PTZ controls unlock when your camera turn is active.
-          </CardFrame>
-        </div>
-      )}
       <div className="shrink-0">
         <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
-      </div>
-      <div className="shrink-0">
-        <ReplaySourcesPanel panelId="ptz-controller-replay-mobile" />
       </div>
     </>
   );
 
   const sidebarWidthClass = isMobile
-    ? 'grid-cols-[minmax(0,1fr)_12rem]'
+    ? 'grid-cols-[minmax(0,1fr)_14rem]'
     : 'grid-cols-[minmax(0,1fr)_20rem]';
 
   const controller = (
