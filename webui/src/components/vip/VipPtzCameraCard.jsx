@@ -485,6 +485,12 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false, layout 
       if (response?.state?.isOperator) onMessage?.('PTZ camera turn active.');
       else if (response?.state?.queuedPosition) onMessage?.(`Joined PTZ queue at position ${response.state.queuedPosition}.`);
     } catch (err) {
+      /*
+        Rover-to-rover switch denial uses the browser alert popup for the
+        dock-and-charge message. PTZ claim denial should feel identical because
+        it is enforcing the same "do not abandon an undocked rover" rule.
+      */
+      alert(err.message || 'PTZ request failed.');
       onMessage?.(err.message || 'PTZ request failed.');
     } finally {
       setPending(false);
