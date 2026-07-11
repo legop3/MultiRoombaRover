@@ -8,9 +8,9 @@ import { useSessionSelector } from '../context/SessionContext.jsx';
 
 const PTZ_STOP = { pan: 0, tilt: 0, zoom: 0 };
 const PTZ_SPEEDS = {
-  slow: 0.22,
-  medium: 0.45,
-  fast: 0.72,
+  slow: 0.15,
+  medium: 0.5,
+  fast: 1,
 };
 const ZOOM_PULSE_MS = 220;
 
@@ -104,7 +104,7 @@ export function usePtzControlAdapter() {
   }, [emitPtz]);
 
   const sendMotion = useCallback(
-    (payload) => {
+    (payload, options = {}) => {
       if (!isActive) return false;
       const nextPayload = {
         pan: clampUnit(payload?.pan),
@@ -112,7 +112,7 @@ export function usePtzControlAdapter() {
         zoom: clampUnit(payload?.zoom),
       };
       const nextSignature = payloadSignature(nextPayload);
-      if (lastMotionSignatureRef.current === nextSignature) return true;
+      if (!options.force && lastMotionSignatureRef.current === nextSignature) return true;
       lastMotionSignatureRef.current = nextSignature;
       if (isIdlePayload(nextPayload)) {
         emitPtz('ptzCamera:stop');
@@ -141,7 +141,13 @@ export function usePtzControlAdapter() {
         stopMotion();
         return true;
       }
-      sendMotion({ pan: 0, tilt: 0, zoom: sign * PTZ_SPEEDS.medium });
+      /*
+        Zoom is different from pan/tilt because it is driven by repeated nudge
+        events from existing camera controls. Force each pulse through even when
+        the payload is identical, otherwise holding "camera up" only sends the
+        first zoom command and every later nudge is de-duped away.
+      */
+      sendMotion({ pan: 0, tilt: 0, zoom: sign * PTZ_SPEEDS.medium }, { force: true });
       if (zoomStopTimerRef.current) clearTimeout(zoomStopTimerRef.current);
       /*
         Existing rover camera controls are nudge/slider based, not hold-based.
