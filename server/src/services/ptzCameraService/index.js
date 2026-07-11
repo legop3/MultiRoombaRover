@@ -866,25 +866,41 @@ function startSnapshotPolling() {
   }, SNAPSHOT_POLL_MS);
 }
 
-function addSnapshotSubscription(socket) {
+function normalizeSnapshotIds(payload = {}) {
+  /*
+    PTZ only has one camera today, but accepting the same { ids } payload shape
+    as rover snapshots keeps the browser subscription lifecycle consistent.
+    Unknown ids are ignored rather than treated as separate PTZ cameras.
+  */
+  const rawIds = Array.isArray(payload.ids) ? payload.ids : [payload.id || PTZ_CAMERA_ID];
+  const ids = rawIds.map((id) => String(id || '').trim()).filter((id) => id === PTZ_CAMERA_ID);
+  return ids.length ? ids : [PTZ_CAMERA_ID];
+}
+
+function addSnapshotSubscription(socket, ids = [PTZ_CAMERA_ID]) {
+  if (!ids.includes(PTZ_CAMERA_ID)) return;
   if (!snapshotSubscribers.has(PTZ_CAMERA_ID)) snapshotSubscribers.set(PTZ_CAMERA_ID, new Set());
   snapshotSubscribers.get(PTZ_CAMERA_ID).add(socket.id);
   if (!socketSnapshotSubscriptions.has(socket.id)) socketSnapshotSubscriptions.set(socket.id, new Set());
   socketSnapshotSubscriptions.get(socket.id).add(PTZ_CAMERA_ID);
 }
 
-function removeSnapshotSubscriptions(socketId) {
+function removeSnapshotSubscriptions(socketId, ids = null) {
   const bucket = socketSnapshotSubscriptions.get(socketId);
   if (!bucket) return;
-  bucket.forEach((id) => {
+  const idsToRemove = ids ? new Set(ids) : bucket;
+  idsToRemove.forEach((id) => {
     const subscribers = snapshotSubscribers.get(id);
     if (subscribers) {
       subscribers.delete(socketId);
       if (!subscribers.size) snapshotSubscribers.delete(id);
     }
+    bucket.delete(id);
   });
-  socketSnapshotSubscriptions.delete(socketId);
-  snapshotLastSentBySocket.delete(socketId);
+  if (!bucket.size) {
+    socketSnapshotSubscriptions.delete(socketId);
+    snapshotLastSentBySocket.delete(socketId);
+  }
 }
 
 function sendSnapshotFrame(socket, buffer, ts) {
@@ -990,18 +1006,20 @@ function registerSocketHandlers() {
       }
     });
     socket.on('ptzCamera:snapshotSubscribe', (firstArg, secondArg) => {
-      const { cb } = normalizeSocketArgs(firstArg, secondArg);
+      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         if (!passesMode(socket)) throw new Error('Not authorized for PTZ snapshots');
-        addSnapshotSubscription(socket);
+        const ids = normalizeSnapshotIds(payload);
+        addSnapshotSubscription(socket, ids);
         if (lastSnapshotState?.frame) sendSnapshotFrame(socket, lastSnapshotState.frame, lastSnapshotState.ts);
-        cb({ ok: true, subscribed: [PTZ_CAMERA_ID] });
+        cb({ ok: true, subscribed: ids });
       } catch (err) {
         cb({ error: err.message });
       }
     });
-    socket.on('ptzCamera:snapshotUnsubscribe', () => {
-      removeSnapshotSubscriptions(socket.id);
+    socket.on('ptzCamera:snapshotUnsubscribe', (firstArg, secondArg) => {
+      const { payload } = normalizeSocketArgs(firstArg, secondArg);
+      removeSnapshotSubscriptions(socket.id, normalizeSnapshotIds(payload));
     });
     socket.on('disconnect', () => {
       if (state.operatorSocketId === socket.id) {

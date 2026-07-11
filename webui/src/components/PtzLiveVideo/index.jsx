@@ -29,6 +29,9 @@ export default function PtzLiveVideo({
   const videoRef = useRef(null);
   const retryTimerRef = useRef(null);
   const playTimerRef = useRef(null);
+  const enabledRef = useRef(enabled);
+  const fallbackRef = useRef(false);
+  const playerGenerationRef = useRef(0);
   const [status, setStatus] = useState('idle');
   const [detail, setDetail] = useState(null);
   const [restartToken, setRestartToken] = useState(0);
@@ -39,8 +42,30 @@ export default function PtzLiveVideo({
   const source = sources[PTZ_CAMERA_ID] || null;
   const shouldUseFallback = Boolean(source?.error && isAuthorizationError(source.error));
 
+  useEffect(() => {
+    enabledRef.current = enabled;
+  }, [enabled]);
+
+  useEffect(() => {
+    fallbackRef.current = shouldUseFallback;
+  }, [shouldUseFallback]);
+
+  useEffect(() => {
+    if (enabled && !shouldUseFallback) return undefined;
+    /*
+      A retry that was scheduled before the server denied live access should not
+      keep firing in snapshot mode. Clear it when live playback is no longer the
+      active display policy.
+    */
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    return undefined;
+  }, [enabled, shouldUseFallback]);
+
   const scheduleRestart = useCallback(() => {
-    if (!enabled || shouldUseFallback) return;
+    if (!enabledRef.current || fallbackRef.current) return;
     /*
       WHEP sessions are one-shot browser/server negotiations. When the camera
       reboots, the old PeerConnection and token can look alive enough to keep a
@@ -53,18 +78,25 @@ export default function PtzLiveVideo({
       retryTimerRef.current = null;
       setRestartToken(Date.now());
     }, RESTART_DELAY_MS);
-  }, [enabled, shouldUseFallback]);
+  }, []);
 
   useEffect(() => {
     if (!enabled || shouldUseFallback || !source?.url || !videoRef.current) return undefined;
     let active = true;
+    const generation = playerGenerationRef.current + 1;
+    playerGenerationRef.current = generation;
     const player = new WhepPlayer({
       url: source.url,
       token: source.token,
       video: videoRef.current,
       startMuted,
       onStatus: (nextStatus, info) => {
-        if (!active) return;
+        /*
+          Old PeerConnection callbacks can arrive after React has already
+          cleaned up this effect for a newer token. Only the currently-owned
+          generation is allowed to update status or schedule another restart.
+        */
+        if (!active || playerGenerationRef.current !== generation) return;
         const normalized = String(nextStatus || '').toLowerCase();
         setStatus(nextStatus || 'unknown');
         setDetail(info || null);
@@ -75,7 +107,7 @@ export default function PtzLiveVideo({
     });
 
     player.start().catch((err) => {
-      if (!active) return;
+      if (!active || playerGenerationRef.current !== generation) return;
       setStatus('error');
       setDetail(err.message || 'WHEP start failed');
       scheduleRestart();
@@ -95,13 +127,16 @@ export default function PtzLiveVideo({
   useEffect(() => {
     const video = videoRef.current;
     if (!enabled || shouldUseFallback || !source?.url || !video) return undefined;
+    const generation = playerGenerationRef.current;
 
     const handleEnded = () => {
+      if (playerGenerationRef.current !== generation) return;
       setStatus('stopped');
       setDetail('ended');
       scheduleRestart();
     };
     const handleError = () => {
+      if (playerGenerationRef.current !== generation) return;
       setStatus('error');
       setDetail(video.error?.message || 'video element error');
       scheduleRestart();
@@ -114,12 +149,6 @@ export default function PtzLiveVideo({
       video.removeEventListener('error', handleError);
     };
   }, [enabled, scheduleRestart, shouldUseFallback, source?.url]);
-
-  useEffect(() => {
-    if (status === 'stopped' && source?.url && !shouldUseFallback) {
-      scheduleRestart();
-    }
-  }, [scheduleRestart, shouldUseFallback, source?.url, status]);
 
   useEffect(() => {
     const video = videoRef.current;

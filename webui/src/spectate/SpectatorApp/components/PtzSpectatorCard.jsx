@@ -4,7 +4,7 @@
 // falls back to the PTZ snapshot feed that remote spectators are allowed to see.
 import PtzLiveVideo from '../../../components/PtzLiveVideo/index.jsx';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
-import { usePtzCameraSnapshot } from '../../../hooks/usePtzCameraSnapshot.js';
+import { PTZ_CAMERA_ID, usePtzCameraSnapshots } from '../../../hooks/usePtzCameraSnapshot.js';
 
 function formatRemaining(deadline) {
   const remaining = Math.max(0, Math.ceil((Number(deadline || 0) - Date.now()) / 1000));
@@ -41,7 +41,8 @@ function InfoRow({ label, value, tone = '' }) {
 }
 
 function PtzSnapshotFallback({ label, source }) {
-  const snapshot = usePtzCameraSnapshot({ enabled: true });
+  const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: true });
+  const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded bg-black">
       {snapshot?.objectUrl ? (

@@ -12,7 +12,7 @@ import KeyPill from './VipAudioUploadCard/KeyPill.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useControlSelector } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
-import { usePtzCameraSnapshot } from '../../hooks/usePtzCameraSnapshot.js';
+import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 import { isFeatureEnabled } from '../../lib/features.js';
 
 const PTZ_CAMERA_ID = 'ptz-camera';
@@ -304,7 +304,8 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
   const isOperator = Boolean(ptz?.isOperator);
   const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape';
   const { ptzRelease } = useSessionActions();
-  const snapshot = usePtzCameraSnapshot({ enabled: open && !isOperator });
+  const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !isOperator });
+  const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   const [releasePending, setReleasePending] = useState(false);
 
   if (!open) return null;
@@ -418,7 +419,8 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false, layout 
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
   const { ptzClaim, ptzRelease } = useSessionActions();
-  const snapshot = usePtzCameraSnapshot({ enabled: Boolean(featureEnabled) });
+  const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: Boolean(featureEnabled) });
+  const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   const [controllerOpen, setControllerOpen] = useState(false);
   const [pending, setPending] = useState(false);
 
