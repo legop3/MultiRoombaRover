@@ -276,11 +276,10 @@ function startPublisher() {
     driven live. Sliced threads allow x264 to keep some parallelism without
     waiting on future frames the way normal frame-threading can.
 
-    The RTSP and muxer flags below bias the whole pipeline toward "latest frame
-    wins". If the server falls behind, ffmpeg should discard stale video frames
-    instead of spending CPU to render a delayed backlog. That matters more for
-    PTZ control than perfect frame delivery because delayed motion feedback makes
-    the camera hard to aim.
+    Keep RTSP demuxing conservative here. More aggressive "drop stale frames"
+    flags caused this camera stream to freeze after running for a while, so the
+    safer latency knob is to keep the encoder light and avoid building delay
+    inside x264 itself.
   */
   const proc = spawn('ffmpeg', [
     '-hide_banner',
@@ -289,26 +288,12 @@ function startPublisher() {
     '-nostdin',
     '-fflags',
     'nobuffer',
-    '-avioflags',
-    'direct',
     '-flags',
     'low_delay',
-    '-use_wallclock_as_timestamps',
-    '1',
-    '-max_delay',
-    '0',
-    '-probesize',
-    '32768',
-    '-analyzeduration',
-    '0',
     '-rtsp_transport',
     'tcp',
     '-i',
     input,
-    '-frame_drop_threshold',
-    '1',
-    '-fps_mode',
-    'drop',
     '-map',
     '0:v:0',
     '-map',

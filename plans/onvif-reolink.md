@@ -146,4 +146,6 @@ Input/control implementation:
 ## NEW UI STUFF
 - desktop:
   - sidebar like there is now
-  - 
+  - replay panel in sidebar
+  - better indicators of light and OR modes
+  - list of controls using keybind things
