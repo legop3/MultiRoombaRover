@@ -240,7 +240,10 @@ function startPublisher() {
     ultrafast avoids deep analysis, zerolatency disables x264 buffering, bf=0
     removes B-frames, and the 20-frame GOP matches the camera's observed 20fps
     autotrack stream so the browser gets frequent keyframes without forcing a
-    huge bitrate spike.
+    huge bitrate spike. The explicit x264 params turn off lookahead buffering
+    that is useful for compression quality but harmful when the camera is being
+    driven live. Sliced threads allow x264 to keep some parallelism without
+    waiting on future frames the way normal frame-threading can.
   */
   const proc = spawn('ffmpeg', [
     '-hide_banner',
@@ -262,6 +265,10 @@ function startPublisher() {
     'ultrafast',
     '-tune',
     'zerolatency',
+    '-threads',
+    '1',
+    '-x264-params',
+    'sliced-threads=1:sync-lookahead=0:rc-lookahead=0:keyint=20:min-keyint=20:scenecut=0',
     '-bf',
     '0',
     '-g',
@@ -291,7 +298,7 @@ function startPublisher() {
       }, 1500);
     }
   });
-  logger.info('Started PTZ stream publisher', { streamPath: PTZ_STREAM_PATH });
+  logger.info('Started PTZ stream publisher', { streamPath: PTZ_STREAM_PATH, encoder: 'libx264' });
 }
 
 async function ensureReolinkClient() {
