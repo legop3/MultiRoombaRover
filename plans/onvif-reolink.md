@@ -142,3 +142,4 @@ Input/control implementation:
 - server must enforce that only the active PTZ operator can send movement/zoom/control commands
 - client-side input interception is only for UX; server-side operator checks are the real authority
 - all movement controls should send stop commands on key/button release, blur, disconnect, controller close, or turn loss
+
