@@ -3,7 +3,6 @@
 // Scope: Owns PTZ UI state only; server-side PTZ ownership, rover handoff, and command authorization remain authoritative.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CardFrame from '../CardFrame/index.jsx';
-import CameraTiltControl from '../CameraTiltControl/index.jsx';
 import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
@@ -16,8 +15,7 @@ import { isFeatureEnabled } from '../../lib/features.js';
 
 const PTZ_CAMERA_ID = 'ptz-camera';
 const PTZ_AUDIO_RETRY_MS = 1000;
-const PTZ_ZOOM_SLIDER_MIN = -1;
-const PTZ_ZOOM_SLIDER_MAX = 1;
+const PTZ_ZOOM_SPEED = 0.55;
 
 function formatRemaining(deadline) {
   const remaining = Math.max(0, Math.ceil((Number(deadline || 0) - Date.now()) / 1000));
@@ -291,61 +289,81 @@ function PtzLightingControls({ ptz, disabled = false }) {
   );
 }
 
-function PtzZoomControl({ disabled = false }) {
+function PtzMobileZoomButtons({ disabled = false }) {
   const { ptzMove, ptzStop } = useSessionActions();
-  const sendZoom = useCallback(
-    (value) => {
-      if (disabled) return;
-      const zoom = Math.max(-1, Math.min(1, Number(value) || 0));
-      if (!zoom) {
-        ptzStop().catch(() => {});
-        return;
-      }
-      ptzMove({ pan: 0, tilt: 0, zoom }).catch(() => {});
-    },
-    [disabled, ptzMove, ptzStop],
-  );
   const stopZoom = useCallback(() => {
     ptzStop().catch(() => {});
   }, [ptzStop]);
+  const startZoom = useCallback(
+    (direction) => (event) => {
+      /*
+        Mobile needs explicit zoom targets because the regular mobile drive pad
+        is already used for pan/tilt. Desktop does not render these buttons; it
+        uses the mapped camera up/down controls shown in the reference panel.
+      */
+      event.preventDefault();
+      if (disabled) return;
+      ptzMove({ pan: 0, tilt: 0, zoom: direction * PTZ_ZOOM_SPEED }).catch(() => {});
+    },
+    [disabled, ptzMove],
+  );
+  const stopFromPointer = useCallback(
+    (event) => {
+      event?.preventDefault?.();
+      if (disabled) return;
+      stopZoom();
+    },
+    [disabled, stopZoom],
+  );
 
   return (
-    <CardFrame title="Zoom" bodyClassName="p-1 text-sm">
-      <CameraTiltControl
-        value={0}
-        min={PTZ_ZOOM_SLIDER_MIN}
-        max={PTZ_ZOOM_SLIDER_MAX}
-        step={1}
-        label="Zoom"
+    <CardFrame title="Zoom" className="md:hidden" bodyClassName="grid grid-cols-2 gap-0.5 p-1 text-sm">
+      <button
+        type="button"
+        className="mobile-touch-control button-dark min-h-12 text-xs disabled:opacity-50"
         disabled={disabled}
-        onChange={sendZoom}
-        onCommit={stopZoom}
-        className="rounded-xl border-2 border-emerald-300/70 bg-emerald-900 px-1 py-1 text-emerald-50"
-        labelRowClass="text-xs text-emerald-100"
-        labelClass="text-sm font-semibold"
-        valueClass="hidden"
-        sliderClass="w-full"
-        accentClass="accent-emerald-400"
-        endpointClass="text-[0.7rem] text-emerald-100/80"
-        endpointLabelClass="w-14"
-      />
-      <div className="mt-0.5 flex justify-between text-[0.7rem] text-slate-400">
-        <span>out</span>
-        <span>release stops</span>
-        <span>in</span>
+        onPointerDown={startZoom(-1)}
+        onPointerUp={stopFromPointer}
+        onPointerCancel={stopFromPointer}
+        onPointerLeave={stopFromPointer}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        Zoom out
+      </button>
+      <button
+        type="button"
+        className="mobile-touch-control button-dark min-h-12 text-xs disabled:opacity-50"
+        disabled={disabled}
+        onPointerDown={startZoom(1)}
+        onPointerUp={stopFromPointer}
+        onPointerCancel={stopFromPointer}
+        onPointerLeave={stopFromPointer}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        Zoom in
+      </button>
+      <div className="col-span-2 text-center text-[0.7rem] text-slate-400">
+        Hold to zoom, release to stop
       </div>
     </CardFrame>
   );
 }
 
+function keyLabelFor(keymap, actionId) {
+  return formatKeyLabel(keymap?.[actionId]?.[0]);
+}
+
 function PtzControlReference() {
   const keymap = useControlSelector((control) => control.state.keymap);
   const rows = [
-    ['Pan / tilt', 'Drive movement'],
-    ['Zoom in', formatKeyLabel(keymap?.cameraUp?.[0]) || 'camera up'],
-    ['Zoom out', formatKeyLabel(keymap?.cameraDown?.[0]) || 'camera down'],
-    ['Spotlight', formatKeyLabel(keymap?.headlightToggle?.[0]) || 'headlight'],
-    ['Infrared mode', formatKeyLabel(keymap?.laserToggle?.[0]) || 'laser'],
+    ['Tilt up', keyLabelFor(keymap, 'driveForward')],
+    ['Tilt down', keyLabelFor(keymap, 'driveBackward')],
+    ['Pan left', keyLabelFor(keymap, 'driveLeft')],
+    ['Pan right', keyLabelFor(keymap, 'driveRight')],
+    ['Zoom in', keyLabelFor(keymap, 'cameraUp')],
+    ['Zoom out', keyLabelFor(keymap, 'cameraDown')],
+    ['Spotlight', keyLabelFor(keymap, 'headlightToggle')],
+    ['Infrared mode', keyLabelFor(keymap, 'laserToggle')],
   ];
 
   return (
@@ -410,7 +428,7 @@ function PtzController({ open, onClose }) {
                   <PtzLightingControls ptz={ptz} />
                 </div>
                 <div className="shrink-0">
-                  <PtzZoomControl />
+                  <PtzMobileZoomButtons />
                 </div>
               </>
             ) : (
