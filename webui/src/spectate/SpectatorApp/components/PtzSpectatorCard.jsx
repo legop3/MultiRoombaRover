@@ -2,13 +2,9 @@
 // Purpose: Adds the single room PTZ camera to the spectator rover grid.
 // Scope: Uses live WHEP only when the server authorizes this socket; otherwise
 // falls back to the PTZ snapshot feed that remote spectators are allowed to see.
-import { useEffect, useRef, useState } from 'react';
+import PtzLiveVideo from '../../../components/PtzLiveVideo/index.jsx';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import { usePtzCameraSnapshot } from '../../../hooks/usePtzCameraSnapshot.js';
-import { useVideoRequests } from '../../../hooks/useVideoRequests.js';
-import { WhepPlayer } from '../../../lib/whepPlayer.js';
-
-const PTZ_CAMERA_ID = 'ptz-camera';
 
 function formatRemaining(deadline) {
   const remaining = Math.max(0, Math.ceil((Number(deadline || 0) - Date.now()) / 1000));
@@ -44,60 +40,37 @@ function InfoRow({ label, value, tone = '' }) {
   );
 }
 
-function PtzLiveOrSnapshot({ label }) {
-  const videoRef = useRef(null);
-  const playerRef = useRef(null);
-  const [liveStatus, setLiveStatus] = useState('connecting');
-  const sources = useVideoRequests(
-    [{ type: 'ptz', id: PTZ_CAMERA_ID, key: PTZ_CAMERA_ID }],
-    { enabled: true },
-  );
-  const source = sources[PTZ_CAMERA_ID] || null;
-  const snapshot = usePtzCameraSnapshot({ enabled: Boolean(source?.error || !source?.url) });
-  const useSnapshot = Boolean(source?.error || !source?.url);
-
-  useEffect(() => {
-    if (useSnapshot || !source?.url || !videoRef.current) return undefined;
-    /*
-      Spectator live access is decided by the server's video session policy.
-      Local spectators get a WHEP URL, while remote spectators receive an error
-      here and automatically fall back to the low-bandwidth snapshot feed.
-    */
-    const player = new WhepPlayer({
-      url: source.url,
-      token: source.token,
-      video: videoRef.current,
-      startMuted: true,
-      onStatus: setLiveStatus,
-    });
-    playerRef.current = player;
-    player.start().catch((err) => setLiveStatus(err.message || 'error'));
-    return () => {
-      player.stop();
-      playerRef.current = null;
-    };
-  }, [source?.token, source?.url, useSnapshot]);
-
+function PtzSnapshotFallback({ label, source }) {
+  const snapshot = usePtzCameraSnapshot({ enabled: true });
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded bg-black">
-      {useSnapshot ? (
-        snapshot?.objectUrl ? (
-          <img src={snapshot.objectUrl} alt={label} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
-            {snapshot?.error || source?.error || 'Waiting for PTZ snapshot...'}
-          </div>
-        )
+      {snapshot?.objectUrl ? (
+        <img src={snapshot.objectUrl} alt={label} className="h-full w-full object-cover" />
       ) : (
-        <video ref={videoRef} className="h-full w-full object-contain" playsInline autoPlay muted />
+        <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
+          {snapshot?.error || source?.error || 'Waiting for PTZ snapshot...'}
+        </div>
       )}
       <div className="pointer-events-none absolute left-0 top-0 bg-black/70 px-1 py-0.5 text-xs font-semibold text-white">
         {label}
       </div>
       <div className="pointer-events-none absolute bottom-0 left-0 m-1 rounded bg-black/70 px-1 py-0.5 text-[0.7rem] text-slate-100">
-        {useSnapshot ? snapshot?.status || 'snapshot' : liveStatus}
+        {snapshot?.status || 'snapshot'}
       </div>
     </div>
+  );
+}
+
+function PtzLiveOrSnapshot({ label }) {
+  return (
+    <PtzLiveVideo
+      enabled
+      startMuted
+      label={label}
+      className="relative aspect-video w-full overflow-hidden rounded bg-black"
+      statusClassName="pointer-events-none absolute bottom-0 left-0 m-1 rounded bg-black/70 px-1 py-0.5 text-[0.7rem] text-slate-100"
+      fallback={({ source }) => <PtzSnapshotFallback label={label} source={source} />}
+    />
   );
 }
 

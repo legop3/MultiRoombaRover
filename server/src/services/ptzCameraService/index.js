@@ -756,6 +756,81 @@ async function setIr(socket, payload = {}) {
   });
 }
 
+async function disableEmittersForIdle() {
+  /*
+    Idle cleanup is a server-owned safety action, not a user control action, so
+    it intentionally does not go through requireOperator(). If nobody is using
+    the camera, the system still needs a way to leave every camera-side emitter
+    in a known off state.
+  */
+  if (!enabled) {
+    return { action: 'disablePtzEmitters', skipped: true, reason: 'ptzDisabled' };
+  }
+
+  await initialize();
+  if (!state.initialized) {
+    return {
+      action: 'disablePtzEmitters',
+      success: false,
+      error: state.error || 'PTZ camera is not ready',
+    };
+  }
+
+  return serializeVendorState(async () => {
+    const client = await ensureReolinkClient();
+    const lightPayload = { channel: 0, state: spotlightCameraStateForLogicalOn(false) };
+    const irPayload = { channel: 0, state: normalizeIrState('off') };
+    const failures = [];
+
+    /*
+      Set the public state before the API calls finish so the UI immediately
+      reflects the idle policy. If a camera call fails, the result still records
+      that failure and the next vendor refresh can correct the optimistic state.
+    */
+    state.light = normalizeSpotlightState({
+      ...(state.light || {}),
+      ...lightPayload,
+      on: false,
+    });
+    state.ir = {
+      ...(state.ir || {}),
+      ...irPayload,
+    };
+    emitChange('idle-emitters-off-pending');
+
+    try {
+      await client.api('SetWhiteLed', { WhiteLed: lightPayload });
+    } catch (err) {
+      failures.push({ control: 'spotlight', error: err.message });
+    }
+
+    try {
+      await client.api('SetIrLights', { IrLights: irPayload });
+    } catch (err) {
+      failures.push({ control: 'ir', error: err.message });
+    }
+
+    /*
+      Read back once after the writes so stale optimistic state does not linger
+      forever. The existing spotlight button path delays verification because it
+      is user-facing and frequently toggled; idle fires rarely, so one ordered
+      refresh keeps the final state simple.
+    */
+    try {
+      await refreshVendorState();
+    } catch (err) {
+      failures.push({ control: 'refresh', error: err.message });
+    }
+
+    emitChange('idle-emitters-off');
+    return {
+      action: 'disablePtzEmitters',
+      success: failures.length === 0,
+      failures,
+    };
+  });
+}
+
 function canRequestLiveVideo(socket) {
   if (!enabled || !passesMode(socket)) return false;
   if (state.operatorSocketId === socket?.id) return true;
@@ -973,6 +1048,7 @@ module.exports = {
   ptzCameraEvents: events,
   getPublicState,
   canRequestLiveVideo,
+  disableEmittersForIdle,
   getReplaySource: () => enabled && isReplayEnabled()
     ? { type: 'ptz', id: PTZ_CAMERA_ID, label: cameraConfig.name || 'PTZ Camera' }
     : null,

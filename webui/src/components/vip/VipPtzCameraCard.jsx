@@ -6,18 +6,16 @@ import { createPortal } from 'react-dom';
 import CardFrame from '../CardFrame/index.jsx';
 import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
 import ControlPadPanel from '../MobileControls/ControlPadPanel.jsx';
+import PtzLiveVideo from '../PtzLiveVideo/index.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import KeyPill from './VipAudioUploadCard/KeyPill.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useControlSelector } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { usePtzCameraSnapshot } from '../../hooks/usePtzCameraSnapshot.js';
-import { useVideoRequests } from '../../hooks/useVideoRequests.js';
-import { WhepPlayer } from '../../lib/whepPlayer.js';
 import { isFeatureEnabled } from '../../lib/features.js';
 
 const PTZ_CAMERA_ID = 'ptz-camera';
-const PTZ_AUDIO_RETRY_MS = 1000;
 const PTZ_ZOOM_SPEED = 0.55;
 
 function formatRemaining(deadline) {
@@ -144,115 +142,6 @@ function PtzStatePanel({ ptz, onClose, onRelease, releaseDisabled = false }) {
         </button>
       ) : null}
     </CardFrame>
-  );
-}
-
-function PtzLiveVideo({ enabled }) {
-  const videoRef = useRef(null);
-  const playerRef = useRef(null);
-  const retryTimerRef = useRef(null);
-  const playTimerRef = useRef(null);
-  const [status, setStatus] = useState('idle');
-  const [retryVersion, setRetryVersion] = useState(0);
-  const sources = useVideoRequests(
-    [{ type: 'ptz', id: PTZ_CAMERA_ID, key: PTZ_CAMERA_ID }],
-    { enabled, version: retryVersion },
-  );
-  const source = sources[PTZ_CAMERA_ID] || null;
-
-  const scheduleRetry = useCallback(() => {
-    if (!enabled || retryTimerRef.current) return;
-    /*
-      A failed WHEP POST consumes the short-lived video token and leaves the
-      PeerConnection in a terminal state. Requesting a fresh server session is
-      the simplest reliable retry path, and it matches how rover playback gets
-      a new authorization token after reconnects.
-    */
-    retryTimerRef.current = setTimeout(() => {
-      retryTimerRef.current = null;
-      setRetryVersion((value) => value + 1);
-    }, 1500);
-  }, [enabled]);
-
-  useEffect(() => {
-    if (!enabled || !source?.url || !videoRef.current) return undefined;
-    /*
-      WhepPlayer already owns PeerConnection setup, low-latency hints, auth
-      headers, and cleanup for rover video. Reusing it keeps PTZ video on the
-      same MediaMTX browser path as the rest of the app.
-    */
-    const player = new WhepPlayer({
-      url: source.url,
-      token: source.token,
-      video: videoRef.current,
-      startMuted: false,
-      onStatus: (nextStatus) => {
-        setStatus(nextStatus);
-        if (['error', 'failed', 'disconnected', 'closed'].includes(String(nextStatus || '').toLowerCase())) {
-          scheduleRetry();
-        }
-      },
-    });
-    playerRef.current = player;
-    player.start().catch((err) => {
-      setStatus(err.message || 'error');
-      scheduleRetry();
-    });
-    return () => {
-      player.stop();
-      playerRef.current = null;
-    };
-  }, [enabled, scheduleRetry, source?.token, source?.url]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!enabled || !source?.url || !video) {
-      if (playTimerRef.current) clearInterval(playTimerRef.current);
-      playTimerRef.current = null;
-      return undefined;
-    }
-    /*
-      The server now publishes inline Opus audio on the PTZ WHEP stream. The
-      shared WHEP helper starts playback once, but browsers can still reject or
-      pause audible media depending on the exact timing of the fullscreen/user
-      gesture. Retry the same element with muted=false so unmuting is not a
-      manual DevTools-only operation.
-    */
-    const attemptPlay = () => {
-      const target = videoRef.current;
-      if (!target) return;
-      target.muted = false;
-      if (!target.paused && !target.ended) return;
-      target.play().catch(() => {});
-    };
-    attemptPlay();
-    playTimerRef.current = setInterval(attemptPlay, PTZ_AUDIO_RETRY_MS);
-    return () => {
-      if (playTimerRef.current) clearInterval(playTimerRef.current);
-      playTimerRef.current = null;
-    };
-  }, [enabled, source?.url, status]);
-
-  useEffect(() => {
-    return () => {
-      if (retryTimerRef.current) {
-        clearTimeout(retryTimerRef.current);
-        retryTimerRef.current = null;
-      }
-      if (playTimerRef.current) {
-        clearInterval(playTimerRef.current);
-        playTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  return (
-    <div className="relative h-full w-full bg-black">
-      <video ref={videoRef} className="h-full w-full object-contain" playsInline autoPlay />
-      <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs text-slate-100">
-        {source?.error || status}
-      </div>
-    </div>
   );
 }
 
@@ -500,7 +389,11 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
         bodyClassName={`grid h-full min-h-0 overflow-hidden ${sidebarWidthClass}`}
       >
         <main className="relative min-h-0 min-w-0 bg-black">
-          {isOperator ? <PtzLiveVideo enabled /> : <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />}
+          {isOperator ? (
+            <PtzLiveVideo enabled startMuted={false} />
+          ) : (
+            <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
+          )}
         </main>
         <aside className="flex h-full min-h-0 items-stretch overflow-hidden border-l border-neutral-600 bg-neutral-950 text-sm">
           <div className="flex min-h-0 w-full flex-col gap-0.5 overflow-y-auto p-0.5">

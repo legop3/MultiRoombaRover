@@ -7,6 +7,7 @@ const { issueCommand } = require('../commandService');
 const homeAssistantService = require('../homeAssistantService');
 const neatoService = require('../neatoService');
 const liftService = require('../liftService');
+const ptzCameraService = require('../ptzCameraService');
 const {
   HEADLIGHT_DISABLE_ACTION,
   LASER_DISABLE_ACTION,
@@ -103,6 +104,17 @@ async function disableAllRoverLasers() {
   return { action: 'disableRoverLasers', attempted, failed };
 }
 
+async function disablePtzEmitters() {
+  /*
+    The PTZ camera has its own light APIs and ownership rules, so the idle
+    service delegates the actual Reolink calls to ptzCameraService instead of
+    pretending they are rover commands. This keeps idleService responsible only
+    for "idle fired; run cleanup actions" and keeps camera-specific payload
+    details beside the rest of the PTZ integration.
+  */
+  return ptzCameraService.disableEmittersForIdle();
+}
+
 async function sendNeatoHome() {
   try {
     await neatoService.sendHome();
@@ -126,6 +138,7 @@ const idleActions = [
   // dockAllRovers,
   disableAllRoverHeadlights,
   disableAllRoverLasers,
+  disablePtzEmitters,
   sendNeatoHome,
   raiseLift,
 ];
