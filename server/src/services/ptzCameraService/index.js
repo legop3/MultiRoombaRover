@@ -6,7 +6,6 @@ const fs = require('fs/promises');
 const path = require('path');
 const { spawn } = require('child_process');
 const { Cam } = require('onvif');
-const { ReolinkClient } = require('reolink-nvr-api');
 
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('ptzCamera');
@@ -53,6 +52,7 @@ const state = {
 
 let onvifCam = null;
 let reolinkClient = null;
+let reolinkModulePromise = null;
 let turnTimer = null;
 let blockedTimer = null;
 let publisherProcess = null;
@@ -234,6 +234,16 @@ function startPublisher() {
 
 async function ensureReolinkClient() {
   if (reolinkClient) return reolinkClient;
+  /*
+    reolink-nvr-api is published as an ESM-only package. This server is still
+    CommonJS, so a top-level require() fails before the service can even start.
+    Dynamic import keeps the server bootable and only loads the vendor SDK when
+    spotlight or IR state is actually queried.
+  */
+  if (!reolinkModulePromise) {
+    reolinkModulePromise = import('reolink-nvr-api');
+  }
+  const { ReolinkClient } = await reolinkModulePromise;
   reolinkClient = new ReolinkClient({
     host: cameraConfig.host,
     username: cameraConfig.username,
