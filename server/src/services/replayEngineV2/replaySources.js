@@ -3,6 +3,7 @@
 // Scope: Handles user-visible replay source catalogs and default source selection rules.
 const roverManager = require('../roverManager');
 const { getRoomCameras } = require('../roomCameraService');
+const ptzCameraService = require('../ptzCameraService');
 
 function getReplaySources(socket = null) {
   const roster = socket ? roverManager.getRosterForSocket(socket) : roverManager.getRoster();
@@ -21,7 +22,10 @@ function getReplaySources(socket = null) {
     label: camera.name || camera.id,
   }));
 
-  return [...roverSources, ...roomSources];
+  const ptzSource = ptzCameraService.getReplaySource();
+  const ptzSources = ptzSource ? [ptzSource] : [];
+
+  return [...roverSources, ...roomSources, ...ptzSources];
 }
 
 function normalizeSource(entry) {
@@ -67,11 +71,14 @@ function getDefaultWebSources(assignment = {}, socket = null) {
 }
 
 function getDefaultDiscordSources() {
-  return getRoomCameras().map((camera) => ({
+  const sources = getRoomCameras().map((camera) => ({
     type: 'room',
     id: String(camera.id),
     label: camera.name || camera.id,
   }));
+  const ptzSource = ptzCameraService.getReplaySource();
+  if (ptzSource) sources.push(ptzSource);
+  return sources;
 }
 
 module.exports = {

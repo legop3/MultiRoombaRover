@@ -8,6 +8,7 @@ const logger = require('../../globals/logger').child('replayEngineV2');
 const { BUFFER_SECONDS, SEGMENT_SECONDS } = require('./constants');
 const { workers, segmentIndex } = require('./state');
 const { sourceKey, sourceDirForKey } = require('./sources');
+const ptzCameraService = require('../ptzCameraService');
 
 async function ensureDir(dir) {
   await fsp.mkdir(dir, { recursive: true });
@@ -123,6 +124,8 @@ function createSegmentStore({ getActiveSegmentRoot }) {
     for (const camera of getRoomCameras()) {
       replaySources.push({ type: 'room', id: String(camera.id), label: camera.name || camera.id });
     }
+    const ptzSource = ptzCameraService.getReplaySource();
+    if (ptzSource) replaySources.push(ptzSource);
 
     for (const source of replaySources) {
       const key = sourceKey({ sourceType: source.type, kind: 'video', id: String(source.id) });

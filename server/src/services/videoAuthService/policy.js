@@ -11,6 +11,7 @@ function createVideoAuthPolicy(deps) {
     isVerified,
     turnService,
     roverManager,
+    ptzCameraService,
     getSocketIp,
     isLocalNetwork,
   } = deps;
@@ -38,6 +39,10 @@ function createVideoAuthPolicy(deps) {
       if (!roverManager.canSeeRover(roverId, socket)) {
         return false;
       }
+    }
+
+    if (streamInfo.type === 'ptz') {
+      return ptzCameraService.canRequestLiveVideo(socket);
     }
 
     if (sourceType === 'roverMic' && action === 'publish') {

@@ -10,6 +10,7 @@ const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
 const { isVerified } = require('../verificationService');
 const turnService = require('../turnService');
 const roverManager = require('../roverManager');
+const ptzCameraService = require('../ptzCameraService');
 const { getRequestIp, getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
 const { logAdminEvent } = require('../adminLogService');
 
@@ -26,6 +27,7 @@ const { canAccessStream } = createVideoAuthPolicy({
   isVerified,
   turnService,
   roverManager,
+  ptzCameraService,
   getSocketIp,
   isLocalNetwork,
 });

@@ -4,6 +4,7 @@
 const path = require('path');
 const roverManager = require('../roverManager');
 const { getRoomCameras } = require('../roomCameraService');
+const ptzCameraService = require('../ptzCameraService');
 const { FFMPEG_BIN, SEGMENT_SECONDS, TARGET_FPS } = require('./constants');
 
 function sourceKey(source) {
@@ -46,6 +47,8 @@ function listDesiredSources() {
     if (!streamUrl) continue;
     sources.push({ id: String(camera.id), sourceType: 'room', kind: 'video', label: camera.name || camera.id, inputUrl: streamUrl });
   }
+  const ptzSource = ptzCameraService.getReplayWorkerSource();
+  if (ptzSource) sources.push(ptzSource);
   return sources;
 }
 

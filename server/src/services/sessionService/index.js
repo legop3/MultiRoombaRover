@@ -10,6 +10,7 @@ const { managerEvents } = roverManager;
 const assignmentService = require('../assignmentService');
 const { getActiveDrivers, getTurnQueues, turnEvents } = require('../turnService');
 const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
+const { getPublicState: getPtzCameraState, ptzCameraEvents } = require('../ptzCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
 const { getState: getNeatoState, neatoEvents } = require('../neatoService');
 const { getState: getLiftState, liftEvents } = require('../liftService');
@@ -107,6 +108,7 @@ function buildSession(socket) {
     activeDrivers,
     turnQueues,
     roomCameras: getRoomCameras(),
+    ptzCamera: getPtzCameraState(socket),
     homeAssistant: getHomeAssistantState(),
     neato: getNeatoState(),
     lift: getLiftState(),
@@ -278,6 +280,11 @@ turnEvents.on('queue', (event = {}) => {
 
 roomCameraEvents.on('update', () => {
   logger.info('Room camera change detected; syncing all clients');
+  syncAll();
+});
+
+ptzCameraEvents.on('change', () => {
+  logger.info('PTZ camera state change; syncing all clients');
   syncAll();
 });
 

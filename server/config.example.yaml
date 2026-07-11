@@ -128,6 +128,19 @@ roomCameras:
       url: "http://192.168.0.51/snapshot.jpg"
       streamUrl: "http://192.168.0.51/stream.mjpg"
 
+ptzCamera:
+  enabled: false
+  name: "PTZ Camera"
+  host: "192.168.0.8"
+  onvifPort: 8000
+  username: "admin"
+  password: "REPLACE_WITH_CAMERA_PASSWORD"
+  # The Reolink TrackMix autotrack profile was token 003 during commissioning.
+  # Keeping this configurable lets firmware/profile resets be fixed without code
+  # changes while the integration still remains a single-camera feature.
+  profileToken: "003"
+  turnDurationMs: 300000
+
 kinect:
   enabled: false
   # Capture requests are global across 3d/color so one person cannot spam room

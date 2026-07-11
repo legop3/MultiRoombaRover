@@ -137,6 +137,22 @@ function createRoverLifecycle(deps) {
     return false;
   }
 
+  function canLeaveCurrentRover(socket, options = {}) {
+    const currentId = getPrimaryRoverForSocket(socket.id);
+    /*
+      Leaving a rover is only risky when this socket is the last person attached
+      to an undocked rover. The same rule is used for rover-to-rover switching
+      and PTZ camera claiming so there is exactly one definition of "do not
+      abandon a rover in the room".
+    */
+    if (!currentId || currentId === options.targetRoverId) return { ok: true, currentId };
+    const currentRecord = rovers.get(currentId);
+    if (!currentRecord) return { ok: true, currentId };
+    if (hasOtherDrivers(currentRecord, socket.id)) return { ok: true, currentId };
+    if (isDockedAndCharging(currentRecord)) return { ok: true, currentId };
+    return { ok: false, currentId, message: 'Dock and charge your current rover before switching.' };
+  }
+
   function canSwitchRover(socket, targetRoverId, options = {}) {
     const target = rovers.get(targetRoverId);
     if (!target) return { ok: false, message: 'Unknown rover' };
@@ -145,13 +161,7 @@ function createRoverLifecycle(deps) {
       allowClosedPrivateGrantInLockdown: Boolean(options.allowClosedPrivateGrantInLockdown),
     });
     if (denied) return { ok: false, message: denied };
-    const currentId = getPrimaryRoverForSocket(socket.id);
-    if (!currentId || currentId === targetRoverId) return { ok: true, currentId };
-    const currentRecord = rovers.get(currentId);
-    if (!currentRecord) return { ok: true, currentId };
-    if (hasOtherDrivers(currentRecord, socket.id)) return { ok: true, currentId };
-    if (isDockedAndCharging(currentRecord)) return { ok: true, currentId };
-    return { ok: false, currentId, message: 'Dock and charge your current rover before switching.' };
+    return canLeaveCurrentRover(socket, { targetRoverId });
   }
 
   function canReplayRoverId(roverId, isPrivateRecord, isPrivateOpen) {
@@ -169,6 +179,7 @@ function createRoverLifecycle(deps) {
     canDrive,
     getRoversForSocket,
     getPrimaryRoverForSocket,
+    canLeaveCurrentRover,
     canSwitchRover,
     canReplayRoverId,
   };

@@ -48,6 +48,10 @@ function extractStreamInfo(path) {
     return { type: 'room', id: remaining[1] || '' };
   }
 
+  if (remaining.length === 2 && remaining[0] === 'ptz') {
+    return { type: 'ptz', id: remaining[1] || '' };
+  }
+
   return null;
 }
 

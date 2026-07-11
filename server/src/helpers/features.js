@@ -49,6 +49,7 @@ function buildFeatureFlags(config = loadConfig()) {
   const barcodeGamesConfig = config.barcodeGames || {};
   const socialsConfig = config.socials || {};
   const interInstanceConfig = config.interInstance || {};
+  const ptzCameraConfig = config.ptzCamera || {};
   const homeAssistant = Boolean(
     asBoolean(homeAssistantConfig.enabled) &&
       asTrimmedString(homeAssistantConfig.url) &&
@@ -80,6 +81,12 @@ function buildFeatureFlags(config = loadConfig()) {
     ),
     socials: Boolean(asBoolean(socialsConfig.enabled) && getConfiguredSocials(config).length > 0),
     interInstance: asBoolean(interInstanceConfig.enabled),
+    ptzCamera: Boolean(
+      asBoolean(ptzCameraConfig.enabled) &&
+        asTrimmedString(ptzCameraConfig.host) &&
+        asTrimmedString(ptzCameraConfig.username) &&
+        asTrimmedString(ptzCameraConfig.password),
+    ),
   };
 }
 

@@ -420,6 +420,12 @@ export function SessionProvider({ children }) {
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
       setPrivateSafety: (roverId, safety = {}) =>
         emitWithAck('session:privateSafety:set', { roverId, safety }),
+      ptzClaim: () => emitWithAck('ptzCamera:claim'),
+      ptzRelease: () => emitWithAck('ptzCamera:release'),
+      ptzMove: (payload = {}) => emitWithAck('ptzCamera:move', payload),
+      ptzStop: () => emitWithAck('ptzCamera:stop'),
+      ptzSpotlight: (payload = {}) => emitWithAck('ptzCamera:spotlight', payload),
+      ptzIr: (payload = {}) => emitWithAck('ptzCamera:ir', payload),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),
       overseerControl: (action, controls = {}) =>
