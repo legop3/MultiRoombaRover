@@ -3,6 +3,7 @@
 // Scope: Owns PTZ UI state only; server-side PTZ ownership, rover handoff, and command authorization remain authoritative.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import ChatPanel from '../ChatPanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
 import ControlPadPanel from '../MobileControls/ControlPadPanel.jsx';
@@ -358,6 +359,16 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
       <div className="shrink-0">
         <PtzControlReference />
       </div>
+      <div className="min-h-[12rem] flex-1">
+        {/*
+          The global chat key focuses the input registered by ChatPanel through
+          ChatContext. Keeping a real ChatPanel mounted inside the PTZ fullscreen
+          sidebar lets the normal keyboard path focus chat and lets Enter submit
+          through the existing chat composer form instead of adding PTZ-specific
+          chat handling.
+        */}
+        <ChatPanel fillHeight title="Chat" />
+      </div>
       <div className="shrink-0">
         <ReplaySourcesPanel panelId="ptz-controller-replay" />
       </div>
@@ -376,6 +387,13 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
     <>
       <div className="shrink-0">
         <PtzMobileControlsPanel ptz={ptz} disabled={!isOperator} />
+      </div>
+      <div className="min-h-[10rem] flex-1">
+        {/*
+          Mobile uses the same ChatPanel registration as desktop so the mapped
+          chat key and the on-screen input stay on one shared chat implementation.
+        */}
+        <ChatPanel fillHeight title="Chat" />
       </div>
       <div className="shrink-0">
         <ReplaySourcesPanel panelId="ptz-controller-replay-mobile" />
@@ -458,11 +476,12 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false, layout 
     try {
       const response = await ptzClaim();
       /*
-        Requesting the PTZ camera is also the user's intent to enter camera mode.
-        Open the controller immediately for operators and queued users so the
-        camera surface does not require a second, redundant "open" click.
+        Requesting the PTZ camera is only enough to open fullscreen after the
+        server confirms the user actually became the operator or entered the
+        queue. Dock-required failures reject before queue entry, so they must
+        leave the user on this card with the dock/charge message visible.
       */
-      setControllerOpen(true);
+      if (response?.state?.isOperator || response?.state?.queuedPosition) setControllerOpen(true);
       if (response?.state?.isOperator) onMessage?.('PTZ camera turn active.');
       else if (response?.state?.queuedPosition) onMessage?.(`Joined PTZ queue at position ${response.state.queuedPosition}.`);
     } catch (err) {

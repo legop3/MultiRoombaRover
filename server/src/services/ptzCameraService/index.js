@@ -24,7 +24,6 @@ const PTZ_STREAM_PATH = 'ptz-camera';
 const DEFAULT_ONVIF_PORT = 8000;
 const DEFAULT_PROFILE_TOKEN = '003';
 const DEFAULT_TURN_DURATION_MS = 5 * 60 * 1000;
-const DOCK_GRACE_MS = 60 * 1000;
 // PTZ is a normal replay source now, so capture should be on unless the feature
 // explicitly disables replay for the camera.
 const DEFAULT_REPLAY_ENABLED = true;
@@ -72,7 +71,6 @@ let onvifCam = null;
 let reolinkClient = null;
 let reolinkModulePromise = null;
 let turnTimer = null;
-let blockedTimer = null;
 let publisherProcess = null;
 let publisherRestartTimer = null;
 let publisherStderrSyncTimer = null;
@@ -594,13 +592,23 @@ function clearTurnTimer() {
   turnTimer = null;
 }
 
-function clearBlockedTimer() {
-  if (blockedTimer) clearTimeout(blockedTimer);
-  blockedTimer = null;
-}
-
 function removeFromQueue(socketId) {
   state.queue = state.queue.filter((id) => id !== socketId);
+}
+
+function buildDockRequiredPayload(socket, leave) {
+  /*
+    PTZ must not become an escape hatch for abandoning the last undocked rover.
+    Keep the payload shape shared between immediate claim rejection and stale
+    queue cleanup so the browser gets one consistent dock-required event.
+  */
+  return {
+    socketId: socket.id,
+    label: getSocketLabel(socket.id),
+    roverId: leave.currentId || null,
+    message: leave.message,
+    until: null,
+  };
 }
 
 function revokeOperator(reason = 'release') {
@@ -652,8 +660,6 @@ function handleTurnDeadline() {
 }
 
 function advanceQueue(reason = 'advance') {
-  clearBlockedTimer();
-  state.blocked = null;
   if (state.operatorSocketId || !state.queue.length) {
     emitChange(reason);
     return;
@@ -668,26 +674,15 @@ function advanceQueue(reason = 'advance') {
   const leave = roverManager.canLeaveCurrentRover(socket);
   if (!leave.ok) {
     /*
-      A queued user may reach the camera while still being the last person on an
-      undocked rover. Hold their queue slot briefly so they can dock; if they do
-      not satisfy the shared rover-leave rule, rotate them to the back and let
-      the next person try.
+      claim() blocks this before queue entry, but this defensive check handles
+      stale state: a user can dock, join the queue, then undock again before
+      their PTZ turn arrives. In that case they are removed instead of holding a
+      PTZ queue slot while still responsible for an undocked rover.
     */
-    state.blocked = {
-      socketId: socket.id,
-      label: getSocketLabel(socket.id),
-      roverId: leave.currentId || null,
-      message: leave.message,
-      until: Date.now() + DOCK_GRACE_MS,
-    };
-    socket.emit('ptzCamera:dockRequired', state.blocked);
-    blockedTimer = setTimeout(() => {
-      const [blockedId] = state.queue.splice(0, 1);
-      if (blockedId) state.queue.push(blockedId);
-      state.blocked = null;
-      advanceQueue('dock-grace-expired');
-    }, DOCK_GRACE_MS);
-    emitChange('dock-required');
+    removeFromQueue(socket.id);
+    socket.emit('ptzCamera:dockRequired', buildDockRequiredPayload(socket, leave));
+    emitChange('drop-dock-required');
+    advanceQueue('drop-dock-required');
     return;
   }
   activateOperator(socket);
@@ -698,6 +693,12 @@ async function claim(socket) {
   await initialize();
   if (!state.initialized) throw new Error(state.error || 'PTZ camera is not ready');
   if (state.operatorSocketId === socket.id) return getPublicState(socket);
+  const leave = roverManager.canLeaveCurrentRover(socket);
+  if (!leave.ok) {
+    const payload = buildDockRequiredPayload(socket, leave);
+    socket.emit('ptzCamera:dockRequired', payload);
+    throw new Error(leave.message);
+  }
   if (state.operatorSocketId) {
     if (!state.queue.includes(socket.id)) state.queue.push(socket.id);
     emitChange('queue-join');
