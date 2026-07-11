@@ -140,6 +140,9 @@ ptzCamera:
   # changes while the integration still remains a single-camera feature.
   profileToken: "003"
   turnDurationMs: 300000
+  # PTZ replay capture needs a known-good replay encoder on the server. Keep it
+  # off by default so adding live PTZ does not start a broken replay worker loop.
+  replayEnabled: false
 
 kinect:
   enabled: false

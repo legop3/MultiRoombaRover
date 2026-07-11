@@ -25,6 +25,7 @@ const DEFAULT_ONVIF_PORT = 8000;
 const DEFAULT_PROFILE_TOKEN = '003';
 const DEFAULT_TURN_DURATION_MS = 5 * 60 * 1000;
 const DOCK_GRACE_MS = 60 * 1000;
+const DEFAULT_REPLAY_ENABLED = false;
 const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
 const SNAPSHOT_POLL_MS = 300;
 const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
@@ -76,6 +77,15 @@ function clampUnit(value) {
 function getTurnDurationMs() {
   const configured = Number(cameraConfig.turnDurationMs);
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_TURN_DURATION_MS;
+}
+
+function isReplayEnabled() {
+  /*
+    Keep this as a single helper so the replay source catalog and the replay
+    worker catalog cannot drift apart. If PTZ replay is off, the UI should not
+    advertise a source that no worker is recording.
+  */
+  return cameraConfig.replayEnabled === undefined ? DEFAULT_REPLAY_ENABLED : Boolean(cameraConfig.replayEnabled);
 }
 
 function passesMode(socket) {
@@ -573,6 +583,23 @@ function sendSnapshotFrame(socket, buffer, ts) {
   socket.emit('ptzCamera:snapshotFrame', { id: PTZ_CAMERA_ID, ts }, buffer);
 }
 
+function normalizeSocketArgs(firstArg, secondArg) {
+  /*
+    Socket.IO does not reserve a payload slot. If the browser emits only an ack
+    callback, the callback arrives as the first argument; if it emits no ack,
+    there is no callback at all. PTZ movement is sometimes fire-and-forget from
+    the shared rover control pipeline, so every handler needs the same small
+    normalizer before it calls back.
+  */
+  if (typeof firstArg === 'function') {
+    return { payload: {}, cb: firstArg };
+  }
+  return {
+    payload: firstArg && typeof firstArg === 'object' ? firstArg : {},
+    cb: typeof secondArg === 'function' ? secondArg : () => {},
+  };
+}
+
 events.on('snapshot:frame', ({ buffer, ts }) => {
   const subscribers = snapshotSubscribers.get(PTZ_CAMERA_ID);
   if (!subscribers || !buffer) return;
@@ -598,56 +625,64 @@ events.on('snapshot:status', ({ error }) => {
 
 function registerSocketHandlers() {
   io.on('connection', (socket) => {
-    socket.on('ptzCamera:claim', async (_payload = {}, cb = () => {}) => {
+    socket.on('ptzCamera:claim', async (firstArg, secondArg) => {
+      const { cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         cb({ ok: true, state: await claim(socket) });
       } catch (err) {
         cb({ error: err.message });
       }
     });
-    socket.on('ptzCamera:release', async (_payload = {}, cb = () => {}) => {
+    socket.on('ptzCamera:release', async (firstArg, secondArg) => {
+      const { cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         cb({ ok: true, state: await release(socket) });
       } catch (err) {
         cb({ error: err.message });
       }
     });
-    socket.on('ptzCamera:move', async (payload = {}, cb = () => {}) => {
+    socket.on('ptzCamera:move', async (firstArg, secondArg) => {
+      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         cb(await move(socket, payload));
       } catch (err) {
         cb({ error: err.message });
       }
     });
-    socket.on('ptzCamera:stop', async (_payload = {}, cb = () => {}) => {
+    socket.on('ptzCamera:stop', async (firstArg, secondArg) => {
+      const { cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         cb(await stop(socket));
       } catch (err) {
         cb({ error: err.message });
       }
     });
-    socket.on('ptzCamera:status', async (_payload = {}, cb = () => {}) => {
+    socket.on('ptzCamera:status', async (firstArg, secondArg) => {
+      const { cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         cb({ ok: true, status: await getStatus(socket) });
       } catch (err) {
         cb({ error: err.message });
       }
     });
-    socket.on('ptzCamera:spotlight', async (payload = {}, cb = () => {}) => {
+    socket.on('ptzCamera:spotlight', async (firstArg, secondArg) => {
+      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         cb({ ok: true, light: await setSpotlight(socket, payload) });
       } catch (err) {
         cb({ error: err.message });
       }
     });
-    socket.on('ptzCamera:ir', async (payload = {}, cb = () => {}) => {
+    socket.on('ptzCamera:ir', async (firstArg, secondArg) => {
+      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         cb({ ok: true, ir: await setIr(socket, payload) });
       } catch (err) {
         cb({ error: err.message });
       }
     });
-    socket.on('ptzCamera:snapshotSubscribe', (_payload = {}, cb = () => {}) => {
+    socket.on('ptzCamera:snapshotSubscribe', (firstArg, secondArg) => {
+      const { cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         if (!passesMode(socket)) throw new Error('Not authorized for PTZ snapshots');
         addSnapshotSubscription(socket);
@@ -705,12 +740,24 @@ module.exports = {
   ptzCameraEvents: events,
   getPublicState,
   canRequestLiveVideo,
-  getReplaySource: () => enabled ? { type: 'ptz', id: PTZ_CAMERA_ID, label: cameraConfig.name || 'PTZ Camera' } : null,
-  getReplayWorkerSource: () => enabled ? {
-    id: PTZ_CAMERA_ID,
-    sourceType: 'ptz',
-    kind: 'video',
-    label: cameraConfig.name || 'PTZ Camera',
-    inputUrl: `srt://127.0.0.1:9000?streamid=read:${encodeURIComponent(PTZ_STREAM_PATH)}`,
-  } : null,
+  getReplaySource: () => enabled && isReplayEnabled()
+    ? { type: 'ptz', id: PTZ_CAMERA_ID, label: cameraConfig.name || 'PTZ Camera' }
+    : null,
+  getReplayWorkerSource: () => {
+    /*
+      PTZ replay capture is optional because the server ffmpeg build must be
+      able to produce browser/Discord-friendly replay segments. The camera live
+      feed can remain raw for MediaMTX while replay capture is left off until
+      the actual server has a working encoder or a copy-only PTZ replay path is
+      intentionally designed.
+    */
+    if (!enabled || !isReplayEnabled()) return null;
+    return {
+      id: PTZ_CAMERA_ID,
+      sourceType: 'ptz',
+      kind: 'video',
+      label: cameraConfig.name || 'PTZ Camera',
+      inputUrl: `srt://127.0.0.1:9000?streamid=read:${encodeURIComponent(PTZ_STREAM_PATH)}`,
+    };
+  },
 };

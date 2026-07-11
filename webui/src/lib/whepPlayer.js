@@ -113,7 +113,15 @@ export class WhepPlayer {
         signal: this.abortController.signal,
       });
       if (!response.ok) {
-        throw new Error(`WHEP request failed: ${response.status}`);
+        /*
+          MediaMTX includes the useful rejection reason in the response body
+          for many 4xx WHEP failures, such as unsupported codecs or malformed
+          SDP. Surface that body so camera/video debugging does not stop at a
+          generic HTTP status code.
+        */
+        const body = await response.text().catch(() => '');
+        const detail = body ? `: ${body.slice(0, 180)}` : '';
+        throw new Error(`WHEP request failed: ${response.status}${detail}`);
       }
       const answerSdp = await response.text();
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
