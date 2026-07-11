@@ -32,6 +32,7 @@ const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots
 const SNAPSHOT_POLL_MS = 300;
 const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
 const SPOTLIGHT_VERIFY_DELAY_MS = 1200;
+const PUBLISHER_STDERR_SYNC_MS = 10000;
 
 const events = new EventEmitter();
 const config = loadConfig();
@@ -96,7 +97,7 @@ function schedulePublisherStateSync(reason = 'publisher') {
   publisherStderrSyncTimer = setTimeout(() => {
     publisherStderrSyncTimer = null;
     emitChange(reason);
-  }, 500);
+  }, PUBLISHER_STDERR_SYNC_MS);
 }
 
 function updatePublisherState(patch = {}, reason = 'publisher') {
@@ -397,7 +398,6 @@ function startPublisher() {
       lastStderr,
       lastEvent: 'stderr',
     };
-    logger.warn('publisher stderr', { text: text.slice(0, 500) });
     schedulePublisherStateSync('publisher-stderr');
   });
   proc.on('exit', (code, signal) => {
