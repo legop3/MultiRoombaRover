@@ -80,12 +80,28 @@ function ControlButton({ title, children, onHold, className = '' }) {
 function PtzLiveVideo({ enabled }) {
   const videoRef = useRef(null);
   const playerRef = useRef(null);
+  const retryTimerRef = useRef(null);
   const [status, setStatus] = useState('idle');
+  const [retryVersion, setRetryVersion] = useState(0);
   const sources = useVideoRequests(
     [{ type: 'ptz', id: PTZ_CAMERA_ID, key: PTZ_CAMERA_ID }],
-    { enabled },
+    { enabled, version: retryVersion },
   );
   const source = sources[PTZ_CAMERA_ID] || null;
+
+  const scheduleRetry = useCallback(() => {
+    if (!enabled || retryTimerRef.current) return;
+    /*
+      A failed WHEP POST consumes the short-lived video token and leaves the
+      PeerConnection in a terminal state. Requesting a fresh server session is
+      the simplest reliable retry path, and it matches how rover playback gets
+      a new authorization token after reconnects.
+    */
+    retryTimerRef.current = setTimeout(() => {
+      retryTimerRef.current = null;
+      setRetryVersion((value) => value + 1);
+    }, 1500);
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled || !source?.url || !videoRef.current) return undefined;
@@ -98,16 +114,33 @@ function PtzLiveVideo({ enabled }) {
       url: source.url,
       token: source.token,
       video: videoRef.current,
-      onStatus: setStatus,
+      onStatus: (nextStatus) => {
+        setStatus(nextStatus);
+        if (['error', 'failed', 'disconnected', 'closed'].includes(String(nextStatus || '').toLowerCase())) {
+          scheduleRetry();
+        }
+      },
       receiveAudio: false,
     });
     playerRef.current = player;
-    player.start().catch((err) => setStatus(err.message || 'error'));
+    player.start().catch((err) => {
+      setStatus(err.message || 'error');
+      scheduleRetry();
+    });
     return () => {
       player.stop();
       playerRef.current = null;
     };
-  }, [enabled, source?.token, source?.url]);
+  }, [enabled, scheduleRetry, source?.token, source?.url]);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="relative h-full w-full bg-black">
@@ -144,60 +177,6 @@ function PtzController({ open, onClose }) {
     },
     [sendMove, stopMotion],
   );
-
-  useEffect(() => {
-    if (!open || !isOperator) return undefined;
-    /*
-      Keyboard control is intentionally active only while the fullscreen PTZ
-      controller is open. Releasing, blurring, or losing operator status sends a
-      stop command so continuous ONVIF movement cannot be left running.
-    */
-    const pressed = new Set();
-    const recompute = () => {
-      let pan = 0;
-      let tilt = 0;
-      let zoom = 0;
-      if (pressed.has('ArrowLeft') || pressed.has('KeyA')) pan -= 0.55;
-      if (pressed.has('ArrowRight') || pressed.has('KeyD')) pan += 0.55;
-      if (pressed.has('ArrowUp') || pressed.has('KeyW')) tilt += 0.55;
-      if (pressed.has('ArrowDown') || pressed.has('KeyS')) tilt -= 0.55;
-      if (pressed.has('KeyQ')) zoom += 0.55;
-      if (pressed.has('KeyE')) zoom -= 0.55;
-      if (pan || tilt || zoom) sendMove({ pan, tilt, zoom });
-      else stopMotion();
-    };
-    const onKeyDown = (event) => {
-      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyQ', 'KeyE', 'Space'].includes(event.code)) return;
-      event.preventDefault();
-      if (event.code === 'Space') {
-        pressed.clear();
-        stopMotion();
-        return;
-      }
-      if (!pressed.has(event.code)) {
-        pressed.add(event.code);
-        recompute();
-      }
-    };
-    const onKeyUp = (event) => {
-      if (!pressed.delete(event.code)) return;
-      event.preventDefault();
-      recompute();
-    };
-    const onBlur = () => {
-      pressed.clear();
-      stopMotion();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
-      stopMotion();
-    };
-  }, [isOperator, open, sendMove, stopMotion]);
 
   if (!open) return null;
 

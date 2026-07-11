@@ -36,7 +36,14 @@ function buildWhepUrlForSource(source) {
   if (source.type === 'room') {
     segments.push('room', encodeURIComponent(source.id));
   } else if (source.type === 'ptz') {
-    segments.push('ptz', encodeURIComponent(source.id));
+    /*
+      MediaMTX exposes WHEP by the exact path name that is being published.
+      The PTZ ffmpeg publisher registers the single camera as "ptz-camera",
+      so the browser must request "/video/ptz-camera/whep" instead of a
+      namespace-like "/video/ptz/ptz-camera/whep" path that MediaMTX has never
+      seen and correctly returns as 404.
+    */
+    segments.push(encodeURIComponent(source.id));
   } else {
     segments.push(encodeURIComponent(source.id));
   }

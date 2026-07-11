@@ -1,6 +1,6 @@
 // Control Command Pipeline
 // Purpose: Converts normalized inputs into command packets sent to the server. Scope: Applies throttling/coalescing/safety filters before socket command emission.
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 import {
@@ -18,6 +18,9 @@ export function useCommandPipeline(options = {}) {
   const socket = useSocket();
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
+  const ptzCamera = useSessionSelector((state) => state.session?.ptzCamera ?? null);
+  const ptzStopTimerRef = useRef(null);
+  const ptzServoBaselineRef = useRef(null);
 
   const rosterEntry = useMemo(() => {
     if (!roverId || !Array.isArray(roster)) return null;
@@ -46,6 +49,14 @@ export function useCommandPipeline(options = {}) {
 
   const headlightState = useMemo(() => rosterEntry?.headlight?.state ?? null, [rosterEntry]);
   const laserState = useMemo(() => rosterEntry?.laser?.state ?? null, [rosterEntry]);
+  const isPtzOperator = Boolean(ptzCamera?.isOperator);
+
+  const emitPtzCommand = useCallback(
+    (eventName, payload = {}, cb) => {
+      socket.emit(eventName, payload, cb);
+    },
+    [socket],
+  );
 
   const emitCommand = useCallback(
     (payload, cb) => {
@@ -54,6 +65,20 @@ export function useCommandPipeline(options = {}) {
     },
     [socket, roverId],
   );
+
+  useEffect(() => {
+    return () => {
+      /*
+        PTZ zoom is implemented as short velocity pulses. Clear any pending stop
+        timer when the pipeline unmounts so old callbacks cannot fire after a
+        page navigation or React remount.
+      */
+      if (ptzStopTimerRef.current) {
+        clearTimeout(ptzStopTimerRef.current);
+        ptzStopTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const enableSensorStream = useCallback(() => {
     if (!roverId) return;
@@ -65,7 +90,6 @@ export function useCommandPipeline(options = {}) {
 
   const sendDriveDirect = useCallback(
     (speeds) => {
-      if (!roverId) return null;
       const rawPayload = {
         left: clampRange(speeds?.left ?? 0, [-500, 500]),
         right: clampRange(speeds?.right ?? 0, [-500, 500]),
@@ -75,13 +99,30 @@ export function useCommandPipeline(options = {}) {
         left: clampRange(transformed?.left ?? 0, [-500, 500]),
         right: clampRange(transformed?.right ?? 0, [-500, 500]),
       };
+      if (isPtzOperator) {
+        /*
+          Convert the final wheel-speed command into PTZ velocity after every
+          normal rover speed modifier has already run. Differential drive math
+          gives us a signed turn amount from left-minus-right and a signed
+          forward amount from their average, which maps cleanly to pan/tilt.
+        */
+        const pan = clampRange((payload.left - payload.right) / 1000, [-1, 1]);
+        const tilt = clampRange((payload.left + payload.right) / 1000, [-1, 1]);
+        if (Math.abs(pan) < 0.01 && Math.abs(tilt) < 0.01) {
+          emitPtzCommand('ptzCamera:stop');
+        } else {
+          emitPtzCommand('ptzCamera:move', { pan, tilt });
+        }
+        return payload;
+      }
+      if (!roverId) return null;
       emitCommand({
         type: 'drive',
         data: { driveDirect: payload },
       });
       return payload;
     },
-    [driveTransform, emitCommand, roverId],
+    [driveTransform, emitCommand, emitPtzCommand, isPtzOperator, roverId],
   );
 
   const sendAuxMotors = useCallback(
@@ -109,6 +150,31 @@ export function useCommandPipeline(options = {}) {
 
   const sendServoAngle = useCallback(
     (angle) => {
+      if (isPtzOperator) {
+        /*
+          Existing rover camera inputs express intent as an angle target. The
+          PTZ camera expects zoom velocity, so compare against the previous
+          target and emit a short zoom pulse in that direction. The delayed stop
+          keeps keyboard and gamepad nudge behavior responsive without leaving
+          the ONVIF zoom motor running after input stops.
+        */
+        const numericAngle = Number(angle);
+        if (!Number.isFinite(numericAngle)) return null;
+        const previous = typeof ptzServoBaselineRef.current === 'number' ? ptzServoBaselineRef.current : numericAngle;
+        const delta = numericAngle - previous;
+        ptzServoBaselineRef.current = numericAngle;
+        if (Math.abs(delta) >= 0.01) {
+          emitPtzCommand('ptzCamera:move', { zoom: delta > 0 ? 0.45 : -0.45 });
+          if (ptzStopTimerRef.current) {
+            clearTimeout(ptzStopTimerRef.current);
+          }
+          ptzStopTimerRef.current = setTimeout(() => {
+            ptzStopTimerRef.current = null;
+            emitPtzCommand('ptzCamera:stop');
+          }, 220);
+        }
+        return angle;
+      }
       if (!roverId || !servoConfig) return null;
       emitCommand({
         type: 'servo',
@@ -116,7 +182,7 @@ export function useCommandPipeline(options = {}) {
       });
       return angle;
     },
-    [emitCommand, roverId, servoConfig],
+    [emitCommand, emitPtzCommand, isPtzOperator, roverId, servoConfig],
   );
 
   const sendOiCommand = useCallback(
@@ -175,6 +241,17 @@ export function useCommandPipeline(options = {}) {
 
   const sendHeadlight = useCallback(
     (action = 'toggle') => {
+      if (isPtzOperator) {
+        /*
+          The rover headlight button is the natural physical control for the
+          camera spotlight. Resolve toggle client-side from the latest session
+          state, then let the server serialize and verify the Reolink API call.
+        */
+        const currentOn = Boolean(ptzCamera?.light?.state);
+        const nextState = action === 'on' ? 1 : action === 'off' ? 0 : currentOn ? 0 : 1;
+        emitPtzCommand('ptzCamera:spotlight', { state: nextState });
+        return action;
+      }
       if (!roverId || !headlight) return null;
       emitCommand({
         type: 'headlight',
@@ -182,11 +259,22 @@ export function useCommandPipeline(options = {}) {
       });
       return action;
     },
-    [emitCommand, headlight, roverId],
+    [emitCommand, emitPtzCommand, headlight, isPtzOperator, ptzCamera?.light?.state, roverId],
   );
 
   const sendLaser = useCallback(
     (action = 'toggle') => {
+      if (isPtzOperator) {
+        /*
+          There is no laser on the PTZ camera, so reuse that secondary light
+          control for IR mode. Toggle switches between Auto and Off, matching
+          the simplified UI control used by the PTZ panel.
+        */
+        const currentOff = String(ptzCamera?.ir?.state || '').toLowerCase() === 'off';
+        const nextState = action === 'on' ? 'Auto' : action === 'off' ? 'Off' : currentOff ? 'Auto' : 'Off';
+        emitPtzCommand('ptzCamera:ir', { state: nextState });
+        return action;
+      }
       if (!roverId || !laser) return null;
       emitCommand({
         type: 'laser',
@@ -194,7 +282,7 @@ export function useCommandPipeline(options = {}) {
       });
       return action;
     },
-    [emitCommand, laser, roverId],
+    [emitCommand, emitPtzCommand, isPtzOperator, laser, ptzCamera?.ir?.state, roverId],
   );
 
   const sendHorn = useCallback(
@@ -238,6 +326,7 @@ export function useCommandPipeline(options = {}) {
   return useMemo(
     () => ({
       roverId,
+      isPtzOperator,
       rosterEntry,
       servoConfig,
       headlight,
@@ -259,6 +348,7 @@ export function useCommandPipeline(options = {}) {
     }),
     [
       roverId,
+      isPtzOperator,
       rosterEntry,
       servoConfig,
       headlight,

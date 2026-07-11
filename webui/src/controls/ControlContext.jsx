@@ -372,10 +372,18 @@ export function ControlSystemProvider({ children }) {
 
   const setServoAngle = useCallback(
     (value, options = {}) => {
-      if (!pipeline.servoConfig) return;
+      if (!pipeline.servoConfig && !pipeline.isPtzOperator) return;
       const force = Boolean(options?.force);
       if (state.manualDockAssist?.active && !force) return;
-      const clamped = clampServoAngle(pipeline.servoConfig, value);
+      /*
+        Rover cameras need hardware min/max clamping from their servo config.
+        PTZ zoom reuses the same browser camera controls after the rover has
+        been released, so there may be no rover servo config at all; in that
+        case the raw numeric target is only used as a direction signal by the
+        command pipeline and does not represent a physical angle.
+      */
+      const clamped = pipeline.servoConfig ? clampServoAngle(pipeline.servoConfig, value) : Number(value);
+      if (!Number.isFinite(clamped)) return;
       dispatch({ type: 'control/set-camera-angle', payload: clamped });
       pipeline.sendServoAngle(clamped);
       servoAngleRef.current = clamped;
@@ -387,17 +395,17 @@ export function ControlSystemProvider({ children }) {
   const nudgeServo = useCallback(
     (delta = 0) => {
       const config = pipeline.servoConfig;
-      if (!config) return;
-      const step = typeof delta === 'number' && delta !== 0 ? delta : config.nudgeDegrees || 1;
+      if (!config && !pipeline.isPtzOperator) return;
+      const step = typeof delta === 'number' && delta !== 0 ? delta : config?.nudgeDegrees || 1;
       const baseline =
         typeof servoAngleRef.current === 'number'
           ? servoAngleRef.current
-          : typeof config.homeAngle === 'number'
+          : typeof config?.homeAngle === 'number'
           ? config.homeAngle
           : 0;
       setServoAngle(baseline + step);
     },
-    [pipeline.servoConfig, setServoAngle],
+    [pipeline.isPtzOperator, pipeline.servoConfig, setServoAngle],
   );
 
   const goServoHome = useCallback(() => {
@@ -484,7 +492,7 @@ export function ControlSystemProvider({ children }) {
 
   const setHeadlight = useCallback(
     (headlightOn) => {
-      if (!pipeline.headlight) return;
+      if (!pipeline.headlight && !pipeline.isPtzOperator) return;
       // Web controls now speak in logical device state. Any electrical
       // inversion needed by the actual GPIO driver is handled by roverd's
       // activeLow config, so this command stays readable and direct.
@@ -501,7 +509,7 @@ export function ControlSystemProvider({ children }) {
 
   const setLaser = useCallback(
     (laserOn) => {
-      if (!pipeline.laser) return;
+      if (!pipeline.laser && !pipeline.isPtzOperator) return;
       if (roomLightsLockedOn && laserOn !== false) return;
       // The laser shares the same logical toggle contract as the headlight; it
       // is separate only because it has its own GPIO pin, UI control, and keybind.

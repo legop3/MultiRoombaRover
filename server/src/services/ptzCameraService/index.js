@@ -58,6 +58,7 @@ let blockedTimer = null;
 let publisherProcess = null;
 let publisherRestartTimer = null;
 let snapshotTimer = null;
+let vendorStatePromise = Promise.resolve();
 let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
 const socketSnapshotSubscriptions = new Map();
@@ -194,10 +195,10 @@ function startPublisher() {
   const input = addCredentialsToRtsp(state.rtspUri);
   const output = `srt://127.0.0.1:9000?streamid=publish:${encodeURIComponent(PTZ_STREAM_PATH)}`;
   /*
-    MediaMTX already treats SRT publishers as trusted local media producers.
-    Copying the autotrack stream keeps the full-resolution camera feed intact;
-    if browser H.265 support becomes a problem later, this is the one place to
-    add a transcode without changing PTZ ownership or UI code.
+    MediaMTX should receive the camera feed exactly as the camera provides it.
+    The WHEP 404 issue is a path mismatch, not a codec problem, so this publisher
+    keeps the autotrack stream untouched and lets playback compatibility be
+    handled separately if it actually becomes the blocker.
   */
   const proc = spawn('ffmpeg', [
     '-hide_banner',
@@ -267,6 +268,18 @@ async function refreshVendorState() {
   state.ir = ir?.IrLights || ir || null;
 }
 
+function serializeVendorState(operation) {
+  /*
+    The Reolink HTTP API can return stale light state when reads and writes are
+    overlapped. Keep spotlight/IR changes in one narrow queue so a button mash
+    becomes ordered camera operations instead of competing Get/Set requests.
+  */
+  vendorStatePromise = vendorStatePromise
+    .catch(() => {})
+    .then(operation);
+  return vendorStatePromise;
+}
+
 async function initialize() {
   if (!enabled || state.initialized || state.initializing) return;
   state.initializing = true;
@@ -330,13 +343,28 @@ function activateOperator(socket) {
   });
   state.operatorSocketId = socket.id;
   state.deadline = Date.now() + getTurnDurationMs();
-  turnTimer = setTimeout(() => {
-    revokeOperator('turn-expired');
-    advanceQueue('turn-expired');
-  }, getTurnDurationMs());
+  turnTimer = setTimeout(handleTurnDeadline, getTurnDurationMs());
   socket.emit('ptzCamera:turn', { status: 'active', deadline: state.deadline });
   events.emit('operator', { socketId: socket.id, action: 'active' });
   emitChange('operator-active');
+}
+
+function handleTurnDeadline() {
+  turnTimer = null;
+  if (!state.operatorSocketId) return;
+  if (state.queue.length > 0) {
+    revokeOperator('turn-expired');
+    advanceQueue('turn-expired');
+    return;
+  }
+  /*
+    A turn timer only matters when somebody else is waiting. If the operator is
+    alone, keep them on the PTZ camera and roll the deadline forward so the UI
+    stays coherent without kicking out the only active viewer.
+  */
+  state.deadline = Date.now() + getTurnDurationMs();
+  turnTimer = setTimeout(handleTurnDeadline, getTurnDurationMs());
+  emitChange('turn-extended-empty-queue');
 }
 
 function advanceQueue(reason = 'advance') {
@@ -446,30 +474,43 @@ async function getStatus(socket) {
 
 async function setSpotlight(socket, payload = {}) {
   requireOperator(socket);
-  const client = await ensureReolinkClient();
-  const current = (await client.api('GetWhiteLed', { channel: 0 })).WhiteLed;
-  const next = {
-    ...current,
-    channel: 0,
-    state: payload.state === undefined ? (current.state ? 0 : 1) : Number(Boolean(payload.state)),
-  };
-  if (Number.isFinite(Number(payload.bright))) {
-    next.bright = Math.max(0, Math.min(100, Number(payload.bright)));
-  }
-  await client.api('SetWhiteLed', { WhiteLed: next });
-  await refreshVendorState();
-  emitChange('light');
-  return state.light;
+  return serializeVendorState(async () => {
+    const client = await ensureReolinkClient();
+    const current = (await client.api('GetWhiteLed', { channel: 0 })).WhiteLed || {};
+    const next = {
+      ...current,
+      channel: 0,
+      state: payload.state === undefined ? (current.state ? 0 : 1) : Number(Boolean(payload.state)),
+    };
+    if (Number.isFinite(Number(payload.bright))) {
+      next.bright = Math.max(0, Math.min(100, Number(payload.bright)));
+    }
+    /*
+      Update local state optimistically before the refresh. That makes the
+      headlight button feel deterministic while the follow-up read still lets
+      the camera correct anything it refused or normalized.
+    */
+    state.light = next;
+    emitChange('light-pending');
+    await client.api('SetWhiteLed', { WhiteLed: next });
+    await refreshVendorState();
+    emitChange('light');
+    return state.light;
+  });
 }
 
 async function setIr(socket, payload = {}) {
   requireOperator(socket);
-  const nextState = String(payload.state || '').toLowerCase() === 'off' ? 'Off' : 'Auto';
-  const client = await ensureReolinkClient();
-  await client.api('SetIrLights', { IrLights: { state: nextState } });
-  await refreshVendorState();
-  emitChange('ir');
-  return state.ir;
+  return serializeVendorState(async () => {
+    const nextState = String(payload.state || '').toLowerCase() === 'off' ? 'Off' : 'Auto';
+    const client = await ensureReolinkClient();
+    state.ir = { ...(state.ir || {}), state: nextState };
+    emitChange('ir-pending');
+    await client.api('SetIrLights', { IrLights: { state: nextState } });
+    await refreshVendorState();
+    emitChange('ir');
+    return state.ir;
+  });
 }
 
 function canRequestLiveVideo(socket) {
