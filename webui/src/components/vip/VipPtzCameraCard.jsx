@@ -432,14 +432,7 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
 
   const desktopSidebar = (
     <>
-      <div className="shrink-0">
-        <PtzStatePanel
-          ptz={ptz}
-          onClose={onClose}
-          onRelease={isOperator ? releaseAndClose : null}
-          releaseDisabled={releasePending}
-        />
-      </div>
+
       <div className="shrink-0">
         <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
       </div>
@@ -459,6 +452,14 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
       </div>
       <div className="shrink-0">
         <ReplaySourcesPanel panelId="ptz-controller-replay" />
+      </div>
+      <div className="shrink-0">
+        <PtzStatePanel
+          ptz={ptz}
+          onClose={onClose}
+          onRelease={isOperator ? releaseAndClose : null}
+          releaseDisabled={releasePending}
+        />
       </div>
     </>
   );
