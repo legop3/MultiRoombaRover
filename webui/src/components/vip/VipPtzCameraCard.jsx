@@ -362,7 +362,6 @@ function PtzMobileControlsPanel({ ptz, disabled = false }) {
         */}
         <ControlPadPanel compact disabled={disabled} />
       </div>
-      <PtzMobileZoomButtons disabled={disabled} />
       <PtzLightingControls ptz={ptz} disabled={disabled} />
     </div>
   );
