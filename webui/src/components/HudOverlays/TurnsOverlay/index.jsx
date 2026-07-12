@@ -7,9 +7,10 @@ import SocialButton from '../../SocialButton/index.jsx';
 function TurnsOverlay({
   roverId = null,
   mobileHud = false,
+  turnModel = null,
 }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
-  const effectiveRoverId = roverId ?? assignedRoverId;
+  const effectiveRoverId = turnModel?.targetId ?? roverId ?? assignedRoverId;
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const users = useSessionSelector((state) => state.session?.users ?? []);
@@ -29,21 +30,30 @@ function TurnsOverlay({
   const subClass = mobileHud ? 'text-xs' : 'text-sm';
   const cueTimerClass = mobileHud ? 'text-[0.55rem]' : 'text-[0.75rem]';
   const cuePadClass = mobileHud ? 'px-4 py-3' : 'px-6 py-4';
-  const turnInfo = effectiveRoverId ? turnQueues?.[effectiveRoverId] : null;
-  const activeDriverId = effectiveRoverId ? activeDrivers?.[effectiveRoverId] : null;
-  const isActiveDriver = Boolean(socketId && activeDriverId === socketId);
-  const isTurnsMode = mode === 'turns';
+  const turnInfo = turnModel ? null : effectiveRoverId ? turnQueues?.[effectiveRoverId] : null;
+  const activeDriverId = turnModel
+    ? turnModel.activeId || null
+    : effectiveRoverId
+    ? activeDrivers?.[effectiveRoverId] || null
+    : null;
+  const isActiveDriver = turnModel
+    ? Boolean(turnModel.isActive)
+    : Boolean(socketId && activeDriverId === socketId);
+  const isTurnsMode = turnModel ? Boolean(turnModel.enabled) : mode === 'turns';
   const now = useSharedClock(1000, isTurnsMode);
   const nextDriverId = useMemo(() => {
+    if (turnModel) return turnModel.nextId || null;
     const queue = turnInfo?.queue || [];
     if (!queue.length || !turnInfo?.current || queue.length <= 1) return null;
     const idx = queue.findIndex((id) => id === turnInfo.current);
     if (idx === -1) return queue[0] || null;
     return queue[(idx + 1) % queue.length] || null;
-  }, [turnInfo]);
-  const isNextDriver = Boolean(socketId && nextDriverId === socketId);
-  const deadline = turnInfo?.deadline || null;
-  const idleDeadline = turnInfo?.idleDeadline || null;
+  }, [turnInfo, turnModel]);
+  const isNextDriver = turnModel
+    ? Boolean(turnModel.isNext)
+    : Boolean(socketId && nextDriverId === socketId);
+  const deadline = turnModel ? turnModel.deadline || null : turnInfo?.deadline || null;
+  const idleDeadline = turnModel ? turnModel.idleDeadline || null : turnInfo?.idleDeadline || null;
   const msUntilTurn = deadline ? deadline - now : null;
   const msUntilIdleSkip = idleDeadline ? idleDeadline - now : null;
   const totalRovers = roster.length;
@@ -59,10 +69,14 @@ function TurnsOverlay({
     });
     return unique.size;
   }, [users]);
-  const shouldUsePreviewByLoad = isTurnsMode && totalDrivers > totalRovers;
+  const shouldUsePreviewByLoad = turnModel
+    ? Boolean(turnModel.showPreviewReason)
+    : isTurnsMode && totalDrivers > totalRovers;
   const isPreSwitchWindow =
     isTurnsMode && isNextDriver && msUntilTurn != null && msUntilTurn <= 5000 && msUntilTurn > 0;
-  const showNotTurnNotice = isTurnsMode && !isActiveDriver;
+  const showNotTurnNotice = turnModel
+    ? Boolean(turnModel.showNotTurnNotice ?? (isTurnsMode && !isActiveDriver))
+    : isTurnsMode && !isActiveDriver;
   const showPreviewReason = showNotTurnNotice && !isPreSwitchWindow && shouldUsePreviewByLoad;
   const turnSeconds =
     msUntilTurn != null && Number.isFinite(msUntilTurn) ? Math.max(0, Math.ceil(msUntilTurn / 1000)) : null;
@@ -82,19 +96,39 @@ function TurnsOverlay({
   const turnTimerFlashActive = noticeFlashActive;
 
   useEffect(() => {
-    if (mode !== 'turns') {
-      setShowTurnCue(false);
-      setTurnCueStartAt(null);
+    /*
+      Rover turns and PTZ turns now arrive through the same render path. Use the
+      normalized isTurnsMode flag here instead of checking the server's rover
+      mode directly, otherwise PTZ can render the notice but never trigger the
+      "your turn" cue when camera ownership changes.
+    */
+    if (!isTurnsMode) {
       lastTurnRef.current = { initialized: false, roverId: null, activeDriverId: null };
-      return;
+      /*
+        React Compiler's lint rules disallow immediate state writes from effect
+        bodies. Defer the visual reset one macrotask; the ref reset above stays
+        synchronous so later turn comparisons do not see stale ownership.
+      */
+      const resetTimer = setTimeout(() => {
+        setShowTurnCue(false);
+        setTurnCueStartAt(null);
+      }, 0);
+      return () => clearTimeout(resetTimer);
     }
     const lastTurn = lastTurnRef.current;
     const nextActiveDriverId = activeDriverId || null;
     if (!socketId || !effectiveRoverId) {
-      setShowTurnCue(false);
-      setTurnCueStartAt(null);
       lastTurnRef.current = { initialized: false, roverId: null, activeDriverId: null };
-      return;
+      /*
+        No socket/target means there is no turn identity to compare. Reset the
+        comparison ref immediately, then defer the visual state reset for the
+        same React Compiler reason documented in the mode-disabled branch.
+      */
+      const resetTimer = setTimeout(() => {
+        setShowTurnCue(false);
+        setTurnCueStartAt(null);
+      }, 0);
+      return () => clearTimeout(resetTimer);
     }
     if (!lastTurn.initialized || lastTurn.roverId !== effectiveRoverId) {
       lastTurnRef.current = { initialized: true, roverId: effectiveRoverId, activeDriverId: nextActiveDriverId };
@@ -104,37 +138,76 @@ function TurnsOverlay({
       Boolean(lastTurn.activeDriverId) &&
       lastTurn.activeDriverId !== socketId &&
       nextActiveDriverId === socketId;
+    let cueTimer = 0;
     if (becameActive) {
-      setShowTurnCue(true);
-      setTurnCueStartAt(Date.now());
+      const cueStartAt = Date.now();
+      /*
+        The active-turn cue is still caused by this ownership transition, but
+        React Compiler wants visual state writes scheduled from an async edge.
+        Capture the timestamp now so the cue dismissal logic compares against
+        the actual transition time, not the later timer callback time.
+      */
+      cueTimer = setTimeout(() => {
+        setShowTurnCue(true);
+        setTurnCueStartAt(cueStartAt);
+      }, 0);
     } else if (nextActiveDriverId !== socketId && showTurnCue) {
-      setShowTurnCue(false);
-      setTurnCueStartAt(null);
+      cueTimer = setTimeout(() => {
+        setShowTurnCue(false);
+        setTurnCueStartAt(null);
+      }, 0);
     }
     lastTurnRef.current = { initialized: true, roverId: effectiveRoverId, activeDriverId: nextActiveDriverId };
-  }, [activeDriverId, mode, effectiveRoverId, socketId, showTurnCue]);
+    return () => {
+      if (cueTimer) clearTimeout(cueTimer);
+    };
+  }, [activeDriverId, effectiveRoverId, isTurnsMode, socketId, showTurnCue]);
 
   useEffect(() => {
     if (!showTurnCue || !turnCueStartAt) return;
     if (lastControlIntentAt > turnCueStartAt) {
-      setShowTurnCue(false);
+      /*
+        Hide the large "your turn" cue after the first control intent, but
+        schedule the state write outside the effect body so this shared overlay
+        remains compatible with the repo's React Compiler lint settings.
+      */
+      const timer = setTimeout(() => setShowTurnCue(false), 0);
+      return () => clearTimeout(timer);
     }
+    return undefined;
   }, [lastControlIntentAt, showTurnCue, turnCueStartAt]);
 
   useEffect(() => {
     const lastIntent = Number(lastIntentRef.current) || 0;
     const nextIntent = Number(lastControlIntentAt) || 0;
     if (nextIntent > lastIntent && showNotTurnNotice) {
-      setNotTurnFlashAt(Date.now());
+      const flashAt = Date.now();
+      /*
+        The "not your turn" flash is a direct response to a recorded control
+        intent. Deferring only the state write preserves the timestamp while
+        satisfying the same effect-state lint rule as the turn cue reset.
+      */
+      const timer = setTimeout(() => setNotTurnFlashAt(flashAt), 0);
+      lastIntentRef.current = nextIntent;
+      return () => clearTimeout(timer);
     }
     lastIntentRef.current = nextIntent;
+    return undefined;
   }, [lastControlIntentAt, showNotTurnNotice]);
 
   useEffect(() => {
     if (!showNotTurnNotice || !notTurnFlashAt) return undefined;
-    setNoticeFlashActive(true);
-    const timer = setTimeout(() => setNoticeFlashActive(false), 650);
-    return () => clearTimeout(timer);
+    /*
+      The flash has two timed edges: activate on the next task, then clear after
+      the visible pulse duration. Owning both timers here keeps cleanup local
+      when the user becomes operator or leaves the PTZ/rover turn surface.
+    */
+    const startTimer = setTimeout(() => setNoticeFlashActive(true), 0);
+    const endTimer = setTimeout(() => setNoticeFlashActive(false), 650);
+    return () => {
+      clearTimeout(startTimer);
+      clearTimeout(endTimer);
+    };
   }, [showNotTurnNotice, notTurnFlashAt]);
 
   return (

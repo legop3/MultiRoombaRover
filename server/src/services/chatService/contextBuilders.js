@@ -7,8 +7,15 @@ const roverManager = require('../roverManager');
 const { getRole } = require('../roleService');
 const { describeAssignment } = require('../assignmentService');
 const { getNickname } = require('../nicknameService');
+const ptzCameraService = require('../ptzCameraService');
+
+function resolvePtzChatTarget(socketId) {
+  return ptzCameraService.getChatTargetForSocket(socketId) || null;
+}
 
 function resolveRoverId(socketId) {
+  const ptzTarget = resolvePtzChatTarget(socketId);
+  if (ptzTarget?.roverId) return ptzTarget.roverId;
   const primary = roverManager.getPrimaryRoverForSocket(socketId);
   if (primary) return primary;
   const assignment = describeAssignment(socketId);
@@ -17,8 +24,20 @@ function resolveRoverId(socketId) {
 
 function resolveRoverColor(roverId) {
   if (!roverId) return null;
+  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) {
+    return ptzCameraService.getPublicState()?.color || null;
+  }
   const record = roverManager.rovers.get(String(roverId));
   return record?.meta?.color || null;
+}
+
+function resolveRoverName(roverId) {
+  if (!roverId) return null;
+  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) {
+    return ptzCameraService.getPublicState()?.name || null;
+  }
+  const record = roverManager.rovers.get(String(roverId));
+  return record?.meta?.name || null;
 }
 
 function isPrivateClosedRoverId(roverId) {
@@ -100,6 +119,7 @@ function buildRoverCtxSnapshot(roverId) {
 function buildMessage(socket, text, meta = {}) {
   const roverId = meta.roverId || resolveRoverId(socket?.id);
   const roverColor = meta.roverColor ?? resolveRoverColor(roverId);
+  const roverName = meta.roverName ?? resolveRoverName(roverId);
   const toolCalls = Array.isArray(meta.toolCalls)
     ? meta.toolCalls
         .map((entry) => {
@@ -122,6 +142,7 @@ function buildMessage(socket, text, meta = {}) {
     nickname: meta.nickname || getNickname(socket) || null,
     role: meta.role || getRole(socket),
     roverId,
+    roverName,
     roverColor,
     fromDiscord: Boolean(meta.fromDiscord),
     discordGuildId: meta.discordGuildId || null,
@@ -143,6 +164,7 @@ function buildMessage(socket, text, meta = {}) {
 function buildTypingPayload(socket, meta = {}) {
   const roverId = meta.roverId || resolveRoverId(socket?.id);
   const roverColor = meta.roverColor ?? resolveRoverColor(roverId);
+  const roverName = meta.roverName ?? resolveRoverName(roverId);
   const socketId = socket?.id || null;
   const fromDiscord = Boolean(meta.fromDiscord);
   let typingId = meta.typingId || null;
@@ -165,6 +187,7 @@ function buildTypingPayload(socket, meta = {}) {
     nickname: meta.nickname || getNickname(socket) || null,
     role: meta.role || getRole(socket),
     roverId,
+    roverName,
     roverColor,
     fromDiscord,
     discordGuildId: meta.discordGuildId || null,

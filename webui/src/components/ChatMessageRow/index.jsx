@@ -127,6 +127,7 @@ export function ChatIdentity({ message, toolsToggle = null }) {
       {message.roverId && (
         <RoverLabel
           roverId={message.roverId}
+          name={message.roverName}
           color={message.roverColor}
           fallback={message.roverId}
           className="shrink-0 text-[0.7rem]"

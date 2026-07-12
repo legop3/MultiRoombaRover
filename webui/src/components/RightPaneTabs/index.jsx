@@ -9,6 +9,7 @@ import HelpPanel from '../HelpPanel/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
 import { LinkButtonsPanel } from '../UserListPanel/index.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
+import PtzQueueCard from '../PtzCamera/index.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../Tabs/index.jsx';
 import TopDownMap from '../TopDownMap/index.jsx';
 import DriveDockAction from '../DriveDockAction/index.jsx';
@@ -201,7 +202,10 @@ function QueueReplayLinksRow() {
       <div className="min-w-0 basis-0 grow-[0.9]">
         <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
       </div>
-      <LinkButtonsPanel className="min-w-0 basis-0 grow-[0.75]" />
+      <div className={`min-w-0 basis-0 grow-[0.75] ${themeStackClass}`}>
+        <LinkButtonsPanel />
+        <PtzQueueCard layout="desktop" />
+      </div>
     </div>
   );
 }

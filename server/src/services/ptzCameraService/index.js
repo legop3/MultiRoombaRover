@@ -27,6 +27,7 @@ const DEFAULT_TURN_DURATION_MS = 5 * 60 * 1000;
 // PTZ is a normal replay source now, so capture should be on unless the feature
 // explicitly disables replay for the camera.
 const DEFAULT_REPLAY_ENABLED = true;
+const DEFAULT_PTZ_COLOR = '#387bf8';
 const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
 const SNAPSHOT_POLL_MS = 300;
 const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
@@ -268,6 +269,7 @@ function getPublicState(socket = null) {
     enabled,
     id: PTZ_CAMERA_ID,
     name: cameraConfig.name || 'PTZ Camera',
+    color: cameraConfig.color || DEFAULT_PTZ_COLOR,
     initialized: state.initialized,
     error: state.error,
     streamPath: state.streamPath,
@@ -283,6 +285,25 @@ function getPublicState(socket = null) {
     isOperator: Boolean(socketId && state.operatorSocketId === socketId),
     queuedPosition: socketId ? state.queue.indexOf(socketId) + 1 || null : null,
     canUse: socket ? canUsePtzFeature(socket) : false,
+  };
+}
+
+function getChatTargetForSocket(socketId) {
+  /*
+    Chat badges are rendered through the same rover badge component on the
+    browser, so PTZ presents itself as a rover-like chat target while a user is
+    actively operating or waiting for the camera. Keeping this mapping in the
+    PTZ service avoids making chat infer camera queue details from public state.
+  */
+  if (!enabled || !socketId) return null;
+  const normalized = String(socketId);
+  const waiting = state.queue.includes(normalized);
+  const operating = state.operatorSocketId === normalized;
+  if (!waiting && !operating) return null;
+  return {
+    roverId: PTZ_CAMERA_ID,
+    roverName: cameraConfig.name || 'PTZ Camera',
+    roverColor: cameraConfig.color || DEFAULT_PTZ_COLOR,
   };
 }
 
@@ -1131,6 +1152,7 @@ module.exports = {
   PTZ_STREAM_PATH,
   ptzCameraEvents: events,
   getPublicState,
+  getChatTargetForSocket,
   canRequestLiveVideo,
   disableEmittersForIdle,
   getReplaySource: () => enabled && isReplayEnabled()
