@@ -35,6 +35,7 @@ const SPOTLIGHT_VERIFY_DELAY_MS = 1200;
 const PUBLISHER_STDERR_SYNC_MS = 10000;
 const PUBLISHER_RTSP_TIMEOUT_US = 10000000;
 const REOLINK_API_RETRY_MS = 1000;
+const REOLINK_API_WRITE_INTERVAL_MS = 1000;
 
 const events = new EventEmitter();
 const config = loadConfig();
@@ -92,6 +93,8 @@ let snapshotTimer = null;
 let spotlightVerifyTimer = null;
 let vendorStatePromise = Promise.resolve();
 let reolinkApiLogNextAt = 0;
+let reolinkWriteInFlight = false;
+let lastReolinkWriteAcceptedAt = 0;
 let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
 const socketSnapshotSubscriptions = new Map();
@@ -815,6 +818,47 @@ function serializeVendorState(operation) {
   return vendorStatePromise;
 }
 
+function reserveReolinkWriteSlot(control) {
+  /*
+    Reolink light/IR writes are physical camera API writes, not high-frequency
+    control signals. Rejecting too-fast requests here, before they enter
+    serializeVendorState(), is what makes this a true rate limit instead of a
+    delayed queue. A request either gets the current write slot immediately or
+    fails immediately; the server never stores skipped toggle states to replay
+    later.
+  */
+  if (reolinkWriteInFlight) {
+    const err = new Error('PTZ API rate limited');
+    err.code = 'PTZ_REOLINK_RATE_LIMITED';
+    err.control = control;
+    err.retryAfterMs = REOLINK_API_WRITE_INTERVAL_MS;
+    throw err;
+  }
+
+  const now = Date.now();
+  const elapsed = now - lastReolinkWriteAcceptedAt;
+  if (elapsed < REOLINK_API_WRITE_INTERVAL_MS) {
+    const err = new Error('PTZ API rate limited');
+    err.code = 'PTZ_REOLINK_RATE_LIMITED';
+    err.control = control;
+    err.retryAfterMs = REOLINK_API_WRITE_INTERVAL_MS - elapsed;
+    throw err;
+  }
+
+  reolinkWriteInFlight = true;
+  lastReolinkWriteAcceptedAt = now;
+}
+
+function releaseReolinkWriteSlot() {
+  /*
+    Keep the in-flight flag separate from the timestamp. The flag blocks
+    overlap while an accepted write is still talking to the camera or waiting
+    through API reconnect; the timestamp blocks a second accepted write from
+    starting immediately after the first one finishes.
+  */
+  reolinkWriteInFlight = false;
+}
+
 async function initialize() {
   if (!enabled || state.initialized || state.initializing) return;
   state.initializing = true;
@@ -1173,64 +1217,74 @@ async function removePreset(socket, payload = {}) {
 
 async function setSpotlight(socket, payload = {}) {
   requireOperator(socket);
+  reserveReolinkWriteSlot('spotlight');
   return serializeVendorState(async () => {
-    let current = state.light ? normalizeSpotlightState(state.light) : null;
-    if (payload.state === undefined && !current) {
+    try {
+      let current = state.light ? normalizeSpotlightState(state.light) : null;
+      if (payload.state === undefined && !current) {
+        /*
+          Toggle requests need a base state. Normal button paths send an explicit
+          state, so this read only happens for rare generic toggle callers or
+          startup races before the initial vendor state has arrived.
+        */
+        current = await refreshSpotlightState();
+      }
+      const logicalOn = payload.state === undefined
+        ? !isSpotlightOn(current || {})
+        : normalizeSpotlightPayloadState(payload.state);
+      const cameraState = spotlightCameraStateForLogicalOn(logicalOn);
+      const cameraPayload = {
+        channel: 0,
+        state: cameraState,
+      };
+      const next = {
+        ...(current || {}),
+        ...cameraPayload,
+        on: logicalOn,
+      };
+      if (Number.isFinite(Number(payload.bright))) {
+        const bright = Math.max(0, Math.min(100, Number(payload.bright)));
+        cameraPayload.bright = bright;
+        next.bright = bright;
+      }
       /*
-        Toggle requests need a base state. Normal button paths send an explicit
-        state, so this read only happens for rare generic toggle callers or
-        startup races before the initial vendor state has arrived.
+        The camera accepts a minimal WhiteLed payload and reports success before
+        GetWhiteLed reflects the new state. Send only the fields we intend to
+        change, then keep the optimistic state until the delayed verification read
+        has a real chance to observe the update.
       */
-      current = await refreshSpotlightState();
+      state.light = next;
+      emitChange('light-pending');
+      await callReolinkApi('SetWhiteLed', { WhiteLed: cameraPayload });
+      scheduleSpotlightVerification();
+      return state.light;
+    } finally {
+      releaseReolinkWriteSlot();
     }
-    const logicalOn = payload.state === undefined
-      ? !isSpotlightOn(current || {})
-      : normalizeSpotlightPayloadState(payload.state);
-    const cameraState = spotlightCameraStateForLogicalOn(logicalOn);
-    const cameraPayload = {
-      channel: 0,
-      state: cameraState,
-    };
-    const next = {
-      ...(current || {}),
-      ...cameraPayload,
-      on: logicalOn,
-    };
-    if (Number.isFinite(Number(payload.bright))) {
-      const bright = Math.max(0, Math.min(100, Number(payload.bright)));
-      cameraPayload.bright = bright;
-      next.bright = bright;
-    }
-    /*
-      The camera accepts a minimal WhiteLed payload and reports success before
-      GetWhiteLed reflects the new state. Send only the fields we intend to
-      change, then keep the optimistic state until the delayed verification read
-      has a real chance to observe the update.
-    */
-    state.light = next;
-    emitChange('light-pending');
-    await callReolinkApi('SetWhiteLed', { WhiteLed: cameraPayload });
-    scheduleSpotlightVerification();
-    return state.light;
   });
 }
 
 async function setIr(socket, payload = {}) {
   requireOperator(socket);
+  reserveReolinkWriteSlot('ir');
   return serializeVendorState(async () => {
-    const nextState = normalizeIrState(payload.state);
-    /*
-      The camera requires channel inside IrLights. Without it, SetIrLights
-      returns param error (-4), while the optimistic local state makes the UI
-      look like the command worked. Keep the optimistic state, but send the
-      minimal payload the camera actually accepts.
-    */
-    state.ir = { ...(state.ir || {}), channel: 0, state: nextState };
-    emitChange('ir-pending');
-    await callReolinkApi('SetIrLights', { IrLights: { channel: 0, state: nextState } });
-    await refreshVendorState();
-    emitChange('ir');
-    return state.ir;
+    try {
+      const nextState = normalizeIrState(payload.state);
+      /*
+        The camera requires channel inside IrLights. Without it, SetIrLights
+        returns param error (-4), while the optimistic local state makes the UI
+        look like the command worked. Keep the optimistic state, but send the
+        minimal payload the camera actually accepts.
+      */
+      state.ir = { ...(state.ir || {}), channel: 0, state: nextState };
+      emitChange('ir-pending');
+      await callReolinkApi('SetIrLights', { IrLights: { channel: 0, state: nextState } });
+      await refreshVendorState();
+      emitChange('ir');
+      return state.ir;
+    } finally {
+      releaseReolinkWriteSlot();
+    }
   });
 }
 
