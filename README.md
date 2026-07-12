@@ -4,6 +4,8 @@ A system for controlling create 2 compatible roombas through a webpage.
 You can explore my basement through this project here:
 https://rover.otter.land
 
+*some of this code was created with help from large language models, and some of it was written by me. This project would not have been possible for me to create without it.*
+
 ## This guide is a work in progress, it will cover:
 - Building rovers
 - Installing roverd on a rover's raspberry pi
