@@ -18,7 +18,7 @@
 - make the ptz queue and join button show up as one roverqueuespanel style rover row below the links panel
   - only show it open for verified users, for non-verified users overlay it with a message and dont let them click on it
   - for mobile layouts, show it below the roverqueuepanel.
-- 
+- dont worry about not being invasive, just dont break anything
 
 ## ui flow should be:
 1. you are verified
@@ -29,4 +29,5 @@
    - you see snapshots, you see the "not your turn" hud, same as driving a rover
 5. its now your turn. the overlay shows up just as it does in rover hud
 6. you control the camera like usual, you want to close it
-7. you hit the close button, 
+7. you hit the close button, you get removed from the queue
+8. the page returns to normal
