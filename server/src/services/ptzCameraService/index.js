@@ -34,8 +34,6 @@ const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
 const SPOTLIGHT_VERIFY_DELAY_MS = 1200;
 const PUBLISHER_STDERR_SYNC_MS = 10000;
 const PUBLISHER_RTSP_TIMEOUT_US = 10000000;
-const REOLINK_API_RETRY_MS = 1000;
-const REOLINK_API_WRITE_INTERVAL_MS = 1000;
 
 const events = new EventEmitter();
 const config = loadConfig();
@@ -74,8 +72,6 @@ const state = {
   reolinkApi: {
     connected: false,
     connecting: false,
-    retryCount: 0,
-    retryAt: null,
     lastError: null,
     lastConnectedAt: null,
     lastEvent: 'idle',
@@ -83,7 +79,6 @@ const state = {
 };
 
 let onvifCam = null;
-let reolinkClient = null;
 let reolinkModulePromise = null;
 let turnTimer = null;
 let publisherProcess = null;
@@ -92,9 +87,6 @@ let publisherStderrSyncTimer = null;
 let snapshotTimer = null;
 let spotlightVerifyTimer = null;
 let vendorStatePromise = Promise.resolve();
-let reolinkApiLogNextAt = 0;
-let reolinkWriteInFlight = false;
-let lastReolinkWriteAcceptedAt = 0;
 let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
 const socketSnapshotSubscriptions = new Map();
@@ -131,12 +123,6 @@ function updateReolinkApiState(patch = {}, reason = 'reolink-api') {
     ...patch,
   };
   emitChange(reason);
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
 
 function parsePublisherProgressLine(line) {
@@ -651,10 +637,10 @@ function getErrorMessage(err) {
 
 async function closeReolinkClient(client, reason = 'reset') {
   /*
-    The Reolink SDK keeps a long-mode login session and may also own background
-    resources internally. close() is documented as idempotent, so use it as the
-    preferred cleanup path and ignore cleanup failures because the whole point
-    of this branch is that the old client/session may already be broken.
+    Each Reolink operation owns a short-lived long-mode session. close() logs
+    out and frees any SDK resources; cleanup failures are logged at debug level
+    because the command result has already been determined by the time finally
+    cleanup runs.
   */
   if (!client || typeof client.close !== 'function') return;
   try {
@@ -664,18 +650,13 @@ async function closeReolinkClient(client, reason = 'reset') {
   }
 }
 
-async function resetReolinkClient(reason = 'reset') {
-  const previous = reolinkClient;
-  reolinkClient = null;
-  await closeReolinkClient(previous, reason);
-}
-
-async function createReolinkClient() {
+async function createReolinkClientSession() {
   /*
     reolink-nvr-api is published as an ESM-only package. This server is still
     CommonJS, so a top-level require() fails before the service can even start.
-    Dynamic import keeps the server bootable and only loads the vendor SDK when
-    spotlight or IR state is actually queried.
+    Dynamic import keeps the server bootable while still creating a fresh camera
+    API client for every command. Avoiding a cached long-lived client keeps one
+    wedged Reolink session from poisoning later light/IR commands.
   */
   if (!reolinkModulePromise) {
     reolinkModulePromise = import('reolink-nvr-api');
@@ -690,88 +671,63 @@ async function createReolinkClient() {
     timeout: 10000,
   });
   await client.login();
-  reolinkClient = client;
   updateReolinkApiState({
     connected: true,
     connecting: false,
-    retryAt: null,
     lastError: null,
     lastConnectedAt: Date.now(),
     lastEvent: 'connected',
   }, 'reolink-api-connected');
-  return reolinkClient;
+  return client;
 }
 
-async function ensureReolinkClient() {
-  if (reolinkClient) return reolinkClient;
+async function callReolinkApi(command, payload = {}) {
+  /*
+    Commands should not depend on the previous command's session or observed
+    state. Open a fresh Reolink session, send exactly the requested API command,
+    and close it. If the camera rejects or ignores the command, the failure is
+    allowed to surface to the caller instead of being hidden behind retries that
+    can make the UI look successful while the physical emitter never changed.
+  */
+  if (!enabled) throw new Error('PTZ camera disabled');
   updateReolinkApiState({
     connected: false,
     connecting: true,
     lastEvent: 'connecting',
   }, 'reolink-api-connecting');
-  return createReolinkClient();
-}
-
-async function callReolinkApi(command, payload = {}) {
-  /*
-    Reolink's HTTP API is stateful in long mode. When the camera restarts or the
-    SDK session wedges, retrying the same cached client can leave all later
-    light/IR operations dead until the Node process restarts. This loop treats
-    any API/login failure as a disposable session, creates a fresh client, and
-    retries at one fixed cadence until the command succeeds. The caller usually
-    sits inside serializeVendorState(), so rapid UI toggles stay ordered behind
-    the reconnecting operation instead of racing multiple login attempts.
-  */
-  while (enabled) {
-    try {
-      const client = await ensureReolinkClient();
-      const result = await client.api(command, payload);
-      updateReolinkApiState({
-        connected: true,
-        connecting: false,
-        retryAt: null,
-        lastError: null,
-        lastConnectedAt: Date.now(),
-        lastEvent: 'api-ok',
-      }, 'reolink-api-ok');
-      return result;
-    } catch (err) {
-      const message = getErrorMessage(err);
-      const retryAt = Date.now() + REOLINK_API_RETRY_MS;
-      /*
-        Do not let one bad long-mode session poison the whole service. Clearing
-        the cached client before the fixed sleep makes the next loop iteration
-        perform a full login rather than reusing the session that just failed.
-      */
-      await resetReolinkClient(`api-failed:${command}`);
-      updateReolinkApiState({
-        connected: false,
-        connecting: true,
-        retryCount: Number(state.reolinkApi?.retryCount || 0) + 1,
-        retryAt,
-        lastError: message,
-        lastEvent: 'retrying',
-      }, 'reolink-api-retry');
-      if (Date.now() >= reolinkApiLogNextAt) {
-        reolinkApiLogNextAt = Date.now() + 30000;
-        logger.warn('Reolink API failed; retrying at fixed interval', {
-          command,
-          retryMs: REOLINK_API_RETRY_MS,
-          error: message,
-        });
-      }
-      await sleep(REOLINK_API_RETRY_MS);
-    }
+  let client = null;
+  try {
+    client = await createReolinkClientSession();
+    const result = await client.api(command, payload);
+    updateReolinkApiState({
+      connected: false,
+      connecting: false,
+      lastError: null,
+      lastConnectedAt: Date.now(),
+      lastEvent: 'api-ok-closed',
+    }, 'reolink-api-ok');
+    return result;
+  } catch (err) {
+    const message = getErrorMessage(err);
+    updateReolinkApiState({
+      connected: false,
+      connecting: false,
+      lastError: message,
+      lastEvent: 'api-error',
+    }, 'reolink-api-error');
+    logger.warn('Reolink API command failed', { command, error: message });
+    throw err;
+  } finally {
+    await closeReolinkClient(client, `api:${command}`);
   }
-  throw new Error('PTZ camera disabled');
 }
 
 async function refreshVendorState() {
   if (!enabled) return;
   /*
-    Read these sequentially so a failed request can reset and rebuild the SDK
-    client before the next request starts. Running both in parallel would let
-    two calls fight over the same broken cached client during reconnect.
+    Read these sequentially so the camera sees one fresh-session API request at
+    a time. Parallel reads are not useful here, and avoiding overlap keeps the
+    vendor API behavior easier to reason about when it is already acting flaky.
   */
   const white = await callReolinkApi('GetWhiteLed', { channel: 0 });
   const ir = await callReolinkApi('GetIrLights', { channel: 0 });
@@ -818,47 +774,6 @@ function serializeVendorState(operation) {
   return vendorStatePromise;
 }
 
-function reserveReolinkWriteSlot(control) {
-  /*
-    Reolink light/IR writes are physical camera API writes, not high-frequency
-    control signals. Rejecting too-fast requests here, before they enter
-    serializeVendorState(), is what makes this a true rate limit instead of a
-    delayed queue. A request either gets the current write slot immediately or
-    fails immediately; the server never stores skipped toggle states to replay
-    later.
-  */
-  if (reolinkWriteInFlight) {
-    const err = new Error('PTZ API rate limited');
-    err.code = 'PTZ_REOLINK_RATE_LIMITED';
-    err.control = control;
-    err.retryAfterMs = REOLINK_API_WRITE_INTERVAL_MS;
-    throw err;
-  }
-
-  const now = Date.now();
-  const elapsed = now - lastReolinkWriteAcceptedAt;
-  if (elapsed < REOLINK_API_WRITE_INTERVAL_MS) {
-    const err = new Error('PTZ API rate limited');
-    err.code = 'PTZ_REOLINK_RATE_LIMITED';
-    err.control = control;
-    err.retryAfterMs = REOLINK_API_WRITE_INTERVAL_MS - elapsed;
-    throw err;
-  }
-
-  reolinkWriteInFlight = true;
-  lastReolinkWriteAcceptedAt = now;
-}
-
-function releaseReolinkWriteSlot() {
-  /*
-    Keep the in-flight flag separate from the timestamp. The flag blocks
-    overlap while an accepted write is still talking to the camera or waiting
-    through API reconnect; the timestamp blocks a second accepted write from
-    starting immediately after the first one finishes.
-  */
-  reolinkWriteInFlight = false;
-}
-
 async function initialize() {
   if (!enabled || state.initialized || state.initializing) return;
   state.initializing = true;
@@ -868,10 +783,8 @@ async function initialize() {
     /*
       Reolink light/IR state is useful, but it must not block PTZ startup. The
       vendor API can be unavailable while ONVIF and RTSP are already healthy;
-      because callReolinkApi() retries until reconnect, awaiting this refresh
-      here would keep the publisher and queue disabled until the HTTP API comes
-      back. Queue it instead so later light/IR operations naturally wait behind
-      the reconnecting refresh while video startup continues.
+      awaiting this refresh here would keep the publisher and queue disabled
+      until the HTTP API responds. Queue it instead so video startup continues.
     */
     serializeVendorState(() => refreshVendorState()).catch((err) => {
       logger.warn('initial Reolink state refresh failed', { error: getErrorMessage(err) });
@@ -1217,74 +1130,68 @@ async function removePreset(socket, payload = {}) {
 
 async function setSpotlight(socket, payload = {}) {
   requireOperator(socket);
-  reserveReolinkWriteSlot('spotlight');
   return serializeVendorState(async () => {
-    try {
-      let current = state.light ? normalizeSpotlightState(state.light) : null;
-      if (payload.state === undefined && !current) {
-        /*
-          Toggle requests need a base state. Normal button paths send an explicit
-          state, so this read only happens for rare generic toggle callers or
-          startup races before the initial vendor state has arrived.
-        */
-        current = await refreshSpotlightState();
-      }
-      const logicalOn = payload.state === undefined
-        ? !isSpotlightOn(current || {})
-        : normalizeSpotlightPayloadState(payload.state);
-      const cameraState = spotlightCameraStateForLogicalOn(logicalOn);
-      const cameraPayload = {
-        channel: 0,
-        state: cameraState,
-      };
-      const next = {
-        ...(current || {}),
-        ...cameraPayload,
-        on: logicalOn,
-      };
-      if (Number.isFinite(Number(payload.bright))) {
-        const bright = Math.max(0, Math.min(100, Number(payload.bright)));
-        cameraPayload.bright = bright;
-        next.bright = bright;
-      }
+    let current = state.light ? normalizeSpotlightState(state.light) : null;
+    if (payload.state === undefined && !current) {
       /*
-        The camera accepts a minimal WhiteLed payload and reports success before
-        GetWhiteLed reflects the new state. Send only the fields we intend to
-        change, then keep the optimistic state until the delayed verification read
-        has a real chance to observe the update.
+        Toggle requests need a base state. Normal button paths send an explicit
+        state, so this read only happens for rare generic toggle callers or
+        startup races before the initial vendor state has arrived.
       */
-      state.light = next;
-      emitChange('light-pending');
-      await callReolinkApi('SetWhiteLed', { WhiteLed: cameraPayload });
-      scheduleSpotlightVerification();
-      return state.light;
-    } finally {
-      releaseReolinkWriteSlot();
+      current = await refreshSpotlightState();
     }
+    const logicalOn = payload.state === undefined
+      ? !isSpotlightOn(current || {})
+      : normalizeSpotlightPayloadState(payload.state);
+    const cameraState = spotlightCameraStateForLogicalOn(logicalOn);
+    const cameraPayload = {
+      channel: 0,
+      state: cameraState,
+    };
+    const next = {
+      ...(current || {}),
+      ...cameraPayload,
+      on: logicalOn,
+    };
+    if (Number.isFinite(Number(payload.bright))) {
+      const bright = Math.max(0, Math.min(100, Number(payload.bright)));
+      cameraPayload.bright = bright;
+      next.bright = bright;
+    }
+    /*
+      Send the explicit requested state through a fresh API session before
+      changing public state. If the camera/API rejects the command, the UI should
+      not be left showing an optimistic state that never reached the device.
+    */
+    await callReolinkApi('SetWhiteLed', { WhiteLed: cameraPayload });
+    state.light = next;
+    emitChange('light');
+    scheduleSpotlightVerification();
+    return state.light;
   });
 }
 
 async function setIr(socket, payload = {}) {
   requireOperator(socket);
-  reserveReolinkWriteSlot('ir');
   return serializeVendorState(async () => {
-    try {
-      const nextState = normalizeIrState(payload.state);
-      /*
-        The camera requires channel inside IrLights. Without it, SetIrLights
-        returns param error (-4), while the optimistic local state makes the UI
-        look like the command worked. Keep the optimistic state, but send the
-        minimal payload the camera actually accepts.
-      */
-      state.ir = { ...(state.ir || {}), channel: 0, state: nextState };
-      emitChange('ir-pending');
-      await callReolinkApi('SetIrLights', { IrLights: { channel: 0, state: nextState } });
-      await refreshVendorState();
-      emitChange('ir');
-      return state.ir;
-    } finally {
-      releaseReolinkWriteSlot();
-    }
+    const nextState = normalizeIrState(payload.state);
+    /*
+      The camera requires channel inside IrLights. Without it, SetIrLights
+      returns param error (-4), while the optimistic local state makes the UI
+      look like the command worked. Keep the optimistic state, but send the
+      minimal payload the camera actually accepts.
+    */
+    const next = { ...(state.ir || {}), channel: 0, state: nextState };
+    /*
+      As with spotlight, update session state after the fresh-session command
+      succeeds so a rejected Reolink request does not make the UI claim the IR
+      mode changed when the camera never accepted it.
+    */
+    await callReolinkApi('SetIrLights', { IrLights: { channel: 0, state: nextState } });
+    state.ir = next;
+    emitChange('ir');
+    await refreshVendorState();
+    return state.ir;
   });
 }
 
