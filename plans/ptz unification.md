@@ -5,7 +5,8 @@
   - have a clear close button
   - on desktop, have some stuff in sidebar and some stuff below the video
     - video should keep the rest of the space
-  - probably make it so that the rest of the page unmounts or unloads or whatever when youre 
+  - reuse rover HUD elements like chat input and not your turn indicator
+  - probably make it so that the rest of the page unmounts or unloads or whatever when youre in it
 - make it feel more like youre switching to a different rover instead of switching to a completely different thing
 - simplify and reuse components wherever possible, frontend and backend
 - right now, it feels tacked on, badly integrated, and incomplete
@@ -17,9 +18,15 @@
 - make the ptz queue and join button show up as one roverqueuespanel style rover row below the links panel
   - only show it open for verified users, for non-verified users overlay it with a message and dont let them click on it
   - for mobile layouts, show it below the roverqueuepanel.
+- 
 
 ## ui flow should be:
 1. you are verified
 2. you see the ptz camera queue in the ui, it has 2 people in it
 3. you click on it, the fullscreen UI opens
-4. 
+   - other people will see you in the queue in the little panel
+4. its not your turn yet. the fullscreen UI replaces the page.
+   - you see snapshots, you see the "not your turn" hud, same as driving a rover
+5. its now your turn. the overlay shows up just as it does in rover hud
+6. you control the camera like usual, you want to close it
+7. you hit the close button, 
