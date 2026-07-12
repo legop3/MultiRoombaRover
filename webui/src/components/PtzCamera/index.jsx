@@ -363,11 +363,11 @@ function PtzMediaPane({ ptz, open }) {
 function PtzDesktopFullscreen({ ptz, releasePending }) {
   return (
     <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(9rem,0.32fr)] gap-0.5 overflow-hidden p-0.5">
-      <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_20rem] gap-0.5 overflow-hidden">
-        <main className="min-h-0 min-w-0 overflow-hidden bg-black">
+      <div className="flex min-h-0 min-w-0 gap-0.5 overflow-hidden">
+        <main className="min-h-0 shrink-0 overflow-hidden bg-black" style={{ aspectRatio: '16 / 9' }}>
           <PtzMediaPane ptz={ptz} open />
         </main>
-        <aside className="flex min-h-0 flex-col gap-0.5 overflow-y-auto bg-neutral-950 text-sm">
+        <aside className="flex min-h-0 min-w-80 flex-1 flex-col gap-0.5 overflow-y-auto bg-neutral-950 text-sm">
           <PtzQueueSummary ptz={ptz} />
           {ptz?.isOperator ? (
             <PtzLightingControls ptz={ptz} />
