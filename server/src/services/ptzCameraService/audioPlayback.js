@@ -15,7 +15,7 @@ const DEFAULT_NEOLINK_BIN = '/usr/local/bin/neolink';
 const DEFAULT_CHROMEGTTS_WAV_BIN = '/usr/local/bin/chromegtts-wav';
 const DEFAULT_ESPEAK_BIN = 'espeak';
 const DEFAULT_FLITE_BIN = 'flite';
-const DEFAULT_VOLUME = 1;
+const DEFAULT_VOLUME = 0.7;
 const MAX_TEXT_CHARS = 512;
 const PLAYBACK_TIMEOUT_MS = 45000;
 
