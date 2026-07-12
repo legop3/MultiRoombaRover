@@ -42,6 +42,12 @@ function resolveRoverName(roverId) {
 
 function isPrivateClosedRoverId(roverId) {
   if (!roverId) return false;
+  /*
+    PTZ uses the existing rover badge fields so chat rows can reuse RoverLabel,
+    but it is not a private rover. Let PTZ-badged messages broadcast normally
+    instead of falling into the closed-private rover path for unknown ids.
+  */
+  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) return false;
   return roverManager.canReplayRoverId(roverId) !== true;
 }
 

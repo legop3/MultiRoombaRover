@@ -347,13 +347,15 @@ function PtzMediaPane({ ptz, open }) {
   const turnModel = useMemo(() => buildPtzTurnModel(ptz, selfId), [ptz, selfId]);
 
   return (
-    <div className="relative h-full min-h-0 w-full overflow-hidden bg-black">
-      {isOperator ? (
-        <PtzLiveVideo enabled={open} startMuted={false} label={ptz?.name || 'PTZ Camera'} />
-      ) : (
-        <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
-      )}
-      <TurnsOverlay turnModel={turnModel} />
+    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-black">
+      <div className="relative aspect-video max-h-full w-full max-w-full overflow-hidden bg-black">
+        {isOperator ? (
+          <PtzLiveVideo enabled={open} startMuted={false} label={ptz?.name || 'PTZ Camera'} />
+        ) : (
+          <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
+        )}
+        <TurnsOverlay turnModel={turnModel} />
+      </div>
     </div>
   );
 }
@@ -366,6 +368,7 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
           <PtzMediaPane ptz={ptz} open />
         </main>
         <aside className="flex min-h-0 flex-col gap-0.5 overflow-y-auto bg-neutral-950 text-sm">
+          <PtzQueueSummary ptz={ptz} />
           {ptz?.isOperator ? (
             <PtzLightingControls ptz={ptz} />
           ) : (
@@ -376,14 +379,13 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
           <PtzControlReference />
           <PtzStatePanel ptz={ptz} />
           <ReplaySourcesPanel panelId="ptz-controller-replay" />
-          <CardFrame title="Position presets" bodyClassName="p-1 text-xs text-slate-500">
-            Presets will live here.
-          </CardFrame>
         </aside>
       </div>
       <div className="grid min-h-0 grid-cols-[minmax(0,1.6fr)_minmax(16rem,0.7fr)] gap-0.5 overflow-hidden">
-        <ChatPanel fillHeight title="Chat" />
-        <PtzQueueSummary ptz={ptz} />
+        <ChatPanel fillHeight title="Chat" allowSpectatorInput inputTarget="overlay" />
+        <CardFrame title="Position presets" fillHeight bodyClassName="p-1 text-xs text-slate-500">
+          Presets will live here.
+        </CardFrame>
       </div>
       {releasePending ? (
         <div className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/80 px-2 py-1 text-xs text-slate-200">
@@ -407,7 +409,7 @@ function PtzMobileFullscreen({ ptz, layout }) {
         <PtzMobileControlsPanel ptz={ptz} disabled={!ptz?.isOperator} />
       </section>
       <section className="grid gap-0.5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)]">
-        <ChatPanel title="Chat" />
+        <ChatPanel title="Chat" allowSpectatorInput inputTarget="overlay" />
         <div className="space-y-0.5">
           <PtzQueueSummary ptz={ptz} />
           <PtzStatePanel ptz={ptz} compact />

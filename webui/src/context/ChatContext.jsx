@@ -61,6 +61,7 @@ export function ChatProvider({ children }) {
   const [isChatFocused, setIsChatFocused] = useState(false);
   const panelInputRef = useRef(null);
   const hudInputRef = useRef(null);
+  const overlayInputRef = useRef(null);
   const audioRef = useRef(null);
   const typingRef = useRef(new Map());
   const typingAlertRef = useRef(new Map());
@@ -236,7 +237,17 @@ export function ChatProvider({ children }) {
   );
 
   const registerInputRef = useCallback((el, options = {}) => {
-    const target = options?.target === 'hud' ? 'hud' : 'panel';
+    const target = options?.target === 'overlay' ? 'overlay' : options?.target === 'hud' ? 'hud' : 'panel';
+    /*
+      Fullscreen surfaces such as PTZ need chat-key focus while they are mounted
+      without stealing the normal HUD ref permanently. Keep overlay chat as a
+      separate highest-priority slot so unmounting the portal only clears the
+      overlay target and leaves the driver HUD/panel refs intact.
+    */
+    if (target === 'overlay') {
+      overlayInputRef.current = el;
+      return;
+    }
     if (target === 'hud') {
       hudInputRef.current = el;
     } else {
@@ -246,11 +257,12 @@ export function ChatProvider({ children }) {
 
   const focusChat = useCallback(() => {
     setIsChatFocused(true);
-    (hudInputRef.current || panelInputRef.current)?.focus();
+    (overlayInputRef.current || hudInputRef.current || panelInputRef.current)?.focus();
   }, []);
 
   const blurChat = useCallback(() => {
     setIsChatFocused(false);
+    overlayInputRef.current?.blur();
     hudInputRef.current?.blur();
     panelInputRef.current?.blur();
   }, []);

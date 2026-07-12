@@ -664,7 +664,6 @@ function revokeOperator(reason = 'release') {
 function activateOperator(socket) {
   revokeOperator('handoff');
   removeFromQueue(socket.id);
-  releaseRoverOwnershipForPtz(socket);
   state.operatorSocketId = socket.id;
   state.deadline = Date.now() + getTurnDurationMs();
   turnTimer = setTimeout(handleTurnDeadline, getTurnDurationMs());
@@ -731,6 +730,15 @@ async function claim(socket) {
     socket.emit('ptzCamera:dockRequired', payload);
     throw new Error(leave.message);
   }
+  /*
+    Joining PTZ is the point where rover ownership must end, even when another
+    user is currently operating the camera and this socket only enters the
+    waiting queue. PTZ queue membership is still a camera session: the user is
+    waiting for a camera turn, not continuing as a rover driver until their turn
+    arrives. Releasing here also keeps chat badges, assignment UI, and command
+    routing from presenting a "rover plus camera queue" hybrid state.
+  */
+  releaseRoverOwnershipForPtz(socket);
   if (state.operatorSocketId) {
     if (!state.queue.includes(socket.id)) state.queue.push(socket.id);
     emitChange('queue-join');

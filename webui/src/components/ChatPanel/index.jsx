@@ -214,6 +214,7 @@ function TtsControls({
 function ChatComposer({
   allowSpectatorInput = false,
   hideSpectatorNotice = false,
+  inputTarget = 'panel',
 }) {
   const {
     sendMessage,
@@ -310,7 +311,7 @@ function ChatComposer({
             setTypingActive(false);
           }
         }}
-        ref={(el) => registerInputRef(el, { target: 'panel' })}
+        ref={(el) => registerInputRef(el, { target: inputTarget })}
         placeholder={canChat ? 'Type a message…' : hideSpectatorNotice ? '' : 'Spectators cannot chat'}
         disabled={!canChat}
       />
@@ -346,6 +347,7 @@ export default function ChatPanel({
   allowSpectatorInput = false,
   title = 'Chat and speech',
   minimal = false,
+  inputTarget = 'panel',
 }) {
   const effectiveHideInput = minimal || hideInput;
   const effectiveTitle = minimal ? '' : title;
@@ -362,6 +364,7 @@ export default function ChatPanel({
         <MemoizedChatComposer
           allowSpectatorInput={allowSpectatorInput}
           hideSpectatorNotice={hideSpectatorNotice}
+          inputTarget={inputTarget}
         />
       )}
     </CardFrame>
