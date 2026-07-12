@@ -33,6 +33,8 @@ const SNAPSHOT_POLL_MS = 300;
 const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
 const SPOTLIGHT_VERIFY_DELAY_MS = 1200;
 const PUBLISHER_STDERR_SYNC_MS = 10000;
+const PUBLISHER_RTSP_TIMEOUT_US = 10000000;
+const REOLINK_API_RETRY_MS = 1000;
 
 const events = new EventEmitter();
 const config = loadConfig();
@@ -68,6 +70,15 @@ const state = {
     progress: null,
     lastEvent: 'idle',
   },
+  reolinkApi: {
+    connected: false,
+    connecting: false,
+    retryCount: 0,
+    retryAt: null,
+    lastError: null,
+    lastConnectedAt: null,
+    lastEvent: 'idle',
+  },
 };
 
 let onvifCam = null;
@@ -80,6 +91,7 @@ let publisherStderrSyncTimer = null;
 let snapshotTimer = null;
 let spotlightVerifyTimer = null;
 let vendorStatePromise = Promise.resolve();
+let reolinkApiLogNextAt = 0;
 let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
 const socketSnapshotSubscriptions = new Map();
@@ -108,6 +120,20 @@ function updatePublisherState(patch = {}, reason = 'publisher') {
     ...patch,
   };
   emitChange(reason);
+}
+
+function updateReolinkApiState(patch = {}, reason = 'reolink-api') {
+  state.reolinkApi = {
+    ...(state.reolinkApi || {}),
+    ...patch,
+  };
+  emitChange(reason);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function parsePublisherProgressLine(line) {
@@ -286,6 +312,7 @@ function getPublicState(socket = null) {
     presets: state.presets,
     presetsError: state.presetsError,
     publisher: state.publisher,
+    reolinkApi: state.reolinkApi,
     isOperator: Boolean(socketId && state.operatorSocketId === socketId),
     queuedPosition: socketId ? state.queue.indexOf(socketId) + 1 || null : null,
     canUse: socket ? canUsePtzFeature(socket) : false,
@@ -451,6 +478,31 @@ function stopPublisher() {
   }, 'publisher-stop');
 }
 
+function schedulePublisherRestart(reason = 'publisher-restart') {
+  /*
+    The publisher's recovery rule is intentionally simple: ffmpeg owns the RTSP
+    connection, and this service starts a fresh process whenever that connection
+    causes ffmpeg to exit. Clearing any existing timer first prevents a burst of
+    quick exits from scheduling multiple competing replacement publishers.
+  */
+  if (!enabled || !state.rtspUri) return null;
+  if (publisherRestartTimer) {
+    clearTimeout(publisherRestartTimer);
+    publisherRestartTimer = null;
+  }
+  const restartAt = Date.now() + 1500;
+  publisherRestartTimer = setTimeout(() => {
+    publisherRestartTimer = null;
+    startPublisher();
+  }, 1500);
+  updatePublisherState({
+    restartAt,
+    restartCount: Number(state.publisher?.restartCount || 0) + 1,
+    lastEvent: reason,
+  }, 'publisher-restart-scheduled');
+  return restartAt;
+}
+
 function startPublisher() {
   if (!enabled || !state.rtspUri || publisherProcess) return;
   const input = addCredentialsToRtsp(state.rtspUri);
@@ -481,6 +533,13 @@ function startPublisher() {
     safer latency knob is to keep the encoder light and avoid building delay
     inside x264 itself.
 
+    The camera can restart while ffmpeg keeps its old TCP/RTSP session open and
+    continues publishing a useless black output stream. The timeout options are
+    input-side failure detectors: when the RTSP socket stops producing usable
+    reads for long enough, ffmpeg should exit instead of staying attached to the
+    dead session. The existing exit handler then starts a new process, which is
+    the part that creates a fresh RTSP connection after the camera comes back.
+
     The mpegts muxer can also hold packets briefly before writing them to SRT.
     flush_packets/muxdelay/muxpreload are output-side latency knobs; they do not
     ask the camera or demuxer to discard frames, so they are a safer next step
@@ -501,6 +560,10 @@ function startPublisher() {
     'low_delay',
     '-rtsp_transport',
     'tcp',
+    '-rw_timeout',
+    String(PUBLISHER_RTSP_TIMEOUT_US),
+    '-timeout',
+    String(PUBLISHER_RTSP_TIMEOUT_US),
     '-i',
     input,
     '-map',
@@ -571,24 +634,42 @@ function startPublisher() {
       running: false,
       pid: null,
       restartAt,
-      restartCount: Number(state.publisher?.restartCount || 0) + (restartAt ? 1 : 0),
       exitCode: code,
       exitSignal: signal,
       exitedAt: Date.now(),
       lastEvent: restartAt ? 'restarting' : 'exited',
     }, 'publisher-exit');
-    if (enabled && state.rtspUri) {
-      publisherRestartTimer = setTimeout(() => {
-        publisherRestartTimer = null;
-        startPublisher();
-      }, 1500);
-    }
+    if (restartAt) schedulePublisherRestart('restarting');
   });
   logger.info('Started PTZ stream publisher', { streamPath: PTZ_STREAM_PATH, encoder: 'libx264' });
 }
 
-async function ensureReolinkClient() {
-  if (reolinkClient) return reolinkClient;
+function getErrorMessage(err) {
+  return err?.message || String(err || 'unknown error');
+}
+
+async function closeReolinkClient(client, reason = 'reset') {
+  /*
+    The Reolink SDK keeps a long-mode login session and may also own background
+    resources internally. close() is documented as idempotent, so use it as the
+    preferred cleanup path and ignore cleanup failures because the whole point
+    of this branch is that the old client/session may already be broken.
+  */
+  if (!client || typeof client.close !== 'function') return;
+  try {
+    await client.close();
+  } catch (err) {
+    logger.debug?.('Reolink client close failed', { reason, error: getErrorMessage(err) });
+  }
+}
+
+async function resetReolinkClient(reason = 'reset') {
+  const previous = reolinkClient;
+  reolinkClient = null;
+  await closeReolinkClient(previous, reason);
+}
+
+async function createReolinkClient() {
   /*
     reolink-nvr-api is published as an ESM-only package. This server is still
     CommonJS, so a top-level require() fails before the service can even start.
@@ -599,7 +680,7 @@ async function ensureReolinkClient() {
     reolinkModulePromise = import('reolink-nvr-api');
   }
   const { ReolinkClient } = await reolinkModulePromise;
-  reolinkClient = new ReolinkClient({
+  const client = new ReolinkClient({
     host: cameraConfig.host,
     username: cameraConfig.username,
     password: cameraConfig.password,
@@ -607,24 +688,98 @@ async function ensureReolinkClient() {
     insecure: true,
     timeout: 10000,
   });
-  await reolinkClient.login();
+  await client.login();
+  reolinkClient = client;
+  updateReolinkApiState({
+    connected: true,
+    connecting: false,
+    retryAt: null,
+    lastError: null,
+    lastConnectedAt: Date.now(),
+    lastEvent: 'connected',
+  }, 'reolink-api-connected');
   return reolinkClient;
+}
+
+async function ensureReolinkClient() {
+  if (reolinkClient) return reolinkClient;
+  updateReolinkApiState({
+    connected: false,
+    connecting: true,
+    lastEvent: 'connecting',
+  }, 'reolink-api-connecting');
+  return createReolinkClient();
+}
+
+async function callReolinkApi(command, payload = {}) {
+  /*
+    Reolink's HTTP API is stateful in long mode. When the camera restarts or the
+    SDK session wedges, retrying the same cached client can leave all later
+    light/IR operations dead until the Node process restarts. This loop treats
+    any API/login failure as a disposable session, creates a fresh client, and
+    retries at one fixed cadence until the command succeeds. The caller usually
+    sits inside serializeVendorState(), so rapid UI toggles stay ordered behind
+    the reconnecting operation instead of racing multiple login attempts.
+  */
+  while (enabled) {
+    try {
+      const client = await ensureReolinkClient();
+      const result = await client.api(command, payload);
+      updateReolinkApiState({
+        connected: true,
+        connecting: false,
+        retryAt: null,
+        lastError: null,
+        lastConnectedAt: Date.now(),
+        lastEvent: 'api-ok',
+      }, 'reolink-api-ok');
+      return result;
+    } catch (err) {
+      const message = getErrorMessage(err);
+      const retryAt = Date.now() + REOLINK_API_RETRY_MS;
+      /*
+        Do not let one bad long-mode session poison the whole service. Clearing
+        the cached client before the fixed sleep makes the next loop iteration
+        perform a full login rather than reusing the session that just failed.
+      */
+      await resetReolinkClient(`api-failed:${command}`);
+      updateReolinkApiState({
+        connected: false,
+        connecting: true,
+        retryCount: Number(state.reolinkApi?.retryCount || 0) + 1,
+        retryAt,
+        lastError: message,
+        lastEvent: 'retrying',
+      }, 'reolink-api-retry');
+      if (Date.now() >= reolinkApiLogNextAt) {
+        reolinkApiLogNextAt = Date.now() + 30000;
+        logger.warn('Reolink API failed; retrying at fixed interval', {
+          command,
+          retryMs: REOLINK_API_RETRY_MS,
+          error: message,
+        });
+      }
+      await sleep(REOLINK_API_RETRY_MS);
+    }
+  }
+  throw new Error('PTZ camera disabled');
 }
 
 async function refreshVendorState() {
   if (!enabled) return;
-  const client = await ensureReolinkClient();
-  const [white, ir] = await Promise.all([
-    client.api('GetWhiteLed', { channel: 0 }).catch((err) => ({ error: err.message })),
-    client.api('GetIrLights', { channel: 0 }).catch((err) => ({ error: err.message })),
-  ]);
+  /*
+    Read these sequentially so a failed request can reset and rebuild the SDK
+    client before the next request starts. Running both in parallel would let
+    two calls fight over the same broken cached client during reconnect.
+  */
+  const white = await callReolinkApi('GetWhiteLed', { channel: 0 });
+  const ir = await callReolinkApi('GetIrLights', { channel: 0 });
   state.light = normalizeSpotlightState(white?.WhiteLed || white || null);
   state.ir = ir?.IrLights || ir || null;
 }
 
 async function refreshSpotlightState() {
-  const client = await ensureReolinkClient();
-  const white = await client.api('GetWhiteLed', { channel: 0 });
+  const white = await callReolinkApi('GetWhiteLed', { channel: 0 });
   state.light = normalizeSpotlightState(white?.WhiteLed || white || null);
   emitChange('light');
   return state.light;
@@ -668,7 +823,17 @@ async function initialize() {
   try {
     onvifCam = await connectOnvif();
     state.rtspUri = await getStreamUriForProfile(onvifCam);
-    await refreshVendorState();
+    /*
+      Reolink light/IR state is useful, but it must not block PTZ startup. The
+      vendor API can be unavailable while ONVIF and RTSP are already healthy;
+      because callReolinkApi() retries until reconnect, awaiting this refresh
+      here would keep the publisher and queue disabled until the HTTP API comes
+      back. Queue it instead so later light/IR operations naturally wait behind
+      the reconnecting refresh while video startup continues.
+    */
+    serializeVendorState(() => refreshVendorState()).catch((err) => {
+      logger.warn('initial Reolink state refresh failed', { error: getErrorMessage(err) });
+    });
     /*
       Presets are not required for the camera to be usable. Refresh them during
       startup so connected clients have the list immediately, but keep failures
@@ -1011,7 +1176,6 @@ async function removePreset(socket, payload = {}) {
 async function setSpotlight(socket, payload = {}) {
   requireOperator(socket);
   return serializeVendorState(async () => {
-    const client = await ensureReolinkClient();
     let current = state.light ? normalizeSpotlightState(state.light) : null;
     if (payload.state === undefined && !current) {
       /*
@@ -1047,7 +1211,7 @@ async function setSpotlight(socket, payload = {}) {
     */
     state.light = next;
     emitChange('light-pending');
-    await client.api('SetWhiteLed', { WhiteLed: cameraPayload });
+    await callReolinkApi('SetWhiteLed', { WhiteLed: cameraPayload });
     scheduleSpotlightVerification();
     return state.light;
   });
@@ -1057,7 +1221,6 @@ async function setIr(socket, payload = {}) {
   requireOperator(socket);
   return serializeVendorState(async () => {
     const nextState = normalizeIrState(payload.state);
-    const client = await ensureReolinkClient();
     /*
       The camera requires channel inside IrLights. Without it, SetIrLights
       returns param error (-4), while the optimistic local state makes the UI
@@ -1066,7 +1229,7 @@ async function setIr(socket, payload = {}) {
     */
     state.ir = { ...(state.ir || {}), channel: 0, state: nextState };
     emitChange('ir-pending');
-    await client.api('SetIrLights', { IrLights: { channel: 0, state: nextState } });
+    await callReolinkApi('SetIrLights', { IrLights: { channel: 0, state: nextState } });
     await refreshVendorState();
     emitChange('ir');
     return state.ir;
@@ -1094,15 +1257,15 @@ async function disableEmittersForIdle() {
   }
 
   return serializeVendorState(async () => {
-    const client = await ensureReolinkClient();
     const lightPayload = { channel: 0, state: spotlightCameraStateForLogicalOn(false) };
     const irPayload = { channel: 0, state: normalizeIrState('off') };
-    const failures = [];
 
     /*
       Set the public state before the API calls finish so the UI immediately
-      reflects the idle policy. If a camera call fails, the result still records
-      that failure and the next vendor refresh can correct the optimistic state.
+      reflects the idle policy. These API calls intentionally use the same
+      fixed-interval reconnect loop as user controls, because idle cleanup is
+      only useful if it survives a camera API session reset instead of giving up
+      and leaving emitters in an unknown physical state.
     */
     state.light = normalizeSpotlightState({
       ...(state.light || {}),
@@ -1115,17 +1278,8 @@ async function disableEmittersForIdle() {
     };
     emitChange('idle-emitters-off-pending');
 
-    try {
-      await client.api('SetWhiteLed', { WhiteLed: lightPayload });
-    } catch (err) {
-      failures.push({ control: 'spotlight', error: err.message });
-    }
-
-    try {
-      await client.api('SetIrLights', { IrLights: irPayload });
-    } catch (err) {
-      failures.push({ control: 'ir', error: err.message });
-    }
+    await callReolinkApi('SetWhiteLed', { WhiteLed: lightPayload });
+    await callReolinkApi('SetIrLights', { IrLights: irPayload });
 
     /*
       Read back once after the writes so stale optimistic state does not linger
@@ -1133,17 +1287,13 @@ async function disableEmittersForIdle() {
       is user-facing and frequently toggled; idle fires rarely, so one ordered
       refresh keeps the final state simple.
     */
-    try {
-      await refreshVendorState();
-    } catch (err) {
-      failures.push({ control: 'refresh', error: err.message });
-    }
+    await refreshVendorState();
 
     emitChange('idle-emitters-off');
     return {
       action: 'disablePtzEmitters',
-      success: failures.length === 0,
-      failures,
+      success: true,
+      failures: [],
     };
   });
 }
