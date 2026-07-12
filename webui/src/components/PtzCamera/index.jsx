@@ -367,7 +367,7 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
         <main className="min-h-0 shrink-0 overflow-hidden bg-black" style={{ aspectRatio: '16 / 9' }}>
           <PtzMediaPane ptz={ptz} open />
         </main>
-        <aside className="flex min-h-0 min-w-80 flex-1 flex-col gap-0.5 overflow-y-auto bg-neutral-950 text-sm">
+        <aside className="flex min-h-0 min-w-72 flex-1 flex-col gap-0.5 overflow-y-auto bg-neutral-950 text-sm">
           <PtzQueueSummary ptz={ptz} />
           {ptz?.isOperator ? (
             <PtzLightingControls ptz={ptz} />
