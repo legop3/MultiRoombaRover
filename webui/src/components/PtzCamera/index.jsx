@@ -3,7 +3,7 @@
 // queueable controllable target instead of a VIP-panel card.
 // Scope: Owns PTZ entry card and fullscreen composition; PTZ command authority,
 // queue ownership, and stream authorization remain server-owned.
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import CardFrame from '../CardFrame/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
@@ -22,7 +22,6 @@ import { useSharedClock } from '../../hooks/useSharedClock.js';
 import { isFeatureEnabled } from '../../lib/features.js';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
 
-const PTZ_ZOOM_SPEED = 0.55;
 const PTZ_DEFAULT_COLOR = '#38bdf8';
 
 function formatRemaining(deadline, now) {
@@ -220,21 +219,41 @@ function PtzLightingControls({ ptz, disabled = false }) {
 }
 
 function PtzMobileZoomButtons({ disabled = false }) {
-  const { ptzMove, ptzStop } = useSessionActions();
+  const { nudgeServo, stopAllMotion } = useControlActions();
+  const repeatTimerRef = useRef(null);
+
   const stopZoom = useCallback(() => {
-    ptzStop().catch(() => {});
-  }, [ptzStop]);
+    /*
+      Mobile zoom is intentionally routed through the normal camera-up/down
+      control action instead of emitting PTZ socket commands directly. That
+      keeps the zoom buttons on the same path as keyboard/gamepad camera tilt,
+      and the PTZ adapter remains the one place that translates "camera nudge"
+      into Reolink zoom pulses.
+    */
+    if (repeatTimerRef.current) {
+      clearInterval(repeatTimerRef.current);
+      repeatTimerRef.current = null;
+    }
+    stopAllMotion();
+  }, [stopAllMotion]);
+
   const startZoom = useCallback(
     (direction) => (event) => {
       /*
-        The rover mobile movement pad is reused for PTZ pan/tilt through the
-        control adapter, so zoom needs its own two hold buttons on mobile.
+        Send an immediate nudge and then repeat while held. The adapter turns
+        each nudge into a short zoom pulse, so repeating the standard action is
+        the simplest way to get continuous hold-to-zoom without adding another
+        PTZ-specific command loop.
       */
       event.preventDefault();
       if (disabled) return;
-      ptzMove({ pan: 0, tilt: 0, zoom: direction * PTZ_ZOOM_SPEED }).catch(() => {});
+      stopZoom();
+      nudgeServo(direction);
+      repeatTimerRef.current = setInterval(() => {
+        nudgeServo(direction);
+      }, 120);
     },
-    [disabled, ptzMove],
+    [disabled, nudgeServo, stopZoom],
   );
   const stopFromPointer = useCallback(
     (event) => {
@@ -243,6 +262,22 @@ function PtzMobileZoomButtons({ disabled = false }) {
       stopZoom();
     },
     [disabled, stopZoom],
+  );
+
+  useEffect(
+    () => () => {
+      /*
+        A touch surface can unmount during orientation changes or fullscreen
+        close while a pointer is still down. Clear the repeat timer here so a
+        held zoom button cannot keep firing camera-up/down actions after the
+        mobile controls have disappeared.
+      */
+      if (repeatTimerRef.current) {
+        clearInterval(repeatTimerRef.current);
+        repeatTimerRef.current = null;
+      }
+    },
+    [],
   );
 
   return (
@@ -405,7 +440,7 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
   );
 }
 
-function PtzMobileFullscreen({ ptz, layout }) {
+function PtzMobileFullscreen({ ptz, layout, onClose, releasePending = false }) {
   const landscape = layout === 'mobile-landscape';
   const topHeightClass = landscape ? 'h-[72dvh]' : 'h-[48dvh]';
   const topGridClass = landscape
@@ -415,7 +450,15 @@ function PtzMobileFullscreen({ ptz, layout }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-0.5">
       <section className={`mobile-touch-control grid ${topHeightClass} min-h-48 shrink-0 ${topGridClass} gap-0.5`}>
-        <main className="min-h-0 overflow-hidden bg-black">
+        <main className="relative min-h-0 overflow-hidden bg-black">
+          <button
+            type="button"
+            className="absolute left-1 top-1 z-50 rounded border border-white/40 bg-black/80 px-2 py-1 text-xs font-semibold text-white shadow disabled:opacity-50"
+            disabled={releasePending}
+            onClick={onClose}
+          >
+            Close
+          </button>
           <PtzMediaPane ptz={ptz} open framed={false} />
         </main>
         <aside className="min-h-0 overflow-y-auto">
@@ -462,19 +505,25 @@ export function PtzFullscreenController({ open, onClose, layout = 'desktop' }) {
   const controller = (
     <div className="fixed inset-0 z-[110] h-[100dvh] w-[100vw] overflow-hidden bg-black text-slate-100">
       <CardFrame
-        title={ptz?.name || 'PTZ Camera'}
-        actions={(
+        title={isMobile ? '' : ptz?.name || 'PTZ Camera'}
+        actions={isMobile ? null : (
           <button type="button" className="button-dark text-xs" disabled={releasePending} onClick={releaseAndClose}>
             Close
           </button>
         )}
+        hideHeader={isMobile}
         fillHeight
         clipOverflow={false}
         className="h-[100dvh] w-[100vw] rounded-none border-0 !bg-black"
         bodyClassName="relative min-h-0 flex-1"
       >
         {isMobile ? (
-          <PtzMobileFullscreen ptz={ptz} layout={layout} />
+          <PtzMobileFullscreen
+            ptz={ptz}
+            layout={layout}
+            onClose={releaseAndClose}
+            releasePending={releasePending}
+          />
         ) : (
           <PtzDesktopFullscreen ptz={ptz} releasePending={releasePending} />
         )}
@@ -563,11 +612,11 @@ export default function PtzQueueCard({ layout = 'desktop' }) {
               id: ptz?.id || PTZ_CAMERA_ID,
               name: ptz?.name || 'PTZ Camera',
               color: ptz?.color || PTZ_DEFAULT_COLOR,
-              description: ptz?.isOperator
-                ? 'Live camera turn active'
-                : ptz?.queuedPosition
-                ? `Queue position ${ptz.queuedPosition}`
-                : 'Pan, tilt, and zoom camera',
+              // description: ptz?.isOperator
+              //   ? 'Live camera turn active'
+              //   : ptz?.queuedPosition
+              //   ? `Queue position ${ptz.queuedPosition}`
+              //   : 'Pan, tilt, and zoom camera',
             }}
             queue={queue}
             currentId={currentId}
