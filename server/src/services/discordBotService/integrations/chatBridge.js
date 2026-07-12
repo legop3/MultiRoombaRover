@@ -2,6 +2,7 @@
 // Purpose: Bridges chat and typing between Discord and site sockets.
 // Scope: Handles inbound Discord messages plus outbound webhook and typing relay.
 const { WebhookClient } = require('discord.js');
+const { isPublicChatTargetId } = require('../../chatService/contextBuilders');
 
 function summarizeToolCall(entry = {}) {
   const tool = String(entry?.tool || 'unknown');
@@ -23,7 +24,6 @@ function createChatBridgeHandlers(deps) {
   const {
     logger,
     client,
-    roverManager,
     getGuildConfig,
     listGuildConfigs,
     sendExternalMessage,
@@ -59,7 +59,13 @@ function createChatBridgeHandlers(deps) {
   function handleChatBridgeOutbound(event) {
     const payload = event?.payload;
     if (!payload) return;
-    if (payload?.roverId && !roverManager.canReplayRoverId(payload.roverId)) return;
+    /*
+      Outbound bridge filtering must use chat visibility, not rover replay
+      visibility. PTZ deliberately uses roverId: "ptz-camera" so the existing
+      chat badge path can be reused, but that id is not a roverManager rover and
+      would be dropped by canReplayRoverId().
+    */
+    if (payload?.roverId && !isPublicChatTargetId(payload.roverId)) return;
     const guildConfigs = listGuildConfigs();
     if (!guildConfigs.length) return;
 
@@ -96,7 +102,11 @@ function createChatBridgeHandlers(deps) {
   function handleChatTypingOutbound(event) {
     const payload = event?.payload;
     if (!payload || payload.fromDiscord) return;
-    if (payload?.roverId && !roverManager.canReplayRoverId(payload.roverId)) return;
+    /*
+      Typing indicators follow the same public-chat-target rule as messages so
+      PTZ users do not look present in web chat while disappearing from Discord.
+    */
+    if (payload?.roverId && !isPublicChatTargetId(payload.roverId)) return;
     const guildConfigs = listGuildConfigs();
     if (!guildConfigs.length) return;
 

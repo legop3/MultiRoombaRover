@@ -1,6 +1,8 @@
 // llm Commentary Service snapshot engine
 // Purpose: Tracks rover activity/history and builds model snapshot payloads from live rover/chat state.
 // Scope: Keeps runtime behavior unchanged while isolating sensor aggregation and snapshot assembly logic.
+const { isPublicChatTargetId } = require('../chatService/contextBuilders');
+
 function createSnapshotEngine(deps) {
   const {
     io,
@@ -368,7 +370,12 @@ function createSnapshotEngine(deps) {
       .filter((entry) => {
         const roverId = entry?.roverId ? String(entry.roverId) : null;
         if (!roverId) return true;
-        return roverManager.canReplayRoverId(roverId);
+        /*
+          This is a chat transcript filter, not a physical-rover filter. PTZ
+          chat intentionally carries a rover-like id so transcript consumers can
+          render it consistently, even though roverManager cannot replay that id.
+        */
+        return isPublicChatTargetId(roverId);
       });
     const chatRecent = allRecentMessages
       .filter((entry) => !entry?.bot)

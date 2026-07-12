@@ -40,6 +40,30 @@ function resolveRoverName(roverId) {
   return record?.meta?.name || null;
 }
 
+function isPtzChatTargetId(roverId) {
+  /*
+    PTZ is intentionally treated as a virtual rover for chat identity only. It
+    does not live in roverManager.rovers because movement, video authorization,
+    and queue ownership are PTZ-service concerns, but chat needs one stable
+    "rover-like" id so the existing web UI, Discord bridge, and AI transcript
+    code can all render the same badge without learning PTZ internals.
+  */
+  return Boolean(roverId) && String(roverId) === ptzCameraService.PTZ_CAMERA_ID;
+}
+
+function isPublicChatTargetId(roverId, socket = null) {
+  if (!roverId) return false;
+  /*
+    Normal rovers remain governed by the existing replay visibility rule, which
+    is also the rule chat historically used to avoid exposing closed private
+    rover activity. PTZ gets an explicit allow-list entry here because it is a
+    public chat target that deliberately pretends to be a rover, even though it
+    is not a roverManager record.
+  */
+  if (isPtzChatTargetId(roverId)) return true;
+  return roverManager.canReplayRoverId(roverId, socket) === true;
+}
+
 function isPrivateClosedRoverId(roverId) {
   if (!roverId) return false;
   /*
@@ -47,8 +71,7 @@ function isPrivateClosedRoverId(roverId) {
     but it is not a private rover. Let PTZ-badged messages broadcast normally
     instead of falling into the closed-private rover path for unknown ids.
   */
-  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) return false;
-  return roverManager.canReplayRoverId(roverId) !== true;
+  return !isPublicChatTargetId(roverId);
 }
 
 function normalizeProfileImageUrl(value) {
@@ -208,6 +231,8 @@ function buildTypingPayload(socket, meta = {}) {
 
 module.exports = {
   resolveRoverId,
+  isPtzChatTargetId,
+  isPublicChatTargetId,
   isPrivateClosedRoverId,
   buildRoverCtxSnapshot,
   buildMessage,

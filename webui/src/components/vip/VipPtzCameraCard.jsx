@@ -1,7 +1,7 @@
 // Vip PTZ Camera Card
 // Purpose: Provides the verified-user entry point and fullscreen controller for the single Reolink PTZ camera.
 // Scope: Owns PTZ UI state only; server-side PTZ ownership, rover handoff, and command authorization remain authoritative.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ChatPanel from '../ChatPanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
@@ -59,11 +59,16 @@ function PtzSnapshotPreview({ feed, label = 'PTZ Camera' }) {
       ) : (
         <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">Waiting for snapshot...</div>
       )}
-      <div className="pointer-events-none absolute left-0 top-0 bg-black/70 px-1 py-0.5 text-xs font-semibold text-white">
-        {label}
-      </div>
-      <div className="pointer-events-none absolute bottom-0 left-0 m-1 rounded bg-black/70 px-1 py-0.5 text-[0.7rem] text-slate-100">
-        {feed?.error ? `Error: ${feed.error}` : feed?.status || 'connecting'}
+      {/*
+        Even on this legacy VIP surface, keep the video pane itself identical
+        to rover media panes: no camera title inside the frame, only the small
+        top-left stream status. Any PTZ name/context belongs to the card chrome
+        around the media, not the media player.
+      */}
+      <div className="pointer-events-none absolute left-1 top-1 z-20 font-medium text-slate-100 text-[0.65rem]">
+        <div className="flex flex-col gap-0.5 leading-none">
+          <span>Status: {feed?.error ? `Error: ${feed.error}` : feed?.status || 'connecting'}</span>
+        </div>
       </div>
     </div>
   );

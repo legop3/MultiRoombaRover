@@ -22,8 +22,6 @@ export default function PtzLiveVideo({
   className = 'relative h-full w-full bg-black',
   videoClassName = 'h-full w-full object-contain',
   statusClassName = 'pointer-events-none absolute left-1 top-1 z-20 font-medium text-slate-100 text-[0.65rem]',
-  label = null,
-  labelClassName = 'pointer-events-none absolute left-0 top-0 bg-black/70 px-1 py-0.5 text-xs font-semibold text-white',
   fallback = null,
 }) {
   const videoRef = useRef(null);
@@ -199,7 +197,6 @@ export default function PtzLiveVideo({
           {source?.error || 'Waiting for PTZ video...'}
         </div>
       )}
-      {label ? <div className={labelClassName}>{label}</div> : null}
       {/*
         PTZ video uses the same low-profile diagnostic shape as the rover
         players: no in-frame camera title, just a compact top-corner status.

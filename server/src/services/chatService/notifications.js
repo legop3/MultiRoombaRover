@@ -7,6 +7,7 @@ const { getRole } = require('../roleService');
 const roverManager = require('../roverManager');
 const { issueCommand } = require('../commandService');
 const { getAdminReason } = require('../adminReasonService');
+const ptzCameraService = require('../ptzCameraService');
 const {
   TYPING_NOTE_DURATION,
   ACCESS_NOTICE_COOLDOWN_MS,
@@ -18,6 +19,13 @@ const { getLastAccessNoticeAt, setLastAccessNoticeAt } = require('./state');
 
 function playTypingNote(roverId, note, socketId) {
   if (!roverId) return;
+  /*
+    PTZ borrows the roverId field for chat badges, but it has no rover command
+    channel. Skipping the song command here keeps PTZ chat from producing noisy
+    "unknown rover" command attempts while still allowing the message itself to
+    behave like rover chat everywhere else.
+  */
+  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) return;
   try {
     issueCommand(roverId, {
       type: 'song',
@@ -83,6 +91,12 @@ function maybeSendAccessNotice(message, sendSystemMessage) {
 
 function maybeSpeak(socket, message, ttsOptions) {
   if (!ttsOptions || !message?.roverId) return;
+  /*
+    TTS is a physical-rover capability backed by commandService and rover audio
+    metadata. PTZ is only rover-like for chat identity, so a PTZ chat message
+    should not try to speak through a non-existent rover record.
+  */
+  if (String(message.roverId) === ptzCameraService.PTZ_CAMERA_ID) return;
   const record = roverManager.rovers.get(message.roverId);
   const ttsEnabled = Boolean(record?.meta?.audio?.ttsEnabled);
   if (!ttsEnabled) return;

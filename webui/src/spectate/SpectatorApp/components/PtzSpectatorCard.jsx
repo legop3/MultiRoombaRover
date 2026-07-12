@@ -65,11 +65,16 @@ function PtzSnapshotFallback({ label, source }) {
           {snapshot?.error || source?.error || 'Waiting for PTZ snapshot...'}
         </div>
       )}
-      <div className="pointer-events-none absolute left-0 top-0 bg-black/70 px-1 py-0.5 text-xs font-semibold text-white">
-        {label}
-      </div>
-      <div className="pointer-events-none absolute bottom-0 left-0 m-1 rounded bg-black/70 px-1 py-0.5 text-[0.7rem] text-slate-100">
-        {snapshot?.status || 'snapshot'}
+      {/*
+        Keep the PTZ snapshot fallback visually aligned with RoverMediaPlayer:
+        the video surface owns only playback health, while the card around it
+        owns identity/context. That prevents a second in-frame camera title and
+        keeps fallback mode from looking different than live WHEP mode.
+      */}
+      <div className="pointer-events-none absolute left-1 top-1 z-20 font-medium text-slate-100 text-[0.65rem]">
+        <div className="flex flex-col gap-0.5 leading-none">
+          <span>Status: {snapshot?.status || 'snapshot'}</span>
+        </div>
       </div>
     </div>
   );
@@ -80,9 +85,7 @@ function PtzLiveOrSnapshot({ label }) {
     <PtzLiveVideo
       enabled
       startMuted
-      label={label}
       className="relative aspect-video w-full overflow-hidden rounded bg-black"
-      statusClassName="pointer-events-none absolute bottom-0 left-0 m-1 rounded bg-black/70 px-1 py-0.5 text-[0.7rem] text-slate-100"
       fallback={({ source }) => <PtzSnapshotFallback label={label} source={source} />}
     />
   );

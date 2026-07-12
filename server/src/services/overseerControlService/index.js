@@ -15,6 +15,7 @@ const { getState: getNeatoState, neatoEvents } = neatoService;
 const { getState: getLiftState, liftEvents } = liftService;
 const roverManager = require('../roverManager');
 const { getRecentMessages, sendSystemMessage } = require('../chatService');
+const { isPublicChatTargetId } = require('../chatService/contextBuilders');
 const { subscribe } = require('../eventBus');
 const {
   PROMPT_PATH,
@@ -378,7 +379,12 @@ async function runDecision(triggerReason) {
     .filter((entry) => Number(entry?.ts || 0) >= runtime.contextResetAt)
     .filter((entry) => {
       if (!entry?.roverId) return true;
-      return roverManager.canReplayRoverId(entry.roverId);
+      /*
+        Chat context should preserve every public chat target, including the
+        PTZ virtual rover. Rover replay visibility alone would drop PTZ because
+        it is owned by ptzCameraService instead of roverManager.
+      */
+      return isPublicChatTargetId(entry.roverId);
     })
     .slice(-(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT));
   const conversationMessages = buildConversation({ recentMessages: recentConversation, name });

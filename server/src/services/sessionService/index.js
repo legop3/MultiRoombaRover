@@ -10,7 +10,11 @@ const { managerEvents } = roverManager;
 const assignmentService = require('../assignmentService');
 const { getActiveDrivers, getTurnQueues, turnEvents } = require('../turnService');
 const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
-const { getPublicState: getPtzCameraState, ptzCameraEvents } = require('../ptzCameraService');
+const {
+  getPublicState: getPtzCameraState,
+  getChatTargetForSocket: getPtzChatTargetForSocket,
+  ptzCameraEvents,
+} = require('../ptzCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
 const { getState: getNeatoState, neatoEvents } = require('../neatoService');
 const { getState: getLiftState, liftEvents } = require('../liftService');
@@ -62,12 +66,19 @@ function buildUserEntry(socket) {
   const role = getRole(socket);
   const assignment = assignmentService.describeAssignment(socket.id);
   const primaryRover = roverManager.getPrimaryRoverForSocket(socket.id);
+  const ptzChatTarget = getPtzChatTargetForSocket(socket.id);
   return {
     socketId: socket.id,
     userId: socket?.data?.userId || null,
     nickname: getNickname(socket) || null,
     role,
-    roverId: primaryRover || assignment?.roverId || null,
+    /*
+      PTZ is not inserted into the physical rover roster, but for chat and user
+      presence it should read like the user moved to a rover-like target. Prefer
+      the PTZ chat target while the socket is queued or operating so presence,
+      queue lookup, and chat identity all agree.
+    */
+    roverId: ptzChatTarget?.roverId || primaryRover || assignment?.roverId || null,
   };
 }
 
