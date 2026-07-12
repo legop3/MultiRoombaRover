@@ -63,8 +63,9 @@ function useChatComposerSessionState(allowSpectatorInput) {
       assignment state.
     */
     const self = users.find((entry) => entry?.socketId === socketId);
+    if (!self?.roverId && ptz?.id && (ptz?.isOperator || ptz?.queuedPosition)) return ptz.id;
     return self?.roverId || currentRoverId || null;
-  }, [currentRoverId, socketId, users]);
+  }, [currentRoverId, ptz?.id, ptz?.isOperator, ptz?.queuedPosition, socketId, users]);
 
   const rover = useMemo(
     () => roster.find((entry) => String(entry.id) === String(chatTargetId)) || null,

@@ -13,6 +13,7 @@ const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 const {
   getPublicState: getPtzCameraState,
   getChatTargetForSocket: getPtzChatTargetForSocket,
+  PTZ_CAMERA_ID,
   ptzCameraEvents,
 } = require('../ptzCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
@@ -90,7 +91,13 @@ function buildSession(socket) {
     .filter(Boolean)
     .map((entry) => ({
       ...entry,
-      roverId: filterVisibleRoverId(socket, entry.roverId),
+      /*
+        PTZ is intentionally not a roverManager record, so the normal physical
+        rover visibility filter would erase the user's PTZ chat target. Preserve
+        it here because getPtzChatTargetForSocket already applied the PTZ access
+        and queue/operator rules before buildUserEntry returned it.
+      */
+      roverId: entry.roverId === PTZ_CAMERA_ID ? entry.roverId : filterVisibleRoverId(socket, entry.roverId),
     }));
   const roster = roverManager.getRosterForSocket(socket);
   const assignment = assignmentService.describeAssignment(socket?.id || '');
