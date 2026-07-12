@@ -18,6 +18,7 @@ const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
 const roverManager = require('../roverManager');
 const assignmentService = require('../assignmentService');
 const videoSessions = require('../videoSessions');
+const { createPtzAudioPlayback } = require('./audioPlayback');
 
 const PTZ_CAMERA_ID = 'ptz-camera';
 const PTZ_STREAM_PATH = 'ptz-camera';
@@ -91,6 +92,12 @@ let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
 const socketSnapshotSubscriptions = new Map();
 const snapshotLastSentBySocket = new Map();
+const audioPlayback = createPtzAudioPlayback({
+  logger,
+  cameraConfig,
+  enabled,
+  getSocketLabel,
+});
 
 function emitChange(reason = 'change') {
   events.emit('change', { reason, state: getPublicState() });
@@ -302,6 +309,7 @@ function getPublicState(socket = null) {
     presetsError: state.presetsError,
     publisher: state.publisher,
     reolinkApi: state.reolinkApi,
+    audio: audioPlayback.getState(),
     isOperator: Boolean(socketId && state.operatorSocketId === socketId),
     queuedPosition: socketId ? state.queue.indexOf(socketId) + 1 || null : null,
     canUse: socket ? canUsePtzFeature(socket) : false,
@@ -325,6 +333,27 @@ function getChatTargetForSocket(socketId) {
     roverName: cameraConfig.name || 'PTZ Camera',
     roverColor: cameraConfig.color || DEFAULT_PTZ_COLOR,
   };
+}
+
+function canSpeakThroughPtz(socket) {
+  /*
+    PTZ chat uses roverId for identity, but the camera has its own queue rather
+    than a roverManager driver record. Match the rover TTS rule closely: the
+    current operator may speak, and queued users may prepare/use TTS while they
+    are in the camera queue. canUsePtzFeature keeps the normal VIP/admin/mode
+    access gates in front of both cases.
+  */
+  if (!canUsePtzFeature(socket)) return false;
+  const socketId = socket?.id ? String(socket.id) : '';
+  if (!socketId) return false;
+  return state.operatorSocketId === socketId || state.queue.includes(socketId);
+}
+
+async function speakText(text, ttsOptions = {}, socket = null) {
+  if (!canSpeakThroughPtz(socket)) {
+    throw new Error('Only the PTZ operator or queue can use PTZ TTS');
+  }
+  return audioPlayback.speakText(text, ttsOptions, { socketId: socket?.id || null });
 }
 
 function callOnvif(method, options = {}) {
@@ -1524,6 +1553,8 @@ module.exports = {
   ptzCameraEvents: events,
   getPublicState,
   getChatTargetForSocket,
+  canSpeakThroughPtz,
+  speakText,
   canRequestLiveVideo,
   disableEmittersForIdle,
   getReplaySource: () => enabled && isReplayEnabled()

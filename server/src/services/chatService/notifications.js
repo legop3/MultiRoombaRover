@@ -91,12 +91,22 @@ function maybeSendAccessNotice(message, sendSystemMessage) {
 
 function maybeSpeak(socket, message, ttsOptions) {
   if (!ttsOptions || !message?.roverId) return;
-  /*
-    TTS is a physical-rover capability backed by commandService and rover audio
-    metadata. PTZ is only rover-like for chat identity, so a PTZ chat message
-    should not try to speak through a non-existent rover record.
-  */
-  if (String(message.roverId) === ptzCameraService.PTZ_CAMERA_ID) return;
+  if (String(message.roverId) === ptzCameraService.PTZ_CAMERA_ID) {
+    /*
+      PTZ has no rover websocket, but it does have a real speaker behind the
+      Reolink/neolink path. Keep PTZ routing here so chat remains the single
+      place that decides whether a user's message should produce speech, while
+      ptzCameraService owns camera-specific permissions and playback details.
+    */
+    ptzCameraService.speakText(message.text, ttsOptions, socket)
+      .then(() => {
+        logger.info('PTZ TTS sent', { engine: ttsOptions.engine, socket: socket.id });
+      })
+      .catch((err) => {
+        logger.warn('PTZ TTS send failed', { error: err.message, socket: socket.id });
+      });
+    return;
+  }
   const record = roverManager.rovers.get(message.roverId);
   const ttsEnabled = Boolean(record?.meta?.audio?.ttsEnabled);
   if (!ttsEnabled) return;

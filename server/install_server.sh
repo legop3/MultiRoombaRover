@@ -2,8 +2,12 @@
 set -euo pipefail
 
 MEDIAMTX_VERSION="1.15.3"
+NEOLINK_VERSION="0.6.2"
 MEDIAMTX_BASE_URL="https://github.com/bluenviron/mediamtx/releases/download/v${MEDIAMTX_VERSION}"
+NEOLINK_BASE_URL="https://github.com/QuantumEntangledAndy/neolink/releases/download/v${NEOLINK_VERSION}"
 MEDIAMTX_BIN="/usr/local/bin/mediamtx"
+NEOLINK_BIN="/usr/local/bin/neolink"
+CHROMEGTTS_WAV_BIN="/usr/local/bin/chromegtts-wav"
 MEDIAMTX_CONF_DIR="/etc/mediamtx"
 MEDIAMTX_CONFIG="$MEDIAMTX_CONF_DIR/mediamtx.yml"
 ROVER_SNAPSHOT_WRITER_BIN="/usr/local/bin/rover-snapshot-writer.sh"
@@ -29,6 +33,49 @@ SERVER_DIR="$SCRIPT_DIR"
 CONFIG_PATH="$SERVER_DIR/config.yaml"
 MEDIAMTX_TEMPLATE="$SERVER_DIR/mediamtx/mediamtx.yml"
 ROVER_SNAPSHOT_WRITER_TEMPLATE="$SERVER_DIR/mediamtx/rover-snapshot-writer.sh"
+CHROMEGTTS_WAV_TEMPLATE="$SERVER_DIR/bin/chromegtts-wav.py"
+
+install_google_tts_assets() {
+  local asset_dir="/opt/roverd/googletts"
+  local voice_dir="${asset_dir}/en-us-x-multi-r30"
+  local dist_url="https://storage.googleapis.com/chromeos-localmirror/distfiles/googletts-26.5.tar.xz"
+  local lib_member=""
+  local arch_name
+  arch_name=$(uname -m)
+
+  # The PTZ camera is not a rover, so Google speech must be synthesized on the
+  # server before neolink sends a WAV to the camera. These assets are the same
+  # offline ChromeOS local TTS assets that rover installers already use; keeping
+  # the layout identical lets the server helper and rover daemon share loader
+  # assumptions.
+  if [[ -f "${asset_dir}/libchrometts.so" && -f "${voice_dir}/pipeline.pb" ]]; then
+    echo "      Google TTS assets already installed"
+    return
+  fi
+
+  case "$arch_name" in
+    x86_64|amd64)
+      lib_member="libchrometts_x86_64.so"
+      ;;
+    aarch64)
+      lib_member="libchrometts_arm64.so"
+      ;;
+    armv7l|armv6l)
+      lib_member="libchrometts_armv7.so"
+      ;;
+    *)
+      echo "Unsupported Google TTS architecture: $arch_name" >&2
+      exit 1
+      ;;
+  esac
+
+  echo "      Installing Google TTS assets -> $asset_dir"
+  curl -L -o "$tmpdir/googletts-26.5.tar.xz" "$dist_url"
+  tar -xf "$tmpdir/googletts-26.5.tar.xz" -C "$tmpdir" en-us-x-multi.zvoice "$lib_member"
+  mkdir -p "$voice_dir"
+  tar -xf "$tmpdir/en-us-x-multi.zvoice" -C "$voice_dir"
+  install -o root -g root -m 0644 "$tmpdir/$lib_member" "${asset_dir}/libchrometts.so"
+}
 
 echo "[1/6] Installing dependencies..."
 # The Kinect tooling uses a native libfreenect worker/probe rather than a
@@ -40,9 +87,19 @@ dnf install -y \
   npm \
   curl \
   tar \
+  unzip \
+  xz \
   gcc-c++ \
   make \
   pkgconf-pkg-config \
+  flite \
+  espeak \
+  python3 \
+  gstreamer1 \
+  gstreamer1-plugins-base \
+  gstreamer1-plugins-good \
+  gstreamer1-plugins-bad-free \
+  gstreamer1-rtsp-server \
   libfreenect \
   libfreenect-devel \
   libusb1-devel >/dev/null
@@ -61,6 +118,13 @@ SUBSYSTEM=="usb", ATTR{idVendor}=="045e", MODE="0666", GROUP="root", TAG+="uacce
 EOF
 chmod 644 "$KINECT_UDEV_RULE"
 udevadm control --reload-rules
+
+if [[ ! -f "$CHROMEGTTS_WAV_TEMPLATE" ]]; then
+  echo "Chrome Google TTS WAV helper missing at $CHROMEGTTS_WAV_TEMPLATE" >&2
+  exit 1
+fi
+echo "      Installing Chrome Google TTS WAV helper -> $CHROMEGTTS_WAV_BIN"
+install -m 0755 "$CHROMEGTTS_WAV_TEMPLATE" "$CHROMEGTTS_WAV_BIN"
 
 echo "[2/6] Installing Node production deps..."
 runuser -u "$TARGET_USER" -- bash -c "cd '$SERVER_DIR' && npm install --production"
@@ -83,12 +147,15 @@ arch=$(uname -m)
 case "$arch" in
   x86_64|amd64)
     mediamtx_pkg="mediamtx_v${MEDIAMTX_VERSION}_linux_amd64.tar.gz"
+    neolink_pkg="neolink_linux_x86_64_ubuntu.zip"
     ;;
   aarch64)
     mediamtx_pkg="mediamtx_v${MEDIAMTX_VERSION}_linux_arm64.tar.gz"
+    neolink_pkg="neolink_linux_arm64.zip"
     ;;
   armv7l)
     mediamtx_pkg="mediamtx_v${MEDIAMTX_VERSION}_linux_armv7.tar.gz"
+    neolink_pkg="neolink_linux_armhf.zip"
     ;;
   *)
     echo "Unsupported architecture: $arch" >&2
@@ -100,6 +167,20 @@ echo "[3/6] Installing mediaMTX ${MEDIAMTX_VERSION}..."
 curl -L "$MEDIAMTX_BASE_URL/$mediamtx_pkg" -o "$tmpdir/mediamtx.tgz"
 tar -xzf "$tmpdir/mediamtx.tgz" -C "$tmpdir" mediamtx
 install -m 0755 "$tmpdir/mediamtx" "$MEDIAMTX_BIN"
+
+echo "      Installing neolink ${NEOLINK_VERSION} -> $NEOLINK_BIN"
+curl -L "$NEOLINK_BASE_URL/$neolink_pkg" -o "$tmpdir/neolink.zip"
+unzip -q "$tmpdir/neolink.zip" -d "$tmpdir/neolink"
+neolink_extracted=$(find "$tmpdir/neolink" -type f -name neolink -perm /111 | head -n 1)
+if [[ -z "$neolink_extracted" ]]; then
+  neolink_extracted=$(find "$tmpdir/neolink" -type f -name neolink | head -n 1)
+fi
+if [[ -z "$neolink_extracted" ]]; then
+  echo "neolink binary missing from $neolink_pkg" >&2
+  exit 1
+fi
+install -m 0755 "$neolink_extracted" "$NEOLINK_BIN"
+install_google_tts_assets
 
 mkdir -p "$MEDIAMTX_CONF_DIR"
 if [[ ! -f "$MEDIAMTX_TEMPLATE" ]]; then

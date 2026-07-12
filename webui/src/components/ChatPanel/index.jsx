@@ -49,17 +49,37 @@ function resolveTtsSettings(settings) {
 
 function useChatComposerSessionState(allowSpectatorInput) {
   const role = useSessionSelector((state) => state.session?.role || null);
+  const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
+  const users = useSessionSelector((state) => state.session?.users ?? []);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
+  const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
+
+  const chatTargetId = useMemo(() => {
+    /*
+      PTZ is intentionally not a roster entry, but session users expose the
+      current chat target for each socket. Prefer the self user entry so the TTS
+      control follows PTZ queue/operation state instead of only physical rover
+      assignment state.
+    */
+    const self = users.find((entry) => entry?.socketId === socketId);
+    return self?.roverId || currentRoverId || null;
+  }, [currentRoverId, socketId, users]);
 
   const rover = useMemo(
-    () => roster.find((entry) => String(entry.id) === String(currentRoverId)) || null,
-    [currentRoverId, roster],
+    () => roster.find((entry) => String(entry.id) === String(chatTargetId)) || null,
+    [chatTargetId, roster],
+  );
+  const ptzTtsSupported = Boolean(
+    ptz?.id &&
+      String(chatTargetId) === String(ptz.id) &&
+      ptz?.audio?.enabled &&
+      (ptz?.isOperator || ptz?.queuedPosition),
   );
 
   return {
     canChat: role !== 'spectator' || allowSpectatorInput,
-    ttsSupported: Boolean(rover?.audio?.ttsEnabled),
+    ttsSupported: Boolean(rover?.audio?.ttsEnabled || ptzTtsSupported),
   };
 }
 
