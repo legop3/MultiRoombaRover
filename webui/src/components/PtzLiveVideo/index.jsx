@@ -21,7 +21,7 @@ export default function PtzLiveVideo({
   startMuted = true,
   className = 'relative h-full w-full bg-black',
   videoClassName = 'h-full w-full object-contain',
-  statusClassName = 'pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs text-slate-100',
+  statusClassName = 'pointer-events-none absolute left-1 top-1 z-20 font-medium text-slate-100 text-[0.65rem]',
   label = null,
   labelClassName = 'pointer-events-none absolute left-0 top-0 bg-black/70 px-1 py-0.5 text-xs font-semibold text-white',
   fallback = null,
@@ -200,7 +200,17 @@ export default function PtzLiveVideo({
         </div>
       )}
       {label ? <div className={labelClassName}>{label}</div> : null}
-      <div className={statusClassName}>{displayStatus}</div>
+      {/*
+        PTZ video uses the same low-profile diagnostic shape as the rover
+        players: no in-frame camera title, just a compact top-corner status.
+        This keeps the media pane visually interchangeable with rover streams
+        while still exposing WHEP/session failures during reconnects.
+      */}
+      <div className={statusClassName}>
+        <div className="flex flex-col gap-0.5 leading-none">
+          <span>Status: {displayStatus}</span>
+        </div>
+      </div>
     </div>
   );
 }

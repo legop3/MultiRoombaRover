@@ -102,11 +102,15 @@ function PtzSnapshotPreview({ feed, label = 'PTZ Camera', className = 'h-full w-
       ) : (
         <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">Waiting for snapshot...</div>
       )}
-      <div className="pointer-events-none absolute left-0 top-0 bg-black/70 px-1 py-0.5 text-xs font-semibold text-white">
-        {label}
-      </div>
-      <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs text-slate-100">
-        {feed?.error ? `Error: ${feed.error}` : feed?.status || 'connecting'}
+      {/*
+        Snapshot mode should look like the regular rover video player: the
+        camera name belongs to the surrounding card/menu, while the media pane
+        only exposes stream health in the small top-left diagnostic overlay.
+      */}
+      <div className="pointer-events-none absolute left-1 top-1 z-20 font-medium text-slate-100 text-[0.65rem]">
+        <div className="flex flex-col gap-0.5 leading-none">
+          <span>Status: {feed?.error ? `Error: ${feed.error}` : feed?.status || 'connecting'}</span>
+        </div>
       </div>
     </div>
   );
@@ -536,7 +540,7 @@ function PtzMediaPane({ ptz, open, framed = true }) {
   const media = (
     <>
       {isOperator ? (
-        <PtzLiveVideo enabled={open} startMuted={false} label={ptz?.name || 'PTZ Camera'} />
+        <PtzLiveVideo enabled={open} startMuted={false} />
       ) : (
         <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
       )}
