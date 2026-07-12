@@ -72,9 +72,16 @@ install_google_tts_assets() {
   echo "      Installing Google TTS assets -> $asset_dir"
   curl -L -o "$tmpdir/googletts-26.5.tar.xz" "$dist_url"
   tar -xf "$tmpdir/googletts-26.5.tar.xz" -C "$tmpdir" en-us-x-multi.zvoice "$lib_member"
-  mkdir -p "$voice_dir"
-  tar -xf "$tmpdir/en-us-x-multi.zvoice" -C "$voice_dir"
+  install -d -o root -g root -m 0755 "$asset_dir"
   install -o root -g root -m 0644 "$tmpdir/$lib_member" "${asset_dir}/libchrometts.so"
+  rm -rf "$voice_dir"
+  install -d -o root -g root -m 0755 "$voice_dir"
+  # The .zvoice member is a zip archive inside the outer tar.xz. Match the
+  # rover installers here; trying to untar it fails after the large download.
+  unzip -q "$tmpdir/en-us-x-multi.zvoice" -d "$voice_dir"
+  chown -R root:root "$asset_dir"
+  find "$asset_dir" -type d -exec chmod 0755 {} +
+  find "$asset_dir" -type f -exec chmod 0644 {} +
 }
 
 echo "[1/6] Installing dependencies..."
