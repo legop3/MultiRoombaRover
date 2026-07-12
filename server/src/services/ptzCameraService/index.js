@@ -628,7 +628,7 @@ function startPublisher() {
   proc.stderr.on('data', handlePublisherStderr);
   proc.on('exit', (code, signal) => {
     if (publisherProcess === proc) publisherProcess = null;
-    logger.warn('publisher exited', { code, signal });
+    logger.warn('publisher exited', { code, signal, lastStderr: state.publisher?.lastStderr || null });
     const restartAt = enabled && state.rtspUri ? Date.now() + 1500 : null;
     updatePublisherState({
       running: false,
