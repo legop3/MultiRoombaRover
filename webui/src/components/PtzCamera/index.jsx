@@ -356,6 +356,159 @@ function PtzControlReference() {
   );
 }
 
+function PtzPresetPanel({ ptz }) {
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const {
+    ptzListPresets,
+    ptzGotoPreset,
+    ptzCreatePreset,
+    ptzRemovePreset,
+  } = useSessionActions();
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState('');
+  const presets = Array.isArray(ptz?.presets) ? ptz.presets : [];
+  const isPresetAdmin = role === 'admin' || role === 'lockdown';
+  const canMoveToPreset = Boolean(ptz?.isOperator);
+
+  const refreshPresets = async () => {
+    if (busy) return;
+    setBusy('refresh');
+    try {
+      /*
+        Presets live on the camera, not in browser state. A manual refresh gives
+        admins a simple recovery path if another admin or the camera's native
+        app changes preset storage while this UI is already open.
+      */
+      await ptzListPresets();
+    } catch (err) {
+      alert(err.message || 'Failed to refresh PTZ presets.');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const goToPreset = async (preset) => {
+    if (!canMoveToPreset || busy || !preset?.token) return;
+    setBusy(`goto:${preset.token}`);
+    try {
+      /*
+        Moving to a preset is a physical camera move, so the server still checks
+        that this browser owns the active PTZ turn before accepting the command.
+      */
+      await ptzGotoPreset({ token: preset.token });
+    } catch (err) {
+      alert(err.message || 'Failed to move to PTZ preset.');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const createPreset = async (event) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!isPresetAdmin || busy || !trimmed) return;
+    setBusy('create');
+    try {
+      /*
+        ONVIF setPreset stores the camera's current physical position. The UI
+        only sends the admin's label; the server supplies the active profile
+        token so browser code does not need to know camera profile internals.
+      */
+      await ptzCreatePreset({ name: trimmed });
+      setName('');
+    } catch (err) {
+      alert(err.message || 'Failed to create PTZ preset.');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const removePreset = async (preset) => {
+    if (!isPresetAdmin || busy || !preset?.token) return;
+    const confirmed = window.confirm(`Remove preset "${preset.name}"?`);
+    if (!confirmed) return;
+    setBusy(`remove:${preset.token}`);
+    try {
+      /*
+        The token is the camera's durable preset identifier. Names are only UI
+        labels and may not be unique, so deletion always targets the token.
+      */
+      await ptzRemovePreset({ token: preset.token });
+    } catch (err) {
+      alert(err.message || 'Failed to remove PTZ preset.');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  return (
+    <CardFrame
+      title="Position presets"
+      fillHeight
+      actions={(
+        <button type="button" className="button-dark text-xs" disabled={Boolean(busy)} onClick={refreshPresets}>
+          Refresh
+        </button>
+      )}
+      bodyClassName="flex min-h-0 flex-col gap-1 p-1 text-xs"
+    >
+      {ptz?.presetsError ? (
+        <div className="rounded border border-amber-500/50 bg-amber-950/40 p-1 text-amber-100">
+          {ptz.presetsError}
+        </div>
+      ) : null}
+      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+        {presets.length ? presets.map((preset) => {
+          const gotoBusy = busy === `goto:${preset.token}`;
+          const removeBusy = busy === `remove:${preset.token}`;
+          return (
+            <div key={preset.token} className="surface grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1">
+              <button
+                type="button"
+                className="button-dark min-w-0 truncate text-left text-xs disabled:opacity-50"
+                disabled={!canMoveToPreset || Boolean(busy)}
+                onClick={() => goToPreset(preset)}
+                title={canMoveToPreset ? `Move to ${preset.name}` : 'Your PTZ turn must be active'}
+              >
+                {gotoBusy ? 'Moving...' : preset.name}
+              </button>
+              {isPresetAdmin ? (
+                <button
+                  type="button"
+                  className="button-dark text-xs text-rose-200 disabled:opacity-50"
+                  disabled={Boolean(busy)}
+                  onClick={() => removePreset(preset)}
+                >
+                  {removeBusy ? 'Removing...' : 'Remove'}
+                </button>
+              ) : null}
+            </div>
+          );
+        }) : (
+          <div className="rounded border border-slate-700 bg-black/30 p-2 text-center text-slate-400">
+            No presets saved.
+          </div>
+        )}
+      </div>
+      {isPresetAdmin ? (
+        <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-1" onSubmit={createPreset}>
+          <input
+            className="min-w-0 rounded border border-slate-700 bg-black px-2 py-1 text-xs text-slate-100 outline-none focus:border-cyan-300"
+            value={name}
+            maxLength={60}
+            disabled={Boolean(busy)}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Preset name"
+          />
+          <button type="submit" className="button-dark text-xs" disabled={Boolean(busy) || !name.trim()}>
+            {busy === 'create' ? 'Saving...' : 'Save'}
+          </button>
+        </form>
+      ) : null}
+    </CardFrame>
+  );
+}
+
 function buildPtzTurnModel(ptz, selfId) {
   const { queue, currentId, nextId } = normalizePtzQueue(ptz);
   const isActive = Boolean(ptz?.isOperator);
@@ -427,9 +580,7 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
       </div>
       <div className="grid min-h-0 grid-cols-[minmax(0,1.6fr)_minmax(16rem,0.7fr)] gap-0.5 overflow-hidden">
         <ChatPanel fillHeight title="Chat" allowSpectatorInput inputTarget="overlay" />
-        <CardFrame title="Position presets" fillHeight bodyClassName="p-1 text-xs text-slate-500">
-          Presets will live here.
-        </CardFrame>
+        <PtzPresetPanel ptz={ptz} />
       </div>
       {releasePending ? (
         <div className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/80 px-2 py-1 text-xs text-slate-200">
@@ -469,6 +620,7 @@ function PtzMobileFullscreen({ ptz, layout, onClose, releasePending = false }) {
         <ChatPanel title="Chat" allowSpectatorInput inputTarget="overlay" />
         <div className="space-y-0.5">
           <PtzQueueSummary ptz={ptz} />
+          <PtzPresetPanel ptz={ptz} />
           <PtzStatePanel ptz={ptz} compact />
           <ReplaySourcesPanel panelId="ptz-controller-replay-mobile" />
         </div>

@@ -53,6 +53,8 @@ const state = {
   status: null,
   light: null,
   ir: null,
+  presets: [],
+  presetsError: null,
   publisher: {
     running: false,
     pid: null,
@@ -281,6 +283,8 @@ function getPublicState(socket = null) {
     status: state.status,
     light: state.light,
     ir: state.ir,
+    presets: state.presets,
+    presetsError: state.presetsError,
     publisher: state.publisher,
     isOperator: Boolean(socketId && state.operatorSocketId === socketId),
     queuedPosition: socketId ? state.queue.indexOf(socketId) + 1 || null : null,
@@ -318,6 +322,81 @@ function callOnvif(method, options = {}) {
       else resolve(data);
     });
   });
+}
+
+function normalizePresetName(rawName, token) {
+  /*
+    ONVIF cameras are inconsistent about preset names. Some return a readable
+    Name field, some return name, and some only return the token. The browser
+    needs a stable label for every button, so fall back to the token only after
+    exhausting the human-facing fields the camera may provide.
+  */
+  const name = String(rawName || '').trim();
+  if (name) return name;
+  const tokenLabel = String(token || '').trim();
+  return tokenLabel ? `Preset ${tokenLabel}` : 'Unnamed preset';
+}
+
+function normalizeOnvifPreset(entry, fallbackToken = '') {
+  /*
+    The onvif package returns camera XML converted to plain objects, but exact
+    key casing can vary by device and service response. Normalize once at the
+    service boundary so UI and socket callers never depend on vendor-specific
+    field names.
+  */
+  if (!entry || typeof entry !== 'object') return null;
+  const token = String(entry.token || entry.$?.token || entry.presetToken || entry.PresetToken || fallbackToken || '').trim();
+  if (!token) return null;
+  return {
+    token,
+    name: normalizePresetName(entry.name || entry.Name, token),
+  };
+}
+
+function normalizeOnvifPresets(raw) {
+  /*
+    getPresets can come back as an array directly, as { presets }, or as nested
+    ONVIF response data depending on the library/device pairing. Keep this
+    intentionally permissive because a missing preset list should degrade to an
+    empty panel, not a broken PTZ session.
+  */
+  const candidates = Array.isArray(raw)
+    ? raw.map((entry) => [null, entry])
+    : Array.isArray(raw?.presets)
+    ? raw.presets.map((entry) => [null, entry])
+    : Array.isArray(raw?.Presets)
+    ? raw.Presets.map((entry) => [null, entry])
+    : Array.isArray(raw?.GetPresetsResponse?.Preset)
+    ? raw.GetPresetsResponse.Preset.map((entry) => [null, entry])
+    : Array.isArray(raw?.Preset)
+    ? raw.Preset.map((entry) => [null, entry])
+    : raw && typeof raw === 'object'
+    ? Object.entries(raw)
+    : [];
+  return candidates
+    .map(([fallbackToken, entry]) => normalizeOnvifPreset(entry, fallbackToken))
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+async function refreshPresets(reason = 'presets') {
+  /*
+    The camera owns preset storage. Reading it back after every create/delete
+    keeps this server stateless and avoids a local JSON store drifting away from
+    what ONVIF will actually accept for gotoPreset.
+  */
+  await initialize();
+  try {
+    const raw = await callOnvif('getPresets', { profileToken: state.profileToken });
+    state.presets = normalizeOnvifPresets(raw);
+    state.presetsError = null;
+  } catch (err) {
+    state.presets = [];
+    state.presetsError = err.message || String(err);
+    logger.warn('Failed to refresh PTZ presets', { error: state.presetsError });
+  }
+  emitChange(reason);
+  return state.presets;
 }
 
 function connectOnvif() {
@@ -590,6 +669,13 @@ async function initialize() {
     onvifCam = await connectOnvif();
     state.rtspUri = await getStreamUriForProfile(onvifCam);
     await refreshVendorState();
+    /*
+      Presets are not required for the camera to be usable. Refresh them during
+      startup so connected clients have the list immediately, but keep failures
+      isolated inside refreshPresets() so a camera with broken preset support
+      can still pan, tilt, zoom, and stream normally.
+    */
+    await refreshPresets('initialize-presets');
     state.initialized = true;
     state.error = null;
     startPublisher();
@@ -766,6 +852,61 @@ function requireOperator(socket) {
   if (!socket || state.operatorSocketId !== socket.id) throw new Error('Not the PTZ operator');
 }
 
+function requirePtzUser(socket) {
+  /*
+    Listing presets does not move the camera, but it still reveals operational
+    camera state. Use the same feature gate as queue entry so unverified users
+    cannot query PTZ-only data through raw socket calls.
+  */
+  if (!enabled) throw new Error('PTZ camera disabled');
+  if (!canUsePtzFeature(socket)) throw new Error('Not authorized for PTZ camera');
+}
+
+function requirePresetAdmin(socket) {
+  /*
+    Preset creation and deletion changes shared camera state for everyone. Keep
+    that narrower than normal PTZ operation so regular camera users can only
+    choose from positions an admin has intentionally published.
+  */
+  if (!enabled) throw new Error('PTZ camera disabled');
+  if (!passesMode(socket)) throw new Error('Not authorized for PTZ camera');
+  if (!isAdmin(socket) && !isLockdownAdmin(socket)) throw new Error('PTZ preset admin required');
+}
+
+function normalizePresetToken(rawToken) {
+  const token = String(rawToken || '').trim();
+  if (!token) throw new Error('Preset token is required');
+  if (/[<>&'"]/.test(token)) throw new Error('Preset token contains invalid characters');
+  return token;
+}
+
+function escapeOnvifXmlText(value) {
+  /*
+    The installed onvif package writes option values directly into SOAP XML.
+    Escape admin-entered preset names before handing them to the package so a
+    normal label like "Door & window" remains valid XML instead of corrupting
+    the SetPreset request body.
+  */
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function normalizePresetCreateName(rawName) {
+  /*
+    The ONVIF API stores the preset at the camera's current position. A clear
+    name is the only context future users get in the UI, so require a small
+    non-empty label instead of silently creating "undefined" camera presets.
+  */
+  const name = String(rawName || '').trim().replace(/\s+/g, ' ');
+  if (!name) throw new Error('Preset name is required');
+  if (name.length > 60) throw new Error('Preset name must be 60 characters or less');
+  return name;
+}
+
 async function move(socket, payload = {}) {
   requireOperator(socket);
   await initialize();
@@ -795,6 +936,76 @@ async function getStatus(socket) {
   state.status = status || null;
   emitChange('status');
   return state.status;
+}
+
+async function listPresets(socket) {
+  requirePtzUser(socket);
+  return refreshPresets('presets-list');
+}
+
+async function gotoPreset(socket, payload = {}) {
+  requireOperator(socket);
+  await initialize();
+  const presetToken = normalizePresetToken(payload.token || payload.presetToken);
+  /*
+    Stop any continuous move before jumping to a preset. Without this, a held
+    key or touch control can keep sending pan/tilt velocity while the camera is
+    trying to execute the absolute preset move, which makes the final position
+    feel inconsistent.
+  */
+  await callOnvif('stop', { profileToken: state.profileToken, panTilt: true, zoom: true }).catch(() => {});
+  await callOnvif('gotoPreset', {
+    profileToken: state.profileToken,
+    /*
+      This onvif package names the goto option "preset" even though it writes
+      that value into the ONVIF PresetToken XML element. Keep the local variable
+      named presetToken because that is what the camera and UI are actually
+      handling, but send the package's expected option name here.
+    */
+    preset: presetToken,
+  });
+  return { ok: true, presetToken };
+}
+
+async function createPreset(socket, payload = {}) {
+  requirePresetAdmin(socket);
+  await initialize();
+  const presetName = normalizePresetCreateName(payload.name || payload.presetName);
+  const options = {
+    profileToken: state.profileToken,
+    presetName: escapeOnvifXmlText(presetName),
+  };
+  /*
+    ONVIF setPreset updates an existing token when one is supplied and creates a
+    new preset when it is omitted. Support both so the UI can start simple with
+    "create current position" and later reuse the same server action for rename
+    or overwrite workflows if needed.
+  */
+  const rawPresetToken = String(payload.token || payload.presetToken || '').trim();
+  const presetToken = rawPresetToken ? normalizePresetToken(rawPresetToken) : '';
+  if (presetToken) options.presetToken = presetToken;
+  const result = await callOnvif('setPreset', options);
+  const presets = await refreshPresets('preset-create');
+  return {
+    ok: true,
+    presetToken: result?.presetToken || result?.PresetToken || presetToken || null,
+    presets,
+  };
+}
+
+async function removePreset(socket, payload = {}) {
+  requirePresetAdmin(socket);
+  await initialize();
+  const presetToken = normalizePresetToken(payload.token || payload.presetToken);
+  await callOnvif('removePreset', {
+    profileToken: state.profileToken,
+    presetToken,
+  });
+  return {
+    ok: true,
+    presetToken,
+    presets: await refreshPresets('preset-remove'),
+  };
 }
 
 async function setSpotlight(socket, payload = {}) {
@@ -1107,6 +1318,38 @@ function registerSocketHandlers() {
       const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
         cb({ ok: true, ir: await setIr(socket, payload) });
+      } catch (err) {
+        cb({ error: err.message });
+      }
+    });
+    socket.on('ptzCamera:presets:list', async (firstArg, secondArg) => {
+      const { cb } = normalizeSocketArgs(firstArg, secondArg);
+      try {
+        cb({ ok: true, presets: await listPresets(socket) });
+      } catch (err) {
+        cb({ error: err.message });
+      }
+    });
+    socket.on('ptzCamera:preset:goto', async (firstArg, secondArg) => {
+      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
+      try {
+        cb(await gotoPreset(socket, payload));
+      } catch (err) {
+        cb({ error: err.message });
+      }
+    });
+    socket.on('ptzCamera:preset:create', async (firstArg, secondArg) => {
+      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
+      try {
+        cb(await createPreset(socket, payload));
+      } catch (err) {
+        cb({ error: err.message });
+      }
+    });
+    socket.on('ptzCamera:preset:remove', async (firstArg, secondArg) => {
+      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
+      try {
+        cb(await removePreset(socket, payload));
       } catch (err) {
         cb({ error: err.message });
       }

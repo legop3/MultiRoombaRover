@@ -426,6 +426,10 @@ export function SessionProvider({ children }) {
       ptzStop: () => emitWithAck('ptzCamera:stop'),
       ptzSpotlight: (payload = {}) => emitWithAck('ptzCamera:spotlight', payload),
       ptzIr: (payload = {}) => emitWithAck('ptzCamera:ir', payload),
+      ptzListPresets: () => emitWithAck('ptzCamera:presets:list'),
+      ptzGotoPreset: (payload = {}) => emitWithAck('ptzCamera:preset:goto', payload),
+      ptzCreatePreset: (payload = {}) => emitWithAck('ptzCamera:preset:create', payload),
+      ptzRemovePreset: (payload = {}) => emitWithAck('ptzCamera:preset:remove', payload),
       llmControl: (action, controls = {}) =>
         emitWithAck('llm:control', { controls: { action, ...controls } }),
       overseerControl: (action, controls = {}) =>
