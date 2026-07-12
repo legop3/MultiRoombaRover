@@ -339,22 +339,31 @@ function buildPtzTurnModel(ptz, selfId) {
   };
 }
 
-function PtzMediaPane({ ptz, open }) {
+function PtzMediaPane({ ptz, open, framed = true }) {
   const isOperator = Boolean(ptz?.isOperator);
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !isOperator });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   const turnModel = useMemo(() => buildPtzTurnModel(ptz, selfId), [ptz, selfId]);
+  const media = (
+    <>
+      {isOperator ? (
+        <PtzLiveVideo enabled={open} startMuted={false} label={ptz?.name || 'PTZ Camera'} />
+      ) : (
+        <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
+      )}
+      <TurnsOverlay turnModel={turnModel} />
+    </>
+  );
+
+  if (!framed) {
+    return <div className="relative h-full min-h-0 w-full overflow-hidden bg-black">{media}</div>;
+  }
 
   return (
     <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-black">
       <div className="relative aspect-video max-h-full w-full max-w-full overflow-hidden bg-black">
-        {isOperator ? (
-          <PtzLiveVideo enabled={open} startMuted={false} label={ptz?.name || 'PTZ Camera'} />
-        ) : (
-          <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
-        )}
-        <TurnsOverlay turnModel={turnModel} />
+        {media}
       </div>
     </div>
   );
@@ -362,12 +371,12 @@ function PtzMediaPane({ ptz, open }) {
 
 function PtzDesktopFullscreen({ ptz, releasePending }) {
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(9rem,0.32fr)] gap-0.5 overflow-hidden p-0.5">
+    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(7rem,0.22fr)] gap-0.5 overflow-hidden p-0.5">
       <div className="flex min-h-0 min-w-0 gap-0.5 overflow-hidden">
         <main className="min-h-0 shrink-0 overflow-hidden bg-black" style={{ aspectRatio: '16 / 9' }}>
-          <PtzMediaPane ptz={ptz} open />
+          <PtzMediaPane ptz={ptz} open framed />
         </main>
-        <aside className="flex min-h-0 min-w-72 flex-1 flex-col gap-0.5 overflow-y-auto bg-neutral-950 text-sm">
+        <aside className="flex min-h-0 min-w-56 flex-1 flex-col gap-0.5 overflow-y-auto bg-neutral-950 text-sm">
           <PtzQueueSummary ptz={ptz} />
           {ptz?.isOperator ? (
             <PtzLightingControls ptz={ptz} />
@@ -398,12 +407,12 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
 
 function PtzMobileFullscreen({ ptz, layout }) {
   const landscape = layout === 'mobile-landscape';
-  const videoClass = landscape ? 'h-[62svh]' : 'h-[42svh]';
+  const videoClass = landscape ? 'h-[58dvh]' : 'h-[44dvh]';
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-0.5">
-      <main className={`${videoClass} min-h-0 overflow-hidden bg-black`}>
-        <PtzMediaPane ptz={ptz} open />
+      <main className={`${videoClass} min-h-48 shrink-0 overflow-hidden bg-black`}>
+        <PtzMediaPane ptz={ptz} open framed={false} />
       </main>
       <section className="mobile-touch-control">
         <PtzMobileControlsPanel ptz={ptz} disabled={!ptz?.isOperator} />
