@@ -203,7 +203,7 @@ function QueueReplayLinksRow() {
         <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
       </div>
       <div className={`min-w-0 basis-0 grow-[0.75] ${themeStackClass}`}>
-        <LinkButtonsPanel />
+        <LinkButtonsPanel fillHeight={false} />
         <PtzQueueCard layout="desktop" />
       </div>
     </div>

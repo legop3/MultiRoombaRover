@@ -19,7 +19,7 @@ export function NicknameEntryPanel({ compact = false }) {
   );
 }
 
-export function LinkButtonsPanel({ className = '' }) {
+export function LinkButtonsPanel({ className = '', fillHeight = true }) {
   const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'socials'));
 
   /*
@@ -32,7 +32,7 @@ export function LinkButtonsPanel({ className = '' }) {
   return (
     <CardFrame
       title="Links!"
-      fillHeight
+      fillHeight={fillHeight}
       className={className}
       bodyClassName="flex flex-1 min-h-0 flex-col gap-0.5 text-base"
     >

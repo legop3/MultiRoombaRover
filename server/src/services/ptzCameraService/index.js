@@ -632,6 +632,24 @@ function buildDockRequiredPayload(socket, leave) {
   };
 }
 
+function releaseRoverOwnershipForPtz(socket) {
+  /*
+    PTZ operation must remove the browser from every rover-control state, not
+    only the roverManager driver set. The normal assignment UI is backed by
+    assignmentService, while low-level control membership is tracked inside
+    roverManager. In healthy flows those two agree, but reconnects, admin paths,
+    or earlier cleanup can leave only one side populated. Releasing the union
+    keeps PTZ from looking like a second simultaneous rover assignment.
+  */
+  if (!socket?.id) return;
+  const roverIds = new Set(roverManager.getRoversForSocket(socket.id));
+  const assignedRoverId = assignmentService.getAssignedRover?.(socket.id);
+  if (assignedRoverId) roverIds.add(assignedRoverId);
+  roverIds.forEach((roverId) => {
+    assignmentService.forceRelease(roverId, socket.id);
+  });
+}
+
 function revokeOperator(reason = 'release') {
   if (!state.operatorSocketId) return;
   const previous = state.operatorSocketId;
@@ -646,14 +664,7 @@ function revokeOperator(reason = 'release') {
 function activateOperator(socket) {
   revokeOperator('handoff');
   removeFromQueue(socket.id);
-  /*
-    PTZ operation is mutually exclusive with rover ownership. Releasing through
-    assignmentService preserves the existing queue/control cleanup rules instead
-    of directly mutating rover manager state.
-  */
-  roverManager.getRoversForSocket(socket.id).forEach((roverId) => {
-    assignmentService.forceRelease(roverId, socket.id);
-  });
+  releaseRoverOwnershipForPtz(socket);
   state.operatorSocketId = socket.id;
   state.deadline = Date.now() + getTurnDurationMs();
   turnTimer = setTimeout(handleTurnDeadline, getTurnDurationMs());
