@@ -407,15 +407,20 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
 
 function PtzMobileFullscreen({ ptz, layout }) {
   const landscape = layout === 'mobile-landscape';
-  const videoClass = landscape ? 'h-[58dvh]' : 'h-[44dvh]';
+  const topHeightClass = landscape ? 'h-[72dvh]' : 'h-[48dvh]';
+  const topGridClass = landscape
+    ? 'grid-cols-[minmax(0,1fr)_13rem]'
+    : 'grid-cols-[minmax(0,1fr)_11rem]';
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-0.5">
-      <main className={`${videoClass} min-h-48 shrink-0 overflow-hidden bg-black`}>
-        <PtzMediaPane ptz={ptz} open framed={false} />
-      </main>
-      <section className="mobile-touch-control">
-        <PtzMobileControlsPanel ptz={ptz} disabled={!ptz?.isOperator} />
+      <section className={`mobile-touch-control grid ${topHeightClass} min-h-48 shrink-0 ${topGridClass} gap-0.5`}>
+        <main className="min-h-0 overflow-hidden bg-black">
+          <PtzMediaPane ptz={ptz} open framed={false} />
+        </main>
+        <aside className="min-h-0 overflow-y-auto">
+          <PtzMobileControlsPanel ptz={ptz} disabled={!ptz?.isOperator} />
+        </aside>
       </section>
       <section className="grid gap-0.5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)]">
         <ChatPanel title="Chat" allowSpectatorInput inputTarget="overlay" />
