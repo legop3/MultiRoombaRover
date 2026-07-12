@@ -560,8 +560,6 @@ function startPublisher() {
     'low_delay',
     '-rtsp_transport',
     'tcp',
-    '-rw_timeout',
-    String(PUBLISHER_RTSP_TIMEOUT_US),
     '-timeout',
     String(PUBLISHER_RTSP_TIMEOUT_US),
     '-i',
