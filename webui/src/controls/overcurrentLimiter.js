@@ -12,7 +12,7 @@ export const OVERCURRENT_GROUPS = [
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
   downRatePerSec: 0.5,
-  upRatePerSec: 0.5,
+  upRatePerSec: 0.2,
   releaseDelaySec: 2,
   outputRateMs: 250,
 };
