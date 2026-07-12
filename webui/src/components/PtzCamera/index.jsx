@@ -442,7 +442,7 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
 
 function PtzMobileFullscreen({ ptz, layout, onClose, releasePending = false }) {
   const landscape = layout === 'mobile-landscape';
-  const topHeightClass = landscape ? 'h-[72dvh]' : 'h-[48dvh]';
+  const topHeightClass = landscape ? 'h-full min-h-[calc(100dvh-0.25rem)]' : 'h-[48dvh]';
   const topGridClass = landscape
     ? 'grid-cols-[minmax(0,1fr)_13rem]'
     : 'grid-cols-[minmax(0,1fr)_11rem]';
@@ -503,7 +503,14 @@ export function PtzFullscreenController({ open, onClose, layout = 'desktop' }) {
   if (!open) return null;
 
   const controller = (
-    <div className="fixed inset-0 z-[110] h-[100dvh] w-[100vw] overflow-hidden bg-black text-slate-100">
+    /*
+      The PTZ controller needs to cover the driver page, but it must not become
+      the top-most application layer. Global fullscreen overlays like help,
+      quickstart, mode gates, and connection warnings are still part of the
+      active app state while PTZ is open, so this portal intentionally sits
+      below their z-30+ overlay stack instead of hiding them.
+    */
+    <div className="fixed inset-0 z-20 h-[100dvh] w-[100vw] overflow-hidden bg-black text-slate-100">
       <CardFrame
         title={isMobile ? '' : ptz?.name || 'PTZ Camera'}
         actions={isMobile ? null : (
