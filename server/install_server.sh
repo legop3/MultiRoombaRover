@@ -84,6 +84,29 @@ install_google_tts_assets() {
   find "$asset_dir" -type f -exec chmod 0644 {} +
 }
 
+verify_google_tts_helper() {
+  local smoke_wav="$tmpdir/chromegtts-smoke.wav"
+
+  echo "      Verifying Chrome Google TTS helper"
+  # libchrometts is a native ChromeOS library. Rendering one tiny WAV during
+  # install catches missing shared-library dependencies, bad asset extraction,
+  # and helper path mistakes before multirover.service starts accepting PTZ TTS
+  # requests that would fail later in logs.
+  if ! "$CHROMEGTTS_WAV_BIN" \
+    --text "test" \
+    --voice tpf \
+    --pitch 1 \
+    --speed 1 \
+    --output "$smoke_wav"; then
+    echo "Chrome Google TTS helper smoke render failed." >&2
+    return 1
+  fi
+  if [[ ! -s "$smoke_wav" ]]; then
+    echo "Chrome Google TTS helper did not create a WAV file." >&2
+    return 1
+  fi
+}
+
 echo "[1/6] Installing dependencies..."
 # The Kinect tooling uses a native libfreenect worker/probe rather than a
 # Python wrapper.  Install both runtime and development headers here so a fresh
@@ -102,6 +125,8 @@ dnf install -y \
   flite \
   espeak \
   python3 \
+  libcxx \
+  libcxxabi \
   gstreamer1 \
   gstreamer1-plugins-base \
   gstreamer1-plugins-good \
@@ -188,6 +213,12 @@ if [[ -z "$neolink_extracted" ]]; then
 fi
 install -m 0755 "$neolink_extracted" "$NEOLINK_BIN"
 install_google_tts_assets
+if ! verify_google_tts_helper; then
+  echo "      Reinstalling Google TTS assets after failed verification"
+  rm -rf /opt/roverd/googletts
+  install_google_tts_assets
+  verify_google_tts_helper
+fi
 
 mkdir -p "$MEDIAMTX_CONF_DIR"
 if [[ ! -f "$MEDIAMTX_TEMPLATE" ]]; then
