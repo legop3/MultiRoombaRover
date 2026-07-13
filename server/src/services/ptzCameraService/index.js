@@ -1013,9 +1013,10 @@ function requirePtzUser(socket) {
 
 function requirePresetAdmin(socket) {
   /*
-    Preset creation and deletion changes shared camera state for everyone. Keep
-    that narrower than normal PTZ operation so regular camera users can only
-    choose from positions an admin has intentionally published.
+    Preset removal is intentionally narrower than normal PTZ operation because
+    deleting a shared camera position is destructive for every future operator.
+    Creation now uses requirePtzUser instead so any authorized PTZ user can save
+    a useful current position without also being allowed to remove presets.
   */
   if (!enabled) throw new Error('PTZ camera disabled');
   if (!passesMode(socket)) throw new Error('Not authorized for PTZ camera');
@@ -1117,7 +1118,7 @@ async function gotoPreset(socket, payload = {}) {
 }
 
 async function createPreset(socket, payload = {}) {
-  requirePresetAdmin(socket);
+  requirePtzUser(socket);
   await initialize();
   const presetName = normalizePresetCreateName(payload.name || payload.presetName);
   const options = {

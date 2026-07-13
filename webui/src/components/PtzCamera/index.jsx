@@ -372,6 +372,7 @@ function PtzPresetPanel({ ptz }) {
   const [busy, setBusy] = useState('');
   const presets = Array.isArray(ptz?.presets) ? ptz.presets : [];
   const isPresetAdmin = role === 'admin' || role === 'lockdown';
+  const canCreatePreset = Boolean(ptz?.canUse);
   const canMoveToPreset = Boolean(ptz?.isOperator);
 
   const refreshPresets = async () => {
@@ -410,13 +411,14 @@ function PtzPresetPanel({ ptz }) {
   const createPreset = async (event) => {
     event.preventDefault();
     const trimmed = name.trim();
-    if (!isPresetAdmin || busy || !trimmed) return;
+    if (!canCreatePreset || busy || !trimmed) return;
     setBusy('create');
     try {
       /*
         ONVIF setPreset stores the camera's current physical position. The UI
-        only sends the admin's label; the server supplies the active profile
-        token so browser code does not need to know camera profile internals.
+        only sends the user's label; the server supplies the active profile
+        token so browser code does not need camera profile internals, and the
+        server still enforces the PTZ feature gate for raw socket callers.
       */
       await ptzCreatePreset({ name: trimmed });
       setName('');
@@ -461,15 +463,20 @@ function PtzPresetPanel({ ptz }) {
           {ptz.presetsError}
         </div>
       ) : null}
-      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-wrap content-start items-start gap-0.5 overflow-y-auto">
+        {/*
+          Presets should behave like a compact pile of actions, not a table.
+          flex-wrap lets each preset keep its natural button width and only
+          starts a new visual line when the current line runs out of room.
+        */}
         {presets.length ? presets.map((preset) => {
           const gotoBusy = busy === `goto:${preset.token}`;
           const removeBusy = busy === `remove:${preset.token}`;
           return (
-            <div key={preset.token} className="surface grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1">
+            <div key={preset.token} className="surface inline-flex max-w-full items-center gap-1">
               <button
                 type="button"
-                className="button-dark min-w-0 truncate text-left text-xs disabled:opacity-50"
+                className="button-dark min-w-0 max-w-40 truncate text-left text-xs disabled:opacity-50"
                 disabled={!canMoveToPreset || Boolean(busy)}
                 onClick={() => goToPreset(preset)}
                 title={canMoveToPreset ? `Move to ${preset.name}` : 'Your PTZ turn must be active'}
@@ -494,10 +501,10 @@ function PtzPresetPanel({ ptz }) {
           </div>
         )}
       </div>
-      {isPresetAdmin ? (
+      {canCreatePreset ? (
         <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-1" onSubmit={createPreset}>
           <input
-            className="min-w-0 rounded border border-slate-700 bg-black px-2 py-1 text-xs text-slate-100 outline-none focus:border-cyan-300"
+            className="field-input min-w-0 text-xs"
             value={name}
             maxLength={60}
             disabled={Boolean(busy)}
