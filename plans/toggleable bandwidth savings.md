@@ -1,4 +1,6 @@
 # make all bandwidth saving options toggleable in one centralized server config
+- external spectators are people outside of local network
+
 - multitab protection mode
   - allowed
   - verified only
