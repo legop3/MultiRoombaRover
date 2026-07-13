@@ -26,6 +26,7 @@ require('./src/services/overseerControlService');
 require('./src/services/globalObjectiveService');
 require('./src/services/serverControlService');
 require('./src/services/videoSessions');
+require('./src/services/ptzCameraService');
 require('./src/services/videoAuthService');
 require('./src/services/videoSocketService');
 require('./src/services/roomCameraService');

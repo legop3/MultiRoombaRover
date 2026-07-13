@@ -46,7 +46,6 @@ export function useCommandPipeline(options = {}) {
 
   const headlightState = useMemo(() => rosterEntry?.headlight?.state ?? null, [rosterEntry]);
   const laserState = useMemo(() => rosterEntry?.laser?.state ?? null, [rosterEntry]);
-
   const emitCommand = useCallback(
     (payload, cb) => {
       if (!roverId) return;
@@ -65,7 +64,6 @@ export function useCommandPipeline(options = {}) {
 
   const sendDriveDirect = useCallback(
     (speeds) => {
-      if (!roverId) return null;
       const rawPayload = {
         left: clampRange(speeds?.left ?? 0, [-500, 500]),
         right: clampRange(speeds?.right ?? 0, [-500, 500]),
@@ -75,6 +73,7 @@ export function useCommandPipeline(options = {}) {
         left: clampRange(transformed?.left ?? 0, [-500, 500]),
         right: clampRange(transformed?.right ?? 0, [-500, 500]),
       };
+      if (!roverId) return null;
       emitCommand({
         type: 'drive',
         data: { driveDirect: payload },

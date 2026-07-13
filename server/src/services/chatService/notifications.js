@@ -7,6 +7,7 @@ const { getRole } = require('../roleService');
 const roverManager = require('../roverManager');
 const { issueCommand } = require('../commandService');
 const { getAdminReason } = require('../adminReasonService');
+const ptzCameraService = require('../ptzCameraService');
 const {
   TYPING_NOTE_DURATION,
   ACCESS_NOTICE_COOLDOWN_MS,
@@ -18,6 +19,13 @@ const { getLastAccessNoticeAt, setLastAccessNoticeAt } = require('./state');
 
 function playTypingNote(roverId, note, socketId) {
   if (!roverId) return;
+  /*
+    PTZ borrows the roverId field for chat badges, but it has no rover command
+    channel. Skipping the song command here keeps PTZ chat from producing noisy
+    "unknown rover" command attempts while still allowing the message itself to
+    behave like rover chat everywhere else.
+  */
+  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) return;
   try {
     issueCommand(roverId, {
       type: 'song',
@@ -83,6 +91,22 @@ function maybeSendAccessNotice(message, sendSystemMessage) {
 
 function maybeSpeak(socket, message, ttsOptions) {
   if (!ttsOptions || !message?.roverId) return;
+  if (String(message.roverId) === ptzCameraService.PTZ_CAMERA_ID) {
+    /*
+      PTZ has no rover websocket, but it does have a real speaker behind the
+      Reolink/neolink path. Keep PTZ routing here so chat remains the single
+      place that decides whether a user's message should produce speech, while
+      ptzCameraService owns camera-specific permissions and playback details.
+    */
+    ptzCameraService.speakText(message.text, ttsOptions, socket)
+      .then(() => {
+        logger.info('PTZ TTS sent', { engine: ttsOptions.engine, socket: socket.id });
+      })
+      .catch((err) => {
+        logger.warn('PTZ TTS send failed', { error: err.message, socket: socket.id });
+      });
+    return;
+  }
   const record = roverManager.rovers.get(message.roverId);
   const ttsEnabled = Boolean(record?.meta?.audio?.ttsEnabled);
   if (!ttsEnabled) return;

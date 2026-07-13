@@ -89,6 +89,7 @@ const {
   canDrive,
   getRoversForSocket,
   getPrimaryRoverForSocket,
+  canLeaveCurrentRover,
   canSwitchRover,
 } = roverLifecycle;
 
@@ -277,6 +278,7 @@ module.exports = {
   managerEvents,
   getRoversForSocket,
   getPrimaryRoverForSocket,
+  canLeaveCurrentRover,
   canSeeRover,
   canRequestControl,
   applyPrivateDriveSafety,

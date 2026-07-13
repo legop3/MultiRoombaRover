@@ -49,7 +49,7 @@ const replayBuilder = createReplayBuilder({
   ensureDir,
   renderSidebarVideo: sidebarRenderer.renderSidebarVideo,
   getVideoEntriesForSource: segmentStore.getVideoEntriesForSource,
-  getAudioEntriesForRover: segmentStore.getAudioEntriesForRover,
+  getAudioEntriesForSource: segmentStore.getAudioEntriesForSource,
   overlapping: segmentStore.overlapping,
 });
 registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefaultWebSources });

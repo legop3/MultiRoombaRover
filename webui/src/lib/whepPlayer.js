@@ -29,12 +29,19 @@ function buildAuthHeader(token) {
 }
 
 export class WhepPlayer {
-  constructor({ url, token, video, onStatus, audioOnly = false, receiveAudio = true }) {
+  constructor({ url, token, video, onStatus, audioOnly = false, receiveAudio = true, startMuted = null }) {
     this.url = url;
     this.token = token;
     this.video = video;
     this.audioOnly = audioOnly;
     this.receiveAudio = receiveAudio;
+    /*
+      Browser autoplay usually requires normal video streams to start muted,
+      while audio-only streams need to start audible. Keep that historical
+      default, but allow a caller that is already behind a user gesture, such as
+      the PTZ fullscreen controller, to request audible inline audio.
+    */
+    this.startMuted = startMuted === null ? !audioOnly : Boolean(startMuted);
     this.pc = null;
     this.abortController = null;
     this.onStatus = onStatus;
@@ -50,7 +57,7 @@ export class WhepPlayer {
     if (!this.video) return;
     this.video.playsInline = true;
     this.video.autoplay = true;
-    this.video.muted = this.audioOnly ? false : true;
+    this.video.muted = this.startMuted;
     if (typeof this.video.disableRemotePlayback !== 'undefined') {
       this.video.disableRemotePlayback = true;
     }
@@ -113,7 +120,15 @@ export class WhepPlayer {
         signal: this.abortController.signal,
       });
       if (!response.ok) {
-        throw new Error(`WHEP request failed: ${response.status}`);
+        /*
+          MediaMTX includes the useful rejection reason in the response body
+          for many 4xx WHEP failures, such as unsupported codecs or malformed
+          SDP. Surface that body so camera/video debugging does not stop at a
+          generic HTTP status code.
+        */
+        const body = await response.text().catch(() => '');
+        const detail = body ? `: ${body.slice(0, 180)}` : '';
+        throw new Error(`WHEP request failed: ${response.status}${detail}`);
       }
       const answerSdp = await response.text();
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });

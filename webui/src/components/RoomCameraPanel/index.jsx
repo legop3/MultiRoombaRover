@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { useRoomCameraSnapshots } from '../../hooks/useRoomCameraSnapshots.js';
+import { PTZ_CAMERA_ID, usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 import RoomCameraFeed from '../RoomCameraFeed/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import { isFeatureEnabled } from '../../lib/features.js';
@@ -105,11 +106,14 @@ function useCameraPanelSubscriptionGate() {
 }
 
 export default function RoomCameraPanel(props) {
-  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'roomCameras'));
+  const enabled = useSessionSelector((state) =>
+    isFeatureEnabled(state, 'roomCameras') || isFeatureEnabled(state, 'ptzCamera'),
+  );
 
   /*
-    Room-camera visibility belongs with the room-camera panel. This keeps every
-    route free to mount the panel without duplicating the server feature rule.
+    Camera-panel visibility belongs with the panel. PTZ is included here because
+    the user-facing request is "show it as a room camera"; the rendering path
+    still uses the same RoomCameraFeed tile as ordinary room cameras.
   */
   if (!enabled) return null;
 
@@ -123,13 +127,35 @@ function RoomCameraPanelContent({
   hideHeader = false,
   panelId = null,
 }) {
+  const roomCamerasEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'roomCameras'));
+  const ptzEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'ptzCamera'));
+  const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const cameras = useSessionSelector((state) => state.session?.roomCameras || []);
+  const cameraSources = useMemo(() => {
+    const base = roomCamerasEnabled ? cameras : [];
+    if (!ptzEnabled || !ptz) return base;
+    /*
+      PTZ snapshots use a different socket namespace from room cameras, but the
+      display model is intentionally the same: an id, a label, and a feed object.
+      Marking the type lets the subscription layer stay separate while the tile
+      renderer remains shared.
+    */
+    return [
+      ...base,
+      {
+        id: PTZ_CAMERA_ID,
+        name: ptz.name || 'PTZ Camera',
+        type: 'ptz',
+      },
+    ];
+  }, [cameras, ptz, ptzEnabled, roomCamerasEnabled]);
   const cameraIds = useMemo(
-    () => cameras.map((camera) => camera.id),
-    [cameras],
+    () => cameraSources.filter((camera) => camera.type !== 'ptz').map((camera) => camera.id),
+    [cameraSources],
   );
   const { panelRef, isPanelVisible } = useCameraPanelSubscriptionGate();
   const feedMap = useRoomCameraSnapshots(cameraIds, { enabled: isPanelVisible });
+  const ptzFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: isPanelVisible && ptzEnabled });
   const { value: orientationSettings, save: saveOrientationSettings } = useSettingsNamespace('roomCameraPanels', {});
   const [orientation, setOrientation] = useState(() =>
     normalizeOrientation(
@@ -152,7 +178,7 @@ function RoomCameraPanelContent({
       );
   const containerClass =
     effectiveOrientation === 'vertical' ? 'flex flex-col gap-0.5' : 'grid gap-0.5 md:grid-cols-2';
-  const showLayoutToggle = !hideLayoutToggle && !forcedOrientation && cameras.length > 0;
+  const showLayoutToggle = !hideLayoutToggle && !forcedOrientation && cameraSources.length > 0;
   const applyOrientation = (next) => {
     setOrientation(next);
     if (panelId) {
@@ -160,7 +186,7 @@ function RoomCameraPanelContent({
     }
   };
 
-  if (cameras.length === 0) {
+  if (cameraSources.length === 0) {
     return (
       <div ref={panelRef}>
         <EmptyState />
@@ -195,8 +221,8 @@ function RoomCameraPanelContent({
         bodyClassName="space-y-0.5 text-base"
       >
         <div className={containerClass}>
-          {cameras.map((camera) => {
-            const feed = feedMap[camera.id] || null;
+          {cameraSources.map((camera) => {
+            const feed = camera.type === 'ptz' ? ptzFeeds[camera.id] || null : feedMap[camera.id] || null;
             return (
               <article key={camera.id} className="w-full space-y-0.5 p-0.5">
                 {/* <header className="space-y-0.5">

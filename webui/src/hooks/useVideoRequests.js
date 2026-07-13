@@ -88,7 +88,12 @@ export function useVideoRequests(sourceList = [], options = {}) {
     let cancelled = false;
 
     function requestEntry(entry) {
-      const payload = entry.type === 'room' ? { roomCameraId: entry.id } : { roverId: entry.id };
+      const payload =
+        entry.type === 'room'
+          ? { roomCameraId: entry.id }
+          : entry.type === 'ptz'
+            ? { type: 'ptz', id: entry.id }
+            : { roverId: entry.id };
       socket.emit('video:request', payload, (resp = {}) => {
         if (cancelled) return;
         if (resp?.error) {

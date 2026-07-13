@@ -49,17 +49,38 @@ function resolveTtsSettings(settings) {
 
 function useChatComposerSessionState(allowSpectatorInput) {
   const role = useSessionSelector((state) => state.session?.role || null);
+  const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
+  const users = useSessionSelector((state) => state.session?.users ?? []);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
+  const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
+
+  const chatTargetId = useMemo(() => {
+    /*
+      PTZ is intentionally not a roster entry, but session users expose the
+      current chat target for each socket. Prefer the self user entry so the TTS
+      control follows PTZ queue/operation state instead of only physical rover
+      assignment state.
+    */
+    const self = users.find((entry) => entry?.socketId === socketId);
+    if (!self?.roverId && ptz?.id && (ptz?.isOperator || ptz?.queuedPosition)) return ptz.id;
+    return self?.roverId || currentRoverId || null;
+  }, [currentRoverId, ptz?.id, ptz?.isOperator, ptz?.queuedPosition, socketId, users]);
 
   const rover = useMemo(
-    () => roster.find((entry) => String(entry.id) === String(currentRoverId)) || null,
-    [currentRoverId, roster],
+    () => roster.find((entry) => String(entry.id) === String(chatTargetId)) || null,
+    [chatTargetId, roster],
+  );
+  const ptzTtsSupported = Boolean(
+    ptz?.id &&
+      String(chatTargetId) === String(ptz.id) &&
+      ptz?.audio?.enabled &&
+      (ptz?.isOperator || ptz?.queuedPosition),
   );
 
   return {
     canChat: role !== 'spectator' || allowSpectatorInput,
-    ttsSupported: Boolean(rover?.audio?.ttsEnabled),
+    ttsSupported: Boolean(rover?.audio?.ttsEnabled || ptzTtsSupported),
   };
 }
 
@@ -214,6 +235,7 @@ function TtsControls({
 function ChatComposer({
   allowSpectatorInput = false,
   hideSpectatorNotice = false,
+  inputTarget = 'panel',
 }) {
   const {
     sendMessage,
@@ -310,7 +332,7 @@ function ChatComposer({
             setTypingActive(false);
           }
         }}
-        ref={(el) => registerInputRef(el, { target: 'panel' })}
+        ref={(el) => registerInputRef(el, { target: inputTarget })}
         placeholder={canChat ? 'Type a message…' : hideSpectatorNotice ? '' : 'Spectators cannot chat'}
         disabled={!canChat}
       />
@@ -346,6 +368,7 @@ export default function ChatPanel({
   allowSpectatorInput = false,
   title = 'Chat and speech',
   minimal = false,
+  inputTarget = 'panel',
 }) {
   const effectiveHideInput = minimal || hideInput;
   const effectiveTitle = minimal ? '' : title;
@@ -362,6 +385,7 @@ export default function ChatPanel({
         <MemoizedChatComposer
           allowSpectatorInput={allowSpectatorInput}
           hideSpectatorNotice={hideSpectatorNotice}
+          inputTarget={inputTarget}
         />
       )}
     </CardFrame>

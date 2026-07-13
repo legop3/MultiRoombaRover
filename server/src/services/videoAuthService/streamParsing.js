@@ -5,6 +5,7 @@ const { loadConfig } = require('../../helpers/configLoader');
 
 const config = loadConfig();
 const mediaConfig = config.media || {};
+const PTZ_STREAM_PATH = 'ptz-camera';
 
 function getPathPrefix() {
   const base = mediaConfig.whepBaseUrl;
@@ -37,6 +38,14 @@ function extractStreamInfo(path) {
   const remaining = segments.slice(start, end);
   if (remaining.length === 1) {
     const rawId = remaining[0] || '';
+    /*
+      PTZ is intentionally published as a flat MediaMTX path so WHEP requests
+      line up with the real stream name. Treat that one reserved path as PTZ
+      before falling back to the normal one-segment rover parsing rules.
+    */
+    if (rawId === PTZ_STREAM_PATH) {
+      return { type: 'ptz', id: rawId };
+    }
     if (rawId.endsWith('-fwd')) {
       return { type: 'rover', id: rawId, baseId: rawId.slice(0, -4) };
     }
@@ -46,6 +55,10 @@ function extractStreamInfo(path) {
 
   if (remaining.length === 2 && remaining[0] === 'room') {
     return { type: 'room', id: remaining[1] || '' };
+  }
+
+  if (remaining.length === 2 && remaining[0] === 'ptz') {
+    return { type: 'ptz', id: remaining[1] || '' };
   }
 
   return null;
@@ -76,6 +89,10 @@ function extractStreamInfoFromBody(body = {}) {
     extractSrtStreamId(body.streamId) ||
     extractSrtStreamId(body.query);
   if (!srtId) return null;
+
+  if (srtId === PTZ_STREAM_PATH) {
+    return { type: 'ptz', id: srtId };
+  }
 
   if (srtId.endsWith('-fwd')) {
     return { type: 'rover', id: srtId, baseId: srtId.slice(0, -4) };

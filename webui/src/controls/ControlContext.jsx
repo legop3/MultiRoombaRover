@@ -35,6 +35,7 @@ import {
   applyDriveOvercurrentScale,
   useOvercurrentLimiter,
 } from './overcurrentLimiter.js';
+import { usePtzControlAdapter } from './ptzControlAdapter.js';
 
 const ControlSystemContext = createContext(null);
 
@@ -179,6 +180,7 @@ export function ControlSystemProvider({ children }) {
     [overcurrentLimiter.adminImmune, overcurrentLimiter.scales],
   );
   const pipeline = useCommandPipeline({ driveTransform, auxTransform });
+  const ptzControls = usePtzControlAdapter();
 
   const turnOnAllLights = useCallback(() => {
     const entities = homeAssistantEntities || [];
@@ -327,9 +329,10 @@ export function ControlSystemProvider({ children }) {
         payload: { ...computed, source: meta.source ?? null },
       });
       recordControlIntent();
+      if (ptzControls.applyDriveVector(vector, meta)) return;
       pipeline.sendDriveDirect(computed.speeds);
     },
-    [pipeline, recordControlIntent, state.manualDockAssist?.active],
+    [pipeline, ptzControls, recordControlIntent, state.manualDockAssist?.active],
   );
 
   const setAuxMotors = useCallback(
@@ -372,6 +375,21 @@ export function ControlSystemProvider({ children }) {
 
   const setServoAngle = useCallback(
     (value, options = {}) => {
+      if (ptzControls.isActive) {
+        /*
+          Servo-capable rover controls converge here from keyboard, gamepad,
+          desktop, and mobile. When the active control target is the PTZ camera,
+          route the intent through the PTZ adapter instead of making the rover
+          command pipeline understand camera zoom semantics.
+        */
+        const baseline = typeof servoAngleRef.current === 'number' ? servoAngleRef.current : 0;
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return;
+        ptzControls.pulseZoom(numeric - baseline);
+        servoAngleRef.current = numeric;
+        recordControlIntent();
+        return;
+      }
       if (!pipeline.servoConfig) return;
       const force = Boolean(options?.force);
       if (state.manualDockAssist?.active && !force) return;
@@ -381,23 +399,23 @@ export function ControlSystemProvider({ children }) {
       servoAngleRef.current = clamped;
       recordControlIntent();
     },
-    [pipeline, recordControlIntent, state.manualDockAssist?.active],
+    [pipeline, ptzControls, recordControlIntent, state.manualDockAssist?.active],
   );
 
   const nudgeServo = useCallback(
     (delta = 0) => {
       const config = pipeline.servoConfig;
-      if (!config) return;
-      const step = typeof delta === 'number' && delta !== 0 ? delta : config.nudgeDegrees || 1;
+      if (!config && !ptzControls.isActive) return;
+      const step = typeof delta === 'number' && delta !== 0 ? delta : config?.nudgeDegrees || 1;
       const baseline =
         typeof servoAngleRef.current === 'number'
           ? servoAngleRef.current
-          : typeof config.homeAngle === 'number'
+          : typeof config?.homeAngle === 'number'
           ? config.homeAngle
           : 0;
       setServoAngle(baseline + step);
     },
-    [pipeline.servoConfig, setServoAngle],
+    [pipeline.servoConfig, ptzControls.isActive, setServoAngle],
   );
 
   const goServoHome = useCallback(() => {
@@ -460,9 +478,13 @@ export function ControlSystemProvider({ children }) {
         source: 'system-stop',
       },
     });
+    if (ptzControls.isActive) {
+      ptzControls.stopMotion();
+      return;
+    }
     pipeline.sendDriveDirect({ left: 0, right: 0 });
     pipeline.sendAuxMotors({ main: 0, side: 0, vacuum: 0 });
-  }, [pipeline]);
+  }, [pipeline, ptzControls]);
 
   const sendOiCommand = useCallback(
     (command) => {
@@ -484,6 +506,10 @@ export function ControlSystemProvider({ children }) {
 
   const setHeadlight = useCallback(
     (headlightOn) => {
+      if (ptzControls.setSpotlight(headlightOn)) {
+        recordControlIntent();
+        return;
+      }
       if (!pipeline.headlight) return;
       // Web controls now speak in logical device state. Any electrical
       // inversion needed by the actual GPIO driver is handled by roverd's
@@ -492,7 +518,7 @@ export function ControlSystemProvider({ children }) {
       pipeline.sendHeadlight(action);
       recordControlIntent();
     },
-    [pipeline, recordControlIntent],
+    [pipeline, ptzControls, recordControlIntent],
   );
 
   const toggleHeadlight = useCallback(() => {
@@ -501,6 +527,10 @@ export function ControlSystemProvider({ children }) {
 
   const setLaser = useCallback(
     (laserOn) => {
+      if (ptzControls.setIr(laserOn)) {
+        recordControlIntent();
+        return;
+      }
       if (!pipeline.laser) return;
       if (roomLightsLockedOn && laserOn !== false) return;
       // The laser shares the same logical toggle contract as the headlight; it
@@ -509,7 +539,7 @@ export function ControlSystemProvider({ children }) {
       pipeline.sendLaser(action);
       recordControlIntent();
     },
-    [pipeline, recordControlIntent, roomLightsLockedOn],
+    [pipeline, ptzControls, recordControlIntent, roomLightsLockedOn],
   );
 
   const toggleLaser = useCallback(() => {
@@ -739,10 +769,11 @@ export function ControlSystemProvider({ children }) {
       state,
       dispatch,
       pipeline,
+      ptzControls,
       overcurrentLimiter,
       actions: stableActions,
     }),
-    [state, pipeline, overcurrentLimiter, stableActions],
+    [state, pipeline, ptzControls, overcurrentLimiter, stableActions],
   );
 
   if (snapshotRef.current == null) {

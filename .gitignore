@@ -5,6 +5,8 @@ create_2_Open_Interface_Spec.txt
 
 logs
 node_modules/
+__pycache__/
+*.py[cod]
 .pio
 .vscode/
 config.h

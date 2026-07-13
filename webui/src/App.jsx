@@ -38,6 +38,7 @@ import useUserIdentitySync from './hooks/useUserIdentitySync.js';
 import useIncomingInterInstanceTransfer from './hooks/useIncomingInterInstanceTransfer.js';
 import GlobalObjectiveBanner from './components/GlobalObjectiveBanner/index.jsx';
 import RoverQueuesPanel from './components/RoverQueuesPanel/index.jsx';
+import PtzQueueCard from './components/PtzCamera/index.jsx';
 import VipPanel from './components/VipPanel/index.jsx';
 import { useSessionSelector } from './context/SessionContext.jsx';
 import { useTelemetryVisualPolicy } from './context/TelemetryContext.jsx';
@@ -206,7 +207,7 @@ function MobileFeatureTabs({
             </div>
           </TabPanel>
           <TabPanel id="vip" keepMounted>
-            <VipPanel isActive={activeTab === 'vip'} />
+            <VipPanel isActive={activeTab === 'vip'} layout={layout} />
           </TabPanel>
           <TabPanel id="roomcontrols">
             <div className={themeStackClass}>
@@ -253,6 +254,7 @@ function MobilePortraitLayout({ onOpenHelpOverlay, swapMobileControlColumns = fa
         <ReplaySourcesPanel panelId="replay-sources-mobile-portrait" />
         <div className="space-y-0.5">
           <RoverQueuesPanel />
+          <PtzQueueCard layout="mobile-portrait" />
         </div>
       </div>
       {/* <ControlSummary /> */}
@@ -283,6 +285,7 @@ function MobileLandscapeLayout({ onOpenHelpOverlay, swapMobileControlColumns = f
             <ReplaySourcesPanel panelId="replay-sources-mobile-landscape" />
             <div className="space-y-0.5">
               <RoverQueuesPanel />
+              <PtzQueueCard layout="mobile-landscape" />
             </div>
           </div>
           {/* <TelemetryPanel /> */}

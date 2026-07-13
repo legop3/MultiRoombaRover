@@ -10,6 +10,12 @@ const { managerEvents } = roverManager;
 const assignmentService = require('../assignmentService');
 const { getActiveDrivers, getTurnQueues, turnEvents } = require('../turnService');
 const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
+const {
+  getPublicState: getPtzCameraState,
+  getChatTargetForSocket: getPtzChatTargetForSocket,
+  PTZ_CAMERA_ID,
+  ptzCameraEvents,
+} = require('../ptzCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
 const { getState: getNeatoState, neatoEvents } = require('../neatoService');
 const { getState: getLiftState, liftEvents } = require('../liftService');
@@ -61,12 +67,19 @@ function buildUserEntry(socket) {
   const role = getRole(socket);
   const assignment = assignmentService.describeAssignment(socket.id);
   const primaryRover = roverManager.getPrimaryRoverForSocket(socket.id);
+  const ptzChatTarget = getPtzChatTargetForSocket(socket.id);
   return {
     socketId: socket.id,
     userId: socket?.data?.userId || null,
     nickname: getNickname(socket) || null,
     role,
-    roverId: primaryRover || assignment?.roverId || null,
+    /*
+      PTZ is not inserted into the physical rover roster, but for chat and user
+      presence it should read like the user moved to a rover-like target. Prefer
+      the PTZ chat target while the socket is queued or operating so presence,
+      queue lookup, and chat identity all agree.
+    */
+    roverId: ptzChatTarget?.roverId || primaryRover || assignment?.roverId || null,
   };
 }
 
@@ -78,7 +91,13 @@ function buildSession(socket) {
     .filter(Boolean)
     .map((entry) => ({
       ...entry,
-      roverId: filterVisibleRoverId(socket, entry.roverId),
+      /*
+        PTZ is intentionally not a roverManager record, so the normal physical
+        rover visibility filter would erase the user's PTZ chat target. Preserve
+        it here because getPtzChatTargetForSocket already applied the PTZ access
+        and queue/operator rules before buildUserEntry returned it.
+      */
+      roverId: entry.roverId === PTZ_CAMERA_ID ? entry.roverId : filterVisibleRoverId(socket, entry.roverId),
     }));
   const roster = roverManager.getRosterForSocket(socket);
   const assignment = assignmentService.describeAssignment(socket?.id || '');
@@ -107,6 +126,7 @@ function buildSession(socket) {
     activeDrivers,
     turnQueues,
     roomCameras: getRoomCameras(),
+    ptzCamera: getPtzCameraState(socket),
     homeAssistant: getHomeAssistantState(),
     neato: getNeatoState(),
     lift: getLiftState(),
@@ -278,6 +298,11 @@ turnEvents.on('queue', (event = {}) => {
 
 roomCameraEvents.on('update', () => {
   logger.info('Room camera change detected; syncing all clients');
+  syncAll();
+});
+
+ptzCameraEvents.on('change', () => {
+  logger.info('PTZ camera state change; syncing all clients');
   syncAll();
 });
 

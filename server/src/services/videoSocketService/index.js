@@ -7,6 +7,7 @@ const { getMode, MODES } = require('../modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
 const videoSessions = require('../videoSessions');
 const roverManager = require('../roverManager');
+const ptzCameraService = require('../ptzCameraService');
 const { loadConfig } = require('../../helpers/configLoader');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
 
@@ -34,6 +35,15 @@ function buildWhepUrlForSource(source) {
   const segments = [];
   if (source.type === 'room') {
     segments.push('room', encodeURIComponent(source.id));
+  } else if (source.type === 'ptz') {
+    /*
+      MediaMTX exposes WHEP by the exact path name that is being published.
+      The PTZ ffmpeg publisher registers the single camera as "ptz-camera",
+      so the browser must request "/video/ptz-camera/whep" instead of a
+      namespace-like "/video/ptz/ptz-camera/whep" path that MediaMTX has never
+      seen and correctly returns as 404.
+    */
+    segments.push(encodeURIComponent(source.id));
   } else {
     segments.push(encodeURIComponent(source.id));
   }
@@ -81,6 +91,9 @@ function normalizeRequest(payload = {}) {
   if (payload.roomCameraId) {
     return { type: 'room', id: String(payload.roomCameraId) };
   }
+  if (payload.ptzCameraId || payload.type === 'ptz') {
+    return { type: 'ptz', id: String(payload.ptzCameraId || payload.id || ptzCameraService.PTZ_CAMERA_ID) };
+  }
   return null;
 }
 
@@ -109,6 +122,13 @@ io.on('connection', (socket) => {
         }
       } else if (target.type === 'room') {
         throw new Error('Room cameras now use the snapshot feed');
+      } else if (target.type === 'ptz') {
+        if (target.id !== ptzCameraService.PTZ_CAMERA_ID) {
+          throw new Error('Unknown PTZ camera');
+        }
+        if (!ptzCameraService.canRequestLiveVideo(socket)) {
+          throw new Error('Not authorized for PTZ video');
+        }
       } else {
         throw new Error('Unsupported video source');
       }

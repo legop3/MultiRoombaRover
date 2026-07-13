@@ -7,8 +7,15 @@ const roverManager = require('../roverManager');
 const { getRole } = require('../roleService');
 const { describeAssignment } = require('../assignmentService');
 const { getNickname } = require('../nicknameService');
+const ptzCameraService = require('../ptzCameraService');
+
+function resolvePtzChatTarget(socketId) {
+  return ptzCameraService.getChatTargetForSocket(socketId) || null;
+}
 
 function resolveRoverId(socketId) {
+  const ptzTarget = resolvePtzChatTarget(socketId);
+  if (ptzTarget?.roverId) return ptzTarget.roverId;
   const primary = roverManager.getPrimaryRoverForSocket(socketId);
   if (primary) return primary;
   const assignment = describeAssignment(socketId);
@@ -17,13 +24,54 @@ function resolveRoverId(socketId) {
 
 function resolveRoverColor(roverId) {
   if (!roverId) return null;
+  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) {
+    return ptzCameraService.getPublicState()?.color || null;
+  }
   const record = roverManager.rovers.get(String(roverId));
   return record?.meta?.color || null;
 }
 
+function resolveRoverName(roverId) {
+  if (!roverId) return null;
+  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) {
+    return ptzCameraService.getPublicState()?.name || null;
+  }
+  const record = roverManager.rovers.get(String(roverId));
+  return record?.meta?.name || null;
+}
+
+function isPtzChatTargetId(roverId) {
+  /*
+    PTZ is intentionally treated as a virtual rover for chat identity only. It
+    does not live in roverManager.rovers because movement, video authorization,
+    and queue ownership are PTZ-service concerns, but chat needs one stable
+    "rover-like" id so the existing web UI, Discord bridge, and AI transcript
+    code can all render the same badge without learning PTZ internals.
+  */
+  return Boolean(roverId) && String(roverId) === ptzCameraService.PTZ_CAMERA_ID;
+}
+
+function isPublicChatTargetId(roverId, socket = null) {
+  if (!roverId) return false;
+  /*
+    Normal rovers remain governed by the existing replay visibility rule, which
+    is also the rule chat historically used to avoid exposing closed private
+    rover activity. PTZ gets an explicit allow-list entry here because it is a
+    public chat target that deliberately pretends to be a rover, even though it
+    is not a roverManager record.
+  */
+  if (isPtzChatTargetId(roverId)) return true;
+  return roverManager.canReplayRoverId(roverId, socket) === true;
+}
+
 function isPrivateClosedRoverId(roverId) {
   if (!roverId) return false;
-  return roverManager.canReplayRoverId(roverId) !== true;
+  /*
+    PTZ uses the existing rover badge fields so chat rows can reuse RoverLabel,
+    but it is not a private rover. Let PTZ-badged messages broadcast normally
+    instead of falling into the closed-private rover path for unknown ids.
+  */
+  return !isPublicChatTargetId(roverId);
 }
 
 function normalizeProfileImageUrl(value) {
@@ -100,6 +148,7 @@ function buildRoverCtxSnapshot(roverId) {
 function buildMessage(socket, text, meta = {}) {
   const roverId = meta.roverId || resolveRoverId(socket?.id);
   const roverColor = meta.roverColor ?? resolveRoverColor(roverId);
+  const roverName = meta.roverName ?? resolveRoverName(roverId);
   const toolCalls = Array.isArray(meta.toolCalls)
     ? meta.toolCalls
         .map((entry) => {
@@ -122,6 +171,7 @@ function buildMessage(socket, text, meta = {}) {
     nickname: meta.nickname || getNickname(socket) || null,
     role: meta.role || getRole(socket),
     roverId,
+    roverName,
     roverColor,
     fromDiscord: Boolean(meta.fromDiscord),
     discordGuildId: meta.discordGuildId || null,
@@ -143,6 +193,7 @@ function buildMessage(socket, text, meta = {}) {
 function buildTypingPayload(socket, meta = {}) {
   const roverId = meta.roverId || resolveRoverId(socket?.id);
   const roverColor = meta.roverColor ?? resolveRoverColor(roverId);
+  const roverName = meta.roverName ?? resolveRoverName(roverId);
   const socketId = socket?.id || null;
   const fromDiscord = Boolean(meta.fromDiscord);
   let typingId = meta.typingId || null;
@@ -165,6 +216,7 @@ function buildTypingPayload(socket, meta = {}) {
     nickname: meta.nickname || getNickname(socket) || null,
     role: meta.role || getRole(socket),
     roverId,
+    roverName,
     roverColor,
     fromDiscord,
     discordGuildId: meta.discordGuildId || null,
@@ -179,6 +231,8 @@ function buildTypingPayload(socket, meta = {}) {
 
 module.exports = {
   resolveRoverId,
+  isPtzChatTargetId,
+  isPublicChatTargetId,
   isPrivateClosedRoverId,
   buildRoverCtxSnapshot,
   buildMessage,

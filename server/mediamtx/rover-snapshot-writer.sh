@@ -16,10 +16,24 @@ esac
 
 mkdir -p "$SNAP_DIR"
 
+FILTER="fps=1"
+QUALITY="6"
+
+case "$PATH_NAME" in
+  ptz-camera)
+    # PTZ snapshots are shown to non-operators specifically to avoid sending the
+    # full live video stream. The PTZ publisher is full-resolution 16:9 video,
+    # so resize the JPEGs at the snapshot writer boundary before Node ever reads
+    # and fans them out over Socket.IO.
+    FILTER="fps=1,scale=480:-2"
+    QUALITY="10"
+    ;;
+esac
+
 exec ffmpeg -hide_banner -loglevel warning -nostdin -y \
   -i "srt://127.0.0.1:9000?streamid=read:${PATH_NAME}" \
   -an \
-  -vf fps=1 \
-  -q:v 6 \
+  -vf "$FILTER" \
+  -q:v "$QUALITY" \
   -update 1 \
   "${SNAP_DIR}/${PATH_NAME}.jpg"
