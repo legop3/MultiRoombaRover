@@ -410,6 +410,10 @@ export function SessionProvider({ children }) {
       // maintenance without becoming a remote shell.
       updateRover: (roverId) =>
         emitWithAck('command', { roverId, type: 'update', data: { update: {} } }),
+      // Bulk rover updates stay server-owned so the admin browser sends one
+      // intent, then the server checks privileges and fans out the same fixed
+      // update command to every currently connected rover.
+      updateAllRovers: () => emitWithAck('command:updateAllRovers'),
       rebootServer: () => emitWithAck('server:reboot'),
       playUploadedAudio: ({ roverId, name, mime, dataBase64 }) =>
         emitWithAck('audio:uploadPlay', { roverId, name, mime, dataBase64 }),

@@ -106,6 +106,28 @@ function handleAck(msg) {
   });
 }
 
+function issueUpdateToAllRovers() {
+  const updated = [];
+  const failed = [];
+
+  roverManager.rovers.forEach((record) => {
+    if (!record?.ws) return;
+
+    const roverId = String(record.id);
+    try {
+      // Use the same narrow update payload as the per-rover admin action. The
+      // browser only asks for "update all"; the Pi still owns the privileged
+      // pull/install/reboot sequence through its fixed self-update helper.
+      issueCommand(roverId, { type: 'update', update: {} });
+      updated.push(roverId);
+    } catch (err) {
+      failed.push({ roverId, error: err.message });
+    }
+  });
+
+  return { updated, failed };
+}
+
 function getRecentDriveActivity(windowMs, options = {}) {
   const now = Date.now();
   const results = [];
@@ -288,6 +310,26 @@ io.on('connection', (socket) => {
 
   socket.on('command', handleCommand);
   socket.on('command:issue', handleCommand);
+
+  socket.on('command:updateAllRovers', (_payload = {}, cb) => {
+    const reply = typeof cb === 'function' ? cb : () => {};
+    try {
+      if (!isAdmin(socket)) {
+        throw new Error('Not authorized');
+      }
+
+      const result = issueUpdateToAllRovers();
+      logger.warn('Admin requested update for all online rovers', {
+        socketId: socket.id,
+        updated: result.updated,
+        failed: result.failed,
+      });
+      reply(result);
+    } catch (err) {
+      logger.warn('Update-all rovers rejected', socket.id, err.message);
+      reply({ error: err.message });
+    }
+  });
 });
 
 homeAssistantService.homeAssistantEvents.on('update', () => {

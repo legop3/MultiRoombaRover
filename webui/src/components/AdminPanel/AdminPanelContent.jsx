@@ -69,6 +69,7 @@ export default function AdminPanelContent() {
     setAdminReason,
     rebootRover,
     updateRover,
+    updateAllRovers,
     rebootServer,
     setAudioLevels,
     setPrivateSafety,
@@ -178,6 +179,35 @@ export default function AdminPanelContent() {
       alert(err.message);
     } finally {
       setUpdateStates((prev) => ({ ...prev, [rover.id]: false }));
+    }
+  };
+
+  const handleUpdateAll = async () => {
+    const roverCount = roster.filter((rover) => rover?.id).length;
+    if (roverCount === 0) return;
+
+    const ok = window.confirm(
+      `Update all ${roverCount} rover${roverCount === 1 ? '' : 's'} now? Each rover will run its self-update and reboot if the update starts successfully.`,
+    );
+    if (!ok) return;
+
+    trackAnalyticsEvent('rover_update_all_click', { roverCount });
+    try {
+      // The server owns the fan-out because it has the authoritative online
+      // rover map and can enforce admin privileges once before issuing the
+      // existing per-rover update command to every connected rover.
+      const result = await updateAllRovers();
+      trackAnalyticsEvent('rover_update_all_result', {
+        status: 'accepted',
+        updated: result?.updated?.length || 0,
+        failed: result?.failed?.length || 0,
+      });
+      if (result?.failed?.length) {
+        alert(`Update requested for ${result.updated?.length || 0} rover(s). ${result.failed.length} rover(s) failed to queue.`);
+      }
+    } catch (err) {
+      trackAnalyticsEvent('rover_update_all_result', { status: 'failed', reason: err?.message || 'unknown' });
+      alert(err.message);
     }
   };
 
@@ -487,6 +517,17 @@ export default function AdminPanelContent() {
         </div>
       </div>
 
+      <div className="flex items-center justify-between gap-0.5 text-xs">
+        <span className="text-slate-400">Rovers</span>
+        <button
+          type="button"
+          onClick={handleUpdateAll}
+          disabled={roster.length === 0}
+          className="button-danger disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Update All
+        </button>
+      </div>
       <RoverRoster
         roster={roster}
         renderActions={(rover) => (
