@@ -29,6 +29,15 @@ if [[ "${EUID}" -ne 0 ]]; then
 	exit 1
 fi
 
+if [[ "${ROVERD_SELF_UPDATE_SYSTEMD:-}" != "1" ]] && command -v systemd-run >/dev/null 2>&1; then
+	exec systemd-run \
+		--unit=roverd-self-update \
+		--collect \
+		--property=Type=exec \
+		--setenv=ROVERD_SELF_UPDATE_SYSTEMD=1 \
+		"$0"
+fi
+
 if [[ ! -f "$ENV_FILE" ]]; then
 	echo "Missing $ENV_FILE; run pi/install_roverd.sh once to register the repository path" >&2
 	exit 1

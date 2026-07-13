@@ -13,4 +13,5 @@
 - external spectator access (new)
   - off (no one can access the spectate page externally)
   - on (everyone can access the spectate page externally)
+  - admin (external spectators get mode gate overlay, when logged in once that identity gets spectator access forever. use database.)
 - anything else related to bandwidth savings should also get config
