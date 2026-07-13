@@ -11,9 +11,9 @@ export const OVERCURRENT_GROUPS = [
 ];
 
 export const DEFAULT_OVERCURRENT_LIMITS = {
-  downRatePerSec: 0.1,
-  upRatePerSec: 0.4,
-  releaseDelaySec: 1,
+  downRatePerSec: 0.4,
+  upRatePerSec: 0.5,
+  releaseDelaySec: 2.5,
   outputRateMs: 250,
 };
 
