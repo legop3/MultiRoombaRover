@@ -86,3 +86,4 @@ log "Repository fast-forward pull complete"
 # drift away from the normal manual install path.
 "$ROVERD_REPO_DIR/pi/install_roverd.sh"
 log "Installer completed successfully"
+systemctl reboot
