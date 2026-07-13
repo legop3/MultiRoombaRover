@@ -120,6 +120,7 @@ run_pipeline() {
     --framerate "${ROVERD_VIDEO_FPS}" \
     --bitrate "${ROVERD_VIDEO_BITRATE}" \
     --codec h264 \
+    --intra 120 \
     --profile baseline \
     --denoise auto \
     --nopreview \
