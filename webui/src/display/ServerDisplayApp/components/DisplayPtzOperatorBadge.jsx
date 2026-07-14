@@ -20,7 +20,7 @@ export default function DisplayPtzOperatorBadge() {
 
   return (
     <aside
-      className="pointer-events-none fixed bottom-[2vh] right-[2vw] z-[90] max-w-[42vw] border-4 border-sky-200 bg-sky-700 px-[1.4vw] py-[1vh] text-center shadow-[0_0_2rem_rgba(14,165,233,0.45)]"
+      className="pointer-events-none fixed bottom-[2vh] right-[2vw] z-[90] max-w-[42vw] border-4 border-sky-200 bg-sky-700 px-[1.4vw] py-[1vh] text-center"
       aria-label={`PTZ operator ${operatorLabel}`}
     >
       {/*
@@ -29,10 +29,10 @@ export default function DisplayPtzOperatorBadge() {
         room, while the smaller prefix prevents the blue box from being mistaken
         for a rover driver or chat message.
       */}
-      <div className="text-[clamp(0.9rem,2.2vh,2rem)] font-black tracking-normal text-sky-100">
-        Ptz camera
+      <div className="text-7xl font-black tracking-normal text-sky-100">
+        PTZ camera
       </div>
-      <div className="truncate text-[clamp(1.8rem,5vh,5rem)] font-black leading-none text-white">
+      <div className="truncate text-9xl font-black leading-none text-white">
         {operatorLabel}
       </div>
     </aside>
