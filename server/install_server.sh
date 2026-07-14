@@ -229,9 +229,12 @@ if [[ ! -f "$ROVER_SNAPSHOT_WRITER_TEMPLATE" ]]; then
   echo "Snapshot writer template missing at $ROVER_SNAPSHOT_WRITER_TEMPLATE" >&2
   exit 1
 fi
-echo "      Installing mediaMTX config -> $MEDIAMTX_CONFIG"
-rm -f "$MEDIAMTX_CONFIG"
-install -m 0644 "$MEDIAMTX_TEMPLATE" "$MEDIAMTX_CONFIG"
+if [[ -f "$MEDIAMTX_CONFIG" ]]; then
+  echo "      Preserving existing mediaMTX config -> $MEDIAMTX_CONFIG"
+else
+  echo "      Installing mediaMTX config -> $MEDIAMTX_CONFIG"
+  install -m 0644 "$MEDIAMTX_TEMPLATE" "$MEDIAMTX_CONFIG"
+fi
 echo "      Installing rover snapshot writer -> $ROVER_SNAPSHOT_WRITER_BIN"
 install -m 0755 "$ROVER_SNAPSHOT_WRITER_TEMPLATE" "$ROVER_SNAPSHOT_WRITER_BIN"
 chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
