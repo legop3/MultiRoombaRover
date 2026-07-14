@@ -170,18 +170,21 @@ export default function MiniSummaryContent() {
     () => roster.filter((rover) => activeDrivers[rover.id]),
     [roster, activeDrivers],
   );
-  const snapshotRoster = driverRoster.length ? driverRoster : roster;
+  const mediaRovers = useMemo(
+    () => roster.filter((rover) => rover?.id),
+    [roster],
+  );
 
   const snapshotFeeds = useRoverSnapshots(
-    snapshotRoster.map((rover) => rover.id),
+    mediaRovers.map((rover) => rover.id),
     { enabled: !inLockdown && !canSpectateVideo, version: session?.mode },
   );
   const videoEntries = useMemo(
     () =>
       canSpectateVideo
-        ? snapshotRoster.map((rover) => ({ type: 'rover', id: rover.id, key: rover.id }))
+        ? mediaRovers.map((rover) => ({ type: 'rover', id: rover.id, key: rover.id }))
         : [],
-    [canSpectateVideo, snapshotRoster],
+    [canSpectateVideo, mediaRovers],
   );
   const videoSources = useVideoRequests(videoEntries, {
     enabled: !inLockdown && canSpectateVideo,
@@ -198,30 +201,18 @@ export default function MiniSummaryContent() {
   );
   const audioSources = useVideoRequests(audioEntries, { enabled: !inLockdown, version: session?.mode });
 
-  const roverPool = useMemo(() => {
-    if (!driverRoster.length) return [];
-    if (!canSpectateVideo) {
-      const withSnapshot = driverRoster.filter((rover) => snapshotFeeds[rover.id]?.objectUrl);
-      return withSnapshot.length ? withSnapshot : driverRoster;
-    }
-    const withVideo = driverRoster.filter((rover) => {
-      const sessionInfo = videoSources[rover.id];
-      return sessionInfo?.url && !sessionInfo?.error;
-    });
-    return withVideo.length ? withVideo : driverRoster;
-  }, [driverRoster, snapshotFeeds, videoSources, canSpectateVideo]);
-
   const rotationPool = useMemo(() => {
     /*
-      PTZ is deliberately added only to the active-driver rotation. The branch
-      below that shows every rover side-by-side when nobody is driving remains
-      rover-only, because that view is a roster/status fallback rather than a
-      source carousel.
+      Rotation membership is intentionally based on human-controlled sources,
+      not on WHEP response timing. The mounted media players below are a
+      separate full-roster list, so a video token refresh, snapshot arrival, or
+      active-driver update changes which already-warm layer is visible instead
+      of tearing down the player components themselves.
     */
-    const entries = roverPool.map((rover) => ({ type: 'rover', rover }));
+    const entries = driverRoster.map((rover) => ({ type: 'rover', rover }));
     if (hasActivePtzOperator) entries.push({ type: 'ptz' });
     return entries;
-  }, [hasActivePtzOperator, roverPool]);
+  }, [driverRoster, hasActivePtzOperator]);
 
   const rotationKey = useMemo(
     () =>
@@ -251,6 +242,8 @@ export default function MiniSummaryContent() {
   const activeAudio = activeRover ? audioSources[`${activeRover.id}-audio`] || null : null;
   const activeFrame = activeRover ? frames[activeRover.id] || null : null;
   const driverLabel = activeRover ? formatDriverLabel({ roverId: activeRover.id, session }) : null;
+  const showSideBySideFallback = !driverRoster.length && !hasActivePtzOperator;
+  const hasMountedMediaSources = Boolean(mediaRovers.length || ptz?.enabled);
 
   if (inLockdown) {
     return (
@@ -263,10 +256,10 @@ export default function MiniSummaryContent() {
     );
   }
 
-  if (!driverRoster.length && !hasActivePtzOperator) {
-    return (
-      <div className="relative flex h-screen w-screen overflow-hidden bg-black text-slate-100">
-        <section className="flex h-full w-full gap-x-3 bg-slate-900 px-0">
+  return (
+    <div className="relative flex h-screen w-screen overflow-hidden bg-black text-slate-100">
+      {showSideBySideFallback ? (
+        <section className="absolute inset-0 z-30 flex h-full w-full gap-x-3 bg-slate-900 px-0">
           {roster.length ? (
             roster.map((rover) => (
               <InfoColumn
@@ -287,14 +280,16 @@ export default function MiniSummaryContent() {
             </div>
           )}
         </section>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-black text-slate-100">
+      ) : null}
       <section
-        className="relative flex h-full shrink-0 items-center justify-start overflow-hidden bg-black"
+        className={`relative flex h-full shrink-0 items-center justify-start overflow-hidden bg-black ${
+          /*
+            The no-driver view is still visually the old side-by-side roster,
+            but keeping this carousel layer mounted behind it prevents every
+            rover WHEP player from cold-starting when the first driver appears.
+          */
+          showSideBySideFallback ? 'opacity-0 pointer-events-none' : ''
+        }`}
         style={{
           /*
             Rover cameras are framed by the existing 4:3 viewport helper below,
@@ -310,7 +305,7 @@ export default function MiniSummaryContent() {
           <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
             Switching to spectator…
           </div>
-        ) : activeEntry ? (
+        ) : hasMountedMediaSources ? (
           <div className="relative h-full w-full overflow-hidden bg-black">
             {/*
               Keep every mini media source mounted while the carousel rotates.
@@ -318,9 +313,7 @@ export default function MiniSummaryContent() {
               blank gap, so inactive sources are hidden with opacity instead of
               being removed from React's tree and forced to reconnect later.
             */}
-            {rotationPool.map((entry) => {
-              if (entry.type !== 'rover') return null;
-              const rover = entry.rover;
+            {mediaRovers.map((rover) => {
               const isActive = activeRover?.id === rover.id;
               return (
                 <div
@@ -330,7 +323,7 @@ export default function MiniSummaryContent() {
                   <FitViewportFrame>
                     {canSpectateVideo ? (
                       <RoverMediaPlayer
-                        sessionInfo={videoSources[rover.id] || null}
+                        roverId={rover.id}
                         videoMode="whep"
                         snapshotFeed={null}
                         audioSessionInfo={isActive ? activeAudio : null}
@@ -353,7 +346,7 @@ export default function MiniSummaryContent() {
                 </div>
               );
             })}
-            {hasActivePtzOperator ? (
+            {ptz?.enabled ? (
               <div className={`absolute inset-0 ${activePtz ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 {/*
                   PTZ bypasses FitViewportFrame because that helper intentionally
@@ -363,7 +356,7 @@ export default function MiniSummaryContent() {
                   when PTZ becomes active.
                 */}
                 <PtzLiveVideo
-                  enabled
+                  enabled={!inLockdown}
                   startMuted
                   className="relative h-full w-full bg-black"
                   videoClassName="h-full w-full object-cover"
@@ -377,7 +370,11 @@ export default function MiniSummaryContent() {
           </div>
         )}
       </section>
-      <aside className="flex h-full min-w-0 flex-1 flex-col border-l border-slate-800/60 bg-black">
+      <aside
+        className={`flex h-full min-w-0 flex-1 flex-col border-l border-slate-800/60 bg-black ${
+          showSideBySideFallback ? 'opacity-0 pointer-events-none' : ''
+        }`}
+      >
         {activePtz ? (
           <MiniPtzUserColumn label={ptzOperatorLabel} />
         ) : activeRover ? (
