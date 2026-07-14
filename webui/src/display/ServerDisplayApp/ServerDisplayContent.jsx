@@ -11,6 +11,7 @@ import OnlinePeopleStrip from './components/OnlinePeopleStrip.jsx';
 import DisplayRoverGrid from './components/DisplayRoverGrid.jsx';
 import DisplayChatFeed from './components/DisplayChatFeed.jsx';
 import DisplayNoticeOverlay from './components/DisplayNoticeOverlay.jsx';
+import DisplayPtzOperatorBadge from './components/DisplayPtzOperatorBadge.jsx';
 
 export default function ServerDisplayContent() {
   const { session } = useSession();
@@ -44,6 +45,11 @@ export default function ServerDisplayContent() {
       <div className="min-h-0 flex-[1.28]">
         <DisplayChatFeed />
       </div>
+      {/* Keep the PTZ operator visible on the room board without changing the
+          existing rover/chat layout. The badge is self-hiding when nobody owns
+          the camera, so the display remains exactly as sparse as before between
+          PTZ turns. */}
+      <DisplayPtzOperatorBadge />
       <DisplayNoticeOverlay />
       <RewardRunOverlay />
       {/* Display is spectator-like: every Discord-hosted replay should take over
