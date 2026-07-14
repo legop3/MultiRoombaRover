@@ -81,6 +81,19 @@ function PtzSnapshotFallback({ label, source }) {
 }
 
 function PtzLiveOrSnapshot({ label }) {
+  const isExternalSpectatorSnapshotOnly = useSessionSelector((state) =>
+    state.session?.role === 'spectator' &&
+    state.session?.isLocalNetwork === false &&
+    state.session?.bandwidthSavings?.externalSpectatorVideo === 'snapshots',
+  );
+  /*
+    PTZ live authorization is server-owned, but the spectator page knows when
+    the configured outcome is snapshot-only. Rendering the fallback directly
+    avoids a guaranteed denied WHEP request for every external spectator card.
+  */
+  if (isExternalSpectatorSnapshotOnly) {
+    return <PtzSnapshotFallback label={label} source={null} />;
+  }
   return (
     <PtzLiveVideo
       enabled

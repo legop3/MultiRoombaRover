@@ -11,6 +11,10 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('ptzCamera');
 const { loadConfig } = require('../../helpers/configLoader');
 const { isFeatureEnabled } = require('../../helpers/features');
+const {
+  shouldUseSnapshotsForNonTurnVideo,
+  shouldUseSnapshotsForExternalSpectatorVideo,
+} = require('../../helpers/bandwidthSavings');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
 const { isVerified } = require('../verificationService');
@@ -1291,7 +1295,26 @@ function canRequestLiveVideo(socket) {
   if (!enabled || !passesMode(socket)) return false;
   if (state.operatorSocketId === socket?.id) return true;
   if (isAdmin(socket) || isLockdownAdmin(socket)) return true;
-  return isLocalNetwork(getSocketIp(socket));
+  const role = getRole(socket);
+  const local = isLocalNetwork(getSocketIp(socket));
+  if (role === 'spectator') {
+    /*
+      Spectator PTZ viewing follows the spectator bandwidth switch. LAN viewers
+      stay live because they do not consume server upload; non-local spectators
+      only get live PTZ when the external spectator video policy allows it.
+    */
+    return local || !shouldUseSnapshotsForExternalSpectatorVideo();
+  }
+  if (canUsePtzFeature(socket) && !shouldUseSnapshotsForNonTurnVideo()) {
+    /*
+      Verified/VIP users who can queue or claim the camera are PTZ "turn"
+      participants even before they become operator. When non-turn video is set
+      to live, they may watch the live feed while waiting; camera movement still
+      remains limited to the active operator by the command handlers.
+    */
+    return true;
+  }
+  return false;
 }
 
 function getSnapshotPath() {

@@ -31,6 +31,7 @@ const {
   resolveUserBySelector,
   userToLegacyIdentityEntry,
 } = require('../identityService');
+const { shouldEnforceSingleDriverTab } = require('../../helpers/bandwidthSavings');
 
 const verificationEvents = new EventEmitter();
 const IDENTITY_TIMEOUT_MS = 2 * 60 * 1000;
@@ -103,7 +104,7 @@ function identifySocket(socket, payload = {}) {
     nickname: incomingNickname || getNickname(socket) || '',
   });
   refreshSocketIdentityFlags(socket);
-  enforceSingleUnverifiedSocketPerIdentity(socket);
+  enforceSingleDriverSocketPerIdentity(socket);
   emitChange('identify', { socketId: socket.id, userId: result.userId });
 
   return {
@@ -132,13 +133,18 @@ function emitDuplicateIdentityAndDisconnect(socket, payload = {}) {
   }, DUPLICATE_IDENTITY_DISCONNECT_DELAY_MS);
 }
 
-function enforceSingleUnverifiedSocketPerIdentity(currentSocket) {
+function enforceSingleDriverSocketPerIdentity(currentSocket) {
   const currentUserId = getUserIdForSocket(currentSocket);
+  const currentRole = getRole(currentSocket);
+  const enforceForCurrentSocket = shouldEnforceSingleDriverTab({
+    isVerified: Boolean(currentSocket?.data?.isVerified),
+    isAdmin: isAdminRole(currentRole),
+  });
   if (
     !currentSocket?.id ||
     !currentUserId ||
-    currentSocket.data?.isVerified ||
-    currentSocket.data?.identitySurface !== 'driver'
+    currentSocket.data?.identitySurface !== 'driver' ||
+    !enforceForCurrentSocket
   ) {
     return;
   }
@@ -150,9 +156,21 @@ function enforceSingleUnverifiedSocketPerIdentity(currentSocket) {
   });
 
   if (!duplicates.length) return;
-  const verifiedDuplicate = duplicates.find((candidate) => candidate?.data?.isVerified);
+  const verifiedDuplicate = duplicates.find((candidate) => {
+    /*
+      verifiedOnly keeps the previous "verified tab wins" rule. In notAllowed
+      mode, verified users are subject to the same single-driver-tab rule, so a
+      verified duplicate should not protect the newer socket from enforcement.
+    */
+    const candidateRole = getRole(candidate);
+    const enforceForCandidate = shouldEnforceSingleDriverTab({
+      isVerified: Boolean(candidate?.data?.isVerified),
+      isAdmin: isAdminRole(candidateRole),
+    });
+    return candidate?.data?.isVerified && !enforceForCandidate;
+  });
   if (verifiedDuplicate) {
-    logger.info('Disconnecting non-verified socket because its user is already active on a verified socket', {
+    logger.info('Disconnecting driver socket because its user is already active on an exempt verified socket', {
       socketId: currentSocket.id,
       retainedSocketId: verifiedDuplicate.id,
       userId: currentUserId,
@@ -162,7 +180,7 @@ function enforceSingleUnverifiedSocketPerIdentity(currentSocket) {
   }
 
   duplicates.forEach((duplicate) => {
-    logger.info('Disconnecting older non-verified duplicate user socket', {
+    logger.info('Disconnecting older duplicate driver socket', {
       socketId: duplicate.id,
       retainedSocketId: currentSocket.id,
       userId: currentUserId,

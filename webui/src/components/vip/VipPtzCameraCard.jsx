@@ -326,9 +326,18 @@ function PtzControlReference() {
 function PtzController({ open, onClose, layout = 'desktop' }) {
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isOperator = Boolean(ptz?.isOperator);
+  const nonTurnVideoPolicy = useSessionSelector(
+    (state) => state.session?.bandwidthSavings?.nonTurnVideo || 'snapshots',
+  );
   const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape';
   const { ptzRelease } = useSessionActions();
-  const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !isOperator });
+  /*
+    The VIP fullscreen surface is available to queued PTZ users too. Let queued
+    users see live video only when the central non-turn video policy allows it;
+    all movement and light controls still remain guarded by isOperator.
+  */
+  const shouldUseLiveVideo = isOperator || nonTurnVideoPolicy === 'live';
+  const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !shouldUseLiveVideo });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   const [releasePending, setReleasePending] = useState(false);
 
@@ -431,7 +440,7 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
         bodyClassName={`grid h-full min-h-0 overflow-hidden ${sidebarWidthClass}`}
       >
         <main className="relative min-h-0 min-w-0 bg-black">
-          {isOperator ? (
+          {shouldUseLiveVideo ? (
             <PtzLiveVideo enabled startMuted={false} />
           ) : (
             <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />

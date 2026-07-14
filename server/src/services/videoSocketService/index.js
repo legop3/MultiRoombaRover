@@ -8,8 +8,13 @@ const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
 const videoSessions = require('../videoSessions');
 const roverManager = require('../roverManager');
 const ptzCameraService = require('../ptzCameraService');
+const turnService = require('../turnService');
 const { loadConfig } = require('../../helpers/configLoader');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
+const {
+  shouldUseSnapshotsForNonTurnVideo,
+  shouldUseSnapshotsForExternalSpectatorVideo,
+} = require('../../helpers/bandwidthSavings');
 
 const config = loadConfig();
 const mediaConfig = config.media || {};
@@ -116,9 +121,24 @@ io.on('connection', (socket) => {
         const role = getRole(socket);
         if (role === 'spectator' && !isAdmin(socket) && !isAudio) {
           const ip = getSocketIp(socket);
-          if (!isLocalNetwork(ip)) {
+          if (!isLocalNetwork(ip) && shouldUseSnapshotsForExternalSpectatorVideo()) {
             throw new Error('Not authorized for video');
           }
+        }
+        if (
+          !isAudio &&
+          role !== 'spectator' &&
+          !isAdmin(socket) &&
+          shouldUseSnapshotsForNonTurnVideo() &&
+          !turnService.canDrive(baseId, socket)
+        ) {
+          /*
+            The browser also forces snapshots for non-active turn holders, but
+            the socket token path must enforce the same rule. Otherwise a stale
+            component or direct socket caller could still mint a MediaMTX token
+            while the UI is showing snapshots.
+          */
+          throw new Error('Live video is limited to the active turn');
         }
       } else if (target.type === 'room') {
         throw new Error('Room cameras now use the snapshot feed');

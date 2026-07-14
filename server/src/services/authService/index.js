@@ -8,9 +8,19 @@ const { loadConfig } = require('../../helpers/configLoader');
 const { clearLockdownTimer } = require('../lockdownGuard');
 const { getMode, MODES } = require('../modeManager');
 const { setRole } = require('../roleService');
+const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
+const {
+  canUseExternalSpectatorAccess,
+  getBandwidthSavingsPolicy,
+} = require('../../helpers/bandwidthSavings');
+const {
+  getFeatureState,
+  getUserIdForSocket,
+} = require('../identityService');
 
 const config = loadConfig();
 const admins = config.admins || [];
+const SPECTATOR_ACCESS_NAMESPACE = 'spectatorAccess';
 
 function findAdmin(username) {
   return admins.find((admin) => admin.username === username);
@@ -36,9 +46,44 @@ function isLockdownAdmin(socket) {
   return socket?.data?.role === 'lockdown';
 }
 
+function hasExternalSpectatorGrant(socket) {
+  const userId = getUserIdForSocket(socket);
+  if (!userId) return false;
+  const state = getFeatureState(userId, SPECTATOR_ACCESS_NAMESPACE, {});
+  /*
+    The identity database already owns per-user feature state. Keeping the grant
+    as a tiny namespaced boolean avoids a new table and lets the existing admin
+    database editor grant/revoke external spectator access immediately.
+  */
+  return Boolean(state?.external);
+}
+
+function canBecomeSpectator(socket) {
+  const ip = getSocketIp(socket);
+  const local = isLocalNetwork(ip);
+  return canUseExternalSpectatorAccess({
+    isLocal: local,
+    isAdmin: isAdmin(socket),
+    hasGrant: hasExternalSpectatorGrant(socket),
+  });
+}
+
+function externalSpectatorAccessError() {
+  const mode = getBandwidthSavingsPolicy().externalSpectatorAccess;
+  if (mode === 'admin') {
+    return 'External spectator access requires admin approval for this identity.';
+  }
+  return 'External spectator access is disabled.';
+}
+
 io.on('connection', (socket) => {
   const requestedRole = socket.handshake?.query?.role;
-  const initialRole = requestedRole === 'spectator' ? 'spectator' : 'user';
+  /*
+    Role is assigned before the browser's full identity heartbeat has completed.
+    For admin-gated external spectators, fail closed here; the spectator page can
+    identify the socket and then retry session:setRole once the grant exists.
+  */
+  const initialRole = requestedRole === 'spectator' && canBecomeSpectator(socket) ? 'spectator' : 'user';
   setRole(socket, initialRole);
   logger.info('Socket connected with role', socket.id, initialRole);
   socket.emit('auth:role', { role: initialRole });
@@ -63,6 +108,12 @@ io.on('connection', (socket) => {
 
   function handleRoleChange({ role } = {}, cb = () => {}) {
     if (role === 'spectator' || role === 'user') {
+      if (role === 'spectator' && !canBecomeSpectator(socket)) {
+        const error = externalSpectatorAccessError();
+        logger.info('Spectator role denied by bandwidth policy', socket.id, { error });
+        cb({ error });
+        return;
+      }
       setRole(socket, role);
       socket.emit('auth:role', { role });
       logger.info('Role changed via client request', socket.id, role);

@@ -54,6 +54,25 @@ media:
   # Example: http://192.168.0.86:8889/video
   whepBaseUrl: "http://192.168.0.86:8889/video"
 
+bandwidthSavings:
+  # Duplicate driver-tab handling for the same browser identity.
+  #   allowed: no duplicate-tab protection
+  #   verifiedOnly: verified/admin users may keep multiple driver tabs; unverified users may not
+  #   notAllowed: every identity is limited to one driver tab
+  multiTabProtection: "verifiedOnly"
+  # Live video for users who are attached to a source but do not currently own
+  # its active turn. "snapshots" saves upload bandwidth; "live" allows full
+  # video whenever the normal mode/visibility rules allow it.
+  nonTurnVideo: "snapshots"
+  # Live video for spectators outside the local network. Local spectators are
+  # not restricted by this switch because LAN traffic is not the upload limit.
+  externalSpectatorVideo: "snapshots"
+  # Whether non-local users may enter the spectator page.
+  #   off: block external spectators
+  #   on: allow external spectators
+  #   admin: require an identity feature-state grant at spectatorAccess.external
+  externalSpectatorAccess: "on"
+
 audioForward:
   enabled: true
   ffmpegBin: "ffmpeg"

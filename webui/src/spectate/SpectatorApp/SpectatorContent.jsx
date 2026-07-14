@@ -23,6 +23,8 @@ export default function SpectatorContent() {
   const latestReplay = useSessionSelector((state) => state.latestReplay);
   const { clearLatestReplay } = useSessionActions();
   const inLockdown = session?.mode === 'lockdown';
+  const canUseSpectatorAccess = session?.bandwidthSavings?.canUseExternalSpectatorAccess !== false;
+  const spectatorAccessMode = session?.bandwidthSavings?.externalSpectatorAccess || 'on';
   useDefaultNickname();
   // The spectator route is not rendered through App.jsx, so it must opt into
   // the same persisted identity heartbeat here. That keeps the existing
@@ -39,6 +41,26 @@ export default function SpectatorContent() {
         <div className="surface max-w-md space-y-0.5 p-1 text-center text-sm">
           <p className="text-lg font-semibold text-white">Spectate disabled during lockdown.</p>
           <p className="text-slate-300">Please wait until the server leaves lockdown to view streams.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (session && !canUseSpectatorAccess) {
+    /*
+      The server keeps this socket in the normal user role when external
+      spectating is blocked. Rendering a full-page gate makes that intentional
+      state obvious instead of showing an empty spectator shell that repeatedly
+      fails to subscribe.
+    */
+    const message = spectatorAccessMode === 'admin'
+      ? 'This external spectator identity needs admin approval before it can view the spectator page.'
+      : 'External spectator access is disabled on this server.';
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black text-slate-200">
+        <div className="surface max-w-md space-y-0.5 p-1 text-center text-sm">
+          <p className="text-lg font-semibold text-white">Spectate access required.</p>
+          <p className="text-slate-300">{message}</p>
         </div>
       </div>
     );

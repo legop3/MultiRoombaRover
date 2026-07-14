@@ -6,11 +6,21 @@ import { useSession } from '../context/SessionContext.jsx';
 export function useSpectatorMode() {
   const { session, setRole, subscribeAll, connected } = useSession();
   const [ready, setReady] = useState(false);
+  const canUseSpectatorAccess = session?.bandwidthSavings?.canUseExternalSpectatorAccess !== false;
 
   useEffect(() => {
     let cancelled = false;
     async function ensureSpectator() {
       if (session?.mode === 'lockdown') {
+        setReady(false);
+        return;
+      }
+      if (!canUseSpectatorAccess) {
+        /*
+          The server will reject the role change too, but stopping here prevents
+          a blocked external spectator from retrying on every session sync while
+          the page is intentionally waiting for an admin grant or config change.
+        */
         setReady(false);
         return;
       }
@@ -33,7 +43,7 @@ export function useSpectatorMode() {
     return () => {
       cancelled = true;
     };
-  }, [connected, session?.mode, session?.role, setRole, subscribeAll]);
+  }, [canUseSpectatorAccess, connected, session?.mode, session?.role, setRole, subscribeAll]);
 
   return ready;
 }

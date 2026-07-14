@@ -1,6 +1,11 @@
 // Video Auth Policy
 // Purpose: Encapsulates mode, role, and stream-specific authorization decisions for MediaMTX auth checks.
 // Scope: Evaluates viewer/publisher eligibility from normalized request context and socket/session state.
+const {
+  shouldUseSnapshotsForNonTurnVideo,
+  shouldUseSnapshotsForExternalSpectatorVideo,
+} = require('../../helpers/bandwidthSavings');
+
 function createVideoAuthPolicy(deps) {
   const {
     getMode,
@@ -63,7 +68,7 @@ function createVideoAuthPolicy(deps) {
     const isAudio = streamInfo.id?.endsWith('-audio');
     if (role === 'spectator' && !isAdmin(socket) && !isAudio) {
       const socketIp = getSocketIp(socket);
-      if (!isLocalNetwork(socketIp)) {
+      if (!isLocalNetwork(socketIp) && shouldUseSnapshotsForExternalSpectatorVideo()) {
         return false;
       }
     }
@@ -71,6 +76,14 @@ function createVideoAuthPolicy(deps) {
     if (streamInfo.type === 'rover' && role !== 'spectator' && !isAdmin(socket)) {
       const roverId = streamInfo.baseId || streamInfo.id;
       if (!roverManager.isDriver(roverId, socket)) {
+        return false;
+      }
+      if (!isAudio && shouldUseSnapshotsForNonTurnVideo() && !turnService.canDrive(roverId, socket)) {
+        /*
+          This mirrors videoSocketService's token gate. MediaMTX can ask auth
+          after a token has been issued, so the active-turn bandwidth rule must
+          be evaluated here too instead of trusting an older browser decision.
+        */
         return false;
       }
     }

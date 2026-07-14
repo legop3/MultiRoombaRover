@@ -3,7 +3,7 @@
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('sessionService');
-const { getRole, roleEvents } = require('../roleService');
+const { getRole, isAdmin, roleEvents } = require('../roleService');
 const { getMode, modeEvents } = require('../modeManager');
 const roverManager = require('../roverManager');
 const { managerEvents } = roverManager;
@@ -39,6 +39,14 @@ const { getAdminReason } = require('../adminReasonService');
 const { subscribe } = require('../eventBus');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
 const { getFeatureFlags } = require('../../helpers/features');
+const {
+  canUseExternalSpectatorAccess,
+  getBandwidthSavingsPolicy,
+} = require('../../helpers/bandwidthSavings');
+const {
+  getFeatureState,
+  getUserIdForSocket,
+} = require('../identityService');
 const { getAudioForwardState, audioForwardEvents } = require('../audioForwardService');
 const { getAudioLevels, audioLevelsEvents } = require('../audioLevelsService');
 const { getButtonBoxState } = require('../buttonBoxService');
@@ -61,6 +69,35 @@ const {
 logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configured');
 logger.info('Ko-fi link loaded:', kofiLink ? 'present' : 'not configured');
 logger.info('Socials config loaded:', configuredSocials?.length ? `${configuredSocials.length} entries` : 'not configured');
+
+const SPECTATOR_ACCESS_NAMESPACE = 'spectatorAccess';
+
+function hasExternalSpectatorGrant(socket) {
+  const userId = getUserIdForSocket(socket);
+  if (!userId) return false;
+  const state = getFeatureState(userId, SPECTATOR_ACCESS_NAMESPACE, {});
+  return Boolean(state?.external);
+}
+
+function buildBandwidthSavingsSessionState(socket) {
+  const policy = getBandwidthSavingsPolicy();
+  const local = isLocalNetwork(getSocketIp(socket));
+  const granted = hasExternalSpectatorGrant(socket);
+  return {
+    ...policy,
+    /*
+      These derived fields let browser routes make clear UI choices without
+      re-implementing IP/admin/grant logic. The server still enforces the same
+      decisions in auth and video services, so the UI remains advisory only.
+    */
+    externalSpectatorGranted: granted,
+    canUseExternalSpectatorAccess: canUseExternalSpectatorAccess({
+      isLocal: local,
+      isAdmin: isAdmin(socket),
+      hasGrant: granted,
+    }),
+  };
+}
 
 function buildUserEntry(socket) {
   if (!socket) return null;
@@ -110,6 +147,7 @@ function buildSession(socket) {
     role: getRole(socket),
     mode: getMode(),
     isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
+    bandwidthSavings: buildBandwidthSavingsSessionState(socket),
     /*
       Features is the single UI contract for optional server capabilities. A
       disabled feature should be absent from navigation/layout decisions even

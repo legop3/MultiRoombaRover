@@ -9,6 +9,9 @@ export function useDriverVideoModePolicy(roverId) {
   const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
+  const nonTurnVideoPolicy = useSessionSelector(
+    (state) => state.session?.bandwidthSavings?.nonTurnVideo || 'snapshots',
+  );
   const isTurnsMode = mode === 'turns';
   /*
     This policy only switches preview/full video around a multi-second turn
@@ -43,7 +46,13 @@ export function useDriverVideoModePolicy(roverId) {
     });
     return unique.size;
   }, [users]);
-  const shouldUsePreviewByLoad = isTurnsMode && totalDrivers > totalRovers;
+  /*
+    The server sends the bandwidth policy because the same rule is enforced in
+    video authorization. The hook only mirrors that policy so the UI avoids
+    requesting live video when snapshots are the intended non-turn experience.
+  */
+  const shouldUsePreviewByLoad =
+    nonTurnVideoPolicy === 'snapshots' && isTurnsMode && totalDrivers > totalRovers;
   const isPreSwitchWindow =
     isTurnsMode && isNextDriver && msUntilTurn != null && msUntilTurn <= 5000 && msUntilTurn > 0;
   const showNotTurnNotice = isTurnsMode && !isActiveDriver;

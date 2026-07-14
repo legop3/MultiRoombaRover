@@ -540,13 +540,23 @@ function buildPtzTurnModel(ptz, selfId) {
 
 function PtzMediaPane({ ptz, open, framed = true }) {
   const isOperator = Boolean(ptz?.isOperator);
+  const nonTurnVideoPolicy = useSessionSelector(
+    (state) => state.session?.bandwidthSavings?.nonTurnVideo || 'snapshots',
+  );
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
-  const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !isOperator });
+  /*
+    PTZ has its own turn queue, so non-operators are the camera equivalent of a
+    non-active rover driver. The server enforces the same policy in
+    canRequestLiveVideo(); this branch only chooses the expected browser render
+    path and never unlocks movement controls.
+  */
+  const shouldUseLiveVideo = isOperator || nonTurnVideoPolicy === 'live';
+  const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !shouldUseLiveVideo });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   const turnModel = useMemo(() => buildPtzTurnModel(ptz, selfId), [ptz, selfId]);
   const media = (
     <>
-      {isOperator ? (
+      {shouldUseLiveVideo ? (
         <PtzLiveVideo enabled={open} startMuted={false} />
       ) : (
         <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
