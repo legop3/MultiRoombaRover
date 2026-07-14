@@ -108,6 +108,9 @@ export default function KeyboardInputManager() {
   const roverId = useControlSelector((control) => control.state.roverId);
   const hornActive = useControlSelector((control) => Boolean(control.state.horn?.active));
   const homeAssistant = useSessionSelector((state) => state.session?.homeAssistant || null);
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const mode = useSessionSelector((state) => state.session?.mode || null);
+  const adminCanControlLockedLights = role === 'lockdown' || (role === 'admin' && mode !== 'lockdown');
   const dockAssist = useManualDockAssist();
   const { homeAssistantSetState, pushAlert } = useSessionActions();
   const { focusChat } = useChatActions();
@@ -310,7 +313,14 @@ export default function KeyboardInputManager() {
     const latest = latestRef.current;
     const ha = latest?.homeAssistant;
     if (!ha?.enabled || !ha?.connected) return;
-    if (ha?.lightPolicy?.locked || ha?.lightPolicy?.lockedOn) return;
+    /*
+      Room-light lock disables keyboard cycling for normal users because those
+      shortcuts are part of the public room-control surface. Admin sessions are
+      allowed through when the current site mode would also allow their socket
+      command, so keyboard behavior matches the server-side authorization and
+      the clickable Room Controls panel.
+    */
+    if ((ha?.lightPolicy?.locked || ha?.lightPolicy?.lockedOn) && !latest?.adminCanControlLockedLights) return;
     const entities = ha.entities || [];
     const eligible = entities.filter(
       (ent) =>
@@ -371,6 +381,7 @@ export default function KeyboardInputManager() {
       homeAssistant,
       homeAssistantSetState,
       isChatFocused,
+      adminCanControlLockedLights,
       keyboardSpeeds,
       keymap,
       nudgeServo,

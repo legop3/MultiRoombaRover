@@ -151,7 +151,6 @@ async function handleTrigger(event = {}) {
   if (action === LIGHTS_LOCK_TOGGLE_ACTION) {
     const lockedOn = await toggleLightsLockedOn({
       source: 'ha-button:lightsLockToggle',
-      forceApply: true,
     });
     const message = lockedOn ? LIGHTS_LOCKED_TTS : LIGHTS_UNLOCKED_TTS;
     sendTtsToNonPrivateRovers(message);

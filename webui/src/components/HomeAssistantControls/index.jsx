@@ -187,9 +187,13 @@ function HomeAssistantControlsContent() {
   const ha = useSessionSelector((state) => state.session?.homeAssistant || null);
   const { homeAssistantToggle, homeAssistantSetLightColor, homeAssistantSetLightWhite } =
     useSessionActions();
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const mode = useSessionSelector((state) => state.session?.mode || null);
   const entities = useMemo(() => ha?.entities || [], [ha?.entities]);
   const lightPolicy = ha?.lightPolicy || null;
-  const controlsLocked = Boolean(lightPolicy?.locked || lightPolicy?.lockedOn);
+  const adminCanControlLockedLights = role === 'lockdown' || (role === 'admin' && mode !== 'lockdown');
+  const lightPolicyLocked = Boolean(lightPolicy?.locked || lightPolicy?.lockedOn);
+  const controlsLocked = lightPolicyLocked && !adminCanControlLockedLights;
   const lockState = lightPolicy?.lockState || (lightPolicy?.lockedOn ? 'on' : null);
   const onKeyLabel = formatKeyLabel(keymap?.homeAssistantOn?.[0]);
   const offKeyLabel = formatKeyLabel(keymap?.homeAssistantOff?.[0]);
@@ -224,18 +228,22 @@ function HomeAssistantControlsContent() {
           {offKeyLabel ? <KeyPill label={offKeyLabel} /> : null}
         </span>
       </div>
-      {controlsLocked ? <StatusBadge label={lockState === 'off' ? 'Locked Off' : 'Locked On'} tone="warn" /> : null}
+      {lightPolicyLocked ? <StatusBadge label={lockState === 'off' ? 'Locked Off' : 'Locked On'} tone="warn" /> : null}
       <StatusBadge label={connected ? 'Connected' : 'Offline'} tone={connected ? 'success' : 'warn'} />
     </>
   );
 
   return (
     <CardFrame title="Room Controls" actions={actions} bodyClassName="space-y-0.5 text-base">
-      {controlsLocked ? (
+      {lightPolicyLocked ? (
         <p className="rounded border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
-          {lockState === 'off'
-            ? 'Lights are locked off. Room controls are disabled.'
-            : 'Lights are locked on. Room controls are disabled.'}
+          {adminCanControlLockedLights
+            ? lockState === 'off'
+              ? 'Lights are locked off. Admin room controls remain available.'
+              : 'Lights are locked on. Admin room controls remain available.'
+            : lockState === 'off'
+              ? 'Lights are locked off. Room controls are disabled.'
+              : 'Lights are locked on. Room controls are disabled.'}
         </p>
       ) : null}
       <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3">

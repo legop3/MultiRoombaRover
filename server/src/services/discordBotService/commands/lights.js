@@ -52,12 +52,11 @@ function createLightsCommand({ homeAssistantService, sanitizeMentions, discordCo
       // The bot command intentionally calls the shared policy setter instead of
       // issuing direct Home Assistant entity commands. That keeps all secondary
       // behavior centralized: web UI controls become disabled through the
-      // session lightPolicy update, lock-on still forces configured lights to
-      // white where possible, and commandService sees the same update event that
-      // forces rover lasers off while the room is locked on.
+      // session lightPolicy update, entering lock-on still sets configured
+      // lights to white where possible once, and commandService sees the same
+      // update event that forces rover lasers off while the room is locked on.
       await homeAssistantService.setLightsLockedOn(locked, {
         source: `bot-command:lights:${action}`,
-        forceApply: true,
       });
 
       await message.reply({

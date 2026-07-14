@@ -1,10 +1,8 @@
 // Reward Definition: Darkness
 // Purpose: Defines the darkness reward that alters visibility/lighting behavior. Scope: Encapsulates reward metadata and effect configuration for runtime execution.
 const DURATION_MS = 15 * 60 * 1000;
-const LIGHT_ENFORCE_TICK_MS = 3000;
 
 let activeTimer = null;
-let enforceLightsTimer = null;
 let headlightLockUntil = 0;
 
 function isHeadlightBlocked() {
@@ -15,10 +13,6 @@ function clearTimers() {
   if (activeTimer) {
     clearTimeout(activeTimer);
     activeTimer = null;
-  }
-  if (enforceLightsTimer) {
-    clearInterval(enforceLightsTimer);
-    enforceLightsTimer = null;
   }
 }
 
@@ -55,7 +49,6 @@ async function stopDarkness(ctx, effect = {}) {
     if (prevLockState === 'on' || prevLockState === 'off') {
       await ctx.setHomeAssistantLightsLockedOn(true, {
         source: 'buttonbox:darknessRestore',
-        forceApply: true,
         targetState: prevLockState,
       });
     } else {
@@ -92,7 +85,6 @@ async function startDarkness(ctx, effect) {
   try {
     await ctx.setHomeAssistantLightsLockedOn(true, {
       source: 'buttonbox:darkness',
-      forceApply: true,
       targetState: 'off',
     });
   } catch (err) {
@@ -100,11 +92,13 @@ async function startDarkness(ctx, effect) {
   }
   ctx.saveEffect('darkness', effect);
 
-  enforceLightsTimer = setInterval(() => {
-    forceAllLightsOff(ctx).catch((err) => {
-      ctx.logger.warn('darkness periodic light enforcement failed', { error: err.message });
-    });
-  }, LIGHT_ENFORCE_TICK_MS);
+  /*
+    Darkness locks the room-light policy off and performs the initial off
+    command through setHomeAssistantLightsLockedOn above. It deliberately does
+    not keep a polling interval that re-forces Home Assistant entities off:
+    after the lock is established, out-of-band manual controls must remain able
+    to change individual room lights without the server fighting them.
+  */
 
   activeTimer = setTimeout(() => {
     stopDarkness(ctx, effect).catch((err) => {

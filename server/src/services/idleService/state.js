@@ -5,6 +5,7 @@ const runtime = {
   timer: null,
   deadlineAt: null,
   lastTriggeredAt: null,
+  idleActionsCompleted: false,
 };
 
 module.exports = {

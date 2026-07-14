@@ -35,11 +35,26 @@ function registerHomeAssistantHooks(deps) {
       return true;
     }
 
+    function isBlockedByRoomControlLock() {
+      /*
+        The lock is meant to keep normal users and automated room-control
+        surfaces from changing the preferred room-light policy. Admins are the
+        exception because they may need to correct a single lamp, verify a Home
+        Assistant integration, or make an operational adjustment while the
+        public controls remain locked.
+
+        This server-side bypass is the authoritative rule. The React UI also
+        enables admin controls for usability, but clients are not trusted to
+        enforce permissions.
+      */
+      return isLightControlLocked() && !isAdmin(socket);
+    }
+
     socket.on('homeAssistant:toggle', async ({ entityId } = {}, cb = () => {}) => {
       if (!hasPermission()) {
         return cb({ error: 'Insufficient permissions to control Home Assistant' });
       }
-      if (isLightControlLocked()) {
+      if (isBlockedByRoomControlLock()) {
         return cb({ error: 'Room controls are locked' });
       }
       try {
@@ -55,7 +70,7 @@ function registerHomeAssistantHooks(deps) {
       if (!hasPermission()) {
         return cb({ error: 'Insufficient permissions to control Home Assistant' });
       }
-      if (isLightControlLocked()) {
+      if (isBlockedByRoomControlLock()) {
         return cb({ error: 'Room controls are locked' });
       }
       try {
@@ -71,7 +86,7 @@ function registerHomeAssistantHooks(deps) {
       if (!hasPermission()) {
         return cb({ error: 'Insufficient permissions to control Home Assistant' });
       }
-      if (isLightControlLocked()) {
+      if (isBlockedByRoomControlLock()) {
         return cb({ error: 'Room controls are locked' });
       }
       try {
@@ -90,7 +105,7 @@ function registerHomeAssistantHooks(deps) {
       if (!hasPermission()) {
         return cb({ error: 'Insufficient permissions to control Home Assistant' });
       }
-      if (isLightControlLocked()) {
+      if (isBlockedByRoomControlLock()) {
         return cb({ error: 'Room controls are locked' });
       }
       try {

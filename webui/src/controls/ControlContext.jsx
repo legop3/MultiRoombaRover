@@ -168,7 +168,12 @@ export function ControlSystemProvider({ children }) {
       : true;
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const homeAssistantEntities = useSessionSelector((state) => state.session?.homeAssistant?.entities ?? []);
-  const roomLightsLockedOn = useSessionSelector((state) => Boolean(state.session?.homeAssistant?.lightPolicy?.lockedOn));
+  const roomLightsLocked = useSessionSelector((state) =>
+    Boolean(state.session?.homeAssistant?.lightPolicy?.locked || state.session?.homeAssistant?.lightPolicy?.lockedOn),
+  );
+  const roomLightsLockedOn = useSessionSelector((state) =>
+    Boolean(state.session?.homeAssistant?.lightPolicy?.lockedOn),
+  );
   const { homeAssistantSetState } = useSessionActions();
   const overcurrentLimiter = useOvercurrentLimiter(roverId);
   const driveTransform = useCallback(
@@ -183,6 +188,17 @@ export function ControlSystemProvider({ children }) {
   const ptzControls = usePtzControlAdapter();
 
   const turnOnAllLights = useCallback(() => {
+    /*
+      Automatic drive-mode lighting is convenience behavior for the open room.
+      A room-light lock is an explicit policy decision, including locked-off,
+      so this helper must not issue any Home Assistant commands while that
+      policy is active. Admins can still use the dedicated room controls when
+      they need to override individual lamps.
+    */
+    if (roomLightsLocked) {
+      pendingLightsRef.current = false;
+      return;
+    }
     const entities = homeAssistantEntities || [];
     const targets = entities.filter(
       (ent) =>
@@ -200,7 +216,7 @@ export function ControlSystemProvider({ children }) {
     });
     // Give the loop a chance; clear pending after issuing commands.
     pendingLightsRef.current = false;
-  }, [homeAssistantEntities, homeAssistantSetState]);
+  }, [homeAssistantEntities, homeAssistantSetState, roomLightsLocked]);
 
   useEffect(() => {
     dispatch({ type: 'control/set-rover', payload: pipeline.roverId });

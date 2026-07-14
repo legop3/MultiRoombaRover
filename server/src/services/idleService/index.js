@@ -73,6 +73,12 @@ function clearIdleTimer() {
 
 function scheduleIdleTimer() {
   if (runtime.timer) return;
+  if (runtime.idleActionsCompleted) {
+    logger.info('Idle timer not scheduled; idle actions already completed for this no-operator window', {
+      lastTriggeredAt: runtime.lastTriggeredAt,
+    });
+    return;
+  }
   runtime.deadlineAt = Date.now() + IDLE_TIMEOUT_MS;
   logger.info('Idle timer scheduled', {
     timeoutMs: IDLE_TIMEOUT_MS,
@@ -87,6 +93,13 @@ function scheduleIdleTimer() {
       return;
     }
     runtime.lastTriggeredAt = Date.now();
+    /*
+      Mark this idle window as handled before running the action pipeline. The
+      pipeline can take time and can call into services that emit their own
+      state changes; setting the guard first prevents any nested refresh from
+      scheduling a second timer for the same continuous no-operator period.
+    */
+    runtime.idleActionsCompleted = true;
     const results = await runIdleActions();
     logger.info('Idle automation executed', {
       idleMs: IDLE_TIMEOUT_MS,
@@ -102,6 +115,15 @@ function refreshIdleState() {
   logger.info('Idle state refresh', activity);
   if (activity.totalActive > 0) {
     clearIdleTimer();
+    if (runtime.idleActionsCompleted) {
+      logger.info('Idle action one-shot reset; operator is online again', activity);
+    }
+    /*
+      A user/admin coming online starts a new activity window. When the room
+      later becomes idle again, the cleanup pipeline should be allowed to run
+      once for that new idle period.
+    */
+    runtime.idleActionsCompleted = false;
     return;
   }
   scheduleIdleTimer();

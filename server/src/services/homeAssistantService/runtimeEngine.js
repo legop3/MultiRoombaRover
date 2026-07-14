@@ -426,14 +426,26 @@ function createRuntimeEngine(deps) {
   async function setLightsLockedOn(nextValue, options = {}) {
     const next = Boolean(nextValue);
     const targetState = options?.targetState === 'off' ? 'off' : 'on';
-    const forceApply = Boolean(options.forceApply);
     const nextLockState = next ? targetState : null;
     const changed = runtime.lightsLockState !== nextLockState;
     runtime.lightsLockState = nextLockState;
 
     if (runtime.lightsLockState != null) {
-      if ((changed || forceApply) && enabled) {
+      if (changed && enabled) {
         const source = String(options?.source || 'homeAssistant:setLightsLockedOn');
+        /*
+          A room-light lock is a policy boundary, not an ongoing reconciliation
+          loop. Entering locked-on or locked-off sets every configured room
+          control to the preferred state once so the room starts from the
+          requested condition. After that first transition, the server leaves
+          Home Assistant alone so out-of-band controls such as wall switches,
+          Home Assistant dashboards, or vendor apps can still adjust individual
+          lights without being periodically overwritten.
+
+          Older callers may still pass forceApply from the previous behavior.
+          It is intentionally ignored here because repeated lock requests must
+          not become repeated light commands.
+        */
         if (runtime.lightsLockState === 'on') {
           // The lock-on path is intentionally stronger than a normal bulk
           // turn_on. It makes actual light entities white while still turning
