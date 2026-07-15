@@ -17,11 +17,13 @@ import DatabaseAdminApp from './database/DatabaseAdminApp.jsx'
 import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
+import SessionDocumentTitle from './components/SessionDocumentTitle/index.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <SocketProvider>
       <SessionProvider>
+        <SessionDocumentTitle />
         <TelemetryProvider>
           <SettingsProvider>
             <ChatProvider>
