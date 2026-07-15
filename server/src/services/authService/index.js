@@ -16,6 +16,7 @@ const {
 const {
   getFeatureState,
   getUserIdForSocket,
+  updateFeatureState,
 } = require('../identityService');
 
 const config = loadConfig();
@@ -76,6 +77,49 @@ function externalSpectatorAccessError() {
   return 'External spectator access is disabled.';
 }
 
+function grantExternalSpectatorAccessAfterAdminLogin(socket) {
+  const policy = getBandwidthSavingsPolicy();
+  if (policy.externalSpectatorAccess !== 'admin') {
+    return false;
+  }
+  const ip = getSocketIp(socket);
+  if (isLocalNetwork(ip)) {
+    return false;
+  }
+  const userId = getUserIdForSocket(socket);
+  if (!userId) {
+    /*
+      Sockets are normally identified on connection before login, but keeping a
+      guard here makes the admin grant fail closed instead of writing an orphan
+      feature-state row if identity setup changes later.
+    */
+    logger.warn('External spectator grant skipped because socket has no identity', { socketId: socket?.id });
+    return false;
+  }
+  updateFeatureState(
+    userId,
+    SPECTATOR_ACCESS_NAMESPACE,
+    (current) => ({
+      /*
+        Preserve any future spectatorAccess settings beside `external`. The
+        login flow is only approving this identity for external spectating, not
+        resetting the whole namespace back to a one-field object.
+      */
+      ...(current || {}),
+      external: true,
+      grantedByAdminLoginAt: Date.now(),
+      grantedByAdminUsername: socket?.data?.user?.username || null,
+    }),
+    {},
+  );
+  logger.info('External spectator access granted after admin login', {
+    socketId: socket.id,
+    userId,
+    username: socket?.data?.user?.username || null,
+  });
+  return true;
+}
+
 io.on('connection', (socket) => {
   const requestedRole = socket.handshake?.query?.role;
   /*
@@ -96,6 +140,13 @@ io.on('connection', (socket) => {
       const role = admin.lockdown ? 'lockdown' : 'admin';
       socket.data.user = { username: admin.username, discordId: admin.discord_id };
       setRole(socket, role);
+      /*
+        In admin-gated external spectator mode, logging in from /spectate is the
+        approval action for this browser identity. Persist the grant before the
+        client retries switching back to spectator, otherwise the user would
+        lose the admin bypass and immediately fall back into the gate.
+      */
+      grantExternalSpectatorAccessAfterAdminLogin(socket);
       socket.emit('auth:role', { role });
       clearLockdownTimer(socket);
       logger.info('Login success', socket.id, role);
