@@ -3,6 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useSession, useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
+import { useSettingsNamespace } from '../../settings/index.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
 import ChatPanel from '../../components/ChatPanel/index.jsx';
@@ -17,11 +18,23 @@ import usePortraitLayout from './hooks/usePortraitLayout.js';
 import RoverRow from './components/RoverRow.jsx';
 import SecondaryRow from './components/SecondaryRow.jsx';
 import LogsRow from './components/LogsRow.jsx';
+import SpectatorViewControls from './components/SpectatorViewControls.jsx';
+
+const SPECTATOR_VIEW_DEFAULTS = {
+  showSidebar: true,
+  showRovers: true,
+  showPtz: true,
+  showRoomCameras: true,
+};
 
 export default function SpectatorContent() {
   const { session } = useSession();
   const latestReplay = useSessionSelector((state) => state.latestReplay);
   const { clearLatestReplay } = useSessionActions();
+  const { value: viewPreferences, save: saveViewPreferences } = useSettingsNamespace(
+    'spectatorPage',
+    SPECTATOR_VIEW_DEFAULTS,
+  );
   const inLockdown = session?.mode === 'lockdown';
   const canUseSpectatorAccess = session?.bandwidthSavings?.canUseExternalSpectatorAccess !== false;
   const spectatorAccessMode = session?.bandwidthSavings?.externalSpectatorAccess || 'on';
@@ -34,6 +47,15 @@ export default function SpectatorContent() {
   useSpectatorMode();
   const isPortraitLayout = usePortraitLayout();
   const roster = session?.roster ?? [];
+  // Treat absent keys as enabled so older settings cookies gain every new view
+  // option by default instead of unexpectedly hiding parts of the page.
+  const showSidebar = viewPreferences?.showSidebar !== false;
+  const showRovers = viewPreferences?.showRovers !== false;
+  const showPtz = viewPreferences?.showPtz !== false;
+  const showRoomCameras = viewPreferences?.showRoomCameras !== false;
+  const updateViewPreference = (key, enabled) => {
+    saveViewPreferences((current) => ({ ...(current || {}), [key]: Boolean(enabled) }));
+  };
 
   if (inLockdown) {
     return (
@@ -68,7 +90,9 @@ export default function SpectatorContent() {
 
   const mainClass = isPortraitLayout
     ? 'flex min-h-screen flex-col bg-black text-slate-100 md:h-screen md:overflow-hidden'
-    : 'grid min-h-screen grid-cols-1 gap-0.5 bg-black text-slate-100 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]';
+    : showSidebar
+      ? 'grid min-h-screen grid-cols-1 gap-0.5 bg-black text-slate-100 md:h-full md:min-h-0 md:grid-cols-[minmax(0,1fr)_18rem] lg:grid-cols-[minmax(0,1fr)_20rem]'
+      : 'grid min-h-screen grid-cols-1 gap-0.5 bg-black text-slate-100 md:h-full md:min-h-0';
   const contentClass = isPortraitLayout
     ? 'order-2 flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto'
     : 'order-1 flex min-h-0 min-w-0 flex-col gap-0.5 md:overflow-y-auto';
@@ -81,7 +105,7 @@ export default function SpectatorContent() {
   return (
     <div className="min-h-screen bg-black text-slate-100 md:h-screen md:overflow-hidden">
       <main className={mainClass}>
-        <section className={sidebarClass}>
+        {showSidebar ? <section className={sidebarClass}>
           {isPortraitLayout ? (
             <div className={`${topBarItemClass} ${portraitItemHeight} flex flex-col gap-0.5`}>
               <GlobalObjectiveBanner layout="desktop" dismissable={false} className="text-sm" />
@@ -112,12 +136,20 @@ export default function SpectatorContent() {
           <div className={`${topBarItemClass} ${isPortraitLayout ? portraitItemHeight : ''}`}>
             <LogsRow className={`${isPortraitLayout ? 'h-full' : 'h-40'} overflow-hidden`} />
           </div>
-        </section>
+        </section> : null}
         <section className={contentClass}>
-          <RoverRow roster={roster} />
-          <SecondaryRow />
+          {/*
+            Conditional rendering is deliberate: CSS-only hiding would leave
+            WHEP peer connections and snapshot socket subscriptions active.
+            Unmounting delegates cleanup to the media components that own them.
+          */}
+          {showRovers || showPtz ? (
+            <RoverRow roster={roster} showRovers={showRovers} showPtz={showPtz} />
+          ) : null}
+          {showRoomCameras ? <SecondaryRow /> : null}
         </section>
       </main>
+      <SpectatorViewControls preferences={viewPreferences} onToggle={updateViewPreference} />
       <AlertFeed />
       <RewardRunOverlay />
       {/* Spectators do not have the replay request panel that normal web users see, so

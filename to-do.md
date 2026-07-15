@@ -1,12 +1,11 @@
 1. improve spectator page, options on what to see and what not to see
 2. assign rovers based on battery percentage, give people highest one
-3. verify centralized bandwidth-saving config in real external/LAN testing
-4. add admin ui for VIP and private requests instead of only through discord
-5. pull page / tab title from session, use the name from profile of interinstance if enabled, if not just default to old one
-6. make overcurrent limiter speed sensitive, slower fill at lower speeds
-7. add feature chat commands, like /neato start, /lift up, etc
-8. add more background gap themes
-9.  fix this:
+3. add admin ui for VIP and private requests instead of only through discord
+4. pull page / tab title from session, use the name from profile of interinstance if enabled, if not just default to old one
+5. make overcurrent limiter speed sensitive, slower fill at lower speeds
+6. add feature chat commands, like /neato start, /lift up, etc
+7. add more background gap themes
+8.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^
