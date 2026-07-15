@@ -77,6 +77,8 @@ export default function SpectatorContent() {
     */
     const message = spectatorAccessMode === 'admin'
       ? 'This external spectator identity needs admin approval before it can view the spectator page.'
+      : spectatorAccessMode === 'verifiedOnly'
+      ? 'This external spectator identity must be verified before it can view the spectator page.'
       : 'External spectator access is disabled on this server.';
     return (
       <div className="flex min-h-screen items-center justify-center bg-black text-slate-200">

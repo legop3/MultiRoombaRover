@@ -94,6 +94,7 @@ function buildBandwidthSavingsSessionState(socket) {
     canUseExternalSpectatorAccess: canUseExternalSpectatorAccess({
       isLocal: local,
       isAdmin: isAdmin(socket),
+      isVerified: Boolean(socket?.data?.isVerified),
       hasGrant: granted,
     }),
   };

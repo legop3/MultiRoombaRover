@@ -65,12 +65,16 @@ function canBecomeSpectator(socket) {
   return canUseExternalSpectatorAccess({
     isLocal: local,
     isAdmin: isAdmin(socket),
+    isVerified: Boolean(socket?.data?.isVerified),
     hasGrant: hasExternalSpectatorGrant(socket),
   });
 }
 
 function externalSpectatorAccessError() {
   const mode = getBandwidthSavingsPolicy().externalSpectatorAccess;
+  if (mode === 'verifiedOnly') {
+    return 'External spectator access requires a verified identity.';
+  }
   if (mode === 'admin') {
     return 'External spectator access requires admin approval for this identity.';
   }

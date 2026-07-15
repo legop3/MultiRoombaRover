@@ -6,7 +6,7 @@ const { loadConfig } = require('./configLoader');
 
 const MULTI_TAB_MODES = new Set(['allowed', 'verifiedOnly', 'notAllowed']);
 const VIDEO_MODES = new Set(['snapshots', 'live']);
-const EXTERNAL_SPECTATOR_ACCESS_MODES = new Set(['off', 'on', 'admin']);
+const EXTERNAL_SPECTATOR_ACCESS_MODES = new Set(['off', 'on', 'verifiedOnly', 'admin']);
 
 const DEFAULT_BANDWIDTH_SAVINGS = Object.freeze({
   multiTabProtection: 'verifiedOnly',
@@ -83,6 +83,7 @@ function shouldUseSnapshotsForExternalSpectatorVideo() {
 function canUseExternalSpectatorAccess({
   isLocal = false,
   isAdmin = false,
+  isVerified = false,
   hasGrant = false,
 } = {}) {
   /*
@@ -93,6 +94,7 @@ function canUseExternalSpectatorAccess({
   if (isLocal || isAdmin) return true;
   const { externalSpectatorAccess } = getBandwidthSavingsPolicy();
   if (externalSpectatorAccess === 'off') return false;
+  if (externalSpectatorAccess === 'verifiedOnly') return Boolean(isVerified);
   if (externalSpectatorAccess === 'admin') return Boolean(hasGrant);
   return true;
 }

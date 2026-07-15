@@ -15,7 +15,8 @@
 - external spectator access (new)
   - off (no one can access the spectate page externally)
   - on (everyone can access the spectate page externally)
-  - admin (external spectators get mode gate overlay, when logged in once that identity gets spectator access forever. use database.)
+  - verifiedOnly (only verified identities can access the spectate page externally)
+  - admin (external spectators need a saved spectatorAccess.external identity grant)
 - anything else related to bandwidth savings should also get config
 
 ## implemented config shape
@@ -24,5 +25,5 @@ bandwidthSavings:
   multiTabProtection: "verifiedOnly" # allowed | verifiedOnly | notAllowed
   nonTurnVideo: "snapshots" # snapshots | live
   externalSpectatorVideo: "snapshots" # snapshots | live
-  externalSpectatorAccess: "on" # off | on | admin
+  externalSpectatorAccess: "on" # off | on | verifiedOnly | admin
 ```

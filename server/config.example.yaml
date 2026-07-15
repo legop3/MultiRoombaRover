@@ -70,6 +70,7 @@ bandwidthSavings:
   # Whether non-local users may enter the spectator page.
   #   off: block external spectators
   #   on: allow external spectators
+  #   verifiedOnly: require a verified identity, but no separate spectator grant
   #   admin: require an identity feature-state grant at spectatorAccess.external
   externalSpectatorAccess: "on"
 
