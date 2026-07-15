@@ -1,14 +1,14 @@
-// Discord Verify Command
+// Operator Verify Command
 // Purpose: Handles verified-user moderation commands for lockdown admins.
 // Scope: Supports list and remove subcommands.
 const { mask, resolveIdentitySelector } = require('./resolvers');
+const { getCommandConfig } = require('../../operatorCommandService/config');
 
-function createVerifyCommand({ listVerifiedUsers, removeVerifiedUser, isLockdownAdminUser, sanitizeMentions, discordConfig }) {
-  // Verification usage text follows the configured prefix for the same reason
-  // as the command router: each bot instance needs its own command namespace.
-  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
+function createVerifyCommand({ listVerifiedUsers, removeVerifiedUser, sanitizeMentions, config }) {
+  // Usage text comes from the same core prefix that both transports parse.
+  const { prefix: commandPrefix } = getCommandConfig(config);
   return async function handleVerifyCommand(message, tokens) {
-    if (!isLockdownAdminUser(message.author?.id)) {
+    if (!message.actor?.isLockdownAdmin) {
       await message.reply({ content: 'Only lockdown admins can manage verified users.', allowedMentions: { parse: [], repliedUser: false } });
       return;
     }
@@ -29,7 +29,7 @@ function createVerifyCommand({ listVerifiedUsers, removeVerifiedUser, isLockdown
         // The command resolver only turns a human-friendly or fuzzy nickname
         // into the stable cookie id so the service does not need Discord/Web
         // command concerns baked into its storage API.
-        const removed = removeVerifiedUser(resolved.record.userId || resolved.record.id || resolved.record.cookieUserId, message.author?.id || null);
+        const removed = removeVerifiedUser(resolved.record.userId || resolved.record.id || resolved.record.cookieUserId, message.actor?.id || null);
         return message.reply({ content: `Removed verified user ${sanitizeMentions(removed.nickname || 'unknown')} (${mask(removed.cookieUserId)}).`, allowedMentions: { parse: [], repliedUser: false } });
       } catch (err) {
         return message.reply({ content: sanitizeMentions(`Failed to remove verified user: ${err.message}`), allowedMentions: { parse: [], repliedUser: false } });

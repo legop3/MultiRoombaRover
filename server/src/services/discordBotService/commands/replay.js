@@ -3,6 +3,7 @@
 // Scope: Resolves sources, enforces cooldowns, reports job progress, uploads video, and broadcasts media URLs.
 const { AttachmentBuilder } = require('discord.js');
 const io = require('../../../globals/io');
+const { hostReplay } = require('../../replayMediaService');
 const {
   DEFAULT_ALLOWED_MENTIONS,
   buildReplayJobId,
@@ -17,7 +18,7 @@ const {
   buildAcceptedMessage,
   buildStatusMessage,
   normalizeUserError,
-} = require('../replayWorkflow');
+} = require('../../replayDeliveryService/workflow');
 
 function createReplayCommand({
   logger,
@@ -32,6 +33,7 @@ function createReplayCommand({
   getActiveDrivers,
   getNickname,
   rovers,
+  discordConfig,
 }) {
   const sourceResolver = createReplaySourceResolver({
     rovers,
@@ -80,18 +82,21 @@ function createReplayCommand({
     });
     const stopTyping = startDiscordTypingLoop(message.channel, logger, 'discord replay command');
 
+    let builtReplay = null;
+    let deliveredMedia = null;
     try {
       jobStatus.emit(job, 'building', { message: buildStatusMessage(job, 'building') });
       if (progressMessage?.edit) {
         await progressMessage.edit({ content: sanitizeMentions(buildStatusMessage(job, 'building')), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
       }
 
-      const { buffer, usedSources = job.sources, missingSources = [] } = await buildReplayVideo({
+      builtReplay = await buildReplayVideo({
         sources: job.sources,
         title: job.title,
         requester: job.requester,
         includeSidebar: job.includeSidebar,
       });
+      const { buffer, usedSources = job.sources, missingSources = [] } = builtReplay;
 
       jobStatus.emit(job, 'uploading', { message: buildStatusMessage(job, 'uploading') });
       if (progressMessage?.edit) {
@@ -108,14 +113,36 @@ function createReplayCommand({
       if (!uploadMessage) throw new Error('Discord upload did not return a message');
 
       const uploadedAttachment = firstAttachmentFromMessage(uploadMessage);
-      const media = buildDiscordReplayMediaPayload({ message: uploadMessage, attachment: uploadedAttachment, job });
-      if (!media) throw new Error('Discord upload did not include a replay attachment URL');
+      deliveredMedia = buildDiscordReplayMediaPayload({ message: uploadMessage, attachment: uploadedAttachment, job });
+      if (!deliveredMedia) throw new Error('Discord upload did not include a replay attachment URL');
 
-      jobStatus.emit(job, 'ready', { message: buildStatusMessage(job, 'ready'), media });
+      jobStatus.emit(job, 'ready', { message: buildStatusMessage(job, 'ready'), media: deliveredMedia });
       if (progressMessage?.edit) {
         await progressMessage.edit({ content: sanitizeMentions(buildStatusMessage(job, 'ready')), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
       }
     } catch (err) {
+      if (deliveredMedia) {
+        logger?.warn?.('Replay uploaded but Discord progress message could not be finalized', { jobId: job.id, error: err.message });
+        return;
+      }
+      // A completed video should never be discarded merely because the
+      // optional Discord upload failed. Host that exact buffer locally and
+      // publish the same ready event consumed by existing clients.
+      if (builtReplay?.buffer && !deliveredMedia) {
+        try {
+          const media = await hostReplay({ buffer: builtReplay.buffer, job });
+          jobStatus.emit(job, 'ready', { message: buildStatusMessage(job, 'ready'), media });
+          if (progressMessage?.edit) {
+            await progressMessage.edit({ content: sanitizeMentions(buildStatusMessage(job, 'ready')), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
+          }
+          const siteUrl = String(discordConfig?.siteUrl || '').replace(/\/$/, '');
+          const publicUrl = siteUrl ? `${siteUrl}${media.url}` : media.url;
+          await progressMessage.reply({ content: `Replay hosted by the rover server: ${publicUrl}`, allowedMentions: DEFAULT_ALLOWED_MENTIONS });
+          return;
+        } catch (fallbackError) {
+          logger?.warn?.('Local replay fallback failed', { jobId: job.id, error: fallbackError.message });
+        }
+      }
       const userMessage = normalizeUserError(err);
       jobStatus.emit(job, 'failed', { message: userMessage });
       if (progressMessage?.edit) {

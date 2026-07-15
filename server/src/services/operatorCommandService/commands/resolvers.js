@@ -1,4 +1,4 @@
-// Discord Command Resolvers
+// Operator Command Resolvers
 // Purpose: Provides shared selector parsing and fuzzy matching for command handlers.
 // Scope: Keeps potentially destructive commands from each inventing their own lookup rules.
 const Fuse = require('fuse.js');

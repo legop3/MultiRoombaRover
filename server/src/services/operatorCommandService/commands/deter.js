@@ -1,16 +1,15 @@
-// Discord Deter Command
+// Operator Deter Command
 // Purpose: Handles deterrence moderation commands for lockdown admins.
 // Scope: Supports list, ban, and unban subcommands.
 const { mask, resolveIdentitySelector } = require('./resolvers');
+const { getCommandConfig } = require('../../operatorCommandService/config');
 
-function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, undeterUser, isLockdownAdminUser, sanitizeMentions, discordConfig }) {
-  // Moderation errors often get copied into Discord chat, so they should show
-  // the configured bot prefix instead of the legacy default when several bots
-  // are present in the same server.
-  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
+function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, undeterUser, sanitizeMentions, config }) {
+  // Moderation usage errors use the same core prefix shown by organized help.
+  const { prefix: commandPrefix } = getCommandConfig(config);
 
   return async function handleDeterCommand(message, tokens) {
-    if (!isLockdownAdminUser(message.author?.id)) {
+    if (!message.actor?.isLockdownAdmin) {
       await message.reply({ content: 'Only lockdown admins can manage deterred users.', allowedMentions: { parse: [], repliedUser: false } });
       return;
     }
@@ -33,7 +32,7 @@ function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, u
         // full remaining text is now always the selector, which lets lockdown
         // admins deter multi-word nicknames without quoting or delimiter rules.
         const stableSelector = verifiedMatch.record?.userId || verifiedMatch.record?.id || verifiedMatch.record?.cookieUserId || selector;
-        const deterred = deterUser(stableSelector, { actor: message.author?.id || null });
+        const deterred = deterUser(stableSelector, { actor: message.actor?.id || null });
         return message.reply({ content: sanitizeMentions(`${deterred.created ? 'Deterred' : 'Updated deterrence for'} ${deterred.nickname || 'unknown'} (${mask(deterred.cookieUserId)}).`), allowedMentions: { parse: [], repliedUser: false } });
       } catch (err) {
         return message.reply({ content: sanitizeMentions(`Failed to deter user: ${err.message}`), allowedMentions: { parse: [], repliedUser: false } });
@@ -45,7 +44,7 @@ function createDeterCommand({ listDeterredUsers, listVerifiedUsers, deterUser, u
       try {
         const resolved = resolveIdentitySelector(selector, listDeterredUsers(), { includeId: true });
         if (resolved.error) return message.reply({ content: sanitizeMentions(resolved.error), allowedMentions: { parse: [], repliedUser: false } });
-        const removed = undeterUser(resolved.record.id || resolved.record.cookieUserId || selector, message.author?.id || null);
+        const removed = undeterUser(resolved.record.id || resolved.record.cookieUserId || selector, message.actor?.id || null);
         return message.reply({ content: sanitizeMentions(`Removed deterrence for ${removed.nickname || 'unknown'} (${mask(removed.cookieUserId)}).`), allowedMentions: { parse: [], repliedUser: false } });
       } catch (err) {
         return message.reply({ content: sanitizeMentions(`Failed to remove deterrence: ${err.message}`), allowedMentions: { parse: [], repliedUser: false } });

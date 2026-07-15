@@ -50,6 +50,7 @@ function buildFeatureFlags(config = loadConfig()) {
   const socialsConfig = config.socials || {};
   const interInstanceConfig = config.interInstance || {};
   const ptzCameraConfig = config.ptzCamera || {};
+  const discordConfig = config.discord || {};
   const homeAssistant = Boolean(
     asBoolean(homeAssistantConfig.enabled) &&
       asTrimmedString(homeAssistantConfig.url) &&
@@ -87,6 +88,13 @@ function buildFeatureFlags(config = loadConfig()) {
         asTrimmedString(ptzCameraConfig.username) &&
         asTrimmedString(ptzCameraConfig.password),
     ),
+    /*
+      Discord is an optional transport, not a prerequisite for chat commands.
+      Requiring both the explicit switch and a token prevents an old token from
+      silently enabling external connections on installations that have chosen
+      to run without the integration.
+    */
+    discord: Boolean(asBoolean(discordConfig.enabled) && asTrimmedString(discordConfig.token)),
   };
 }
 

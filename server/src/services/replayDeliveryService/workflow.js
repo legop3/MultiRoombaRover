@@ -1,6 +1,6 @@
-// Discord Replay Workflow
-// Purpose: Provides the shared replay job, Discord upload, fuzzy source lookup, and user-facing status helpers.
-// Scope: Keeps Discord-command and web-triggered replay delivery on the same status pipeline.
+// Replay Delivery Workflow
+// Purpose: Provides transport-neutral replay jobs, source lookup, status events, and user-facing progress text.
+// Scope: Keeps Discord-command and web-triggered replay delivery on the same core status pipeline.
 const Fuse = require('fuse.js');
 
 const DEFAULT_ALLOWED_MENTIONS = { parse: [], repliedUser: false };

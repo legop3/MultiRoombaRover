@@ -1,6 +1,8 @@
-// Discord Lights Command
+// Operator Lights Command
 // Purpose: Handles admin room-light lock policy commands from Discord and web chat.
 // Scope: Delegates all actual Home Assistant policy behavior to homeAssistantService.
+const { getCommandConfig } = require('../../operatorCommandService/config');
+
 function describeLightPolicy(lightPolicy = {}) {
   // The HA service exposes both the newer explicit lockState and the older
   // lockedOn boolean. Prefer lockState because it can distinguish locked-on
@@ -12,10 +14,10 @@ function describeLightPolicy(lightPolicy = {}) {
   return 'Room lights are unlocked.';
 }
 
-function createLightsCommand({ homeAssistantService, sanitizeMentions, discordConfig }) {
+function createLightsCommand({ homeAssistantService, sanitizeMentions, config }) {
   // The HA policy behavior is prefix-agnostic; this value is only used so
   // invalid-command guidance points admins at this bot instance's namespace.
-  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
+  const { prefix: commandPrefix } = getCommandConfig(config);
   return async function handleLightsCommand(message, tokens = []) {
     // Defaulting to status makes the bare lights command safe to type while
     // still exposing explicit mutating forms under the configured prefix. This

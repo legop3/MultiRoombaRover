@@ -1,7 +1,7 @@
-// Discord Mode Command
-// Purpose: Handles mode updates from Discord admins through the configured bot prefix.
+// Operator Mode Command
+// Purpose: Handles mode updates from authorized operators through the shared command prefix.
 // Scope: Validates mode values and applies mode changes with optional reason text.
-function createModeCommand({ MODES, setMode, setAdminReason, isLockdownAdminUser, sanitizeMentions }) {
+function createModeCommand({ MODES, setMode, setAdminReason, sanitizeMentions }) {
   return async function handleModeCommand(message, tokens = []) {
     const next = String(tokens.shift() || '').toLowerCase();
     const reasonText = tokens.join(' ').trim();
@@ -10,9 +10,9 @@ function createModeCommand({ MODES, setMode, setAdminReason, isLockdownAdminUser
       return;
     }
     try {
-      const role = isLockdownAdminUser(message.author?.id) ? 'lockdown' : 'admin';
-      setMode(next, { data: { role, user: { username: `discord:${message.author?.username || 'unknown'}` } } });
-      if (reasonText) setAdminReason(reasonText, { by: message.author?.id || null });
+      const role = message.actor?.isLockdownAdmin ? 'lockdown' : 'admin';
+      setMode(next, { data: { role, user: { username: `${message.transport}:${message.actor?.label || 'unknown'}` } } });
+      if (reasonText) setAdminReason(reasonText, { by: message.actor?.id || null });
       await message.reply({ content: sanitizeMentions(`Mode set to ${next}.`), allowedMentions: { parse: [], repliedUser: false } });
     } catch (err) {
       await message.reply({ content: sanitizeMentions(`Failed to set mode: ${err.message}`), allowedMentions: { parse: [], repliedUser: false } });

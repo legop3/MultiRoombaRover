@@ -1,7 +1,8 @@
-// Discord Kick Command
+// Operator Kick Command
 // Purpose: Removes a connected user from their current rover without applying any persistent moderation state.
 // Scope: Resolves an online driver, sends them a UI-visible reason, and releases their current rover assignment.
 const Fuse = require('fuse.js');
+const { getCommandConfig } = require('../../operatorCommandService/config');
 
 const DEFAULT_KICK_REASON = 'Removed from rover by admin.';
 
@@ -97,11 +98,11 @@ function resolveKickTarget(selector, candidates, commandPrefix = 'rs') {
   return { target: first.item };
 }
 
-function createKickCommand({ io, roverManager, getNickname, sanitizeMentions, discordConfig }) {
+function createKickCommand({ io, roverManager, getNickname, sanitizeMentions, config }) {
   // The kick parser itself does not need the prefix, but its validation message
   // does. Keeping this local avoids passing display-only config through the
   // lower-level fuzzy target resolver except when an error string is needed.
-  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
+  const { prefix: commandPrefix } = getCommandConfig(config);
   return async function handleKickCommand(message, rawText) {
     const { selector, reason } = splitSelectorAndReason(rawText);
     const assignmentService = require('../../assignmentService');
@@ -127,7 +128,7 @@ function createKickCommand({ io, roverManager, getNickname, sanitizeMentions, di
       title: 'Removed by admin',
       message: removalReason,
       reasonCode: 'admin-kick',
-      actor: message.author?.id || null,
+      actor: message.actor?.id || null,
     });
     await message.reply({
       content: sanitizeMentions(`Removed ${target.label} from ${target.roverId}: ${removalReason}`),

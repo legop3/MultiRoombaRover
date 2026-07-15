@@ -1,5 +1,5 @@
 // Replay Ready Popup
-// Purpose: Presents the latest Discord-hosted replay video to web users as soon as upload completes.
+// Purpose: Presents the latest delivered replay video, whether Discord-hosted or served by the rover server.
 // Scope: Owns the ephemeral modal shell, immediate video loading, and click-outside close behavior.
 import { useCallback, useEffect, useRef } from 'react';
 import CardFrame from '../CardFrame/index.jsx';
