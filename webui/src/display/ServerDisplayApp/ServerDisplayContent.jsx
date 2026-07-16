@@ -36,8 +36,14 @@ export default function ServerDisplayContent() {
 
   return (
     <div className="display-page flex h-screen w-screen flex-col overflow-hidden bg-black text-slate-100">
-      <div className="h-[8vh] min-h-[4rem] shrink-0">
+      <div className="flex h-[8vh] min-h-[4rem] shrink-0 overflow-hidden">
         <OnlinePeopleStrip users={session?.users || []} />
+        {/* The PTZ operator belongs in the same information band as the people
+            strip because it is another "who is active right now" signal. Making
+            it a flex sibling lets the badge reserve real layout space when it
+            appears, which pushes the scrolling strip left instead of covering
+            the rover or chat areas. */}
+        <DisplayPtzOperatorBadge />
       </div>
       <div className="min-h-0 flex-[0.72]">
         <DisplayRoverGrid roster={session?.roster || []} session={session} />
@@ -45,11 +51,6 @@ export default function ServerDisplayContent() {
       <div className="min-h-0 flex-[1.28]">
         <DisplayChatFeed />
       </div>
-      {/* Keep the PTZ operator visible on the room board without changing the
-          existing rover/chat layout. The badge is self-hiding when nobody owns
-          the camera, so the display remains exactly as sparse as before between
-          PTZ turns. */}
-      <DisplayPtzOperatorBadge />
       <DisplayNoticeOverlay />
       <RewardRunOverlay />
       {/* Display is spectator-like: every Discord-hosted replay should take over

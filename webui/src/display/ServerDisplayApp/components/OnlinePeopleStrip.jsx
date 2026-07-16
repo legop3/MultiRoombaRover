@@ -68,7 +68,10 @@ export default function OnlinePeopleStrip({ users = [] }) {
   ));
 
   return (
-    <div ref={viewportRef} className="relative h-full min-w-0 overflow-hidden border-b border-slate-800/80 bg-black">
+    <div
+      ref={viewportRef}
+      className="relative h-full min-w-0 flex-1 overflow-hidden border-b border-slate-800/80 bg-black"
+    >
       <div
         ref={trackRef}
         className={classNames(
