@@ -85,6 +85,29 @@ function canViewRoomCamera(socket) {
   return passesMode(socket);
 }
 
+function countControllableUsers() {
+  const ids = new Set();
+  io.sockets.sockets.forEach((candidate) => {
+    if (!candidate?.id || getRole(candidate) === 'spectator') return;
+    /*
+      Rover drivers and PTZ participants are both "controllable" users for this
+      bandwidth decision because either group can create a non-turn video view.
+      Counting unique socket ids prevents someone who is transitioning between
+      rover and PTZ from being counted twice.
+    */
+    if (roverManager.getRoversForSocket(candidate.id).length > 0) {
+      ids.add(candidate.id);
+    }
+  });
+  if (typeof ptzCameraService.getParticipantSocketIds === 'function') {
+    ptzCameraService.getParticipantSocketIds().forEach((socketId) => {
+      const socket = io.sockets.sockets.get(socketId);
+      if (socket && getRole(socket) !== 'spectator') ids.add(socketId);
+    });
+  }
+  return ids.size;
+}
+
 function normalizeRequest(payload = {}) {
   if (!payload) return null;
   if (payload.type && payload.id) {
@@ -129,7 +152,7 @@ io.on('connection', (socket) => {
           !isAudio &&
           role !== 'spectator' &&
           !isAdmin(socket) &&
-          shouldUseSnapshotsForNonTurnVideo() &&
+          shouldUseSnapshotsForNonTurnVideo({ controllableUserCount: countControllableUsers() }) &&
           !turnService.canDrive(baseId, socket)
         ) {
           /*

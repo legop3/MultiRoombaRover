@@ -339,6 +339,34 @@ function getChatTargetForSocket(socketId) {
   };
 }
 
+function getParticipantSocketIds() {
+  /*
+    PTZ has no roverManager record, so services that need a global "how many
+    controllable users are online" count need a tiny PTZ-owned participant list.
+    The operator and queue are the only users attached to this controllable
+    camera target; spectators merely viewing snapshots/live video are excluded.
+  */
+  return Array.from(new Set([
+    state.operatorSocketId,
+    ...state.queue,
+  ].filter(Boolean)));
+}
+
+function countControllableUsers() {
+  const ids = new Set();
+  io.sockets.sockets.forEach((candidate) => {
+    if (!candidate?.id || getRole(candidate) === 'spectator') return;
+    if (roverManager.getRoversForSocket(candidate.id).length > 0) {
+      ids.add(candidate.id);
+    }
+  });
+  getParticipantSocketIds().forEach((socketId) => {
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket && getRole(socket) !== 'spectator') ids.add(socketId);
+  });
+  return ids.size;
+}
+
 function canSpeakThroughPtz(socket) {
   /*
     PTZ chat uses roverId for identity, but the camera has its own queue rather
@@ -1305,7 +1333,10 @@ function canRequestLiveVideo(socket) {
     */
     return local || !shouldUseSnapshotsForExternalSpectatorVideo();
   }
-  if (canUsePtzFeature(socket) && !shouldUseSnapshotsForNonTurnVideo()) {
+  if (
+    canUsePtzFeature(socket) &&
+    !shouldUseSnapshotsForNonTurnVideo({ controllableUserCount: countControllableUsers() })
+  ) {
     /*
       Verified/VIP users who can queue or claim the camera are PTZ "turn"
       participants even before they become operator. When non-turn video is set
@@ -1577,6 +1608,7 @@ module.exports = {
   ptzCameraEvents: events,
   getPublicState,
   getChatTargetForSocket,
+  getParticipantSocketIds,
   canSpeakThroughPtz,
   speakText,
   canRequestLiveVideo,

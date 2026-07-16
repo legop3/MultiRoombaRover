@@ -4,13 +4,11 @@ import { useSharedClock } from './useSharedClock.js';
 
 export function useDriverVideoModePolicy(roverId) {
   const mode = useSessionSelector((state) => state.session?.mode || null);
-  const roster = useSessionSelector((state) => state.session?.roster ?? []);
-  const users = useSessionSelector((state) => state.session?.users ?? []);
   const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
-  const nonTurnVideoPolicy = useSessionSelector(
-    (state) => state.session?.bandwidthSavings?.nonTurnVideo || 'snapshots',
+  const nonTurnSnapshotsActive = useSessionSelector(
+    (state) => Boolean(state.session?.bandwidthSavings?.nonTurnVideo?.snapshotsActive),
   );
   const isTurnsMode = mode === 'turns';
   /*
@@ -33,26 +31,13 @@ export function useDriverVideoModePolicy(roverId) {
   const isNextDriver = Boolean(socketId && nextDriverId === socketId);
   const deadline = turnInfo?.deadline || null;
   const msUntilTurn = deadline ? deadline - now : null;
-  const totalRovers = roster.length;
-  const totalDrivers = useMemo(() => {
-    const unique = new Set();
-    users.forEach((entry) => {
-      const role = String(entry?.role || '');
-      if (role === 'spectator') return;
-      const turnRoverId = String(entry?.roverId || '').trim();
-      const turnSocketId = String(entry?.socketId || '').trim();
-      if (!turnRoverId || !turnSocketId) return;
-      unique.add(turnSocketId);
-    });
-    return unique.size;
-  }, [users]);
   /*
-    The server sends the bandwidth policy because the same rule is enforced in
-    video authorization. The hook only mirrors that policy so the UI avoids
-    requesting live video when snapshots are the intended non-turn experience.
+    The server evaluates the global controllable-user threshold because that
+    same decision is enforced in socket video tokens and MediaMTX auth. This
+    hook only mirrors the active result so the browser does not request live
+    video when snapshots are already the authoritative non-turn outcome.
   */
-  const shouldUsePreviewByLoad =
-    nonTurnVideoPolicy === 'snapshots' && isTurnsMode && totalDrivers > totalRovers;
+  const shouldUsePreviewByLoad = nonTurnSnapshotsActive && isTurnsMode;
   const isPreSwitchWindow =
     isTurnsMode && isNextDriver && msUntilTurn != null && msUntilTurn <= 5000 && msUntilTurn > 0;
   const showNotTurnNotice = isTurnsMode && !isActiveDriver;

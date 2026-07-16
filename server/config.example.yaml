@@ -60,10 +60,16 @@ bandwidthSavings:
   #   verifiedOnly: verified/admin users may keep multiple driver tabs; unverified users may not
   #   notAllowed: every identity is limited to one driver tab
   multiTabProtection: "verifiedOnly"
-  # Live video for users who are attached to a source but do not currently own
-  # its active turn. "snapshots" saves upload bandwidth; "live" allows full
-  # video whenever the normal mode/visibility rules allow it.
-  nonTurnVideo: "snapshots"
+  # Video for users who are attached to a source but do not currently own its
+  # active turn. "snapshots" saves upload bandwidth; "live" allows full video
+  # whenever the normal mode/visibility rules allow it.
+  nonTurnVideo:
+    mode: "snapshots"
+    # Snapshot mode activates only when controllable users exceed this number.
+    # A controllable user is attached to a rover or PTZ as operator/queue, not a
+    # plain spectator. 0 preserves always-on non-turn snapshots once anyone is
+    # actually attached to a controllable source.
+    userThreshold: 0
   # Live video for spectators outside the local network. Local spectators are
   # not restricted by this switch because LAN traffic is not the upload limit.
   externalSpectatorVideo: "snapshots"

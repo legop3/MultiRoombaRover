@@ -7,8 +7,9 @@
   - not allowed
 - snapshots
   - non-turn video
-    - snapshots (rover non-active turn holders and PTZ non-operators see snapshots)
+    - snapshots (rover non-active turn holders and PTZ non-operators see snapshots after the user threshold is exceeded)
     - live (rover non-active turn holders and PTZ non-operators can get full video)
+    - userThreshold (snapshots turn on when controllable users exceed this number)
   - external spectator video
     - snapshots (external spectators are only allowed snapshots)
     - live (external spectators can get full video)
@@ -23,7 +24,9 @@
 ```yaml
 bandwidthSavings:
   multiTabProtection: "verifiedOnly" # allowed | verifiedOnly | notAllowed
-  nonTurnVideo: "snapshots" # snapshots | live
+  nonTurnVideo:
+    mode: "snapshots" # snapshots | live
+    userThreshold: 0 # snapshots turn on when controllable users exceed this number
   externalSpectatorVideo: "snapshots" # snapshots | live
   externalSpectatorAccess: "on" # off | on | verifiedOnly | admin
 ```

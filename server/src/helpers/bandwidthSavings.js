@@ -10,7 +10,10 @@ const EXTERNAL_SPECTATOR_ACCESS_MODES = new Set(['off', 'on', 'verifiedOnly', 'a
 
 const DEFAULT_BANDWIDTH_SAVINGS = Object.freeze({
   multiTabProtection: 'verifiedOnly',
-  nonTurnVideo: 'snapshots',
+  nonTurnVideo: Object.freeze({
+    mode: 'snapshots',
+    userThreshold: 0,
+  }),
   externalSpectatorVideo: 'snapshots',
   externalSpectatorAccess: 'on',
 });
@@ -25,6 +28,23 @@ function normalizeEnum(value, allowed, fallback) {
   return allowed.has(normalized) ? normalized : fallback;
 }
 
+function normalizeNonTurnVideo(value) {
+  const raw = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const threshold = Number(raw.userThreshold);
+  /*
+    userThreshold is intentionally "greater than", not "greater than or equal".
+    A value of 4 means the first four controllable users can keep live non-turn
+    video, and the fifth controllable user activates snapshot saving. Invalid
+    or negative values fall back to zero, which preserves always-on snapshots
+    for any real non-turn participant.
+  */
+  const userThreshold = Number.isFinite(threshold) ? Math.max(0, Math.floor(threshold)) : 0;
+  return {
+    mode: normalizeEnum(raw.mode, VIDEO_MODES, DEFAULT_BANDWIDTH_SAVINGS.nonTurnVideo.mode),
+    userThreshold,
+  };
+}
+
 function buildBandwidthSavingsPolicy(config = loadConfig()) {
   const raw = config.bandwidthSavings || {};
   return {
@@ -33,11 +53,7 @@ function buildBandwidthSavingsPolicy(config = loadConfig()) {
       MULTI_TAB_MODES,
       DEFAULT_BANDWIDTH_SAVINGS.multiTabProtection,
     ),
-    nonTurnVideo: normalizeEnum(
-      raw.nonTurnVideo,
-      VIDEO_MODES,
-      DEFAULT_BANDWIDTH_SAVINGS.nonTurnVideo,
-    ),
+    nonTurnVideo: normalizeNonTurnVideo(raw.nonTurnVideo),
     externalSpectatorVideo: normalizeEnum(
       raw.externalSpectatorVideo,
       VIDEO_MODES,
@@ -72,8 +88,16 @@ function shouldEnforceSingleDriverTab({ isVerified = false, isAdmin = false } = 
   return !isVerified && !isAdmin;
 }
 
-function shouldUseSnapshotsForNonTurnVideo() {
-  return getBandwidthSavingsPolicy().nonTurnVideo === 'snapshots';
+function shouldUseSnapshotsForNonTurnVideo({ controllableUserCount = 0 } = {}) {
+  const { nonTurnVideo } = getBandwidthSavingsPolicy();
+  if (nonTurnVideo.mode !== 'snapshots') return false;
+  /*
+    The threshold is evaluated centrally so MediaMTX auth, socket-issued video
+    tokens, PTZ authorization, and browser session state all agree. Using a
+    strict greater-than comparison makes the configured value read like the
+    maximum number of controllable users allowed before snapshots start.
+  */
+  return Math.max(0, Number(controllableUserCount) || 0) > nonTurnVideo.userThreshold;
 }
 
 function shouldUseSnapshotsForExternalSpectatorVideo() {

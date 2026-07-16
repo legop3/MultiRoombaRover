@@ -30,6 +30,7 @@ const { canAccessStream } = createVideoAuthPolicy({
   ptzCameraService,
   getSocketIp,
   isLocalNetwork,
+  io,
 });
 
 registerVideoAuthRoute({

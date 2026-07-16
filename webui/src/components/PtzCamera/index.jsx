@@ -540,8 +540,8 @@ function buildPtzTurnModel(ptz, selfId) {
 
 function PtzMediaPane({ ptz, open, framed = true }) {
   const isOperator = Boolean(ptz?.isOperator);
-  const nonTurnVideoPolicy = useSessionSelector(
-    (state) => state.session?.bandwidthSavings?.nonTurnVideo || 'snapshots',
+  const nonTurnSnapshotsActive = useSessionSelector(
+    (state) => Boolean(state.session?.bandwidthSavings?.nonTurnVideo?.snapshotsActive),
   );
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   /*
@@ -550,7 +550,7 @@ function PtzMediaPane({ ptz, open, framed = true }) {
     canRequestLiveVideo(); this branch only chooses the expected browser render
     path and never unlocks movement controls.
   */
-  const shouldUseLiveVideo = isOperator || nonTurnVideoPolicy === 'live';
+  const shouldUseLiveVideo = isOperator || !nonTurnSnapshotsActive;
   const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !shouldUseLiveVideo });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   const turnModel = useMemo(() => buildPtzTurnModel(ptz, selfId), [ptz, selfId]);

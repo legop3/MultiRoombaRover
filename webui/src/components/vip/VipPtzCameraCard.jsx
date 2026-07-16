@@ -326,8 +326,8 @@ function PtzControlReference() {
 function PtzController({ open, onClose, layout = 'desktop' }) {
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isOperator = Boolean(ptz?.isOperator);
-  const nonTurnVideoPolicy = useSessionSelector(
-    (state) => state.session?.bandwidthSavings?.nonTurnVideo || 'snapshots',
+  const nonTurnSnapshotsActive = useSessionSelector(
+    (state) => Boolean(state.session?.bandwidthSavings?.nonTurnVideo?.snapshotsActive),
   );
   const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape';
   const { ptzRelease } = useSessionActions();
@@ -336,7 +336,7 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
     users see live video only when the central non-turn video policy allows it;
     all movement and light controls still remain guarded by isOperator.
   */
-  const shouldUseLiveVideo = isOperator || nonTurnVideoPolicy === 'live';
+  const shouldUseLiveVideo = isOperator || !nonTurnSnapshotsActive;
   const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !shouldUseLiveVideo });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   const [releasePending, setReleasePending] = useState(false);

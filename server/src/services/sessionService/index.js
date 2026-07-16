@@ -42,6 +42,7 @@ const { getFeatureFlags } = require('../../helpers/features');
 const {
   canUseExternalSpectatorAccess,
   getBandwidthSavingsPolicy,
+  shouldUseSnapshotsForNonTurnVideo,
 } = require('../../helpers/bandwidthSavings');
 const {
   getFeatureState,
@@ -79,12 +80,17 @@ function hasExternalSpectatorGrant(socket) {
   return Boolean(state?.external);
 }
 
-function buildBandwidthSavingsSessionState(socket) {
+function buildBandwidthSavingsSessionState(socket, controllableUserCount = 0) {
   const policy = getBandwidthSavingsPolicy();
   const local = isLocalNetwork(getSocketIp(socket));
   const granted = hasExternalSpectatorGrant(socket);
   return {
     ...policy,
+    nonTurnVideo: {
+      ...policy.nonTurnVideo,
+      controllableUserCount,
+      snapshotsActive: shouldUseSnapshotsForNonTurnVideo({ controllableUserCount }),
+    },
     /*
       These derived fields let browser routes make clear UI choices without
       re-implementing IP/admin/grant logic. The server still enforces the same
@@ -98,6 +104,24 @@ function buildBandwidthSavingsSessionState(socket) {
       hasGrant: granted,
     }),
   };
+}
+
+function countControllableUsers(userEntries = []) {
+  const ids = new Set();
+  userEntries.forEach((entry) => {
+    const role = String(entry?.role || '');
+    if (role === 'spectator') return;
+    const socketId = String(entry?.socketId || '').trim();
+    const roverId = String(entry?.roverId || '').trim();
+    /*
+      buildUserEntry already maps PTZ queued/operators to the PTZ pseudo-rover
+      id and normal drivers to their physical rover. Counting entries after that
+      normalization gives the browser the same conceptual "controllable users"
+      count it shows in the user/queue panels without duplicating PTZ UI logic.
+    */
+    if (socketId && roverId) ids.add(socketId);
+  });
+  return ids.size;
 }
 
 function buildUserEntry(socket) {
@@ -124,19 +148,22 @@ function buildUserEntry(socket) {
 function buildSession(socket) {
   const overseerVote = getOverseerVoteStatus();
   const features = getFeatureFlags();
-  const users = Array.from(io.sockets.sockets.values())
+  const userEntries = Array.from(io.sockets.sockets.values())
     .map((sock) => buildUserEntry(sock))
-    .filter(Boolean)
-    .map((entry) => ({
-      ...entry,
-      /*
-        PTZ is intentionally not a roverManager record, so the normal physical
-        rover visibility filter would erase the user's PTZ chat target. Preserve
-        it here because getPtzChatTargetForSocket already applied the PTZ access
-        and queue/operator rules before buildUserEntry returned it.
-      */
-      roverId: entry.roverId === PTZ_CAMERA_ID ? entry.roverId : filterVisibleRoverId(socket, entry.roverId),
-    }));
+    .filter(Boolean);
+  const controllableUserCount = countControllableUsers(userEntries);
+  const users = userEntries.map((entry) => ({
+    ...entry,
+    /*
+      PTZ is intentionally not a roverManager record, so the normal physical
+      rover visibility filter would erase the user's PTZ chat target. Preserve
+      it here because getPtzChatTargetForSocket already applied the PTZ access
+      and queue/operator rules before buildUserEntry returned it.
+    */
+    roverId: entry.roverId === PTZ_CAMERA_ID
+      ? entry.roverId
+      : filterVisibleRoverId(socket, entry.roverId),
+  }));
   const roster = roverManager.getRosterForSocket(socket);
   const assignment = assignmentService.describeAssignment(socket?.id || '');
   const assignmentRoverId = filterVisibleRoverId(socket, assignment?.roverId);
@@ -148,7 +175,7 @@ function buildSession(socket) {
     role: getRole(socket),
     mode: getMode(),
     isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
-    bandwidthSavings: buildBandwidthSavingsSessionState(socket),
+    bandwidthSavings: buildBandwidthSavingsSessionState(socket, controllableUserCount),
     /*
       Features is the single UI contract for optional server capabilities. A
       disabled feature should be absent from navigation/layout decisions even

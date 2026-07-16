@@ -19,7 +19,30 @@ function createVideoAuthPolicy(deps) {
     ptzCameraService,
     getSocketIp,
     isLocalNetwork,
+    io,
   } = deps;
+
+  function countControllableUsers() {
+    const ids = new Set();
+    io.sockets.sockets.forEach((candidate) => {
+      if (!candidate?.id || getRole(candidate) === 'spectator') return;
+      /*
+        MediaMTX can ask for authorization after a browser has already received
+        a token, so this count intentionally mirrors videoSocketService instead
+        of trusting the client-visible session policy snapshot.
+      */
+      if (roverManager.getRoversForSocket(candidate.id).length > 0) {
+        ids.add(candidate.id);
+      }
+    });
+    if (typeof ptzCameraService.getParticipantSocketIds === 'function') {
+      ptzCameraService.getParticipantSocketIds().forEach((socketId) => {
+        const socket = io.sockets.sockets.get(socketId);
+        if (socket && getRole(socket) !== 'spectator') ids.add(socketId);
+      });
+    }
+    return ids.size;
+  }
 
   function canView(socket) {
     const mode = getMode();
@@ -78,7 +101,11 @@ function createVideoAuthPolicy(deps) {
       if (!roverManager.isDriver(roverId, socket)) {
         return false;
       }
-      if (!isAudio && shouldUseSnapshotsForNonTurnVideo() && !turnService.canDrive(roverId, socket)) {
+      if (
+        !isAudio &&
+        shouldUseSnapshotsForNonTurnVideo({ controllableUserCount: countControllableUsers() }) &&
+        !turnService.canDrive(roverId, socket)
+      ) {
         /*
           This mirrors videoSocketService's token gate. MediaMTX can ask auth
           after a token has been issued, so the active-turn bandwidth rule must
