@@ -8,7 +8,7 @@ const { hasProfanity, isKeymash, normalizeUserText } = require('./contentFilters
 const { buildMessage, buildTypingPayload, resolveRoverId, isPrivateClosedRoverId, buildRoverCtxSnapshot } = require('./contextBuilders');
 const { broadcastMessage, broadcastTyping } = require('./broadcast');
 const { playTypingNote, normalizeTtsOptions, maybeSendAccessNotice, maybeSpeak, TYPING_SEND_NOTE } = require('./notifications');
-const { runChatTextCommand } = require('./textCommands');
+const { isTextCommand, runChatTextCommand } = require('./textCommands');
 
 function createHandlers({ sendSystemMessage }) {
   async function handleIncoming({ text, tts, bot = false, profileImage = null } = {}, socket, cb = () => {}) {
@@ -53,21 +53,26 @@ function createHandlers({ sendSystemMessage }) {
     maybeSendAccessNotice(message, sendSystemMessage);
     maybeSpeak(socket, message, ttsOptions);
 
-    try {
-      // Commands sent from site chat should still be visible as normal chat
-      // messages. Running the command after broadcast preserves the user-visible
-      // transcript while keeping permissions and command execution entirely on
-      // the server.
-      const ranCommand = await runChatTextCommand({ text: clean, socket, sendSystemMessage });
-      cb({ success: true, command: ranCommand });
-      return;
-    } catch (err) {
-      logger.warn('Chat command failed after broadcast', { socket: socket?.id, error: err.message });
-      cb({ success: true, command: true, commandError: err.message || 'Command failed' });
-      return;
-    }
+    const command = isTextCommand(clean);
+    // Chat delivery is complete once validation, broadcast, and local side
+    // effects above have succeeded. A command may wait on Home Assistant,
+    // hardware, replay preparation, or an external transport, so tying the
+    // socket acknowledgement to command completion leaves the browser's send
+    // promise pending and makes its input state appear stuck. Acknowledge now;
+    // command replies continue through the normal Rover bot message stream.
+    cb({ success: true, command });
 
-    cb({ success: true });
+    if (command) {
+      // Deliberately do not await this promise. runChatTextCommand already turns
+      // ordinary command failures into visible bot messages; this final catch
+      // protects the service from an unexpected setup/programming failure and
+      // cannot attempt a second acknowledgement after the UI has moved on.
+      void runChatTextCommand({ text: clean, socket, sendSystemMessage }).catch((err) => {
+        logger.warn('Chat command failed after acknowledgement', { socket: socket?.id, error: err.message });
+        sendSystemMessage(`Command failed: ${err.message || 'unknown error'}`, { nickname: 'Rover bot', bot: true });
+      });
+    }
+    return;
   }
 
   function sendExternalMessage({ text, nickname = 'Discord', role = 'admin', roverId = null, discordGuildId = null, discordGuildName = null, discordGuildIconUrl = null, discordChannelId = null, discordUserId = null, discordUserName = null, discordUserAvatarUrl = null, bot = false, profileImage = null }) {
