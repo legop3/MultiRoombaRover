@@ -5,10 +5,13 @@ const {
   Client,
   GatewayIntentBits,
   Partials,
+  AttachmentBuilder,
 } = require('discord.js');
 const logger = require('../../globals/logger').child('discordBot');
 const io = require('../../globals/io');
 const { loadConfig } = require('../../helpers/configLoader');
+const { isFeatureEnabled } = require('../../helpers/features');
+const { parseCommandText } = require('../operatorCommandService/config');
 const roverManager = require('../roverManager');
 const { getRoster, lockRover, rovers } = roverManager;
 const { MODES, getMode, setMode } = require('../modeManager');
@@ -20,6 +23,8 @@ const { getNickname } = require('../nicknameService');
 const { getGlobalObjective, setGlobalObjective, clearGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
 const homeAssistantService = require('../homeAssistantService');
+const liftService = require('../liftService');
+const neatoService = require('../neatoService');
 const {
   getGuildConfig,
   listGuildConfigs,
@@ -48,26 +53,32 @@ const {
 const { subscribe } = require('../eventBus');
 const { createPresenceManager } = require('./presence');
 const { createChannelIO } = require('./channelIO');
-const { createCommandHandlers } = require('./commands');
+const { createCommandHandlers } = require('../operatorCommandService');
+const { createDiscordTransportHandlers, createDiscordCommandRequest } = require('./commandAdapter');
 const { createIntegrations } = require('./integrations');
+const { registerPreferredDeliveryProvider } = require('../replayDeliveryService');
+const {
+  DEFAULT_ALLOWED_MENTIONS,
+  createReplayCaptionBuilder,
+  startDiscordTypingLoop,
+  sanitizeReplayTitleForFilename,
+  firstAttachmentFromMessage,
+  buildDiscordReplayMediaPayload,
+  buildAcceptedMessage,
+  buildStatusMessage,
+} = require('../replayDeliveryService/workflow');
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
-const enabled = Boolean(discordConfig.token);
+const enabled = isFeatureEnabled('discord');
 // These normalized command names mirror the command router. Bridge-channel
 // command replies are mirrored into web chat, so this entrypoint needs to know
 // the configured command names before it wraps message.reply.
-const commandPrefix = String(discordConfig.commandPrefix || 'rs').trim() || 'rs';
-const timeStatusCommand = discordConfig.timeStatusCommand === null
-  ? ''
-  : String(discordConfig.timeStatusCommand || 'ts').trim();
-const normalizedCommandPrefix = commandPrefix.toLowerCase();
-const normalizedTimeStatusCommand = timeStatusCommand.toLowerCase();
 const adminIds = new Set((config.admins || []).map((a) => String(a.discord_id || '').trim()).filter(Boolean));
 const lockdownAdminIds = new Set((config.admins || []).filter((admin) => admin.lockdown).map((admin) => String(admin.discord_id || '').trim()).filter(Boolean));
 
 if (!enabled) {
-  logger.info('Discord bot disabled; missing token in config.discord.token');
+  logger.info('Discord feature disabled or missing required token');
   return;
 }
 
@@ -123,7 +134,72 @@ const presence = createPresenceManager({
   countReady,
 });
 
-const commands = createCommandHandlers({
+const replayCaption = createReplayCaptionBuilder({
+  io,
+  rovers,
+  getActiveDrivers,
+  getNickname,
+  sanitizeMentions,
+});
+
+// Discord is the preferred replay host only while this optional feature is
+// active. The core replay delivery service owns generation and automatically
+// falls back to its local media store when any operation below fails.
+if (discordConfig?.channels?.replay) {
+  registerPreferredDeliveryProvider({
+    async begin(job) {
+      const channelId = discordConfig.channels.replay;
+      const progressMessage = await channelIO.sendToChannel(channelId, buildAcceptedMessage(job), {}, DEFAULT_ALLOWED_MENTIONS);
+      if (!progressMessage) throw new Error('Discord replay progress message could not be sent');
+      const channel = await channelIO.fetchChannel(channelId);
+      return {
+        channelId,
+        progressMessage,
+        stopTyping: startDiscordTypingLoop(channel, logger, 'web replay delivery'),
+      };
+    },
+    async deliver({ job, context, buffer, usedSources = job.sources, missingSources = [] }) {
+      const progressMessage = context?.progressMessage;
+      try {
+        if (progressMessage?.edit) {
+          await progressMessage.edit({ content: buildStatusMessage(job, 'uploading'), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
+        }
+        const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(job.title)}.mp4` });
+        const body = replayCaption.build({ job, usedSources, missingSources });
+        const uploadMessage = await channelIO.sendToChannel(context.channelId, body, { files: [attachment] }, DEFAULT_ALLOWED_MENTIONS);
+        if (!uploadMessage) throw new Error('Discord upload did not return a message');
+        const media = buildDiscordReplayMediaPayload({ message: uploadMessage, attachment: firstAttachmentFromMessage(uploadMessage), job });
+        if (!media) throw new Error('Discord upload did not include a replay attachment URL');
+        if (progressMessage?.edit) {
+          // The attachment URL is already durable once Discord returns it. A
+          // cosmetic progress-edit failure must not trigger a duplicate local
+          // replay or replace the successful media payload sent to clients.
+          await progressMessage.edit({ content: buildStatusMessage(job, 'ready'), allowedMentions: DEFAULT_ALLOWED_MENTIONS }).catch((err) => {
+            logger.warn('Discord replay uploaded but progress message update failed', { jobId: job.id, error: err.message });
+          });
+        }
+        return media;
+      } catch (err) {
+        err.progressMessage = progressMessage;
+        throw err;
+      } finally {
+        if (context?.stopTyping) context.stopTyping();
+      }
+    },
+    async completeFallback({ context, media }) {
+      const siteUrl = String(discordConfig.siteUrl || '').replace(/\/$/, '');
+      const publicUrl = siteUrl ? `${siteUrl}${media.url}` : media.url;
+      if (context?.progressMessage?.reply) {
+        await context.progressMessage.reply({
+          content: `Replay hosted by the rover server: ${publicUrl}`,
+          allowedMentions: DEFAULT_ALLOWED_MENTIONS,
+        });
+      }
+    },
+  });
+}
+
+const commandDependencies = {
   logger,
   client,
   io,
@@ -151,6 +227,9 @@ const commands = createCommandHandlers({
   // service into the shared command router keeps Discord and mirrored web-chat
   // command behavior aligned without duplicating Home Assistant calls here.
   homeAssistantService,
+  liftService,
+  neatoService,
+  isFeatureEnabled,
   getGuildConfig,
   setGuildConfig,
   removeGuildConfig,
@@ -167,7 +246,9 @@ const commands = createCommandHandlers({
   isLockdownAdminUser,
   discordConfig,
   config,
-});
+};
+commandDependencies.transportHandlers = createDiscordTransportHandlers(commandDependencies);
+const commands = createCommandHandlers(commandDependencies);
 
   const integrations = createIntegrations({
   logger,
@@ -209,16 +290,9 @@ const commands = createCommandHandlers({
 const integrationHandlers = integrations.register();
 
 function isTextCommand(content) {
-  const clean = String(content || '').trim();
-  const lower = clean.toLowerCase();
-  if (normalizedTimeStatusCommand && lower === normalizedTimeStatusCommand) return true;
-  if (!lower.startsWith(normalizedCommandPrefix)) return false;
-
-  const nextCharacter = clean.charAt(commandPrefix.length);
-  // Mirrored bridge commands must use the exact same whole-token prefix rule
-  // as the command router. If this check is looser than the router, normal
-  // bridge chat can be wrapped as a command reply even though no command runs.
-  return !nextCharacter || /\s/.test(nextCharacter);
+  // Both transports share this parser so command detection cannot drift from
+  // the dispatcher when an installation changes its prefix.
+  return parseCommandText(content, config).matched;
 }
 
 function isBridgeChannelMessage(message) {
@@ -263,7 +337,8 @@ function createBridgeMirroredCommandMessage(message) {
 client.on('messageCreate', async (message) => {
   try {
     await integrationHandlers.handleBridgeInbound(message);
-    await commands.handleCommand(createBridgeMirroredCommandMessage(message));
+    const commandMessage = createBridgeMirroredCommandMessage(message);
+    await commands.handleCommand(createDiscordCommandRequest(commandMessage, { isAdminUser, isLockdownAdminUser }));
   } catch (err) {
     logger.warn('Error handling Discord message', err.message);
   }

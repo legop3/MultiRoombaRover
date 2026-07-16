@@ -7,11 +7,7 @@ const { getMode, MODES } = require('../modeManager');
 const { publishEvent } = require('../eventBus');
 const assignmentService = require('../assignmentService');
 const { getNickname } = require('../nicknameService');
-const { loadConfig } = require('../../helpers/configLoader');
-const { buildReplayJobId, buildReplayTitle } = require('../discordBotService/replayWorkflow');
-
-const config = loadConfig();
-const discordConfig = config.discord || {};
+const { buildReplayJobId, buildReplayTitle } = require('../replayDeliveryService/workflow');
 
 function buildRequesterLabel(socket) {
   return getNickname(socket) || socket?.data?.user?.username || socket?.id || 'unknown';
@@ -32,11 +28,6 @@ function registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefau
     const handleReplayTrigger = (payload = {}, cb = () => {}) => {
       if (getMode() === MODES.LOCKDOWN) {
         cb({ error: 'Replay disabled in lockdown', state: null });
-        return;
-      }
-      const channelId = discordConfig?.channels?.replay || null;
-      if (!channelId) {
-        cb({ error: 'Replay channel not configured', state: null });
         return;
       }
       const requestedSources = Array.isArray(payload?.sources) ? payload.sources : null;
@@ -65,7 +56,6 @@ function registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefau
         type: 'replay.requested',
         payload: {
           jobId,
-          channelId,
           requester,
           title,
           includeSidebar,

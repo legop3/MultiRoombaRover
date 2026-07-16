@@ -3,7 +3,7 @@
 // Scope: Builds and sends rover status embed for one rover or all visible rovers.
 const { EmbedBuilder } = require('discord.js');
 const { buildBatteryStatusEmbed } = require('../batteryEmbeds');
-const { resolveRoverSelector } = require('./resolvers');
+const { resolveRoverSelector } = require('../../operatorCommandService/commands/resolvers');
 
 function createStatusCommand({ rovers, roverManager }) {
   return async function handleStatusCommand(message, roverId) {

@@ -2,28 +2,12 @@
 // Purpose: Handles event-bus announcements to Discord channels.
 // Scope: Processes supported event types and posts formatted messages/embeds.
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
-const io = require('../../../globals/io');
 const { buildBatteryStatusEmbed, buildBatteryCaption } = require('../batteryEmbeds');
-const {
-  DEFAULT_ALLOWED_MENTIONS,
-  createReplayJob,
-  createJobStatusEmitter,
-  createReplayCaptionBuilder,
-  startDiscordTypingLoop,
-  sanitizeReplayTitleForFilename,
-  firstAttachmentFromMessage,
-  buildDiscordReplayMediaPayload,
-  buildAcceptedMessage,
-  buildStatusMessage,
-  normalizeUserError,
-} = require('../replayWorkflow');
 
 function createBusEventHandler(deps) {
-  const { logger, discordConfig, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel, fetchChannel, buildReplayVideo, getActiveDrivers, getNickname, sanitizeMentions } = deps;
+  const { logger, discordConfig, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel } = deps;
   const ADMIN_ALERT_EVENT_TYPES = new Set(['rover.online', 'rover.offline', 'rover.dockGuard', 'battery.warn', 'battery.urgent', 'battery.docked', 'battery.undocked', 'battery.charging.start', 'battery.charging.stop', 'battery.locked', 'battery.unlocked']);
   let skippedFirstModeAnnouncement = false;
-  const jobStatus = createJobStatusEmitter({ io, logger, sanitizeMentions });
-  const replayCaption = createReplayCaptionBuilder({ io, rovers, getActiveDrivers, getNickname, sanitizeMentions });
 
   function buildEmbed({ title, description, color, includeSiteUrl = true }) {
     const embed = new EmbedBuilder().setTitle(title || 'Update').setColor(color || 0x2196f3);
@@ -53,66 +37,6 @@ function createBusEventHandler(deps) {
       ? embeds
       : [buildEmbed({ title, description, color, includeSiteUrl })];
     await sendToChannel(channelId, `${prefix}${content || ''}`.trim(), { embeds: payloadEmbeds, files: Array.isArray(files) ? files : undefined }, { parse: [], roles: pingRoleId ? [pingRoleId] : [] }, !pingRoleId);
-  }
-
-  async function sendReplayToChannel(channelId, requester, sources = [], explicitTitle = '', includeSidebar = true, jobId = null, requestedBy = null) {
-    if (!channelId) throw new Error('Replay channel not configured');
-    const job = createReplayJob({
-      id: jobId,
-      requester,
-      source: 'web',
-      title: explicitTitle,
-      sources,
-      includeSidebar,
-      requestedBy,
-    });
-    jobStatus.emit(job, 'accepted', { message: buildAcceptedMessage(job) });
-    const progressMessage = await sendToChannel(channelId, buildAcceptedMessage(job), {}, DEFAULT_ALLOWED_MENTIONS);
-    const channel = await fetchChannel(channelId);
-    const stopTyping = startDiscordTypingLoop(channel, logger, 'web replay delivery');
-    try {
-      jobStatus.emit(job, 'building', { message: buildStatusMessage(job, 'building') });
-      if (progressMessage?.edit) await progressMessage.edit({ content: buildStatusMessage(job, 'building'), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
-      const { buffer, usedSources = job.sources, missingSources = [] } = await buildReplayVideo({
-        sources: job.sources,
-        title: job.title,
-        requester: job.requester,
-        includeSidebar: job.includeSidebar,
-      });
-      jobStatus.emit(job, 'uploading', { message: buildStatusMessage(job, 'uploading') });
-      if (progressMessage?.edit) await progressMessage.edit({ content: buildStatusMessage(job, 'uploading'), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
-      const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(job.title)}.mp4` });
-      const body = replayCaption.build({ job, usedSources, missingSources });
-      const uploadMessage = await sendToChannel(channelId, body, { files: [attachment] }, DEFAULT_ALLOWED_MENTIONS);
-      if (!uploadMessage) throw new Error('Discord upload did not return a message');
-      const uploadedAttachment = firstAttachmentFromMessage(uploadMessage);
-      const media = buildDiscordReplayMediaPayload({ message: uploadMessage, attachment: uploadedAttachment, job });
-      if (!media) throw new Error('Discord upload did not include a replay attachment URL');
-      jobStatus.emit(job, 'ready', { message: buildStatusMessage(job, 'ready'), media });
-      if (progressMessage?.edit) await progressMessage.edit({ content: buildStatusMessage(job, 'ready'), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
-    } catch (err) {
-      const message = normalizeUserError(err);
-      jobStatus.emit(job, 'failed', { message });
-      if (progressMessage?.edit) await progressMessage.edit({ content: sanitizeMentions(message), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
-      throw err;
-    } finally {
-      stopTyping();
-    }
-  }
-
-  function handleReplayRequested(event) {
-    const payload = event?.payload || {};
-    sendReplayToChannel(
-      payload?.channelId,
-      payload?.requester,
-      payload?.sources || [],
-      payload?.title || '',
-      payload?.includeSidebar !== false,
-      payload?.jobId || null,
-      payload?.requestedBy || null,
-    ).catch((err) => {
-      logger.warn('Replay send failed', { error: err.message });
-    });
   }
 
   function handleBusEvent(event) {
@@ -200,9 +124,9 @@ function createBusEventHandler(deps) {
         });
         break;
       }
-      case 'replay.requested':
-        handleReplayRequested(event);
-        break;
+      // Replay requests are deliberately consumed by replayDeliveryService.
+      // Discord registers only a preferred delivery provider, allowing the
+      // same request to fall back locally without a second event subscriber.
       case 'buttonBox.discordStalkerPing': {
         const message = payload?.message ? String(payload.message) : 'Button box chaos reward triggered.';
         announce({
@@ -234,7 +158,7 @@ function createBusEventHandler(deps) {
     }
   }
 
-  return { handleBusEvent, handleReplayRequested };
+  return { handleBusEvent };
 }
 
 module.exports = { createBusEventHandler };

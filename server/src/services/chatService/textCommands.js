@@ -10,6 +10,9 @@ const { getNickname } = require('../nicknameService');
 const { getGlobalObjective, setGlobalObjective, clearGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
 const homeAssistantService = require('../homeAssistantService');
+const liftService = require('../liftService');
+const neatoService = require('../neatoService');
+const { isFeatureEnabled } = require('../../helpers/features');
 const {
   listVerifiedUsers,
   removeVerifiedUser,
@@ -20,20 +23,21 @@ const {
 const { publishEvent } = require('../eventBus');
 const assignmentService = require('../assignmentService');
 const { loadConfig } = require('../../helpers/configLoader');
-const { createCommandHandlers } = require('../discordBotService/commands');
+const { createCommandHandlers } = require('../operatorCommandService');
+const { parseCommandText } = require('../operatorCommandService/config');
+const { createWebTransportHandlers } = require('../operatorCommandService/webTransport');
 const { commandReplyToText } = require('./commandResultFormatter');
 const {
   buildReplayJobId,
   buildReplayTitle,
   createReplaySourceResolver,
-} = require('../discordBotService/replayWorkflow');
+} = require('../replayDeliveryService/workflow');
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
 
 function isTextCommand(text) {
-  const clean = String(text || '').trim();
-  return clean.toLowerCase() === 'ts' || /^rs(?:\s|$)/i.test(clean);
+  return parseCommandText(text, config).matched;
 }
 
 function sanitizeMentions(text) {
@@ -70,12 +74,6 @@ function createWebReplayTextCommand(socket, sendSystemMessage, replayApi) {
         return;
       }
 
-      const channelId = discordConfig?.channels?.replay || null;
-      if (!channelId) {
-        await message.reply({ content: 'Replay denied: replay channel is not configured.' });
-        return;
-      }
-
       const resolved = sourceResolver.resolve(query);
       if (resolved?.error) {
         await message.reply({ content: resolved.error });
@@ -99,7 +97,6 @@ function createWebReplayTextCommand(socket, sendSystemMessage, replayApi) {
         type: 'replay.requested',
         payload: {
           jobId,
-          channelId,
           requester,
           title: '',
           includeSidebar: true,
@@ -113,18 +110,18 @@ function createWebReplayTextCommand(socket, sendSystemMessage, replayApi) {
   };
 }
 
-function createChatCommandMessage({ socket, text, sendSystemMessage }) {
+function createChatCommandRequest({ socket, text, sendSystemMessage }) {
   const nickname = buildRequesterLabel(socket);
   return {
     content: String(text || '').trim(),
-    author: {
+    actor: {
       bot: false,
       id: socket.id,
-      username: nickname,
+      label: nickname,
+      isAdmin: isAdmin(socket),
+      isLockdownAdmin: isLockdownAdmin(socket),
     },
-    member: {
-      nickname,
-    },
+    transport: 'web-chat',
     reply: async (payload) => {
       const response = sanitizeMentions(commandReplyToText(payload));
       if (!response) return null;
@@ -139,8 +136,8 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
   // keeps ordinary chatService initialization from changing the service boot
   // order, while still letting `rs replay` use the existing replay pipeline.
   const replayApi = require('../replayEngineV2');
-  const message = createChatCommandMessage({ socket, text, sendSystemMessage });
-  const commands = createCommandHandlers({
+  const message = createChatCommandRequest({ socket, text, sendSystemMessage });
+  const commandDependencies = {
     logger: null,
     client: null,
     io,
@@ -168,6 +165,9 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     // lights lock/unlock` from becoming transport-specific, and it preserves
     // the existing session update path for all connected browsers.
     homeAssistantService,
+    liftService,
+    neatoService,
+    isFeatureEnabled,
     getGuildConfig: () => null,
     setGuildConfig: () => null,
     removeGuildConfig: () => null,
@@ -183,9 +183,12 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     isAdminUser: (id) => String(id) === String(socket.id) && isAdmin(socket),
     isLockdownAdminUser: (id) => String(id) === String(socket.id) && isLockdownAdmin(socket),
     discordConfig,
+    siteUrl: String(discordConfig.siteUrl || ''),
     config,
     createReplayTextCommand: createWebReplayTextCommand(socket, sendSystemMessage, replayApi),
-  });
+  };
+  commandDependencies.transportHandlers = createWebTransportHandlers(commandDependencies);
+  const commands = createCommandHandlers(commandDependencies);
 
   // Let the shared router perform normal command permission checks. Site chat
   // has already broadcast the user's command text, so command replies become a

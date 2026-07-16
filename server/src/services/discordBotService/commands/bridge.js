@@ -2,11 +2,12 @@
 // Purpose: Handles chat bridge configuration/status commands per guild.
 // Scope: Manages bridge channel, mode, and webhook provisioning.
 const { PermissionsBitField } = require('discord.js');
+const { getCommandConfig } = require('../../operatorCommandService/config');
 
-function createBridgeCommand({ getGuildConfig, setGuildConfig, removeGuildConfig, normalizeMode, VALID_MODES, isAdminUser, discordConfig }) {
+function createBridgeCommand({ getGuildConfig, setGuildConfig, removeGuildConfig, normalizeMode, VALID_MODES, isAdminUser, config }) {
   // Error text should name the active prefix because bridge setup is one of the
   // first commands an admin runs when a bot instance joins a shared Discord.
-  const commandPrefix = String(discordConfig?.commandPrefix || 'rs').trim() || 'rs';
+  const { prefix: commandPrefix } = getCommandConfig(config);
   function canManageBridge(message) {
     if (isAdminUser(message.author.id)) return true;
     if (!message.guild || !message.member) return false;

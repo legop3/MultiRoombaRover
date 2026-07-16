@@ -49,5 +49,8 @@ require('./src/services/kinectService');
 require('./src/services/sessionService');
 require('./src/services/batteryManager');
 require('./src/services/replayEngineV2');
+// Replay delivery is a core service. It must subscribe before the optional
+// Discord feature so web requests always have a local delivery path.
+require('./src/services/replayDeliveryService');
 require('./src/services/discordBotService');
 require('./src/services/httpServer');

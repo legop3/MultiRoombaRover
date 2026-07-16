@@ -1,9 +1,8 @@
 1. assign rovers based on battery percentage, give people highest one
 2. add admin ui for VIP and private requests instead of only through discord
 3. make overcurrent limiter speed sensitive, slower fill at lower speeds
-4. add feature chat commands, like /neato start, /lift up, etc
-5. add more background gap themes
-6.  fix this:
+4. add more background gap themes
+5.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^
