@@ -4,7 +4,12 @@
 const { app } = require('../../globals/http');
 const { renderIndexHtml, renderOgImage } = require('../embedService');
 
-app.get(['/', '/spectate', '/mini', '/display', '/scanner', '/database'], async (req, res) => {
+/*
+  Every client-side BrowserRouter entry point must also be an explicit HTTP
+  entry point. Including /ptz here lets direct loads and browser refreshes
+  receive the same rendered index document as navigation from the driver page.
+*/
+app.get(['/', '/spectate', '/mini', '/display', '/scanner', '/database', '/ptz'], async (req, res) => {
   try {
     const html = await renderIndexHtml(req);
     res.type('html').send(html);
