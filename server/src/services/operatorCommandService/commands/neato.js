@@ -13,7 +13,7 @@ function createNeatoCommand({ neatoService, sanitizeMentions }) {
     if (action === 'status') return message.reply({ content: describeState(neatoService.getState()) });
 
     const actions = {
-      start: ['starting cleaning', neatoService.startCleaning],
+      start: ['now cleaning', neatoService.startCleaning],
       home: ['returning home', neatoService.sendHome],
       locate: ['playing locate sound', neatoService.locateRobot],
       'clear-errors': ['clearing errors', neatoService.clearErrors],
