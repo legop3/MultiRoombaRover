@@ -18,6 +18,7 @@ import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
 import SessionDocumentTitle from './components/SessionDocumentTitle/index.jsx'
+import PtzAppRoot from './ptz/PtzAppRoot.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -37,6 +38,13 @@ createRoot(document.getElementById('root')).render(
                   <Route path="/display" element={<ServerDisplayApp />} />
                   <Route path="/scanner" element={<ScannerApp />} />
                   <Route path="/database" element={<DatabaseAdminApp />} />
+                  {/*
+                    PTZ is a separate route so the driver layout and its replay
+                    panel are not mounted behind the camera controller. This
+                    also makes orientation changes a PTZ layout concern instead
+                    of a local overlay-open state owned by the driver page.
+                  */}
+                  <Route path="/ptz" element={<PtzAppRoot />} />
                 </Routes>
               </BrowserRouter>
             </ChatProvider>

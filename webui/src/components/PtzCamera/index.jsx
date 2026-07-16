@@ -1,14 +1,16 @@
 // PTZ Camera UI
 // Purpose: Integrates the single PTZ camera into the main rover UI flow as a
 // queueable controllable target instead of a VIP-panel card.
-// Scope: Owns PTZ entry card and fullscreen composition; PTZ command authority,
-// queue ownership, and stream authorization remain server-owned.
+// Scope: Owns the driver-page PTZ entry card and the dedicated PTZ route
+// composition; PTZ command authority, queue ownership, and stream authorization
+// remain server-owned.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import CardFrame from '../CardFrame/index.jsx';
 import ChatPanel from '../ChatPanel/index.jsx';
 import ControlPadPanel from '../MobileControls/ControlPadPanel.jsx';
 import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
+import HomeAssistantControls from '../HomeAssistantControls/index.jsx';
 import PtzLiveVideo, { PTZ_CAMERA_ID } from '../PtzLiveVideo/index.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import QueueTargetRow, { QueueUserChips } from '../QueueTargetRow/index.jsx';
@@ -116,45 +118,6 @@ function PtzSnapshotPreview({ feed, label = 'PTZ Camera', className = 'h-full w-
   );
 }
 
-function StatusRow({ label, value, tone = '' }) {
-  return (
-    <div className="flex items-center justify-between gap-1 text-xs">
-      <span className="text-slate-400">{label}</span>
-      <span className={`min-w-0 truncate font-medium ${tone || 'text-slate-100'}`}>{value}</span>
-    </div>
-  );
-}
-
-function PtzStatePanel({ ptz, compact = false }) {
-  const now = useSharedClock(1000, Boolean(ptz?.deadline));
-  const spotlightOn = isSpotlightOn(ptz?.light);
-  const irMode = normalizeIrMode(ptz?.ir?.state);
-  const publisher = ptz?.publisher || {};
-  const publisherStatus = publisher.running
-    ? 'running'
-    : publisher.restartAt
-    ? 'restarting'
-    : publisher.lastEvent || 'stopped';
-  const mode = ptz?.isOperator ? 'operator' : ptz?.queuedPosition ? `queued ${ptz.queuedPosition}` : 'spectator';
-
-  return (
-    <CardFrame title="Camera state" bodyClassName="space-y-0.5 p-1 text-sm">
-      <StatusRow label="Mode" value={mode} tone={ptz?.isOperator ? 'text-emerald-300' : ''} />
-      <StatusRow label="Operator" value={ptz?.operatorLabel || 'none'} />
-      <StatusRow label="Remaining" value={formatRemaining(ptz?.deadline, now)} />
-      <StatusRow label="Spotlight" value={spotlightOn ? 'On' : 'Off'} tone={spotlightOn ? 'text-emerald-300' : 'text-slate-200'} />
-      <StatusRow label="Infrared mode" value={irMode} />
-      <StatusRow label="Stream" value={ptz?.status || ptz?.error || 'idle'} tone={ptz?.error ? 'text-amber-300' : ''} />
-      {!compact ? <StatusRow label="Transcoder" value={publisherStatus} tone={publisher.running ? 'text-emerald-300' : 'text-amber-300'} /> : null}
-      {ptz?.blocked?.message ? (
-        <div className="rounded border border-amber-500/50 bg-amber-950/40 p-1 text-xs text-amber-100">
-          {ptz.blocked.message}
-        </div>
-      ) : null}
-    </CardFrame>
-  );
-}
-
 function PtzQueueSummary({ ptz, title = 'PTZ queue' }) {
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const lookupUser = usePtzQueueLookup(ptz);
@@ -223,7 +186,7 @@ function PtzLightingControls({ ptz, disabled = false }) {
 }
 
 function PtzMobileZoomButtons({ disabled = false }) {
-  const { nudgeServo, stopAllMotion } = useControlActions();
+  const { nudgeServo } = useControlActions();
   const repeatTimerRef = useRef(null);
 
   const stopZoom = useCallback(() => {
@@ -238,8 +201,13 @@ function PtzMobileZoomButtons({ disabled = false }) {
       clearInterval(repeatTimerRef.current);
       repeatTimerRef.current = null;
     }
-    stopAllMotion();
-  }, [stopAllMotion]);
+    /*
+      Zero is a zoom-only release signal in the PTZ adapter. Using the global
+      stop action here previously erased a simultaneously held pan/tilt vector,
+      making mixed touch controls unexpectedly stop the camera.
+    */
+    nudgeServo(0);
+  }, [nudgeServo]);
 
   const startZoom = useCallback(
     (direction) => (event) => {
@@ -540,6 +508,7 @@ function buildPtzTurnModel(ptz, selfId) {
 
 function PtzMediaPane({ ptz, open, framed = true }) {
   const isOperator = Boolean(ptz?.isOperator);
+  const isParticipant = Boolean(isOperator || ptz?.queuedPosition);
   const nonTurnSnapshotsActive = useSessionSelector(
     (state) => Boolean(state.session?.bandwidthSavings?.nonTurnVideo?.snapshotsActive),
   );
@@ -550,7 +519,15 @@ function PtzMediaPane({ ptz, open, framed = true }) {
     canRequestLiveVideo(); this branch only chooses the expected browser render
     path and never unlocks movement controls.
   */
-  const shouldUseLiveVideo = isOperator || !nonTurnSnapshotsActive;
+  /*
+    A direct /ptz load renders before its automatic queue claim is acknowledged.
+    Do not mount the live player during that short pre-claim window: its first
+    token request would correctly be rejected, and PtzLiveVideo intentionally
+    treats authorization rejection as a terminal snapshot fallback. Once the
+    session confirms queue/operator membership, mounting the player creates a
+    fresh authorized request without changing shared retry or server policy.
+  */
+  const shouldUseLiveVideo = isParticipant && (isOperator || !nonTurnSnapshotsActive);
   const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !shouldUseLiveVideo });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   const turnModel = useMemo(() => buildPtzTurnModel(ptz, selfId), [ptz, selfId]);
@@ -595,8 +572,13 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
             </CardFrame>
           )}
           <PtzControlReference />
-          <PtzStatePanel ptz={ptz} />
-          <ReplaySourcesPanel panelId="ptz-controller-replay" />
+          <ReplaySourcesPanel panelId="ptz-controller-replay" defaultSelectedKey={`ptz:${PTZ_CAMERA_ID}`} />
+          {/*
+            Desktop keeps room controls as the final sidebar tool so camera
+            turn controls and replay remain above the less-frequent room-wide
+            actions. HomeAssistantControls owns its own feature and policy gate.
+          */}
+          <HomeAssistantControls />
         </aside>
       </div>
       <div className="grid min-h-0 grid-cols-[minmax(0,1.6fr)_minmax(16rem,0.7fr)] gap-0.5 overflow-hidden">
@@ -612,50 +594,174 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
   );
 }
 
-function PtzMobileFullscreen({ ptz, layout, onClose, releasePending = false }) {
-  const landscape = layout === 'mobile-landscape';
-  const topHeightClass = landscape ? 'h-full min-h-[calc(100dvh-0.25rem)]' : 'h-[48dvh]';
-  const topGridClass = landscape
-    ? 'grid-cols-[minmax(0,1fr)_13rem]'
-    : 'grid-cols-[minmax(0,1fr)_11rem]';
-
+function PtzMobileLandscape({ ptz, onClose, releasePending = false }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-0.5">
-      <section className={`mobile-touch-control grid ${topHeightClass} min-h-48 shrink-0 ${topGridClass} gap-0.5`}>
-        <main className="relative min-h-0 overflow-hidden bg-black">
-          <button
-            type="button"
-            className="absolute left-1 top-1 z-50 rounded border border-white/40 bg-black/80 px-2 py-1 text-xs font-semibold text-white shadow disabled:opacity-50"
-            disabled={releasePending}
-            onClick={onClose}
-          >
-            Close
-          </button>
-          <PtzMediaPane ptz={ptz} open framed={false} />
-        </main>
-        <aside className="min-h-0 overflow-y-auto">
+      {/*
+        Landscape intentionally retains one control column beside the video.
+        This is the established PTZ interaction and avoids forcing rover-style
+        left/right columns onto a camera that has a smaller control inventory.
+      */}
+      <section className="mobile-touch-control grid min-h-[calc(100dvh-0.25rem)] shrink-0 grid-cols-[minmax(0,1fr)_13rem] items-start gap-0.5">
+        {/*
+          The video keeps one viewport of height, but the grid row is allowed to
+          grow when the control column is taller. That makes the sidebar's tail
+          extend below the video instead of forcing it into a nested scroller.
+        */}
+        <div className="min-w-0 space-y-0.5">
+          <main className="relative h-[calc(100dvh-0.25rem)] min-h-0 overflow-hidden bg-black">
+            <button
+              type="button"
+              className="absolute left-1 top-1 z-50 rounded border border-white/40 bg-black/80 px-2 py-1 text-xs font-semibold text-white shadow disabled:opacity-50"
+              disabled={releasePending}
+              onClick={onClose}
+            >
+              Close
+            </button>
+            <PtzMediaPane ptz={ptz} open framed={false} />
+          </main>
+          {/*
+            The right control column is naturally taller than the viewport.
+            Placing room controls after the fixed-height video uses that left-
+            column space while the whole landscape page continues scrolling as
+            one surface.
+          */}
+          <HomeAssistantControls />
+        </div>
+        {/*
+          Do not put overflow scrolling on this column. The surrounding PTZ
+          landscape content is the single page scroller, so a swipe over either
+          the video area or these controls advances the same document flow.
+        */}
+        <aside className="min-h-0 space-y-0.5">
+          {/*
+            Landscape keeps all turn-critical controls in its one existing
+            sidebar. Queue position belongs first so the operator can confirm
+            control ownership before touching the camera, while replay follows
+            the lighting buttons because it is the next secondary action in
+            the same scroll column.
+          */}
+          <PtzQueueSummary ptz={ptz} />
           <PtzMobileControlsPanel ptz={ptz} disabled={!ptz?.isOperator} />
+          <ReplaySourcesPanel
+            panelId="ptz-controller-replay-mobile-landscape"
+            defaultSelectedKey={`ptz:${PTZ_CAMERA_ID}`}
+          />
         </aside>
       </section>
       <section className="grid gap-0.5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)]">
         <ChatPanel title="Chat" allowSpectatorInput inputTarget="overlay" />
-        <div className="space-y-0.5">
-          <PtzQueueSummary ptz={ptz} />
-          <PtzPresetPanel ptz={ptz} />
-          <PtzStatePanel ptz={ptz} compact />
-          <ReplaySourcesPanel panelId="ptz-controller-replay-mobile" />
-        </div>
+        <PtzPresetPanel ptz={ptz} />
       </section>
     </div>
   );
 }
 
-export function PtzFullscreenController({ open, onClose, layout = 'desktop' }) {
+function PtzMobilePortrait({ ptz, onClose, releasePending = false }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-0.5">
+      <main className="relative aspect-video min-h-0 shrink-0 overflow-hidden bg-black">
+        <button
+          type="button"
+          className="absolute left-1 top-1 z-50 rounded border border-white/40 bg-black/80 px-2 py-1 text-xs font-semibold text-white shadow disabled:opacity-50"
+          disabled={releasePending}
+          onClick={onClose}
+        >
+          Close
+        </button>
+        <PtzMediaPane ptz={ptz} open framed={false} />
+      </main>
+      {/*
+        Portrait gives the video its full available width and places controls
+        below it. Reusing the landscape sidebar width here was the source of the
+        cramped portrait presentation, while the controls themselves remain the
+        same shared PTZ controls used in landscape.
+      */}
+      <section className="mobile-touch-control">
+        <PtzMobileControlsPanel ptz={ptz} disabled={!ptz?.isOperator} />
+      </section>
+      <section className="space-y-0.5">
+        {/*
+          Replay and presets are compact secondary actions, so portrait places
+          them in one equal-width row before the full-width queue and chat. The
+          explicit two-column grid keeps this arrangement local to portrait and
+          leaves the desktop and one-column landscape compositions unchanged.
+        */}
+        <div className="grid grid-cols-2 items-start gap-0.5">
+          <ReplaySourcesPanel
+            panelId="ptz-controller-replay-mobile-portrait"
+            defaultSelectedKey={`ptz:${PTZ_CAMERA_ID}`}
+          />
+          <PtzPresetPanel ptz={ptz} />
+        </div>
+        <PtzQueueSummary ptz={ptz} />
+        <ChatPanel title="Chat" allowSpectatorInput inputTarget="overlay" />
+        {/* Portrait keeps room controls immediately after chat as requested. */}
+        <HomeAssistantControls />
+      </section>
+    </div>
+  );
+}
+
+export function PtzControllerPage({ layout = 'desktop' }) {
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
-  const { ptzRelease } = useSessionActions();
+  const featureEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'ptzCamera'));
+  const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const socketId = useSessionSelector((state) => state.session?.socketId || null);
+  const { ptzClaim, ptzRelease, pushAlert } = useSessionActions();
   const { stopAllMotion } = useControlActions();
+  const navigate = useNavigate();
   const [releasePending, setReleasePending] = useState(false);
-  const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape';
+  const autoClaimSocketRef = useRef(null);
+  const isMobile = layout !== 'desktop';
+  const canUse = Boolean(ptz?.canUse || isVerified || role === 'admin' || role === 'lockdown');
+
+  useEffect(() => {
+    if (!featureEnabled || !ptz || !socketId || !canUse) return undefined;
+
+    if (ptz.isOperator || ptz.queuedPosition) {
+      /*
+        Navigation from the driver queue normally arrives with membership
+        already established. Mark this socket complete so later session syncs
+        cannot turn that normal route transition into another claim request.
+      */
+      autoClaimSocketRef.current = socketId;
+      return undefined;
+    }
+
+    if (autoClaimSocketRef.current === socketId) return undefined;
+    autoClaimSocketRef.current = socketId;
+    let active = true;
+
+    /*
+      A direct /ptz load still receives the ordinary user role first, which can
+      briefly assign a rover. Claiming through the existing server action is
+      deliberate: ptzCameraService releases that rover ownership before it
+      activates or queues this socket, keeping one authoritative transition.
+
+      The socket-keyed ref suppresses repeats caused by session updates and
+      React's development effect replay. The server claim is also idempotent for
+      an existing operator/queue member, which covers an acknowledgement racing
+      with a fresh public-state sync.
+    */
+    ptzClaim().catch((err) => {
+      if (!active) return;
+      pushAlert({
+        id: `ptz-auto-claim-${socketId}`,
+        title: 'PTZ camera',
+        message: err?.message || 'Unable to join the PTZ queue.',
+        color: '#f59e0b',
+        lifetimeMs: 6000,
+      });
+    });
+
+    return () => {
+      // Do not emit or update UI from a rejected request after this route has
+      // unmounted; the server still owns completion of any request in flight.
+      active = false;
+    };
+  }, [canUse, featureEnabled, ptz, ptzClaim, pushAlert, socketId]);
 
   const releaseAndClose = useCallback(async () => {
     if (releasePending) return;
@@ -666,24 +772,28 @@ export function PtzFullscreenController({ open, onClose, layout = 'desktop' }) {
         running while the server removes this socket from the PTZ queue.
       */
       stopAllMotion?.();
-      await ptzRelease();
-      onClose?.();
+      if (ptz?.isOperator || ptz?.queuedPosition) {
+        await ptzRelease();
+      }
+      navigate('/');
     } finally {
       setReleasePending(false);
     }
-  }, [onClose, ptzRelease, releasePending, stopAllMotion]);
+  }, [navigate, ptz?.isOperator, ptz?.queuedPosition, ptzRelease, releasePending, stopAllMotion]);
 
-  if (!open) return null;
+  if (!featureEnabled) {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center bg-black p-2 text-slate-100">
+        <CardFrame title="PTZ camera" bodyClassName="space-y-1 p-2 text-sm">
+          <p>The PTZ camera is not available.</p>
+          <button type="button" className="button-dark w-full" onClick={() => navigate('/')}>Return to driver page</button>
+        </CardFrame>
+      </main>
+    );
+  }
 
-  const controller = (
-    /*
-      The PTZ controller needs to cover the driver page, but it must not become
-      the top-most application layer. Global fullscreen overlays like help,
-      quickstart, mode gates, and connection warnings are still part of the
-      active app state while PTZ is open, so this portal intentionally sits
-      below their z-30+ overlay stack instead of hiding them.
-    */
-    <div className="fixed inset-0 z-20 h-[100dvh] w-[100vw] overflow-hidden bg-black text-slate-100">
+  return (
+    <main className="h-[100dvh] w-full overflow-hidden bg-black text-slate-100">
       <CardFrame
         title={isMobile ? '' : ptz?.name || 'PTZ Camera'}
         actions={isMobile ? null : (
@@ -698,20 +808,17 @@ export function PtzFullscreenController({ open, onClose, layout = 'desktop' }) {
         bodyClassName="relative min-h-0 flex-1"
       >
         {isMobile ? (
-          <PtzMobileFullscreen
-            ptz={ptz}
-            layout={layout}
-            onClose={releaseAndClose}
-            releasePending={releasePending}
-          />
+          layout === 'mobile-landscape' ? (
+            <PtzMobileLandscape ptz={ptz} onClose={releaseAndClose} releasePending={releasePending} />
+          ) : (
+            <PtzMobilePortrait ptz={ptz} onClose={releaseAndClose} releasePending={releasePending} />
+          )
         ) : (
           <PtzDesktopFullscreen ptz={ptz} releasePending={releasePending} />
         )}
       </CardFrame>
-    </div>
+    </main>
   );
-
-  return createPortal(controller, document.body);
 }
 
 export default function PtzQueueCard({ layout = 'desktop' }) {
@@ -721,10 +828,10 @@ export default function PtzQueueCard({ layout = 'desktop' }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const { ptzClaim, ptzRelease } = useSessionActions();
+  const navigate = useNavigate();
   const lookupUser = usePtzQueueLookup(ptz);
   const { queue, currentId, nextId } = normalizePtzQueue(ptz);
   const now = useSharedClock(1000, Boolean(ptz?.deadline));
-  const [controllerOpen, setControllerOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const canUse = Boolean(ptz?.canUse || isVerified || role === 'admin' || role === 'lockdown');
   const isParticipant = Boolean(ptz?.isOperator || ptz?.queuedPosition);
@@ -735,7 +842,7 @@ export default function PtzQueueCard({ layout = 'desktop' }) {
   const handleRequest = async () => {
     if (!canUse || pending) return;
     if (isParticipant) {
-      setControllerOpen(true);
+      navigate('/ptz');
       return;
     }
     setPending(true);
@@ -748,7 +855,7 @@ export default function PtzQueueCard({ layout = 'desktop' }) {
         dock-guard rejection does not strand the user in fullscreen.
       */
       if (response?.state?.isOperator || response?.state?.queuedPosition) {
-        setControllerOpen(true);
+        navigate('/ptz');
       }
       trackAnalyticsEvent('ptz_queue_join_result', { layout, status: 'accepted' });
     } catch (err) {
@@ -784,8 +891,7 @@ export default function PtzQueueCard({ layout = 'desktop' }) {
     : 'request';
 
   return (
-    <>
-      <CardFrame title={ptz?.name || 'PTZ camera'} bodyClassName="relative space-y-0.5 text-sm">
+    <CardFrame title={ptz?.name || 'PTZ camera'} bodyClassName="relative space-y-0.5 text-sm">
         <ul className="space-y-0.5 text-sm">
           <QueueTargetRow
             target={{
@@ -823,8 +929,6 @@ export default function PtzQueueCard({ layout = 'desktop' }) {
             Verify your account to use the PTZ camera.
           </div>
         ) : null}
-      </CardFrame>
-      <PtzFullscreenController open={controllerOpen} onClose={() => setControllerOpen(false)} layout={layout} />
-    </>
+    </CardFrame>
   );
 }

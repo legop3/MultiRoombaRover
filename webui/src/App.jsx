@@ -52,36 +52,7 @@ import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
 import DuplicateIdentityOverlay from './components/DuplicateIdentityOverlay/index.jsx';
 import { pageBackgroundClass, themeGapClass, themeStackClass } from './themeFlags.js';
 import { trackAnalyticsEvent } from './analytics/index.js';
-
-function useLayoutMode() {
-  const [mode, setMode] = useState(() => {
-    if (typeof window === 'undefined') return 'desktop';
-    return window.innerWidth >= 1024
-      ? 'desktop'
-      : window.innerWidth > window.innerHeight
-      ? 'mobile-landscape'
-      : 'mobile-portrait';
-  });
-
-  useEffect(() => {
-    function updateMode() {
-      if (typeof window === 'undefined') return;
-      const { innerWidth, innerHeight } = window;
-      if (innerWidth >= 1024) {
-        setMode('desktop');
-      } else if (innerWidth > innerHeight) {
-        setMode('mobile-landscape');
-      } else {
-        setMode('mobile-portrait');
-      }
-    }
-    updateMode();
-    window.addEventListener('resize', updateMode);
-    return () => window.removeEventListener('resize', updateMode);
-  }, []);
-
-  return mode;
-}
+import useLayoutMode from './hooks/useLayoutMode.js';
 
 function DesktopLayout({ layout, onOpenHelpOverlay }) {
   return (

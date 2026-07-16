@@ -4,7 +4,7 @@
 // mobile, desktop, and gamepad inputs do not each learn camera-specific rules.
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
-import { useSessionSelector } from '../context/SessionContext.jsx';
+import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 
 const PTZ_STOP = { pan: 0, tilt: 0, zoom: 0 };
 const PTZ_SPEEDS = {
@@ -98,9 +98,12 @@ function nextIrMode(currentMode) {
 
 export function usePtzControlAdapter() {
   const socket = useSocket();
+  const { ptzSpotlight, ptzIr } = useSessionActions();
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isActive = Boolean(ptz?.isOperator);
   const lastMotionSignatureRef = useRef(payloadSignature(PTZ_STOP));
+  const panTiltIntentRef = useRef({ pan: 0, tilt: 0 });
+  const zoomIntentRef = useRef(0);
   const zoomStopTimerRef = useRef(null);
 
   const emitPtz = useCallback(
@@ -116,6 +119,10 @@ export function usePtzControlAdapter() {
       clearTimeout(zoomStopTimerRef.current);
       zoomStopTimerRef.current = null;
     }
+    // A true global stop is used for blur, route close, and control release, so
+    // it deliberately clears every independently tracked PTZ axis intent.
+    panTiltIntentRef.current = { pan: 0, tilt: 0 };
+    zoomIntentRef.current = 0;
     const stopSignature = payloadSignature(PTZ_STOP);
     if (lastMotionSignatureRef.current === stopSignature) return;
     lastMotionSignatureRef.current = stopSignature;
@@ -146,7 +153,20 @@ export function usePtzControlAdapter() {
   const applyDriveVector = useCallback(
     (vector, meta = {}) => {
       if (!isActive) return false;
-      sendMotion(buildPanTiltPayload(vector, meta));
+      const panTilt = buildPanTiltPayload(vector, meta);
+      panTiltIntentRef.current = {
+        pan: panTilt.pan,
+        tilt: panTilt.tilt,
+      };
+      /*
+        ONVIF continuous movement accepts pan, tilt, and zoom in one command.
+        Preserve the current zoom intent when a direction update arrives so a
+        keyboard or touch event on one axis cannot erase another held axis.
+      */
+      sendMotion({
+        ...panTiltIntentRef.current,
+        zoom: zoomIntentRef.current,
+      });
       return true;
     },
     [isActive, sendMotion],
@@ -157,7 +177,17 @@ export function usePtzControlAdapter() {
       if (!isActive) return false;
       const sign = axisSign(direction);
       if (!sign) {
-        stopMotion();
+        if (zoomStopTimerRef.current) {
+          clearTimeout(zoomStopTimerRef.current);
+          zoomStopTimerRef.current = null;
+        }
+        zoomIntentRef.current = 0;
+        /*
+          Releasing zoom must not call the global PTZ stop. Re-emit the retained
+          pan/tilt intent with zoom cleared so a held direction continues
+          immediately instead of waiting for another directional key event.
+        */
+        sendMotion({ ...panTiltIntentRef.current, zoom: 0 }, { force: true });
         return true;
       }
       /*
@@ -166,7 +196,11 @@ export function usePtzControlAdapter() {
         the payload is identical, otherwise holding "camera up" only sends the
         first zoom command and every later nudge is de-duped away.
       */
-      sendMotion({ pan: 0, tilt: 0, zoom: sign * PTZ_SPEEDS.medium }, { force: true });
+      zoomIntentRef.current = sign * PTZ_SPEEDS.medium;
+      sendMotion({
+        ...panTiltIntentRef.current,
+        zoom: zoomIntentRef.current,
+      }, { force: true });
       if (zoomStopTimerRef.current) clearTimeout(zoomStopTimerRef.current);
       /*
         Existing rover camera controls are nudge/slider based, not hold-based.
@@ -175,21 +209,31 @@ export function usePtzControlAdapter() {
       */
       zoomStopTimerRef.current = setTimeout(() => {
         zoomStopTimerRef.current = null;
-        stopMotion();
+        zoomIntentRef.current = 0;
+        // A zoom pulse ending restores, rather than stops, any direction that
+        // is still held in the independent pan/tilt intent.
+        sendMotion({ ...panTiltIntentRef.current, zoom: 0 }, { force: true });
       }, ZOOM_PULSE_MS);
       return true;
     },
-    [isActive, sendMotion, stopMotion],
+    [isActive, sendMotion],
   );
 
   const setSpotlight = useCallback(
     (nextOn) => {
       if (!isActive) return false;
       const desiredOn = typeof nextOn === 'boolean' ? nextOn : !isSpotlightOn(ptz?.light);
-      emitPtz('ptzCamera:spotlight', { state: desiredOn ? 1 : 0 });
+      /*
+        Lighting keybinds should use the exact acknowledged command action as
+        the visible PTZ buttons. Movement remains fire-and-forget because it is
+        continuous and high frequency, but a discrete light toggle benefits
+        from the existing authorization/error contract and must not maintain a
+        second socket-only behavior merely because its source is a keybind.
+      */
+      ptzSpotlight({ state: desiredOn ? 1 : 0 }).catch(() => {});
       return true;
     },
-    [emitPtz, isActive, ptz?.light],
+    [isActive, ptz?.light, ptzSpotlight],
   );
 
   const setIr = useCallback(
@@ -198,15 +242,19 @@ export function usePtzControlAdapter() {
       const desiredState = typeof nextOn === 'boolean'
         ? (nextOn ? 'On' : 'Off')
         : nextIrMode(ptz?.ir?.state);
-      emitPtz('ptzCamera:ir', { state: desiredState });
+      // Match the button path for the same reason as spotlight above. The
+      // shared laser key continues to select IR; only its transport is unified.
+      ptzIr({ state: desiredState }).catch(() => {});
       return true;
     },
-    [emitPtz, isActive, ptz?.ir?.state],
+    [isActive, ptz?.ir?.state, ptzIr],
   );
 
   useEffect(() => {
     if (isActive) return undefined;
     lastMotionSignatureRef.current = payloadSignature(PTZ_STOP);
+    panTiltIntentRef.current = { pan: 0, tilt: 0 };
+    zoomIntentRef.current = 0;
     if (zoomStopTimerRef.current) {
       clearTimeout(zoomStopTimerRef.current);
       zoomStopTimerRef.current = null;

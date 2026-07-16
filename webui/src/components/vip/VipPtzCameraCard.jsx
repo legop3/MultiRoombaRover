@@ -384,7 +384,7 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
         <ChatPanel fillHeight title="Chat" />
       </div>
       <div className="shrink-0">
-        <ReplaySourcesPanel panelId="ptz-controller-replay" />
+        <ReplaySourcesPanel panelId="ptz-controller-replay" defaultSelectedKey={`ptz:${PTZ_CAMERA_ID}`} />
       </div>
       <div className="shrink-0">
         <PtzStatePanel
@@ -410,7 +410,10 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
         <ChatPanel fillHeight title="Chat" />
       </div>
       <div className="shrink-0">
-        <ReplaySourcesPanel panelId="ptz-controller-replay-mobile" />
+        <ReplaySourcesPanel
+          panelId="ptz-controller-replay-mobile"
+          defaultSelectedKey={`ptz:${PTZ_CAMERA_ID}`}
+        />
       </div>
       <div className="shrink-0">
         <PtzStatePanel

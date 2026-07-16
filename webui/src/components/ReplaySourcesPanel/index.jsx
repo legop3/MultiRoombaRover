@@ -35,13 +35,16 @@ function selectedKeysEqual(left, right) {
   return true;
 }
 
-export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHeight = false }) {
+export default function ReplaySourcesPanel({
+  panelId = 'replay-sources',
+  fillHeight = false,
+  defaultSelectedKey = null,
+}) {
   const replaySources = useSessionSelector((state) => state.session?.replaySources ?? []);
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const assignmentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const replayState = useSessionSelector((state) => state.session?.replay || null);
-  const latestReplay = useSessionSelector((state) => state.latestReplay);
   const { triggerReplay } = useSessionActions();
   const sources = useMemo(() => normalizeSources(replaySources || []), [replaySources]);
   const { value: settings, save: saveSettings } = useSettingsNamespace('replaySources', {});
@@ -65,20 +68,35 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
   const activeReplayJob = useSessionSelector((state) => (
     activeJobId ? state.replayJobs?.[activeJobId] || null : null
   ));
-  const latestReplayJobId = latestReplay?.jobId || null;
+  // The job id is deliberately local to this mounted panel. Reading the global
+  // latestReplay value here caused a newly mounted panel to resurrect the last
+  // replay popup even though this panel did not request it. The job record can
+  // remain in shared session state for asynchronous socket updates; selecting
+  // it through this panel-owned id keeps popup ownership and lifetime local.
+  const panelReplay = activeReplayJob?.media || null;
+  const panelReplayJobId = panelReplay?.jobId || null;
   const showPanelReplay = Boolean(
-    latestReplay?.url &&
-    latestReplayJobId &&
-    dismissedPanelReplayId !== latestReplayJobId,
+    panelReplay?.url &&
+    panelReplayJobId &&
+    dismissedPanelReplayId !== panelReplayJobId,
   );
 
-  const defaults = useMemo(() => {
-    const roverId = assignmentRoverId;
-    if (roverId) {
-      return [`rover:${roverId}`];
+  const availableDefaultKey = useMemo(() => {
+    // PTZ layouts provide their camera key explicitly so entering the dedicated
+    // camera page does not inherit the user's assigned rover. Waiting until the
+    // source is actually advertised also handles the initial session load: an
+    // unavailable key is never left selected, but it becomes the default as
+    // soon as the server publishes that replay source.
+    if (defaultSelectedKey && sources.some((source) => source.key === defaultSelectedKey)) {
+      return defaultSelectedKey;
     }
-    return [];
-  }, [assignmentRoverId]);
+    const roverKey = assignmentRoverId ? `rover:${assignmentRoverId}` : null;
+    if (roverKey && sources.some((source) => source.key === roverKey)) {
+      return roverKey;
+    }
+    return null;
+  }, [assignmentRoverId, defaultSelectedKey, sources]);
+  const defaults = useMemo(() => (availableDefaultKey ? [availableDefaultKey] : []), [availableDefaultKey]);
 
   const defaultTitle = useMemo(() => {
     const roverId = assignmentRoverId || null;
@@ -225,9 +243,9 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
       {showPanelReplay ? (
         <div className="absolute bottom-[calc(100%+0.125rem)] left-1/2 z-[70] w-[min(20rem,calc(100vw-1rem))] -translate-x-1/2">
           <ReplayReadyPopup
-            replay={latestReplay}
+            replay={panelReplay}
             variant="floating-panel"
-            onClose={() => setDismissedPanelReplayId(latestReplayJobId)}
+            onClose={() => setDismissedPanelReplayId(panelReplayJobId)}
           />
         </div>
       ) : null}
@@ -260,6 +278,16 @@ export default function ReplaySourcesPanel({ panelId = 'replay-sources', fillHei
                 setTitle(next);
                 setTitleDirty(true);
                 saveSettings((current) => ({ ...(current || {}), [titleSettingKey]: next }));
+              }}
+              onKeyDown={(event) => {
+                // Enter is the keyboard equivalent of clicking Replay. Ignore
+                // composition events so confirming an IME candidate cannot
+                // accidentally submit a replay before the title is complete.
+                // handleReplay remains the single authority for cooldown,
+                // lockdown, busy, and empty-source checks.
+                if (event.key !== 'Enter' || event.nativeEvent?.isComposing) return;
+                event.preventDefault();
+                handleReplay();
               }}
               placeholder={defaultTitle}
               maxLength={120}
