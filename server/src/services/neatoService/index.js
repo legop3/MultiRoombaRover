@@ -8,7 +8,7 @@ const { loadConfig } = require('../../helpers/configLoader');
 const { isFeatureEnabled } = require('../../helpers/features');
 const { isVerified } = require('../verificationService');
 const { getMode, MODES } = require('../modeManager');
-const { isLockdownAdmin } = require('../roleService');
+const { isAdmin, isLockdownAdmin } = require('../roleService');
 const {
   homeAssistantEvents,
   getRawEntitySnapshot,
@@ -269,17 +269,19 @@ function hasVerifiedSockets() {
 
 if (featureEnabled) {
   io.on('connection', (socket) => {
-  function assertLockdownAccess() {
-    if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
-      throw new Error('Server in lockdown');
-    }
+  function assertFeatureAccess() {
+    const mode = getMode();
+    // Neato shares the same public-activity policy as lift: everyone may use
+    // it in open/turns modes, admin mode requires an admin, and lockdown
+    // requires a lockdown admin. This service-level gate protects every socket
+    // action even if a future client bypasses the current UI presentation.
+    if (mode === MODES.ADMIN && !isAdmin(socket)) throw new Error('Admin mode: admins only');
+    if (mode === MODES.LOCKDOWN && !isLockdownAdmin(socket)) throw new Error('Server in lockdown');
   }
 
   socket.on('neato:start', async (_, cb = () => {}) => {
     try {
-      assertLockdownAccess();
-      // Neato commands are public activity features. The lockdown check above
-      // remains the room-wide safety/admin gate when the server is restricted.
+      assertFeatureAccess();
       await startCleaning();
       cb({ success: true });
     } catch (err) {
@@ -289,8 +291,7 @@ if (featureEnabled) {
 
   socket.on('neato:sendHome', async (_, cb = () => {}) => {
     try {
-      assertLockdownAccess();
-      // Keep send-home public for consistency with the rest of the Neato card.
+      assertFeatureAccess();
       await sendHome();
       cb({ success: true });
     } catch (err) {
@@ -300,8 +301,7 @@ if (featureEnabled) {
 
   socket.on('neato:locate', async (_, cb = () => {}) => {
     try {
-      assertLockdownAccess();
-      // Locate is a public activity action; lockdown still blocks it above.
+      assertFeatureAccess();
       await locateRobot();
       cb({ success: true });
     } catch (err) {
@@ -311,9 +311,7 @@ if (featureEnabled) {
 
   socket.on('neato:clearErrors', async (_, cb = () => {}) => {
     try {
-      assertLockdownAccess();
-      // Error clearing is grouped with the public Neato controls so the UI does
-      // not show a button that only some public users can actually run.
+      assertFeatureAccess();
       await clearErrors();
       cb({ success: true });
     } catch (err) {
@@ -323,9 +321,7 @@ if (featureEnabled) {
 
   socket.on('neato:powerCycle', async (_, cb = () => {}) => {
     try {
-      assertLockdownAccess();
-      // Power cycle follows the same public policy as the rest of the card;
-      // operational safety remains controlled by lockdown mode.
+      assertFeatureAccess();
       await powerCycle();
       cb({ success: true });
     } catch (err) {

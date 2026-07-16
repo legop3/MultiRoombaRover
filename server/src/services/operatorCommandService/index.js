@@ -97,8 +97,19 @@ function createCommandHandlers(deps) {
     // light locking belongs here because it can force the physical room lights
     // on and disables ordinary Home Assistant room controls for everyone else.
     const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'lights', 'kick', 'lift', 'neato']);
+    const isAccessModeCommand = commandDefinition?.permission === 'access-mode';
 
-    if (!isAdmin && action !== '' && action !== 'status' && action !== 'help' && action !== 'replay' && action !== 'bridge' && action !== 'goal' && action !== 'reason' && action !== 'verify' && action !== 'deter') {
+    // Feature commands are public activities while access is open or managed
+    // by turns. In admin mode they follow the same admin-only boundary as rover
+    // access, and lockdown continues to require the stricter lockdown role.
+    // Keeping this policy in the shared dispatcher makes web chat and Discord
+    // behave identically instead of each transport interpreting modes itself.
+    if (isAccessModeCommand && mode === MODES.ADMIN && !isAdmin) {
+      await request.reply({ content: 'Admin mode: only admins can run feature commands.', allowedMentions: { parse: [], repliedUser: false } });
+      return;
+    }
+
+    if (!isAccessModeCommand && !isAdmin && action !== '' && action !== 'status' && action !== 'help' && action !== 'replay' && action !== 'bridge' && action !== 'goal' && action !== 'reason' && action !== 'verify' && action !== 'deter') {
       await request.reply({ content: 'Only admins can run that command.', allowedMentions: { parse: [], repliedUser: false } });
       return;
     }

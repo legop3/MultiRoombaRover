@@ -7,7 +7,7 @@ const logger = require('../../globals/logger').child('liftService');
 const { loadConfig } = require('../../helpers/configLoader');
 const { isFeatureEnabled } = require('../../helpers/features');
 const { getMode, MODES } = require('../modeManager');
-const { isLockdownAdmin } = require('../roleService');
+const { isAdmin, isLockdownAdmin } = require('../roleService');
 const {
   homeAssistantEvents,
   getRawEntitySnapshot,
@@ -186,13 +186,20 @@ if (featureEnabled) {
   homeAssistantEvents.on('status', emitUpdate);
 
   io.on('connection', (socket) => {
+    function assertFeatureAccess() {
+      const mode = getMode();
+      // Lift is a public activity feature in open and turns modes. Restricted
+      // access modes mirror the rest of the server: admin mode admits normal
+      // admins, while lockdown admits only the explicitly stronger lockdown
+      // role. Enforcing this in the owning service keeps UI buttons and text
+      // command behavior aligned instead of trusting individual callers.
+      if (mode === MODES.ADMIN && !isAdmin(socket)) throw new Error('Admin mode: admins only');
+      if (mode === MODES.LOCKDOWN && !isLockdownAdmin(socket)) throw new Error('Server in lockdown');
+    }
+
     socket.on('lift:up', async (_, cb = () => {}) => {
       try {
-        if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
-          throw new Error('Server in lockdown');
-        }
-        // Lift movement is now a public activity feature. Lockdown still wins
-        // above because that mode is the global safety/admin gate for the room.
+        assertFeatureAccess();
         const resp = await moveUp(socket.id || 'socket');
         cb({ success: true, ...resp });
       } catch (err) {
@@ -202,11 +209,7 @@ if (featureEnabled) {
 
     socket.on('lift:down', async (_, cb = () => {}) => {
       try {
-        if (getMode() === MODES.LOCKDOWN && !isLockdownAdmin(socket)) {
-          throw new Error('Server in lockdown');
-        }
-        // Public access intentionally mirrors lift:up so both directions share
-        // the same policy and cannot drift into different permission behavior.
+        assertFeatureAccess();
         const resp = await moveDown(socket.id || 'socket');
         cb({ success: true, ...resp });
       } catch (err) {

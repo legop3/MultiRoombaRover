@@ -23,8 +23,8 @@ function buildCommandRegistry(prefix, timeCommand) {
     kick: { category: 'admin', summary: 'Remove a user from their current rover.', usage: [`${prefix} kick <user> [reason]`], access: 'Admin', permission: 'admin' },
     verify: { category: 'admin', summary: 'List or remove verified identities.', usage: [`${prefix} verify list`, `${prefix} verify remove <identity>`], access: 'Lockdown admin', permission: 'lockdown-admin' },
     deter: { category: 'admin', summary: 'List, add, or remove identity deterrence.', usage: [`${prefix} deter list`, `${prefix} deter ban <identity>`, `${prefix} deter unban <identity>`], access: 'Lockdown admin', permission: 'lockdown-admin' },
-    lift: { category: 'features', summary: 'Show or move the lift.', usage: [`${prefix} lift <status|up|down>`], access: 'Admin', permission: 'admin', requiredFeature: 'lift', unavailableLabel: 'Lift' },
-    neato: { category: 'features', summary: 'Show or control Neato.', usage: [`${prefix} neato <status|start|home|locate|clear-errors>`], access: 'Admin', permission: 'admin', requiredFeature: 'neato', unavailableLabel: 'Neato' },
+    lift: { category: 'features', summary: 'Show or move the lift.', usage: [`${prefix} lift <status|up|down>`], access: 'Public unless server access is restricted', permission: 'access-mode', requiredFeature: 'lift', unavailableLabel: 'Lift' },
+    neato: { category: 'features', summary: 'Show or control Neato.', usage: [`${prefix} neato <status|start|home|locate|clear-errors>`], access: 'Public unless server access is restricted', permission: 'access-mode', requiredFeature: 'neato', unavailableLabel: 'Neato' },
     bridge: { category: 'discord', summary: 'Configure this Discord server chat bridge.', usage: [`${prefix} bridge`, `${prefix} bridge here <global|private>`, `${prefix} bridge mode <global|private>`, `${prefix} bridge off`], access: 'Discord server manager' },
   };
 }
