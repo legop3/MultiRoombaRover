@@ -714,8 +714,44 @@ export function PtzControllerPage({ layout = 'desktop' }) {
   const navigate = useNavigate();
   const [releasePending, setReleasePending] = useState(false);
   const autoClaimSocketRef = useRef(null);
+  const routeExitReleaseTimerRef = useRef(null);
+  const participantRef = useRef(false);
+  const closingThroughButtonRef = useRef(false);
   const isMobile = layout !== 'desktop';
   const canUse = Boolean(ptz?.canUse || isVerified || role === 'admin' || role === 'lockdown');
+  const isParticipant = Boolean(ptz?.isOperator || ptz?.queuedPosition);
+
+  useEffect(() => {
+    // Route-exit cleanup runs after the last render, so retain the latest
+    // server-confirmed membership without making the lifecycle effect resubscribe.
+    participantRef.current = isParticipant;
+  }, [isParticipant]);
+
+  useEffect(() => {
+    if (routeExitReleaseTimerRef.current) {
+      clearTimeout(routeExitReleaseTimerRef.current);
+      routeExitReleaseTimerRef.current = null;
+    }
+
+    return () => {
+      if (!participantRef.current || closingThroughButtonRef.current) return;
+      /*
+        Browser Back and route navigation unmount the PTZ page without invoking
+        its Close button. Defer release by one task so React Strict Mode's
+        development-only cleanup/remount cycle can cancel it in the next setup;
+        a real route exit has no replacement setup, so membership is released.
+
+        This is intentionally membership-gated. An admin release command can
+        revoke the current operator even when the admin is not that operator,
+        so an admin merely visiting/leaving a disabled or unjoined page must not
+        emit a release command.
+      */
+      routeExitReleaseTimerRef.current = setTimeout(() => {
+        routeExitReleaseTimerRef.current = null;
+        ptzRelease().catch(() => {});
+      }, 0);
+    };
+  }, [ptzRelease]);
 
   useEffect(() => {
     if (!featureEnabled || !ptz || !socketId || !canUse) return undefined;
@@ -766,6 +802,7 @@ export function PtzControllerPage({ layout = 'desktop' }) {
   const releaseAndClose = useCallback(async () => {
     if (releasePending) return;
     setReleasePending(true);
+    closingThroughButtonRef.current = true;
     try {
       /*
         Stop first so a held key/pointer cannot leave ONVIF continuous movement
@@ -776,6 +813,11 @@ export function PtzControllerPage({ layout = 'desktop' }) {
         await ptzRelease();
       }
       navigate('/');
+    } catch (err) {
+      // A rejected manual release leaves the route mounted, so route-exit
+      // cleanup must remain armed for a later Back/navigation attempt.
+      closingThroughButtonRef.current = false;
+      throw err;
     } finally {
       setReleasePending(false);
     }
