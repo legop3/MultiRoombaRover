@@ -69,11 +69,18 @@ constexpr const char* kBoardBluetoothName = "Nintendo RVL-WBC-01";
 constexpr int kBluetoothProtocolHci = 1;
 constexpr uint16_t kHciChannelControl = 3;
 constexpr uint16_t kHciDeviceNone = 0xffff;
+constexpr uint16_t kMgmtCommandCompleteEvent = 0x0001;
+constexpr uint16_t kMgmtCommandStatusEvent = 0x0002;
+constexpr uint16_t kMgmtNewSettingsEvent = 0x0006;
 constexpr uint16_t kMgmtPinCodeRequestEvent = 0x000e;
 constexpr uint16_t kMgmtPinCodeReplyCommand = 0x0016;
 constexpr uint16_t kMgmtSetConnectableCommand = 0x0007;
+constexpr uint16_t kMgmtSetFastConnectableCommand = 0x0008;
 constexpr uint16_t kPrimaryControllerIndex = 0;
 constexpr uint8_t kBluetoothClassicAddressType = 0;
+constexpr uint32_t kControllerConnectableSetting = 1U << 1;
+constexpr uint32_t kControllerFastConnectableSetting = 1U << 2;
+constexpr int kManagementCommandTimeoutMs = 2000;
 constexpr int kFrameIntervalMs = 50;
 constexpr int kDiscoveryRestartDelayMs = 1000;
 constexpr const char* kDiscoveryTimeoutSeconds = "86400";
@@ -121,6 +128,15 @@ struct RunningCommand {
   int output_fd = -1;
   std::string pending_output;
   std::string transcript;
+};
+
+struct ManagementRuntimeState {
+  // Runtime reassertions are asynchronous so a temporary controller setting
+  // change cannot block PIN or HID handling. Track each outstanding opcode to
+  // avoid submitting the same command repeatedly while BlueZ is acknowledging
+  // the first request.
+  bool connectable_pending = false;
+  bool fast_connectable_pending = false;
 };
 
 uint64_t monotonic_ms() {
@@ -581,22 +597,119 @@ void write_u16_le(uint8_t* output, uint16_t value) {
   output[1] = static_cast<uint8_t>((value >> 8) & 0xff);
 }
 
-bool enable_incoming_connections(int fd) {
-  if (fd < 0) return false;
+uint16_t read_u16_le(const uint8_t* input) {
+  return static_cast<uint16_t>(input[0] | (input[1] << 8));
+}
 
-  // MGMT Set Connectable controls the BR/EDR page scan. Pairable alone does not
-  // imply connectable, so without this command the sleeping board can flash for
-  // several seconds while its incoming page never reaches the L2CAP listener.
-  // This server uses hci0 as its sole Bluetooth controller, represented by
-  // management index zero.
+uint32_t read_u32_le(const uint8_t* input) {
+  return static_cast<uint32_t>(input[0]) |
+      (static_cast<uint32_t>(input[1]) << 8) |
+      (static_cast<uint32_t>(input[2]) << 16) |
+      (static_cast<uint32_t>(input[3]) << 24);
+}
+
+std::string management_status_description(uint8_t status) {
+  // These are the management statuses that setting controller modes can
+  // realistically return. Retain the numeric value as well because it remains
+  // actionable if a newer kernel introduces a status this worker does not yet
+  // name.
+  const char* description = "unknown management status";
+  switch (status) {
+    case 0x00: description = "success"; break;
+    case 0x03: description = "failed"; break;
+    case 0x0a: description = "busy"; break;
+    case 0x0c: description = "not supported"; break;
+    case 0x0d: description = "invalid parameters"; break;
+    case 0x0f: description = "controller not powered"; break;
+    case 0x11: description = "invalid controller index"; break;
+    case 0x14: description = "permission denied"; break;
+  }
+  std::ostringstream result;
+  result << description << " (0x" << std::hex << std::setw(2)
+         << std::setfill('0') << static_cast<int>(status) << ")";
+  return result.str();
+}
+
+bool write_management_boolean_command(int fd, uint16_t opcode, bool enabled) {
+  if (fd < 0) return false;
   constexpr std::size_t header_size = 6;
   std::array<uint8_t, header_size + 1> packet{};
-  write_u16_le(packet.data(), kMgmtSetConnectableCommand);
+  write_u16_le(packet.data(), opcode);
   write_u16_le(packet.data() + 2, kPrimaryControllerIndex);
   write_u16_le(packet.data() + 4, 1);
-  packet[header_size] = 1;
+  packet[header_size] = enabled ? 1 : 0;
   return write(fd, packet.data(), packet.size()) ==
       static_cast<ssize_t>(packet.size());
+}
+
+bool set_management_boolean_and_wait(int fd, uint16_t opcode,
+                                     const std::string& setting_name,
+                                     std::string* error) {
+  if (!write_management_boolean_command(fd, opcode, true)) {
+    if (error) *error = "could not send the " + setting_name + " command: " +
+        std::string(std::strerror(errno));
+    return false;
+  }
+
+  // A successful write only queues a request to the kernel. Wait for the
+  // matching Command Complete/Status event so the worker never advertises a
+  // reliable wake listener when the adapter actually rejected the setting.
+  const uint64_t deadline = monotonic_ms() + kManagementCommandTimeoutMs;
+  while (running.load()) {
+    const uint64_t now = monotonic_ms();
+    if (now >= deadline) break;
+    const int remaining = static_cast<int>(deadline - now);
+    pollfd descriptor{fd, POLLIN, 0};
+    const int ready = poll(&descriptor, 1, std::max(1, remaining));
+    if (ready < 0) {
+      if (errno == EINTR) continue;
+      if (error) *error = "could not wait for the " + setting_name +
+          " response: " + std::string(std::strerror(errno));
+      return false;
+    }
+    if (ready == 0) break;
+
+    std::array<uint8_t, 1024> response{};
+    const ssize_t count = read(fd, response.data(), response.size());
+    if (count < 9) continue;
+    const uint16_t event = read_u16_le(response.data());
+    const uint16_t response_opcode = read_u16_le(response.data() + 6);
+    if ((event != kMgmtCommandCompleteEvent && event != kMgmtCommandStatusEvent) ||
+        response_opcode != opcode) {
+      // Startup occurs before pairing and connection threads exist, so the only
+      // expected extra packet is New Settings generated by the command itself.
+      // The matching completion is still queued immediately after it.
+      continue;
+    }
+
+    const uint8_t status = response[8];
+    if (status == 0) return true;
+    if (error) *error = setting_name + " was rejected: " +
+        management_status_description(status);
+    return false;
+  }
+
+  if (error) *error = "timed out waiting for the " + setting_name + " response";
+  return false;
+}
+
+bool enable_incoming_connections(int fd, std::string* error) {
+  if (fd < 0) {
+    if (error) *error = "management socket is unavailable";
+    return false;
+  }
+
+  // Set Connectable enables the BR/EDR page scan that accepts the board's
+  // incoming front-button connection. Fast Connectable increases the page-scan
+  // duty cycle so the controller can catch the board during its unusually short
+  // one-to-two-second wake attempt. A stationary server can accept the modest
+  // adapter power cost in exchange for reliable unattended operation.
+  if (!set_management_boolean_and_wait(
+          fd, kMgmtSetConnectableCommand, "connectable setting", error)) {
+    return false;
+  }
+  return set_management_boolean_and_wait(
+      fd, kMgmtSetFastConnectableCommand, "fast connectable setting", error);
 }
 
 void answer_pin_request(int fd, uint16_t adapter_index,
@@ -620,16 +733,73 @@ void answer_pin_request(int fd, uint16_t adapter_index,
   }
 }
 
-void process_management_events(int fd, PairingSharedState* shared) {
+void queue_runtime_management_setting(int fd, uint16_t opcode,
+                                      const std::string& setting_name,
+                                      bool* pending) {
+  if (!pending || *pending) return;
+  if (!write_management_boolean_command(fd, opcode, true)) {
+    emit_status("error", "", "Could not restore the Bluetooth " + setting_name +
+        ": " + std::string(std::strerror(errno)));
+    return;
+  }
+  *pending = true;
+}
+
+void process_management_events(int fd, PairingSharedState* shared,
+                               ManagementRuntimeState* management) {
   if (fd < 0) return;
   std::array<uint8_t, 1024> buffer{};
   ssize_t count = 0;
   while ((count = read(fd, buffer.data(), buffer.size())) > 0) {
     if (count < 6) continue;
-    const uint16_t event = static_cast<uint16_t>(buffer[0] | (buffer[1] << 8));
-    const uint16_t adapter_index = static_cast<uint16_t>(buffer[2] | (buffer[3] << 8));
-    const uint16_t payload_size = static_cast<uint16_t>(buffer[4] | (buffer[5] << 8));
+    const uint16_t event = read_u16_le(buffer.data());
+    const uint16_t adapter_index = read_u16_le(buffer.data() + 2);
+    const uint16_t payload_size = read_u16_le(buffer.data() + 4);
     if (count < 6 + payload_size) continue;
+
+    if ((event == kMgmtCommandCompleteEvent || event == kMgmtCommandStatusEvent) &&
+        payload_size >= 3 && management) {
+      const uint16_t opcode = read_u16_le(buffer.data() + 6);
+      const uint8_t status = buffer[8];
+      bool recognized = false;
+      std::string setting_name;
+      if (opcode == kMgmtSetConnectableCommand) {
+        management->connectable_pending = false;
+        recognized = true;
+        setting_name = "connectable setting";
+      } else if (opcode == kMgmtSetFastConnectableCommand) {
+        management->fast_connectable_pending = false;
+        recognized = true;
+        setting_name = "fast connectable setting";
+      }
+      if (recognized && status != 0) {
+        emit_status("error", "", "Bluetooth " + setting_name +
+            " reassertion was rejected: " + management_status_description(status));
+      }
+      continue;
+    }
+
+    if (event == kMgmtNewSettingsEvent && payload_size >= 4 &&
+        adapter_index == kPrimaryControllerIndex && management) {
+      const uint32_t settings = read_u32_le(buffer.data() + 6);
+      // BlueZ or another controller operation can replace the page-scan modes
+      // after worker startup. Reassert only missing modes and let their normal
+      // command responses below report any rejection; pending flags prevent a
+      // burst of New Settings events from queuing duplicate commands.
+      if ((settings & kControllerConnectableSetting) == 0) {
+        queue_runtime_management_setting(
+            fd, kMgmtSetConnectableCommand, "connectable setting",
+            &management->connectable_pending);
+      } else if ((settings & kControllerFastConnectableSetting) == 0) {
+        // Fast Connectable is meaningful only after ordinary Connectable has
+        // taken effect. Sequencing them avoids a transient Busy/Rejected reply
+        // when a controller reset removed both modes at the same time.
+        queue_runtime_management_setting(
+            fd, kMgmtSetFastConnectableCommand, "fast connectable setting",
+            &management->fast_connectable_pending);
+      }
+      continue;
+    }
 
     if (event == kMgmtPinCodeRequestEvent && payload_size >= 8) {
       std::optional<BluetoothAddress> target;
@@ -1129,6 +1299,7 @@ int main() {
 
   const int management_fd = open_management_socket();
   bool bluetooth_startup_ready = true;
+  std::string incoming_connection_error;
   if (management_fd < 0) {
     // The socket now serves both commissioning and front-button wake: it sends
     // the raw six-byte PIN and keeps hci0 connectable for incoming pages. Never
@@ -1137,10 +1308,12 @@ int main() {
     bluetooth_startup_ready = false;
     emit_status("error", configured_address,
                 "Bluetooth management socket unavailable; install the worker capability");
-  } else if (!enable_incoming_connections(management_fd)) {
+  } else if (!enable_incoming_connections(
+                 management_fd, &incoming_connection_error)) {
     bluetooth_startup_ready = false;
     emit_status("error", configured_address,
-                "Could not enable incoming Bluetooth connections on hci0");
+                "Could not enable reliable incoming Bluetooth connections on hci0: " +
+                    incoming_connection_error);
   }
 
   std::thread commission_thread;
@@ -1155,8 +1328,9 @@ int main() {
     emit_status(pairing.commissioning ? "commissioning" : "waiting", configured_address);
   }
 
+  ManagementRuntimeState management;
   while (running.load()) {
-    process_management_events(management_fd, &pairing);
+    process_management_events(management_fd, &pairing, &management);
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 
