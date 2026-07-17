@@ -16,9 +16,6 @@ MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
 SNAPSHOT_DIR="/var/lib/rover-snapshots"
 REPLAY_SEGMENT_DIR="/var/lib/replay-segments"
 KINECT_UDEV_RULE="/etc/udev/rules.d/99-kinect-world.rules"
-BALANCE_BOARD_UDEV_RULE="/etc/udev/rules.d/99-multirover-balance-board.rules"
-BALANCE_BOARD_MODULES_LOAD="/etc/modules-load.d/multirover-balance-board.conf"
-BLUEZ_INPUT_CONFIG="/etc/bluetooth/input.conf"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This installer must be run with sudo/root." >&2
@@ -141,7 +138,8 @@ dnf install -y \
   libfreenect-devel \
   libusb1-devel \
   bluez \
-  crudini \
+  wiiuse \
+  wiiuse-devel \
   libcap >/dev/null
 NODE_BIN="$(command -v node)"
 
@@ -157,17 +155,6 @@ cat > "$KINECT_UDEV_RULE" <<'EOF'
 SUBSYSTEM=="usb", ATTR{idVendor}=="045e", MODE="0666", GROUP="root", TAG+="uaccess"
 EOF
 chmod 644 "$KINECT_UDEV_RULE"
-udevadm control --reload-rules
-
-echo "      Installing Balance Board input rule -> $BALANCE_BOARD_UDEV_RULE"
-cat > "$BALANCE_BOARD_UDEV_RULE" <<EOF
-# hid-wiimote creates a calibrated evdev device specifically for the Balance
-# Board extension. Give only the rover service owner access to that exact input
-# name; the Node process and unrelated local users do not receive broad access
-# to keyboards, mice, or every device in the input group.
-SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="Nintendo Wii Remote Balance Board", OWNER="$TARGET_USER", MODE="0660", TAG+="uaccess"
-EOF
-chmod 644 "$BALANCE_BOARD_UDEV_RULE"
 udevadm control --reload-rules
 
 if [[ ! -f "$CHROMEGTTS_WAV_TEMPLATE" ]]; then
@@ -204,43 +191,10 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
   echo "Copied config.example.yaml to config.yaml; edit it before exposing the service."
 fi
 
-echo "      Configuring BlueZ for the Wii Balance Board"
-for balance_board_module in hidp hid-wiimote; do
-  if ! modinfo "$balance_board_module" >/dev/null 2>&1; then
-    echo "The running kernel does not provide $balance_board_module; install a Fedora kernel with that module." >&2
-    exit 1
-  fi
-done
-
-install -d -m 0755 /etc/bluetooth /etc/modules-load.d
-touch "$BLUEZ_INPUT_CONFIG"
-chmod 0644 "$BLUEZ_INPUT_CONFIG"
-# Balance Board support is a server hardware prerequisite, just like the native
-# worker and udev rule above. Install it every time instead of coupling machine
-# setup to an application setting in config.yaml; that keeps the installer
-# deterministic and lets the feature flag remain a simple runtime UI switch.
-# crudini changes only the two Wii compatibility keys and preserves every other
-# Bluetooth input option already configured by the operator.
-crudini --set "$BLUEZ_INPUT_CONFIG" General UserspaceHID false
-crudini --set "$BLUEZ_INPUT_CONFIG" General ClassicBondedOnly false
-
-# UserspaceHID=false hands the Bluetooth HID channels to the kernel's `hidp`
-# transport, which then creates a HID device for `hid-wiimote` to calibrate.
-# They are separate modules, so load and persist both explicitly; loading only
-# hid-wiimote leaves BlueZ with no kernel transport to create the input socket.
-cat > "$BALANCE_BOARD_MODULES_LOAD" <<'EOF'
-# MultiRoombaRover Wii Balance Board support.
-hidp
-hid-wiimote
-EOF
-chmod 0644 "$BALANCE_BOARD_MODULES_LOAD"
-modprobe hidp
-modprobe hid-wiimote
-
-# BlueZ reads input.conf only at daemon startup. Restart it before the rover
-# service so the required HID mode is active immediately without a reboot.
+# Bluetoothd is still responsible for discovery and the one-time bond. Wiiuse
+# owns the live HID channels, so no kernel HID modules, input.conf edits, or
+# broad /dev/input permission rule are involved in the runtime data path.
 systemctl enable --now bluetooth.service
-systemctl restart bluetooth.service
 
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT

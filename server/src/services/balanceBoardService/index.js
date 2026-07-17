@@ -42,8 +42,9 @@ function roundedWeight(value) {
 }
 
 function rawWeightKg(corners = {}) {
-  // hid-wiimote reports each calibrated load cell in centi-kilograms. The UI
-  // only needs total scale weight, so sum and convert at this single boundary.
+  // The native wiiuse bridge reports each calibrated load cell in
+  // centi-kilograms. The UI only needs total scale weight, so sum and convert
+  // at this single boundary.
   return ['topRight', 'bottomRight', 'topLeft', 'bottomLeft']
     .reduce((total, key) => total + Math.max(0, Number(corners[key]) || 0), 0) / 100;
 }
@@ -107,16 +108,6 @@ function processFrame(message = {}) {
   io.to(FRAME_ROOM).emit('balanceBoard:frame', latestFrame);
 }
 
-function diagnosticDetail(message = {}) {
-  if (message.inputError) return `Input device: ${message.inputError}`;
-  if (message.bluetoothError) return `Bluetooth: ${message.bluetoothError}`;
-  // The native worker now reduces controller events and the matching journal
-  // entry to one concrete stage-specific sentence. Preserve that evidence
-  // verbatim instead of replacing it with generic retry wording here.
-  if (message.reconnectDetail) return String(message.reconnectDetail);
-  return 'Press the front power button. The server will keep trying to connect.';
-}
-
 function handleWorkerMessage(message = {}) {
   if (message.type === 'frame') {
     processFrame(message);
@@ -131,24 +122,6 @@ function handleWorkerMessage(message = {}) {
     }
     hardware?.setAddress(address);
     updateStatus('connecting', 'Paired. Connecting to the board now.');
-    return;
-  }
-
-  if (message.type === 'diagnostics') {
-    const bluetoothConnected = Boolean(message.bluetooth?.connected);
-    const inputReady = message.inputState === 'ready';
-    const reconnectStage = String(message.reconnectStage || 'waiting');
-    if (bluetoothConnected && inputReady) {
-      updateStatus('connected', 'Connected. Waiting for weight readings.');
-    } else if (bluetoothConnected) {
-      updateStatus('connecting', message.inputError || 'Bluetooth connected. Waiting for the input device.');
-    } else if (reconnectStage === 'input-failed' || reconnectStage === 'connection-failed') {
-      connected = false;
-      updateStatus('connection-failed', diagnosticDetail(message));
-    } else if (store.address) {
-      connected = false;
-      updateStatus('waiting', diagnosticDetail(message));
-    }
     return;
   }
 
@@ -169,7 +142,11 @@ function handleWorkerMessage(message = {}) {
     connected = false;
     // A controller connection proves the physical board answered, but Bluetooth
     // does not identify which physical button woke it. Keep the message exact.
-    updateStatus('connecting', 'Board responded. Bluetooth connected; creating the input device.');
+    updateStatus('connecting', 'Board responded. Reading its sensor calibration.');
+  } else if (workerState === 'connection-failed') {
+    connected = false;
+    latestFrame = null;
+    updateStatus('connection-failed', message.error || 'The direct Balance Board connection failed.');
   } else if (workerState === 'waiting') {
     connected = false;
     latestFrame = null;

@@ -1,11 +1,12 @@
 CXX ?= g++
 
-# The bridge deliberately uses the stable Linux input and Bluetooth management
-# ABIs directly. Keeping it free of third-party libraries makes installation on
-# the Fedora server predictable and avoids binding the rover service to an old
-# Wii-specific userspace package.
+# Wiiuse owns the Balance Board's HID control/interrupt channels and applies the
+# calibration stored in the board. This deliberately avoids BlueZ's generic HID
+# profile: current BlueZ requests medium link security for a bonded board, and
+# the original Balance Board rejects that negotiation before an input device is
+# created.
 CXXFLAGS ?= -O2 -std=c++17 -Wall -Wextra -pedantic
-LDLIBS += -pthread
+LDLIBS += -lwiiuse -lbluetooth -pthread
 
 TARGET := balance_board_worker
 SRC := balance_board_worker.cpp
