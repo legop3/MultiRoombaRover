@@ -231,7 +231,7 @@ export function TelemetryProvider({ children }) {
   );
 
   useEffect(() => {
-    function handleSensorFrame({ roverId, sensors = {}, frame = {} }) {
+    function handleSensorFrame({ roverId, sensors = {}, frame = {}, overcurrentProtection = null }) {
       if (!roverId) return;
       const previous = framesRef.current[roverId] ?? {};
       framesRef.current = {
@@ -240,6 +240,10 @@ export function TelemetryProvider({ children }) {
           ...previous,
           roverId,
           sensors,
+          // Protection is server-calculated policy state, not a native Roomba
+          // sensor. Keeping it beside `sensors` preserves that distinction while
+          // allowing selectors to read one coherent telemetry snapshot.
+          overcurrentProtection,
           raw: frame?.data || null,
           receivedAt: Date.now(),
         },

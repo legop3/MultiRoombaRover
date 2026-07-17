@@ -9,6 +9,7 @@ const { isDeterred } = require('../verificationService');
 const logger = require('../../globals/logger').child('commandService');
 const { isHeadlightBlocked } = require('../../rewards/definitions/darkness');
 const homeAssistantService = require('../homeAssistantService');
+const overcurrentProtectionService = require('../overcurrentProtectionService');
 
 const pendingCommands = new Map(); // id -> { roverId }
 const lastDriveActivity = new Map(); // roverId -> { ts, socketId, direction, speed, isAdmin }
@@ -92,6 +93,31 @@ function issueCommand(roverId, payload) {
   logger.info('Issued command', roverId, normalizedPayload.type, id);
   return id;
 }
+
+/*
+  The protection service owns decisions about when a held command must be
+  resent at a lower output. Injecting this raw transport function keeps those
+  resends on the same rover websocket path as every other server command while
+  avoiding a circular dependency from the protection service back into this
+  socket-facing module.
+*/
+overcurrentProtectionService.configureCommandIssuer((roverId, payload) => {
+  const blockedUntil = driveCooldowns.get(roverId);
+  const safetyCooldownActive = blockedUntil && Date.now() < blockedUntil;
+  if (safetyCooldownActive && getCommandMotionMagnitude(payload?.type, payload) > 0) {
+    /*
+      Private-rover and dock safety own the existing command cooldown map. A
+      rate-limited protection resend must respect those independent systems;
+      otherwise this new service could restart drive or brushes immediately
+      after an unrelated safety feature deliberately stopped them. Returning
+      false tells the protection service to retry after the cooldown instead of
+      recording an output that never reached the rover.
+    */
+    return false;
+  }
+  issueCommand(roverId, payload);
+  return true;
+});
 
 function handleAck(msg) {
   const pending = pendingCommands.get(msg.id);
@@ -226,7 +252,7 @@ io.on('connection', (socket) => {
       if (type === 'audioLevels') {
         throw new Error('audioLevels command is service-managed');
       }
-      const payload = data ? { ...data } : {};
+      let payload = data ? { ...data } : {};
       if (type === 'headlight' && isHeadlightBlocked()) {
         logger.info('Ignoring headlight command while darkness lock is active', { socketId: socket.id, roverId });
         reply({ ignored: true, reason: 'darknessActive' });
@@ -290,6 +316,19 @@ io.on('connection', (socket) => {
             isAdmin: isAdminSocket,
           });
         }
+      }
+
+      if (type === 'drive' || type === 'motors') {
+        /*
+          Role is supplied at the command boundary because telemetry does not
+          identify the operator who produced the active motor intent. Admin and
+          lockdown commands therefore enter the service explicitly bypassed;
+          they are recorded for status visibility but are never scaled, blocked,
+          or countermanded by a later sensor frame.
+        */
+        payload = overcurrentProtectionService.protectCommand(roverId, type, payload, {
+          bypassed: isAdminSocket,
+        });
       }
       const id = issueCommand(roverId, { type, ...payload });
       logger.info('Queued command', socket.id, roverId, type);

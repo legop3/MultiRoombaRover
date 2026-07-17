@@ -1,8 +1,9 @@
-// Overcurrent Limiter Hook/Utility
-// Purpose: Applies client-side overcurrent guard logic to reduce harmful command spikes. Scope: Tracks limiter state and exposes gated dispatch behavior to controls.
-import { useEffect, useMemo, useRef, useState } from 'react';
+// Overcurrent Protection View Hook
+// Purpose: Adapts server-authoritative protection telemetry for existing control and HUD consumers.
+// Scope: Contains no protection timers or command scaling; enforcement belongs exclusively to the server service.
+
+import { useMemo } from 'react';
 import { useTelemetrySelector } from '../context/TelemetryContext.jsx';
-import { overcurrentFlagsEqual, selectOvercurrentFlags } from '../context/telemetryViews.js';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 
 export const OVERCURRENT_GROUPS = [
@@ -10,189 +11,62 @@ export const OVERCURRENT_GROUPS = [
   { key: 'aux', motors: ['mainBrush', 'sideBrush'] },
 ];
 
-export const DEFAULT_OVERCURRENT_LIMITS = {
-  downRatePerSec: 0.4,
-  upRatePerSec: 0.5,
-  releaseDelaySec: 2.5,
-  outputRateMs: 250,
-};
+const EMPTY_PROTECTION = Object.freeze({
+  status: 'idle',
+  bypassed: false,
+  drive: Object.freeze({ cap: 1, blocked: false, requiresNeutral: false, stopReason: null }),
+  motors: Object.freeze({}),
+  config: Object.freeze({}),
+});
 
-const RECOVERED_CAP_THRESHOLD = 0.999;
-
-function createInitialCaps() {
-  return OVERCURRENT_GROUPS.reduce((acc, group) => {
-    acc[group.key] = { cap: 1, clearSec: 0 };
-    return acc;
-  }, {});
+function selectOvercurrentProtection(frame) {
+  return frame?.overcurrentProtection || EMPTY_PROTECTION;
 }
 
-function clampUnit(value) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(1, value));
-}
-
-export function useOvercurrentLimiter(roverId, options = {}) {
+export function useOvercurrentLimiter(roverId) {
   const role = useSessionSelector((state) => state.session?.role || null);
-  const overcurrentFlags = useTelemetrySelector(roverId, selectOvercurrentFlags, overcurrentFlagsEqual);
-  const config = useMemo(
-    () => ({ ...DEFAULT_OVERCURRENT_LIMITS, ...(options.config || {}) }),
-    [options.config],
-  );
-  const [caps, setCaps] = useState(() => createInitialCaps());
-  const lastTickRef = useRef(0);
-  const flagsRef = useRef(overcurrentFlags);
-
-  useEffect(() => {
-    flagsRef.current = overcurrentFlags || {};
-  }, [overcurrentFlags]);
-
-  useEffect(() => {
-    setCaps(createInitialCaps());
-    lastTickRef.current = 0;
-  }, [roverId]);
-
-  const hasAnyOvercurrent = useMemo(
-    () => OVERCURRENT_GROUPS.some((group) => group.motors.some((motor) => Boolean(overcurrentFlags?.[motor]))),
-    [overcurrentFlags],
-  );
-  const needsRecoveryTick = useMemo(
-    () =>
-      Object.values(caps || {}).some((entry) => {
-        /*
-          Recovery intentionally completes at a tiny tolerance below exactly 1.
-          The limiter advances in timed floating-point steps, so requiring an
-          exact 1 can strand the UI at a visually empty bar while the limiter is
-          still technically active at a value like 0.9992.
-        */
-        const cap = Number.isFinite(entry?.cap) ? entry.cap : 1;
-        return cap < RECOVERED_CAP_THRESHOLD;
-      }),
-    [caps],
-  );
-  const shouldTick = Boolean(roverId) && (hasAnyOvercurrent || needsRecoveryTick);
-
-  useEffect(() => {
-    if (!shouldTick) return undefined;
-    lastTickRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const interval = setInterval(() => {
-      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      const deltaMs = Math.max(0, now - lastTickRef.current);
-      lastTickRef.current = now;
-      const deltaSec = Math.min(0.25, deltaMs / 1000);
-      if (deltaSec <= 0) return;
-      setCaps((prev) => {
-        let changed = false;
-        const next = {};
-        const downRate = Number.isFinite(config.downRatePerSec) ? Math.max(0, config.downRatePerSec) : 0;
-        const upRate = Number.isFinite(config.upRatePerSec) ? Math.max(0, config.upRatePerSec) : 0;
-        const releaseDelay = Number.isFinite(config.releaseDelaySec) ? Math.max(0, config.releaseDelaySec) : 0;
-        OVERCURRENT_GROUPS.forEach((group) => {
-          const prevEntry = prev[group.key] || { cap: 1, clearSec: 0 };
-          const prevCap = Number.isFinite(prevEntry.cap) ? prevEntry.cap : 1;
-          const prevClear = Number.isFinite(prevEntry.clearSec) ? prevEntry.clearSec : 0;
-          const over = group.motors.some((motor) => Boolean(flagsRef.current?.[motor]));
-          const nextClear = over ? 0 : prevClear + deltaSec;
-          const allowRecover = !over && nextClear >= releaseDelay;
-          const rawNextCap = clampUnit(
-            over ? prevCap - downRate * deltaSec : allowRecover ? prevCap + upRate * deltaSec : prevCap,
-          );
-          /*
-            Once recovery reaches the shared completion threshold, snap the cap
-            to exactly full strength. This keeps the tick loop, command scaling,
-            and HUD visibility from disagreeing over a harmless fractional tail.
-          */
-          const nextCap = !over && rawNextCap >= RECOVERED_CAP_THRESHOLD ? 1 : rawNextCap;
-          if (Math.abs(nextCap - prevCap) > 0.0001 || Math.abs(nextClear - prevClear) > 0.0001) {
-            changed = true;
-          }
-          next[group.key] = { cap: nextCap, clearSec: nextClear };
-        });
-        return changed ? next : prev;
-      });
-    }, 100);
-    return () => clearInterval(interval);
-  }, [config.downRatePerSec, config.releaseDelaySec, config.upRatePerSec, roverId, shouldTick]);
-
-  const scales = useMemo(() => {
-    const perGroup = OVERCURRENT_GROUPS.reduce((acc, group) => {
-      const entry = caps?.[group.key];
-      const cap = Number.isFinite(entry?.cap) ? entry.cap : 1;
-      acc[group.key] = clampUnit(cap);
-      return acc;
-    }, {});
-    return {
-      perGroup,
-      drive: {
-        left: perGroup.drive ?? 1,
-        right: perGroup.drive ?? 1,
-      },
-      aux: {
-        main: perGroup.aux ?? 1,
-        side: perGroup.aux ?? 1,
-        vacuum: 1,
-      },
-    };
-  }, [caps]);
-
-  const overcurrent = useMemo(() => {
-    const motors = {};
-    OVERCURRENT_GROUPS.forEach((group) => {
-      group.motors.forEach((motor) => {
-        motors[motor] = Boolean(overcurrentFlags?.[motor]);
-      });
-    });
-    const groups = OVERCURRENT_GROUPS.reduce((acc, group) => {
-      acc[group.key] = group.motors.some((motor) => Boolean(overcurrentFlags?.[motor]));
-      return acc;
-    }, {});
-    return { motors, groups };
-  }, [overcurrentFlags]);
-
+  const protection = useTelemetrySelector(roverId, selectOvercurrentProtection);
   const adminImmune = role === 'admin' || role === 'lockdown';
 
-  return useMemo(
-    () => ({
-      caps,
-      overcurrent,
-      scales,
-      /*
-        HUD and resend behavior should only remain active while the limiter has
-        meaningful scale left to recover. Using the same threshold as the tick
-        loop prevents an empty overcurrent overlay from staying mounted after
-        recovery has already stopped.
-      */
-      isActive:
-        (scales?.drive?.left ?? 1) < RECOVERED_CAP_THRESHOLD ||
-        (scales?.drive?.right ?? 1) < RECOVERED_CAP_THRESHOLD ||
-        (scales?.aux?.main ?? 1) < RECOVERED_CAP_THRESHOLD ||
-        (scales?.aux?.side ?? 1) < RECOVERED_CAP_THRESHOLD,
-      config,
+  return useMemo(() => {
+    const motors = protection?.motors || {};
+    const driveCap = Number.isFinite(protection?.drive?.cap) ? protection.drive.cap : 1;
+    const mainCap = Number.isFinite(motors?.mainBrush?.cap) ? motors.mainBrush.cap : 1;
+    const sideCap = Number.isFinite(motors?.sideBrush?.cap) ? motors.sideBrush.cap : 1;
+    const auxCap = Math.min(mainCap, sideCap);
+    const motorFlags = OVERCURRENT_GROUPS.reduce((result, group) => {
+      group.motors.forEach((motor) => {
+        result[motor] = Boolean(motors?.[motor]?.overcurrent);
+      });
+      return result;
+    }, {});
+    const groupFlags = OVERCURRENT_GROUPS.reduce((result, group) => {
+      result[group.key] = group.motors.some((motor) => motorFlags[motor]);
+      return result;
+    }, {});
+
+    /*
+      The compatibility-shaped fields keep existing control-context consumers
+      simple while every value now comes from the same server snapshot. There
+      is deliberately no local recovery loop: a stale or disconnected browser
+      must never invent a safer state than the server actually calculated.
+    */
+    return {
+      ...protection,
+      caps: {
+        drive: { cap: driveCap },
+        aux: { cap: auxCap },
+      },
+      scales: {
+        perGroup: { drive: driveCap, aux: auxCap },
+        drive: { left: driveCap, right: driveCap },
+        aux: { main: mainCap, side: sideCap, vacuum: 1 },
+      },
+      overcurrent: { motors: motorFlags, groups: groupFlags },
+      isActive: protection?.status === 'limiting'
+        || protection?.status === 'stopped'
+        || protection?.status === 'recovering',
       adminImmune,
-    }),
-    [caps, overcurrent, scales, config, adminImmune],
-  );
-}
-
-export function applyDriveOvercurrentScale(speeds = {}, scales, adminImmune = false) {
-  if (adminImmune || !scales?.drive) return speeds;
-  const leftScale = typeof scales.drive.left === 'number' ? scales.drive.left : 1;
-  const rightScale = typeof scales.drive.right === 'number' ? scales.drive.right : 1;
-  if (leftScale >= 0.999 && rightScale >= 0.999) return speeds;
-  return {
-    left: Math.round((speeds.left ?? 0) * leftScale),
-    right: Math.round((speeds.right ?? 0) * rightScale),
-  };
-}
-
-export function applyAuxOvercurrentScale(values = {}, scales, adminImmune = false) {
-  if (adminImmune || !scales?.aux) return values;
-  const mainScale = typeof scales.aux.main === 'number' ? scales.aux.main : 1;
-  const sideScale = typeof scales.aux.side === 'number' ? scales.aux.side : 1;
-  const vacuumScale = typeof scales.aux.vacuum === 'number' ? scales.aux.vacuum : 1;
-  if (mainScale >= 0.999 && sideScale >= 0.999 && vacuumScale >= 0.999) return values;
-  return {
-    main: Math.round((values.main ?? 0) * mainScale),
-    side: Math.round((values.side ?? 0) * sideScale),
-    vacuum: Math.round((values.vacuum ?? 0) * vacuumScale),
-  };
+    };
+  }, [adminImmune, protection]);
 }

@@ -31,6 +31,7 @@ function createSensorPipeline(deps) {
     sendAlert,
     publishEvent,
     processOdometerFrame,
+    processOvercurrentTelemetry,
     isPrivateRecord,
     isPrivateOpen,
     getPrivateSafety,
@@ -551,6 +552,19 @@ function createSensorPipeline(deps) {
       };
       record.lastSensor = { raw: frame, decoded };
     }
+    /*
+      Rover manager remains responsible only for decoding and routing sensor
+      frames. The dedicated service receives the completed sensor object after
+      odometry has added measured wheel speeds, because requested-versus-actual
+      motion is the evidence that distinguishes a transient current spike from
+      a mechanically stalled wheel.
+    */
+    // Use server arrival time inside the service rather than the Pi timestamp.
+    // Raspberry Pi clocks can differ across the fleet, while command resend
+    // throttling is also measured on this server and needs one clock domain.
+    const overcurrentProtection = decoded && typeof processOvercurrentTelemetry === 'function'
+      ? processOvercurrentTelemetry(roverId, decoded)
+      : null;
     updateMovement(record, decoded);
     const hasDockInfo = decoded?.chargingSources != null;
     if (hasDockInfo) {
@@ -563,8 +577,18 @@ function createSensorPipeline(deps) {
     if (bumps?.bumpLeft || bumps?.bumpRight) record.lastBumpAt = Date.now();
     handlePrivateButtonHold(record, decoded);
     evaluatePrivateSafety(record, decoded);
-    io.to(record.room).volatile.emit('sensorFrame', { roverId, frame, sensors: decoded });
-    managerEvents.emit('sensor', { roverId, sensors: decoded, batteryState: record.batteryState });
+    io.to(record.room).volatile.emit('sensorFrame', {
+      roverId,
+      frame,
+      sensors: decoded,
+      overcurrentProtection,
+    });
+    managerEvents.emit('sensor', {
+      roverId,
+      sensors: decoded,
+      batteryState: record.batteryState,
+      overcurrentProtection,
+    });
     evaluateDockGuard(record, decoded);
   }
 

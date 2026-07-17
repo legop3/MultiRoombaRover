@@ -6,6 +6,7 @@ const logger = require('../../globals/logger').child('roverManager');
 const { sendAlert } = require('../alertService');
 const { parseSensorFrame } = require('../../helpers/sensorDecoder');
 const odometerService = require('../odometerService');
+const overcurrentProtectionService = require('../overcurrentProtectionService');
 const { MODES, getMode } = require('../modeManager');
 const { isAdmin, isLockdownAdmin, roleEvents } = require('../roleService');
 const { publishEvent } = require('../eventBus');
@@ -179,6 +180,7 @@ const sensorPipeline = createSensorPipeline({
   sendAlert,
   publishEvent,
   processOdometerFrame: odometerService.processSensorFrame,
+  processOvercurrentTelemetry: overcurrentProtectionService.processTelemetry,
   isPrivateRecord,
   isPrivateOpen,
   getPrivateSafety,
@@ -189,6 +191,18 @@ const sensorPipeline = createSensorPipeline({
 
 const { handleSensorFrame, applyPrivateDriveSafety } = sensorPipeline;
 stopDockGuard = sensorPipeline.stopDockGuard;
+
+managerEvents.on('rover', ({ roverId, action }) => {
+  /*
+    Protection state contains the last motor intent for a specific physical
+    rover connection. Removing it with the roster record prevents a reconnect
+    from inheriting stale stress, an old administrator bypass, or a neutral
+    requirement from the previous connection.
+  */
+  if (action === 'removed') {
+    overcurrentProtectionService.cleanupRover(roverId);
+  }
+});
 
 function removeSocket(socket) {
   roverLifecycle.removeSocket(socket, disableSpectator);

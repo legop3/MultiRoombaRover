@@ -30,11 +30,7 @@ import { canonicalizeKeyInput } from './keymapUtils.js';
 import { useSettingsNamespace } from '../settings/index.js';
 import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 import { HORN_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
-import {
-  applyAuxOvercurrentScale,
-  applyDriveOvercurrentScale,
-  useOvercurrentLimiter,
-} from './overcurrentLimiter.js';
+import { useOvercurrentLimiter } from './overcurrentLimiter.js';
 import { usePtzControlAdapter } from './ptzControlAdapter.js';
 
 const ControlSystemContext = createContext(null);
@@ -176,15 +172,13 @@ export function ControlSystemProvider({ children }) {
   );
   const { homeAssistantSetState } = useSessionActions();
   const overcurrentLimiter = useOvercurrentLimiter(roverId);
-  const driveTransform = useCallback(
-    (speeds) => applyDriveOvercurrentScale(speeds, overcurrentLimiter.scales, overcurrentLimiter.adminImmune),
-    [overcurrentLimiter.adminImmune, overcurrentLimiter.scales],
-  );
-  const auxTransform = useCallback(
-    (values) => applyAuxOvercurrentScale(values, overcurrentLimiter.scales, overcurrentLimiter.adminImmune),
-    [overcurrentLimiter.adminImmune, overcurrentLimiter.scales],
-  );
-  const pipeline = useCommandPipeline({ driveTransform, auxTransform });
+  /*
+    Motor commands now remain raw until they reach the server-owned protection
+    service. Applying another transform here would make non-admin commands pass
+    through two independent limiters and would let browser lifecycle determine
+    whether protection exists at all.
+  */
+  const pipeline = useCommandPipeline();
   const ptzControls = usePtzControlAdapter();
 
   const turnOnAllLights = useCallback(() => {
@@ -287,39 +281,6 @@ export function ControlSystemProvider({ children }) {
   const recordControlIntent = useCallback(() => {
     dispatch({ type: 'control/record-intent' });
   }, []);
-
-  const driveSpeedsRef = useRef(state.drive.speeds);
-  const auxValuesRef = useRef(state.aux);
-  const limiterScaleToken = useMemo(() => JSON.stringify(overcurrentLimiter.scales), [overcurrentLimiter.scales]);
-  const limiterDriveSentAtRef = useRef(0);
-  const limiterAuxSentAtRef = useRef(0);
-
-  useEffect(() => {
-    driveSpeedsRef.current = state.drive.speeds;
-  }, [state.drive.speeds]);
-
-  useEffect(() => {
-    auxValuesRef.current = state.aux;
-  }, [state.aux]);
-
-  useEffect(() => {
-    if (!pipeline.roverId || overcurrentLimiter.adminImmune || !overcurrentLimiter.isActive) return;
-    const outputRateMs = Math.max(0, Number(overcurrentLimiter?.config?.outputRateMs) || 0);
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const drive = driveSpeedsRef.current || { left: 0, right: 0 };
-    const aux = auxValuesRef.current || { main: 0, side: 0, vacuum: 0 };
-    const driveActive = Boolean(drive.left || drive.right);
-    const auxActive = Boolean(aux.main || aux.side || aux.vacuum);
-    if (!driveActive && !auxActive) return;
-    if (driveActive && now - limiterDriveSentAtRef.current >= outputRateMs) {
-      limiterDriveSentAtRef.current = now;
-      pipeline.sendDriveDirect(drive);
-    }
-    if (auxActive && now - limiterAuxSentAtRef.current >= outputRateMs) {
-      limiterAuxSentAtRef.current = now;
-      pipeline.sendAuxMotors(aux);
-    }
-  }, [limiterScaleToken, overcurrentLimiter.adminImmune, overcurrentLimiter.config, overcurrentLimiter.isActive, pipeline]);
 
   const setDriveVector = useCallback(
     (vector, meta = {}) => {

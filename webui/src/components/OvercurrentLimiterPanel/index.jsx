@@ -1,14 +1,15 @@
-// Overcurrent Limiter Panel
-// Purpose: Defines the Overcurrent Limiter Panel module and the local helpers/components used in this file.
-// Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useMemo } from 'react';
+// Overcurrent Protection Panel
+// Purpose: Presents detailed server-calculated motor stress and command-tracking diagnostics.
+// Scope: Read-only status surface for the assigned rover; protection and recovery remain server-owned.
+
 import { useControlSelector } from '../../controls/index.js';
-import { OVERCURRENT_GROUPS } from '../../controls/overcurrentLimiter.js';
 import CardFrame from '../CardFrame/index.jsx';
 
-const GROUP_LABELS = {
-  drive: 'Drive wheels',
-  aux: 'Aux motors',
+const MOTOR_LABELS = {
+  leftWheel: 'Left wheel',
+  rightWheel: 'Right wheel',
+  mainBrush: 'Main brush',
+  sideBrush: 'Side brush',
 };
 
 function formatPct(value) {
@@ -16,8 +17,13 @@ function formatPct(value) {
   return `${Math.round(value * 100)}%`;
 }
 
+function formatSpeed(value) {
+  if (!Number.isFinite(value)) return '--';
+  return `${Math.round(value)} mm/s`;
+}
+
 function ProgressBar({ value, color = 'bg-emerald-500' }) {
-  const width = `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
+  const width = `${Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100)}%`;
   return (
     <div className="h-2 w-full overflow-hidden rounded bg-slate-800">
       <div className={`h-full ${color}`} style={{ width }} />
@@ -25,51 +31,72 @@ function ProgressBar({ value, color = 'bg-emerald-500' }) {
   );
 }
 
+function statusLabel(protection) {
+  if (protection?.adminImmune) return 'Admin bypass';
+  if (protection?.status === 'stopped') return 'Drive stopped';
+  if (protection?.status === 'limiting') return 'Limiting';
+  if (protection?.status === 'recovering') return 'Recovering';
+  return 'Ready';
+}
+
 export default function OvercurrentLimiterPanel() {
   const roverId = useControlSelector((control) => control.state.roverId);
-  const overcurrentLimiter = useControlSelector((control) => control.overcurrentLimiter);
-  const groups = useMemo(() => OVERCURRENT_GROUPS.map((group) => group.key), []);
+  const protection = useControlSelector((control) => control.overcurrentLimiter);
+  const motors = protection?.motors || {};
 
   return (
     <CardFrame
-      title="Overcurrent limiter"
-      meta={overcurrentLimiter?.adminImmune ? 'Admin immune' : 'Active'}
-      bodyClassName="space-y-0.5 text-sm"
+      title="Overcurrent protection"
+      meta={statusLabel(protection)}
+      bodyClassName="space-y-1 text-sm"
     >
       {!roverId ? (
-        <p className="text-xs text-slate-500">Assign a rover to view limiter status.</p>
+        <p className="text-xs text-slate-500">Assign a rover to view protection status.</p>
       ) : (
-        <div className="space-y-0.5">
-          {groups.map((key) => {
-            const cap = overcurrentLimiter?.caps?.[key]?.cap ?? 0;
-            const over = overcurrentLimiter?.overcurrent?.groups?.[key] ?? false;
-            const scale = overcurrentLimiter?.scales?.perGroup?.[key] ?? 1;
+        <div className="space-y-1">
+          {Object.entries(MOTOR_LABELS).map(([key, label]) => {
+            const motor = motors[key] || {};
+            const wheel = key === 'leftWheel' || key === 'rightWheel';
             return (
-              <div key={key} className="space-y-0.5">
+              <div key={key} className="space-y-0.5 border-b border-slate-800 pb-1 last:border-0">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-200">{GROUP_LABELS[key] || key}</span>
-                  <span className={over ? 'text-red-300' : 'text-slate-400'}>
-                    {over ? 'overcurrent' : 'ok'}
+                  <span className="text-slate-200">{label}</span>
+                  <span className={motor.overcurrent ? 'text-red-300' : 'text-slate-400'}>
+                    {motor.overcurrent ? 'Overcurrent' : 'Clear'}
                   </span>
                 </div>
-                <div className="space-y-0.5">
-                  <div className="flex items-center justify-between text-[0.7rem] text-slate-400">
-                    <span>Cap</span>
-                    <span>{formatPct(cap)}</span>
-                  </div>
-                  <ProgressBar value={cap} color="bg-amber-500" />
-                  <div className="flex items-center justify-between text-[0.7rem] text-slate-400">
-                    <span>Scale</span>
-                    <span>{formatPct(scale)}</span>
-                  </div>
+                <div className="flex items-center justify-between text-[0.7rem] text-slate-400">
+                  <span>Stress {formatPct(motor.stress)}</span>
+                  <span>Output {formatPct(motor.cap)}</span>
                 </div>
+                <ProgressBar
+                  value={motor.stress}
+                  color={motor.overcurrent ? 'bg-red-500' : 'bg-amber-500'}
+                />
+                {wheel ? (
+                  <div className="grid grid-cols-3 gap-1 text-[0.65rem] text-slate-500">
+                    <span>{`Command ${formatSpeed(Math.abs(Number(motor.commandedSpeed)))}`}</span>
+                    <span>{`Measured ${formatSpeed(motor.measuredSpeed)}`}</span>
+                    <span>{`Stall ${formatPct(motor.stallFactor)}`}</span>
+                  </div>
+                ) : null}
               </div>
             );
           })}
+          {protection?.drive?.blocked ? (
+            <p className="text-xs text-red-300">
+              {protection.drive.requiresNeutral
+                ? 'Drive is stopped. Release controls to neutral before resuming.'
+                : 'Drive is stopped while the wheel condition clears.'}
+            </p>
+          ) : null}
           <div className="text-[0.7rem] text-slate-400">
-            <div>{`Down rate ${overcurrentLimiter?.config?.downRatePerSec}/s · Up rate ${overcurrentLimiter?.config?.upRatePerSec}/s`}</div>
-            <div>{`Release delay ${overcurrentLimiter?.config?.releaseDelaySec}s`}</div>
-            <div>{`Output rate ${overcurrentLimiter?.config?.outputRateMs}ms`}</div>
+            <div>{`Drive output ${formatPct(protection?.drive?.cap)}`}</div>
+            <div>
+              {protection?.adminImmune
+                ? 'This session bypasses all overcurrent enforcement.'
+                : 'Status and output limits are calculated by the server.'}
+            </div>
           </div>
         </div>
       )}
