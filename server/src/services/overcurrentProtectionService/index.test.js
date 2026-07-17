@@ -48,7 +48,9 @@ test('a short stalled-wheel spike remains inside the grace region', () => {
     wheelSpeedsMmPerSecond: { left: 0 },
   }), start + 100);
 
-  assert.equal(snapshot.motors.leftWheel.stress, 0.025);
+  // Stress is accumulated with floating-point time arithmetic, so compare
+  // within a tiny tolerance instead of depending on an exact binary decimal.
+  assert.ok(Math.abs(snapshot.motors.leftWheel.stress - 0.02) < 1e-9);
   assert.equal(snapshot.motors.leftWheel.cap, 1);
   // The hardware event is visible immediately even though the grace region
   // correctly leaves the command cap at full output.
@@ -62,7 +64,7 @@ test('persistent stalled-wheel overcurrent scales both wheels and then stops dri
     driveDirect: { left: 300, right: 200 },
   });
 
-  for (let step = 0; step <= 12; step += 1) {
+  for (let step = 0; step <= 18; step += 1) {
     service.processTelemetry('rover', makeSensors({
       wheelOvercurrents: { leftWheel: true },
       wheelSpeedsMmPerSecond: { left: 0, right: 200 },
@@ -70,15 +72,15 @@ test('persistent stalled-wheel overcurrent scales both wheels and then stops dri
   }
 
   /*
-    The first 400 ms establish that the wheel is making no net progress. Once
-    classified, the faster stalled rate should approach—but not yet cross—the
-    hard-stop boundary at 1.2 seconds.
+    The first 400 ms establish that the wheel is making no net progress. The
+    tuned stalled rate should then approach—but not yet cross—the hard-stop
+    boundary at 1.8 seconds.
   */
   assert.equal(service.getPublicState('rover').drive.blocked, false);
   service.processTelemetry('rover', makeSensors({
     wheelOvercurrents: { leftWheel: true },
     wheelSpeedsMmPerSecond: { left: 0, right: 200 },
-  }), start + 1300);
+  }), start + 1900);
 
   const snapshot = service.getPublicState('rover');
   assert.equal(snapshot.status, 'stopped');
@@ -140,7 +142,7 @@ test('encoder wobble around zero is classified as a full stall', () => {
     driveDirect: { left: 300, right: 300 },
   });
 
-  for (let step = 0; step <= 13; step += 1) {
+  for (let step = 0; step <= 19; step += 1) {
     const wobbleSpeed = step % 2 === 0 ? 10 : -9;
     service.processTelemetry('rover', makeSensors({
       wheelOvercurrents: { leftWheel: true },
@@ -222,7 +224,7 @@ test('wheel comparison follows scaled output and resets after reversal', () => {
     driveDirect: { left: 300, right: 300 },
   });
 
-  for (let step = 0; step <= 6; step += 1) {
+  for (let step = 0; step <= 8; step += 1) {
     service.processTelemetry('rover', makeSensors({
       wheelOvercurrents: { leftWheel: true },
       wheelSpeedsMmPerSecond: { left: 0 },
@@ -237,7 +239,7 @@ test('wheel comparison follows scaled output and resets after reversal', () => {
   const reversed = service.processTelemetry('rover', makeSensors({
     wheelOvercurrents: { leftWheel: true },
     wheelSpeedsMmPerSecond: { left: -250 },
-  }), start + 700);
+  }), start + 900);
   assert.equal(reversed.motors.leftWheel.classification, 'unknown');
   assert.equal(reversed.motors.leftWheel.progressRatio, null);
 });
@@ -248,14 +250,14 @@ test('a stopped drive stays blocked until both clear time and neutral are observ
   service.protectCommand('rover', 'drive', {
     driveDirect: { left: 300, right: 300 },
   });
-  for (let step = 0; step <= 13; step += 1) {
+  for (let step = 0; step <= 19; step += 1) {
     service.processTelemetry('rover', makeSensors({
       wheelOvercurrents: { leftWheel: true },
       wheelSpeedsMmPerSecond: { left: 0 },
     }), start + step * 100);
   }
 
-  for (let step = 14; step <= 28; step += 1) {
+  for (let step = 20; step <= 52; step += 1) {
     service.processTelemetry('rover', makeSensors(), start + step * 100);
   }
   assert.equal(service.getPublicState('rover').drive.blocked, true);
@@ -274,6 +276,34 @@ test('a stopped drive stays blocked until both clear time and neutral are observ
     driveDirect: { left: 300, right: 300 },
   });
   assert.deepEqual(resumed.driveDirect, { left: 300, right: 300 });
+});
+
+test('cleared wheel stress remains visible through the hold and drains to idle', () => {
+  const { service } = createHarness();
+  const start = Date.now();
+  service.protectCommand('rover', 'drive', {
+    driveDirect: { left: 300, right: 300 },
+  });
+  service.processTelemetry('rover', makeSensors({
+    wheelOvercurrents: { leftWheel: true },
+    wheelSpeedsMmPerSecond: { left: 0 },
+  }), start);
+  service.processTelemetry('rover', makeSensors({
+    wheelOvercurrents: { leftWheel: true },
+    wheelSpeedsMmPerSecond: { left: 0 },
+  }), start + 100);
+
+  const justCleared = service.processTelemetry('rover', makeSensors(), start + 200);
+  assert.equal(justCleared.status, 'recovering');
+  assert.ok(justCleared.motors.leftWheel.stress > 0);
+
+  const held = service.processTelemetry('rover', makeSensors(), start + 800);
+  assert.equal(held.status, 'recovering');
+  assert.ok(held.motors.leftWheel.stress > 0);
+
+  const recovered = service.processTelemetry('rover', makeSensors(), start + 1000);
+  assert.equal(recovered.status, 'idle');
+  assert.equal(recovered.motors.leftWheel.stress, 0);
 });
 
 test('brush stress limits only the brush that reports overcurrent', () => {

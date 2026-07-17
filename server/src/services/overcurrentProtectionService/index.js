@@ -11,9 +11,10 @@ const DEFAULT_CONFIG = Object.freeze({
   encoderNoiseFloorMmPerSec: 15,
   fullStallProgressRatio: 0.1,
   movingProgressRatio: 0.6,
-  movingOrUnknownRatePerSec: 0.25,
-  fullStallRatePerSec: 1,
-  wheelRecoveryRatePerSec: 0.75,
+  movingOrUnknownRatePerSec: 0.2,
+  fullStallRatePerSec: 0.6,
+  wheelRecoveryDelaySec: 0.75,
+  wheelRecoveryRatePerSec: 0.4,
   brushOvercurrentRatePerSec: 1,
   brushRecoveryRatePerSec: 0.75,
   clearBeforeUnlockSec: 0.75,
@@ -44,6 +45,7 @@ function createMotorState() {
     classification: 'unknown',
     progressSamples: [],
     windowCommandSign: 0,
+    clearSec: 0,
     stress: 0,
     cap: 1,
   };
@@ -325,6 +327,7 @@ function createOvercurrentProtectionService(options = {}) {
     motor.commandedSpeed = commandNumber;
     motor.measuredSpeed = measuredValid ? measuredNumber : null;
     motor.currentMa = Number.isFinite(Number(currentMa)) ? Number(currentMa) : null;
+    motor.clearSec = motor.overcurrent ? 0 : motor.clearSec + deltaSec;
 
     if (!motor.overcurrent) {
       resetWheelProgressWindow(motor, commandSign);
@@ -354,9 +357,14 @@ function createOvercurrentProtectionService(options = {}) {
 
     const riseRate = config.movingOrUnknownRatePerSec
       + (config.fullStallRatePerSec - config.movingOrUnknownRatePerSec) * motor.stallFactor;
+    const recoveryAllowed = !motor.overcurrent && motor.clearSec >= config.wheelRecoveryDelaySec;
     motor.stress = clampUnit(
       motor.stress
-        + (motor.overcurrent ? riseRate * deltaSec : -config.wheelRecoveryRatePerSec * deltaSec),
+        + (motor.overcurrent
+          ? riseRate * deltaSec
+          : recoveryAllowed
+            ? -config.wheelRecoveryRatePerSec * deltaSec
+            : 0),
     );
     motor.cap = calculateCap(motor.stress);
   }
@@ -524,7 +532,11 @@ function createOvercurrentProtectionService(options = {}) {
     // still inside the transient grace region. Reporting it separately keeps
     // HUD visibility immediate without falsely claiming output is being scaled.
     if (anyOvercurrent) return 'overcurrent';
-    if (anyLimited) return 'recovering';
+    // Stress below the command-limiting grace threshold still represents a
+    // recent hardware event. Keeping recovery visible until it reaches zero
+    // prevents the HUD from vanishing the instant the raw flag clears.
+    const anyStress = MOTOR_KEYS.some((key) => state.motors[key].stress > 0);
+    if (anyStress) return 'recovering';
     return 'idle';
   }
 
