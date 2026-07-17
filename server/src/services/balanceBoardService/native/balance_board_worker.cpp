@@ -60,6 +60,7 @@ constexpr uint8_t kBluetoothClassicAddressType = 0;
 constexpr int kFrameIntervalMs = 50;
 constexpr int kDeviceScanIntervalMs = 500;
 constexpr int kDiscoveryRestartDelayMs = 1000;
+constexpr const char* kDiscoveryTimeoutSeconds = "86400";
 constexpr int kBatteryRefreshMs = 5000;
 
 std::atomic<bool> running{true};
@@ -334,12 +335,20 @@ void stop_command(RunningCommand* command) {
   }
 }
 
-std::optional<BluetoothAddress> take_discovered_board(RunningCommand* discovery) {
+std::optional<BluetoothAddress> take_discovered_board(RunningCommand* discovery,
+                                                       bool* discovery_started) {
   if (!discovery) return std::nullopt;
   std::size_t newline = discovery->pending_output.find('\n');
   while (newline != std::string::npos) {
     const std::string line = discovery->pending_output.substr(0, newline);
     discovery->pending_output.erase(0, newline + 1);
+
+    // bluetoothctl reports filter setup before StartDiscovery completes. Treat
+    // only this explicit event as proof that button presses can now be seen;
+    // `SetDiscoveryFilter success` alone is not an active Bluetooth scan.
+    if (discovery_started && line.find("Discovery started") != std::string::npos) {
+      *discovery_started = true;
+    }
 
     // A Classic device is initially announced by address and receives its name
     // in a later change event. Parse every complete scan line so either BlueZ
@@ -427,7 +436,12 @@ void commissioning_loop(PairingSharedState* shared) {
     // own event stream. The previous bounded scan exited for twelve seconds at a
     // time and then queried a second client, making successful discovery depend
     // on when the physical button happened to be pressed.
-    RunningCommand discovery = start_command({"bluetoothctl", "scan", "bredr"});
+    // BlueZ's command-line client exits after the SetDiscoveryFilter callback
+    // unless non-interactive mode has a timeout. A one-day timeout keeps the
+    // client alive for unattended commissioning; the worker normally stops it
+    // itself as soon as the board appears and restarts it if the day expires.
+    RunningCommand discovery = start_command({
+        "bluetoothctl", "--timeout", kDiscoveryTimeoutSeconds, "scan", "bredr"});
     if (discovery.pid < 0) {
       emit_status("error", "", "could not start Bluetooth discovery: " +
           command_error_summary(discovery.transcript, "unknown process error"));
@@ -436,13 +450,23 @@ void commissioning_loop(PairingSharedState* shared) {
     }
 
     std::optional<BluetoothAddress> address;
+    bool discovery_started = false;
     while (running.load() && !address.has_value()) {
       const bool discovery_running = collect_command_output(&discovery);
-      address = take_discovered_board(&discovery);
+      const bool was_started = discovery_started;
+      address = take_discovered_board(&discovery, &discovery_started);
+      if (!was_started && discovery_started) {
+        // This status clears any prior scanner error and tells the browser that
+        // the server is genuinely listening for the board's red Sync button.
+        emit_status("discovering");
+      }
       if (address.has_value()) break;
       if (!discovery_running) {
-        emit_status("error", "", "Bluetooth discovery stopped: " +
-            command_error_summary(discovery.transcript, "bluetoothctl exited unexpectedly"));
+        const std::string detail = command_error_summary(
+            discovery.transcript, "bluetoothctl exited unexpectedly");
+        emit_status("error", "", discovery_started
+            ? "Bluetooth scanner stopped unexpectedly; retrying automatically: " + detail
+            : "Bluetooth scanner exited before discovery started; retrying automatically: " + detail);
         break;
       }
 

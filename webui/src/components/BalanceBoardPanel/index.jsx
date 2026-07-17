@@ -31,12 +31,29 @@ function formatWeight(value) {
 
 function describePhase(status, frame) {
   const phase = frame?.phase || status?.phase || 'waiting';
-  if (phase === 'commissioning') {
+  if (phase === 'error' || status?.lastError) {
+    const message = status?.lastError || 'The Balance Board bridge reported an error.';
+    // Name the failed subsystem in the badge. Generic labels such as “Needs
+    // attention” force an operator to read implementation details to understand
+    // whether the problem is scanning, pairing, or the sensor bridge itself.
+    const label = /scanner|discovery/i.test(message)
+      ? 'Bluetooth scanner stopped'
+      : (/pair/i.test(message) ? 'Board pairing failed' : 'Balance Board error');
     return {
-      label: 'Pairing setup',
-      // Discovery retries automatically, so retain and show the last concrete
-      // BlueZ failure while the worker keeps listening for another Sync press.
-      instruction: status?.lastError || 'Press the red Sync button underneath the board. The server will pair it automatically.',
+      label,
+      instruction: message,
+      className: 'border-red-500/60 bg-red-950/60 text-red-200',
+    };
+  }
+  if (phase === 'commissioning') {
+    const scannerReady = status?.hardwareState === 'discovering';
+    return {
+      label: scannerReady ? 'Waiting for red Sync' : 'Starting Bluetooth scan',
+      // Pairing is automatic once discovery is active. State that directly so
+      // the UI cannot imply that a second software pairing action is required.
+      instruction: status?.lastError || (scannerReady
+        ? 'Bluetooth is listening. Press the red Sync button underneath the board once.'
+        : 'The server is starting Bluetooth discovery. Wait for “Waiting for red Sync” before pressing the board button.'),
       className: 'border-amber-500/60 bg-amber-950/60 text-amber-200',
     };
   }
@@ -45,13 +62,6 @@ function describePhase(status, frame) {
       label: 'Pairing',
       instruction: 'Keep the red Sync button active while the server completes the Bluetooth bond.',
       className: 'border-sky-500/60 bg-sky-950/60 text-sky-200',
-    };
-  }
-  if (phase === 'error' || status?.lastError) {
-    return {
-      label: 'Needs attention',
-      instruction: status?.lastError || 'The Balance Board bridge reported an error.',
-      className: 'border-red-500/60 bg-red-950/60 text-red-200',
     };
   }
   if (!status?.connected) {
@@ -236,11 +246,9 @@ function BalanceBoardPanelContent() {
             <div className="border-t border-slate-700 pt-1">
               <div className="mb-0.5 text-[0.62rem] text-slate-500">Admin maintenance</div>
               <div className="flex flex-wrap gap-0.5">
-                {!status?.paired ? (
-                  <button type="button" className="button-dark px-1 py-0.5 text-xs" disabled={Boolean(actionPending)} onClick={() => runAction('pair')}>
-                    Pair board
-                  </button>
-                ) : null}
+                {/* An unpaired server scans automatically. A separate “Pair
+                    board” action was redundant and incorrectly suggested that
+                    commissioning required two software/physical pair steps. */}
                 <button type="button" className="button-dark px-1 py-0.5 text-xs" disabled={Boolean(actionPending) || !status?.connected} onClick={() => runAction('tare')}>
                   Tare
                 </button>
