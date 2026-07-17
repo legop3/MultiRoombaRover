@@ -12,18 +12,22 @@
 // BlueZ's agent response with the correct raw MGMT_OP_PIN_CODE_REPLY. Only the
 // board currently being commissioned is eligible for that reply.
 //
-// After commissioning, wiiuse opens the HID control and interrupt L2CAP sockets
-// itself. This is important rather than stylistic: BlueZ's input profile applies
-// medium security to bonded HID devices, and an original Balance Board rejects
-// that request with EACCES. Direct low-security HID sockets match the protocol
-// used by the board and avoid the failing profile entirely.
+// After commissioning, this worker owns both directions of the HID transport.
+// Red Sync uses wiiuse's normal outbound connection; the front power button is
+// accepted on an always-open interrupt listener before the worker opens the
+// matching control channel. This is important rather than stylistic: BlueZ's
+// input profile applies medium security to bonded HID devices, and an original
+// Balance Board rejects that request with EACCES. Direct low-security sockets
+// match the board and avoid the failing profile entirely.
 //
 // Security boundary:
-// The installed binary receives CAP_NET_ADMIN solely to open the Bluetooth
-// management socket. The much larger Node server remains unprivileged. Normal
-// sensor access uses ordinary Bluetooth L2CAP sockets through wiiuse.
+// The installed binary receives CAP_NET_ADMIN solely for the Bluetooth
+// management socket and CAP_NET_BIND_SERVICE solely for the reserved HID PSM.
+// The much larger Node server remains unprivileged. Normal sensor access uses
+// ordinary Bluetooth L2CAP sockets through wiiuse.
 
 #include <wiiuse.h>
+#include <bluetooth/l2cap.h>
 
 #include <algorithm>
 #include <array>
@@ -51,6 +55,14 @@
 #include <unistd.h>
 #include <vector>
 
+// Wiiuse exports these two handshake functions from its shared library but
+// keeps them out of the public header because ordinary callers receive sockets
+// from wiiuse_connect(). The Balance Board's front button reverses the normal
+// direction of the interrupt channel, so this bridge must accept that socket
+// first and then start the exact same upstream handshake explicitly.
+extern "C" void wiiuse_handshake(struct wiimote_t* board, byte* data, uint16_t length);
+extern "C" int wiiuse_set_report_type(struct wiimote_t* board);
+
 namespace {
 
 constexpr const char* kBoardBluetoothName = "Nintendo RVL-WBC-01";
@@ -59,15 +71,18 @@ constexpr uint16_t kHciChannelControl = 3;
 constexpr uint16_t kHciDeviceNone = 0xffff;
 constexpr uint16_t kMgmtPinCodeRequestEvent = 0x000e;
 constexpr uint16_t kMgmtPinCodeReplyCommand = 0x0016;
+constexpr uint16_t kMgmtSetConnectableCommand = 0x0007;
+constexpr uint16_t kPrimaryControllerIndex = 0;
 constexpr uint8_t kBluetoothClassicAddressType = 0;
 constexpr int kFrameIntervalMs = 50;
 constexpr int kDiscoveryRestartDelayMs = 1000;
 constexpr const char* kDiscoveryTimeoutSeconds = "86400";
-constexpr int kDirectReconnectDelayMs = 1000;
+constexpr uint16_t kHidControlPsm = 0x0011;
+constexpr uint16_t kHidInterruptPsm = 0x0013;
+constexpr int kCommissioningConnectWindowMs = 15000;
 constexpr int kHandshakeWarningMs = 10000;
 constexpr int kEmptyWeightThresholdCentiKg = 200;
 constexpr int kEmptySleepDelayMs = 2 * 60 * 1000;
-constexpr int kSleepDisconnectCooldownMs = 30 * 1000;
 
 std::atomic<bool> running{true};
 std::mutex output_mutex;
@@ -85,6 +100,7 @@ struct PairingSharedState {
   std::optional<BluetoothAddress> active_pin;
   std::optional<std::string> commissioned_address;
   bool commissioning = false;
+  bool outbound_connection_requested = false;
 };
 
 struct BoardReadings {
@@ -523,6 +539,11 @@ void commissioning_loop(PairingSharedState* shared) {
       std::lock_guard<std::mutex> lock(shared->mutex);
       shared->commissioned_address = address->display;
       shared->commissioning = false;
+      // Red Sync makes the board discoverable rather than initiating its normal
+      // host reconnect. Give wiiuse one bounded outbound window immediately
+      // after commissioning; every later front-button wake arrives through the
+      // interrupt listener instead.
+      shared->outbound_connection_requested = true;
     }
     emit_json("\"type\":\"paired\",\"address\":\"" + json_escape(address->display) + "\"");
     // The direct connection loop notices this address immediately. Pairing and
@@ -557,6 +578,24 @@ int open_management_socket() {
 void write_u16_le(uint8_t* output, uint16_t value) {
   output[0] = static_cast<uint8_t>(value & 0xff);
   output[1] = static_cast<uint8_t>((value >> 8) & 0xff);
+}
+
+bool enable_incoming_connections(int fd) {
+  if (fd < 0) return false;
+
+  // MGMT Set Connectable controls the BR/EDR page scan. Pairable alone does not
+  // imply connectable, so without this command the sleeping board can flash for
+  // several seconds while its incoming page never reaches the L2CAP listener.
+  // This server uses hci0 as its sole Bluetooth controller, represented by
+  // management index zero.
+  constexpr std::size_t header_size = 6;
+  std::array<uint8_t, header_size + 1> packet{};
+  write_u16_le(packet.data(), kMgmtSetConnectableCommand);
+  write_u16_le(packet.data() + 2, kPrimaryControllerIndex);
+  write_u16_le(packet.data() + 4, 1);
+  packet[header_size] = 1;
+  return write(fd, packet.data(), packet.size()) ==
+      static_cast<ssize_t>(packet.size());
 }
 
 void answer_pin_request(int fd, uint16_t adapter_index,
@@ -695,6 +734,116 @@ wiimote_t** initialize_wiiuse() {
   return boards;
 }
 
+bool request_low_bluetooth_security(int fd, std::string* error) {
+  bt_security security{};
+  security.level = BT_SECURITY_LOW;
+  if (setsockopt(fd, SOL_BLUETOOTH, BT_SECURITY, &security, sizeof(security)) == 0) {
+    return true;
+  }
+  if (error) *error = std::strerror(errno);
+  return false;
+}
+
+int open_interrupt_listener(std::string* error) {
+  const int fd = socket(AF_BLUETOOTH,
+                        SOCK_SEQPACKET | SOCK_CLOEXEC | SOCK_NONBLOCK,
+                        BTPROTO_L2CAP);
+  if (fd < 0) {
+    if (error) *error = std::strerror(errno);
+    return -1;
+  }
+
+  // The bonded BlueZ input profile requested medium security and produced the
+  // original EACCES failure. Wii hardware HID channels are intentionally low
+  // security; applying that level to the listener also makes it inherit onto
+  // every accepted front-button connection.
+  if (!request_low_bluetooth_security(fd, error)) {
+    close(fd);
+    return -1;
+  }
+
+  sockaddr_l2 local{};
+  local.l2_family = AF_BLUETOOTH;
+  local.l2_psm = htobs(kHidInterruptPsm);
+  // Value initialization leaves l2_bdaddr at the all-zero BDADDR_ANY value.
+  // Avoid BlueZ's C-only compound-literal macro, which is not valid C++17.
+  if (bind(fd, reinterpret_cast<const sockaddr*>(&local), sizeof(local)) != 0 ||
+      listen(fd, 1) != 0) {
+    if (error) *error = std::strerror(errno);
+    close(fd);
+    return -1;
+  }
+  return fd;
+}
+
+std::optional<int> accept_board_interrupt(int listener,
+                                          const std::string& expected_address,
+                                          std::string* error) {
+  sockaddr_l2 remote{};
+  socklen_t remote_size = sizeof(remote);
+  const int fd = accept4(listener, reinterpret_cast<sockaddr*>(&remote),
+                         &remote_size, SOCK_CLOEXEC);
+  if (fd < 0) {
+    if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR && error) {
+      *error = std::strerror(errno);
+    }
+    return std::nullopt;
+  }
+
+  char remote_text[18]{};
+  ba2str(&remote.l2_bdaddr, remote_text);
+  const auto normalized = parse_address(remote_text);
+  if (!normalized.has_value() || normalized->display != expected_address) {
+    // PSM 0x13 is global to the adapter. The installer dedicates it to this
+    // worker, but still reject any unrelated controller instead of attaching
+    // an arbitrary Bluetooth input device to the Balance Board parser.
+    close(fd);
+    return std::nullopt;
+  }
+  return fd;
+}
+
+bool attach_incoming_board(wiimote_t* board, int interrupt_fd,
+                           const std::string& address, std::string* error) {
+  const int control_fd = socket(AF_BLUETOOTH, SOCK_SEQPACKET | SOCK_CLOEXEC,
+                                BTPROTO_L2CAP);
+  if (control_fd < 0) {
+    if (error) *error = std::strerror(errno);
+    close(interrupt_fd);
+    return false;
+  }
+  if (!request_low_bluetooth_security(control_fd, error)) {
+    close(control_fd);
+    close(interrupt_fd);
+    return false;
+  }
+
+  sockaddr_l2 remote{};
+  remote.l2_family = AF_BLUETOOTH;
+  remote.l2_psm = htobs(kHidControlPsm);
+  str2ba(address.c_str(), &remote.l2_bdaddr);
+  if (connect(control_fd, reinterpret_cast<const sockaddr*>(&remote), sizeof(remote)) != 0) {
+    if (error) *error = std::strerror(errno);
+    close(control_fd);
+    close(interrupt_fd);
+    return false;
+  }
+
+  // From this point the socket arrangement is identical to wiiuse_connect():
+  // commands leave through PSM 0x11 and reports arrive through PSM 0x13. Set
+  // the public Linux fields, mark the transport connected, and invoke wiiuse's
+  // own exported handshake so calibration and report parsing stay upstream.
+  close_wiiuse_sockets(board);
+  wiiuse_disconnected(board);
+  prepare_wiiuse_address(board, address);
+  board->out_sock = control_fd;
+  board->in_sock = interrupt_fd;
+  board->state |= WIIMOTE_STATE_CONNECTED;
+  wiiuse_handshake(board, nullptr, 0);
+  wiiuse_set_report_type(board);
+  return true;
+}
+
 void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
   wiimote_t* board = boards ? boards[0] : nullptr;
   if (!board) {
@@ -702,13 +851,25 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
     return;
   }
 
+  std::string listener_error;
+  const int interrupt_listener = open_interrupt_listener(&listener_error);
+  if (interrupt_listener < 0) {
+    emit_status("error", "",
+                "Cannot listen for the Balance Board front button: " + listener_error +
+                    ". Run the installer to configure the dedicated Bluetooth listener.");
+    return;
+  }
+
   std::string prepared_address;
-  bool sleeping_after_idle = false;
+  uint64_t outbound_connect_until = 0;
   while (running.load()) {
     std::optional<std::string> address;
+    bool outbound_requested = false;
     {
       std::lock_guard<std::mutex> lock(shared->mutex);
       address = shared->commissioned_address;
+      outbound_requested = shared->outbound_connection_requested;
+      shared->outbound_connection_requested = false;
     }
     if (!address.has_value()) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -722,38 +883,57 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
       prepared_address = *address;
     }
 
-    // wiiuse_connect opens PSM 0x11 and 0x13 directly. It returns zero when the
-    // sleeping board does not answer; errno retains the actual socket failure,
-    // which lets the panel distinguish normal sleep from a real permission,
-    // adapter, or protocol error.
-    errno = 0;
-    const int connected_count = wiiuse_connect(boards, 1);
-    const int connection_error = errno;
-    if (connected_count != 1 || !WIIMOTE_IS_CONNECTED(board)) {
-      close_wiiuse_sockets(board);
-      wiiuse_disconnected(board);
-      prepare_wiiuse_address(board, *address);
-      if (connection_error != 0 && !sleeping_connection_error(connection_error)) {
-        emit_status("connection-failed", *address,
-                    "Direct Balance Board connection failed: " +
-                        std::string(std::strerror(connection_error)));
-      } else if (sleeping_after_idle) {
-        // Do not replace an intentional sleep with a generic connection status
-        // every time the powered-off board correctly ignores a Bluetooth page.
-        emit_status("sleeping", *address, "Board is asleep. Press the front power button to wake it.");
+    if (outbound_requested) {
+      outbound_connect_until = monotonic_ms() + kCommissioningConnectWindowMs;
+    }
+
+    bool transport_connected = false;
+    std::string incoming_error;
+    if (auto interrupt_fd = accept_board_interrupt(
+            interrupt_listener, *address, &incoming_error)) {
+      emit_status("link-detected", *address);
+      std::string attach_error;
+      if (attach_incoming_board(board, *interrupt_fd, *address, &attach_error)) {
+        transport_connected = true;
       } else {
-        emit_status("waiting", *address, "No Bluetooth response from the board yet.");
+        emit_status("connection-failed", *address,
+                    "Front button reached the server, but the HID control channel failed: " +
+                        attach_error);
       }
-      for (int elapsed = 0; elapsed < kDirectReconnectDelayMs && running.load(); elapsed += 100) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    } else if (!incoming_error.empty()) {
+      emit_status("connection-failed", *address,
+                  "Balance Board listener failed: " + incoming_error);
+    }
+
+    if (!transport_connected && monotonic_ms() < outbound_connect_until) {
+      // Red Sync makes the board discoverable instead of reconnecting to the
+      // remembered host. During the short post-commissioning window only,
+      // retain wiiuse's normal outbound connector so the first session starts
+      // without asking for a second physical button press.
+      errno = 0;
+      const int connected_count = wiiuse_connect(boards, 1);
+      const int connection_error = errno;
+      if (connected_count == 1 && WIIMOTE_IS_CONNECTED(board)) {
+        transport_connected = true;
+        outbound_connect_until = 0;
+        emit_status("link-detected", *address);
+      } else {
+        close_wiiuse_sockets(board);
+        wiiuse_disconnected(board);
+        prepare_wiiuse_address(board, *address);
+        if (connection_error != 0 && !sleeping_connection_error(connection_error)) {
+          emit_status("connection-failed", *address,
+                      "Initial Balance Board connection failed: " +
+                          std::string(std::strerror(connection_error)));
+        }
       }
+    }
+
+    if (!transport_connected) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(25));
       continue;
     }
 
-    // Any successful response means the board was physically woken. Clear the
-    // remembered sleep state before publishing connection progress.
-    sleeping_after_idle = false;
-    emit_status("link-detected", *address);
     bool board_ready = false;
     bool handshake_warning_sent = false;
     bool intentional_sleep = false;
@@ -826,19 +1006,15 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
     wiiuse_disconnected(board);
     prepare_wiiuse_address(board, *address);
     if (intentional_sleep) {
-      sleeping_after_idle = true;
       // Closing both HID channels makes the board abandon the host connection
-      // and power itself down. Do not page it again during that transition or
-      // the worker could reconnect before its firmware finishes shutting off.
-      for (int elapsed = 0;
-           elapsed < kSleepDisconnectCooldownMs && running.load(); elapsed += 100) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      }
+      // and power itself down. The interrupt listener stays open without paging
+      // it, so only a later front-button connection starts another session.
     } else {
       emit_status("waiting", *address, "Board disconnected. Press the front power button.");
     }
   }
 
+  close(interrupt_listener);
   close_wiiuse_sockets(board);
   wiiuse_disconnected(board);
 }
@@ -893,21 +1069,30 @@ int main() {
   }
 
   const int management_fd = open_management_socket();
+  bool bluetooth_startup_ready = true;
   if (management_fd < 0) {
-    if (!pairing.commissioned_address.has_value()) {
-      // An already commissioned board can use ordinary wiiuse L2CAP sockets
-      // without the management socket. Missing capability is fatal only when
-      // the bridge needs to answer the special six-byte pairing PIN.
-      pairing.commissioning = false;
-      emit_status("error", configured_address,
-                  "Bluetooth management socket unavailable; install the worker capability");
-    }
+    // The socket now serves both commissioning and front-button wake: it sends
+    // the raw six-byte PIN and keeps hci0 connectable for incoming pages. Never
+    // pretend an already-known address can wake reliably without it.
+    pairing.commissioning = false;
+    bluetooth_startup_ready = false;
+    emit_status("error", configured_address,
+                "Bluetooth management socket unavailable; install the worker capability");
+  } else if (!enable_incoming_connections(management_fd)) {
+    bluetooth_startup_ready = false;
+    emit_status("error", configured_address,
+                "Could not enable incoming Bluetooth connections on hci0");
   }
 
-  std::thread commission_thread(commissioning_loop, &pairing);
-  std::thread connection_thread(direct_connection_loop, &pairing, boards);
+  std::thread commission_thread;
+  std::thread connection_thread;
+  if (bluetooth_startup_ready) {
+    commission_thread = std::thread(commissioning_loop, &pairing);
+    connection_thread = std::thread(direct_connection_loop, &pairing, boards);
+  }
   std::thread input_thread(stdin_loop, &pairing);
-  if (management_fd >= 0 || pairing.commissioned_address.has_value()) {
+  if (bluetooth_startup_ready &&
+      (management_fd >= 0 || pairing.commissioned_address.has_value())) {
     emit_status(pairing.commissioning ? "commissioning" : "waiting", configured_address);
   }
 
