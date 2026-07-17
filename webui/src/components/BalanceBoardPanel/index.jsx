@@ -51,7 +51,7 @@ function CornerReading({ className, label, value }) {
   return (
     <div className={`surface absolute min-w-[5.5rem] text-center ${className}`}>
       <div className="text-[0.62rem] text-slate-400">{label}</div>
-      <div className="font-mono text-sm font-semibold text-slate-100">{formatWeight(value)}</div>
+      <div className="text-sm font-semibold text-slate-100">{formatWeight(value)}</div>
     </div>
   );
 }
@@ -70,6 +70,7 @@ function BalanceBoardPanelContent() {
   const role = useSessionSelector((state) => state.session?.role || null);
   const [frame, setFrame] = useState(EMPTY_FRAME);
   const [unpairing, setUnpairing] = useState(false);
+  const [zeroRequesting, setZeroRequesting] = useState(false);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -109,6 +110,18 @@ function BalanceBoardPanelContent() {
   const battery = liveBattery ?? sessionBattery;
   const sleeping = board?.status === 'sleeping';
   const isAdmin = role === 'admin' || role === 'lockdown';
+  const calibration = board?.calibration || null;
+  const zeroing = Boolean(calibration?.active);
+
+  const zero = () => {
+    if (zeroRequesting || zeroing || !board?.connected) return;
+    if (!window.confirm('Use the board’s current load as zero? Keep everything still for ten seconds.')) return;
+    setZeroRequesting(true);
+    socket.emit('balanceBoard:zero', {}, (response = {}) => {
+      setZeroRequesting(false);
+      if (response.error) window.alert(response.error);
+    });
+  };
 
   const unpair = () => {
     if (unpairing || !board?.paired) return;
@@ -127,17 +140,29 @@ function BalanceBoardPanelContent() {
   const actions = (
     <div className="flex items-center gap-0.5">
       {battery != null ? (
-        <span className="font-mono text-xs text-slate-300">{Math.round(battery)}% battery</span>
+        <span className="text-xs text-slate-300">{Math.round(battery)}% battery</span>
       ) : null}
       {isAdmin ? (
-        <button
-          type="button"
-          className="button-dark text-xs disabled:opacity-50"
-          disabled={!board?.paired || unpairing}
-          onClick={unpair}
-        >
-          {unpairing ? 'Unpairing…' : 'Unpair'}
-        </button>
+        <>
+          <button
+            type="button"
+            className="button-dark text-xs disabled:opacity-50"
+            disabled={!board?.connected || zeroRequesting || zeroing || unpairing}
+            onClick={zero}
+          >
+            {zeroing
+              ? `Zeroing ${calibration.samplesCollected}/${calibration.totalSamples}`
+              : zeroRequesting ? 'Starting…' : 'Zero'}
+          </button>
+          <button
+            type="button"
+            className="button-dark text-xs disabled:opacity-50"
+            disabled={!board?.paired || unpairing || zeroing}
+            onClick={unpair}
+          >
+            {unpairing ? 'Unpairing…' : 'Unpair'}
+          </button>
+        </>
       ) : null}
     </div>
   );
@@ -158,7 +183,17 @@ function BalanceBoardPanelContent() {
         </div>
       ) : null}
 
-      <div className="panel-section relative h-40 overflow-hidden">
+      <div className="panel-section relative h-52 overflow-hidden">
+        {zeroing ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-950/90 px-2 text-center">
+            <div className="space-y-0.5">
+              <p className="text-lg font-semibold text-slate-100">
+                Zeroing {calibration.samplesCollected}/{calibration.totalSamples}
+              </p>
+              <p className="text-sm text-slate-300">Keep the board and everything on it still.</p>
+            </div>
+          </div>
+        ) : null}
         <CornerReading className="left-0.5 top-0.5" label="Top left" value={corners.topLeft} />
         <CornerReading className="right-0.5 top-0.5" label="Top right" value={corners.topRight} />
         <CornerReading className="bottom-0.5 left-0.5" label="Bottom left" value={corners.bottomLeft} />
@@ -175,7 +210,7 @@ function BalanceBoardPanelContent() {
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="surface px-1 py-0.5 text-center">
             <div className="text-[0.65rem] text-slate-400">Total weight</div>
-            <div className="font-mono text-3xl font-bold leading-none text-white">
+            <div className="text-3xl font-bold leading-none text-white">
               {formatWeight(liveFrame.totalKg)}
             </div>
           </div>

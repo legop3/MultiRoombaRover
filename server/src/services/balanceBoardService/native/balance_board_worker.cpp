@@ -82,8 +82,8 @@ constexpr uint16_t kHidInterruptPsm = 0x0013;
 constexpr int kCommissioningConnectWindowMs = 15000;
 constexpr int kIncomingChannelPairTimeoutMs = 5000;
 constexpr int kHandshakeWarningMs = 10000;
-constexpr int kEmptyWeightThresholdCentiKg = 200;
-constexpr int kEmptySleepDelayMs = 2 * 60 * 1000;
+constexpr int kMovementThresholdCentiKg = 50;
+constexpr int kStillSleepDelayMs = 2 * 60 * 1000;
 
 std::atomic<bool> running{true};
 std::mutex output_mutex;
@@ -981,8 +981,9 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
     bool board_ready = false;
     bool handshake_warning_sent = false;
     bool intentional_sleep = false;
-    std::optional<uint64_t> empty_since;
+    std::optional<BoardReadings> activity_reference;
     uint64_t connected_at = monotonic_ms();
+    uint64_t last_movement_at = connected_at;
     uint64_t last_frame_at = 0;
     while (running.load() && WIIMOTE_IS_CONNECTED(board)) {
       wiiuse_poll(boards, 1);
@@ -1005,7 +1006,8 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
         if (now - last_frame_at >= kFrameIntervalMs) {
           // Wiiuse interpolates each sensor using the board's factory 0/17/34kg
           // calibration values. Preserve the existing centi-kilogram wire unit
-          // so Node's tare and total-weight calculation remain straightforward.
+          // so Node can apply its persisted installation zero per corner without
+          // losing the native sensor resolution.
           const wii_board_t& weights = board->exp.wb;
           BoardReadings readings{
               static_cast<int>(std::lround(std::max(0.0F, weights.tr) * 100.0F)),
@@ -1018,16 +1020,27 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
           emit_frame(readings, battery);
           last_frame_at = now;
 
-          const int total_weight = readings.top_right + readings.bottom_right +
-              readings.top_left + readings.bottom_left;
-          if (total_weight > kEmptyWeightThresholdCentiKg) {
-            // A person, rover, or other load immediately restarts the complete
-            // two-minute idle window. Short empty gaps can never accumulate and
-            // shut the board down while it is actively being used.
-            empty_since.reset();
-          } else if (!empty_since.has_value()) {
-            empty_since = now;
-          } else if (now - *empty_since >= kEmptySleepDelayMs) {
+          if (!activity_reference.has_value()) {
+            activity_reference = readings;
+            last_movement_at = now;
+          } else {
+            // Compare against the last meaningful activity snapshot rather
+            // than the immediately previous frame. That lets slow movement
+            // accumulate past the noise threshold while ordinary sensor jitter
+            // cannot keep the board awake forever. All four corners matter, so
+            // shifting a load without changing total weight still counts.
+            const int movement =
+                std::abs(readings.top_right - activity_reference->top_right) +
+                std::abs(readings.bottom_right - activity_reference->bottom_right) +
+                std::abs(readings.top_left - activity_reference->top_left) +
+                std::abs(readings.bottom_left - activity_reference->bottom_left);
+            if (movement >= kMovementThresholdCentiKg) {
+              activity_reference = readings;
+              last_movement_at = now;
+            }
+          }
+
+          if (now - last_movement_at >= kStillSleepDelayMs) {
             intentional_sleep = true;
             emit_status("sleeping", *address,
                         "Board is asleep. Press the front power button to wake it.");

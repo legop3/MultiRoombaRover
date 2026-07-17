@@ -1,6 +1,6 @@
 // Balance Board Service
 // Purpose: Exposes one Wii Balance Board as a self-pairing Bluetooth scale.
-// Scope: Stores the paired address, applies a small automatic tare, and publishes simple status plus live weight.
+// Scope: Stores pairing and admin zero calibration, then publishes status plus live four-corner weight.
 const fs = require('fs');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
@@ -20,19 +20,43 @@ const rawConfig = loadConfig().balanceBoard || {};
 const DATA_DIR = resolveDataDir();
 const STORE_PATH = resolveDataPath('balance-board.json');
 const FRAME_ROOM = 'balance-board-viewers';
-const TARE_SAMPLE_COUNT = 20;
-const MAX_AUTOMATIC_TARE_KG = 2;
+const CORNER_KEYS = ['topRight', 'bottomRight', 'topLeft', 'bottomLeft'];
+const ZERO_SAMPLE_COUNT = 10;
+const ZERO_SAMPLE_INTERVAL_MS = 1000;
+const ZERO_MAX_SAMPLE_AGE_MS = 1500;
+const ZERO_MAX_COMBINED_RANGE_KG = 0.5;
 const execFileAsync = promisify(execFile);
 const ALERT_COLOR = '#38bdf8';
+
+function emptyZeroCorners() {
+  return Object.fromEntries(CORNER_KEYS.map((key) => [key, 0]));
+}
+
+function normalizeStoredCorners(value) {
+  if (!value || typeof value !== 'object') return emptyZeroCorners();
+  return Object.fromEntries(CORNER_KEYS.map((key) => {
+    const number = Number(value[key]);
+    return [key, Number.isFinite(number) ? Math.max(0, number) : 0];
+  }));
+}
+
+function emptyStore() {
+  return { address: '', zeroCorners: emptyZeroCorners(), zeroedAt: null };
+}
 
 function loadStore() {
   try {
     const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
     const address = typeof parsed?.address === 'string' ? parsed.address.trim().toUpperCase() : '';
-    return { address };
+    const zeroedAt = Number.isFinite(Number(parsed?.zeroedAt)) ? Number(parsed.zeroedAt) : null;
+    return {
+      address,
+      zeroCorners: zeroedAt ? normalizeStoredCorners(parsed.zeroCorners) : emptyZeroCorners(),
+      zeroedAt,
+    };
   } catch (err) {
     if (err.code !== 'ENOENT') logger.warn('Failed to load Balance Board address', err.message);
-    return { address: '' };
+    return emptyStore();
   }
 }
 
@@ -47,18 +71,10 @@ function roundedWeight(value) {
   return Math.round(Math.max(0, Number(value) || 0) * 100) / 100;
 }
 
-function rawWeightKg(corners = {}) {
-  // The native wiiuse bridge reports each calibrated load cell in
-  // centi-kilograms. The UI only needs total scale weight, so sum and convert
-  // at this single boundary.
-  return ['topRight', 'bottomRight', 'topLeft', 'bottomLeft']
-    .reduce((total, key) => total + Math.max(0, Number(corners[key]) || 0), 0) / 100;
-}
-
 function cornerWeightsKg(corners = {}) {
-  // Preserve all four factory-calibrated load cells in kilograms. Their
-  // relative distribution drives the center-of-pressure dot in the panel,
-  // while the existing tare continues to apply only to the displayed total.
+  // Preserve wiiuse's factory-calibrated load cells in kilograms. The separate
+  // admin zero calibration below is an installation baseline layered on top of
+  // this factory conversion; it must never replace the hardware calibration.
   return {
     topRight: roundedWeight((Number(corners.topRight) || 0) / 100),
     bottomRight: roundedWeight((Number(corners.bottomRight) || 0) / 100),
@@ -67,7 +83,19 @@ function cornerWeightsKg(corners = {}) {
   };
 }
 
-let store = enabled ? loadStore() : { address: '' };
+function subtractZero(rawCorners) {
+  const baseline = store.zeroedAt ? store.zeroCorners : emptyZeroCorners();
+  return Object.fromEntries(CORNER_KEYS.map((key) => [
+    key,
+    roundedWeight(Math.max(0, rawCorners[key] - baseline[key])),
+  ]));
+}
+
+function totalCornerWeight(corners) {
+  return roundedWeight(CORNER_KEYS.reduce((total, key) => total + corners[key], 0));
+}
+
+let store = enabled ? loadStore() : emptyStore();
 let hardware = null;
 let status = enabled ? (store.address ? 'waiting' : 'starting') : 'disabled';
 let detail = enabled
@@ -76,11 +104,26 @@ let detail = enabled
 let connected = false;
 let batteryPercent = null;
 let latestFrame = null;
-let tareSamples = [];
-let tareKg = 0;
+let latestRawCorners = null;
+let latestRawFrameAt = 0;
+let zeroTimer = null;
+let zeroSamples = [];
+let zeroProgress = {
+  active: false,
+  samplesCollected: 0,
+  totalSamples: ZERO_SAMPLE_COUNT,
+  error: '',
+};
 let previousWorkerState = '';
 let lastAlertKey = '';
 let unpairing = false;
+
+function sendRawAlert(state, message = '') {
+  const rawMessage = message ? `${state}: ${message}` : state;
+  if (rawMessage === lastAlertKey) return;
+  lastAlertKey = rawMessage;
+  sendAlert({ color: ALERT_COLOR, title: 'Balance Board', message: rawMessage });
+}
 
 function sendStatusAlert(workerState, message = '') {
   const shouldAlert =
@@ -97,11 +140,7 @@ function sendStatusAlert(workerState, message = '') {
   // state first, followed by its exact detail when one exists. The service does
   // not reinterpret failures as friendlier product copy, but still collapses
   // identical retries so a failing reconnect cannot flood the activity feed.
-  const rawMessage = message ? `${workerState}: ${message}` : workerState;
-  const key = rawMessage;
-  if (key === lastAlertKey) return;
-  lastAlertKey = key;
-  sendAlert({ color: ALERT_COLOR, title: 'Balance Board', message: rawMessage });
+  sendRawAlert(workerState, message);
 }
 
 function getState() {
@@ -113,6 +152,11 @@ function getState() {
     status,
     detail,
     batteryPercent,
+    calibration: {
+      calibrated: Boolean(store.zeroedAt),
+      zeroedAt: store.zeroedAt,
+      ...zeroProgress,
+    },
   };
 }
 
@@ -125,28 +169,118 @@ function updateStatus(nextStatus, nextDetail) {
   events.emit('change', { state: getState() });
 }
 
+function publishCalibrationState() {
+  // Calibration progress belongs in the ordinary session payload because it
+  // changes only once per second for ten seconds. Live 20 Hz weights remain in
+  // their dedicated room and never trigger a full-session broadcast.
+  events.emit('change', { state: getState() });
+}
+
+function clearZeroTimer() {
+  if (!zeroTimer) return;
+  clearInterval(zeroTimer);
+  zeroTimer = null;
+}
+
+function failZeroCalibration(error, { alert = true } = {}) {
+  clearZeroTimer();
+  zeroSamples = [];
+  zeroProgress = {
+    active: false,
+    samplesCollected: 0,
+    totalSamples: ZERO_SAMPLE_COUNT,
+    error: String(error || 'Calibration failed'),
+  };
+  publishCalibrationState();
+  if (alert) sendRawAlert('zero-failed', zeroProgress.error);
+}
+
+function finishZeroCalibration() {
+  clearZeroTimer();
+
+  // A single average could hide movement that returns to its starting point.
+  // Sum every corner's complete ten-second range before accepting the result so
+  // distributed movement cannot hide below four independent thresholds. Retain
+  // three decimals so averaging ten centi-kilogram samples does not throw away
+  // useful sub-centi-kilogram precision in the persisted baseline.
+  const combinedRange = CORNER_KEYS.reduce((totalRange, key) => {
+    const values = zeroSamples.map((sample) => sample[key]);
+    return totalRange + Math.max(...values) - Math.min(...values);
+  }, 0);
+  if (combinedRange > ZERO_MAX_COMBINED_RANGE_KG) {
+    failZeroCalibration('Load moved during the ten-second calibration.');
+    return;
+  }
+
+  store.zeroCorners = Object.fromEntries(CORNER_KEYS.map((key) => {
+    const average = zeroSamples.reduce((sum, sample) => sum + sample[key], 0) /
+      zeroSamples.length;
+    return [key, Math.round(average * 1000) / 1000];
+  }));
+  store.zeroedAt = Date.now();
+  persistStore();
+  zeroSamples = [];
+  zeroProgress = {
+    active: false,
+    samplesCollected: ZERO_SAMPLE_COUNT,
+    totalSamples: ZERO_SAMPLE_COUNT,
+    error: '',
+  };
+  publishCalibrationState();
+  sendRawAlert('zeroed');
+}
+
+function takeZeroSample() {
+  if (!connected || !latestRawCorners || Date.now() - latestRawFrameAt > ZERO_MAX_SAMPLE_AGE_MS) {
+    failZeroCalibration('Live Balance Board data stopped during calibration.');
+    return;
+  }
+
+  zeroSamples.push({ ...latestRawCorners });
+  zeroProgress = {
+    active: true,
+    samplesCollected: zeroSamples.length,
+    totalSamples: ZERO_SAMPLE_COUNT,
+    error: '',
+  };
+  publishCalibrationState();
+  if (zeroSamples.length >= ZERO_SAMPLE_COUNT) finishZeroCalibration();
+}
+
+function startZeroCalibration() {
+  if (zeroProgress.active) throw new Error('Balance Board zero calibration is already running');
+  if (!connected || !latestRawCorners || Date.now() - latestRawFrameAt > ZERO_MAX_SAMPLE_AGE_MS) {
+    throw new Error('The Balance Board must be connected and sending weight data');
+  }
+
+  zeroSamples = [];
+  zeroProgress = {
+    active: true,
+    samplesCollected: 0,
+    totalSamples: ZERO_SAMPLE_COUNT,
+    error: '',
+  };
+  publishCalibrationState();
+  sendRawAlert('zeroing');
+  // Delaying the first sample by one interval makes this a real ten-second
+  // calibration rather than ten rapid reads followed by nine seconds of UI.
+  zeroTimer = setInterval(takeZeroSample, ZERO_SAMPLE_INTERVAL_MS);
+}
+
 function processFrame(message = {}) {
-  const rawKg = rawWeightKg(message.corners);
+  const rawCorners = cornerWeightsKg(message.corners);
+  latestRawCorners = rawCorners;
+  latestRawFrameAt = Date.now();
   if (Number.isFinite(Number(message.batteryPercent))) {
     batteryPercent = Math.max(0, Math.min(100, Number(message.batteryPercent)));
   }
 
-  if (tareSamples.length < TARE_SAMPLE_COUNT && rawKg <= MAX_AUTOMATIC_TARE_KG) {
-    tareSamples.push(rawKg);
-    if (tareSamples.length === TARE_SAMPLE_COUNT) {
-      tareKg = tareSamples.reduce((sum, value) => sum + value, 0) / tareSamples.length;
-    }
-  }
-
   connected = true;
-  const zeroReady = tareSamples.length >= TARE_SAMPLE_COUNT;
-  updateStatus(
-    zeroReady ? 'connected' : 'zeroing',
-    zeroReady ? 'Live weight is updating.' : 'Keep the board empty for one second while it zeros.',
-  );
+  updateStatus('connected', 'Live weight is updating.');
+  const adjustedCorners = subtractZero(rawCorners);
   latestFrame = {
-    totalKg: roundedWeight(rawKg - tareKg),
-    corners: cornerWeightsKg(message.corners),
+    totalKg: totalCornerWeight(adjustedCorners),
+    corners: adjustedCorners,
     batteryPercent,
   };
   io.to(FRAME_ROOM).emit('balanceBoard:frame', latestFrame);
@@ -162,15 +296,15 @@ function handleWorkerMessage(message = {}) {
     const address = typeof message.address === 'string' ? message.address.trim().toUpperCase() : '';
     if (address && address !== store.address) {
       store.address = address;
+      // A zero baseline belongs to one physical board and whatever permanent
+      // platform/load was present when an admin calibrated it. Never carry that
+      // baseline across commissioning a different Bluetooth identity.
+      store.zeroCorners = emptyZeroCorners();
+      store.zeroedAt = null;
       persistStore();
     }
     hardware?.setAddress(address);
-    lastAlertKey = 'paired';
-    sendAlert({
-      color: ALERT_COLOR,
-      title: 'Balance Board',
-      message: 'paired',
-    });
+    sendRawAlert('paired');
     updateStatus('connecting', 'Paired. Connecting to the board now.');
     return;
   }
@@ -186,9 +320,7 @@ function handleWorkerMessage(message = {}) {
     updateStatus('pairing', 'Board found. Pairing now.');
   } else if (workerState === 'connected') {
     connected = true;
-    tareSamples = [];
-    tareKg = 0;
-    updateStatus('zeroing', 'Connected. Keep the board empty for one second while it zeros.');
+    updateStatus('connected', 'Connected. Waiting for live weight data.');
   } else if (workerState === 'link-detected') {
     connected = false;
     // The native bridge can now distinguish which half of the board's HID
@@ -198,17 +330,29 @@ function handleWorkerMessage(message = {}) {
   } else if (workerState === 'connection-failed') {
     connected = false;
     latestFrame = null;
+    latestRawCorners = null;
+    latestRawFrameAt = 0;
+    if (zeroProgress.active) failZeroCalibration('Board disconnected during calibration.');
     updateStatus('connection-failed', message.error || 'The direct Balance Board connection failed.');
   } else if (workerState === 'sleeping') {
     connected = false;
     latestFrame = null;
+    latestRawCorners = null;
+    latestRawFrameAt = 0;
+    if (zeroProgress.active) failZeroCalibration('Board slept during calibration.');
     updateStatus('sleeping', message.error || 'Board is asleep. Press the front power button to wake it.');
   } else if (workerState === 'waiting') {
     connected = false;
     latestFrame = null;
+    latestRawCorners = null;
+    latestRawFrameAt = 0;
+    if (zeroProgress.active) failZeroCalibration('Board disconnected during calibration.');
     updateStatus('waiting', message.error || 'Press the front power button. The server will keep trying to connect.');
   } else if (workerState === 'error') {
     connected = false;
+    latestRawCorners = null;
+    latestRawFrameAt = 0;
+    if (zeroProgress.active) failZeroCalibration('Worker stopped during calibration.');
     updateStatus('error', message.error || 'The Balance Board worker stopped.');
   }
 }
@@ -220,6 +364,18 @@ io.on('connection', (socket) => {
     cb({ success: true });
   });
   socket.on('balanceBoard:unsubscribe', () => socket.leave(FRAME_ROOM));
+  socket.on('balanceBoard:zero', (_payload = {}, cb = () => {}) => {
+    if (!isAdmin(socket)) {
+      cb({ error: 'Admin access required' });
+      return;
+    }
+    try {
+      startZeroCalibration();
+      cb({ success: true });
+    } catch (err) {
+      cb({ error: err.message || 'Failed to start Balance Board zero calibration' });
+    }
+  });
   socket.on('balanceBoard:unpair', async (_payload = {}, cb = () => {}) => {
     if (!isAdmin(socket)) {
       cb({ error: 'Admin access required' });
@@ -249,22 +405,27 @@ io.on('connection', (socket) => {
       }
 
       store.address = '';
+      store.zeroCorners = emptyZeroCorners();
+      store.zeroedAt = null;
       persistStore();
+      clearZeroTimer();
+      zeroSamples = [];
+      zeroProgress = {
+        active: false,
+        samplesCollected: 0,
+        totalSamples: ZERO_SAMPLE_COUNT,
+        error: '',
+      };
       connected = false;
       batteryPercent = null;
       latestFrame = null;
-      tareSamples = [];
-      tareKg = 0;
+      latestRawCorners = null;
+      latestRawFrameAt = 0;
       previousWorkerState = '';
-      lastAlertKey = 'unpaired';
       hardware?.setAddress('');
       hardware?.restart();
       updateStatus('starting', 'Starting Bluetooth discovery.');
-      sendAlert({
-        color: ALERT_COLOR,
-        title: 'Balance Board',
-        message: 'unpaired',
-      });
+      sendRawAlert('unpaired');
       cb({ success: true, warning: bluetoothWarning || null });
     } catch (err) {
       logger.error('Failed to unpair Balance Board', err);
@@ -288,7 +449,10 @@ if (enabled) {
 }
 
 function installShutdownHooks() {
-  const shutdown = () => hardware?.stop();
+  const shutdown = () => {
+    clearZeroTimer();
+    hardware?.stop();
+  };
   process.once('exit', shutdown);
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
