@@ -182,7 +182,7 @@ if [[ -f "$BALANCE_BOARD_NATIVE_DIR/Makefile" ]]; then
     exit 1
   fi
   # Only this small audited bridge needs the management socket used for the
-  # board's raw six-byte pairing PIN and the reserved HID interrupt PSM used by
+  # board's raw six-byte pairing PIN and the two reserved HID PSMs used by
   # front-button reconnects. Never grant either capability to node or the full
   # multirover service executable.
   setcap cap_net_admin,cap_net_bind_service+ep "$BALANCE_BOARD_WORKER"
@@ -195,11 +195,11 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
 fi
 
 # Bluetoothd remains responsible for discovery and the one-time bond, but its
-# generic input plugin otherwise reserves PSM 0x13 before the Balance Board
-# worker can listen for the board's front-button reconnect. This dedicated rover
-# server gives that one HID listener to the worker; every other BlueZ profile is
-# left enabled. Clearing ExecStart is required by systemd before replacing the
-# vendor unit's command in a drop-in.
+# generic input plugin otherwise reserves control PSM 0x11 and interrupt PSM
+# 0x13 before the Balance Board worker can listen for the board's front-button
+# reconnect. This dedicated rover server gives those two HID listeners to the
+# worker; every other BlueZ profile is left enabled. Clearing ExecStart is
+# required by systemd before replacing the vendor unit's command in a drop-in.
 install -d -m 0755 "$BLUETOOTH_OVERRIDE_DIR"
 cat > "$BLUETOOTH_OVERRIDE" <<'EOF'
 [Service]

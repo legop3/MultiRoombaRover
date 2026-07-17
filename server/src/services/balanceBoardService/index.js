@@ -140,9 +140,10 @@ function handleWorkerMessage(message = {}) {
     updateStatus('zeroing', 'Connected. Keep the board empty for one second while it zeros.');
   } else if (workerState === 'link-detected') {
     connected = false;
-    // A controller connection proves the physical board answered, but Bluetooth
-    // does not identify which physical button woke it. Keep the message exact.
-    updateStatus('connecting', 'Board responded. Reading its sensor calibration.');
+    // The native bridge can now distinguish which half of the board's HID
+    // connection reached the server. Preserve that diagnostic until both
+    // channels arrive; the generic text remains for the outbound Sync flow.
+    updateStatus('connecting', message.error || 'Board responded. Reading its sensor calibration.');
   } else if (workerState === 'connection-failed') {
     connected = false;
     latestFrame = null;
