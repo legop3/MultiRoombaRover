@@ -178,23 +178,9 @@ kinect:
   captureCooldownMs: 10000
 
 balanceBoard:
-  # After enabling this feature, rerun install_server.sh. The installer then
-  # configures BlueZ's Wii-compatible HID mode, persistent hid-wiimote loading,
-  # and the restricted evdev permission automatically.
+  # The server installer always prepares Bluetooth and the kernel driver. This
+  # switch only starts the service and shows its small live-weight panel.
   enabled: false
-  # A load must reach this weight before stability timing begins. Keeping the
-  # threshold above sensor drift prevents an empty board from capturing itself.
-  minimumWeightKg: 1
-  # Capture happens automatically after the total weight remains inside the
-  # tolerance window for this long.
-  stableDurationMs: 1500
-  stableToleranceKg: 0.15
-  # After a captured rover leaves, readings below this threshold reset the
-  # station for its next visitor.
-  exitWeightKg: 0.35
-  # Disconnect an empty board to conserve batteries. Set to 0 to leave the HID
-  # connection open until the board turns itself off.
-  disconnectWhenEmptyMs: 30000
 
 buttonBox:
   enabled: false

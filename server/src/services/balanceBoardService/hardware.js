@@ -1,6 +1,6 @@
 // Balance Board Hardware Bridge
 // Purpose: Supervises the capability-limited native worker and converts its JSON-line protocol into service events.
-// Scope: Owns process lifecycle, restart recovery, worker commands, and protocol validation; measurement policy remains in index.js.
+// Scope: Owns process lifecycle, restart recovery, shutdown, and protocol validation; scale policy remains in index.js.
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 const path = require('path');
@@ -106,16 +106,6 @@ function createBalanceBoardHardware({ logger, address = '', simulate = false } =
     });
   }
 
-  function send(command, payload = {}) {
-    if (!worker || worker.killed || !worker.stdin?.writable) {
-      throw new Error('balance board worker is not running');
-    }
-    // Commands are intentionally a tiny fixed vocabulary. The native worker
-    // never accepts shell fragments or arbitrary Bluetooth addresses from the
-    // browser, so an admin maintenance action cannot become command execution.
-    worker.stdin.write(`${JSON.stringify({ command, ...payload })}\n`);
-  }
-
   function stop() {
     stopped = true;
     if (restartTimer) {
@@ -139,28 +129,10 @@ function createBalanceBoardHardware({ logger, address = '', simulate = false } =
     }, 1500).unref();
   }
 
-  function restart() {
-    if (worker) {
-      const child = worker;
-      worker = null;
-      child.kill('SIGTERM');
-      setTimeout(() => {
-        if (child.exitCode == null && child.signalCode == null) child.kill('SIGKILL');
-      }, 1500).unref();
-    }
-    if (restartTimer) clearTimeout(restartTimer);
-    restartTimer = setTimeout(() => {
-      restartTimer = null;
-      start();
-    }, 250);
-  }
-
   return {
     events,
     start,
     stop,
-    restart,
-    send,
     setAddress(nextAddress) {
       // The factory can be created before first commissioning. Preserve the
       // newly paired address for later bridge restarts in the same Node process

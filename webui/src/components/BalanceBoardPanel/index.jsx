@@ -1,183 +1,47 @@
 // Balance Board Panel
-// Purpose: Presents the automatic rover weigh-station lifecycle and live four-corner load visualization.
-// Scope: Owns feature gating, frame subscription, status copy, centering display, and admin-only maintenance actions.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+// Purpose: Shows exactly what the Bluetooth board is doing and its current total weight.
+// Scope: Owns optional feature gating and the live weight-frame subscription only.
+import { useEffect, useState } from 'react';
 import { useSocket } from '../../context/SocketContext.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { isFeatureEnabled } from '../../lib/features.js';
 import CardFrame from '../CardFrame/index.jsx';
 
-const EMPTY_FRAME = {
-  totalKg: 0,
-  corners: {
-    topLeft: 0,
-    topRight: 0,
-    bottomLeft: 0,
-    bottomRight: 0,
-  },
-  center: { x: 0, y: 0 },
-  batteryPercent: null,
-  phase: 'waiting',
-};
-
-function clamp(value, minimum, maximum) {
-  return Math.max(minimum, Math.min(maximum, Number(value) || 0));
-}
+const EMPTY_FRAME = { totalKg: 0, batteryPercent: null };
 
 function formatWeight(value) {
   const weight = Number(value);
   return Number.isFinite(weight) ? `${weight.toFixed(2)} kg` : '0.00 kg';
 }
 
-function describePhase(status, frame) {
-  const phase = frame?.phase || status?.phase || 'waiting';
-  if (phase === 'error' || status?.lastError) {
-    const message = status?.lastError || 'The Balance Board bridge reported an error.';
-    // Name the failed subsystem in the badge. Generic labels such as “Needs
-    // attention” force an operator to read implementation details to understand
-    // whether the problem is scanning, pairing, or the sensor bridge itself.
-    const label = /scanner|discovery/i.test(message)
-      ? 'Bluetooth scanner stopped'
-      : (/pair/i.test(message) ? 'Board pairing failed' : 'Balance Board error');
-    return {
-      label,
-      instruction: message,
-      className: 'border-red-500/60 bg-red-950/60 text-red-200',
-    };
-  }
-  if (phase === 'commissioning') {
-    const scannerReady = status?.hardwareState === 'discovering';
-    return {
-      label: scannerReady ? 'Waiting for red Sync' : 'Starting Bluetooth scan',
-      // Pairing is automatic once discovery is active. State that directly so
-      // the UI cannot imply that a second software pairing action is required.
-      instruction: status?.lastError || (scannerReady
-        ? 'Bluetooth is listening. Press the red Sync button underneath the board once.'
-        : 'The server is starting Bluetooth discovery. Wait for “Waiting for red Sync” before pressing the board button.'),
-      className: 'border-amber-500/60 bg-amber-950/60 text-amber-200',
-    };
-  }
-  if (phase === 'pairing') {
-    return {
-      label: 'Pairing',
-      instruction: 'Keep the red Sync button active while the server completes the Bluetooth bond.',
-      className: 'border-sky-500/60 bg-sky-950/60 text-sky-200',
-    };
-  }
-  if (!status?.connected) {
-    if (status?.bluetooth?.connected) {
-      return {
-        label: 'Bluetooth connected, input unavailable',
-        instruction: status?.inputError || 'The radio link is active, but Linux has not exposed a readable Balance Board input device.',
-        className: 'border-red-500/60 bg-red-950/60 text-red-200',
-      };
-    }
-    if (status?.paired && !status?.lastConnectedAt) {
-      return {
-        label: 'Paired, not connected',
-        instruction: 'Press the front power button. The server is actively attempting to connect during the blue-light wake window.',
-        className: 'border-amber-500/60 bg-amber-950/60 text-amber-200',
-      };
-    }
-    return {
-      label: 'Sleeping',
-      instruction: 'The previously working board is disconnected. Press its front power button, then drive onto the station.',
-      className: 'border-slate-600 bg-slate-800 text-slate-200',
-    };
-  }
-  if (phase === 'zeroing') {
-    return {
-      label: 'Zeroing',
-      instruction: 'Keep the board empty while it establishes its resting baseline.',
-      className: 'border-violet-500/60 bg-violet-950/60 text-violet-200',
-    };
-  }
-  if (phase === 'entering') {
-    return {
-      label: 'Approaching',
-      instruction: 'Continue onto the board until the rover’s full weight is supported.',
-      className: 'border-sky-500/60 bg-sky-950/60 text-sky-200',
-    };
-  }
-  if (phase === 'stabilizing') {
-    return {
-      label: 'Hold still',
-      instruction: 'Center the marker and stop moving while the measurement stabilizes.',
-      className: 'border-amber-500/60 bg-amber-950/60 text-amber-200',
-    };
-  }
-  if (phase === 'captured') {
-    return {
-      label: 'Captured',
-      instruction: 'Measurement saved. Drive completely off to reset the station.',
-      className: 'border-emerald-500/60 bg-emerald-950/60 text-emerald-200',
-    };
-  }
-  return {
-    label: 'Ready',
-    instruction: 'Drive onto the board. The station will capture a stable weight automatically.',
-    className: 'border-emerald-500/60 bg-emerald-950/60 text-emerald-200',
-  };
-}
-
-function CornerLoad({ label, value }) {
-  return (
-    <div className="rounded border border-slate-600 bg-slate-950/70 px-1 py-0.5 text-center">
-      <div className="text-[0.62rem] text-slate-400">{label}</div>
-      <div className="font-mono text-xs font-semibold text-slate-100">{formatWeight(value)}</div>
-    </div>
-  );
-}
-
-function readableHardwareValue(value) {
-  if (value == null || value === '') return 'Unknown';
-  return String(value)
-    .split('-')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function HardwareStatusRow({ label, value, tone = 'text-slate-200' }) {
-  return (
-    <div className="flex min-w-0 items-start justify-between gap-2 border-b border-slate-800 py-0.5 last:border-b-0">
-      <span className="shrink-0 text-slate-500">{label}</span>
-      <span className={`min-w-0 break-all text-right font-mono ${tone}`}>{value}</span>
-    </div>
-  );
+function statusPresentation(value) {
+  const status = String(value || 'starting');
+  if (status === 'connected') return { label: 'Connected', tone: 'border-emerald-600 bg-emerald-950 text-emerald-200' };
+  if (status === 'zeroing') return { label: 'Zeroing', tone: 'border-violet-600 bg-violet-950 text-violet-200' };
+  if (status === 'pairing') return { label: 'Pairing', tone: 'border-sky-600 bg-sky-950 text-sky-200' };
+  if (status === 'waiting-for-sync') return { label: 'Waiting for red Sync', tone: 'border-amber-600 bg-amber-950 text-amber-200' };
+  if (status === 'waiting') return { label: 'Waiting for front button', tone: 'border-amber-600 bg-amber-950 text-amber-200' };
+  if (status === 'connecting') return { label: 'Connecting', tone: 'border-sky-600 bg-sky-950 text-sky-200' };
+  if (status === 'error') return { label: 'Error', tone: 'border-red-600 bg-red-950 text-red-200' };
+  return { label: 'Starting', tone: 'border-slate-600 bg-slate-900 text-slate-200' };
 }
 
 export default function BalanceBoardPanel() {
   const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'balanceBoard'));
-
-  /*
-    Balance Board support is optional physical hardware. Keeping the gate inside
-    this component lets every Activities layout include the panel without
-    duplicating config checks or leaving an empty wrapper on disabled servers.
-  */
+  // Keep feature ownership inside the component so layouts do not need special
+  // cases or empty wrappers when the optional hardware is disabled.
   if (!enabled) return null;
   return <BalanceBoardPanelContent />;
 }
 
 function BalanceBoardPanelContent() {
   const socket = useSocket();
-  const status = useSessionSelector((state) => state.session?.balanceBoard || null);
-  const role = useSessionSelector((state) => state.session?.role || 'spectator');
+  const board = useSessionSelector((state) => state.session?.balanceBoard || null);
   const [frame, setFrame] = useState(EMPTY_FRAME);
-  const [actionError, setActionError] = useState('');
-  const [actionPending, setActionPending] = useState('');
-  const isAdmin = role === 'admin' || role === 'lockdown';
 
   useEffect(() => {
     if (!socket) return undefined;
-    const handleFrame = (next = {}) => {
-      setFrame({
-        ...EMPTY_FRAME,
-        ...next,
-        corners: { ...EMPTY_FRAME.corners, ...(next.corners || {}) },
-        center: { ...EMPTY_FRAME.center, ...(next.center || {}) },
-      });
-    };
+    const handleFrame = (next = {}) => setFrame({ ...EMPTY_FRAME, ...next });
     socket.on('balanceBoard:frame', handleFrame);
     socket.emit('balanceBoard:subscribe', {}, () => {});
     return () => {
@@ -186,168 +50,36 @@ function BalanceBoardPanelContent() {
     };
   }, [socket]);
 
-  const runAction = useCallback(
-    (action) => {
-      if (!socket || actionPending) return;
-      setActionPending(action);
-      setActionError('');
-      socket.emit(`balanceBoard:${action}`, {}, (response = {}) => {
-        if (response.error) setActionError(response.error);
-        setActionPending('');
-      });
-    },
-    [actionPending, socket],
-  );
-
-  // Keep the last received frame in state for ordinary socket updates, but mask
-  // it synchronously whenever hardware disconnects. Deriving the visible value
-  // avoids both a stale-weight render and an extra effect-driven state update.
-  const displayFrame = status?.connected ? frame : EMPTY_FRAME;
-  const presentation = useMemo(() => describePhase(status, displayFrame), [displayFrame, status]);
-  const centerX = clamp(displayFrame.center?.x, -1, 1);
-  const centerY = clamp(displayFrame.center?.y, -1, 1);
-  const markerStyle = {
-    left: `${50 + centerX * 42}%`,
-    top: `${50 + centerY * 42}%`,
-  };
-  const battery = Number.isFinite(Number(displayFrame.batteryPercent))
-    ? Number(displayFrame.batteryPercent)
-    : Number.isFinite(Number(status?.batteryPercent))
-      ? Number(status.batteryPercent)
+  // Mask the previous reading immediately when disconnected. Keeping the last
+  // socket frame in state avoids effect-driven state resets and stale flashes.
+  const liveFrame = board?.connected ? frame : EMPTY_FRAME;
+  const battery = Number.isFinite(Number(liveFrame.batteryPercent))
+    ? Number(liveFrame.batteryPercent)
+    : Number.isFinite(Number(board?.batteryPercent))
+      ? Number(board.batteryPercent)
       : null;
-  const displayedWeight = status?.connected
-    ? displayFrame.totalKg
-    : status?.lastMeasurement?.totalKg || 0;
-  const bondStatus = status?.bluetooth?.paired
-    ? (status?.bluetooth?.trusted ? 'Paired and trusted' : 'Paired, not trusted')
-    : (status?.paired ? 'Saved, not confirmed' : 'Not paired');
-  const linkStatus = status?.bluetooth?.connected ? 'Connected' : 'Disconnected';
-  const diagnosticsTime = Number(status?.diagnosticsUpdatedAt);
-  const diagnosticsLabel = Number.isFinite(diagnosticsTime)
-    ? new Date(diagnosticsTime).toLocaleTimeString()
-    : 'Never';
-
+  const presentation = statusPresentation(board?.status);
   const actions = (
-    <div className="flex flex-wrap items-center justify-end gap-0.5">
-      {battery != null ? (
-        <span className="rounded border border-slate-600 bg-slate-900 px-1 py-0.5 text-[0.65rem] text-slate-300">
-          Battery {Math.round(battery)}%
-        </span>
-      ) : null}
-      <span className={`rounded border px-1 py-0.5 text-[0.65rem] font-semibold ${presentation.className}`}>
-        {presentation.label}
-      </span>
-    </div>
+    <span className={`rounded border px-1.5 py-0.5 text-xs font-semibold ${presentation.tone}`}>
+      {presentation.label}
+    </span>
   );
 
   return (
-    <CardFrame title="Rover Weigh Station" actions={actions} bodyClassName="space-y-1 p-1.5">
-      <div className="grid gap-1 md:grid-cols-[minmax(0,1fr)_minmax(11rem,0.72fr)]">
-        <div className="relative aspect-[1.55/1] min-h-[10rem] overflow-hidden rounded-lg border-2 border-slate-500 bg-slate-800 shadow-inner">
-          {/*
-            The crosshair and normalized marker make centering readable without
-            pretending the board can locate a rover in physical centimeters.
-            The kernel gives load distribution, so -1..1 is the honest unit.
-          */}
-          <div className="absolute inset-x-0 top-1/2 h-px bg-slate-600" />
-          <div className="absolute inset-y-0 left-1/2 w-px bg-slate-600" />
-          <div className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-emerald-400/70" />
-          <div
-            className={`absolute z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-lg transition-[left,top] duration-100 ${
-              displayFrame.totalKg >= Number(status?.settings?.minimumWeightKg || 1)
-                ? 'border-white bg-emerald-400 shadow-emerald-400/50'
-                : 'border-slate-400 bg-slate-600'
-            }`}
-            style={markerStyle}
-            aria-label="Center of pressure"
-          />
-          <div className="absolute inset-1 grid grid-cols-2 grid-rows-2 gap-1">
-            <CornerLoad label="Top left" value={displayFrame.corners.topLeft} />
-            <CornerLoad label="Top right" value={displayFrame.corners.topRight} />
-            <CornerLoad label="Bottom left" value={displayFrame.corners.bottomLeft} />
-            <CornerLoad label="Bottom right" value={displayFrame.corners.bottomRight} />
+    <CardFrame title="Balance Board" actions={actions} bodyClassName="p-2">
+      <div className="flex min-w-0 items-center justify-between gap-4 rounded border border-slate-700 bg-slate-950/50 p-2">
+        <div className="min-w-0">
+          <div className="font-mono text-4xl font-bold leading-none text-white">
+            {formatWeight(liveFrame.totalKg)}
           </div>
+          <p className="mt-2 break-words text-sm text-slate-300">{board?.detail || 'Starting Balance Board support.'}</p>
+          {board?.address ? <p className="mt-1 font-mono text-[0.65rem] text-slate-600">{board.address}</p> : null}
         </div>
-
-        <div className="flex min-w-0 flex-col justify-between gap-1 rounded border border-slate-700 bg-slate-950/50 p-1.5">
-          <div>
-            <div className="text-[0.65rem] tracking-wide text-slate-500">Current weight</div>
-            <div className="font-mono text-3xl font-bold leading-tight text-white">{formatWeight(displayedWeight)}</div>
-            <p className="mt-1 text-xs leading-snug text-slate-300">{presentation.instruction}</p>
+        {battery != null ? (
+          <div className="shrink-0 text-right text-xs text-slate-400">
+            Battery<br /><span className="font-mono text-base text-slate-200">{Math.round(battery)}%</span>
           </div>
-
-          <div className="rounded border border-slate-700 bg-slate-950/70 px-1.5 py-1 text-[0.68rem] leading-tight">
-            {/* These are deliberately literal diagnostics rather than another
-                synthesized health badge. Operators need to see which exact
-                layer—bond, radio link, or Linux input—is blocking readings. */}
-            <HardwareStatusRow label="Address" value={status?.address || 'None'} />
-            <HardwareStatusRow
-              label="Bluetooth device"
-              value={status?.bluetooth?.available ? 'Known to BlueZ' : 'Not available'}
-            />
-            <HardwareStatusRow label="Bluetooth bond" value={bondStatus} />
-            <HardwareStatusRow
-              label="Wake reconnect"
-              value={status?.bluetooth?.wakeAllowed ? 'Allowed' : 'Not allowed'}
-              tone={status?.bluetooth?.wakeAllowed ? 'text-emerald-300' : 'text-amber-300'}
-            />
-            <HardwareStatusRow
-              label="Bluetooth link"
-              value={linkStatus}
-              tone={status?.bluetooth?.connected ? 'text-emerald-300' : 'text-amber-300'}
-            />
-            <HardwareStatusRow
-              label="Input device"
-              value={readableHardwareValue(status?.inputState)}
-              tone={status?.inputState === 'ready' ? 'text-emerald-300' : 'text-amber-300'}
-            />
-            <HardwareStatusRow label="Worker" value={readableHardwareValue(status?.hardwareState)} />
-            <HardwareStatusRow label="Status updated" value={diagnosticsLabel} />
-            {status?.reconnectDetail ? (
-              <p className="mt-1 break-words border-t border-slate-700 pt-1 text-amber-200">
-                Last reconnect: {status.reconnectDetail}
-              </p>
-            ) : null}
-            {status?.bluetoothError ? <p className="mt-1 break-words text-red-300">Bluetooth: {status.bluetoothError}</p> : null}
-            {status?.inputError ? <p className="mt-1 break-words text-red-300">Input: {status.inputError}</p> : null}
-          </div>
-
-          {status?.lastMeasurement ? (
-            <div className="rounded border border-emerald-700/60 bg-emerald-950/30 p-1 text-xs text-emerald-200">
-              Last captured: <strong>{formatWeight(status.lastMeasurement.totalKg)}</strong>
-            </div>
-          ) : null}
-
-          {isAdmin ? (
-            <div className="border-t border-slate-700 pt-1">
-              <div className="mb-0.5 text-[0.62rem] text-slate-500">Admin maintenance</div>
-              <div className="flex flex-wrap gap-0.5">
-                {/* An unpaired server scans automatically. A separate “Pair
-                    board” action was redundant and incorrectly suggested that
-                    commissioning required two software/physical pair steps. */}
-                <button type="button" className="button-dark px-1 py-0.5 text-xs" disabled={Boolean(actionPending) || !status?.connected} onClick={() => runAction('tare')}>
-                  Tare
-                </button>
-                <button type="button" className="button-dark px-1 py-0.5 text-xs" disabled={Boolean(actionPending)} onClick={() => runAction('restart')}>
-                  Restart bridge
-                </button>
-                {status?.paired ? (
-                  <button
-                    type="button"
-                    className="rounded border border-red-700 bg-red-950/60 px-1 py-0.5 text-xs text-red-200 hover:bg-red-900/70 disabled:opacity-50"
-                    disabled={Boolean(actionPending)}
-                    onClick={() => {
-                      if (window.confirm('Forget the paired Balance Board and return to commissioning mode?')) runAction('forget');
-                    }}
-                  >
-                    Forget board
-                  </button>
-                ) : null}
-              </div>
-              {actionError ? <p className="mt-0.5 text-[0.68rem] text-red-300">{actionError}</p> : null}
-            </div>
-          ) : null}
-        </div>
+        ) : null}
       </div>
     </CardFrame>
   );

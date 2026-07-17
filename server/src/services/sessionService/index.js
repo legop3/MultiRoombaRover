@@ -403,9 +403,9 @@ kinectEvents.on('change', () => {
 });
 
 balanceBoardEvents.on('change', () => {
-  // Live load frames use their own Socket.IO room. Only lifecycle transitions
-  // and captured results reach this listener, keeping session sync inexpensive
-  // while still making reconnects and completed measurements durable UI state.
+  // Live weight frames use their own Socket.IO room because they change much
+  // faster than the full session. Only connection/status changes reach this
+  // listener, keeping session sync inexpensive while the panel stays current.
   logger.info('Balance Board state change; syncing all clients');
   syncAll();
 });

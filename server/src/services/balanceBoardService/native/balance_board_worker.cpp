@@ -883,50 +883,12 @@ std::optional<std::string> extract_command_value(const std::string& line, const 
 }
 
 void handle_command(const std::string& line, PairingSharedState* shared) {
+  (void)shared;
   const std::string command = extract_command_value(line, "command").value_or("");
-  if (command == "pair") {
-    std::lock_guard<std::mutex> lock(shared->mutex);
-    if (!shared->pairing_available) {
-      emit_status("error", "", "Bluetooth pairing capability is unavailable; reinstall the bridge capability");
-      return;
-    }
-    shared->commissioned_address.reset();
-    shared->commissioning = true;
-  } else if (command == "forget") {
-    std::optional<std::string> address;
-    {
-      std::lock_guard<std::mutex> lock(shared->mutex);
-      if (!shared->pairing_available) {
-        emit_status("error", address.value_or(""),
-                    "cannot forget the board while Bluetooth pairing capability is unavailable");
-        return;
-      }
-      address = shared->commissioned_address;
-      shared->commissioned_address.reset();
-      // Do not let the discovery loop race the BlueZ removal. It may otherwise
-      // rediscover and attempt to pair the still-bonded object before `remove`
-      // has finished deleting its keys and cached SDP record.
-      shared->commissioning = false;
-    }
-    if (address.has_value()) run_command({"bluetoothctl", "--timeout", "8", "remove", *address});
-    {
-      std::lock_guard<std::mutex> lock(shared->mutex);
-      shared->commissioning = true;
-    }
-    emit_status("commissioning");
-  } else if (command == "disconnect") {
-    std::optional<std::string> address;
-    {
-      std::lock_guard<std::mutex> lock(shared->mutex);
-      address = shared->commissioned_address;
-    }
-    // Idle disconnect is intentionally host-initiated only after the server has
-    // observed an empty station for its configured delay. The bond remains, so
-    // the next front power-button press still reconnects without commissioning.
-    if (address.has_value()) {
-      run_command({"bluetoothctl", "--timeout", "8", "disconnect", *address});
-    }
-  } else if (command == "stop") {
+  // Pairing and reconnect are deliberately automatic. The only command the
+  // Node supervisor needs is a clean shutdown signal; removing manual pair,
+  // forget, and disconnect modes keeps the hardware flow single-purpose.
+  if (command == "stop") {
     running.store(false);
   }
 }
@@ -943,9 +905,8 @@ void simulated_loop() {
   simulated_bluetooth.trusted = true;
   simulated_bluetooth.connected = true;
   simulated_bluetooth.wake_allowed = true;
-  // Exercise the same diagnostics contract as real hardware so development UI
-  // builds cannot silently break the status table merely because CI lacks a
-  // Bluetooth adapter and physical Balance Board.
+  // Exercise the same status contract as real hardware so development UI
+  // builds cannot silently break merely because CI lacks a physical board.
   emit_diagnostics("SIMULATED", simulated_bluetooth, "ready", "", "");
   emit_status("waiting", "SIMULATED");
   const std::array<BoardReadings, 12> sequence{{
