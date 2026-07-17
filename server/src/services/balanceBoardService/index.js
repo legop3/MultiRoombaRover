@@ -23,13 +23,7 @@ const FRAME_ROOM = 'balance-board-viewers';
 const TARE_SAMPLE_COUNT = 20;
 const MAX_AUTOMATIC_TARE_KG = 2;
 const execFileAsync = promisify(execFile);
-const ALERT_COLORS = {
-  connected: '#10b981',
-  sleeping: '#64748b',
-  warning: '#f59e0b',
-  error: '#ef4444',
-  info: '#38bdf8',
-};
+const ALERT_COLOR = '#38bdf8';
 
 function loadStore() {
   try {
@@ -89,49 +83,25 @@ let lastAlertKey = '';
 let unpairing = false;
 
 function sendStatusAlert(workerState, message = '') {
-  let alert = null;
-  if (workerState === 'connected') {
-    alert = {
-      color: ALERT_COLORS.connected,
-      title: 'Balance Board connected',
-      message: 'Live weight is available.',
-    };
-  } else if (workerState === 'sleeping') {
-    alert = {
-      color: ALERT_COLORS.sleeping,
-      title: 'Balance Board sleeping',
-      message: 'Press the front power button when you are ready to use it.',
-    };
-  } else if (workerState === 'waiting' && previousWorkerState === 'connected') {
-    alert = {
-      color: ALERT_COLORS.warning,
-      title: 'Balance Board disconnected',
-      message: message || 'Press the front power button to reconnect it.',
-    };
-  } else if (workerState === 'connection-failed') {
-    alert = {
-      color: ALERT_COLORS.error,
-      title: 'Balance Board connection failed',
-      message: message || 'The Bluetooth connection did not complete.',
-    };
-  } else if (workerState === 'error') {
-    alert = {
-      color: ALERT_COLORS.error,
-      title: 'Balance Board needs attention',
-      message: message || 'The hardware worker stopped.',
-    };
-  }
+  const shouldAlert =
+    workerState === 'connected' ||
+    workerState === 'sleeping' ||
+    workerState === 'connection-failed' ||
+    workerState === 'error' ||
+    (workerState === 'waiting' && previousWorkerState === 'connected');
 
   previousWorkerState = workerState;
-  if (!alert) return;
+  if (!shouldAlert) return;
 
-  // Native reconnect retries may repeat the same result while hardware is out
-  // of range. Collapse identical status/message pairs so feed alerts remain
-  // meaningful state changes instead of turning into a transport log.
-  const key = `${workerState}:${alert.message}`;
+  // Keep the alert at the same system-level boundary as the worker protocol:
+  // state first, followed by its exact detail when one exists. The service does
+  // not reinterpret failures as friendlier product copy, but still collapses
+  // identical retries so a failing reconnect cannot flood the activity feed.
+  const rawMessage = message ? `${workerState}: ${message}` : workerState;
+  const key = rawMessage;
   if (key === lastAlertKey) return;
   lastAlertKey = key;
-  sendAlert(alert);
+  sendAlert({ color: ALERT_COLOR, title: 'Balance Board', message: rawMessage });
 }
 
 function getState() {
@@ -197,9 +167,9 @@ function handleWorkerMessage(message = {}) {
     hardware?.setAddress(address);
     lastAlertKey = 'paired';
     sendAlert({
-      color: ALERT_COLORS.info,
-      title: 'Balance Board paired',
-      message: 'Bluetooth setup completed.',
+      color: ALERT_COLOR,
+      title: 'Balance Board',
+      message: 'paired',
     });
     updateStatus('connecting', 'Paired. Connecting to the board now.');
     return;
@@ -291,9 +261,9 @@ io.on('connection', (socket) => {
       hardware?.restart();
       updateStatus('starting', 'Starting Bluetooth discovery.');
       sendAlert({
-        color: ALERT_COLORS.warning,
-        title: 'Balance Board unpaired',
-        message: 'Press the red Sync button underneath the board to pair it again.',
+        color: ALERT_COLOR,
+        title: 'Balance Board',
+        message: 'unpaired',
       });
       cb({ success: true, warning: bluetoothWarning || null });
     } catch (err) {
