@@ -15,6 +15,7 @@ import {
 } from './controls/index.js';
 import RoomCameraPanel from './components/RoomCameraPanel/index.jsx';
 import KinectPanel from './components/KinectPanel/index.jsx';
+import BalanceBoardPanel from './components/BalanceBoardPanel/index.jsx';
 import DriverVideo from './components/DriverVideo/index.jsx';
 import RightPaneTabs from './components/RightPaneTabs/index.jsx';
 import ModeGateOverlay from './components/ModeGateOverlay/index.jsx';
@@ -175,6 +176,7 @@ function MobileFeatureTabs({
               <OdometerPanel />
               <ButtonBoxPanel />
               <KinectPanel />
+              <BalanceBoardPanel />
             </div>
           </TabPanel>
           <TabPanel id="vip" keepMounted>

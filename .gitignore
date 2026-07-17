@@ -33,3 +33,4 @@ server/data/identity.sqlite
 server/data/barcode-games.json
 server/data/identity.sqlite-shm
 server/data/identity.sqlite-wal
+server/src/services/balanceBoardService/native/balance_board_worker

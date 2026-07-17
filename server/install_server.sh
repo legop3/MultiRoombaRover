@@ -16,6 +16,7 @@ MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
 SNAPSHOT_DIR="/var/lib/rover-snapshots"
 REPLAY_SEGMENT_DIR="/var/lib/replay-segments"
 KINECT_UDEV_RULE="/etc/udev/rules.d/99-kinect-world.rules"
+BALANCE_BOARD_UDEV_RULE="/etc/udev/rules.d/99-multirover-balance-board.rules"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This installer must be run with sudo/root." >&2
@@ -30,6 +31,8 @@ fi
 TARGET_USER="$SUDO_USER"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 SERVER_DIR="$SCRIPT_DIR"
+BALANCE_BOARD_NATIVE_DIR="$SCRIPT_DIR/src/services/balanceBoardService/native"
+BALANCE_BOARD_WORKER="$BALANCE_BOARD_NATIVE_DIR/balance_board_worker"
 CONFIG_PATH="$SERVER_DIR/config.yaml"
 MEDIAMTX_TEMPLATE="$SERVER_DIR/mediamtx/mediamtx.yml"
 ROVER_SNAPSHOT_WRITER_TEMPLATE="$SERVER_DIR/mediamtx/rover-snapshot-writer.sh"
@@ -134,7 +137,9 @@ dnf install -y \
   gstreamer1-rtsp-server \
   libfreenect \
   libfreenect-devel \
-  libusb1-devel >/dev/null
+  libusb1-devel \
+  bluez \
+  libcap >/dev/null
 NODE_BIN="$(command -v node)"
 
 echo "      Installing Kinect udev rule -> $KINECT_UDEV_RULE"
@@ -151,6 +156,17 @@ EOF
 chmod 644 "$KINECT_UDEV_RULE"
 udevadm control --reload-rules
 
+echo "      Installing Balance Board input rule -> $BALANCE_BOARD_UDEV_RULE"
+cat > "$BALANCE_BOARD_UDEV_RULE" <<EOF
+# hid-wiimote creates a calibrated evdev device specifically for the Balance
+# Board extension. Give only the rover service owner access to that exact input
+# name; the Node process and unrelated local users do not receive broad access
+# to keyboards, mice, or every device in the input group.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="Nintendo Wii Remote Balance Board", OWNER="$TARGET_USER", MODE="0660", TAG+="uaccess"
+EOF
+chmod 644 "$BALANCE_BOARD_UDEV_RULE"
+udevadm control --reload-rules
+
 if [[ ! -f "$CHROMEGTTS_WAV_TEMPLATE" ]]; then
   echo "Chrome Google TTS WAV helper missing at $CHROMEGTTS_WAV_TEMPLATE" >&2
   exit 1
@@ -164,6 +180,19 @@ runuser -u "$TARGET_USER" -- bash -c "cd '$SERVER_DIR' && npm install --producti
 if [[ -f "$SERVER_DIR/src/services/kinectService/native/Makefile" ]]; then
   echo "      Building native Kinect worker..."
   runuser -u "$TARGET_USER" -- bash -c "cd '$SERVER_DIR/src/services/kinectService/native' && make"
+fi
+
+if [[ -f "$BALANCE_BOARD_NATIVE_DIR/Makefile" ]]; then
+  echo "      Building native Balance Board bridge..."
+  runuser -u "$TARGET_USER" -- bash -c "cd '$BALANCE_BOARD_NATIVE_DIR' && make"
+  if [[ ! -x "$BALANCE_BOARD_WORKER" ]]; then
+    echo "Balance Board worker build did not create $BALANCE_BOARD_WORKER" >&2
+    exit 1
+  fi
+  # Only this small audited bridge needs the management socket used for the
+  # board's raw six-byte pairing PIN. Never grant CAP_NET_ADMIN to node or the
+  # full multirover service executable.
+  setcap cap_net_admin+ep "$BALANCE_BOARD_WORKER"
 fi
 
 if [[ ! -f "$CONFIG_PATH" ]]; then
@@ -304,3 +333,5 @@ echo
 echo "Update $CONFIG_PATH to set admins, lockdown settings, and media parameters."
 echo "Kinect/libfreenect packages and udev permissions were installed."
 echo "If a Kinect is already plugged in, unplug/replug its USB/power before testing so the new udev rule applies."
+echo "Wii Balance Board Bluetooth support and the restricted input rule were installed."
+echo "Enable balanceBoard in config.yaml, then press the red Sync button once to commission it."

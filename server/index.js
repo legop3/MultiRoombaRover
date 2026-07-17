@@ -46,6 +46,7 @@ require('./src/services/buttonBoxService');
 require('./src/services/barcodeScannerService');
 require('./src/services/barcodeGameService');
 require('./src/services/kinectService');
+require('./src/services/balanceBoardService');
 require('./src/services/sessionService');
 require('./src/services/batteryManager');
 require('./src/services/replayEngineV2');
