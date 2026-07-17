@@ -205,10 +205,12 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
 fi
 
 echo "      Configuring BlueZ for the Wii Balance Board"
-if ! modinfo hid-wiimote >/dev/null 2>&1; then
-  echo "The running kernel does not provide hid-wiimote; install a Fedora kernel with that module." >&2
-  exit 1
-fi
+for balance_board_module in hidp hid-wiimote; do
+  if ! modinfo "$balance_board_module" >/dev/null 2>&1; then
+    echo "The running kernel does not provide $balance_board_module; install a Fedora kernel with that module." >&2
+    exit 1
+  fi
+done
 
 install -d -m 0755 /etc/bluetooth /etc/modules-load.d
 touch "$BLUEZ_INPUT_CONFIG"
@@ -222,14 +224,17 @@ chmod 0644 "$BLUEZ_INPUT_CONFIG"
 crudini --set "$BLUEZ_INPUT_CONFIG" General UserspaceHID false
 crudini --set "$BLUEZ_INPUT_CONFIG" General ClassicBondedOnly false
 
-# The service consumes calibrated evdev axes from the kernel driver. Load the
-# driver now and at every boot so a short board wake is never lost while an
-# operator manually prepares the server.
+# UserspaceHID=false hands the Bluetooth HID channels to the kernel's `hidp`
+# transport, which then creates a HID device for `hid-wiimote` to calibrate.
+# They are separate modules, so load and persist both explicitly; loading only
+# hid-wiimote leaves BlueZ with no kernel transport to create the input socket.
 cat > "$BALANCE_BOARD_MODULES_LOAD" <<'EOF'
 # MultiRoombaRover Wii Balance Board support.
+hidp
 hid-wiimote
 EOF
 chmod 0644 "$BALANCE_BOARD_MODULES_LOAD"
+modprobe hidp
 modprobe hid-wiimote
 
 # BlueZ reads input.conf only at daemon startup. Restart it before the rover

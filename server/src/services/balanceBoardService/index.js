@@ -110,17 +110,10 @@ function processFrame(message = {}) {
 function diagnosticDetail(message = {}) {
   if (message.inputError) return `Input device: ${message.inputError}`;
   if (message.bluetoothError) return `Bluetooth: ${message.bluetoothError}`;
-  if (message.reconnectDetail) {
-    const reconnectDetail = String(message.reconnectDetail);
-    // bluetoothctl can return a long transcript containing every property
-    // change around one failed attempt. Translate the known Wii HID socket
-    // failure into one useful sentence so the panel remains readable while the
-    // worker continues its automatic retries in the background.
-    if (reconnectDetail.includes('br-connection-create-socket')) {
-      return 'Bluetooth rejected the input connection. The server is retrying automatically.';
-    }
-    return reconnectDetail;
-  }
+  // The native worker now reduces controller events and the matching journal
+  // entry to one concrete stage-specific sentence. Preserve that evidence
+  // verbatim instead of replacing it with generic retry wording here.
+  if (message.reconnectDetail) return String(message.reconnectDetail);
   return 'Press the front power button. The server will keep trying to connect.';
 }
 
@@ -144,10 +137,14 @@ function handleWorkerMessage(message = {}) {
   if (message.type === 'diagnostics') {
     const bluetoothConnected = Boolean(message.bluetooth?.connected);
     const inputReady = message.inputState === 'ready';
+    const reconnectStage = String(message.reconnectStage || 'waiting');
     if (bluetoothConnected && inputReady) {
       updateStatus('connected', 'Connected. Waiting for weight readings.');
     } else if (bluetoothConnected) {
       updateStatus('connecting', message.inputError || 'Bluetooth connected. Waiting for the input device.');
+    } else if (reconnectStage === 'input-failed' || reconnectStage === 'connection-failed') {
+      connected = false;
+      updateStatus('connection-failed', diagnosticDetail(message));
     } else if (store.address) {
       connected = false;
       updateStatus('waiting', diagnosticDetail(message));
@@ -168,6 +165,11 @@ function handleWorkerMessage(message = {}) {
     tareSamples = [];
     tareKg = 0;
     updateStatus('zeroing', 'Connected. Keep the board empty for one second while it zeros.');
+  } else if (workerState === 'link-detected') {
+    connected = false;
+    // A controller connection proves the physical board answered, but Bluetooth
+    // does not identify which physical button woke it. Keep the message exact.
+    updateStatus('connecting', 'Board responded. Bluetooth connected; creating the input device.');
   } else if (workerState === 'waiting') {
     connected = false;
     latestFrame = null;

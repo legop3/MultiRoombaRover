@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
 #include <cerrno>
 #include <chrono>
 #include <csignal>
@@ -56,6 +57,9 @@ constexpr uint16_t kHciChannelControl = 3;
 constexpr uint16_t kHciDeviceNone = 0xffff;
 constexpr uint16_t kMgmtPinCodeRequestEvent = 0x000e;
 constexpr uint16_t kMgmtPinCodeReplyCommand = 0x0016;
+constexpr uint16_t kMgmtDeviceConnectedEvent = 0x000b;
+constexpr uint16_t kMgmtDeviceDisconnectedEvent = 0x000c;
+constexpr uint16_t kMgmtConnectFailedEvent = 0x000d;
 constexpr uint8_t kBluetoothClassicAddressType = 0;
 constexpr int kFrameIntervalMs = 50;
 constexpr int kDeviceScanIntervalMs = 500;
@@ -63,6 +67,7 @@ constexpr int kDiscoveryRestartDelayMs = 1000;
 constexpr const char* kDiscoveryTimeoutSeconds = "86400";
 constexpr int kBluetoothMonitorIntervalMs = 2000;
 constexpr int kReconnectAttemptIntervalMs = 3000;
+constexpr int kConnectionEvidenceWindowMs = 5000;
 constexpr int kBatteryRefreshMs = 5000;
 
 std::atomic<bool> running{true};
@@ -82,6 +87,14 @@ struct PairingSharedState {
   std::optional<std::string> commissioned_address;
   std::string input_state = "not-detected";
   std::string input_error;
+  // The management socket sees the actual controller-level events even when
+  // bluetoothctl reduces them to a generic D-Bus failure. Timestamps let the
+  // reconnect thread associate those events with one specific attempt.
+  uint64_t last_radio_connected_at = 0;
+  uint64_t last_radio_disconnected_at = 0;
+  uint64_t last_connect_failed_at = 0;
+  uint8_t last_disconnect_reason = 0;
+  uint8_t last_connect_status = 0;
   bool commissioning = false;
   bool pairing_available = true;
 };
@@ -178,6 +191,7 @@ void emit_diagnostics(const std::string& address,
                       const BluetoothDeviceState& bluetooth,
                       const std::string& input_state,
                       const std::string& input_error,
+                      const std::string& reconnect_stage,
                       const std::string& reconnect_detail) {
   // Bluetooth bonding, the current radio link, and Linux evdev readiness are
   // separate layers. Report each one explicitly so the server never has to
@@ -197,6 +211,9 @@ void emit_diagnostics(const std::string& address,
   }
   if (!input_error.empty()) {
     fields << ",\"inputError\":\"" << json_escape(input_error) << "\"";
+  }
+  if (!reconnect_stage.empty()) {
+    fields << ",\"reconnectStage\":\"" << json_escape(reconnect_stage) << "\"";
   }
   if (!reconnect_detail.empty()) {
     fields << ",\"reconnectDetail\":\"" << json_escape(reconnect_detail) << "\"";
@@ -448,6 +465,120 @@ std::string command_error_summary(const std::string& raw, const std::string& fal
   return summary.empty() ? fallback : summary;
 }
 
+std::string lowercase(std::string value) {
+  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+    return static_cast<char>(std::tolower(ch));
+  });
+  return value;
+}
+
+std::string relevant_log_detail(const std::string& raw) {
+  std::istringstream lines(raw);
+  std::string line;
+  std::string selected;
+  while (std::getline(lines, line)) {
+    const std::string lowered = lowercase(line);
+    // Bluetoothd and the kernel normally log the useful transport error on a
+    // line containing one of these terms. Ignore routine property changes so
+    // the panel receives the cause, not another multi-line command transcript.
+    const bool relevant =
+        lowered.find("hidp") != std::string::npos ||
+        lowered.find("uhid") != std::string::npos ||
+        lowered.find("wiimote") != std::string::npos ||
+        lowered.find("profiles/input") != std::string::npos ||
+        lowered.find("host is down") != std::string::npos ||
+        lowered.find("permission denied") != std::string::npos ||
+        lowered.find("not supported") != std::string::npos ||
+        lowered.find("failed") != std::string::npos ||
+        lowered.find("error") != std::string::npos;
+    if (!relevant) continue;
+    const std::string cleaned = command_error_summary(line, "");
+    if (!cleaned.empty()) selected = cleaned;
+  }
+  return selected;
+}
+
+std::string hardware_setup_failure() {
+  std::ifstream input_config("/etc/bluetooth/input.conf");
+  std::ostringstream input_config_text;
+  input_config_text << input_config.rdbuf();
+  std::string normalized = lowercase(input_config_text.str());
+  normalized.erase(std::remove_if(normalized.begin(), normalized.end(), [](unsigned char ch) {
+    return std::isspace(ch);
+  }), normalized.end());
+
+  // These checks describe the machine state after a failed HID creation. They
+  // match the transport path installed by install_server.sh and turn a missed
+  // installer/restart step into an explicit panel error instead of speculation.
+  if (normalized.find("userspacehid=false") == std::string::npos) {
+    return "BlueZ UserspaceHID=false is not active in /etc/bluetooth/input.conf";
+  }
+  if (access("/sys/module/hidp", F_OK) != 0) {
+    return "the kernel HIDP Bluetooth transport is not loaded";
+  }
+  if (access("/sys/module/hid_wiimote", F_OK) != 0) {
+    return "the kernel hid-wiimote driver is not loaded";
+  }
+  return "";
+}
+
+std::string connection_log_detail(uint64_t attempt_started_epoch_seconds) {
+  // Query only the tiny time window belonging to this connection attempt. On
+  // Fedora the service owner normally has journal access through its ordinary
+  // account groups; if it does not, the management-event diagnosis below still
+  // remains available and no privileged helper is introduced.
+  const uint64_t lookback_seconds = (kConnectionEvidenceWindowMs / 1000) + 1;
+  const std::string since = "@" + std::to_string(
+      attempt_started_epoch_seconds > lookback_seconds
+          ? attempt_started_epoch_seconds - lookback_seconds
+          : 0);
+  const CommandResult bluetooth_log = run_command({
+      "journalctl", "--quiet", "--no-pager", "--output=cat",
+      "--since", since, "--unit", "bluetooth.service"});
+  if (bluetooth_log.exit_code == 0) {
+    if (const std::string detail = relevant_log_detail(bluetooth_log.output);
+        !detail.empty()) {
+      return detail;
+    }
+  }
+
+  const CommandResult kernel_log = run_command({
+      "journalctl", "--quiet", "--no-pager", "--output=cat",
+      "--since", since, "--dmesg"});
+  return kernel_log.exit_code == 0 ? relevant_log_detail(kernel_log.output) : "";
+}
+
+std::string disconnect_reason_detail(uint8_t reason) {
+  switch (reason) {
+    case 0x01: return "Bluetooth connection timed out";
+    case 0x02: return "the local Bluetooth stack closed the connection";
+    case 0x03: return "the board closed the connection";
+    case 0x04: return "Bluetooth authentication failed";
+    case 0x05: return "the local host suspended the connection";
+    default: return "the Bluetooth connection closed for an unspecified reason";
+  }
+}
+
+std::string connect_status_detail(uint8_t status) {
+  // These are the standard Bluetooth controller status values returned by the
+  // kernel management API. Naming the common failures makes an unanswered wake
+  // distinguishable from a bad stored key or a transport timeout.
+  switch (status) {
+    case 0x04: return "the board did not answer the Bluetooth page";
+    case 0x05: return "Bluetooth authentication failed";
+    case 0x06: return "the stored Bluetooth PIN or link key is missing";
+    case 0x08: return "the Bluetooth connection timed out";
+    case 0x10: return "the board did not accept the connection in time";
+    default: {
+      std::ostringstream detail;
+      detail << "Bluetooth controller rejected the connection (status 0x"
+             << std::hex << std::setw(2) << std::setfill('0')
+             << static_cast<int>(status) << ")";
+      return detail.str();
+    }
+  }
+}
+
 bool command_succeeded(const CommandResult& result) {
   if (result.exit_code != 0) return false;
   return result.output.find("Failed") == std::string::npos &&
@@ -504,25 +635,10 @@ std::string prepare_known_device(const BluetoothAddress& address) {
   return "";
 }
 
-std::string trust_and_connect(const BluetoothAddress& address) {
-  if (const std::string prepare_error = prepare_known_device(address);
-      !prepare_error.empty()) {
-    return prepare_error;
-  }
-  // A board remains awake for only a short window after Sync. Connecting the
-  // HID profile immediately is what teaches it to initiate future connections
-  // when its front power button is pressed.
-  const CommandResult connect = run_command({
-      "bluetoothctl", "--timeout", "8", "connect", address.display});
-  if (!command_succeeded(connect)) {
-    return "initial connection failed: " +
-        command_error_summary(connect.output, "BlueZ returned no detail");
-  }
-  return "";
-}
-
 void connection_monitor_loop(PairingSharedState* shared) {
   uint64_t last_reconnect_attempt_at = 0;
+  std::string reconnect_stage = "waiting";
+  std::string reconnect_detail = "No Bluetooth response from the board yet.";
   while (running.load()) {
     std::optional<std::string> address;
     std::string input_state;
@@ -540,7 +656,10 @@ void connection_monitor_loop(PairingSharedState* shared) {
     }
 
     BluetoothDeviceState bluetooth = inspect_bluetooth_device(*address);
-    std::string reconnect_detail;
+    if (!bluetooth.connected && input_state != "ready" && reconnect_stage == "input-ready") {
+      reconnect_stage = "waiting";
+      reconnect_detail = "Board disconnected. Waiting for the next front-button wake.";
+    }
     const uint64_t now = monotonic_ms();
     if (bluetooth.available && !bluetooth.connected &&
         now - last_reconnect_attempt_at >= kReconnectAttemptIntervalMs) {
@@ -550,22 +669,86 @@ void connection_monitor_loop(PairingSharedState* shared) {
       // server is waiting so the several-second blue-light wake window is caught
       // from either direction without requiring another red-Sync operation.
       last_reconnect_attempt_at = now;
+      const uint64_t attempt_started_at = monotonic_ms();
+      const uint64_t attempt_started_epoch_seconds =
+          std::chrono::duration_cast<std::chrono::seconds>(
+              std::chrono::system_clock::now().time_since_epoch()).count();
       const CommandResult reconnect = run_command({
           "bluetoothctl", "--timeout", "4", "connect", *address});
       // Query again because Connect() may have changed several properties before
       // returning. The diagnostics should describe the resulting state, not the
       // stale snapshot taken immediately before the attempt.
       bluetooth = inspect_bluetooth_device(*address);
-      if (bluetooth.connected) {
+      uint64_t radio_connected_at = 0;
+      uint64_t radio_disconnected_at = 0;
+      uint64_t connect_failed_at = 0;
+      uint8_t disconnect_reason = 0;
+      uint8_t connect_status = 0;
+      {
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        radio_connected_at = shared->last_radio_connected_at;
+        radio_disconnected_at = shared->last_radio_disconnected_at;
+        connect_failed_at = shared->last_connect_failed_at;
+        disconnect_reason = shared->last_disconnect_reason;
+        connect_status = shared->last_connect_status;
+        input_state = shared->input_state;
+        input_error = shared->input_error;
+      }
+
+      const bool radio_was_reached = radio_connected_at >= attempt_started_at ||
+          reconnect.output.find("Connected: yes") != std::string::npos;
+      // The board may initiate its own ACL connection while the monitor is
+      // still running the preceding BlueZ property query. Include that short
+      // pre-attempt window so an actual wake event cannot be lost merely due to
+      // thread timing.
+      const uint64_t evidence_window_started_at =
+          attempt_started_at > kConnectionEvidenceWindowMs
+              ? attempt_started_at - kConnectionEvidenceWindowMs
+              : 0;
+      const bool recent_radio_connection =
+          radio_connected_at >= evidence_window_started_at;
+      const bool radio_closed_during_attempt =
+          radio_disconnected_at >= evidence_window_started_at;
+      const bool controller_rejected_attempt = connect_failed_at >= attempt_started_at;
+
+      if (input_state == "ready") {
+        reconnect_stage = "input-ready";
+        reconnect_detail = "Balance Board input device is ready.";
+      } else if (bluetooth.connected) {
+        reconnect_stage = "radio-connected";
         reconnect_detail = "Bluetooth link established; waiting for the Balance Board input device";
+      } else if (radio_was_reached || recent_radio_connection ||
+                 reconnect.output.find("br-connection-create-socket") != std::string::npos) {
+        reconnect_stage = "input-failed";
+        const std::string setup_error = hardware_setup_failure();
+        const std::string logged_error = setup_error.empty()
+            ? connection_log_detail(attempt_started_epoch_seconds)
+            : "";
+        if (!setup_error.empty()) {
+          reconnect_detail = "Board reached the server, but HID input setup failed: " + setup_error + ".";
+        } else if (!logged_error.empty()) {
+          reconnect_detail = "Board reached the server, but HID input setup failed: " + logged_error;
+        } else if (radio_closed_during_attempt) {
+          reconnect_detail = "Board reached the server, but no input device was created before " +
+              disconnect_reason_detail(disconnect_reason) + ".";
+        } else {
+          reconnect_detail = "Board reached the server, but BlueZ could not create its HID input connection: " +
+              command_error_summary(reconnect.output, "no lower-level error was logged");
+        }
+      } else if (controller_rejected_attempt &&
+                 connect_status != 0x04 && connect_status != 0x08 && connect_status != 0x10) {
+        // Page/connection timeouts are normal while the board sleeps. Preserve
+        // the last meaningful hardware failure instead of replacing it every
+        // three seconds with noise from an unanswered background page.
+        reconnect_stage = "connection-failed";
+        reconnect_detail = connect_status_detail(connect_status) + ".";
       } else if (!command_succeeded(reconnect)) {
-        reconnect_detail = command_error_summary(
-            reconnect.output, "Bluetooth reconnect attempt did not complete");
-      } else {
-        // bluetoothctl's timeout can end a command without a D-Bus error even
-        // though the device never connected. Trust the resulting Connected
-        // property rather than presenting process exit status as hardware success.
-        reconnect_detail = "Reconnect attempt finished without establishing a Bluetooth link";
+        const std::string command_error = command_error_summary(reconnect.output, "");
+        if (!command_error.empty() &&
+            command_error.find("not available") != std::string::npos) {
+          reconnect_stage = "connection-failed";
+          reconnect_detail = command_error;
+        }
       }
     }
 
@@ -577,7 +760,8 @@ void connection_monitor_loop(PairingSharedState* shared) {
       input_state = shared->input_state;
       input_error = shared->input_error;
     }
-    emit_diagnostics(*address, bluetooth, input_state, input_error, reconnect_detail);
+    emit_diagnostics(
+        *address, bluetooth, input_state, input_error, reconnect_stage, reconnect_detail);
 
     for (int elapsed = 0;
          elapsed < kBluetoothMonitorIntervalMs && running.load(); elapsed += 100) {
@@ -700,14 +884,17 @@ void commissioning_loop(PairingSharedState* shared) {
       continue;
     }
 
-    const std::string initial_connection_error = trust_and_connect(*address);
+    const std::string prepare_error = prepare_known_device(*address);
     {
       std::lock_guard<std::mutex> lock(shared->mutex);
       shared->commissioned_address = address->display;
       shared->commissioning = false;
     }
     emit_json("\"type\":\"paired\",\"address\":\"" + json_escape(address->display) + "\"");
-    emit_status("waiting", address->display, initial_connection_error);
+    // Use the same instrumented monitor for the first post-pair connection and
+    // every later wake. A separate one-off connect here previously produced a
+    // large opaque error before the monitor could observe its controller stages.
+    emit_status("waiting", address->display, prepare_error);
   }
 }
 
@@ -764,24 +951,60 @@ void process_management_events(int fd, PairingSharedState* shared) {
   std::array<uint8_t, 1024> buffer{};
   ssize_t count = 0;
   while ((count = read(fd, buffer.data(), buffer.size())) > 0) {
-    if (count < 14) continue;
+    if (count < 6) continue;
     const uint16_t event = static_cast<uint16_t>(buffer[0] | (buffer[1] << 8));
     const uint16_t adapter_index = static_cast<uint16_t>(buffer[2] | (buffer[3] << 8));
     const uint16_t payload_size = static_cast<uint16_t>(buffer[4] | (buffer[5] << 8));
-    if (event != kMgmtPinCodeRequestEvent || payload_size < 8 || count < 6 + payload_size) continue;
+    if (count < 6 + payload_size) continue;
 
-    std::optional<BluetoothAddress> target;
-    std::optional<BluetoothAddress> pin;
-    {
-      std::lock_guard<std::mutex> lock(shared->mutex);
-      target = shared->active_target;
-      pin = shared->active_pin;
-    }
-    if (!target.has_value() || !pin.has_value() ||
-        !std::equal(target->wire.begin(), target->wire.end(), buffer.begin() + 6)) {
+    if (event == kMgmtPinCodeRequestEvent && payload_size >= 8) {
+      std::optional<BluetoothAddress> target;
+      std::optional<BluetoothAddress> pin;
+      {
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        target = shared->active_target;
+        pin = shared->active_pin;
+      }
+      if (target.has_value() && pin.has_value() &&
+          std::equal(target->wire.begin(), target->wire.end(), buffer.begin() + 6)) {
+        answer_pin_request(fd, adapter_index, *target, *pin);
+      }
       continue;
     }
-    answer_pin_request(fd, adapter_index, *target, *pin);
+
+    std::optional<BluetoothAddress> commissioned;
+    {
+      std::lock_guard<std::mutex> lock(shared->mutex);
+      if (shared->commissioned_address.has_value()) {
+        commissioned = parse_address(*shared->commissioned_address);
+      }
+    }
+    if (!commissioned.has_value() || payload_size < 7 ||
+        !std::equal(commissioned->wire.begin(), commissioned->wire.end(), buffer.begin() + 6)) {
+      continue;
+    }
+
+    const uint64_t observed_at = monotonic_ms();
+    bool announce_link = false;
+    {
+      std::lock_guard<std::mutex> lock(shared->mutex);
+      if (event == kMgmtDeviceConnectedEvent && payload_size >= 13) {
+        shared->last_radio_connected_at = observed_at;
+        announce_link = true;
+      } else if (event == kMgmtDeviceDisconnectedEvent && payload_size >= 8) {
+        shared->last_radio_disconnected_at = observed_at;
+        shared->last_disconnect_reason = buffer[13];
+      } else if (event == kMgmtConnectFailedEvent && payload_size >= 8) {
+        shared->last_connect_failed_at = observed_at;
+        shared->last_connect_status = buffer[13];
+      }
+    }
+    if (announce_link) {
+      // This is the first trustworthy proof that the physical board answered
+      // the adapter. Publish it immediately instead of guessing from a later
+      // bluetoothctl timeout; Bluetooth does not identify which button woke it.
+      emit_status("link-detected", commissioned->display);
+    }
   }
 }
 
@@ -907,7 +1130,7 @@ void simulated_loop() {
   simulated_bluetooth.wake_allowed = true;
   // Exercise the same status contract as real hardware so development UI
   // builds cannot silently break merely because CI lacks a physical board.
-  emit_diagnostics("SIMULATED", simulated_bluetooth, "ready", "", "");
+  emit_diagnostics("SIMULATED", simulated_bluetooth, "ready", "", "input-ready", "");
   emit_status("waiting", "SIMULATED");
   const std::array<BoardReadings, 12> sequence{{
       {0, 0, 0, 0}, {0, 0, 0, 0}, {40, 30, 35, 25}, {95, 82, 90, 76},
