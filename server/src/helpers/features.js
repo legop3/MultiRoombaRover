@@ -46,6 +46,7 @@ function buildFeatureFlags(config = loadConfig()) {
   const kinectConfig = config.kinect || {};
   const buttonBoxConfig = config.buttonBox || {};
   const barcodeScannerConfig = config.barcodeScanner || {};
+  const balanceBoardConfig = config.balanceBoard || {};
   const barcodeGamesConfig = config.barcodeGames || {};
   const socialsConfig = config.socials || {};
   const interInstanceConfig = config.interInstance || {};
@@ -68,6 +69,10 @@ function buildFeatureFlags(config = loadConfig()) {
     kinect: asBoolean(kinectConfig.enabled),
     buttonBox: asBoolean(buttonBoxConfig.enabled),
     barcodeScanner,
+    // The worker performs its own runtime availability reporting. Advertising
+    // the feature from the explicit config switch lets the UI show useful
+    // commissioning and hardware-error states even before a board is paired.
+    balanceBoard: asBoolean(balanceBoardConfig.enabled),
     barcodeGames: Boolean(barcodeScanner && asBoolean(barcodeGamesConfig.enabled)),
     lift: Boolean(
       homeAssistant &&

@@ -177,6 +177,11 @@ kinect:
   # camera cache; it only gates browser-requested broadcasts.
   captureCooldownMs: 10000
 
+balanceBoard:
+  # The server installer always prepares Bluetooth and the kernel driver. This
+  # switch only starts the service and shows its small live-weight panel.
+  enabled: false
+
 buttonBox:
   enabled: false
 

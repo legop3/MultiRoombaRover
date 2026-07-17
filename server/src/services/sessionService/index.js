@@ -20,6 +20,10 @@ const { getState: getHomeAssistantState, homeAssistantEvents } = require('../hom
 const { getState: getNeatoState, neatoEvents } = require('../neatoService');
 const { getState: getLiftState, liftEvents } = require('../liftService');
 const { getState: getKinectState, kinectEvents } = require('../kinectService');
+const {
+  getState: getBalanceBoardState,
+  balanceBoardEvents,
+} = require('../balanceBoardService');
 const { getVoteStatus: getOverseerVoteStatus } = require('../overseerControlService');
 const { getNickname, nicknameEvents } = require('../nicknameService');
 const {
@@ -197,6 +201,7 @@ function buildSession(socket) {
     neato: getNeatoState(),
     lift: getLiftState(),
     kinect: getKinectState(),
+    balanceBoard: getBalanceBoardState(),
     replay: getReplayState(),
     replaySources: getReplaySources(socket),
     health: getHealthSnapshot(),
@@ -394,6 +399,14 @@ liftEvents.on('update', () => {
 
 kinectEvents.on('change', () => {
   logger.info('Kinect state change; syncing all clients');
+  syncAll();
+});
+
+balanceBoardEvents.on('change', () => {
+  // Live weight frames use their own Socket.IO room because they change much
+  // faster than the full session. Only connection/status changes reach this
+  // listener, keeping session sync inexpensive while the panel stays current.
+  logger.info('Balance Board state change; syncing all clients');
   syncAll();
 });
 
