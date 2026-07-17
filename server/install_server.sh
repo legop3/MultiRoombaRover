@@ -16,6 +16,8 @@ MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
 SNAPSHOT_DIR="/var/lib/rover-snapshots"
 REPLAY_SEGMENT_DIR="/var/lib/replay-segments"
 KINECT_UDEV_RULE="/etc/udev/rules.d/99-kinect-world.rules"
+BLUETOOTH_OVERRIDE_DIR="/etc/systemd/system/bluetooth.service.d"
+BLUETOOTH_OVERRIDE="$BLUETOOTH_OVERRIDE_DIR/20-multirover-balance-board.conf"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This installer must be run with sudo/root." >&2
@@ -30,6 +32,8 @@ fi
 TARGET_USER="$SUDO_USER"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 SERVER_DIR="$SCRIPT_DIR"
+BALANCE_BOARD_NATIVE_DIR="$SCRIPT_DIR/src/services/balanceBoardService/native"
+BALANCE_BOARD_WORKER="$BALANCE_BOARD_NATIVE_DIR/balance_board_worker"
 CONFIG_PATH="$SERVER_DIR/config.yaml"
 MEDIAMTX_TEMPLATE="$SERVER_DIR/mediamtx/mediamtx.yml"
 ROVER_SNAPSHOT_WRITER_TEMPLATE="$SERVER_DIR/mediamtx/rover-snapshot-writer.sh"
@@ -134,7 +138,11 @@ dnf install -y \
   gstreamer1-rtsp-server \
   libfreenect \
   libfreenect-devel \
-  libusb1-devel >/dev/null
+  libusb1-devel \
+  bluez \
+  wiiuse \
+  wiiuse-devel \
+  libcap >/dev/null
 NODE_BIN="$(command -v node)"
 
 echo "      Installing Kinect udev rule -> $KINECT_UDEV_RULE"
@@ -166,11 +174,42 @@ if [[ -f "$SERVER_DIR/src/services/kinectService/native/Makefile" ]]; then
   runuser -u "$TARGET_USER" -- bash -c "cd '$SERVER_DIR/src/services/kinectService/native' && make"
 fi
 
+if [[ -f "$BALANCE_BOARD_NATIVE_DIR/Makefile" ]]; then
+  echo "      Building native Balance Board bridge..."
+  runuser -u "$TARGET_USER" -- bash -c "cd '$BALANCE_BOARD_NATIVE_DIR' && make"
+  if [[ ! -x "$BALANCE_BOARD_WORKER" ]]; then
+    echo "Balance Board worker build did not create $BALANCE_BOARD_WORKER" >&2
+    exit 1
+  fi
+  # Only this small audited bridge needs the management socket used for the
+  # board's raw six-byte pairing PIN and the two reserved HID PSMs used by
+  # front-button reconnects. Never grant either capability to node or the full
+  # multirover service executable.
+  setcap cap_net_admin,cap_net_bind_service+ep "$BALANCE_BOARD_WORKER"
+fi
+
 if [[ ! -f "$CONFIG_PATH" ]]; then
   cp "$SERVER_DIR/config.example.yaml" "$CONFIG_PATH"
   chown "$TARGET_USER":"$TARGET_USER" "$CONFIG_PATH"
   echo "Copied config.example.yaml to config.yaml; edit it before exposing the service."
 fi
+
+# Bluetoothd remains responsible for discovery and the one-time bond, but its
+# generic input plugin otherwise reserves control PSM 0x11 and interrupt PSM
+# 0x13 before the Balance Board worker can listen for the board's front-button
+# reconnect. This dedicated rover server gives those two HID listeners to the
+# worker; every other BlueZ profile is left enabled. Clearing ExecStart is
+# required by systemd before replacing the vendor unit's command in a drop-in.
+install -d -m 0755 "$BLUETOOTH_OVERRIDE_DIR"
+cat > "$BLUETOOTH_OVERRIDE" <<'EOF'
+[Service]
+ExecStart=
+ExecStart=/usr/libexec/bluetooth/bluetoothd --noplugin=input
+EOF
+chmod 0644 "$BLUETOOTH_OVERRIDE"
+systemctl daemon-reload
+systemctl enable bluetooth.service
+systemctl restart bluetooth.service
 
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
@@ -266,8 +305,8 @@ EOF
 cat > "$MULTIROVER_SERVICE" <<EOF
 [Unit]
 Description=Multi-Roomba Rover control server
-After=network-online.target mediamtx.service
-Wants=network-online.target
+After=network-online.target mediamtx.service bluetooth.service
+Wants=network-online.target bluetooth.service
 
 [Service]
 User=$TARGET_USER
@@ -304,3 +343,5 @@ echo
 echo "Update $CONFIG_PATH to set admins, lockdown settings, and media parameters."
 echo "Kinect/libfreenect packages and udev permissions were installed."
 echo "If a Kinect is already plugged in, unplug/replug its USB/power before testing so the new udev rule applies."
+echo "Wii Balance Board direct Bluetooth bridge and front-button listener were installed."
+echo "Enable balanceBoard in config.yaml, press red Sync once, then use the front button for later wakes."
