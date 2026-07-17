@@ -25,6 +25,7 @@ const ZERO_SAMPLE_COUNT = 10;
 const ZERO_SAMPLE_INTERVAL_MS = 1000;
 const ZERO_MAX_SAMPLE_AGE_MS = 1500;
 const ZERO_MAX_COMBINED_RANGE_KG = 0.5;
+const RECORD_PERSIST_DELAY_MS = 1000;
 const execFileAsync = promisify(execFile);
 const ALERT_COLOR = '#38bdf8';
 
@@ -41,7 +42,13 @@ function normalizeStoredCorners(value) {
 }
 
 function emptyStore() {
-  return { address: '', zeroCorners: emptyZeroCorners(), zeroedAt: null };
+  return {
+    address: '',
+    zeroCorners: emptyZeroCorners(),
+    zeroedAt: null,
+    recordKg: 0,
+    recordedAt: null,
+  };
 }
 
 function loadStore() {
@@ -49,10 +56,18 @@ function loadStore() {
     const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
     const address = typeof parsed?.address === 'string' ? parsed.address.trim().toUpperCase() : '';
     const zeroedAt = Number.isFinite(Number(parsed?.zeroedAt)) ? Number(parsed.zeroedAt) : null;
+    const recordKg = Number.isFinite(Number(parsed?.recordKg))
+      ? roundedWeight(parsed.recordKg)
+      : 0;
+    const recordedAt = Number.isFinite(Number(parsed?.recordedAt))
+      ? Number(parsed.recordedAt)
+      : null;
     return {
       address,
       zeroCorners: zeroedAt ? normalizeStoredCorners(parsed.zeroCorners) : emptyZeroCorners(),
       zeroedAt,
+      recordKg,
+      recordedAt: recordKg > 0 ? recordedAt : null,
     };
   } catch (err) {
     if (err.code !== 'ENOENT') logger.warn('Failed to load Balance Board address', err.message);
@@ -107,6 +122,7 @@ let latestFrame = null;
 let latestRawCorners = null;
 let latestRawFrameAt = 0;
 let zeroTimer = null;
+let recordPersistTimer = null;
 let zeroSamples = [];
 let zeroProgress = {
   active: false,
@@ -152,12 +168,63 @@ function getState() {
     status,
     detail,
     batteryPercent,
+    recordKg: store.recordKg,
+    recordedAt: store.recordedAt,
     calibration: {
       calibrated: Boolean(store.zeroedAt),
       zeroedAt: store.zeroedAt,
       ...zeroProgress,
     },
   };
+}
+
+function clearRecordPersistTimer() {
+  if (!recordPersistTimer) return;
+  clearTimeout(recordPersistTimer);
+  recordPersistTimer = null;
+}
+
+function scheduleRecordPersistence() {
+  clearRecordPersistTimer();
+
+  // A person driving onto the board produces many successively larger frames.
+  // Waiting until the maximum has stopped changing prevents a synchronous JSON
+  // rewrite for every 20 Hz sensor frame while still saving a settled record
+  // promptly enough to survive an ordinary service restart.
+  recordPersistTimer = setTimeout(() => {
+    recordPersistTimer = null;
+    persistStore();
+  }, RECORD_PERSIST_DELAY_MS);
+  recordPersistTimer.unref?.();
+}
+
+function publishLatestFrame() {
+  if (!latestFrame) return;
+  io.to(FRAME_ROOM).emit('balanceBoard:frame', latestFrame);
+}
+
+function resetWeightRecord() {
+  clearRecordPersistTimer();
+
+  // Reset means "start measuring the record from now." If the board currently
+  // has a load, that current measurement is the first candidate in the new
+  // period. Saving it immediately avoids briefly showing zero before the next
+  // live frame restores the same weight as the record.
+  const currentWeight = connected && latestFrame ? roundedWeight(latestFrame.totalKg) : 0;
+  store.recordKg = currentWeight;
+  store.recordedAt = currentWeight > 0 ? Date.now() : null;
+  persistStore();
+
+  if (latestFrame) {
+    latestFrame = {
+      ...latestFrame,
+      recordKg: store.recordKg,
+      recordedAt: store.recordedAt,
+    };
+    publishLatestFrame();
+  }
+  events.emit('change', { state: getState() });
+  sendRawAlert('record-reset');
 }
 
 function updateStatus(nextStatus, nextDetail) {
@@ -218,6 +285,11 @@ function finishZeroCalibration() {
     return [key, Math.round(average * 1000) / 1000];
   }));
   store.zeroedAt = Date.now();
+  // A new zero changes the meaning of every adjusted weight, so an old record
+  // cannot be compared with measurements under the new baseline.
+  clearRecordPersistTimer();
+  store.recordKg = 0;
+  store.recordedAt = null;
   persistStore();
   zeroSamples = [];
   zeroProgress = {
@@ -278,12 +350,22 @@ function processFrame(message = {}) {
   connected = true;
   updateStatus('connected', 'Live weight is updating.');
   const adjustedCorners = subtractZero(rawCorners);
+  const totalKg = totalCornerWeight(adjustedCorners);
+  if (totalKg > store.recordKg) {
+    // Store only adjusted weight so the displayed record uses the same admin
+    // zero baseline as the live total and all four corner readings.
+    store.recordKg = totalKg;
+    store.recordedAt = Date.now();
+    scheduleRecordPersistence();
+  }
   latestFrame = {
-    totalKg: totalCornerWeight(adjustedCorners),
+    totalKg,
     corners: adjustedCorners,
     batteryPercent,
+    recordKg: store.recordKg,
+    recordedAt: store.recordedAt,
   };
-  io.to(FRAME_ROOM).emit('balanceBoard:frame', latestFrame);
+  publishLatestFrame();
 }
 
 function handleWorkerMessage(message = {}) {
@@ -301,6 +383,9 @@ function handleWorkerMessage(message = {}) {
       // baseline across commissioning a different Bluetooth identity.
       store.zeroCorners = emptyZeroCorners();
       store.zeroedAt = null;
+      clearRecordPersistTimer();
+      store.recordKg = 0;
+      store.recordedAt = null;
       persistStore();
     }
     hardware?.setAddress(address);
@@ -376,6 +461,20 @@ io.on('connection', (socket) => {
       cb({ error: err.message || 'Failed to start Balance Board zero calibration' });
     }
   });
+  socket.on('balanceBoard:resetRecord', (_payload = {}, cb = () => {}) => {
+    if (!isAdmin(socket)) {
+      cb({ error: 'Admin access required' });
+      return;
+    }
+
+    try {
+      resetWeightRecord();
+      cb({ success: true });
+    } catch (err) {
+      logger.error('Failed to reset Balance Board weight record', err);
+      cb({ error: err.message || 'Failed to reset the Balance Board weight record' });
+    }
+  });
   socket.on('balanceBoard:unpair', async (_payload = {}, cb = () => {}) => {
     if (!isAdmin(socket)) {
       cb({ error: 'Admin access required' });
@@ -407,6 +506,9 @@ io.on('connection', (socket) => {
       store.address = '';
       store.zeroCorners = emptyZeroCorners();
       store.zeroedAt = null;
+      clearRecordPersistTimer();
+      store.recordKg = 0;
+      store.recordedAt = null;
       persistStore();
       clearZeroTimer();
       zeroSamples = [];
@@ -451,6 +553,13 @@ if (enabled) {
 function installShutdownHooks() {
   const shutdown = () => {
     clearZeroTimer();
+    // A record may still be inside the short debounce window when the process
+    // receives a normal shutdown signal. Flush that newest maximum before the
+    // hardware worker stops so a clean restart cannot lose it.
+    if (recordPersistTimer) {
+      clearRecordPersistTimer();
+      persistStore();
+    }
     hardware?.stop();
   };
   process.once('exit', shutdown);

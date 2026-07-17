@@ -13,7 +13,16 @@ const EMPTY_CORNERS = {
   bottomLeft: 0,
   bottomRight: 0,
 };
-const EMPTY_FRAME = { totalKg: 0, batteryPercent: null, corners: EMPTY_CORNERS };
+const EMPTY_FRAME = {
+  totalKg: 0,
+  batteryPercent: null,
+  // Null distinguishes "no live frame received yet" from a legitimate record
+  // of zero, allowing the persisted session value to remain visible while the
+  // socket room subscription is being established.
+  recordKg: null,
+  recordedAt: null,
+  corners: EMPTY_CORNERS,
+};
 
 function formatWeight(value) {
   const weight = Number(value);
@@ -71,6 +80,7 @@ function BalanceBoardPanelContent() {
   const [frame, setFrame] = useState(EMPTY_FRAME);
   const [unpairing, setUnpairing] = useState(false);
   const [zeroRequesting, setZeroRequesting] = useState(false);
+  const [resettingRecord, setResettingRecord] = useState(false);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -108,6 +118,13 @@ function BalanceBoardPanelContent() {
   const liveBattery = finiteNumber(liveFrame.batteryPercent);
   const sessionBattery = finiteNumber(board?.batteryPercent);
   const battery = liveBattery ?? sessionBattery;
+  // Live frames make a newly reached record move immediately. The session copy
+  // remains available while the board sleeps or before this panel subscribes,
+  // which is important because the record belongs to the installation rather
+  // than to one Bluetooth connection.
+  const liveRecord = board?.connected ? finiteNumber(frame.recordKg) : null;
+  const sessionRecord = finiteNumber(board?.recordKg);
+  const record = liveRecord ?? sessionRecord ?? 0;
   const sleeping = board?.status === 'sleeping';
   const isAdmin = role === 'admin' || role === 'lockdown';
   const calibration = board?.calibration || null;
@@ -137,35 +154,38 @@ function BalanceBoardPanelContent() {
     });
   };
 
-  const actions = (
+  const resetRecord = () => {
+    if (resettingRecord) return;
+    if (!window.confirm('Reset the highest weight record?')) return;
+    setResettingRecord(true);
+    socket.emit('balanceBoard:resetRecord', {}, (response = {}) => {
+      setResettingRecord(false);
+      if (response.error) window.alert(response.error);
+    });
+  };
+
+  const actions = isAdmin ? (
     <div className="flex items-center gap-0.5">
-      {battery != null ? (
-        <span className="text-xs text-slate-300">{Math.round(battery)}% battery</span>
-      ) : null}
-      {isAdmin ? (
-        <>
-          <button
-            type="button"
-            className="button-dark text-xs disabled:opacity-50"
-            disabled={!board?.connected || zeroRequesting || zeroing || unpairing}
-            onClick={zero}
-          >
-            {zeroing
-              ? `Zeroing ${calibration.samplesCollected}/${calibration.totalSamples}`
-              : zeroRequesting ? 'Starting…' : 'Zero'}
-          </button>
-          <button
-            type="button"
-            className="button-dark text-xs disabled:opacity-50"
-            disabled={!board?.paired || unpairing || zeroing}
-            onClick={unpair}
-          >
-            {unpairing ? 'Unpairing…' : 'Unpair'}
-          </button>
-        </>
-      ) : null}
+      <button
+        type="button"
+        className="button-dark text-xs disabled:opacity-50"
+        disabled={!board?.connected || zeroRequesting || zeroing || unpairing}
+        onClick={zero}
+      >
+        {zeroing
+          ? `Zeroing ${calibration.samplesCollected}/${calibration.totalSamples}`
+          : zeroRequesting ? 'Starting…' : 'Zero'}
+      </button>
+      <button
+        type="button"
+        className="button-dark text-xs disabled:opacity-50"
+        disabled={!board?.paired || unpairing || zeroing}
+        onClick={unpair}
+      >
+        {unpairing ? 'Unpairing…' : 'Unpair'}
+      </button>
     </div>
-  );
+  ) : null;
 
   return (
     <CardFrame
@@ -183,35 +203,64 @@ function BalanceBoardPanelContent() {
         </div>
       ) : null}
 
-      <div className="panel-section relative h-52 overflow-hidden">
-        {zeroing ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-950/90 px-2 text-center">
-            <div className="space-y-0.5">
-              <p className="text-lg font-semibold text-slate-100">
-                Zeroing {calibration.samplesCollected}/{calibration.totalSamples}
-              </p>
-              <p className="text-sm text-slate-300">Keep the board and everything on it still.</p>
+      {/* Keep the measurement column narrow and fixed so the board remains the
+          dominant visual while record and battery stay in one predictable
+          place. Both pieces use the shared dark panel treatment instead of
+          introducing a Balance Board-specific background style. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-0.5">
+        <div className="panel-section relative h-52 overflow-hidden">
+          {zeroing ? (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-neutral-950/90 px-2 text-center">
+              <div className="space-y-0.5">
+                <p className="text-lg font-semibold text-slate-100">
+                  Zeroing {calibration.samplesCollected}/{calibration.totalSamples}
+                </p>
+                <p className="text-sm text-slate-300">Keep the board and everything on it still.</p>
+              </div>
+            </div>
+          ) : null}
+          <CornerReading className="left-0.5 top-0.5" label="Top left" value={corners.topLeft} />
+          <CornerReading className="right-0.5 top-0.5" label="Top right" value={corners.topRight} />
+          <CornerReading className="bottom-0.5 left-0.5" label="Bottom left" value={corners.bottomLeft} />
+          <CornerReading className="bottom-0.5 right-0.5" label="Bottom right" value={corners.bottomRight} />
+          <div
+            aria-label="Center of pressure"
+            className={`absolute z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border transition-all duration-100 ${
+              center.active
+                ? 'border-sky-200 bg-sky-500'
+                : 'border-neutral-500 bg-neutral-600 opacity-50'
+            }`}
+            style={{ left: `${center.left}%`, top: `${center.top}%` }}
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="surface px-1 py-0.5 text-center">
+              <div className="text-[0.65rem] text-slate-400">Total weight</div>
+              <div className="text-3xl font-bold leading-none text-white">
+                {formatWeight(liveFrame.totalKg)}
+              </div>
             </div>
           </div>
-        ) : null}
-        <CornerReading className="left-0.5 top-0.5" label="Top left" value={corners.topLeft} />
-        <CornerReading className="right-0.5 top-0.5" label="Top right" value={corners.topRight} />
-        <CornerReading className="bottom-0.5 left-0.5" label="Bottom left" value={corners.bottomLeft} />
-        <CornerReading className="bottom-0.5 right-0.5" label="Bottom right" value={corners.bottomRight} />
-        <div
-          aria-label="Center of pressure"
-          className={`absolute z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border transition-all duration-100 ${
-            center.active
-              ? 'border-sky-200 bg-sky-500'
-              : 'border-neutral-500 bg-neutral-600 opacity-50'
-          }`}
-          style={{ left: `${center.left}%`, top: `${center.top}%` }}
-        />
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="surface px-1 py-0.5 text-center">
-            <div className="text-[0.65rem] text-slate-400">Total weight</div>
-            <div className="text-3xl font-bold leading-none text-white">
-              {formatWeight(liveFrame.totalKg)}
+        </div>
+
+        <div className="grid h-52 grid-rows-[minmax(0,1fr)_auto] gap-0.5">
+          <div className="panel-section flex min-h-0 flex-col items-center justify-center gap-1 text-center">
+            <div className="text-xs text-slate-400">Weight record</div>
+            <div className="text-xl font-bold text-white">{formatWeight(record)}</div>
+            {isAdmin ? (
+              <button
+                type="button"
+                className="button-dark text-xs disabled:opacity-50"
+                disabled={resettingRecord}
+                onClick={resetRecord}
+              >
+                {resettingRecord ? 'Resetting…' : 'Reset'}
+              </button>
+            ) : null}
+          </div>
+          <div className="panel-section px-1 py-1 text-center">
+            <div className="text-xs text-slate-400">Battery</div>
+            <div className="text-xl font-semibold text-slate-100">
+              {battery == null ? '—' : `${Math.round(battery)}%`}
             </div>
           </div>
         </div>
