@@ -59,7 +59,7 @@ constexpr uint16_t kMgmtPinCodeReplyCommand = 0x0016;
 constexpr uint8_t kBluetoothClassicAddressType = 0;
 constexpr int kFrameIntervalMs = 50;
 constexpr int kDeviceScanIntervalMs = 500;
-constexpr int kCommissionRetryMs = 12000;
+constexpr int kDiscoveryRestartDelayMs = 1000;
 constexpr int kBatteryRefreshMs = 5000;
 
 std::atomic<bool> running{true};
@@ -91,6 +91,13 @@ struct BoardReadings {
 struct CommandResult {
   int exit_code = -1;
   std::string output;
+};
+
+struct RunningCommand {
+  pid_t pid = -1;
+  int output_fd = -1;
+  std::string pending_output;
+  std::string transcript;
 };
 
 uint64_t monotonic_ms() {
@@ -234,21 +241,137 @@ CommandResult run_command(const std::vector<std::string>& args) {
   return result;
 }
 
-std::optional<BluetoothAddress> find_cached_board() {
-  const CommandResult devices = run_command({"bluetoothctl", "devices"});
-  std::istringstream lines(devices.output);
-  std::string line;
-  while (std::getline(lines, line)) {
-    // BlueZ prints `Device AA:BB:CC:DD:EE:FF Nintendo RVL-WBC-01`.
-    // Match the complete board name so a nearby Wiimote is never eligible for
-    // the raw PIN response or accidentally stored as the weigh station.
-    if (line.find(kBoardBluetoothName) == std::string::npos) continue;
-    const std::size_t device_prefix = line.find("Device ");
-    if (device_prefix == std::string::npos || line.size() < device_prefix + 24) continue;
-    const std::string raw_address = line.substr(device_prefix + 7, 17);
-    if (auto address = parse_address(raw_address)) return address;
+RunningCommand start_command(const std::vector<std::string>& args) {
+  RunningCommand command;
+  if (args.empty()) return command;
+
+  int pipe_fds[2]{};
+  if (pipe(pipe_fds) != 0) {
+    command.transcript = std::strerror(errno);
+    return command;
+  }
+
+  const pid_t pid = fork();
+  if (pid == 0) {
+    dup2(pipe_fds[1], STDOUT_FILENO);
+    dup2(pipe_fds[1], STDERR_FILENO);
+    close(pipe_fds[0]);
+    close(pipe_fds[1]);
+
+    std::vector<char*> argv;
+    argv.reserve(args.size() + 1);
+    for (const auto& arg : args) argv.push_back(const_cast<char*>(arg.c_str()));
+    argv.push_back(nullptr);
+    execvp(argv[0], argv.data());
+    _exit(127);
+  }
+
+  close(pipe_fds[1]);
+  if (pid < 0) {
+    command.transcript = std::strerror(errno);
+    close(pipe_fds[0]);
+    return command;
+  }
+
+  // Discovery has no predetermined completion time: it must remain active until
+  // the user wakes the board. A nonblocking pipe lets the commissioning thread
+  // consume BlueZ events while still honoring server shutdown and maintenance
+  // commands promptly.
+  const int current_flags = fcntl(pipe_fds[0], F_GETFL, 0);
+  if (current_flags >= 0) fcntl(pipe_fds[0], F_SETFL, current_flags | O_NONBLOCK);
+  command.pid = pid;
+  command.output_fd = pipe_fds[0];
+  return command;
+}
+
+bool collect_command_output(RunningCommand* command) {
+  if (!command || command->pid < 0) return false;
+
+  std::array<char, 1024> buffer{};
+  ssize_t count = 0;
+  while ((count = read(command->output_fd, buffer.data(), buffer.size())) > 0) {
+    const std::string chunk(buffer.data(), static_cast<std::size_t>(count));
+    command->pending_output += chunk;
+    command->transcript += chunk;
+    // A busy Bluetooth environment can produce an unbounded stream of RSSI
+    // updates. Retain only the most recent diagnostics instead of allowing a
+    // commissioning session left open for days to grow the worker indefinitely.
+    constexpr std::size_t max_transcript_size = 8192;
+    if (command->transcript.size() > max_transcript_size) {
+      command->transcript.erase(0, command->transcript.size() - max_transcript_size);
+    }
+  }
+
+  int status = 0;
+  const pid_t waited = waitpid(command->pid, &status, WNOHANG);
+  if (waited == 0) return true;
+  if (waited == command->pid) {
+    command->pid = -1;
+  }
+  return false;
+}
+
+void stop_command(RunningCommand* command) {
+  if (!command) return;
+  if (command->pid > 0) {
+    // bluetoothctl normally exits immediately on SIGTERM. Bound that grace
+    // period so a wedged D-Bus client cannot prevent the server from stopping.
+    kill(command->pid, SIGTERM);
+    for (int attempt = 0; attempt < 50 && command->pid > 0; ++attempt) {
+      collect_command_output(command);
+      if (command->pid > 0) usleep(10000);
+    }
+    if (command->pid > 0) {
+      kill(command->pid, SIGKILL);
+      int status = 0;
+      while (waitpid(command->pid, &status, 0) < 0 && errno == EINTR) {}
+      command->pid = -1;
+    }
+  }
+  if (command->output_fd >= 0) {
+    close(command->output_fd);
+    command->output_fd = -1;
+  }
+}
+
+std::optional<BluetoothAddress> take_discovered_board(RunningCommand* discovery) {
+  if (!discovery) return std::nullopt;
+  std::size_t newline = discovery->pending_output.find('\n');
+  while (newline != std::string::npos) {
+    const std::string line = discovery->pending_output.substr(0, newline);
+    discovery->pending_output.erase(0, newline + 1);
+
+    // A Classic device is initially announced by address and receives its name
+    // in a later change event. Parse every complete scan line so either BlueZ
+    // form works, but require the exact Nintendo board name before accepting an
+    // address. A nearby Wiimote must never become eligible for the raw PIN.
+    if (line.find(kBoardBluetoothName) != std::string::npos) {
+      const std::size_t device_prefix = line.find("Device ");
+      if (device_prefix != std::string::npos && line.size() >= device_prefix + 24) {
+        if (auto address = parse_address(line.substr(device_prefix + 7, 17))) return address;
+      }
+    }
+    newline = discovery->pending_output.find('\n');
   }
   return std::nullopt;
+}
+
+std::string command_error_summary(const std::string& raw, const std::string& fallback) {
+  std::string summary;
+  summary.reserve(std::min<std::size_t>(raw.size(), 400));
+  bool previous_was_space = false;
+  for (unsigned char ch : raw) {
+    const bool is_space = ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r';
+    if (is_space) {
+      if (!summary.empty() && !previous_was_space) summary.push_back(' ');
+    } else if (ch >= 0x20) {
+      summary.push_back(static_cast<char>(ch));
+    }
+    previous_was_space = is_space;
+    if (summary.size() >= 400) break;
+  }
+  while (!summary.empty() && summary.back() == ' ') summary.pop_back();
+  return summary.empty() ? fallback : summary;
 }
 
 std::optional<BluetoothAddress> find_default_controller() {
@@ -299,21 +422,54 @@ void commissioning_loop(PairingSharedState* shared) {
     }
 
     emit_status("commissioning");
-    // Discovery is deliberately bounded rather than permanently enabled. Short
-    // BR/EDR-only windows are enough for the red Sync button while minimizing
-    // interference with other Bluetooth equipment on the server.
-    run_command({"bluetoothctl", "--timeout", "8", "scan", "bredr"});
-    auto address = find_cached_board();
+    // Commissioning must be listening before the board's short red-Sync window
+    // begins. Keep one BlueZ discovery client alive continuously and consume its
+    // own event stream. The previous bounded scan exited for twelve seconds at a
+    // time and then queried a second client, making successful discovery depend
+    // on when the physical button happened to be pressed.
+    RunningCommand discovery = start_command({"bluetoothctl", "scan", "bredr"});
+    if (discovery.pid < 0) {
+      emit_status("error", "", "could not start Bluetooth discovery: " +
+          command_error_summary(discovery.transcript, "unknown process error"));
+      std::this_thread::sleep_for(std::chrono::milliseconds(kDiscoveryRestartDelayMs));
+      continue;
+    }
+
+    std::optional<BluetoothAddress> address;
+    while (running.load() && !address.has_value()) {
+      const bool discovery_running = collect_command_output(&discovery);
+      address = take_discovered_board(&discovery);
+      if (address.has_value()) break;
+      if (!discovery_running) {
+        emit_status("error", "", "Bluetooth discovery stopped: " +
+            command_error_summary(discovery.transcript, "bluetoothctl exited unexpectedly"));
+        break;
+      }
+
+      bool still_commissioning = false;
+      {
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        still_commissioning = shared->commissioning &&
+            !shared->commissioned_address.has_value();
+      }
+      if (!still_commissioning) break;
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
     if (!address.has_value()) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(kCommissionRetryMs));
+      stop_command(&discovery);
+      if (running.load()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(kDiscoveryRestartDelayMs));
+      }
       continue;
     }
 
     const auto controller = find_default_controller();
     if (!controller.has_value()) {
+      stop_command(&discovery);
       emit_status("commissioning", address->display,
                   "no powered Bluetooth controller is available for pairing");
-      std::this_thread::sleep_for(std::chrono::milliseconds(kCommissionRetryMs));
+      std::this_thread::sleep_for(std::chrono::milliseconds(kDiscoveryRestartDelayMs));
       continue;
     }
 
@@ -332,6 +488,10 @@ void commissioning_loop(PairingSharedState* shared) {
     // charge of everything else.
     const CommandResult pair_result = run_command({
         "bluetoothctl", "--timeout", "12", "--agent", "NoInputNoOutput", "pair", address->display});
+    // Keep the discovery owner alive through Pair(). BlueZ documents pairing by
+    // address as requiring an active scan report, and the board may stop its
+    // Sync window before a new discovery client could be established.
+    stop_command(&discovery);
 
     {
       std::lock_guard<std::mutex> lock(shared->mutex);
@@ -341,8 +501,9 @@ void commissioning_loop(PairingSharedState* shared) {
 
     if (!command_succeeded(pair_result)) {
       emit_status("commissioning", address->display,
-                  "pairing failed; press the red Sync button and try again");
-      std::this_thread::sleep_for(std::chrono::milliseconds(kCommissionRetryMs));
+                  "pairing failed: " + command_error_summary(
+                      pair_result.output, "BlueZ returned an unknown pairing error"));
+      std::this_thread::sleep_for(std::chrono::milliseconds(kDiscoveryRestartDelayMs));
       continue;
     }
 

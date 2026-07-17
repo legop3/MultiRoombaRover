@@ -334,7 +334,12 @@ function handleWorkerMessage(message = {}) {
   if (message.type !== 'status') return;
 
   hardwareState = String(message.state || 'unknown');
-  lastError = message.error ? String(message.error) : null;
+  // Commissioning automatically restarts discovery after a transient BlueZ
+  // failure. Preserve the last actionable error across the following plain
+  // `commissioning` status instead of replacing it with an unhelpful generic
+  // instruction one second later. Any real progress beyond discovery clears it.
+  if (message.error) lastError = String(message.error);
+  else if (hardwareState !== 'commissioning') lastError = null;
   if (hardwareState === 'connected') {
     if (!connected) {
       connected = true;

@@ -34,7 +34,9 @@ function describePhase(status, frame) {
   if (phase === 'commissioning') {
     return {
       label: 'Pairing setup',
-      instruction: 'Press the red Sync button underneath the board. The server will pair it automatically.',
+      // Discovery retries automatically, so retain and show the last concrete
+      // BlueZ failure while the worker keeps listening for another Sync press.
+      instruction: status?.lastError || 'Press the red Sync button underneath the board. The server will pair it automatically.',
       className: 'border-amber-500/60 bg-amber-950/60 text-amber-200',
     };
   }
