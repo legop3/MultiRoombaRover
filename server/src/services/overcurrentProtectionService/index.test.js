@@ -50,7 +50,9 @@ test('a short stalled-wheel spike remains inside the grace region', () => {
 
   assert.equal(snapshot.motors.leftWheel.stress, 0.025);
   assert.equal(snapshot.motors.leftWheel.cap, 1);
-  assert.equal(snapshot.status, 'idle');
+  // The hardware event is visible immediately even though the grace region
+  // correctly leaves the command cap at full output.
+  assert.equal(snapshot.status, 'overcurrent');
 });
 
 test('persistent stalled-wheel overcurrent scales both wheels and then stops drive', () => {

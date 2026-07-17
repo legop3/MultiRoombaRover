@@ -35,6 +35,7 @@ function statusLabel(protection) {
   if (protection?.adminImmune) return 'Admin bypass';
   if (protection?.status === 'stopped') return 'Drive stopped';
   if (protection?.status === 'limiting') return 'Limiting';
+  if (protection?.status === 'overcurrent') return 'Overcurrent detected';
   if (protection?.status === 'recovering') return 'Recovering';
   return 'Ready';
 }

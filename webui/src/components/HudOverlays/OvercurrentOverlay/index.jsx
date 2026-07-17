@@ -40,7 +40,9 @@ function OvercurrentOverlay({ roverId = null, overcurrentLimiter = null, compact
       ? 'Drive stopped'
       : status === 'recovering'
         ? 'Protection recovering'
-        : 'Overcurrent limiting';
+        : status === 'limiting'
+          ? 'Overcurrent limiting'
+          : 'Overcurrent detected';
   const detail = bypassed
     ? 'Admin bypass'
     : stopped && protection?.drive?.requiresNeutral

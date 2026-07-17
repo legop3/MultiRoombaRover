@@ -64,6 +64,7 @@ export function useOvercurrentLimiter(roverId) {
       },
       overcurrent: { motors: motorFlags, groups: groupFlags },
       isActive: protection?.status === 'limiting'
+        || protection?.status === 'overcurrent'
         || protection?.status === 'stopped'
         || protection?.status === 'recovering',
       adminImmune,

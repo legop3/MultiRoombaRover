@@ -421,6 +421,10 @@ function createOvercurrentProtectionService(options = {}) {
     if (state.driveBlocked) return 'stopped';
     const anyLimited = MOTOR_KEYS.some((key) => state.motors[key].cap < 1);
     if (anyLimited && anyOvercurrent) return 'limiting';
+    // The raw Roomba flag is useful operator information even while stress is
+    // still inside the transient grace region. Reporting it separately keeps
+    // HUD visibility immediate without falsely claiming output is being scaled.
+    if (anyOvercurrent) return 'overcurrent';
     if (anyLimited) return 'recovering';
     return 'idle';
   }
