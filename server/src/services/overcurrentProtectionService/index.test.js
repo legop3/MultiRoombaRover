@@ -48,7 +48,7 @@ test('a short stalled-wheel spike remains inside the grace region', () => {
     wheelSpeedsMmPerSecond: { left: 0 },
   }), start + 100);
 
-  assert.equal(snapshot.motors.leftWheel.stress, 0.2);
+  assert.equal(snapshot.motors.leftWheel.stress, 0.025);
   assert.equal(snapshot.motors.leftWheel.cap, 1);
   assert.equal(snapshot.status, 'idle');
 });
@@ -60,12 +60,23 @@ test('persistent stalled-wheel overcurrent scales both wheels and then stops dri
     driveDirect: { left: 300, right: 200 },
   });
 
-  for (let step = 0; step <= 5; step += 1) {
+  for (let step = 0; step <= 39; step += 1) {
     service.processTelemetry('rover', makeSensors({
       wheelOvercurrents: { leftWheel: true },
       wheelSpeedsMmPerSecond: { left: 0, right: 200 },
     }), start + step * 100);
   }
+
+  /*
+    Thirty-nine accumulated 100 ms intervals represent 3.9 seconds at the
+    maximum 0.25/s rate. The drive must still be available immediately before
+    the intended four-second hard-stop boundary.
+  */
+  assert.equal(service.getPublicState('rover').drive.blocked, false);
+  service.processTelemetry('rover', makeSensors({
+    wheelOvercurrents: { leftWheel: true },
+    wheelSpeedsMmPerSecond: { left: 0, right: 200 },
+  }), start + 4000);
 
   const snapshot = service.getPublicState('rover');
   assert.equal(snapshot.status, 'stopped');
@@ -85,10 +96,15 @@ test('persistent stalled-wheel overcurrent scales both wheels and then stops dri
   const scaledDrive = issued.find((entry) => entry.payload.type === 'drive'
     && entry.payload.driveDirect.left > 0);
   assert.ok(scaledDrive);
-  assert.equal(
-    scaledDrive.payload.driveDirect.left / 300,
-    scaledDrive.payload.driveDirect.right / 200,
-  );
+  const leftScale = scaledDrive.payload.driveDirect.left / 300;
+  const rightScale = scaledDrive.payload.driveDirect.right / 200;
+  /*
+    Motor commands are integers, so applying one shared fractional cap can
+    round the two differently sized wheel commands by different sub-unit
+    amounts. A one-percent tolerance verifies the shared curve without
+    pretending integer transport preserves an exact floating-point ratio.
+  */
+  assert.ok(Math.abs(leftScale - rightScale) < 0.01);
 });
 
 test('administrator commands and telemetry bypass all enforcement', () => {
@@ -121,14 +137,14 @@ test('a stopped drive stays blocked until both clear time and neutral are observ
   service.protectCommand('rover', 'drive', {
     driveDirect: { left: 300, right: 300 },
   });
-  for (let step = 0; step <= 5; step += 1) {
+  for (let step = 0; step <= 40; step += 1) {
     service.processTelemetry('rover', makeSensors({
       wheelOvercurrents: { leftWheel: true },
       wheelSpeedsMmPerSecond: { left: 0 },
     }), start + step * 100);
   }
 
-  for (let step = 6; step <= 14; step += 1) {
+  for (let step = 41; step <= 61; step += 1) {
     service.processTelemetry('rover', makeSensors(), start + step * 100);
   }
   assert.equal(service.getPublicState('rover').drive.blocked, true);

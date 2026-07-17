@@ -6,10 +6,15 @@ const logger = require('../../globals/logger').child('overcurrentProtectionServi
 
 const DEFAULT_CONFIG = Object.freeze({
   minimumUsefulWheelIntent: 75,
-  stressGrace: 0.2,
-  baseWheelOvercurrentRatePerSec: 0.75,
-  stalledWheelAdditionalRatePerSec: 1.25,
-  wheelRecoveryRatePerSec: 1,
+  // A fully stalled wheel now accumulates 0.25 stress per second, producing a
+  // roughly four-second hard-stop window. The smaller base rate also prevents
+  // a wheel that is still making progress from being treated like a hard jam.
+  stressGrace: 0.25,
+  baseWheelOvercurrentRatePerSec: 0.08,
+  stalledWheelAdditionalRatePerSec: 0.17,
+  // Clear telemetry removes stress faster than even a complete stall adds it,
+  // so short threshold climbs and direction-change spikes do not linger.
+  wheelRecoveryRatePerSec: 0.5,
   brushOvercurrentRatePerSec: 1,
   brushRecoveryRatePerSec: 0.75,
   clearBeforeUnlockSec: 0.75,
