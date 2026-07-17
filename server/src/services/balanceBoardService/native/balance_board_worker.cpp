@@ -61,6 +61,8 @@ constexpr int kFrameIntervalMs = 50;
 constexpr int kDeviceScanIntervalMs = 500;
 constexpr int kDiscoveryRestartDelayMs = 1000;
 constexpr const char* kDiscoveryTimeoutSeconds = "86400";
+constexpr int kBluetoothMonitorIntervalMs = 2000;
+constexpr int kReconnectAttemptIntervalMs = 3000;
 constexpr int kBatteryRefreshMs = 5000;
 
 std::atomic<bool> running{true};
@@ -78,6 +80,8 @@ struct PairingSharedState {
   std::optional<BluetoothAddress> active_target;
   std::optional<BluetoothAddress> active_pin;
   std::optional<std::string> commissioned_address;
+  std::string input_state = "not-detected";
+  std::string input_error;
   bool commissioning = false;
   bool pairing_available = true;
 };
@@ -92,6 +96,21 @@ struct BoardReadings {
 struct CommandResult {
   int exit_code = -1;
   std::string output;
+};
+
+struct BluetoothDeviceState {
+  bool available = false;
+  bool paired = false;
+  bool trusted = false;
+  bool connected = false;
+  bool wake_allowed = false;
+  std::string error;
+};
+
+struct InputProbe {
+  std::optional<std::string> path;
+  std::string state = "not-detected";
+  std::string error;
 };
 
 struct RunningCommand {
@@ -152,6 +171,36 @@ void emit_frame(const BoardReadings& readings, std::optional<int> battery_percen
          << "\"topLeft\":" << readings.top_left << ","
          << "\"bottomLeft\":" << readings.bottom_left << "}";
   if (battery_percent.has_value()) fields << ",\"batteryPercent\":" << *battery_percent;
+  emit_json(fields.str());
+}
+
+void emit_diagnostics(const std::string& address,
+                      const BluetoothDeviceState& bluetooth,
+                      const std::string& input_state,
+                      const std::string& input_error,
+                      const std::string& reconnect_detail) {
+  // Bluetooth bonding, the current radio link, and Linux evdev readiness are
+  // separate layers. Report each one explicitly so the server never has to
+  // infer all hardware failures from the absence of weight frames.
+  std::ostringstream fields;
+  fields << "\"type\":\"diagnostics\","
+         << "\"address\":\"" << json_escape(address) << "\","
+         << "\"bluetooth\":{"
+         << "\"available\":" << (bluetooth.available ? "true" : "false") << ","
+         << "\"paired\":" << (bluetooth.paired ? "true" : "false") << ","
+         << "\"trusted\":" << (bluetooth.trusted ? "true" : "false") << ","
+         << "\"connected\":" << (bluetooth.connected ? "true" : "false") << ","
+         << "\"wakeAllowed\":" << (bluetooth.wake_allowed ? "true" : "false") << "},"
+         << "\"inputState\":\"" << json_escape(input_state) << "\"";
+  if (!bluetooth.error.empty()) {
+    fields << ",\"bluetoothError\":\"" << json_escape(bluetooth.error) << "\"";
+  }
+  if (!input_error.empty()) {
+    fields << ",\"inputError\":\"" << json_escape(input_error) << "\"";
+  }
+  if (!reconnect_detail.empty()) {
+    fields << ",\"reconnectDetail\":\"" << json_escape(reconnect_detail) << "\"";
+  }
   emit_json(fields.str());
 }
 
@@ -383,6 +432,33 @@ std::string command_error_summary(const std::string& raw, const std::string& fal
   return summary.empty() ? fallback : summary;
 }
 
+bool command_succeeded(const CommandResult& result) {
+  if (result.exit_code != 0) return false;
+  return result.output.find("Failed") == std::string::npos &&
+         result.output.find("not available") == std::string::npos;
+}
+
+bool bluetooth_property_is_yes(const std::string& output, const std::string& property) {
+  return output.find(property + ": yes") != std::string::npos;
+}
+
+BluetoothDeviceState inspect_bluetooth_device(const std::string& address) {
+  const CommandResult info = run_command({
+      "bluetoothctl", "--timeout", "3", "info", address});
+  BluetoothDeviceState state;
+  state.available = command_succeeded(info) &&
+      info.output.find("Device " + address) != std::string::npos;
+  if (!state.available) {
+    state.error = command_error_summary(info.output, "BlueZ did not return device information");
+    return state;
+  }
+  state.paired = bluetooth_property_is_yes(info.output, "Paired");
+  state.trusted = bluetooth_property_is_yes(info.output, "Trusted");
+  state.connected = bluetooth_property_is_yes(info.output, "Connected");
+  state.wake_allowed = bluetooth_property_is_yes(info.output, "WakeAllowed");
+  return state;
+}
+
 std::optional<BluetoothAddress> find_default_controller() {
   const CommandResult controller = run_command({"bluetoothctl", "show"});
   std::istringstream lines(controller.output);
@@ -395,26 +471,103 @@ std::optional<BluetoothAddress> find_default_controller() {
   return std::nullopt;
 }
 
-bool command_succeeded(const CommandResult& result) {
-  if (result.exit_code != 0) return false;
-  return result.output.find("Failed") == std::string::npos &&
-         result.output.find("not available") == std::string::npos;
-}
-
-void prepare_known_device(const BluetoothAddress& address) {
-  run_command({"bluetoothctl", "--timeout", "8", "trust", address.display});
+std::string prepare_known_device(const BluetoothAddress& address) {
+  const CommandResult trust = run_command({
+      "bluetoothctl", "--timeout", "8", "trust", address.display});
+  if (!command_succeeded(trust)) {
+    return "trust failed: " + command_error_summary(trust.output, "BlueZ returned no detail");
+  }
   // WakeAllowed tells current BlueZ releases to accept the board's incoming HID
   // connection after its front power button is pressed. Older releases may not
   // implement the command; trust + the stored link key still remain effective.
-  run_command({"bluetoothctl", "--timeout", "8", "wake", address.display, "on"});
+  const CommandResult wake = run_command({
+      "bluetoothctl", "--timeout", "8", "wake", address.display, "on"});
+  if (!command_succeeded(wake)) {
+    return "wake policy failed: " + command_error_summary(wake.output, "BlueZ returned no detail");
+  }
+  return "";
 }
 
-void trust_and_connect(const BluetoothAddress& address) {
-  prepare_known_device(address);
+std::string trust_and_connect(const BluetoothAddress& address) {
+  if (const std::string prepare_error = prepare_known_device(address);
+      !prepare_error.empty()) {
+    return prepare_error;
+  }
   // A board remains awake for only a short window after Sync. Connecting the
   // HID profile immediately is what teaches it to initiate future connections
   // when its front power button is pressed.
-  run_command({"bluetoothctl", "--timeout", "8", "connect", address.display});
+  const CommandResult connect = run_command({
+      "bluetoothctl", "--timeout", "8", "connect", address.display});
+  if (!command_succeeded(connect)) {
+    return "initial connection failed: " +
+        command_error_summary(connect.output, "BlueZ returned no detail");
+  }
+  return "";
+}
+
+void connection_monitor_loop(PairingSharedState* shared) {
+  uint64_t last_reconnect_attempt_at = 0;
+  while (running.load()) {
+    std::optional<std::string> address;
+    std::string input_state;
+    std::string input_error;
+    {
+      std::lock_guard<std::mutex> lock(shared->mutex);
+      address = shared->commissioned_address;
+      input_state = shared->input_state;
+      input_error = shared->input_error;
+    }
+
+    if (!address.has_value()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(250));
+      continue;
+    }
+
+    BluetoothDeviceState bluetooth = inspect_bluetooth_device(*address);
+    std::string reconnect_detail;
+    const uint64_t now = monotonic_ms();
+    if (bluetooth.available && !bluetooth.connected &&
+        now - last_reconnect_attempt_at >= kReconnectAttemptIntervalMs) {
+      // A bonded Balance Board normally pages its remembered host after the
+      // front button is pressed, but adapters and BlueZ versions do not handle
+      // that incoming reconnect consistently. Page the known address while the
+      // server is waiting so the several-second blue-light wake window is caught
+      // from either direction without requiring another red-Sync operation.
+      last_reconnect_attempt_at = now;
+      const CommandResult reconnect = run_command({
+          "bluetoothctl", "--timeout", "4", "connect", *address});
+      // Query again because Connect() may have changed several properties before
+      // returning. The diagnostics should describe the resulting state, not the
+      // stale snapshot taken immediately before the attempt.
+      bluetooth = inspect_bluetooth_device(*address);
+      if (bluetooth.connected) {
+        reconnect_detail = "Bluetooth link established; waiting for the Balance Board input device";
+      } else if (!command_succeeded(reconnect)) {
+        reconnect_detail = command_error_summary(
+            reconnect.output, "Bluetooth reconnect attempt did not complete");
+      } else {
+        // bluetoothctl's timeout can end a command without a D-Bus error even
+        // though the device never connected. Trust the resulting Connected
+        // property rather than presenting process exit status as hardware success.
+        reconnect_detail = "Reconnect attempt finished without establishing a Bluetooth link";
+      }
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(shared->mutex);
+      // Forget/recommission can complete while bluetoothctl is returning. Never
+      // publish an old board's result after the selected address has changed.
+      if (shared->commissioned_address != address) continue;
+      input_state = shared->input_state;
+      input_error = shared->input_error;
+    }
+    emit_diagnostics(*address, bluetooth, input_state, input_error, reconnect_detail);
+
+    for (int elapsed = 0;
+         elapsed < kBluetoothMonitorIntervalMs && running.load(); elapsed += 100) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+  }
 }
 
 void commissioning_loop(PairingSharedState* shared) {
@@ -531,14 +684,14 @@ void commissioning_loop(PairingSharedState* shared) {
       continue;
     }
 
-    trust_and_connect(*address);
+    const std::string initial_connection_error = trust_and_connect(*address);
     {
       std::lock_guard<std::mutex> lock(shared->mutex);
       shared->commissioned_address = address->display;
       shared->commissioning = false;
     }
     emit_json("\"type\":\"paired\",\"address\":\"" + json_escape(address->display) + "\"");
-    emit_status("waiting", address->display);
+    emit_status("waiting", address->display, initial_connection_error);
   }
 }
 
@@ -616,27 +769,39 @@ void process_management_events(int fd, PairingSharedState* shared) {
   }
 }
 
-std::optional<std::string> find_board_input_path() {
+InputProbe probe_board_input() {
+  InputProbe probe;
   DIR* directory = opendir("/dev/input");
-  if (!directory) return std::nullopt;
+  if (!directory) {
+    probe.state = "input-directory-unavailable";
+    probe.error = std::strerror(errno);
+    return probe;
+  }
 
-  std::optional<std::string> found;
   while (dirent* entry = readdir(directory)) {
     if (std::strncmp(entry->d_name, "event", 5) != 0) continue;
     const std::string path = std::string("/dev/input/") + entry->d_name;
+    // Read the sysfs name before opening evdev. The name remains readable when
+    // device permissions are wrong, allowing diagnostics to distinguish “the
+    // kernel never created it” from “the service user cannot open it.”
+    std::ifstream name_file(std::string("/sys/class/input/") + entry->d_name + "/device/name");
+    std::string name;
+    std::getline(name_file, name);
+    if (name != kBoardInputName) continue;
+
     const int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-    if (fd < 0) continue;
-    std::array<char, 256> name{};
-    if (ioctl(fd, EVIOCGNAME(name.size()), name.data()) >= 0 &&
-        std::string(name.data()) == kBoardInputName) {
-      found = path;
-      close(fd);
+    if (fd < 0) {
+      probe.state = errno == EACCES ? "permission-denied" : "open-failed";
+      probe.error = std::strerror(errno);
       break;
     }
     close(fd);
+    probe.path = path;
+    probe.state = "detected";
+    break;
   }
   closedir(directory);
-  return found;
+  return probe;
 }
 
 void read_initial_axis(int fd, unsigned int axis, int* destination) {
@@ -756,6 +921,16 @@ void stdin_loop(PairingSharedState* shared) {
 }
 
 void simulated_loop() {
+  BluetoothDeviceState simulated_bluetooth;
+  simulated_bluetooth.available = true;
+  simulated_bluetooth.paired = true;
+  simulated_bluetooth.trusted = true;
+  simulated_bluetooth.connected = true;
+  simulated_bluetooth.wake_allowed = true;
+  // Exercise the same diagnostics contract as real hardware so development UI
+  // builds cannot silently break the status table merely because CI lacks a
+  // Bluetooth adapter and physical Balance Board.
+  emit_diagnostics("SIMULATED", simulated_bluetooth, "ready", "", "");
   emit_status("waiting", "SIMULATED");
   const std::array<BoardReadings, 12> sequence{{
       {0, 0, 0, 0}, {0, 0, 0, 0}, {40, 30, 35, 25}, {95, 82, 90, 76},
@@ -818,6 +993,7 @@ int main() {
   }
 
   std::thread commission_thread(commissioning_loop, &pairing);
+  std::thread connection_monitor_thread(connection_monitor_loop, &pairing);
   std::thread input_thread(stdin_loop, &pairing);
   if (management_fd >= 0 || pairing.commissioned_address.has_value()) {
     emit_status(pairing.commissioning ? "commissioning" : "waiting", configured_address);
@@ -833,15 +1009,27 @@ int main() {
 
     if (input_fd < 0 && monotonic_ms() - last_device_scan_at >= kDeviceScanIntervalMs) {
       last_device_scan_at = monotonic_ms();
-      if (auto path = find_board_input_path()) {
-        input_fd = open_board_input(*path, &readings);
+      const InputProbe probe = probe_board_input();
+      {
+        std::lock_guard<std::mutex> lock(pairing.mutex);
+        pairing.input_state = probe.state;
+        pairing.input_error = probe.error;
+      }
+      if (probe.path.has_value()) {
+        input_fd = open_board_input(*probe.path, &readings);
         if (input_fd >= 0) {
           std::string address;
           {
             std::lock_guard<std::mutex> lock(pairing.mutex);
             address = pairing.commissioned_address.value_or("");
+            pairing.input_state = "ready";
+            pairing.input_error.clear();
           }
           emit_status("connected", address);
+        } else {
+          std::lock_guard<std::mutex> lock(pairing.mutex);
+          pairing.input_state = errno == EACCES ? "permission-denied" : "open-failed";
+          pairing.input_error = std::strerror(errno);
         }
       }
     }
@@ -853,6 +1041,8 @@ int main() {
       {
         std::lock_guard<std::mutex> lock(pairing.mutex);
         address = pairing.commissioned_address.value_or("");
+        pairing.input_state = "not-detected";
+        pairing.input_error = "Balance Board input device closed";
       }
       emit_status("waiting", address);
     }
@@ -864,5 +1054,6 @@ int main() {
   if (management_fd >= 0) close(management_fd);
   if (input_thread.joinable()) input_thread.detach();
   if (commission_thread.joinable()) commission_thread.join();
+  if (connection_monitor_thread.joinable()) connection_monitor_thread.join();
   return 0;
 }

@@ -65,9 +65,23 @@ function describePhase(status, frame) {
     };
   }
   if (!status?.connected) {
+    if (status?.bluetooth?.connected) {
+      return {
+        label: 'Bluetooth connected, input unavailable',
+        instruction: status?.inputError || 'The radio link is active, but Linux has not exposed a readable Balance Board input device.',
+        className: 'border-red-500/60 bg-red-950/60 text-red-200',
+      };
+    }
+    if (status?.paired && !status?.lastConnectedAt) {
+      return {
+        label: 'Paired, not connected',
+        instruction: 'Press the front power button. The server is actively attempting to connect during the blue-light wake window.',
+        className: 'border-amber-500/60 bg-amber-950/60 text-amber-200',
+      };
+    }
     return {
       label: 'Sleeping',
-      instruction: 'Press the board’s front power button, then drive onto the station.',
+      instruction: 'The previously working board is disconnected. Press its front power button, then drive onto the station.',
       className: 'border-slate-600 bg-slate-800 text-slate-200',
     };
   }
@@ -115,6 +129,24 @@ function CornerLoad({ label, value }) {
   );
 }
 
+function readableHardwareValue(value) {
+  if (value == null || value === '') return 'Unknown';
+  return String(value)
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function HardwareStatusRow({ label, value, tone = 'text-slate-200' }) {
+  return (
+    <div className="flex min-w-0 items-start justify-between gap-2 border-b border-slate-800 py-0.5 last:border-b-0">
+      <span className="shrink-0 text-slate-500">{label}</span>
+      <span className={`min-w-0 break-all text-right font-mono ${tone}`}>{value}</span>
+    </div>
+  );
+}
+
 export default function BalanceBoardPanel() {
   const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'balanceBoard'));
 
@@ -154,10 +186,6 @@ function BalanceBoardPanelContent() {
     };
   }, [socket]);
 
-  useEffect(() => {
-    if (!status?.connected) setFrame(EMPTY_FRAME);
-  }, [status?.connected]);
-
   const runAction = useCallback(
     (action) => {
       if (!socket || actionPending) return;
@@ -171,21 +199,33 @@ function BalanceBoardPanelContent() {
     [actionPending, socket],
   );
 
-  const presentation = useMemo(() => describePhase(status, frame), [frame, status]);
-  const centerX = clamp(frame.center?.x, -1, 1);
-  const centerY = clamp(frame.center?.y, -1, 1);
+  // Keep the last received frame in state for ordinary socket updates, but mask
+  // it synchronously whenever hardware disconnects. Deriving the visible value
+  // avoids both a stale-weight render and an extra effect-driven state update.
+  const displayFrame = status?.connected ? frame : EMPTY_FRAME;
+  const presentation = useMemo(() => describePhase(status, displayFrame), [displayFrame, status]);
+  const centerX = clamp(displayFrame.center?.x, -1, 1);
+  const centerY = clamp(displayFrame.center?.y, -1, 1);
   const markerStyle = {
     left: `${50 + centerX * 42}%`,
     top: `${50 + centerY * 42}%`,
   };
-  const battery = Number.isFinite(Number(frame.batteryPercent))
-    ? Number(frame.batteryPercent)
+  const battery = Number.isFinite(Number(displayFrame.batteryPercent))
+    ? Number(displayFrame.batteryPercent)
     : Number.isFinite(Number(status?.batteryPercent))
       ? Number(status.batteryPercent)
       : null;
   const displayedWeight = status?.connected
-    ? frame.totalKg
+    ? displayFrame.totalKg
     : status?.lastMeasurement?.totalKg || 0;
+  const bondStatus = status?.bluetooth?.paired
+    ? (status?.bluetooth?.trusted ? 'Paired and trusted' : 'Paired, not trusted')
+    : (status?.paired ? 'Saved, not confirmed' : 'Not paired');
+  const linkStatus = status?.bluetooth?.connected ? 'Connected' : 'Disconnected';
+  const diagnosticsTime = Number(status?.diagnosticsUpdatedAt);
+  const diagnosticsLabel = Number.isFinite(diagnosticsTime)
+    ? new Date(diagnosticsTime).toLocaleTimeString()
+    : 'Never';
 
   const actions = (
     <div className="flex flex-wrap items-center justify-end gap-0.5">
@@ -214,7 +254,7 @@ function BalanceBoardPanelContent() {
           <div className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-emerald-400/70" />
           <div
             className={`absolute z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-lg transition-[left,top] duration-100 ${
-              frame.totalKg >= Number(status?.settings?.minimumWeightKg || 1)
+              displayFrame.totalKg >= Number(status?.settings?.minimumWeightKg || 1)
                 ? 'border-white bg-emerald-400 shadow-emerald-400/50'
                 : 'border-slate-400 bg-slate-600'
             }`}
@@ -222,10 +262,10 @@ function BalanceBoardPanelContent() {
             aria-label="Center of pressure"
           />
           <div className="absolute inset-1 grid grid-cols-2 grid-rows-2 gap-1">
-            <CornerLoad label="Top left" value={frame.corners.topLeft} />
-            <CornerLoad label="Top right" value={frame.corners.topRight} />
-            <CornerLoad label="Bottom left" value={frame.corners.bottomLeft} />
-            <CornerLoad label="Bottom right" value={frame.corners.bottomRight} />
+            <CornerLoad label="Top left" value={displayFrame.corners.topLeft} />
+            <CornerLoad label="Top right" value={displayFrame.corners.topRight} />
+            <CornerLoad label="Bottom left" value={displayFrame.corners.bottomLeft} />
+            <CornerLoad label="Bottom right" value={displayFrame.corners.bottomRight} />
           </div>
         </div>
 
@@ -234,6 +274,42 @@ function BalanceBoardPanelContent() {
             <div className="text-[0.65rem] tracking-wide text-slate-500">Current weight</div>
             <div className="font-mono text-3xl font-bold leading-tight text-white">{formatWeight(displayedWeight)}</div>
             <p className="mt-1 text-xs leading-snug text-slate-300">{presentation.instruction}</p>
+          </div>
+
+          <div className="rounded border border-slate-700 bg-slate-950/70 px-1.5 py-1 text-[0.68rem] leading-tight">
+            {/* These are deliberately literal diagnostics rather than another
+                synthesized health badge. Operators need to see which exact
+                layer—bond, radio link, or Linux input—is blocking readings. */}
+            <HardwareStatusRow label="Address" value={status?.address || 'None'} />
+            <HardwareStatusRow
+              label="Bluetooth device"
+              value={status?.bluetooth?.available ? 'Known to BlueZ' : 'Not available'}
+            />
+            <HardwareStatusRow label="Bluetooth bond" value={bondStatus} />
+            <HardwareStatusRow
+              label="Wake reconnect"
+              value={status?.bluetooth?.wakeAllowed ? 'Allowed' : 'Not allowed'}
+              tone={status?.bluetooth?.wakeAllowed ? 'text-emerald-300' : 'text-amber-300'}
+            />
+            <HardwareStatusRow
+              label="Bluetooth link"
+              value={linkStatus}
+              tone={status?.bluetooth?.connected ? 'text-emerald-300' : 'text-amber-300'}
+            />
+            <HardwareStatusRow
+              label="Input device"
+              value={readableHardwareValue(status?.inputState)}
+              tone={status?.inputState === 'ready' ? 'text-emerald-300' : 'text-amber-300'}
+            />
+            <HardwareStatusRow label="Worker" value={readableHardwareValue(status?.hardwareState)} />
+            <HardwareStatusRow label="Status updated" value={diagnosticsLabel} />
+            {status?.reconnectDetail ? (
+              <p className="mt-1 break-words border-t border-slate-700 pt-1 text-amber-200">
+                Last reconnect: {status.reconnectDetail}
+              </p>
+            ) : null}
+            {status?.bluetoothError ? <p className="mt-1 break-words text-red-300">Bluetooth: {status.bluetoothError}</p> : null}
+            {status?.inputError ? <p className="mt-1 break-words text-red-300">Input: {status.inputError}</p> : null}
           </div>
 
           {status?.lastMeasurement ? (

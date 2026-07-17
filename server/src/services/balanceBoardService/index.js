@@ -71,6 +71,19 @@ let lastError = null;
 let batteryPercent = null;
 let latestFrame = null;
 let lastMeasurement = null;
+let bluetooth = {
+  available: null,
+  paired: null,
+  trusted: null,
+  connected: null,
+  wakeAllowed: null,
+};
+let inputState = enabled ? 'not-detected' : 'disabled';
+let bluetoothError = null;
+let inputError = null;
+let reconnectDetail = null;
+let diagnosticsUpdatedAt = null;
+let lastConnectedAt = null;
 let tareSamples = [];
 let tare = { topRight: 0, bottomRight: 0, topLeft: 0, bottomLeft: 0 };
 let stableSamples = [];
@@ -143,6 +156,13 @@ function getState() {
     batteryPercent,
     lastError,
     lastMeasurement,
+    bluetooth,
+    inputState,
+    bluetoothError,
+    inputError,
+    reconnectDetail,
+    diagnosticsUpdatedAt,
+    lastConnectedAt,
     settings: {
       minimumWeightKg: settings.minimumWeightKg,
       stableDurationMs: settings.stableDurationMs,
@@ -331,6 +351,27 @@ function handleWorkerMessage(message = {}) {
     emitStateChange('board-paired');
     return;
   }
+  if (message.type === 'diagnostics') {
+    // Preserve the three hardware layers independently. A valid BlueZ bond, an
+    // active Bluetooth connection, and a readable evdev device are not
+    // interchangeable and must never collapse back into a single “sleeping”
+    // boolean in the browser.
+    const reportedBluetooth = message.bluetooth || {};
+    bluetooth = {
+      available: Boolean(reportedBluetooth.available),
+      paired: Boolean(reportedBluetooth.paired),
+      trusted: Boolean(reportedBluetooth.trusted),
+      connected: Boolean(reportedBluetooth.connected),
+      wakeAllowed: Boolean(reportedBluetooth.wakeAllowed),
+    };
+    inputState = typeof message.inputState === 'string' ? message.inputState : 'unknown';
+    bluetoothError = message.bluetoothError ? String(message.bluetoothError) : null;
+    inputError = message.inputError ? String(message.inputError) : null;
+    reconnectDetail = message.reconnectDetail ? String(message.reconnectDetail) : null;
+    diagnosticsUpdatedAt = Date.now();
+    emitStateChange('hardware-diagnostics');
+    return;
+  }
   if (message.type !== 'status') return;
 
   hardwareState = String(message.state || 'unknown');
@@ -341,6 +382,7 @@ function handleWorkerMessage(message = {}) {
   if (message.error) lastError = String(message.error);
   else if (hardwareState !== 'commissioning') lastError = null;
   if (hardwareState === 'connected') {
+    lastConnectedAt = Date.now();
     if (!connected) {
       connected = true;
       beginTare();
