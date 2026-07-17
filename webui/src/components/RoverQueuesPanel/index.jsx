@@ -8,7 +8,7 @@ import CardFrame from '../CardFrame/index.jsx';
 import QueueTargetRow from '../QueueTargetRow/index.jsx';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
 import { openExternalRover } from '../../lib/interInstanceTransfer.js';
-import { ExternalInstancesCompact } from '../InterInstancePanel/index.jsx';
+import { ExternalInstancesCompact, InterInstancePopup } from '../InterInstancePanel/index.jsx';
 import { isFeatureEnabled } from '../../lib/features.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 
@@ -32,12 +32,16 @@ export default function RoverQueuesPanel({
   users: usersOverride = null,
   externalInstance = null,
   disabledOverlay = '',
+  fillHeight = false,
 }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const localRoster = useSessionSelector((state) => state.session?.roster ?? []);
   const localTurnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const localUsers = useSessionSelector((state) => state.session?.users ?? []);
   const interInstanceEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'interInstance'));
+  const hasRemoteInstances = useSessionSelector(
+    (state) => (state.session?.interInstances?.instances?.length ?? 0) > 0,
+  );
   const { value: pageSettings } = useSettingsNamespace('page', { interInstanceTransferSettings: true });
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const assignedRoverId = useSessionSelector((state) => String(state.session?.assignment?.roverId || '').trim());
@@ -50,6 +54,7 @@ export default function RoverQueuesPanel({
   const { requestControl, rebootOwnRover } = useSessionActions();
   const [pending, setPending] = useState({});
   const [rebootPending, setRebootPending] = useState(false);
+  const [interInstancePopupOpen, setInterInstancePopupOpen] = useState(false);
   const externalMode = Boolean(externalInstance);
   const externalBlocked = Boolean(externalMode && disabledOverlay);
   const includeInterInstanceSettings = pageSettings?.interInstanceTransferSettings !== false;
@@ -146,8 +151,8 @@ export default function RoverQueuesPanel({
     }
   }
 
-  const headerActions =
-    !externalMode && role !== 'spectator' && assignedRoverId ? (
+  const rebootAction =
+    role !== 'spectator' && assignedRoverId ? (
       <button
         type="button"
         onClick={handleRebootOwnRover}
@@ -159,14 +164,35 @@ export default function RoverQueuesPanel({
       </button>
     ) : null;
 
+  const headerActions = !externalMode ? (
+    <>
+      {interInstanceEnabled && hasRemoteInstances ? (
+        <button
+          type="button"
+          className="button-dark"
+          onClick={() => setInterInstancePopupOpen(true)}
+        >
+          Browse servers
+        </button>
+      ) : null}
+      {rebootAction}
+    </>
+  ) : null;
+
   return (
-    <CardFrame title={title} actions={headerActions} bodyClassName="space-y-0.5 text-sm">
-      <div className="relative space-y-0.5">
-        {rosterItems.length === 0 ? (
-          <p className="text-sm text-slate-500">No rovers registered.</p>
-        ) : (
-          <ul className="space-y-0.5 text-sm">
-            {rosterItems.map((rover) => {
+    <>
+      <CardFrame
+        title={title}
+        actions={headerActions}
+        fillHeight={fillHeight}
+        bodyClassName="space-y-0.5 text-sm"
+      >
+        <div className={fillHeight ? 'relative flex min-h-0 flex-1 flex-col gap-0.5' : 'relative space-y-0.5'}>
+          {rosterItems.length === 0 ? (
+            <p className="text-sm text-slate-500">No rovers registered.</p>
+          ) : (
+            <ul className="space-y-0.5 text-sm">
+              {rosterItems.map((rover) => {
               const roverId = String(rover.id);
               const info = turnQueues?.[roverId] || null;
               const queue = info?.queue || [];
@@ -220,16 +246,25 @@ export default function RoverQueuesPanel({
                   showAction={Boolean(canRequest)}
                 />
               );
-            })}
-          </ul>
-        )}
-        {externalBlocked ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded bg-black/70 px-2 text-center text-sm font-semibold text-slate-100">
-            {disabledOverlay}
-          </div>
-        ) : null}
-        {!externalMode && interInstanceEnabled ? <ExternalInstancesCompact /> : null}
-      </div>
-    </CardFrame>
+              })}
+            </ul>
+          )}
+          {externalBlocked ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded bg-black/70 px-2 text-center text-sm font-semibold text-slate-100">
+              {disabledOverlay}
+            </div>
+          ) : null}
+          {!externalMode && interInstanceEnabled ? <ExternalInstancesCompact /> : null}
+        </div>
+      </CardFrame>
+      {interInstancePopupOpen ? (
+        /*
+          The popup remains owned by the local Rover Queues panel because its
+          title-bar action opens it. External queue panels never render that
+          action, which prevents recursively opening browsers from remote rows.
+        */
+        <InterInstancePopup onClose={() => setInterInstancePopupOpen(false)} />
+      ) : null}
+    </>
   );
 }

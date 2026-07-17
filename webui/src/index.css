@@ -59,6 +59,39 @@ body {
 }
 
 @layer components {
+  .inter-instance-overlay-frame {
+    /* The unscaled frame always stays inside the viewport on phones and on
+       desktop browsers that do not apply the larger presentation below. */
+    max-width: calc(100vw - 0.5rem);
+  }
+
+  .inter-instance-overlay-body {
+    max-height: 82vh;
+  }
+
+  @media (min-width: 1024px) {
+    .inter-instance-overlay-scale {
+      /*
+        `zoom` enlarges the complete interface—including typography, controls,
+        spacing, and hit targets—while participating in layout. A transform
+        would only enlarge the paint result and could overlap or clip sibling
+        content because the browser would still reserve the original size.
+      */
+      zoom: 1.5;
+    }
+
+    .inter-instance-overlay-frame {
+      /* Reserve the inverse width before the 1.5x zoom so the final rendered
+         frame still fits inside the physical desktop viewport. */
+      max-width: calc((100vw - 0.5rem) / 1.5);
+    }
+
+    .inter-instance-overlay-body {
+      /* 54.6667vh becomes approximately 82vh after the 1.5x desktop zoom. */
+      max-height: 54.6667vh;
+    }
+  }
+
   .pride-page-bg {
     background-color: #050505;
     background-image:

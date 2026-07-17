@@ -1,6 +1,10 @@
-1. assign rovers based on battery percentage, give people highest one
-2. add admin ui for VIP and private requests instead of only through discord
-3. make overcurrent limiter speed sensitive, slower fill at lower speeds
+1. interinstance UI updates
+   1. on desktop, scale up the overlay UI, like actually scale like 1.5x
+   2. update the rover queues panel so that instances are always expanded
+      1. have a "scroll for more" thing
+      2. make it so that the list takes up all the vertical space
+2. assign rovers based on battery percentage, give people highest one
+3. add admin ui for VIP and private requests instead of only through discord
 4. add more background gap themes
 5.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92

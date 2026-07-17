@@ -102,8 +102,9 @@ export default function ModeGateOverlay() {
           */
           <InterInstanceBrowserFrame
             hideWhenEmpty
-            className="max-w-[calc(100vw-0.5rem)]"
-            bodyClassName="max-h-[86vh] overflow-y-auto p-0.5"
+            scaledOverlay
+            className="inter-instance-overlay-frame"
+            bodyClassName="inter-instance-overlay-body overflow-y-auto p-0.5"
           />
         ) : null}
       </div>

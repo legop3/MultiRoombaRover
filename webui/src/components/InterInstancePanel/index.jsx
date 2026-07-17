@@ -1,7 +1,7 @@
 // Inter Instance Panel
 // Purpose: Renders remote rover servers discovered through the inter-instance directory.
 // Scope: Owns external server metadata presentation while reusing RoverQueuesPanel for rover/queue rows.
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverQueuesPanel from '../RoverQueuesPanel/index.jsx';
@@ -133,44 +133,99 @@ function RemoteMediaStrip({ remote }) {
   );
 }
 
+function ScrollableInstanceList({ children }) {
+  const viewportRef = useRef(null);
+  const contentRef = useRef(null);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  const measureScrollRemainder = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    /*
+      A small tolerance prevents fractional browser measurements from leaving
+      the cue visible when the user is effectively at the bottom. Comparing the
+      live viewport and content dimensions also means the cue only appears when
+      there is genuinely hidden content, rather than merely because several
+      instances happen to exist.
+    */
+    const remaining = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    setCanScrollDown(remaining > 2);
+  }, []);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return undefined;
+
+    /*
+      Remote rosters and queues can change height without a window resize. A
+      ResizeObserver on both the viewport and its inner content keeps the cue
+      accurate for those live session updates while avoiding polling timers.
+    */
+    const observer = new ResizeObserver(measureScrollRemainder);
+    observer.observe(viewport);
+    observer.observe(content);
+    const animationFrame = window.requestAnimationFrame(measureScrollRemainder);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      observer.disconnect();
+    };
+  }, [measureScrollRemainder]);
+
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div
+        ref={viewportRef}
+        className="min-h-0 flex-1 overflow-y-auto"
+        onScroll={measureScrollRemainder}
+      >
+        <div ref={contentRef} className={classNames('space-y-0.5', canScrollDown && 'pb-6')}>
+          {children}
+        </div>
+      </div>
+      {canScrollDown ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-neutral-950 via-neutral-950/90 to-transparent px-1 pb-0.5 pt-5 text-center text-xs font-semibold text-slate-200">
+          Scroll for more ↓
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ExternalInstancesCompact() {
-  const [expanded, setExpanded] = useState(false);
-  const [popupOpen, setPopupOpen] = useState(false);
   const enabled = useInterInstanceEnabled();
   const instances = useRemoteInstances();
   const visible = useMemo(() => instances.filter((remote) => remote?.online || remote?.url), [instances]);
   if (!enabled) return null;
   if (!visible.length) return null;
   return (
-    <div className="space-y-0.5">
-      <div className="grid grid-cols-2 gap-0.5">
-        <button type="button" className="button-dark w-full" onClick={() => setExpanded((value) => !value)}>
-          {expanded ? 'Hide external' : `Show external (${visible.length})`}
-        </button>
-        <button type="button" className="button-dark w-full" onClick={() => setPopupOpen(true)}>
-          Browse servers
-        </button>
-      </div>
-      {expanded ? (
-        <div className="space-y-0.5">
-          {visible.map((remote) =>
-            remote.online ? (
-              <RoverQueuesPanel
-                key={remote.url}
-                title={remote.instance?.name || remote.url}
-                roster={remote.roster}
-                turnQueues={remote.turnQueues}
-                users={remote.users}
-                externalInstance={remote}
-                disabledOverlay={getRemoteAvailability(remote).blocked ? getRemoteAvailability(remote).overlay : ''}
-              />
-            ) : (
-              <InstancePanel key={remote.url} remote={remote} />
-            ),
-          )}
-        </div>
-      ) : null}
-      {popupOpen ? <InterInstancePopup onClose={() => setPopupOpen(false)} /> : null}
+    /*
+      External instances are intentionally always mounted. Besides removing an
+      unnecessary disclosure click, this preserves the live queue rows while
+      the local Rover Queues card uses this region as its remaining-height
+      scroller. The viewport cap remains a safety boundary in layouts whose
+      parent has natural height instead of a fixed desktop row height.
+    */
+    <div className="flex min-h-0 max-h-[min(60vh,36rem)] flex-1 flex-col border-t border-neutral-600/60 pt-0.5">
+      <ScrollableInstanceList>
+        {visible.map((remote) =>
+          remote.online ? (
+            <RoverQueuesPanel
+              key={remote.url}
+              title={remote.instance?.name || remote.url}
+              roster={remote.roster}
+              turnQueues={remote.turnQueues}
+              users={remote.users}
+              externalInstance={remote}
+              disabledOverlay={getRemoteAvailability(remote).blocked ? getRemoteAvailability(remote).overlay : ''}
+            />
+          ) : (
+            <InstancePanel key={remote.url} remote={remote} />
+          ),
+        )}
+      </ScrollableInstanceList>
     </div>
   );
 }
@@ -180,8 +235,9 @@ export function InterInstancePopup({ onClose }) {
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-0.5">
       <InterInstanceBrowserFrame
         onClose={onClose}
-        className="max-w-[calc(100vw-0.5rem)]"
-        bodyClassName="max-h-[82vh] overflow-y-auto p-0.5"
+        scaledOverlay
+        className="inter-instance-overlay-frame"
+        bodyClassName="inter-instance-overlay-body overflow-y-auto p-0.5"
       />
     </div>
   );
@@ -226,6 +282,7 @@ export function InterInstanceBrowserFrame({
   className = '',
   bodyClassName = 'p-0.5',
   centered = false,
+  scaledOverlay = false,
 }) {
   const enabled = useInterInstanceEnabled();
   const instances = useRemoteInstances();
@@ -245,7 +302,7 @@ export function InterInstanceBrowserFrame({
     <CardFrame
       title="External instances"
       actions={actions}
-      className={className}
+      className={classNames(scaledOverlay && 'inter-instance-overlay-scale', className)}
       bodyClassName={bodyClassName}
       clipOverflow={false}
     >
