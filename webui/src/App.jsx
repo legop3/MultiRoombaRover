@@ -172,11 +172,11 @@ function MobileFeatureTabs({
             <div className={`flex flex-col ${themeGapClass}`}>
               <NeatoCard />
               <LiftCard />
+              <BalanceBoardPanel />
               <BarcodeGamesPanel />
               <OdometerPanel />
               <ButtonBoxPanel />
               <KinectPanel />
-              <BalanceBoardPanel />
             </div>
           </TabPanel>
           <TabPanel id="vip" keepMounted>

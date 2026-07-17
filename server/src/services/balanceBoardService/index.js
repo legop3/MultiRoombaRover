@@ -2,12 +2,16 @@
 // Purpose: Exposes one Wii Balance Board as a self-pairing Bluetooth scale.
 // Scope: Stores the paired address, applies a small automatic tare, and publishes simple status plus live weight.
 const fs = require('fs');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('balanceBoardService');
 const { loadConfig } = require('../../helpers/configLoader');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { isFeatureEnabled } = require('../../helpers/features');
+const { isAdmin } = require('../roleService');
+const { sendAlert } = require('../alertService');
 const { createBalanceBoardHardware } = require('./hardware');
 
 const events = new EventEmitter();
@@ -18,6 +22,14 @@ const STORE_PATH = resolveDataPath('balance-board.json');
 const FRAME_ROOM = 'balance-board-viewers';
 const TARE_SAMPLE_COUNT = 20;
 const MAX_AUTOMATIC_TARE_KG = 2;
+const execFileAsync = promisify(execFile);
+const ALERT_COLORS = {
+  connected: '#10b981',
+  sleeping: '#64748b',
+  warning: '#f59e0b',
+  error: '#ef4444',
+  info: '#38bdf8',
+};
 
 function loadStore() {
   try {
@@ -49,6 +61,18 @@ function rawWeightKg(corners = {}) {
     .reduce((total, key) => total + Math.max(0, Number(corners[key]) || 0), 0) / 100;
 }
 
+function cornerWeightsKg(corners = {}) {
+  // Preserve all four factory-calibrated load cells in kilograms. Their
+  // relative distribution drives the center-of-pressure dot in the panel,
+  // while the existing tare continues to apply only to the displayed total.
+  return {
+    topRight: roundedWeight((Number(corners.topRight) || 0) / 100),
+    bottomRight: roundedWeight((Number(corners.bottomRight) || 0) / 100),
+    topLeft: roundedWeight((Number(corners.topLeft) || 0) / 100),
+    bottomLeft: roundedWeight((Number(corners.bottomLeft) || 0) / 100),
+  };
+}
+
 let store = enabled ? loadStore() : { address: '' };
 let hardware = null;
 let status = enabled ? (store.address ? 'waiting' : 'starting') : 'disabled';
@@ -60,6 +84,55 @@ let batteryPercent = null;
 let latestFrame = null;
 let tareSamples = [];
 let tareKg = 0;
+let previousWorkerState = '';
+let lastAlertKey = '';
+let unpairing = false;
+
+function sendStatusAlert(workerState, message = '') {
+  let alert = null;
+  if (workerState === 'connected') {
+    alert = {
+      color: ALERT_COLORS.connected,
+      title: 'Balance Board connected',
+      message: 'Live weight is available.',
+    };
+  } else if (workerState === 'sleeping') {
+    alert = {
+      color: ALERT_COLORS.sleeping,
+      title: 'Balance Board sleeping',
+      message: 'Press the front power button when you are ready to use it.',
+    };
+  } else if (workerState === 'waiting' && previousWorkerState === 'connected') {
+    alert = {
+      color: ALERT_COLORS.warning,
+      title: 'Balance Board disconnected',
+      message: message || 'Press the front power button to reconnect it.',
+    };
+  } else if (workerState === 'connection-failed') {
+    alert = {
+      color: ALERT_COLORS.error,
+      title: 'Balance Board connection failed',
+      message: message || 'The Bluetooth connection did not complete.',
+    };
+  } else if (workerState === 'error') {
+    alert = {
+      color: ALERT_COLORS.error,
+      title: 'Balance Board needs attention',
+      message: message || 'The hardware worker stopped.',
+    };
+  }
+
+  previousWorkerState = workerState;
+  if (!alert) return;
+
+  // Native reconnect retries may repeat the same result while hardware is out
+  // of range. Collapse identical status/message pairs so feed alerts remain
+  // meaningful state changes instead of turning into a transport log.
+  const key = `${workerState}:${alert.message}`;
+  if (key === lastAlertKey) return;
+  lastAlertKey = key;
+  sendAlert(alert);
+}
 
 function getState() {
   return {
@@ -103,6 +176,7 @@ function processFrame(message = {}) {
   );
   latestFrame = {
     totalKg: roundedWeight(rawKg - tareKg),
+    corners: cornerWeightsKg(message.corners),
     batteryPercent,
   };
   io.to(FRAME_ROOM).emit('balanceBoard:frame', latestFrame);
@@ -121,12 +195,19 @@ function handleWorkerMessage(message = {}) {
       persistStore();
     }
     hardware?.setAddress(address);
+    lastAlertKey = 'paired';
+    sendAlert({
+      color: ALERT_COLORS.info,
+      title: 'Balance Board paired',
+      message: 'Bluetooth setup completed.',
+    });
     updateStatus('connecting', 'Paired. Connecting to the board now.');
     return;
   }
 
   if (message.type !== 'status') return;
   const workerState = String(message.state || 'unknown');
+  sendStatusAlert(workerState, message.error || '');
   if (workerState === 'commissioning') {
     updateStatus('starting', 'Starting Bluetooth discovery.');
   } else if (workerState === 'discovering') {
@@ -169,6 +250,59 @@ io.on('connection', (socket) => {
     cb({ success: true });
   });
   socket.on('balanceBoard:unsubscribe', () => socket.leave(FRAME_ROOM));
+  socket.on('balanceBoard:unpair', async (_payload = {}, cb = () => {}) => {
+    if (!isAdmin(socket)) {
+      cb({ error: 'Admin access required' });
+      return;
+    }
+    if (unpairing) {
+      cb({ error: 'The Balance Board is already being unpaired' });
+      return;
+    }
+
+    unpairing = true;
+    const address = store.address;
+    let bluetoothWarning = '';
+    try {
+      if (address) {
+        try {
+          // A complete forget removes both sources of remembered identity. If
+          // only the JSON address or only the BlueZ bond were removed, the next
+          // red-Sync attempt could inherit half of the previous relationship.
+          await execFileAsync('bluetoothctl', ['remove', address], { timeout: 10000 });
+        } catch (err) {
+          bluetoothWarning = String(
+            err?.stderr || err?.message || 'BlueZ did not remove the bond',
+          ).trim();
+          logger.warn('Balance Board BlueZ bond removal failed', bluetoothWarning);
+        }
+      }
+
+      store.address = '';
+      persistStore();
+      connected = false;
+      batteryPercent = null;
+      latestFrame = null;
+      tareSamples = [];
+      tareKg = 0;
+      previousWorkerState = '';
+      lastAlertKey = 'unpaired';
+      hardware?.setAddress('');
+      hardware?.restart();
+      updateStatus('starting', 'Starting Bluetooth discovery.');
+      sendAlert({
+        color: ALERT_COLORS.warning,
+        title: 'Balance Board unpaired',
+        message: 'Press the red Sync button underneath the board to pair it again.',
+      });
+      cb({ success: true, warning: bluetoothWarning || null });
+    } catch (err) {
+      logger.error('Failed to unpair Balance Board', err);
+      cb({ error: err.message || 'Failed to unpair the Balance Board' });
+    } finally {
+      unpairing = false;
+    }
+  });
 });
 
 if (enabled) {

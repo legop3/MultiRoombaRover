@@ -16,6 +16,7 @@ function createBalanceBoardHardware({ logger, address = '', simulate = false } =
   let worker = null;
   let stdoutBuffer = '';
   let stopped = false;
+  let restarting = false;
   let restartTimer = null;
   let lastStderrLogAt = 0;
   let suppressedStderrLines = 0;
@@ -100,7 +101,11 @@ function createBalanceBoardHardware({ logger, address = '', simulate = false } =
     child.on('close', (code, signal) => {
       if (worker === child) worker = null;
       if (!stopped) {
-        emitProtocolError(`balance board worker exited (${signal || code})`);
+        // Admin unpair deliberately replaces the worker with an empty address.
+        // Do not turn that expected exit into a red hardware-error state while
+        // still using the normal restart scheduler for the replacement.
+        if (!restarting) emitProtocolError(`balance board worker exited (${signal || code})`);
+        restarting = false;
         scheduleRestart();
       }
     });
@@ -108,6 +113,7 @@ function createBalanceBoardHardware({ logger, address = '', simulate = false } =
 
   function stop() {
     stopped = true;
+    restarting = false;
     if (restartTimer) {
       clearTimeout(restartTimer);
       restartTimer = null;
@@ -129,10 +135,36 @@ function createBalanceBoardHardware({ logger, address = '', simulate = false } =
     }, 1500).unref();
   }
 
+  function restart() {
+    if (stopped) return;
+    if (!worker) {
+      start();
+      return;
+    }
+
+    const child = worker;
+    restarting = true;
+    try {
+      // An admin forget changes the address used in the child environment. A
+      // controlled restart lets the replacement worker start with that new
+      // value, while the existing close handler remains the single owner of
+      // delayed respawn and avoids overlapping Bluetooth listeners.
+      child.stdin.write(`${JSON.stringify({ command: 'stop' })}\n`);
+    } catch (_err) {
+      // The child may have already closed stdin; SIGTERM below still guarantees
+      // that it cannot keep listening for the address that was just forgotten.
+    }
+    child.kill('SIGTERM');
+    setTimeout(() => {
+      if (child.exitCode == null && child.signalCode == null) child.kill('SIGKILL');
+    }, 1500).unref();
+  }
+
   return {
     events,
     start,
     stop,
+    restart,
     setAddress(nextAddress) {
       // The factory can be created before first commissioning. Preserve the
       // newly paired address for later bridge restarts in the same Node process

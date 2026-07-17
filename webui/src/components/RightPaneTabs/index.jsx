@@ -421,11 +421,11 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
             <div className={`flex flex-col ${themeGapClass}`}>
               <NeatoCard />
               <LiftCard />
+              <BalanceBoardPanel />
               <BarcodeGamesPanel />
               <OdometerPanel />
               <ButtonBoxPanel />
               <KinectPanel />
-              <BalanceBoardPanel />
             </div>
           </TabPanel>
 
