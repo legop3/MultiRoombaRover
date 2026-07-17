@@ -42,11 +42,10 @@ function centerOfPressure(corners) {
   const bottomRight = Math.max(0, finiteNumber(corners.bottomRight) || 0);
   const total = topLeft + topRight + bottomLeft + bottomRight;
 
-  // An empty board naturally has tiny load-cell noise. Keep the marker centered
-  // and subdued until there is enough weight for its position to mean anything;
-  // once loaded, map the normalized left/right and top/bottom balance into the
-  // safe interior of the load map.
-  if (total < 0.5) return { left: 50, top: 50, active: false };
+  // Only an exact zero stays centered because dividing by zero cannot produce a
+  // position. Every positive reading participates immediately, with no minimum
+  // weight or center deadzone hiding small shifts reported by the load cells.
+  if (total === 0) return { left: 50, top: 50, active: false };
   const horizontal = ((topRight + bottomRight) - (topLeft + bottomLeft)) / total;
   const vertical = ((bottomLeft + bottomRight) - (topLeft + topRight)) / total;
   return {
