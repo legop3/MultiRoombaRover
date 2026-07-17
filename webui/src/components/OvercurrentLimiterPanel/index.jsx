@@ -22,6 +22,13 @@ function formatSpeed(value) {
   return `${Math.round(value)} mm/s`;
 }
 
+function formatClassification(value) {
+  if (value === 'stalled') return 'Stalled';
+  if (value === 'partial') return 'Partial';
+  if (value === 'moving') return 'Moving';
+  return 'Unknown';
+}
+
 function ProgressBar({ value, color = 'bg-emerald-500' }) {
   const width = `${Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100)}%`;
   return (
@@ -75,10 +82,11 @@ export default function OvercurrentLimiterPanel() {
                   color={motor.overcurrent ? 'bg-red-500' : 'bg-amber-500'}
                 />
                 {wheel ? (
-                  <div className="grid grid-cols-3 gap-1 text-[0.65rem] text-slate-500">
+                  <div className="grid grid-cols-2 gap-1 text-[0.65rem] text-slate-500">
                     <span>{`Command ${formatSpeed(Math.abs(Number(motor.commandedSpeed)))}`}</span>
                     <span>{`Measured ${formatSpeed(motor.measuredSpeed)}`}</span>
-                    <span>{`Stall ${formatPct(motor.stallFactor)}`}</span>
+                    <span>{`Progress ${formatPct(motor.progressRatio)}`}</span>
+                    <span>{`${formatClassification(motor.classification)} · stall ${formatPct(motor.stallFactor)}`}</span>
                   </div>
                 ) : null}
               </div>

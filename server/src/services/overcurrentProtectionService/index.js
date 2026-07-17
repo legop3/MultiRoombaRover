@@ -6,15 +6,14 @@ const logger = require('../../globals/logger').child('overcurrentProtectionServi
 
 const DEFAULT_CONFIG = Object.freeze({
   minimumUsefulWheelIntent: 75,
-  // A fully stalled wheel now accumulates 0.25 stress per second, producing a
-  // roughly four-second hard-stop window. The smaller base rate also prevents
-  // a wheel that is still making progress from being treated like a hard jam.
   stressGrace: 0.25,
-  baseWheelOvercurrentRatePerSec: 0.08,
-  stalledWheelAdditionalRatePerSec: 0.17,
-  // Clear telemetry removes stress faster than even a complete stall adds it,
-  // so short threshold climbs and direction-change spikes do not linger.
-  wheelRecoveryRatePerSec: 0.5,
+  wheelProgressWindowSec: 0.4,
+  encoderNoiseFloorMmPerSec: 15,
+  fullStallProgressRatio: 0.1,
+  movingProgressRatio: 0.6,
+  movingOrUnknownRatePerSec: 0.25,
+  fullStallRatePerSec: 1,
+  wheelRecoveryRatePerSec: 0.75,
   brushOvercurrentRatePerSec: 1,
   brushRecoveryRatePerSec: 0.75,
   clearBeforeUnlockSec: 0.75,
@@ -41,6 +40,10 @@ function createMotorState() {
     measuredSpeed: null,
     currentMa: null,
     stallFactor: 0,
+    progressRatio: null,
+    classification: 'unknown',
+    progressSamples: [],
+    windowCommandSign: 0,
     stress: 0,
     cap: 1,
   };
@@ -240,23 +243,117 @@ function createOvercurrentProtectionService(options = {}) {
     return payload;
   }
 
-  function updateWheelMotor(motor, { overcurrent, command, measured, currentMa, deltaSec }) {
-    const commandMagnitude = Math.abs(finiteNumber(command));
-    const measuredNumber = Number(measured);
-    const measuredMagnitude = Number.isFinite(measuredNumber) ? Math.abs(measuredNumber) : null;
-    const usefulIntent = commandMagnitude >= config.minimumUsefulWheelIntent;
-    const motionRatio = usefulIntent && measuredMagnitude != null
-      ? clampUnit(measuredMagnitude / Math.max(commandMagnitude, config.minimumUsefulWheelIntent))
-      : 1;
-    const stallFactor = usefulIntent ? 1 - motionRatio : 0;
-    const riseRate = config.baseWheelOvercurrentRatePerSec
-      + config.stalledWheelAdditionalRatePerSec * stallFactor;
+  function resetWheelProgressWindow(motor, commandSign = 0) {
+    motor.progressSamples = [];
+    motor.windowCommandSign = commandSign;
+    motor.progressRatio = null;
+    motor.classification = 'unknown';
+    motor.stallFactor = 0;
+  }
+
+  function appendWheelProgressSample(motor, sample) {
+    motor.progressSamples.push(sample);
+    let windowSec = motor.progressSamples.reduce((total, entry) => total + entry.deltaSec, 0);
+
+    /*
+      Keep an actual rolling time window rather than periodically clearing a
+      bucket. If the oldest sample crosses the boundary, retain only its
+      proportional tail so classification does not depend on sensor cadence.
+    */
+    while (motor.progressSamples.length && windowSec > config.wheelProgressWindowSec) {
+      const excessSec = windowSec - config.wheelProgressWindowSec;
+      const oldest = motor.progressSamples[0];
+      if (oldest.deltaSec <= excessSec) {
+        motor.progressSamples.shift();
+        windowSec -= oldest.deltaSec;
+        continue;
+      }
+      const retainedFraction = (oldest.deltaSec - excessSec) / oldest.deltaSec;
+      oldest.deltaSec -= excessSec;
+      oldest.expectedDistance *= retainedFraction;
+      oldest.alignedDistance *= retainedFraction;
+      windowSec = config.wheelProgressWindowSec;
+    }
+    return windowSec;
+  }
+
+  function classifyWheelProgress(motor, windowSec) {
+    if (windowSec < config.wheelProgressWindowSec * 0.9) return;
+    const totals = motor.progressSamples.reduce(
+      (result, sample) => ({
+        expectedDistance: result.expectedDistance + sample.expectedDistance,
+        alignedDistance: result.alignedDistance + sample.alignedDistance,
+      }),
+      { expectedDistance: 0, alignedDistance: 0 },
+    );
+    if (totals.expectedDistance <= 0) return;
+
+    /*
+      Signed, command-aligned distance lets forward/backward encoder wobble
+      cancel over the window. The fixed noise floor then removes small residual
+      bias from gearbox lash or a wheel module rocking without real travel.
+    */
+    const averageExpectedSpeed = totals.expectedDistance / windowSec;
+    const averageAlignedSpeed = totals.alignedDistance / windowSec;
+    const usefulProgressSpeed = Math.max(0, averageAlignedSpeed - config.encoderNoiseFloorMmPerSec);
+    const progressRatio = clampUnit(usefulProgressSpeed / averageExpectedSpeed);
+    const ratioRange = Math.max(0.0001, config.movingProgressRatio - config.fullStallProgressRatio);
+    const stallFactor = clampUnit((config.movingProgressRatio - progressRatio) / ratioRange);
+
+    motor.progressRatio = progressRatio;
+    motor.stallFactor = stallFactor;
+    motor.classification = progressRatio <= config.fullStallProgressRatio
+      ? 'stalled'
+      : progressRatio >= config.movingProgressRatio
+        ? 'moving'
+        : 'partial';
+  }
+
+  function updateWheelMotor(motor, { overcurrent, command, intent, measured, currentMa, deltaSec }) {
+    const commandNumber = finiteNumber(command);
+    const commandMagnitude = Math.abs(commandNumber);
+    const commandSign = Math.sign(commandNumber);
+    const intentMagnitude = Math.abs(finiteNumber(intent));
+    // Null is intentionally checked before Number conversion because
+    // Number(null) is zero, which would falsely turn missing telemetry into a
+    // perfectly stalled wheel.
+    const measuredNumber = measured == null ? null : Number(measured);
+    const measuredValid = Number.isFinite(measuredNumber);
+    const usefulIntent = intentMagnitude >= config.minimumUsefulWheelIntent;
 
     motor.overcurrent = Boolean(overcurrent);
-    motor.commandedSpeed = finiteNumber(command);
-    motor.measuredSpeed = measuredMagnitude;
+    motor.commandedSpeed = commandNumber;
+    motor.measuredSpeed = measuredValid ? measuredNumber : null;
     motor.currentMa = Number.isFinite(Number(currentMa)) ? Number(currentMa) : null;
-    motor.stallFactor = stallFactor;
+
+    if (!motor.overcurrent) {
+      resetWheelProgressWindow(motor, commandSign);
+    } else if (!usefulIntent || commandMagnitude <= 0 || !measuredValid) {
+      // Low commands and missing telemetry are real overcurrent events, but
+      // neither supplies enough evidence to label the wheel mechanically stalled.
+      // Raw operator intent decides whether the classifier remains meaningful;
+      // the progressively smaller applied output must not erase an already
+      // confirmed stall merely because protection itself reduced it below the
+      // normal command threshold.
+      resetWheelProgressWindow(motor, commandSign);
+    } else {
+      if (motor.windowCommandSign !== commandSign) {
+        // Samples from opposite requested directions cannot share a progress
+        // window because their aligned distances describe different motion.
+        resetWheelProgressWindow(motor, commandSign);
+      }
+      if (deltaSec > 0) {
+        const windowSec = appendWheelProgressSample(motor, {
+          deltaSec,
+          expectedDistance: commandMagnitude * deltaSec,
+          alignedDistance: measuredNumber * commandSign * deltaSec,
+        });
+        classifyWheelProgress(motor, windowSec);
+      }
+    }
+
+    const riseRate = config.movingOrUnknownRatePerSec
+      + (config.fullStallRatePerSec - config.movingOrUnknownRatePerSec) * motor.stallFactor;
     motor.stress = clampUnit(
       motor.stress
         + (motor.overcurrent ? riseRate * deltaSec : -config.wheelRecoveryRatePerSec * deltaSec),
@@ -373,14 +470,16 @@ function createOvercurrentProtectionService(options = {}) {
 
     updateWheelMotor(state.motors.leftWheel, {
       overcurrent: flags.leftWheel,
-      command: state.driveIntent.left,
+      command: state.lastDriveOutput.left,
+      intent: state.driveIntent.left,
       measured: speeds.left,
       currentMa: sensors?.wheelLeftCurrentMa,
       deltaSec,
     });
     updateWheelMotor(state.motors.rightWheel, {
       overcurrent: flags.rightWheel,
-      command: state.driveIntent.right,
+      command: state.lastDriveOutput.right,
+      intent: state.driveIntent.right,
       measured: speeds.right,
       currentMa: sensors?.wheelRightCurrentMa,
       deltaSec,
@@ -432,7 +531,11 @@ function createOvercurrentProtectionService(options = {}) {
   function getPublicState(roverId) {
     const state = getState(roverId);
     const motors = MOTOR_KEYS.reduce((result, key) => {
-      result[key] = { ...state.motors[key] };
+      // Rolling samples are internal evidence, not UI state. Excluding them
+      // keeps every sensor frame compact while exposing the resulting ratio and
+      // classification needed to explain the service's decision.
+      const { progressSamples: _progressSamples, windowCommandSign: _windowCommandSign, ...motor } = state.motors[key];
+      result[key] = motor;
       return result;
     }, {});
     return {
