@@ -418,7 +418,23 @@ std::string command_error_summary(const std::string& raw, const std::string& fal
   std::string summary;
   summary.reserve(std::min<std::size_t>(raw.size(), 400));
   bool previous_was_space = false;
+  int ansi_state = 0;
   for (unsigned char ch : raw) {
+    // bluetoothctl emits terminal color CSI sequences even when its output is
+    // captured by a pipe. Drop the entire ESC ... final-byte sequence so the UI
+    // never exposes fragments such as `[[0;93mCHG[0m]` as hardware diagnostics.
+    if (ch == 0x1b) {
+      ansi_state = 1;
+      continue;
+    }
+    if (ansi_state == 1) {
+      ansi_state = ch == '[' ? 2 : 0;
+      continue;
+    }
+    if (ansi_state == 2) {
+      if (ch >= 0x40 && ch <= 0x7e) ansi_state = 0;
+      continue;
+    }
     const bool is_space = ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r';
     if (is_space) {
       if (!summary.empty() && !previous_was_space) summary.push_back(' ');

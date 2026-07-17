@@ -178,6 +178,9 @@ kinect:
   captureCooldownMs: 10000
 
 balanceBoard:
+  # After enabling this feature, rerun install_server.sh. The installer then
+  # configures BlueZ's Wii-compatible HID mode, persistent hid-wiimote loading,
+  # and the restricted evdev permission automatically.
   enabled: false
   # A load must reach this weight before stability timing begins. Keeping the
   # threshold above sensor drift prevents an empty board from capturing itself.

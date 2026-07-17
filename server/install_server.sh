@@ -17,6 +17,8 @@ SNAPSHOT_DIR="/var/lib/rover-snapshots"
 REPLAY_SEGMENT_DIR="/var/lib/replay-segments"
 KINECT_UDEV_RULE="/etc/udev/rules.d/99-kinect-world.rules"
 BALANCE_BOARD_UDEV_RULE="/etc/udev/rules.d/99-multirover-balance-board.rules"
+BALANCE_BOARD_MODULES_LOAD="/etc/modules-load.d/multirover-balance-board.conf"
+BLUEZ_INPUT_CONFIG="/etc/bluetooth/input.conf"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This installer must be run with sudo/root." >&2
@@ -139,6 +141,7 @@ dnf install -y \
   libfreenect-devel \
   libusb1-devel \
   bluez \
+  crudini \
   libcap >/dev/null
 NODE_BIN="$(command -v node)"
 
@@ -199,6 +202,52 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
   cp "$SERVER_DIR/config.example.yaml" "$CONFIG_PATH"
   chown "$TARGET_USER":"$TARGET_USER" "$CONFIG_PATH"
   echo "Copied config.example.yaml to config.yaml; edit it before exposing the service."
+fi
+
+# Use the same YAML library as the server instead of approximating nested YAML
+# with grep. This makes system configuration follow the exact explicit boolean
+# feature flag that the running Node service will use.
+BALANCE_BOARD_ENABLED=$(SERVER_DIR="$SERVER_DIR" CONFIG_PATH="$CONFIG_PATH" "$NODE_BIN" <<'NODE'
+const fs = require('fs');
+const path = require('path');
+const yaml = require(path.join(process.env.SERVER_DIR, 'node_modules', 'js-yaml'));
+const config = yaml.load(fs.readFileSync(process.env.CONFIG_PATH, 'utf8')) || {};
+process.stdout.write(config.balanceBoard?.enabled === true ? 'true' : 'false');
+NODE
+)
+
+if [[ "$BALANCE_BOARD_ENABLED" == "true" ]]; then
+  echo "      Configuring BlueZ for the Wii Balance Board"
+  if ! modinfo hid-wiimote >/dev/null 2>&1; then
+    echo "The running kernel does not provide hid-wiimote; install a Fedora kernel with that module before enabling balanceBoard." >&2
+    exit 1
+  fi
+
+  install -d -m 0755 /etc/bluetooth /etc/modules-load.d
+  touch "$BLUEZ_INPUT_CONFIG"
+  chmod 0644 "$BLUEZ_INPUT_CONFIG"
+  # Modern BlueZ defaults Classic HID devices to userspace UHID and enforces a
+  # security mode that breaks the Wii family's unusual legacy HID handshake.
+  # crudini changes only these two keys, preserving every unrelated Bluetooth
+  # input option an operator may already have configured on the server.
+  crudini --set "$BLUEZ_INPUT_CONFIG" General UserspaceHID false
+  crudini --set "$BLUEZ_INPUT_CONFIG" General ClassicBondedOnly false
+
+  # The service consumes the calibrated evdev axes created specifically by the
+  # kernel hid-wiimote driver. Load it now and on every future boot so the brief
+  # board wake window is never lost waiting for manual module setup.
+  cat > "$BALANCE_BOARD_MODULES_LOAD" <<'EOF'
+# MultiRoombaRover Wii Balance Board support.
+hid-wiimote
+EOF
+  chmod 0644 "$BALANCE_BOARD_MODULES_LOAD"
+  modprobe hid-wiimote
+
+  # BlueZ reads input.conf only at daemon startup. Restart it during the
+  # installer, before multirover is restarted below, so the new HID mode is
+  # guaranteed to be active without requiring a reboot or another command.
+  systemctl enable --now bluetooth.service
+  systemctl restart bluetooth.service
 fi
 
 tmpdir=$(mktemp -d)
@@ -295,8 +344,8 @@ EOF
 cat > "$MULTIROVER_SERVICE" <<EOF
 [Unit]
 Description=Multi-Roomba Rover control server
-After=network-online.target mediamtx.service
-Wants=network-online.target
+After=network-online.target mediamtx.service bluetooth.service
+Wants=network-online.target bluetooth.service
 
 [Service]
 User=$TARGET_USER
@@ -333,5 +382,9 @@ echo
 echo "Update $CONFIG_PATH to set admins, lockdown settings, and media parameters."
 echo "Kinect/libfreenect packages and udev permissions were installed."
 echo "If a Kinect is already plugged in, unplug/replug its USB/power before testing so the new udev rule applies."
-echo "Wii Balance Board Bluetooth support and the restricted input rule were installed."
-echo "Enable balanceBoard in config.yaml, then press the red Sync button once to commission it."
+if [[ "$BALANCE_BOARD_ENABLED" == "true" ]]; then
+  echo "Wii Balance Board BlueZ compatibility, kernel driver, bridge, and restricted input rule were installed."
+  echo "Press the red Sync button once to commission it; later wakes use the front power button."
+else
+  echo "Wii Balance Board bridge and restricted input rule were installed but system Bluetooth compatibility was left unchanged because balanceBoard is disabled."
+fi

@@ -7,19 +7,28 @@ Balance Board input device.
 
 ## Commissioning on the real server
 
-1. Run `sudo ./install_server.sh` from the `server` directory.
-2. Set `balanceBoard.enabled: true` in `server/config.yaml` and restart
-   `multirover.service`.
-3. Open the Activities tab. While it says **Pairing setup**, press the red Sync
-   button under the board's battery cover.
-4. Wait for the card to change to **Sleeping** or **Ready**. BlueZ retains the
-   bond and the service also stores the selected board address in
+1. Set `balanceBoard.enabled: true` in `server/config.yaml`.
+2. Run `sudo ./install_server.sh` from the `server` directory. The installer
+   configures BlueZ's Wii-compatible kernel HID mode, loads `hid-wiimote` now
+   and at boot, and restarts Bluetooth and the rover server automatically.
+3. Open the Activities tab. When it says **Waiting for red Sync**, press the red
+   Sync button under the board's battery cover.
+4. Wait for the card to report a paired bond and then **Ready**. BlueZ retains
+   the bond and the service also stores the selected board address in
    `server/data/balance-board.json`.
 5. For ordinary use, press only the front power button. The board should connect
    to the server without another Sync operation.
 
-The bridge intentionally uses short Bluetooth Classic discovery windows only
-while no board is commissioned. It stops scanning after a successful bond.
+The bridge keeps Bluetooth Classic discovery active while no board is
+commissioned and stops scanning after a successful bond. Once commissioned, it
+actively retries the saved address while disconnected so a front-button wake is
+caught even when the adapter does not accept the board's incoming reconnect.
+
+Wii-family HID compatibility requires `UserspaceHID=false` and
+`ClassicBondedOnly=false` in BlueZ's `input.conf`. The installer applies only
+those two keys with an INI-aware tool and preserves unrelated Bluetooth input
+settings. The latter relaxes BlueZ's global Classic HID bonding restriction;
+this is limited to servers where Balance Board support is explicitly enabled.
 
 ## Physical station
 
