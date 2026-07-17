@@ -21,6 +21,7 @@ function statusPresentation(value) {
   if (status === 'pairing') return { label: 'Pairing', tone: 'border-sky-600 bg-sky-950 text-sky-200' };
   if (status === 'waiting-for-sync') return { label: 'Waiting for red Sync', tone: 'border-amber-600 bg-amber-950 text-amber-200' };
   if (status === 'waiting') return { label: 'Waiting for front button', tone: 'border-amber-600 bg-amber-950 text-amber-200' };
+  if (status === 'sleeping') return { label: 'Sleeping', tone: 'border-slate-600 bg-slate-900 text-slate-200' };
   if (status === 'connecting') return { label: 'Connecting', tone: 'border-sky-600 bg-sky-950 text-sky-200' };
   if (status === 'connection-failed') return { label: 'Connection failed', tone: 'border-red-600 bg-red-950 text-red-200' };
   if (status === 'error') return { label: 'Error', tone: 'border-red-600 bg-red-950 text-red-200' };

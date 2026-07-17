@@ -147,6 +147,10 @@ function handleWorkerMessage(message = {}) {
     connected = false;
     latestFrame = null;
     updateStatus('connection-failed', message.error || 'The direct Balance Board connection failed.');
+  } else if (workerState === 'sleeping') {
+    connected = false;
+    latestFrame = null;
+    updateStatus('sleeping', message.error || 'Board is asleep. Press the front power button to wake it.');
   } else if (workerState === 'waiting') {
     connected = false;
     latestFrame = null;

@@ -65,6 +65,9 @@ constexpr int kDiscoveryRestartDelayMs = 1000;
 constexpr const char* kDiscoveryTimeoutSeconds = "86400";
 constexpr int kDirectReconnectDelayMs = 1000;
 constexpr int kHandshakeWarningMs = 10000;
+constexpr int kEmptyWeightThresholdCentiKg = 200;
+constexpr int kEmptySleepDelayMs = 2 * 60 * 1000;
+constexpr int kSleepDisconnectCooldownMs = 30 * 1000;
 
 std::atomic<bool> running{true};
 std::mutex output_mutex;
@@ -700,6 +703,7 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
   }
 
   std::string prepared_address;
+  bool sleeping_after_idle = false;
   while (running.load()) {
     std::optional<std::string> address;
     {
@@ -733,6 +737,10 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
         emit_status("connection-failed", *address,
                     "Direct Balance Board connection failed: " +
                         std::string(std::strerror(connection_error)));
+      } else if (sleeping_after_idle) {
+        // Do not replace an intentional sleep with a generic connection status
+        // every time the powered-off board correctly ignores a Bluetooth page.
+        emit_status("sleeping", *address, "Board is asleep. Press the front power button to wake it.");
       } else {
         emit_status("waiting", *address, "No Bluetooth response from the board yet.");
       }
@@ -742,9 +750,14 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
       continue;
     }
 
+    // Any successful response means the board was physically woken. Clear the
+    // remembered sleep state before publishing connection progress.
+    sleeping_after_idle = false;
     emit_status("link-detected", *address);
     bool board_ready = false;
     bool handshake_warning_sent = false;
+    bool intentional_sleep = false;
+    std::optional<uint64_t> empty_since;
     uint64_t connected_at = monotonic_ms();
     uint64_t last_frame_at = 0;
     while (running.load() && WIIMOTE_IS_CONNECTED(board)) {
@@ -757,6 +770,11 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
       if (board->exp.type == EXP_WII_BOARD) {
         if (!board_ready) {
           board_ready = true;
+          // The Balance Board has one blue player light. Wiiuse clears all LEDs
+          // during its handshake, which leaves the light flashing even though
+          // measurements work. A solid first LED is the unambiguous connected
+          // indication used for the rest of this session.
+          wiiuse_set_leds(board, WIIMOTE_LED_1);
           emit_status("connected", *address);
         }
         const uint64_t now = monotonic_ms();
@@ -775,6 +793,22 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
               std::clamp(board->battery_level, 0.0F, 1.0F) * 100.0F));
           emit_frame(readings, battery);
           last_frame_at = now;
+
+          const int total_weight = readings.top_right + readings.bottom_right +
+              readings.top_left + readings.bottom_left;
+          if (total_weight > kEmptyWeightThresholdCentiKg) {
+            // A person, rover, or other load immediately restarts the complete
+            // two-minute idle window. Short empty gaps can never accumulate and
+            // shut the board down while it is actively being used.
+            empty_since.reset();
+          } else if (!empty_since.has_value()) {
+            empty_since = now;
+          } else if (now - *empty_since >= kEmptySleepDelayMs) {
+            intentional_sleep = true;
+            emit_status("sleeping", *address,
+                        "Board is asleep. Press the front power button to wake it.");
+            break;
+          }
         }
       } else if (!handshake_warning_sent &&
                  monotonic_ms() - connected_at >= kHandshakeWarningMs) {
@@ -791,7 +825,18 @@ void direct_connection_loop(PairingSharedState* shared, wiimote_t** boards) {
     close_wiiuse_sockets(board);
     wiiuse_disconnected(board);
     prepare_wiiuse_address(board, *address);
-    emit_status("waiting", *address, "Board disconnected. Press the front power button.");
+    if (intentional_sleep) {
+      sleeping_after_idle = true;
+      // Closing both HID channels makes the board abandon the host connection
+      // and power itself down. Do not page it again during that transition or
+      // the worker could reconnect before its firmware finishes shutting off.
+      for (int elapsed = 0;
+           elapsed < kSleepDisconnectCooldownMs && running.load(); elapsed += 100) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
+    } else {
+      emit_status("waiting", *address, "Board disconnected. Press the front power button.");
+    }
   }
 
   close_wiiuse_sockets(board);
