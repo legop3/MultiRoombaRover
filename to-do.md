@@ -1,7 +1,12 @@
 1. assign rovers based on battery percentage, give people highest one
 2. add admin ui for VIP and private requests instead of only through discord
-3. add more background gap themes
-4.  fix this:
+3. add flag in roverd for video aspect ratio
+   1. either 4:3 or 16:9
+   2. default is 4:3
+   3. all it does is tell the web UI to make the rover video 16:9 or 4:3 shaped
+      1. web UI should default to 4:3 if that rover doesnt yet have that config yet
+4. add more background gap themes
+5.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^

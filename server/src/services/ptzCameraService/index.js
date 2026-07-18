@@ -1223,19 +1223,7 @@ function requestMotionCommands({ fullStop = false, panTilt = false, zoom = false
         const zoom = desiredMotion.zoom;
         try {
           await initialize();
-          if (!zoom) {
-            /*
-              Zero zoom velocity is the axis-local release. The camera's Stop
-              implementation is over-broad and halts pan/tilt even when the
-              request includes only Zoom=true.
-            */
-            await callOnvif('continuousMove', {
-              profileToken: state.profileToken,
-              zoom: 0,
-              onlySendZoom: true,
-              timeout: ZOOM_PULSE_TIMEOUT_MS,
-            });
-          } else {
+          if (zoom) {
             /*
               The TrackMix does not advertise continuous zoom, but physical
               testing showed each accepted zoom-only ContinuousMove advances one
@@ -1290,7 +1278,7 @@ function syncZoomRepeater() {
   }, ZOOM_REPEAT_MS);
 }
 
-function queueMotionIntent(motion, reason = 'input', options = {}) {
+function queueMotionIntent(motion, reason = 'input') {
   const nextMotion = normalizeMotionIntent(motion);
   const panTiltChanged = !panTiltMatches(nextMotion, desiredMotion);
   const zoomChanged = nextMotion.zoom !== desiredMotion.zoom;
@@ -1315,10 +1303,20 @@ function queueMotionIntent(motion, reason = 'input', options = {}) {
     either motor scheduler: pan/tilt already has a long continuous command, and
     zoom has its own 120 ms axis-only repeater.
   */
-  const sendPanTilt = panTiltChanged || Boolean(options.forceAxes);
-  const sendZoom = zoomChanged || Boolean(options.forceAxes);
+  const sendPanTilt = panTiltChanged;
+  /*
+    A live-camera recording proved that both Stop(Zoom=true) and a zero-velocity
+    zoom ContinuousMove halt pan/tilt on this firmware. Zoom itself is step-based:
+    each non-zero pulse advances once and then settles. Releasing zoom therefore
+    means clearing its timer and any coalesced-but-unsent pulse, with no camera
+    command at all. The last transmitted pulse retains its finite one-second
+    timeout as a backstop.
+  */
+  if (zoomChanged && !nextMotion.zoom) pendingZoomCommand = false;
+  const sendZoom = Boolean(nextMotion.zoom) && zoomChanged;
   if (sendPanTilt) armPanTiltRenewal();
   if (sendZoom) syncZoomRepeater();
+  if (zoomChanged && !nextMotion.zoom) clearZoomRepeat();
   const pending = requestMotionCommands({ panTilt: sendPanTilt, zoom: sendZoom });
   pending.catch(() => {});
   return { ok: true, motion: desiredMotion, reason };
