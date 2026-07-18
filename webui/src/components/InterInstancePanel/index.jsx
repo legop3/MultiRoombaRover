@@ -153,7 +153,7 @@ export function ExternalInstancesCompact({ onBrowse = null }) {
       so this nested section deliberately keeps its natural content height.
     */
     <CardFrame
-      title="External servers"
+      title="External servers below:"
       actions={browseAction}
       bodyClassName="space-y-0.5 text-sm"
     >
