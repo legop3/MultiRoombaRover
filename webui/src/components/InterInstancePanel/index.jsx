@@ -1,7 +1,7 @@
 // Inter Instance Panel
 // Purpose: Renders remote rover servers discovered through the inter-instance directory.
 // Scope: Owns external server metadata presentation while reusing RoverQueuesPanel for rover/queue rows.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverQueuesPanel from '../RoverQueuesPanel/index.jsx';
@@ -133,100 +133,52 @@ function RemoteMediaStrip({ remote }) {
   );
 }
 
-function ScrollableInstanceList({ children }) {
-  const viewportRef = useRef(null);
-  const contentRef = useRef(null);
-  const [canScrollDown, setCanScrollDown] = useState(false);
-
-  const measureScrollRemainder = useCallback(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-
-    /*
-      A small tolerance prevents fractional browser measurements from leaving
-      the cue visible when the user is effectively at the bottom. Comparing the
-      live viewport and content dimensions also means the cue only appears when
-      there is genuinely hidden content, rather than merely because several
-      instances happen to exist.
-    */
-    const remaining = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-    setCanScrollDown(remaining > 2);
-  }, []);
-
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    const content = contentRef.current;
-    if (!viewport || !content) return undefined;
-
-    /*
-      Remote rosters and queues can change height without a window resize. A
-      ResizeObserver on both the viewport and its inner content keeps the cue
-      accurate for those live session updates while avoiding polling timers.
-    */
-    const observer = new ResizeObserver(measureScrollRemainder);
-    observer.observe(viewport);
-    observer.observe(content);
-    const animationFrame = window.requestAnimationFrame(measureScrollRemainder);
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      observer.disconnect();
-    };
-  }, [measureScrollRemainder]);
-
-  return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <div
-        ref={viewportRef}
-        className="min-h-0 flex-1 overflow-y-auto"
-        onScroll={measureScrollRemainder}
-      >
-        <div ref={contentRef} className={classNames('space-y-0.5', canScrollDown && 'pb-6')}>
-          {children}
-        </div>
-      </div>
-      {canScrollDown ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-neutral-950 via-neutral-950/90 to-transparent px-1 pb-0.5 pt-5 text-center text-xs font-semibold text-slate-200">
-          Scroll for more ↓
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-export function ExternalInstancesCompact() {
+export function ExternalInstancesCompact({ onBrowse = null }) {
   const enabled = useInterInstanceEnabled();
   const instances = useRemoteInstances();
   const visible = useMemo(() => instances.filter((remote) => remote?.online || remote?.url), [instances]);
   if (!enabled) return null;
   if (!visible.length) return null;
+  const browseAction = onBrowse ? (
+    <button type="button" className="button-dark" onClick={onBrowse}>
+      Browse Servers
+    </button>
+  ) : null;
   return (
     /*
       External instances are intentionally always mounted. Besides removing an
       unnecessary disclosure click, this preserves the live queue rows while
-      the local Rover Queues card uses this region as its remaining-height
-      scroller. The viewport cap remains a safety boundary in layouts whose
-      parent has natural height instead of a fixed desktop row height.
+      the local Rover Queues card can provide one continuous scroll surface for
+      both its local and external rows. Scrolling belongs to that owning panel,
+      so this nested section deliberately keeps its natural content height.
     */
-    <div className="flex min-h-0 max-h-[min(60vh,36rem)] flex-1 flex-col border-t border-neutral-600/60 pt-0.5">
-      <ScrollableInstanceList>
-        {visible.map((remote) =>
-          remote.online ? (
-            <RoverQueuesPanel
-              key={remote.url}
-              title={remote.instance?.name || remote.url}
-              roster={remote.roster}
-              turnQueues={remote.turnQueues}
-              users={remote.users}
-              externalInstance={remote}
-              disabledOverlay={getRemoteAvailability(remote).blocked ? getRemoteAvailability(remote).overlay : ''}
-            />
-          ) : (
-            <InstancePanel key={remote.url} remote={remote} />
-          ),
-        )}
-      </ScrollableInstanceList>
-    </div>
+    <CardFrame
+      title="External servers"
+      actions={browseAction}
+      bodyClassName="space-y-0.5 text-sm"
+    >
+      {/*
+        One containing card gives the remote-server collection a clear boundary
+        below the local rover rows. Individual remote queue cards stay intact
+        inside it because they still own each server's title and operational
+        status, while this outer title bar owns the collection-wide browser.
+      */}
+      {visible.map((remote) =>
+        remote.online ? (
+          <RoverQueuesPanel
+            key={remote.url}
+            title={remote.instance?.name || remote.url}
+            roster={remote.roster}
+            turnQueues={remote.turnQueues}
+            users={remote.users}
+            externalInstance={remote}
+            disabledOverlay={getRemoteAvailability(remote).blocked ? getRemoteAvailability(remote).overlay : ''}
+          />
+        ) : (
+          <InstancePanel key={remote.url} remote={remote} />
+        ),
+      )}
+    </CardFrame>
   );
 }
 

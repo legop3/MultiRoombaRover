@@ -196,14 +196,18 @@ function QueueReplayLinksRow() {
     removes that item instead of preserving an empty grid column.
   */
   return (
-    <div className={`flex ${themeGapClass}`}>
-      <div className="min-w-0 basis-0 grow-[1]">
+    <div className={`flex items-stretch ${themeGapClass}`}>
+      <div className="relative min-w-0 basis-0 grow-[1]">
         {/*
-          The queue card stretches to the desktop row height so its always-open
-          external-instance region receives the same vertical budget as the
-          neighboring replay card and can scroll within that space.
+          The absolutely positioned queue card is removed from flex cross-size
+          calculation. Replay and the links/PTZ stack therefore define the row
+          height entirely through normal CSS layout; this relative column then
+          stretches to that established height and gives the queue card an exact
+          containing block to fill without any JavaScript measurement.
         */}
-        <RoverQueuesPanel fillHeight />
+        <div className="absolute inset-0 min-h-0">
+          <RoverQueuesPanel fillHeight />
+        </div>
       </div>
       <div className="min-w-0 basis-0 grow-[0.9]">
         <ReplaySourcesPanel panelId="replay-sources-desktop" fillHeight />
