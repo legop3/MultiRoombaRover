@@ -90,6 +90,7 @@ export default function KeyboardInputManager() {
     setDriveVector,
     setAuxMotors,
     nudgeServo,
+    setCameraAxisIntent,
     runMacro,
     stopAllMotion,
     registerInputState,
@@ -215,6 +216,13 @@ export default function KeyboardInputManager() {
   const ensureServoLoop = useCallback(() => {
     const direction = computeServoDirection();
     if (direction === 0) {
+      /*
+        Keyup must publish a real neutral PTZ zoom intent before the repeat loop
+        disappears. Rover servos ignore this generic axis release and retain
+        their existing nudge behavior because setCameraAxisIntent returns false
+        whenever PTZ is not the active target.
+      */
+      latestRef.current?.setCameraAxisIntent(0);
       stopServoLoop();
       return;
     }
@@ -235,7 +243,9 @@ export default function KeyboardInputManager() {
       const tokensSnapshot = new Set(activeTokensRef.current);
       const precisionActive = isPrecisionDriveActive(tokensSnapshot, latest.keymap);
       const servoStep = precisionActive ? PRECISION_SERVO_NUDGE_DEGREES : latest.servoStep;
-      latest.nudgeServo(nextDirection * servoStep);
+      if (!latest.setCameraAxisIntent(nextDirection)) {
+        latest.nudgeServo(nextDirection * servoStep);
+      }
       servoIntervalRef.current = setTimeout(tick, latest.servoRepeatMs);
     };
     servoIntervalRef.current = setTimeout(tick, 0);
@@ -394,6 +404,7 @@ export default function KeyboardInputManager() {
       servoRepeatMs,
       servoStep,
       setAuxMotors,
+      setCameraAxisIntent,
       setCameraPrecisionMode,
       setDriveVector,
       setMicPttActive,

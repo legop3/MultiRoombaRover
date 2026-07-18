@@ -45,6 +45,7 @@ const CONTROL_ACTION_NAMES = [
   'setAuxMotors',
   'setServoAngle',
   'nudgeServo',
+  'setCameraAxisIntent',
   'goServoHome',
   'setCameraPrecisionMode',
   'runMacro',
@@ -352,21 +353,12 @@ export function ControlSystemProvider({ children }) {
 
   const setServoAngle = useCallback(
     (value, options = {}) => {
-      if (ptzControls.isActive) {
-        /*
-          Servo-capable rover controls converge here from keyboard, gamepad,
-          desktop, and mobile. When the active control target is the PTZ camera,
-          route the intent through the PTZ adapter instead of making the rover
-          command pipeline understand camera zoom semantics.
-        */
-        const baseline = typeof servoAngleRef.current === 'number' ? servoAngleRef.current : 0;
-        const numeric = Number(value);
-        if (!Number.isFinite(numeric)) return;
-        ptzControls.pulseZoom(numeric - baseline);
-        servoAngleRef.current = numeric;
-        recordControlIntent();
-        return;
-      }
+      /*
+        Absolute servo positions belong only to rover hardware. PTZ zoom now
+        enters through setCameraAxisIntent as a signed held velocity, so this
+        function must not infer zoom direction by comparing unrelated absolute
+        angle values from gamepad/manual-dock callers.
+      */
       if (!pipeline.servoConfig) return;
       const force = Boolean(options?.force);
       if (state.manualDockAssist?.active && !force) return;
@@ -376,13 +368,24 @@ export function ControlSystemProvider({ children }) {
       servoAngleRef.current = clamped;
       recordControlIntent();
     },
-    [pipeline, ptzControls, recordControlIntent, state.manualDockAssist?.active],
+    [pipeline, recordControlIntent, state.manualDockAssist?.active],
   );
 
   const nudgeServo = useCallback(
     (delta = 0) => {
+      if (ptzControls.isActive) {
+        /*
+          A PTZ camera has no absolute browser-side servo angle. Treat a nudge
+          as held zoom direction and, importantly, preserve zero as an explicit
+          release. The previous fallback converted nudgeServo(0) into a positive
+          default step, so releasing the mobile zoom button could zoom in again.
+        */
+        ptzControls.setZoomIntent(delta);
+        recordControlIntent();
+        return;
+      }
       const config = pipeline.servoConfig;
-      if (!config && !ptzControls.isActive) return;
+      if (!config) return;
       const step = typeof delta === 'number' && delta !== 0 ? delta : config?.nudgeDegrees || 1;
       const baseline =
         typeof servoAngleRef.current === 'number'
@@ -392,7 +395,28 @@ export function ControlSystemProvider({ children }) {
           : 0;
       setServoAngle(baseline + step);
     },
-    [pipeline.servoConfig, ptzControls.isActive, setServoAngle],
+    [pipeline.servoConfig, ptzControls, recordControlIntent, setServoAngle],
+  );
+
+  const setCameraAxisIntent = useCallback(
+    (direction = 0) => {
+      /*
+        Keyboard, touch, and gamepad all need an explicit way to say that a
+        camera axis returned to neutral. Rover servos remain position/nudge
+        based, so returning false tells those callers to continue through their
+        existing rover implementation without introducing PTZ rules there.
+      */
+      if (!ptzControls.isActive) return false;
+      ptzControls.setZoomIntent(direction);
+      /*
+        Do not dispatch recordControlIntent here. Gamepads publish their neutral
+        and held axes every animation frame; the PTZ adapter deduplicates state
+        and owns its 250 ms heartbeat, so a React reducer update per frame would
+        add churn without representing a new user action.
+      */
+      return true;
+    },
+    [ptzControls],
   );
 
   const goServoHome = useCallback(() => {
@@ -691,6 +715,7 @@ export function ControlSystemProvider({ children }) {
       setAuxMotors,
       setServoAngle,
       nudgeServo,
+      setCameraAxisIntent,
       goServoHome,
       setCameraPrecisionMode,
       runMacro,
@@ -718,6 +743,7 @@ export function ControlSystemProvider({ children }) {
       setAuxMotors,
       setServoAngle,
       nudgeServo,
+      setCameraAxisIntent,
       goServoHome,
       setCameraPrecisionMode,
       runMacro,

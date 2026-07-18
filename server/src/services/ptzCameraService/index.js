@@ -29,6 +29,13 @@ const PTZ_STREAM_PATH = 'ptz-camera';
 const DEFAULT_ONVIF_PORT = 8000;
 const DEFAULT_PROFILE_TOKEN = '003';
 const DEFAULT_TURN_DURATION_MS = 5 * 60 * 1000;
+// The TrackMix reports PT1S as its minimum supported continuous-move timeout.
+// Browser heartbeats arrive every 250 ms, so 650 ms allows ordinary LAN jitter
+// while still issuing an explicit stop well before the camera's own one-second
+// timeout becomes the final safety backstop.
+const MOTION_WATCHDOG_MS = 650;
+const ONVIF_MOTION_TIMEOUT_MS = 1000;
+const STOP_MOTION = Object.freeze({ pan: 0, tilt: 0, zoom: 0 });
 // PTZ is a normal replay source now, so capture should be on unless the feature
 // explicitly disables replay for the camera.
 const DEFAULT_REPLAY_ENABLED = true;
@@ -92,6 +99,11 @@ let publisherStderrSyncTimer = null;
 let snapshotTimer = null;
 let spotlightVerifyTimer = null;
 let vendorStatePromise = Promise.resolve();
+let motionWatchdogTimer = null;
+let desiredMotion = STOP_MOTION;
+let desiredMotionVersion = 0;
+let appliedMotionVersion = 0;
+let motionCommandPromise = null;
 let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
 const socketSnapshotSubscriptions = new Map();
@@ -924,7 +936,10 @@ function revokeOperator(reason = 'release') {
   state.deadline = null;
   clearTurnTimer();
   videoSessions.revokeWhere((info) => info.socketId === previous && info.sourceType === 'ptz');
-  callOnvif('stop', { profileToken: state.profileToken, panTilt: true, zoom: true }).catch(() => {});
+  // Operator handoff/disconnect must enter the same serialized stream as
+  // movement. A raw concurrent Stop could otherwise finish before an older
+  // ContinuousMove and allow that stale move to restart the camera afterward.
+  forceMotionStop(`operator-${reason}`);
   events.emit('operator', { socketId: previous, action: 'release', reason });
 }
 
@@ -1089,26 +1104,126 @@ function normalizePresetCreateName(rawName) {
   return name;
 }
 
-async function move(socket, payload = {}) {
-  requireOperator(socket);
-  await initialize();
-  const x = clampUnit(payload.pan ?? payload.x);
-  const y = clampUnit(payload.tilt ?? payload.y);
-  const zoom = clampUnit(payload.zoom);
-  await callOnvif('continuousMove', {
-    profileToken: state.profileToken,
-    x,
-    y,
-    zoom,
-    timeout: 1000,
-  });
-  return { ok: true };
+function normalizeMotionIntent(payload = {}) {
+  return {
+    pan: clampUnit(payload.pan ?? payload.x),
+    tilt: clampUnit(payload.tilt ?? payload.y),
+    zoom: clampUnit(payload.zoom),
+  };
 }
 
-async function stop(socket) {
+function isMotionIdle(motion = STOP_MOTION) {
+  return !motion.pan && !motion.tilt && !motion.zoom;
+}
+
+function clearMotionWatchdog() {
+  if (!motionWatchdogTimer) return;
+  clearTimeout(motionWatchdogTimer);
+  motionWatchdogTimer = null;
+}
+
+function runMotionCommandPump() {
+  if (motionCommandPromise) return motionCommandPromise;
+
+  /*
+    ONVIF requests are asynchronous HTTP/SOAP operations. Starting one request
+    per Socket.IO event allowed a quick move/stop/move sequence to overlap at
+    the camera, where response order is not a safe proxy for execution order.
+    This single pump permits exactly one camera operation at a time. If browser
+    heartbeats arrive while it is busy, only the newest complete desired state
+    survives the loop, so intermediate input noise is coalesced rather than
+    replayed after the operator has already released the controls.
+  */
+  motionCommandPromise = (async () => {
+    while (appliedMotionVersion < desiredMotionVersion) {
+      const commandVersion = desiredMotionVersion;
+      const commandMotion = desiredMotion;
+      try {
+        await initialize();
+        if (isMotionIdle(commandMotion)) {
+          await callOnvif('stop', {
+            profileToken: state.profileToken,
+            panTilt: true,
+            zoom: true,
+          });
+        } else {
+          /*
+            Send the complete vector even when only one axis changed. The live
+            TrackMix accepts combined pan/tilt/zoom despite failing to advertise
+            its continuous zoom space, and zero on an axis is how the newest
+            intent releases that axis without disturbing a non-zero sibling.
+          */
+          await callOnvif('continuousMove', {
+            profileToken: state.profileToken,
+            x: commandMotion.pan,
+            y: commandMotion.tilt,
+            zoom: commandMotion.zoom,
+            timeout: ONVIF_MOTION_TIMEOUT_MS,
+          });
+        }
+      } catch (err) {
+        /*
+          Mark this version consumed below instead of spinning on a failing
+          camera. A held control supplies another heartbeat and therefore a
+          bounded retry; a failed stop still has the camera's one-second ONVIF
+          timeout as its independent final safety mechanism.
+        */
+        logger.warn('PTZ motion command failed', {
+          error: getErrorMessage(err),
+          idle: isMotionIdle(commandMotion),
+          version: commandVersion,
+        });
+      }
+      appliedMotionVersion = commandVersion;
+    }
+  })().finally(() => {
+    motionCommandPromise = null;
+    // An intent can arrive after the loop condition but before this promise's
+    // finally callback. Recheck the versions so that narrow timing window does
+    // not strand the newest state without a command pump.
+    if (appliedMotionVersion < desiredMotionVersion) runMotionCommandPump();
+  });
+
+  return motionCommandPromise;
+}
+
+function queueMotionIntent(motion, reason = 'input') {
+  desiredMotion = normalizeMotionIntent(motion);
+  desiredMotionVersion += 1;
+  clearMotionWatchdog();
+
+  if (!isMotionIdle(desiredMotion)) {
+    /*
+      Socket disconnect normally arrives quickly, but it is not a suitable motor
+      safety boundary. Every non-zero browser heartbeat replaces this timer; if
+      releases or subsequent heartbeats disappear, the server injects a zero
+      intent into the same serialized stream as ordinary control changes.
+    */
+    motionWatchdogTimer = setTimeout(() => {
+      motionWatchdogTimer = null;
+      queueMotionIntent(STOP_MOTION, 'watchdog');
+    }, MOTION_WATCHDOG_MS);
+  }
+
+  const pending = runMotionCommandPump();
+  pending.catch(() => {});
+  return { ok: true, motion: desiredMotion, reason };
+}
+
+function acceptMotionIntent(socket, payload = {}) {
   requireOperator(socket);
-  await callOnvif('stop', { profileToken: state.profileToken, panTilt: true, zoom: true });
-  return { ok: true };
+  return queueMotionIntent(payload, 'operator-input');
+}
+
+function forceMotionStop(reason = 'safety-stop') {
+  /*
+    Lifecycle stops intentionally increment the version even when local state is
+    already zero. The browser may have lost its final packet, or the camera may
+    have accepted a command whose response has not returned, so deduplicating a
+    safety stop would trust precisely the state we are trying to recover from.
+  */
+  queueMotionIntent(STOP_MOTION, reason);
+  return motionCommandPromise || Promise.resolve();
 }
 
 async function getStatus(socket) {
@@ -1133,9 +1248,10 @@ async function gotoPreset(socket, payload = {}) {
     Stop any continuous move before jumping to a preset. Without this, a held
     key or touch control can keep sending pan/tilt velocity while the camera is
     trying to execute the absolute preset move, which makes the final position
-    feel inconsistent.
+    feel inconsistent. Await the serialized safety stop instead of issuing a
+    raw concurrent ONVIF request that could itself race an older movement.
   */
-  await callOnvif('stop', { profileToken: state.profileToken, panTilt: true, zoom: true }).catch(() => {});
+  await forceMotionStop('preset').catch(() => {});
   await callOnvif('gotoPreset', {
     profileToken: state.profileToken,
     /*
@@ -1475,18 +1591,16 @@ function registerSocketHandlers() {
         cb({ error: err.message });
       }
     });
-    socket.on('ptzCamera:move', async (firstArg, secondArg) => {
+    socket.on('ptzCamera:motion', (firstArg, secondArg) => {
       const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
-        cb(await move(socket, payload));
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:stop', async (firstArg, secondArg) => {
-      const { cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb(await stop(socket));
+        /*
+          Acknowledge acceptance of the newest desired state immediately. The
+          serialized ONVIF pump deliberately runs independently of Socket.IO
+          request latency so browser heartbeats cannot accumulate while waiting
+          for a camera SOAP response.
+        */
+        cb(acceptMotionIntent(socket, payload));
       } catch (err) {
         cb({ error: err.message });
       }

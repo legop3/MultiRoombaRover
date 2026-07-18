@@ -53,6 +53,7 @@ export default function GamepadInputManager() {
     setDriveVector,
     setAuxMotors,
     setServoAngle,
+    setCameraAxisIntent,
     runMacro,
     toggleHeadlight,
     toggleLaser,
@@ -173,6 +174,7 @@ export default function GamepadInputManager() {
       runMacro,
       saveGamepadSettings,
       setAuxMotors,
+      setCameraAxisIntent,
       setDriveVector,
       setMode,
       setServoAngle,
@@ -187,6 +189,9 @@ export default function GamepadInputManager() {
       if (!latest) return;
       const activePad = pickActivePad(hubState.pads, latest.activeSignature);
       if (!activePad) {
+        // A disconnected controller cannot deliver a final neutral axis sample.
+        // Publish it here so PTZ zoom never depends on the browser doing so.
+        latest.setCameraAxisIntent(0);
         if (!areVectorsEqual(lastVectorRef.current, ZERO_VECTOR)) {
           lastVectorRef.current = ZERO_VECTOR;
           latest.setDriveVector(ZERO_VECTOR, { source: SOURCE });
@@ -204,6 +209,9 @@ export default function GamepadInputManager() {
       }
 
       if (isTextEntryActive()) {
+        // Entering text blocks gamepad control immediately, including a held
+        // camera axis that otherwise would keep its last PTZ zoom direction.
+        latest.setCameraAxisIntent(0);
         if (!areVectorsEqual(lastVectorRef.current, ZERO_VECTOR)) {
           lastVectorRef.current = ZERO_VECTOR;
           latest.setDriveVector(ZERO_VECTOR, { source: SOURCE });
@@ -302,7 +310,14 @@ export default function GamepadInputManager() {
         handleButtonEdge('laserToggle', false);
       }
 
-      if (Math.abs(outputs.cameraAxis) > 0.001) {
+      /*
+        PTZ zoom consumes the live signed gamepad axis, including its zero
+        position, so releasing the stick is an explicit stop instead of merely
+        ending calls to the old servo updater. Rover camera servos return false
+        here and continue through their established absolute/velocity mapping.
+      */
+      const handledAsPtzZoom = latest.setCameraAxisIntent(outputs.cameraAxis);
+      if (!handledAsPtzZoom && Math.abs(outputs.cameraAxis) > 0.001) {
         handleCameraAxis(outputs.cameraAxis, profile.calibration);
       }
 

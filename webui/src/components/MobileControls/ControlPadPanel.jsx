@@ -148,13 +148,25 @@ export default function ControlPadPanel({ compact = false, disabled = false }) {
     return () => {
       clearRepeatTimer();
       /*
-        Mobile controls can unmount when layouts change or the driver leaves the
-        control surface. Clear the shared flag so a stale mobile precision choice
-        cannot leave desktop/keyboard camera tilt in fine-step mode.
+        Mobile controls can unmount during an orientation/layout change while a
+        pointer is still captured by the disappearing element. Publish a neutral
+        vector directly during cleanup so neither rover drive nor PTZ pan/tilt
+        can retain the last cell merely because pointerup had nowhere to land.
       */
+      activeCellRef.current = null;
+      setDriveVector({ x: 0, y: 0, boost: false }, { source: SOURCE });
+      registerInputState(SOURCE, {
+        keys: [],
+        vector: { x: 0, y: 0, boost: false },
+        activeCell: 'stop',
+        speedMode: speedModeRef.current,
+        lastEvent: 'unmount',
+      });
+      // Clear the shared flag too, so a stale mobile precision choice cannot
+      // leave desktop/keyboard camera tilt in fine-step mode.
       setCameraPrecisionMode(false);
     };
-  }, [clearRepeatTimer, setCameraPrecisionMode]);
+  }, [clearRepeatTimer, registerInputState, setCameraPrecisionMode, setDriveVector]);
 
   useEffect(() => {
     if (!disabled) return;

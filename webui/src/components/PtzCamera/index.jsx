@@ -188,46 +188,30 @@ function PtzLightingControls({ ptz, disabled = false }) {
 }
 
 function PtzMobileZoomButtons({ disabled = false }) {
-  const { nudgeServo } = useControlActions();
-  const repeatTimerRef = useRef(null);
+  const { setCameraAxisIntent } = useControlActions();
 
   const stopZoom = useCallback(() => {
     /*
-      Mobile zoom is intentionally routed through the normal camera-up/down
-      control action instead of emitting PTZ socket commands directly. That
-      keeps the zoom buttons on the same path as keyboard/gamepad camera tilt,
-      and the PTZ adapter remains the one place that translates "camera nudge"
-      into Reolink zoom pulses.
+      Zero only releases the zoom axis. The PTZ adapter combines it with any
+      pan/tilt direction still held on the movement pad, so lifting one finger
+      cannot erase the other finger's intent.
     */
-    if (repeatTimerRef.current) {
-      clearInterval(repeatTimerRef.current);
-      repeatTimerRef.current = null;
-    }
-    /*
-      Zero is a zoom-only release signal in the PTZ adapter. Using the global
-      stop action here previously erased a simultaneously held pan/tilt vector,
-      making mixed touch controls unexpectedly stop the camera.
-    */
-    nudgeServo(0);
-  }, [nudgeServo]);
+    setCameraAxisIntent(0);
+  }, [setCameraAxisIntent]);
 
   const startZoom = useCallback(
     (direction) => (event) => {
       /*
-        Send an immediate nudge and then repeat while held. The adapter turns
-        each nudge into a short zoom pulse, so repeating the standard action is
-        the simplest way to get continuous hold-to-zoom without adding another
-        PTZ-specific command loop.
+        Publish held state once. The adapter owns the single motion heartbeat,
+        so this button no longer creates a second interval whose queued callback
+        could run after pointerup and restart zoom.
       */
       event.preventDefault();
       if (disabled) return;
-      stopZoom();
-      nudgeServo(direction);
-      repeatTimerRef.current = setInterval(() => {
-        nudgeServo(direction);
-      }, 120);
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setCameraAxisIntent(direction);
     },
-    [disabled, nudgeServo, stopZoom],
+    [disabled, setCameraAxisIntent],
   );
   const stopFromPointer = useCallback(
     (event) => {
@@ -242,16 +226,12 @@ function PtzMobileZoomButtons({ disabled = false }) {
     () => () => {
       /*
         A touch surface can unmount during orientation changes or fullscreen
-        close while a pointer is still down. Clear the repeat timer here so a
-        held zoom button cannot keep firing camera-up/down actions after the
-        mobile controls have disappeared.
+        close while a pointer is still down. Explicitly clear zoom here because
+        an unmounted DOM node cannot deliver its pointerup/pointercancel event.
       */
-      if (repeatTimerRef.current) {
-        clearInterval(repeatTimerRef.current);
-        repeatTimerRef.current = null;
-      }
+      setCameraAxisIntent(0);
     },
-    [],
+    [setCameraAxisIntent],
   );
 
   return (
@@ -263,7 +243,7 @@ function PtzMobileZoomButtons({ disabled = false }) {
         onPointerDown={startZoom(-1)}
         onPointerUp={stopFromPointer}
         onPointerCancel={stopFromPointer}
-        onPointerLeave={stopFromPointer}
+        onLostPointerCapture={stopFromPointer}
         onContextMenu={(event) => event.preventDefault()}
       >
         Zoom out
@@ -275,7 +255,7 @@ function PtzMobileZoomButtons({ disabled = false }) {
         onPointerDown={startZoom(1)}
         onPointerUp={stopFromPointer}
         onPointerCancel={stopFromPointer}
-        onPointerLeave={stopFromPointer}
+        onLostPointerCapture={stopFromPointer}
         onContextMenu={(event) => event.preventDefault()}
       >
         Zoom in

@@ -12,7 +12,11 @@ const PTZ_SPEEDS = {
   medium: 0.5,
   fast: 1,
 };
-const ZOOM_PULSE_MS = 220;
+// The TrackMix advertises a minimum ONVIF movement timeout of one second. A
+// quarter-second browser heartbeat gives the server several opportunities to
+// renew a genuinely held intent while still letting its watchdog distinguish a
+// live control from a browser that disappeared without delivering a release.
+const MOTION_HEARTBEAT_MS = 250;
 
 function clampUnit(value) {
   const number = Number(value) || 0;
@@ -102,9 +106,10 @@ export function usePtzControlAdapter() {
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isActive = Boolean(ptz?.isOperator);
   const lastMotionSignatureRef = useRef(payloadSignature(PTZ_STOP));
+  const desiredMotionRef = useRef(PTZ_STOP);
   const panTiltIntentRef = useRef({ pan: 0, tilt: 0 });
   const zoomIntentRef = useRef(0);
-  const zoomStopTimerRef = useRef(null);
+  const heartbeatTimerRef = useRef(null);
 
   const emitPtz = useCallback(
     (eventName, payload = {}) => {
@@ -114,22 +119,13 @@ export function usePtzControlAdapter() {
     [isActive, socket],
   );
 
-  const stopMotion = useCallback(() => {
-    if (zoomStopTimerRef.current) {
-      clearTimeout(zoomStopTimerRef.current);
-      zoomStopTimerRef.current = null;
-    }
-    // A true global stop is used for blur, route close, and control release, so
-    // it deliberately clears every independently tracked PTZ axis intent.
-    panTiltIntentRef.current = { pan: 0, tilt: 0 };
-    zoomIntentRef.current = 0;
-    const stopSignature = payloadSignature(PTZ_STOP);
-    if (lastMotionSignatureRef.current === stopSignature) return;
-    lastMotionSignatureRef.current = stopSignature;
-    emitPtz('ptzCamera:stop');
-  }, [emitPtz]);
+  const clearHeartbeat = useCallback(() => {
+    if (!heartbeatTimerRef.current) return;
+    clearInterval(heartbeatTimerRef.current);
+    heartbeatTimerRef.current = null;
+  }, []);
 
-  const sendMotion = useCallback(
+  const publishMotion = useCallback(
     (payload, options = {}) => {
       if (!isActive) return false;
       const nextPayload = {
@@ -138,16 +134,49 @@ export function usePtzControlAdapter() {
         zoom: clampUnit(payload?.zoom),
       };
       const nextSignature = payloadSignature(nextPayload);
+      desiredMotionRef.current = nextPayload;
+
+      if (isIdlePayload(nextPayload)) {
+        clearHeartbeat();
+      } else if (!heartbeatTimerRef.current) {
+        /*
+          Movement is renewed from the complete desired vector, not from the
+          individual input event that happened to start it. This is what makes
+          pan/tilt and zoom independent: every heartbeat describes all axes as
+          they should be now, and no delayed zoom pulse can resurrect an older
+          direction after a release.
+        */
+        heartbeatTimerRef.current = setInterval(() => {
+          const current = desiredMotionRef.current;
+          if (isIdlePayload(current)) {
+            clearHeartbeat();
+            return;
+          }
+          emitPtz('ptzCamera:motion', current);
+        }, MOTION_HEARTBEAT_MS);
+      }
+
       if (!options.force && lastMotionSignatureRef.current === nextSignature) return true;
       lastMotionSignatureRef.current = nextSignature;
-      if (isIdlePayload(nextPayload)) {
-        emitPtz('ptzCamera:stop');
-      } else {
-        emitPtz('ptzCamera:move', nextPayload);
-      }
+      // Zero is a first-class desired state. The server translates the complete
+      // idle vector into ONVIF Stop inside the same serialized command stream as
+      // movement, which prevents separate move/stop handlers from racing.
+      emitPtz('ptzCamera:motion', nextPayload);
       return true;
     },
-    [emitPtz, isActive],
+    [clearHeartbeat, emitPtz, isActive],
+  );
+
+  const stopMotion = useCallback(
+    (options = {}) => {
+      // A global stop deliberately clears every axis. Safety/lifecycle callers
+      // use force so the server receives a fresh stop even when the browser's
+      // local signature already says it is idle after a dropped connection.
+      panTiltIntentRef.current = { pan: 0, tilt: 0 };
+      zoomIntentRef.current = 0;
+      return publishMotion(PTZ_STOP, { force: Boolean(options.force) });
+    },
+    [publishMotion],
   );
 
   const applyDriveVector = useCallback(
@@ -163,60 +192,36 @@ export function usePtzControlAdapter() {
         Preserve the current zoom intent when a direction update arrives so a
         keyboard or touch event on one axis cannot erase another held axis.
       */
-      sendMotion({
+      publishMotion({
         ...panTiltIntentRef.current,
         zoom: zoomIntentRef.current,
       });
       return true;
     },
-    [isActive, sendMotion],
+    [isActive, publishMotion],
   );
 
-  const pulseZoom = useCallback(
+  const setZoomIntent = useCallback(
     (direction) => {
       if (!isActive) return false;
-      const sign = axisSign(direction);
-      if (!sign) {
-        if (zoomStopTimerRef.current) {
-          clearTimeout(zoomStopTimerRef.current);
-          zoomStopTimerRef.current = null;
-        }
-        zoomIntentRef.current = 0;
-        /*
-          Releasing zoom must not call the global PTZ stop. Re-emit the retained
-          pan/tilt intent with zoom cleared so a held direction continues
-          immediately instead of waiting for another directional key event.
-        */
-        sendMotion({ ...panTiltIntentRef.current, zoom: 0 }, { force: true });
-        return true;
-      }
+      const numeric = clampUnit(direction);
+      const sign = axisSign(numeric);
       /*
-        Zoom is different from pan/tilt because it is driven by repeated nudge
-        events from existing camera controls. Force each pulse through even when
-        the payload is identical, otherwise holding "camera up" only sends the
-        first zoom command and every later nudge is de-duped away.
+        PTZ zoom is a held velocity, not a rover servo nudge. Convert the input
+        magnitude to the same precision/normal tiers used for pan and tilt, then
+        retain it until the input surface explicitly publishes zero. The shared
+        heartbeat renews that state; there are no per-button repeat or delayed
+        stop timers left to race with pointer/key release.
       */
-      zoomIntentRef.current = sign * PTZ_SPEEDS.medium;
-      sendMotion({
+      const speed = !sign ? 0 : Math.abs(numeric) <= 0.45 ? PTZ_SPEEDS.slow : PTZ_SPEEDS.medium;
+      zoomIntentRef.current = sign * speed;
+      publishMotion({
         ...panTiltIntentRef.current,
         zoom: zoomIntentRef.current,
-      }, { force: true });
-      if (zoomStopTimerRef.current) clearTimeout(zoomStopTimerRef.current);
-      /*
-        Existing rover camera controls are nudge/slider based, not hold-based.
-        Treat each nudge as a short PTZ zoom pulse, then stop from the adapter
-        so delayed stop behavior is owned by the camera layer only.
-      */
-      zoomStopTimerRef.current = setTimeout(() => {
-        zoomStopTimerRef.current = null;
-        zoomIntentRef.current = 0;
-        // A zoom pulse ending restores, rather than stops, any direction that
-        // is still held in the independent pan/tilt intent.
-        sendMotion({ ...panTiltIntentRef.current, zoom: 0 }, { force: true });
-      }, ZOOM_PULSE_MS);
+      });
       return true;
     },
-    [isActive, sendMotion],
+    [isActive, publishMotion],
   );
 
   const setSpotlight = useCallback(
@@ -253,20 +258,42 @@ export function usePtzControlAdapter() {
   useEffect(() => {
     if (isActive) return undefined;
     lastMotionSignatureRef.current = payloadSignature(PTZ_STOP);
+    desiredMotionRef.current = PTZ_STOP;
     panTiltIntentRef.current = { pan: 0, tilt: 0 };
     zoomIntentRef.current = 0;
-    if (zoomStopTimerRef.current) {
-      clearTimeout(zoomStopTimerRef.current);
-      zoomStopTimerRef.current = null;
-    }
+    clearHeartbeat();
     return undefined;
-  }, [isActive]);
+  }, [clearHeartbeat, isActive]);
+
+  useEffect(() => {
+    if (!isActive) return undefined;
+
+    const forceSafetyStop = () => stopMotion({ force: true });
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') forceSafetyStop();
+    };
+
+    /*
+      Input components handle ordinary pointer/key releases, but the adapter is
+      the only layer guaranteed to see every PTZ control surface. Centralizing
+      browser lifecycle stops here covers touch, keyboard, and gamepad equally
+      when a tab hides, a window blurs, or mobile navigation fires pagehide.
+    */
+    window.addEventListener('blur', forceSafetyStop);
+    window.addEventListener('pagehide', forceSafetyStop);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('blur', forceSafetyStop);
+      window.removeEventListener('pagehide', forceSafetyStop);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isActive, stopMotion]);
 
   useEffect(
     () => () => {
-      if (zoomStopTimerRef.current) clearTimeout(zoomStopTimerRef.current);
+      clearHeartbeat();
     },
-    [],
+    [clearHeartbeat],
   );
 
   return useMemo(
@@ -274,11 +301,11 @@ export function usePtzControlAdapter() {
       isActive,
       state: ptz,
       applyDriveVector,
-      pulseZoom,
+      setZoomIntent,
       setSpotlight,
       setIr,
       stopMotion,
     }),
-    [applyDriveVector, isActive, ptz, pulseZoom, setIr, setSpotlight, stopMotion],
+    [applyDriveVector, isActive, ptz, setIr, setSpotlight, setZoomIntent, stopMotion],
   );
 }

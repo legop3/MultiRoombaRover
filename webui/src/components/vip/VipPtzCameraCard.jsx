@@ -1,7 +1,7 @@
 // Vip PTZ Camera Card
 // Purpose: Provides the verified-user entry point and fullscreen controller for the single Reolink PTZ camera.
 // Scope: Owns PTZ UI state only; server-side PTZ ownership, rover handoff, and command authorization remain authoritative.
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ChatPanel from '../ChatPanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
@@ -11,13 +11,12 @@ import PtzLiveVideo from '../PtzLiveVideo/index.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import KeyPill from './VipAudioUploadCard/KeyPill.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
-import { useControlSelector } from '../../controls/index.js';
+import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 import { isFeatureEnabled } from '../../lib/features.js';
 
 const PTZ_CAMERA_ID = 'ptz-camera';
-const PTZ_ZOOM_SPEED = 0.55;
 
 function formatRemaining(deadline) {
   const remaining = Math.max(0, Math.ceil((Number(deadline || 0) - Date.now()) / 1000));
@@ -218,22 +217,25 @@ function PtzLightingControls({ ptz, disabled = false }) {
 }
 
 function PtzMobileZoomButtons({ disabled = false }) {
-  const { ptzMove, ptzStop } = useSessionActions();
+  const { setCameraAxisIntent } = useControlActions();
   const stopZoom = useCallback(() => {
-    ptzStop().catch(() => {});
-  }, [ptzStop]);
+    // This is a zoom-only release; the shared adapter retains any simultaneous
+    // pan/tilt intent from the movement pad in its next combined motion state.
+    setCameraAxisIntent(0);
+  }, [setCameraAxisIntent]);
   const startZoom = useCallback(
     (direction) => (event) => {
       /*
-        Mobile needs explicit zoom targets because the regular mobile drive pad
-        is already used for pan/tilt. Desktop does not render these buttons; it
-        uses the mapped camera up/down controls shown in the reference panel.
+        The adapter owns renewal for held PTZ state. Publishing the direction
+        once avoids a component-local repeat timer and keeps this legacy card on
+        the exact same motion path as the dedicated PTZ route.
       */
       event.preventDefault();
       if (disabled) return;
-      ptzMove({ pan: 0, tilt: 0, zoom: direction * PTZ_ZOOM_SPEED }).catch(() => {});
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      setCameraAxisIntent(direction);
     },
-    [disabled, ptzMove],
+    [disabled, setCameraAxisIntent],
   );
   const stopFromPointer = useCallback(
     (event) => {
@@ -242,6 +244,15 @@ function PtzMobileZoomButtons({ disabled = false }) {
       stopZoom();
     },
     [disabled, stopZoom],
+  );
+
+  useEffect(
+    () => () => {
+      // Orientation changes can unmount the button before pointerup. Clear the
+      // held zoom state explicitly instead of waiting for the server watchdog.
+      setCameraAxisIntent(0);
+    },
+    [setCameraAxisIntent],
   );
 
   return (
@@ -253,7 +264,7 @@ function PtzMobileZoomButtons({ disabled = false }) {
         onPointerDown={startZoom(-1)}
         onPointerUp={stopFromPointer}
         onPointerCancel={stopFromPointer}
-        onPointerLeave={stopFromPointer}
+        onLostPointerCapture={stopFromPointer}
         onContextMenu={(event) => event.preventDefault()}
       >
         Zoom out
@@ -265,7 +276,7 @@ function PtzMobileZoomButtons({ disabled = false }) {
         onPointerDown={startZoom(1)}
         onPointerUp={stopFromPointer}
         onPointerCancel={stopFromPointer}
-        onPointerLeave={stopFromPointer}
+        onLostPointerCapture={stopFromPointer}
         onContextMenu={(event) => event.preventDefault()}
       >
         Zoom in
