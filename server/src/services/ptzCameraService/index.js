@@ -106,6 +106,7 @@ let motionWatchdogTimer = null;
 let panTiltRenewTimer = null;
 let zoomRepeatTimer = null;
 let desiredMotion = STOP_MOTION;
+let pendingFullStopCommand = false;
 let pendingPanTiltCommand = false;
 let pendingZoomCommand = false;
 let motionCommandPromise = null;
@@ -1143,10 +1144,14 @@ function panTiltMatches(left = STOP_MOTION, right = STOP_MOTION) {
   return left.pan === right.pan && left.tilt === right.tilt;
 }
 
-function requestMotionCommands({ panTilt = false, zoom = false } = {}) {
+function requestMotionCommands({ fullStop = false, panTilt = false, zoom = false } = {}) {
+  pendingFullStopCommand = pendingFullStopCommand || fullStop;
   pendingPanTiltCommand = pendingPanTiltCommand || panTilt;
   pendingZoomCommand = pendingZoomCommand || zoom;
-  if (motionCommandPromise || (!pendingPanTiltCommand && !pendingZoomCommand)) {
+  if (
+    motionCommandPromise ||
+    (!pendingFullStopCommand && !pendingPanTiltCommand && !pendingZoomCommand)
+  ) {
     return motionCommandPromise || Promise.resolve();
   }
 
@@ -1157,7 +1162,27 @@ function requestMotionCommands({ panTilt = false, zoom = false } = {}) {
     building a delayed command backlog that would continue after release.
   */
   motionCommandPromise = (async () => {
-    while (pendingPanTiltCommand || pendingZoomCommand) {
+    while (pendingFullStopCommand || pendingPanTiltCommand || pendingZoomCommand) {
+      const sendFullStop = pendingFullStopCommand;
+      pendingFullStopCommand = false;
+      if (sendFullStop) {
+        try {
+          await initialize();
+          /*
+            Reserve ONVIF Stop for real all-axis safety events. The TrackMix
+            appears to treat even an axis-filtered Stop as global, so ordinary
+            user releases below use zero velocity instead.
+          */
+          await callOnvif('stop', {
+            profileToken: state.profileToken,
+            panTilt: true,
+            zoom: true,
+          });
+        } catch (err) {
+          logger.warn('PTZ full stop command failed', { error: getErrorMessage(err) });
+        }
+      }
+
       const sendPanTilt = pendingPanTiltCommand;
       pendingPanTiltCommand = false;
       if (sendPanTilt) {
@@ -1166,12 +1191,17 @@ function requestMotionCommands({ panTilt = false, zoom = false } = {}) {
         try {
           await initialize();
           if (!pan && !tilt) {
-            // Stop only pan/tilt. Omitting Zoom is essential because a zoom
-            // finger/key may still be held while direction returns to neutral.
-            await callOnvif('stop', {
+            /*
+              Zero pan/tilt velocity stops only that axis under ContinuousMove.
+              Do not use ONVIF Stop here: this TrackMix ignores the requested
+              axis filter and can also stop zoom that is still being held.
+            */
+            await callOnvif('continuousMove', {
               profileToken: state.profileToken,
-              panTilt: true,
-              zoom: false,
+              x: 0,
+              y: 0,
+              onlySendPanTilt: true,
+              timeout: PAN_TILT_TIMEOUT_MS,
             });
           } else {
             await callOnvif('continuousMove', {
@@ -1194,12 +1224,16 @@ function requestMotionCommands({ panTilt = false, zoom = false } = {}) {
         try {
           await initialize();
           if (!zoom) {
-            // Stop only zoom so repeated zoom release cannot interrupt a smooth
-            // pan/tilt ContinuousMove that is already running on the camera.
-            await callOnvif('stop', {
+            /*
+              Zero zoom velocity is the axis-local release. The camera's Stop
+              implementation is over-broad and halts pan/tilt even when the
+              request includes only Zoom=true.
+            */
+            await callOnvif('continuousMove', {
               profileToken: state.profileToken,
-              panTilt: false,
-              zoom: true,
+              zoom: 0,
+              onlySendZoom: true,
+              timeout: ZOOM_PULSE_TIMEOUT_MS,
             });
           } else {
             /*
@@ -1223,7 +1257,9 @@ function requestMotionCommands({ panTilt = false, zoom = false } = {}) {
   })().finally(() => {
     motionCommandPromise = null;
     // Cover an intent arriving between the loop check and promise cleanup.
-    if (pendingPanTiltCommand || pendingZoomCommand) requestMotionCommands();
+    if (pendingFullStopCommand || pendingPanTiltCommand || pendingZoomCommand) {
+      requestMotionCommands();
+    }
   });
 
   return motionCommandPromise;
@@ -1295,14 +1331,15 @@ function acceptMotionIntent(socket, payload = {}) {
 
 function forceMotionStop(reason = 'safety-stop') {
   /*
-    Lifecycle stops force both axis-specific Stop commands even when local state
-    is already zero. The browser may have lost its final packet, or the camera
-    may have accepted a command whose response has not returned, so deduplicating
-    a safety stop would trust precisely the state we are trying to recover from.
+    Lifecycle stops force a real all-axis ONVIF Stop even when local state is
+    already zero. The browser may have lost its final packet, or the camera may
+    have accepted a command whose response has not returned, so deduplicating a
+    safety stop would trust precisely the state we are trying to recover from.
   */
   clearPanTiltRenewal();
   clearZoomRepeat();
-  queueMotionIntent(STOP_MOTION, reason, { forceAxes: true });
+  queueMotionIntent(STOP_MOTION, reason);
+  requestMotionCommands({ fullStop: true });
   return motionCommandPromise || Promise.resolve();
 }
 
