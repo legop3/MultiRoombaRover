@@ -6,6 +6,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useChatActions, useChatTimeline } from '../../context/ChatContext.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
+import useChatMessageHistoryNavigation from '../../hooks/useChatMessageHistoryNavigation.js';
 import ChatMessageRow from '../ChatMessageRow/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
@@ -260,6 +261,7 @@ function ChatComposer({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [speak, setSpeak] = useState(true);
+  const { navigateHistory, resetHistoryNavigation } = useChatMessageHistoryNavigation();
   const effectiveSpeak = ttsSupported && speak;
   const ttsPayload = useMemo(() => {
     if (!effectiveSpeak) return null;
@@ -291,6 +293,7 @@ function ChatComposer({
     try {
       await sendMessage(clean, ttsPayload);
       setDraft('');
+      resetHistoryNavigation();
       blurChat();
       setTypingActive(false);
     } catch (err) {
@@ -314,6 +317,9 @@ function ChatComposer({
         value={draft}
         onChange={(event) => {
           const next = event.target.value;
+          // A direct edit starts a fresh history traversal. This prevents an
+          // old ArrowDown position from overwriting text the user just typed.
+          resetHistoryNavigation();
           setDraft(next);
           setTypingActive(Boolean(next.trim()));
         }}
@@ -326,6 +332,15 @@ function ChatComposer({
           setTypingActive(false);
         }}
         onKeyDown={(event) => {
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            const recalledDraft = navigateHistory(event.key === 'ArrowUp' ? 'previous' : 'next', draft);
+            if (recalledDraft !== null) {
+              event.preventDefault();
+              setDraft(recalledDraft);
+              setTypingActive(Boolean(recalledDraft.trim()));
+            }
+            return;
+          }
           if (event.key === 'Enter' && !draft.trim()) {
             event.preventDefault();
             blurChat();

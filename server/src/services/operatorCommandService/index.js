@@ -93,9 +93,10 @@ function createCommandHandlers(deps) {
       return;
     }
     // Actions in this set can change operational safety or access policy, so
-    // lockdown mode narrows them from normal admins to lockdown admins. Room
-    // light locking belongs here because it can force the physical room lights
-    // on and disables ordinary Home Assistant room controls for everyone else.
+    // lockdown mode narrows them from normal admins to lockdown admins. Lights
+    // is included because its lock/unlock subcommands change room policy. Its
+    // ordinary on/off/color actions are also intentionally restricted to a
+    // lockdown admin while the entire server is in lockdown.
     const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'lights', 'kick', 'lift', 'neato']);
     const isAccessModeCommand = commandDefinition?.permission === 'access-mode';
 

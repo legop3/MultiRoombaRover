@@ -196,6 +196,72 @@ function createRuntimeEngine(deps) {
     };
   }
 
+  function createBrightRandomRgbColor() {
+    // A completely random RGB triplet frequently produces colors that are very
+    // dark, gray, or visually indistinguishable from a bulb being off. Choosing
+    // a random hue at full saturation and brightness still gives every bulb a
+    // genuinely random color while keeping the requested room effect vivid.
+    const hueSegment = Math.random() * 6;
+    const segmentIndex = Math.floor(hueSegment);
+    const risingChannel = Math.round((hueSegment - segmentIndex) * 255);
+    const fallingChannel = 255 - risingChannel;
+
+    switch (segmentIndex) {
+      case 0: return [255, risingChannel, 0];
+      case 1: return [fallingChannel, 255, 0];
+      case 2: return [0, 255, risingChannel];
+      case 3: return [0, fallingChannel, 255];
+      case 4: return [risingChannel, 0, 255];
+      default: return [255, 0, fallingChannel];
+    }
+  }
+
+  async function setRandomColorScene(options = {}) {
+    const source = String(options?.source || 'homeAssistant:setRandomColorScene');
+    const entities = Array.from(entityConfig.values()).map((meta) => ({
+      meta,
+      state: entityState.get(meta.id) || buildState(meta, null),
+    }));
+
+    // RGB capability comes from Home Assistant's live supported_color_modes
+    // snapshot. This avoids a second operator-maintained list and makes newly
+    // replaced bulbs automatically participate once Home Assistant reports
+    // their capabilities. Everything else is turned off, including switches
+    // and white-only lights, exactly matching the scene's requested boundary.
+    const operations = entities.map(({ meta, state }) => {
+      if (state.supportsColor) {
+        return setLightColor(meta.id, createBrightRandomRgbColor());
+      }
+      return setEntityState(meta.id, 'off', { source: `${source}:non-rgb-off` });
+    });
+    const results = await Promise.allSettled(operations);
+    const failures = results
+      .map((result, index) => ({ result, entityId: entities[index].meta.id }))
+      .filter(({ result }) => result.status === 'rejected')
+      .map(({ result, entityId }) => ({ entityId, error: result.reason?.message || 'unknown error' }));
+    const succeeded = results
+      .map((result, index) => ({ result, entityId: entities[index].meta.id }))
+      .filter(({ result }) => result.status === 'fulfilled')
+      .map(({ entityId }) => entityId);
+
+    if (failures.length) {
+      logger.warn('Some Home Assistant random color scene updates failed', {
+        total: entities.length,
+        failed: failures.length,
+        failures,
+      });
+    }
+
+    return {
+      source,
+      total: entities.length,
+      colorLights: entities.filter(({ state }) => state.supportsColor).length,
+      nonColorEntities: entities.filter(({ state }) => !state.supportsColor).length,
+      succeeded,
+      failures,
+    };
+  }
+
   async function setEntityLockedOnWhite(entityId, options = {}) {
     const meta = entityConfig.get(entityId);
     const source = String(options?.source || 'homeAssistant:setEntityLockedOnWhite');
@@ -498,6 +564,7 @@ function createRuntimeEngine(deps) {
     setLightColor,
     setLightWhite,
     setAllControllableEntitiesState,
+    setRandomColorScene,
     setAllControllableEntitiesLockedOnWhite,
     setLightsLockedOn,
     toggleLightsLockedOn,

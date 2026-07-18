@@ -61,6 +61,25 @@ function validateSources(list = [], socket = null) {
 }
 
 function getDefaultWebSources(assignment = {}, socket = null) {
+  /*
+    PTZ ownership is intentionally tracked outside assignmentService because
+    taking the camera releases the user's rover assignment. Check the PTZ
+    service directly so a source-less web replay request, including `rs
+    replay`, follows the camera currently controlled by that socket just as it
+    follows an assigned rover below.
+
+    isOperator is deliberately stricter than PTZ access or queue membership:
+    spectators and users waiting for a camera turn must not silently replay a
+    camera they are not currently operating. Keeping this rule here also makes
+    every web replay entry point share the same default instead of teaching the
+    chat-command adapter about PTZ-specific state.
+  */
+  if (ptzCameraService.getPublicState(socket).isOperator) {
+    const source = ptzCameraService.getReplaySource();
+    if (!source) return [];
+    return [{ type: source.type, id: String(source.id), label: source.label || source.id }];
+  }
+
   if (assignment?.roverId) {
     const id = String(assignment.roverId);
     const match = getReplaySources(socket).find((entry) => entry.type === 'rover' && entry.id === id);

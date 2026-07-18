@@ -78,6 +78,7 @@ module.exports = {
   setLightColor: runtimeEngine.setLightColor,
   setLightWhite: runtimeEngine.setLightWhite,
   setAllControllableEntitiesState: runtimeEngine.setAllControllableEntitiesState,
+  setRandomColorScene: runtimeEngine.setRandomColorScene,
   setLightsLockedOn: runtimeEngine.setLightsLockedOn,
   toggleLightsLockedOn: runtimeEngine.toggleLightsLockedOn,
   homeAssistantEvents: events,

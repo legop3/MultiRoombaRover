@@ -5,6 +5,7 @@ import { memo, useMemo, useState } from 'react';
 import { useChatActions } from '../../../context/ChatContext.jsx';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../../settings/index.js';
+import useChatMessageHistoryNavigation from '../../../hooks/useChatMessageHistoryNavigation.js';
 
 function detectSafari() {
   if (typeof navigator === 'undefined') return false;
@@ -42,6 +43,7 @@ function HudChatInput({ compact = false }) {
   });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const { navigateHistory, resetHistoryNavigation } = useChatMessageHistoryNavigation();
   const canChat = role !== 'spectator';
   const hideHudChat = role === 'spectator';
   const chatTargetId = useMemo(() => {
@@ -118,6 +120,7 @@ function HudChatInput({ compact = false }) {
     try {
       await sendMessage(clean, ttsPayload);
       setDraft('');
+      resetHistoryNavigation();
       blurChat();
       setTypingActive(false);
     } catch (err) {
@@ -136,6 +139,9 @@ function HudChatInput({ compact = false }) {
         value={draft}
         onChange={(event) => {
           const next = event.target.value;
+          // Keep HUD navigation independent from the panel's cursor even
+          // though both inputs read the same persisted message collection.
+          resetHistoryNavigation();
           setDraft(next);
           setTypingActive(Boolean(next.trim()));
         }}
@@ -148,6 +154,15 @@ function HudChatInput({ compact = false }) {
           setTypingActive(false);
         }}
         onKeyDown={(event) => {
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            const recalledDraft = navigateHistory(event.key === 'ArrowUp' ? 'previous' : 'next', draft);
+            if (recalledDraft !== null) {
+              event.preventDefault();
+              setDraft(recalledDraft);
+              setTypingActive(Boolean(recalledDraft.trim()));
+            }
+            return;
+          }
           if (event.key === 'Enter' && !draft.trim()) {
             event.preventDefault();
             blurChat();

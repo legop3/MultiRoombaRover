@@ -30,6 +30,12 @@ const CHAT_FOCUS_DEFAULT = {
   selfSocketId: null,
 };
 
+const CHAT_HISTORY_DEFAULT = {
+  messageHistory: [],
+};
+const CHAT_HISTORY_LIMIT = 10;
+const CHAT_HISTORY_ENTRY_LIMIT = 200;
+
 // Chat messages and typing indicators are the highest-churn chat data. Keeping
 // them in their own context lets transcript components update without forcing
 // controlled composer inputs to re-render and re-commit unchanged attributes.
@@ -44,6 +50,12 @@ const ChatActionsContext = createContext(CHAT_ACTIONS_DEFAULT);
 // blur events, but it should not be tied to incoming chat traffic either.
 const ChatFocusContext = createContext(CHAT_FOCUS_DEFAULT);
 
+// Sent-message history has its own subscription because it changes only when
+// this browser successfully posts a message. Keeping it separate prevents the
+// transcript and focus consumers from re-rendering when the persisted history
+// changes, while still giving every mounted composer one shared history source.
+const ChatHistoryContext = createContext(CHAT_HISTORY_DEFAULT);
+
 const ChatContext = createContext({
   ...CHAT_TIMELINE_DEFAULT,
   ...CHAT_ACTIONS_DEFAULT,
@@ -56,6 +68,7 @@ export function ChatProvider({ children }) {
   const { pushAlert } = useSessionActions();
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const { value: profileSettings } = useSettingsNamespace('profile', { nickname: '', profileImageUrl: '' });
+  const { value: chatSettings, save: saveChatSettings } = useSettingsNamespace('chat', CHAT_HISTORY_DEFAULT);
   const [messages, setMessages] = useState([]);
   const [typing, setTyping] = useState([]);
   const [isChatFocused, setIsChatFocused] = useState(false);
@@ -229,11 +242,29 @@ export function ChatProvider({ children }) {
               hasTts: Boolean(tts),
               length: typeof text === 'string' ? text.trim().length : 0,
             });
+
+            /*
+              Record only messages accepted by the server so ArrowUp never
+              recalls a draft that failed to send. The settings subsystem uses
+              one browser cookie for every namespace, so both the entry length
+              and history count are deliberately bounded to leave room for the
+              user's other persisted preferences.
+            */
+            const historyEntry = typeof text === 'string' ? text.slice(0, CHAT_HISTORY_ENTRY_LIMIT) : '';
+            if (historyEntry) {
+              saveChatSettings((current) => {
+                const currentHistory = Array.isArray(current?.messageHistory) ? current.messageHistory : [];
+                return {
+                  ...(current || {}),
+                  messageHistory: [...currentHistory.slice(-(CHAT_HISTORY_LIMIT - 1)), historyEntry],
+                };
+              });
+            }
             resolve(resp);
           }
         });
       }),
-    [profileImage, socket],
+    [profileImage, saveChatSettings, socket],
   );
 
   const registerInputRef = useCallback((el, options = {}) => {
@@ -301,13 +332,23 @@ export function ChatProvider({ children }) {
     [isChatFocused, session?.socketId],
   );
 
+  const historyValue = useMemo(
+    () => ({
+      // Treat malformed or hand-edited cookie data as an empty history. This
+      // keeps keyboard navigation safe without mutating unrelated settings.
+      messageHistory: Array.isArray(chatSettings?.messageHistory) ? chatSettings.messageHistory : [],
+    }),
+    [chatSettings],
+  );
+
   const value = useMemo(
     () => ({
       ...timelineValue,
       ...actionsValue,
       ...focusValue,
+      ...historyValue,
     }),
-    [actionsValue, focusValue, timelineValue],
+    [actionsValue, focusValue, historyValue, timelineValue],
   );
 
   return (
@@ -316,7 +357,9 @@ export function ChatProvider({ children }) {
     <ChatTimelineContext.Provider value={timelineValue}>
       <ChatActionsContext.Provider value={actionsValue}>
         <ChatFocusContext.Provider value={focusValue}>
-          <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
+          <ChatHistoryContext.Provider value={historyValue}>
+            <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
+          </ChatHistoryContext.Provider>
         </ChatFocusContext.Provider>
       </ChatActionsContext.Provider>
     </ChatTimelineContext.Provider>
@@ -351,6 +394,14 @@ export function useChatFocus() {
   const ctx = useContext(ChatFocusContext);
   if (!ctx) {
     throw new Error('useChatFocus must be used inside ChatProvider');
+  }
+  return ctx;
+}
+
+export function useChatHistory() {
+  const ctx = useContext(ChatHistoryContext);
+  if (!ctx) {
+    throw new Error('useChatHistory must be used inside ChatProvider');
   }
   return ctx;
 }

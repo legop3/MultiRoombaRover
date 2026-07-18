@@ -3,8 +3,8 @@
 // Scope: Supplies transport-neutral metadata; execution handlers remain focused on server operations.
 const CATEGORIES = {
   system: { title: 'System', names: ['help', 'status', 'replay', 'time-status'] },
-  admin: { title: 'Admin', names: ['lock', 'unlock', 'mode', 'reason', 'goal', 'lights', 'kick', 'verify', 'deter'] },
-  features: { title: 'Features', names: ['lift', 'neato'] },
+  admin: { title: 'Admin', names: ['lock', 'unlock', 'mode', 'reason', 'goal', 'kick', 'verify', 'deter'] },
+  features: { title: 'Features', names: ['lights', 'lift', 'neato'] },
   discord: { title: 'Discord', names: ['bridge'] },
 };
 
@@ -19,7 +19,18 @@ function buildCommandRegistry(prefix, timeCommand) {
     mode: { category: 'admin', summary: 'Change the server mode.', usage: [`${prefix} mode <open|turns|admin|lockdown>`], access: 'Admin', permission: 'admin' },
     reason: { category: 'admin', summary: 'Show, set, or clear the admin-mode reason.', usage: [`${prefix} reason [text|clear]`], access: 'Admin to change' },
     goal: { category: 'admin', summary: 'Show, set, or clear the global objective.', usage: [`${prefix} goal [text|clear]`], access: 'Admin to change' },
-    lights: { category: 'admin', summary: 'Show or change the room-light lock.', usage: [`${prefix} lights <status|lock|unlock>`], access: 'Admin', permission: 'admin' },
+    lights: {
+      category: 'features',
+      summary: 'Control room lights or manage the admin light lock.',
+      usage: [
+        `${prefix} lights <on|off|colors>`,
+        `${prefix} lights <status|lock|unlock>`,
+      ],
+      access: 'Light controls are public unless server access is restricted; lock controls require admin',
+      permission: 'access-mode',
+      requiredFeature: 'homeAssistant',
+      unavailableLabel: 'Home Assistant',
+    },
     kick: { category: 'admin', summary: 'Remove a user from their current rover.', usage: [`${prefix} kick <user> [reason]`], access: 'Admin', permission: 'admin' },
     verify: { category: 'admin', summary: 'List or remove verified identities.', usage: [`${prefix} verify list`, `${prefix} verify remove <identity>`], access: 'Lockdown admin', permission: 'lockdown-admin' },
     deter: { category: 'admin', summary: 'List, add, or remove identity deterrence.', usage: [`${prefix} deter list`, `${prefix} deter ban <identity>`, `${prefix} deter unban <identity>`], access: 'Lockdown admin', permission: 'lockdown-admin' },

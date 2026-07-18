@@ -33,6 +33,34 @@ function createLightsCommand({ homeAssistantService, sanitizeMentions, config })
       return;
     }
 
+    const isAdmin = Boolean(message.actor?.isAdmin);
+    const adminActions = new Set(['status', 'lock', 'unlock']);
+
+    // The lights namespace intentionally contains both public feature actions
+    // and room-policy actions. The shared dispatcher applies the current server
+    // mode to the feature as a whole; this focused check preserves the stronger
+    // historical permission on status/lock/unlock without making on/off/colors
+    // admin-only during normal open or turns operation.
+    if (adminActions.has(action) && !isAdmin) {
+      await message.reply({
+        content: 'Only admins can manage the room-light lock.',
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+
+    // An active lock is a policy boundary for ordinary feature commands. Admin
+    // lock management remains available, but public scene commands must not
+    // silently defeat a locked-on or locked-off room state.
+    const lightPolicy = homeAssistantService.getLightPolicyState?.() || {};
+    if ((action === 'on' || action === 'off' || action === 'colors') && lightPolicy.locked) {
+      await message.reply({
+        content: describeLightPolicy(lightPolicy),
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+
     if (action === 'status') {
       await message.reply({
         content: describeLightPolicy(homeAssistantService.getLightPolicyState?.() || {}),
@@ -41,9 +69,35 @@ function createLightsCommand({ homeAssistantService, sanitizeMentions, config })
       return;
     }
 
+    if (action === 'on' || action === 'off' || action === 'colors') {
+      try {
+        const result = action === 'colors'
+          ? await homeAssistantService.setRandomColorScene({ source: 'bot-command:lights:colors' })
+          : await homeAssistantService.setAllControllableEntitiesState(action, {
+            source: `bot-command:lights:${action}`,
+          });
+        const failed = result?.failures?.length || 0;
+        const succeeded = result?.succeeded?.length || 0;
+        const description = action === 'colors'
+          ? `Applied random colors to ${result?.colorLights || 0} RGB lights and requested off for ${result?.nonColorEntities || 0} non-RGB lights.`
+          : `Turned ${action} ${succeeded} room lights.`;
+        const failureSuffix = failed ? ` ${failed} failed.` : '';
+        await message.reply({
+          content: sanitizeMentions(`${description}${failureSuffix}`),
+          allowedMentions: { parse: [], repliedUser: false },
+        });
+      } catch (err) {
+        await message.reply({
+          content: sanitizeMentions(`Failed to update room lights: ${err.message}`),
+          allowedMentions: { parse: [], repliedUser: false },
+        });
+      }
+      return;
+    }
+
     if (action !== 'lock' && action !== 'unlock') {
       await message.reply({
-        content: `Invalid lights command. Use \`${commandPrefix} lights lock\`, \`${commandPrefix} lights unlock\`, or \`${commandPrefix} lights status\`.`,
+        content: `Invalid lights command. Use \`${commandPrefix} lights on\`, \`${commandPrefix} lights off\`, \`${commandPrefix} lights colors\`, \`${commandPrefix} lights lock\`, \`${commandPrefix} lights unlock\`, or \`${commandPrefix} lights status\`.`,
         allowedMentions: { parse: [], repliedUser: false },
       });
       return;

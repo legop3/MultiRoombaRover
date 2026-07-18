@@ -5,8 +5,7 @@
    2. default is 4:3
    3. all it does is tell the web UI to make the rover video 16:9 or 4:3 shaped
       1. web UI should default to 4:3 if that rover doesnt yet have that config yet
-4. add more background gap themes
-5.  fix this:
+4.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^
