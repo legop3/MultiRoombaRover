@@ -104,12 +104,12 @@ function createVideoAuthPolicy(deps) {
       if (
         !isAudio &&
         shouldUseSnapshotsForNonTurnVideo({ controllableUserCount: countControllableUsers() }) &&
-        !turnService.canDrive(roverId, socket)
+        !turnService.canRequestLiveVideo(roverId, socket)
       ) {
         /*
           This mirrors videoSocketService's token gate. MediaMTX can ask auth
-          after a token has been issued, so the active-turn bandwidth rule must
-          be evaluated here too instead of trusting an older browser decision.
+          after a token has been issued, so the same "must belong to this rover's
+          driver queue" rule has to be evaluated here too.
         */
         return false;
       }

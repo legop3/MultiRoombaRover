@@ -153,15 +153,15 @@ io.on('connection', (socket) => {
           role !== 'spectator' &&
           !isAdmin(socket) &&
           shouldUseSnapshotsForNonTurnVideo({ controllableUserCount: countControllableUsers() }) &&
-          !turnService.canDrive(baseId, socket)
+          !turnService.canRequestLiveVideo(baseId, socket)
         ) {
           /*
-            The browser also forces snapshots for non-active turn holders, but
-            the socket token path must enforce the same rule. Otherwise a stale
-            component or direct socket caller could still mint a MediaMTX token
-            while the UI is showing snapshots.
+            The browser owns the snapshot-vs-live presentation for queued rover
+            drivers. The server side only verifies that the socket belongs to
+            this rover's driver queue so legitimate warm-up/switch requests are
+            not rejected by small turn-timer timing differences.
           */
-          throw new Error('Live video is limited to the active turn');
+          throw new Error('Live video is limited to this rover queue');
         }
       } else if (target.type === 'room') {
         throw new Error('Room cameras now use the snapshot feed');

@@ -196,6 +196,26 @@ function canDrive(roverId, socket) {
   return activeDrivers.get(roverId) === socket.id;
 }
 
+function canRequestLiveVideo(roverId, socket) {
+  if (!socket) return false;
+  if (canDrive(roverId, socket)) return true;
+
+  const queue = driverQueues.get(roverId);
+  if (!queue || getMode() !== MODES.TURNS) {
+    return false;
+  }
+
+  /*
+    This helper is intentionally broader than canDrive(). Bandwidth saving is a
+    presentation/subscription decision for normal driver clients: the UI keeps
+    non-current drivers on snapshots, and only asks for live video when it wants
+    to warm or show the stream. The server should still verify that the socket is
+    actually attached to this rover, but it should not reject a legitimate queued
+    driver because the browser and turn timer are a few milliseconds out of sync.
+  */
+  return queue.queue.includes(socket.id);
+}
+
 function isQueuedDriver(roverId, socketId) {
   if (!socketId) return false;
   const queue = driverQueues.get(roverId);
@@ -410,6 +430,7 @@ module.exports = {
   driverRemoved,
   cleanupRover,
   canDrive,
+  canRequestLiveVideo,
   isQueuedDriver,
   getActiveDrivers,
   turnEvents,
