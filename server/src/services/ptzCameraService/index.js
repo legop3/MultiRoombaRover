@@ -29,12 +29,15 @@ const PTZ_STREAM_PATH = 'ptz-camera';
 const DEFAULT_ONVIF_PORT = 8000;
 const DEFAULT_PROFILE_TOKEN = '003';
 const DEFAULT_TURN_DURATION_MS = 5 * 60 * 1000;
-// The TrackMix reports PT1S as its minimum supported continuous-move timeout.
-// Browser heartbeats arrive every 250 ms, so 650 ms allows ordinary LAN jitter
-// while still issuing an explicit stop well before the camera's own one-second
-// timeout becomes the final safety backstop.
+// The TrackMix exposes pan/tilt and zoom through the same ONVIF method but does
+// not behave as if they were the same kind of motor. Pan/tilt runs smoothly from
+// one long ContinuousMove; zoom advances in command-sized increments. Keep the
+// timings separate so zoom can repeat quickly without restarting pan/tilt.
 const MOTION_WATCHDOG_MS = 650;
-const ONVIF_MOTION_TIMEOUT_MS = 1000;
+const PAN_TILT_TIMEOUT_MS = 10000;
+const PAN_TILT_RENEW_MS = 8000;
+const ZOOM_PULSE_TIMEOUT_MS = 1000;
+const ZOOM_REPEAT_MS = 120;
 const STOP_MOTION = Object.freeze({ pan: 0, tilt: 0, zoom: 0 });
 // PTZ is a normal replay source now, so capture should be on unless the feature
 // explicitly disables replay for the camera.
@@ -100,9 +103,11 @@ let snapshotTimer = null;
 let spotlightVerifyTimer = null;
 let vendorStatePromise = Promise.resolve();
 let motionWatchdogTimer = null;
+let panTiltRenewTimer = null;
+let zoomRepeatTimer = null;
 let desiredMotion = STOP_MOTION;
-let desiredMotionVersion = 0;
-let appliedMotionVersion = 0;
+let pendingPanTiltCommand = false;
+let pendingZoomCommand = false;
 let motionCommandPromise = null;
 let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
@@ -1122,77 +1127,141 @@ function clearMotionWatchdog() {
   motionWatchdogTimer = null;
 }
 
-function runMotionCommandPump() {
-  if (motionCommandPromise) return motionCommandPromise;
+function clearPanTiltRenewal() {
+  if (!panTiltRenewTimer) return;
+  clearTimeout(panTiltRenewTimer);
+  panTiltRenewTimer = null;
+}
+
+function clearZoomRepeat() {
+  if (!zoomRepeatTimer) return;
+  clearInterval(zoomRepeatTimer);
+  zoomRepeatTimer = null;
+}
+
+function panTiltMatches(left = STOP_MOTION, right = STOP_MOTION) {
+  return left.pan === right.pan && left.tilt === right.tilt;
+}
+
+function requestMotionCommands({ panTilt = false, zoom = false } = {}) {
+  pendingPanTiltCommand = pendingPanTiltCommand || panTilt;
+  pendingZoomCommand = pendingZoomCommand || zoom;
+  if (motionCommandPromise || (!pendingPanTiltCommand && !pendingZoomCommand)) {
+    return motionCommandPromise || Promise.resolve();
+  }
 
   /*
-    ONVIF requests are asynchronous HTTP/SOAP operations. Starting one request
-    per Socket.IO event allowed a quick move/stop/move sequence to overlap at
-    the camera, where response order is not a safe proxy for execution order.
-    This single pump permits exactly one camera operation at a time. If browser
-    heartbeats arrive while it is busy, only the newest complete desired state
-    survives the loop, so intermediate input noise is coalesced rather than
-    replayed after the operator has already released the controls.
+    Keep one ONVIF request in flight at a time, but coalesce independently by
+    axis. A zoom timer can tick several times while the camera answers one SOAP
+    request; one pending boolean preserves the newest required pulse without
+    building a delayed command backlog that would continue after release.
   */
   motionCommandPromise = (async () => {
-    while (appliedMotionVersion < desiredMotionVersion) {
-      const commandVersion = desiredMotionVersion;
-      const commandMotion = desiredMotion;
-      try {
-        await initialize();
-        if (isMotionIdle(commandMotion)) {
-          await callOnvif('stop', {
-            profileToken: state.profileToken,
-            panTilt: true,
-            zoom: true,
-          });
-        } else {
-          /*
-            Send the complete vector even when only one axis changed. The live
-            TrackMix accepts combined pan/tilt/zoom despite failing to advertise
-            its continuous zoom space, and zero on an axis is how the newest
-            intent releases that axis without disturbing a non-zero sibling.
-          */
-          await callOnvif('continuousMove', {
-            profileToken: state.profileToken,
-            x: commandMotion.pan,
-            y: commandMotion.tilt,
-            zoom: commandMotion.zoom,
-            timeout: ONVIF_MOTION_TIMEOUT_MS,
-          });
+    while (pendingPanTiltCommand || pendingZoomCommand) {
+      const sendPanTilt = pendingPanTiltCommand;
+      pendingPanTiltCommand = false;
+      if (sendPanTilt) {
+        const pan = desiredMotion.pan;
+        const tilt = desiredMotion.tilt;
+        try {
+          await initialize();
+          if (!pan && !tilt) {
+            // Stop only pan/tilt. Omitting Zoom is essential because a zoom
+            // finger/key may still be held while direction returns to neutral.
+            await callOnvif('stop', {
+              profileToken: state.profileToken,
+              panTilt: true,
+              zoom: false,
+            });
+          } else {
+            await callOnvif('continuousMove', {
+              profileToken: state.profileToken,
+              x: pan,
+              y: tilt,
+              onlySendPanTilt: true,
+              timeout: PAN_TILT_TIMEOUT_MS,
+            });
+          }
+        } catch (err) {
+          logger.warn('PTZ pan/tilt command failed', { error: getErrorMessage(err), pan, tilt });
         }
-      } catch (err) {
-        /*
-          Mark this version consumed below instead of spinning on a failing
-          camera. A held control supplies another heartbeat and therefore a
-          bounded retry; a failed stop still has the camera's one-second ONVIF
-          timeout as its independent final safety mechanism.
-        */
-        logger.warn('PTZ motion command failed', {
-          error: getErrorMessage(err),
-          idle: isMotionIdle(commandMotion),
-          version: commandVersion,
-        });
       }
-      appliedMotionVersion = commandVersion;
+
+      const sendZoom = pendingZoomCommand;
+      pendingZoomCommand = false;
+      if (sendZoom) {
+        const zoom = desiredMotion.zoom;
+        try {
+          await initialize();
+          if (!zoom) {
+            // Stop only zoom so repeated zoom release cannot interrupt a smooth
+            // pan/tilt ContinuousMove that is already running on the camera.
+            await callOnvif('stop', {
+              profileToken: state.profileToken,
+              panTilt: false,
+              zoom: true,
+            });
+          } else {
+            /*
+              The TrackMix does not advertise continuous zoom, but physical
+              testing showed each accepted zoom-only ContinuousMove advances one
+              step. Repeating this axis-only request restores responsive zoom
+              without resending or restarting the pan/tilt motor.
+            */
+            await callOnvif('continuousMove', {
+              profileToken: state.profileToken,
+              zoom,
+              onlySendZoom: true,
+              timeout: ZOOM_PULSE_TIMEOUT_MS,
+            });
+          }
+        } catch (err) {
+          logger.warn('PTZ zoom command failed', { error: getErrorMessage(err), zoom });
+        }
+      }
     }
   })().finally(() => {
     motionCommandPromise = null;
-    // An intent can arrive after the loop condition but before this promise's
-    // finally callback. Recheck the versions so that narrow timing window does
-    // not strand the newest state without a command pump.
-    if (appliedMotionVersion < desiredMotionVersion) runMotionCommandPump();
+    // Cover an intent arriving between the loop check and promise cleanup.
+    if (pendingPanTiltCommand || pendingZoomCommand) requestMotionCommands();
   });
 
   return motionCommandPromise;
 }
 
-function queueMotionIntent(motion, reason = 'input') {
-  desiredMotion = normalizeMotionIntent(motion);
-  desiredMotionVersion += 1;
+function armPanTiltRenewal() {
+  clearPanTiltRenewal();
+  if (!desiredMotion.pan && !desiredMotion.tilt) return;
+  /*
+    The camera requires a finite timeout. Renew close to the ten-second limit,
+    not on every browser heartbeat, so an unusually long hold stays continuous
+    without bringing back the quarter-second motor restarts.
+  */
+  panTiltRenewTimer = setTimeout(() => {
+    panTiltRenewTimer = null;
+    requestMotionCommands({ panTilt: true });
+    armPanTiltRenewal();
+  }, PAN_TILT_RENEW_MS);
+}
+
+function syncZoomRepeater() {
+  clearZoomRepeat();
+  if (!desiredMotion.zoom) return;
+  // queueMotionIntent sends the first step once after configuring this timer;
+  // subsequent ticks retain the old fast hold cadence without a double pulse.
+  zoomRepeatTimer = setInterval(() => {
+    requestMotionCommands({ zoom: true });
+  }, ZOOM_REPEAT_MS);
+}
+
+function queueMotionIntent(motion, reason = 'input', options = {}) {
+  const nextMotion = normalizeMotionIntent(motion);
+  const panTiltChanged = !panTiltMatches(nextMotion, desiredMotion);
+  const zoomChanged = nextMotion.zoom !== desiredMotion.zoom;
+  desiredMotion = nextMotion;
   clearMotionWatchdog();
 
-  if (!isMotionIdle(desiredMotion)) {
+  if (!isMotionIdle(nextMotion)) {
     /*
       Socket disconnect normally arrives quickly, but it is not a suitable motor
       safety boundary. Every non-zero browser heartbeat replaces this timer; if
@@ -1205,7 +1274,16 @@ function queueMotionIntent(motion, reason = 'input') {
     }, MOTION_WATCHDOG_MS);
   }
 
-  const pending = runMotionCommandPump();
+  /*
+    Identical browser heartbeats refresh only the watchdog. They must not touch
+    either motor scheduler: pan/tilt already has a long continuous command, and
+    zoom has its own 120 ms axis-only repeater.
+  */
+  const sendPanTilt = panTiltChanged || Boolean(options.forceAxes);
+  const sendZoom = zoomChanged || Boolean(options.forceAxes);
+  if (sendPanTilt) armPanTiltRenewal();
+  if (sendZoom) syncZoomRepeater();
+  const pending = requestMotionCommands({ panTilt: sendPanTilt, zoom: sendZoom });
   pending.catch(() => {});
   return { ok: true, motion: desiredMotion, reason };
 }
@@ -1217,12 +1295,14 @@ function acceptMotionIntent(socket, payload = {}) {
 
 function forceMotionStop(reason = 'safety-stop') {
   /*
-    Lifecycle stops intentionally increment the version even when local state is
-    already zero. The browser may have lost its final packet, or the camera may
-    have accepted a command whose response has not returned, so deduplicating a
-    safety stop would trust precisely the state we are trying to recover from.
+    Lifecycle stops force both axis-specific Stop commands even when local state
+    is already zero. The browser may have lost its final packet, or the camera
+    may have accepted a command whose response has not returned, so deduplicating
+    a safety stop would trust precisely the state we are trying to recover from.
   */
-  queueMotionIntent(STOP_MOTION, reason);
+  clearPanTiltRenewal();
+  clearZoomRepeat();
+  queueMotionIntent(STOP_MOTION, reason, { forceAxes: true });
   return motionCommandPromise || Promise.resolve();
 }
 
