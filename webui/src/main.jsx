@@ -4,6 +4,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './index.css'
+// Theme artwork is a separate style concern from global component utilities. Loading its dedicated
+// entrypoint here keeps every route consistent without returning theme definitions to index.css.
+import './themes/styles/index.css'
 import App from './App.jsx'
 import { SocketProvider } from './context/SocketContext.jsx'
 import { SessionProvider } from './context/SessionContext.jsx'

@@ -2,7 +2,7 @@
 // Purpose: Defines the Tabs module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
-import { themeGapClass, themeStackClass } from '../../themeFlags.js';
+import { themeGapClass, themeStackClass } from '../../themes/index.js';
 
 const TabsContext = createContext(null);
 

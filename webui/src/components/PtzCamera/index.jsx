@@ -23,6 +23,8 @@ import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import { isFeatureEnabled } from '../../lib/features.js';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
+import { useSettingsNamespace } from '../../settings/index.js';
+import { DEFAULT_PAGE_THEME_KEY, getPageThemeClass } from '../../themes/index.js';
 
 const PTZ_DEFAULT_COLOR = '#38bdf8';
 
@@ -562,7 +564,10 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
         <main className="min-h-0 shrink-0 overflow-hidden bg-black" style={{ aspectRatio: '16 / 9' }}>
           <PtzMediaPane ptz={ptz} open framed />
         </main>
-        <aside className="flex min-h-0 min-w-56 flex-1 flex-col gap-0.5 overflow-y-auto bg-neutral-950 text-sm">
+        {/* Keep the sidebar itself transparent. Its child cards still own their dark surfaces,
+            while the shared PTZ page theme can show through the same compact gaps as the driver
+            layout instead of being covered by one solid sidebar rectangle. */}
+        <aside className="flex min-h-0 min-w-56 flex-1 flex-col gap-0.5 overflow-y-auto text-sm">
           <PtzQueueSummary ptz={ptz} />
           {ptz?.isOperator ? (
             <PtzLightingControls ptz={ptz} />
@@ -717,9 +722,16 @@ export function PtzControllerPage({ layout = 'desktop' }) {
   const routeExitReleaseTimerRef = useRef(null);
   const participantRef = useRef(false);
   const closingThroughButtonRef = useRef(false);
+  const { value: pageSettings } = useSettingsNamespace('page', {
+    backgroundTheme: DEFAULT_PAGE_THEME_KEY,
+  });
   const isMobile = layout !== 'desktop';
   const canUse = Boolean(ptz?.canUse || isVerified || role === 'admin' || role === 'lockdown');
   const isParticipant = Boolean(ptz?.isOperator || ptz?.queuedPosition);
+  // PTZ is a separate route but shares the browser's page settings. Applying the catalog class to
+  // its body surface exposes the theme only through layout padding and card gaps; camera pixels,
+  // controls, and card interiors retain their purpose-built dark backgrounds.
+  const pageBackgroundClass = getPageThemeClass(pageSettings?.backgroundTheme);
 
   useEffect(() => {
     // Route-exit cleanup runs after the last render, so retain the latest
@@ -825,7 +837,7 @@ export function PtzControllerPage({ layout = 'desktop' }) {
 
   if (!featureEnabled) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-black p-2 text-slate-100">
+      <main className={`flex min-h-[100dvh] items-center justify-center p-2 text-slate-100 ${pageBackgroundClass}`}>
         <CardFrame title="PTZ camera" bodyClassName="space-y-1 p-2 text-sm">
           <p>The PTZ camera is not available.</p>
           <button type="button" className="button-dark w-full" onClick={() => navigate('/')}>Return to driver page</button>
@@ -835,7 +847,10 @@ export function PtzControllerPage({ layout = 'desktop' }) {
   }
 
   return (
-    <main className="h-[100dvh] w-full overflow-hidden bg-black text-slate-100">
+    <main className={`h-[100dvh] w-full overflow-hidden text-slate-100 ${pageBackgroundClass}`}>
+      {/* The fullscreen CardFrame remains the structural shell. Painting its otherwise
+          transparent body is what lets every desktop and mobile PTZ composition share one
+          continuous pattern without threading theme props into each individual child panel. */}
       <CardFrame
         title={isMobile ? '' : ptz?.name || 'PTZ Camera'}
         actions={isMobile ? null : (
@@ -847,7 +862,7 @@ export function PtzControllerPage({ layout = 'desktop' }) {
         fillHeight
         clipOverflow={false}
         className="h-[100dvh] w-[100vw] rounded-none border-0 !bg-black"
-        bodyClassName="relative min-h-0 flex-1"
+        bodyClassName={`relative min-h-0 flex-1 ${pageBackgroundClass}`}
       >
         {isMobile ? (
           layout === 'mobile-landscape' ? (

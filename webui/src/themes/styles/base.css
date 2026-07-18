@@ -1,0 +1,26 @@
+/* Page Theme Surfaces
+ * Purpose: Defines behavior shared by every page theme and by the settings demonstration.
+ * Scope: Canvas positioning and the explicit no-artwork fallback; individual artwork lives elsewhere.
+ */
+
+/* These selectors intentionally remain ordinary CSS. This stylesheet is processed separately from
+ * index.css, so placing them in a Tailwind layer would require duplicating Tailwind's directives. */
+  .page-theme {
+    /* A fixed canvas makes separated card gaps look like windows onto one continuous design.
+       Individual theme classes below supply only their artwork and fallback color. */
+    background-color: #050505;
+    background-attachment: fixed;
+  }
+
+  .page-theme-preview {
+    /* Preview artwork belongs to the demonstration box, not the browser viewport. Overriding the
+       page behavior here keeps the swatch representative while it moves inside a scroll panel. */
+    background-attachment: scroll;
+    background-position: center;
+  }
+
+  .page-theme-black {
+    /* An explicit quiet option belongs in the catalog rather than being a special-case toggle. */
+    background-color: #000000;
+    background-image: none;
+  }

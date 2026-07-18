@@ -34,7 +34,7 @@ import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
-import { themeGapClass, themeStackClass } from '../../themeFlags.js';
+import { themeGapClass, themeStackClass } from '../../themes/index.js';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 const CHAT_DOCK_INITIAL_HEIGHT = 224;

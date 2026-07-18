@@ -1,0 +1,124 @@
+/* Pride Page Themes
+ * Purpose: Contains the broad, equal-width flag-inspired stripe artwork.
+ * Scope: Pride color sequences only; shared canvas behavior lives in base.css.
+ */
+
+/* Ordinary CSS keeps the artwork independent of Tailwind's global component layer. main.jsx loads
+ * this theme bundle after index.css, giving the theme modifiers their original cascade position. */
+  .page-theme-pride-mix {
+    /* Every solid stripe theme uses the same forty-eight-pixel band width. Keeping that measurement
+       shared makes browsing predictable: only the colors and sequence change, never the visual
+       density of the card-gap artwork. */
+    background-image: repeating-linear-gradient(
+      45deg,
+      #5bcefa 0 48px,
+      #f5a9b8 48px 96px,
+      #ffffff 96px 144px,
+      #f5a9b8 144px 192px,
+      #5bcefa 192px 240px,
+      #e40303 240px 288px,
+      #ff8c00 288px 336px,
+      #ffed00 336px 384px,
+      #00a651 384px 432px,
+      #0066ff 432px 480px,
+      #9b2fae 480px 528px
+    );
+  }
+
+  .page-theme-rainbow {
+    /* Equal broad diagonal bands keep the familiar six-color flag readable as color fields rather
+       than a dense ribbon when exposed through either horizontal or vertical card gaps. */
+    background-image: repeating-linear-gradient(
+      45deg,
+      #e40303 0 48px,
+      #ff8c00 48px 96px,
+      #ffed00 96px 144px,
+      #008026 144px 192px,
+      #004dff 192px 240px,
+      #750787 240px 288px
+    );
+  }
+
+  .page-theme-progress-pride {
+    /* The inclusive chevron colors are interleaved with the rainbow because a literal large
+       chevron would disappear inside narrow seams. Using the shared stripe width keeps this longer
+       sequence just as bold as the shorter flag themes instead of compressing it to fit one cycle. */
+    background-image: repeating-linear-gradient(
+      45deg,
+      #000000 0 48px,
+      #784f17 48px 96px,
+      #5bcefa 96px 144px,
+      #f5a9b8 144px 192px,
+      #ffffff 192px 240px,
+      #e40303 240px 288px,
+      #ff8c00 288px 336px,
+      #ffed00 336px 384px,
+      #008026 384px 432px,
+      #004dff 432px 480px,
+      #750787 480px 528px
+    );
+  }
+
+  .page-theme-transgender {
+    background-image: repeating-linear-gradient(
+      45deg,
+      #5bcefa 0 48px,
+      #f5a9b8 48px 96px,
+      #ffffff 96px 144px,
+      #f5a9b8 144px 192px,
+      #5bcefa 192px 240px
+    );
+  }
+
+  .page-theme-bisexual {
+    /* Equal bands deliberately prioritize consistency with the other selectable stripe themes.
+       The three-color identity remains clear while browsing no longer changes stripe density. */
+    background-image: repeating-linear-gradient(
+      45deg,
+      #d60270 0 48px,
+      #9b4f96 48px 96px,
+      #0038a8 96px 144px
+    );
+  }
+
+  .page-theme-lesbian {
+    background-image: repeating-linear-gradient(
+      45deg,
+      #d52d00 0 48px,
+      #ef7627 48px 96px,
+      #ff9a56 96px 144px,
+      #ffffff 144px 192px,
+      #d162a4 192px 240px,
+      #b55690 240px 288px,
+      #a30262 288px 336px
+    );
+  }
+
+  .page-theme-nonbinary {
+    background-image: repeating-linear-gradient(
+      45deg,
+      #fff430 0 48px,
+      #ffffff 48px 96px,
+      #9c59d1 96px 144px,
+      #2d2d2d 144px 192px
+    );
+  }
+
+  .page-theme-pansexual {
+    background-image: repeating-linear-gradient(
+      45deg,
+      #ff218c 0 48px,
+      #ffd800 48px 96px,
+      #21b1ff 96px 144px
+    );
+  }
+
+  .page-theme-asexual {
+    background-image: repeating-linear-gradient(
+      45deg,
+      #111111 0 48px,
+      #a3a3a3 48px 96px,
+      #ffffff 96px 144px,
+      #800080 144px 192px
+    );
+  }

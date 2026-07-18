@@ -51,7 +51,12 @@ import NeatoCard from './components/NeatoCard/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
 import DuplicateIdentityOverlay from './components/DuplicateIdentityOverlay/index.jsx';
-import { pageBackgroundClass, themeGapClass, themeStackClass } from './themeFlags.js';
+import {
+  DEFAULT_PAGE_THEME_KEY,
+  getPageThemeClass,
+  themeGapClass,
+  themeStackClass,
+} from './themes/index.js';
 import { trackAnalyticsEvent } from './analytics/index.js';
 import useLayoutMode from './hooks/useLayoutMode.js';
 
@@ -280,6 +285,12 @@ function App() {
   const layout = useLayoutMode();
   const isDesktop = layout === 'desktop';
   const fullscreen = useFullscreenPrompt(layout);
+  const { value: pageSettings } = useSettingsNamespace('page', {
+    backgroundTheme: DEFAULT_PAGE_THEME_KEY,
+  });
+  // Resolve the cookie value through the shared catalog before painting the page. This prevents
+  // an obsolete or hand-edited key from stripping the background class from every exposed seam.
+  const pageBackgroundClass = getPageThemeClass(pageSettings?.backgroundTheme);
 
   return (
     <div className={`${pageBackgroundClass} text-slate-100 ${isDesktop ? 'h-screen overflow-hidden' : 'ios-safe-screen min-h-screen'}`}>

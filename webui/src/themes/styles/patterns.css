@@ -1,0 +1,207 @@
+/* Pattern Page Themes
+ * Purpose: Contains decorative non-pride artwork optimized for narrow horizontal and vertical gaps.
+ * Scope: Static gradients and repeating patterns only; theme identity and ordering live in catalog.js.
+ */
+
+/* Ordinary CSS keeps the artwork independent of Tailwind's global component layer. main.jsx loads
+ * this theme bundle after index.css, giving the theme modifiers their original cascade position. */
+  .page-theme-aurora {
+    /* Overlapping oversized glows create slow color movement across the page without animation,
+       avoiding distracting motion and continuous painting behind live video. */
+    background-color: #03120f;
+    background-image:
+      radial-gradient(circle at 18% 24%, rgba(45, 212, 191, 0.95), transparent 34%),
+      radial-gradient(circle at 76% 18%, rgba(168, 85, 247, 0.9), transparent 38%),
+      radial-gradient(circle at 56% 82%, rgba(34, 197, 94, 0.88), transparent 42%),
+      linear-gradient(125deg, #020617, #0f172a 45%, #082f49);
+    background-size: 34rem 28rem, 38rem 32rem, 42rem 36rem, auto;
+  }
+
+  .page-theme-synthwave-grid {
+    /* Two repeating line layers form a broad grid; the magenta horizon glow prevents horizontal
+       gaps from reading as a single flat color when they cross between grid lines. Two-pixel grid
+       strokes remain crisp without bringing back the previous tiny graph-paper appearance. */
+    background-color: #090018;
+    background-image:
+      linear-gradient(rgba(34, 211, 238, 0.7) 2px, transparent 2px),
+      linear-gradient(90deg, rgba(236, 72, 153, 0.72) 2px, transparent 2px),
+      radial-gradient(ellipse at 50% 100%, #7e22ce 0, #1e1b4b 38%, #090018 72%);
+    background-size: 54px 54px, 54px 54px, auto;
+  }
+
+  .page-theme-neon-checker {
+    /* A conic gradient makes a crisp checker with no image asset and keeps intersections equally
+       interesting when exposed through horizontal or vertical card seams. The large tile size
+       turns each color into a strong block instead of a rapidly alternating micro-pattern. */
+    background-color: #111827;
+    background-image: conic-gradient(
+      from 45deg,
+      #06b6d4 0 25%,
+      #7c3aed 0 50%,
+      #ec4899 0 75%,
+      #111827 0
+    );
+    background-size: 84px 84px;
+  }
+
+  .page-theme-ocean-current {
+    /* Crossing translucent diagonals suggest moving water while remaining completely static. The
+       broad transparent intervals create long currents instead of tightly packed hatch marks. */
+    background-color: #082f49;
+    background-image:
+      repeating-linear-gradient(35deg, rgba(103, 232, 249, 0.72) 0 12px, transparent 12px 54px),
+      repeating-linear-gradient(-35deg, rgba(14, 116, 144, 0.72) 0 21px, transparent 21px 72px),
+      linear-gradient(90deg, #0c4a6e, #0891b2, #164e63);
+  }
+
+  .page-theme-ember-lattice {
+    /* Opposing narrow diagonals create bright crossings, with a dark red base keeping the theme
+       readable instead of overpowering the neutral cards around it. The enlarged repeat creates
+       occasional strong crossings rather than a dense mesh along every seam. */
+    background-color: #1c0704;
+    background-image:
+      repeating-linear-gradient(45deg, transparent 0 36px, rgba(251, 146, 60, 0.9) 36px 45px),
+      repeating-linear-gradient(-45deg, transparent 0 48px, rgba(239, 68, 68, 0.78) 48px 57px),
+      radial-gradient(circle at center, #7c2d12, #1c0704 70%);
+  }
+
+  .page-theme-starfield {
+    /* Offset radial layers provide stars at three scales. All layers repeat, so long PTZ and
+       driver pages never reveal an unpainted region while scrolling. Larger spacing and dots make
+       this read as a sparse starfield rather than fine visual noise inside the narrow gaps. */
+    background-color: #020617;
+    background-image:
+      radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 2px, transparent 3px),
+      radial-gradient(circle, rgba(125, 211, 252, 0.9) 0 3px, transparent 4px),
+      radial-gradient(circle, rgba(216, 180, 254, 0.8) 0 2px, transparent 3px),
+      linear-gradient(135deg, #020617, #172554 55%, #3b0764);
+    background-position: 0 0, 57px 81px, 123px 33px, 0 0;
+    background-size: 111px 111px, 183px 183px, 237px 237px, auto;
+  }
+
+  .page-theme-vaporwave-sunset {
+    /* A large horizon glow supplies the sunset while widely spaced scan lines add retro structure.
+       Both layers span enough distance to remain recognizable through narrow card seams instead of
+       collapsing into the fine television-static texture common to smaller vaporwave patterns. */
+    background-color: #2e1065;
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent 0 24px,
+        rgba(103, 232, 249, 0.48) 24px 27px,
+        transparent 27px 54px
+      ),
+      radial-gradient(circle at 50% 78%, #fda4af 0 14%, #f97316 14% 25%, transparent 25.5%),
+      linear-gradient(180deg, #172554 0%, #6b21a8 48%, #db2777 72%, #f97316 100%);
+    background-size: auto, 48rem 34rem, auto;
+  }
+
+  .page-theme-electric-circuit {
+    /* Offset horizontal and vertical traces form large circuit-like routes. Separate repeat sizes
+       keep their intersections irregular, while the dark navy base prevents the cyan and violet
+       traces from overpowering the cards that the pattern is meant to separate. */
+    background-color: #020617;
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        transparent 0 48px,
+        rgba(34, 211, 238, 0.9) 48px 52px,
+        transparent 52px 96px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0 68px,
+        rgba(168, 85, 247, 0.86) 68px 72px,
+        transparent 72px 124px
+      ),
+      radial-gradient(circle at center, #312e81 0, #0f172a 45%, #020617 78%);
+  }
+
+  .page-theme-lava-flow {
+    /* Oversized overlapping pools create broad molten channels without animation. Their offset
+       positions ensure horizontal and vertical seams cross different hot and cooled regions as
+       they travel around the page. */
+    background-color: #180503;
+    background-image:
+      radial-gradient(ellipse at 18% 28%, #facc15 0 8%, #f97316 9% 18%, #991b1b 24%, transparent 39%),
+      radial-gradient(ellipse at 76% 64%, #fb923c 0 10%, #dc2626 18%, #7f1d1d 29%, transparent 44%),
+      radial-gradient(ellipse at 48% 92%, #fde047 0 7%, #ea580c 17%, transparent 36%),
+      linear-gradient(135deg, #180503, #450a0a 50%, #1c0704);
+    background-size: 42rem 34rem, 48rem 39rem, 37rem 31rem, auto;
+  }
+
+  .page-theme-deep-space-nebula {
+    /* Large soft clouds distinguish this from the sparse Starfield theme. A few broad nebulae are
+       more useful in thin gaps than many tiny stars, and the static layers avoid continuous paint
+       work behind the live rover and PTZ video surfaces. */
+    background-color: #020617;
+    background-image:
+      radial-gradient(ellipse at 22% 38%, rgba(217, 70, 239, 0.92), transparent 34%),
+      radial-gradient(ellipse at 72% 24%, rgba(59, 130, 246, 0.9), transparent 38%),
+      radial-gradient(ellipse at 58% 82%, rgba(14, 165, 233, 0.72), transparent 36%),
+      radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 2px, transparent 3px),
+      linear-gradient(125deg, #020617, #1e1b4b 52%, #3b0764);
+    background-position: center, center, center, 17px 31px, center;
+    background-size: 42rem 34rem, 48rem 38rem, 39rem 35rem, 173px 173px, auto;
+  }
+
+  .page-theme-holographic-waves {
+    /* Broad translucent diagonals cross over an iridescent base. Using two directions means both
+       horizontal and vertical gaps encounter gradual color shifts without resorting to small,
+       noisy rainbow repetitions. */
+    background-color: #164e63;
+    background-image:
+      repeating-linear-gradient(
+        32deg,
+        rgba(255, 255, 255, 0.4) 0 14px,
+        transparent 14px 82px
+      ),
+      repeating-linear-gradient(
+        -38deg,
+        rgba(216, 180, 254, 0.38) 0 18px,
+        transparent 18px 104px
+      ),
+      linear-gradient(110deg, #67e8f9, #c4b5fd 32%, #f9a8d4 60%, #86efac 100%);
+  }
+
+  .page-theme-hazard-stripes {
+    /* This intentionally uses a simple, very wide two-color repeat. The large bands make the
+       industrial warning motif immediately readable even though only a two-pixel slice is visible
+       between neighboring cards. Its bands use the same shared width as every pride stripe theme. */
+    background-color: #111111;
+    background-image: repeating-linear-gradient(
+      45deg,
+      #facc15 0 48px,
+      #171717 48px 96px
+    );
+  }
+
+  .page-theme-mint-mosaic {
+    /* A large conic tile creates chunky geometric blocks in cool mint, teal, navy, and cream. The
+       restrained palette offers a calmer alternative to Neon checker while retaining clear color
+       changes along both seam directions. */
+    background-color: #064e3b;
+    background-image: conic-gradient(
+      from 45deg,
+      #a7f3d0 0 25%,
+      #0f766e 0 50%,
+      #fef3c7 0 75%,
+      #164e63 0
+    );
+    background-size: 96px 96px;
+  }
+
+  .page-theme-candy-swirl {
+    /* Large repeating rings provide curved movement that the otherwise line-oriented catalog does
+       not have. Wide color stops keep the pastel rings bold and prevent them from turning into a
+       dense target pattern in the preview or real page gaps. */
+    background-color: #fdf2f8;
+    background-image: repeating-radial-gradient(
+      circle at 28% 34%,
+      #f9a8d4 0 28px,
+      #fef3c7 28px 56px,
+      #93c5fd 56px 84px,
+      #c4b5fd 84px 112px,
+      #f9a8d4 112px 140px
+    );
+  }

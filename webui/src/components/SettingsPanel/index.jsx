@@ -1,7 +1,7 @@
 // Settings Panel
 // Purpose: Defines the Settings Panel module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import AuthPanel from '../AuthPanel/index.jsx';
 import AdminPanel from '../AdminPanel/index.jsx';
@@ -19,6 +19,13 @@ import { useSocket } from '../../context/SocketContext.jsx';
 import { AUDIO_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { trackAnalyticsEvent, trackAnalyticsEventThrottled } from '../../analytics/index.js';
+import {
+  DEFAULT_PAGE_THEME_KEY,
+  PAGE_THEME_OPTIONS,
+  getPageTheme,
+  getPageThemeClass,
+  normalizePageThemeKey,
+} from '../../themes/index.js';
 
 const manualTabs = [
   { key: 'start', label: 'Start OI' },
@@ -64,6 +71,24 @@ function SettingHelp({ children }) {
   // Helper text is still secondary, but it no longer uses the very small microcopy scale that
   // made the settings panel difficult to read from a normal driving distance.
   return <p className="mx-auto w-full max-w-lg text-xs leading-snug text-white">{children}</p>;
+}
+
+function ThemePreviewCard({ title, className = '' }) {
+  // Use the production CardFrame rather than a lookalike rectangle. This makes the demonstration
+  // honest about borders, opaque card surfaces, and the exact amount of theme visible in a gap.
+  return (
+    <CardFrame
+      title={title}
+      className={className}
+      bodyClassName="flex min-h-0 flex-1 flex-col justify-center gap-1 p-1"
+      fillHeight
+    >
+      {/* Neutral placeholder lines suggest real panel content without making the preview look like
+          an interactive control surface or tying it to any one driver/PTZ layout. */}
+      <div className="h-1.5 w-4/5 rounded-full bg-neutral-600/80" />
+      <div className="h-1.5 w-3/5 rounded-full bg-neutral-700/90" />
+    </CardFrame>
+  );
 }
 
 function RangeSetting({ label, value, disabled = false, onChange }) {
@@ -116,6 +141,7 @@ export default function SettingsPanel() {
     swapMobileControlColumns: false,
     driveMacroBackoffEnabled: true,
     interInstanceTransferSettings: true,
+    backgroundTheme: DEFAULT_PAGE_THEME_KEY,
   });
   const { value: audioSettings, save: saveAudioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
   const { value: videoSettings, save: saveVideoSettings } = useSettingsNamespace('video', VIDEO_SETTINGS_DEFAULTS);
@@ -126,6 +152,11 @@ export default function SettingsPanel() {
       ? pageSettings.driveMacroBackoffEnabled
       : true;
   const interInstanceTransferSettings = pageSettings?.interInstanceTransferSettings !== false;
+  const savedPageThemeKey = normalizePageThemeKey(pageSettings?.backgroundTheme);
+  const [previewPageThemeKey, setPreviewPageThemeKey] = useState(savedPageThemeKey);
+  const previewPageTheme = getPageTheme(previewPageThemeKey);
+  const savedPageTheme = getPageTheme(savedPageThemeKey);
+  const hasUnsavedPageTheme = previewPageThemeKey !== savedPageThemeKey;
   const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
   const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
   const roverVolume = Number.isFinite(audioSettings?.roverVolume) ? audioSettings.roverVolume : AUDIO_SETTINGS_DEFAULTS.roverVolume;
@@ -140,6 +171,13 @@ export default function SettingsPanel() {
     : AUDIO_SETTINGS_DEFAULTS.mainBrushDuckAmount;
   const videoColorFilter = normalizeVideoFilter(videoSettings?.colorFilter);
   const videoFilterCycleKeyLabel = formatKeyLabel(keymap?.videoFilterCycle?.[0]);
+
+  useEffect(() => {
+    // Settings load after the provider mounts and can also be replaced by an incoming inter-instance
+    // transfer. Resynchronize only when the persisted key changes; browsing the local preview does
+    // not touch pageSettings, so Previous/Next choices are not accidentally reset.
+    setPreviewPageThemeKey(savedPageThemeKey);
+  }, [savedPageThemeKey]);
 
   const sensorButtons = useMemo(
     () => [
@@ -202,6 +240,32 @@ export default function SettingsPanel() {
     trackAnalyticsEvent('settings_change', { setting: 'interInstanceTransferSettings', value: checked });
   };
 
+  const movePageThemePreview = (direction) => {
+    const currentIndex = PAGE_THEME_OPTIONS.findIndex((theme) => theme.key === previewPageThemeKey);
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+    // Theme browsing wraps in both directions so the Back and Next buttons remain useful at the
+    // ends of the catalog instead of forcing the user to reverse through every previous option.
+    const nextIndex = (safeIndex + direction + PAGE_THEME_OPTIONS.length) % PAGE_THEME_OPTIONS.length;
+    setPreviewPageThemeKey(PAGE_THEME_OPTIONS[nextIndex].key);
+  };
+
+  const handlePageThemeSelect = (event) => {
+    setPreviewPageThemeKey(normalizePageThemeKey(event.target.value));
+  };
+
+  const handlePageThemeSave = () => {
+    // Browsing is intentionally local. Persist only this explicit choice so opening Page settings
+    // and experimenting with patterns cannot unexpectedly alter the driver or PTZ page background.
+    savePageSettings((current) => ({
+      ...(current ?? {}),
+      backgroundTheme: previewPageThemeKey,
+    }));
+    trackAnalyticsEvent('settings_change', {
+      setting: 'backgroundTheme',
+      value: previewPageThemeKey,
+    });
+  };
+
   const handleVideoFilterChange = (event) => {
     const nextFilter = normalizeVideoFilter(event.target.value);
 
@@ -238,6 +302,73 @@ export default function SettingsPanel() {
               stretched column. Audio spans both columns because volume sliders need extra width
               for comfortable pointer control. */}
           <div className="grid gap-1.5 lg:grid-cols-2">
+            <CardFrame
+              title="Background theme"
+              className="lg:col-span-2"
+              bodyClassName="space-y-1.5 p-1 text-sm"
+            >
+              {/* Back/Next provide fast visual browsing, while the dropdown remains the direct
+                  route to a known theme in a growing catalog. Neither control saves implicitly. */}
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5">
+                <button
+                  type="button"
+                  className="button-dark min-w-16 text-sm"
+                  onClick={() => movePageThemePreview(-1)}
+                >
+                  Back
+                </button>
+                <select
+                  aria-label="Preview background theme"
+                  value={previewPageThemeKey}
+                  onChange={handlePageThemeSelect}
+                  className="field-input min-w-0 px-1 py-0.5 text-sm"
+                >
+                  {PAGE_THEME_OPTIONS.map((theme) => (
+                    <option key={theme.key} value={theme.key}>
+                      {theme.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="button-dark min-w-16 text-sm"
+                  onClick={() => movePageThemePreview(1)}
+                >
+                  Next
+                </button>
+              </div>
+
+              {/* This miniature layout contains both a full-height vertical seam and horizontal
+                  seams between stacked cards. It exercises the exact gap directions the artwork
+                  must serve on the driver and PTZ pages. */}
+              <div
+                className={`page-theme-preview grid h-32 grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(0,0.85fr)] grid-rows-2 gap-0.5 overflow-hidden rounded border border-neutral-500/70 p-0.5 ${getPageThemeClass(previewPageThemeKey)}`}
+              >
+                <ThemePreviewCard title="Video" className="row-span-2" />
+                <ThemePreviewCard title="Controls" />
+                <ThemePreviewCard title="Queue" />
+                <ThemePreviewCard title="Chat" className="col-span-2" />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <p className="min-w-0 text-xs text-white">
+                  Previewing <span className="font-semibold">{previewPageTheme.label}</span>
+                  {hasUnsavedPageTheme ? (
+                    <span className="text-slate-300">; saved theme is {savedPageTheme.label}.</span>
+                  ) : (
+                    <span className="text-slate-300">; this is your saved theme.</span>
+                  )}
+                </p>
+                <button
+                  type="button"
+                  className="button-dark min-w-24 text-sm disabled:cursor-default disabled:opacity-45"
+                  disabled={!hasUnsavedPageTheme}
+                  onClick={handlePageThemeSave}
+                >
+                  Save theme
+                </button>
+              </div>
+            </CardFrame>
             <CardFrame title="HUD" bodyClassName="space-y-1 p-1 text-sm">
               <SettingRow className="grid-cols-[auto_minmax(0,1fr)] max-[420px]:grid-cols-[auto_minmax(0,1fr)]">
                 <input

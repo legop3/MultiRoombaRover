@@ -6,7 +6,8 @@ import CardFrame from '../components/CardFrame/index.jsx';
 import SocketConnectionPill from '../components/SocketConnectionPill/index.jsx';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 import useUserIdentitySync from '../hooks/useUserIdentitySync.js';
-import { pageBackgroundClass } from '../themeFlags.js';
+import { useSettingsNamespace } from '../settings/index.js';
+import { DEFAULT_PAGE_THEME_KEY, getPageThemeClass } from '../themes/index.js';
 import IdentityDatabasePanel from './IdentityDatabasePanel.jsx';
 
 function isLockdownAdminRole(role) {
@@ -17,6 +18,12 @@ export default function DatabaseAdminApp() {
   useUserIdentitySync({ identitySurface: 'passive' });
   const role = useSessionSelector((state) => state.session?.role || null);
   const connected = useSessionSelector((state) => state.connected);
+  const { value: pageSettings } = useSettingsNamespace('page', {
+    backgroundTheme: DEFAULT_PAGE_THEME_KEY,
+  });
+  // Database cards use the same narrow seams as the driver page, so honoring the shared browser
+  // preference here keeps the existing route-level background behavior while making it dynamic.
+  const pageBackgroundClass = getPageThemeClass(pageSettings?.backgroundTheme);
 
   const isLockdownAdmin = isLockdownAdminRole(role);
   const isLoggedInAdmin = role === 'admin' || isLockdownAdmin;

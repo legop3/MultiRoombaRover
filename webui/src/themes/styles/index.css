@@ -1,0 +1,8 @@
+/* Page Theme Stylesheet Entry
+ * Purpose: Loads theme surfaces and artwork as one explicit bundle from main.jsx.
+ * Scope: Import order keeps shared behavior first, followed by the two artwork families.
+ */
+
+@import './base.css';
+@import './pride.css';
+@import './patterns.css';
