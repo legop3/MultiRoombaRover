@@ -3,6 +3,7 @@ package roverd
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	hostStatsInterval = 5 * time.Second
+	hostStatsInterval = 1 * time.Second
 	rootFilesystem    = "/"
 )
 
@@ -63,7 +64,24 @@ type WiFiStats struct {
 	TXBytes       *uint64  `json:"txBytes,omitempty"`
 	RXPackets     *uint64  `json:"rxPackets,omitempty"`
 	TXPackets     *uint64  `json:"txPackets,omitempty"`
+	DownloadMbps  *float64 `json:"downloadMbps,omitempty"`
+	UploadMbps    *float64 `json:"uploadMbps,omitempty"`
 	InactiveMs    *int     `json:"inactiveMs,omitempty"`
+
+	// networkSampledAt records the instant associated with the kernel byte
+	// counters. Keeping it out of JSON lets the websocket loop calculate rates
+	// with monotonic Go timestamps without expanding the browser contract with
+	// an implementation-only value.
+	networkSampledAt time.Time
+}
+
+// networkRateSample is scoped to one rover websocket connection. A new
+// connection intentionally starts a new baseline so counters from an old boot
+// or network interface lifetime can never create an artificial traffic spike.
+type networkRateSample struct {
+	rxBytes   uint64
+	txBytes   uint64
+	sampledAt time.Time
 }
 
 // CollectHostStats gathers every source independently so one missing kernel
@@ -370,12 +388,81 @@ func collectWiFiStats(ctx context.Context) (*WiFiStats, error) {
 		return nil, err
 	}
 
-	// The interface is used only to ask iw about the active connection. It is
-	// not copied into WiFiStats because the UI does not need to expose it.
-	if err := enrichWiFiWithIW(ctx, iface, stats); err != nil {
-		return stats, err
+	// The interface is used only for local collection. It is not copied into
+	// WiFiStats because the UI does not need to expose Linux device names.
+	iwErr := enrichWiFiWithIW(ctx, iface, stats)
+
+	// Read the kernel counters after iw because iw also provides cumulative
+	// station counters. The kernel interface values deliberately win: they are
+	// the host-traffic source used for both the cumulative display and Mbps math.
+	// Link capacity still comes independently from iw's bitrate fields.
+	counterErr := enrichWiFiWithNetworkCounters(iface, stats)
+	return stats, errors.Join(counterErr, iwErr)
+}
+
+func enrichWiFiWithNetworkCounters(iface string, stats *WiFiStats) error {
+	basePath := "/sys/class/net/" + iface + "/statistics/"
+	rxBytes, err := readUintFile(basePath + "rx_bytes")
+	if err != nil {
+		return fmt.Errorf("read %s receive bytes: %w", iface, err)
 	}
-	return stats, nil
+	txBytes, err := readUintFile(basePath + "tx_bytes")
+	if err != nil {
+		return fmt.Errorf("read %s transmit bytes: %w", iface, err)
+	}
+
+	stats.RXBytes = &rxBytes
+	stats.TXBytes = &txBytes
+	// Capture the timestamp immediately beside the counter reads so unrelated
+	// host-stat collection latency cannot distort the elapsed-time divisor.
+	stats.networkSampledAt = time.Now()
+	return nil
+}
+
+func readUintFile(path string) (uint64, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseUint(strings.TrimSpace(string(raw)), 10, 64)
+}
+
+func applyNetworkThroughput(stats *WiFiStats, previous *networkRateSample) *networkRateSample {
+	if stats == nil || stats.RXBytes == nil || stats.TXBytes == nil || stats.networkSampledAt.IsZero() {
+		// Do not discard the last valid baseline during a temporary read failure.
+		// The next successful calculation then covers the full elapsed interval and
+		// remains an accurate average for all traffic transferred during the gap.
+		return previous
+	}
+
+	current := &networkRateSample{
+		rxBytes:   *stats.RXBytes,
+		txBytes:   *stats.TXBytes,
+		sampledAt: stats.networkSampledAt,
+	}
+	if previous == nil {
+		return current
+	}
+
+	elapsed := current.sampledAt.Sub(previous.sampledAt).Seconds()
+	// Linux counters can return to zero after an interface reset. Re-baselining
+	// on any decrease prevents unsigned underflow from becoming a huge false
+	// throughput spike in the host-stat card.
+	if elapsed <= 0 || current.rxBytes < previous.rxBytes || current.txBytes < previous.txBytes {
+		return current
+	}
+
+	downloadMbps := bytesToMbps(current.rxBytes-previous.rxBytes, elapsed)
+	uploadMbps := bytesToMbps(current.txBytes-previous.txBytes, elapsed)
+	stats.DownloadMbps = &downloadMbps
+	stats.UploadMbps = &uploadMbps
+	return current
+}
+
+func bytesToMbps(byteDelta uint64, elapsedSeconds float64) float64 {
+	// Mbps uses decimal megabits, matching network equipment and link-rate
+	// conventions: eight bits per byte and 1,000,000 bits per megabit.
+	return roundOneDecimal((float64(byteDelta) * 8) / elapsedSeconds / 1_000_000)
 }
 
 func readWirelessStats() (string, *WiFiStats, error) {
