@@ -35,6 +35,8 @@ const PLACEHOLDER_STATS = Object.freeze({
     qualityMax: 70,
     rxBitrateMbit: 72.2,
     txBitrateMbit: 58.5,
+    downloadMbps: 12.4,
+    uploadMbps: 3.7,
     rxBytes: 12400000,
     txBytes: 2300000,
     rxPackets: 12640,
@@ -304,14 +306,22 @@ export default function PiHostStatsCard() {
 
         <section className="min-w-0 space-y-0.5">
           <ColumnTitle label="WiFi" />
-          <div className="surface grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-1">
-            <div className="min-w-0">
-              <div className="truncate text-base leading-tight text-slate-100">SSID: {valueOrDash(wifi.ssidSample)}</div>
-              <div className="text-xs text-slate-400">{formatFrequency(wifi.frequencyMhz)}</div>
+          <div className="grid min-w-0 grid-cols-2 gap-0.5">
+            <div className="surface grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-1">
+              <div className="min-w-0">
+                <div className="truncate text-base leading-tight text-slate-100">SSID: {valueOrDash(wifi.ssidSample)}</div>
+                <div className="text-xs text-slate-400">{formatFrequency(wifi.frequencyMhz)}</div>
+              </div>
+              <div className="text-right">
+                <div className={`font-semibold leading-tight ${toneTextClass(currentSignalTone)}`}>{formatDbm(wifi.signalDbm)}</div>
+                <SignalBars bars={bars} tone={currentSignalTone} />
+              </div>
             </div>
-            <div className="text-right">
-              <div className={`font-semibold leading-tight ${toneTextClass(currentSignalTone)}`}>{formatDbm(wifi.signalDbm)}</div>
-              <SignalBars bars={bars} tone={currentSignalTone} />
+            <div className="surface flex min-w-0 flex-col justify-center gap-0.5 text-xs">
+              {/* Actual traffic belongs beside connection identity and signal,
+                  while negotiated link rates remain in their existing rows. */}
+              <ThroughputRow label="Download" value={formatBitrate(wifi.downloadMbps)} />
+              <ThroughputRow label="Upload" value={formatBitrate(wifi.uploadMbps)} />
             </div>
           </div>
           <BarRow
@@ -343,6 +353,15 @@ function StatRow({ label, value, compact = false, valueClassName = 'text-slate-1
     <div className={`surface flex min-w-0 items-center justify-between gap-1 ${compact ? 'text-xs' : ''}`}>
       <span className="shrink-0 text-slate-400">{label}</span>
       <span className={`min-w-0 truncate text-right ${valueClassName}`}>{value}</span>
+    </div>
+  );
+}
+
+function ThroughputRow({ label, value }) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-1">
+      <span className="shrink-0 text-slate-400">{label}</span>
+      <span className="min-w-0 truncate text-right text-slate-100">{value}</span>
     </div>
   );
 }

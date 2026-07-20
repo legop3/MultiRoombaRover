@@ -531,14 +531,21 @@ func (c *WSClient) forwardEvents(ctx context.Context, conn *websocket.Conn) {
 }
 
 func (c *WSClient) forwardHostStats(ctx context.Context, conn *websocket.Conn) {
+	var previousNetworkSample *networkRateSample
+
 	send := func() bool {
 		// Host stats are collected on demand so each outbound message describes
 		// the current Pi state. Collection failures are encoded into the stats
 		// payload, which keeps this telemetry path from closing the rover socket.
+		stats := CollectHostStats(ctx)
+		// Throughput is derived here because this loop owns the ordered, periodic
+		// samples for one connection. CollectHostStats stays independent, while a
+		// reconnect automatically receives a clean counter baseline.
+		previousNetworkSample = applyNetworkThroughput(stats.WiFi, previousNetworkSample)
 		msg := hostStatsMessage{
 			Type:      "hostStats",
 			Timestamp: time.Now().UnixMilli(),
-			Stats:     CollectHostStats(ctx),
+			Stats:     stats,
 		}
 		if err := writeJSON(ctx, conn, msg); err != nil {
 			c.log.Printf("host stats send failed: %v", err)
