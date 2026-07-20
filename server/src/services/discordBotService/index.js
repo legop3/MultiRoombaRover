@@ -56,6 +56,8 @@ const { createChannelIO } = require('./channelIO');
 const { createCommandHandlers } = require('../operatorCommandService');
 const { createDiscordTransportHandlers, createDiscordCommandRequest } = require('./commandAdapter');
 const { createIntegrations } = require('./integrations');
+const { createFleetDailyReports } = require('./fleetDailyReports');
+const fleetReportService = require('../fleetReportService');
 const { registerPreferredDeliveryProvider } = require('../replayDeliveryService');
 const {
   DEFAULT_ALLOWED_MENTIONS,
@@ -347,6 +349,17 @@ client.on('messageCreate', async (message) => {
 client.once('ready', () => {
   logger.info('Discord bot logged in', { tag: client.user?.tag });
   presence.schedulePresenceRotation();
+  // Discord is only a delivery consumer. Starting its scheduler after the bot
+  // is ready avoids failed sends during login while the collector continues to
+  // operate independently of Discord availability.
+  createFleetDailyReports({
+    logger,
+    discordConfig,
+    fleetConfig: config.fleetReports || {},
+    fleetReportService,
+    roverManager,
+    sendToChannel: channelIO.sendToChannel,
+  }).start();
 });
 
 client.login(discordConfig.token).catch((err) => {

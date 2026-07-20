@@ -16,6 +16,7 @@
     "home-assistant-js-websocket": "^3.1.2",
     "js-yaml": "^4.1.1",
     "kokoro-js": "^1.2.1",
+    "luxon": "^3.7.2",
     "morgan": "^1.10.0",
     "obscenity": "^0.4.6",
     "ollama": "^0.6.3",

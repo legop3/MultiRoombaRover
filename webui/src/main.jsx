@@ -1,6 +1,6 @@
 // WebUI Bootstrap Entry
 // Purpose: Boots the React application and mounts global providers/router roots. Scope: Defines top-level route wiring and root render lifecycle for the browser app.
-import { StrictMode } from 'react'
+import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './index.css'
@@ -22,6 +22,11 @@ import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
 import SessionDocumentTitle from './components/SessionDocumentTitle/index.jsx'
 import PtzAppRoot from './ptz/PtzAppRoot.jsx'
+
+// The reporting route includes the charting and CSV libraries. Loading that
+// bundle only when `/reports` is visited keeps ordinary rover-control sessions
+// from paying the cost of the in-depth diagnostics interface.
+const FleetReportsApp = lazy(() => import('./reports/FleetReportsApp.jsx'))
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -48,6 +53,14 @@ createRoot(document.getElementById('root')).render(
                     of a local overlay-open state owned by the driver page.
                   */}
                   <Route path="/ptz" element={<PtzAppRoot />} />
+                  <Route
+                    path="/reports"
+                    element={(
+                      <Suspense fallback={<div className="min-h-screen bg-neutral-950 p-1 text-sm text-slate-300">Loading fleet reports…</div>}>
+                        <FleetReportsApp />
+                      </Suspense>
+                    )}
+                  />
                 </Routes>
               </BrowserRouter>
             </ChatProvider>

@@ -52,6 +52,7 @@ function buildFeatureFlags(config = loadConfig()) {
   const interInstanceConfig = config.interInstance || {};
   const ptzCameraConfig = config.ptzCamera || {};
   const discordConfig = config.discord || {};
+  const fleetReportsConfig = config.fleetReports || {};
   const homeAssistant = Boolean(
     asBoolean(homeAssistantConfig.enabled) &&
       asTrimmedString(homeAssistantConfig.url) &&
@@ -100,6 +101,11 @@ function buildFeatureFlags(config = loadConfig()) {
       to run without the integration.
     */
     discord: Boolean(asBoolean(discordConfig.enabled) && asTrimmedString(discordConfig.token)),
+    // Fleet reports are deliberately controlled by one explicit server switch.
+    // Storage contents, Discord availability, or historical database files must
+    // never cause the reporting UI to appear on an installation that has not
+    // opted into the collector.
+    fleetReports: asBoolean(fleetReportsConfig.enabled),
   };
 }
 

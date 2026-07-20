@@ -227,3 +227,23 @@ socials:
       url: "https://ko-fi.com/your-handle"
       icon: "FaCoffee"
       color: "#29ABE0"
+# Optional passive fleet telemetry, history, and daily reporting. The collector
+# observes existing server events and rover sensor frames but never participates
+# in command, assignment, docking, or safety decisions.
+fleetReports:
+  enabled: false
+  retention:
+    # Zero retains evidence indefinitely. Set explicit day counts on servers
+    # that prefer bounded storage over complete long-term history.
+    detailedDays: 0
+    minuteSamplesDays: 0
+  battery:
+    enabled: true
+    maximumIntegrationGapSeconds: 5
+    minimumCapacityTestDepthPercent: 60
+  discord:
+    enabled: true
+    sendAt: "08:00"
+    timezone: "America/New_York"
+  privacy:
+    retainChatBodies: true

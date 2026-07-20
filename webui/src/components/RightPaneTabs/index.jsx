@@ -28,6 +28,7 @@ import { useSettingsNamespace } from '../../settings/index.js';
 import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
 import BarcodeGamesPanel from '../BarcodeGamesPanel/index.jsx';
 import OdometerPanel from '../OdometerPanel/index.jsx';
+import FleetReportsCard from '../FleetReportsCard/index.jsx';
 import LiftCard from '../LiftCard/index.jsx';
 import NeatoCard from '../NeatoCard/index.jsx';
 import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
@@ -435,6 +436,9 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
               <OdometerPanel />
               <ButtonBoxPanel />
               <KinectPanel />
+              {/* The compact report is a terminal summary for Activities; the
+                  component itself disappears when the server feature is off. */}
+              <FleetReportsCard />
             </div>
           </TabPanel>
 

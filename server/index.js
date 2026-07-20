@@ -49,6 +49,10 @@ require('./src/services/kinectService');
 require('./src/services/balanceBoardService');
 require('./src/services/sessionService');
 require('./src/services/batteryManager');
+// Fleet reporting starts after the rover and battery services so its passive
+// subscriptions see fully decoded state without becoming an initialization
+// dependency of either control path.
+require('./src/services/fleetReportService');
 require('./src/services/replayEngineV2');
 // Replay delivery is a core service. It must subscribe before the optional
 // Discord feature so web requests always have a local delivery path.

@@ -9,7 +9,7 @@ const { renderIndexHtml, renderOgImage } = require('../embedService');
   entry point. Including /ptz here lets direct loads and browser refreshes
   receive the same rendered index document as navigation from the driver page.
 */
-app.get(['/', '/spectate', '/mini', '/display', '/scanner', '/database', '/ptz'], async (req, res) => {
+app.get(['/', '/spectate', '/mini', '/display', '/scanner', '/database', '/ptz', '/reports'], async (req, res) => {
   try {
     const html = await renderIndexHtml(req);
     res.type('html').send(html);

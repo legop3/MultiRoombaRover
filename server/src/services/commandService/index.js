@@ -2,6 +2,7 @@
 // Purpose: Defines the command Service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const { v4: uuidv4 } = require('uuid');
+const EventEmitter = require('events');
 const io = require('../../globals/io');
 const roverManager = require('../roverManager');
 const { isAdmin, isLockdownAdmin } = require('../roleService');
@@ -10,6 +11,12 @@ const logger = require('../../globals/logger').child('commandService');
 const { isHeadlightBlocked } = require('../../rewards/definitions/darkness');
 const homeAssistantService = require('../homeAssistantService');
 const overcurrentProtectionService = require('../overcurrentProtectionService');
+
+// Command observations are intentionally separate from the global event bus.
+// Drive and motor commands can run at control-loop frequency, and publishing
+// every packet onto the logging event bus would manufacture noise. Optional
+// observers can aggregate this emitter without changing command delivery.
+const commandEvents = new EventEmitter();
 
 const pendingCommands = new Map(); // id -> { roverId }
 const lastDriveActivity = new Map(); // roverId -> { ts, socketId, direction, speed, isAdmin }
@@ -130,6 +137,16 @@ function handleAck(msg) {
     status: msg.status || 'ok',
     error: msg.error,
   });
+  commandEvents.emit('observation', {
+    ts: Date.now(),
+    roverId: pending.roverId,
+    type: pending.type,
+    commandId: msg.id,
+    outcome: msg.error ? 'failed' : 'acknowledged',
+    latencyMs: Date.now() - pending.ts,
+    status: msg.status || 'ok',
+    error: msg.error || null,
+  });
 }
 
 function issueUpdateToAllRovers() {
@@ -237,6 +254,7 @@ module.exports = {
   handleAck,
   getRecentDriveActivity,
   setDriveCooldown,
+  commandEvents,
 };
 
 io.on('connection', (socket) => {
@@ -331,6 +349,17 @@ io.on('connection', (socket) => {
         });
       }
       const id = issueCommand(roverId, { type, ...payload });
+      commandEvents.emit('observation', {
+        ts: Date.now(),
+        roverId: String(roverId),
+        type,
+        commandId: id,
+        outcome: 'issued',
+        socketId: socket.id,
+        // Payloads are omitted deliberately: raw OI, TTS, and maintenance
+        // commands can carry arbitrary content. Their structured type/outcome
+        // supplies analytics without accidentally persisting secret material.
+      });
       logger.info('Queued command', socket.id, roverId, type);
       if (shouldRecordTurnActivity(type, payload)) {
         try {
@@ -343,6 +372,14 @@ io.on('connection', (socket) => {
       reply({ id });
     } catch (err) {
       logger.warn('Command rejected', socket.id, err.message);
+      commandEvents.emit('observation', {
+        ts: Date.now(),
+        roverId: roverId ? String(roverId) : null,
+        type: type || 'unknown',
+        outcome: 'rejected',
+        socketId: socket.id,
+        error: err.message,
+      });
       reply({ error: err.message });
     }
   }
