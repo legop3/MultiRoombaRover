@@ -328,6 +328,13 @@ export default function MiniSummaryContent() {
                         snapshotFeed={null}
                         audioSessionInfo={isActive ? activeAudio : null}
                         forceMute={!isActive}
+                        /*
+                          /mini intentionally keeps every carousel stream warm so
+                          rotation never waits for WHEP negotiation. Opting out
+                          preserves that behavior despite the shared player's
+                          normal offscreen-video bandwidth gate.
+                        */
+                        pauseVideoWhenHidden={false}
                         label={rover.name || rover.id}
                         sensors={frames[rover.id]?.sensors || null}
                       />
@@ -338,6 +345,8 @@ export default function MiniSummaryContent() {
                         snapshotFeed={snapshotFeeds[rover.id] || null}
                         audioSessionInfo={isActive ? activeAudio : null}
                         forceMute={!isActive}
+                        /* Keep /mini snapshot rotation behavior identical to its live-video path. */
+                        pauseVideoWhenHidden={false}
                         label={rover.name || rover.id}
                         sensors={frames[rover.id]?.sensors || null}
                       />

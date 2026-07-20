@@ -48,6 +48,77 @@ function hasRoverAudioCapture(rover) {
   return Boolean(rover?.media?.audioCapture?.enabled && rover?.media?.audioCapture?.publishUrl);
 }
 
+function useVideoVisibilityGate(enabled) {
+  const containerRef = useRef(null);
+  const [observedVisibility, setObservedVisibility] = useState(false);
+
+  useEffect(() => {
+    /*
+      Some surfaces, notably /mini, intentionally keep video players warm while
+      they are visually hidden. The explicit opt-out must bypass every part of
+      this gate so those existing reconnect and rotation semantics do not change.
+    */
+    if (!enabled) {
+      return undefined;
+    }
+
+    const container = containerRef.current;
+    if (!container || typeof window === 'undefined' || typeof document === 'undefined') {
+      return undefined;
+    }
+
+    let intersectsViewport = true;
+    const publishVisibility = () => {
+      /*
+        IntersectionObserver covers media scrolled or laid out outside the
+        viewport, while the Page Visibility API covers an otherwise intersecting
+        player in a background browser tab. Video should run only when both are
+        true; dedicated rover audio is deliberately not connected to this state.
+      */
+      setObservedVisibility(intersectsViewport && document.visibilityState !== 'hidden');
+    };
+    const handlePageVisibilityChange = () => publishVisibility();
+
+    document.addEventListener('visibilitychange', handlePageVisibilityChange);
+
+    if (typeof IntersectionObserver !== 'function') {
+      /*
+        Page visibility is still a useful safe fallback on older browsers. We
+        cannot reliably infer scroll clipping without IntersectionObserver, so
+        the video remains active while the page itself is visible.
+      */
+      publishVisibility();
+      return () => document.removeEventListener('visibilitychange', handlePageVisibilityChange);
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        intersectsViewport = Boolean(entry?.isIntersecting);
+        publishVisibility();
+      },
+      {
+        // Match room-camera behavior: do not pre-connect video before it reaches the viewport.
+        root: null,
+        rootMargin: '0px',
+        threshold: 0,
+      },
+    );
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', handlePageVisibilityChange);
+    };
+  }, [enabled]);
+
+  /*
+    Derive the opt-out directly instead of synchronizing it through an effect.
+    That makes disabling the gate immediate and avoids an unnecessary render for
+    /mini, whose behavior must remain permanently enabled.
+  */
+  return { containerRef, isVisible: enabled ? observedVisibility : true };
+}
+
 export default function RoverMediaPlayer({
   roverId = null,
   sessionInfo = null,
@@ -57,6 +128,7 @@ export default function RoverMediaPlayer({
   label,
   forceMute = false,
   sensors,
+  pauseVideoWhenHidden = true,
 }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const effectiveRoverId = roverId ?? assignedRoverId;
@@ -67,28 +139,44 @@ export default function RoverMediaPlayer({
       : null,
   );
   const hasAudio = hasRoverAudioCapture(rosterEntry);
+  const { containerRef, isVisible: isVideoVisible } = useVideoVisibilityGate(pauseVideoWhenHidden);
   const autoVideoEnabled = videoMode ? videoMode === 'whep' : true;
   const autoAudioEnabled = hasAudio;
-  const autoEntries = useMemo(() => {
-    if (!effectiveRoverId) return [];
-    return [
-      ...(autoVideoEnabled ? [{ type: 'rover', id: effectiveRoverId, key: effectiveRoverId }] : []),
-      ...(autoAudioEnabled
+  const autoVideoEntries = useMemo(
+    () =>
+      effectiveRoverId && autoVideoEnabled
+        ? [{ type: 'rover', id: effectiveRoverId, key: effectiveRoverId }]
+        : [],
+    [effectiveRoverId, autoVideoEnabled],
+  );
+  const autoAudioEntries = useMemo(
+    () =>
+      effectiveRoverId && autoAudioEnabled
         ? [{ type: 'rover', id: `${effectiveRoverId}-audio`, key: `${effectiveRoverId}-audio` }]
-        : []),
-    ];
-  }, [effectiveRoverId, autoVideoEnabled, autoAudioEnabled]);
-  const autoSources = useVideoRequests(autoEntries, {
-    enabled: Boolean(effectiveRoverId && (autoVideoEnabled || autoAudioEnabled)),
+        : [],
+    [effectiveRoverId, autoAudioEnabled],
+  );
+  /*
+    Video and audio requests must be separate here. A single combined request
+    list would discard the dedicated audio session whenever visibility disables
+    video, even though the rover publishes audio as an independent stream.
+  */
+  const autoVideoSources = useVideoRequests(autoVideoEntries, {
+    enabled: Boolean(effectiveRoverId && autoVideoEnabled && isVideoVisible),
+    version: mode,
+  });
+  const autoAudioSources = useVideoRequests(autoAudioEntries, {
+    enabled: Boolean(effectiveRoverId && autoAudioEnabled),
     version: mode,
   });
   const resolvedSessionInfo =
-    sessionInfo ?? (effectiveRoverId ? autoSources[effectiveRoverId] || null : null);
+    sessionInfo ?? (effectiveRoverId ? autoVideoSources[effectiveRoverId] || null : null);
   const resolvedAudioSessionInfo =
     audioSessionInfo ??
-    (effectiveRoverId && hasAudio ? autoSources[`${effectiveRoverId}-audio`] || null : null);
+    (effectiveRoverId && hasAudio ? autoAudioSources[`${effectiveRoverId}-audio`] || null : null);
   const autoSnapshots = useRoverSnapshots(effectiveRoverId ? [effectiveRoverId] : [], {
-    enabled: Boolean(effectiveRoverId && !resolvedSessionInfo?.url),
+    /* Snapshot delivery is video traffic too, so it follows the same visibility gate as WHEP. */
+    enabled: Boolean(effectiveRoverId && isVideoVisible && !resolvedSessionInfo?.url),
     version: mode,
   });
   const resolvedSnapshotFeed =
@@ -317,7 +405,7 @@ export default function RoverMediaPlayer({
   }, [usingSnapshot]);
 
   useEffect(() => {
-    if (usingSnapshot || !resolvedSessionInfo?.url || !videoRef.current) {
+    if (!isVideoVisible || usingSnapshot || !resolvedSessionInfo?.url || !videoRef.current) {
       return undefined;
     }
     let active = true;
@@ -381,6 +469,7 @@ export default function RoverMediaPlayer({
     };
   }, [
     usingSnapshot,
+    isVideoVisible,
     resolvedSessionInfo?.url,
     resolvedSessionInfo?.token,
     restartToken,
@@ -611,7 +700,7 @@ export default function RoverMediaPlayer({
     status !== 'playing';
 
   return (
-    <>
+    <div ref={containerRef} className="relative h-full w-full">
       {usingSnapshot ? (
         resolvedSnapshotFeed?.objectUrl ? (
           <img
@@ -651,6 +740,6 @@ export default function RoverMediaPlayer({
           {renderedAudioStatus ? <span>Audio: {renderedAudioStatus}</span> : null}
         </div>
       </div>
-    </>
+    </div>
   );
 }

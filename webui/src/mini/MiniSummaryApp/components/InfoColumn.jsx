@@ -100,6 +100,8 @@ export default function InfoColumn({
                       videoMode={videoMode}
                       snapshotFeed={snapshotFeed}
                       audioSessionInfo={null}
+                      /* All /mini previews retain their existing always-mounted media behavior. */
+                      pauseVideoWhenHidden={false}
                       label={rover.name || rover.id}
                       sensors={frame?.sensors || null}
                     />
