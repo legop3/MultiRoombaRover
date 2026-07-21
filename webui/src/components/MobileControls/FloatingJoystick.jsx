@@ -3,6 +3,7 @@
 // Scope: Owns pointer tracking, fixed overlay positioning, and active 3x3 drive-zone feedback.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 const PAD_MARGIN = 12;
 const CELL_COUNT = 3;
@@ -146,6 +147,10 @@ export default function FloatingJoystick({
       const cell = cellFromPointer(currentPad, event.clientX, event.clientY);
       if (activeCellIdRef.current !== cell.id) {
         activeCellIdRef.current = cell.id;
+        // Pulse only when the thumb crosses a real 3x3 cell boundary so
+        // continuous pointermove traffic cannot buzz constantly. The shared
+        // pointerup listener provides a Safari-compatible gesture-end pulse.
+        triggerTouchHaptic('drive');
         onCellChange?.(cell);
       }
       setActivePad({

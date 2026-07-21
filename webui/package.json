@@ -19,7 +19,8 @@
     "react-joystick-component": "^6.2.1",
     "react-router-dom": "^7.9.6",
     "three": "^0.184.0",
-    "uplot": "^1.6.32"
+    "uplot": "^1.6.32",
+    "web-haptics": "latest"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

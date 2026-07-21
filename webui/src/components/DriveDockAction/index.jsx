@@ -9,6 +9,7 @@ import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import { deriveDriveDockStateFromTelemetry } from './driveDockState.js';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
+import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 function StatusRow({ value, tone = 'neutral' }) {
   const toneClasses =
@@ -126,6 +127,7 @@ export default function DriveDockAction({
 
   const handleReturnToDrive = async () => {
     if (!roverId || pending) return;
+    if (isMobile) triggerTouchHaptic('button');
     setPending('drive');
     trackAnalyticsEvent('drive_return', { roverId, source: 'drive_dock_action' });
     try {
@@ -143,6 +145,7 @@ export default function DriveDockAction({
 
   const handleStartDrive = async () => {
     if (!roverId || pending) return;
+    if (isMobile) triggerTouchHaptic('button');
     setConfirmOpen(false);
     setShowModal(false);
     setPending('drive');
@@ -162,6 +165,7 @@ export default function DriveDockAction({
 
   const handleConfirmDock = async () => {
     if (!roverId || pending) return;
+    if (isMobile) triggerTouchHaptic('button');
     setPending('dock');
     trackAnalyticsEvent('dock_assist_start', { roverId });
     try {
@@ -179,6 +183,7 @@ export default function DriveDockAction({
 
   const handleOpenDock = () => {
     if (dockDisabled) return;
+    if (isMobile) triggerTouchHaptic('button');
     if (manualAssistActive) {
       dockAssist.exitAssist();
       trackAnalyticsEvent('dock_assist_exit', { roverId });

@@ -2,6 +2,9 @@
 // Purpose: Provides the mobile-only camera tilt slider that supports simultaneous two-finger mobile driving.
 // Scope: Owns pointer tracking and visual slider state for the compact vertical mobile camera control.
 import { useCallback, useMemo, useRef } from 'react';
+import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
+
+const HAPTIC_MIN_ANGLE_DELTA_DEGREES = 2;
 
 function clampCameraAngle(value, min, max) {
   if (!Number.isFinite(value)) return min;
@@ -23,6 +26,7 @@ export default function VerticalCameraTilt({
 }) {
   const trackRef = useRef(null);
   const pointerIdRef = useRef(null);
+  const lastHapticValueRef = useRef(null);
 
   const valuePercent = useMemo(() => {
     if (max === min) return 50;
@@ -47,6 +51,17 @@ export default function VerticalCameraTilt({
   const sendPointerValue = useCallback(
     (event) => {
       const next = valueFromPointer(event);
+
+      /*
+        Camera commands must retain the configured 0.5 or 0.1 degree precision,
+        but physical feedback does not need to mirror every servo step. Require
+        two degrees of accumulated travel so the ticks describe slider position
+        without allowing pointer event frequency to control their cadence.
+      */
+      if (Math.abs(next - lastHapticValueRef.current) >= HAPTIC_MIN_ANGLE_DELTA_DEGREES) {
+        triggerTouchHaptic('camera');
+        lastHapticValueRef.current = next;
+      }
       onChange?.(next);
     },
     [onChange, valueFromPointer],
@@ -65,10 +80,13 @@ export default function VerticalCameraTilt({
       */
       event.preventDefault();
       pointerIdRef.current = event.pointerId;
+      // Seed the slider value so its first position update is not mistaken for
+      // two degrees of travel before the finger has actually moved that far.
+      lastHapticValueRef.current = value;
       trackRef.current?.setPointerCapture?.(event.pointerId);
       sendPointerValue(event);
     },
-    [disabled, sendPointerValue],
+    [disabled, sendPointerValue, value],
   );
 
   const handlePointerMove = useCallback(

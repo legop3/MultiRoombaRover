@@ -11,6 +11,7 @@ import {
 } from '../../controls/inputs/driveIntent.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
+import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 import FloatingJoystick from './FloatingJoystick.jsx';
 import {
   DRIVE_PAD_REPEAT_MS,
@@ -134,8 +135,12 @@ export default function ControlPadPanel({ compact = false, disabled = false }) {
 
   const handleSpeedModeChange = useCallback(
     (nextMode) => {
+      if (nextMode === speedModeRef.current) return;
       setSpeedMode(nextMode);
       speedModeRef.current = nextMode;
+      // Confirm the accepted mode transition here so tapping an already-active
+      // mode cannot produce feedback for a state change that did not happen.
+      triggerTouchHaptic('button');
       setCameraPrecisionMode(nextMode === 'precision');
       if (activeCellRef.current) {
         sendDriveCell(activeCellRef.current, 'speed', nextMode);

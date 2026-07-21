@@ -2,6 +2,7 @@
 // Purpose: Renders a direct press target for rover GPIO-backed toggles such as the headlight and laser.
 // Scope: Owns optimistic button state and touch/click de-duplication while callers provide device labels and actions.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 function isBoolean(value) {
   return typeof value === 'boolean';
@@ -53,6 +54,9 @@ export default function GPIOToggleControl({
     if (disabled) return;
     const next = hasState ? !displayOn : true;
     setOptimistic(next);
+    // The optimistic state transition is the control's accepted action, so its
+    // feedback belongs here rather than on an unrelated global pointer event.
+    triggerTouchHaptic('button');
     onToggle?.(next);
   };
 

@@ -25,6 +25,7 @@ import { isFeatureEnabled } from '../../lib/features.js';
 import { trackAnalyticsEvent } from '../../analytics/index.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { DEFAULT_PAGE_THEME_KEY, getPageThemeClass } from '../../themes/index.js';
+import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 const PTZ_DEFAULT_COLOR = '#38bdf8';
 
@@ -157,6 +158,7 @@ function PtzLightingControls({ ptz, disabled = false }) {
 
   const cycleIr = async () => {
     if (disabled) return;
+    triggerTouchHaptic('button');
     setBusy('ir');
     try {
       await ptzIr({ state: nextIrMode(irMode) });
@@ -208,6 +210,7 @@ function PtzMobileZoomButtons({ disabled = false }) {
       */
       event.preventDefault();
       if (disabled) return;
+      triggerTouchHaptic('button');
       event.currentTarget.setPointerCapture?.(event.pointerId);
       setCameraAxisIntent(direction);
     },

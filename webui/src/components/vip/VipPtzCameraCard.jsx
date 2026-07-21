@@ -15,6 +15,7 @@ import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 import { isFeatureEnabled } from '../../lib/features.js';
+import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 const PTZ_CAMERA_ID = 'ptz-camera';
 
@@ -186,6 +187,7 @@ function PtzLightingControls({ ptz, disabled = false }) {
 
   const cycleIr = async () => {
     if (disabled) return;
+    triggerTouchHaptic('button');
     setBusy('ir');
     try {
       await ptzIr({ state: nextIrMode(irMode) });
@@ -232,6 +234,7 @@ function PtzMobileZoomButtons({ disabled = false }) {
       */
       event.preventDefault();
       if (disabled) return;
+      triggerTouchHaptic('button');
       event.currentTarget.setPointerCapture?.(event.pointerId);
       setCameraAxisIntent(direction);
     },

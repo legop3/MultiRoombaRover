@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { HORN_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import { HORN_MAX_FREQUENCY } from '../../controls/constants.js';
+import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 function clampFreq(value) {
   const num = Number(value);
@@ -120,6 +121,9 @@ export default function HornControl({
     event.preventDefault();
     activePointerIdRef.current = event.pointerId;
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    // Starting the held horn is the meaningful action; release only stops the
+    // same action and therefore should not generate a second confirmation.
+    triggerTouchHaptic('button');
     onStart?.();
   };
 

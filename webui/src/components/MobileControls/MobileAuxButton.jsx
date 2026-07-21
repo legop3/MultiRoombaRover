@@ -1,6 +1,8 @@
 // Mobile Aux Button
 // Purpose: Defines the Mobile Aux Button module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
+import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
+
 export default function MobileAuxButton({ id, label, values, color, disabled, onPress, onRelease }) {
   return (
     <button
@@ -10,7 +12,12 @@ export default function MobileAuxButton({ id, label, values, color, disabled, on
         event.preventDefault();
         onPress(id, values);
       }}
-      onPointerUp={() => onRelease(id)}
+      onPointerUp={() => {
+        onRelease(id);
+        // A completed held action is the semantic confirmation point. Keeping
+        // feedback beside release avoids buzzing for cancelled aux gestures.
+        triggerTouchHaptic('button');
+      }}
       onPointerLeave={() => onRelease(id)}
       onPointerCancel={() => onRelease(id)}
       onContextMenu={(event) => event.preventDefault()}
