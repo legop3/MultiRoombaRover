@@ -45,14 +45,30 @@ function describeSource(source) {
 }
 
 function sanitizeReplayTitleForFilename(title) {
-  // Discord attachment names should be readable and filesystem-safe.
-  // The title may originate from chat/web input, so strip separators and cap length before upload.
+  // Replay filenames are exposed by both Discord and the server-hosted fallback.
+  // The title may originate from chat/web input, so strip separators and cap its
+  // length before it is used in an attachment name, URL, or local filesystem path.
   const cleaned = String(title || '')
     .replace(/[\\/:*?"<>|]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 96);
   return cleaned || 'replay';
+}
+
+function buildReplayFilename(job = {}) {
+  const title = sanitizeReplayTitleForFilename(job.title);
+  const createdAt = Number(job.createdAt);
+
+  // The job creation time is shared by every delivery path. Using it instead
+  // of the later upload/hosting time guarantees that a Discord upload and its
+  // local fallback describe the same replay with the same readable filename.
+  // Date.now() is retained only as a defensive fallback for older callers that
+  // construct a minimal job object without going through createReplayJob().
+  const timestamp = Number.isFinite(createdAt) && createdAt > 0
+    ? Math.trunc(createdAt)
+    : Date.now();
+  return `${title} ${timestamp}.mp4`;
 }
 
 function buildReplayTitle({ explicitTitle = '', sources = [] } = {}) {
@@ -379,6 +395,7 @@ module.exports = {
   createReplayCaptionBuilder,
   startDiscordTypingLoop,
   sanitizeReplayTitleForFilename,
+  buildReplayFilename,
   firstAttachmentFromMessage,
   buildDiscordReplayMediaPayload,
   buildAcceptedMessage,

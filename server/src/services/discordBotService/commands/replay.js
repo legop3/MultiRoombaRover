@@ -12,7 +12,7 @@ const {
   createReplaySourceResolver,
   createReplayCaptionBuilder,
   startDiscordTypingLoop,
-  sanitizeReplayTitleForFilename,
+  buildReplayFilename,
   firstAttachmentFromMessage,
   buildDiscordReplayMediaPayload,
   buildAcceptedMessage,
@@ -103,7 +103,9 @@ function createReplayCommand({
         await progressMessage.edit({ content: sanitizeMentions(buildStatusMessage(job, 'uploading')), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
       }
 
-      const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(job.title)}.mp4` });
+      // Keep direct Discord commands consistent with web-triggered uploads and
+      // with the local hosting fallback used when Discord delivery is unavailable.
+      const attachment = new AttachmentBuilder(buffer, { name: buildReplayFilename(job) });
       const body = replayCaption.build({ job, usedSources, missingSources });
       const uploadMessage = await progressMessage.reply({
         content: body,

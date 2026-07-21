@@ -63,7 +63,7 @@ const {
   DEFAULT_ALLOWED_MENTIONS,
   createReplayCaptionBuilder,
   startDiscordTypingLoop,
-  sanitizeReplayTitleForFilename,
+  buildReplayFilename,
   firstAttachmentFromMessage,
   buildDiscordReplayMediaPayload,
   buildAcceptedMessage,
@@ -166,7 +166,9 @@ if (discordConfig?.channels?.replay) {
         if (progressMessage?.edit) {
           await progressMessage.edit({ content: buildStatusMessage(job, 'uploading'), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
         }
-        const attachment = new AttachmentBuilder(buffer, { name: `${sanitizeReplayTitleForFilename(job.title)}.mp4` });
+        // Every delivery path uses the job creation time, so a Discord upload
+        // and a server-hosted fallback always expose the same replay filename.
+        const attachment = new AttachmentBuilder(buffer, { name: buildReplayFilename(job) });
         const body = replayCaption.build({ job, usedSources, missingSources });
         const uploadMessage = await channelIO.sendToChannel(context.channelId, body, { files: [attachment] }, DEFAULT_ALLOWED_MENTIONS);
         if (!uploadMessage) throw new Error('Discord upload did not return a message');

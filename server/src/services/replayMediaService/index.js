@@ -1,18 +1,29 @@
 // Replay Media Service
 // Purpose: Stores and serves completed replay videos when Discord delivery is unavailable.
 // Scope: Owns only final hosted MP4 files; replay frame caches and active video builds remain outside this service.
-const crypto = require('crypto');
 const fsp = require('fs/promises');
 const path = require('path');
 const logger = require('../../globals/logger').child('replayMedia');
 const { app } = require('../../globals/http');
 const { resolveDataDir } = require('../../helpers/dataPaths');
+const { buildReplayFilename } = require('../replayDeliveryService/workflow');
 
 const REPLAY_DIR = path.join(resolveDataDir(), 'replays');
 const MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
 const MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
-const PUBLIC_FILE_PATTERN = /^[a-f0-9]{32}\.mp4$/;
+const PUBLIC_FILE_PATTERN = /^.+ \d{13}\.mp4$/u;
+
+function buildContentDisposition(filename) {
+  // The ASCII fallback keeps Node's response header valid for titles containing
+  // Unicode, while filename* preserves the full readable name in browsers that
+  // support the standard UTF-8 Content-Disposition form.
+  const asciiFilename = filename.replace(/[^\x20-\x7E]/g, '_');
+  const encodedFilename = encodeURIComponent(filename).replace(/[!'()*]/g, (character) => (
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  ));
+  return `inline; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`;
+}
 
 async function listCompletedFiles() {
   await fsp.mkdir(REPLAY_DIR, { recursive: true });
@@ -64,7 +75,7 @@ async function cleanup() {
 async function hostReplay({ buffer, job }) {
   if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error('Replay output was empty');
   await fsp.mkdir(REPLAY_DIR, { recursive: true });
-  const filename = `${crypto.randomBytes(16).toString('hex')}.mp4`;
+  const filename = buildReplayFilename(job);
   const finalPath = path.join(REPLAY_DIR, filename);
   const temporaryPath = `${finalPath}.${process.pid}.tmp`;
 
@@ -102,7 +113,14 @@ app.get('/media/replays/:filename', (req, res, next) => {
   // Express sendFile supports byte-range requests, which preserves seeking in
   // the existing browser video players without implementing a second streamer.
   res.setHeader('Cache-Control', 'private, max-age=3600');
-  return res.sendFile(filePath, { headers: { 'Content-Type': 'video/mp4' } }, (err) => {
+  return res.sendFile(filePath, {
+    headers: {
+      'Content-Type': 'video/mp4',
+      // Supplying the readable filename explicitly ensures that saving a video
+      // keeps its replay title even though it was delivered through an HTTP route.
+      'Content-Disposition': buildContentDisposition(filename),
+    },
+  }, (err) => {
     if (!err || res.headersSent) return;
     if (err.code === 'ENOENT') return res.status(404).end();
     return next(err);
