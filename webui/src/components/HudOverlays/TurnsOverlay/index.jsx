@@ -88,6 +88,15 @@ function TurnsOverlay({
     if (!isTurnsMode || !isActiveDriver) return null;
     return turnSeconds != null ? `${turnSeconds}s left` : 'Your turn';
   }, [isTurnsMode, isActiveDriver, turnSeconds]);
+  const idleTimerText = useMemo(() => {
+    /*
+      Idle grace is independent from the full turn deadline. Rendering it in
+      the persistent corner status means initial page loads and reconnects get
+      the same warning as users who happened to see the large handoff cue.
+    */
+    if (!isTurnsMode || !isActiveDriver || idleSkipSeconds == null) return null;
+    return `Idle skip in ${idleSkipSeconds}s`;
+  }, [idleSkipSeconds, isActiveDriver, isTurnsMode]);
   const notTurnCountdownText = useMemo(() => {
     if (!showNotTurnNotice || !isNextDriver || turnSeconds == null) return null;
     return `${turnSeconds} seconds until your turn.`;
@@ -230,13 +239,16 @@ function TurnsOverlay({
 
       {turnTimerText ? (
         <div
-          className={`pointer-events-none absolute bottom-1 left-1 rounded border ${
+          className={`pointer-events-none absolute bottom-1 left-1 flex flex-col rounded border ${
             turnTimerFlashActive
               ? 'border-red-300/90 bg-red-900/80 text-red-100'
               : 'border-amber-300/80 bg-black/75 text-amber-200'
           } ${timerPadClass} ${timerTextClass}`}
         >
           {turnTimerText}
+          {idleTimerText ? (
+            <span className="font-semibold text-red-200">{idleTimerText}</span>
+          ) : null}
         </div>
       ) : null}
 

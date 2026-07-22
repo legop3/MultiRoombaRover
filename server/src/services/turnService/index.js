@@ -112,6 +112,7 @@ function driverAdded(roverId, socketId, options = {}) {
   const { force, pauseQueue } = normalizeDriverAddOptions(options);
   const queue = ensureQueue(roverId);
   const alreadyQueued = queue.queue.includes(socketId);
+  const previousQueueLength = queue.queue.length;
 
   if (pauseQueue) {
     applyAdminQueuePause(roverId, socketId, queue);
@@ -141,6 +142,30 @@ function driverAdded(roverId, socketId, options = {}) {
   if (!queue.current || force) {
     queue.current = socketId;
   }
+
+  /*
+    A normal join changes who will receive a future turn; it does not begin a
+    new turn for the person who is already driving. Preserve both deadlines and
+    the current driver's activity state while an already-rotating queue grows.
+
+    The one-to-two transition is intentionally different. Before the second
+    driver arrives there is no reason to time the sole driver, so this is the
+    moment the first real rotating turn begins. A forced grant also changes the
+    active driver immediately and therefore starts that driver's fresh turn.
+  */
+  const turnsAreRotating = getMode() === MODES.TURNS && queue.queue.length > 1;
+  const beginsRotatingTurns = turnsAreRotating && previousQueueLength <= 1;
+  if (turnsAreRotating && (force || beginsRotatingTurns)) {
+    startCurrentTurn(roverId, queue);
+    return;
+  }
+
+  if (turnsAreRotating) {
+    setActiveDriver(roverId, queue.current);
+    turnEvents.emit('queue', { roverId, reason: 'driver-joined' });
+    return;
+  }
+
   syncState(roverId);
 }
 
@@ -165,13 +190,32 @@ function driverRemoved(roverId, socketId) {
       idleSkips.delete(roverId);
     }
   }
-  idleDisarmed.delete(roverId);
   if (queue.current === socketId) {
+    /*
+      Removing the active driver is a real handoff. advanceTurn() owns clearing
+      the old turn state and creating the next driver's deadlines, keeping this
+      path identical for explicit release, disconnect, and stale-socket reap.
+    */
     stopRover(roverId);
     advanceTurn(roverId);
-  } else {
-    scheduleIdleTimer(roverId);
+    return;
   }
+
+  /*
+    A waiting driver leaving must not re-arm idle detection or extend the
+    unrelated active driver's turn. If this removal ends rotation entirely,
+    syncState() clears both deadlines immediately; otherwise only the public
+    queue membership changes.
+  */
+  if (getMode() !== MODES.TURNS || queue.queue.length <= 1) {
+    syncState(roverId);
+    return;
+  }
+  if (isQueuePaused(queue)) {
+    turnEvents.emit('queue', { roverId, reason: 'driver-left-admin-pause' });
+    return;
+  }
+  turnEvents.emit('queue', { roverId, reason: 'driver-left' });
 }
 
 function cleanupRover(roverId) {
@@ -242,11 +286,24 @@ function syncState(roverId) {
   if (!queue.current) {
     queue.current = queue.queue[0];
   }
+  /*
+    syncState() is used when entering turns mode and when a previously untimed
+    queue becomes rotatable. Both cases begin a genuine turn rather than merely
+    publishing a membership update.
+  */
+  startCurrentTurn(roverId, queue);
+}
+
+function startCurrentTurn(roverId, queue) {
+  /*
+    This is the sole normal entry point for a fresh timed turn. Keeping active
+    ownership, the full-turn deadline, and the activity grace window together
+    prevents callers from resetting only part of the lifecycle.
+  */
   setActiveDriver(roverId, queue.current);
   idleDisarmed.set(roverId, false);
   scheduleNextTurn(roverId);
   scheduleIdleTimer(roverId);
-  turnEvents.emit('queue', { roverId });
 }
 
 function scheduleNextTurn(roverId) {
@@ -423,7 +480,12 @@ function reapStaleDrivers() {
   });
 }
 
-setInterval(reapStaleDrivers, STALE_REAPER_MS);
+/*
+  Stale cleanup should run for the lifetime of the server, but it should not by
+  itself keep short-lived tools or the Node test runner alive after their work
+  has completed.
+*/
+setInterval(reapStaleDrivers, STALE_REAPER_MS).unref();
 
 module.exports = {
   driverAdded,

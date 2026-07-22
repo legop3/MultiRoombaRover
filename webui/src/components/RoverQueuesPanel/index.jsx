@@ -249,9 +249,20 @@ export default function RoverQueuesPanel({
                   const roverId = String(rover.id);
                   const info = turnQueues?.[roverId] || null;
                   const queue = info?.queue || [];
-                  const deadline = info?.idleDeadline || info?.deadline || null;
-                  const remainingSeconds =
-                    deadline && deadline > now ? Math.ceil((deadline - now) / 1000) : deadline ? 0 : null;
+                  /*
+                    A turn handoff and an inactivity skip are separate server
+                    deadlines. Keep them separate through formatting so an idle
+                    warning cannot masquerade as the length of the whole turn or
+                    jump from seven seconds back to the turn countdown.
+                  */
+                  const turnDeadline = info?.deadline || null;
+                  const idleDeadline = info?.idleDeadline || null;
+                  const turnRemainingSeconds = turnDeadline
+                    ? Math.max(0, Math.ceil((turnDeadline - now) / 1000))
+                    : null;
+                  const idleRemainingSeconds = idleDeadline
+                    ? Math.max(0, Math.ceil((idleDeadline - now) / 1000))
+                    : null;
                   const currentId = info?.current || null;
                   const currentIdx = currentId ? queue.findIndex((id) => id === currentId) : -1;
                   const nextId =
@@ -262,7 +273,14 @@ export default function RoverQueuesPanel({
                       : null;
                   const isSelfCurrent = Boolean(selfId && currentId && currentId === selfId);
                   const isSelfNext = Boolean(selfId && nextId && nextId === selfId);
-                  const showTimer = remainingSeconds != null && (isSelfCurrent || isSelfNext);
+                  const timerLabel = isSelfCurrent
+                    ? [
+                        turnRemainingSeconds != null ? `${turnRemainingSeconds}s left` : '',
+                        idleRemainingSeconds != null ? `Idle skip in ${idleRemainingSeconds}s` : '',
+                      ].filter(Boolean).join(' · ')
+                    : isSelfNext && turnRemainingSeconds != null
+                    ? `Your turn in ${turnRemainingSeconds}s`
+                    : '';
                   const isPrivateOpen = Boolean(rover?.private?.enabled && rover?.private?.open);
                   const isGrantedClosedPrivate = Boolean(rover?.private?.enabled && !rover?.private?.open);
                   const locked = Boolean(rover.locked);
@@ -293,7 +311,7 @@ export default function RoverQueuesPanel({
                       buttonLabel={buttonLabel}
                       batteryLabel={formatBattery(rover)}
                       batteryClassName={batteryClass(rover)}
-                      timerLabel={showTimer ? (isSelfCurrent ? `${remainingSeconds}s left` : `Your turn in ${remainingSeconds}s`) : ''}
+                      timerLabel={timerLabel}
                       thumbnailUrl={externalMode ? rover?.snapshots?.latestUrl : ''}
                       onRequest={handleRequest}
                       showAction={Boolean(canRequest)}
