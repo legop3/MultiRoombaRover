@@ -8,7 +8,7 @@ const logger = require('../../globals/logger').child('audioForwardService');
 const { loadConfig } = require('../../helpers/configLoader');
 const roverManager = require('../roverManager');
 const turnService = require('../turnService');
-const { isVerified } = require('../verificationService');
+const { isMuted, isVerified, verificationEvents } = require('../verificationService');
 const videoSessions = require('../videoSessions');
 const { createAudioForwardPolicy } = require('./policy');
 const { createAudioForwardWorkerEngine } = require('./workerEngine');
@@ -62,6 +62,7 @@ function getAudioForwardState() {
 
 const audioForwardPolicy = createAudioForwardPolicy({
   isVerified,
+  isMuted,
   roverManager,
   turnService,
   streamSuffix,
@@ -141,6 +142,8 @@ registerAudioForwardHooks({
   buildWhipUrl,
   videoSessions,
   startSilenceWriter,
+  isMuted,
+  verificationEvents,
 });
 
 registerChargeCompleteSound({

@@ -23,7 +23,33 @@ function registerAudioForwardHooks(deps) {
     buildWhipUrl,
     videoSessions,
     startSilenceWriter,
+    isMuted,
+    verificationEvents,
   } = deps;
+
+  verificationEvents.on('change', ({ socketId } = {}) => {
+    if (!socketId) return;
+    const socket = io.sockets.sockets.get(socketId);
+    if (!socket || !isMuted(socket)) return;
+
+    /*
+      Permission checks stop new muted audio, but an upload or microphone can
+      already be live when moderation changes. Stop only streams owned by this
+      socket so muting does not disturb another driver's audio or unrelated
+      server-generated sounds.
+    */
+    for (const [roverId, ownerSocketId] of whipOwners.entries()) {
+      if (ownerSocketId === socketId) {
+        stopWhipForRover(roverId, 'owner_muted');
+      }
+    }
+    workers.forEach((worker, roverId) => {
+      if (worker?.contentKind === 'upload' && worker.activeOwnerSocketId === socketId) {
+        logger.info('Stopping uploaded audio because its owner was muted', { roverId, socketId });
+        startSilenceWriter(roverId);
+      }
+    });
+  });
 
   roverManager.managerEvents.on('rover', ({ roverId, action } = {}) => {
     if (!roverId) return;

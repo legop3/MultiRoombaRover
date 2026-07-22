@@ -37,6 +37,10 @@ export function setDeterrence(socket, userId, enabled, reason) {
   return emitIdentityAdmin(socket, 'identityAdmin:setDeterrence', { userId, enabled, reason });
 }
 
+export function setMuted(socket, userId, enabled) {
+  return emitIdentityAdmin(socket, 'identityAdmin:setMuted', { userId, enabled });
+}
+
 export function updateFeatureState(socket, userId, namespace, value) {
   return emitIdentityAdmin(socket, 'identityAdmin:updateFeatureState', { userId, namespace, value });
 }

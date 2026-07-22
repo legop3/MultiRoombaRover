@@ -6,7 +6,7 @@ const EventEmitter = require('events');
 const io = require('../../globals/io');
 const roverManager = require('../roverManager');
 const { isAdmin, isLockdownAdmin } = require('../roleService');
-const { isDeterred } = require('../verificationService');
+const { isDeterred, isMuted } = require('../verificationService');
 const logger = require('../../globals/logger').child('commandService');
 const { isHeadlightBlocked } = require('../../rewards/definitions/darkness');
 const homeAssistantService = require('../homeAssistantService');
@@ -291,6 +291,14 @@ io.on('connection', (socket) => {
       const isAdminSocket = isAdmin(socket);
       if (!isAdminSocket && isDeterred(socket)) {
         throw new Error('Not authorized');
+      }
+      /*
+        Both structured song commands and raw Open Interface song payloads
+        reach this shared flag. Enforcing mute here covers the VIP MIDI beeper
+        and any future browser beeper without affecting unrelated driving.
+      */
+      if (!isAdminSocket && isSongCommand && isMuted(socket)) {
+        throw new Error('Muted');
       }
       // Rover updates run a privileged, root-owned helper on the Pi. Keep this
       // in the same explicit admin-only branch as reboot instead of relying on

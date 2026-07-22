@@ -41,8 +41,11 @@ const {
   listVerifiedUsers,
   removeVerifiedUser,
   listDeterredUsers,
+  listMutedUsers,
   deterUser,
   undeterUser,
+  muteUser,
+  unmuteUser,
 } = require('../verificationService');
 const {
   attachDmMessage: attachPrivateAccessDmMessage,
@@ -242,8 +245,11 @@ const commandDependencies = {
   listVerifiedUsers,
   removeVerifiedUser,
   listDeterredUsers,
+  listMutedUsers,
   deterUser,
   undeterUser,
+  muteUser,
+  unmuteUser,
   sanitizeMentions,
   sendToChannel: channelIO.sendToChannel,
   isAdminUser,

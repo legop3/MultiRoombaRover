@@ -55,6 +55,7 @@ export function userMatchesQuery(user, query) {
 export function userMatchesFilter(user, filter) {
   if (filter === 'verified') return Boolean(user?.verified?.enabled);
   if (filter === 'deterred') return Boolean(user?.deterrence?.enabled);
+  if (filter === 'muted') return Boolean(user?.deterrence?.muted);
   if (filter === 'unverified') return !user?.verified?.enabled;
   return true;
 }

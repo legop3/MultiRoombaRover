@@ -3,6 +3,7 @@
 // Scope: Owns message validation pipeline and typed outbound message construction.
 const logger = require('../../globals/logger').child('chatService');
 const { getRole } = require('../roleService');
+const { isDeterred, isMuted } = require('../verificationService');
 const { withinRateLimit } = require('./state');
 const { hasProfanity, isKeymash, normalizeUserText } = require('./contentFilters');
 const { buildMessage, buildTypingPayload, resolveRoverId, isPrivateClosedRoverId, buildRoverCtxSnapshot } = require('./contextBuilders');
@@ -17,6 +18,12 @@ function createHandlers({ sendSystemMessage }) {
     const normalized = normalizeUserText(text);
     const clean = normalized.trim();
     if (!clean) return cb({ error: 'Message required' });
+    /*
+      Mute is narrower than deterrence: the socket may continue driving and
+      using ordinary features, but its message must stop before broadcast,
+      command parsing, TTS, or any other chat-derived side effect occurs.
+    */
+    if (isMuted(socket)) return cb({ error: 'Muted' });
     if (!withinRateLimit(socket.id)) return cb({ error: 'Slow down' });
     // This service no longer enforces a character-count ceiling for chat text.
     // The chat layer only rejects empty, rate-limited, or moderated content so
@@ -37,23 +44,40 @@ function createHandlers({ sendSystemMessage }) {
     });
 
     logger.info('Chat message', { socket: socket.id, roverId: message.roverId });
-    playTypingNote(roverId, TYPING_SEND_NOTE, socket?.id);
+    const deterred = isDeterred(socket);
+    /*
+      Deterred users retain text chat, but chat must not become an indirect
+      hardware-control path. Suppress the rover typing note and TTS while still
+      constructing and broadcasting the same visible message as everyone else.
+    */
+    if (!deterred) {
+      playTypingNote(roverId, TYPING_SEND_NOTE, socket?.id);
+    }
 
     if (isPrivateClosedRoverId(message.roverId)) {
       // Private-closed chat does not broadcast the text, so TTS is the only
       // delivery path. Use the same Google speech default as normal chat when
       // the sender did not provide explicit TTS settings.
       const forcedTts = ttsOptions || { speak: true, engine: 'chromegtts' };
-      maybeSpeak(socket, message, forcedTts);
+      if (!deterred) {
+        maybeSpeak(socket, message, forcedTts);
+      }
       cb({ success: true, privateOnly: true });
       return;
     }
 
     broadcastMessage(message);
     maybeSendAccessNotice(message, sendSystemMessage);
-    maybeSpeak(socket, message, ttsOptions);
+    if (!deterred) {
+      maybeSpeak(socket, message, ttsOptions);
+    }
 
-    const command = isTextCommand(clean);
+    /*
+      Command-shaped text from a deterred user remains ordinary visible chat.
+      Reporting command=false prevents the client from implying that the server
+      accepted an action, and the command router is never invoked.
+    */
+    const command = !deterred && isTextCommand(clean);
     // Chat delivery is complete once validation, broadcast, and local side
     // effects above have succeeded. A command may wait on Home Assistant,
     // hardware, replay preparation, or an external transport, so tying the

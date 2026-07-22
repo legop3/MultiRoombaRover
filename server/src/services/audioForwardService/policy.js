@@ -4,6 +4,7 @@
 function createAudioForwardPolicy(deps) {
   const {
     isVerified,
+    isMuted,
     roverManager,
     turnService,
     streamSuffix,
@@ -18,6 +19,9 @@ function createAudioForwardPolicy(deps) {
 
   function ensureAudioForwardPermission(socket, roverId) {
     ensureVipVerified(socket);
+    if (isMuted(socket)) {
+      throw new Error('Muted');
+    }
     if (!roverManager.isDriver(roverId, socket)) {
       throw new Error('Audio forwarding is only allowed on your own rover');
     }

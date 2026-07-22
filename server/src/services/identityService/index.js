@@ -17,7 +17,7 @@ const USER_ID_RE = /^usr_[a-f0-9]{32}$/;
 const DB_PATH = resolveDataPath('identity.sqlite');
 const LEGACY_VERIFICATION_PATH = resolveDataPath('verified-users.json');
 const LEGACY_BARCODE_PATH = resolveDataPath('barcode-games.json');
-const STORE_VERSION = 1;
+const STORE_VERSION = 2;
 const identityEvents = new EventEmitter();
 
 let db = null;
@@ -166,7 +166,10 @@ function ensureSchema(conn) {
       deterrence_enabled integer not null default 0,
       deterrence_reason text,
       deterrence_at integer,
-      deterrence_by text
+      deterrence_by text,
+      muted_enabled integer not null default 0,
+      muted_at integer,
+      muted_by text
     );
 
     create table if not exists verification_requests (
@@ -213,6 +216,24 @@ function ensureSchema(conn) {
 
     pragma user_version = ${STORE_VERSION};
   `);
+
+  /*
+    SQLite's `create table if not exists` leaves an existing table untouched.
+    Add the mute columns explicitly for installations created before store
+    version 2, while the column-name check keeps every later startup idempotent.
+  */
+  const statusColumns = new Set(
+    conn.prepare('pragma table_info(user_status)').all().map((column) => column.name),
+  );
+  if (!statusColumns.has('muted_enabled')) {
+    conn.exec('alter table user_status add column muted_enabled integer not null default 0');
+  }
+  if (!statusColumns.has('muted_at')) {
+    conn.exec('alter table user_status add column muted_at integer');
+  }
+  if (!statusColumns.has('muted_by')) {
+    conn.exec('alter table user_status add column muted_by text');
+  }
 }
 
 function createUser(conn = getDb(), ts = nowMs()) {
@@ -278,6 +299,20 @@ function mergeUsers(conn, targetUserId, sourceUserId) {
           deterrence_by = coalesce(deterrence_by, ?)
       where user_id = ?
     `).run(sourceStatus.deterrence_reason || null, sourceStatus.deterrence_at || ts, sourceStatus.deterrence_by || null, targetUserId);
+  }
+  if (sourceStatus?.muted_enabled) {
+    /*
+      Identity merging must preserve the stricter moderation state. Otherwise
+      joining two signals could silently clear a mute merely because the
+      unmuted record happened to become the merge target.
+    */
+    conn.prepare(`
+      update user_status
+      set muted_enabled = 1,
+          muted_at = coalesce(muted_at, ?),
+          muted_by = coalesce(muted_by, ?)
+      where user_id = ?
+    `).run(sourceStatus.muted_at || ts, sourceStatus.muted_by || null, targetUserId);
   }
 
   const sourceFeatures = conn.prepare('select namespace, data_json, created_at, updated_at from user_feature_state where user_id = ?').all(sourceUserId);
@@ -382,6 +417,7 @@ function setSocketIdentityState(socket, user, identity = {}) {
   socket.data.verifiedRecordId = user.verified?.enabled ? user.id : null;
   socket.data.isDeterred = Boolean(user.deterrence?.enabled);
   socket.data.deterredRecordId = user.deterrence?.enabled ? user.id : null;
+  socket.data.isMuted = Boolean(user.deterrence?.muted);
 }
 
 function identifySocket(socket, payload = {}) {
@@ -422,6 +458,7 @@ function identifySocket(socket, payload = {}) {
     fingerprintId: fingerprintId || null,
     isVerified: Boolean(user.verified?.enabled),
     isDeterred: Boolean(user.deterrence?.enabled),
+    isMuted: Boolean(user.deterrence?.muted),
   };
 }
 
@@ -468,6 +505,9 @@ function getUserById(userId, { conn = getDb(), includeFeatures = true } = {}) {
       reason: status.deterrence_reason || null,
       at: status.deterrence_at || null,
       by: status.deterrence_by || null,
+      muted: Boolean(status.muted_enabled),
+      mutedAt: status.muted_at || null,
+      mutedBy: status.muted_by || null,
     },
     features,
   };
@@ -673,6 +713,19 @@ function setDeterrence(userId, { enabled = true, reason = null, actor = null, at
   return getUserById(id);
 }
 
+function setMuted(userId, { enabled = true, actor = null, at = nowMs() } = {}) {
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('userId required');
+  ensureUserStatus(getDb(), id);
+  getDb().prepare(`
+    update user_status
+    set muted_enabled = ?, muted_at = ?, muted_by = ?
+    where user_id = ?
+  `).run(enabled ? 1 : 0, enabled ? at : null, enabled ? actor : null, id);
+  identityEvents.emit('change', { reason: enabled ? 'muted' : 'unmuted', userId: id });
+  return getUserById(id);
+}
+
 function isVerified(socket) {
   return Boolean(socket?.data?.isVerified);
 }
@@ -681,12 +734,13 @@ function isDeterred(socket) {
   return Boolean(socket?.data?.isDeterred);
 }
 
-function listUsers({ verified = null, deterred = null } = {}) {
+function listUsers({ verified = null, deterred = null, muted = null } = {}) {
   const conn = getDb();
   let sql = 'select users.id from users join user_status on user_status.user_id = users.id';
   const where = [];
   if (verified !== null) where.push(`user_status.verified_enabled = ${verified ? 1 : 0}`);
   if (deterred !== null) where.push(`user_status.deterrence_enabled = ${deterred ? 1 : 0}`);
+  if (muted !== null) where.push(`user_status.muted_enabled = ${muted ? 1 : 0}`);
   if (where.length) sql += ` where ${where.join(' and ')}`;
   sql += ' order by users.updated_at desc';
   return conn.prepare(sql).all().map((row) => getUserById(row.id, { conn, includeFeatures: false }));
@@ -705,6 +759,9 @@ function userToLegacyIdentityEntry(user) {
     updatedAt: user.updatedAt,
     approvedBy: user.verified?.by || null,
     reason: user.deterrence?.reason || null,
+    muted: Boolean(user.deterrence?.muted),
+    mutedAt: user.deterrence?.mutedAt || null,
+    mutedBy: user.deterrence?.mutedBy || null,
   };
 }
 
@@ -714,6 +771,10 @@ function listVerifiedUsers() {
 
 function listDeterredUsers() {
   return listUsers({ deterred: true }).map(userToLegacyIdentityEntry);
+}
+
+function listMutedUsers() {
+  return listUsers({ muted: true }).map(userToLegacyIdentityEntry);
 }
 
 function resolveUserBySelector(selector, { includeDeterred = true, includeVerified = true } = {}) {
@@ -969,10 +1030,12 @@ module.exports = {
   listFeatureStates,
   setVerified,
   setDeterrence,
+  setMuted,
   isVerified,
   isDeterred,
   listVerifiedUsers,
   listDeterredUsers,
+  listMutedUsers,
   resolveUserBySelector,
   userToLegacyIdentityEntry,
   createJsonStore,

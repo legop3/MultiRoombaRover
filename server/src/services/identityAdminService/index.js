@@ -11,6 +11,7 @@ const {
   removeUserSignal,
   setVerified,
   setDeterrence,
+  setMuted,
   setFeatureState,
   deleteFeatureState,
 } = require('../identityService');
@@ -98,6 +99,14 @@ io.on('connection', (socket) => {
     user: getUserForAdmin(setDeterrence(userId, {
       enabled: Boolean(enabled),
       reason: String(reason || '').trim() || null,
+      actor: socket?.data?.user?.username || socket.id,
+      at: Date.now(),
+    }).id),
+  }));
+
+  ackHandler(socket, 'identityAdmin:setMuted', ({ userId, enabled }) => ({
+    user: getUserForAdmin(setMuted(userId, {
+      enabled: Boolean(enabled),
       actor: socket?.data?.user?.username || socket.id,
       at: Date.now(),
     }).id),

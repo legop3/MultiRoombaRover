@@ -26,8 +26,10 @@ const {
   sanitizeNickname,
   setVerified,
   setDeterrence,
+  setMuted,
   listVerifiedUsers,
   listDeterredUsers,
+  listMutedUsers,
   resolveUserBySelector,
   userToLegacyIdentityEntry,
 } = require('../identityService');
@@ -37,6 +39,26 @@ const verificationEvents = new EventEmitter();
 const IDENTITY_TIMEOUT_MS = 2 * 60 * 1000;
 const IDENTITY_SWEEP_INTERVAL_MS = 15 * 1000;
 const DUPLICATE_IDENTITY_DISCONNECT_DELAY_MS = 250;
+const DETERRED_DISCONNECT_DELAY_MS = 250;
+
+/*
+  Deterrence is intentionally enforced at the socket boundary instead of being
+  repeated in every feature service. A deterred browser still needs the small
+  identity/authentication surface that lets it reconnect, retain a chat name,
+  and let a real administrator log in. Everything else is limited to ordinary
+  text chat and its non-mutating typing indicator.
+
+  Keeping this list exact is important: newly added socket capabilities are
+  denied by default, so a future feature cannot accidentally become an escape
+  hatch merely because its service forgot a deterrence check.
+*/
+const DETERRED_ALLOWED_SOCKET_EVENTS = new Set([
+  'auth:login',
+  'session:identify',
+  'nickname:set',
+  'chat:send',
+  'chat:typing',
+]);
 
 function emitChange(reason, payload = {}) {
   verificationEvents.emit('change', { reason, ...payload });
@@ -44,6 +66,31 @@ function emitChange(reason, payload = {}) {
 
 function isAdminRole(role) {
   return role === 'admin' || role === 'lockdown';
+}
+
+function installDeterredSocketGuard(socket) {
+  socket.use(([eventName, ...eventArgs], next) => {
+    if (!socket?.data?.isDeterred || DETERRED_ALLOWED_SOCKET_EVENTS.has(eventName)) {
+      next();
+      return;
+    }
+
+    /*
+      Socket.IO does not automatically acknowledge a packet that middleware
+      declines. Reply through the packet's acknowledgement callback when one
+      exists so browser promises settle normally instead of hanging forever.
+      We deliberately do not call next() after the reply because doing so would
+      deliver the denied packet to its feature handler.
+    */
+    const acknowledgement = eventArgs[eventArgs.length - 1];
+    if (typeof acknowledgement === 'function') {
+      acknowledgement({ error: 'Not authorized' });
+    }
+    logger.info('Blocked socket event from deterred user', {
+      socketId: socket.id,
+      eventName,
+    });
+  });
 }
 
 function refreshSocketIdentityFlags(socket) {
@@ -55,13 +102,21 @@ function refreshSocketIdentityFlags(socket) {
   const role = getRole(socket);
   const verifiedByRole = isAdminRole(role);
   const deterredByUser = Boolean(user.deterrence?.enabled);
+  const mutedByUser = Boolean(user.deterrence?.muted);
   socket.data.isVerified = verifiedByRole || Boolean(user.verified?.enabled);
   socket.data.verifiedRecordId = socket.data.isVerified ? user.id : null;
   socket.data.isDeterred = isAdminRole(role) ? false : deterredByUser;
   socket.data.deterredRecordId = socket.data.isDeterred ? user.id : null;
+  /*
+    Mute follows the same administrator exemption as full deterrence. This
+    prevents a stored moderation flag from disabling an authenticated admin's
+    operational chat/audio tools while preserving the flag for normal roles.
+  */
+  socket.data.isMuted = isAdminRole(role) ? false : mutedByUser;
   return {
     isVerified: socket.data.isVerified,
     isDeterred: socket.data.isDeterred,
+    isMuted: socket.data.isMuted,
     matchedRecordId: user.id,
     reason: socket.data.isVerified ? 'matched' : 'no_match',
     userId: user.id,
@@ -212,6 +267,7 @@ function getVerificationStateForSocket(socket) {
 function getModerationStateForSocket(socket) {
   return {
     isDeterred: Boolean(socket?.data?.isDeterred),
+    isMuted: Boolean(socket?.data?.isMuted),
     recordId: socket?.data?.deterredRecordId || null,
   };
 }
@@ -482,6 +538,41 @@ function undeterUser(selector, removedBy = null) {
   return userToLegacyIdentityEntry(user);
 }
 
+function setUserMute(selector, enabled, actor = null) {
+  const resolved = resolveUserBySelector(selector, { includeVerified: true, includeDeterred: true });
+  if (resolved.error || !resolved.user) {
+    throw new Error(resolved.error === 'ambiguous_nickname' ? 'Nickname matches multiple users.' : 'User not found.');
+  }
+
+  const user = setMuted(resolved.user.id, {
+    enabled,
+    actor: actor ? String(actor) : null,
+    at: Date.now(),
+  });
+  refreshSocketsForUser(user.id);
+  publishEvent({
+    source: 'moderation',
+    type: enabled ? 'moderation.muted' : 'moderation.unmuted',
+    payload: {
+      userId: user.id,
+      cookieUserId: user.cookieUserIds[0] || null,
+      nickname: user.nickname,
+      actor: actor ? String(actor) : null,
+      ts: Date.now(),
+    },
+  });
+  emitChange(enabled ? 'mute_update' : 'mute_remove', { userId: user.id });
+  return userToLegacyIdentityEntry(user);
+}
+
+function muteUser(selector, actor = null) {
+  return setUserMute(selector, true, actor);
+}
+
+function unmuteUser(selector, actor = null) {
+  return setUserMute(selector, false, actor);
+}
+
 function reevaluateSocketVerification(socket) {
   return refreshSocketIdentityFlags(socket);
 }
@@ -500,6 +591,7 @@ function getVerificationStatus(socket) {
 io.on('connection', (socket) => {
   socket.data = socket.data || {};
   socket.data.connectedAt = Date.now();
+  installDeterredSocketGuard(socket);
   identifySocket(socket, {});
 
   socket.on('session:identify', (payload = {}, cb = () => {}) => {
@@ -535,6 +627,32 @@ roleEvents.on('change', ({ socket }) => {
 identityEvents.on('change', ({ userId, reason } = {}) => {
   if (!userId) return;
   refreshSocketsForUser(userId);
+
+  if (reason === 'deterred') {
+    io.sockets.sockets.forEach((socket) => {
+      if (getUserIdForSocket(socket) !== userId || !socket.data?.isDeterred) return;
+
+      /*
+        A user can be deterred while already driving or consuming media. One
+        normal disconnect lets the established rover, PTZ, video, and snapshot
+        services perform their own cleanup without coupling moderation to each
+        subsystem. The browser may reconnect immediately; identification then
+        restores the deterred flag and the guard above leaves chat available.
+      */
+      setTimeout(() => {
+        if (!socket.disconnected && socket.data?.isDeterred) {
+          /*
+            Close the underlying transport rather than issuing Socket.IO's
+            explicit server-disconnect packet. A server-disconnect disables
+            automatic reconnection in the browser, while a transport close
+            runs the same disconnect cleanup and then lets the normal client
+            reconnect path restore its chat-only session.
+          */
+          socket.conn.close();
+        }
+      }, DETERRED_DISCONNECT_DELAY_MS);
+    });
+  }
   emitChange('identity_change', { userId, reason });
 });
 
@@ -573,10 +691,14 @@ module.exports = {
   listVerifiedUsers,
   removeVerifiedUser,
   listDeterredUsers,
+  listMutedUsers,
   deterUser,
   undeterUser,
+  muteUser,
+  unmuteUser,
   isVerified: (socket) => Boolean(socket?.data?.isVerified),
   isDeterred: (socket) => Boolean(socket?.data?.isDeterred),
+  isMuted: (socket) => Boolean(socket?.data?.isMuted),
   reevaluateSocketVerification,
   reevaluateSocketDeterrence,
   verificationEvents,

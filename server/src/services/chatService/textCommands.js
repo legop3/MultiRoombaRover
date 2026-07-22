@@ -17,8 +17,11 @@ const {
   listVerifiedUsers,
   removeVerifiedUser,
   listDeterredUsers,
+  listMutedUsers,
   deterUser,
   undeterUser,
+  muteUser,
+  unmuteUser,
 } = require('../verificationService');
 const { publishEvent } = require('../eventBus');
 const assignmentService = require('../assignmentService');
@@ -176,8 +179,11 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     listVerifiedUsers,
     removeVerifiedUser,
     listDeterredUsers,
+    listMutedUsers,
     deterUser,
     undeterUser,
+    muteUser,
+    unmuteUser,
     sanitizeMentions,
     sendToChannel: null,
     isAdminUser: (id) => String(id) === String(socket.id) && isAdmin(socket),

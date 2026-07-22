@@ -12,6 +12,7 @@ import {
   listUsers,
   removeSignal,
   setDeterrence,
+  setMuted,
   setVerified,
   updateFeatureState,
 } from './identityDatabaseApi.js';
@@ -30,6 +31,7 @@ const FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'verified', label: 'Verified' },
   { key: 'deterred', label: 'Deterred' },
+  { key: 'muted', label: 'Muted' },
   { key: 'unverified', label: 'Unverified' },
 ];
 
@@ -85,6 +87,7 @@ function UserListCard({ users, selectedUserId, query, filter, loading, onQuery, 
             <span className="flex flex-col items-end gap-0.25">
               <StatusPill active={user.verified?.enabled}>verified</StatusPill>
               <StatusPill active={user.deterrence?.enabled}>deterred</StatusPill>
+              <StatusPill active={user.deterrence?.muted}>muted</StatusPill>
             </span>
           </button>
         )) : (
@@ -164,7 +167,7 @@ function SignalsCard({ user, onAddSignal, onRemoveSignal }) {
   );
 }
 
-function StatusCard({ user, onVerified, onDeterrence }) {
+function StatusCard({ user, onVerified, onDeterrence, onMuted }) {
   const [reason, setReason] = useState(user?.deterrence?.reason || '');
 
   useEffect(() => {
@@ -206,6 +209,23 @@ function StatusCard({ user, onVerified, onDeterrence }) {
         <button type="button" className="button-dark text-xs" onClick={() => onDeterrence(Boolean(user?.deterrence?.enabled), reason)}>
           Save Reason
         </button>
+        <div className="border-t border-slate-700/70 pt-0.5">
+          <label className="flex items-center gap-0.5 text-slate-100">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-amber-500"
+              checked={Boolean(user?.deterrence?.muted)}
+              onChange={(event) => onMuted(event.target.checked)}
+            />
+            <span>Muted</span>
+          </label>
+          {/*
+            Mute is intentionally presented inside deterrence status because
+            it is a narrower moderation action, while its own timestamp makes
+            it clear that toggling mute does not toggle full deterrence.
+          */}
+          <p className="text-xs text-slate-500">Updated {formatDateTime(user?.deterrence?.mutedAt)}</p>
+        </div>
       </div>
     </CardFrame>
   );
@@ -358,6 +378,8 @@ export default function IdentityDatabasePanel() {
     runMutation((userId) => setVerified(socket, userId, enabled), 'Verification updated.');
   const handleDeterrence = (enabled, reason) =>
     runMutation((userId) => setDeterrence(socket, userId, enabled, reason), 'Deterrence updated.');
+  const handleMuted = (enabled) =>
+    runMutation((userId) => setMuted(socket, userId, enabled), 'Mute updated.');
   const handleSaveFeature = (namespace, value) =>
     runMutation((userId) => updateFeatureState(socket, userId, namespace, value), 'Feature state saved.');
   const handleDeleteFeature = (namespace) =>
@@ -393,7 +415,7 @@ export default function IdentityDatabasePanel() {
                   <SignalsCard user={selectedUser} onAddSignal={handleAddSignal} onRemoveSignal={handleRemoveSignal} />
                 </TabPanel>
                 <TabPanel id="status">
-                  <StatusCard user={selectedUser} onVerified={handleVerified} onDeterrence={handleDeterrence} />
+                  <StatusCard user={selectedUser} onVerified={handleVerified} onDeterrence={handleDeterrence} onMuted={handleMuted} />
                 </TabPanel>
                 <TabPanel id="features">
                   <FeatureStateCard user={selectedUser} onSaveFeature={handleSaveFeature} onDeleteFeature={handleDeleteFeature} />

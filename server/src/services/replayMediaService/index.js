@@ -95,7 +95,11 @@ async function hostReplay({ buffer, job }) {
     title: job.title,
     requester: job.requester,
     requestedBy: job.requestedBy || null,
-    url: `/media/replays/${filename}`,
+    // The readable filename intentionally contains spaces, but the media URL is
+    // also pasted into Discord messages where an unescaped space terminates the
+    // detected link. Encode only the path segment; Express decodes the route
+    // parameter back to the exact on-disk filename before the file is served.
+    url: `/media/replays/${encodeURIComponent(filename)}`,
     proxyUrl: null,
     messageUrl: null,
     filename,
