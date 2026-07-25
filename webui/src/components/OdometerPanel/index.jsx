@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSocket } from '../../context/SocketContext.jsx';
+import useFleetReport from '../../hooks/useFleetReport.js';
+import { isFeatureEnabled } from '../../lib/features.js';
 import CardFrame from '../CardFrame/index.jsx';
 
 function mapByRoverId(entries = []) {
@@ -41,6 +43,22 @@ function formatAge(timestamp, now) {
   return `${Math.round(ageMs / (60 * 1000))}m ago`;
 }
 
+function formatSpeed(mmPerSecond) {
+  const value = Number(mmPerSecond);
+  if (!Number.isFinite(value)) return '--';
+  return `${(value / 1000).toFixed(2)} m/s`;
+}
+
+function formatHealth(percent) {
+  const value = Number(percent);
+  return Number.isFinite(value) ? `${value.toFixed(0)}%` : '--';
+}
+
+function formatEfficiency(whPerKm) {
+  const value = Number(whPerKm);
+  return Number.isFinite(value) ? `${value.toFixed(1)} Wh/km` : '--';
+}
+
 function roverLabel(rover) {
   return rover?.name || rover?.id || 'Unknown rover';
 }
@@ -50,6 +68,7 @@ export default function OdometerPanel() {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const sessionOdometers = useSessionSelector((state) => state.session?.odometers ?? []);
+  const fleetReportsEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'fleetReports'));
   const sessionOdometerMap = useMemo(() => mapByRoverId(sessionOdometers), [sessionOdometers]);
   const [liveOdometerMap, setLiveOdometerMap] = useState({});
   const [now, setNow] = useState(() => Date.now());
@@ -97,36 +116,86 @@ export default function OdometerPanel() {
       })),
     [odometerMap, roster],
   );
+  const visibleRoverIds = useMemo(() => roster.map((rover) => String(rover.id)), [roster]);
 
-  const primaryRoverId = assignedRoverId || visibleRows[0]?.rover?.id || null;
+  /*
+    The emphasized summary represents "your rover", so it must follow the
+    actual assignment rather than silently promoting the first visible rover.
+    Unassigned users still retain the compact all-rover list below.
+  */
+  const primaryRoverId = assignedRoverId || null;
   const primaryRover = visibleRows.find((entry) => String(entry.rover?.id) === String(primaryRoverId))?.rover || null;
   const primary = primaryRoverId ? odometerMap[String(primaryRoverId)] || null : null;
 
   return (
     <CardFrame title="Rover odometer" clipOverflow={false} bodyClassName="space-y-0.5 text-base text-slate-100">
-      {!primaryRoverId ? (
-        <p className="text-sm text-slate-500">No rover odometer data yet.</p>
+      {fleetReportsEnabled ? (
+        <OdometerReportContent
+          now={now}
+          primary={primary}
+          primaryRover={primaryRover}
+          primaryRoverId={primaryRoverId}
+          roverIds={visibleRoverIds}
+          rows={visibleRows}
+        />
       ) : (
-        <>
-          <OdometerSummary odometer={primary} rover={primaryRover} now={now} />
-          <RoverOdometerList rows={visibleRows} primaryRoverId={primaryRoverId} />
-        </>
+        <OdometerContent
+          now={now}
+          primary={primary}
+          primaryRover={primaryRover}
+          primaryRoverId={primaryRoverId}
+          rows={visibleRows}
+        />
       )}
     </CardFrame>
   );
 }
 
-function OdometerSummary({ odometer, rover, now }) {
-  const status = odometer?.status || 'waiting';
-  const ignoredSamples = Number(odometer?.ignoredSamples) || 0;
+function OdometerReportContent({ roverIds, ...props }) {
+  // A lazy state initializer establishes one stable 24-hour query boundary;
+  // ordinary odometer re-renders must not trigger fresh historical requests.
+  const [rangeEnd] = useState(() => Date.now());
+  const { report } = useFleetReport({
+    since: rangeEnd - 24 * 60 * 60 * 1000,
+    until: rangeEnd,
+    compact: true,
+    includeEvents: false,
+    roverIds,
+  });
+  const reportByRoverId = useMemo(
+    () => Object.fromEntries((report?.rovers || []).map((rover) => [String(rover.roverId), rover])),
+    [report],
+  );
+  return <OdometerContent {...props} reportByRoverId={reportByRoverId} />;
+}
+
+function OdometerContent({ now, primary, primaryRover, primaryRoverId, rows, reportByRoverId = {} }) {
+  const primaryReport = primaryRoverId ? reportByRoverId[String(primaryRoverId)] : null;
+  return (
+    <>
+      {primaryRoverId ? (
+        <OdometerSummary odometer={primary} rover={primaryRover} report={primaryReport} now={now} />
+      ) : (
+        <p className="surface px-1 py-0.5 text-sm text-slate-500">You do not currently have a rover.</p>
+      )}
+      <RoverOdometerList rows={rows} primaryRoverId={primaryRoverId} reportByRoverId={reportByRoverId} />
+    </>
+  );
+}
+
+function OdometerSummary({ odometer, rover, report, now }) {
   return (
     <div className="space-y-0.5">
-      <div className="text-sm font-semibold text-slate-200">{roverLabel(rover)}</div>
-      <div className="grid grid-cols-2 gap-0.5 md:grid-cols-3">
+      <div className="flex items-center justify-between gap-1 text-sm">
+        <span className="font-semibold text-slate-200">{roverLabel(rover)}</span>
+        <span className="text-xs text-slate-500">{formatAge(odometer?.updatedAt, now)}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-0.5 md:grid-cols-5">
         <Metric label="Total distance" value={formatDistance(odometer?.totalMm)} />
-        <Metric label="Last update" value={formatAge(odometer?.updatedAt, now)} />
-        <Metric label="Status" value={status} />
-        {ignoredSamples > 0 ? <Metric label="Ignored samples" value={String(ignoredSamples)} /> : null}
+        <Metric label="Session distance" value={formatDistance(odometer?.sessionMm)} />
+        <Metric label="Current speed" value={formatSpeed(odometer?.wheelSpeedsMmPerSecond?.center)} />
+        <Metric label="Battery health" value={formatHealth(report?.batteryHealth?.capacityRetentionPercent)} />
+        <Metric label="Efficiency" value={formatEfficiency(report?.overallWhPerKm)} />
       </div>
     </div>
   );
@@ -141,12 +210,13 @@ function Metric({ label, value }) {
   );
 }
 
-function RoverOdometerList({ rows, primaryRoverId }) {
+function RoverOdometerList({ rows, primaryRoverId, reportByRoverId }) {
   if (!rows.length) return null;
   return (
     <DetailCard title="All rovers">
       {rows.map(({ rover, odometer }) => {
         const active = String(rover?.id) === String(primaryRoverId);
+        const report = reportByRoverId[String(rover?.id)];
         return (
           <div
             key={rover?.id}
@@ -156,7 +226,8 @@ function RoverOdometerList({ rows, primaryRoverId }) {
           >
             <span className="min-w-0 truncate">{roverLabel(rover)}</span>
             <span className="shrink-0 text-right text-slate-100">{formatDistance(odometer?.totalMm)}</span>
-            <span className="shrink-0 text-right text-slate-400">{odometer?.status || 'waiting'}</span>
+            <span className="shrink-0 text-right text-slate-300">{formatHealth(report?.batteryHealth?.capacityRetentionPercent)}</span>
+            <span className="shrink-0 text-right text-slate-400">{formatEfficiency(report?.overallWhPerKm)}</span>
           </div>
         );
       })}
@@ -169,15 +240,6 @@ function DetailCard({ title, children }) {
     <div className="surface space-y-0.5 p-1 text-sm">
       <div className="text-[0.78rem] font-semibold leading-none text-slate-200">{title}</div>
       <div className="space-y-0.5">{children}</div>
-    </div>
-  );
-}
-
-function ValueRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-0.5">
-      <span className="text-slate-300">{label}</span>
-      <span className="min-w-0 truncate text-right text-slate-100">{value ?? '--'}</span>
     </div>
   );
 }
