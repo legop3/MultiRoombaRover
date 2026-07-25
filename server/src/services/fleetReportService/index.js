@@ -83,8 +83,10 @@ if (!isFeatureEnabled('fleetReports')) {
       since: Number(since) || end - 24 * 60 * 60 * 1000,
       until: end,
       roverIds: Array.isArray(roverIds) ? roverIds : undefined,
-      includeEvents: true,
-      eventLimit: 1000,
+      // Daily Discord output is intentionally metric-only. Avoiding the event
+      // query here also prevents irrelevant event volume from bloating the
+      // durable daily snapshot that supports delivery idempotency.
+      includeEvents: false,
     });
   }
 

@@ -1,184 +1,235 @@
 // Fleet Report Builder
-// Purpose: Produces dense read models from stored evidence without leaking presentation logic into collection.
-// Scope: Owns totals, rover comparisons, attention findings, and exact supporting datasets for UI/Discord consumers.
+// Purpose: Produces fleet-wide battery-health and energy-efficiency read models from passive evidence.
+// Scope: Keeps estimation, confidence, and comparison policy out of collection, transport, Discord, and UI code.
+
+const MINIMUM_EFFICIENCY_DISTANCE_MM = 25 * 1000;
 
 function sum(rows, key) {
   return rows.reduce((total, row) => total + (Number(row?.[key]) || 0), 0);
 }
 
-function groupByRover(minutes, roster = []) {
+function median(values) {
+  const usable = values.map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  if (!usable.length) return null;
+  const middle = Math.floor(usable.length / 2);
+  return usable.length % 2 ? usable[middle] : (usable[middle - 1] + usable[middle]) / 2;
+}
+
+function weightedAverage(rows, valueKey, weightKey = 'sampleCount') {
+  const weighted = rows.reduce((result, row) => {
+    const value = Number(row[valueKey]);
+    const weight = Number(row[weightKey]);
+    if (!Number.isFinite(value) || !Number.isFinite(weight) || weight <= 0) return result;
+    result.total += value * weight;
+    result.weight += weight;
+    return result;
+  }, { total: 0, weight: 0 });
+  return weighted.weight ? weighted.total / weighted.weight : null;
+}
+
+function minimum(rows, key) {
+  const values = rows.map((row) => Number(row[key])).filter(Number.isFinite);
+  return values.length ? Math.min(...values) : null;
+}
+
+function maximum(rows, key) {
+  const values = rows.map((row) => Number(row[key])).filter(Number.isFinite);
+  return values.length ? Math.max(...values) : null;
+}
+
+function confidenceForObservationCount(count, averageDepthPercent) {
+  /*
+    Confidence is intentionally continuous evidence summarized into a label,
+    not a pass/fail cycle judgment. Multiple partial observations can become
+    strong evidence, while shallow observations remain visible and useful.
+  */
+  if (count >= 5 && averageDepthPercent >= 25) return 'high';
+  if (count >= 2 && averageDepthPercent >= 10) return 'medium';
+  return 'low';
+}
+
+function buildBatteryHealth({ rover, sessions, registryEntry }) {
+  const referenceMah = Number(registryEntry?.ratedCapacityMah) || Number(rover.reportedCapacityMah) || null;
+  const batteryKey = registryEntry?.batteryKey
+    || sessions[0]?.batteryKey
+    || `unregistered:${rover.roverId}`;
+  const sameBattery = sessions.filter((session) => session.batteryKey === batteryKey);
+  const observations = sameBattery.flatMap((session) => {
+    if (session.kind !== 'discharging' || !referenceMah) return [];
+    const chargeDropMah = Number(session.startChargeMah) - Number(session.endChargeMah);
+    const dischargedMah = Number(session.dischargedMah);
+    if (!Number.isFinite(chargeDropMah) || chargeDropMah < 100 || !Number.isFinite(dischargedMah) || dischargedMah <= 0) {
+      return [];
+    }
+    const depthPercent = chargeDropMah / referenceMah * 100;
+    /*
+      Packet 25 provides the changing charge position while signed current
+      supplies an independent coulomb count. Extrapolating each partial slice
+      produces a capacity observation without requiring a full-to-empty run.
+      Depth is retained so callers can see exactly how much evidence supports
+      the estimate.
+    */
+    return [{
+      startedAt: session.startedAt,
+      endedAt: session.endedAt,
+      depthPercent,
+      estimatedUsableMah: dischargedMah / (chargeDropMah / referenceMah),
+      gapCount: Number(session.gapCount) || 0,
+    }];
+  });
+  const cleanObservations = observations.filter((observation) => observation.gapCount <= 1);
+  const measuredUsableMah = median(cleanObservations.map((observation) => observation.estimatedUsableMah));
+  const observedChargeHighMah = maximum(rover.minutes, 'maxChargeMah');
+  const observedChargeLowMah = minimum(rover.minutes, 'minChargeMah');
+  const observedUsableFloorMah = observedChargeHighMah != null && observedChargeLowMah != null
+    ? Math.max(0, observedChargeHighMah - observedChargeLowMah)
+    : null;
+  const averageDepthPercent = cleanObservations.length
+    ? sum(cleanObservations, 'depthPercent') / cleanObservations.length
+    : 0;
+  const baselineMah = Number(registryEntry?.healthyBaselineMah) || referenceMah;
+  const capacityRetentionPercent = measuredUsableMah && baselineMah
+    ? measuredUsableMah / baselineMah * 100
+    : null;
+  const nominalVoltageMv = rover.averageVoltageMv;
+
+  return {
+    batteryKey,
+    referenceMah,
+    baselineMah,
+    measuredUsableMah,
+    measuredUsableWh: measuredUsableMah && nominalVoltageMv
+      ? measuredUsableMah * nominalVoltageMv / 1e6
+      : null,
+    capacityRetentionPercent,
+    observedUsableFloorMah,
+    observedChargeHighMah,
+    observedChargeLowMah,
+    observationCount: cleanObservations.length,
+    averageObservationDepthPercent: averageDepthPercent,
+    confidence: confidenceForObservationCount(cleanObservations.length, averageDepthPercent),
+    confidenceReason: cleanObservations.length
+      ? `${cleanObservations.length} partial current/charge observations averaging ${averageDepthPercent.toFixed(1)}% depth`
+      : 'collecting partial discharge evidence',
+    dischargedThroughputMah: sum(sameBattery, 'dischargedMah'),
+    latestObservationAt: cleanObservations.reduce(
+      (latest, observation) => Math.max(latest, Number(observation.endedAt) || Number(observation.startedAt) || 0),
+      0,
+    ) || null,
+    observations: cleanObservations,
+  };
+}
+
+function groupByRover({ minutes, sessions, roster, batteryRegistry }) {
   const rosterById = new Map(roster.map((rover) => [String(rover.id), rover]));
-  const grouped = new Map();
+  const minuteGroups = new Map();
   minutes.forEach((minute) => {
     const roverId = String(minute.roverId);
-    if (!grouped.has(roverId)) grouped.set(roverId, []);
-    grouped.get(roverId).push(minute);
+    if (!minuteGroups.has(roverId)) minuteGroups.set(roverId, []);
+    minuteGroups.get(roverId).push(minute);
   });
-  return Array.from(new Set([...rosterById.keys(), ...grouped.keys()])).map((roverId) => {
-    const rows = grouped.get(roverId) || [];
-    const samples = sum(rows, 'sampleCount');
-    const voltageWeighted = rows.reduce(
-      (total, row) => total + (Number(row.avgVoltageMv) || 0) * (Number(row.sampleCount) || 0),
-      0,
-    );
-    const temperatureWeighted = rows.reduce(
-      (total, row) => total + (Number(row.avgTemperatureC) || 0) * (Number(row.sampleCount) || 0),
-      0,
-    );
+
+  return Array.from(new Set([...rosterById.keys(), ...minuteGroups.keys()])).map((roverId) => {
+    const rows = minuteGroups.get(roverId) || [];
+    const distanceMm = sum(rows, 'distanceMm');
+    const dischargedWh = sum(rows, 'dischargedWh');
+    const movingDischargedWh = sum(rows, 'movingDischargedWh');
+    const movingMs = sum(rows, 'movingMs');
     const latest = rows[rows.length - 1] || null;
-    return {
+    const base = {
       roverId,
       name: rosterById.get(roverId)?.name || roverId,
       color: rosterById.get(roverId)?.color || null,
       online: Boolean(rosterById.get(roverId)),
-      sampleCount: samples,
+      minutes: rows,
+      sampleCount: sum(rows, 'sampleCount'),
       coverageMs: sum(rows, 'coverageMs'),
       gapCount: sum(rows, 'gapCount'),
-      commandCount: sum(rows, 'commandCount'),
-      driveCommandCount: sum(rows, 'driveCommandCount'),
-      rejectedCommandCount: sum(rows, 'rejectedCommandCount'),
-      distanceMm: sum(rows, 'distanceMm'),
-      bumpCount: sum(rows, 'bumpCount'),
-      cliffCount: sum(rows, 'cliffCount'),
-      wheelDropCount: sum(rows, 'wheelDropCount'),
-      virtualWallCount: sum(rows, 'virtualWallCount'),
-      overcurrentEpisodeCount: sum(rows, 'overcurrentEpisodeCount'),
+      distanceMm,
+      movingMs,
+      averageSpeedMmPerSecond: movingMs ? distanceMm / (movingMs / 1000) : null,
+      maximumSpeedMmPerSecond: maximum(rows, 'maximumSpeedMmPerSecond'),
       chargedMah: sum(rows, 'chargedMah'),
       dischargedMah: sum(rows, 'dischargedMah'),
-      averageVoltageMv: samples ? voltageWeighted / samples : null,
-      minimumVoltageMv: rows.reduce((value, row) => row.minVoltageMv == null ? value : Math.min(value ?? Infinity, row.minVoltageMv), null),
-      maximumVoltageMv: rows.reduce((value, row) => row.maxVoltageMv == null ? value : Math.max(value ?? -Infinity, row.maxVoltageMv), null),
-      averageTemperatureC: samples ? temperatureWeighted / samples : null,
-      minimumTemperatureC: rows.reduce((value, row) => row.minTemperatureC == null ? value : Math.min(value ?? Infinity, row.minTemperatureC), null),
-      maximumTemperatureC: rows.reduce((value, row) => row.maxTemperatureC == null ? value : Math.max(value ?? -Infinity, row.maxTemperatureC), null),
+      chargedWh: sum(rows, 'chargedWh'),
+      dischargedWh,
+      movingDischargedWh,
+      stationaryDischargedWh: sum(rows, 'stationaryDischargedWh'),
+      overallWhPerKm: distanceMm >= MINIMUM_EFFICIENCY_DISTANCE_MM
+        ? dischargedWh / (distanceMm / 1e6)
+        : null,
+      movingWhPerKm: distanceMm >= MINIMUM_EFFICIENCY_DISTANCE_MM
+        ? movingDischargedWh / (distanceMm / 1e6)
+        : null,
+      efficiencyDistanceRequiredMm: Math.max(0, MINIMUM_EFFICIENCY_DISTANCE_MM - distanceMm),
+      averageVoltageMv: weightedAverage(rows, 'avgVoltageMv'),
+      averageCurrentMa: weightedAverage(rows, 'avgCurrentMa'),
+      minimumVoltageMv: minimum(rows, 'minVoltageMv'),
+      maximumVoltageMv: maximum(rows, 'maxVoltageMv'),
+      averageTemperatureC: weightedAverage(rows, 'avgTemperatureC'),
+      minimumTemperatureC: minimum(rows, 'minTemperatureC'),
+      maximumTemperatureC: maximum(rows, 'maxTemperatureC'),
       latestChargeMah: latest?.lastChargeMah ?? null,
       reportedCapacityMah: latest?.reportedCapacityMah ?? null,
       lastSampleAt: latest ? latest.bucketTs + 60000 : null,
     };
+    const registryEntry = batteryRegistry.find((battery) =>
+      String(battery.roverId) === roverId && battery.retiredAt == null,
+    );
+    base.batteryHealth = buildBatteryHealth({
+      rover: base,
+      sessions: sessions.filter((session) => String(session.roverId) === roverId),
+      registryEntry,
+    });
+    delete base.minutes;
+    return base;
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function buildFindings({ roverRows, events, now }) {
-  const findings = [];
+function buildAttention(roverRows, now) {
+  const attention = [];
   roverRows.forEach((rover) => {
     if (!rover.sampleCount) {
-      findings.push({
-        key: `no-telemetry:${rover.roverId}`,
-        roverId: rover.roverId,
-        severity: rover.online ? 'warning' : 'notice',
-        confidence: 'high',
-        status: 'ongoing',
-        title: rover.online ? 'No battery telemetry in selected range' : 'Rover offline or absent',
-        evidence: { sampleCount: 0 },
-      });
-      return;
-    }
-    if (rover.maximumTemperatureC != null && rover.maximumTemperatureC >= 45) {
-      findings.push({
-        key: `battery-temperature:${rover.roverId}`,
-        roverId: rover.roverId,
-        severity: rover.maximumTemperatureC >= 50 ? 'critical' : 'warning',
-        confidence: 'high',
-        status: 'observed',
-        title: 'High battery temperature observed',
-        evidence: { maximumTemperatureC: rover.maximumTemperatureC, sampleCount: rover.sampleCount },
-      });
-    }
-    if (rover.gapCount > 0) {
-      findings.push({
-        key: `telemetry-gaps:${rover.roverId}`,
+      attention.push({
+        key: `telemetry:${rover.roverId}`,
         roverId: rover.roverId,
         severity: 'notice',
-        confidence: 'high',
-        status: 'observed',
-        title: 'Battery integration contains telemetry gaps',
-        evidence: { gapCount: rover.gapCount, coverageMs: rover.coverageMs },
+        title: rover.online ? 'Battery metrics unavailable in this range' : 'Rover was not observed in this range',
       });
     }
-    if (rover.lastSampleAt && now - rover.lastSampleAt > 5 * 60 * 1000 && rover.online) {
-      findings.push({
-        key: `stale-telemetry:${rover.roverId}`,
+    if (rover.maximumTemperatureC >= 45) {
+      attention.push({
+        key: `temperature:${rover.roverId}`,
+        roverId: rover.roverId,
+        severity: rover.maximumTemperatureC >= 50 ? 'critical' : 'warning',
+        title: `Battery reached ${rover.maximumTemperatureC} °C`,
+      });
+    }
+    if (rover.batteryHealth.capacityRetentionPercent != null
+      && rover.batteryHealth.confidence !== 'low'
+      && rover.batteryHealth.capacityRetentionPercent < 80) {
+      attention.push({
+        key: `capacity:${rover.roverId}`,
+        roverId: rover.roverId,
+        severity: rover.batteryHealth.capacityRetentionPercent < 65 ? 'critical' : 'warning',
+        title: `Estimated usable capacity is ${rover.batteryHealth.capacityRetentionPercent.toFixed(1)}% of baseline`,
+      });
+    }
+    if (rover.online && rover.lastSampleAt && now - rover.lastSampleAt > 5 * 60 * 1000) {
+      attention.push({
+        key: `stale:${rover.roverId}`,
         roverId: rover.roverId,
         severity: 'warning',
-        confidence: 'high',
-        status: 'ongoing',
-        title: 'Telemetry is stale while rover is online',
-        evidence: { lastSampleAt: rover.lastSampleAt },
+        title: 'Battery metrics are stale',
       });
     }
   });
-
-  const criticalEvents = events.filter((event) => event.severity === 'critical');
-  if (criticalEvents.length) {
-    findings.push({
-      key: 'critical-events',
-      roverId: null,
-      severity: 'critical',
-      confidence: 'high',
-      status: 'observed',
-      title: `${criticalEvents.length} critical event${criticalEvents.length === 1 ? '' : 's'} in selected range`,
-      evidence: { eventIds: criticalEvents.slice(0, 25).map((event) => event.id) },
-    });
-  }
-  const rank = { critical: 0, warning: 1, notice: 2, informational: 3 };
-  return findings.sort((a, b) => (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9));
-}
-
-function median(values) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-}
-
-function buildBatteryHealth({ sessions, roverRows, batteryRegistry }) {
-  return roverRows.map((rover) => {
-    const roverSessions = sessions.filter((session) => String(session.roverId) === String(rover.roverId));
-    const qualified = roverSessions
-      .filter((session) => session.kind === 'discharging' && session.details?.capacityTestQualified)
-      .sort((a, b) => a.startedAt - b.startedAt);
-    // The first three qualified tests establish the learned healthy baseline.
-    // A median resists one unusually light/heavy run while remaining auditable
-    // in the session table. Battery replacement identity will start a separate
-    // key, so only sessions for the current key should contribute once one is
-    // registered.
-    const activeRegistryEntry = batteryRegistry.find((battery) =>
-      String(battery.roverId) === String(rover.roverId) && battery.retiredAt == null,
-    );
-    const currentKey = activeRegistryEntry?.batteryKey || qualified[qualified.length - 1]?.batteryKey || roverSessions[0]?.batteryKey || `unregistered:${rover.roverId}`;
-    const sameBattery = qualified.filter((session) => session.batteryKey === currentKey);
-    const baselineTests = sameBattery.slice(0, 3);
-    const baselineMah = median(baselineTests.map((session) => Number(session.dischargedMah)));
-    const latest = sameBattery[sameBattery.length - 1] || null;
-    const measuredUsableMah = latest ? Number(latest.dischargedMah) : null;
-    const capacityRetentionPercent = baselineMah && measuredUsableMah != null
-      ? measuredUsableMah / baselineMah * 100
-      : null;
-    const throughputMah = roverSessions.reduce((total, session) => total + (Number(session.dischargedMah) || 0), 0);
-    const cycleReferenceMah = baselineMah || Number(rover.reportedCapacityMah) || null;
-    return {
-      roverId: rover.roverId,
-      batteryKey: currentKey,
-      qualifiedTestCount: sameBattery.length,
-      baselineTestCount: baselineTests.length,
-      baselineMah,
-      measuredUsableMah,
-      capacityRetentionPercent,
-      equivalentFullCycles: cycleReferenceMah ? throughputMah / cycleReferenceMah : null,
-      dischargedThroughputMah: throughputMah,
-      latestQualifiedTestAt: latest?.endedAt || null,
-      confidence: sameBattery.length >= 3 ? 'high' : sameBattery.length >= 1 ? 'medium' : 'low',
-      confidenceReason: sameBattery.length >= 3
-        ? 'at least three qualified full-to-low tests'
-        : sameBattery.length >= 1
-          ? 'fewer than three qualified tests'
-          : 'no qualified full-to-low capacity test',
-    };
-  });
+  const rank = { critical: 0, warning: 1, notice: 2 };
+  return attention.sort((a, b) => rank[a.severity] - rank[b.severity]);
 }
 
 function createReportBuilder({ storage, collector, roverManager }) {
-  function build({ since, until, roverIds, includeEvents = true, eventLimit = 500 }) {
+  function build({ since, until, roverIds, includeEvents = false, eventLimit = 500 }) {
     const visibleRoster = Array.from(roverManager.rovers?.values?.() || []).map((record) => ({
       id: record.id,
       name: record.name || record.id,
@@ -190,48 +241,47 @@ function createReportBuilder({ storage, collector, roverManager }) {
       : visibleRoster;
     const effectiveIds = requestedIds || roster.map((rover) => String(rover.id));
     const minutes = storage.listMinutes({ since, until, roverIds: effectiveIds });
-    const events = includeEvents
-      ? storage.listEvents({ since, until, roverIds: effectiveIds, limit: eventLimit })
-      : [];
-    const batterySessions = storage.listBatterySessions({ since, until, roverIds: effectiveIds, limit: 500 });
-    const roverRows = groupByRover(minutes, roster);
+    const batterySessions = storage.listBatterySessions({ since, until, roverIds: effectiveIds, limit: 2000 });
     const batteryRegistry = storage.listBatteries(effectiveIds);
-    const batteryHealth = buildBatteryHealth({ sessions: batterySessions, roverRows, batteryRegistry });
-    const findings = buildFindings({ roverRows, events, now: Date.now() });
+    const roverRows = groupByRover({ minutes, sessions: batterySessions, roster, batteryRegistry });
+    const attention = buildAttention(roverRows, Date.now());
+    const distanceMm = sum(roverRows, 'distanceMm');
+    const dischargedWh = sum(roverRows, 'dischargedWh');
+    const movingDischargedWh = sum(roverRows, 'movingDischargedWh');
+
     return {
       generatedAt: Date.now(),
       range: { since, until },
+      methodology: {
+        minimumEfficiencyDistanceMm: MINIMUM_EFFICIENCY_DISTANCE_MM,
+        historicalWhAvailable: false,
+      },
       totals: {
         roverCount: roverRows.length,
         onlineRoverCount: roverRows.filter((rover) => rover.online).length,
-        sampleCount: sum(minutes, 'sampleCount'),
-        coverageMs: sum(minutes, 'coverageMs'),
-        telemetryGapCount: sum(minutes, 'gapCount'),
-        commandCount: sum(minutes, 'commandCount'),
-        driveCommandCount: sum(minutes, 'driveCommandCount'),
-        rejectedCommandCount: sum(minutes, 'rejectedCommandCount'),
-        distanceMm: sum(minutes, 'distanceMm'),
-        bumpCount: sum(minutes, 'bumpCount'),
-        cliffCount: sum(minutes, 'cliffCount'),
-        wheelDropCount: sum(minutes, 'wheelDropCount'),
-        virtualWallCount: sum(minutes, 'virtualWallCount'),
-        overcurrentEpisodeCount: sum(minutes, 'overcurrentEpisodeCount'),
-        chargedMah: sum(minutes, 'chargedMah'),
-        dischargedMah: sum(minutes, 'dischargedMah'),
-        eventCountReturned: events.length,
-        batterySessionCount: batterySessions.length,
-        criticalFindingCount: findings.filter((finding) => finding.severity === 'critical').length,
-        warningFindingCount: findings.filter((finding) => finding.severity === 'warning').length,
+        distanceMm,
+        movingMs: sum(roverRows, 'movingMs'),
+        chargedWh: sum(roverRows, 'chargedWh'),
+        dischargedWh,
+        movingDischargedWh,
+        stationaryDischargedWh: sum(roverRows, 'stationaryDischargedWh'),
+        overallWhPerKm: distanceMm >= MINIMUM_EFFICIENCY_DISTANCE_MM
+          ? dischargedWh / (distanceMm / 1e6)
+          : null,
+        movingWhPerKm: distanceMm >= MINIMUM_EFFICIENCY_DISTANCE_MM
+          ? movingDischargedWh / (distanceMm / 1e6)
+          : null,
+        attentionCount: attention.filter((item) => item.severity !== 'notice').length,
       },
       rovers: roverRows,
-      findings,
-      minutes,
-      batterySessions,
-      batteryHealth,
+      attention,
       batteryRegistry,
       dailyReportHistory: storage.listDailyReports(365),
-      events,
-      live: collector.getLiveState(),
+      // Events remain available only for explicit advanced/debug consumers.
+      // Neither the normal UI nor Discord requests them.
+      events: includeEvents
+        ? storage.listEvents({ since, until, roverIds: effectiveIds, limit: eventLimit })
+        : [],
       diagnostics: {
         collector: collector.getDiagnostics(),
         storage: storage.getDiagnostics(),
@@ -243,5 +293,6 @@ function createReportBuilder({ storage, collector, roverManager }) {
 }
 
 module.exports = {
+  MINIMUM_EFFICIENCY_DISTANCE_MM,
   createReportBuilder,
 };

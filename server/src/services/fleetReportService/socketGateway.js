@@ -44,18 +44,11 @@ function registerSocketGateway({ roverManager, reportBuilder, storage, collector
           report.totals.eventCountReturned = report.events.length;
         }
         if (payload.compact === true) {
-          // The Activities card needs current totals and findings, not the
-          // underlying time series. Removing bulky evidence here keeps the
-          // always-visible surface cheap while `/reports` retains full depth.
-          report.minutes = [];
+          // The Activities card now consumes the same all-rovers metric rows
+          // as fullscreen. The builder no longer attaches minute/session
+          // evidence by default, so compacting only removes archival metadata.
           report.events = [];
-          report.batterySessions = [];
           report.dailyReportHistory = [];
-          report.live = report.live.map((entry) => ({
-            roverId: entry.roverId,
-            lastAt: entry.lastAt,
-            sessionKind: entry.sessionKind,
-          }));
         }
         cb({ ok: true, report });
       } catch (err) {

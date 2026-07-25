@@ -2,7 +2,7 @@
 // Purpose: Schedules and delivers completed-day fleet summaries to the existing admin alert channel.
 // Scope: Discord owns timing/formatting/delivery; the fleet service owns evidence, analysis, and durable delivery state.
 const { DateTime } = require('luxon');
-const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 
 function parseSendTime(value) {
   const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || '').trim());
@@ -54,24 +54,34 @@ function createFleetDailyReports({ logger, discordConfig, fleetConfig, fleetRepo
 
   function buildEmbed(reportDate, report) {
     const totals = report.totals;
-    const attention = report.findings.slice(0, 12).map((finding) =>
-      `• ${finding.roverId ? `${finding.roverId}: ` : ''}${finding.title} (${finding.severity}, ${finding.confidence} confidence)`,
-    ).join('\n') || 'No report findings.';
-    const roverLines = report.rovers.map((rover) =>
-      `• ${rover.name}: ${formatNumber(rover.dischargedMah)} mAh used, ${formatNumber(rover.chargedMah)} mAh charged, ${formatNumber(rover.sampleCount, 0)} samples, ${formatNumber(rover.gapCount, 0)} gaps`,
+    const attention = report.attention
+      .filter((item) => item.severity !== 'notice')
+      .slice(0, 12)
+      .map((item) => `• ${item.roverId}: ${item.title}`)
+      .join('\n') || 'No material battery or efficiency changes need attention.';
+    const roverLines = report.rovers.map((rover) => {
+      const health = rover.batteryHealth || {};
+      const efficiency = rover.overallWhPerKm == null
+        ? `efficiency pending (${formatNumber(rover.distanceMm / 1000, 0)} m)`
+        : `${formatNumber(rover.overallWhPerKm)} Wh/km`;
+      const capacity = health.measuredUsableMah == null
+        ? `health collecting (${health.confidence || 'low'} confidence)`
+        : `${formatNumber(health.measuredUsableMah / 1000, 2)} Ah usable · ${formatNumber(health.capacityRetentionPercent)}% retained · ${health.confidence} confidence`;
+      return `• ${rover.name}: ${formatNumber(rover.distanceMm / 1e6, 2)} km · ${formatNumber(rover.dischargedWh, 2)} Wh · ${efficiency}\n  Battery: ${capacity}`;
+    }
     ).join('\n') || 'No public rover telemetry.';
     return new EmbedBuilder()
       .setTitle(`Daily fleet report — ${reportDate}`)
-      .setColor(totals.criticalFindingCount ? 0xe53935 : totals.warningFindingCount ? 0xf0b651 : 0x4caf50)
+      .setColor(totals.attentionCount ? 0xf0b651 : 0x4caf50)
       .addFields(
         {
-          name: 'Fleet totals',
-          value: `${totals.onlineRoverCount}/${totals.roverCount} online · ${formatNumber(totals.sampleCount, 0)} samples · ${formatNumber(totals.dischargedMah)} mAh used · ${formatNumber(totals.chargedMah)} mAh charged · ${formatNumber(totals.telemetryGapCount, 0)} gaps`,
+          name: 'Fleet energy',
+          value: `${formatNumber(totals.distanceMm / 1e6, 2)} km · ${formatNumber(totals.dischargedWh, 2)} Wh · ${totals.overallWhPerKm == null ? 'efficiency pending' : `${formatNumber(totals.overallWhPerKm)} Wh/km`} · ${formatNumber(totals.stationaryDischargedWh, 2)} stationary Wh`,
         },
         { name: 'Needs attention', value: attention.slice(0, 1024) },
         { name: 'Rovers', value: roverLines.slice(0, 1024) },
       )
-      .setFooter({ text: 'Detailed read-only evidence is available on the server reports page.' });
+      .setFooter({ text: 'The server reports page contains the complete all-rovers metric table.' });
   }
 
   async function deliverPreviousDay() {
@@ -79,31 +89,23 @@ function createFleetDailyReports({ logger, discordConfig, fleetConfig, fleetRepo
     const range = completedDayRange();
     const existing = fleetReportService.storage.getDailyReport(range.reportDate);
     if (existing?.discordDeliveredAt) return;
-    const report = existing?.report || fleetReportService.getDailyReport({
+    const report = fleetReportService.getDailyReport({
       since: range.since,
       until: range.until,
       roverIds: publicRoverIds(),
     });
     if (!report) return;
-    // Lockdown-only records and raw event payloads do not belong in a shared
-    // Discord attachment. The interactive server UI applies per-socket access
-    // and remains the place for complete event evidence.
-    const attachmentReport = {
-      ...report,
-      events: report.events.filter((event) => event.visibility !== 'lockdown').map(({ payload, ...event }) => ({
-        ...event,
-        payload,
-      })),
-    };
-    fleetReportService.storage.saveDailyReport(range.reportDate, attachmentReport);
-    const attachment = new AttachmentBuilder(
-      Buffer.from(JSON.stringify(attachmentReport, null, 2)),
-      { name: `fleet-report-${range.reportDate}.json` },
-    );
+    /*
+      Daily storage retains the exact metric report used for delivery, but the
+      Discord message intentionally has no raw JSON attachment. Admins need
+      actionable fleet comparisons here; the complete read-only evidence stays
+      on the reports page without turning routine events into notification noise.
+    */
+    fleetReportService.storage.saveDailyReport(range.reportDate, report);
     const sent = await sendToChannel(
       channelId,
       `Daily fleet report for ${range.reportDate}`,
-      { embeds: [buildEmbed(range.reportDate, report)], files: [attachment] },
+      { embeds: [buildEmbed(range.reportDate, report)] },
       { parse: [] },
     );
     if (sent) {

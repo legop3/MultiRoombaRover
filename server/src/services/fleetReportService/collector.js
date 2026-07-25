@@ -68,6 +68,12 @@ function makeMinute(roverId, now) {
     gapCount: 0,
     chargedMah: 0,
     dischargedMah: 0,
+    chargedWh: 0,
+    dischargedWh: 0,
+    movingDischargedWh: 0,
+    stationaryDischargedWh: 0,
+    movingMs: 0,
+    maximumSpeedMmPerSecond: null,
     minVoltageMv: null,
     maxVoltageMv: null,
     voltageTotal: 0,
@@ -107,6 +113,12 @@ function persistedMinute(minute) {
     gapCount: minute.gapCount,
     chargedMah: minute.chargedMah,
     dischargedMah: minute.dischargedMah,
+    chargedWh: minute.chargedWh,
+    dischargedWh: minute.dischargedWh,
+    movingDischargedWh: minute.movingDischargedWh,
+    stationaryDischargedWh: minute.stationaryDischargedWh,
+    movingMs: Math.round(minute.movingMs),
+    maximumSpeedMmPerSecond: minute.maximumSpeedMmPerSecond,
     minVoltageMv: minute.minVoltageMv,
     maxVoltageMv: minute.maxVoltageMv,
     avgVoltageMv: minute.voltageCount ? minute.voltageTotal / minute.voltageCount : null,
@@ -240,7 +252,7 @@ function createCollector({ storage, logger, maximumIntegrationGapMs, minimumCapa
     }
   }
 
-  function updateMinute(minute, sensors, elapsedMs, chargedMah, dischargedMah, gap) {
+  function updateMinute(minute, sensors, elapsedMs, chargedMah, dischargedMah, chargedWh, dischargedWh, gap) {
     const voltage = finite(sensors?.voltageMv);
     const current = finite(sensors?.currentMa);
     const temperature = finite(sensors?.batteryTemperatureC);
@@ -251,6 +263,23 @@ function createCollector({ storage, logger, maximumIntegrationGapMs, minimumCapa
     minute.gapCount += gap ? 1 : 0;
     minute.chargedMah += chargedMah;
     minute.dischargedMah += dischargedMah;
+    minute.chargedWh += chargedWh;
+    minute.dischargedWh += dischargedWh;
+    /*
+      Movement classification deliberately consumes the center speed produced
+      by odometerService. That service already owns encoder rollover, physical
+      conversion, and impossible-jump rejection; duplicating those rules here
+      would allow reporting and the rover's actual odometer to disagree.
+    */
+    const speed = finite(sensors?.wheelSpeedsMmPerSecond?.center);
+    const moving = speed != null && Math.abs(speed) >= 1;
+    if (moving) {
+      minute.movingMs += elapsedMs;
+      minute.movingDischargedWh += dischargedWh;
+    } else {
+      minute.stationaryDischargedWh += dischargedWh;
+    }
+    minute.maximumSpeedMmPerSecond = maximum(minute.maximumSpeedMmPerSecond, speed == null ? null : Math.abs(speed));
     minute.minVoltageMv = minimum(minute.minVoltageMv, voltage);
     minute.maxVoltageMv = maximum(minute.maxVoltageMv, voltage);
     if (voltage != null) { minute.voltageTotal += voltage; minute.voltageCount += 1; }
@@ -371,6 +400,16 @@ function createCollector({ storage, logger, maximumIntegrationGapMs, minimumCapa
     const deltaMah = currentMa * validElapsedMs / 3600000;
     const chargedMah = Math.max(0, deltaMah);
     const dischargedMah = Math.max(0, -deltaMah);
+    const voltageMv = finite(sensors.voltageMv);
+    /*
+      Millivolts multiplied by milliamps are microwatts. Dividing their
+      millisecond product by 3.6e12 therefore yields watt-hours. Integrating
+      voltage and current together here is required: multiplying independent
+      daily averages later would produce incorrect energy whenever load varies.
+    */
+    const deltaWh = voltageMv == null ? 0 : voltageMv * currentMa * validElapsedMs / 3.6e12;
+    const chargedWh = Math.max(0, deltaWh);
+    const dischargedWh = Math.max(0, -deltaWh);
 
     const bucketTs = Math.floor(now / MINUTE_MS) * MINUTE_MS;
     if (state.minute.bucketTs !== bucketTs) {
@@ -378,7 +417,16 @@ function createCollector({ storage, logger, maximumIntegrationGapMs, minimumCapa
       diagnostics.minuteWrites += 1;
       state.minute = makeMinute(state.roverId, now);
     }
-    updateMinute(state.minute, sensors, validElapsedMs, chargedMah, dischargedMah, gap);
+    updateMinute(
+      state.minute,
+      sensors,
+      validElapsedMs,
+      chargedMah,
+      dischargedMah,
+      chargedWh,
+      dischargedWh,
+      gap,
+    );
     const bumps = sensors?.bumpsAndWheelDrops || {};
     const nextSafety = {
       bump: Boolean(bumps.bumpLeft || bumps.bumpRight),

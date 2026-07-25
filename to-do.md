@@ -1,6 +1,8 @@
 1. assign rovers based on battery percentage, give people highest one
-2. add admin ui for VIP and private requests instead of only through discord
-3. add flag in roverd for video aspect ratio
+2. bandwidth savings option for videoplayer invisible disconnecting
+3. setting to disable replay popups in spectator settings menu
+4. add admin ui for VIP and private requests instead of only through discord
+5. add flag in roverd for video aspect ratio
    1. maybe dont? whats the point anyway? why do we exist at all? is there purpose to life?
       1. just removing the black bars, doesnt do anything practical for the driver page
       2. would only actually help for keeping spectate page compact
@@ -9,7 +11,7 @@
    3. default is 4:3
    4. all it does is tell the web UI to make the rover video 16:9 or 4:3 shaped
       1. web UI should default to 4:3 if that rover doesnt yet have that config yet
-4.  fix this:
+6.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^

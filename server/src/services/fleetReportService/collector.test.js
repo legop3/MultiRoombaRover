@@ -58,6 +58,51 @@ test('integrates signed battery current while excluding long telemetry gaps', ()
   }
 });
 
+test('integrates watt-hours and classifies energy with existing odometer speed', () => {
+  const { collector } = makeHarness();
+  const originalNow = Date.now;
+  let now = 1_500_000;
+  Date.now = () => now;
+  try {
+    collector.collectSensor({
+      roverId: 'alpha',
+      sensors: sensors({ wheelSpeedsMmPerSecond: { left: 200, right: 200, center: 200 } }),
+    });
+    now += 1000;
+    collector.collectSensor({
+      roverId: 'alpha',
+      sensors: sensors({ wheelSpeedsMmPerSecond: { left: 200, right: 200, center: 200 } }),
+    });
+    now += 1000;
+    collector.collectSensor({
+      roverId: 'alpha',
+      sensors: sensors({ wheelSpeedsMmPerSecond: { left: 0, right: 0, center: 0 } }),
+    });
+    const live = collector.getLiveState()[0].minute;
+    /*
+      A 14.5 V, 3.6 A discharge is 52.2 W. Two one-second intervals therefore
+      consume 52.2 / 1800 Wh; the first is moving and the second stationary.
+      This verifies that the collector uses odometer speed rather than deriving
+      movement from commands.
+    */
+    assert.ok(Math.abs(live.dischargedWh - (52.2 / 1800)) < 1e-12);
+    assert.ok(Math.abs(live.movingDischargedWh - (52.2 / 3600)) < 1e-12);
+    assert.ok(Math.abs(live.stationaryDischargedWh - (52.2 / 3600)) < 1e-12);
+    assert.equal(live.movingMs, 1000);
+    assert.equal(live.maximumSpeedMmPerSecond, 200);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test('uses cumulative odometer distance without recalculating encoder movement', () => {
+  const { collector } = makeHarness();
+  collector.collectOdometer({ roverId: 'alpha', odometer: { totalMm: 1000, updatedAt: 4_000_000 } });
+  collector.collectOdometer({ roverId: 'alpha', odometer: { totalMm: 1250, updatedAt: 4_001_000 } });
+  const live = collector.getLiveState()[0].minute;
+  assert.equal(live.distanceMm, 250);
+});
+
 test('aggregates drive commands into minute counters instead of event noise', () => {
   const { collector, writes } = makeHarness();
   const originalNow = Date.now;
