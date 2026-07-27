@@ -10,6 +10,7 @@ const EXTERNAL_SPECTATOR_ACCESS_MODES = new Set(['off', 'on', 'verifiedOnly', 'a
 
 const DEFAULT_BANDWIDTH_SAVINGS = Object.freeze({
   multiTabProtection: 'verifiedOnly',
+  pauseHiddenRoverVideo: false,
   nonTurnVideo: Object.freeze({
     mode: 'snapshots',
     userThreshold: 0,
@@ -26,6 +27,15 @@ function normalizeEnum(value, allowed, fallback) {
   */
   const normalized = typeof value === 'string' ? value.trim() : '';
   return allowed.has(normalized) ? normalized : fallback;
+}
+
+function normalizeBoolean(value, fallback) {
+  /*
+    YAML booleans must stay real booleans. Treating strings such as "false" as
+    truthy would silently enable a bandwidth policy that the operator intended
+    to disable, so invalid values fall back to the documented server default.
+  */
+  return typeof value === 'boolean' ? value : fallback;
 }
 
 function normalizeNonTurnVideo(value) {
@@ -52,6 +62,10 @@ function buildBandwidthSavingsPolicy(config = loadConfig()) {
       raw.multiTabProtection,
       MULTI_TAB_MODES,
       DEFAULT_BANDWIDTH_SAVINGS.multiTabProtection,
+    ),
+    pauseHiddenRoverVideo: normalizeBoolean(
+      raw.pauseHiddenRoverVideo,
+      DEFAULT_BANDWIDTH_SAVINGS.pauseHiddenRoverVideo,
     ),
     nonTurnVideo: normalizeNonTurnVideo(raw.nonTurnVideo),
     externalSpectatorVideo: normalizeEnum(

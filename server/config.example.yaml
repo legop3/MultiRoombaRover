@@ -60,6 +60,11 @@ bandwidthSavings:
   #   verifiedOnly: verified/admin users may keep multiple driver tabs; unverified users may not
   #   notAllowed: every identity is limited to one driver tab
   multiTabProtection: "verifiedOnly"
+  # Disconnect rover video when its player is outside the viewport or the web
+  # page is in a background browser tab. Rover audio is a separate stream and
+  # remains connected. /mini intentionally keeps its existing always-warm video
+  # behavior regardless of this option.
+  pauseHiddenRoverVideo: false
   # Video for users who are attached to a source but do not currently own its
   # active turn. "snapshots" saves upload bandwidth; "live" allows full video
   # whenever the normal mode/visibility rules allow it.

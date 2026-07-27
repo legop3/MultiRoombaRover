@@ -128,18 +128,37 @@ export default function RoverMediaPlayer({
   label,
   forceMute = false,
   sensors,
-  pauseVideoWhenHidden = true,
+  pauseVideoWhenHidden = null,
 }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const effectiveRoverId = roverId ?? assignedRoverId;
   const mode = useSessionSelector((state) => state.session?.mode || null);
+  const configuredPauseHiddenRoverVideo = useSessionSelector(
+    /*
+      The server-normalized session policy is the browser source of truth. An
+      exact true check also preserves the requested off-by-default behavior
+      during initial session loading or when connected to an older payload.
+    */
+    (state) => state.session?.bandwidthSavings?.pauseHiddenRoverVideo === true,
+  );
   const rosterEntry = useSessionSelector((state) =>
     effectiveRoverId && Array.isArray(state.session?.roster)
       ? state.session.roster.find((item) => String(item.id) === String(effectiveRoverId)) || null
       : null,
   );
   const hasAudio = hasRoverAudioCapture(rosterEntry);
-  const { containerRef, isVisible: isVideoVisible } = useVideoVisibilityGate(pauseVideoWhenHidden);
+  /*
+    A surface-level override is retained for intentional exceptions. /mini sets
+    false explicitly because its carousel depends on hidden players remaining
+    warm; every normal player follows the server-configured bandwidth policy.
+  */
+  const shouldPauseVideoWhenHidden =
+    typeof pauseVideoWhenHidden === 'boolean'
+      ? pauseVideoWhenHidden
+      : configuredPauseHiddenRoverVideo;
+  const { containerRef, isVisible: isVideoVisible } = useVideoVisibilityGate(
+    shouldPauseVideoWhenHidden,
+  );
   const autoVideoEnabled = videoMode ? videoMode === 'whep' : true;
   const autoAudioEnabled = hasAudio;
   const autoVideoEntries = useMemo(
