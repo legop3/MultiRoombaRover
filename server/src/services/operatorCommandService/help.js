@@ -25,7 +25,7 @@ function formatHelp({ commandPrefix = 'rs', timeStatusCommand = 'ts', topic = ''
   const requestedCategory = normalizedTopic === 'feature' ? 'features' : normalizedTopic;
   const categoryNames = requestedCategory && CATEGORIES[requestedCategory]
     ? [requestedCategory]
-    : ['system', 'admin', 'features', ...(includeDiscord ? ['discord'] : [])];
+    : ['system', 'admin', 'features', 'fun', ...(includeDiscord ? ['discord'] : [])];
 
   const output = ['**Rover Bot Commands**'];
   for (const categoryName of categoryNames) {

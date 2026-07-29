@@ -25,8 +25,10 @@ const {
 } = require('../verificationService');
 const { publishEvent } = require('../eventBus');
 const assignmentService = require('../assignmentService');
+const funStatsService = require('../funStatsService');
 const { loadConfig } = require('../../helpers/configLoader');
 const { createCommandHandlers } = require('../operatorCommandService');
+const { createCooldownGate } = require('../operatorCommandService/cooldowns');
 const { parseCommandText } = require('../operatorCommandService/config');
 const { createWebTransportHandlers } = require('../operatorCommandService/webTransport');
 const { commandReplyToText } = require('./commandResultFormatter');
@@ -38,6 +40,14 @@ const {
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
+
+/*
+  Site chat builds a fresh command router for every message so each router can
+  close over the sending socket. Fun command cooldowns therefore have to live out
+  here: a gate created inside the router would be thrown away after one message
+  and would never actually rate limit anything.
+*/
+const commandCooldowns = createCooldownGate();
 
 function isTextCommand(text) {
   return parseCommandText(text, config).matched;
@@ -120,6 +130,12 @@ function createChatCommandRequest({ socket, text, sendSystemMessage }) {
     actor: {
       bot: false,
       id: socket.id,
+      /*
+        Fun command tallies are keyed by identity rather than connection, so the
+        canonical user id is passed alongside the socket id. Without it a user's
+        bonk count would reset on every reconnect and split across browser tabs.
+      */
+      userId: String(socket?.data?.userId || '').trim() || null,
       label: nickname,
       isAdmin: isAdmin(socket),
       isLockdownAdmin: isLockdownAdmin(socket),
@@ -185,6 +201,16 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     muteUser,
     unmuteUser,
     sanitizeMentions,
+    funStatsService,
+    commandCooldowns,
+    /*
+      Fun commands that move hardware need the sending socket so they can prove
+      the caller holds control. issueCommand is required lazily for the same
+      reason replayEngineV2 is: commandService registers socket handlers on load,
+      and chatService should not pull that forward in the boot order.
+    */
+    getActorSocket: () => socket,
+    issueCommand: (roverId, payload) => require('../commandService').issueCommand(roverId, payload),
     sendToChannel: null,
     isAdminUser: (id) => String(id) === String(socket.id) && isAdmin(socket),
     isLockdownAdminUser: (id) => String(id) === String(socket.id) && isLockdownAdmin(socket),
