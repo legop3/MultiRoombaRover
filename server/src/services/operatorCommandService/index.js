@@ -8,6 +8,7 @@ const { createReasonCommand } = require('./commands/reason');
 const { createGoalCommand } = require('./commands/goal');
 const { createVerifyCommand } = require('./commands/verify');
 const { createDeterCommand } = require('./commands/deter');
+const { createGainCommand } = require('./commands/gain');
 const { createLightsCommand } = require('./commands/lights');
 const { createKickCommand } = require('./commands/kick');
 const { createLiftCommand } = require('./commands/lift');
@@ -47,6 +48,7 @@ function createCommandHandlers(deps) {
   const handleGoalCommand = createGoalCommand(deps);
   const handleVerifyCommand = createVerifyCommand(deps);
   const handleDeterCommand = createDeterCommand(deps);
+  const handleGainCommand = createGainCommand(deps);
   const handleBridgeCommand = transportHandlers.bridge;
   const handleTimeStatusCommand = transportHandlers.timeStatus;
   const handleLightsCommand = createLightsCommand(deps);
@@ -97,7 +99,7 @@ function createCommandHandlers(deps) {
     // is included because its lock/unlock subcommands change room policy. Its
     // ordinary on/off/color actions are also intentionally restricted to a
     // lockdown admin while the entire server is in lockdown.
-    const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'lights', 'kick', 'lift', 'neato']);
+    const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'gain', 'lights', 'kick', 'lift', 'neato']);
     const isAccessModeCommand = commandDefinition?.permission === 'access-mode';
 
     // Feature commands are public activities while access is open or managed
@@ -153,6 +155,8 @@ function createCommandHandlers(deps) {
         return handleVerifyCommand(request, tokens);
       case 'deter':
         return handleDeterCommand(request, tokens);
+      case 'gain':
+        return handleGainCommand(request, tokens);
       default:
         return request.reply(formatHelp({ commandPrefix, timeStatusCommand, includeDiscord: request.transport === 'discord', isFeatureEnabled: deps.isFeatureEnabled }));
     }

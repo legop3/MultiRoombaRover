@@ -11,6 +11,15 @@ const { isAdmin } = require('../roleService');
 const roverManager = require('../roverManager');
 const { getFeatureState, setFeatureState, getUserIdForSocket } = require('../identityService');
 const { issueCommand } = require('../commandService');
+const {
+  GAIN_KEYS,
+  clampGain,
+  clampFraction,
+  normalizeUserGains,
+  normalizeGainSet,
+  resolveCeilings,
+  applyCeilings,
+} = require('./gainMath');
 
 const audioLevelsEvents = new EventEmitter();
 const DATA_DIR = resolveDataDir();
@@ -18,13 +27,6 @@ const STORE_PATH = resolveDataPath('audio-levels.json');
 const config = loadConfig();
 const configuredDefaults = config.audioLevels || {};
 const configuredUserCaps = configuredDefaults.userGainCaps || {};
-
-/*
-  The three gain keys are the same on every layer of this feature: the global
-  admin gains, the admin-editable VIP boost caps, and each user's personal
-  preference. Iterating one list keeps those layers from drifting apart.
-*/
-const GAIN_KEYS = ['hornGain', 'ttsGain', 'forwardGain'];
 
 /*
   Per-user preferences live in identity feature state so they follow the user
@@ -45,35 +47,15 @@ const USER_GAIN_CAP_DEFAULTS = {
   forwardGain: 0.4,
 };
 
-function clampGain(value, fallback = 1) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.max(0, Math.min(4, num));
-}
-
-function clampFraction(value, fallback = 1) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.max(0, Math.min(1, num));
-}
-
 const DEFAULTS = {
   hornGain: clampGain(configuredDefaults.hornGain, 1),
   ttsGain: clampGain(configuredDefaults.ttsGain, 1),
   forwardGain: clampGain(configuredDefaults.forwardGain, 1),
-  userGainCaps: {
-    hornGain: clampGain(configuredUserCaps.hornGain, USER_GAIN_CAP_DEFAULTS.hornGain),
-    ttsGain: clampGain(configuredUserCaps.ttsGain, USER_GAIN_CAP_DEFAULTS.ttsGain),
-    forwardGain: clampGain(configuredUserCaps.forwardGain, USER_GAIN_CAP_DEFAULTS.forwardGain),
-  },
+  userGainCaps: normalizeGainSet(configuredUserCaps, USER_GAIN_CAP_DEFAULTS),
 };
 
 function normalizeUserGainCaps(raw = {}, fallback = DEFAULTS.userGainCaps) {
-  return {
-    hornGain: clampGain(raw?.hornGain, fallback.hornGain),
-    ttsGain: clampGain(raw?.ttsGain, fallback.ttsGain),
-    forwardGain: clampGain(raw?.forwardGain, fallback.forwardGain),
-  };
+  return normalizeGainSet(raw, fallback);
 }
 
 function normalizeStore(raw = {}) {
@@ -141,34 +123,26 @@ function emitChange(reason = 'update', extra = {}) {
   });
 }
 
-/*
-  Ceiling resolution. A user without the boost flag can never exceed the global
-  admin gain. The flag raises the ceiling to the admin-managed hard cap, and
-  Math.max keeps the flag from ever being a downgrade: if an admin runs the
-  global gain higher than the boost cap, a boosted user simply keeps the global
-  ceiling instead of losing volume for holding a permission.
-*/
+function getAdminLimits() {
+  const current = loadState();
+  return {
+    hornGain: current.hornGain,
+    ttsGain: current.ttsGain,
+    forwardGain: current.forwardGain,
+  };
+}
+
 function getGainCeilings(hasBoost) {
   const current = loadState();
-  const caps = current.userGainCaps;
-  const ceilings = {};
-  GAIN_KEYS.forEach((key) => {
-    const adminCeiling = clampGain(current[key], 0);
-    ceilings[key] = hasBoost ? Math.max(adminCeiling, clampGain(caps[key], 0)) : adminCeiling;
+  return resolveCeilings({
+    adminLimits: getAdminLimits(),
+    boostCaps: current.userGainCaps,
+    hasBoost,
   });
-  return ceilings;
 }
 
 function getGainCeilingsForSocket(socket) {
   return getGainCeilings(Boolean(socket?.data?.hasAudioGainBoost));
-}
-
-function normalizeUserGains(raw = {}) {
-  const out = {};
-  GAIN_KEYS.forEach((key) => {
-    out[key] = clampFraction(raw?.[key], 1);
-  });
-  return out;
 }
 
 function getUserGains(userId) {
@@ -178,14 +152,6 @@ function getUserGains(userId) {
 
 function getUserGainsForSocket(socket) {
   return getUserGains(getUserIdForSocket(socket));
-}
-
-function applyCeilings(fractions, ceilings) {
-  const out = {};
-  GAIN_KEYS.forEach((key) => {
-    out[key] = clampGain(clampFraction(fractions?.[key], 1) * clampGain(ceilings?.[key], 0), 0);
-  });
-  return out;
 }
 
 function getEffectiveLevelsForSocket(socket) {
@@ -222,15 +188,7 @@ function resolveAudioOwnerSocket(roverId) {
 
 function resolveLevelsForRover(roverId) {
   const owner = resolveAudioOwnerSocket(roverId);
-  if (!owner) {
-    const current = loadState();
-    return {
-      hornGain: current.hornGain,
-      ttsGain: current.ttsGain,
-      forwardGain: current.forwardGain,
-    };
-  }
-  return getEffectiveLevelsForSocket(owner);
+  return owner ? getEffectiveLevelsForSocket(owner) : getAdminLimits();
 }
 
 function pushLevelsToRover(roverId) {
@@ -315,7 +273,6 @@ function setUserGains(socket, input = {}) {
   so the UI can show what the rover will actually play.
 */
 function getAudioGainStateForSocket(socket) {
-  const current = loadState();
   const hasBoost = Boolean(socket?.data?.hasAudioGainBoost);
   const values = getUserGainsForSocket(socket);
   const ceilings = getGainCeilings(hasBoost);
@@ -324,12 +281,8 @@ function getAudioGainStateForSocket(socket) {
     ceilings,
     effective: applyCeilings(values, ceilings),
     boostGranted: hasBoost,
-    adminLimits: {
-      hornGain: current.hornGain,
-      ttsGain: current.ttsGain,
-      forwardGain: current.forwardGain,
-    },
-    boostCaps: { ...current.userGainCaps },
+    adminLimits: getAdminLimits(),
+    boostCaps: getUserGainCaps(),
   };
 }
 
