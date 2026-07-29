@@ -53,6 +53,7 @@ function buildCommandRegistry(prefix, timeCommand) {
         `${prefix} gain list`,
         `${prefix} gain grant <vip>`,
         `${prefix} gain revoke <vip>`,
+        `${prefix} gain help`,
       ],
       access: 'Admin',
       permission: 'admin',
