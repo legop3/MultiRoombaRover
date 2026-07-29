@@ -203,6 +203,9 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     sanitizeMentions,
     funStatsService,
     commandCooldowns,
+    // Lets `rs bonk` announce itself so audioForwardService can play the bonk
+    // sound on the rover the target is driving.
+    publishEvent,
     /*
       Fun commands that move hardware need the sending socket so they can prove
       the caller holds control. issueCommand is required lazily for the same

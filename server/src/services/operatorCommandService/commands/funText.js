@@ -18,6 +18,14 @@ const {
 
 const TEXT_COOLDOWN_MS = 4 * 1000;
 
+/*
+  The bonk sound gets its own, much longer rover-scoped window. Playing it
+  interrupts whatever that rover is forwarding — including a live microphone — so
+  the audio must not be spammable even though the text bonk stays snappy, and a
+  group of people bonking one driver cannot chain it either.
+*/
+const BONK_SOUND_ROVER_COOLDOWN_MS = 20 * 1000;
+
 const SLAP_ITEMS = [
   'a large trout', 'a rolled-up service manual', 'a dead AA battery', 'a docking station',
   'a suspiciously warm power brick', 'half a roll of duct tape', 'a decommissioned brush guard',
@@ -95,9 +103,41 @@ function uwuify(text) {
     .replace(/!+/g, ' !!');
 }
 
-function createFunTextCommands({ io, getNickname, sanitizeMentions, funStatsService, cooldowns, config }) {
+function createFunTextCommands({
+  io,
+  getNickname,
+  getActiveDrivers,
+  publishEvent,
+  sanitizeMentions,
+  funStatsService,
+  cooldowns,
+  config,
+}) {
   const { prefix: commandPrefix } = getCommandConfig(config);
   const safe = (text) => (sanitizeMentions ? sanitizeMentions(text) : String(text || ''));
+
+  /*
+    Announces the bonk so audioForwardService can play the sound on the rover the
+    target is driving. Published as an event rather than calling the audio pipeline
+    directly, matching how the charging-complete cue is wired: the command layer
+    stays unaware of ffmpeg, and a server without the sound installed simply has
+    nothing listening that can do anything.
+  */
+  function announceBonk(targetSocket, targetLabel, actorLabelText) {
+    if (!targetSocket || typeof publishEvent !== 'function') return;
+
+    const drivers = getActiveDrivers?.() || {};
+    const roverId = Object.keys(drivers).find((id) => drivers[id] === targetSocket.id) || null;
+    if (!roverId) return;
+
+    if (cooldowns.consume(`bonk:sound:${roverId}`, BONK_SOUND_ROVER_COOLDOWN_MS) > 0) return;
+
+    publishEvent({
+      source: 'funCommands',
+      type: 'fun.bonked',
+      payload: { roverId, targetLabel, actor: actorLabelText },
+    });
+  }
 
   function reply(message, content) {
     return message.reply({ content: safe(content), allowedMentions: PLAIN_MENTIONS });
@@ -126,7 +166,7 @@ function createFunTextCommands({ io, getNickname, sanitizeMentions, funStatsServ
     the counter names, and the flavour text differ, and keeping them in one place
     means a fix to self-targeting or tally credit applies to all of them.
   */
-  function createInteraction({ action, counterGiven, counterTaken, selfReply, render }) {
+  function createInteraction({ action, counterGiven, counterTaken, selfReply, render, onApplied }) {
     return async function handleInteraction(message, tokens = []) {
       const selector = tokens.join(' ').trim();
       if (!selector) {
@@ -148,6 +188,10 @@ function createFunTextCommands({ io, getNickname, sanitizeMentions, funStatsServ
         ? funStatsService.bumpActorStats(resolved.actorKey, { label: resolved.label, [counterTaken]: 1 })
         : null;
 
+      // Side effects run after the tallies so a failure in an optional extra (the
+      // bonk sound) cannot cost the user their recorded bonk.
+      onApplied?.({ actor: gated.label, resolved });
+
       return reply(message, render({
         actor: gated.label,
         actorKey: gated.actorKey,
@@ -163,6 +207,7 @@ function createFunTextCommands({ io, getNickname, sanitizeMentions, funStatsServ
     counterGiven: 'bonksGiven',
     counterTaken: 'bonksTaken',
     selfReply: (label) => `${label} bonked themselves. That is between you and the rover.`,
+    onApplied: ({ actor, resolved }) => announceBonk(resolved.socket, resolved.label, actor),
     render: ({ targetLabel, takenCount }) => {
       const tally = takenCount ? ` That is their ${ordinal(takenCount)} bonk.` : '';
       return `🔨 Bonked ${targetLabel}.${tally}`;

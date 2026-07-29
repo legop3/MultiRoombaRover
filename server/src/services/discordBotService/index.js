@@ -53,7 +53,7 @@ const {
   approveRequest: approvePrivateAccessRequest,
   denyRequest: denyPrivateAccessRequest,
 } = require('../privateRoverAccessRequestService');
-const { subscribe } = require('../eventBus');
+const { subscribe, publishEvent } = require('../eventBus');
 const funStatsService = require('../funStatsService');
 const { issueCommand } = require('../commandService');
 const { createPresenceManager } = require('./presence');
@@ -260,6 +260,9 @@ const commandDependencies = {
   sanitizeMentions,
   funStatsService,
   commandCooldowns,
+  // A Discord bonk still plays the sound on the rover the target is driving; only
+  // the commands that need the caller's own socket are unavailable from here.
+  publishEvent,
   /*
     Discord has no socket behind a message, so the hardware-backed fun commands
     cannot prove drive control and decline with an explanation instead. The text,

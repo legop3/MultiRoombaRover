@@ -29,11 +29,14 @@ function createStatsDouble() {
   };
 }
 
-function createHarness({ sockets = [] } = {}) {
+function createHarness({ sockets = [], activeDrivers = {} } = {}) {
   const stats = createStatsDouble();
+  const events = [];
   const handlers = createFunTextCommands({
     io: { sockets: { sockets: new Map(sockets.map((entry) => [entry.id, entry])) } },
     getNickname: (entry) => entry?.data?.nickname || '',
+    getActiveDrivers: () => activeDrivers,
+    publishEvent: (event) => events.push(event),
     // Matches the real sanitizer so tests exercise the actual escaping rules.
     sanitizeMentions: (text) => String(text || '')
       .replace(/<(@[!&]?\d+|#\d+)>/g, '[ping removed]')
@@ -43,7 +46,7 @@ function createHarness({ sockets = [] } = {}) {
     cooldowns: createCooldownGate(),
     config: { commands: { prefix: 'rs' } },
   });
-  return { handlers, stats };
+  return { handlers, stats, events };
 }
 
 function message(actor = { id: 's1', userId: 'u-alice', label: 'alice' }) {
@@ -221,6 +224,73 @@ test('uwu transforms text without dropping it', () => {
   assert.equal(uwuify('hello world'), 'hewwo wowwd');
   assert.equal(uwuify('love'), 'wuv');
   assert.equal(uwuify('nice'), 'nyice');
+});
+
+test('bonking someone who is driving announces the sound for their rover', async () => {
+  const { handlers, events } = createHarness({ sockets: [bob], activeDrivers: { 'rover-1': 's2' } });
+  await handlers.bonk(message(), ['bob']);
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, 'fun.bonked');
+  assert.equal(events[0].payload.roverId, 'rover-1');
+  assert.equal(events[0].payload.targetLabel, 'bob');
+});
+
+test('bonking someone who is not driving announces nothing', async () => {
+  const { handlers, events } = createHarness({ sockets: [bob], activeDrivers: {} });
+  const msg = message();
+  await handlers.bonk(msg, ['bob']);
+
+  // The text bonk still lands and is still tallied; only the sound is skipped.
+  assert.match(msg.replies[0].content, /Bonked bob/);
+  assert.equal(events.length, 0);
+});
+
+test('bonking a name that is not a real user announces nothing', async () => {
+  const { handlers, events } = createHarness({ sockets: [bob], activeDrivers: { 'rover-1': 's2' } });
+  await handlers.bonk(message(), ['the dishwasher']);
+  assert.equal(events.length, 0);
+});
+
+test('the bonk sound is rate limited per rover so it cannot interrupt a mic repeatedly', async () => {
+  const { handlers, events } = createHarness({ sockets: [bob], activeDrivers: { 'rover-1': 's2' } });
+  await handlers.bonk(message(), ['bob']);
+  // A different actor has their own text cooldown but must not get a second sound.
+  await handlers.bonk(message({ id: 's3', userId: 'u-carol', label: 'carol' }), ['bob']);
+  await handlers.bonk(message({ id: 's4', userId: 'u-erin', label: 'erin' }), ['bob']);
+
+  assert.equal(events.length, 1);
+});
+
+test('a self-bonk never announces a sound', async () => {
+  const alice = { id: 's1', data: { userId: 'u-alice', nickname: 'alice' } };
+  const { handlers, events } = createHarness({ sockets: [alice], activeDrivers: { 'rover-1': 's1' } });
+  await handlers.bonk(message(), ['alice']);
+  assert.equal(events.length, 0);
+});
+
+test('hug and slap do not announce a bonk sound', async () => {
+  const { handlers, events } = createHarness({ sockets: [bob], activeDrivers: { 'rover-1': 's2' } });
+  await handlers.hug(message(), ['bob']);
+  await handlers.slap(message(), ['bob']);
+  assert.equal(events.length, 0);
+});
+
+test('a transport with no publishEvent still bonks normally', async () => {
+  const stats = createStatsDouble();
+  const handlers = createFunTextCommands({
+    io: { sockets: { sockets: new Map([[bob.id, bob]]) } },
+    getNickname: (entry) => entry?.data?.nickname || '',
+    getActiveDrivers: () => ({ 'rover-1': 's2' }),
+    publishEvent: undefined,
+    sanitizeMentions: (text) => String(text || ''),
+    funStatsService: stats,
+    cooldowns: createCooldownGate(),
+    config: { commands: { prefix: 'rs' } },
+  });
+  const msg = message();
+  await handlers.bonk(msg, ['bob']);
+  assert.match(msg.replies[0].content, /Bonked bob/);
 });
 
 test('wanted includes prior bonks when the target has any on record', async () => {
