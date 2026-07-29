@@ -56,10 +56,13 @@ const {
   approveRequest: approvePrivateAccessRequest,
   denyRequest: denyPrivateAccessRequest,
 } = require('../privateRoverAccessRequestService');
-const { subscribe } = require('../eventBus');
+const { subscribe, publishEvent } = require('../eventBus');
+const funStatsService = require('../funStatsService');
+const { issueCommand } = require('../commandService');
 const { createPresenceManager } = require('./presence');
 const { createChannelIO } = require('./channelIO');
 const { createCommandHandlers } = require('../operatorCommandService');
+const { createCooldownGate } = require('../operatorCommandService/cooldowns');
 const { createDiscordTransportHandlers, createDiscordCommandRequest } = require('./commandAdapter');
 const { createIntegrations } = require('./integrations');
 const { createFleetDailyReports } = require('./fleetDailyReports');
@@ -209,6 +212,10 @@ if (discordConfig?.channels?.replay) {
   });
 }
 
+// The Discord router is built once for the process, so one gate here covers every
+// guild and channel this bot answers in.
+const commandCooldowns = createCooldownGate();
+
 const commandDependencies = {
   logger,
   client,
@@ -257,6 +264,18 @@ const commandDependencies = {
   grantAudioGainBoost,
   revokeAudioGainBoost,
   sanitizeMentions,
+  funStatsService,
+  commandCooldowns,
+  // A Discord bonk still plays the sound on the rover the target is driving; only
+  // the commands that need the caller's own socket are unavailable from here.
+  publishEvent,
+  /*
+    Discord has no socket behind a message, so the hardware-backed fun commands
+    cannot prove drive control and decline with an explanation instead. The text,
+    counter, and read-only fun commands work normally from here.
+  */
+  getActorSocket: () => null,
+  issueCommand,
   sendToChannel: channelIO.sendToChannel,
   isAdminUser,
   isLockdownAdminUser,

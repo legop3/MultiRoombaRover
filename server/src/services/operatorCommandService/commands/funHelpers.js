@@ -1,0 +1,174 @@
+// Operator Fun Command Helpers
+// Purpose: Shared actor identity, target lookup, and deterministic randomness for the fun commands.
+// Scope: No side effects; every function here is safe to call before permission checks pass.
+const { normalizeSearchText, normalizeText, resolveRoverSelector } = require('./resolvers');
+
+// Echoed user text is capped so a fun command cannot be used to shout a wall of
+// text into every bridged Discord channel.
+const MAX_ECHO_LENGTH = 180;
+const PLAIN_MENTIONS = { parse: [], repliedUser: false };
+
+/*
+  Fun counters have to survive across transports, so they are keyed by a stable
+  identity rather than a connection. Site chat resolves to the identity user id
+  that moderation already uses; Discord has no row in that database, so it gets
+  its own key space. An unidentified site socket falls back to its socket id,
+  which means its tally resets on reconnect — acceptable for a joke counter, and
+  much better than crediting every anonymous visitor to one shared bucket.
+*/
+function buildActorKey(request) {
+  const transport = normalizeText(request?.transport) || 'unknown';
+  if (transport === 'discord') {
+    const discordId = normalizeText(request?.actor?.id);
+    return discordId ? `discord:${discordId}` : null;
+  }
+  const userId = normalizeText(request?.actor?.userId);
+  if (userId) return `user:${userId}`;
+  const socketId = normalizeText(request?.actor?.id);
+  return socketId ? `socket:${socketId}` : null;
+}
+
+function actorLabel(request) {
+  return normalizeText(request?.actor?.label) || 'someone';
+}
+
+/*
+  Collapses every connected socket for one person onto their canonical user id so
+  extra browser tabs cannot make a target look ambiguous. Mirrors the same
+  approach the deter command uses for moderation targets.
+*/
+function findOnlineUsers(io, getNickname, selector) {
+  const normalizedSelector = normalizeSearchText(selector);
+  if (!normalizedSelector) return [];
+
+  const sockets = io?.sockets?.sockets;
+  if (!sockets || typeof sockets.forEach !== 'function') return [];
+
+  const byUserId = new Map();
+  sockets.forEach((socket) => {
+    const nickname = getNickname?.(socket);
+    if (normalizeSearchText(nickname) !== normalizedSelector) return;
+    const userId = normalizeText(socket?.data?.userId);
+    const key = userId || `socket:${normalizeText(socket?.id)}`;
+    if (!key) return;
+    if (!byUserId.has(key)) {
+      byUserId.set(key, { userId: userId || null, nickname: normalizeText(nickname), socket });
+    }
+  });
+
+  return Array.from(byUserId.values());
+}
+
+/*
+  A fun command should still work when the target is not a real user — bonking
+  "the dishwasher" is half the point. So an unmatched selector is not an error:
+  it becomes a plain label and simply credits nobody's tally. Ambiguity is
+  treated the same way, because guessing which of two identical nicknames took
+  the hit would be worse than crediting neither.
+*/
+function resolveFunTarget({ io, getNickname, selector }) {
+  const label = clampEcho(selector);
+  if (!label) return null;
+
+  const matches = findOnlineUsers(io, getNickname, selector);
+  if (matches.length === 1) {
+    const [match] = matches;
+    return {
+      label: match.nickname || label,
+      actorKey: match.userId ? `user:${match.userId}` : null,
+      socket: match.socket || null,
+      online: true,
+    };
+  }
+
+  return { label, actorKey: null, socket: null, online: false };
+}
+
+/*
+  Rover-scoped fun commands accept an explicit rover name and otherwise fall back
+  to whichever rover the caller is already attached to. Discord has no socket
+  behind it, so the fallback simply is not available there and the caller is asked
+  to name a rover rather than having one chosen for them.
+*/
+function createRoverResolver({ rovers, roverManager, getActorSocket, commandPrefix = 'rs' }) {
+  return function resolveTargetRover(selector, action = 'pet') {
+    const query = normalizeText(selector);
+    if (query) {
+      const resolved = resolveRoverSelector(query, rovers);
+      if (resolved.error) return { error: resolved.error };
+      return { id: resolved.id, name: resolved.label || resolved.id, record: resolved.record };
+    }
+
+    const socket = getActorSocket?.() || null;
+    if (!socket) return { error: `Name a rover: \`${commandPrefix} ${action} <rover>\`` };
+
+    // getPrimaryRoverForSocket takes a socket id and returns a rover id string.
+    const roverId = normalizeText(roverManager?.getPrimaryRoverForSocket?.(socket.id));
+    if (!roverId) return { error: 'You are not on a rover right now. Name one instead.' };
+    const record = rovers.get(roverId) || null;
+    return { id: roverId, name: record?.meta?.name || roverId, record, socket };
+  };
+}
+
+function clampEcho(value) {
+  const text = normalizeText(value).replace(/\s+/g, ' ');
+  if (!text) return '';
+  if (text.length <= MAX_ECHO_LENGTH) return text;
+  return `${text.slice(0, MAX_ECHO_LENGTH - 1)}…`;
+}
+
+/*
+  FNV-1a. Fun commands that judge something — `ship`, `rate`, `8ball` — use a
+  hash of the input instead of Math.random so the same question always gets the
+  same answer. Re-rolling until you like the verdict is not funny; a server that
+  stubbornly insists your ship rating is 4% is.
+*/
+function hashSeed(value) {
+  const text = normalizeSearchText(value);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+function pickBySeed(list, seed) {
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) return null;
+  return items[seed % items.length];
+}
+
+// Order-independent so `rs ship a b` and `rs ship b a` agree with each other.
+function pairSeed(left, right) {
+  const pair = [normalizeSearchText(left), normalizeSearchText(right)].sort();
+  return hashSeed(pair.join(' '));
+}
+
+function percentFromSeed(seed) {
+  return seed % 101;
+}
+
+function ordinal(count) {
+  const value = Number(count) || 0;
+  const mod100 = value % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${value}th`;
+  const suffix = { 1: 'st', 2: 'nd', 3: 'rd' }[value % 10] || 'th';
+  return `${value}${suffix}`;
+}
+
+module.exports = {
+  MAX_ECHO_LENGTH,
+  PLAIN_MENTIONS,
+  actorLabel,
+  buildActorKey,
+  clampEcho,
+  createRoverResolver,
+  findOnlineUsers,
+  hashSeed,
+  ordinal,
+  pairSeed,
+  percentFromSeed,
+  pickBySeed,
+  resolveFunTarget,
+};
