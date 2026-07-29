@@ -12,6 +12,7 @@ import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../Tabs/index.jsx';
 import SessionSnapshot from '../SessionSnapshot/index.jsx';
 import SocketLogPanel from '../SocketLogPanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
+import VolumeSettingsCard from '../VolumeSettingsCard/index.jsx';
 import KeyPill from '../vip/VipAudioUploadCard/KeyPill.jsx';
 import { useHudMapSetting } from '../../hooks/useHudMapSetting.js';
 import { useSettingsNamespace } from '../../settings/index.js';
@@ -468,6 +469,9 @@ export default function SettingsPanel() {
                 Lowers rover audio only while the main brush is running.
               </SettingHelp>
             </CardFrame>
+            {/* Volume is server-backed rather than cookie-backed: it changes what the
+                rover plays for everyone in the room, so the server owns the limits. */}
+            <VolumeSettingsCard />
             <CardFrame title="Connection" bodyClassName="space-y-1 p-1 text-sm">
               <SettingRow>
                 <span className="font-semibold text-white">Transport</span>

@@ -422,6 +422,13 @@ export function SessionProvider({ children }) {
       readyMicWhip: (roverId) => emitWithAck('audio:micWhipReady', { roverId }),
       stopMicWhip: (roverId) => emitWithAck('audio:micWhipStop', { roverId }),
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
+      /*
+        Personal volume is a 0-1 fraction of whichever ceiling the server has
+        resolved for this user, so the browser never sends an absolute gain and
+        cannot widen its own limits.
+      */
+      setUserAudioGains: (gains = {}) => emitWithAck('audioLevels:setUserGains', gains),
+      setUserAudioGainCaps: (caps = {}) => emitWithAck('audioLevels:setUserCaps', caps),
       setPrivateSafety: (roverId, safety = {}) =>
         emitWithAck('session:privateSafety:set', { roverId, safety }),
       ptzClaim: () => emitWithAck('ptzCamera:claim'),

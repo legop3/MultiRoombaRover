@@ -3,7 +3,7 @@
 // Scope: Supplies transport-neutral metadata; execution handlers remain focused on server operations.
 const CATEGORIES = {
   system: { title: 'System', names: ['help', 'status', 'replay', 'time-status'] },
-  admin: { title: 'Admin', names: ['lock', 'unlock', 'mode', 'reason', 'goal', 'kick', 'verify', 'deter'] },
+  admin: { title: 'Admin', names: ['lock', 'unlock', 'mode', 'reason', 'goal', 'kick', 'verify', 'deter', 'gain'] },
   features: { title: 'Features', names: ['lights', 'lift', 'neato'] },
   discord: { title: 'Discord', names: ['bridge'] },
 };
@@ -45,6 +45,17 @@ function buildCommandRegistry(prefix, timeCommand) {
       ],
       access: 'Lockdown admin',
       permission: 'lockdown-admin',
+    },
+    gain: {
+      category: 'admin',
+      summary: 'Manage the VIP audio gain boost that raises a user\'s volume ceiling past the global gains.',
+      usage: [
+        `${prefix} gain list`,
+        `${prefix} gain grant <vip>`,
+        `${prefix} gain revoke <vip>`,
+      ],
+      access: 'Admin',
+      permission: 'admin',
     },
     lift: { category: 'features', summary: 'Show or move the lift.', usage: [`${prefix} lift <status|up|down>`], access: 'Public unless server access is restricted', permission: 'access-mode', requiredFeature: 'lift', unavailableLabel: 'Lift' },
     neato: { category: 'features', summary: 'Show or control Neato.', usage: [`${prefix} neato <status|start|home|locate|clear-errors>`], access: 'Public unless server access is restricted', permission: 'access-mode', requiredFeature: 'neato', unavailableLabel: 'Neato' },

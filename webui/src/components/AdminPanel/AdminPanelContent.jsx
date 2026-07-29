@@ -18,6 +18,44 @@ const MODES = [
   { key: 'lockdown', label: 'Lockdown' },
 ];
 
+/*
+  The same three gain keys drive both the global levels and the VIP boost hard
+  caps, so both editors render from one list instead of six copied sliders.
+*/
+const GAIN_FIELDS = [
+  { key: 'hornGain', label: 'Horn gain' },
+  { key: 'ttsGain', label: 'TTS gain' },
+  { key: 'forwardGain', label: 'Forward gain' },
+];
+
+function normalizeGainDraft(source, fallback) {
+  const draft = {};
+  GAIN_FIELDS.forEach(({ key }) => {
+    draft[key] = Number.isFinite(source?.[key]) ? source[key] : fallback[key];
+  });
+  return draft;
+}
+
+function GainSlider({ label, value, onChange }) {
+  return (
+    <label className="grid gap-0.5 text-xs text-slate-200">
+      <div className="flex items-center justify-between gap-0.5">
+        <span>{label}</span>
+        <span>{Number(value).toFixed(2)}x</span>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="4"
+        step="0.01"
+        value={value}
+        onChange={onChange}
+        className="w-full accent-emerald-500"
+      />
+    </label>
+  );
+}
+
 function buildPrivateSafetyDraft(rover) {
   const safety = rover?.private?.safety || {};
   return {
@@ -72,6 +110,7 @@ export default function AdminPanelContent() {
     updateAllRovers,
     rebootServer,
     setAudioLevels,
+    setUserAudioGainCaps,
     setPrivateSafety,
     llmControl,
     overseerControl,
@@ -94,11 +133,13 @@ export default function AdminPanelContent() {
   const reasonUpdatedAt = session?.adminReason?.updatedAt || null;
   const [reasonDraft, setReasonDraft] = useState(currentReason);
   const currentAudioLevels = session?.audioLevels || {};
-  const [audioLevelDraft, setAudioLevelDraft] = useState({
-    hornGain: Number.isFinite(currentAudioLevels.hornGain) ? currentAudioLevels.hornGain : 1,
-    ttsGain: Number.isFinite(currentAudioLevels.ttsGain) ? currentAudioLevels.ttsGain : 1,
-    forwardGain: Number.isFinite(currentAudioLevels.forwardGain) ? currentAudioLevels.forwardGain : 1,
-  });
+  const currentUserGainCaps = currentAudioLevels.userGainCaps || {};
+  const [audioLevelDraft, setAudioLevelDraft] = useState(
+    () => normalizeGainDraft(currentAudioLevels, { hornGain: 1, ttsGain: 1, forwardGain: 1 }),
+  );
+  const [userGainCapDraft, setUserGainCapDraft] = useState(
+    () => normalizeGainDraft(currentUserGainCaps, { hornGain: 0.5, ttsGain: 0.8, forwardGain: 0.4 }),
+  );
   const [privateSafetyDrafts, setPrivateSafetyDrafts] = useState({});
   const [privateSafetyDirty, setPrivateSafetyDirty] = useState({});
 
@@ -299,6 +340,19 @@ export default function AdminPanelContent() {
     }
   };
 
+  const handleUserGainCapDraft = (key) => (event) => {
+    const next = Number(event.target.value);
+    setUserGainCapDraft((current) => ({ ...(current || {}), [key]: Number.isFinite(next) ? next : 0 }));
+  };
+
+  const handleUserGainCapsSave = async () => {
+    try {
+      await setUserAudioGainCaps(userGainCapDraft);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const handleTestRewardOverlay = async () => {
     window.dispatchEvent(
       new CustomEvent('buttonBox:rewardRunLocalTest', {
@@ -320,12 +374,14 @@ export default function AdminPanelContent() {
   }, [currentReason]);
 
   useEffect(() => {
-    setAudioLevelDraft({
-      hornGain: Number.isFinite(currentAudioLevels.hornGain) ? currentAudioLevels.hornGain : 1,
-      ttsGain: Number.isFinite(currentAudioLevels.ttsGain) ? currentAudioLevels.ttsGain : 1,
-      forwardGain: Number.isFinite(currentAudioLevels.forwardGain) ? currentAudioLevels.forwardGain : 1,
-    });
+    setAudioLevelDraft(normalizeGainDraft(currentAudioLevels, { hornGain: 1, ttsGain: 1, forwardGain: 1 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAudioLevels.forwardGain, currentAudioLevels.hornGain, currentAudioLevels.ttsGain]);
+
+  useEffect(() => {
+    setUserGainCapDraft(normalizeGainDraft(currentUserGainCaps, { hornGain: 0.5, ttsGain: 0.8, forwardGain: 0.4 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserGainCaps.forwardGain, currentUserGainCaps.hornGain, currentUserGainCaps.ttsGain]);
 
 
   useEffect(() => {
@@ -420,54 +476,45 @@ export default function AdminPanelContent() {
             <span>Updated {new Date(session.audioLevels.updatedAt).toLocaleString()}</span>
           ) : null}
         </div>
-        <label className="grid gap-0.5 text-xs text-slate-200">
-          <div className="flex items-center justify-between gap-0.5">
-            <span>Horn gain</span>
-            <span>{audioLevelDraft.hornGain.toFixed(2)}x</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="4"
-            step="0.01"
-            value={audioLevelDraft.hornGain}
-            onChange={handleAudioLevelDraft('hornGain')}
-            className="w-full accent-emerald-500"
+        {GAIN_FIELDS.map(({ key, label }) => (
+          <GainSlider
+            key={key}
+            label={label}
+            value={audioLevelDraft[key]}
+            onChange={handleAudioLevelDraft(key)}
           />
-        </label>
-        <label className="grid gap-0.5 text-xs text-slate-200">
-          <div className="flex items-center justify-between gap-0.5">
-            <span>TTS gain</span>
-            <span>{audioLevelDraft.ttsGain.toFixed(2)}x</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="4"
-            step="0.01"
-            value={audioLevelDraft.ttsGain}
-            onChange={handleAudioLevelDraft('ttsGain')}
-            className="w-full accent-emerald-500"
-          />
-        </label>
-        <label className="grid gap-0.5 text-xs text-slate-200">
-          <div className="flex items-center justify-between gap-0.5">
-            <span>Forward gain</span>
-            <span>{audioLevelDraft.forwardGain.toFixed(2)}x</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="4"
-            step="0.01"
-            value={audioLevelDraft.forwardGain}
-            onChange={handleAudioLevelDraft('forwardGain')}
-            className="w-full accent-emerald-500"
-          />
-        </label>
+        ))}
+        <p className="text-xs text-slate-500">
+          These are the volume ceilings for ordinary users. Each user picks a 0-100% share of them.
+        </p>
         <div className="flex gap-0.5 text-xs">
           <button type="button" onClick={handleAudioLevelsSave} className="button-dark">
             Apply audio levels
+          </button>
+        </div>
+      </div>
+      <div className="space-y-0.5">
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>VIP gain boost hard caps</span>
+          {session?.audioLevels?.capsUpdatedAt ? (
+            <span>Updated {new Date(session.audioLevels.capsUpdatedAt).toLocaleString()}</span>
+          ) : null}
+        </div>
+        {GAIN_FIELDS.map(({ key, label }) => (
+          <GainSlider
+            key={key}
+            label={label}
+            value={userGainCapDraft[key]}
+            onChange={handleUserGainCapDraft(key)}
+          />
+        ))}
+        <p className="text-xs text-slate-500">
+          Ceilings for VIPs granted the boost with <code>rs gain grant &lt;vip&gt;</code>. A boost never lowers
+          someone&apos;s limit, so a cap below the global gain above has no effect.
+        </p>
+        <div className="flex gap-0.5 text-xs">
+          <button type="button" onClick={handleUserGainCapsSave} className="button-dark">
+            Apply boost caps
           </button>
         </div>
       </div>

@@ -146,7 +146,7 @@ function resolveIdentitySelector(selector, records = [], options = {}) {
     ],
   });
   const results = fuse.search(query);
-  if (!results.length) return { error: buildResultError('not_found', 'Selector', candidates) };
+  if (!results.length) return { error: buildResultError('not_found', 'User', candidates) };
 
   const first = results[0];
   const second = results[1];
