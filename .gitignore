@@ -26,7 +26,7 @@ webui/package-lock.json
 !server/data/barcode-registry.json
 webui/src/config/analytics.jsx
 webui/src/config/driverAnalytics.json
-webui/src/config/analytics.html
+server/data/analytics.html
 plans/barcodegames.txt
 .gitignore
 server/data/identity.sqlite

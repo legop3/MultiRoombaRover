@@ -5,7 +5,6 @@ import { useState } from 'react';
 import NicknameForm from '../NicknameForm/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import { flowWrapClass, innerFlowClass, fieldClass } from './constants.js';
-import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 export default function VipVerificationCard({
   pendingRequestId,
@@ -26,7 +25,6 @@ export default function VipVerificationCard({
     setRequestKeyInput(currentStoredKey);
     setConfirmNickname(false);
     onMessage?.('');
-    trackAnalyticsEvent('vip_verify_flow_start', { hasNickname: Boolean(nickname) });
   };
 
   const cancelRequestFlow = () => {
@@ -46,10 +44,6 @@ export default function VipVerificationCard({
     }
     setWorking(true);
     onMessage?.('');
-    trackAnalyticsEvent('vip_verify_attempt', {
-      hasNickname: Boolean(nickname),
-      hasIdentityKey: Boolean(requestKeyInput),
-    });
     try {
       const applied = await applyIdentityKey(requestKeyInput);
       await requestVerification?.();
@@ -57,9 +51,7 @@ export default function VipVerificationCard({
       setRequestFlowStep(0);
       setConfirmNickname(false);
       onMessage?.('Verification request sent to lockdown admins.');
-      trackAnalyticsEvent('vip_verify_result', { status: 'accepted' });
     } catch (err) {
-      trackAnalyticsEvent('vip_verify_result', { status: 'failed', reason: err?.message || 'unknown' });
       onMessage?.(err.message || 'Failed to submit request.');
     } finally {
       setWorking(false);

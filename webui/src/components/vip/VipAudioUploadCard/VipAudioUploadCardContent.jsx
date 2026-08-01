@@ -18,7 +18,6 @@ import { mergeFloatChunks, encodeWavMono16 } from './audioCodec.js';
 import StatusIndicator from './StatusIndicator.jsx';
 import KeyPill from './KeyPill.jsx';
 import CardFrame from '../../CardFrame/index.jsx';
-import { trackAnalyticsEvent, trackAnalyticsEventThrottled } from '../../../analytics/index.js';
 
 export default function VipAudioUploadCard({
   ownRoverId = '',
@@ -88,9 +87,8 @@ export default function VipAudioUploadCard({
     (nextMode) => {
       const mode = nextMode === 'clip' ? 'clip' : 'live';
       saveVipAudio((current) => ({ ...(current || {}), pttMode: mode }));
-      trackAnalyticsEvent('vip_ptt_mode_change', { mode, roverId });
     },
-    [roverId, saveVipAudio],
+    [saveVipAudio],
   );
 
   const handleUploadPlay = async () => {
@@ -109,11 +107,6 @@ export default function VipAudioUploadCard({
 
     setWorking(true);
     setMessage('');
-    trackAnalyticsEvent('vip_upload_play', {
-      roverId,
-      size: selectedUpload.size,
-      mime: selectedUpload.type || '',
-    });
     try {
       const buffer = await selectedUpload.arrayBuffer();
       const dataBase64 = bytesToBase64(new Uint8Array(buffer));
@@ -124,9 +117,7 @@ export default function VipAudioUploadCard({
         dataBase64,
       });
       setMessage('Upload playback started.');
-      trackAnalyticsEvent('vip_upload_play_result', { roverId, status: 'accepted' });
     } catch (err) {
-      trackAnalyticsEvent('vip_upload_play_result', { roverId, status: 'failed', reason: err?.message || 'unknown' });
       setMessage(err?.message || 'Failed to play upload.');
     } finally {
       setWorking(false);
@@ -141,13 +132,10 @@ export default function VipAudioUploadCard({
 
     setWorking(true);
     setMessage('');
-    trackAnalyticsEvent('vip_upload_stop', { roverId });
     try {
       await stopUploadedAudio?.(roverId);
       setMessage('Upload playback stopped.');
-      trackAnalyticsEvent('vip_upload_stop_result', { roverId, status: 'accepted' });
     } catch (err) {
-      trackAnalyticsEvent('vip_upload_stop_result', { roverId, status: 'failed', reason: err?.message || 'unknown' });
       setMessage(err?.message || 'Failed to stop upload.');
     } finally {
       setWorking(false);
@@ -378,24 +366,20 @@ export default function VipAudioUploadCard({
 
       if (!send) {
         setClipState('idle');
-        trackAnalyticsEvent('vip_clip_record_cancel', { roverId });
         return;
       }
 
       if (!roverId) {
         setClipState('idle');
-        trackAnalyticsEvent('vip_clip_send', { roverId, status: 'skipped_no_rover' });
         return;
       }
 
       if (!chunks.length) {
         setClipState('idle');
-        trackAnalyticsEvent('vip_clip_send', { roverId, status: 'skipped_empty' });
         return;
       }
 
       setClipState('sending');
-      trackAnalyticsEvent('vip_clip_send', { roverId, status: 'started' });
       try {
         const merged = mergeFloatChunks(chunks);
         const wavBytes = encodeWavMono16(merged, clipSampleRateRef.current || TARGET_SAMPLE_RATE);
@@ -407,10 +391,8 @@ export default function VipAudioUploadCard({
           dataBase64,
         });
         setClipState('idle');
-        trackAnalyticsEvent('vip_clip_send', { roverId, status: 'accepted' });
       } catch (err) {
         setClipState('error');
-        trackAnalyticsEvent('vip_clip_send', { roverId, status: 'failed', reason: err?.message || 'unknown' });
         setMessage(err?.message || 'Failed to send PTT clip.');
       }
     },
@@ -426,7 +408,6 @@ export default function VipAudioUploadCard({
     clipChunksRef.current = [];
     clipRecordingRef.current = true;
     setClipState('recording');
-    trackAnalyticsEvent('vip_clip_record_start', { roverId });
   }, [ensureClipPipeline, roverId]);
 
   useEffect(() => {
@@ -453,17 +434,11 @@ export default function VipAudioUploadCard({
         await startWhipMic(roverId);
         if (!cancelled) {
           setMicState('live');
-          trackAnalyticsEvent('vip_live_mic_start', { roverId });
         }
       } catch (err) {
         if (!cancelled) {
           setMicState('error');
           setMessage(err?.message || 'Failed to start mic forwarding.');
-          trackAnalyticsEventThrottled(
-            'vip_live_mic_error',
-            { roverId, reason: err?.message || 'unknown' },
-            { key: `${roverId}:${err?.message || 'unknown'}`, throttleMs: 60 * 1000 },
-          );
         }
         await stopMicCapture(roverId);
       }
@@ -651,7 +626,6 @@ export default function VipAudioUploadCard({
                   onChange={(event) => {
                     const enabled = Boolean(event.target.checked);
                     saveVipAudio((current) => ({ ...(current || {}), openMicEnabled: enabled }));
-                    trackAnalyticsEvent('vip_open_mic_change', { roverId, enabled });
                   }}
                 />
                 <span>{clipMode ? 'Open mic (live mode only)' : 'Open mic'}</span>

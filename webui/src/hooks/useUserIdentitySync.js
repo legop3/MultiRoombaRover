@@ -19,9 +19,7 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
     { enabled: false },
   );
 
-  const inFlightRef = useRef(false);
   const lastAckSocketRef = useRef(null);
-  const retryTimerRef = useRef(null);
   const fingerprintRef = useRef('');
 
   const ready =
@@ -31,16 +29,8 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
   const overseerEnabled = Boolean(overseerPreference?.enabled);
   const normalizedIdentitySurface = identitySurface === 'driver' ? 'driver' : 'passive';
 
-  const clearRetry = useCallback(() => {
-    if (retryTimerRef.current) {
-      clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
-  }, []);
-
   const sendIdentify = useCallback(async () => {
-    if (!ready || !connected || !socket?.id || inFlightRef.current) return;
-    inFlightRef.current = true;
+    if (!ready || !connected || !socket?.id) return;
     try {
       if (!fingerprintRef.current) {
         /*
@@ -68,17 +58,14 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
         saveIdentity((current) => ({ ...(current || {}), cookieUserId: nextKey }));
       }
       lastAckSocketRef.current = socket.id;
-      clearRetry();
     } catch {
-      clearRetry();
-      retryTimerRef.current = setTimeout(() => {
-        sendIdentify();
-      }, 2000);
-    } finally {
-      inFlightRef.current = false;
+      /*
+        The permanent heartbeat below is the retry mechanism. A failed or
+        half-open request must not create separate timer state that can stop
+        future identity sends or disappear during a socket transition.
+      */
     }
   }, [
-    clearRetry,
     connected,
     cookieUserId,
     identifySession,
@@ -87,7 +74,7 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
     overseerEnabled,
     ready,
     saveIdentity,
-    socket?.id,
+    socket,
   ]);
 
   useEffect(() => {
@@ -120,13 +107,17 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
   }, [sendIdentify, socket?.connected]);
 
   useEffect(() => {
-    if (!ready || !socket?.connected) return undefined;
+    /*
+      Keep this interval installed whenever persisted identity settings are
+      ready, including while Socket.IO is reconnecting. Each tick checks the
+      current connection before sending, so reconnects resume heartbeats without
+      depending on an acknowledgement or another effect recreating the timer.
+    */
+    if (!ready) return undefined;
     const timer = setInterval(() => {
       if (!socket?.connected) return;
       sendIdentify();
-    }, 60000);
+    }, 2000);
     return () => clearInterval(timer);
-  }, [ready, sendIdentify, socket?.connected]);
-
-  useEffect(() => () => clearRetry(), [clearRetry]);
+  }, [ready, sendIdentify, socket]);
 }

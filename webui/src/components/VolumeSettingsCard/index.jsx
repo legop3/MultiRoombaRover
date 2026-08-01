@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CardFrame from '../CardFrame/index.jsx';
 import { useSession } from '../../context/SessionContext.jsx';
-import { trackAnalyticsEventThrottled } from '../../analytics/index.js';
 
 /*
   Sliders are a 0-1 fraction of whichever ceiling the server resolved for this
@@ -87,11 +86,6 @@ export default function VolumeSettingsCard() {
     setDraft(nextDraft);
     if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
     commitTimerRef.current = setTimeout(() => commit(nextDraft), COMMIT_DEBOUNCE_MS);
-    trackAnalyticsEventThrottled(
-      'settings_change',
-      { setting: key, value: next },
-      { key: `volume:${key}`, throttleMs: 3 * 1000 },
-    );
   };
 
   // Sliders would be misleading before the first session sync lands.

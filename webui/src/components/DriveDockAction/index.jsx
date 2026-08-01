@@ -8,7 +8,6 @@ import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetry
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import { deriveDriveDockStateFromTelemetry } from './driveDockState.js';
-import { trackAnalyticsEvent } from '../../analytics/index.js';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 function StatusRow({ value, tone = 'neutral' }) {
@@ -129,14 +128,11 @@ export default function DriveDockAction({
     if (!roverId || pending) return;
     if (isMobile) triggerTouchHaptic('button');
     setPending('drive');
-    trackAnalyticsEvent('drive_return', { roverId, source: 'drive_dock_action' });
     try {
       dockAssist.exitAssist();
       actions.setMode('drive');
       await actions.runMacro('drive-sequence');
-      trackAnalyticsEvent('drive_return_result', { roverId, status: 'accepted' });
     } catch (err) {
-      trackAnalyticsEvent('drive_return_result', { roverId, status: 'failed', reason: err?.message || 'unknown' });
       alert(err.message);
     } finally {
       setPending(null);
@@ -149,14 +145,11 @@ export default function DriveDockAction({
     setConfirmOpen(false);
     setShowModal(false);
     setPending('drive');
-    trackAnalyticsEvent('drive_start', { roverId, source: 'drive_dock_action' });
     try {
       dockAssist.exitAssist();
       actions.setMode('drive');
       await actions.runMacro('drive-sequence');
-      trackAnalyticsEvent('drive_start_result', { roverId, status: 'accepted' });
     } catch (err) {
-      trackAnalyticsEvent('drive_start_result', { roverId, status: 'failed', reason: err?.message || 'unknown' });
       alert(err.message);
     } finally {
       setPending(null);
@@ -167,12 +160,9 @@ export default function DriveDockAction({
     if (!roverId || pending) return;
     if (isMobile) triggerTouchHaptic('button');
     setPending('dock');
-    trackAnalyticsEvent('dock_assist_start', { roverId });
     try {
       dockAssist.enterAssist();
-      trackAnalyticsEvent('dock_assist_start_result', { roverId, status: 'accepted' });
     } catch (err) {
-      trackAnalyticsEvent('dock_assist_start_result', { roverId, status: 'failed', reason: err?.message || 'unknown' });
       alert(err.message);
     } finally {
       setPending(null);
@@ -186,12 +176,10 @@ export default function DriveDockAction({
     if (isMobile) triggerTouchHaptic('button');
     if (manualAssistActive) {
       dockAssist.exitAssist();
-      trackAnalyticsEvent('dock_assist_exit', { roverId });
       return;
     }
     setShowModal(true);
     setConfirmOpen(true);
-    trackAnalyticsEvent('dock_assist_open', { roverId });
   };
 
   // The drive/dock card appears inside the mobile controls and can be held or

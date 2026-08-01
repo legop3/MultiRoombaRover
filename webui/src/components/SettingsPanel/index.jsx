@@ -19,7 +19,6 @@ import { useSettingsNamespace } from '../../settings/index.js';
 import { useSocket } from '../../context/SocketContext.jsx';
 import { AUDIO_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import { formatKeyLabel } from '../../controls/keymapUtils.js';
-import { trackAnalyticsEvent, trackAnalyticsEventThrottled } from '../../analytics/index.js';
 import {
   DEFAULT_PAGE_THEME_KEY,
   PAGE_THEME_OPTIONS,
@@ -196,7 +195,6 @@ export default function SettingsPanel() {
   const handleTransportChange = (event) => {
     const next = event.target.value;
     savePageSettings((current) => ({ ...(current ?? {}), connectionTransport: next }));
-    trackAnalyticsEvent('settings_change', { setting: 'connection_transport', value: next });
     reconnectSocketWithTransport(socket, next);
   };
 
@@ -204,30 +202,21 @@ export default function SettingsPanel() {
     const raw = Number(event.target.value);
     const next = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0;
     saveAudioSettings((current) => ({ ...(current ?? {}), [key]: next }));
-    trackAnalyticsEventThrottled(
-      'settings_change',
-      { setting: key, value: next },
-      { key: `audio:${key}`, throttleMs: 3 * 1000 },
-    );
   };
 
   const handleMainBrushDuckEnabled = (event) => {
     const checked = Boolean(event.target.checked);
     saveAudioSettings((current) => ({ ...(current ?? {}), mainBrushDuckEnabled: checked }));
-    trackAnalyticsEvent('settings_change', { setting: 'mainBrushDuckEnabled', value: checked });
   };
 
   const handleSwapMobileControlColumns = (event) => {
     const checked = Boolean(event.target.checked);
     savePageSettings((current) => ({ ...(current ?? {}), swapMobileControlColumns: checked }));
-    trackAnalyticsEvent('mobile_controls_swap', { enabled: checked });
-    trackAnalyticsEvent('settings_change', { setting: 'swapMobileControlColumns', value: checked });
   };
 
   const handleDriveMacroBackoffEnabled = (event) => {
     const checked = Boolean(event.target.checked);
     savePageSettings((current) => ({ ...(current ?? {}), driveMacroBackoffEnabled: checked }));
-    trackAnalyticsEvent('settings_change', { setting: 'driveMacroBackoffEnabled', value: checked });
   };
 
   const handleInterInstanceTransferSettings = (event) => {
@@ -238,7 +227,6 @@ export default function SettingsPanel() {
       letting users opt out of sending their current settings cookie.
     */
     savePageSettings((current) => ({ ...(current ?? {}), interInstanceTransferSettings: checked }));
-    trackAnalyticsEvent('settings_change', { setting: 'interInstanceTransferSettings', value: checked });
   };
 
   const movePageThemePreview = (direction) => {
@@ -261,10 +249,6 @@ export default function SettingsPanel() {
       ...(current ?? {}),
       backgroundTheme: previewPageThemeKey,
     }));
-    trackAnalyticsEvent('settings_change', {
-      setting: 'backgroundTheme',
-      value: previewPageThemeKey,
-    });
   };
 
   const handleVideoFilterChange = (event) => {
@@ -276,7 +260,6 @@ export default function SettingsPanel() {
       ...(current ?? {}),
       colorFilter: nextFilter,
     }));
-    trackAnalyticsEvent('settings_change', { setting: 'videoColorFilter', value: nextFilter });
   };
 
   return (

@@ -32,6 +32,7 @@ import { useSessionActions, useSessionSelector } from '../context/SessionContext
 import { HORN_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 import { useOvercurrentLimiter } from './overcurrentLimiter.js';
 import { usePtzControlAdapter } from './ptzControlAdapter.js';
+import { trackAnalyticsEvent } from '../analytics/index.js';
 
 const ControlSystemContext = createContext(null);
 
@@ -283,6 +284,13 @@ export function ControlSystemProvider({ children }) {
     dispatch({ type: 'control/record-intent' });
   }, []);
 
+  const driveEngagementRoverRef = useRef(null);
+
+  useEffect(() => {
+    /* A new assignment gets one meaningful movement conversion event. */
+    driveEngagementRoverRef.current = null;
+  }, [pipeline.roverId]);
+
   const setDriveVector = useCallback(
     (vector, meta = {}) => {
       const speedOptions = { ...(meta.speedOptions || {}) };
@@ -302,6 +310,14 @@ export function ControlSystemProvider({ children }) {
         );
       }
       const computed = computeDifferentialSpeeds(vector, speedOptions);
+      const isMoving = computed.speeds.left !== 0 || computed.speeds.right !== 0;
+      if (pipeline.roverId && isMoving && driveEngagementRoverRef.current !== pipeline.roverId) {
+        driveEngagementRoverRef.current = pipeline.roverId;
+        trackAnalyticsEvent('drive_engaged', {
+          roverId: pipeline.roverId,
+          source: meta.source || 'unknown',
+        });
+      }
       dispatch({
         type: 'control/update-drive',
         payload: { ...computed, source: meta.source ?? null },

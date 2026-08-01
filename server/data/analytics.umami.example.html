@@ -1,0 +1,22 @@
+<!--
+  Umami example for the optional provider-neutral rover analytics bridge.
+
+  Copy this file to analytics.html in the same data directory, replace the
+  example URLs and attributes, and restart the server. The server injects the
+  copied file into every web UI entry page; this example filename is not loaded
+  automatically.
+-->
+<!-- Replace these example URLs, website IDs, domains, and recorder settings. -->
+<script defer src="https://analytics.example.com/script.js" data-website-id="replace-with-website-id" data-domains="rover.example.com"></script>
+<script defer src="https://analytics.example.com/recorder.js" data-website-id="replace-with-website-id" data-domains="rover.example.com" data-sample-rate="0.15" data-mask-level="moderate" data-max-duration="300000"></script>
+
+<script>
+  window.roverAnalytics = {
+    track: function (name, data) {
+      window.umami?.track(name, data);
+    },
+    identify: function (data) {
+      window.umami?.identify(data);
+    },
+  };
+</script>

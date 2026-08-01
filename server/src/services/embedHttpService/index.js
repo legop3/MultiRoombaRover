@@ -2,7 +2,7 @@
 // Purpose: Defines the embed Http Service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const { app } = require('../../globals/http');
-const { renderIndexHtml, renderOgImage } = require('../embedService');
+const { renderIndexHtml, renderOgImage, renderWebManifest } = require('../embedService');
 
 /*
   Every client-side BrowserRouter entry point must also be an explicit HTTP
@@ -26,4 +26,14 @@ app.get('/og/preview.png', async (req, res) => {
   } catch (err) {
     res.status(500).send('Failed to render embed image');
   }
+});
+
+app.get('/manifest.webmanifest', (req, res) => {
+  /*
+    The manifest varies with server configuration, so it is served by the
+    application rather than copied into Vite's static output. Revalidation
+    lets browsers pick up branding changes after the server is restarted.
+  */
+  res.set('Cache-Control', 'no-cache');
+  res.type('application/manifest+json').send(renderWebManifest());
 });

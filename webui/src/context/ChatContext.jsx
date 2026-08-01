@@ -235,8 +235,8 @@ export function ChatProvider({ children }) {
           } else {
             /*
               Count successful chat sends without forwarding chat text. The
-              centralized analytics session identity can still attach nickname
-              when the build-time adapter is configured to include it.
+              centralized analytics session identity adds aggregate role and
+              assignment context without attaching message text or nickname.
             */
             trackAnalyticsEvent('chat_send', {
               hasTts: Boolean(tts),

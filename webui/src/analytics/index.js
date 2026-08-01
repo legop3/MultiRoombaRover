@@ -1,13 +1,12 @@
 // Analytics Bridge
 // Purpose: Gives React a tiny, provider-neutral analytics surface. Scope:
-// forwards optional app events to a build-time injected browser adapter without
+// forwards optional app events to a runtime-injected browser adapter without
 // importing Umami, embedding website ids, or making rover controls depend on
 // analytics availability.
 
 const MAX_EVENT_NAME_LENGTH = 80;
 const MAX_PROPERTY_KEY_LENGTH = 80;
 const MAX_STRING_VALUE_LENGTH = 240;
-const throttledEvents = new Map();
 
 function getAdapter() {
   if (typeof window === 'undefined') return null;
@@ -100,22 +99,4 @@ export function identifyAnalyticsSession(payload = {}) {
   } catch (error) {
     console.warn('Analytics identify failed', error);
   }
-}
-
-export function trackAnalyticsEventThrottled(name, payload = {}, options = {}) {
-  const eventName = normalizeEventName(name);
-  if (!eventName) return;
-  const throttleMs = Number.isFinite(options?.throttleMs) ? Math.max(0, options.throttleMs) : 30 * 1000;
-  const key = `${eventName}:${typeof options?.key === 'string' ? options.key : JSON.stringify(normalizePayload(payload))}`;
-  const now = Date.now();
-  const lastTrackedAt = throttledEvents.get(key) || 0;
-
-  /*
-    Reliability signals can repeat every reconnect loop or failed media retry.
-    Throttling by a caller-owned key keeps Umami useful as an incident signal
-    without turning transient outages into hundreds of duplicate custom events.
-  */
-  if (now - lastTrackedAt < throttleMs) return;
-  throttledEvents.set(key, now);
-  trackAnalyticsEvent(eventName, payload);
 }

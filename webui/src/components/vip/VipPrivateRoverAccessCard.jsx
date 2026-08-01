@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react';
 import CardFrame from '../CardFrame/index.jsx';
 import { flowWrapClass, innerFlowClass } from './constants.js';
 import RoverLabel from '../RoverLabel/index.jsx';
-import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 export default function VipPrivateRoverAccessCard({
   requestableRovers = [],
@@ -30,24 +29,14 @@ export default function VipPrivateRoverAccessCard({
     if (!roverId) return;
     setPendingByRover((prev) => ({ ...prev, [roverId]: true }));
     onMessage?.('');
-    trackAnalyticsEvent('vip_private_rover_request', { roverId, status: 'started' });
     try {
       const response = await requestPrivateRoverAccess?.(roverId);
-      trackAnalyticsEvent('vip_private_rover_request', {
-        roverId,
-        status: response?.existing ? 'existing' : 'accepted',
-      });
       if (response?.existing) {
         onMessage?.('You already have a pending request for that rover.');
       } else {
         onMessage?.('Private rover access request sent to lockdown admins.');
       }
     } catch (err) {
-      trackAnalyticsEvent('vip_private_rover_request', {
-        roverId,
-        status: 'failed',
-        reason: err?.message || 'unknown',
-      });
       onMessage?.(err.message || 'Failed to send request.');
     } finally {
       setPendingByRover((prev) => ({ ...prev, [roverId]: false }));

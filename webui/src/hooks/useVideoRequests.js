@@ -2,7 +2,6 @@
 // Purpose: Coordinates client-side video stream request intents and authorization timing. Scope: Provides reusable request helpers for rover and room video consumers.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
-import { trackAnalyticsEventThrottled } from '../analytics/index.js';
 
 function normalizeEntry(entry) {
   if (!entry) return null;
@@ -96,23 +95,6 @@ export function useVideoRequests(sourceList = [], options = {}) {
             : { roverId: entry.id };
       socket.emit('video:request', payload, (resp = {}) => {
         if (cancelled) return;
-        if (resp?.error) {
-          /*
-            Video authorization/session failures are operational signals, but
-            this hook can request several feeds at once and retry after socket
-            reconnects. Throttle by feed key so one broken camera does not flood
-            Umami while still showing which rover or room camera is affected.
-          */
-          trackAnalyticsEventThrottled(
-            'video_request_failed',
-            {
-              type: entry.type,
-              sourceId: entry.id,
-              reason: resp.error,
-            },
-            { key: `${entry.type}:${entry.id}:${resp.error}`, throttleMs: 60 * 1000 },
-          );
-        }
         setSources((prev) => ({ ...prev, [entry.key]: resp }));
       });
     }

@@ -24,7 +24,6 @@ import {
   isPrecisionDriveActive,
   resolveKeyboardSpeeds,
 } from './driveIntent.js';
-import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 const SOURCE = 'keyboard';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
@@ -445,18 +444,14 @@ export default function KeyboardInputManager() {
 
       if (newlyPressed.length > 0) {
         if (newlyPressed.some((token) => latest.keymap.driveMacro?.has(token))) {
-          trackAnalyticsEvent('drive_start', { roverId: latest.roverId || '', source: 'keyboard' });
           latest.dockAssist.exitAssist();
           latest.setMode('drive');
           latest.runMacro('drive-sequence');
         } else if (newlyPressed.some((token) => latest.keymap.dockMacro?.has(token))) {
-          trackAnalyticsEvent('dock_assist_toggle', { roverId: latest.roverId || '', source: 'keyboard' });
           latest.dockAssist.toggleAssist();
         } else if (newlyPressed.some((token) => latest.keymap.headlightToggle?.has(token))) {
-          trackAnalyticsEvent('headlight_toggle', { roverId: latest.roverId || '', source: 'keyboard' });
           latest.toggleHeadlight();
         } else if (newlyPressed.some((token) => latest.keymap.laserToggle?.has(token))) {
-          trackAnalyticsEvent('laser_toggle', { roverId: latest.roverId || '', source: 'keyboard' });
           latest.toggleLaser();
         } else if (newlyPressed.some((token) => latest.keymap.videoFilterCycle?.has(token))) {
           cycleVideoFilter();

@@ -58,7 +58,6 @@ import {
   themeGapClass,
   themeStackClass,
 } from './themes/index.js';
-import { trackAnalyticsEvent } from './analytics/index.js';
 import useLayoutMode from './hooks/useLayoutMode.js';
 
 function DesktopLayout({ layout, onOpenHelpOverlay }) {
@@ -117,15 +116,9 @@ function MobileFeatureTabs({
   });
   const handleTabChange = useCallback(
     (tab) => {
-      /*
-        Tab changes are one of the highest-signal UI events because the app is a
-        dense single-page control surface. Recording the selected panel gives
-        Umami useful journeys without tracking every button inside each panel.
-      */
       setActiveTab(tab);
-      trackAnalyticsEvent('tab_change', { tab, layout, surface: 'mobile_features' });
     },
-    [layout],
+    [],
   );
   return (
     <section className="text-base">
@@ -342,71 +335,46 @@ function AppWithProviders({ layout, isDesktop, fullscreen }) {
     }
   }, [quickstartStatus, quickstartSettings?.showOnLoad]);
 
-  useEffect(() => {
-    if (!fullscreenVisible) return;
-    trackAnalyticsEvent('fullscreen_prompt_show', { layout, mode: fullscreenMode });
-  }, [fullscreenMode, fullscreenVisible, layout]);
-
-  useEffect(() => {
-    if (!quickstartVisible) return;
-    trackAnalyticsEvent('quickstart_open', { layout });
-  }, [layout, quickstartVisible]);
-
   const openHelp = useCallback(() => {
     setHelpVisible(true);
-    trackAnalyticsEvent('help_open', { layout, source: 'panel' });
-  }, [layout]);
+  }, []);
   const closeHelp = useCallback(() => {
     setHelpVisible(false);
-    trackAnalyticsEvent('help_close', { layout });
-  }, [layout]);
+  }, []);
   const closeQuickstart = useCallback(() => {
     setQuickstartVisible(false);
-    trackAnalyticsEvent('quickstart_close', { layout });
-  }, [layout]);
+  }, []);
   const handleFloatingFullscreen = useCallback(async () => {
     if (fullscreenIsIOS) {
-      trackAnalyticsEvent('fullscreen_prompt_manual_open', { layout, mode: 'pwa-hint', source: 'floating_button' });
       showPrompt();
       return;
     }
     const entered = await enterFullscreen();
-    trackAnalyticsEvent(entered ? 'fullscreen_enter' : 'fullscreen_enter_failed', {
-      layout,
-      source: 'floating_button',
-    });
     if (!entered) {
       showPrompt();
     }
-  }, [enterFullscreen, fullscreenIsIOS, layout, showPrompt]);
+  }, [enterFullscreen, fullscreenIsIOS, showPrompt]);
   const setQuickstartShowOnLoad = useCallback(
     (enabled) => {
       const next = Boolean(enabled);
       saveQuickstartSettings((current) => ({ ...(current ?? {}), showOnLoad: next }));
-      trackAnalyticsEvent('quickstart_show_on_load_change', { layout, enabled: next });
       if (!next) {
         setQuickstartVisible(false);
       }
     },
-    [layout, saveQuickstartSettings],
+    [saveQuickstartSettings],
   );
   const openHelpFromQuickstart = useCallback(() => {
     setQuickstartVisible(false);
     setHelpVisible(true);
-    trackAnalyticsEvent('help_open', { layout, source: 'quickstart' });
-  }, [layout]);
+  }, []);
   const handleFullscreenPromptEnter = useCallback(async () => {
     const entered = await enterFullscreen();
-    trackAnalyticsEvent(entered ? 'fullscreen_enter' : 'fullscreen_enter_failed', {
-      layout,
-      source: 'prompt',
-    });
     return entered;
-  }, [enterFullscreen, layout]);
+  }, [enterFullscreen]);
   const handleFullscreenPromptDismiss = useCallback(() => {
     dismiss();
-    trackAnalyticsEvent('fullscreen_dismiss', { layout, mode: fullscreenMode });
-  }, [dismiss, fullscreenMode, layout]);
+  }, [dismiss]);
 
   const renderedLayout = useMemo(
     () =>

@@ -36,7 +36,6 @@ import CardFrame from '../CardFrame/index.jsx';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import { themeGapClass, themeStackClass } from '../../themes/index.js';
-import { trackAnalyticsEvent } from '../../analytics/index.js';
 
 const CHAT_DOCK_INITIAL_HEIGHT = 224;
 const CHAT_DOCK_MIN_HEIGHT = 144;
@@ -103,23 +102,20 @@ function DriveDockPanel() {
   const cameraTiltStep = camera?.precisionMode
     ? CAMERA_TILT_PRECISION_STEP_DEGREES
     : CAMERA_TILT_STEP_DEGREES;
-  const trackedControls = useMemo(
+  const auxControls = useMemo(
     () => ({
       setHeadlight: (nextOn) => {
-        trackAnalyticsEvent('headlight_toggle', { roverId, source: 'desktop_control', enabled: Boolean(nextOn) });
         setHeadlight(nextOn);
       },
       setLaser: (nextOn) => {
-        trackAnalyticsEvent('laser_toggle', { roverId, source: 'desktop_control', enabled: Boolean(nextOn) });
         setLaser(nextOn);
       },
       startHorn: () => {
-        trackAnalyticsEvent('horn_start', { roverId, source: 'desktop_control' });
         return startHorn();
       },
       stopHorn,
     }),
-    [roverId, setHeadlight, setLaser, startHorn, stopHorn],
+    [setHeadlight, setLaser, startHorn, stopHorn],
   );
 
   return (
@@ -139,7 +135,7 @@ function DriveDockPanel() {
                   label="Headlight"
                   on={headlightState?.headlightOn}
                   disabled={!roverId}
-                  onToggle={trackedControls.setHeadlight}
+                  onToggle={auxControls.setHeadlight}
                   keyLabel={headlightLabel}
                 />
               )}
@@ -148,7 +144,7 @@ function DriveDockPanel() {
                   label="Laser"
                   on={laserState?.laserOn}
                   disabled={!roverId || roomLightsLockedOn}
-                  onToggle={trackedControls.setLaser}
+                  onToggle={auxControls.setLaser}
                   keyLabel={laserLabel}
                 />
               )}
@@ -157,8 +153,8 @@ function DriveDockPanel() {
           {hornAvailable && (
             <HornControl
               disabled={!roverId || hornBlocked}
-              onStart={trackedControls.startHorn}
-              onStop={trackedControls.stopHorn}
+              onStart={auxControls.startHorn}
+              onStop={auxControls.stopHorn}
               keyLabel={hornLabel}
               active={horn?.active}
               heat={horn?.heat}
@@ -259,14 +255,12 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
   const handleTabChange = useCallback(
     (tab) => {
       /*
-        Desktop users spend most of their time on this one route, so panel
-        changes are the cleanest way to understand feature usage without adding
-        analytics calls to every nested control in the rover dashboard.
+        Keep the selected desktop panel controlled here so the tab strip and
+        panel content always move together.
       */
       setActiveTab(tab);
-      trackAnalyticsEvent('tab_change', { tab, layout, surface: 'desktop_right_pane' });
     },
-    [layout],
+    [],
   );
 
   useLayoutEffect(() => {

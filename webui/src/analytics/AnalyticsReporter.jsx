@@ -1,12 +1,11 @@
 // Analytics Reporter
-// Purpose: Publishes page/session context to the optional build-time analytics
+// Purpose: Publishes page/session context to the optional runtime analytics
 // adapter. Scope: observes route, layout, nickname, role, verification, and
 // rover assignment without owning any analytics vendor implementation.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../settings/index.js';
-import { identifyAnalyticsSession, trackAnalyticsEvent } from './index.js';
+import { identifyAnalyticsSession } from './index.js';
 
 function detectLayout() {
   if (typeof window === 'undefined') return 'desktop';
@@ -31,15 +30,10 @@ function useAnalyticsLayout() {
 }
 
 export default function AnalyticsReporter() {
-  const location = useLocation();
   const layout = useAnalyticsLayout();
   const { value: profile } = useSettingsNamespace('profile', { nickname: '' });
   const session = useSessionSelector((state) => state.session);
-  const previousRouteRef = useRef(null);
-  const previousLayoutRef = useRef(null);
-  const previousRoverRef = useRef(null);
   const previousIdentityRef = useRef('');
-  const route = location.pathname || '/';
   const nickname = String(profile?.nickname || session?.nickname || '').trim();
   const roverId = String(session?.assignment?.roverId || '').trim();
   const role = String(session?.role || '').trim();
@@ -47,16 +41,14 @@ export default function AnalyticsReporter() {
 
   const identity = useMemo(
     () => ({
-      route,
       layout,
-      nickname,
       hasNickname: Boolean(nickname),
       roverId,
       assignedRover: Boolean(roverId),
       role,
       verified,
     }),
-    [layout, nickname, role, route, roverId, verified],
+    [layout, nickname, role, roverId, verified],
   );
 
   useEffect(() => {
@@ -65,30 +57,13 @@ export default function AnalyticsReporter() {
     previousIdentityRef.current = serialized;
 
     /*
-      This pushes the current browser/session context into the injected adapter.
-      The adapter is responsible for applying build-time privacy/config choices,
-      such as whether nickname and rover id should be sent to Umami.
+      Session properties describe durable segmentation dimensions. Route is
+      intentionally absent because Umami attaches the current URL to pageviews
+      and events automatically, and nickname is reduced to a non-identifying
+      boolean so aggregate analytics does not store user-entered names.
     */
     identifyAnalyticsSession(identity);
   }, [identity]);
-
-  useEffect(() => {
-    if (previousRouteRef.current === route) return;
-    previousRouteRef.current = route;
-    trackAnalyticsEvent('route_enter', { route, layout });
-  }, [layout, route]);
-
-  useEffect(() => {
-    if (previousLayoutRef.current === layout) return;
-    previousLayoutRef.current = layout;
-    trackAnalyticsEvent('layout_change', { route, layout });
-  }, [layout, route]);
-
-  useEffect(() => {
-    if (!roverId || previousRoverRef.current === roverId) return;
-    previousRoverRef.current = roverId;
-    trackAnalyticsEvent('rover_assigned', { roverId, route, layout });
-  }, [layout, route, roverId]);
 
   return null;
 }

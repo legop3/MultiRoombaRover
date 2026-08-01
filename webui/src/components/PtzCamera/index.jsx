@@ -22,7 +22,6 @@ import { useSessionActions, useSessionSelector } from '../../context/SessionCont
 import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import { isFeatureEnabled } from '../../lib/features.js';
-import { trackAnalyticsEvent } from '../../analytics/index.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { DEFAULT_PAGE_THEME_KEY, getPageThemeClass } from '../../themes/index.js';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
@@ -861,7 +860,7 @@ export function PtzControllerPage({ layout = 'desktop' }) {
   );
 }
 
-export default function PtzQueueCard({ layout = 'desktop' }) {
+export default function PtzQueueCard() {
   const featureEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'ptzCamera'));
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
@@ -886,7 +885,6 @@ export default function PtzQueueCard({ layout = 'desktop' }) {
       return;
     }
     setPending(true);
-    trackAnalyticsEvent('ptz_queue_join', { layout });
     try {
       const response = await ptzClaim();
       /*
@@ -897,13 +895,7 @@ export default function PtzQueueCard({ layout = 'desktop' }) {
       if (response?.state?.isOperator || response?.state?.queuedPosition) {
         navigate('/ptz');
       }
-      trackAnalyticsEvent('ptz_queue_join_result', { layout, status: 'accepted' });
     } catch (err) {
-      trackAnalyticsEvent('ptz_queue_join_result', {
-        layout,
-        status: 'failed',
-        reason: err?.message || 'unknown',
-      });
       alert(err.message || 'PTZ request failed.');
     } finally {
       setPending(false);

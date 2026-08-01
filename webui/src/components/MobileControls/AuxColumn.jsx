@@ -9,7 +9,6 @@ import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
 import { AUX_ZERO } from './constants.js';
 import VacuumControls from './VacuumControls.jsx';
 import VerticalCameraTilt from './VerticalCameraTilt.jsx';
-import { trackAnalyticsEvent } from '../../analytics/index.js';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 
 const CAMERA_TILT_STEP_DEGREES = 0.5;
@@ -56,25 +55,22 @@ function AuxColumnContent() {
   const handleHeadlightToggle = useCallback(
     (nextOn) => {
       if (!headlightAvailable) return;
-      trackAnalyticsEvent('headlight_toggle', { roverId, source: 'mobile_control', enabled: Boolean(nextOn) });
       setHeadlight(nextOn);
     },
-    [headlightAvailable, roverId, setHeadlight],
+    [headlightAvailable, setHeadlight],
   );
 
   const handleLaserToggle = useCallback(
     (nextOn) => {
       if (!laserAvailable) return;
-      trackAnalyticsEvent('laser_toggle', { roverId, source: 'mobile_control', enabled: Boolean(nextOn) });
       setLaser(nextOn);
     },
-    [laserAvailable, roverId, setLaser],
+    [laserAvailable, setLaser],
   );
 
   const handleHornStart = useCallback(() => {
-    trackAnalyticsEvent('horn_start', { roverId, source: 'mobile_control' });
     return startHorn();
-  }, [roverId, startHorn]);
+  }, [startHorn]);
 
   const handleAuxPress = useCallback(
     (id, values) => {

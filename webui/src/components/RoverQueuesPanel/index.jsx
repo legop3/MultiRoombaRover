@@ -168,22 +168,13 @@ export default function RoverQueuesPanel({
       return;
     }
     setPending((prev) => ({ ...prev, [targetRoverId]: true }));
-    trackAnalyticsEvent('rover_queue_join', {
+    trackAnalyticsEvent('rover_selected', {
       roverId: targetRoverId,
-      alreadyAssigned: assignedRoverId === String(targetRoverId),
+      alreadySelected: assignedRoverId === String(targetRoverId),
     });
     try {
       await requestControl(targetRoverId);
-      trackAnalyticsEvent('rover_queue_join_result', {
-        roverId: targetRoverId,
-        status: 'accepted',
-      });
     } catch (err) {
-      trackAnalyticsEvent('rover_queue_join_result', {
-        roverId: targetRoverId,
-        status: 'failed',
-        reason: err?.message || 'unknown',
-      });
       alert(err.message);
     } finally {
       setPending((prev) => ({ ...prev, [targetRoverId]: false }));
@@ -198,18 +189,10 @@ export default function RoverQueuesPanel({
     const ok = window.confirm(`Reboot your rover "${assignedRoverName}" now?`);
     if (!ok) return;
     setRebootPending(true);
-    trackAnalyticsEvent('rover_reboot_click', { roverId: assignedRoverId, scope: 'own_rover' });
     try {
       await rebootOwnRover();
-      trackAnalyticsEvent('rover_reboot_result', { roverId: assignedRoverId, scope: 'own_rover', status: 'accepted' });
       alert('Reboot command sent.');
     } catch (err) {
-      trackAnalyticsEvent('rover_reboot_result', {
-        roverId: assignedRoverId,
-        scope: 'own_rover',
-        status: 'failed',
-        reason: err?.message || 'unknown',
-      });
       alert(err.message);
     } finally {
       setRebootPending(false);
