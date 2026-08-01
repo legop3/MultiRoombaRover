@@ -52,6 +52,7 @@ import NeatoCard from './components/NeatoCard/index.jsx';
 import RewardRunOverlay from './components/RewardRunOverlay/index.jsx';
 import SocketConnectionPill from './components/SocketConnectionPill/index.jsx';
 import DuplicateIdentityOverlay from './components/DuplicateIdentityOverlay/index.jsx';
+import DriverAdCard from './components/DriverAdCard/index.jsx';
 import {
   DEFAULT_PAGE_THEME_KEY,
   getPageThemeClass,
@@ -66,6 +67,13 @@ function DesktopLayout({ layout, onOpenHelpOverlay }) {
       <div className={`flex min-w-0 flex-[1.22] flex-col ${themeGapClass} overflow-y-auto pr-0`}>
         <DriverVideo />
         <PiHostStatsCard />
+        {/*
+          The ad owns its empty-state gate and uses auto top margin to consume
+          any spare column height. Keeping it as the final desktop-only child
+          pins it to the bottom without introducing layout measurement code or
+          exposing it on mobile and alternate application routes.
+        */}
+        <DriverAdCard className="mt-auto" />
         {/* <TelemetryPanel /> */}
       </div>
       <div className={`flex min-w-0 flex-1 flex-col ${themeGapClass} overflow-y-auto`}>

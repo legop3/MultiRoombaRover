@@ -34,3 +34,6 @@ server/data/barcode-games.json
 server/data/identity.sqlite-shm
 server/data/identity.sqlite-wal
 server/src/services/balanceBoardService/native/balance_board_worker
+server/data/fleet-reports.sqlite
+server/data/fleet-reports.sqlite-shm
+server/data/fleet-reports.sqlite-wal

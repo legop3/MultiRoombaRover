@@ -232,6 +232,18 @@ socials:
       url: "https://ko-fi.com/your-handle"
       icon: "FaCoffee"
       color: "#29ABE0"
+
+# Optional trusted HTML card shown at the bottom of the desktop driver page's
+# left column. Leave html empty (or omit this section) to hide the card. This
+# content is sent to driver browsers without sanitization, so only place markup
+# here that is controlled by the server operator.
+driverAd:
+  title: "Advertisement"
+  html: |
+    <a href="https://example.com" target="_blank" rel="noopener noreferrer">
+      <img src="https://example.com/ad.png" alt="Advertisement" style="display:block;width:100%;height:auto;">
+    </a>
+
 # Optional passive fleet telemetry, history, and daily reporting. The collector
 # observes existing server events and rover sensor frames but never participates
 # in command, assignment, docking, or safety decisions.

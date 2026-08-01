@@ -61,6 +61,7 @@ const {
   kofiLink,
   serverTimezone,
   configuredSocials,
+  driverAd,
   ACTIVITY_SYNC_COOLDOWN_MS,
   GPIO_TOGGLE_SYNC_COOLDOWN_MS,
   PERIODIC_SYNC_MS,
@@ -209,6 +210,13 @@ function buildSession(socket) {
     adminReason: getAdminReason(),
     users,
     socials,
+    /*
+      This is intentionally raw, operator-authored HTML. The browser only
+      mounts it on the desktop driver page, but keeping it in the ordinary
+      session payload makes the server configuration the single source of
+      truth and avoids a separate endpoint for one small optional card.
+    */
+    driverAd,
     discord: {
       invite: discordInvite,
     },

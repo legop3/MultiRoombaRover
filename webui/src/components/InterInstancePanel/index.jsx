@@ -195,10 +195,15 @@ export function InterInstancePopup({ onClose }) {
   );
 }
 
-function InterInstanceCards({ instances, centered = false }) {
+function InterInstanceCards({ instances, centered = false, singleColumn = false }) {
   return (
     <div className={classNames(
-      'flex flex-wrap justify-center gap-0.5',
+      /*
+        The full browser wraps cards to use available popup space. Restricted
+        mode instead requests one stable vertical column so queue overflow can
+        only add vertical scrolling and can never widen the gate overlay.
+      */
+      singleColumn ? 'flex flex-col items-center gap-0.5' : 'flex flex-wrap justify-center gap-0.5',
       centered && 'mx-auto w-full max-w-3xl',
     )}>
       {instances.map((remote) => (
@@ -235,6 +240,7 @@ export function InterInstanceBrowserFrame({
   bodyClassName = 'p-0.5',
   centered = false,
   scaledOverlay = false,
+  singleColumn = false,
 }) {
   const enabled = useInterInstanceEnabled();
   const instances = useRemoteInstances();
@@ -259,7 +265,7 @@ export function InterInstanceBrowserFrame({
       clipOverflow={false}
     >
       {instances.length ? (
-        <InterInstanceCards instances={instances} centered={centered} />
+        <InterInstanceCards instances={instances} centered={centered} singleColumn={singleColumn} />
       ) : (
         <p className="text-sm text-slate-500">No external instances discovered.</p>
       )}
