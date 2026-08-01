@@ -134,33 +134,6 @@ function buildEmbedCopy(state, camera) {
     lockdown: 'locked',
   }[mode] || mode;
 
-  let title = 'Roomba Rover';
-  if (mode === 'lockdown') {
-    title = 'Private mode is on';
-  } else if (roversOnline === 0) {
-    title = 'Rovers offline - check back soon';
-  } else if (driverCount > 0) {
-    title = 'Rovers in use - drive a rover';
-  } else if (mode === 'turns') {
-    title = 'Controls open - jump in';
-  } else {
-    title = 'Controls open - drive a rover';
-  }
-
-  const descriptionParts = [];
-  descriptionParts.push(`${roversOnline} rover${roversOnline === 1 ? '' : 's'} online`);
-  if (driverCount > 0) {
-    descriptionParts.push(`${driverCount} driving`);
-  } else {
-    descriptionParts.push('no active drivers');
-  }
-  if (mode === 'lockdown') {
-    descriptionParts.push('privacy mode');
-  } else {
-    descriptionParts.push(modeLabel);
-  }
-  const description = descriptionParts.join(' | ');
-
   const statsParts = [
     `${roversOnline} online`,
     driverCount > 0 ? `${driverCount} driving` : 'no drivers',
@@ -173,9 +146,6 @@ function buildEmbedCopy(state, camera) {
 
   const cameraLabel = camera?.name || camera?.id || 'room cam';
   return {
-    title,
-    description,
-    subtitle: 'Control a live rover from your browser',
     stats: statsParts.join(' | '),
     cameraLabel: mode === 'lockdown' ? 'Room cams hidden' : `Room cam: ${cameraLabel}`,
   };
@@ -346,7 +316,8 @@ async function renderOgImage() {
   const overlaySvg = Buffer.from(
     buildOverlaySvg({
       title: siteMetadata.name,
-      subtitle: copy.subtitle,
+      // The image must use the same resolved description as the page metadata and installed shortcut.
+      subtitle: siteMetadata.description,
       stats: copy.stats,
       cameraLabel: copy.cameraLabel,
       hasFrame,
