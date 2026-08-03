@@ -3,6 +3,7 @@
 PROFILE="pi"
 BINARY_SRC=""
 CONFIG_SRC=""
+INSTALL_FFMPEG_STATIC=0
 
 usage() {
 	cat <<'USAGE'
@@ -14,6 +15,9 @@ Options:
   -b, --binary <path>   Path to the roverd binary (default depends on profile)
   -c, --config <path>   Source config to install if /etc/roverd.yaml is missing
                         (default depends on profile)
+  --ffmpeg-static       Download and install a static ffmpeg with the WHIP muxer
+                        (~100MB, arm64/x86_64 only). Only needed for transport:
+                        whip - the default RTSP transport works on the apt ffmpeg.
   -h, --help            Show this help text
 
 The script must run from the repository root and as root (sudo). It will:
@@ -35,6 +39,12 @@ parse_args() {
 				;;
 			--debian-laptop)
 				PROFILE="debian-laptop"
+				shift
+				;;
+			# Opt-in rather than default: it is a ~100MB fetch of a third-party binary, and the
+			# default transport (RTSP) works fine on the apt ffmpeg. Only WHIP needs this.
+			--ffmpeg-static)
+				INSTALL_FFMPEG_STATIC=1
 				shift
 				;;
 			-b|--binary)

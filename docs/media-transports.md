@@ -87,8 +87,40 @@ others alone.
 | RTSP / UDP | — | — | **broken across the internet, never use** |
 
 WHIP is both faster and steadier (26/27/29ms across repeats, against 66/39/39 for RTSP/TCP). It is
-not the default only because the muxer needs ffmpeg ≥ 7.1 and Pi OS bookworm ships 5.1. On a rover
-with a newer ffmpeg, set `transport: whip`.
+not the default only because the muxer needs ffmpeg ≥ 7.1 and Pi OS bookworm ships 5.1.
+
+### Getting WHIP on a rover
+
+apt cannot get you to 7.1 on bookworm, so the installer can fetch a static build:
+
+```bash
+sudo ./pi/install_roverd.sh --ffmpeg-static
+```
+
+That installs to `/opt/roverd-ffmpeg` and links it into `/usr/local/bin`, which precedes
+`/usr/bin` on PATH — so the publishers pick it up and the apt ffmpeg stays in place as a
+fallback. It is **opt-in**, because it is a ~100MB download of a third-party binary and the
+default RTSP transport works fine on the apt ffmpeg.
+
+The installer **verifies the muxer before linking it into PATH**, and reverts if verification
+fails through the symlink, so a build that cannot actually do WHIP never becomes the ffmpeg your
+rovers use. Every install — with or without the flag — ends by reporting what the ffmpeg on PATH
+supports, so you find out from the install log rather than from a rover that will not publish.
+
+Then set the transport and restart the media services:
+
+```yaml
+media:
+  video:
+    transport: whip
+  audioCapture:
+    transport: whip
+```
+
+**64-bit only.** There is no static ffmpeg ≥ 7.1 for 32-bit ARM from any current source, so a
+rover on 32-bit Raspberry Pi OS (`uname -m` reports `armv7l`) cannot use WHIP at all. The
+installer refuses rather than installing something that will not work. Those rovers stay on RTSP,
+which is the default and needs only ffmpeg 4.x+. Reinstalling with 64-bit Pi OS is what unlocks it.
 
 **RTSP must be TCP.** Plain RTP/UDP has no retransmission where the SRT it replaces has ARQ, so
 RTSP/UDP is strictly worse than what it replaces and fails outright over the internet — the

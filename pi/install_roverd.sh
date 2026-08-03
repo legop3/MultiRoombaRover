@@ -24,6 +24,7 @@ source pi/install/pi_profile.sh
 source pi/install/debian_laptop_profile.sh
 source pi/install/media_env.sh
 source pi/install/systemd.sh
+source pi/install/ffmpeg_static.sh
 
 main() {
 	parse_args "$@"
@@ -37,10 +38,22 @@ main() {
 	install_roverd_unit
 
 	install_selected_profile
+
+	# After the profile, so the apt ffmpeg is already present and the static build overrides a
+	# known-good baseline rather than being the only ffmpeg on the box.
+	if [[ "${INSTALL_FFMPEG_STATIC:-0}" == "1" ]]; then
+		install_ffmpeg_static
+	fi
+
 	install_media_units
 	write_media_env_placeholder
 	install_audio_fifo
 	enable_and_restart_units
+
+	# Reported on every install, not only when --ffmpeg-static was passed. The transports this
+	# rover can use depend entirely on which ffmpeg is on PATH, and finding that out from the
+	# install log beats finding out from a rover that will not publish.
+	report_ffmpeg_capabilities ffmpeg || true
 
 	log "Install complete for profile $PROFILE"
 }
