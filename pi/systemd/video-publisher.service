@@ -9,6 +9,15 @@ User=roverd
 Group=roverd
 WorkingDirectory=/var/lib/roverd
 EnvironmentFile=/var/lib/roverd/media.env
+# /run/roverd holds the transport state file this publisher writes so roverd can report which
+# transmit method is actually in use. systemd has to create it: this unit runs as the
+# unprivileged roverd user, which cannot mkdir inside root-owned /run, so without this the
+# publisher's write is silently skipped and the UI shows no transport.
+#
+# Preserved on stop because all three media units share this directory. Without it, stopping
+# one would delete the state the other two had reported.
+RuntimeDirectory=roverd
+RuntimeDirectoryPreserve=yes
 ExecStart=/usr/local/bin/video-publisher
 Restart=always
 RestartSec=2

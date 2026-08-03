@@ -17,7 +17,13 @@ battery:
   urgent: 1650
 maxWheelSpeed: 350
 media:
+  # Listener ports on the media server. Every stream URL is derived from these plus the
+  # server host and this rover's name, so these three numbers are the only per-deployment
+  # media configuration. A VPS that only grants a contiguous port block (see
+  # webrtc/deploy/install.sh --port-base) sets all three; a default MediaMTX needs none.
   publishPort: 9000
+  rtspPort: 8554
+  whipPort: 8889
   manage: true
   healthUrl: ""
   healthInterval: 30s
@@ -25,10 +31,68 @@ media:
     enabled: true
     service: video-publisher.service
     publisher: pi-libcamera
-    publishUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
+    # Transport selects how encoded frames reach the media server. Measured in
+    # webrtc/: dropping the MPEG-TS container takes glass-to-glass latency from
+    # ~172ms to ~12ms, because the delay is inside the server's mpegts demux and no
+    # ffmpeg flag on the rover can reach it.
+    #
+    #   rtsp    DEFAULT. 39ms. Works on ffmpeg 4.x+, so every current rover can use it.
+    #           Needs `rtsp: yes` on the media server.
+    #   whip    27ms and steadier, but the muxer needs ffmpeg >= 7.1 and Raspberry Pi OS
+    #           bookworm ships 5.1. Set this once ffmpeg is upgraded.
+    #   mpegts  the old behaviour, 199-235ms. This is the knob to set (or `srt`, same
+    #           thing) to get the previous setup back.
+    #
+    # An unrecognised value resolves to rtsp, so a typo cannot stop a rover publishing.
+    # There is no automatic fallback between transports: if the configured one does not
+    # work the publisher restarts rather than silently running slow, which is easier to
+    # notice. Set mpegts to fall back deliberately.
+    #
+    # The live transport appears in the Rover Pi Stats card: the publishers write it to
+    # /run/roverd/*-transport (override with ROVERD_MEDIA_STATE_DIR) and roverd reports it.
+    transport: rtsp
+    # Every URL below is DERIVED from serverUrl's host plus this rover's `name` when left
+    # empty, which is the normal case - you should not need to write any of them:
+    #
+    #   video     <name>          rtsp://<host>:8554/<name>
+    #   mic       <name>-audio    rtsp://<host>:8554/<name>-audio
+    #   speaker   <name>-fwd      rtsp://<host>:8554/<name>-fwd
+    #
+    # Ports come from publishPort / rtspPort / whipPort on the media block. Set a URL
+    # explicitly only for a non-standard server layout or a one-off test; it then wins over
+    # the derived value. The stream NAMES are not configurable, because the server derives
+    # the same names independently from the roster - a URL that disagreed would publish
+    # successfully to a path nothing reads.
+    publishUrl: ""
+    #
+    # RTSP runs over TCP, and must. An earlier version of this comment recommended UDP
+    # on the grounds that it "preserves the loss behaviour SRT was chosen for" - that was
+    # backwards. SRT has ARQ retransmission and plain RTP/UDP has none, so RTSP/UDP is
+    # strictly worse than the SRT it replaces: one lost packet in a fragmented keyframe
+    # is unrecoverable. Measured over a real internet path, RTSP/UDP failed outright -
+    # MediaMTX reported the path ready and no WebRTC reader ever started. TCP measured
+    # 39ms against 199-235ms for the shipped MPEG-TS/SRT path.
+    #
+    # TCP's real cost is head-of-line blocking on a lossy WiFi link. If that bites, the
+    # fix is whipUrl below, not UDP.
+    rtspUrl: ""
+    whipUrl: ""
     width: 640
     height: 480
     fps: 30
+    # Real content saturates whatever budget it is given, so this figure IS the
+    # per-viewer upload cost - and every WHEP viewer pays it in full. Measured on real
+    # sensor content over a live internet path, average quantizer against bitrate:
+    #
+    #   2000000  qp 21.7   egress 1999 kbps
+    #   1200000  qp 25.2   egress 1188 kbps   <- 40% less upload, no visible cost
+    #    800000  qp 27.2   egress  792 kbps   <- 60% less, nearing the edge
+    #    600000  qp 31.7   egress  596 kbps   <- past it; blockiness shows around 30
+    #
+    # So the knee is between 800000 and 600000. 1200000 is the conservative saving and
+    # 800000 the aggressive one. Left at 2000000 because these were measured on a webcam,
+    # not an OV5647, and lowering every rover's picture quality on that evidence would be
+    # overreach - validate on your own camera and lighting first.
     bitrate: 2000000
     # Default assumes camera is mounted upside down; set false for upright mounts.
     inverted: true
@@ -36,7 +100,18 @@ media:
   audioCapture:
     enabled: false
     service: audio-only-publisher.service
-    publishUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha-audio,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
+    # The rover's MICROPHONE, published as "<name>-audio" so viewers can hear the room.
+    # Not the speaker - that is audioPlayback below. See docs/media-transports.md.
+    #
+    # Measured 330ms over MPEG-TS against 183.7ms over RTSP. Opus is already WebRTC's native
+    # audio codec so nothing is transcoded - only the container changes. RTSP carries
+    # Opus-only fine and works on ffmpeg 4.x+, which is why it is the default here too.
+    # Same values as video: rtsp (default), whip, mpegts.
+    transport: rtsp
+    # Derived from serverUrl's host and "<name>-audio" when empty.
+    publishUrl: ""
+    rtspUrl: ""
+    whipUrl: ""
     device: hw:0,0
     sampleRate: 48000
     channels: 2
@@ -44,7 +119,15 @@ media:
   audioPlayback:
     enabled: true
     service: audio-forward-listener.service
-    forwardUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha-fwd,m=request&latency=10&mode=caller&transtype=live&pkt_size=1316
+    # The rover's SPEAKER: audio the SERVER produces - TTS, bonk, a VIP upload, or a driver's
+    # forwarded microphone - which the rover READS from "<name>-fwd" and plays locally.
+    #
+    # Measured 138ms reading over SRT/MPEG-TS against 29.7ms over RTSP. Only rtsp and mpegts
+    # apply: the rover is a reader here and WHIP is a publish protocol.
+    transport: rtsp
+    # Derived from serverUrl's host and "<name>-fwd" when empty.
+    forwardUrl: ""
+    rtspUrl: ""
     device: forward
     normalize: true
 cameraServo:

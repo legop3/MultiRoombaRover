@@ -8,6 +8,11 @@ Type=simple
 User=roverd
 Group=roverd
 EnvironmentFile=/var/lib/roverd/media.env
+# Shared with the video and audio publishers: /run/roverd holds the transport state files
+# roverd reads. systemd must create it because this unit runs unprivileged, and it is preserved
+# on stop so one unit stopping does not delete the others' reported state.
+RuntimeDirectory=roverd
+RuntimeDirectoryPreserve=yes
 ExecStart=/usr/local/bin/audio-forward-listener
 KillMode=control-group
 TimeoutStopSec=5

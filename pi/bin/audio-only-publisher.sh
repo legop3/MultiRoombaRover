@@ -87,6 +87,38 @@ else
 	exit 1
 fi
 
+# This is the rover MICROPHONE going up to the server, published as "<rover>-audio". Not to
+# be confused with the speaker path in audio-forward-listener.sh, which reads audio the
+# server produces. See docs/media-transports.md.
+#
+# RTSP by default: it carries an Opus-only stream fine (MediaMTX reports a single Opus track)
+# and works on ffmpeg 4.x+, so a rover on bookworm's ffmpeg 5.1 gets the improvement without
+# upgrading anything. Measured 330ms over MPEG-TS against 183.7ms over RTSP.
+resolve_audio_transport() {
+	case "${ROVERD_AUDIO_CAPTURE_TRANSPORT:-rtsp}" in
+		srt) echo "mpegts" ;;
+		whip) echo "whip" ;;
+		mpegts) echo "mpegts" ;;
+		*) echo "rtsp" ;;
+	esac
+}
+
+audio_transport_output_args() {
+	case "$1" in
+		whip)
+			printf '%s\n' -f whip -pkt_size 1200 "${ROVERD_AUDIO_CAPTURE_WHIP_URL}"
+			;;
+		rtsp)
+			# TCP for the same reason as video: RTSP/UDP has no retransmission and failed
+			# outright over a real internet path. See video-publisher.sh.
+			printf '%s\n' -f rtsp -rtsp_transport "${ROVERD_AUDIO_CAPTURE_RTSP_TRANSPORT:-tcp}" "${ROVERD_AUDIO_CAPTURE_RTSP_URL}"
+			;;
+		*)
+			printf '%s\n' -f mpegts "${ROVERD_AUDIO_CAPTURE_PUBLISH_URL}"
+			;;
+	esac
+}
+
 run_pipeline() {
 	local ffmpeg_args=(
 		-hide_banner
@@ -129,9 +161,18 @@ run_pipeline() {
 		-flush_packets 1
 		-muxdelay 0
 		-muxpreload 0
-		-f mpegts
-		"${ROVERD_AUDIO_CAPTURE_PUBLISH_URL}"
 	)
+
+	# Transport, chosen the same way the video publisher chooses it and for the same
+	# reason. Measured in webrtc/: the microphone path costs 338ms over MPEG-TS and 181ms
+	# over WHIP, a 157ms saving that matches the video finding almost exactly, because the
+	# delay is in the server's mpegts demux rather than anywhere on this side.
+	#
+	# Opus is already WebRTC's native audio codec, so nothing is transcoded on the way
+	# through - only the container changes.
+	local -a transport_args=()
+	while IFS= read -r arg; do transport_args+=("$arg"); done < <(audio_transport_output_args "$AUDIO_TRANSPORT")
+	ffmpeg_args+=("${transport_args[@]}")
 
 	# The capture format comes from roverd's normalized media config. Keeping
 	# arecord and ffmpeg on the same env-backed values prevents the publisher
@@ -149,6 +190,19 @@ run_pipeline() {
 }
 
 trap 'kill 0 2>/dev/null' EXIT INT TERM
+
+# Records the transport in use so roverd can show it. Best-effort: a missing or read-only
+# state directory must never stop audio.
+write_audio_transport_state() {
+	local dir="${ROVERD_MEDIA_STATE_DIR:-/run/roverd}"
+	mkdir -p "$dir" 2>/dev/null || return 0
+	printf 'transport=%s\n' "$1" >"${dir}/audio-capture-transport" 2>/dev/null || true
+	return 0
+}
+
+AUDIO_TRANSPORT="$(resolve_audio_transport)"
+echo "Audio-only publisher using transport: ${AUDIO_TRANSPORT}" >&2
+write_audio_transport_state "$AUDIO_TRANSPORT"
 
 while true; do
 	if run_pipeline; then

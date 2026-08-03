@@ -109,7 +109,63 @@ else
   exit 1
 fi
 
+# Transport selection.
+#
+# Measured on the latency harness in webrtc/: publishing these same encoded frames
+# without the MPEG-TS container takes glass-to-glass latency from ~172ms to ~12ms. The
+# delay is inside MediaMTX's mpegts demux, so no ffmpeg flag on this side reaches it -
+# the container itself has to go. SRT latency, encoder settings, and the browser were
+# all eliminated as causes; see webrtc/README.md for the full attribution.
+#
+# Three transports, chosen by roverd.yaml. roverd validates the value and writes it here,
+# so this script does not second-guess it:
+#
+#   rtsp    Default. Works on ffmpeg 4.x+, so every current rover can use it. Requires
+#           `rtsp: yes` on the media server. TCP, always - see below.
+#   whip    Faster still (27ms vs 39ms) and steadier, but the muxer needs ffmpeg >= 7.1
+#           and Raspberry Pi OS bookworm ships 5.1. Set it once ffmpeg is upgraded.
+#   mpegts  The old path. Slowest, always available; set this to get the previous
+#           behaviour back.
+#
+# RTSP is TCP, not UDP. Measured against a real VPS: RTSP/TCP gave 39ms against 199-235ms
+# for MPEG-TS/SRT, while RTSP/UDP failed outright - the stream published, MediaMTX reported
+# the path ready, and no WebRTC reader ever started because no complete keyframe assembled.
+# Plain RTP/UDP has no retransmission where the SRT it replaces has ARQ, so UDP here is
+# strictly worse than what it replaces. TCP's cost is head-of-line blocking on a bad radio;
+# if that ever bites, the answer is whip, not udp.
+resolve_transport() {
+  case "${ROVERD_VIDEO_TRANSPORT:-rtsp}" in
+    srt) echo "mpegts" ;;
+    whip) echo "whip" ;;
+    mpegts) echo "mpegts" ;;
+    *) echo "rtsp" ;;
+  esac
+}
+
+# Output arguments for the selected transport. Everything before this point in the
+# pipeline is identical across transports, so switching cannot change what is encoded -
+# only how it is carried.
+transport_output_args() {
+  case "$1" in
+    whip)
+      # pkt_size 1200 keeps RTP payloads inside a typical 1500-byte MTU so packets are
+      # not fragmented leaving the rover.
+      printf '%s\n' -f whip -pkt_size 1200 "${ROVERD_VIDEO_WHIP_URL}"
+      ;;
+    rtsp)
+      printf '%s\n' -f rtsp -rtsp_transport "${ROVERD_VIDEO_RTSP_TRANSPORT:-tcp}" "${ROVERD_VIDEO_RTSP_URL}"
+      ;;
+    *)
+      printf '%s\n' -f mpegts "${ROVERD_VIDEO_PUBLISH_URL}"
+      ;;
+  esac
+}
+
 run_pipeline() {
+  local transport="$1"
+  local -a output_args=()
+  while IFS= read -r arg; do output_args+=("$arg"); done < <(transport_output_args "$transport")
+
   "${LIBCAMERA_BIN_PATH}" \
     --inline \
     --timeout 0 \
@@ -142,12 +198,27 @@ run_pipeline() {
       -flush_packets 1 \
       -muxdelay 0 \
       -muxpreload 0 \
-      -f mpegts \
-      "${ROVERD_VIDEO_PUBLISH_URL}"
+      "${output_args[@]}"
 }
 
+# Records the transport in use so roverd can show it in the Pi stats card. Best-effort: a
+# missing or read-only state directory must never stop video, and `set -e` is active, so each
+# step is guarded.
+write_transport_state() {
+  local dir="${ROVERD_MEDIA_STATE_DIR:-/run/roverd}"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  printf 'transport=%s\n' "$1" >"${dir}/video-transport" 2>/dev/null || true
+  return 0
+}
+
+TRANSPORT="$(resolve_transport)"
+echo "Video publisher using transport: ${TRANSPORT}" >&2
+write_transport_state "$TRANSPORT"
+
+# Restart on exit. systemd has Restart=always as the outer net; this loop keeps the restart
+# quick and keeps the state file accurate without a service bounce.
 while true; do
-  if run_pipeline; then
+  if run_pipeline "$TRANSPORT"; then
     exit 0
   fi
   echo "Video publisher exited, restarting in 2s..." >&2

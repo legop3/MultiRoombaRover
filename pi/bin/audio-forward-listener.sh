@@ -86,8 +86,41 @@ fi
 LAST_FFMPEG_STATUS="unknown"
 LAST_APLAY_STATUS="unknown"
 
+# Which URL this rover reads forwarded audio from.
+#
+# Measured in webrtc/ on the browser-to-rover path, at a matched normalize setting:
+#
+#   SRT / MPEG-TS (current)   138ms p50
+#   RTSP / UDP                 29.7ms p50
+#
+# ~108ms, and the same server-side MPEG-TS cost the download paths pay - here it is this
+# script demuxing rather than the server. The browser already publishes over WHIP, so this
+# read leg is what is left.
+#
+# Prefer a TCP RTSP URL here. Measured over a real internet path, RTSP/UDP failed to deliver
+# a usable stream at all because it has no retransmission, where SRT does. ffmpeg picks the
+# transport when reading, so add ?tcp or set ROVERD_AUDIO_PLAYBACK_RTSP_TRANSPORT if your
+# ffmpeg build needs it stated explicitly.
+#
+# RTSP by default. There is no whip option here: this script READS and WHIP publishes.
+resolve_forward_transport() {
+  case "${ROVERD_AUDIO_PLAYBACK_TRANSPORT:-rtsp}" in
+    srt|mpegts) echo "mpegts" ;;
+    *) echo "rtsp" ;;
+  esac
+}
+
+forward_url_for() {
+  if [[ "$1" == "rtsp" ]]; then
+    printf '%s' "${ROVERD_AUDIO_PLAYBACK_RTSP_URL}"
+  else
+    printf '%s' "${ROVERD_AUDIO_PLAYBACK_FORWARD_URL}"
+  fi
+}
+
 run_pipeline() {
   set +e
+  local read_url="$1"
   local -a ffmpeg_args=(
     -hide_banner
     -loglevel warning
@@ -95,7 +128,7 @@ run_pipeline() {
     -flags low_delay
     -analyzeduration 200k
     -probesize 32k
-    -i "${ROVERD_AUDIO_PLAYBACK_FORWARD_URL}"
+    -i "${read_url}"
     -vn
   )
 
@@ -128,8 +161,22 @@ run_pipeline() {
 
 trap 'kill 0 2>/dev/null' EXIT INT TERM
 
+# Records the transport in use so roverd can show it. Best-effort: a missing or read-only
+# state directory must never stop rover audio.
+write_forward_transport_state() {
+  local dir="${ROVERD_MEDIA_STATE_DIR:-/run/roverd}"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  printf 'transport=%s\n' "$1" >"${dir}/audio-playback-transport" 2>/dev/null || true
+  return 0
+}
+
+FORWARD_TRANSPORT="$(resolve_forward_transport)"
+FORWARD_URL="$(forward_url_for "$FORWARD_TRANSPORT")"
+echo "Audio forward listener reading via ${FORWARD_TRANSPORT}" >&2
+write_forward_transport_state "$FORWARD_TRANSPORT"
+
 while true; do
-  if run_pipeline; then
+  if run_pipeline "$FORWARD_URL"; then
     exit 0
   fi
   echo "Audio forward listener exited ffmpeg=${LAST_FFMPEG_STATUS:-unknown} aplay=${LAST_APLAY_STATUS:-unknown}, restarting in 2s..." >&2

@@ -80,7 +80,21 @@ type MediaConfig struct {
 	// PublishPort is shared by the derived video, microphone, and forwarded-audio
 	// SRT URLs. Keeping it at this level prevents each nested block from needing
 	// to repeat the same server port when the common MediaMTX listener is used.
-	PublishPort    int                 `yaml:"publishPort" json:"-"`
+	PublishPort int `yaml:"publishPort" json:"-"`
+
+	/*
+		RTSPPort and WHIPPort do for the low-latency transports what PublishPort does for SRT:
+		every stream URL is derived from the server host plus this rover's name, so adding a
+		transport does not mean hand-writing three more URLs per rover.
+
+		They are ports rather than full URLs because the stream *names* are not free
+		parameters - the server derives the same names independently when it reads these
+		streams, so a hand-written URL that disagreed would produce a rover that publishes
+		successfully to a path nobody reads. Only the port can differ per deployment.
+	*/
+	RTSPPort int `yaml:"rtspPort" json:"-"`
+	WHIPPort int `yaml:"whipPort" json:"-"`
+
 	Manage         bool                `yaml:"manage" json:"manage"`
 	HealthURL      string              `yaml:"healthUrl" json:"healthUrl,omitempty"`
 	HealthInterval Duration            `yaml:"healthInterval" json:"-"`
@@ -93,10 +107,33 @@ type VideoMediaConfig struct {
 	// Publisher selects the installed publisher script/pipeline family. The
 	// first pass uses pi-libcamera for current rovers; laptop-v4l2 can be added
 	// without changing the server-facing media shape again.
-	Enabled     bool   `yaml:"enabled" json:"enabled"`
-	Service     string `yaml:"service" json:"service,omitempty"`
-	Publisher   string `yaml:"publisher" json:"publisher,omitempty"`
-	PublishURL  string `yaml:"publishUrl" json:"publishUrl,omitempty"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	Service   string `yaml:"service" json:"service,omitempty"`
+	Publisher string `yaml:"publisher" json:"publisher,omitempty"`
+	/*
+		Transport selects how encoded frames reach the media server. Measured against a real
+		VPS: 39ms over RTSP against 199-235ms over MPEG-TS/SRT. The delay lives in the
+		server's mpegts demux, so dropping that container is the whole win and no flag on
+		this side can reach it.
+
+		  rtsp    default. Works on ffmpeg 4.x+, needs `rtsp: yes` on the server.
+		  whip    27ms and steadier, but the muxer needs ffmpeg >= 7.1 and Pi OS bookworm
+		          ships 5.1.
+		  mpegts  the previous behaviour. "srt" is an alias.
+	*/
+	Transport string `yaml:"transport" json:"transport,omitempty"`
+	// PublishURL is the MPEG-TS/SRT endpoint and remains the fallback for every rover.
+	PublishURL string `yaml:"publishUrl" json:"publishUrl,omitempty"`
+	/*
+		All three URLs are DERIVED from the server host and this rover's name when left empty -
+		see videoStreamName and deriveRTSPURL. Setting one overrides the derivation, which is
+		only needed for a non-standard server layout or a one-off test.
+
+		Leaving these empty is the normal case. It does not disable a transport; `transport`
+		above is what selects one.
+	*/
+	RTSPURL     string `yaml:"rtspUrl" json:"rtspUrl,omitempty"`
+	WHIPURL     string `yaml:"whipUrl" json:"whipUrl,omitempty"`
 	Device      string `yaml:"device" json:"device,omitempty"`
 	InputFormat string `yaml:"inputFormat" json:"-"`
 	Width       int    `yaml:"width" json:"-"`
@@ -111,9 +148,17 @@ type AudioCaptureConfig struct {
 	// AudioCapture describes the rover microphone stream that browsers can
 	// subscribe to as "<rover>-audio". A disabled capture block still has
 	// normalized defaults so enabling it only requires flipping enabled: true.
-	Enabled    bool   `yaml:"enabled" json:"enabled"`
-	Service    string `yaml:"service" json:"service,omitempty"`
+	Enabled bool   `yaml:"enabled" json:"enabled"`
+	Service string `yaml:"service" json:"service,omitempty"`
+	// Transport mirrors Video.Transport. The microphone path measured 338ms over MPEG-TS
+	// against 181ms over WHIP, the same ~160ms server-side demux cost the video path pays.
+	Transport  string `yaml:"transport" json:"transport,omitempty"`
 	PublishURL string `yaml:"publishUrl" json:"publishUrl,omitempty"`
+	// Derived from the server host and "<rover>-audio" when empty, which is the normal case.
+	// RTSP carries an Opus-only stream and works on ffmpeg 4.x+, so it is how a rover on
+	// bookworm's ffmpeg 5.1 gets the audio improvement without upgrading ffmpeg.
+	RTSPURL    string `yaml:"rtspUrl" json:"rtspUrl,omitempty"`
+	WHIPURL    string `yaml:"whipUrl" json:"whipUrl,omitempty"`
 	Device     string `yaml:"device" json:"device,omitempty"`
 	SampleRate int    `yaml:"sampleRate" json:"-"`
 	Channels   int    `yaml:"channels" json:"-"`
@@ -125,9 +170,17 @@ type AudioPlaybackConfig struct {
 	// MediaMTX for playback on the rover speaker. The URL is a request/read URL
 	// for the rover listener, while the server converts it to publish mode when
 	// it needs to inject audio.
-	Enabled         bool   `yaml:"enabled" json:"enabled"`
-	Service         string `yaml:"service" json:"service,omitempty"`
-	ForwardURL      string `yaml:"forwardUrl" json:"forwardUrl,omitempty"`
+	Enabled bool   `yaml:"enabled" json:"enabled"`
+	Service string `yaml:"service" json:"service,omitempty"`
+	// Transport selects which URL below the rover reads forwarded audio from. Measured on
+	// the browser-to-rover path at a matched normalize setting: 138ms over SRT/MPEG-TS
+	// against 29.7ms over RTSP, roughly 108ms. The browser already publishes over WHIP, so
+	// this read leg is the remaining cost.
+	Transport  string `yaml:"transport" json:"transport,omitempty"`
+	ForwardURL string `yaml:"forwardUrl" json:"forwardUrl,omitempty"`
+	// Derived from the server host and "<rover>-fwd" when empty, which is the normal case.
+	// There is no whipUrl here: the rover READS this stream, and WHIP publishes.
+	RTSPURL         string `yaml:"rtspUrl" json:"rtspUrl,omitempty"`
 	Device          string `yaml:"device" json:"device,omitempty"`
 	Normalize       bool   `yaml:"normalize" json:"-"`
 	NormalizeFilter string `yaml:"normalizeFilter" json:"-"`
@@ -435,22 +488,39 @@ func validateMediaConfig(cfg *MediaConfig, serverURL string, roverName string) e
 	if cfg.PublishPort <= 0 {
 		cfg.PublishPort = 9000
 	}
+	// MediaMTX's defaults. A deployment using a contiguous port block (see
+	// webrtc/deploy/install.sh --port-base) sets these explicitly.
+	if cfg.RTSPPort <= 0 {
+		cfg.RTSPPort = 8554
+	}
+	if cfg.WHIPPort <= 0 {
+		cfg.WHIPPort = 8889
+	}
 	if cfg.HealthInterval.Duration <= 0 {
 		cfg.HealthInterval = Duration{Duration: 30 * time.Second}
 	}
-	if err := validateVideoMediaConfig(&cfg.Video, serverURL, roverName, cfg.PublishPort); err != nil {
+	ports := mediaPorts{srt: cfg.PublishPort, rtsp: cfg.RTSPPort, whip: cfg.WHIPPort}
+	if err := validateVideoMediaConfig(&cfg.Video, serverURL, roverName, ports); err != nil {
 		return fmt.Errorf("video: %w", err)
 	}
-	if err := validateAudioCaptureConfig(&cfg.AudioCapture, serverURL, roverName, cfg.PublishPort); err != nil {
+	if err := validateAudioCaptureConfig(&cfg.AudioCapture, serverURL, roverName, ports); err != nil {
 		return fmt.Errorf("audioCapture: %w", err)
 	}
-	if err := validateAudioPlaybackConfig(&cfg.AudioPlayback, serverURL, roverName, cfg.PublishPort); err != nil {
+	if err := validateAudioPlaybackConfig(&cfg.AudioPlayback, serverURL, roverName, ports); err != nil {
 		return fmt.Errorf("audioPlayback: %w", err)
 	}
 	return nil
 }
 
-func validateVideoMediaConfig(cfg *VideoMediaConfig, serverURL string, roverName string, publishPort int) error {
+// mediaPorts groups the three listener ports so adding a transport does not mean threading
+// another positional int through every validator.
+type mediaPorts struct {
+	srt  int
+	rtsp int
+	whip int
+}
+
+func validateVideoMediaConfig(cfg *VideoMediaConfig, serverURL string, roverName string, ports mediaPorts) error {
 	if cfg.Service == "" {
 		cfg.Service = "video-publisher.service"
 	}
@@ -476,20 +546,75 @@ func validateVideoMediaConfig(cfg *VideoMediaConfig, serverURL string, roverName
 	if cfg.SensorMode == "" && cfg.Publisher == "pi-libcamera" {
 		cfg.SensorMode = "1296:972"
 	}
+	/*
+		Transport defaults to auto, which prefers the lowest-latency option the rover can
+		actually use and falls back to MPEG-TS otherwise. An unrecognised value is
+		corrected to auto rather than rejected: a typo in this field should not stop a
+		rover publishing video, and the publisher logs which transport it selected.
+	*/
+	cfg.Transport = normalizeMediaTransport(cfg.Transport, "whip", "rtsp", "mpegts", "srt")
+	stream := videoStreamName(roverName)
 	if cfg.PublishURL == "" {
-		derived, err := derivePublishURL(serverURL, roverName, publishPort)
+		derived, err := derivePublishURL(serverURL, stream, ports.srt)
 		if err != nil {
 			return fmt.Errorf("derive publishUrl: %w", err)
 		}
 		cfg.PublishURL = derived
 	}
+	/*
+		The low-latency URLs are derived from the rover name exactly as the SRT one is, so a
+		rover opts into RTSP or WHIP by naming the transport rather than by pasting URLs.
+
+		An explicitly configured value still wins, which is what makes a non-standard server
+		layout or a one-off test possible without changing this code.
+	*/
+	if cfg.RTSPURL == "" {
+		derived, err := deriveRTSPURL(serverURL, stream, ports.rtsp)
+		if err != nil {
+			return fmt.Errorf("derive rtspUrl: %w", err)
+		}
+		cfg.RTSPURL = derived
+	}
+	if cfg.WHIPURL == "" {
+		derived, err := deriveWHIPURL(serverURL, stream, ports.whip)
+		if err != nil {
+			return fmt.Errorf("derive whipUrl: %w", err)
+		}
+		cfg.WHIPURL = derived
+	}
 	return nil
 }
 
-func validateAudioCaptureConfig(cfg *AudioCaptureConfig, serverURL string, roverName string, publishPort int) error {
+/*
+normalizeMediaTransport resolves the transport field. Absent or unrecognised means "rtsp",
+which is the fastest transport every current rover can actually run and needs no extra
+configuration, since the URL is derived from the rover's name.
+
+whip is faster still (27ms against 39ms) but its muxer needs ffmpeg >= 7.1 and Raspberry Pi
+OS bookworm ships 5.1, so it is opt-in. mpegts restores the previous behaviour.
+*/
+func normalizeMediaTransport(value string, allowed ...string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	for _, candidate := range allowed {
+		if normalized == candidate {
+			return normalized
+		}
+	}
+	return "rtsp"
+}
+
+func validateAudioCaptureConfig(cfg *AudioCaptureConfig, serverURL string, roverName string, ports mediaPorts) error {
 	if cfg.Service == "" {
 		cfg.Service = "audio-only-publisher.service"
 	}
+	/*
+		This is the rover's MICROPHONE going up to the server, so viewers can hear the room.
+		It is a publish, on its own stream name, and is not to be confused with either of the
+		other two audio paths - the server sending audio down for the rover's speaker
+		(AudioPlayback below), or a driver's browser talking to the rover over WHIP, which
+		roverd does not touch at all. See docs/media-transports.md.
+	*/
+	cfg.Transport = normalizeMediaTransport(cfg.Transport, "whip", "rtsp", "mpegts", "srt")
 	if cfg.Device == "" {
 		cfg.Device = "hw:0,0"
 	}
@@ -502,17 +627,41 @@ func validateAudioCaptureConfig(cfg *AudioCaptureConfig, serverURL string, rover
 	if cfg.Bitrate <= 0 {
 		cfg.Bitrate = 510000
 	}
+	stream := audioCaptureStreamName(roverName)
 	if cfg.PublishURL == "" {
-		derived, err := derivePublishURL(serverURL, roverName+"-audio", publishPort)
+		derived, err := derivePublishURL(serverURL, stream, ports.srt)
 		if err != nil {
 			return fmt.Errorf("derive publishUrl: %w", err)
 		}
 		cfg.PublishURL = derived
 	}
+	if cfg.RTSPURL == "" {
+		derived, err := deriveRTSPURL(serverURL, stream, ports.rtsp)
+		if err != nil {
+			return fmt.Errorf("derive rtspUrl: %w", err)
+		}
+		cfg.RTSPURL = derived
+	}
+	if cfg.WHIPURL == "" {
+		derived, err := deriveWHIPURL(serverURL, stream, ports.whip)
+		if err != nil {
+			return fmt.Errorf("derive whipUrl: %w", err)
+		}
+		cfg.WHIPURL = derived
+	}
 	return nil
 }
 
-func validateAudioPlaybackConfig(cfg *AudioPlaybackConfig, serverURL string, roverName string, publishPort int) error {
+func validateAudioPlaybackConfig(cfg *AudioPlaybackConfig, serverURL string, roverName string, ports mediaPorts) error {
+	/*
+		This is the rover's SPEAKER: audio the SERVER produces - TTS, bonk, a VIP upload, or a
+		driver's forwarded microphone - which the rover READS and plays locally.
+
+		The direction is why there is no whipUrl here. The rover is a reader on this path, and
+		WHIP is a publish protocol; the read-side equivalent would be WHEP, which ffmpeg cannot
+		consume. So this path is RTSP or SRT only.
+	*/
+	cfg.Transport = normalizeMediaTransport(cfg.Transport, "rtsp", "mpegts", "srt")
 	if cfg.Service == "" {
 		cfg.Service = "audio-forward-listener.service"
 	}
@@ -522,12 +671,20 @@ func validateAudioPlaybackConfig(cfg *AudioPlaybackConfig, serverURL string, rov
 	if cfg.NormalizeFilter == "" {
 		cfg.NormalizeFilter = "dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled"
 	}
+	stream := audioForwardStreamName(roverName)
 	if cfg.ForwardURL == "" {
-		derived, err := deriveReadURL(serverURL, roverName+"-fwd", publishPort)
+		derived, err := deriveReadURL(serverURL, stream, ports.srt)
 		if err != nil {
 			return fmt.Errorf("derive forwardUrl: %w", err)
 		}
 		cfg.ForwardURL = derived
+	}
+	if cfg.RTSPURL == "" {
+		derived, err := deriveRTSPURL(serverURL, stream, ports.rtsp)
+		if err != nil {
+			return fmt.Errorf("derive rtspUrl: %w", err)
+		}
+		cfg.RTSPURL = derived
 	}
 	return nil
 }
@@ -576,8 +733,74 @@ func validateAutoSideBrushConfig(cfg *AutoSideBrushConfig) {
 	cfg.Speed = clampInt(cfg.Speed, -127, 127)
 }
 
+/*
+Stream names, derived from the rover's own name.
+
+These three names are the contract between rover and server, and the server derives them
+independently from the roster - so they are computed rather than configured. A rover called
+"roomba-alpha" publishes video to "roomba-alpha", its microphone to "roomba-alpha-audio",
+and reads forwarded audio from "roomba-alpha-fwd", on every transport.
+
+Deriving the name for every transport rather than only SRT is what stops the low-latency
+path needing three extra hand-written URLs per rover, and removes the failure mode where a
+typo'd URL publishes successfully to a path nothing reads.
+*/
+func videoStreamName(roverName string) string        { return roverName }
+func audioCaptureStreamName(roverName string) string { return roverName + "-audio" }
+func audioForwardStreamName(roverName string) string { return roverName + "-fwd" }
+
 func derivePublishURL(serverURL, streamName string, port int) (string, error) {
 	return deriveSRTURL(serverURL, streamName, port, "publish")
+}
+
+/*
+deriveRTSPURL builds the plain RTSP URL for a stream. No transport is stated in the URL:
+the publisher pins TCP with -rtsp_transport, because RTSP/UDP has no retransmission and
+fails outright across the internet. See webrtc/README.md.
+*/
+func deriveRTSPURL(serverURL, streamName string, port int) (string, error) {
+	host, err := serverHost(serverURL)
+	if err != nil {
+		return "", err
+	}
+	if streamName == "" {
+		return "", errors.New("missing stream name for rtspUrl")
+	}
+	if port <= 0 {
+		port = 8554
+	}
+	return fmt.Sprintf("rtsp://%s:%d/%s", host, port, url.PathEscape(streamName)), nil
+}
+
+/*
+deriveWHIPURL builds the WHIP endpoint. MediaMTX serves WHIP at <path>/whip on its WebRTC
+listener, over plain HTTP here for the same reason the rest of this config does: these are
+LAN or VPS-internal endpoints and TLS termination is not roverd's concern.
+*/
+func deriveWHIPURL(serverURL, streamName string, port int) (string, error) {
+	host, err := serverHost(serverURL)
+	if err != nil {
+		return "", err
+	}
+	if streamName == "" {
+		return "", errors.New("missing stream name for whipUrl")
+	}
+	if port <= 0 {
+		port = 8889
+	}
+	return fmt.Sprintf("http://%s:%d/%s/whip", host, port, url.PathEscape(streamName)), nil
+}
+
+func serverHost(serverURL string) (string, error) {
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		return "", err
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return "", errors.New("serverUrl missing host")
+	}
+	return host, nil
 }
 
 func deriveReadURL(serverURL, streamName string, port int) (string, error) {

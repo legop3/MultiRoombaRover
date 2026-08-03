@@ -35,6 +35,7 @@ type HostStats struct {
 	DiskFreeBytes     *uint64           `json:"diskFreeBytes,omitempty"`
 	DiskUsedPct       *float64          `json:"diskUsedPct,omitempty"`
 	WiFi              *WiFiStats        `json:"wifi,omitempty"`
+	Media             *MediaTransports  `json:"media,omitempty"`
 	ThrottledRaw      string            `json:"throttledRaw,omitempty"`
 	UndervoltageNow   *bool             `json:"undervoltageNow,omitempty"`
 	UndervoltageSeen  *bool             `json:"undervoltageSeen,omitempty"`
@@ -157,6 +158,11 @@ func CollectHostStats(ctx context.Context) HostStats {
 	} else {
 		stats.WiFi = wifi
 	}
+
+	// Reads state the publisher scripts wrote; it never runs a command or touches hardware,
+	// so it cannot fail in a way worth reporting. Absent state means no publisher has
+	// reported yet, which is a normal condition and not an error.
+	stats.Media = readMediaTransports(mediaStateDir())
 
 	if len(stats.Errors) == 0 {
 		stats.Errors = nil
@@ -392,10 +398,11 @@ func collectWiFiStats(ctx context.Context) (*WiFiStats, error) {
 	// WiFiStats because the UI does not need to expose Linux device names.
 	iwErr := enrichWiFiWithIW(ctx, iface, stats)
 
-	// Read the kernel counters after iw because iw also provides cumulative
-	// station counters. The kernel interface values deliberately win: they are
-	// the host-traffic source used for both the cumulative display and Mbps math.
-	// Link capacity still comes independently from iw's bitrate fields.
+	// Read the kernel counters after iw because iw also provides cumulative station
+	// counters. The kernel interface values deliberately win for both bytes AND packets:
+	// mixing the two sources put interface-lifetime bytes next to association-lifetime
+	// packets in the same field. Link capacity still comes independently from iw's bitrate
+	// fields, which describe the negotiated rate rather than traffic.
 	counterErr := enrichWiFiWithNetworkCounters(iface, stats)
 	return stats, errors.Join(counterErr, iwErr)
 }
@@ -413,6 +420,26 @@ func enrichWiFiWithNetworkCounters(iface string, stats *WiFiStats) error {
 
 	stats.RXBytes = &rxBytes
 	stats.TXBytes = &txBytes
+
+	/*
+		Packets come from here too, not just bytes.
+
+		Previously iw supplied both and this function overwrote only the byte counters, so the
+		UI rendered kernel interface-lifetime bytes beside iw's per-association packet counts -
+		two different measurement windows in one "54.1 GB / 281.2m" field. They agree only
+		while the association has lasted as long as the interface has been up; after any
+		reconnect the packet count restarts and the pairing becomes silently wrong.
+
+		A packet read failure is tolerated rather than fatal: bytes are the more useful figure
+		and drive the Mbps calculation, so losing packet counts must not discard them.
+	*/
+	if rxPackets, err := readUintFile(basePath + "rx_packets"); err == nil {
+		stats.RXPackets = &rxPackets
+	}
+	if txPackets, err := readUintFile(basePath + "tx_packets"); err == nil {
+		stats.TXPackets = &txPackets
+	}
+
 	// Capture the timestamp immediately beside the counter reads so unrelated
 	// host-stat collection latency cannot distort the elapsed-time divisor.
 	stats.networkSampledAt = time.Now()
