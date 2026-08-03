@@ -38,8 +38,6 @@ const {
 const { shouldEnforceSingleDriverTab } = require('../../helpers/bandwidthSavings');
 
 const verificationEvents = new EventEmitter();
-const IDENTITY_TIMEOUT_MS = 2 * 60 * 1000;
-const IDENTITY_SWEEP_INTERVAL_MS = 15 * 1000;
 const DUPLICATE_IDENTITY_DISCONNECT_DELAY_MS = 250;
 const DETERRED_DISCONNECT_DELAY_MS = 250;
 
@@ -157,9 +155,9 @@ function identifySocket(socket, payload = {}) {
   }
 
   /*
-    Spectator-style pages send identity heartbeats too, but only the driver
-    surface participates in duplicate-driver enforcement. This flag remains on
-    the socket because it is connection-specific, not person-specific.
+    Spectator-style pages carry identity too, but only the driver surface
+    participates in duplicate-driver enforcement. This flag remains on the
+    socket because it is connection-specific, not person-specific.
   */
   socket.data.identitySurface = payload.identitySurface === 'driver' ? 'driver' : 'passive';
 
@@ -644,16 +642,41 @@ function getVerificationStatus(socket) {
   };
 }
 
+/*
+  Namespace middleware completes before Socket.IO emits `connection` to any
+  service. Attaching canonical identity here guarantees that authorization,
+  session construction, queues, chat, and media handlers never observe the old
+  intermediate state where a transport existed but session:identify had not
+  arrived yet. Missing keys remain valid: the canonical service creates the
+  first portable key and exposes it through the initial session sync.
+*/
+io.use((socket, next) => {
+  try {
+    socket.data = socket.data || {};
+    socket.data.connectedAt = Date.now();
+    identifySocket(socket, socket.handshake?.auth || {});
+    next();
+  } catch (err) {
+    logger.warn('Rejected socket with invalid handshake identity', {
+      socketId: socket.id,
+      error: err.message,
+    });
+    next(new Error(err.message));
+  }
+});
+
 io.on('connection', (socket) => {
-  socket.data = socket.data || {};
-  socket.data.connectedAt = Date.now();
   installDeterredSocketGuard(socket);
-  identifySocket(socket, {});
+  /*
+    Duplicate-driver enforcement emits a normal socket event before disconnecting
+    the losing tab, so it runs after middleware admits the namespace connection.
+    Identity itself is already present before this point.
+  */
+  enforceSingleDriverSocketPerIdentity(socket);
 
   socket.on('session:identify', (payload = {}, cb = () => {}) => {
     try {
       const result = identifySocket(socket, payload || {});
-      socket.data.lastClientIdentifyAt = Date.now();
       cb({ success: true, ...result });
     } catch (err) {
       cb({ error: err.message });
@@ -711,27 +734,6 @@ identityEvents.on('change', ({ userId, reason } = {}) => {
   }
   emitChange('identity_change', { userId, reason });
 });
-
-setInterval(() => {
-  const now = Date.now();
-  io.sockets.sockets.forEach((socket) => {
-    if (!socket?.id) return;
-    const role = getRole(socket);
-    if (role === 'admin' || role === 'lockdown' || role === 'spectator') return;
-    const connectedAt = Number(socket?.data?.connectedAt || 0);
-    const lastClientIdentifyAt = Number(socket?.data?.lastClientIdentifyAt || 0);
-    const referenceTs = lastClientIdentifyAt || connectedAt;
-    if (!referenceTs) return;
-    if (now - referenceTs < IDENTITY_TIMEOUT_MS) return;
-    logger.info('Disconnecting socket due to stale identity heartbeat', {
-      socketId: socket.id,
-      role,
-      ageMs: now - referenceTs,
-      hadClientIdentify: Boolean(lastClientIdentifyAt),
-    });
-    socket.disconnect(true);
-  });
-}, IDENTITY_SWEEP_INTERVAL_MS);
 
 module.exports = {
   identifySocket,

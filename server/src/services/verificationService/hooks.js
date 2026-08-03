@@ -21,7 +21,6 @@ function registerVerificationHooks(deps) {
     socket.on('session:identify', (payload = {}, cb = () => {}) => {
       try {
         const result = identifySocket(socket, payload || {});
-        socket.data.lastClientIdentifyAt = Date.now();
         cb({ success: true, ...result });
       } catch (err) {
         cb({ error: err.message });
