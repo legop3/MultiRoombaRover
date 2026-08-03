@@ -1,0 +1,130 @@
+# MediaMTX config for a VPS deployment
+# Purpose: Low-latency ingest and egress over a real network, with the values install.sh must substitute.
+# Scope: Media server only. The node app server is separate and is not configured here.
+#
+# Placeholders replaced by install.sh:
+#   __PUBLIC_IP__     the VPS public IPv4 address. Deliberately the only host advertised for
+#                     ICE - see webrtcAdditionalHosts below for why the DNS name must not be.
+#   __AUTH_URL__      the node server's mediamtx auth endpoint, or empty to disable auth
+#   PORT placeholders every listener port, named __PORT_ followed by the service, derived
+#                     from --port-base
+#
+# Every port is a placeholder rather than a default, because MediaMTX's defaults (8889, 8189,
+# 8554, 8000, 8001, 9000) are spread across the port space and a VPS that only grants a
+# contiguous allocation cannot use any of them.
+logLevel: info
+
+# API and metrics stay on loopback. They are unauthenticated and expose stream topology and
+# byte counters, so binding them publicly would be a real leak. Reach them over SSH.
+api: yes
+apiAddress: 127.0.0.1:__PORT_API__
+metrics: yes
+metricsAddress: 127.0.0.1:__PORT_METRICS__
+pprof: no
+
+###############################################################################
+# Egress to browsers: WebRTC (WHEP), and ingest from browsers (WHIP)
+###############################################################################
+webrtc: yes
+webrtcAddress: :__PORT_WEBRTC__
+
+# ICE. This is the part that most often fails on a VPS and the failure looks like "the
+# stream just does not start".
+#
+# A VPS usually has its public address directly on the interface, so host candidates work
+# and no STUN is needed for the server side. webrtcAdditionalHosts is what makes the server
+# advertise a reachable address; without it, candidates carry an address the client cannot
+# route to.
+#
+# The IP only, never the DNS name. MediaMTX resolves each entry here locally and advertises
+# the result as a host candidate. On Debian the machine's own hostname resolves via /etc/hosts
+# to 127.0.1.1, so adding the DNS name makes the server advertise a loopback candidate - and
+# it lands ahead of the real one in the answer.
+#
+# Browsers survive that, because ICE tries every candidate in parallel and discards the dud.
+# ffmpeg's WHIP muxer does not: it takes the first candidate, sends STUN to 127.0.1.1, hits
+# its own loopback and fails the publish with "Connection refused". Measured directly - WHEP
+# read worked the whole time while every WHIP publish failed, which is exactly the shape of
+# bug this comment exists to prevent someone re-introducing.
+webrtcAdditionalHosts: ['__PUBLIC_IP__']
+
+# Do NOT enumerate local interfaces for ICE candidates.
+#
+# By default MediaMTX walks the local interfaces via netlink to discover addresses. On a
+# containerised or otherwise restricted VPS that call fails, and every WHEP request then returns
+#   400 error getting local interfaces: route ip+net: netlinkrib:
+#       address family not supported by protocol
+# which reads like a client problem and is not one.
+#
+# It is also unnecessary here: webrtcAdditionalHosts above already states the address clients
+# should connect to, and on a VPS an enumerated private address would be useless to them anyway.
+webrtcIPsFromInterfaces: no
+
+# One UDP port for all ICE traffic, so the firewall rule is a single line. It must be open
+# to the internet in UDP - this is the port media actually flows over, and if it is blocked
+# everything falls back to TCP relay or fails outright.
+webrtcLocalUDPAddress: :__PORT_ICE__
+webrtcLocalTCPAddress: :__PORT_ICE__
+
+# STUN lets a client behind NAT discover its own mapped address. Harmless on the server side
+# and necessary for many clients.
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+  - url: stun:stun.cloudflare.com:3478
+# A TURN server would go here if clients on restrictive networks cannot connect. Do NOT add
+# placeholder credentials: this repo previously shipped `turn:your.turn.server:3478` with
+# username 'user', which could never work and only cost ICE gathering time.
+#  - url: turn:turn.example.com:3478
+#    username: real-username
+#    password: real-password
+
+###############################################################################
+# Ingest from rovers
+###############################################################################
+# RTSP is the low-latency rover ingest path. Measured: publishing without the MPEG-TS
+# container takes video glass-to-glass from ~172ms to ~12ms, and it works on the ffmpeg
+# Raspberry Pi OS already ships.
+rtsp: yes
+rtspAddress: :__PORT_RTSP__
+# rtspAddress only governs the TCP control port. The UDP RTP/RTCP listeners are separate and
+# must be opened too, or UDP transport silently fails and falls back to TCP.
+rtpAddress: :__PORT_RTP__
+rtcpAddress: :__PORT_RTCP__
+# TCP first. Over a real internet path RTSP/UDP does not work: plain RTP/UDP has no
+# retransmission, so a fragmented keyframe that loses one packet never assembles, and the path
+# goes ready while no WebRTC reader ever starts. The publishers pin tcp for this reason.
+#
+# UDP is left in the list because this only declares what the server accepts, and a publisher on
+# the same LAN as the server may legitimately use it. It is not a recommendation for anything
+# crossing the internet.
+rtspTransports: [tcp, udp]
+
+# SRT stays enabled as the fallback ingest every existing rover already uses. Removing it
+# would strand any rover that has not been reconfigured.
+srt: yes
+srtAddress: :__PORT_SRT__
+
+# MediaMTX 1.19 enables MoQ (Media over QUIC) by default, which binds :8892 on both TCP and
+# UDP. Nothing here uses it, and an unused listener is only attack surface, so it is off.
+# Verify with: journalctl -u rover-mediamtx | grep 'started with listener'
+moq: no
+rtmp: no
+hls: no
+
+###############################################################################
+# Authentication
+###############################################################################
+# Publishing and reading are authenticated against the node server, which is what stops
+# anyone on the internet publishing to a rover's path or watching a private one. install.sh
+# substitutes the URL; if it is left empty the internal fallback below applies instead.
+authMethod: http
+authHTTPAddress: __AUTH_URL__
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
+
+paths:
+  all_others:
+    source: publisher
+    sourceOnDemand: no

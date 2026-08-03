@@ -1,0 +1,14 @@
+{
+  "name": "rover-webrtc-latency-harness",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Measures rover video/audio and WHEP/WHIP latency end to end.",
+  "type": "commonjs",
+  "scripts": {
+    "measure": "node measure.js",
+    "watch": "node measure.js --continuous"
+  },
+  "dependencies": {
+    "playwright": "1.62.1"
+  }
+}

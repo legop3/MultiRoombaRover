@@ -21,6 +21,9 @@ server/data/admin-reason.json
 server/data/buttonbox-state.json
 server/data/barcode-tts-cache/
 server/data/rover-odometers.json
+# Per-deployment gain state written at runtime, same class as the entries above. Listed
+# because it was committed by accident once.
+server/data/audio-levels.json
 webui/package-lock.json
 !server/data/
 !server/data/barcode-registry.json
@@ -37,3 +40,23 @@ server/src/services/balanceBoardService/native/balance_board_worker
 server/data/fleet-reports.sqlite
 server/data/fleet-reports.sqlite-shm
 server/data/fleet-reports.sqlite-wal
+
+# WebRTC latency harness: pinned third-party binaries and per-run measurement
+# output. Baselines worth keeping are committed explicitly by filename.
+webrtc/vendor/
+# Scratch space for measurement output and one-off audit scripts. Useful to keep on disk,
+# not useful in the repository.
+webrtc/local/
+webrtc/results/
+# Private keys and self-signed certs MediaMTX writes into whatever its working directory
+# happens to be at startup. Unanchored because that directory is not always webrtc/ - these
+# have been committed by accident twice, from two different directories, which is exactly
+# why this rule matches by name anywhere rather than by path.
+auto.crt
+auto.key
+# Any other key material, so the next accident is caught by the pattern rather than by
+# someone noticing it in a diff.
+*.key
+*.pem
+*.p12
+*.pfx

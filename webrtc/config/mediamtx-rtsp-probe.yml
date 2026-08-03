@@ -1,0 +1,60 @@
+# Latency Harness MediaMTX config - RTSP INGEST PROBE
+# Purpose: Same as baseline but with RTSP ingest enabled, to isolate mpegts+SRT from MediaMTX itself.
+# Scope: Differs from baseline ONLY by enabling RTSP. Not a production config.
+#
+# The baseline put ~155ms upstream of the browser. Publishing the same frames over
+# RTSP instead of mpegts-over-SRT says whether that time is spent in the mpegts mux
+# and SRT transport or inside MediaMTX after ingest.
+logLevel: info
+
+api: yes
+apiAddress: 127.0.0.1:9987
+metrics: yes
+metricsAddress: 127.0.0.1:9988
+pprof: no
+
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp, udp]
+# MediaMTX 1.19 enables MoQ (Media over QUIC) by default, which binds :8892 on both TCP and
+# UDP. Nothing here uses it, and an unused listener is only attack surface, so it is off.
+# Verify with: journalctl -u rover-mediamtx | grep 'started with listener'
+moq: no
+rtmp: no
+hls: no
+
+webrtc: yes
+# Production serves WebRTC on the default 8889. The harness moves it, along with
+# every other port, so a measurement run cannot collide with a real server or with
+# whatever already holds :9000 on this machine.
+webrtcAddress: :8899
+webrtcLocalUDPAddress: :8289
+webrtcLocalTCPAddress: :8289
+# No STUN and no additional hosts. Everything is on loopback, so host candidates
+# are the only ones that can win, and adding STUN would only add gathering delay
+# to a connection that cannot benefit from it.
+webrtcICEServers2: []
+
+srt: yes
+srtAddress: :9890
+
+# Production authenticates every path against the node server over HTTP. The
+# harness runs without it: there is no node server in the loop, and auth latency
+# is a connection-setup cost that would confound steady-state measurement.
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass:
+    ips: ['127.0.0.1', '::1']
+    permissions:
+      - action: publish
+      - action: read
+      - action: api
+      - action: metrics
+
+paths:
+  all_others:
+    source: publisher
+    sourceOnDemand: no
+    # Production runs a snapshot writer on ready. Omitted here because it spawns a
+    # process per path and its ffmpeg would compete for CPU with the measurement.
