@@ -1,0 +1,8 @@
+  .no-touch-select { user-select: none; -webkit-user-select: none; -ms-user-select: none; -webkit-touch-callout: none; }
+  .mobile-touch-control {
+    /* Suppress browser gestures that compete with deliberate control presses. */
+    user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; overscroll-behavior: contain;
+  }
+  .mobile-drag-control { touch-action: none; }

@@ -2,6 +2,8 @@
 // Purpose: Defines the Hud Chat Input module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { memo, useMemo, useState } from 'react';
+import './styles.css';
+import '../../MobileControls/mobileControls.css';
 import { useChatActions } from '../../../context/ChatContext.jsx';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../../settings/index.js';

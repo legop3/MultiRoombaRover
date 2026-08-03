@@ -1,0 +1,7 @@
+  .inter-instance-overlay-frame { max-width: calc(100vw - .5rem); }
+  .inter-instance-overlay-body { max-height: 82vh; }
+  @media (min-width: 1024px) {
+    .inter-instance-overlay-scale { zoom: 1.5; }
+    .inter-instance-overlay-frame { max-width: calc((100vw - .5rem) / 1.5); }
+    .inter-instance-overlay-body { max-height: 54.6667vh; }
+  }

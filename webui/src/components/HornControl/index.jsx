@@ -2,6 +2,7 @@
 // Purpose: Defines the Horn Control module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import '../MobileControls/mobileControls.css';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { HORN_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import { HORN_MAX_FREQUENCY } from '../../controls/constants.js';

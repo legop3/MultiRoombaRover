@@ -2,6 +2,7 @@
 // Purpose: Renders a direct press target for rover GPIO-backed toggles such as the headlight and laser.
 // Scope: Owns optimistic button state and touch/click de-duplication while callers provide device labels and actions.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import '../MobileControls/mobileControls.css';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 function isBoolean(value) {

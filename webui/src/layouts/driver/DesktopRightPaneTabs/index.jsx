@@ -1,41 +1,34 @@
 // Right Pane Tabs
 // Purpose: Defines the Right Pane Tabs module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import RoomCameraPanel from '../RoomCameraPanel/index.jsx';
-import KinectPanel from '../KinectPanel/index.jsx';
-import BalanceBoardPanel from '../BalanceBoardPanel/index.jsx';
-import HomeAssistantControls from '../HomeAssistantControls/index.jsx';
-import SettingsPanel from '../SettingsPanel/index.jsx';
-import HelpPanel from '../HelpPanel/index.jsx';
-import ChatPanel from '../ChatPanel/index.jsx';
-import { LinkButtonsPanel } from '../UserListPanel/index.jsx';
-import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
-import PtzQueueCard from '../PtzCamera/index.jsx';
-import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../Tabs/index.jsx';
-import TopDownMap from '../TopDownMap/index.jsx';
-import DriveDockAction from '../DriveDockAction/index.jsx';
-import { useDriveDockState } from '../DriveDockAction/driveDockState.js';
-import { useControlActions, useControlSelector } from '../../controls/index.js';
-import RoverQueuesPanel from '../RoverQueuesPanel/index.jsx';
-import RawUserPilePanel from '../RawUserPilePanel/index.jsx';
-import { formatKeyLabel } from '../../controls/keymapUtils.js';
-import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
-import HornControl from '../HornControl/index.jsx';
-import CameraTiltControl from '../CameraTiltControl/index.jsx';
-import VipPanel from '../VipPanel/index.jsx';
-import { useSessionSelector } from '../../context/SessionContext.jsx';
-import { useSettingsNamespace } from '../../settings/index.js';
-import ButtonBoxPanel from '../ButtonBoxPanel/index.jsx';
-import BarcodeGamesPanel from '../BarcodeGamesPanel/index.jsx';
-import OdometerPanel from '../OdometerPanel/index.jsx';
-import FleetReportsCard from '../FleetReportsCard/index.jsx';
-import LiftCard from '../LiftCard/index.jsx';
-import NeatoCard from '../NeatoCard/index.jsx';
-import OverseerPreferencePanel from '../OverseerPreferencePanel/index.jsx';
-import CardFrame from '../CardFrame/index.jsx';
+import RoomCameraPanel from '../../../components/RoomCameraPanel/index.jsx';
+import HomeAssistantControls from '../../../components/HomeAssistantControls/index.jsx';
+import ChatPanel from '../../../components/ChatPanel/index.jsx';
+import { LinkButtonsPanel } from '../../../components/UserListPanel/index.jsx';
+import ReplaySourcesPanel from '../../../components/ReplaySourcesPanel/index.jsx';
+import PtzQueueCard from '../../../components/PtzCamera/index.jsx';
+import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../../../components/Tabs/index.jsx';
+import TopDownMap from '../../../components/TopDownMap/index.jsx';
+import DriveDockAction from '../../../components/DriveDockAction/index.jsx';
+import { useDriveDockState } from '../../../components/DriveDockAction/driveDockState.js';
+import { useControlActions, useControlSelector } from '../../../controls/index.js';
+import RoverQueuesPanel from '../../../components/RoverQueuesPanel/index.jsx';
+import RawUserPilePanel from '../../../components/RawUserPilePanel/index.jsx';
+import { formatKeyLabel } from '../../../controls/keymapUtils.js';
+import GPIOToggleControl from '../../../components/GPIOToggleControl/index.jsx';
+import HornControl from '../../../components/HornControl/index.jsx';
+import CameraTiltControl from '../../../components/CameraTiltControl/index.jsx';
+import { useSessionSelector } from '../../../context/SessionContext.jsx';
+import { useSettingsNamespace } from '../../../settings/index.js';
+import OverseerPreferencePanel from '../../../components/OverseerPreferencePanel/index.jsx';
+import CardFrame from '../../../components/CardFrame/index.jsx';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
-import { themeGapClass, themeStackClass } from '../../themes/index.js';
+import { useManualDockAssist } from '../../../features/manualDockAssist/useManualDockAssist.js';
+import { themeGapClass, themeStackClass } from '../../../themes/index.js';
+import ActivitiesTab from '../tabs/shared/ActivitiesTab/index.jsx';
+import VipTab from '../tabs/shared/VipTab/index.jsx';
+import HelpTab from '../tabs/shared/HelpTab/index.jsx';
+import SettingsTab from '../tabs/shared/SettingsTab/index.jsx';
 
 const CHAT_DOCK_INITIAL_HEIGHT = 224;
 const CHAT_DOCK_MIN_HEIGHT = 144;
@@ -217,7 +210,7 @@ function QueueReplayLinksRow() {
   );
 }
 
-export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
+export default function RightPaneTabs() {
   const [activeTab, setActiveTab] = useState('telemetry');
   const chatDockRef = useRef(null);
   const [chatDockHeight, setChatDockHeight] = useState(CHAT_DOCK_INITIAL_HEIGHT);
@@ -420,36 +413,10 @@ export default function RightPaneTabs({ layout, onOpenHelpOverlay }) {
             </div>
           </TabPanel>
 
-          {/* activities tab */}
-          <TabPanel id="activities">
-            <div className={`flex flex-col ${themeGapClass}`}>
-              <NeatoCard />
-              <LiftCard />
-              <BalanceBoardPanel />
-              <BarcodeGamesPanel />
-              <OdometerPanel />
-              <ButtonBoxPanel />
-              <KinectPanel />
-              {/* The compact report is a terminal summary for Activities; the
-                  component itself disappears when the server feature is off. */}
-              <FleetReportsCard />
-            </div>
-          </TabPanel>
-
-          {/* VIP tab */}
-          <TabPanel id="vip" keepMounted>
-            <VipPanel isActive={activeTab === 'vip'} layout={layout} />
-          </TabPanel>
-
-          {/* help tab */}
-          <TabPanel id="help">
-            <HelpPanel layout={layout} onOpenOverlay={onOpenHelpOverlay} />
-          </TabPanel>
-
-          {/* settings tab */}
-          <TabPanel id="settings">
-            <SettingsPanel />
-          </TabPanel>
+          <ActivitiesTab />
+          <VipTab />
+          <HelpTab />
+          <SettingsTab />
         </TabPanels>
       </Tabs>
     </section>

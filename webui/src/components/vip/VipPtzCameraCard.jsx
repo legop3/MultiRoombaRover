@@ -2,6 +2,7 @@
 // Purpose: Provides the verified-user entry point and fullscreen controller for the single Reolink PTZ camera.
 // Scope: Owns PTZ UI state only; server-side PTZ ownership, rover handoff, and command authorization remain authoritative.
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import '../MobileControls/mobileControls.css';
 import { createPortal } from 'react-dom';
 import ChatPanel from '../ChatPanel/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';

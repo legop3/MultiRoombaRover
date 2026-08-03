@@ -1,0 +1,23 @@
+@media (max-width: 1023px) {
+  html:has(.driver-mobile-layout) {
+    /* These three driver-only positions deliberately use strict page snapping. */
+    scroll-snap-type: y mandatory;
+  }
+
+  .driver-mobile-layout .mobile-top-snap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .driver-mobile-layout .mobile-content-snap,
+  .driver-mobile-layout .mobile-tabs-snap {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+}

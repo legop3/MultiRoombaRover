@@ -14,6 +14,16 @@ function useTabsContext() {
   return context;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
+export function useTabIsActive(id) {
+  /*
+    Tab content that manages a mounted media lifecycle needs to know whether it
+    is selected without having the parent shell relay activeTab as a prop. This
+    reads the same Tabs context that already controls TabPanel visibility.
+  */
+  return useTabsContext().activeTab === id;
+}
+
 const TAB_VARIANTS = {
   primary: {
     base: 'flex-1 px-0.5 py-0.5 text-sm font-medium focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-slate-500 rounded-md border border-slate-800',

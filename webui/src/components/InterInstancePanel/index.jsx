@@ -2,6 +2,7 @@
 // Purpose: Renders remote rover servers discovered through the inter-instance directory.
 // Scope: Owns external server metadata presentation while reusing RoverQueuesPanel for rover/queue rows.
 import { useMemo } from 'react';
+import './styles.css';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import RoverQueuesPanel from '../RoverQueuesPanel/index.jsx';

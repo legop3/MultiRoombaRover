@@ -3,6 +3,7 @@
 // Scope: Keeps timeline updates isolated from controlled form inputs so incoming chat activity does not
 // force the composer DOM to re-commit while a user is simply watching or driving.
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import './styles.css';
 import { useChatActions, useChatTimeline } from '../../context/ChatContext.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';

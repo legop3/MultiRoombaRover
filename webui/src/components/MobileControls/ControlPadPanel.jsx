@@ -2,6 +2,7 @@
 // Purpose: Provides the mobile movement control pad and speed mode selector.
 // Scope: Converts touch pad cells into keyboard-style drive vectors; movement column owns drive/dock placement.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import './mobileControls.css';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { normalizeKeymapEntries } from '../../controls/keymapUtils.js';
 import {

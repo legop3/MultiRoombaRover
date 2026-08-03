@@ -2,6 +2,7 @@
 // Purpose: Assembles the mobile auxiliary controls column, which is the left column by default.
 // Scope: Owns mobile aux/camera/headlight/laser/horn wiring while reusing desktop variation components where intended.
 import { useCallback, useRef } from 'react';
+import './mobileControls.css';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import HornControl from '../HornControl/index.jsx';

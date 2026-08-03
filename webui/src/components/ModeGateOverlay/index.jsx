@@ -2,6 +2,7 @@
 // Purpose: Defines the Mode Gate Overlay module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
+import '../InterInstancePanel/styles.css';
 import AuthPanel from '../AuthPanel/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSharedClock } from '../../hooks/useSharedClock.js';

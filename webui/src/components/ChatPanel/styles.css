@@ -1,0 +1,12 @@
+  .chat-composer { container-type: inline-size; display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.125rem; min-width: 0; overflow: hidden; }
+  .chat-composer-nickname { flex: 0 0 5rem; min-width: 0; order: 1; }
+  .chat-composer-input { flex: 1 1 0%; min-width: 0; order: 2; }
+  .chat-composer-send { flex: 0 0 auto; align-self: stretch; order: 3; }
+  .chat-composer-tts { display: flex; flex: 1 1 100%; align-items: center; gap: 0.125rem; min-width: 0; overflow: hidden; order: 4; }
+  @container (min-width: 44rem) {
+    .chat-composer { flex-wrap: nowrap; }
+    .chat-composer-nickname { flex-basis: 7rem; order: 1; }
+    .chat-composer-input { order: 2; }
+    .chat-composer-tts { flex: 0 1 auto; order: 3; }
+    .chat-composer-send { order: 4; }
+  }
