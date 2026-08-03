@@ -7,6 +7,20 @@ import { hostStatsEqual, selectHostStats } from '../../context/telemetryViews.js
 
 const EMPTY_STATS = Object.freeze({});
 const EMPTY_WIFI = Object.freeze({});
+const EMPTY_MEDIA = Object.freeze({});
+
+/*
+  Dev fixture for reviewing this card's layout without a live rover.
+
+  Not dead code, despite being unreferenced: swap EMPTY_STATS for PLACEHOLDER_STATS in the
+  selector fallback below and every row renders populated. It was unslotted deliberately in
+  51863c4d ("unslot placeholder data"), which changed only that one word and kept this. Please
+  leave it - it was already deleted once as "unused" by someone who did not check the history.
+
+  Values are chosen to exercise the interesting branches rather than to look healthy: qp-warning
+  temperature, 100% memory, the undervoltage and frequency-cap flags both set, and one stream on
+  each transport so all three labels are visible.
+*/
 const PLACEHOLDER_STATS = Object.freeze({
   uptimeSec: 12840,
   cpuTempC: 74.2,
@@ -42,7 +56,30 @@ const PLACEHOLDER_STATS = Object.freeze({
     rxPackets: 12640,
     txPackets: 6840,
   }),
+  media: Object.freeze({
+    video: Object.freeze({ active: 'rtsp' }),
+    audioCapture: Object.freeze({ active: 'mpegts' }),
+    audioPlayback: Object.freeze({ active: 'whip' }),
+  }),
 });
+
+/*
+  Transmit method labels. mpegts is shown as "SRT" because that is what an operator
+  configured and what the rest of the project calls it - MPEG-TS is the container carried
+  inside it, which is an implementation detail at this level.
+*/
+const TRANSPORT_LABELS = Object.freeze({
+  whip: 'WHIP',
+  rtsp: 'RTSP',
+  mpegts: 'SRT',
+  auto: 'auto',
+});
+
+const MEDIA_STREAMS = Object.freeze([
+  { key: 'video', label: 'Video' },
+  { key: 'audioCapture', label: 'Mic' },
+  { key: 'audioPlayback', label: 'Speaker' },
+]);
 
 function valueOrDash(value) {
   return value == null || value === '' ? '--' : value;
@@ -203,7 +240,32 @@ function signalTone(signalDbm) {
   return 'bad';
 }
 
+const THROTTLE_FLAGS = Object.freeze([
+  'undervoltageNow',
+  'throttledNow',
+  'frequencyCappedNow',
+  'softTempLimitNow',
+  'undervoltageSeen',
+  'throttledSeen',
+  'frequencyCappedSeen',
+  'softTempLimitSeen',
+]);
+
+/*
+  Whether the Pi actually reported its throttle state.
+
+  These arrive from roverd as omitempty pointers, so a failed `vcgencmd get_throttled` - not
+  installed, no permission, or not a Pi at all - omits every flag rather than sending false.
+  Treating absent as false made the card report a confident green "OK" for a reading that was
+  never taken, which is the worst possible answer for a power warning: it looks like an
+  all-clear. Absence is now reported as unknown.
+*/
+function hasThrottleData(stats) {
+  return THROTTLE_FLAGS.some((flag) => typeof stats[flag] === 'boolean');
+}
+
 function powerStatus(stats) {
+  if (!hasThrottleData(stats)) return '--';
   // Current throttle flags are more important than historical flags because
   // they describe active power or thermal limits. Historical flags are still
   // surfaced as "seen" so they remain useful without overstating urgency.
@@ -216,6 +278,8 @@ function powerStatus(stats) {
 }
 
 function powerTone(stats) {
+  // Neutral, not good: no data is not the same as no problem.
+  if (!hasThrottleData(stats)) return 'neutral';
   if (stats.undervoltageNow || stats.throttledNow || stats.frequencyCappedNow || stats.softTempLimitNow) return 'bad';
   if (stats.undervoltageSeen || stats.throttledSeen || stats.frequencyCappedSeen || stats.softTempLimitSeen) return 'warn';
   return 'good';
@@ -224,9 +288,25 @@ function powerTone(stats) {
 function formatPacketCount(value) {
   const numeric = finiteNumber(value);
   if (numeric == null) return '--';
-  if (numeric >= 1000000) return `${(numeric / 1000000).toFixed(1)}m`;
+  // Uppercase M for mega. Lowercase m is the SI prefix for milli, so "281.2m packets" read as
+  // a fraction of a packet. k stays lowercase, which is correct for kilo.
+  if (numeric >= 1_000_000_000) return `${(numeric / 1_000_000_000).toFixed(1)}G`;
+  if (numeric >= 1_000_000) return `${(numeric / 1_000_000).toFixed(1)}M`;
   if (numeric >= 1000) return `${(numeric / 1000).toFixed(1)}k`;
   return `${Math.round(numeric)}`;
+}
+
+function transportLabel(transport) {
+  if (!transport?.active) return '--';
+  return TRANSPORT_LABELS[transport.active] || transport.active;
+}
+
+// RTSP and WHIP are the low-latency paths; SRT is the slow one, so it reads as neutral rather
+// than good without being flagged as a fault.
+function transportTone(transport) {
+  if (!transport?.active) return 'neutral';
+  if (transport.active === 'rtsp' || transport.active === 'whip') return 'good';
+  return 'neutral';
 }
 
 function formatTraffic(bytes, packets) {
@@ -247,6 +327,15 @@ function warningMessages(stats) {
   if (!stats.frequencyCappedNow && stats.frequencyCappedSeen) messages.push('frequency cap seen');
   if (!stats.softTempLimitNow && stats.softTempLimitSeen) messages.push('soft temp limit seen');
 
+  /*
+    roverd reports per-source collection failures in `errors` and the card was discarding them
+    entirely, so a source that stopped working showed up only as a value quietly reading "--".
+    Naming the failed source is the difference between "this Pi has no reading" and "this
+    reading is broken", and it is how a missing vcgencmd gets noticed at all.
+  */
+  const sources = Object.keys(stats.errors || {});
+  if (sources.length) messages.push(`no data from: ${sources.sort().join(', ')}`);
+
   return messages;
 }
 
@@ -254,6 +343,7 @@ export default function PiHostStatsCard() {
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const stats = useTelemetrySelector(roverId, selectHostStats, hostStatsEqual) || EMPTY_STATS;
   const wifi = stats.wifi || EMPTY_WIFI;
+  const media = stats.media || EMPTY_MEDIA;
   const warnings = warningMessages(stats);
   const wifiQuality = wifiQualityPercent(wifi);
   const bars = signalBars(wifi.signalDbm);
@@ -278,6 +368,18 @@ export default function PiHostStatsCard() {
           <StatRow label="Core Voltage" value={formatVoltage(stats.coreVoltageV)} />
           <StatRow label="Uptime" value={formatUptime(stats.uptimeSec)} />
           <StatRow label="Power" value={powerStatus(stats)} valueClassName={toneTextClass(currentPowerTone)} />
+          {/* The transmit method each stream is using, reported by the publishers themselves
+              so it does not have to be read out of journald on the Pi. */}
+          <div className="surface grid grid-cols-3 gap-1">
+            {MEDIA_STREAMS.map(({ key, label }) => (
+              <div key={key} className="min-w-0">
+                <div className="truncate text-[0.7rem] text-slate-400">{label}</div>
+                <div className={`truncate text-xs ${toneTextClass(transportTone(media[key]))}`}>
+                  {transportLabel(media[key])}
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="min-w-0 space-y-0.5">

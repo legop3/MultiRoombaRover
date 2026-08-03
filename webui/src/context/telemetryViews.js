@@ -61,8 +61,38 @@ export function dockTelemetryEqual(left, right) {
   return shallowObjectEqual(left, right);
 }
 
+/*
+  Host stats are compared by value, not shallowly.
+
+  Unlike the sensor selectors above, this one hands back roverd's payload as-is, and that
+  payload nests: `wifi` and `errors` one level down, `media.video.active` three. It arrives
+  freshly parsed from JSON every second, so every nested value is a new reference every tick.
+  A shallow compare therefore reported "changed" on every single frame regardless of content -
+  the memoisation was present but never once held, and the card re-rendered at 1Hz forever.
+
+  The recursion is depth-limited rather than unbounded. This runs on a 1Hz hot path against a
+  payload whose shape is defined by roverd's HostStats struct, so a cycle is not reachable
+  today; the limit is there so that if the payload ever grows deeper or gains a cycle, this
+  degrades to "treat as different" - one wasted render - instead of blowing the stack.
+*/
+const HOST_STATS_MAX_COMPARE_DEPTH = 4;
+
+function hostStatsValueEqual(left, right, depth) {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  if (Array.isArray(left) !== Array.isArray(right)) return false;
+  if (depth >= HOST_STATS_MAX_COMPARE_DEPTH) return false;
+  const leftKeys = Object.keys(left);
+  if (leftKeys.length !== Object.keys(right).length) return false;
+  for (const key of leftKeys) {
+    if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+    if (!hostStatsValueEqual(left[key], right[key], depth + 1)) return false;
+  }
+  return true;
+}
+
 export function hostStatsEqual(left, right) {
-  return shallowObjectEqual(left, right);
+  return hostStatsValueEqual(left, right, 0);
 }
 
 export function selectLightBumpTelemetry(frame) {
