@@ -3,6 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
+import { useSocket } from '../../context/SocketContext.jsx';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import CardFrame from '../CardFrame/index.jsx';
@@ -45,18 +46,18 @@ export default function ReplaySourcesPanel({
   const assignmentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const replayState = useSessionSelector((state) => state.session?.replay || null);
+  const replayStatus = useSessionSelector((state) => state.replayStatus);
+  const socket = useSocket();
   const { triggerReplay } = useSessionActions();
   const sources = useMemo(() => normalizeSources(replaySources || []), [replaySources]);
   const { value: settings, save: saveSettings } = useSettingsNamespace('replaySources', {});
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
   const [title, setTitle] = useState('');
   const [titleDirty, setTitleDirty] = useState(false);
   const [includeSidebar, setIncludeSidebar] = useState(true);
-  const [activeJobId, setActiveJobId] = useState(null);
-  const [dismissedPanelReplayId, setDismissedPanelReplayId] = useState(null);
+  const [panelReplay, setPanelReplay] = useState(null);
   // Settings keys include the panel id because the same replay source control is
   // mounted in desktop, portrait, and landscape layouts with independent saved UI
   // preferences. Pulling the values into named constants also gives hook
@@ -65,21 +66,23 @@ export default function ReplaySourcesPanel({
   const titleSettingKey = `${panelId}:title`;
   const savedIncludeSidebar = settings?.[includeSidebarSettingKey];
   const savedTitle = settings?.[titleSettingKey];
-  const activeReplayJob = useSessionSelector((state) => (
-    activeJobId ? state.replayJobs?.[activeJobId] || null : null
-  ));
-  // The job id is deliberately local to this mounted panel. Reading the global
-  // latestReplay value here caused a newly mounted panel to resurrect the last
-  // replay popup even though this panel did not request it. The job record can
-  // remain in shared session state for asynchronous socket updates; selecting
-  // it through this panel-owned id keeps popup ownership and lifetime local.
-  const panelReplay = activeReplayJob?.media || null;
-  const panelReplayJobId = panelReplay?.jobId || null;
-  const showPanelReplay = Boolean(
-    panelReplay?.url &&
-    panelReplayJobId &&
-    dismissedPanelReplayId !== panelReplayJobId,
-  );
+  const showPanelReplay = Boolean(panelReplay?.url);
+
+  useEffect(() => {
+    const handleReplayReady = (replay = {}) => {
+      if (!replay?.url) return;
+      /*
+        A replay popup is an event owned by the lifetime of this mounted panel,
+        not retained application history. Listening to the live socket event
+        means a ready replay opens immediately, while switching tabs away and
+        back cannot replay an event that happened before the new mount.
+      */
+      setPanelReplay(replay);
+    };
+
+    socket.on('replay:ready', handleReplayReady);
+    return () => socket.off('replay:ready', handleReplayReady);
+  }, [socket]);
 
   const availableDefaultKey = useMemo(() => {
     // PTZ layouts provide their camera key explicitly so entering the dedicated
@@ -182,10 +185,10 @@ export default function ReplaySourcesPanel({
     // child lists a stable value while the selected keys have not changed.
     return new Set(selected);
   }, [selected]);
-  const activeJobStatusText = useMemo(() => {
-    if (!activeReplayJob?.status) return null;
-    const titleText = activeReplayJob.title ? `: ${activeReplayJob.title}` : '';
-    switch (activeReplayJob.status) {
+  const replayStatusText = useMemo(() => {
+    if (!replayStatus?.status) return null;
+    const titleText = replayStatus.title ? `: ${replayStatus.title}` : '';
+    switch (replayStatus.status) {
       case 'accepted':
         return `Replay accepted${titleText}`;
       case 'building':
@@ -195,40 +198,33 @@ export default function ReplaySourcesPanel({
       case 'ready':
         return `Replay ready${titleText}`;
       case 'failed':
-        return activeReplayJob.message || `Replay failed${titleText}`;
+        return replayStatus.message || `Replay failed${titleText}`;
       default:
-        return activeReplayJob.message || `Replay ${activeReplayJob.status}${titleText}`;
+        return replayStatus.message || `Replay ${replayStatus.status}${titleText}`;
     }
-  }, [activeReplayJob]);
-
+  }, [replayStatus]);
   const toggleKey = useCallback((key) => {
     setSelected((prev) => {
       return prev.includes(key) ? prev.filter((value) => value !== key) : [...prev, key];
     });
-    setSuccess(null);
   }, []);
 
   const handleReplay = useCallback(async () => {
     if (replayDisabled) return;
     setBusy(true);
     setError(null);
-    setSuccess(null);
-    setActiveJobId(null);
     try {
       const payload = selected.map((key) => {
         const [type, id] = key.split(':');
         return { type, id };
       });
       const resolvedTitle = String(title || '').trim() || defaultTitle;
-      const resp = await triggerReplay({ sources: payload, title: resolvedTitle, includeSidebar });
-      if (resp?.jobId) {
-        // The socket acknowledgement is only the start of the async job.
-        // Later replay:status events update this same job id as Discord builds and uploads the video.
-        setActiveJobId(resp.jobId);
-        setSuccess('Replay accepted.');
-      } else {
-        setSuccess('Replay accepted.');
-      }
+      await triggerReplay({ sources: payload, title: resolvedTitle, includeSidebar });
+      /*
+        Do not set panel-local success state after acknowledgement. The server
+        broadcasts the authoritative accepted/building/uploading/ready stages,
+        and every replay panel renders that one shared status progression.
+      */
     } catch (err) {
       setError(err.message);
     } finally {
@@ -245,7 +241,7 @@ export default function ReplaySourcesPanel({
           <ReplayReadyPopup
             replay={panelReplay}
             variant="floating-panel"
-            onClose={() => setDismissedPanelReplayId(panelReplayJobId)}
+            onClose={() => setPanelReplay(null)}
           />
         </div>
       ) : null}
@@ -256,11 +252,11 @@ export default function ReplaySourcesPanel({
         </div>
         <div className="space-y-0.5">
           {error ? <div className="text-xs text-amber-400">{error}</div> : null}
-          {activeJobStatusText ? (
-            <div className={`text-xs ${activeReplayJob?.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
-              {activeJobStatusText}
+          {replayStatusText ? (
+            <div className={`text-xs ${replayStatus?.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
+              {replayStatusText}
             </div>
-          ) : success ? <div className="text-xs text-emerald-300">{success}</div> : null}
+          ) : null}
           <div className="flex items-center gap-0.5">
             <label className="surface shrink-0 text-xs" htmlFor={`${panelId}-title`}>
               Replay title:

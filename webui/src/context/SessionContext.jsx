@@ -15,9 +15,8 @@ const INITIAL_STATE = {
   overseerControlState: null,
   overseerMemory: null,
   alerts: [],
-  replayJobs: {},
   latestReplay: null,
-  latestRequestedReplay: null,
+  replayStatus: null,
   duplicateIdentityBlock: null,
   roverRemovalNotice: null,
 };
@@ -201,62 +200,40 @@ export function SessionProvider({ children }) {
       }));
     }
     function handleReplayStatus(payload = {}) {
-      if (!payload?.jobId) return;
-      setState((prev) => {
-        const previous = prev.replayJobs?.[payload.jobId] || {};
-        const nextJob = {
-          ...previous,
+      if (!payload?.status) return;
+      setState((prev) => ({
+        ...prev,
+        /*
+          Replay creation is serialized by the server's cooldown and workflow,
+          so the browser needs one current progress value rather than a map of
+          jobs. The server remains authoritative for job identity and execution;
+          this scalar exists only to present accepted/building/uploading/ready/
+          failed progress in the web UI.
+        */
+        replayStatus: {
           ...payload,
-          updatedAt: Date.now(),
-        };
-        return {
-          ...prev,
-          // Keep status by job id because the replay panel receives the job id synchronously
-          // from the trigger acknowledgement, then later socket events update that same record.
-          replayJobs: {
-            ...(prev.replayJobs || {}),
-            [payload.jobId]: nextJob,
-          },
-        };
-      });
+          receivedAt: Date.now(),
+        },
+      }));
     }
     function handleReplayReady(payload = {}) {
       if (!payload?.jobId || !payload?.url) return;
-      setState((prev) => {
-        const previous = prev.replayJobs?.[payload.jobId] || {};
-        const selfSocketId = String(prev.session?.socketId || '').trim();
-        const requesterSocketId = String(payload?.requestedBy?.socketId || '').trim();
-        const requestedByThisBrowser = Boolean(selfSocketId && requesterSocketId && selfSocketId === requesterSocketId);
-        const nextJob = {
-          ...previous,
+      setState((prev) => ({
+        ...prev,
+        /*
+          The client needs only the newest completed replay for immediate
+          presentation on spectator and server-display routes. Replay request
+          panels listen to the live socket event instead, because retaining media
+          for those panels would make an old popup return after a tab remount.
+          Keeping one media slot here also avoids turning replays into a library.
+        */
+        latestReplay: {
           ...payload,
-          status: 'ready',
-          media: payload,
-          updatedAt: Date.now(),
-        };
-        return {
-          ...prev,
-          replayJobs: {
-            ...(prev.replayJobs || {}),
-            [payload.jobId]: nextJob,
-          },
-          // Only the latest replay media is retained. Discord is the media host, so
-          // this state is intentionally short-lived and does not become a replay library.
-          latestReplay: {
-            ...payload,
-            receivedAt: Date.now(),
-          },
-          latestRequestedReplay: requestedByThisBrowser
-            ? {
-                ...payload,
-                receivedAt: Date.now(),
-              }
-            : prev.latestRequestedReplay,
-        };
-      });
+          receivedAt: Date.now(),
+        },
+      }));
     }
     function handleReplayFailed(payload = {}) {
-      if (payload?.jobId) handleReplayStatus({ ...payload, status: 'failed' });
       const message = typeof payload?.message === 'string' && payload.message.trim()
         ? payload.message.trim()
         : 'Replay failed after being accepted.';
@@ -453,13 +430,6 @@ export function SessionProvider({ children }) {
         })),
       clearLatestReplay: () =>
         setState((prev) => (prev.latestReplay ? { ...prev, latestReplay: null } : prev)),
-      showReplayModal: (replay) =>
-        setState((prev) => ({
-          ...prev,
-          latestRequestedReplay: replay ? { ...replay, receivedAt: Date.now() } : null,
-        })),
-      clearReplayModal: () =>
-        setState((prev) => (prev.latestRequestedReplay ? { ...prev, latestRequestedReplay: null } : prev)),
     }),
     [emitWithAck, setState],
   );

@@ -155,9 +155,9 @@ export default function SpectatorContent() {
       <AlertFeed />
       <RewardRunOverlay />
       {/* Spectators do not have the replay request panel that normal web users see, so
-          the spectator route listens to every ready replay directly. This intentionally
-          uses latestReplay instead of latestRequestedReplay because all spectators should
-          get the fullscreen replay when a Discord-hosted replay becomes available. */}
+          the spectator route presents the shared latestReplay value directly. Every
+          spectator should receive the fullscreen replay when completed media becomes
+          available, regardless of which browser or transport requested its creation. */}
       <ReplayReadyPopup replay={latestReplay} onClose={clearLatestReplay} />
     </div>
   );
