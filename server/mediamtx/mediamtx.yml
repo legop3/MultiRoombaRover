@@ -8,7 +8,47 @@ metricsAddress: 0.0.0.0:9998
 pprof: no
 pprofAddress: 127.0.0.1:9999
 
-rtsp: no
+# RTSP exists solely as a low-latency ingest path for rovers.
+#
+# Measured in webrtc/: publishing the same encoded frames without the MPEG-TS container
+# takes glass-to-glass latency from ~172ms to ~12ms. The delay is inside this server's
+# mpegts demux, so no setting on the rover can reach it - the container has to change.
+#
+# WHIP would be preferable (it reuses the WebRTC listener and needs nothing new here),
+# but it requires ffmpeg >= 7.1 on the rover and Raspberry Pi OS bookworm ships 5.1.
+# RTSP works on ffmpeg 4.x and up, so it is the transport current rovers can actually
+# use.
+#
+# Bound to the LAN interface rather than 0.0.0.0 so enabling ingest does not also expose
+# a new port to the internet. Change this address to match your own network, or set
+# `rtsp: no` to disable the path entirely - rovers fall back to MPEG-TS automatically
+# and keep working exactly as before.
+#
+# Publishing still authenticates through authHTTPAddress below, the same as every other
+# protocol here, so this does not open an unauthenticated ingest.
+rtsp: yes
+rtspAddress: 192.168.0.100:8554
+# rtspAddress governs only the TCP control port. The UDP RTP/RTCP listeners are separate
+# and default to every interface (:8000 and :8001), so they are pinned to the same LAN
+# address explicitly - otherwise "restricted to the LAN" would only be half true.
+rtpAddress: 192.168.0.100:8000
+rtcpAddress: 192.168.0.100:8001
+# TCP first, and TCP is what the publishers actually request.
+#
+# An earlier version of this comment claimed UDP "preserves the loss behaviour SRT was chosen
+# for". That was backwards: SRT has ARQ retransmission and plain RTP/UDP has none, so RTSP/UDP
+# is strictly worse under loss than the SRT it replaces. Measured over a real internet path it
+# failed outright - the path went ready and no WebRTC reader ever started, because a fragmented
+# keyframe never fully assembled.
+#
+# UDP stays in the list because this only declares what the server will accept and removing it
+# would be a gratuitous restriction on a LAN publisher that has a reason to use it. It is not a
+# recommendation. See pi/bin/video-publisher.sh, which pins tcp.
+rtspTransports: [tcp, udp]
+# MediaMTX 1.19 enables MoQ (Media over QUIC) by default, which binds :8892 on both TCP and
+# UDP. Nothing here uses it, and an unused listener is only attack surface, so it is off.
+# Verify with: journalctl -u rover-mediamtx | grep 'started with listener'
+moq: no
 rtmp: no
 hls: no
 

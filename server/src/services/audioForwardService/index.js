@@ -72,6 +72,7 @@ const audioForwardPolicy = createAudioForwardPolicy({
 const {
   ensureAudioForwardPermission,
   resolveForwardUrl,
+  resolveForwardPublishTarget,
   resolveForwardPathId,
   buildWhipUrl,
 } = audioForwardPolicy;
@@ -91,6 +92,7 @@ const workerEngine = createAudioForwardWorkerEngine({
   whipOwners,
   setState,
   resolveForwardUrl,
+  resolveForwardPublishTarget,
   resolveForwardPathId,
 });
 

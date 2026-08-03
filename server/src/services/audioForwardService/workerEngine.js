@@ -21,6 +21,7 @@ function createAudioForwardWorkerEngine(deps) {
     whipOwners,
     setState,
     resolveForwardUrl,
+    resolveForwardPublishTarget,
     resolveForwardPathId,
   } = deps;
 
@@ -109,7 +110,12 @@ function createAudioForwardWorkerEngine(deps) {
     }, graceMs);
   }
 
-  function buildPublisherArgs(fifoPath, outputUrl) {
+  /*
+    container selects the output muxer. mpegts is the historical path; rtsp avoids the
+    server-side MPEG-TS cost measured at roughly 131ms on this leg. Everything before the
+    output is identical, so switching cannot change what is encoded - only how it is carried.
+  */
+  function buildPublisherArgs(fifoPath, outputUrl, container = 'mpegts') {
     return [
       '-hide_banner',
       '-loglevel',
@@ -144,8 +150,15 @@ function createAudioForwardWorkerEngine(deps) {
       '0',
       '-muxpreload',
       '0',
-      '-f',
-      'mpegts',
+      /*
+        TCP for RTSP, not UDP. Measured over a real internet path, RTSP/UDP produced a stream
+        MediaMTX reported as ready but that no WebRTC reader could ever start, because plain
+        RTP/UDP has no retransmission and a fragmented keyframe never fully assembles. SRT has
+        ARQ, so UDP here was strictly worse than what it replaced rather than equivalent.
+      */
+      ...(container === 'rtsp'
+        ? ['-f', 'rtsp', '-rtsp_transport', 'tcp']
+        : ['-f', 'mpegts']),
       outputUrl,
     ];
   }
@@ -332,10 +345,13 @@ function createAudioForwardWorkerEngine(deps) {
     ensureRuntimeDir();
     const fifoPath = path.join(runtimeDir, `${sanitizeRoverId(roverId)}.pcm`);
     ensureFifo(fifoPath);
-    const outputUrl = resolveForwardUrl(roverId);
+    const target = resolveForwardPublishTarget
+      ? resolveForwardPublishTarget(roverId)
+      : { url: resolveForwardUrl(roverId), container: 'mpegts' };
+    const outputUrl = target.url;
 
     const keepaliveFd = fs.openSync(fifoPath, 'r+');
-    const publisher = spawnFfmpeg(roverId, 'publisher', buildPublisherArgs(fifoPath, outputUrl));
+    const publisher = spawnFfmpeg(roverId, 'publisher', buildPublisherArgs(fifoPath, outputUrl, target.container));
 
     const worker = {
       roverId,

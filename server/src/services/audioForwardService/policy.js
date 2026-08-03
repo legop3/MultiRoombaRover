@@ -39,6 +39,40 @@ function createAudioForwardPolicy(deps) {
     return value.replace(/([?&]streamid=#!::[^&]*)/, '$1,m=publish');
   }
 
+  /*
+    Where and how the server publishes forwarded audio into MediaMTX.
+
+    Measured on the server-originated path (bonk sound, VIP clip playback, forwarded TTS),
+    server publish through to rover PCM:
+
+      publish mpegts, rover reads srt    283ms    <- current
+      publish mpegts, rover reads rtsp   168ms
+      publish rtsp,   rover reads srt    151.5ms
+      publish rtsp,   rover reads rtsp    30.5ms
+
+    This is the only audio path with MPEG-TS on both legs, so it pays the container cost twice
+    where the browser microphone pays it once. The two legs are roughly additive at ~115ms and
+    ~131ms.
+
+    RTSP is used only when the rover has an rtspUrl configured, because the rover has to be
+    able to read what is published. An absent rtspUrl therefore keeps exactly today's
+    behaviour, and the two legs can be migrated independently in either order - each one alone
+    still helps.
+  */
+  function resolveForwardPublishTarget(roverId) {
+    const record = roverManager.rovers.get(roverId);
+    const rtspUrl = record?.meta?.media?.audioPlayback?.rtspUrl;
+    if (rtspUrl && String(rtspUrl).trim()) {
+      /*
+        No mode rewriting for RTSP. SRT distinguishes publish from read inside the stream id,
+        which is why forcePublishStreamMode exists; RTSP distinguishes them by method
+        (ANNOUNCE/RECORD versus DESCRIBE/PLAY), so the same URL serves both.
+      */
+      return { url: String(rtspUrl).trim(), container: 'rtsp' };
+    }
+    return { url: resolveForwardUrl(roverId), container: 'mpegts' };
+  }
+
   function resolveForwardUrl(roverId) {
     const record = roverManager.rovers.get(roverId);
     // Rovers listen to the playback stream with a request/read URL. The VIP
@@ -78,6 +112,7 @@ function createAudioForwardPolicy(deps) {
     ensureVipVerified,
     ensureAudioForwardPermission,
     resolveForwardUrl,
+    resolveForwardPublishTarget,
     resolveForwardPathId,
     buildWhipUrl,
   };
