@@ -1,5 +1,5 @@
 [Unit]
-Description=Rover Audio Publisher (ALSA -> SRT)
+Description=Rover Audio Publisher (ALSA -> RTSP/TCP)
 After=network-online.target roverd.service
 Wants=network-online.target
 

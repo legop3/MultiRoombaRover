@@ -87,6 +87,7 @@ else
 fi
 
 run_pipeline() {
+	local -a pipeline_statuses=()
 	local ffmpeg_args=(
 		-hide_banner
 		-loglevel warning
@@ -146,6 +147,17 @@ run_pipeline() {
 	# latency compared with the old 65,536-byte buffer.
 	arecord -D "${CAPTURE_DEVICE}" -f S32_LE -c "${ROVERD_AUDIO_CAPTURE_CHANNELS}" -r "${ROVERD_AUDIO_CAPTURE_SAMPLE_RATE}" -B "${AUDIO_ALSA_BUFFER_BYTES}" -F "${AUDIO_ALSA_PERIOD_BYTES}" -q -t raw \
 		| "${FFMPEG_BIN_PATH}" "${ffmpeg_args[@]}"
+	pipeline_statuses=("${PIPESTATUS[@]}")
+
+	# PIPESTATUS belongs to the pipeline that just finished and is replaced by the next shell
+	# command. Capture it immediately, then return the publisher failure first because that is
+	# normally the reason arecord receives a secondary broken pipe.
+	LAST_ARECORD_STATUS="${pipeline_statuses[0]:-unknown}"
+	LAST_FFMPEG_STATUS="${pipeline_statuses[1]:-unknown}"
+	if [[ "${LAST_FFMPEG_STATUS}" != "0" ]]; then
+		return "${LAST_FFMPEG_STATUS}"
+	fi
+	return "${LAST_ARECORD_STATUS}"
 }
 
 trap 'kill 0 2>/dev/null' EXIT INT TERM
@@ -154,6 +166,6 @@ while true; do
 	if run_pipeline; then
 		exit 0
 	fi
-	echo "Audio-only publisher exited arecord=${PIPESTATUS[0]} ffmpeg=${PIPESTATUS[1]}, restarting in 2s..." >&2
+	echo "Audio-only publisher exited arecord=${LAST_ARECORD_STATUS:-unknown} ffmpeg=${LAST_FFMPEG_STATUS:-unknown}, restarting in 2s..." >&2
 	sleep 2
 done

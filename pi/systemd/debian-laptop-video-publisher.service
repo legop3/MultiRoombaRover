@@ -1,5 +1,5 @@
 [Unit]
-Description=Rover Debian Laptop Video Publisher (V4L2 -> SRT)
+Description=Rover Debian Laptop Video Publisher (V4L2 -> RTSP/TCP)
 After=network-online.target roverd.service
 Wants=network-online.target
 

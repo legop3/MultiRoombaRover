@@ -1,5 +1,5 @@
 [Unit]
-Description=Rover Audio Forward Listener (SRT -> ALSA)
+Description=Rover Audio Forward Listener (RTSP/TCP -> ALSA)
 After=network-online.target roverd.service
 Wants=network-online.target
 
