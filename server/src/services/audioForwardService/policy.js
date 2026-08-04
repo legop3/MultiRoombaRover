@@ -30,25 +30,13 @@ function createAudioForwardPolicy(deps) {
     }
   }
 
-  function forcePublishStreamMode(rawUrl) {
-    const value = String(rawUrl || '').trim();
-    if (!value) return '';
-    if (!/[?&]streamid=#!::/.test(value)) return value;
-    if (/,m=publish\b/.test(value)) return value;
-    if (/,m=[a-zA-Z]+\b/.test(value)) return value.replace(/,m=[a-zA-Z]+\b/, ',m=publish');
-    return value.replace(/([?&]streamid=#!::[^&]*)/, '$1,m=publish');
-  }
-
   function resolveForwardUrl(roverId) {
-    const record = roverManager.rovers.get(roverId);
-    // Rovers listen to the playback stream with a request/read URL. The VIP
-    // upload path needs to publish into that same stream, so the configured
-    // nested playback URL is converted to publish mode below.
-    const configured = record?.meta?.media?.audioPlayback?.forwardUrl;
-    if (configured) return forcePublishStreamMode(configured);
-    return `srt://127.0.0.1:9000?streamid=#!::r=${encodeURIComponent(
-      roverId + streamSuffix,
-    )},m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316`;
+    /*
+      The server publishes to its own MediaMTX child, so loopback is the stable and correct
+      route regardless of which hostname a rover uses to reach this machine. RTSP uses the
+      same path for publish and read; ANNOUNCE/RECORD and DESCRIBE/PLAY distinguish direction.
+    */
+    return `rtsp://127.0.0.1:8554/${encodeURIComponent(roverId + streamSuffix)}`;
   }
 
   function resolveForwardPathId(roverId) {

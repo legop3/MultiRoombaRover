@@ -51,8 +51,15 @@ barcodeGames:
 media:
   # Base address for mediaMTX (scheme + host + optional port/path). The UI will always request
   #   http://<base>/<roverId>/whep
-  # Example: http://192.168.0.86:8889/video
-  whepBaseUrl: "http://192.168.0.86:8889/video"
+  # Example: http://media-server.local:8889/video
+  whepBaseUrl: "http://media-server.local:8889/video"
+  # MediaMTX advertises these instance-specific DNS names or IP addresses as WebRTC ICE
+  # candidates. Include every public and LAN address browsers use to reach this server.
+  # The server generates MediaMTX's runtime configuration from this list; never edit a
+  # separate mediamtx.yml for a new installation.
+  additionalHosts:
+    - "rover.example.com"
+    - "media-server.local"
 
 bandwidthSavings:
   # Duplicate driver-tab handling for the same browser identity.

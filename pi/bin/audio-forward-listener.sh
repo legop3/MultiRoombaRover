@@ -9,9 +9,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-# Load KEY=VALUE pairs from media.env without evaluating shell syntax. The
-# forward URL is data produced by roverd, and treating it as shell code would
-# break on normal SRT query-string characters such as '&'.
+# Load KEY=VALUE pairs from media.env without evaluating shell syntax. The forward URL is
+# data produced by roverd and must never be interpreted as executable shell code.
 load_env_file() {
   local content=""
 
@@ -95,6 +94,9 @@ run_pipeline() {
     -flags low_delay
     -analyzeduration 200k
     -probesize 32k
+    # The forwarded-audio URL is RTSP. Pinning TCP avoids ffmpeg negotiating the
+    # separate unreliable RTP/UDP transport that the server intentionally disables.
+    -rtsp_transport tcp
     -i "${ROVERD_AUDIO_PLAYBACK_FORWARD_URL}"
     -vn
   )

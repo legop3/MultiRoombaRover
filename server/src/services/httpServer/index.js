@@ -4,7 +4,14 @@
 const { httpServer } = require('../../globals/http');
 const config = require('../../globals/config');
 const logger = require('../../globals/logger').child('httpServer');
+const { startMediaMtx } = require('../mediaMtxService');
 
 httpServer.listen(config.port, () => {
   logger.info(`Server listening on :${config.port}`);
+  /*
+    MediaMTX immediately calls the server's HTTP authorization route when clients connect.
+    Starting it from the listen callback guarantees that endpoint is reachable before the
+    first publisher attempts to authenticate.
+  */
+  startMediaMtx();
 });

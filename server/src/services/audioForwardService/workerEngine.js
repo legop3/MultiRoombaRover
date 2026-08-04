@@ -86,7 +86,7 @@ function createAudioForwardWorkerEngine(deps) {
       exited = true;
     };
     // ChildProcess.killed only means Node successfully sent a signal, not that
-    // ffmpeg actually exited. Track the real exit event so FIFO/SRT hangs still
+    // ffmpeg actually exited. Track the real exit event so FIFO/publisher hangs still
     // get escalated to SIGKILL instead of making systemd wait for its timeout.
     proc.once('exit', markExited);
     try {
@@ -145,7 +145,13 @@ function createAudioForwardWorkerEngine(deps) {
       '-muxpreload',
       '0',
       '-f',
-      'mpegts',
+      'rtsp',
+      /*
+        The MediaMTX listener accepts RTSP over TCP only. Pinning it here makes the server's
+        own publisher follow the same reliable transport contract as every rover publisher.
+      */
+      '-rtsp_transport',
+      'tcp',
       outputUrl,
     ];
   }

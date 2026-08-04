@@ -9,9 +9,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
 	exit 1
 fi
 
-# Load roverd's generated media.env as data instead of sourcing it as shell.
-# The SRT publish URL contains normal query-string characters like '&' and '#!',
-# so evaluating the file would be both fragile and unnecessary.
+# Load roverd's generated media.env as data instead of sourcing it as shell. URLs are
+# configuration data, so evaluating the file would be both fragile and unnecessary.
 load_env_file() {
 	local content=""
 
@@ -103,6 +102,8 @@ if [[ "${ROVERD_VIDEO_INVERT}" -ne 0 ]]; then
 fi
 
 run_pipeline() {
+	# Keep laptop rovers on the same transport contract as Pi camera rovers. This changes
+	# only the encoded stream's carrier; V4L2 capture and H264 encoding remain untouched.
 	"${FFMPEG_BIN_PATH}" \
 		-hide_banner \
 		-loglevel warning \
@@ -130,7 +131,8 @@ run_pipeline() {
 		-flush_packets 1 \
 		-muxdelay 0 \
 		-muxpreload 0 \
-		-f mpegts \
+		-f rtsp \
+		-rtsp_transport tcp \
 		"${ROVERD_VIDEO_PUBLISH_URL}"
 }
 

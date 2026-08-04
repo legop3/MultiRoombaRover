@@ -9,9 +9,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
 	exit 1
 fi
 
-# Load KEY=VALUE pairs from media.env without evaluating shell syntax. SRT URLs
-# contain characters such as '&' and '#!', so sourcing this file would treat a
-# data file as code and can split a valid URL into shell control operators.
+# Load KEY=VALUE pairs from media.env without evaluating shell syntax. URLs are data;
+# sourcing this file would unnecessarily treat server-provided values as shell code.
 load_env_file() {
 	local content=""
 
@@ -123,13 +122,14 @@ run_pipeline() {
 		-frame_duration 20
 		-compression_level 0
 
-		# Mirror the video publisher's MPEG-TS low-latency settings. Without
-		# these, ffmpeg is allowed to hold packets for mux timing, which is
-		# exactly the wrong tradeoff for live rover feedback.
+		# RTSP carries the existing Opus stream directly, avoiding MediaMTX's costly
+		# MPEG-TS demux without changing microphone capture or encoding quality. TCP is
+		# required for the same reliable local-network behavior as the video publisher.
 		-flush_packets 1
 		-muxdelay 0
 		-muxpreload 0
-		-f mpegts
+		-f rtsp
+		-rtsp_transport tcp
 		"${ROVERD_AUDIO_CAPTURE_PUBLISH_URL}"
 	)
 

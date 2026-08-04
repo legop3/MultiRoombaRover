@@ -22,7 +22,8 @@ battery:
 maxWheelSpeed: 350
 
 media:
-  publishPort: 9000
+  # Media URLs are derived from serverUrl's hostname, this port, and the rover name.
+  rtspPort: 8554
   manage: true
   healthUrl: ""
   healthInterval: 30s

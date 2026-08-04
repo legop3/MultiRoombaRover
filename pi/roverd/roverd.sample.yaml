@@ -17,7 +17,8 @@ battery:
   urgent: 1650
 maxWheelSpeed: 350
 media:
-  publishPort: 9000
+  # Media URLs are derived from serverUrl's hostname, this port, and the rover name.
+  rtspPort: 8554
   manage: true
   healthUrl: ""
   healthInterval: 30s
@@ -25,7 +26,6 @@ media:
     enabled: true
     service: video-publisher.service
     publisher: pi-libcamera
-    publishUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
     width: 640
     height: 480
     fps: 30
@@ -36,7 +36,6 @@ media:
   audioCapture:
     enabled: false
     service: audio-only-publisher.service
-    publishUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha-audio,m=publish&latency=10&mode=caller&transtype=live&pkt_size=1316
     device: hw:0,0
     sampleRate: 48000
     channels: 2
@@ -44,7 +43,6 @@ media:
   audioPlayback:
     enabled: true
     service: audio-forward-listener.service
-    forwardUrl: srt://192.168.0.86:9000?streamid=#!::r=roomba-alpha-fwd,m=request&latency=10&mode=caller&transtype=live&pkt_size=1316
     device: forward
     normalize: true
 cameraServo:
