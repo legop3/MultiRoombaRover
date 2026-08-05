@@ -110,6 +110,10 @@ else
 fi
 
 run_pipeline() {
+  # MPEG-TS added most of the former rover-to-browser latency inside MediaMTX's
+  # demuxer. RTSP carries the same encoded H264 without changing the camera or codec.
+  # TCP is explicit because plain RTSP/RTP over UDP has no retransmission and proved
+  # unreliable even though MediaMTX still reported the incomplete stream as ready.
   "${LIBCAMERA_BIN_PATH}" \
     --inline \
     --timeout 0 \
@@ -142,7 +146,8 @@ run_pipeline() {
       -flush_packets 1 \
       -muxdelay 0 \
       -muxpreload 0 \
-      -f mpegts \
+      -f rtsp \
+      -rtsp_transport tcp \
       "${ROVERD_VIDEO_PUBLISH_URL}"
 }
 

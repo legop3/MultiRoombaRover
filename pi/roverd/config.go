@@ -3,9 +3,11 @@ package roverd
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,10 +79,10 @@ type HornConfig struct {
 }
 
 type MediaConfig struct {
-	// PublishPort is shared by the derived video, microphone, and forwarded-audio
-	// SRT URLs. Keeping it at this level prevents each nested block from needing
+	// RTSPPort is shared by the derived video, microphone, and forwarded-audio
+	// RTSP URLs. Keeping it at this level prevents each nested block from needing
 	// to repeat the same server port when the common MediaMTX listener is used.
-	PublishPort    int                 `yaml:"publishPort" json:"-"`
+	RTSPPort       int                 `yaml:"rtspPort" json:"-"`
 	Manage         bool                `yaml:"manage" json:"manage"`
 	HealthURL      string              `yaml:"healthUrl" json:"healthUrl,omitempty"`
 	HealthInterval Duration            `yaml:"healthInterval" json:"-"`
@@ -93,10 +95,12 @@ type VideoMediaConfig struct {
 	// Publisher selects the installed publisher script/pipeline family. The
 	// first pass uses pi-libcamera for current rovers; laptop-v4l2 can be added
 	// without changing the server-facing media shape again.
-	Enabled     bool   `yaml:"enabled" json:"enabled"`
-	Service     string `yaml:"service" json:"service,omitempty"`
-	Publisher   string `yaml:"publisher" json:"publisher,omitempty"`
-	PublishURL  string `yaml:"publishUrl" json:"publishUrl,omitempty"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	Service   string `yaml:"service" json:"service,omitempty"`
+	Publisher string `yaml:"publisher" json:"publisher,omitempty"`
+	// PublishURL is derived during validation. It remains in rover metadata for server-side
+	// consumers, but is not a second hand-written endpoint in /etc/roverd.yaml.
+	PublishURL  string `yaml:"-" json:"publishUrl,omitempty"`
 	Device      string `yaml:"device" json:"device,omitempty"`
 	InputFormat string `yaml:"inputFormat" json:"-"`
 	Width       int    `yaml:"width" json:"-"`
@@ -111,9 +115,10 @@ type AudioCaptureConfig struct {
 	// AudioCapture describes the rover microphone stream that browsers can
 	// subscribe to as "<rover>-audio". A disabled capture block still has
 	// normalized defaults so enabling it only requires flipping enabled: true.
-	Enabled    bool   `yaml:"enabled" json:"enabled"`
-	Service    string `yaml:"service" json:"service,omitempty"`
-	PublishURL string `yaml:"publishUrl" json:"publishUrl,omitempty"`
+	Enabled bool   `yaml:"enabled" json:"enabled"`
+	Service string `yaml:"service" json:"service,omitempty"`
+	// PublishURL follows the same derived-only contract as the video path.
+	PublishURL string `yaml:"-" json:"publishUrl,omitempty"`
 	Device     string `yaml:"device" json:"device,omitempty"`
 	SampleRate int    `yaml:"sampleRate" json:"-"`
 	Channels   int    `yaml:"channels" json:"-"`
@@ -125,9 +130,10 @@ type AudioPlaybackConfig struct {
 	// MediaMTX for playback on the rover speaker. The URL is a request/read URL
 	// for the rover listener, while the server converts it to publish mode when
 	// it needs to inject audio.
-	Enabled         bool   `yaml:"enabled" json:"enabled"`
-	Service         string `yaml:"service" json:"service,omitempty"`
-	ForwardURL      string `yaml:"forwardUrl" json:"forwardUrl,omitempty"`
+	Enabled bool   `yaml:"enabled" json:"enabled"`
+	Service string `yaml:"service" json:"service,omitempty"`
+	// ForwardURL is derived because the server and rover must agree on the exact -fwd path.
+	ForwardURL      string `yaml:"-" json:"forwardUrl,omitempty"`
 	Device          string `yaml:"device" json:"device,omitempty"`
 	Normalize       bool   `yaml:"normalize" json:"-"`
 	NormalizeFilter string `yaml:"normalizeFilter" json:"-"`
@@ -230,7 +236,7 @@ func LoadConfig(path string) (*Config, error) {
 			},
 		},
 		Media: MediaConfig{
-			PublishPort:    9000,
+			RTSPPort:       8554,
 			HealthInterval: Duration{Duration: 30 * time.Second},
 			Video: VideoMediaConfig{
 				Enabled:    true,
@@ -349,8 +355,8 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.BRC.GPIOChip == "" {
 		cfg.BRC.GPIOChip = "gpiochip0"
 	}
-	if cfg.Media.PublishPort <= 0 {
-		cfg.Media.PublishPort = 9000
+	if cfg.Media.RTSPPort <= 0 {
+		cfg.Media.RTSPPort = 8554
 	}
 	if err := validateMediaConfig(&cfg.Media, cfg.ServerURL, cfg.Name); err != nil {
 		return nil, fmt.Errorf("media: %w", err)
@@ -432,25 +438,25 @@ func validateMediaConfig(cfg *MediaConfig, serverURL string, roverName string) e
 		file is written. This keeps the Pi behavior stable while making laptop
 		and future publisher variants explicit configuration choices.
 	*/
-	if cfg.PublishPort <= 0 {
-		cfg.PublishPort = 9000
+	if cfg.RTSPPort <= 0 {
+		cfg.RTSPPort = 8554
 	}
 	if cfg.HealthInterval.Duration <= 0 {
 		cfg.HealthInterval = Duration{Duration: 30 * time.Second}
 	}
-	if err := validateVideoMediaConfig(&cfg.Video, serverURL, roverName, cfg.PublishPort); err != nil {
+	if err := validateVideoMediaConfig(&cfg.Video, serverURL, roverName, cfg.RTSPPort); err != nil {
 		return fmt.Errorf("video: %w", err)
 	}
-	if err := validateAudioCaptureConfig(&cfg.AudioCapture, serverURL, roverName, cfg.PublishPort); err != nil {
+	if err := validateAudioCaptureConfig(&cfg.AudioCapture, serverURL, roverName, cfg.RTSPPort); err != nil {
 		return fmt.Errorf("audioCapture: %w", err)
 	}
-	if err := validateAudioPlaybackConfig(&cfg.AudioPlayback, serverURL, roverName, cfg.PublishPort); err != nil {
+	if err := validateAudioPlaybackConfig(&cfg.AudioPlayback, serverURL, roverName, cfg.RTSPPort); err != nil {
 		return fmt.Errorf("audioPlayback: %w", err)
 	}
 	return nil
 }
 
-func validateVideoMediaConfig(cfg *VideoMediaConfig, serverURL string, roverName string, publishPort int) error {
+func validateVideoMediaConfig(cfg *VideoMediaConfig, serverURL string, roverName string, rtspPort int) error {
 	if cfg.Service == "" {
 		cfg.Service = "video-publisher.service"
 	}
@@ -476,17 +482,19 @@ func validateVideoMediaConfig(cfg *VideoMediaConfig, serverURL string, roverName
 	if cfg.SensorMode == "" && cfg.Publisher == "pi-libcamera" {
 		cfg.SensorMode = "1296:972"
 	}
-	if cfg.PublishURL == "" {
-		derived, err := derivePublishURL(serverURL, roverName, publishPort)
-		if err != nil {
-			return fmt.Errorf("derive publishUrl: %w", err)
-		}
-		cfg.PublishURL = derived
+	/*
+		Always derive this endpoint. Older rover configs can contain an explicit SRT publishUrl;
+		honoring it after a binary update would silently leave that rover on the old transport.
+	*/
+	derived, err := derivePublishURL(serverURL, roverName, rtspPort)
+	if err != nil {
+		return fmt.Errorf("derive publishUrl: %w", err)
 	}
+	cfg.PublishURL = derived
 	return nil
 }
 
-func validateAudioCaptureConfig(cfg *AudioCaptureConfig, serverURL string, roverName string, publishPort int) error {
+func validateAudioCaptureConfig(cfg *AudioCaptureConfig, serverURL string, roverName string, rtspPort int) error {
 	if cfg.Service == "" {
 		cfg.Service = "audio-only-publisher.service"
 	}
@@ -502,17 +510,15 @@ func validateAudioCaptureConfig(cfg *AudioCaptureConfig, serverURL string, rover
 	if cfg.Bitrate <= 0 {
 		cfg.Bitrate = 510000
 	}
-	if cfg.PublishURL == "" {
-		derived, err := derivePublishURL(serverURL, roverName+"-audio", publishPort)
-		if err != nil {
-			return fmt.Errorf("derive publishUrl: %w", err)
-		}
-		cfg.PublishURL = derived
+	derived, err := derivePublishURL(serverURL, roverName+"-audio", rtspPort)
+	if err != nil {
+		return fmt.Errorf("derive publishUrl: %w", err)
 	}
+	cfg.PublishURL = derived
 	return nil
 }
 
-func validateAudioPlaybackConfig(cfg *AudioPlaybackConfig, serverURL string, roverName string, publishPort int) error {
+func validateAudioPlaybackConfig(cfg *AudioPlaybackConfig, serverURL string, roverName string, rtspPort int) error {
 	if cfg.Service == "" {
 		cfg.Service = "audio-forward-listener.service"
 	}
@@ -522,13 +528,11 @@ func validateAudioPlaybackConfig(cfg *AudioPlaybackConfig, serverURL string, rov
 	if cfg.NormalizeFilter == "" {
 		cfg.NormalizeFilter = "dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled"
 	}
-	if cfg.ForwardURL == "" {
-		derived, err := deriveReadURL(serverURL, roverName+"-fwd", publishPort)
-		if err != nil {
-			return fmt.Errorf("derive forwardUrl: %w", err)
-		}
-		cfg.ForwardURL = derived
+	derived, err := deriveReadURL(serverURL, roverName+"-fwd", rtspPort)
+	if err != nil {
+		return fmt.Errorf("derive forwardUrl: %w", err)
 	}
+	cfg.ForwardURL = derived
 	return nil
 }
 
@@ -577,19 +581,16 @@ func validateAutoSideBrushConfig(cfg *AutoSideBrushConfig) {
 }
 
 func derivePublishURL(serverURL, streamName string, port int) (string, error) {
-	return deriveSRTURL(serverURL, streamName, port, "publish")
+	return deriveRTSPURL(serverURL, streamName, port)
 }
 
 func deriveReadURL(serverURL, streamName string, port int) (string, error) {
-	return deriveSRTURL(serverURL, streamName, port, "request")
+	return deriveRTSPURL(serverURL, streamName, port)
 }
 
-func deriveSRTURL(serverURL, streamName string, port int, mode string) (string, error) {
+func deriveRTSPURL(serverURL, streamName string, port int) (string, error) {
 	if streamName == "" {
 		return "", errors.New("missing stream name for publishUrl")
-	}
-	if mode == "" {
-		mode = "publish"
 	}
 	parsed, err := url.Parse(serverURL)
 	if err != nil {
@@ -600,10 +601,16 @@ func deriveSRTURL(serverURL, streamName string, port int, mode string) (string, 
 		return "", errors.New("serverUrl missing host")
 	}
 	if port <= 0 {
-		port = 9000
+		port = 8554
 	}
+	/*
+		JoinHostPort handles both ordinary hostnames and bracketed IPv6 addresses. The rover name
+		is a MediaMTX path, so it is escaped independently instead of interpolated into the host.
+		RTSP distinguishes publishing from reading through protocol methods, which is why both
+		directions intentionally use the same URL shape.
+	*/
 	escaped := url.PathEscape(streamName)
-	return fmt.Sprintf("srt://%s:%d?streamid=#!::r=%s,m=%s&latency=10&mode=caller&transtype=live&pkt_size=1316", host, port, escaped, mode), nil
+	return fmt.Sprintf("rtsp://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), escaped), nil
 }
 
 var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)

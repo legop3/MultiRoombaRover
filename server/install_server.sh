@@ -8,8 +8,6 @@ NEOLINK_BASE_URL="https://github.com/QuantumEntangledAndy/neolink/releases/downl
 MEDIAMTX_BIN="/usr/local/bin/mediamtx"
 NEOLINK_BIN="/usr/local/bin/neolink"
 CHROMEGTTS_WAV_BIN="/usr/local/bin/chromegtts-wav"
-MEDIAMTX_CONF_DIR="/etc/mediamtx"
-MEDIAMTX_CONFIG="$MEDIAMTX_CONF_DIR/mediamtx.yml"
 ROVER_SNAPSHOT_WRITER_BIN="/usr/local/bin/rover-snapshot-writer.sh"
 MEDIAMTX_SERVICE="/etc/systemd/system/mediamtx.service"
 MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
@@ -35,7 +33,6 @@ SERVER_DIR="$SCRIPT_DIR"
 BALANCE_BOARD_NATIVE_DIR="$SCRIPT_DIR/src/services/balanceBoardService/native"
 BALANCE_BOARD_WORKER="$BALANCE_BOARD_NATIVE_DIR/balance_board_worker"
 CONFIG_PATH="$SERVER_DIR/config.yaml"
-MEDIAMTX_TEMPLATE="$SERVER_DIR/mediamtx/mediamtx.yml"
 ROVER_SNAPSHOT_WRITER_TEMPLATE="$SERVER_DIR/mediamtx/rover-snapshot-writer.sh"
 CHROMEGTTS_WAV_TEMPLATE="$SERVER_DIR/bin/chromegtts-wav.py"
 
@@ -259,53 +256,39 @@ if ! verify_google_tts_helper; then
   verify_google_tts_helper
 fi
 
-mkdir -p "$MEDIAMTX_CONF_DIR"
-if [[ ! -f "$MEDIAMTX_TEMPLATE" ]]; then
-  echo "mediaMTX template missing at $MEDIAMTX_TEMPLATE" >&2
-  exit 1
-fi
 if [[ ! -f "$ROVER_SNAPSHOT_WRITER_TEMPLATE" ]]; then
   echo "Snapshot writer template missing at $ROVER_SNAPSHOT_WRITER_TEMPLATE" >&2
   exit 1
 fi
-if [[ -f "$MEDIAMTX_CONFIG" ]]; then
-  echo "      Preserving existing mediaMTX config -> $MEDIAMTX_CONFIG"
-else
-  echo "      Installing mediaMTX config -> $MEDIAMTX_CONFIG"
-  install -m 0644 "$MEDIAMTX_TEMPLATE" "$MEDIAMTX_CONFIG"
-fi
 echo "      Installing rover snapshot writer -> $ROVER_SNAPSHOT_WRITER_BIN"
 install -m 0755 "$ROVER_SNAPSHOT_WRITER_TEMPLATE" "$ROVER_SNAPSHOT_WRITER_BIN"
-chown -R "$TARGET_USER":"$TARGET_USER" "$MEDIAMTX_CONF_DIR"
+
+# Validate the new source of truth before disabling a working legacy service. The validator
+# performs the same build and YAML serialization as server startup without opening listeners
+# or leaving a process behind.
+runuser -u "$TARGET_USER" -- env \
+  SERVER_CONFIG="$CONFIG_PATH" \
+  ROVER_SNAPSHOT_WRITER_BIN="$ROVER_SNAPSHOT_WRITER_BIN" \
+  "$NODE_BIN" "$SERVER_DIR/scripts/validateMediaMtxConfig.js"
+
+# MediaMTX used to run as its own systemd service with a hand-maintained config in
+# /etc/mediamtx. Stop it before multirover starts the new child process, otherwise the two
+# processes race for every media listener. Both commands are deliberately idempotent so an
+# already-migrated server and a first-time installation follow the same path.
+echo "      Disabling legacy mediamtx.service"
+systemctl disable --now mediamtx.service 2>/dev/null || true
+rm -f "$MEDIAMTX_SERVICE"
+rm -f /etc/mediamtx/mediamtx.yml
 
 echo "[4/6] Writing systemd units..."
 mkdir -p "$SNAPSHOT_DIR"
 chown "$TARGET_USER":"$TARGET_USER" "$SNAPSHOT_DIR"
 mkdir -p "$REPLAY_SEGMENT_DIR"
 chown "$TARGET_USER":"$TARGET_USER" "$REPLAY_SEGMENT_DIR"
-cat > "$MEDIAMTX_SERVICE" <<EOF
-[Unit]
-Description=mediaMTX WebRTC Server
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=$TARGET_USER
-Group=$TARGET_USER
-WorkingDirectory=$MEDIAMTX_CONF_DIR
-Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
-ExecStart=$MEDIAMTX_BIN $MEDIAMTX_CONFIG
-Restart=on-failure
-RestartSec=2
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
 cat > "$MULTIROVER_SERVICE" <<EOF
 [Unit]
 Description=Multi-Roomba Rover control server
-After=network-online.target mediamtx.service bluetooth.service
+After=network-online.target bluetooth.service
 Wants=network-online.target bluetooth.service
 
 [Service]
@@ -316,6 +299,9 @@ Environment=NODE_ENV=production
 Environment=SERVER_CONFIG=$CONFIG_PATH
 Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
 Environment=REPLAY_SEGMENT_DIR=$REPLAY_SEGMENT_DIR
+Environment=ROVER_SNAPSHOT_WRITER_BIN=$ROVER_SNAPSHOT_WRITER_BIN
+RuntimeDirectory=multirover
+RuntimeDirectoryMode=0750
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
 Restart=on-failure
 RestartSec=2
@@ -325,20 +311,17 @@ SuccessExitStatus=130 143
 WantedBy=multi-user.target
 EOF
 
-chmod 644 "$MEDIAMTX_SERVICE" "$MULTIROVER_SERVICE"
+chmod 644 "$MULTIROVER_SERVICE"
 
 echo "[5/6] Enabling services..."
 systemctl daemon-reload
-systemctl enable --now mediamtx.service
 systemctl enable --now multirover.service
-systemctl restart mediamtx.service
 systemctl restart multirover.service
 
 echo "[6/6] Done."
 echo
 echo "Services installed:"
-echo "  mediamtx.service (WebRTC fan-out)"
-echo "  multirover.service (Node.js control server)"
+echo "  multirover.service (Node.js control server with MediaMTX child)"
 echo
 echo "Update $CONFIG_PATH to set admins, lockdown settings, and media parameters."
 echo "Kinect/libfreenect packages and udev permissions were installed."

@@ -1,5 +1,5 @@
 [Unit]
-Description=Rover Video Publisher (libcamera -> SRT)
+Description=Rover Video Publisher (libcamera -> RTSP/TCP)
 After=network-online.target roverd.service
 Wants=network-online.target
 

@@ -33,11 +33,21 @@ function registerVideoAuthRoute(deps) {
     }
 
     const isSrtLikeProtocol = protocol === 'srt' || protocol === 'srtconn' || protocol.startsWith('srt');
+    const isRtspProtocol = protocol === 'rtsp' || protocol.startsWith('rtsp');
     const isForwardAudioRead = action === 'read' && streamInfo?.id?.endsWith('-fwd');
     if ((action === 'read' && isSrtLikeProtocol) || isForwardAudioRead) {
       return res.status(200).end();
     }
     if (action === 'publish' && isSrtLikeProtocol) {
+      return res.status(200).end();
+    }
+    /*
+      Rover and server publishers reach MediaMTX only on the local network and intentionally
+      do not carry browser session credentials. MediaMTX still invokes its global HTTP auth
+      callback for RTSP, so explicitly admit that publish protocol while leaving WHEP reads
+      under the existing session and role checks below.
+    */
+    if (action === 'publish' && isRtspProtocol) {
       return res.status(200).end();
     }
 
