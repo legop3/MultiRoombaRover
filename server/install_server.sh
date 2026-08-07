@@ -300,8 +300,6 @@ Environment=SERVER_CONFIG=$CONFIG_PATH
 Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
 Environment=REPLAY_SEGMENT_DIR=$REPLAY_SEGMENT_DIR
 Environment=ROVER_SNAPSHOT_WRITER_BIN=$ROVER_SNAPSHOT_WRITER_BIN
-RuntimeDirectory=multirover
-RuntimeDirectoryMode=0750
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
 Restart=on-failure
 RestartSec=2

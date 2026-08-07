@@ -25,7 +25,7 @@ function formatHelp({ commandPrefix = 'rs', timeStatusCommand = 'ts', topic = ''
   const requestedCategory = normalizedTopic === 'feature' ? 'features' : normalizedTopic;
   const categoryNames = requestedCategory && CATEGORIES[requestedCategory]
     ? [requestedCategory]
-    : ['system', 'admin', 'features', 'fun', ...(includeDiscord ? ['discord'] : [])];
+    : ['system', 'admin', 'features', ...(includeDiscord ? ['discord'] : [])];
 
   const output = ['**Rover Bot Commands**'];
   for (const categoryName of categoryNames) {
@@ -36,7 +36,9 @@ function formatHelp({ commandPrefix = 'rs', timeStatusCommand = 'ts', topic = ''
       const entry = entries[name];
       if (!entry?.usage?.length) continue;
       const availability = entry.requiredFeature && !isFeatureEnabled(entry.requiredFeature) ? ' *(unavailable)*' : '';
-      output.push(`\`${entry.usage[0]}\` — ${entry.summary}${availability}`);
+      // A colon stays readable in both Discord and site chat while avoiding the
+      // typographic punctuation that made command help awkward to copy or edit.
+      output.push(`- \`${entry.usage[0]}\`: ${entry.summary}${availability}`);
     }
   }
   output.push('', `Use \`${prefix} help <command|category>\` for details.`);

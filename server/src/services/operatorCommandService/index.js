@@ -13,10 +13,6 @@ const { createLightsCommand } = require('./commands/lights');
 const { createKickCommand } = require('./commands/kick');
 const { createLiftCommand } = require('./commands/lift');
 const { createNeatoCommand } = require('./commands/neato');
-const { createFunTextCommands } = require('./commands/funText');
-const { createFunStatsCommands } = require('./commands/funStats');
-const { createFunRoverCommands } = require('./commands/funRover');
-const { createCooldownGate } = require('./cooldowns');
 const { getCommandConfig } = require('./config');
 const { buildCommandRegistry } = require('./registry');
 
@@ -69,20 +65,6 @@ function createCommandHandlers(deps) {
   const handleLiftCommand = createLiftCommand(deps);
   const handleNeatoCommand = createNeatoCommand(deps);
 
-  /*
-    Fun commands share one cooldown gate. Web chat rebuilds this router per
-    message, so an injected gate is what makes the cooldowns actually shared
-    across a user's messages; a gate created here would be discarded every time
-    and rate limit nothing. Falling back to a local gate keeps the router usable
-    on its own (and in tests) without making every caller supply one.
-  */
-  const cooldowns = deps.commandCooldowns || createCooldownGate();
-  const funHandlers = {
-    ...createFunTextCommands({ ...deps, cooldowns }),
-    ...createFunStatsCommands({ ...deps, cooldowns }),
-    ...createFunRoverCommands({ ...deps, cooldowns }),
-  };
-
   function stripCommandPrefix(content) {
     const trimmed = String(content || '').trim();
     const lower = trimmed.toLowerCase();
@@ -128,8 +110,6 @@ function createCommandHandlers(deps) {
     // lockdown admin while the entire server is in lockdown.
     const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'gain', 'lights', 'kick', 'lift', 'neato']);
     const isAccessModeCommand = commandDefinition?.permission === 'access-mode';
-    const isPublicCommand = commandDefinition?.permission === 'public';
-    const isFunCommand = commandDefinition?.category === 'fun';
 
     // Feature commands are public activities while access is open or managed
     // by turns. In admin mode they follow the same admin-only boundary as rover
@@ -141,17 +121,12 @@ function createCommandHandlers(deps) {
       return;
     }
 
-    if (!isAccessModeCommand && !isPublicCommand && !isAdmin && !SELF_GATED_ACTIONS.has(action)) {
+    if (!isAccessModeCommand && !isAdmin && !SELF_GATED_ACTIONS.has(action)) {
       await request.reply({ content: 'Only admins can run that command.', allowedMentions: { parse: [], repliedUser: false } });
       return;
     }
 
-    /*
-      Lockdown exists to make the server quiet and controlled, so the whole fun
-      category is suspended alongside the moderation-sensitive actions rather than
-      leaving a horn command reachable by anyone while the fleet is locked down.
-    */
-    if (mode === MODES.LOCKDOWN && (moderationActions.has(action) || isFunCommand) && !isLockdownAdmin) {
+    if (mode === MODES.LOCKDOWN && moderationActions.has(action) && !isLockdownAdmin) {
       await request.reply({ content: 'Lockdown mode: only lockdown admins can run that command.', allowedMentions: { parse: [], repliedUser: false } });
       return;
     }
@@ -192,7 +167,6 @@ function createCommandHandlers(deps) {
       case 'gain':
         return handleGainCommand(request, tokens);
       default:
-        if (funHandlers[action]) return funHandlers[action](request, tokens);
         return request.reply(formatHelp({ commandPrefix, timeStatusCommand, includeDiscord: request.transport === 'discord', isFeatureEnabled: deps.isFeatureEnabled }));
     }
   }

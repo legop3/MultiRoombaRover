@@ -218,6 +218,9 @@ test('help lists every subcommand', async () => {
   for (const fragment of ['rs gain list', 'rs gain grant <vip>', 'rs gain revoke <vip>', 'rs gain help']) {
     assert.ok(replies[0].content.includes(fragment), `help should mention ${fragment}`);
   }
+  // Subcommand help follows the same copy-friendly punctuation rule as the
+  // shared `rs help` renderer instead of quietly reintroducing em dashes.
+  assert.doesNotMatch(replies[0].content, /—/);
 });
 
 test('an unknown subcommand falls back to the same help text', async () => {

@@ -14,7 +14,6 @@ const { createAudioForwardPolicy } = require('./policy');
 const { createAudioForwardWorkerEngine } = require('./workerEngine');
 const { registerAudioForwardHooks } = require('./hooks');
 const { registerChargeCompleteSound } = require('./chargeCompleteSound');
-const { registerBonkSound } = require('./bonkSound');
 
 const audioForwardEvents = new EventEmitter();
 const config = loadConfig();
@@ -148,11 +147,6 @@ registerAudioForwardHooks({
 });
 
 registerChargeCompleteSound({
-  logger,
-  playServerAudioFile,
-});
-
-registerBonkSound({
   logger,
   playServerAudioFile,
 });

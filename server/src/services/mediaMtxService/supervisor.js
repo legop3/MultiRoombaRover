@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const yaml = require('js-yaml');
+const { resolveDataPath } = require('../../helpers/dataPaths');
 const { buildMediaMtxConfig } = require('./config');
 
 function createMediaMtxSupervisor(deps) {
@@ -13,7 +14,7 @@ function createMediaMtxSupervisor(deps) {
     serverPort,
     logger,
     mediaMtxBin = process.env.MEDIAMTX_BIN || '/usr/local/bin/mediamtx',
-    runtimeDir = process.env.MULTIROVER_RUNTIME_DIR || '/run/multirover',
+    configPath = resolveDataPath('mediamtx.yml'),
     snapshotWriterPath = process.env.ROVER_SNAPSHOT_WRITER_BIN || '/usr/local/bin/rover-snapshot-writer.sh',
     spawnProcess = spawn,
   } = deps;
@@ -39,10 +40,14 @@ function createMediaMtxSupervisor(deps) {
   function start() {
     if (child) return child;
 
-    const runtimeConfig = buildMediaMtxConfig({ config, serverPort, snapshotWriterPath });
-    const configPath = path.join(runtimeDir, 'mediamtx.yml');
-    fs.mkdirSync(runtimeDir, { recursive: true, mode: 0o750 });
-    fs.writeFileSync(configPath, yaml.dump(runtimeConfig, { noRefs: true, lineWidth: 120 }), { mode: 0o640 });
+    const generatedConfig = buildMediaMtxConfig({ config, serverPort, snapshotWriterPath });
+    /*
+      Generated MediaMTX state belongs beside the server's other owned data. Using the shared
+      data-path helper honors SERVER_DATA_DIR as well as the normal server/data directory and
+      avoids introducing a systemd-created /run directory with separate permission rules.
+    */
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, yaml.dump(generatedConfig, { noRefs: true, lineWidth: 120 }), { mode: 0o640 });
 
     logger.info(`Starting MediaMTX with generated config ${configPath}`);
     child = spawnProcess(mediaMtxBin, [configPath], {
