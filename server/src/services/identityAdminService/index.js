@@ -12,6 +12,8 @@ const {
   setVerified,
   setDeterrence,
   setMuted,
+  setUserPermission,
+  listRegisteredPermissions,
   setFeatureState,
   deleteFeatureState,
 } = require('../identityService');
@@ -71,6 +73,11 @@ function ackHandler(socket, eventName, handler) {
 io.on('connection', (socket) => {
   ackHandler(socket, 'identityAdmin:listUsers', () => ({
     users: listUsersForAdmin(),
+    permissions: listRegisteredPermissions(),
+  }));
+
+  ackHandler(socket, 'identityAdmin:listPermissions', () => ({
+    permissions: listRegisteredPermissions(),
   }));
 
   ackHandler(socket, 'identityAdmin:getUser', ({ userId }) => {
@@ -106,6 +113,14 @@ io.on('connection', (socket) => {
 
   ackHandler(socket, 'identityAdmin:setMuted', ({ userId, enabled }) => ({
     user: getUserForAdmin(setMuted(userId, {
+      enabled: Boolean(enabled),
+      actor: socket?.data?.user?.username || socket.id,
+      at: Date.now(),
+    }).id),
+  }));
+
+  ackHandler(socket, 'identityAdmin:setPermission', ({ userId, permissionKey, enabled }) => ({
+    user: getUserForAdmin(setUserPermission(userId, permissionKey, {
       enabled: Boolean(enabled),
       actor: socket?.data?.user?.username || socket.id,
       at: Date.now(),

@@ -41,6 +41,10 @@ export function setMuted(socket, userId, enabled) {
   return emitIdentityAdmin(socket, 'identityAdmin:setMuted', { userId, enabled });
 }
 
+export function setPermission(socket, userId, permissionKey, enabled) {
+  return emitIdentityAdmin(socket, 'identityAdmin:setPermission', { userId, permissionKey, enabled });
+}
+
 export function updateFeatureState(socket, userId, namespace, value) {
   return emitIdentityAdmin(socket, 'identityAdmin:updateFeatureState', { userId, namespace, value });
 }

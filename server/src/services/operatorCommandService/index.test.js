@@ -35,6 +35,15 @@ function createRouter({ mode = MODES.OPEN, featureEnabled = true } = {}) {
     listVerifiedUsers: () => [],
     listDeterredUsers: () => [],
     listMutedUsers: () => [],
+    listUsersForAdmin: () => [],
+    listUsersWithPermission: () => [],
+    listRegisteredPermissions: () => [{
+      key: 'audio.personalAdjustment',
+      commandName: 'audio-adjustment',
+      label: 'Personal audio adjustment',
+      description: 'Allows personal volume adjustments.',
+    }],
+    setUserPermission: () => null,
     getGlobalObjective: () => null,
     getAdminReason: () => null,
     config: { commands: { prefix: 'rs' } },
@@ -63,7 +72,7 @@ const admin = { id: 's1', userId: 'u-alice', label: 'alice', isAdmin: true, isLo
 
 test('admin-only commands stay admin-only for a non-admin', async () => {
   const run = createRouter();
-  for (const command of ['rs lock rover-1', 'rs unlock rover-1', 'rs mode open', 'rs kick alice']) {
+  for (const command of ['rs lock rover-1', 'rs unlock rover-1', 'rs mode open', 'rs kick alice', 'rs permissions list']) {
     assert.match(await run(command, nonAdmin), ADMIN_DENIAL, `${command} must stay admin-only`);
   }
 });

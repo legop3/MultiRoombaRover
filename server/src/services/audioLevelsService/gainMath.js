@@ -1,79 +1,62 @@
-// audio Levels Gain Math
-// Purpose: Holds the pure clamping and ceiling rules shared by every gain layer.
-// Scope: No IO, no state; keeps the volume policy independently reviewable and testable.
-
-/*
-  The three gain keys are the same on every layer of this feature: the global
-  admin gains, the admin-editable VIP boost caps, and each user's personal
-  preference. Iterating one list keeps those layers from drifting apart.
-*/
-const GAIN_KEYS = ['hornGain', 'ttsGain', 'forwardGain'];
-
-// Absolute gain limits accepted anywhere a multiplier is stored.
+// Audio Adjustment Math
+// Purpose: Converts signed browser percentages into server-enforced rover gain multipliers.
+// Scope: Contains no IO or identity logic so the adjustment policy can be tested independently.
+const ADJUSTMENT_FIELDS = [
+  { gainKey: 'hornGain', percentKey: 'hornPercent' },
+  { gainKey: 'ttsGain', percentKey: 'ttsPercent' },
+  { gainKey: 'forwardGain', percentKey: 'forwardPercent' },
+];
 const MIN_GAIN = 0;
 const MAX_GAIN = 4;
+const MIN_ADJUSTMENT_PERCENT = -100;
+const MAX_ADJUSTMENT_PERCENT = 100;
 
 function clampGain(value, fallback = 1) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.max(MIN_GAIN, Math.min(MAX_GAIN, num));
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(MIN_GAIN, Math.min(MAX_GAIN, number));
 }
 
-function clampFraction(value, fallback = 1) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.max(0, Math.min(1, num));
+function clampMaximumAdjustmentPercent(value, fallback = 50) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.round(Math.max(0, Math.min(MAX_ADJUSTMENT_PERCENT, number)));
 }
 
-function normalizeUserGains(raw = {}) {
-  const out = {};
-  GAIN_KEYS.forEach((key) => {
-    out[key] = clampFraction(raw?.[key], 1);
+function clampAdjustmentPercent(value, maximum = 0) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  const limit = clampMaximumAdjustmentPercent(maximum, 0);
+  return Math.round(Math.max(-limit, Math.min(limit, number)));
+}
+
+function normalizeAdjustments(raw = {}, maximum = 0) {
+  const normalized = {};
+  ADJUSTMENT_FIELDS.forEach(({ percentKey }) => {
+    normalized[percentKey] = clampAdjustmentPercent(raw?.[percentKey], maximum);
   });
-  return out;
+  return normalized;
 }
 
-function normalizeGainSet(raw = {}, fallback = {}) {
-  const out = {};
-  GAIN_KEYS.forEach((key) => {
-    out[key] = clampGain(raw?.[key], clampGain(fallback?.[key], 1));
+function applyAdjustments(baseLevels = {}, adjustments = {}) {
+  const effective = {};
+  ADJUSTMENT_FIELDS.forEach(({ gainKey, percentKey }) => {
+    const base = clampGain(baseLevels?.[gainKey], 0);
+    const percentage = Math.max(MIN_ADJUSTMENT_PERCENT, Math.min(MAX_ADJUSTMENT_PERCENT, Number(adjustments?.[percentKey]) || 0));
+    effective[gainKey] = clampGain(base * (1 + percentage / 100), 0);
   });
-  return out;
-}
-
-/*
-  A user without the boost flag can never exceed the global admin gain. The flag
-  raises the ceiling to the admin-managed hard cap, and Math.max keeps the flag
-  from ever being a downgrade: if an admin runs the global gain higher than the
-  boost cap, a boosted user keeps the global ceiling instead of losing volume
-  for holding a permission.
-*/
-function resolveCeilings({ adminLimits = {}, boostCaps = {}, hasBoost = false } = {}) {
-  const out = {};
-  GAIN_KEYS.forEach((key) => {
-    const adminCeiling = clampGain(adminLimits?.[key], 0);
-    out[key] = hasBoost ? Math.max(adminCeiling, clampGain(boostCaps?.[key], 0)) : adminCeiling;
-  });
-  return out;
-}
-
-// Personal preferences are fractions of whichever ceiling applies to the user.
-function applyCeilings(fractions = {}, ceilings = {}) {
-  const out = {};
-  GAIN_KEYS.forEach((key) => {
-    out[key] = clampGain(clampFraction(fractions?.[key], 1) * clampGain(ceilings?.[key], 0), 0);
-  });
-  return out;
+  return effective;
 }
 
 module.exports = {
-  GAIN_KEYS,
+  ADJUSTMENT_FIELDS,
   MIN_GAIN,
   MAX_GAIN,
+  MIN_ADJUSTMENT_PERCENT,
+  MAX_ADJUSTMENT_PERCENT,
   clampGain,
-  clampFraction,
-  normalizeUserGains,
-  normalizeGainSet,
-  resolveCeilings,
-  applyCeilings,
+  clampMaximumAdjustmentPercent,
+  clampAdjustmentPercent,
+  normalizeAdjustments,
+  applyAdjustments,
 };

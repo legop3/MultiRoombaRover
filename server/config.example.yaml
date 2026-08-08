@@ -99,10 +99,15 @@ audioForward:
   maxUploadBytes: 8388608
 
 audioLevels:
-  # Gains are multipliers (0.0 - 4.0) applied globally to all rovers.
+  # Base multipliers (0.0 - 4.0) applied before any approved user's signed
+  # personal adjustment. The server clamps every final rover gain to this same
+  # hard multiplier range.
   hornGain: 1.0
   ttsGain: 1.0
   forwardGain: 1.0
+  # Approved users may move each personal slider this far below or above the
+  # base multiplier. Browser cookies store percentages, never raw multipliers.
+  maxPersonalAdjustmentPercent: 50
 
 homeAssistant:
   enabled: false

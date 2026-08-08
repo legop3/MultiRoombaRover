@@ -46,10 +46,13 @@ const {
   undeterUser,
   muteUser,
   unmuteUser,
-  listAudioGainBoostUsers,
-  grantAudioGainBoost,
-  revokeAudioGainBoost,
 } = require('../verificationService');
+const {
+  listUsersForAdmin,
+  listUsersWithPermission,
+  listRegisteredPermissions,
+  setUserPermission,
+} = require('../identityService');
 const {
   attachDmMessage: attachPrivateAccessDmMessage,
   getRequestByMessageId: getPrivateAccessRequestByMessageId,
@@ -253,9 +256,10 @@ const commandDependencies = {
   undeterUser,
   muteUser,
   unmuteUser,
-  listAudioGainBoostUsers,
-  grantAudioGainBoost,
-  revokeAudioGainBoost,
+  listUsersForAdmin,
+  listUsersWithPermission,
+  listRegisteredPermissions,
+  setUserPermission,
   sanitizeMentions,
   sendToChannel: channelIO.sendToChannel,
   isAdminUser,

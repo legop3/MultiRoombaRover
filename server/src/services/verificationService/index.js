@@ -27,11 +27,9 @@ const {
   setVerified,
   setDeterrence,
   setMuted,
-  setAudioGainBoost,
   listVerifiedUsers,
   listDeterredUsers,
   listMutedUsers,
-  listAudioGainBoostUsers,
   resolveUserBySelector,
   userToLegacyIdentityEntry,
 } = require('../identityService');
@@ -113,17 +111,10 @@ function refreshSocketIdentityFlags(socket) {
     operational chat/audio tools while preserving the flag for normal roles.
   */
   socket.data.isMuted = isAdminRole(role) ? false : mutedByUser;
-  /*
-    Admins already control the global gain settings, so they carry the raised
-    audio ceiling implicitly for the same reason they carry verification: a
-    stored per-user grant should never be what gates an operator's own tools.
-  */
-  socket.data.hasAudioGainBoost = verifiedByRole || Boolean(user.audioGainBoost?.enabled);
   return {
     isVerified: socket.data.isVerified,
     isDeterred: socket.data.isDeterred,
     isMuted: socket.data.isMuted,
-    hasAudioGainBoost: socket.data.hasAudioGainBoost,
     matchedRecordId: user.id,
     reason: socket.data.isVerified ? 'matched' : 'no_match',
     userId: user.id,
@@ -132,6 +123,17 @@ function refreshSocketIdentityFlags(socket) {
 
 function identifySocket(socket, payload = {}) {
   if (!socket) throw new Error('Socket required');
+
+  /*
+    Personal audio percentages travel with portable browser identity but are not
+    identity database state. Keeping the raw object on this connection lets the
+    audio service apply its current permission and range policy after canonical
+    identity resolution, including during handshake authentication.
+  */
+  socket.data = socket.data || {};
+  socket.data.audioAdjustments = payload?.audioAdjustments && typeof payload.audioAdjustments === 'object'
+    ? { ...payload.audioAdjustments }
+    : {};
 
   const incomingNickname = sanitizeNickname(payload.nickname);
   if (incomingNickname) {
@@ -572,53 +574,6 @@ function setUserMute(selector, enabled, actor = null) {
   return userToLegacyIdentityEntry(user);
 }
 
-/*
-  Audio gain boost is a VIP-only grant. resolveUserBySelector's `includeVerified`
-  flag reads as an inclusion toggle but actually relaxes the verified filter, so
-  passing `false` is what restricts the nickname lookup to verified users. That
-  keeps an unverified visitor from being matched by a shared nickname and handed
-  a raised gain ceiling they are not eligible to use.
-*/
-function setUserAudioGainBoost(selector, enabled, actor = null) {
-  const resolved = resolveUserBySelector(selector, { includeVerified: false, includeDeterred: true });
-  if (resolved.error || !resolved.user) {
-    throw new Error(resolved.error === 'ambiguous_nickname'
-      ? 'Nickname matches multiple VIPs.'
-      : 'VIP not found. Only verified users can be granted an audio gain boost.');
-  }
-  if (!resolved.user.verified?.enabled) {
-    throw new Error('Only verified VIPs can be granted an audio gain boost.');
-  }
-
-  const user = setAudioGainBoost(resolved.user.id, {
-    enabled,
-    actor: actor ? String(actor) : null,
-    at: Date.now(),
-  });
-  refreshSocketsForUser(user.id);
-  publishEvent({
-    source: 'moderation',
-    type: enabled ? 'audio.gainBoostGranted' : 'audio.gainBoostRevoked',
-    payload: {
-      userId: user.id,
-      cookieUserId: user.cookieUserIds[0] || null,
-      nickname: user.nickname,
-      actor: actor ? String(actor) : null,
-      ts: Date.now(),
-    },
-  });
-  emitChange(enabled ? 'audio_gain_boost_grant' : 'audio_gain_boost_revoke', { userId: user.id });
-  return userToLegacyIdentityEntry(user);
-}
-
-function grantAudioGainBoost(selector, actor = null) {
-  return setUserAudioGainBoost(selector, true, actor);
-}
-
-function revokeAudioGainBoost(selector, actor = null) {
-  return setUserAudioGainBoost(selector, false, actor);
-}
-
 function muteUser(selector, actor = null) {
   return setUserMute(selector, true, actor);
 }
@@ -754,13 +709,9 @@ module.exports = {
   undeterUser,
   muteUser,
   unmuteUser,
-  listAudioGainBoostUsers,
-  grantAudioGainBoost,
-  revokeAudioGainBoost,
   isVerified: (socket) => Boolean(socket?.data?.isVerified),
   isDeterred: (socket) => Boolean(socket?.data?.isDeterred),
   isMuted: (socket) => Boolean(socket?.data?.isMuted),
-  hasAudioGainBoost: (socket) => Boolean(socket?.data?.hasAudioGainBoost),
   reevaluateSocketVerification,
   reevaluateSocketDeterrence,
   verificationEvents,

@@ -17,10 +17,8 @@ const MODES = [
   { key: 'lockdown', label: 'Lockdown' },
 ];
 
-/*
-  The same three gain keys drive both the global levels and the VIP boost hard
-  caps, so both editors render from one list instead of six copied sliders.
-*/
+// These are the physical rover gain channels. Personal settings remain signed
+// percentages and never replace these server-owned base multipliers.
 const GAIN_FIELDS = [
   { key: 'hornGain', label: 'Horn gain' },
   { key: 'ttsGain', label: 'TTS gain' },
@@ -109,7 +107,7 @@ export default function AdminPanelContent() {
     updateAllRovers,
     rebootServer,
     setAudioLevels,
-    setUserAudioGainCaps,
+    setPersonalAudioAdjustmentRange,
     setPrivateSafety,
     llmControl,
     overseerControl,
@@ -132,12 +130,11 @@ export default function AdminPanelContent() {
   const reasonUpdatedAt = session?.adminReason?.updatedAt || null;
   const [reasonDraft, setReasonDraft] = useState(currentReason);
   const currentAudioLevels = session?.audioLevels || {};
-  const currentUserGainCaps = currentAudioLevels.userGainCaps || {};
   const [audioLevelDraft, setAudioLevelDraft] = useState(
     () => normalizeGainDraft(currentAudioLevels, { hornGain: 1, ttsGain: 1, forwardGain: 1 }),
   );
-  const [userGainCapDraft, setUserGainCapDraft] = useState(
-    () => normalizeGainDraft(currentUserGainCaps, { hornGain: 0.5, ttsGain: 0.8, forwardGain: 0.4 }),
+  const [maxAdjustmentDraft, setMaxAdjustmentDraft] = useState(
+    () => Number(currentAudioLevels.maxPersonalAdjustmentPercent) || 0,
   );
   const [privateSafetyDrafts, setPrivateSafetyDrafts] = useState({});
   const [privateSafetyDirty, setPrivateSafetyDirty] = useState({});
@@ -317,14 +314,9 @@ export default function AdminPanelContent() {
     }
   };
 
-  const handleUserGainCapDraft = (key) => (event) => {
-    const next = Number(event.target.value);
-    setUserGainCapDraft((current) => ({ ...(current || {}), [key]: Number.isFinite(next) ? next : 0 }));
-  };
-
-  const handleUserGainCapsSave = async () => {
+  const handlePersonalAdjustmentRangeSave = async () => {
     try {
-      await setUserAudioGainCaps(userGainCapDraft);
+      await setPersonalAudioAdjustmentRange(maxAdjustmentDraft);
     } catch (err) {
       alert(err.message);
     }
@@ -356,9 +348,8 @@ export default function AdminPanelContent() {
   }, [currentAudioLevels.forwardGain, currentAudioLevels.hornGain, currentAudioLevels.ttsGain]);
 
   useEffect(() => {
-    setUserGainCapDraft(normalizeGainDraft(currentUserGainCaps, { hornGain: 0.5, ttsGain: 0.8, forwardGain: 0.4 }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserGainCaps.forwardGain, currentUserGainCaps.hornGain, currentUserGainCaps.ttsGain]);
+    setMaxAdjustmentDraft(Number(currentAudioLevels.maxPersonalAdjustmentPercent) || 0);
+  }, [currentAudioLevels.maxPersonalAdjustmentPercent]);
 
 
   useEffect(() => {
@@ -462,7 +453,7 @@ export default function AdminPanelContent() {
           />
         ))}
         <p className="text-xs text-slate-500">
-          These are the volume ceilings for ordinary users. Each user picks a 0-100% share of them.
+          These are the base multipliers. Approved personal adjustments are calculated around these values.
         </p>
         <div className="flex gap-0.5 text-xs">
           <button type="button" onClick={handleAudioLevelsSave} className="button-dark">
@@ -472,26 +463,32 @@ export default function AdminPanelContent() {
       </div>
       <div className="space-y-0.5">
         <div className="flex items-center justify-between text-xs text-slate-400">
-          <span>VIP gain boost hard caps</span>
-          {session?.audioLevels?.capsUpdatedAt ? (
-            <span>Updated {new Date(session.audioLevels.capsUpdatedAt).toLocaleString()}</span>
+          <span>Maximum personal adjustment</span>
+          {session?.audioLevels?.adjustmentRangeUpdatedAt ? (
+            <span>Updated {new Date(session.audioLevels.adjustmentRangeUpdatedAt).toLocaleString()}</span>
           ) : null}
         </div>
-        {GAIN_FIELDS.map(({ key, label }) => (
-          <GainSlider
-            key={key}
-            label={label}
-            value={userGainCapDraft[key]}
-            onChange={handleUserGainCapDraft(key)}
+        <label className="grid gap-0.5 text-xs text-slate-200">
+          <div className="flex items-center justify-between gap-0.5">
+            <span>Allowed range in both directions</span>
+            <span>±{Math.round(Number(maxAdjustmentDraft) || 0)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={maxAdjustmentDraft}
+            onChange={(event) => setMaxAdjustmentDraft(Number(event.target.value) || 0)}
+            className="w-full accent-emerald-500"
           />
-        ))}
+        </label>
         <p className="text-xs text-slate-500">
-          Ceilings for VIPs granted the boost with <code>rs gain grant &lt;vip&gt;</code>. A boost never lowers
-          someone&apos;s limit, so a cap below the global gain above has no effect.
+          Users with the personal audio adjustment permission can reduce or increase each base level by this percentage.
         </p>
         <div className="flex gap-0.5 text-xs">
-          <button type="button" onClick={handleUserGainCapsSave} className="button-dark">
-            Apply boost caps
+          <button type="button" onClick={handlePersonalAdjustmentRangeSave} className="button-dark">
+            Apply adjustment range
           </button>
         </div>
       </div>

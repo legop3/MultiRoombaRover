@@ -10,6 +10,7 @@ const Database = require('better-sqlite3');
 const { getSocketIp, normalizeIp } = require('../../helpers/ipResolver');
 const { resolveDataPath } = require('../../helpers/dataPaths');
 const logger = require('../../globals/logger').child('identityService');
+const { listRegisteredPermissions, requireRegisteredPermission } = require('./permissions');
 
 const COOKIE_USER_ID_RE = /^cu_[a-f0-9]{32}$/;
 const FINGERPRINT_ID_RE = /^tm_[a-z0-9_-]{8,256}$/;
@@ -17,7 +18,7 @@ const USER_ID_RE = /^usr_[a-f0-9]{32}$/;
 const DB_PATH = resolveDataPath('identity.sqlite');
 const LEGACY_VERIFICATION_PATH = resolveDataPath('verified-users.json');
 const LEGACY_BARCODE_PATH = resolveDataPath('barcode-games.json');
-const STORE_VERSION = 3;
+const STORE_VERSION = 4;
 const identityEvents = new EventEmitter();
 
 let db = null;
@@ -169,10 +170,7 @@ function ensureSchema(conn) {
       deterrence_by text,
       muted_enabled integer not null default 0,
       muted_at integer,
-      muted_by text,
-      audio_gain_boost_enabled integer not null default 0,
-      audio_gain_boost_at integer,
-      audio_gain_boost_by text
+      muted_by text
     );
 
     create table if not exists verification_requests (
@@ -208,6 +206,15 @@ function ensureSchema(conn) {
       primary key (user_id, namespace)
     );
 
+    create table if not exists user_permissions (
+      user_id text not null references users(id) on delete cascade,
+      permission_key text not null,
+      granted_at integer not null,
+      granted_by text,
+      primary key (user_id, permission_key)
+    );
+    create index if not exists idx_user_permissions_key on user_permissions(permission_key);
+
     create table if not exists legacy_imports (
       source text not null,
       legacy_id text not null,
@@ -223,8 +230,9 @@ function ensureSchema(conn) {
   /*
     SQLite's `create table if not exists` leaves an existing table untouched.
     Add the mute columns explicitly for installations created before store
-    version 2, and the audio gain boost columns for those created before store
-    version 3. The column-name check keeps every later startup idempotent.
+    version 2. Permission grants now live in their own normalized table, so the
+    obsolete audio-specific status columns are deliberately removed instead of
+    carrying old grants into the new capability system.
   */
   const statusColumns = new Set(
     conn.prepare('pragma table_info(user_status)').all().map((column) => column.name),
@@ -238,15 +246,13 @@ function ensureSchema(conn) {
   if (!statusColumns.has('muted_by')) {
     conn.exec('alter table user_status add column muted_by text');
   }
-  if (!statusColumns.has('audio_gain_boost_enabled')) {
-    conn.exec('alter table user_status add column audio_gain_boost_enabled integer not null default 0');
-  }
-  if (!statusColumns.has('audio_gain_boost_at')) {
-    conn.exec('alter table user_status add column audio_gain_boost_at integer');
-  }
-  if (!statusColumns.has('audio_gain_boost_by')) {
-    conn.exec('alter table user_status add column audio_gain_boost_by text');
-  }
+  ['audio_gain_boost_enabled', 'audio_gain_boost_at', 'audio_gain_boost_by'].forEach((column) => {
+    if (statusColumns.has(column)) conn.exec(`alter table user_status drop column ${column}`);
+  });
+  // Old personal fractions were identity-backed feature state. The replacement
+  // is intentionally browser-local, so retaining these unreachable rows would
+  // make the database page imply that they still control runtime behavior.
+  conn.prepare('delete from user_feature_state where namespace = ?').run('audioGains');
 }
 
 function createUser(conn = getDb(), ts = nowMs()) {
@@ -291,6 +297,13 @@ function mergeUsers(conn, targetUserId, sourceUserId) {
   conn.prepare('delete from user_known_ips where user_id = ?').run(sourceUserId);
   conn.prepare('update verification_requests set user_id = ? where user_id = ?').run(targetUserId, sourceUserId);
   conn.prepare('update legacy_imports set user_id = ? where user_id = ?').run(targetUserId, sourceUserId);
+  /*
+    Permissions describe the person, not one browser signal. Merging identities
+    therefore unions their grants before the source user is deleted; a conflict
+    keeps the target row and its original audit metadata.
+  */
+  conn.prepare('update or ignore user_permissions set user_id = ? where user_id = ?').run(targetUserId, sourceUserId);
+  conn.prepare('delete from user_permissions where user_id = ?').run(sourceUserId);
 
   const sourceStatus = conn.prepare('select * from user_status where user_id = ?').get(sourceUserId);
   ensureUserStatus(conn, targetUserId);
@@ -431,7 +444,6 @@ function setSocketIdentityState(socket, user, identity = {}) {
   socket.data.isDeterred = Boolean(user.deterrence?.enabled);
   socket.data.deterredRecordId = user.deterrence?.enabled ? user.id : null;
   socket.data.isMuted = Boolean(user.deterrence?.muted);
-  socket.data.hasAudioGainBoost = Boolean(user.audioGainBoost?.enabled);
 }
 
 function identifySocket(socket, payload = {}) {
@@ -523,11 +535,7 @@ function getUserById(userId, { conn = getDb(), includeFeatures = true } = {}) {
       mutedAt: status.muted_at || null,
       mutedBy: status.muted_by || null,
     },
-    audioGainBoost: {
-      enabled: Boolean(status.audio_gain_boost_enabled),
-      at: status.audio_gain_boost_at || null,
-      by: status.audio_gain_boost_by || null,
-    },
+    permissions: getUserPermissions(id, { conn }),
     features,
   };
 }
@@ -746,47 +754,76 @@ function setMuted(userId, { enabled = true, actor = null, at = nowMs() } = {}) {
 }
 
 /*
-  The audio gain boost flag lets a trusted VIP raise their personal horn/TTS/mic
-  gain ceiling past the global admin gain settings. It stays a status column
-  rather than feature state so it can be filtered in SQL alongside the other
-  moderation flags and copied onto the socket at identify time.
+  Positive capabilities use normalized rows rather than feature-specific status
+  columns. This keeps moderation state focused and gives future permissions the
+  same audited grant/revoke path without another schema alteration.
 */
-function setAudioGainBoost(userId, { enabled = true, actor = null, at = nowMs() } = {}) {
+function setUserPermission(userId, permissionKey, { enabled = true, actor = null, at = nowMs() } = {}) {
   const id = String(userId || '').trim();
   if (!id) throw new Error('userId required');
-  ensureUserStatus(getDb(), id);
-  getDb().prepare(`
-    update user_status
-    set audio_gain_boost_enabled = ?, audio_gain_boost_at = ?, audio_gain_boost_by = ?
-    where user_id = ?
-  `).run(enabled ? 1 : 0, enabled ? at : null, enabled ? actor : null, id);
+  const permission = requireRegisteredPermission(permissionKey);
+  const conn = getDb();
+  if (!conn.prepare('select 1 from users where id = ?').get(id)) throw new Error('User not found.');
+  if (enabled) {
+    conn.prepare(`
+      insert into user_permissions (user_id, permission_key, granted_at, granted_by)
+      values (?, ?, ?, ?)
+      on conflict(user_id, permission_key) do update set granted_at = excluded.granted_at, granted_by = excluded.granted_by
+    `).run(id, permission.key, at, actor ? String(actor) : null);
+  } else {
+    conn.prepare('delete from user_permissions where user_id = ? and permission_key = ?').run(id, permission.key);
+  }
   identityEvents.emit('change', {
-    reason: enabled ? 'audio_gain_boost_granted' : 'audio_gain_boost_revoked',
+    reason: enabled ? 'permission_granted' : 'permission_revoked',
     userId: id,
+    permissionKey: permission.key,
   });
+  conn.prepare('update users set updated_at = ? where id = ?').run(at, id);
   return getUserById(id);
+}
+
+function getUserPermissions(userId, { conn = getDb() } = {}) {
+  const id = String(userId || '').trim();
+  if (!id) return [];
+  return conn.prepare(`
+    select permission_key as key, granted_at as grantedAt, granted_by as grantedBy
+    from user_permissions
+    where user_id = ?
+    order by permission_key
+  `).all(id);
+}
+
+function hasUserPermission(userId, permissionKey, { conn = getDb() } = {}) {
+  const id = String(userId || '').trim();
+  const permission = requireRegisteredPermission(permissionKey);
+  if (!id) return false;
+  return Boolean(conn.prepare('select 1 from user_permissions where user_id = ? and permission_key = ?').get(id, permission.key));
+}
+
+function listUsersWithPermission(permissionKey) {
+  const permission = requireRegisteredPermission(permissionKey);
+  const conn = getDb();
+  return conn.prepare('select user_id from user_permissions where permission_key = ? order by granted_at desc')
+    .all(permission.key)
+    .map((row) => getUserById(row.user_id, { conn, includeFeatures: false }))
+    .filter(Boolean);
 }
 
 function isVerified(socket) {
   return Boolean(socket?.data?.isVerified);
 }
 
-function hasAudioGainBoost(socket) {
-  return Boolean(socket?.data?.hasAudioGainBoost);
-}
-
 function isDeterred(socket) {
   return Boolean(socket?.data?.isDeterred);
 }
 
-function listUsers({ verified = null, deterred = null, muted = null, audioGainBoost = null } = {}) {
+function listUsers({ verified = null, deterred = null, muted = null } = {}) {
   const conn = getDb();
   let sql = 'select users.id from users join user_status on user_status.user_id = users.id';
   const where = [];
   if (verified !== null) where.push(`user_status.verified_enabled = ${verified ? 1 : 0}`);
   if (deterred !== null) where.push(`user_status.deterrence_enabled = ${deterred ? 1 : 0}`);
   if (muted !== null) where.push(`user_status.muted_enabled = ${muted ? 1 : 0}`);
-  if (audioGainBoost !== null) where.push(`user_status.audio_gain_boost_enabled = ${audioGainBoost ? 1 : 0}`);
   if (where.length) sql += ` where ${where.join(' and ')}`;
   sql += ' order by users.updated_at desc';
   return conn.prepare(sql).all().map((row) => getUserById(row.id, { conn, includeFeatures: false }));
@@ -808,9 +845,7 @@ function userToLegacyIdentityEntry(user) {
     muted: Boolean(user.deterrence?.muted),
     mutedAt: user.deterrence?.mutedAt || null,
     mutedBy: user.deterrence?.mutedBy || null,
-    audioGainBoost: Boolean(user.audioGainBoost?.enabled),
-    audioGainBoostAt: user.audioGainBoost?.at || null,
-    audioGainBoostBy: user.audioGainBoost?.by || null,
+    permissions: (user.permissions || []).map((permission) => permission.key),
   };
 }
 
@@ -824,10 +859,6 @@ function listDeterredUsers() {
 
 function listMutedUsers() {
   return listUsers({ muted: true }).map(userToLegacyIdentityEntry);
-}
-
-function listAudioGainBoostUsers() {
-  return listUsers({ audioGainBoost: true }).map(userToLegacyIdentityEntry);
 }
 
 function resolveUserBySelector(selector, { includeDeterred = true, includeVerified = true } = {}) {
@@ -1084,14 +1115,16 @@ module.exports = {
   setVerified,
   setDeterrence,
   setMuted,
-  setAudioGainBoost,
+  setUserPermission,
+  getUserPermissions,
+  hasUserPermission,
+  listUsersWithPermission,
+  listRegisteredPermissions,
   isVerified,
   isDeterred,
-  hasAudioGainBoost,
   listVerifiedUsers,
   listDeterredUsers,
   listMutedUsers,
-  listAudioGainBoostUsers,
   resolveUserBySelector,
   userToLegacyIdentityEntry,
   createJsonStore,

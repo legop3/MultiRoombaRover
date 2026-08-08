@@ -22,10 +22,13 @@ const {
   undeterUser,
   muteUser,
   unmuteUser,
-  listAudioGainBoostUsers,
-  grantAudioGainBoost,
-  revokeAudioGainBoost,
 } = require('../verificationService');
+const {
+  listUsersForAdmin,
+  listUsersWithPermission,
+  listRegisteredPermissions,
+  setUserPermission,
+} = require('../identityService');
 const { publishEvent } = require('../eventBus');
 const assignmentService = require('../assignmentService');
 const { loadConfig } = require('../../helpers/configLoader');
@@ -187,9 +190,10 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     undeterUser,
     muteUser,
     unmuteUser,
-    listAudioGainBoostUsers,
-    grantAudioGainBoost,
-    revokeAudioGainBoost,
+    listUsersForAdmin,
+    listUsersWithPermission,
+    listRegisteredPermissions,
+    setUserPermission,
     sanitizeMentions,
     sendToChannel: null,
     isAdminUser: (id) => String(id) === String(socket.id) && isAdmin(socket),

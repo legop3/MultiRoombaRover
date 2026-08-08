@@ -13,6 +13,7 @@ import {
   removeSignal,
   setDeterrence,
   setMuted,
+  setPermission,
   setVerified,
   updateFeatureState,
 } from './identityDatabaseApi.js';
@@ -307,9 +308,33 @@ function RawRecordCard({ user }) {
   );
 }
 
+function PermissionsCard({ user, permissions, onPermission }) {
+  const grantedKeys = new Set((user?.permissions || []).map((permission) => permission.key));
+  return (
+    <CardFrame title="Permissions" bodyClassName="grid gap-0.5 p-0.5 text-sm md:grid-cols-2">
+      {permissions.map((permission) => (
+        <label key={permission.key} className="surface space-y-0.5 px-1 py-0.75 text-slate-100">
+          <span className="flex items-center gap-0.5 font-semibold">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-emerald-500"
+              checked={grantedKeys.has(permission.key)}
+              onChange={(event) => onPermission(permission.key, event.target.checked)}
+            />
+            {permission.label}
+          </span>
+          <span className="block text-xs text-slate-400">{permission.description}</span>
+          <code className="block text-[0.68rem] text-lime-300">{permission.key}</code>
+        </label>
+      ))}
+    </CardFrame>
+  );
+}
+
 export default function IdentityDatabasePanel() {
   const socket = useSocket();
   const [users, setUsers] = useState([]);
+  const [permissions, setPermissions] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
@@ -321,6 +346,7 @@ export default function IdentityDatabasePanel() {
     try {
       const resp = await listUsers(socket);
       setUsers(resp.users || []);
+      setPermissions(resp.permissions || []);
       if (selectedUser?.id) {
         const updated = await getUser(socket, selectedUser.id);
         setSelectedUser(updated.user || null);
@@ -380,6 +406,11 @@ export default function IdentityDatabasePanel() {
     runMutation((userId) => setDeterrence(socket, userId, enabled, reason), 'Deterrence updated.');
   const handleMuted = (enabled) =>
     runMutation((userId) => setMuted(socket, userId, enabled), 'Mute updated.');
+  const handlePermission = (permissionKey, enabled) =>
+    runMutation(
+      (userId) => setPermission(socket, userId, permissionKey, enabled),
+      'Permission updated.',
+    );
   const handleSaveFeature = (namespace, value) =>
     runMutation((userId) => updateFeatureState(socket, userId, namespace, value), 'Feature state saved.');
   const handleDeleteFeature = (namespace) =>
@@ -407,6 +438,7 @@ export default function IdentityDatabasePanel() {
               <TabList>
                 <Tab id="signals">Signals</Tab>
                 <Tab id="status">Status</Tab>
+                <Tab id="permissions">Permissions</Tab>
                 <Tab id="features">Feature state</Tab>
                 <Tab id="raw">Raw JSON</Tab>
               </TabList>
@@ -416,6 +448,9 @@ export default function IdentityDatabasePanel() {
                 </TabPanel>
                 <TabPanel id="status">
                   <StatusCard user={selectedUser} onVerified={handleVerified} onDeterrence={handleDeterrence} onMuted={handleMuted} />
+                </TabPanel>
+                <TabPanel id="permissions">
+                  <PermissionsCard user={selectedUser} permissions={permissions} onPermission={handlePermission} />
                 </TabPanel>
                 <TabPanel id="features">
                   <FeatureStateCard user={selectedUser} onSaveFeature={handleSaveFeature} onDeleteFeature={handleDeleteFeature} />

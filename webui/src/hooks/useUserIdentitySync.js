@@ -19,9 +19,17 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
     'overseerPreference',
     { enabled: false },
   );
+  const { value: audioAdjustments, status: audioAdjustmentsStatus } = useSettingsNamespace('audioAdjustments', {
+    hornPercent: 0,
+    ttsPercent: 0,
+    forwardPercent: 0,
+  });
 
   const ready =
-    identityStatus === 'ready' && profileStatus === 'ready' && overseerPreferenceStatus === 'ready';
+    identityStatus === 'ready'
+    && profileStatus === 'ready'
+    && overseerPreferenceStatus === 'ready'
+    && audioAdjustmentsStatus === 'ready';
   const cookieUserId = (identity?.cookieUserId || '').trim();
   const nickname = (profile?.nickname || '').trim();
   const overseerEnabled = Boolean(overseerPreference?.enabled);
@@ -40,6 +48,7 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
         cookieUserId,
         fingerprintId: await getBrowserFingerprintId(),
         nickname,
+        audioAdjustments,
         overseerEnabled,
         identitySurface: normalizedIdentitySurface,
       });
@@ -55,6 +64,7 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
       */
     }
   }, [
+    audioAdjustments,
     connected,
     cookieUserId,
     identifySession,
@@ -75,7 +85,7 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
     */
     if (!ready || !connected || !socket?.id) return;
     sendIdentify();
-  }, [ready, connected, socket?.id, cookieUserId, nickname, overseerEnabled, normalizedIdentitySurface, sendIdentify]);
+  }, [ready, connected, socket?.id, cookieUserId, nickname, audioAdjustments, overseerEnabled, normalizedIdentitySurface, sendIdentify]);
 
   useEffect(() => {
     /*

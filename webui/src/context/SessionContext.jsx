@@ -342,8 +342,8 @@ export function SessionProvider({ children }) {
   const actions = useMemo(
     () => ({
       login: (username, password) => emitWithAck('auth:login', { username, password }),
-      identifySession: ({ cookieUserId, fingerprintId, nickname, overseerEnabled, identitySurface } = {}) =>
-        emitWithAck('session:identify', { cookieUserId, fingerprintId, nickname, overseerEnabled, identitySurface }),
+      identifySession: ({ cookieUserId, fingerprintId, nickname, audioAdjustments, overseerEnabled, identitySurface } = {}) =>
+        emitWithAck('session:identify', { cookieUserId, fingerprintId, nickname, audioAdjustments, overseerEnabled, identitySurface }),
       setRole: (role) => emitWithAck('session:setRole', { role }),
       requestControl: (roverId, options = {}) =>
         emitWithAck('session:requestControl', { roverId, ...options }),
@@ -399,13 +399,10 @@ export function SessionProvider({ children }) {
       readyMicWhip: (roverId) => emitWithAck('audio:micWhipReady', { roverId }),
       stopMicWhip: (roverId) => emitWithAck('audio:micWhipStop', { roverId }),
       setAudioLevels: (levels = {}) => emitWithAck('audioLevels:set', levels),
-      /*
-        Personal volume is a 0-1 fraction of whichever ceiling the server has
-        resolved for this user, so the browser never sends an absolute gain and
-        cannot widen its own limits.
-      */
-      setUserAudioGains: (gains = {}) => emitWithAck('audioLevels:setUserGains', gains),
-      setUserAudioGainCaps: (caps = {}) => emitWithAck('audioLevels:setUserCaps', caps),
+      setPersonalAudioAdjustments: (adjustments = {}) =>
+        emitWithAck('audioLevels:setPersonalAdjustments', adjustments),
+      setPersonalAudioAdjustmentRange: (maxAdjustmentPercent) =>
+        emitWithAck('audioLevels:setPersonalAdjustmentRange', { maxAdjustmentPercent }),
       setPrivateSafety: (roverId, safety = {}) =>
         emitWithAck('session:privateSafety:set', { roverId, safety }),
       ptzClaim: () => emitWithAck('ptzCamera:claim'),

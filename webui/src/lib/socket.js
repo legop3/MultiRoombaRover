@@ -36,6 +36,9 @@ async function buildSocketIdentity() {
     cookieUserId: String(currentSettings?.identity?.cookieUserId || '').trim(),
     fingerprintId,
     nickname: String(currentSettings?.profile?.nickname || '').trim(),
+    // Signed percentages are harmless browser preferences. The server resolves
+    // identity first, then enforces permission and range before rover output.
+    audioAdjustments: currentSettings?.audioAdjustments || {},
     overseerEnabled: Boolean(currentSettings?.overseerPreference?.enabled),
     identitySurface: getIdentitySurface(),
   };

@@ -48,6 +48,7 @@ export function userMatchesQuery(user, query) {
     ...(user?.nicknames || []),
     ...(user?.knownIps || []),
     ...(user?.featureNamespaces || []),
+    ...(user?.permissions || []).map((permission) => permission.key),
   ].join(' ').toLowerCase();
   return haystack.includes(needle);
 }

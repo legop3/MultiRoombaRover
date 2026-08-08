@@ -3,7 +3,7 @@
 // Scope: Supplies transport-neutral metadata; execution handlers remain focused on server operations.
 const CATEGORIES = {
   system: { title: 'System', names: ['help', 'status', 'replay', 'time-status'] },
-  admin: { title: 'Admin', names: ['lock', 'unlock', 'mode', 'reason', 'goal', 'kick', 'verify', 'deter', 'gain'] },
+  admin: { title: 'Admin', names: ['lock', 'unlock', 'mode', 'reason', 'goal', 'kick', 'verify', 'deter', 'permissions'] },
   features: { title: 'Features', names: ['lights', 'lift', 'neato'] },
   discord: { title: 'Discord', names: ['bridge'] },
 };
@@ -46,14 +46,13 @@ function buildCommandRegistry(prefix, timeCommand) {
       access: 'Lockdown admin',
       permission: 'lockdown-admin',
     },
-    gain: {
+    permissions: {
       category: 'admin',
-      summary: 'Manage the VIP audio gain boost that raises a user\'s volume ceiling past the global gains.',
+      summary: 'Manage registered user permissions.',
       usage: [
-        `${prefix} gain list`,
-        `${prefix} gain grant <vip>`,
-        `${prefix} gain revoke <vip>`,
-        `${prefix} gain help`,
+        `${prefix} permissions list [permission]`,
+        `${prefix} permissions grant <permission> <user>`,
+        `${prefix} permissions revoke <permission> <user>`,
       ],
       access: 'Admin',
       permission: 'admin',

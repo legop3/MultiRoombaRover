@@ -53,7 +53,7 @@ const {
   getUserIdForSocket,
 } = require('../identityService');
 const { getAudioForwardState, audioForwardEvents } = require('../audioForwardService');
-const { getAudioLevels, getAudioGainStateForSocket, audioLevelsEvents } = require('../audioLevelsService');
+const { getAudioLevels, getAudioAdjustmentStateForSocket, audioLevelsEvents } = require('../audioLevelsService');
 const { getButtonBoxState } = require('../buttonBoxService');
 const { getState: getInterInstanceState, interInstanceEvents } = require('../interInstanceService');
 const {
@@ -231,7 +231,7 @@ function buildSession(socket) {
     isVerified: Boolean(socket?.data?.isVerified),
     audioForward: getAudioForwardState(),
     audioLevels: getAudioLevels(),
-    audioGains: getAudioGainStateForSocket(socket),
+    audioAdjustments: getAudioAdjustmentStateForSocket(socket),
     buttonBox: getButtonBoxState(),
     /*
       Inter-instance state is a read-only directory snapshot. It is included in
@@ -463,16 +463,14 @@ audioForwardEvents.on('change', () => {
   syncAll();
 });
 
-audioLevelsEvents.on('change', ({ scope, userId } = {}) => {
+audioLevelsEvents.on('change', ({ scope, socketId } = {}) => {
   /*
-    A user dragging their own volume slider only changes their own payload, so
-    it resyncs just that user's tabs. Admin gain and cap edits still change
-    everyone's ceiling and keep the full broadcast.
+    A browser dragging its own volume slider changes only that connection's
+    payload. Base-level and allowed-range changes still affect everyone and use
+    the full broadcast path.
   */
-  if (scope === 'user' && userId) {
-    io.sockets.sockets.forEach((socket) => {
-      if (getUserIdForSocket(socket) === userId) syncSocket(socket);
-    });
+  if (scope === 'socket' && socketId) {
+    syncSocket(io.sockets.sockets.get(socketId));
     return;
   }
   syncAll();

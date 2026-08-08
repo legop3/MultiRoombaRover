@@ -7,18 +7,16 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('audioLevelsService');
 const { loadConfig } = require('../../helpers/configLoader');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
-const { isAdmin } = require('../roleService');
+const { isAdmin, roleEvents } = require('../roleService');
 const roverManager = require('../roverManager');
-const { getFeatureState, setFeatureState, getUserIdForSocket } = require('../identityService');
+const { identityEvents, getUserIdForSocket, hasUserPermission } = require('../identityService');
 const { issueCommand } = require('../commandService');
 const {
-  GAIN_KEYS,
+  ADJUSTMENT_FIELDS,
   clampGain,
-  clampFraction,
-  normalizeUserGains,
-  normalizeGainSet,
-  resolveCeilings,
-  applyCeilings,
+  clampMaximumAdjustmentPercent,
+  normalizeAdjustments,
+  applyAdjustments,
 } = require('./gainMath');
 
 const audioLevelsEvents = new EventEmitter();
@@ -26,48 +24,32 @@ const DATA_DIR = resolveDataDir();
 const STORE_PATH = resolveDataPath('audio-levels.json');
 const config = loadConfig();
 const configuredDefaults = config.audioLevels || {};
-const configuredUserCaps = configuredDefaults.userGainCaps || {};
-
-/*
-  Per-user preferences live in identity feature state so they follow the user
-  across browsers and cannot be raised by editing a client-side cookie. They are
-  stored as a 0..1 fraction of whatever ceiling currently applies rather than an
-  absolute gain, so lowering the global admin gain immediately quiets everyone
-  without having to rewrite every stored preference.
-*/
-const USER_GAINS_NAMESPACE = 'audioGains';
-
-/*
-  Absolute ceilings for users holding the audioGainBoost flag. These are the
-  hard caps the flag cannot exceed; admins can retune them from the driver page.
-*/
-const USER_GAIN_CAP_DEFAULTS = {
-  hornGain: 0.5,
-  ttsGain: 0.8,
-  forwardGain: 0.4,
-};
+const PERSONAL_ADJUSTMENT_PERMISSION = 'audio.personalAdjustment';
+const DEFAULT_MAX_PERSONAL_ADJUSTMENT_PERCENT = 50;
 
 const DEFAULTS = {
   hornGain: clampGain(configuredDefaults.hornGain, 1),
   ttsGain: clampGain(configuredDefaults.ttsGain, 1),
   forwardGain: clampGain(configuredDefaults.forwardGain, 1),
-  userGainCaps: normalizeGainSet(configuredUserCaps, USER_GAIN_CAP_DEFAULTS),
+  maxPersonalAdjustmentPercent: clampMaximumAdjustmentPercent(
+    configuredDefaults.maxPersonalAdjustmentPercent,
+    DEFAULT_MAX_PERSONAL_ADJUSTMENT_PERCENT,
+  ),
 };
-
-function normalizeUserGainCaps(raw = {}, fallback = DEFAULTS.userGainCaps) {
-  return normalizeGainSet(raw, fallback);
-}
 
 function normalizeStore(raw = {}) {
   return {
     hornGain: clampGain(raw.hornGain, DEFAULTS.hornGain),
     ttsGain: clampGain(raw.ttsGain, DEFAULTS.ttsGain),
     forwardGain: clampGain(raw.forwardGain, DEFAULTS.forwardGain),
-    userGainCaps: normalizeUserGainCaps(raw.userGainCaps),
+    maxPersonalAdjustmentPercent: clampMaximumAdjustmentPercent(
+      raw.maxPersonalAdjustmentPercent,
+      DEFAULTS.maxPersonalAdjustmentPercent,
+    ),
     updatedAt: Number.isFinite(raw.updatedAt) ? raw.updatedAt : null,
     updatedBy: typeof raw.updatedBy === 'string' ? raw.updatedBy : null,
-    capsUpdatedAt: Number.isFinite(raw.capsUpdatedAt) ? raw.capsUpdatedAt : null,
-    capsUpdatedBy: typeof raw.capsUpdatedBy === 'string' ? raw.capsUpdatedBy : null,
+    adjustmentRangeUpdatedAt: Number.isFinite(raw.adjustmentRangeUpdatedAt) ? raw.adjustmentRangeUpdatedAt : null,
+    adjustmentRangeUpdatedBy: typeof raw.adjustmentRangeUpdatedBy === 'string' ? raw.adjustmentRangeUpdatedBy : null,
   };
 }
 
@@ -78,6 +60,11 @@ function loadState() {
   try {
     const raw = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
     state = normalizeStore(raw);
+    if (Object.prototype.hasOwnProperty.call(raw, 'userGainCaps')) {
+      // Rewrite once so the retired VIP-cap object does not linger beside the
+      // new percentage range and confuse future operator inspection.
+      persistState(state);
+    }
   } catch (err) {
     if (err.code !== 'ENOENT') {
       logger.warn('Failed to load audio levels store', err.message);
@@ -103,16 +90,12 @@ function getAudioLevels() {
     hornGain: current.hornGain,
     ttsGain: current.ttsGain,
     forwardGain: current.forwardGain,
-    userGainCaps: { ...current.userGainCaps },
+    maxPersonalAdjustmentPercent: current.maxPersonalAdjustmentPercent,
     updatedAt: current.updatedAt,
     updatedBy: current.updatedBy,
-    capsUpdatedAt: current.capsUpdatedAt,
-    capsUpdatedBy: current.capsUpdatedBy,
+    adjustmentRangeUpdatedAt: current.adjustmentRangeUpdatedAt,
+    adjustmentRangeUpdatedBy: current.adjustmentRangeUpdatedBy,
   };
-}
-
-function getUserGainCaps() {
-  return { ...loadState().userGainCaps };
 }
 
 function emitChange(reason = 'update', extra = {}) {
@@ -132,30 +115,19 @@ function getAdminLimits() {
   };
 }
 
-function getGainCeilings(hasBoost) {
-  const current = loadState();
-  return resolveCeilings({
-    adminLimits: getAdminLimits(),
-    boostCaps: current.userGainCaps,
-    hasBoost,
-  });
+function canUsePersonalAdjustments(socket) {
+  if (isAdmin(socket)) return true;
+  const userId = getUserIdForSocket(socket);
+  return Boolean(userId && hasUserPermission(userId, PERSONAL_ADJUSTMENT_PERMISSION));
 }
 
-function getGainCeilingsForSocket(socket) {
-  return getGainCeilings(Boolean(socket?.data?.hasAudioGainBoost));
-}
-
-function getUserGains(userId) {
-  if (!userId) return normalizeUserGains({});
-  return normalizeUserGains(getFeatureState(userId, USER_GAINS_NAMESPACE, {}));
-}
-
-function getUserGainsForSocket(socket) {
-  return getUserGains(getUserIdForSocket(socket));
+function getAdjustmentsForSocket(socket) {
+  if (!canUsePersonalAdjustments(socket)) return normalizeAdjustments({}, 0);
+  return normalizeAdjustments(socket?.data?.audioAdjustments, loadState().maxPersonalAdjustmentPercent);
 }
 
 function getEffectiveLevelsForSocket(socket) {
-  return applyCeilings(getUserGainsForSocket(socket), getGainCeilingsForSocket(socket));
+  return applyAdjustments(getAdminLimits(), getAdjustmentsForSocket(socket));
 }
 
 /*
@@ -234,55 +206,49 @@ function setAudioLevels(input = {}, actor = null) {
   return getAudioLevels();
 }
 
-function setUserGainCaps(input = {}, actor = null) {
+function setMaxPersonalAdjustmentPercent(value, actor = null) {
   const current = loadState();
   const next = {
     ...current,
-    userGainCaps: normalizeUserGainCaps(input, current.userGainCaps),
-    capsUpdatedAt: Date.now(),
-    capsUpdatedBy: actor,
+    maxPersonalAdjustmentPercent: clampMaximumAdjustmentPercent(value, current.maxPersonalAdjustmentPercent),
+    adjustmentRangeUpdatedAt: Date.now(),
+    adjustmentRangeUpdatedBy: actor,
   };
   persistState(next);
   /*
-    Lowering a cap has to take effect immediately for anyone already driving,
-    otherwise a boosted user keeps the louder gain until their next turn.
+    A narrower range must take effect immediately for current drivers rather
+    than leaving an out-of-range multiplier active until their next turn.
   */
   pushLevelsToAllRovers();
-  emitChange('user_caps_set');
-  return getUserGainCaps();
+  emitChange('personal_adjustment_range_set');
+  return loadState().maxPersonalAdjustmentPercent;
 }
 
-function setUserGains(socket, input = {}) {
-  const userId = getUserIdForSocket(socket);
-  if (!userId) throw new Error('Identity required');
-  const current = getUserGains(userId);
-  const next = { ...current };
-  GAIN_KEYS.forEach((key) => {
-    if (input?.[key] === undefined) return;
-    next[key] = clampFraction(input[key], current[key]);
-  });
-  setFeatureState(userId, USER_GAINS_NAMESPACE, next);
+function setSocketAdjustments(socket, input = {}) {
+  socket.data = socket.data || {};
+  // Store only server-normalized percentages on the transport. The cookie is a
+  // browser preference, while permission and range enforcement remain here.
+  socket.data.audioAdjustments = normalizeAdjustments(input, 100);
   pushLevelsForSocket(socket);
-  emitChange('user_gains_set', { scope: 'user', userId });
-  return getAudioGainStateForSocket(socket);
+  emitChange('personal_adjustments_set', { scope: 'socket', socketId: socket.id });
+  return getAudioAdjustmentStateForSocket(socket);
 }
 
 /*
-  The client needs all three layers to render an honest slider: its own stored
-  fraction, the ceiling that fraction is measured against, and the resolved gain
-  so the UI can show what the rover will actually play.
+  The client receives the percentages the server accepted, the permitted range,
+  and the resulting multipliers. This keeps the UI honest even when a cookie was
+  edited or an administrator changed permission while the browser was online.
 */
-function getAudioGainStateForSocket(socket) {
-  const hasBoost = Boolean(socket?.data?.hasAudioGainBoost);
-  const values = getUserGainsForSocket(socket);
-  const ceilings = getGainCeilings(hasBoost);
+function getAudioAdjustmentStateForSocket(socket) {
+  const allowed = canUsePersonalAdjustments(socket);
+  const maximum = loadState().maxPersonalAdjustmentPercent;
+  const values = allowed ? getAdjustmentsForSocket(socket) : normalizeAdjustments({}, 0);
   return {
     values,
-    ceilings,
-    effective: applyCeilings(values, ceilings),
-    boostGranted: hasBoost,
-    adminLimits: getAdminLimits(),
-    boostCaps: getUserGainCaps(),
+    allowed,
+    maxAdjustmentPercent: maximum,
+    effective: applyAdjustments(getAdminLimits(), values),
+    baseLevels: getAdminLimits(),
   };
 }
 
@@ -311,6 +277,23 @@ setImmediate(() => {
   }
 });
 
+identityEvents.on('change', ({ reason, userId } = {}) => {
+  if (!userId || !['permission_granted', 'permission_revoked', 'identify'].includes(reason)) return;
+  io.sockets.sockets.forEach((socket) => {
+    if (getUserIdForSocket(socket) !== userId) return;
+    pushLevelsForSocket(socket);
+    // Permission changes alter both effective rover output and the controls the
+    // browser may use, so each affected connection receives a fresh session.
+    emitChange('personal_adjustment_permission_changed', { scope: 'socket', socketId: socket.id });
+  });
+});
+
+roleEvents.on('change', ({ socket } = {}) => {
+  // Administrators implicitly have this capability, so login/logout can change
+  // the effective adjustment even though no database permission row changed.
+  if (socket) pushLevelsForSocket(socket);
+});
+
 io.on('connection', (socket) => {
   socket.on('audioLevels:get', (_, cb = () => {}) => {
     cb({ success: true, levels: getAudioLevels() });
@@ -329,30 +312,30 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('audioLevels:setUserCaps', (payload = {}, cb = () => {}) => {
+  socket.on('audioLevels:setPersonalAdjustmentRange', (payload = {}, cb = () => {}) => {
     try {
       if (!isAdmin(socket)) {
         throw new Error('Not authorized');
       }
       const actor = socket?.data?.user?.username || null;
-      const userGainCaps = setUserGainCaps(payload || {}, actor);
-      cb({ success: true, userGainCaps });
+      const maxPersonalAdjustmentPercent = setMaxPersonalAdjustmentPercent(payload?.maxAdjustmentPercent, actor);
+      cb({ success: true, maxPersonalAdjustmentPercent });
     } catch (err) {
       cb({ error: err.message });
     }
   });
 
-  socket.on('audioLevels:getUserGains', (_, cb = () => {}) => {
+  socket.on('audioLevels:getPersonalAdjustments', (_, cb = () => {}) => {
     try {
-      cb({ success: true, audioGains: getAudioGainStateForSocket(socket) });
+      cb({ success: true, audioAdjustments: getAudioAdjustmentStateForSocket(socket) });
     } catch (err) {
       cb({ error: err.message });
     }
   });
 
-  socket.on('audioLevels:setUserGains', (payload = {}, cb = () => {}) => {
+  socket.on('audioLevels:setPersonalAdjustments', (payload = {}, cb = () => {}) => {
     try {
-      cb({ success: true, audioGains: setUserGains(socket, payload || {}) });
+      cb({ success: true, audioAdjustments: setSocketAdjustments(socket, payload || {}) });
     } catch (err) {
       cb({ error: err.message });
     }
@@ -362,17 +345,15 @@ io.on('connection', (socket) => {
 loadState();
 
 module.exports = {
-  GAIN_KEYS,
-  USER_GAIN_CAP_DEFAULTS,
+  ADJUSTMENT_FIELDS,
+  PERSONAL_ADJUSTMENT_PERMISSION,
+  DEFAULT_MAX_PERSONAL_ADJUSTMENT_PERCENT,
   getAudioLevels,
   setAudioLevels,
-  getUserGainCaps,
-  setUserGainCaps,
-  getUserGains,
-  setUserGains,
-  getGainCeilingsForSocket,
+  setMaxPersonalAdjustmentPercent,
+  setSocketAdjustments,
   getEffectiveLevelsForSocket,
-  getAudioGainStateForSocket,
+  getAudioAdjustmentStateForSocket,
   pushLevelsToRover,
   audioLevelsEvents,
 };
