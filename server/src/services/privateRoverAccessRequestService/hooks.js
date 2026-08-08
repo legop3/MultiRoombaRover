@@ -71,8 +71,15 @@ function registerPrivateRoverAccessHooks(deps) {
     socket.on('privateRover:requestAccess', handleRequest);
     socket.on('session:privateRover:requestAccess', handleRequest);
     socket.on('session:identify', () => {
-      applySocketGrantCache(socket);
-      requestEvents.emit('change', { reason: 'identify', socketId: socket.id });
+      /*
+        session:identify also carries unrelated live preferences such as audio
+        adjustments. Only publish a private-access change when identification
+        actually moved this socket to a different requester or grant set; a
+        no-op event must not fan out a full session sync to every connection.
+      */
+      if (applySocketGrantCache(socket)) {
+        requestEvents.emit('change', { reason: 'identify', socketId: socket.id });
+      }
     });
   });
 }

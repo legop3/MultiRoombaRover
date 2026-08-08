@@ -66,7 +66,15 @@ export function useSettings() {
 
 export function useSettingsNamespace(namespace, defaults = {}) {
   const { data, status, setNamespace } = useSettings();
-  const value = data[namespace] ?? defaults ?? {};
+  /*
+    Defaults describe the initial shape of a namespace; they are not live state.
+    Keep the first supplied value in lazy hook state because callers naturally pass object
+    literals. Returning each newly-created literal while the namespace is absent
+    would make an unchanged setting appear to change on every parent render and
+    could retrigger effects that synchronize settings to the server.
+  */
+  const [initialDefaults] = useState(() => defaults ?? {});
+  const value = data[namespace] ?? initialDefaults;
 
   const save = useCallback(
     (update) => {
@@ -89,9 +97,14 @@ export function useSettingsNamespace(namespace, defaults = {}) {
   );
 
   const reset = useCallback(() => {
-    const base = typeof defaults === 'object' ? { ...defaults } : defaults;
+    /*
+      Reset uses the same stable initial defaults exposed above. This keeps the
+      namespace contract consistent even if a caller recreates its defaults
+      object during later renders.
+    */
+    const base = typeof initialDefaults === 'object' ? { ...initialDefaults } : initialDefaults;
     setNamespace(namespace, () => base ?? {});
-  }, [defaults, namespace, setNamespace]);
+  }, [initialDefaults, namespace, setNamespace]);
 
   return { value, status, save, replace, reset };
 }

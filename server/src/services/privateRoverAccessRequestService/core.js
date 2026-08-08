@@ -84,10 +84,29 @@ function listGrantedRoversForRequester(requesterKey) {
 }
 
 function applySocketGrantCache(socket) {
-  if (!socket) return;
+  if (!socket) return false;
   socket.data = socket.data || {};
   const requesterKey = buildRequesterKey(socket);
-  socket.data.privateClosedAccessRovers = listGrantedRoversForRequester(requesterKey);
+  const nextRoverIds = listGrantedRoversForRequester(requesterKey).sort();
+  const previousRoverIds = Array.isArray(socket.data.privateClosedAccessRovers)
+    ? socket.data.privateClosedAccessRovers
+    : [];
+  const requesterChanged = socket.data.privateAccessRequesterKey !== requesterKey;
+  const grantsChanged = previousRoverIds.length !== nextRoverIds.length
+    || previousRoverIds.some((roverId, index) => String(roverId) !== String(nextRoverIds[index]));
+
+  /*
+    Remember both inputs that determine the socket's private-access projection.
+    The requester key matters even when both identities currently have no grants,
+    because pending requests in the session payload are also keyed by requester.
+    Returning whether either input changed lets transport hooks avoid announcing
+    a false state change for ordinary live identity-setting updates.
+  */
+  socket.data.privateAccessRequesterKey = requesterKey;
+  if (grantsChanged) {
+    socket.data.privateClosedAccessRovers = nextRoverIds;
+  }
+  return requesterChanged || grantsChanged;
 }
 
 function refreshAllSocketGrantCaches() {
