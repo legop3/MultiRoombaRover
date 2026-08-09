@@ -10,6 +10,7 @@ const { getNickname } = require('../nicknameService');
 const { getGlobalObjective, setGlobalObjective, clearGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
 const homeAssistantService = require('../homeAssistantService');
+const greenModeService = require('../greenModeService');
 const liftService = require('../liftService');
 const neatoService = require('../neatoService');
 const { isFeatureEnabled } = require('../../helpers/features');
@@ -174,6 +175,7 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     // lights lock/unlock` from becoming transport-specific, and it preserves
     // the existing session update path for all connected browsers.
     homeAssistantService,
+    greenModeService,
     liftService,
     neatoService,
     isFeatureEnabled,

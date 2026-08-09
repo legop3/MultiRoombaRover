@@ -20,8 +20,8 @@ import SocketConnectionPill from '../components/SocketConnectionPill/index.jsx';
 import DuplicateIdentityOverlay from '../components/DuplicateIdentityOverlay/index.jsx';
 import {
   DEFAULT_PAGE_THEME_KEY,
-  getPageThemeClass,
   themeGapClass,
+  usePageThemeClass,
 } from '../themes/index.js';
 import useLayoutMode from '../hooks/useLayoutMode.js';
 import { DriverLayoutProvider } from '../layouts/driver/DriverLayoutContext.jsx';
@@ -35,7 +35,7 @@ function DriverPageRoot() {
   });
   // Resolve the cookie value through the shared catalog before painting the page. This prevents
   // an obsolete or hand-edited key from stripping the background class from every exposed seam.
-  const pageBackgroundClass = getPageThemeClass(pageSettings?.backgroundTheme);
+  const pageBackgroundClass = usePageThemeClass(pageSettings?.backgroundTheme);
 
   return (
     <div className={`${pageBackgroundClass} text-slate-100`}>

@@ -3,7 +3,7 @@
 // Scope: Supplies transport-neutral metadata; execution handlers remain focused on server operations.
 const CATEGORIES = {
   system: { title: 'System', names: ['help', 'status', 'replay', 'time-status'] },
-  admin: { title: 'Admin', names: ['lock', 'unlock', 'mode', 'reason', 'goal', 'kick', 'verify', 'deter', 'permissions'] },
+  admin: { title: 'Admin', names: ['lock', 'unlock', 'mode', 'reason', 'goal', 'green', 'kick', 'verify', 'deter', 'permissions'] },
   features: { title: 'Features', names: ['lights', 'lift', 'neato'] },
   discord: { title: 'Discord', names: ['bridge'] },
 };
@@ -19,6 +19,7 @@ function buildCommandRegistry(prefix, timeCommand) {
     mode: { category: 'admin', summary: 'Change the server mode.', usage: [`${prefix} mode <open|turns|admin|lockdown>`], access: 'Admin', permission: 'admin' },
     reason: { category: 'admin', summary: 'Show, set, or clear the admin-mode reason.', usage: [`${prefix} reason [text|clear]`], access: 'Admin to change' },
     goal: { category: 'admin', summary: 'Show, set, or clear the global objective.', usage: [`${prefix} goal [text|clear]`], access: 'Admin to change' },
+    green: { category: 'admin', summary: 'Toggle green room and page mode.', usage: [`${prefix} green <on|off>`], access: 'Admin', permission: 'admin', requiredFeature: 'homeAssistant', unavailableLabel: 'Home Assistant' },
     lights: {
       category: 'features',
       summary: 'Control room lights or manage the admin light lock.',

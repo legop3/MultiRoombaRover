@@ -10,6 +10,7 @@ const { createVerifyCommand } = require('./commands/verify');
 const { createDeterCommand } = require('./commands/deter');
 const { createPermissionsCommand } = require('./commands/permissions');
 const { createLightsCommand } = require('./commands/lights');
+const { createGreenCommand } = require('./commands/green');
 const { createKickCommand } = require('./commands/kick');
 const { createLiftCommand } = require('./commands/lift');
 const { createNeatoCommand } = require('./commands/neato');
@@ -61,6 +62,7 @@ function createCommandHandlers(deps) {
   const handleBridgeCommand = transportHandlers.bridge;
   const handleTimeStatusCommand = transportHandlers.timeStatus;
   const handleLightsCommand = createLightsCommand(deps);
+  const handleGreenCommand = createGreenCommand(deps);
   const handleKickCommand = createKickCommand(deps);
   const handleLiftCommand = createLiftCommand(deps);
   const handleNeatoCommand = createNeatoCommand(deps);
@@ -108,7 +110,7 @@ function createCommandHandlers(deps) {
     // is included because its lock/unlock subcommands change room policy. Its
     // ordinary on/off/color actions are also intentionally restricted to a
     // lockdown admin while the entire server is in lockdown.
-    const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'permissions', 'lights', 'kick', 'lift', 'neato']);
+    const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'permissions', 'lights', 'green', 'kick', 'lift', 'neato']);
     const isAccessModeCommand = commandDefinition?.permission === 'access-mode';
 
     // Feature commands are public activities while access is open or managed
@@ -144,6 +146,8 @@ function createCommandHandlers(deps) {
         return handleBridgeCommand(request, tokens);
       case 'lights':
         return handleLightsCommand(request, tokens);
+      case 'green':
+        return handleGreenCommand(request, tokens);
       case 'kick':
         return handleKickCommand(request, rest);
       case 'lift':

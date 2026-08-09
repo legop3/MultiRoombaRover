@@ -10,6 +10,7 @@ const discordPingEveryone = require('./definitions/discordPingEveryone');
 const modeJam = require('./definitions/modeJam');
 const assignmentRoulette = require('./definitions/assignmentRoulette');
 const chatSpam = require('./definitions/chatSpam');
+const greenMode = require('./definitions/greenMode');
 
 const orderedRewards = [
   dockPanic,
@@ -22,6 +23,7 @@ const orderedRewards = [
   modeJam,
   assignmentRoulette,
   chatSpam,
+  greenMode,
 ];
 
 const rewardById = new Map(orderedRewards.map((reward, idx) => [reward.id, { ...reward, number: idx + 1 }]));

@@ -63,6 +63,7 @@ const { subscribe } = require('../eventBus');
 const { createPresenceManager } = require('./presence');
 const { createChannelIO } = require('./channelIO');
 const { createCommandHandlers } = require('../operatorCommandService');
+const greenModeService = require('../greenModeService');
 const { createDiscordTransportHandlers, createDiscordCommandRequest } = require('./commandAdapter');
 const { createIntegrations } = require('./integrations');
 const { createFleetDailyReports } = require('./fleetDailyReports');
@@ -240,6 +241,7 @@ const commandDependencies = {
   // service into the shared command router keeps Discord and mirrored web-chat
   // command behavior aligned without duplicating Home Assistant calls here.
   homeAssistantService,
+  greenModeService,
   liftService,
   neatoService,
   isFeatureEnabled,

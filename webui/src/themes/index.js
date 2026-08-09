@@ -10,3 +10,4 @@ export {
   normalizePageThemeKey,
 } from './catalog.js';
 export { themeGapClass, themeStackClass } from './layout.js';
+export { default as usePageThemeClass } from './usePageThemeClass.js';

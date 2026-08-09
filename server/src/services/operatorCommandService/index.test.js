@@ -30,6 +30,9 @@ function createRouter({ mode = MODES.OPEN, featureEnabled = true } = {}) {
     isFeatureEnabled: () => featureEnabled,
     sanitizeMentions: (text) => String(text || ''),
     homeAssistantService: { getLightPolicyState: () => ({}), setAllControllableEntitiesState: () => Promise.resolve() },
+    // Green mode is admin-only at the dispatcher, so this double only needs to
+    // prove that an authorized command reaches the small standalone service.
+    greenModeService: { setEnabled: (enabled) => Promise.resolve(Boolean(enabled)) },
     liftService: null,
     neatoService: null,
     listVerifiedUsers: () => [],
@@ -72,7 +75,7 @@ const admin = { id: 's1', userId: 'u-alice', label: 'alice', isAdmin: true, isLo
 
 test('admin-only commands stay admin-only for a non-admin', async () => {
   const run = createRouter();
-  for (const command of ['rs lock rover-1', 'rs unlock rover-1', 'rs mode open', 'rs kick alice', 'rs permissions list']) {
+  for (const command of ['rs lock rover-1', 'rs unlock rover-1', 'rs mode open', 'rs green on', 'rs kick alice', 'rs permissions list']) {
     assert.match(await run(command, nonAdmin), ADMIN_DENIAL, `${command} must stay admin-only`);
   }
 });
@@ -100,9 +103,20 @@ test('admin mode restricts access-mode feature commands', async () => {
 
 test('lockdown still suspends the pre-existing moderation-sensitive commands', async () => {
   const run = createRouter({ mode: MODES.LOCKDOWN });
-  for (const command of ['rs lock rover-1', 'rs mode open', 'rs lights on', 'rs goal', 'rs kick alice']) {
+  for (const command of ['rs lock rover-1', 'rs mode open', 'rs lights on', 'rs green on', 'rs goal', 'rs kick alice']) {
     assert.match(await run(command, admin), LOCKDOWN_DENIAL, `${command} should stay lockdown-gated`);
   }
+});
+
+test('admins can toggle green mode through the shared command path', async () => {
+  const run = createRouter();
+  assert.match(await run('rs green on', admin), /Green mode enabled/);
+  assert.match(await run('rs green off', admin), /Green mode disabled/);
+});
+
+test('green mode rejects unknown actions with focused usage guidance', async () => {
+  const run = createRouter();
+  assert.match(await run('rs green maybe', admin), /rs green on.*rs green off/);
 });
 
 test('status and help survive lockdown', async () => {

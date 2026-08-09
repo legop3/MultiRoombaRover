@@ -495,6 +495,92 @@ The Firmata toggle backend converts the logical value using `activeLow` before s
 
 Peripheral authors should not write JSON, construct SysEx messages, or manually dispatch control IDs. The proposed `RoverPeripheralFirmata` Arduino library owns those tasks.
 
+A long positional call such as `addRoverCameraServo(14, -15, 30, 0, 2, 900, 2100, false, false)` is deliberately not part of the API. Several adjacent numbers and booleans are too difficult to understand or review without repeatedly consulting the function signature.
+
+The public API uses named configuration structs. Field names include units where a bare number would otherwise be ambiguous, and enums replace booleans whose meaning would be unclear at the call site.
+
+### Proposed configuration types
+
+The core public types are:
+
+```cpp
+enum class OutputPolarity {
+  ActiveHigh,
+  ActiveLow
+};
+
+enum class ButtonMode {
+  Toggle,
+  Momentary
+};
+
+struct FirmataServoOutput {
+  uint8_t pin;
+};
+
+struct FirmataPwmOutput {
+  uint8_t pin;
+};
+
+struct FirmataDigitalOutput {
+  uint8_t pin;
+  OutputPolarity polarity = OutputPolarity::ActiveHigh;
+};
+
+struct RoverCameraServoConfig {
+  uint8_t pin;
+
+  float minimumAngleDegrees;
+  float maximumAngleDegrees;
+  float homeAngleDegrees = 0;
+  float nudgeDegrees = 2;
+
+  uint16_t minimumPulseMicroseconds = 900;
+  uint16_t maximumPulseMicroseconds = 2100;
+
+  bool allowRawPulse = false;
+  bool inverted = false;
+};
+
+struct RoverDigitalOutputConfig {
+  uint8_t pin;
+  OutputPolarity polarity = OutputPolarity::ActiveHigh;
+  bool initiallyOn = false;
+};
+
+struct SliderControlConfig {
+  String id;
+  String name;
+  int minimum;
+  int maximum;
+};
+
+struct ButtonControlConfig {
+  String id;
+  String name;
+  ButtonMode mode;
+};
+
+struct NumberControlConfig {
+  String id;
+  String name;
+  int minimum;
+  int maximum;
+};
+
+struct TextControlConfig {
+  String id;
+  String name;
+  size_t maximumLength;
+};
+```
+
+Defaults cover values that are commonly shared, but required hardware and display values remain explicit. The implementation must validate the completed struct when it is registered rather than assuming that every default-constructed object is usable.
+
+The API uses ordinary field assignments instead of C++ designated initializers. This keeps example sketches compatible with ESP32 Arduino toolchains that are not configured for C++20.
+
+### Generic-control registration
+
 A complete sketch for one servo slider, one light-brightness slider, and one custom momentary button is:
 
 ```cpp
@@ -507,9 +593,6 @@ A complete sketch for one servo slider, one light-brightness slider, and one cus
  * browser preserves that order when it renders the peripheral's column.
  */
 RoverPeripheralFirmata peripheral("Example peripheral");
-
-constexpr uint8_t SERVO_PIN = 14;
-constexpr uint8_t LIGHT_PWM_PIN = 18;
 
 /*
  * This is ordinary application code rather than Firmata plumbing. A real
@@ -526,34 +609,44 @@ void setup() {
    * roverd handles this control with standard Firmata SERVO commands. The
    * ESP32 application does not need a callback for each slider update.
    */
-  peripheral.addServoSlider(
-    "servoPosition",
-    "Servo position",
-    SERVO_PIN,
-    0,
-    180
-  );
+  SliderControlConfig servoPosition;
+  servoPosition.id = "servoPosition";
+  servoPosition.name = "Servo position";
+  servoPosition.minimum = 0;
+  servoPosition.maximum = 180;
+
+  FirmataServoOutput servoOutput;
+  servoOutput.pin = 14;
+
+  peripheral.addServoSlider(servoPosition, servoOutput);
 
   /*
    * roverd handles this control with standard Firmata PWM commands. The range
    * is included in the generated description and displayed by the web UI.
    */
-  peripheral.addPwmSlider(
-    "lightBrightness",
-    "Light brightness",
-    LIGHT_PWM_PIN,
-    0,
-    255
-  );
+  SliderControlConfig lightBrightness;
+  lightBrightness.id = "lightBrightness";
+  lightBrightness.name = "Light brightness";
+  lightBrightness.minimum = 0;
+  lightBrightness.maximum = 255;
+
+  FirmataPwmOutput lightOutput;
+  lightOutput.pin = 18;
+
+  peripheral.addPwmSlider(lightBrightness, lightOutput);
 
   /*
    * Custom controls are delivered through the rover-peripheral Firmata feature.
    * The library finds this registration by control ID and invokes the callback
    * with true on press and false on release.
    */
-  peripheral.addMomentaryButton(
-    "specialAction",
-    "Run special action",
+  ButtonControlConfig specialAction;
+  specialAction.id = "specialAction";
+  specialAction.name = "Run special action";
+  specialAction.mode = ButtonMode::Momentary;
+
+  peripheral.addButton(
+    specialAction,
     [](bool pressed) {
       if (pressed) {
         runSpecialAction();
@@ -576,40 +669,27 @@ void loop() {
 }
 ```
 
-The intended registration methods are:
+The intended generic registration methods are:
 
 ```cpp
-addServoSlider(id, name, pin, min, max)
-addPwmSlider(id, name, pin, min, max)
-addDigitalToggle(id, name, pin)
-addDigitalMomentaryButton(id, name, pin)
+addServoSlider(const SliderControlConfig&, const FirmataServoOutput&)
+addPwmSlider(const SliderControlConfig&, const FirmataPwmOutput&)
+addDigitalButton(const ButtonControlConfig&, const FirmataDigitalOutput&)
 
-addCustomSlider(id, name, min, max, callback)
-addToggle(id, name, callback)
-addMomentaryButton(id, name, callback)
-addNumber(id, name, min, max, callback)
-addText(id, name, maxLength, callback)
+addSlider(const SliderControlConfig&, SliderCallback)
+addButton(const ButtonControlConfig&, ButtonCallback)
+addNumber(const NumberControlConfig&, NumberCallback)
+addText(const TextControlConfig&, TextCallback)
 ```
 
-These helpers all produce the same four UI types. Method names describe the Firmata mapping or callback type; they do not create additional UI control types.
+These helpers still produce only the four agreed UI types. The overload or method name distinguishes a standard Firmata output from a custom callback; it does not create an additional UI type.
 
 The standardized built-in replacements use separate methods because they do not create generic UI controls:
 
 ```cpp
-addRoverCameraServo(
-  pin,
-  minAngle,
-  maxAngle,
-  homeAngle,
-  nudgeDegrees,
-  minPulseUs,
-  maxPulseUs,
-  allowRawPulse,
-  invert
-)
-
-addRoverHeadlight(pin, activeLow, initialOn)
-addRoverLaser(pin, activeLow, initialOn)
+addRoverCameraServo(const RoverCameraServoConfig&)
+addRoverHeadlight(const RoverDigitalOutputConfig&)
+addRoverLaser(const RoverDigitalOutputConfig&)
 ```
 
 A laptop GPIO peripheral can combine built-in replacements and additional controls:
@@ -628,29 +708,45 @@ void setup() {
    * These declarations satisfy existing rover roles. They retain the normal
    * camera, headlight, and laser UI instead of entering the generic column.
    */
-  peripheral.addRoverCameraServo(
-    14,
-    -15,
-    30,
-    0,
-    2,
-    900,
-    2100,
-    false,
-    false
-  );
-  peripheral.addRoverHeadlight(18, false, false);
-  peripheral.addRoverLaser(19, false, false);
+  RoverCameraServoConfig cameraServo;
+  cameraServo.pin = 14;
+  cameraServo.minimumAngleDegrees = -15;
+  cameraServo.maximumAngleDegrees = 30;
+  cameraServo.homeAngleDegrees = 0;
+  cameraServo.nudgeDegrees = 2;
+  cameraServo.minimumPulseMicroseconds = 900;
+  cameraServo.maximumPulseMicroseconds = 2100;
+  cameraServo.allowRawPulse = false;
+  cameraServo.inverted = false;
+
+  peripheral.addRoverCameraServo(cameraServo);
+
+  RoverDigitalOutputConfig headlight;
+  headlight.pin = 18;
+  headlight.polarity = OutputPolarity::ActiveHigh;
+  headlight.initiallyOn = false;
+
+  peripheral.addRoverHeadlight(headlight);
+
+  RoverDigitalOutputConfig laser;
+  laser.pin = 19;
+  laser.polarity = OutputPolarity::ActiveHigh;
+  laser.initiallyOn = false;
+
+  peripheral.addRoverLaser(laser);
 
   /*
    * This is an additional feature, so it appears below the peripheral heading
    * in the ordered generic-control column.
    */
-  peripheral.addCustomSlider(
-    "underglowBrightness",
-    "Underglow brightness",
-    0,
-    255,
+  SliderControlConfig underglowBrightness;
+  underglowBrightness.id = "underglowBrightness";
+  underglowBrightness.name = "Underglow brightness";
+  underglowBrightness.minimum = 0;
+  underglowBrightness.maximum = 255;
+
+  peripheral.addSlider(
+    underglowBrightness,
     [](int brightness) {
       setUnderglowBrightness(brightness);
     }

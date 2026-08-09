@@ -17,6 +17,7 @@ const {
   ptzCameraEvents,
 } = require('../ptzCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
+const { isEnabled: isGreenModeEnabled, greenModeEvents } = require('../greenModeService');
 const { getState: getNeatoState, neatoEvents } = require('../neatoService');
 const { getState: getLiftState, liftEvents } = require('../liftService');
 const { getState: getKinectState, kinectEvents } = require('../kinectService');
@@ -199,6 +200,9 @@ function buildSession(socket) {
     roomCameras: getRoomCameras(),
     ptzCamera: getPtzCameraState(socket),
     homeAssistant: getHomeAssistantState(),
+    // Green mode is a server-wide visual feature. It stays separate from Home
+    // Assistant state because HA only supplies the generic light operations.
+    greenMode: isGreenModeEnabled(),
     neato: getNeatoState(),
     lift: getLiftState(),
     kinect: getKinectState(),
@@ -388,6 +392,11 @@ ptzCameraEvents.on('change', () => {
 
 homeAssistantEvents.on('update', () => {
   logger.info('Home Assistant state change; syncing all clients');
+  syncAll();
+});
+
+greenModeEvents.on('change', () => {
+  logger.info('Green mode change detected; syncing all clients');
   syncAll();
 });
 

@@ -23,7 +23,7 @@ import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import { isFeatureEnabled } from '../../lib/features.js';
 import { useSettingsNamespace } from '../../settings/index.js';
-import { DEFAULT_PAGE_THEME_KEY, getPageThemeClass } from '../../themes/index.js';
+import { DEFAULT_PAGE_THEME_KEY, usePageThemeClass } from '../../themes/index.js';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 const PTZ_DEFAULT_COLOR = '#38bdf8';
@@ -713,7 +713,7 @@ export function PtzControllerPage({ layout = 'desktop' }) {
   // PTZ is a separate route but shares the browser's page settings. Applying the catalog class to
   // its body surface exposes the theme only through layout padding and card gaps; camera pixels,
   // controls, and card interiors retain their purpose-built dark backgrounds.
-  const pageBackgroundClass = getPageThemeClass(pageSettings?.backgroundTheme);
+  const pageBackgroundClass = usePageThemeClass(pageSettings?.backgroundTheme);
 
   useEffect(() => {
     // Route-exit cleanup runs after the last render, so retain the latest

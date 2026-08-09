@@ -12,7 +12,7 @@ import useUserIdentitySync from '../hooks/useUserIdentitySync.js';
 import useFleetReport from '../hooks/useFleetReport.js';
 import { isFeatureEnabled } from '../lib/features.js';
 import { useSettingsNamespace } from '../settings/index.js';
-import { DEFAULT_PAGE_THEME_KEY, getPageThemeClass, themeGapClass } from '../themes/index.js';
+import { DEFAULT_PAGE_THEME_KEY, themeGapClass, usePageThemeClass } from '../themes/index.js';
 
 const RANGE_OPTIONS = [
   { label: '24 hours', ms: 24 * 60 * 60 * 1000 },
@@ -261,8 +261,9 @@ export default function FleetReportsApp() {
   useUserIdentitySync({ identitySurface: 'passive' });
   const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'fleetReports'));
   const { value: pageSettings } = useSettingsNamespace('page', { backgroundTheme: DEFAULT_PAGE_THEME_KEY });
+  const pageBackgroundClass = usePageThemeClass(pageSettings?.backgroundTheme);
   return (
-    <div className={`${getPageThemeClass(pageSettings?.backgroundTheme)} min-h-screen text-slate-100`}>
+    <div className={`${pageBackgroundClass} min-h-screen text-slate-100`}>
       <SocketConnectionPill />
       <main className={`mx-auto flex min-h-screen w-full max-w-[120rem] flex-col ${themeGapClass} p-1`}>
         {enabled ? <FullReportContent /> : (

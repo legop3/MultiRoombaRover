@@ -24,3 +24,10 @@
     background-color: #000000;
     background-image: none;
   }
+
+  .page-theme-green-mode {
+    /* The deliberately blunt solid lime canvas is a temporary server mode, not
+       a selectable personal theme, so it belongs outside the persisted catalog. */
+    background-color: #00ff00;
+    background-image: none;
+  }

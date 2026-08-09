@@ -24,6 +24,7 @@ const { isLocalNetwork, normalizeIp } = require('../../helpers/ipResolver');
 const { createButtonBoxStore } = require('./store');
 const { createButtonBoxCore } = require('./core');
 const { registerButtonBoxRoute } = require('./httpRoute');
+const greenModeService = require('../greenModeService');
 
 const DATA_DIR = resolveDataDir();
 const STORE_PATH = resolveDataPath('buttonbox-state.json');
@@ -61,6 +62,14 @@ const core = createButtonBoxCore({
   getHomeAssistantState,
   setHomeAssistantEntityState,
   setHomeAssistantLightsLockedOn,
+  setGreenMode: greenModeService.setEnabled,
+  isGreenModeEnabled: greenModeService.isEnabled,
+  // Return an explicit cleanup function so timed rewards can stop observing
+  // the global service when they expire, rerun, or are recovered.
+  onGreenModeChange: (listener) => {
+    greenModeService.greenModeEvents.on('change', listener);
+    return () => greenModeService.greenModeEvents.off('change', listener);
+  },
   store,
 });
 

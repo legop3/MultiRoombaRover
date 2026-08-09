@@ -42,6 +42,7 @@ export default function CardFrame({
   children,
 }) {
   const showHeader = !hideHeader && (title || meta != null || actions);
+  const greenMode = useSessionSelector((state) => Boolean(state.session?.greenMode));
   const ownRoverColor = useSessionSelector((state) => {
     const roverId = String(state.session?.assignment?.roverId || '').trim();
     if (!roverId) return null;
@@ -52,11 +53,20 @@ export default function CardFrame({
   const accentRgb = hexToRgb(ownRoverColor);
   
   // swap these to toggle rover card border colors stuff 
-  const cardStyle = accentRgb ? { borderColor: rgba(accentRgb, 0.3) } : undefined;
+  // Green mode is global server chrome, so it wins over the assigned rover's
+  // personal accent while active. Keeping this override in CardFrame makes all
+  // present and future cards participate without sprinkling mode checks around.
+  const cardStyle = greenMode
+    ? { borderColor: '#00ff00' }
+    : accentRgb
+      ? { borderColor: rgba(accentRgb, 0.3) }
+      : undefined;
   // const cardStyle = undefined;
 
 
-  const headerStyle = accentRgb
+  const headerStyle = greenMode
+    ? { borderColor: '#00ff00' }
+    : accentRgb
     ? {
         backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 0%, ${rgba(accentRgb, 0.1)} 100%)`,
         // backgroundImage: `linear-gradient(90deg, ${rgba(accentRgb, 0.1)} 100%)`,
@@ -85,7 +95,11 @@ export default function CardFrame({
           style={headerStyle}
         >
           <div className="flex min-w-0 items-center gap-0.5">
-            {title ? <p className="m-0 text-[0.78rem] font-semibold leading-none text-neutral-50">{title}</p> : null}
+            {title ? (
+              <p className={cx('m-0 text-[0.78rem] font-semibold leading-none', greenMode ? 'text-lime-400' : 'text-neutral-50')}>
+                {title}
+              </p>
+            ) : null}
             {meta != null ? <span className="text-[0.68rem] font-medium leading-none text-neutral-200">{meta}</span> : null}
           </div>
           {actions ? <div className="flex flex-wrap items-center justify-end gap-0.5">{actions}</div> : null}

@@ -22,6 +22,9 @@ function createButtonBoxCore(deps) {
     getHomeAssistantState,
     setHomeAssistantEntityState,
     setHomeAssistantLightsLockedOn,
+    setGreenMode,
+    isGreenModeEnabled,
+    onGreenModeChange,
     store,
   } = deps;
 
@@ -215,6 +218,11 @@ function createButtonBoxCore(deps) {
         setHomeAssistantEntityState(entityId, state, { source: 'buttonBoxReward' }),
       setHomeAssistantLightsLockedOn: (next, options = {}) =>
         setHomeAssistantLightsLockedOn(next, options),
+      // Rewards receive the standalone feature boundary rather than reaching
+      // into Home Assistant or duplicating green-mode state and alerts.
+      setGreenMode: (next, options = {}) => setGreenMode(next, options),
+      isGreenModeEnabled: () => isGreenModeEnabled(),
+      onGreenModeChange: (listener) => onGreenModeChange(listener),
       saveEffect: (effectId, payload = {}) => saveEffect(effectId, payload, { broadcast: false }),
       clearEffect: (effectId) => clearEffect(effectId, { broadcast: false }),
     };
