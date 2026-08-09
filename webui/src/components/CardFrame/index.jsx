@@ -57,7 +57,7 @@ export default function CardFrame({
   // personal accent while active. Keeping this override in CardFrame makes all
   // present and future cards participate without sprinkling mode checks around.
   const cardStyle = greenMode
-    ? { borderColor: '#00ff00' }
+    ? { borderColor: '#008a35' }
     : accentRgb
       ? { borderColor: rgba(accentRgb, 0.3) }
       : undefined;
@@ -65,7 +65,7 @@ export default function CardFrame({
 
 
   const headerStyle = greenMode
-    ? { borderColor: '#00ff00' }
+    ? { borderColor: '#008a35' }
     : accentRgb
     ? {
         backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 0%, ${rgba(accentRgb, 0.1)} 100%)`,
