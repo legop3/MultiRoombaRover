@@ -19,7 +19,10 @@ function buildCommandRegistry(prefix, timeCommand) {
     mode: { category: 'admin', summary: 'Change the server mode.', usage: [`${prefix} mode <open|turns|admin|lockdown>`], access: 'Admin', permission: 'admin' },
     reason: { category: 'admin', summary: 'Show, set, or clear the admin-mode reason.', usage: [`${prefix} reason [text|clear]`], access: 'Admin to change' },
     goal: { category: 'admin', summary: 'Show, set, or clear the global objective.', usage: [`${prefix} goal [text|clear]`], access: 'Admin to change' },
-    green: { category: 'admin', summary: 'Toggle green room and page mode.', usage: [`${prefix} green <on|off>`], access: 'Admin', permission: 'admin', requiredFeature: 'homeAssistant', unavailableLabel: 'Home Assistant' },
+    // Green mode is fundamentally a server theme. Home Assistant lighting is
+    // an optional enhancement, so the command must remain available when that
+    // integration is absent.
+    green: { category: 'admin', summary: 'Toggle green room and page mode.', usage: [`${prefix} green <on|off>`], access: 'Admin', permission: 'admin' },
     lights: {
       category: 'features',
       summary: 'Control room lights or manage the admin light lock.',

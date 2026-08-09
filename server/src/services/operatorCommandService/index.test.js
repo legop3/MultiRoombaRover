@@ -130,6 +130,11 @@ test('a disabled required feature is reported before any permission check', asyn
   assert.match(await run('rs lights on', nonAdmin), /Home Assistant feature is not configured/);
 });
 
+test('green mode remains available without optional Home Assistant features', async () => {
+  const run = createRouter({ featureEnabled: false });
+  assert.match(await run('rs green on', admin), /Green mode enabled/);
+});
+
 test('ordinary words that merely start with the prefix are not commands', async () => {
   const run = createRouter();
   assert.equal(await run('rsvp', nonAdmin), '');

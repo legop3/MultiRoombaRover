@@ -19,7 +19,7 @@ async function setEnabled(nextValue, options = {}) {
   const next = Boolean(nextValue);
   if (enabled === next) return enabled;
 
-  if (next) {
+  if (next && homeAssistantService.enabled) {
     /*
       Lock first because the existing locked-on transition sets lights white.
       Recoloring RGB lights afterward leaves them green while retaining the
@@ -54,13 +54,21 @@ async function setEnabled(nextValue, options = {}) {
     if (failures.length) {
       logger.warn('Some room controls failed to enter green mode', { failures });
     }
-  } else {
+  } else if (!next && homeAssistantService.enabled) {
     // Disabling the visual mode simply releases the lock it created. Bulb
     // colors remain untouched, matching the existing one-shot light behavior.
     await homeAssistantService.setLightsLockedOn(false, {
       source: String(options?.source || 'greenMode:disable'),
     });
   }
+
+  /*
+    Home Assistant is deliberately optional here. When it is not configured,
+    skipping the physical-room operations still allows the session theme,
+    CardFrame styling, alerts, commands, and timed reward to work normally.
+    The integration's generic lock state is also left untouched because there
+    are no server-managed room controls to lock.
+  */
 
   enabled = next;
   logger.info('Green mode changed', {
