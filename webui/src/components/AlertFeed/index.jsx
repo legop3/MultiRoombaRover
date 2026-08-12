@@ -71,6 +71,7 @@ function isGenericAlert(alert) {
   if (alert?.kind === 'chat' && alert.payload) return false;
   if (alert?.kind === 'chat-typing' && alert.payload) return false;
   if (alert?.kind === 'barcode-scan' && alert.payload) return false;
+  if (alert?.kind === 'undocked-exit-warning') return false;
   return true;
 }
 
@@ -481,6 +482,27 @@ function BarcodeScanToast({ payload }) {
   );
 }
 
+function UndockedExitWarningToast() {
+  return (
+    <div
+      /*
+        This warning deliberately keeps AlertFeed's existing dark shell and
+        compact rounded geometry while giving a safety-critical instruction
+        enough type size and breathing room to be unmistakable. The responsive
+        width leaves space for the feed shell's separate dismiss column on
+        narrow screens instead of allowing the card to overflow the viewport.
+      */
+      className="w-[min(32rem,calc(80vw-1.25rem))] border-l-4 border-amber-400 bg-amber-950/90 px-4 py-3 text-left text-amber-50"
+      role="alert"
+    >
+      <p className="text-xl font-bold leading-tight text-amber-100">Please dock your rover</p>
+      <p className="mt-1 text-base font-medium leading-snug text-amber-50/90">
+        Your rover is still undocked. Please dock it before leaving the page.
+      </p>
+    </div>
+  );
+}
+
 function AlertToast({ alert }) {
   if (alert.kind === 'buttonbox-active' && alert.payload) {
     const payload = alert.payload;
@@ -514,6 +536,9 @@ function AlertToast({ alert }) {
   }
   if (alert.kind === 'barcode-scan' && alert.payload) {
     return <BarcodeScanToast payload={alert.payload} />;
+  }
+  if (alert.kind === 'undocked-exit-warning') {
+    return <UndockedExitWarningToast />;
   }
   return (
     <div
