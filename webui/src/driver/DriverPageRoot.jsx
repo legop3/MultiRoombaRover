@@ -26,6 +26,7 @@ import {
 import useLayoutMode from '../hooks/useLayoutMode.js';
 import { DriverLayoutProvider } from '../layouts/driver/DriverLayoutContext.jsx';
 import DriverLayoutRoot from '../layouts/driver/DriverLayoutRoot.jsx';
+import UndockedPageExitGuard from '../components/UndockedPageExitGuard/index.jsx';
 
 /* Driver-page compositions live under layouts/driver. App retains only global providers, overlays, and route-level state. */
 function DriverPageRoot() {
@@ -92,6 +93,12 @@ function DriverPageContent({ layout }) {
   }, []);
   return (
     <ControlSystemProvider>
+      {/*
+        Keep document-exit protection inside the control provider so it follows
+        the same assigned-rover identity as every driving command. Mounting it
+        only on the driver page leaves spectator and utility routes unchanged.
+      */}
+      <UndockedPageExitGuard />
       <KeyboardInputManager />
       <GamepadInputManager />
       <main className={`relative flex w-full flex-col ${themeGapClass} text-base`}>
