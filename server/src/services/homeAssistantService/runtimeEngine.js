@@ -80,6 +80,27 @@ function normalizeRgbColor(color) {
 function createRuntimeEngine(deps) {
   const { logger, enabled, haConfig, callHomeAssistantService } = deps;
 
+  async function turnOnLightAtFullBrightness(entityId, serviceData = {}) {
+    /*
+      Every server-owned interaction that turns on or changes a light must
+      also restore it to full brightness. Home Assistant remembers a bulb's
+      previous brightness, so sending only a color or color temperature can
+      otherwise make a light appear unexpectedly dim even though this service
+      requested an on-state.
+
+      Keeping this rule in one helper makes it apply consistently to ordinary
+      on commands, RGB changes, white-temperature changes, bulk operations,
+      random scenes, and lock-on behavior. brightness_pct is deliberately
+      written after the caller's service data so future call sites cannot
+      accidentally override the service-wide 100 percent requirement.
+    */
+    await callHomeAssistantService('light', 'turn_on', {
+      entity_id: entityId,
+      ...serviceData,
+      brightness_pct: 100,
+    });
+  }
+
   function emitUpdate(getState) {
     events.emit('update', getState());
   }
@@ -143,7 +164,14 @@ function createRuntimeEngine(deps) {
     const domain = String(meta.domain || (meta.type === 'light' ? 'light' : 'switch')).toLowerCase();
     const service = nextState === 'on' ? 'turn_on' : 'turn_off';
     const source = String(options?.source || 'unknown');
-    await callHomeAssistantService(domain, service, { entity_id: entityId });
+    if (domain === 'light' && service === 'turn_on') {
+      await turnOnLightAtFullBrightness(entityId);
+    } else {
+      // Off commands and non-light domains do not accept a meaningful light
+      // brightness value, so their existing Home Assistant payload stays
+      // intentionally unchanged.
+      await callHomeAssistantService(domain, service, { entity_id: entityId });
+    }
     logger.info('Issued Home Assistant command', { entityId, domain, service, source });
   }
 
@@ -467,7 +495,7 @@ function createRuntimeEngine(deps) {
     if (!runtime.connection) throw new Error('Home Assistant not connected');
 
     const normalized = normalizeRgbColor(color);
-    await callHomeAssistantService('light', 'turn_on', { entity_id: entityId, rgb_color: normalized });
+    await turnOnLightAtFullBrightness(entityId, { rgb_color: normalized });
     logger.info('Issued Home Assistant color command', { entityId, rgbColor: normalized });
   }
 
@@ -481,7 +509,7 @@ function createRuntimeEngine(deps) {
     const normalizedKelvin = Number.isFinite(nextKelvin)
       ? Math.max(2000, Math.min(6500, Math.round(nextKelvin)))
       : DEFAULT_WHITE_KELVIN;
-    await callHomeAssistantService('light', 'turn_on', { entity_id: entityId, color_temp_kelvin: normalizedKelvin });
+    await turnOnLightAtFullBrightness(entityId, { color_temp_kelvin: normalizedKelvin });
     logger.info('Issued Home Assistant white command', { entityId, colorTempKelvin: normalizedKelvin });
   }
 
