@@ -62,7 +62,18 @@ function buildCommandRegistry(prefix, timeCommand) {
       permission: 'admin',
     },
     lift: { category: 'features', summary: 'Show or move the lift.', usage: [`${prefix} lift <status|up|down>`], access: 'Public unless server access is restricted', permission: 'access-mode', requiredFeature: 'lift', unavailableLabel: 'Lift' },
-    neato: { category: 'features', summary: 'Show or control Neato.', usage: [`${prefix} neato <status|start|home|locate|clear-errors>`], access: 'Public unless server access is restricted', permission: 'access-mode', requiredFeature: 'neato', unavailableLabel: 'Neato' },
+    neato: {
+      category: 'features',
+      summary: 'Show or control Neato.',
+      usage: [
+        `${prefix} neato <status|start|home|sound|clear>`,
+        `${prefix} neato navigation <normal|gentle|deep|quick>`,
+      ],
+      access: 'Public unless server access is restricted',
+      permission: 'access-mode',
+      requiredFeature: 'neato',
+      unavailableLabel: 'Neato',
+    },
     bridge: { category: 'discord', summary: 'Configure this Discord server chat bridge.', usage: [`${prefix} bridge`, `${prefix} bridge here <global|private>`, `${prefix} bridge mode <global|private>`, `${prefix} bridge off`], access: 'Discord server manager' },
   };
 }

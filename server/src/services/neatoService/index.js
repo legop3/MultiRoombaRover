@@ -9,6 +9,7 @@ const { isFeatureEnabled } = require('../../helpers/features');
 const { isVerified } = require('../verificationService');
 const { getMode, MODES } = require('../modeManager');
 const { isAdmin, isLockdownAdmin } = require('../roleService');
+const { sendAlert } = require('../alertService');
 const {
   homeAssistantEvents,
   getRawEntitySnapshot,
@@ -31,6 +32,7 @@ function normalizeDeviceName(value) {
 
 const device = normalizeDeviceName(neatoConfig.device);
 const RESUME_DELAY_MS = 3000;
+const ALERT_COLOR = '#a855f7';
 // BrainSlug exposes these exact select values for Gen 3 robots. Keeping the
 // allowlist on the server prevents arbitrary Home Assistant select options from
 // being submitted by a modified browser while preserving BrainSlug's casing.
@@ -70,6 +72,22 @@ const ENTITY_IDS = {
   },
 };
 
+// Alert Feed coverage is intentionally limited to the raw robot lifecycle and
+// issue fields requested for Neato. Battery and charger telemetry poll often and
+// would create noise without representing a useful robot status transition.
+const ALERT_ENTITIES = Object.freeze([
+  { title: 'Neato UI state', entityId: ENTITY_IDS.textSensors.uiState },
+  { title: 'Neato robot state', entityId: ENTITY_IDS.textSensors.robotState },
+  { title: 'Neato robot alert', entityId: ENTITY_IDS.textSensors.robotAlert },
+  { title: 'Neato robot error', entityId: ENTITY_IDS.textSensors.robotError },
+  { title: 'Neato external power', entityId: ENTITY_IDS.binarySensors.extPowerPresent },
+]);
+
+// Each entity establishes its own baseline because ESPHome entities can become
+// available on different snapshots. A Map also distinguishes "not observed yet"
+// from a legitimate raw state string without inventing a sentinel state value.
+const alertBaselines = new Map();
+
 function readRaw(entityIdValue) {
   if (!entityIdValue) return null;
   return getRawEntitySnapshot(entityIdValue);
@@ -99,6 +117,32 @@ function isEntityAvailable(entityIdValue) {
   const state = String(raw.state ?? '').trim().toLowerCase();
   if (!state) return false;
   return state !== 'unavailable';
+}
+
+function emitRawStateAlerts() {
+  for (const { title, entityId: entityIdValue } of ALERT_ENTITIES) {
+    const raw = readState(entityIdValue);
+    const normalized = String(raw ?? '').trim().toLowerCase();
+
+    // Missing and unavailable values commonly occur while Home Assistant or the
+    // ESPHome device reconnects. Ignoring them preserves the last real baseline
+    // and prevents connection churn from becoming misleading Neato activity.
+    if (!normalized || normalized === 'unavailable' || normalized === 'unknown') continue;
+
+    const rawMessage = String(raw);
+    if (!alertBaselines.has(entityIdValue)) {
+      // The first real value is startup state, not a transition caused while the
+      // service was watching, so record it without creating an Alert Feed toast.
+      alertBaselines.set(entityIdValue, rawMessage);
+      continue;
+    }
+    if (alertBaselines.get(entityIdValue) === rawMessage) continue;
+
+    alertBaselines.set(entityIdValue, rawMessage);
+    // The title provides field context, while the message remains exactly the
+    // new Home Assistant state with no friendly translation or previous value.
+    sendAlert({ color: ALERT_COLOR, title, message: rawMessage });
+  }
 }
 
 function requiredEntityIds() {
@@ -214,6 +258,7 @@ if (featureEnabled) {
   */
   homeAssistantEvents.on('snapshot', () => {
     emitUpdate();
+    emitRawStateAlerts();
   });
 
   homeAssistantEvents.on('status', () => {
