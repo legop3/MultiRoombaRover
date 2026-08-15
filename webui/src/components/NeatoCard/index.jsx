@@ -10,17 +10,12 @@ function normalizeState(value) {
   return String(value || '').trim();
 }
 
-function humanizeUiState(value) {
-  const state = normalizeState(value);
-  if (!state) return '--';
-  if (state.includes('DOCKINGRUNNING')) return 'Returning';
-  if (state.includes('PAUSED')) return 'Paused';
-  if (state.includes('HOUSECLEANINGRUNNING')) return 'Cleaning';
-  if (state.includes('SPOTCLEANINGRUNNING')) return 'Spot cleaning';
-  if (state.includes('STATE_START')) return 'Starting';
-  if (state.includes('STATE_IDLE')) return 'Idle';
-  if (state.includes('STATE_STANDBY')) return 'Idle';
-  return state;
+function displayRawState(value) {
+  // Only substitute a placeholder when Home Assistant supplied no value at all.
+  // Otherwise preserve the complete string so the status panel is a faithful
+  // view of BrainSlug output, including identifiers unknown to this frontend.
+  if (value == null || value === '') return '--';
+  return String(value);
 }
 
 function metricToneClass(tone) {
@@ -66,6 +61,7 @@ function NeatoCardContent() {
     neatoLocate,
     neatoClearErrors,
     neatoPowerCycle,
+    neatoSetNavigationMode,
   } = useSessionActions();
   const [working, setWorking] = useState('');
 
@@ -74,14 +70,17 @@ function NeatoCardContent() {
   const docked = Boolean(neato?.telemetry?.extPowerPresent);
   const charging = Boolean(neato?.telemetry?.chargingActive);
 
-  const uiStateLabel = humanizeUiState(neato?.telemetry?.uiState);
-  const robotStateRaw = normalizeState(neato?.telemetry?.robotState) || '--';
+  // These values deliberately stay raw. BrainSlug owns their meaning, and a
+  // partial frontend translation would create a second, potentially incorrect
+  // state model instead of showing what the robot actually reported.
+  const uiStateRaw = displayRawState(neato?.telemetry?.uiState);
+  const robotStateRaw = displayRawState(neato?.telemetry?.robotState);
   const battery = neato?.telemetry?.batteryPercent;
   const batteryLabel = Number.isFinite(battery) ? `${battery}%` : '--';
   const voltage = neato?.telemetry?.batteryVoltage;
   const voltageLabel = Number.isFinite(voltage) ? `${voltage.toFixed(2)} V` : '--';
-  const robotError = normalizeState(neato?.telemetry?.robotError) || '--';
-  const robotAlert = normalizeState(neato?.telemetry?.robotAlert) || '--';
+  const robotError = displayRawState(neato?.telemetry?.robotError);
+  const robotAlert = displayRawState(neato?.telemetry?.robotAlert);
 
   const controls = neato?.controls || {};
   const canStart = Boolean(controls?.start?.available);
@@ -89,12 +88,17 @@ function NeatoCardContent() {
   const canLocate = Boolean(controls?.locate?.available);
   const canClearErrors = Boolean(controls?.clearErrors?.available);
   const canPowerCycle = Boolean(controls?.powerCycle?.available);
+  const navigationMode = controls?.navigationMode || {};
+  const canSetNavigationMode = Boolean(navigationMode.available);
+  const navigationModeValue = normalizeState(navigationMode.value);
+  const navigationModeOptions = Array.isArray(navigationMode.options) ? navigationMode.options : [];
 
   const canRunStart = configured && connected && canStart;
   const canRunSendHome = configured && connected && canSendHome;
   const canRunLocate = configured && connected && canLocate;
   const canRunClearErrors = configured && connected && canClearErrors;
   const canRunPowerCycle = configured && connected && canPowerCycle;
+  const canRunNavigationMode = configured && connected && canSetNavigationMode;
 
   const runAction = async (key, fn) => {
     if (!fn) return;
@@ -113,8 +117,6 @@ function NeatoCardContent() {
 
   const batteryTone =
     battery == null ? 'muted' : battery >= 60 ? 'good' : battery >= 25 ? 'warn' : 'danger';
-
-  const primaryState = docked ? 'Docked' : uiStateLabel !== '--' ? uiStateLabel : 'Away from dock';
 
   return (
     <CardFrame
@@ -179,6 +181,27 @@ function NeatoCardContent() {
               </button>
             </div>
             <div className="surface-muted grid gap-0.5 pt-0.25">
+              <label className="grid gap-0.25 text-xs text-slate-300">
+                <span className="text-center">Navigation mode</span>
+                <select
+                  value={navigationModeValue}
+                  disabled={!canRunNavigationMode || Boolean(working)}
+                  onChange={(event) => runAction(
+                    'navigationMode',
+                    () => neatoSetNavigationMode(event.target.value),
+                  )}
+                  className="field-input w-full text-sm disabled:opacity-50"
+                >
+                  {!navigationModeOptions.includes(navigationModeValue) ? (
+                    <option value="">--</option>
+                  ) : null}
+                  {navigationModeOptions.map((mode) => (
+                    <option key={mode} value={mode}>{mode}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="surface-muted grid gap-0.5 pt-0.25">
               <p className="text-xs text-slate-300 text-center">Power status</p>
               <div className="grid grid-cols-2 gap-0.5">
                 <StatusTile label="Battery" value={batteryLabel} tone={batteryTone} />
@@ -204,24 +227,20 @@ function NeatoCardContent() {
               <p className="text-xs text-slate-300 text-center">Robot Status</p>
               <div className="grid gap-0.5">
                 <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                  <div className="text-[0.72rem] text-slate-300">Robot state (raw)</div>
-                  <div className="font-mono text-sm text-slate-100 break-all">{robotStateRaw}</div>
-                </div>
-                <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                  <div className="text-[0.72rem] text-slate-300">Basic state</div>
-                  <div className="font-mono text-sm text-slate-100 break-all">{primaryState}</div>
-                </div>
-                <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                  <div className="text-[0.72rem] text-slate-300">UI state</div>
-                  <div className="font-mono text-sm text-slate-100 break-all">{uiStateLabel}</div>
+                  <div className="text-[0.72rem] text-slate-300">Robot alert</div>
+                  <div className="font-mono text-sm text-slate-100 break-all">{robotAlert}</div>
                 </div>
                 <div className="rounded-md bg-slate-800 px-1 py-0.5">
                   <div className="text-[0.72rem] text-slate-300">Robot error</div>
                   <div className="font-mono text-sm text-slate-100 break-all">{robotError}</div>
                 </div>
                 <div className="rounded-md bg-slate-800 px-1 py-0.5">
-                  <div className="text-[0.72rem] text-slate-300">Robot alert</div>
-                  <div className="font-mono text-sm text-slate-100 break-all">{robotAlert}</div>
+                  <div className="text-[0.72rem] text-slate-300">Robot state</div>
+                  <div className="font-mono text-sm text-slate-100 break-all">{robotStateRaw}</div>
+                </div>
+                <div className="rounded-md bg-slate-800 px-1 py-0.5">
+                  <div className="text-[0.72rem] text-slate-300">UI state</div>
+                  <div className="font-mono text-sm text-slate-100 break-all">{uiStateRaw}</div>
                 </div>
               </div>
             </div>

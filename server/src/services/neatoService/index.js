@@ -31,6 +31,10 @@ function normalizeDeviceName(value) {
 
 const device = normalizeDeviceName(neatoConfig.device);
 const RESUME_DELAY_MS = 3000;
+// BrainSlug exposes these exact select values for Gen 3 robots. Keeping the
+// allowlist on the server prevents arbitrary Home Assistant select options from
+// being submitted by a modified browser while preserving BrainSlug's casing.
+const NAVIGATION_MODES = Object.freeze(['Normal', 'Gentle', 'Deep', 'Quick']);
 
 function entityId(domain, suffix) {
   if (!device) return '';
@@ -60,6 +64,9 @@ const ENTITY_IDS = {
     uiState: entityId('sensor', 'ui_state'),
     robotError: entityId('sensor', 'robot_error'),
     robotAlert: entityId('sensor', 'robot_alert'),
+  },
+  selects: {
+    navigationMode: entityId('select', 'navigation_mode'),
   },
 };
 
@@ -145,6 +152,14 @@ function buildState() {
     powerCycle: {
       entityId: ENTITY_IDS.buttons.powerCycle,
       available: hasEntity(ENTITY_IDS.buttons.powerCycle),
+    },
+    navigationMode: {
+      entityId: ENTITY_IDS.selects.navigationMode,
+      available: isEntityAvailable(ENTITY_IDS.selects.navigationMode),
+      value: readState(ENTITY_IDS.selects.navigationMode),
+      // The browser receives the supported choices through the session contract
+      // instead of duplicating BrainSlug-specific values in the presentation layer.
+      options: NAVIGATION_MODES,
     },
   };
 
@@ -255,6 +270,29 @@ async function powerCycle() {
   await pressButton(ENTITY_IDS.buttons.powerCycle, 'powercucle');
 }
 
+async function setNavigationMode(mode) {
+  assertConfiguredAndConnected();
+  const normalizedMode = String(mode || '').trim();
+  if (!NAVIGATION_MODES.includes(normalizedMode)) {
+    throw new Error('Invalid Neato navigation mode');
+  }
+  if (!isEntityAvailable(ENTITY_IDS.selects.navigationMode)) {
+    throw new Error('Neato action unavailable: navigation_mode');
+  }
+
+  // ESPHome implements Navigation Mode as a Home Assistant select entity, so
+  // select_option is the native service call and avoids sending raw UART commands.
+  await callHomeAssistantService('select', 'select_option', {
+    entity_id: ENTITY_IDS.selects.navigationMode,
+    option: normalizedMode,
+  });
+  logger.info('Issued Neato action', {
+    action: 'set_navigation_mode',
+    entityId: ENTITY_IDS.selects.navigationMode,
+    option: normalizedMode,
+  });
+}
+
 function getState() {
   cachedState = buildState();
   return cachedState;
@@ -328,6 +366,16 @@ if (featureEnabled) {
       cb({ error: err.message });
     }
   });
+
+  socket.on('neato:setNavigationMode', async ({ mode } = {}, cb = () => {}) => {
+    try {
+      assertFeatureAccess();
+      await setNavigationMode(mode);
+      cb({ success: true });
+    } catch (err) {
+      cb({ error: err.message });
+    }
+  });
   });
 } else {
   logger.info('Neato disabled by config');
@@ -342,5 +390,6 @@ module.exports = {
   locateRobot,
   clearErrors,
   powerCycle,
+  setNavigationMode,
   neatoEvents: events,
 };
