@@ -1,3 +1,8 @@
+1. improve midi player
+```
+research how midis can be played easier with drag and drop, auto selection based on which playback mode would fit, more useful and clear toggles, sample midi files to analyze how they would play on a single tone system, better live playback to see what notes are actually playing from each source and what simply wont play on the speaker
+and make sure each toggle and counter actually has a purpose besides debugging or something more useful to the user, note skipped is just for debugging
+```
 1. assign rovers based on battery percentage, give people highest one
 2. setting to disable replay popups in spectator settings menu
 3. add admin ui for VIP and private requests instead of only through discord
