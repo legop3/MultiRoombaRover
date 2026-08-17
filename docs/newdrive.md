@@ -1,0 +1,28 @@
+- start work on new better ui layout, using components that already exist when possible
+- centered rover video, full screen height
+  - rover HUD contains small but expandable rover telemetry UI and vis
+  - make newgen folder for new HUD elements. reuse old elements where possible
+  - make all new hud elements small and clean
+  - every hud element:
+    - is a nice small translucent thing with text icons or both
+    - can be expanded to show more relavent information
+    - is consistent. maybe make a reusable thing for this
+  - some specific hud elements:
+    - top bar:
+      - battery percentage that goes red and flashes and such
+      - turns hud that shows people in queue
+    - big in the middle
+      - left and right sides
+        - wheel drop indicators that show up when wheel drop is happening
+      - overcurrent and battery warnings
+    - bottom section:
+      - sensor elements that show up only when the sensor is "happening"
+        - bumpers
+        - front IR proximity sensors
+- two sidebars
+  - sidebars contain all the stuff that isnt the rover
+  - left
+    - idk
+  - right
+    - chat, users, rovers list, and replay sources
+- everything involving the rover is a video HUD, everything external is in the sidebars
