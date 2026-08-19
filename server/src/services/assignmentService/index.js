@@ -244,7 +244,8 @@ function pickRover(socket, options = {}) {
   }
   /*
     Eligibility is resolved above, while this shared comparator owns only the
-    requested placement order: undocked-and-empty, battery, then driver count.
+    requested placement order: empty, undocked when empty, driver count, then
+    battery percentage.
     Keeping those concerns separate prevents a ranking change from weakening
     lock, private-rover, role, or mode access checks.
   */

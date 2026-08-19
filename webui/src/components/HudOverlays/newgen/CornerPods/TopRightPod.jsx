@@ -2,7 +2,6 @@
 // Purpose: Combines the battery/current gauge with a compact attached advanced-power expansion.
 import { createElement, useMemo } from 'react';
 import { FaArrowDown, FaArrowUp, FaBatteryHalf, FaBolt, FaExclamationTriangle, FaMemory, FaThermometerHalf, FaWifi } from 'react-icons/fa';
-import { useControlSelector } from '../../../../controls/index.js';
 import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import { useTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
 import { hostStatsEqual, selectHostStats, selectSpectatorTelemetry, spectatorTelemetryEqual } from '../../../../context/telemetryViews.js';
@@ -70,7 +69,6 @@ function SpeedTile({ icon, label, value, colorClass }) {
 export default function TopRightPod({ roverId }) {
   const [batteryOpen, setBatteryOpen] = usePodVisibility('battery', true);
   const [powerOpen, setPowerOpen] = usePodVisibility('advancedPower', false);
-  const dockAssistActive = useControlSelector((control) => Boolean(control.state.manualDockAssist?.active));
   const batteryState = useSessionSelector((state) => {
     const rover = (state.session?.roster || []).find((entry) => String(entry.id) === String(roverId));
     return rover?.batteryState || null;
@@ -104,26 +102,11 @@ export default function TopRightPod({ roverId }) {
   const download = finite(wifi.downloadMbps);
   const upload = finite(wifi.uploadMbps);
   const docked = Boolean(electrical?.homeBase);
-  const chargingLabel = String(electrical?.chargingStateLabel || '').toLowerCase();
-  const charging = docked && chargingLabel !== '' && chargingLabel !== 'not charging';
-  const autoDocking = !docked && !dockAssistActive && String(electrical?.oiModeLabel || '').toLowerCase() === 'passive';
-
-  // The warning describes the next useful fact instead of blindly telling every user to dock.
-  // This matters during assist, autonomous docking, and charging, where the old overlay's generic
-  // instruction was either redundant or actively misleading.
-  let warningMessage = urgentBattery ? 'Battery critical · Dock now' : 'Battery low · Dock soon';
-  if (charging) {
-    warningMessage = urgentBattery ? 'Battery critical · Charging' : 'Battery low · Charging';
-  } else if (docked) {
-    warningMessage = urgentBattery ? 'Battery critical · On dock' : 'Battery low · On dock';
-  } else if (dockAssistActive) {
-    warningMessage = urgentBattery ? 'Battery critical · Continue docking' : 'Battery low · Continue docking';
-  } else if (autoDocking) {
-    warningMessage = urgentBattery ? 'Battery critical · Returning to dock' : 'Battery low · Returning to dock';
-  }
+  const warningMessage = urgentBattery ? 'BATTERY CRITICAL, DOCK NOW' : 'Battery low, please dock soon.';
 
   return (
-    <div className="pointer-events-auto absolute right-0 top-0 z-20 flex flex-col items-end">
+    <>
+      <div className="pointer-events-auto absolute right-0 top-0 z-20 flex flex-col items-end">
       {batteryOpen ? (
         <div className="relative flex h-[8.5rem] w-[8.5rem] items-center justify-center rounded-bl-[4.25rem] bg-black/60">
           {/* Let the gauge geometry define the visible inset so this pod does not carry an
@@ -150,22 +133,6 @@ export default function TopRightPod({ roverId }) {
         <CornerPodToggle corner="top-right" expanded={false} label="Show battery pod" onClick={() => setBatteryOpen(true)} />
       )}
 
-      {/* This is status, not another docking control. Keeping it attached to the battery pod
-          preserves one canonical Dock action while still making the reason for urgency obvious. */}
-      {lowBattery ? (
-        <div
-          className={`absolute top-12 flex items-center gap-1.5 whitespace-nowrap rounded-l px-2.5 py-1.5 text-xs font-bold text-white transition-[right,background-color] ${
-            batteryOpen ? 'right-[8.5rem]' : 'right-0'
-          } ${
-            urgentBattery ? 'bg-red-950' : 'bg-amber-950'
-          }`}
-          role="status"
-        >
-          <FaExclamationTriangle className={urgentBattery ? 'text-red-300' : 'text-amber-300'} aria-hidden="true" />
-          <span>{warningMessage}</span>
-        </div>
-      ) : null}
-
       {/* Advanced power is an independently persisted right-edge expansion. Its own arrow is
           retained when closed, and the whole panel moves into the corner if the pod closes. */}
       {powerOpen ? (
@@ -187,6 +154,22 @@ export default function TopRightPod({ roverId }) {
           <ExpansionToggle direction="left" label="Show power and computer" onClick={() => setPowerOpen(true)} />
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Battery danger is a stage-level warning, so it belongs near the user's focus instead
+          of beside the corner gauge. It deliberately has only two stable messages and no
+          animation; severity comes from its size and solid color rather than visual noise. */}
+      {lowBattery && !docked ? (
+        <div
+          className={`pointer-events-none absolute left-1/2 top-[58%] z-[55] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap px-4 py-2 font-bold text-white shadow-xl ${
+            urgentBattery ? 'bg-red-950 text-xl' : 'bg-amber-950 text-base'
+          }`}
+          role="alert"
+        >
+          <FaExclamationTriangle className={urgentBattery ? 'text-red-300' : 'text-amber-300'} aria-hidden="true" />
+          <span>{warningMessage}</span>
+        </div>
+      ) : null}
+    </>
   );
 }

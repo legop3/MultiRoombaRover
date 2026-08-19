@@ -22,21 +22,38 @@ function rankedIds(entries) {
   return entries.sort(compareRoversForAssignment).map((entry) => entry.id);
 }
 
-test('an undocked empty rover outranks every rover that is docked or occupied', () => {
+test('an empty rover outranks an occupied rover regardless of battery or docking state', () => {
   const result = rankedIds([
     rover({ id: 'occupied-high', docked: false, battery: 100, drivers: 1 }),
-    rover({ id: 'docked-high', docked: true, battery: 100 }),
-    rover({ id: 'ready-empty', docked: false, battery: 20 }),
+    rover({ id: 'docked-empty', docked: true, battery: 20 }),
   ]);
 
-  assert.equal(result[0], 'ready-empty');
+  assert.deepEqual(result, ['docked-empty', 'occupied-high']);
 });
 
-test('battery percentage ranks rovers after undocked-and-empty readiness', () => {
+test('an undocked rover is preferred when both rovers are empty', () => {
   const result = rankedIds([
-    rover({ id: 'low', docked: false, battery: 35 }),
-    rover({ id: 'high', docked: false, battery: 90 }),
-    rover({ id: 'middle', docked: false, battery: 60 }),
+    rover({ id: 'docked-high', docked: true, battery: 100 }),
+    rover({ id: 'undocked-low', docked: false, battery: 20 }),
+  ]);
+
+  assert.deepEqual(result, ['undocked-low', 'docked-high']);
+});
+
+test('lowest driver count ranks occupied rovers before battery percentage', () => {
+  const result = rankedIds([
+    rover({ id: 'busy-high', docked: false, battery: 100, drivers: 4 }),
+    rover({ id: 'quieter-low', docked: false, battery: 20, drivers: 1 }),
+  ]);
+
+  assert.deepEqual(result, ['quieter-low', 'busy-high']);
+});
+
+test('battery percentage ranks rovers after availability and load are equal', () => {
+  const result = rankedIds([
+    rover({ id: 'low', docked: false, battery: 35, drivers: 1 }),
+    rover({ id: 'high', docked: false, battery: 90, drivers: 1 }),
+    rover({ id: 'middle', docked: false, battery: 60, drivers: 1 }),
   ]);
 
   assert.deepEqual(result, ['high', 'middle', 'low']);
@@ -49,15 +66,6 @@ test('known battery percentage outranks missing battery telemetry', () => {
   ]);
 
   assert.deepEqual(result, ['known', 'unknown']);
-});
-
-test('driver count breaks a battery-percentage tie', () => {
-  const result = rankedIds([
-    rover({ id: 'busy', docked: false, battery: 70, drivers: 3 }),
-    rover({ id: 'less-busy', docked: false, battery: 70, drivers: 1 }),
-  ]);
-
-  assert.deepEqual(result, ['less-busy', 'busy']);
 });
 
 test('exactly equivalent rovers remain tied for random selection by assignmentService', () => {

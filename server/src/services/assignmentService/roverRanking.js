@@ -36,13 +36,36 @@ function batteryPercentage(rover) {
 
 function compareRoversForAssignment(left, right) {
   /*
-    An undocked rover with nobody assigned is the most useful placement because
-    it starts a fresh driving session without adding another user to a queue.
-    Both conditions must be true to receive this first-priority rank.
+    Spread drivers across the fleet before adding another person to an existing
+    rover queue. This comparison is deliberately independent of battery: a
+    small battery-percentage difference should never concentrate users on one
+    rover while another eligible rover has nobody assigned.
   */
-  const leftReadyAndEmpty = readDockedState(left) === false && driverCount(left) === 0;
-  const rightReadyAndEmpty = readDockedState(right) === false && driverCount(right) === 0;
-  if (leftReadyAndEmpty !== rightReadyAndEmpty) return leftReadyAndEmpty ? -1 : 1;
+  const leftDrivers = driverCount(left);
+  const rightDrivers = driverCount(right);
+  const leftEmpty = leftDrivers === 0;
+  const rightEmpty = rightDrivers === 0;
+  if (leftEmpty !== rightEmpty) return leftEmpty ? -1 : 1;
+
+  /*
+    When both choices are empty, prefer the rover that is already away from its
+    dock. Docking state does not separate occupied rovers because queue balance
+    is more useful there, and an existing driver may already be handling the
+    rover's physical state. Unknown docking telemetry receives no undocked
+    preference rather than being guessed as ready.
+  */
+  if (leftEmpty && rightEmpty) {
+    const leftUndocked = readDockedState(left) === false;
+    const rightUndocked = readDockedState(right) === false;
+    if (leftUndocked !== rightUndocked) return leftUndocked ? -1 : 1;
+  }
+
+  /*
+    For occupied rovers, queue length is the primary balancing signal. This is
+    intentionally evaluated before battery so a one-percent battery advantage
+    cannot cause every later user to pile onto the same rover.
+  */
+  if (leftDrivers !== rightDrivers) return leftDrivers - rightDrivers;
 
   const leftBattery = batteryPercentage(left);
   const rightBattery = batteryPercentage(right);
@@ -52,12 +75,11 @@ function compareRoversForAssignment(left, right) {
   if (leftHasBattery && leftBattery !== rightBattery) return rightBattery - leftBattery;
 
   /*
-    Battery-equivalent rovers are balanced by current assignment load. Returning
-    zero after this comparison is intentional: assignmentService randomly picks
-    within that exact best tier so stable Map insertion order does not create a
-    permanent favorite rover.
+    Returning zero is intentional. assignmentService randomly selects from the
+    complete best tier so stable Map insertion order cannot permanently favor a
+    rover whose emptiness, docking state, load, and battery are all equivalent.
   */
-  return driverCount(left) - driverCount(right);
+  return 0;
 }
 
 module.exports = {
