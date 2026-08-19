@@ -73,26 +73,25 @@ constexpr uint16_t kMgmtCommandCompleteEvent = 0x0001;
 constexpr uint16_t kMgmtCommandStatusEvent = 0x0002;
 constexpr uint16_t kMgmtNewSettingsEvent = 0x0006;
 constexpr uint16_t kMgmtPinCodeRequestEvent = 0x000e;
+constexpr uint16_t kMgmtDeviceFoundEvent = 0x0012;
+constexpr uint16_t kMgmtDiscoveringEvent = 0x0013;
 constexpr uint16_t kMgmtPinCodeReplyCommand = 0x0016;
 constexpr uint16_t kMgmtSetConnectableCommand = 0x0007;
 constexpr uint16_t kMgmtSetFastConnectableCommand = 0x0008;
+constexpr uint16_t kMgmtStartDiscoveryCommand = 0x0023;
+constexpr uint16_t kMgmtStopDiscoveryCommand = 0x0024;
 constexpr uint16_t kPrimaryControllerIndex = 0;
 constexpr uint8_t kBluetoothClassicAddressType = 0;
+constexpr uint8_t kBluetoothClassicDiscoveryMask = 1U << 0;
+constexpr uint32_t kDeviceFoundLegacyPairingFlag = 1U << 1;
+constexpr uint8_t kEirClassOfDeviceType = 0x0d;
+constexpr uint32_t kBalanceBoardClassOfDevice = 0x00002504;
 constexpr uint32_t kControllerConnectableSetting = 1U << 1;
 constexpr uint32_t kControllerFastConnectableSetting = 1U << 2;
 constexpr int kManagementCommandTimeoutMs = 2000;
 constexpr int kFrameIntervalMs = 50;
 constexpr int kDiscoveryRestartDelayMs = 1000;
-// A live bluetoothctl PID is not proof that BlueZ actually began inquiry. Some
-// adapters can leave the command parked after accepting its discovery filter,
-// which previously made commissioning look active for the command's full
-// one-day lifetime while the controller remained `Discovering: no`. Bound that
-// unconfirmed startup state so a transient adapter or BlueZ failure is repaired
-// automatically instead of requiring a manual foreground scan.
 constexpr int kDiscoveryStartDeadlineMs = 5000;
-constexpr int kCandidateIdentityRetryMs = 500;
-constexpr int kCandidateIdleRetryMs = 5000;
-constexpr const char* kDiscoveryTimeoutSeconds = "86400";
 constexpr uint16_t kHidControlPsm = 0x0011;
 constexpr uint16_t kHidInterruptPsm = 0x0013;
 constexpr int kCommissioningConnectWindowMs = 15000;
@@ -116,6 +115,16 @@ struct PairingSharedState {
   std::optional<BluetoothAddress> active_target;
   std::optional<BluetoothAddress> active_pin;
   std::optional<std::string> commissioned_address;
+  // Discovery commands and events use the same kernel management socket as
+  // raw Wii PIN replies. The main thread owns socket reads while the
+  // commissioning thread consumes this small synchronized state, avoiding a
+  // second reader that could steal PIN or controller-setting events.
+  std::optional<BluetoothAddress> discovery_candidate;
+  std::string discovery_error;
+  bool discovery_start_pending = false;
+  bool discovery_stop_pending = false;
+  bool discovery_session_started = false;
+  bool discovery_active = false;
   bool commissioning = false;
   bool outbound_connection_requested = false;
 };
@@ -130,19 +139,6 @@ struct BoardReadings {
 struct CommandResult {
   int exit_code = -1;
   std::string output;
-};
-
-struct RunningCommand {
-  pid_t pid = -1;
-  int output_fd = -1;
-  std::string pending_output;
-  std::string transcript;
-};
-
-struct DiscoveryCandidate {
-  BluetoothAddress address;
-  uint64_t last_seen_at = 0;
-  uint64_t next_identity_check_at = 0;
 };
 
 struct ManagementRuntimeState {
@@ -230,6 +226,24 @@ std::optional<BluetoothAddress> parse_address(const std::string& raw) {
   return address;
 }
 
+BluetoothAddress address_from_management_wire(const uint8_t* wire) {
+  BluetoothAddress address;
+  if (!wire) return address;
+
+  // Management packets carry Bluetooth addresses least-significant byte first,
+  // while every BlueZ command and user-facing status expects the conventional
+  // most-significant-byte-first representation. Preserve both forms because
+  // the original wire bytes are later compared with the kernel PIN request.
+  std::copy(wire, wire + address.wire.size(), address.wire.begin());
+  char address_buffer[18]{};
+  std::snprintf(
+      address_buffer, sizeof(address_buffer), "%02X:%02X:%02X:%02X:%02X:%02X",
+      address.wire[5], address.wire[4], address.wire[3],
+      address.wire[2], address.wire[1], address.wire[0]);
+  address.display = address_buffer;
+  return address;
+}
+
 CommandResult run_command(const std::vector<std::string>& args) {
   CommandResult result;
   if (args.empty()) return result;
@@ -275,170 +289,16 @@ CommandResult run_command(const std::vector<std::string>& args) {
   return result;
 }
 
-RunningCommand start_command(const std::vector<std::string>& args) {
-  RunningCommand command;
-  if (args.empty()) return command;
-
-  int pipe_fds[2]{};
-  if (pipe(pipe_fds) != 0) {
-    command.transcript = std::strerror(errno);
-    return command;
-  }
-
-  const pid_t pid = fork();
-  if (pid == 0) {
-    dup2(pipe_fds[1], STDOUT_FILENO);
-    dup2(pipe_fds[1], STDERR_FILENO);
-    close(pipe_fds[0]);
-    close(pipe_fds[1]);
-
-    std::vector<char*> argv;
-    argv.reserve(args.size() + 1);
-    for (const auto& arg : args) argv.push_back(const_cast<char*>(arg.c_str()));
-    argv.push_back(nullptr);
-    execvp(argv[0], argv.data());
-    _exit(127);
-  }
-
-  close(pipe_fds[1]);
-  if (pid < 0) {
-    command.transcript = std::strerror(errno);
-    close(pipe_fds[0]);
-    return command;
-  }
-
-  // Discovery has no predetermined completion time: it must remain active until
-  // the user wakes the board. A nonblocking pipe lets the commissioning thread
-  // consume BlueZ events while still honoring server shutdown and maintenance
-  // commands promptly.
-  const int current_flags = fcntl(pipe_fds[0], F_GETFL, 0);
-  if (current_flags >= 0) fcntl(pipe_fds[0], F_SETFL, current_flags | O_NONBLOCK);
-  command.pid = pid;
-  command.output_fd = pipe_fds[0];
-  return command;
-}
-
-bool collect_command_output(RunningCommand* command) {
-  if (!command || command->pid < 0) return false;
-
-  std::array<char, 1024> buffer{};
-  ssize_t count = 0;
-  while ((count = read(command->output_fd, buffer.data(), buffer.size())) > 0) {
-    const std::string chunk(buffer.data(), static_cast<std::size_t>(count));
-    command->pending_output += chunk;
-    command->transcript += chunk;
-    // A busy Bluetooth environment can produce an unbounded stream of RSSI
-    // updates. Retain only the most recent output instead of allowing a
-    // commissioning session left open for days to grow the worker indefinitely.
-    constexpr std::size_t max_transcript_size = 8192;
-    if (command->transcript.size() > max_transcript_size) {
-      command->transcript.erase(0, command->transcript.size() - max_transcript_size);
-    }
-  }
-
-  int status = 0;
-  const pid_t waited = waitpid(command->pid, &status, WNOHANG);
-  if (waited == 0) return true;
-  if (waited == command->pid) {
-    command->pid = -1;
-  }
-  return false;
-}
-
-void stop_command(RunningCommand* command) {
-  if (!command) return;
-  if (command->pid > 0) {
-    // bluetoothctl normally exits immediately on SIGTERM. Bound that grace
-    // period so a wedged D-Bus client cannot prevent the server from stopping.
-    kill(command->pid, SIGTERM);
-    for (int attempt = 0; attempt < 50 && command->pid > 0; ++attempt) {
-      collect_command_output(command);
-      if (command->pid > 0) usleep(10000);
-    }
-    if (command->pid > 0) {
-      kill(command->pid, SIGKILL);
-      int status = 0;
-      while (waitpid(command->pid, &status, 0) < 0 && errno == EINTR) {}
-      command->pid = -1;
-    }
-  }
-  if (command->output_fd >= 0) {
-    close(command->output_fd);
-    command->output_fd = -1;
-  }
-}
-
-std::optional<BluetoothAddress> take_discovered_board(
-    RunningCommand* discovery, bool* discovery_started,
-    std::vector<DiscoveryCandidate>* candidates) {
-  if (!discovery) return std::nullopt;
-  std::size_t newline = discovery->pending_output.find('\n');
-  while (newline != std::string::npos) {
-    const std::string line = discovery->pending_output.substr(0, newline);
-    discovery->pending_output.erase(0, newline + 1);
-
-    // bluetoothctl reports filter setup before StartDiscovery completes. Treat
-    // only this explicit event as proof that button presses can now be seen;
-    // `SetDiscoveryFilter success` alone is not an active Bluetooth scan.
-    if (discovery_started && line.find("Discovery started") != std::string::npos) {
-      *discovery_started = true;
-    }
-
-    const std::size_t device_prefix = line.find("Device ");
-    if (device_prefix != std::string::npos && line.size() >= device_prefix + 24) {
-      const auto address = parse_address(line.substr(device_prefix + 7, 17));
-      if (!address.has_value()) {
-        newline = discovery->pending_output.find('\n');
-        continue;
-      }
-
-      // The exact remote name remains definitive whenever the adapter resolves
-      // it during the board's short red-Sync window.
-      if (line.find(kBoardBluetoothName) != std::string::npos) return address;
-
-      // Some adapters initially report only "Device <address> <address>" and
-      // never finish remote-name resolution before the board powers down. Keep
-      // those unresolved devices as candidates so their BlueZ properties can be
-      // inspected without stopping the discovery session. Named ambient devices
-      // such as TVs are not candidates, which prevents normal room traffic from
-      // replacing the panel's useful waiting-for-Sync message.
-      const std::string trailing = line.substr(device_prefix + 24);
-      const bool address_only = trailing.empty() ||
-          trailing.find(address->display) != std::string::npos;
-      if (address_only && candidates) {
-        const uint64_t now = monotonic_ms();
-        const auto existing = std::find_if(
-            candidates->begin(), candidates->end(),
-            [&](const DiscoveryCandidate& candidate) {
-              return candidate.address.display == address->display;
-            });
-        if (existing == candidates->end()) {
-          candidates->push_back({*address, now, now});
-          emit_status("device-detected", address->display,
-                      "Bluetooth device detected; checking whether it is the Balance Board.");
-        } else {
-          // A fresh scan event generally means the physical button was pressed
-          // again. Recheck immediately even if this candidate had previously
-          // fallen back to the slower idle retry interval.
-          existing->last_seen_at = now;
-          existing->next_identity_check_at = now;
-        }
-      }
-    }
-    newline = discovery->pending_output.find('\n');
-  }
-  return std::nullopt;
-}
-
 bool candidate_is_balance_board(const BluetoothAddress& address) {
   const CommandResult info = run_command({
       "bluetoothctl", "--timeout", "2", "info", address.display});
   if (info.output.find(kBoardBluetoothName) != std::string::npos) return true;
 
   // Original Wii input devices identify as legacy-pairing gaming peripherals.
-  // This fallback is deliberately applied only to an address-only device seen
-  // during active commissioning. That physical red-Sync action is the selection
-  // boundary when an adapter cannot resolve Nintendo's remote name in time.
+  // This fallback is deliberately applied only to an address delivered by the
+  // kernel's legacy-pairing Device Found event during active commissioning.
+  // That physical red-Sync action is the selection boundary when an adapter
+  // cannot resolve Nintendo's remote name in time.
   const bool gaming_peripheral =
       info.output.find("Class: 0x00002504") != std::string::npos &&
       info.output.find("Icon: input-gaming") != std::string::npos;
@@ -502,7 +362,11 @@ std::optional<BluetoothAddress> find_default_controller() {
   return std::nullopt;
 }
 
-void commissioning_loop(PairingSharedState* shared) {
+bool start_management_discovery(int fd, PairingSharedState* shared,
+                                std::string* error);
+void stop_management_discovery(int fd, PairingSharedState* shared);
+
+void commissioning_loop(PairingSharedState* shared, int management_fd) {
   while (running.load()) {
     bool should_commission = false;
     {
@@ -516,112 +380,62 @@ void commissioning_loop(PairingSharedState* shared) {
     }
 
     emit_status("commissioning");
-    // Commissioning must be listening before the board's short red-Sync window
-    // begins. Keep one BlueZ discovery client alive continuously and consume its
-    // own event stream. The previous bounded scan exited for twelve seconds at a
-    // time and then queried a second client, making successful discovery depend
-    // on when the physical button happened to be pressed.
-    // BlueZ's command-line client exits after the SetDiscoveryFilter callback
-    // unless non-interactive mode has a timeout. Its explicit monitor mode is
-    // equally important because current bluetoothctl versions otherwise omit
-    // the asynchronous `[NEW]` and `[CHG]` device lines parsed below.
-    //
-    // stdout and stderr are worker-owned pipes rather than a terminal. Fedora's
-    // bluetoothctl therefore block-buffers even `Discovery started`, leaving a
-    // genuinely active scan indistinguishable from a hung process until the
-    // one-day command exits. stdbuf replaces itself with bluetoothctl in the
-    // same PID while forcing both streams to flush each line immediately. That
-    // gives the watchdog and device parser live evidence without adding a
-    // pseudo-terminal or another process for the supervisor to manage.
-    //
-    // The one-day timeout keeps that monitored client alive for unattended
-    // commissioning; the worker normally stops it itself as soon as the board
-    // appears and restarts it if the day expires.
-    RunningCommand discovery = start_command({
-        "stdbuf", "-oL", "-eL", "bluetoothctl", "--monitor", "--timeout",
-        kDiscoveryTimeoutSeconds, "scan", "bredr"});
-    if (discovery.pid < 0) {
-      emit_status("error", "", "could not start Bluetooth discovery: " +
-          command_error_summary(discovery.transcript, "unknown process error"));
+    // Discovery is deliberately performed through the kernel management
+    // socket already required for Wii PIN replies. Long-running bluetoothctl
+    // output proved version- and terminal-dependent on the production server;
+    // MGMT Device Found events are the stable interface underneath BlueZ and
+    // arrive on this socket without parsing human-oriented terminal output.
+    std::string discovery_error;
+    if (!start_management_discovery(
+            management_fd, shared, &discovery_error)) {
+      emit_status("error", "", "Bluetooth discovery could not start: " +
+          discovery_error);
       std::this_thread::sleep_for(std::chrono::milliseconds(kDiscoveryRestartDelayMs));
       continue;
     }
 
     std::optional<BluetoothAddress> address;
-    bool discovery_started = false;
-    // Measure from the successful fork, not from the first output line. A
-    // wedged bluetoothctl may emit `SetDiscoveryFilter success` and then stay
-    // alive forever without producing the only confirmation that matters:
-    // `Discovery started`.
-    const uint64_t discovery_launched_at = monotonic_ms();
-    std::vector<DiscoveryCandidate> candidates;
     while (running.load() && !address.has_value()) {
-      const bool discovery_running = collect_command_output(&discovery);
-      const bool was_started = discovery_started;
-      address = take_discovered_board(
-          &discovery, &discovery_started, &candidates);
-      if (!was_started && discovery_started) {
-        // This status clears any prior scanner error and tells the browser that
-        // the server is genuinely listening for the board's red Sync button.
-        emit_status("discovering");
-      }
-      if (address.has_value()) break;
-
-      const uint64_t now = monotonic_ms();
-      for (auto& candidate : candidates) {
-        if (now < candidate.next_identity_check_at) continue;
-        if (candidate_is_balance_board(candidate.address)) {
-          address = candidate.address;
-          break;
-        }
-
-        // Query quickly while a newly pressed board is still awake, then back
-        // off once it has been absent for several seconds. A later scan event
-        // resets this deadline immediately, so another button press never waits
-        // for the idle interval and an unidentified device cannot cause a
-        // permanent stream of bluetoothctl processes.
-        const bool recently_seen = now - candidate.last_seen_at < 10000;
-        candidate.next_identity_check_at = now +
-            (recently_seen ? kCandidateIdentityRetryMs : kCandidateIdleRetryMs);
-      }
-      if (address.has_value()) break;
-      if (!discovery_running) {
-        const std::string detail = command_error_summary(
-            discovery.transcript, "bluetoothctl exited unexpectedly");
-        emit_status("error", "", discovery_started
-            ? "Bluetooth scanner stopped unexpectedly; retrying automatically: " + detail
-            : "Bluetooth scanner exited before discovery started; retrying automatically: " + detail);
-        break;
-      }
-
-      if (!discovery_started &&
-          now - discovery_launched_at >= kDiscoveryStartDeadlineMs) {
-        // Terminating this specific client is safe: stop_command() only owns
-        // the child created above, and the outer commissioning loop immediately
-        // starts a clean replacement. Preserve bluetoothctl's actual output in
-        // the status so the panel explains whether BlueZ stalled after filter
-        // setup or failed in some other adapter-specific way.
-        const std::string detail = command_error_summary(
-            discovery.transcript, "bluetoothctl produced no startup response");
-        emit_status(
-            "error", "",
-            "Bluetooth scanner did not start within 5 seconds; retrying automatically: " +
-                detail);
-        break;
-      }
-
+      std::optional<BluetoothAddress> candidate;
       bool still_commissioning = false;
       {
         std::lock_guard<std::mutex> lock(shared->mutex);
         still_commissioning = shared->commissioning &&
             !shared->commissioned_address.has_value();
+        candidate = shared->discovery_candidate;
+        shared->discovery_candidate.reset();
+        discovery_error = shared->discovery_error;
       }
       if (!still_commissioning) break;
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      if (!discovery_error.empty()) {
+        emit_status("error", "", discovery_error);
+        break;
+      }
+
+      if (candidate.has_value()) {
+        emit_status("device-detected", candidate->display,
+                    "Classic Bluetooth device detected; checking whether it is the Balance Board.");
+        // Class, icon, and legacy-pairing properties can arrive just after the
+        // first raw inquiry result. Retry that bounded local property lookup at
+        // quarter-second intervals while the board is awake; this replaces the
+        // old dependence on a later human-readable bluetoothctl change line.
+        // The exact identity gate remains mandatory, so an unrelated controller
+        // can never arm the privileged Wii PIN response.
+        for (int attempt = 0; attempt < 5 && !address.has_value(); ++attempt) {
+          if (candidate_is_balance_board(*candidate)) {
+            address = candidate;
+            break;
+          }
+          if (attempt < 4) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+          }
+        }
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(25));
     }
 
     if (!address.has_value()) {
-      stop_command(&discovery);
+      stop_management_discovery(management_fd, shared);
       if (running.load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(kDiscoveryRestartDelayMs));
       }
@@ -630,8 +444,8 @@ void commissioning_loop(PairingSharedState* shared) {
 
     const auto controller = find_default_controller();
     if (!controller.has_value()) {
-      stop_command(&discovery);
-      emit_status("commissioning", address->display,
+      stop_management_discovery(management_fd, shared);
+      emit_status("error", address->display,
                   "no powered Bluetooth controller is available for pairing");
       std::this_thread::sleep_for(std::chrono::milliseconds(kDiscoveryRestartDelayMs));
       continue;
@@ -652,10 +466,10 @@ void commissioning_loop(PairingSharedState* shared) {
     // charge of everything else.
     const CommandResult pair_result = run_command({
         "bluetoothctl", "--timeout", "12", "--agent", "NoInputNoOutput", "pair", address->display});
-    // Keep the discovery owner alive through Pair(). BlueZ documents pairing by
-    // address as requiring an active scan report, and the board may stop its
-    // Sync window before a new discovery client could be established.
-    stop_command(&discovery);
+    // Keep kernel discovery alive through Pair(). BlueZ pairing by address
+    // requires the fresh device record, and the board's Sync window is too
+    // short to stop and recreate discovery before bonding begins.
+    stop_management_discovery(management_fd, shared);
 
     {
       std::lock_guard<std::mutex> lock(shared->mutex);
@@ -664,7 +478,7 @@ void commissioning_loop(PairingSharedState* shared) {
     }
 
     if (!command_succeeded(pair_result)) {
-      emit_status("commissioning", address->display,
+      emit_status("error", address->display,
                   "pairing failed: " + command_error_summary(
                       pair_result.output, "BlueZ returned an unknown pairing error"));
       std::this_thread::sleep_for(std::chrono::milliseconds(kDiscoveryRestartDelayMs));
@@ -727,6 +541,38 @@ uint32_t read_u32_le(const uint8_t* input) {
       (static_cast<uint32_t>(input[3]) << 24);
 }
 
+bool management_event_has_balance_board_class(const uint8_t* payload,
+                                               uint16_t payload_size) {
+  // Device Found has a fixed 14-byte prefix followed by standard EIR fields.
+  // Each field begins with a byte count that includes its one-byte type. Parse
+  // defensively because this data originates over the radio and a malformed
+  // length must never let commissioning inspect beyond the management packet.
+  constexpr std::size_t fixed_size = 14;
+  if (!payload || payload_size < fixed_size) return false;
+  const uint16_t eir_size = read_u16_le(payload + 12);
+  if (eir_size > payload_size - fixed_size) return false;
+
+  const uint8_t* eir = payload + fixed_size;
+  std::size_t offset = 0;
+  while (offset < eir_size) {
+    const uint8_t field_size = eir[offset];
+    if (field_size == 0) break;
+    if (offset + 1 + field_size > eir_size) return false;
+
+    const uint8_t field_type = eir[offset + 1];
+    const std::size_t data_size = field_size - 1;
+    if (field_type == kEirClassOfDeviceType && data_size >= 3) {
+      const uint32_t device_class =
+          static_cast<uint32_t>(eir[offset + 2]) |
+          (static_cast<uint32_t>(eir[offset + 3]) << 8) |
+          (static_cast<uint32_t>(eir[offset + 4]) << 16);
+      return device_class == kBalanceBoardClassOfDevice;
+    }
+    offset += 1 + field_size;
+  }
+  return false;
+}
+
 std::string management_status_description(uint8_t status) {
   // These are the management statuses that setting controller modes can
   // realistically return. Retain the numeric value as well because it remains
@@ -759,6 +605,112 @@ bool write_management_boolean_command(int fd, uint16_t opcode, bool enabled) {
   packet[header_size] = enabled ? 1 : 0;
   return write(fd, packet.data(), packet.size()) ==
       static_cast<ssize_t>(packet.size());
+}
+
+bool write_management_discovery_command(int fd, uint16_t opcode) {
+  if (fd < 0) return false;
+  constexpr std::size_t header_size = 6;
+  std::array<uint8_t, header_size + 1> packet{};
+  write_u16_le(packet.data(), opcode);
+  write_u16_le(packet.data() + 2, kPrimaryControllerIndex);
+  write_u16_le(packet.data() + 4, 1);
+  // The Balance Board is a Classic Bluetooth device. Restricting discovery to
+  // BR/EDR avoids irrelevant LE advertisements and ensures every Device Found
+  // event uses the address type expected by the Wii pairing path.
+  packet[header_size] = kBluetoothClassicDiscoveryMask;
+  return write(fd, packet.data(), packet.size()) ==
+      static_cast<ssize_t>(packet.size());
+}
+
+bool start_management_discovery(int fd, PairingSharedState* shared,
+                                std::string* error) {
+  if (fd < 0 || !shared) {
+    if (error) *error = "Bluetooth management socket is unavailable";
+    return false;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(shared->mutex);
+    shared->discovery_candidate.reset();
+    shared->discovery_error.clear();
+    shared->discovery_start_pending = true;
+    shared->discovery_stop_pending = false;
+    shared->discovery_session_started = false;
+    shared->discovery_active = false;
+  }
+  if (!write_management_discovery_command(fd, kMgmtStartDiscoveryCommand)) {
+    const std::string detail = "could not send Start Discovery: " +
+        std::string(std::strerror(errno));
+    {
+      std::lock_guard<std::mutex> lock(shared->mutex);
+      shared->discovery_start_pending = false;
+      shared->discovery_error = detail;
+    }
+    if (error) *error = detail;
+    return false;
+  }
+
+  // Command Complete proves the kernel accepted the session, while the
+  // Discovering event proves inquiry is actually active on the controller.
+  // Require both so the UI can never repeat the earlier false "listening"
+  // state where a process existed but no radio scan was running.
+  const uint64_t deadline = monotonic_ms() + kDiscoveryStartDeadlineMs;
+  while (running.load() && monotonic_ms() < deadline) {
+    std::string discovery_error;
+    bool ready = false;
+    {
+      std::lock_guard<std::mutex> lock(shared->mutex);
+      discovery_error = shared->discovery_error;
+      ready = shared->discovery_session_started && shared->discovery_active;
+    }
+    if (!discovery_error.empty()) {
+      if (error) *error = discovery_error;
+      return false;
+    }
+    if (ready) return true;
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+
+  if (error) *error = "kernel accepted no active BR/EDR discovery session within 5 seconds";
+  stop_management_discovery(fd, shared);
+  return false;
+}
+
+void stop_management_discovery(int fd, PairingSharedState* shared) {
+  if (fd < 0 || !shared) return;
+
+  bool should_stop = false;
+  {
+    std::lock_guard<std::mutex> lock(shared->mutex);
+    should_stop = shared->discovery_start_pending ||
+        shared->discovery_session_started || shared->discovery_active;
+    shared->discovery_candidate.reset();
+    if (should_stop) shared->discovery_stop_pending = true;
+  }
+  if (!should_stop) return;
+
+  if (!write_management_discovery_command(fd, kMgmtStopDiscoveryCommand)) {
+    std::lock_guard<std::mutex> lock(shared->mutex);
+    shared->discovery_stop_pending = false;
+    shared->discovery_error = "could not send Stop Discovery: " +
+        std::string(std::strerror(errno));
+    return;
+  }
+
+  // Pairing retries should not collide with a previous inquiry session. Wait
+  // briefly for the matching command response, but never let a misbehaving
+  // adapter hold server shutdown or commissioning indefinitely.
+  const uint64_t deadline = monotonic_ms() + kManagementCommandTimeoutMs;
+  while (running.load() && monotonic_ms() < deadline) {
+    bool stopped = false;
+    {
+      std::lock_guard<std::mutex> lock(shared->mutex);
+      stopped = !shared->discovery_stop_pending &&
+          !shared->discovery_session_started;
+    }
+    if (stopped) return;
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
 }
 
 bool set_management_boolean_and_wait(int fd, uint16_t opcode,
@@ -877,16 +829,44 @@ void process_management_events(int fd, PairingSharedState* shared,
     if (count < 6 + payload_size) continue;
 
     if ((event == kMgmtCommandCompleteEvent || event == kMgmtCommandStatusEvent) &&
-        payload_size >= 3 && management) {
+        payload_size >= 3) {
       const uint16_t opcode = read_u16_le(buffer.data() + 6);
       const uint8_t status = buffer[8];
+
+      if (opcode == kMgmtStartDiscoveryCommand ||
+          opcode == kMgmtStopDiscoveryCommand) {
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        if (opcode == kMgmtStartDiscoveryCommand) {
+          shared->discovery_start_pending = false;
+          if (status == 0) {
+            shared->discovery_session_started = true;
+          } else {
+            shared->discovery_session_started = false;
+            shared->discovery_active = false;
+            shared->discovery_error = "Start Discovery was rejected: " +
+                management_status_description(status);
+          }
+        } else {
+          shared->discovery_stop_pending = false;
+          if (status == 0) {
+            shared->discovery_start_pending = false;
+            shared->discovery_session_started = false;
+            shared->discovery_active = false;
+          } else {
+            shared->discovery_error = "Stop Discovery was rejected: " +
+                management_status_description(status);
+          }
+        }
+        continue;
+      }
+
       bool recognized = false;
       std::string setting_name;
-      if (opcode == kMgmtSetConnectableCommand) {
+      if (management && opcode == kMgmtSetConnectableCommand) {
         management->connectable_pending = false;
         recognized = true;
         setting_name = "connectable setting";
-      } else if (opcode == kMgmtSetFastConnectableCommand) {
+      } else if (management && opcode == kMgmtSetFastConnectableCommand) {
         management->fast_connectable_pending = false;
         recognized = true;
         setting_name = "fast connectable setting";
@@ -894,6 +874,50 @@ void process_management_events(int fd, PairingSharedState* shared,
       if (recognized && status != 0) {
         emit_status("error", "", "Bluetooth " + setting_name +
             " reassertion was rejected: " + management_status_description(status));
+      }
+      continue;
+    }
+
+    if (event == kMgmtDiscoveringEvent && payload_size >= 2 &&
+        adapter_index == kPrimaryControllerIndex) {
+      const uint8_t address_types = buffer[6];
+      const bool active = buffer[7] != 0;
+      bool announce_discovery = false;
+      {
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        if (shared->commissioning &&
+            (address_types & kBluetoothClassicDiscoveryMask) != 0) {
+          announce_discovery = active && !shared->discovery_active;
+          shared->discovery_active = active;
+        }
+      }
+      if (announce_discovery) emit_status("discovering");
+      continue;
+    }
+
+    if (event == kMgmtDeviceFoundEvent && payload_size >= 14 &&
+        adapter_index == kPrimaryControllerIndex) {
+      const uint8_t* payload = buffer.data() + 6;
+      const uint8_t address_type = payload[6];
+      const uint32_t flags = read_u32_le(payload + 8);
+      const bool balance_board_class =
+          management_event_has_balance_board_class(payload, payload_size);
+
+      // Some controllers provide the gaming-device class in the first inquiry
+      // result and add Legacy Pairing only after name resolution; others do the
+      // reverse. Either radio-level signal is narrow enough to justify the
+      // bounded BlueZ property check, while ordinary Classic devices never
+      // disturb the panel or launch repeated identity commands.
+      if (address_type == kBluetoothClassicAddressType &&
+          (balance_board_class ||
+           (flags & kDeviceFoundLegacyPairingFlag) != 0)) {
+        const BluetoothAddress candidate =
+            address_from_management_wire(payload);
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        if (shared->commissioning &&
+            !shared->commissioned_address.has_value()) {
+          shared->discovery_candidate = candidate;
+        }
       }
       continue;
     }
@@ -1438,7 +1462,8 @@ int main() {
   std::thread commission_thread;
   std::thread connection_thread;
   if (bluetooth_startup_ready) {
-    commission_thread = std::thread(commissioning_loop, &pairing);
+    commission_thread = std::thread(
+        commissioning_loop, &pairing, management_fd);
     connection_thread = std::thread(direct_connection_loop, &pairing, boards);
   }
   std::thread input_thread(stdin_loop, &pairing);
