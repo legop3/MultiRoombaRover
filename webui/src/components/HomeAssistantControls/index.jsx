@@ -134,8 +134,9 @@ function LampTile({ entity, connected, controlsLocked, onToggle, onSetColor, onS
       className={cx(
         // The parent grid owns row and column sizing so the room-controls panel
         // never sprawls wider than three lamps per row. The tile only keeps a
-        // small minimum width so names and swatches remain readable.
-        'flex min-w-[9.5rem] flex-col gap-0.5 rounded border px-0.5 py-0.5 transition-colors',
+        // zero minimum lets a pair of tiles share a narrow desktop card. The
+        // internal title truncation and wrapping swatches preserve readability.
+        'flex min-w-0 flex-col gap-0.5 rounded border px-0.5 py-0.5 transition-colors',
         disableToggle ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-white/60',
         tileTone,
       )}
@@ -246,7 +247,10 @@ function HomeAssistantControlsContent() {
               : 'Lights are locked on. Room controls are disabled.'}
         </p>
       ) : null}
-      <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Each lamp declares only the smallest width at which its title, status,
+          and swatches remain useful. Auto-fit then derives the column and row
+          count directly from the card width without layout-specific breakpoints. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(9rem,100%),1fr))] gap-0.5">
         {entities.map((entity) => (
           <LampTile
             key={entity.id}

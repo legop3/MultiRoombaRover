@@ -29,7 +29,7 @@ function renderSegments(segments, keymap) {
   });
 }
 
-function renderLine(line, keymap, idx) {
+function renderLine(line, keymap) {
   if (typeof line === 'string') return line;
   if (Array.isArray(line?.segments)) return renderSegments(line.segments, keymap);
   if (line && typeof line === 'object') {
@@ -65,7 +65,7 @@ function Hero({ hero, keymap }) {
             const key = Array.isArray(line?.segments) ? `hero-${idx}` : `hero-${idx}`;
             return (
               <li key={key} className="surface-muted px-0.5 py-0.25">
-                {renderLine(line, keymap, idx)}
+                {renderLine(line, keymap)}
               </li>
             );
           })}
@@ -84,7 +84,7 @@ function ListBlock({ block, keymap }) {
           const key = `item-${idx}`;
           return (
             <li key={key} className="surface-muted flex flex-wrap items-center gap-0.5 px-0.5 py-0.25">
-              {renderLine(item, keymap, idx)}
+              {renderLine(item, keymap)}
             </li>
           );
         })}
@@ -117,8 +117,10 @@ function KeyboardGroup({ group, keymap }) {
       <p className="px-0.5 py-0.25 text-[0.75rem] font-semibold text-slate-200">{group.title}</p>
       <div className="space-y-0.5 px-0.5 pb-0.25">
         {group.items.map((item) => (
-          <div key={item.action} className="surface-muted flex items-center justify-between gap-0.5 px-0.5 py-0.25 text-[0.8rem]">
-            <span className="text-slate-200">{item.label}</span>
+          <div key={item.action} className="surface-muted flex flex-wrap items-center justify-between gap-0.5 px-0.5 py-0.25 text-[0.8rem]">
+            {/* A binding label may wrap in a slim sidebar, while the key remains
+                a compact complete token instead of forcing horizontal overflow. */}
+            <span className="min-w-0 flex-1 text-slate-200">{item.label}</span>
             <KeyPill actionId={item.action} keymap={keymap} />
           </div>
         ))}
@@ -131,11 +133,16 @@ function KeyboardBlock({ block, keymap }) {
   if (!block) return null;
   return (
     <div className="space-y-0.5">
-      <div className="flex items-center justify-between text-xs text-slate-200">
+      {/* Heading and footnote share a row when possible and wrap independently
+          when the Help card is mounted in a narrow desktop column. */}
+      <div className="flex flex-wrap items-center justify-between gap-0.5 text-xs text-slate-200">
         <span className="font-semibold">{block.title}</span>
         {block.footnote && <span className="text-[0.7rem] text-slate-400">{block.footnote}</span>}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-0.5">
+      {/* Two keyboard groups fit comfortably once the Help surface reaches 32rem.
+          Using the real content threshold restores the established old-page layout
+          without forcing two crushed columns inside the narrow new-drive sidebar. */}
+      <div className="grid grid-cols-1 gap-0.5 @[32rem]:grid-cols-2">
         {block.groups?.map((group) => (
           <KeyboardGroup key={group.id} group={group} keymap={keymap} />
         ))}
@@ -185,10 +192,11 @@ export function HelpContentView({ layout, keymap }) {
   return (
     <div className="space-y-0.5">
       <Hero hero={content.hero} keymap={bindings} />
-      <div
-        className="grid gap-0.5"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}
-      >
+      {/* The previous fixed 360px minimum was wider than the new-drive sidebar
+          and forced the entire Help card to overflow. This intrinsic minimum
+          uses one full-width column when 22.5rem cannot physically fit, while
+          preserving the multi-column presentation in genuinely wide panels. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(22.5rem,100%),1fr))] gap-0.5">
         <div className="space-y-0.5">
           {mainBlocks.map((block, idx) => (
             <BlockRenderer key={block.title || idx} block={block} keymap={bindings} />

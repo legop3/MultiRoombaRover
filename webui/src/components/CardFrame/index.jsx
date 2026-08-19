@@ -77,7 +77,11 @@ export default function CardFrame({
   return (
     <section
       className={cx(
-        'panel-section border border-neutral-500/60 bg-neutral-900/100',
+        // Cards are reused in full-width pages, mobile stacks, and narrow desktop
+        // sidebars. Making the card itself a query container lets its contents
+        // respond to the space they actually receive instead of the viewport,
+        // which may be wide while a sidebar card is only a few hundred pixels.
+        'panel-section @container border border-neutral-500/60 bg-neutral-900/100',
         clipOverflow ? 'overflow-hidden' : 'overflow-visible',
         fillHeight && 'flex h-full min-h-0 flex-col',
         className,

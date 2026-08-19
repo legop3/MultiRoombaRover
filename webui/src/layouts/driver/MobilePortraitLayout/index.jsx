@@ -2,7 +2,7 @@
 // Purpose: Owns the concrete portrait video, controls, and secondary-card placement.
 import AuxColumn from '../../../components/MobileControls/AuxColumn.jsx';
 import MovementColumn from '../../../components/MobileControls/MovementColumn.jsx';
-import DriverVideo from '../../../components/DriverVideo/index.jsx';
+import NewDriveVideo from '../../../components/NewDriveVideo/index.jsx';
 import { useSettingsNamespace } from '../../../settings/index.js';
 import { themeGapClass } from '../../../themes/index.js';
 import MobileLayoutFrame from '../MobileLayoutFrame/index.jsx';
@@ -22,7 +22,9 @@ export default function MobilePortraitLayout() {
   return (
     <MobileLayoutFrame>
       <div className={`flex flex-col ${themeGapClass}`}>
-      <DriverVideo layoutFormat="mobile-portrait" />
+      {/* NewDriveVideo reads the shared layout context and removes only its redundant
+          physical-control pods; the established portrait controls below remain unchanged. */}
+      <NewDriveVideo />
       {/* Preserve the existing two-column portrait control surface exactly. */}
       <section className="mobile-touch-control text-white">
         <div className="mobile-touch-control grid grid-cols-2 gap-0.5 items-stretch">

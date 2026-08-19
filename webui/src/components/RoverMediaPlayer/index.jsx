@@ -729,7 +729,9 @@ export default function RoverMediaPlayer({
         </div>
       ) : null}
       <audio ref={audioRef} autoPlay hidden />
-      <div className="pointer-events-none absolute left-1 top-1 z-20 font-medium text-slate-100 text-[0.65rem]">
+      {/* Connection diagnostics remain readable without competing with rover controls,
+          safety warnings, or the primary HUD layered above the media player. */}
+      <div className="pointer-events-none absolute left-1 top-1 z-0 font-medium text-slate-100 opacity-50 text-[0.65rem]">
         <div className="flex flex-col gap-0.5 leading-none">
           <span>Status: {renderedStatus}</span>
           {renderedAudioStatus ? <span>Audio: {renderedAudioStatus}</span> : null}

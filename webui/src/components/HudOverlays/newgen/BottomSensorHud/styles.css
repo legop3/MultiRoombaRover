@@ -1,0 +1,11 @@
+.newgen-bottom-sensor-hud {
+  pointer-events: none;
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  bottom: -2.5rem;
+  left: 0;
+  width: 100%;
+  height: clamp(7rem, 18vh, 11rem);
+  overflow: visible;
+}

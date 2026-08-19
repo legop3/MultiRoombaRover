@@ -54,13 +54,13 @@ function normalizeVideoFilter(value) {
     : VIDEO_SETTINGS_DEFAULTS.colorFilter;
 }
 
-function SettingRow({ children, className = '' }) {
+function SettingRow({ children, inline = false, className = '' }) {
   // Page settings are changed one row at a time, so each row gets a subtle container and a
   // max width. This keeps the label and control together instead of stretching them across
   // the full settings pane.
   return (
     <label
-      className={`mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm text-white max-[420px]:grid-cols-1 ${className}`}
+      className={`mx-auto flex w-full max-w-lg items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm text-white ${inline ? 'flex-row' : 'flex-col items-stretch @lg:flex-row @lg:items-center'} ${className}`}
     >
       {children}
     </label>
@@ -96,7 +96,7 @@ function RangeSetting({ label, value, disabled = false, onChange }) {
   // the row while the percentage value stays beside the label for quick feedback.
   return (
     <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1 text-sm text-white">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
+      <div className="flex items-center justify-between gap-1.5">
         <span className="min-w-0 font-semibold text-white">{label}</span>
         <span className="rounded bg-neutral-900 px-1 py-0.5 text-xs text-white">
           {Math.round(value * 100)}%
@@ -262,13 +262,19 @@ export default function SettingsPanel() {
     }));
   };
 
+  // Settings owns grids outside its individual CardFrames. This boundary makes
+  // those grids react to the panel's allocated width in any desktop column.
   return (
-    <Tabs defaultTab="keybindings">
+    <div className="@container">
+      <Tabs defaultTab="keybindings">
       <TabList>
-        <Tab id="keybindings">Keybindings</Tab>
-        <Tab id="controller">Controller</Tab>
-        <Tab id="page">Page settings</Tab>
-        <Tab id="admin">Admin</Tab>
+        {/* Four long labels cannot remain readable in one narrow sidebar row.
+            Each tab claims half the row until this Settings container is wide,
+            where the minimum is removed and the original single row returns. */}
+        <Tab id="keybindings" className="min-w-[calc(50%_-_0.125rem)] @[28rem]:min-w-0">Keybindings</Tab>
+        <Tab id="controller" className="min-w-[calc(50%_-_0.125rem)] @[28rem]:min-w-0">Controller</Tab>
+        <Tab id="page" className="min-w-[calc(50%_-_0.125rem)] @[28rem]:min-w-0">Page settings</Tab>
+        <Tab id="admin" className="min-w-[calc(50%_-_0.125rem)] @[28rem]:min-w-0">Admin</Tab>
       </TabList>
       <TabPanels>
         <TabPanel id="keybindings">
@@ -282,30 +288,23 @@ export default function SettingsPanel() {
           </div>
         </TabPanel>
         <TabPanel id="page">
-          {/* Page settings use a responsive card grid so unrelated settings do not form one long,
-              stretched column. Audio spans both columns because volume sliders need extra width
-              for comfortable pointer control. */}
-          <div className="grid gap-1.5 lg:grid-cols-2">
+          {/* The normal two-column settings page returns at the width where two
+              useful cards actually fit. The former 48rem threshold was unreachable
+              in the old driver pane and incorrectly made its fallback permanent. */}
+          <div className="flex flex-col gap-1.5 @[28rem]:grid @[28rem]:grid-cols-2">
             <CardFrame
               title="Background theme"
-              className="lg:col-span-2"
+              className="col-span-full"
               bodyClassName="space-y-1.5 p-1 text-sm"
             >
-              {/* Back/Next provide fast visual browsing, while the dropdown remains the direct
-                  route to a known theme in a growing catalog. Neither control saves implicitly. */}
-              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5">
-                <button
-                  type="button"
-                  className="button-dark min-w-16 text-sm"
-                  onClick={() => movePageThemePreview(-1)}
-                >
-                  Back
-                </button>
+              {/* The selector owns a full row at narrow widths. Navigation is a
+                  separate flex row so neither button can squeeze the select text. */}
+              <div className="flex flex-col gap-1.5">
                 <select
                   aria-label="Preview background theme"
                   value={previewPageThemeKey}
                   onChange={handlePageThemeSelect}
-                  className="field-input min-w-0 px-1 py-0.5 text-sm"
+                  className="field-input w-full min-w-0 px-1 py-0.5 text-sm"
                 >
                   {PAGE_THEME_OPTIONS.map((theme) => (
                     <option key={theme.key} value={theme.key}>
@@ -313,20 +312,29 @@ export default function SettingsPanel() {
                     </option>
                   ))}
                 </select>
-                <button
-                  type="button"
-                  className="button-dark min-w-16 text-sm"
-                  onClick={() => movePageThemePreview(1)}
-                >
-                  Next
-                </button>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    className="button-dark min-w-0 flex-1 text-sm"
+                    onClick={() => movePageThemePreview(-1)}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="button-dark min-w-0 flex-1 text-sm"
+                    onClick={() => movePageThemePreview(1)}
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
 
               {/* This miniature layout contains both a full-height vertical seam and horizontal
                   seams between stacked cards. It exercises the exact gap directions the artwork
                   must serve on the driver and PTZ pages. */}
               <div
-                className={`page-theme-preview grid h-32 grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(0,0.85fr)] grid-rows-2 gap-0.5 overflow-hidden rounded border border-neutral-500/70 p-0.5 ${getPageThemeClass(previewPageThemeKey)}`}
+                className={`page-theme-preview flex h-48 flex-col gap-0.5 overflow-hidden rounded border border-neutral-500/70 p-0.5 @[28rem]:grid @[28rem]:h-32 @[28rem]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(0,0.85fr)] @[28rem]:grid-rows-2 ${getPageThemeClass(previewPageThemeKey)}`}
               >
                 <ThemePreviewCard title="Video" className="row-span-2" />
                 <ThemePreviewCard title="Controls" />
@@ -334,7 +342,7 @@ export default function SettingsPanel() {
                 <ThemePreviewCard title="Chat" className="col-span-2" />
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <div className="flex flex-col items-stretch gap-1.5 @lg:flex-row @lg:items-center @lg:justify-between">
                 <p className="min-w-0 text-xs text-white">
                   Previewing <span className="font-semibold">{previewPageTheme.label}</span>
                   {hasUnsavedPageTheme ? (
@@ -345,7 +353,7 @@ export default function SettingsPanel() {
                 </p>
                 <button
                   type="button"
-                  className="button-dark min-w-24 text-sm disabled:cursor-default disabled:opacity-45"
+                  className="button-dark w-full text-sm disabled:cursor-default disabled:opacity-45 @lg:w-auto @lg:min-w-24"
                   disabled={!hasUnsavedPageTheme}
                   onClick={handlePageThemeSave}
                 >
@@ -354,7 +362,7 @@ export default function SettingsPanel() {
               </div>
             </CardFrame>
             <CardFrame title="HUD" bodyClassName="space-y-1 p-1 text-sm">
-              <SettingRow className="grid-cols-[auto_minmax(0,1fr)] max-[420px]:grid-cols-[auto_minmax(0,1fr)]">
+              <SettingRow inline>
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 accent-emerald-500"
@@ -394,7 +402,7 @@ export default function SettingsPanel() {
               </SettingHelp>
             </CardFrame>
             <CardFrame title="Mobile controls" bodyClassName="space-y-1 p-1 text-sm">
-              <SettingRow className="grid-cols-[auto_minmax(0,1fr)] max-[420px]:grid-cols-[auto_minmax(0,1fr)]">
+              <SettingRow inline>
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 accent-emerald-500"
@@ -405,7 +413,7 @@ export default function SettingsPanel() {
               </SettingRow>
             </CardFrame>
             <CardFrame title="Macros" bodyClassName="space-y-1 p-1 text-sm">
-              <SettingRow className="grid-cols-[auto_minmax(0,1fr)] max-[420px]:grid-cols-[auto_minmax(0,1fr)]">
+              <SettingRow inline>
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 accent-emerald-500"
@@ -415,7 +423,7 @@ export default function SettingsPanel() {
                 <span className="font-semibold text-white">Enable backward bump in drive macro</span>
               </SettingRow>
             </CardFrame>
-            <CardFrame title="Audio" className="lg:col-span-2" bodyClassName="space-y-1 p-1 text-sm">
+            <CardFrame title="Audio" className="col-span-full" bodyClassName="space-y-1 p-1 text-sm">
               {/* Audio sliders are stacked inside the wider card so the value chip, label, and
                   slider remain easy to compare while preserving enough drag distance. */}
               <RangeSetting
@@ -470,7 +478,7 @@ export default function SettingsPanel() {
               <SettingHelp>Switching reconnects your session.</SettingHelp>
             </CardFrame>
             <CardFrame title="Inter-instance" bodyClassName="space-y-1 p-1 text-sm">
-              <SettingRow className="grid-cols-[auto_minmax(0,1fr)] max-[420px]:grid-cols-[auto_minmax(0,1fr)]">
+              <SettingRow inline>
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 accent-emerald-500"
@@ -526,6 +534,7 @@ export default function SettingsPanel() {
           </div>
         </TabPanel>
       </TabPanels>
-    </Tabs>
+      </Tabs>
+    </div>
   );
 }

@@ -1,0 +1,30 @@
+.newgen-wheel-drop {
+  pointer-events: none;
+  position: absolute;
+  z-index: 20;
+  top: 50%;
+  display: flex;
+  width: 4rem;
+  height: 15rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  background: rgb(239 68 68 / 0.36);
+  color: white;
+  transform: translateY(-50%);
+}
+
+.newgen-wheel-drop--left { left: 1rem; }
+.newgen-wheel-drop--right { right: 1rem; }
+
+.newgen-wheel-drop span {
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.65);
+}
+
+.newgen-wheel-drop--left span { transform: rotate(-90deg); }
+.newgen-wheel-drop--right span { transform: rotate(90deg); }

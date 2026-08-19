@@ -83,10 +83,10 @@ export default function VolumeSettingsCard() {
   if (!serverState) return null;
 
   return (
-    <CardFrame title="Personal volume adjustment" className="lg:col-span-2" bodyClassName="space-y-1 p-1 text-sm">
+    <CardFrame title="Personal volume adjustment" className="@[28rem]:col-span-2" bodyClassName="space-y-1 p-1 text-sm">
       {ADJUSTMENT_FIELDS.map(({ key, label }) => (
         <label key={key} className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1 text-white">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
+          <div className="flex items-center justify-between gap-1.5">
             <span className="min-w-0 font-semibold text-white">{label}</span>
             <span className="rounded bg-neutral-900 px-1 py-0.5 text-xs text-white">
               {formatPercent(draft[key])}

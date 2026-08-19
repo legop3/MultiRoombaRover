@@ -17,6 +17,7 @@ function clampFreq(value) {
 
 export default function HornControl({
   disabled,
+  icon: Icon,
   onStart,
   onStop,
   keyLabel,
@@ -56,10 +57,14 @@ export default function HornControl({
       'mobile-touch-control group relative flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-1 py-1.5 text-xs font-semibold select-none no-touch-select';
     const active = 'border-fuchsia-300/70 bg-fuchsia-700 text-fuchsia-50';
     const inactive = 'border-cyan-300/70 bg-cyan-900 text-cyan-50 hover:bg-cyan-800';
-    return [base, isActive ? active : inactive, 'disabled:opacity-50', className]
+    // This is a role-based held control rather than a native button, so CSS's
+    // :disabled pseudo-class can never match it. Reflect disabled state directly
+    // while leaving the nested settings button available.
+    const disabledClass = disabled ? 'cursor-not-allowed opacity-50' : '';
+    return [base, isActive ? active : inactive, disabledClass, className]
       .filter(Boolean)
       .join(' ');
-  }, [className, isActive]);
+  }, [className, disabled, isActive]);
 
   const formattedWaveform = waveform === 'sine' ? 'sine' : 'saw';
 
@@ -170,6 +175,7 @@ export default function HornControl({
       role="button"
       tabIndex={0}
       aria-pressed={isActive}
+      aria-disabled={disabled}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
@@ -201,6 +207,9 @@ export default function HornControl({
       />
       <div className="relative z-10 flex items-center justify-between gap-0.5">
         <span className="flex items-center gap-0.5 text-sm font-semibold">
+          {/* Keep icon ownership with the caller so adding mobile affordance does
+              not silently change every existing desktop horn presentation. */}
+          {Icon ? <Icon className="shrink-0 text-base" aria-hidden="true" /> : null}
           <span>Horn</span>
           {keyLabel ? (
             <span className="rounded bg-black/40 px-1 py-0.5 text-[0.6rem] font-semibold text-white">

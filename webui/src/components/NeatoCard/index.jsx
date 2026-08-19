@@ -135,7 +135,9 @@ function NeatoCardContent() {
           <p className="text-xs text-slate-400">Control the autonomous Neato robovac. Be nice to him.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0.5">
+        {/* Neato's control and status groups depend on card width, not on whether
+            the overall desktop viewport happens to cross Tailwind's lg breakpoint. */}
+        <div className="grid grid-cols-1 gap-0.5 @[28rem]:grid-cols-2">
           <div className="surface-muted grid gap-0.5">
             <p className="text-xs text-slate-300 text-center">Controls</p>
             <button

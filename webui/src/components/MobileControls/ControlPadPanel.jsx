@@ -181,7 +181,10 @@ export default function ControlPadPanel({ compact = false, disabled = false }) {
   }, [disabled, setCameraPrecisionMode, stopDrivePad]);
 
   return (
-    <div className={`mobile-touch-control flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900 text-slate-100 shadow-md ${compact ? 'h-full' : ''}`}>
+    <div
+      aria-disabled={disabled}
+      className={`mobile-touch-control flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-900 text-slate-100 shadow-md transition-opacity ${compact ? 'h-full' : ''} ${disabled ? 'opacity-50' : 'opacity-100'}`}
+    >
       <div className={`mobile-touch-control grid grid-cols-3 gap-0.5 border-b border-slate-700 bg-slate-950 ${compact ? 'p-0.25' : 'p-0.5'}`}>
         {DRIVE_PAD_SPEED_MODES.map((mode) => {
           const active = speedMode === mode.id;

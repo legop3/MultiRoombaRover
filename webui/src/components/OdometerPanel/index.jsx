@@ -190,7 +190,12 @@ function OdometerSummary({ odometer, rover, report, now }) {
         <span className="font-semibold text-slate-200">{roverLabel(rover)}</span>
         <span className="text-xs text-slate-500">{formatAge(odometer?.updatedAt, now)}</span>
       </div>
-      <div className="grid grid-cols-2 gap-0.5 md:grid-cols-5">
+      {/* A single metric row keeps both its label and value visible in the narrow
+          desktop sidebar. Wider cards progressively regain dashboard density. */}
+      {/* Five compact odometer metrics need far less than Tailwind's 42rem 2xl
+          container. Returning at 28rem restores the normal row in old and mobile
+          layouts while preserving the two-column fallback in genuinely slim cards. */}
+      <div className="grid grid-cols-1 gap-0.5 @xs:grid-cols-2 @[28rem]:grid-cols-5">
         <Metric label="Total distance" value={formatDistance(odometer?.totalMm)} />
         <Metric label="Session distance" value={formatDistance(odometer?.sessionMm)} />
         <Metric label="Current speed" value={formatSpeed(odometer?.wheelSpeedsMmPerSecond?.center)} />
@@ -220,14 +225,22 @@ function RoverOdometerList({ rows, primaryRoverId, reportByRoverId }) {
         return (
           <div
             key={rover?.id}
-            className={`flex items-center justify-between gap-1 rounded px-1 py-0.5 ${
+            className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1 gap-y-0.5 rounded px-1 py-0.5 ${
               active ? 'bg-slate-700/70 text-slate-50' : 'text-slate-200'
             }`}
           >
             <span className="min-w-0 truncate">{roverLabel(rover)}</span>
             <span className="shrink-0 text-right text-slate-100">{formatDistance(odometer?.totalMm)}</span>
-            <span className="shrink-0 text-right text-slate-300">{formatHealth(report?.batteryHealth?.capacityRetentionPercent)}</span>
-            <span className="shrink-0 text-right text-slate-400">{formatEfficiency(report?.overallWhPerKm)}</span>
+            {/* Secondary health metrics share their own line so they never push
+                the rover identity or primary distance out of a slim card. */}
+            <span className="col-span-2 flex flex-wrap justify-between gap-x-1 text-[0.72rem]">
+              <span className="text-slate-300">
+                Battery {formatHealth(report?.batteryHealth?.capacityRetentionPercent)}
+              </span>
+              <span className="text-slate-400">
+                Efficiency {formatEfficiency(report?.overallWhPerKm)}
+              </span>
+            </span>
           </div>
         );
       })}

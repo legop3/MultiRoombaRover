@@ -29,7 +29,7 @@ import DriverLayoutRoot from '../layouts/driver/DriverLayoutRoot.jsx';
 import UndockedPageExitGuard from '../components/UndockedPageExitGuard/index.jsx';
 
 /* Driver-page compositions live under layouts/driver. App retains only global providers, overlays, and route-level state. */
-function DriverPageRoot() {
+function DriverPageRoot({ oldDesktop = false }) {
   const layout = useLayoutMode();
   const { value: pageSettings } = useSettingsNamespace('page', {
     backgroundTheme: DEFAULT_PAGE_THEME_KEY,
@@ -40,12 +40,12 @@ function DriverPageRoot() {
 
   return (
     <div className={`${pageBackgroundClass} text-slate-100`}>
-      <DriverPageContent layout={layout} />
+      <DriverPageContent layout={layout} oldDesktop={oldDesktop} />
     </div>
   );
 }
 
-function DriverPageContent({ layout }) {
+function DriverPageContent({ layout, oldDesktop }) {
   useDefaultNickname();
   useIncomingInterInstanceTransfer();
   useUserIdentitySync({ identitySurface: 'driver' });
@@ -103,7 +103,9 @@ function DriverPageContent({ layout }) {
       <GamepadInputManager />
       <main className={`relative flex w-full flex-col ${themeGapClass} text-base`}>
         <DriverLayoutProvider layout={layout} openHelp={openHelp}>
-          <DriverLayoutRoot />
+          {/* Route selection affects only which desktop composition is mounted;
+              all providers, overlays, inputs, and mobile layouts remain shared. */}
+          <DriverLayoutRoot oldDesktop={oldDesktop} />
         </DriverLayoutProvider>
       </main>
       <AlertFeed />

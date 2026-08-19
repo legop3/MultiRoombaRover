@@ -1,0 +1,11 @@
+.newgen-ir-proximity-cone {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  transition: opacity 150ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .newgen-ir-proximity-cone { transition: none; }
+}

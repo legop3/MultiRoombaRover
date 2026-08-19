@@ -1,0 +1,18 @@
+.newgen-cliff-path {
+  fill: none;
+  stroke: rgb(245 158 11 / 0.68);
+  stroke-width: 22;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.newgen-cliff-label {
+  fill: white;
+  font-family: system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  paint-order: stroke;
+  stroke: rgb(0 0 0 / 0.65);
+  stroke-width: 1.5px;
+}

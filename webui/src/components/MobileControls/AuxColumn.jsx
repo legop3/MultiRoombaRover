@@ -1,10 +1,14 @@
 // Aux Column
 // Purpose: Assembles the mobile auxiliary controls column, which is the left column by default.
 // Scope: Owns mobile aux/camera/headlight/laser/horn wiring while reusing desktop variation components where intended.
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { FaBullhorn, FaCrosshairs, FaLightbulb } from 'react-icons/fa';
 import './mobileControls.css';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
+import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
+import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
+import useCanControlRover from '../../hooks/useCanControlRover.js';
 import HornControl from '../HornControl/index.jsx';
 import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
 import { AUX_ZERO } from './constants.js';
@@ -27,7 +31,17 @@ function AuxColumnContent() {
   const pipelineHorn = useControlSelector((control) => control.pipeline?.horn);
   const { setServoAngle, setHeadlight, setLaser, setAuxMotors, startHorn, stopHorn } = useControlActions();
   const dockAssist = useManualDockAssist();
-  const disabled = !roverId;
+  const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
+  const canControl = useCanControlRover(roverId);
+  // Turn ownership is the common mutation boundary for every control in this
+  // column. Dock and OI state are applied separately only where the hardware
+  // command itself depends on the Roomba being able to drive.
+  const controlsDisabled = !roverId || !canControl;
+  const docked = Boolean(dockTelemetry?.homeBase);
+  const drivingMode = String(dockTelemetry?.oiModeLabel || '').toLowerCase() === 'full';
+  const vacuumDisabled = controlsDisabled
+    || docked
+    || (!drivingMode && !dockAssist.active);
   const activeAuxButtonRef = useRef(null);
   const cameraConfig = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
@@ -43,7 +57,7 @@ function AuxColumnContent() {
       : typeof cameraConfig?.homeAngle === 'number'
         ? cameraConfig.homeAngle
         : (cameraMin + cameraMax) / 2;
-  const cameraDisabled = Boolean(disabled || dockAssist.cameraLocked);
+  const cameraDisabled = Boolean(controlsDisabled || dockAssist.cameraLocked);
   /*
     The mobile tilt track shares the same precision flag as desktop tilt. This
     keeps the servo fine-step behavior tied to the selected movement mode rather
@@ -55,73 +69,80 @@ function AuxColumnContent() {
 
   const handleHeadlightToggle = useCallback(
     (nextOn) => {
-      if (!headlightAvailable) return;
+      if (!headlightAvailable || controlsDisabled) return;
       setHeadlight(nextOn);
     },
-    [headlightAvailable, setHeadlight],
+    [controlsDisabled, headlightAvailable, setHeadlight],
   );
 
   const handleLaserToggle = useCallback(
     (nextOn) => {
-      if (!laserAvailable) return;
+      if (!laserAvailable || controlsDisabled) return;
       setLaser(nextOn);
     },
-    [laserAvailable, setLaser],
+    [controlsDisabled, laserAvailable, setLaser],
   );
 
   const handleHornStart = useCallback(() => {
+    if (controlsDisabled) return false;
     return startHorn();
-  }, [startHorn]);
+  }, [controlsDisabled, startHorn]);
 
   const handleAuxPress = useCallback(
     (id, values) => {
-      if (disabled) return;
+      if (vacuumDisabled) return;
       activeAuxButtonRef.current = id;
       setAuxMotors(values);
     },
-    [disabled, setAuxMotors],
+    [setAuxMotors, vacuumDisabled],
   );
 
   const handleAuxRelease = useCallback(
     (id) => {
-      if (disabled) return;
       if (activeAuxButtonRef.current === id) {
         activeAuxButtonRef.current = null;
+        // Neutral commands must remain available after ownership or OI state is
+        // lost; otherwise disabling a held control could preserve its last output.
         setAuxMotors(AUX_ZERO);
       }
     },
-    [disabled, setAuxMotors],
+    [setAuxMotors],
   );
+
+  useEffect(() => {
+    if (!vacuumDisabled || activeAuxButtonRef.current === null) return;
+    // Pointer cancellation is browser-dependent when a held button becomes
+    // disabled. Explicitly neutralize the Roomba motors at the state boundary.
+    activeAuxButtonRef.current = null;
+    setAuxMotors(AUX_ZERO);
+  }, [setAuxMotors, vacuumDisabled]);
 
   return (
     <div className="mobile-touch-control grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0.5 text-slate-100">
       <VacuumControls
-        disabled={disabled}
+        disabled={vacuumDisabled}
         onPress={handleAuxPress}
         onRelease={handleAuxRelease}
       />
       <div className="mobile-touch-control flex min-h-0 items-stretch gap-0.5">
         {cameraEnabled ? (
-          // Match the desktop camera tilt card's emerald styling so the vertical
-          // mobile control reads as the same feature in a phone-sized layout.
-          <div className="mobile-touch-control flex-1 min-h-0 rounded-xl border-2 border-emerald-300/70 bg-emerald-900 px-1 py-1 text-emerald-50">
-            <VerticalCameraTilt
-              value={cameraValue}
-              min={cameraMin}
-              max={cameraMax}
-              step={cameraTiltStep}
-              disabled={cameraDisabled}
-              onChange={setServoAngle}
-            />
-          </div>
+          <VerticalCameraTilt
+            value={cameraValue}
+            min={cameraMin}
+            max={cameraMax}
+            step={cameraTiltStep}
+            disabled={cameraDisabled}
+            onChange={setServoAngle}
+          />
         ) : null}
         {(headlightAvailable || laserAvailable) ? (
           <div className="mobile-touch-control flex min-h-0 flex-1 flex-col gap-0.5">
             {headlightAvailable ? (
               <GPIOToggleControl
                 label="Headlight"
+                icon={FaLightbulb}
                 on={headlightState?.headlightOn}
-                disabled={disabled}
+                disabled={controlsDisabled}
                 onToggle={handleHeadlightToggle}
                 heightClass="h-full"
               />
@@ -129,8 +150,9 @@ function AuxColumnContent() {
             {laserAvailable ? (
               <GPIOToggleControl
                 label="Laser"
+                icon={FaCrosshairs}
                 on={laserState?.laserOn}
-                disabled={disabled || roomLightsLockedOn}
+                disabled={controlsDisabled || roomLightsLockedOn}
                 onToggle={handleLaserToggle}
                 heightClass="h-full"
               />
@@ -141,7 +163,8 @@ function AuxColumnContent() {
       <div className="mobile-touch-control min-h-0">
         {hornAvailable ? (
           <HornControl
-            disabled={disabled || hornBlocked}
+            icon={FaBullhorn}
+            disabled={controlsDisabled || hornBlocked}
             onStart={handleHornStart}
             onStop={stopHorn}
             active={horn?.active}

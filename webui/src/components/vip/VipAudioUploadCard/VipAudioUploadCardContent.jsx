@@ -539,7 +539,8 @@ export default function VipAudioUploadCard({
           </div>
         </section>
 
-        <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
+        {/* PTT controls split only when the Audio Controls card itself is wide. */}
+        <div className="grid grid-cols-1 gap-0.5 @[28rem]:grid-cols-2">
           <section className="surface h-full">
             <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr]">
               <p className="text-sm text-slate-200 text-center">PTT Mode</p>
@@ -578,7 +579,9 @@ export default function VipAudioUploadCard({
           </section>
         </div>
 
-        <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
+        {/* Upload and live-microphone controls stack in narrow sidebars instead
+            of inheriting the desktop viewport's two-column decision. */}
+        <div className="grid grid-cols-1 gap-0.5 @[28rem]:grid-cols-2">
           <section className="surface h-full">
             <div className="grid h-full gap-0.5 grid-rows-[auto_auto_1fr_auto]">
               <p className="text-sm text-slate-200 text-center">Audio Upload</p>
@@ -642,7 +645,10 @@ export default function VipAudioUploadCard({
         <section className="surface">
           <div className="space-y-0.5">
             <p className="text-sm text-slate-200 text-center">Audio Status</p>
-            <div className="grid gap-0.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-6">
+            {/* A compact sidebar gets two readable status columns. At 28rem the six
+                short status values fit again, restoring the card's normal strip in
+                old desktop and sufficiently wide mobile surfaces. */}
+            <div className="grid grid-cols-1 gap-0.5 @xs:grid-cols-2 @[28rem]:grid-cols-6">
               <StatusIndicator label="Forward pipe" active={pipelineConnected} detail={pipelineConnected ? 'connected' : 'offline'} />
               <StatusIndicator label="Upload playback" active={uploadPlaying} detail={uploadPlaying ? 'playing' : 'idle'} />
               <StatusIndicator label="Mic relay" active={micRelayActive} detail={micRelayActive ? 'active' : 'idle'} />

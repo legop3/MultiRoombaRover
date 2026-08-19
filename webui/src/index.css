@@ -14,39 +14,23 @@ body {
   @apply bg-black text-slate-100;
 }
 
+/*
+  Native scrollbar gutters consume meaningful width in the application's many
+  nested sidebars and logs. Hide only the browser chrome globally; overflow,
+  wheel, trackpad, touch, keyboard, and programmatic scrolling remain unchanged.
+*/
 html,
-body {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
-}
-
+body,
 * {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+  scrollbar-width: none;
 }
 
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
 *::-webkit-scrollbar {
-  width: 2px;
-  height: 2px;
-}
-
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-*::-webkit-scrollbar-thumb {
-  background-color: rgba(148, 163, 184, 0.55);
-  border-radius: 9999px;
-}
-
-@supports (scrollbar-width: thin) {
-  @media (pointer: coarse) {
-    html,
-    body,
-    * {
-      scrollbar-width: none;
-    }
-  }
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 @layer components {

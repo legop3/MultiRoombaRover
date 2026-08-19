@@ -6,10 +6,12 @@ const { renderIndexHtml, renderOgImage, renderWebManifest } = require('../embedS
 
 /*
   Every client-side BrowserRouter entry point must also be an explicit HTTP
-  entry point. Including /ptz here lets direct loads and browser refreshes
-  receive the same rendered index document as navigation from the driver page.
+  entry point. Keeping this list aligned with webui/src/main.jsx lets direct
+  loads and browser refreshes receive the same rendered index document as
+  in-app navigation. The retired desktop composition is intentionally exposed
+  at /old; the removed /newdrive route is intentionally absent.
 */
-app.get(['/', '/spectate', '/mini', '/display', '/scanner', '/database', '/ptz', '/reports'], async (req, res) => {
+app.get(['/', '/old', '/spectate', '/mini', '/display', '/scanner', '/database', '/ptz', '/reports'], async (req, res) => {
   try {
     const html = await renderIndexHtml(req);
     res.type('html').send(html);

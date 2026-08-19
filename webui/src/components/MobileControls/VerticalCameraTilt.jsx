@@ -2,6 +2,7 @@
 // Purpose: Provides the mobile-only camera tilt slider that supports simultaneous two-finger mobile driving.
 // Scope: Owns pointer tracking and visual slider state for the compact vertical mobile camera control.
 import { useCallback, useMemo, useRef } from 'react';
+import { FaVideo } from 'react-icons/fa';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 const HAPTIC_MIN_ANGLE_DELTA_DEGREES = 2;
@@ -32,7 +33,7 @@ export default function VerticalCameraTilt({
     if (max === min) return 50;
     return ((clampCameraAngle(value, min, max) - min) / (max - min)) * 100;
   }, [max, min, value]);
-  const disabledClass = disabled ? 'opacity-50' : '';
+  const disabledClass = disabled ? 'cursor-not-allowed opacity-50' : '';
 
   const valueFromPointer = useCallback(
     (event) => {
@@ -106,9 +107,16 @@ export default function VerticalCameraTilt({
   }, []);
 
   return (
-    <div className="mobile-touch-control flex h-full items-center justify-center gap-0.5">
-      <span className="mobile-touch-control text-sm font-semibold text-emerald-50 [writing-mode:vertical-rl] rotate-180">
-        Camera tilt
+    <div
+      className={`mobile-touch-control flex h-full min-h-0 flex-1 items-center justify-center gap-0.5 rounded-xl border-2 border-emerald-300/70 bg-emerald-900 px-1 py-1 text-emerald-50 transition-opacity ${disabledClass}`}
+    >
+      {/* This component owns its entire visible card so interaction state, border,
+          background, label, and slider always dim as one coherent control. */}
+      <span className="mobile-touch-control flex items-center gap-1 text-sm font-semibold text-emerald-50 [writing-mode:vertical-rl] rotate-180">
+        {/* Rotate the icon with the established vertical label so both read as one
+            control identity without consuming additional horizontal space. */}
+        <FaVideo className="shrink-0" aria-hidden="true" />
+        <span>Camera tilt</span>
       </span>
       <div
         ref={trackRef}
@@ -134,7 +142,7 @@ export default function VerticalCameraTilt({
           camera gesture.
         */
         style={{ touchAction: 'none' }}
-        className={`mobile-touch-control mobile-drag-control relative h-full w-6 rounded-full border border-emerald-100/80 bg-emerald-950 shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 ${disabledClass}`.trim()}
+        className="mobile-touch-control mobile-drag-control relative h-full w-6 rounded-full border border-emerald-100/80 bg-emerald-950 shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
       >
         <div
           className="pointer-events-none absolute inset-x-1 bottom-1 rounded-full bg-emerald-400"

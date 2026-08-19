@@ -39,6 +39,9 @@ createRoot(document.getElementById('root')).render(
                 <AnalyticsReporter />
                 <Routes>
                   <Route path="/" element={<DriverPageRoot />} />
+                  {/* The retired desktop composition remains available for direct comparison
+                      without duplicating the driver shell or changing canonical mobile layouts. */}
+                  <Route path="/old" element={<DriverPageRoot oldDesktop />} />
                   <Route path="/spectate" element={<SpectatorApp />} />
                   <Route path="/mini" element={<MiniSummaryApp />} />
                   <Route path="/display" element={<ServerDisplayApp />} />

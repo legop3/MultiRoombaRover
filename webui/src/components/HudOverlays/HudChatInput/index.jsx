@@ -1,7 +1,7 @@
 // Hud Chat Input
 // Purpose: Defines the Hud Chat Input module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import './styles.css';
 import '../../MobileControls/mobileControls.css';
 import { useChatActions } from '../../../context/ChatContext.jsx';
@@ -25,7 +25,7 @@ function detectSafari() {
     !/crios|fxios|edgios|opr|chrome|android/i.test(userAgent);
 }
 
-function HudChatInput({ compact = false }) {
+function HudChatInput({ compact = false, variant = 'legacy', open = true, onOpenChange = null }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
@@ -45,6 +45,7 @@ function HudChatInput({ compact = false }) {
   });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const formRef = useRef(null);
   const { navigateHistory, resetHistoryNavigation } = useChatMessageHistoryNavigation();
   const canChat = role !== 'spectator';
   const hideHudChat = role === 'spectator';
@@ -96,22 +97,37 @@ function HudChatInput({ compact = false }) {
     ttsSettings?.voice,
     ttsSupported,
   ]);
-  const containerClass = compact
-    ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-[9rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.4 py-0.2'
-    : 'pointer-events-auto absolute bottom-1 right-1 flex w-[12rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.5 py-0.25';
+  const newDrivePresentation = variant === 'newdrive';
+  const containerClass = newDrivePresentation
+    ? `absolute left-1/2 top-1/2 z-[70] flex w-[min(36rem,82%)] -translate-x-1/2 -translate-y-1/2 items-stretch gap-1 rounded-md border border-neutral-700 bg-neutral-900 p-1 transition-opacity duration-100 ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`
+    : compact
+      ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-[9rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.4 py-0.2'
+      : 'pointer-events-auto absolute bottom-1 right-1 flex w-[12rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.5 py-0.25';
   const isSafari = useMemo(() => detectSafari(), []);
   /*
     Safari zooms focused inputs below 16px. Keep that workaround Safari-only so
     other mobile browsers keep the deliberately tiny HUD typography.
   */
-  const inputTextClass = isSafari ? 'mobile-text-entry' : compact ? 'text-[0.55rem]' : 'text-[0.7rem]';
-  const inputClass = `min-w-0 flex-1 bg-transparent ${inputTextClass} text-slate-100 placeholder:text-slate-400 focus:outline-none`;
+  const inputTextClass = newDrivePresentation
+    ? 'text-base'
+    : isSafari
+      ? 'mobile-text-entry'
+      : compact
+        ? 'text-[0.55rem]'
+        : 'text-[0.7rem]';
+  // The current HUD composer is a physically larger instance of the normal
+  // chat-panel entry field, not a separately styled translucent overlay.
+  const inputClass = newDrivePresentation
+    ? `field-input h-12 min-w-0 flex-1 px-2 ${inputTextClass} text-slate-100 placeholder:text-slate-400 focus:outline-none`
+    : `min-w-0 flex-1 bg-transparent ${inputTextClass} text-slate-100 placeholder:text-slate-400 focus:outline-none`;
   // The submit button is still a touch target even though the adjacent input must
   // remain editable, so it gets press suppression without inheriting input text
   // selection behavior.
-  const buttonClass = compact
-    ? 'mobile-touch-control rounded bg-cyan-500/80 px-0.35 py-0.2 text-[0.55rem] font-semibold text-black disabled:opacity-50'
-    : 'mobile-touch-control rounded bg-cyan-500/80 px-0.5 py-0.25 text-[0.7rem] font-semibold text-black disabled:opacity-50';
+  const buttonClass = newDrivePresentation
+    ? 'button-dark min-h-12 shrink-0 px-4 text-base font-semibold disabled:opacity-50'
+    : compact
+      ? 'mobile-touch-control rounded bg-cyan-500/80 px-0.35 py-0.2 text-[0.55rem] font-semibold text-black disabled:opacity-50'
+      : 'mobile-touch-control rounded bg-cyan-500/80 px-0.5 py-0.25 text-[0.7rem] font-semibold text-black disabled:opacity-50';
 
   async function handleSend(event) {
     event.preventDefault();
@@ -125,6 +141,9 @@ function HudChatInput({ compact = false }) {
       resetHistoryNavigation();
       blurChat();
       setTypingActive(false);
+      // The new-drive composer is intentionally transient. Sending returns the
+      // HUD to its small corner icon while legacy HUD inputs remain unchanged.
+      if (newDrivePresentation) onOpenChange?.(false);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -135,7 +154,7 @@ function HudChatInput({ compact = false }) {
   if (hideHudChat) return null;
 
   return (
-    <form onSubmit={handleSend} className={containerClass}>
+    <form ref={formRef} onSubmit={handleSend} className={containerClass}>
       <input
         className={inputClass}
         value={draft}
@@ -150,12 +169,32 @@ function HudChatInput({ compact = false }) {
         onFocus={(event) => {
           onInputFocus(event);
           setTypingActive(Boolean(draft.trim()));
+          // The chat key focuses the always-mounted HUD input through ChatContext.
+          // Opening from this focus event avoids a second keyboard listener and
+          // preserves HUD-over-sidebar focus priority.
+          if (newDrivePresentation) onOpenChange?.(true);
         }}
         onBlur={(event) => {
           onInputBlur(event);
           setTypingActive(false);
+          if (newDrivePresentation) {
+            // Defer the containment check until focus has reached a submit or
+            // close button; moving within the composer must not dismiss it.
+            window.requestAnimationFrame(() => {
+              if (!formRef.current?.contains(document.activeElement)) {
+                onOpenChange?.(false);
+              }
+            });
+          }
         }}
         onKeyDown={(event) => {
+          if (newDrivePresentation && event.key === 'Escape') {
+            event.preventDefault();
+            onOpenChange?.(false);
+            blurChat();
+            setTypingActive(false);
+            return;
+          }
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             const recalledDraft = navigateHistory(event.key === 'ArrowUp' ? 'previous' : 'next', draft);
             if (recalledDraft !== null) {
@@ -172,12 +211,27 @@ function HudChatInput({ compact = false }) {
           }
         }}
         ref={(el) => registerInputRef(el, { target: 'hud' })}
-        placeholder={canChat ? 'Chat (tts)' : 'Spectator'}
+        tabIndex={newDrivePresentation && !open ? -1 : undefined}
+        placeholder={canChat ? (newDrivePresentation ? 'Type a message…' : 'Chat (tts)') : 'Spectator'}
         disabled={!canChat}
       />
       <button type="submit" disabled={!canChat || sending} className={buttonClass}>
-        Speak
+        {sending ? '...' : newDrivePresentation ? 'Send' : 'Speak'}
       </button>
+      {newDrivePresentation ? (
+        <button
+          type="button"
+          aria-label="Close chat"
+          onClick={() => {
+            onOpenChange?.(false);
+            blurChat();
+            setTypingActive(false);
+          }}
+          className="flex min-h-12 w-10 shrink-0 items-center justify-center rounded border border-neutral-600 bg-neutral-800 text-xl leading-none text-slate-200 hover:bg-neutral-700 hover:text-white"
+        >
+          ×
+        </button>
+      ) : null}
     </form>
   );
 }

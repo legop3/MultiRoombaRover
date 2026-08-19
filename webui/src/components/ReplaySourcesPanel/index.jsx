@@ -246,7 +246,10 @@ export default function ReplaySourcesPanel({
         </div>
       ) : null}
       <CardFrame title="Replay Sources" fillHeight={fillHeight} bodyClassName="space-y-0.5 text-sm">
-        <div className={`grid gap-0.5 md:grid-cols-2 ${listWrapClass}`}>
+        {/* Both source lists are intentionally compact enough to share the
+            current desktop sidebar. They only collapse when the card becomes
+            narrower than the supported new-drive desktop column. */}
+        <div className={`grid grid-cols-2 gap-0.5 @max-[15rem]:grid-cols-1 ${listWrapClass}`}>
           <GroupList title="Rovers" items={grouped.rovers} selectedSet={selectedSet} onToggle={toggleKey} />
           <GroupList title="Room Cams" items={grouped.rooms} selectedSet={selectedSet} onToggle={toggleKey} />
         </div>

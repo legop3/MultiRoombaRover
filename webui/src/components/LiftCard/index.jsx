@@ -121,7 +121,9 @@ function LiftCardContent() {
         </div>
 
         <section className="surface-muted px-0.5 py-0.5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-0.5">
+          {/* Stack status and actions in narrow cards, then restore the compact
+              three-column control row when this card grows wide enough. */}
+          <div className="grid grid-cols-1 gap-0.5 @md:grid-cols-3">
             <div className="rounded-md bg-slate-800 px-1 py-0.75 text-center">
               <div className="text-xs text-slate-300">Position</div>
               <div className="text-base font-semibold text-slate-100">{positionLabel(position)}</div>

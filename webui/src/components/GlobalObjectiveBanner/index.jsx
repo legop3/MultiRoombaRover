@@ -80,6 +80,13 @@ export default function GlobalObjectiveBanner({ layout = 'desktop', className = 
       if (!textContainer || !text) return;
       const available = textContainer.clientWidth;
       if (!available) return;
+      /* A narrow desktop sidebar benefits from a stable readable size and
+         natural wrapping. Mobile deliberately keeps its existing timed,
+         single-line behavior, while wider desktop banners still use fitting. */
+      if (!isMobile && available < 384) {
+        setFontSize(16);
+        return;
+      }
       const needed = text.scrollWidth;
       if (!needed) return;
       const scale = Math.min(1, available / needed);
@@ -96,12 +103,13 @@ export default function GlobalObjectiveBanner({ layout = 'desktop', className = 
       window.cancelAnimationFrame(rafId);
       observer.disconnect();
     };
-  }, [goalText]);
+  }, [goalText, isMobile]);
 
   const containerClass = useMemo(
     () =>
       [
         'panel-section flex w-full items-center justify-center border border-neutral-500/60 shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_10px_24px_rgba(0,0,0,0.28)]',
+        !isMobile ? '@container' : '',
         isMobile ? 'rounded-none' : 'rounded',
         'px-1 py-1 text-center font-semibold tracking-tight',
         className,
@@ -133,12 +141,31 @@ export default function GlobalObjectiveBanner({ layout = 'desktop', className = 
       style={{ ...(frameStyle || {}), fontSize: `${fontSize}px`, lineHeight: 1.1 }}
       {...dismissProps}
     >
-      <span className="flex w-full items-stretch gap-0.5 whitespace-nowrap rounded-md">
-        <span className="flex flex-col justify-center border-r border-slate-700/60 px-0.5 text-[0.55em] font-semibold leading-tight text-slate-400">
+      <span
+        className={
+          isMobile
+            ? 'flex w-full items-stretch gap-0.5 whitespace-nowrap rounded-md'
+            : 'flex w-full flex-col items-stretch gap-0.5 whitespace-normal rounded-md @sm:flex-row @sm:whitespace-nowrap'
+        }
+      >
+        <span
+          className={
+            isMobile
+              ? 'flex flex-col justify-center border-r border-slate-700/60 px-0.5 text-[0.55em] font-semibold leading-tight text-slate-400'
+              : 'flex flex-row items-center justify-center gap-1 border-b border-slate-700/60 px-0.5 py-0.5 text-[0.65em] font-semibold leading-tight text-slate-400 @sm:flex-col @sm:gap-0 @sm:border-b-0 @sm:border-r @sm:py-0 @sm:text-[0.55em]'
+          }
+        >
           <span>Global</span>
           <span>Objective</span>
         </span>
-        <span ref={textContainerRef} className="flex-1 overflow-hidden text-slate-100">
+        <span
+          ref={textContainerRef}
+          className={
+            isMobile
+              ? 'flex-1 overflow-hidden text-slate-100'
+              : 'flex-1 whitespace-normal break-words text-slate-100 @sm:overflow-hidden @sm:whitespace-nowrap'
+          }
+        >
           <span ref={textRef} className="block">
             {goalText}
           </span>

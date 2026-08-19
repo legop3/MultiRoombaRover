@@ -410,7 +410,9 @@ export default function VipMidiBeeperCard() {
   return (
     <CardFrame title="Midi Beeper">
       <div className="grid gap-1">
-        <div className="grid gap-0.5 grid-cols-1 lg:grid-cols-2">
+        {/* The file and live-input workspaces follow this card's width. A wide
+            viewport must not force them beside each other inside a sidebar. */}
+        <div className="grid grid-cols-1 gap-0.5 @[28rem]:grid-cols-2">
           <section className="surface h-full">
             <div className="grid h-full gap-0.5 content-start">
               <p className="text-sm text-slate-200 text-center">File playback</p>
@@ -495,7 +497,7 @@ export default function VipMidiBeeperCard() {
 
               <div className="mx-auto grid w-full max-w-sm gap-0.5 text-xs text-slate-300 text-center">
                 <span>Playback shape</span>
-                <div className="grid grid-cols-2 gap-0.5 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-0.5 @sm:grid-cols-4">
                   <label className="grid gap-0.5">
                     <span>Max note</span>
                     <input
@@ -647,7 +649,9 @@ export default function VipMidiBeeperCard() {
         <section className="surface">
           <div className="space-y-0.5">
             <p className="text-sm text-slate-200 text-center">Beeper status</p>
-            <div className="grid gap-0.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-6">
+            {/* Status stays legible as a short vertical list in slim cards, then
+                returns to the normal six-value strip as soon as 28rem is available. */}
+            <div className="grid grid-cols-1 gap-0.5 @xs:grid-cols-2 @[28rem]:grid-cols-6">
               <StatusRow label="Rover" value={ownRoverId || 'none'} active={Boolean(ownRoverId)} />
               <StatusRow label="File state" value={playbackState} active={playbackState === 'playing'} />
               <StatusRow label="Parts" value={selectedPartIds.length || 'none'} active={selectedPartIds.length > 0} />

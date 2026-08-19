@@ -65,7 +65,9 @@ export default function RawUserPilePanel({
     >
       {!hideNicknameForm && (
         <div className="space-y-0.5">
-          <div className="grid gap-0.5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          {/* Keep identity and social controls stacked until this card itself is
+              wide enough; the viewport says nothing about a sidebar's width. */}
+          <div className="grid gap-0.5 @sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <div className="min-w-0">
               <div className="flex w-full items-center px-0 py-0">
                 <NicknameForm compact={compact} />

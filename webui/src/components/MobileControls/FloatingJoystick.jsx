@@ -3,6 +3,7 @@
 // Scope: Owns pointer tracking, fixed overlay positioning, and active 3x3 drive-zone feedback.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { FaArrowsAlt } from 'react-icons/fa';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
 const PAD_MARGIN = 12;
@@ -244,7 +245,10 @@ export default function FloatingJoystick({
         ) : null}
         {!compact ? (
           <div className="pointer-events-none flex flex-col items-center gap-0.5 px-2 pt-5 text-center">
-            <span className="text-sm font-semibold text-slate-100">drive pad</span>
+            <span className="flex items-center gap-1 text-sm font-semibold text-slate-100">
+              <FaArrowsAlt aria-hidden="true" />
+              <span>drive pad</span>
+            </span>
             <span className="text-xs leading-tight text-slate-300">hold and drag</span>
           </div>
         ) : (

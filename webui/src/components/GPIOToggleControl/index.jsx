@@ -11,6 +11,7 @@ function isBoolean(value) {
 
 export default function GPIOToggleControl({
   label,
+  icon: Icon,
   on,
   disabled,
   onToggle,
@@ -125,6 +126,9 @@ export default function GPIOToggleControl({
       className={buttonClasses}
     >
       <span className="flex items-center gap-0.5">
+        {/* Callers opt into an icon so shared desktop GPIO controls retain their
+            established density while narrow mobile controls gain faster recognition. */}
+        {Icon ? <Icon className="shrink-0 text-base" aria-hidden="true" /> : null}
         <span className="text-sm font-semibold">{label}</span>
         {keyLabel ? (
           <span className="rounded bg-slate-800 px-1 py-0.5 text-[0.6rem] font-semibold text-slate-200">

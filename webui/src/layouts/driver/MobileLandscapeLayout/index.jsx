@@ -2,7 +2,7 @@
 // Purpose: Owns the concrete landscape video, controls, and secondary-card placement.
 import AuxColumn from '../../../components/MobileControls/AuxColumn.jsx';
 import MovementColumn from '../../../components/MobileControls/MovementColumn.jsx';
-import DriverVideo from '../../../components/DriverVideo/index.jsx';
+import NewDriveVideo from '../../../components/NewDriveVideo/index.jsx';
 import { useSettingsNamespace } from '../../../settings/index.js';
 import { themeGapClass } from '../../../themes/index.js';
 import MobileLayoutFrame from '../MobileLayoutFrame/index.jsx';
@@ -26,7 +26,9 @@ export default function MobileLandscapeLayout() {
       <section className={`grid grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] ${themeGapClass}`}>
         {firstColumn}
         <div className="min-w-0 self-start">
-          <DriverVideo layoutFormat="mobile-landscape" />
+          {/* The video stage adapts through DriverLayoutContext while this layout keeps
+              ownership of the existing landscape touch-control columns. */}
+          <NewDriveVideo />
         </div>
         {secondColumn}
       </section>

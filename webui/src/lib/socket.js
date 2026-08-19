@@ -18,7 +18,9 @@ function getIdentitySurface() {
     to mount. The main driver and dedicated PTZ controller are the two active
     control surfaces; every other route is passive identity-wise.
   */
-  return window.location.pathname === '/' || window.location.pathname === '/ptz'
+  return window.location.pathname === '/'
+    || window.location.pathname === '/old'
+    || window.location.pathname === '/ptz'
     ? 'driver'
     : 'passive';
 }

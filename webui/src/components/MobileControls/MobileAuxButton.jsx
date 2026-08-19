@@ -3,7 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
-export default function MobileAuxButton({ id, label, values, color, disabled, onPress, onRelease }) {
+export default function MobileAuxButton({ id, label, icon: Icon, values, color, disabled, onPress, onRelease }) {
   return (
     <button
       type="button"
@@ -23,9 +23,12 @@ export default function MobileAuxButton({ id, label, values, color, disabled, on
       onContextMenu={(event) => event.preventDefault()}
       // The mobile-touch-control class is applied directly to this button because
       // long-press callouts and text selection are triggered at the pressed node.
-      className={`mobile-touch-control flex h-full w-full items-center justify-center rounded-xl border-2 px-1 py-0.75 text-center text-sm font-semibold text-white transition select-none no-touch-select ${color} hover:brightness-110 active:brightness-125 active:scale-[0.99] disabled:opacity-30`}
+      className={`mobile-touch-control flex h-full w-full items-center justify-center gap-1 rounded-xl border-2 px-1 py-0.75 text-center text-sm font-semibold text-white transition select-none no-touch-select ${color} hover:brightness-110 active:brightness-125 active:scale-[0.99] disabled:opacity-30`}
     >
-      {label}
+      {/* The icon is optional because this low-level held-action control is also
+          useful for labels that do not have a clear visual symbol. */}
+      {Icon ? <Icon className="shrink-0 text-base" aria-hidden="true" /> : null}
+      <span>{label}</span>
     </button>
   );
 }

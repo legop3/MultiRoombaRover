@@ -114,7 +114,9 @@ export function TabList({ children, className = '' }) {
         className
       )}
     >
-      <div className={`flex ${themeGapClass}`}>{children}</div>
+      {/* Wrapping is driven by the selector's actual contents and allocated width,
+          so the same tabs remain compact in wide panels and readable in sidebars. */}
+      <div className={`flex flex-wrap ${themeGapClass}`}>{children}</div>
     </div>
   );
 }

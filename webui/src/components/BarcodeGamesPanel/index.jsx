@@ -101,7 +101,7 @@ function GameChoice({ game, disabled, onVote }) {
 function StatGrid({ stats, theme }) {
   if (!Array.isArray(stats) || !stats.length) return null;
   return (
-    <div className="grid gap-0.5 sm:grid-cols-3">
+    <div className="grid gap-0.5 @sm:grid-cols-3">
       {stats.slice(0, 6).map((stat) => (
         <div key={stat.label} className="surface px-1 py-0.75 text-center">
           <p className="truncate text-[0.68rem] text-neutral-400">{stat.label}</p>
@@ -215,7 +215,7 @@ function Leaderboard({ players, ownPlayer }) {
   const hasOwnPoints = ownPlayer && Number.isFinite(ownPlayer.totalPoints);
   return (
     <div className="space-y-1">
-      <div className="grid gap-0.5 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <div className="grid gap-0.5 @sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
         <div className="surface grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1 py-0.75">
           <div className="min-w-0">
             <p className="text-xs font-semibold text-neutral-300">Your points</p>
@@ -286,7 +286,7 @@ function BarcodeGamesPanelContent() {
 
   return (
     <CardFrame title="Barcode games" bodyClassName="space-y-1 p-0.5 text-sm">
-      <div className="grid gap-0.5 sm:grid-cols-2">
+      <div className="grid gap-0.5 @sm:grid-cols-2">
         {games.map((game) => (
           <GameChoice
             key={game.id}
@@ -298,7 +298,9 @@ function BarcodeGamesPanelContent() {
       </div>
 
       <section className="space-y-1 border-t border-neutral-700 pt-1">
-        <div className="grid items-stretch gap-0.5 lg:grid-cols-[minmax(0,1fr)_9rem_10rem]">
+        {/* The game summary becomes a three-part dashboard only when the card can
+            fit its fixed timer and participant blocks without crushing the title. */}
+        <div className="grid items-stretch gap-0.5 @[28rem]:grid-cols-[minmax(0,1fr)_9rem_10rem]">
           <div className="surface min-w-0 border-l-4 border-neutral-700 px-1 py-0.75" style={activeTheme.titleBoxStyle}>
             <p className="break-words text-xl font-bold leading-tight text-neutral-50" style={activeTheme.textStyle}>
               {display.title || activeGame?.title || 'No game active'}
@@ -311,7 +313,7 @@ function BarcodeGamesPanelContent() {
             ) : null}
             <DisplaySections sections={display.sections} />
           </div>
-          <div className="surface px-1 py-0.75 text-left lg:text-right">
+          <div className="surface px-1 py-0.75 text-left @[28rem]:text-right">
             <p className="text-xs font-semibold text-neutral-400">{display.timer?.label || 'Time'}</p>
             <p className="font-mono text-xl font-semibold leading-tight text-neutral-50" style={activeTheme.textStyle}>
               {timerText || '--'}
@@ -327,7 +329,7 @@ function BarcodeGamesPanelContent() {
 
       <Leaderboard players={state.leaderboard} ownPlayer={state.ownPlayer} />
 
-      <div className="grid gap-0.5 border-t border-neutral-700 pt-1 sm:grid-cols-2">
+      <div className="grid gap-0.5 border-t border-neutral-700 pt-1 @sm:grid-cols-2">
         <div className="surface px-1 py-0.75">
           <CounterList title="Most scanned objects" entries={state.counters?.objects} />
         </div>

@@ -49,11 +49,13 @@ export default function VipPanel() {
     return next;
   };
 
+  // VipPanel owns its outer grid rather than placing it inside one CardFrame,
+  // so it establishes its own query boundary for the same width-aware behavior.
   return (
-    <section className="space-y-2 text-base">
-      <div className="grid gap-2 grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)]">
+    <section className="@container space-y-2 text-base">
+      <div className="grid grid-cols-1 gap-2 @[32rem]:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)]">
         {!isVerified ? (
-          <div className="lg:col-span-2">
+          <div className="@[32rem]:col-span-2">
             <VipVerificationCard
               pendingRequestId={pendingRequestId}
               currentStoredKey={currentStoredKey}
@@ -66,7 +68,7 @@ export default function VipPanel() {
           </div>
         ) : null}
 
-        <div className="lg:col-span-2">
+        <div className="@[32rem]:col-span-2">
           {isVerified ? (
             <div className="space-y-2">
               <VipMidiBeeperCard />
@@ -89,7 +91,7 @@ export default function VipPanel() {
           )}
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="@[32rem]:col-span-2">
           <VipPrivateRoverAccessCard
             requestableRovers={requestablePrivateRovers}
             pendingRequests={pendingPrivateRoverRequests}
@@ -99,7 +101,7 @@ export default function VipPanel() {
           />
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="@[32rem]:col-span-2">
           <VipIdentityCard
             currentStoredKey={currentStoredKey}
             applyIdentityKey={applyIdentityKey}
@@ -108,7 +110,7 @@ export default function VipPanel() {
           />
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="@[32rem]:col-span-2">
           <VipProfileImageCard
             isVerified={isVerified}
             onMessage={setMessage}

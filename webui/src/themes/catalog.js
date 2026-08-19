@@ -2,14 +2,16 @@
 // Purpose: Defines persisted theme identities and their presentation order.
 // Scope: Shared by the settings picker and every route that resolves a saved page theme.
 
-export const DEFAULT_PAGE_THEME_KEY = 'progress-pride';
+// Use the quiet, artwork-free theme whenever a browser has not saved a preference yet. Keeping
+// this fallback as a catalog key means every page and the settings preview resolve the same default.
+export const DEFAULT_PAGE_THEME_KEY = 'black';
 
 export const PAGE_THEME_OPTIONS = [
   // Stable keys are stored in the browser settings cookie. Keeping presentation labels separate
   // lets the UI wording improve later without invalidating anybody's saved preference.
   { key: 'progress-pride', label: 'Progress pride', className: 'page-theme-progress-pride' },
-  // Keep the high-contrast caution-stripe option near the default so it is reachable with one
-  // Next click as well as directly through the dropdown.
+  // Keep the high-contrast caution-stripe option near the start of the catalog so it remains easy
+  // to reach while browsing sequentially as well as directly through the dropdown.
   { key: 'hazard-stripes', label: 'Hazard stripes', className: 'page-theme-hazard-stripes' },
   { key: 'pride-mix', label: 'Pride mix', className: 'page-theme-pride-mix' },
   { key: 'rainbow', label: 'Rainbow', className: 'page-theme-rainbow' },
