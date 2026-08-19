@@ -6,7 +6,7 @@ import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import { useTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
 import { hostStatsEqual, selectHostStats, selectSpectatorTelemetry, spectatorTelemetryEqual } from '../../../../context/telemetryViews.js';
 import CornerPodToggle from './CornerPodToggle.jsx';
-import ExpansionToggle from './ExpansionToggle.jsx';
+import ExpansionPanel from './ExpansionPanel.jsx';
 import usePodVisibility from './usePodVisibility.js';
 
 function finite(value) {
@@ -135,9 +135,17 @@ export default function TopRightPod({ roverId }) {
 
       {/* Advanced power is an independently persisted right-edge expansion. Its own arrow is
           retained when closed, and the whole panel moves into the corner if the pod closes. */}
-      {powerOpen ? (
-        <div className={`absolute right-0 w-56 rounded-bl-xl bg-black/60 p-1.5 pl-4 text-white ${batteryOpen ? 'top-[8.5rem]' : 'top-0'}`}>
-          <ExpansionToggle direction="right" label="Hide power and computer" onClick={() => setPowerOpen(false)} className="absolute left-0 top-1/2 -translate-y-1/2" />
+      <ExpansionPanel
+        open={powerOpen}
+        onOpenChange={setPowerOpen}
+        anchorClassName={`absolute right-0 ${batteryOpen ? 'top-[8.5rem]' : 'top-10'}`}
+        panelAlign="right"
+        panelClassName="w-56 rounded-bl-xl bg-black/60 p-1.5 pt-4 text-white"
+        openDirection="left"
+        closeDirection="right"
+        openLabel="Show power and computer"
+        closeLabel="Hide power and computer"
+      >
           <div className="space-y-1.5">
             <MetricRow icon={FaBolt} label="Roomba voltage" value={voltage == null ? '--' : `${(voltage / 1000).toFixed(1)} V`} percent={voltagePercent} iconClass="text-sky-300" fillClass="bg-sky-400" />
             <MetricRow icon={FaBolt} label="Roomba current" value={`${current > 0 ? '+' : ''}${Math.round(current)} mA`} percent={currentPercent * 100} iconClass={current < 0 ? 'text-amber-300' : 'text-emerald-300'} fillClass={current < 0 ? 'bg-amber-400' : 'bg-emerald-400'} />
@@ -148,12 +156,7 @@ export default function TopRightPod({ roverId }) {
             <SpeedTile icon={FaArrowDown} label="Download speed" value={download == null ? '--' : `${download.toFixed(1)} Mb/s`} colorClass="text-sky-300" />
             <SpeedTile icon={FaArrowUp} label="Upload speed" value={upload == null ? '--' : `${upload.toFixed(1)} Mb/s`} colorClass="text-violet-300" />
           </div>
-        </div>
-      ) : (
-        <div className={`absolute right-0 flex h-8 w-3 bg-black/60 ${batteryOpen ? 'top-[8.5rem]' : 'top-10'}`}>
-          <ExpansionToggle direction="left" label="Show power and computer" onClick={() => setPowerOpen(true)} />
-        </div>
-      )}
+      </ExpansionPanel>
       </div>
 
       {/* Battery danger is a stage-level warning, so it belongs near the user's focus instead

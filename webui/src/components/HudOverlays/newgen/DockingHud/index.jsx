@@ -3,7 +3,7 @@
 // Scope: Owns presentation and the existing manual-assist lifecycle for the current driver HUD;
 // the archived desktop layout retains its previous DriveDockAction behavior.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FaChargingStation, FaChevronDown } from 'react-icons/fa';
+import { FaChargingStation } from 'react-icons/fa';
 import { useControlActions, useControlSelector } from '../../../../controls/index.js';
 import { formatKeyLabel } from '../../../../controls/keymapUtils.js';
 import { useTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
@@ -14,7 +14,7 @@ import useCanControlRover from '../../../../hooks/useCanControlRover.js';
 import { useDriverLayout } from '../../../../layouts/driver/DriverLayoutContext.jsx';
 import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import KeyPill from '../../../vip/VipAudioUploadCard/KeyPill.jsx';
-import ExpansionToggle from '../CornerPods/ExpansionToggle.jsx';
+import ExpansionPanel from '../CornerPods/ExpansionPanel.jsx';
 import usePodVisibility from '../CornerPods/usePodVisibility.js';
 
 function DockedAction({ driveKeyLabel, pending, controlsDisabled, error, onUndock }) {
@@ -101,29 +101,10 @@ function AutoDockingAction({ driveKeyLabel, pending, controlsDisabled, error, on
 function DockAssistAction({ active, pending, controlsDisabled, error, dockKeyLabel, onDock, onCancel, cornerOffsetClass, open, onOpenChange, batterySeverity }) {
   const batteryUrgent = batterySeverity === 'urgent';
   const batteryLow = batterySeverity === 'low';
-  if (!open) {
-    return (
-      <button
-        type="button"
-        aria-label="Show rover docking control"
-        title="Dock rover"
-        onClick={() => onOpenChange(true)}
-        className={`pointer-events-auto absolute top-0 z-20 flex h-6 w-10 items-center justify-center gap-1 rounded-bl text-[0.6rem] transition ${
-          batteryUrgent
-            ? 'bg-red-950 text-red-100 hover:bg-red-900'
-            : batteryLow
-              ? 'bg-amber-950 text-amber-100 hover:bg-amber-900'
-              : 'bg-indigo-950/75 text-indigo-100 hover:bg-indigo-900'
-        } ${cornerOffsetClass === 'right-0' ? 'right-10' : cornerOffsetClass}`}
-      >
-        {/* The collapsed tab retains feature identity instead of becoming an
-            anonymous expansion arrow whose purpose must be remembered. */}
-        <FaChargingStation aria-hidden="true" />
-        <FaChevronDown aria-hidden="true" />
-      </button>
-    );
-  }
-
+  // When the battery pod is collapsed its triangular reopen control owns the
+  // outermost forty pixels. Docking uses the next top-edge slot in both open
+  // and collapsed states so the two independent controls never overlap.
+  const dockPositionClass = cornerOffsetClass === 'right-0' ? 'right-10' : cornerOffsetClass;
   if (active) {
     return (
       <div className="pointer-events-none absolute inset-0 z-[60] flex items-center justify-center">
@@ -147,29 +128,38 @@ function DockAssistAction({ active, pending, controlsDisabled, error, dockKeyLab
   }
 
   return (
-    <div className={`pointer-events-auto absolute top-0 z-20 flex items-stretch ${cornerOffsetClass}`}>
-      <ExpansionToggle direction="up" label="Hide dock controls" onClick={() => onOpenChange(false)} />
-      <button
-        type="button"
-        aria-label="Start rover docking assist"
-        disabled={pending || controlsDisabled}
-        onClick={onDock}
-        className={`flex items-center gap-1.5 rounded-bl-xl px-4 py-2 text-base font-bold shadow-xl ring-1 transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-75 ${
-          batteryUrgent
-            ? 'bg-red-950 text-red-50 ring-red-300/80 hover:bg-red-900 focus-visible:ring-red-200'
-            : batteryLow
-              ? 'bg-amber-950 text-amber-50 ring-amber-300/80 hover:bg-amber-900 focus-visible:ring-amber-200'
-              : 'bg-indigo-950/60 text-indigo-50 ring-indigo-300/70 hover:bg-indigo-900 focus-visible:ring-indigo-200'
-        }`}
-      >
-        <FaChargingStation className="shrink-0" aria-hidden="true" />
-        <span>{pending ? 'Starting…' : batteryUrgent ? 'Dock now' : batteryLow ? 'Dock soon' : 'Dock rover'}</span>
-        {dockKeyLabel && !pending ? <KeyPill label={dockKeyLabel} /> : null}
-      </button>
-      {/* The expansion toggle stays on the far side of this panel so the battery pod's
-          triangular control remains unobstructed when both occupy the top-right area. */}
+    <ExpansionPanel
+      open={open}
+      onOpenChange={onOpenChange}
+      anchorClassName={`absolute top-0 ${dockPositionClass}`}
+      panelAlign="right"
+      panelClassName="flex items-start"
+      openDirection="down"
+      closeDirection="up"
+      openLabel="Show rover docking control"
+      closeLabel="Hide dock controls"
+    >
+      <div className="relative">
+        <button
+          type="button"
+          aria-label="Start rover docking assist"
+          disabled={pending || controlsDisabled}
+          onClick={onDock}
+          className={`flex items-center gap-1.5 rounded-bl-xl px-4 pb-2 pt-4 text-base font-bold shadow-xl ring-1 transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-75 ${
+            batteryUrgent
+              ? 'bg-red-950 text-red-50 ring-red-300/80 hover:bg-red-900 focus-visible:ring-red-200'
+              : batteryLow
+                ? 'bg-amber-950 text-amber-50 ring-amber-300/80 hover:bg-amber-900 focus-visible:ring-amber-200'
+                : 'bg-indigo-950/60 text-indigo-50 ring-indigo-300/70 hover:bg-indigo-900 focus-visible:ring-indigo-200'
+          }`}
+        >
+          <FaChargingStation className="shrink-0" aria-hidden="true" />
+          <span>{pending ? 'Starting…' : batteryUrgent ? 'Dock now' : batteryLow ? 'Dock soon' : 'Dock rover'}</span>
+          {dockKeyLabel && !pending ? <KeyPill label={dockKeyLabel} /> : null}
+        </button>
+      </div>
       {error ? <div className="mt-2 max-w-64 bg-red-950/90 px-3 py-2 text-sm font-semibold text-red-100">{error}</div> : null}
-    </div>
+    </ExpansionPanel>
   );
 }
 

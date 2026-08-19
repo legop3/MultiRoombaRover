@@ -6,16 +6,15 @@ const ICONS = { down: FaChevronDown, left: FaChevronLeft, right: FaChevronRight,
 
 export default function ExpansionToggle({ direction, label, onClick, className = '' }) {
   const Icon = ICONS[direction] || FaChevronLeft;
-  const horizontalEdge = direction === 'up' || direction === 'down';
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className={`flex shrink-0 items-center justify-center bg-black/60 text-[0.5rem] text-white/75 hover:bg-black hover:text-white ${horizontalEdge ? 'h-3 w-8' : 'h-8 w-3'} ${className}`}
+      className={`z-10 flex h-3 w-8 shrink-0 items-center justify-center bg-black/60 text-[0.5rem] text-white/75 hover:bg-black hover:text-white ${className}`}
     >
-      {/* The black strip is intentionally retained around the chevron. A collapsed expansion is
-          therefore still a thin piece of that expansion, never a loose button over a pod. */}
+      {/* ExpansionPanel owns all positioning so this button has exactly one visual
+          form. Only the chevron direction changes between open and closed states. */}
       <Icon aria-hidden="true" />
     </button>
   );

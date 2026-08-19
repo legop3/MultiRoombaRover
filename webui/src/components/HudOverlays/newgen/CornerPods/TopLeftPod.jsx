@@ -6,7 +6,7 @@ import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import { useSharedClock } from '../../../../hooks/useSharedClock.js';
 import RoverLabel from '../../../RoverLabel/index.jsx';
 import CornerPodToggle from './CornerPodToggle.jsx';
-import ExpansionToggle from './ExpansionToggle.jsx';
+import ExpansionPanel from './ExpansionPanel.jsx';
 import usePodVisibility from './usePodVisibility.js';
 
 export default function TopLeftPod({ roverId }) {
@@ -159,16 +159,18 @@ export default function TopLeftPod({ roverId }) {
       {/* The rover name is an independent edge expansion. Its visibility control lives in
           the expansion itself, and its position naturally moves into the corner whenever
           the conditional timer pod is absent or manually collapsed. */}
-      {nameOpen ? (
-        <div className={`flex h-11 items-center gap-2 bg-black/60 px-2 ${showTimer ? '' : 'rounded-br-xl'}`}>
+      <ExpansionPanel
+        open={nameOpen}
+        onOpenChange={setNameOpen}
+        anchorClassName={`relative shrink-0 ${showTimer || !turnActive ? '' : 'ml-10'}`}
+        panelClassName={`flex h-11 min-w-max items-center gap-2 bg-black/60 px-2 pt-3 ${showTimer ? '' : 'rounded-br-xl'}`}
+        openDirection="down"
+        closeDirection="up"
+        openLabel="Show rover name"
+        closeLabel="Hide rover name"
+      >
           <RoverLabel roverId={roverId} fallback={roverId} className="px-2 py-1 text-base" />
-          <ExpansionToggle direction="up" label="Hide rover name" onClick={() => setNameOpen(false)} />
-        </div>
-      ) : (
-        <div className={`flex h-3 w-8 bg-black/60 ${showTimer ? '' : 'ml-10'}`}>
-          <ExpansionToggle direction="down" label="Show rover name" onClick={() => setNameOpen(true)} />
-        </div>
-      )}
+      </ExpansionPanel>
     </div>
   );
 }

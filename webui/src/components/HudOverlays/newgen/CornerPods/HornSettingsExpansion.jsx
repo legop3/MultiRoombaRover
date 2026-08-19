@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { HORN_MAX_FREQUENCY } from '../../../../controls/constants.js';
 import { useSettingsNamespace } from '../../../../settings/index.js';
 import { HORN_SETTINGS_DEFAULTS } from '../../../../settings/namespaces.js';
-import ExpansionToggle from './ExpansionToggle.jsx';
+import ExpansionPanel from './ExpansionPanel.jsx';
 
 function clampFrequency(value) {
   const numeric = Number(value);
@@ -12,7 +12,7 @@ function clampFrequency(value) {
   return Math.min(HORN_MAX_FREQUENCY, Math.round(numeric));
 }
 
-export default function HornSettingsExpansion({ open, podOpen, onOpenChange }) {
+export default function HornSettingsExpansion({ open, onOpenChange }) {
   const { value, save } = useSettingsNamespace('horn', HORN_SETTINGS_DEFAULTS);
   const waveform = value?.waveform === 'sine' ? 'sine' : 'saw';
   const frequencies = [...(Array.isArray(value?.freqs) ? value.freqs : HORN_SETTINGS_DEFAULTS.freqs), 0, 0, 0, 0]
@@ -31,21 +31,25 @@ export default function HornSettingsExpansion({ open, podOpen, onOpenChange }) {
     });
   }, [save]);
 
-  if (!open) {
-    return (
-      <div className={`pointer-events-auto absolute left-10 z-20 flex h-3 w-8 bg-black/60 ${podOpen ? 'bottom-40' : 'bottom-0'}`}>
-        <ExpansionToggle direction="up" label="Show horn settings" onClick={() => onOpenChange(true)} />
-      </div>
-    );
-  }
-
   return (
-    <div className={`pointer-events-auto absolute left-0 z-20 w-52 rounded-tr-xl bg-black/60 p-2 text-xs text-white ${podOpen ? 'bottom-40' : 'bottom-0'}`}>
+    /* Horn settings belongs to the left video wall, not to the peripheral pod.
+       Keeping this anchor fixed above the pod's maximum footprint means the
+       expansion never follows or overlaps the pod as that separate UI closes.
+       Its arrows mirror advanced info on the opposite wall: open points into
+       the screen and close points back toward the wall. */
+    <ExpansionPanel
+      open={open}
+      onOpenChange={onOpenChange}
+      anchorClassName="absolute bottom-40 left-0"
+      panelVerticalAlign="bottom"
+      panelClassName="w-52 rounded-tr-xl bg-black/60 p-2 pb-4 text-xs text-white"
+      openDirection="right"
+      closeDirection="left"
+      openLabel="Show horn settings"
+      closeLabel="Hide horn settings"
+    >
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="font-semibold text-cyan-100">Horn settings</span>
-        {/* This arrow belongs to the expansion. Closing the peripheral pod never changes
-            hornSettings visibility; it only moves this panel into the vacated corner. */}
-        <ExpansionToggle direction="down" label="Hide horn settings" onClick={() => onOpenChange(false)} />
       </div>
       <label className="flex items-center justify-between gap-2 text-slate-300">
         <span>Wave</span>
@@ -73,6 +77,6 @@ export default function HornSettingsExpansion({ open, podOpen, onOpenChange }) {
           </label>
         ))}
       </div>
-    </div>
+    </ExpansionPanel>
   );
 }

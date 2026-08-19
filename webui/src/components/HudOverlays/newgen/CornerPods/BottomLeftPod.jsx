@@ -84,7 +84,7 @@ export default function BottomLeftPod({ roverId }) {
       ) : (
         <CornerPodToggle corner="bottom-left" expanded={false} label="Show rover controls" onClick={() => setOpen(true)} />
       )}
-      {hornDevice ? <HornSettingsExpansion open={hornSettingsOpen} podOpen={open} onOpenChange={setHornSettingsOpen} /> : null}
+      {hornDevice ? <HornSettingsExpansion open={hornSettingsOpen} onOpenChange={setHornSettingsOpen} /> : null}
     </>
   );
 }
