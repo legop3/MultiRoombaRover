@@ -7,7 +7,7 @@ import { FaChargingStation, FaChevronDown } from 'react-icons/fa';
 import { useControlActions, useControlSelector } from '../../../../controls/index.js';
 import { formatKeyLabel } from '../../../../controls/keymapUtils.js';
 import { useTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
-import { dockTelemetryEqual, resolveDocked, selectDockTelemetry } from '../../../../context/telemetryViews.js';
+import { dockTelemetryEqual, selectDockTelemetry } from '../../../../context/telemetryViews.js';
 import { useManualDockAssist } from '../../../../features/manualDockAssist/useManualDockAssist.js';
 import { useSettingsNamespace } from '../../../../settings/index.js';
 import useCanControlRover from '../../../../hooks/useCanControlRover.js';
@@ -256,7 +256,7 @@ export default function DockingHud({ roverId }) {
   const [error, setError] = useState('');
   const [showUndockTransition, setShowUndockTransition] = useState(false);
 
-  const docked = resolveDocked(dockTelemetry);
+  const docked = Boolean(dockTelemetry?.homeBase);
   const oiMode = String(dockTelemetry?.oiModeLabel || '').toLowerCase();
   // The established UI contract treats exactly passive + undocked as the Roomba's
   // autonomous docking attempt. Unknown telemetry must not fabricate that state.

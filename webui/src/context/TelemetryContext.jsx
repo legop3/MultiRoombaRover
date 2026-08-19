@@ -217,6 +217,14 @@ export function TelemetryProvider({ children }) {
           currentValue: selector(framesRef.current[roverId] ?? EMPTY_FRAME),
         };
         listeners.add(entry);
+
+        // React renders before effects subscribe. A sensor frame can therefore
+        // arrive after the hook's render-time read but before this entry exists.
+        // Publish the exact snapshot used to initialize the subscription so the
+        // component cannot remain stuck on that stale render-time value until a
+        // selected field changes again. Registering first is important: any
+        // frame arriving after this point will also notify the listener normally.
+        listener(entry.currentValue);
         return () => {
           const current = selectorSubscribersRef.current.get(roverId);
           if (!current) return;

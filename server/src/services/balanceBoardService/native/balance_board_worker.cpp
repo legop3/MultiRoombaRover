@@ -83,6 +83,8 @@ constexpr uint32_t kControllerFastConnectableSetting = 1U << 2;
 constexpr int kManagementCommandTimeoutMs = 2000;
 constexpr int kFrameIntervalMs = 50;
 constexpr int kDiscoveryRestartDelayMs = 1000;
+constexpr int kCandidateIdentityRetryMs = 500;
+constexpr int kCandidateIdleRetryMs = 5000;
 constexpr const char* kDiscoveryTimeoutSeconds = "86400";
 constexpr uint16_t kHidControlPsm = 0x0011;
 constexpr uint16_t kHidInterruptPsm = 0x0013;
@@ -128,6 +130,12 @@ struct RunningCommand {
   int output_fd = -1;
   std::string pending_output;
   std::string transcript;
+};
+
+struct DiscoveryCandidate {
+  BluetoothAddress address;
+  uint64_t last_seen_at = 0;
+  uint64_t next_identity_check_at = 0;
 };
 
 struct ManagementRuntimeState {
@@ -353,8 +361,9 @@ void stop_command(RunningCommand* command) {
   }
 }
 
-std::optional<BluetoothAddress> take_discovered_board(RunningCommand* discovery,
-                                                       bool* discovery_started) {
+std::optional<BluetoothAddress> take_discovered_board(
+    RunningCommand* discovery, bool* discovery_started,
+    std::vector<DiscoveryCandidate>* candidates) {
   if (!discovery) return std::nullopt;
   std::size_t newline = discovery->pending_output.find('\n');
   while (newline != std::string::npos) {
@@ -368,19 +377,67 @@ std::optional<BluetoothAddress> take_discovered_board(RunningCommand* discovery,
       *discovery_started = true;
     }
 
-    // A Classic device is initially announced by address and receives its name
-    // in a later change event. Parse every complete scan line so either BlueZ
-    // form works, but require the exact Nintendo board name before accepting an
-    // address. A nearby Wiimote must never become eligible for the raw PIN.
-    if (line.find(kBoardBluetoothName) != std::string::npos) {
-      const std::size_t device_prefix = line.find("Device ");
-      if (device_prefix != std::string::npos && line.size() >= device_prefix + 24) {
-        if (auto address = parse_address(line.substr(device_prefix + 7, 17))) return address;
+    const std::size_t device_prefix = line.find("Device ");
+    if (device_prefix != std::string::npos && line.size() >= device_prefix + 24) {
+      const auto address = parse_address(line.substr(device_prefix + 7, 17));
+      if (!address.has_value()) {
+        newline = discovery->pending_output.find('\n');
+        continue;
+      }
+
+      // The exact remote name remains definitive whenever the adapter resolves
+      // it during the board's short red-Sync window.
+      if (line.find(kBoardBluetoothName) != std::string::npos) return address;
+
+      // Some adapters initially report only "Device <address> <address>" and
+      // never finish remote-name resolution before the board powers down. Keep
+      // those unresolved devices as candidates so their BlueZ properties can be
+      // inspected without stopping the discovery session. Named ambient devices
+      // such as TVs are not candidates, which prevents normal room traffic from
+      // replacing the panel's useful waiting-for-Sync message.
+      const std::string trailing = line.substr(device_prefix + 24);
+      const bool address_only = trailing.empty() ||
+          trailing.find(address->display) != std::string::npos;
+      if (address_only && candidates) {
+        const uint64_t now = monotonic_ms();
+        const auto existing = std::find_if(
+            candidates->begin(), candidates->end(),
+            [&](const DiscoveryCandidate& candidate) {
+              return candidate.address.display == address->display;
+            });
+        if (existing == candidates->end()) {
+          candidates->push_back({*address, now, now});
+          emit_status("device-detected", address->display,
+                      "Bluetooth device detected; checking whether it is the Balance Board.");
+        } else {
+          // A fresh scan event generally means the physical button was pressed
+          // again. Recheck immediately even if this candidate had previously
+          // fallen back to the slower idle retry interval.
+          existing->last_seen_at = now;
+          existing->next_identity_check_at = now;
+        }
       }
     }
     newline = discovery->pending_output.find('\n');
   }
   return std::nullopt;
+}
+
+bool candidate_is_balance_board(const BluetoothAddress& address) {
+  const CommandResult info = run_command({
+      "bluetoothctl", "--timeout", "2", "info", address.display});
+  if (info.output.find(kBoardBluetoothName) != std::string::npos) return true;
+
+  // Original Wii input devices identify as legacy-pairing gaming peripherals.
+  // This fallback is deliberately applied only to an address-only device seen
+  // during active commissioning. That physical red-Sync action is the selection
+  // boundary when an adapter cannot resolve Nintendo's remote name in time.
+  const bool gaming_peripheral =
+      info.output.find("Class: 0x00002504") != std::string::npos &&
+      info.output.find("Icon: input-gaming") != std::string::npos;
+  const bool legacy_pairing =
+      info.output.find("LegacyPairing: yes") != std::string::npos;
+  return gaming_peripheral && legacy_pairing;
 }
 
 std::string command_error_summary(const std::string& raw, const std::string& fallback) {
@@ -472,14 +529,35 @@ void commissioning_loop(PairingSharedState* shared) {
 
     std::optional<BluetoothAddress> address;
     bool discovery_started = false;
+    std::vector<DiscoveryCandidate> candidates;
     while (running.load() && !address.has_value()) {
       const bool discovery_running = collect_command_output(&discovery);
       const bool was_started = discovery_started;
-      address = take_discovered_board(&discovery, &discovery_started);
+      address = take_discovered_board(
+          &discovery, &discovery_started, &candidates);
       if (!was_started && discovery_started) {
         // This status clears any prior scanner error and tells the browser that
         // the server is genuinely listening for the board's red Sync button.
         emit_status("discovering");
+      }
+      if (address.has_value()) break;
+
+      const uint64_t now = monotonic_ms();
+      for (auto& candidate : candidates) {
+        if (now < candidate.next_identity_check_at) continue;
+        if (candidate_is_balance_board(candidate.address)) {
+          address = candidate.address;
+          break;
+        }
+
+        // Query quickly while a newly pressed board is still awake, then back
+        // off once it has been absent for several seconds. A later scan event
+        // resets this deadline immediately, so another button press never waits
+        // for the idle interval and an unidentified device cannot cause a
+        // permanent stream of bluetoothctl processes.
+        const bool recently_seen = now - candidate.last_seen_at < 10000;
+        candidate.next_identity_check_at = now +
+            (recently_seen ? kCandidateIdentityRetryMs : kCandidateIdleRetryMs);
       }
       if (address.has_value()) break;
       if (!discovery_running) {

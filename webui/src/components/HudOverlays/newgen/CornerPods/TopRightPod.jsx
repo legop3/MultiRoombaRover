@@ -4,7 +4,7 @@ import { createElement, useMemo } from 'react';
 import { FaArrowDown, FaArrowUp, FaBatteryHalf, FaBolt, FaExclamationTriangle, FaMemory, FaThermometerHalf, FaWifi } from 'react-icons/fa';
 import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import { useTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
-import { hostStatsEqual, resolveDocked, selectHostStats, selectSpectatorTelemetry, spectatorTelemetryEqual } from '../../../../context/telemetryViews.js';
+import { hostStatsEqual, selectHostStats, selectSpectatorTelemetry, spectatorTelemetryEqual } from '../../../../context/telemetryViews.js';
 import CornerPodToggle from './CornerPodToggle.jsx';
 import ExpansionToggle from './ExpansionToggle.jsx';
 import usePodVisibility from './usePodVisibility.js';
@@ -101,7 +101,7 @@ export default function TopRightPod({ roverId }) {
   const memoryTone = memoryUsed >= 90 ? 'bg-red-400' : memoryUsed >= 75 ? 'bg-amber-400' : 'bg-violet-400';
   const download = finite(wifi.downloadMbps);
   const upload = finite(wifi.uploadMbps);
-  const docked = resolveDocked(electrical);
+  const docked = Boolean(electrical?.homeBase);
   const warningMessage = urgentBattery ? 'BATTERY CRITICAL, DOCK NOW' : 'Battery low, please dock soon.';
 
   return (

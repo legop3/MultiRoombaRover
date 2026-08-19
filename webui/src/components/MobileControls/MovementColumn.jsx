@@ -5,7 +5,7 @@ import { FaChargingStation } from 'react-icons/fa';
 import { useControlSelector } from '../../controls/index.js';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
-import { dockTelemetryEqual, resolveDocked, selectDockTelemetry } from '../../context/telemetryViews.js';
+import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import useCanControlRover from '../../hooks/useCanControlRover.js';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
@@ -22,7 +22,7 @@ function MovementColumnContent({ layout }) {
   });
   const batteryUrgent = Boolean(batteryState?.urgentActive);
   const batteryLow = Boolean(batteryState?.warnActive || batteryUrgent);
-  const docked = resolveDocked(dockTelemetry);
+  const docked = Boolean(dockTelemetry?.homeBase);
   const drivingMode = String(dockTelemetry?.oiModeLabel || '').toLowerCase() === 'full';
 
   /*

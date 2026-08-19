@@ -401,6 +401,15 @@ function handleWorkerMessage(message = {}) {
     updateStatus('starting', 'Starting Bluetooth discovery.');
   } else if (workerState === 'discovering') {
     updateStatus('waiting-for-sync', 'Press the red Sync button underneath the board.');
+  } else if (workerState === 'device-detected') {
+    // Preserve the worker's exact identification stage instead of leaving the
+    // panel apparently unchanged when an adapter sees only the board's address.
+    // This is intentionally not a feed alert because ambient unresolved devices
+    // can appear during commissioning and the state is already visible locally.
+    updateStatus(
+      'identifying',
+      message.error || 'Bluetooth device detected; checking whether it is the Balance Board.',
+    );
   } else if (workerState === 'pairing') {
     updateStatus('pairing', 'Board found. Pairing now.');
   } else if (workerState === 'connected') {

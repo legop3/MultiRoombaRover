@@ -4,14 +4,14 @@
 
 import { useMemo } from 'react';
 import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
-import { dockTelemetryEqual, isDockedChargingState, resolveDocked, selectDockTelemetry } from '../../context/telemetryViews.js';
+import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
 
 export function deriveDriveDockStateFromTelemetry(dockTelemetry) {
   const oiLabel = dockTelemetry?.oiModeLabel || 'Unknown';
   const oiNormalized = oiLabel.toLowerCase();
   const chargingLabel = dockTelemetry?.chargingStateLabel || '';
-  const docked = resolveDocked(dockTelemetry);
-  const charging = isDockedChargingState(chargingLabel);
+  const docked = Boolean(dockTelemetry?.homeBase);
+  const charging = docked && chargingLabel.toLowerCase() !== 'not charging' && chargingLabel !== '';
   const driving = oiNormalized === 'full';
   const dockedNotCharging = docked && !charging;
   const dockingInProgress = !docked && !charging && oiNormalized === 'passive';
