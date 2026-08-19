@@ -83,6 +83,13 @@ constexpr uint32_t kControllerFastConnectableSetting = 1U << 2;
 constexpr int kManagementCommandTimeoutMs = 2000;
 constexpr int kFrameIntervalMs = 50;
 constexpr int kDiscoveryRestartDelayMs = 1000;
+// A live bluetoothctl PID is not proof that BlueZ actually began inquiry. Some
+// adapters can leave the command parked after accepting its discovery filter,
+// which previously made commissioning look active for the command's full
+// one-day lifetime while the controller remained `Discovering: no`. Bound that
+// unconfirmed startup state so a transient adapter or BlueZ failure is repaired
+// automatically instead of requiring a manual foreground scan.
+constexpr int kDiscoveryStartDeadlineMs = 5000;
 constexpr int kCandidateIdentityRetryMs = 500;
 constexpr int kCandidateIdleRetryMs = 5000;
 constexpr const char* kDiscoveryTimeoutSeconds = "86400";
@@ -529,6 +536,11 @@ void commissioning_loop(PairingSharedState* shared) {
 
     std::optional<BluetoothAddress> address;
     bool discovery_started = false;
+    // Measure from the successful fork, not from the first output line. A
+    // wedged bluetoothctl may emit `SetDiscoveryFilter success` and then stay
+    // alive forever without producing the only confirmation that matters:
+    // `Discovery started`.
+    const uint64_t discovery_launched_at = monotonic_ms();
     std::vector<DiscoveryCandidate> candidates;
     while (running.load() && !address.has_value()) {
       const bool discovery_running = collect_command_output(&discovery);
@@ -566,6 +578,22 @@ void commissioning_loop(PairingSharedState* shared) {
         emit_status("error", "", discovery_started
             ? "Bluetooth scanner stopped unexpectedly; retrying automatically: " + detail
             : "Bluetooth scanner exited before discovery started; retrying automatically: " + detail);
+        break;
+      }
+
+      if (!discovery_started &&
+          now - discovery_launched_at >= kDiscoveryStartDeadlineMs) {
+        // Terminating this specific client is safe: stop_command() only owns
+        // the child created above, and the outer commissioning loop immediately
+        // starts a clean replacement. Preserve bluetoothctl's actual output in
+        // the status so the panel explains whether BlueZ stalled after filter
+        // setup or failed in some other adapter-specific way.
+        const std::string detail = command_error_summary(
+            discovery.transcript, "bluetoothctl produced no startup response");
+        emit_status(
+            "error", "",
+            "Bluetooth scanner did not start within 5 seconds; retrying automatically: " +
+                detail);
         break;
       }
 
