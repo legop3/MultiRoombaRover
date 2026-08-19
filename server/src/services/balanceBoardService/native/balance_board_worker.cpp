@@ -522,11 +522,17 @@ void commissioning_loop(PairingSharedState* shared) {
     // time and then queried a second client, making successful discovery depend
     // on when the physical button happened to be pressed.
     // BlueZ's command-line client exits after the SetDiscoveryFilter callback
-    // unless non-interactive mode has a timeout. A one-day timeout keeps the
-    // client alive for unattended commissioning; the worker normally stops it
-    // itself as soon as the board appears and restarts it if the day expires.
+    // unless non-interactive mode has a timeout. Its explicit monitor mode is
+    // equally important here: stdout is a worker-owned pipe rather than a
+    // terminal, and current bluetoothctl versions otherwise report command
+    // acknowledgements such as `Discovery started` without forwarding the
+    // asynchronous `[NEW]` and `[CHG]` device lines parsed below. A one-day
+    // timeout keeps that monitored client alive for unattended commissioning;
+    // the worker normally stops it itself as soon as the board appears and
+    // restarts it if the day expires.
     RunningCommand discovery = start_command({
-        "bluetoothctl", "--timeout", kDiscoveryTimeoutSeconds, "scan", "bredr"});
+        "bluetoothctl", "--monitor", "--timeout", kDiscoveryTimeoutSeconds,
+        "scan", "bredr"});
     if (discovery.pid < 0) {
       emit_status("error", "", "could not start Bluetooth discovery: " +
           command_error_summary(discovery.transcript, "unknown process error"));
