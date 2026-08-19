@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
-import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
+import { dockTelemetryEqual, isDockedChargingState, resolveDocked, selectDockTelemetry } from '../../context/telemetryViews.js';
 
 export function useManualDockAssist(options = {}) {
   const { manageLifecycle = false } = options;
@@ -10,8 +10,10 @@ export function useManualDockAssist(options = {}) {
   const actions = useControlActions();
   const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
   const chargingLabel = dockTelemetry.chargingStateLabel || '';
-  const docked = Boolean(dockTelemetry.homeBase);
-  const charging = docked && chargingLabel.toLowerCase() !== 'not charging' && chargingLabel !== '';
+  const docked = resolveDocked(dockTelemetry);
+  // Use the same explicit charging labels that can establish dock presence.
+  // A non-empty fault or unknown label must not masquerade as active charging.
+  const charging = isDockedChargingState(chargingLabel);
   const wasDockedRef = useRef(false);
 
   const enterAssist = useCallback(() => {

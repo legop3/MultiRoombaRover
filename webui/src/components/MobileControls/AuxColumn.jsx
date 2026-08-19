@@ -6,7 +6,7 @@ import { FaBullhorn, FaCrosshairs, FaLightbulb } from 'react-icons/fa';
 import './mobileControls.css';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
-import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
+import { dockTelemetryEqual, resolveDocked, selectDockTelemetry } from '../../context/telemetryViews.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import useCanControlRover from '../../hooks/useCanControlRover.js';
 import HornControl from '../HornControl/index.jsx';
@@ -37,7 +37,7 @@ function AuxColumnContent() {
   // column. Dock and OI state are applied separately only where the hardware
   // command itself depends on the Roomba being able to drive.
   const controlsDisabled = !roverId || !canControl;
-  const docked = Boolean(dockTelemetry?.homeBase);
+  const docked = resolveDocked(dockTelemetry);
   const drivingMode = String(dockTelemetry?.oiModeLabel || '').toLowerCase() === 'full';
   const vacuumDisabled = controlsDisabled
     || docked

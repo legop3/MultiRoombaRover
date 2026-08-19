@@ -37,6 +37,27 @@ const EMPTY_MAIN_BRUSH_AUDIO = Object.freeze({
   mainBrushOvercurrent: false,
 });
 
+// These labels represent an active charging relationship reported by the
+// Roomba. That is independently useful dock evidence: some already-docked
+// rovers report charging before the home-base contact bit changes again.
+const DOCKED_CHARGING_STATES = new Set([
+  'reconditioning charging',
+  'full charging',
+  'trickle charging',
+  'waiting',
+]);
+
+export function isDockedChargingState(chargingStateLabel) {
+  return DOCKED_CHARGING_STATES.has(String(chargingStateLabel || '').trim().toLowerCase());
+}
+
+export function resolveDocked(dockTelemetry) {
+  // Dock contact and active charging are complementary sensor evidence, not
+  // fallback state. Treating either as sufficient prevents UI controls from
+  // claiming a charging rover should be driven onto a dock it already occupies.
+  return Boolean(dockTelemetry?.homeBase) || isDockedChargingState(dockTelemetry?.chargingStateLabel);
+}
+
 function bucketNumber(value, step) {
   // Visual widgets do not benefit from repainting for tiny analog jitter. The
   // bucket step intentionally applies only to display selectors; raw telemetry
