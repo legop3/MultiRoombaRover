@@ -1,4 +1,27 @@
 @media (max-width: 1023px) {
+  .driver-mobile-layout {
+    /* Sixty viewport-width units preserves the landscape layout's original
+       0.7 / 2.1 / 0.7 proportions. The height-derived limit prevents that
+       center track from producing a 4:3 video taller than the small viewport. */
+    --mobile-landscape-video-width: min(60vw, 133.333svh);
+  }
+
+  .driver-mobile-layout:has(> .panel-section) {
+    /* GlobalObjectiveBanner is a direct panel-section child when visible. Only
+       then reserve its compact mobile height; a dismissed or absent banner no
+       longer leaves permanent space beneath and beside the video. */
+    --mobile-landscape-video-width: min(60vw, calc(133.333svh - 3.333rem));
+  }
+
+  .driver-mobile-layout .mobile-landscape-driver-grid {
+    /* The side controls consume all width not used by the exact video track.
+       This removes the empty center-column gutters created by max-width alone. */
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(0, var(--mobile-landscape-video-width))
+      minmax(0, 1fr);
+  }
+
   html:has(.driver-mobile-layout) {
     /* These three driver-only positions deliberately use strict page snapping. */
     scroll-snap-type: y mandatory;

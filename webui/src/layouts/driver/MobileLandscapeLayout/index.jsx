@@ -23,11 +23,12 @@ export default function MobileLandscapeLayout() {
     <MobileLayoutFrame>
       <div className={`flex flex-col ${themeGapClass}`}>
       {/* The center column deliberately contains only the driver video. */}
-      <section className={`grid grid-cols-[minmax(0,0.7fr)_minmax(0,2.1fr)_minmax(0,0.7fr)] ${themeGapClass}`}>
+      <section className={`mobile-landscape-driver-grid grid ${themeGapClass}`}>
         {firstColumn}
         <div className="min-w-0 self-start">
-          {/* The video stage adapts through DriverLayoutContext while this layout keeps
-              ownership of the existing landscape touch-control columns. */}
+          {/* The grid owns the 4:3 height constraint so its center track always
+              matches the video. Any width the video cannot use is reassigned to
+              the control columns instead of becoming empty gutters around it. */}
           <NewDriveVideo />
         </div>
         {secondColumn}

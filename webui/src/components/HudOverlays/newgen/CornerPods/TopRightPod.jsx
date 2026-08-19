@@ -3,7 +3,7 @@
 import { createElement, useMemo } from 'react';
 import { FaArrowDown, FaArrowUp, FaBatteryHalf, FaBolt, FaExclamationTriangle, FaMemory, FaThermometerHalf, FaWifi } from 'react-icons/fa';
 import { useSessionSelector } from '../../../../context/SessionContext.jsx';
-import { useTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
+import { useVisualTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
 import { hostStatsEqual, selectHostStats, selectSpectatorTelemetry, spectatorTelemetryEqual } from '../../../../context/telemetryViews.js';
 import CornerPodToggle from './CornerPodToggle.jsx';
 import ExpansionPanel from './ExpansionPanel.jsx';
@@ -73,8 +73,13 @@ export default function TopRightPod({ roverId }) {
     const rover = (state.session?.roster || []).find((entry) => String(entry.id) === String(roverId));
     return rover?.batteryState || null;
   });
-  const electrical = useTelemetrySelector(roverId, selectSpectatorTelemetry, spectatorTelemetryEqual);
-  const host = useTelemetrySelector(powerOpen ? roverId : null, selectHostStats, hostStatsEqual);
+  // These values drive gauges and informational bars only; no control decision
+  // depends on their render cadence. The visual subscription remains immediate
+  // on desktop while honoring MobileLayoutFrame's shared telemetry throttle on
+  // phones, preventing analog current/voltage noise from repainting this pod at
+  // the rover sensor-stream rate.
+  const electrical = useVisualTelemetrySelector(roverId, selectSpectatorTelemetry, spectatorTelemetryEqual);
+  const host = useVisualTelemetrySelector(powerOpen ? roverId : null, selectHostStats, hostStatsEqual);
   const percent = Math.max(0, Math.min(100, finite(batteryState?.percentDisplay) ?? 0));
   const current = finite(electrical?.currentMa) ?? 0;
   const currentPercent = Math.max(0, Math.min(1, Math.abs(current) / 2500));

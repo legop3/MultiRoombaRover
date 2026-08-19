@@ -31,6 +31,8 @@ export function useManualDockAssist(options = {}) {
     const justDocked = docked && !wasDockedRef.current;
     const justUndocked = !docked && wasDockedRef.current;
     if (active && justDocked) {
+      // Stop on the first home-base contact so continued input cannot push the rover against the dock.
+      actions.stopAllMotion();
       actions.sendSong([{ note: 84, duration: 6 }], { slot: 1 });
     } else if (active && justUndocked) {
       actions.sendSong([{ note: 72, duration: 6 }], { slot: 1 });
