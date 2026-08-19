@@ -523,16 +523,23 @@ void commissioning_loop(PairingSharedState* shared) {
     // on when the physical button happened to be pressed.
     // BlueZ's command-line client exits after the SetDiscoveryFilter callback
     // unless non-interactive mode has a timeout. Its explicit monitor mode is
-    // equally important here: stdout is a worker-owned pipe rather than a
-    // terminal, and current bluetoothctl versions otherwise report command
-    // acknowledgements such as `Discovery started` without forwarding the
-    // asynchronous `[NEW]` and `[CHG]` device lines parsed below. A one-day
-    // timeout keeps that monitored client alive for unattended commissioning;
-    // the worker normally stops it itself as soon as the board appears and
-    // restarts it if the day expires.
+    // equally important because current bluetoothctl versions otherwise omit
+    // the asynchronous `[NEW]` and `[CHG]` device lines parsed below.
+    //
+    // stdout and stderr are worker-owned pipes rather than a terminal. Fedora's
+    // bluetoothctl therefore block-buffers even `Discovery started`, leaving a
+    // genuinely active scan indistinguishable from a hung process until the
+    // one-day command exits. stdbuf replaces itself with bluetoothctl in the
+    // same PID while forcing both streams to flush each line immediately. That
+    // gives the watchdog and device parser live evidence without adding a
+    // pseudo-terminal or another process for the supervisor to manage.
+    //
+    // The one-day timeout keeps that monitored client alive for unattended
+    // commissioning; the worker normally stops it itself as soon as the board
+    // appears and restarts it if the day expires.
     RunningCommand discovery = start_command({
-        "bluetoothctl", "--monitor", "--timeout", kDiscoveryTimeoutSeconds,
-        "scan", "bredr"});
+        "stdbuf", "-oL", "-eL", "bluetoothctl", "--monitor", "--timeout",
+        kDiscoveryTimeoutSeconds, "scan", "bredr"});
     if (discovery.pid < 0) {
       emit_status("error", "", "could not start Bluetooth discovery: " +
           command_error_summary(discovery.transcript, "unknown process error"));
