@@ -1,0 +1,35 @@
+/*
+  These animations belong only to InitialSessionOverlay. Keeping them beside
+  the component avoids adding feature-specific behavior to the global styles.
+  Rotation and hue use separate elements so their independent infinite cycles
+  cannot overwrite one another's transform or filter properties.
+*/
+@keyframes initial-session-spinner-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes initial-session-spinner-hue {
+  from {
+    filter: hue-rotate(0deg);
+  }
+
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .initial-session-spinner-rotation {
+    animation: initial-session-spinner-rotate 1.8s linear infinite;
+  }
+
+  .initial-session-spinner-image {
+    animation: initial-session-spinner-hue 2.8s linear infinite;
+  }
+}

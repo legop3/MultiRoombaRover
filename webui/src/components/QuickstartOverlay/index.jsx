@@ -19,9 +19,9 @@ function ControlRow({ label, keyLabel }) {
 function DesktopQuickstart({ keymap }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-sm text-slate-200">1. Press "Start Driving" put your rover into driving mode.</p>
+      <p className="text-sm text-slate-200">1. Click "Your rover is docked" to undock.</p>
       <div className="space-y-0.5">
-        <p className="text-sm text-slate-200">2. Use the drive controls to move your rover:</p>
+        <p className="text-sm text-slate-200">2. Drive with these keybindings:</p>
         <div className="space-y-0.5">
           <ControlRow label="Forward" keyLabel={formatKeyLabel(keymap?.driveForward?.[0])} />
           <ControlRow label="Backward" keyLabel={formatKeyLabel(keymap?.driveBackward?.[0])} />
@@ -31,7 +31,8 @@ function DesktopQuickstart({ keymap }) {
           <ControlRow label="Move slower" keyLabel={formatKeyLabel(keymap?.slowModifier?.[0])} />
         </div>
       </div>
-      <p className="text-sm text-slate-200">3. When done, enter "Docking Assist" and line up the front sensor with the dock sensor.</p>
+      <p className="text-sm text-slate-200">3. Use the video HUD for rover controls and information.</p>
+      <p className="text-sm text-slate-200">4. Click "Dock rover" when finished.</p>
     </div>
   );
 }
@@ -39,10 +40,11 @@ function DesktopQuickstart({ keymap }) {
 function MobileQuickstart() {
   return (
     <div className="space-y-0.5 text-sm text-slate-200">
-      <p>1. Press "Start Driving" put your rover into driving mode.</p>
-      <p>2. Touch and hold in Joystick area to move.</p>
-      <p>3. Use the other column for motor, horn, and camera controls.</p>
-      <p>4. When done, enter "Docking Assist" and line up the front sensor with the dock sensor.</p>
+      <p>1. Tap "Your rover is docked" to undock.</p>
+      <p>2. Hold and drag on the drive pad.</p>
+      <p>3. Choose Precision, Normal, or Turbo above the drive pad.</p>
+      <p>4. Use the other column for rover controls.</p>
+      <p>5. Tap "Dock and charge" when finished.</p>
     </div>
   );
 }
@@ -71,7 +73,6 @@ export default function QuickstartOverlay({
   layout,
   showOnLoad,
   onToggleShowOnLoad,
-  onOpenHelp,
   onClose,
 }) {
   const rawKeymap = useControlSelector((control) => control.state.keymap);

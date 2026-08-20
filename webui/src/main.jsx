@@ -21,6 +21,7 @@ import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
 import PtzAppRoot from './ptz/PtzAppRoot.jsx'
+import InitialSessionOverlay from './components/InitialSessionOverlay/index.jsx'
 
 // The reporting route includes the charting and CSV libraries. Loading that
 // bundle only when `/reports` is visited keeps ordinary rover-control sessions
@@ -31,6 +32,11 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <SocketProvider>
       <SessionProvider>
+        {/* Every route depends on the first authoritative session snapshot.
+            Mounting this opaque layer at the shared provider boundary prevents
+            incomplete route-specific placeholders from flashing while still
+            allowing every application tree to initialize underneath it. */}
+        <InitialSessionOverlay />
         <TelemetryProvider>
           <SettingsProvider>
             <ChatProvider>

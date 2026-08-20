@@ -11,26 +11,44 @@ export const HELP_CONTENT = {
         type: 'list',
         title: 'Chat and nicknames',
         items: [
-          'Set a nickname in the user list panel, on the bottom left of the page below the rover video.',
-          { segments: ['Toggle chat focus with ', { action: 'chatFocus' }, '. Press ', { action: 'chatFocus'}, ' again to send.'] },
+          'Chat and nickname controls are in the Chat/Rovers tab.',
+          { segments: ['Open the HUD chat composer with ', { action: 'chatFocus' }, '. Press ', { action: 'chatFocus'}, ' again to send.'] },
         ]
       },
       {
         type: 'list',
         title: 'Driving the rover',
         items: [
-          { segments: ['Press the "Start Driving" button onscreen, or press ' , { action: 'driveMacro' }, ' on your keyboard to put the rover into driving mode.'] },
-          'Refer to the controls for the controls for the rover.'
+          { segments: ['Click "Your rover is docked", or press ', { action: 'driveMacro' }, ', to undock.'] },
+          'Drive with the movement keybindings.',
+          'Rover controls dim while another person has the turn.',
+        ],
+      },
+      {
+        type: 'list',
+        title: 'Video HUD',
+        items: [
+          'Top left shows the rover name and turns.',
+          'Top right shows battery and rover status.',
+          'Bottom left contains horn, headlight, and laser controls.',
+          'Bottom right contains camera tilt and chat.',
+          'Use the arrows to open and close pods and their expansions.',
+        ],
+      },
+      {
+        type: 'list',
+        title: 'Page layout',
+        items: [
+          'Room, Activities, and VIP are in the left sidebar.',
+          'Chat/Rovers, Help, and Settings are in the right sidebar.',
         ],
       },
       {
         type: 'list',
         title: 'Docking the rover',
         items: [
-          'If the rover shows "Docking in Progress", it is already auto-seeking the dock.',
-          'To dock manually, enter Docking Assist from the drive panel.',
-          { segments: ['Press "Enter Docking Assist", or press ', { action: 'dockMacro' }, '.'] },
-          'In assist mode, camera tilts down and driving speed is limited for precise alignment.',
+          { segments: ['Click "Dock rover", or press ', { action: 'dockMacro' }, '.'] },
+          'Click "Rover is docking itself" to resume driving.',
         ],
       },
     ],
@@ -56,8 +74,8 @@ export const HELP_CONTENT = {
             id: 'macros',
             title: 'Rover modes & chat',
             items: [
-              { action: 'driveMacro', label: 'Drive macro' },
-              { action: 'dockMacro', label: 'Docking assist toggle' },
+              { action: 'driveMacro', label: 'Undock / resume driving' },
+              { action: 'dockMacro', label: 'Dock rover' },
               { action: 'chatFocus', label: 'Chat focus' },
             ],
           },
@@ -119,27 +137,35 @@ export const HELP_CONTENT = {
         type: 'list',
         title: 'Chat and nicknames',
         items: [
-          'Set a nickname in the user list panel below.',
-          'Tap in the chat box to send messages in the chat.'
+          'Chat and nickname controls are in the Chat tab.',
+          'Tap the chat box to send a message.',
         ]
       },
       {
         type: 'list',
         title: 'Driving the rover',
         items: [
-          { segments: ['Press the "Start Driving" button onscreen to put the rover into driving mode.'] },
-          'Look below the rover video. Use the joystick column to move the rover, and hold the aux buttons in the other control column.'
+          'Tap "Your rover is docked" to undock.',
+          'Hold and drag on the drive pad.',
+          'Choose Precision, Normal, or Turbo above the drive pad.',
+          'Use the other column for rover controls.',
+          'Rover controls dim while another person has the turn.',
         ],
       },
       {
         type: 'list',
         title: 'Docking the rover',
         items: [
-          'If you see "Docking in Progress", the rover is currently auto-seeking the dock.',
-          { segments: ['For manual docking, press "Enter Docking Assist".'] },
-          'Assist mode tilts camera down and limits speed for precise alignment.',
+          'Tap "Dock and charge" when finished.',
         ],
-      }
+      },
+      {
+        type: 'list',
+        title: 'More controls',
+        items: [
+          'Chat, Activities, VIP, Room Controls, Help, and Settings are below the rover controls.',
+        ],
+      },
     ],
   },
   'mobile-landscape': {
@@ -148,28 +174,35 @@ export const HELP_CONTENT = {
         type: 'list',
         title: 'Chat and nicknames',
         items: [
-          'Scroll down to see more of the page.',
-          'Set a nickname in the user list panel below.',
-          'Tap in the chat box to send messages in the chat.'
+          'Chat and nickname controls are in the Chat tab.',
+          'Tap the chat box to send a message.',
         ]
       },
       {
         type: 'list',
         title: 'Driving the rover',
         items: [
-          { segments: ['Press the "Start Driving" button, or the "Drive" button to put the rover into driving mode.'] },
-          'Use the joystick column beside the video feed to move the rover, and hold the aux buttons in the other control column.'
+          'Tap "Your rover is docked" to undock.',
+          'Hold and drag on the drive pad.',
+          'Choose Precision, Normal, or Turbo above the drive pad.',
+          'Use the other column for rover controls.',
+          'Rover controls dim while another person has the turn.',
         ],
       },
       {
         type: 'list',
         title: 'Docking the rover',
         items: [
-          'If you see "Docking in Progress", the rover is currently auto-seeking the dock.',
-          { segments: ['For manual docking, press "Enter Docking Assist" (or "Dock" button).'] },
-          'Assist mode tilts camera down and limits speed for precise alignment.',
+          'Tap "Dock and charge" when finished.',
         ],
-      }
+      },
+      {
+        type: 'list',
+        title: 'More controls',
+        items: [
+          'Chat, Activities, VIP, Room Controls, Help, and Settings are below the rover controls.',
+        ],
+      },
     ],
     // aside: [
     //   {

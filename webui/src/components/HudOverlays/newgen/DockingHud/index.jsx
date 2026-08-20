@@ -18,42 +18,69 @@ import ExpansionPanel from '../CornerPods/ExpansionPanel.jsx';
 import usePodVisibility from '../CornerPods/usePodVisibility.js';
 
 function DockedAction({ driveKeyLabel, pending, controlsDisabled, error, onUndock }) {
+  const [hidden, setHidden] = useState(false);
   const waitingForTurn = controlsDisabled && !pending;
+
+  /* The dismissal belongs to this mounted docked episode. DockingHud unmounts
+     this component when the rover leaves the base, and its roverId key remounts
+     it for a different assignment, so no persistence or reset effect is needed. */
+  if (hidden && !pending) return null;
+
+  const mainToneClass = waitingForTurn
+    ? 'cursor-not-allowed bg-slate-950/95 ring-slate-400/70'
+    : 'bg-emerald-950/90 ring-emerald-300/80 hover:bg-emerald-900/95 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-75';
+  const hideToneClass = waitingForTurn
+    ? 'bg-slate-950/95 ring-slate-400/70 hover:bg-slate-900'
+    : 'bg-emerald-950/90 ring-emerald-300/80 hover:bg-emerald-900/95 focus-visible:ring-emerald-200';
+
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-6">
-      <button
-        type="button"
-        disabled={pending || controlsDisabled}
-        onClick={onUndock}
-        className={`pointer-events-auto flex w-[min(32rem,80%)] flex-col items-center gap-2 px-8 py-7 text-center text-white shadow-2xl ring-2 transition focus-visible:outline-none focus-visible:ring-4 ${
-          waitingForTurn
-            ? 'cursor-not-allowed bg-slate-950/95 ring-slate-400/70'
-            : 'bg-emerald-950/90 ring-emerald-300/80 hover:bg-emerald-900/95 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-75'
-        }`}
-      >
-        <strong className="text-3xl leading-tight">{pending ? 'Undocking…' : 'Your rover is docked'}</strong>
-        {pending ? (
-          null
-        ) : waitingForTurn ? (
-          /* A disabled action must explain the ownership constraint instead of
-             continuing to advertise a click and keybind that cannot succeed. */
-          <span className="text-lg font-semibold leading-snug text-slate-300">
-            Wait for your turn to undock.
-          </span>
-        ) : (
-          <span className="text-lg font-semibold leading-snug text-emerald-50">
-            Click here
-            {driveKeyLabel ? (
-              <>
-                {' '}or press <KeyPill label={driveKeyLabel} />
-              </>
-            ) : null}
-            {' '}to undock and drive the rover
-          </span>
-        )}
-        {error ? <span className="text-sm font-semibold text-red-200">{error}</span> : null}
-      </button>
-    </div>
+    <>
+      {/* The docked shield is owned by the dismissible action so hiding the
+          prompt also reveals the video and ordinary HUD instead of leaving an
+          unexplained dark, input-blocking layer behind. */}
+      <div className="pointer-events-auto absolute inset-0 z-[25] bg-black/75" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-6">
+        <div className="relative w-[min(32rem,80%)]">
+          <button
+            type="button"
+            disabled={pending || controlsDisabled}
+            onClick={onUndock}
+            className={`pointer-events-auto flex w-full flex-col items-center gap-2 px-8 py-7 text-center text-white shadow-2xl ring-2 transition focus-visible:outline-none focus-visible:ring-4 ${mainToneClass}`}
+          >
+            <strong className="text-3xl leading-tight">{pending ? 'Undocking…' : 'Your rover is docked'}</strong>
+            {pending ? (
+              null
+            ) : waitingForTurn ? (
+              /* A disabled action must explain the ownership constraint instead of
+                 continuing to advertise a click and keybind that cannot succeed. */
+              <span className="text-lg font-semibold leading-snug text-slate-300">
+                Wait for your turn to undock.
+              </span>
+            ) : (
+              <span className="text-lg font-semibold leading-snug text-emerald-50">
+                Click here
+                {driveKeyLabel ? (
+                  <>
+                    {' '}or press <KeyPill label={driveKeyLabel} />
+                  </>
+                ) : null}
+                {' '}to undock and drive the rover
+              </span>
+            )}
+            {error ? <span className="text-sm font-semibold text-red-200">{error}</span> : null}
+          </button>
+          {!pending ? (
+            <button
+              type="button"
+              onClick={() => setHidden(true)}
+              className={`pointer-events-auto absolute left-1/2 top-full -translate-x-1/2 rounded-b-lg px-6 py-1.5 text-sm font-bold text-white shadow-xl ring-2 transition focus-visible:outline-none focus-visible:ring-4 ${hideToneClass}`}
+            >
+              Hide
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -318,15 +345,12 @@ export default function DockingHud({ roverId }) {
 
   return (
     <>
-      {/* This single layer both dims and blocks the ordinary rover HUD. A passive
-          undocked rover is still moving autonomously, so it gets a lighter but equally
-          blocking shield. Explicit pending state keeps the correct shield mounted until
-          the complete drive sequence finishes even as telemetry changes underneath it. */}
+      {/* Automatic docking keeps its own lighter blocking shield. The ordinary
+          docked shield lives inside DockedAction because the new Hide control
+          must dismiss the prompt and its dimming as one coherent surface. */}
       <div
         className={`absolute inset-0 z-[25] transition-all duration-300 ${
-          docked || pendingAction === 'undocking'
-            ? 'pointer-events-auto bg-black/75 opacity-100'
-            : autoDocking || pendingAction === 'resuming'
+          autoDocking || pendingAction === 'resuming'
               ? 'pointer-events-auto bg-black/55 opacity-100'
               : 'pointer-events-none opacity-0'
         }`}
@@ -335,6 +359,7 @@ export default function DockingHud({ roverId }) {
 
       {docked || pendingAction === 'undocking' ? (
         <DockedAction
+          key={roverId}
           driveKeyLabel={driveKeyLabel}
           pending={pendingAction === 'undocking'}
           controlsDisabled={!canControl}

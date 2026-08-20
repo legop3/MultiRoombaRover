@@ -87,10 +87,6 @@ function DriverPageContent({ layout, oldDesktop }) {
     },
     [saveQuickstartSettings],
   );
-  const openHelpFromQuickstart = useCallback(() => {
-    setQuickstartVisible(false);
-    setHelpVisible(true);
-  }, []);
   return (
     <ControlSystemProvider>
       {/*
@@ -127,7 +123,6 @@ function DriverPageContent({ layout, oldDesktop }) {
         layout={layout}
         showOnLoad={quickstartSettings?.showOnLoad !== false}
         onToggleShowOnLoad={setQuickstartShowOnLoad}
-        onOpenHelp={openHelpFromQuickstart}
         onClose={closeQuickstart}
       />
     </ControlSystemProvider>
