@@ -97,8 +97,20 @@ roverManager.managerEvents.on('private', ({ roverId, open }) => {
   }
 });
 
-roverManager.managerEvents.on('rover', ({ action }) => {
-  if (action === 'removed' || action === 'upsert') {
+roverManager.managerEvents.on('rover', ({ roverId, action }) => {
+  if (action === 'removed') {
+    /*
+      The physical rover record is the authority for current driver ownership.
+      Once it disappears, every assignment that names it must be released and
+      run through ordinary placement again. Leaving those map entries intact
+      lets the same id become visible after reconnect without recreating its
+      driver membership, which is the exact stale-UI/video-auth split this
+      lifecycle boundary must prevent.
+    */
+    reassignFromRover(roverId);
+    return;
+  }
+  if (action === 'upsert') {
     reassignWaiting();
   }
 });

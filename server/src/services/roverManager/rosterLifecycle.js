@@ -24,6 +24,7 @@ function createRosterLifecycle(deps) {
     isRoverVisibleToSocket,
     normalizePrivateSafety,
     stopDockGuard,
+    removeRoverDrivers,
   } = deps;
 
   function ensureRecord(id) {
@@ -106,7 +107,14 @@ function createRosterLifecycle(deps) {
   function removeRover(id) {
     const record = rovers.get(id);
     if (!record) return;
+    /*
+      Remove the public record before emitting driver-removal events. Any
+      session sync caused by those events must already see this rover as
+      offline, while removeRoverDrivers still receives the captured record so
+      it can clean the reverse membership index and Socket.IO room membership.
+    */
     rovers.delete(id);
+    removeRoverDrivers(id, record);
     stopDockGuard(id);
     privateButtonStates.delete(id);
     privateNoUsersSince.delete(id);

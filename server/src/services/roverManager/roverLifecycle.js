@@ -3,6 +3,7 @@
 // Scope: Keeps runtime behavior unchanged by reusing rover-manager state maps and injected policy helpers.
 function createRoverLifecycle(deps) {
   const {
+    io,
     rovers,
     socketToRovers,
     managerEvents,
@@ -83,6 +84,40 @@ function createRoverLifecycle(deps) {
     socket.leave(record.room);
     turnService.driverRemoved(roverId, socket.id);
     managerEvents.emit('driver', { socketId: socket.id, roverId, action: 'remove' });
+  }
+
+  function removeRoverDrivers(roverId, removedRecord = null) {
+    /*
+      A rover connection owns the record that contains its driver set, but the
+      reverse socket-to-rover index outlives that record. Disconnect cleanup
+      must therefore remove both halves before a reconnect creates a fresh
+      record with the same id. Otherwise session assignment can name the rover
+      while video/control authorization correctly sees no driver membership.
+
+      removedRecord is accepted because rosterLifecycle deliberately deletes
+      the public rover record first. Session syncs triggered by the driver
+      events below will consequently hide the unavailable rover immediately,
+      even before assignmentService finishes normal reassignment.
+    */
+    const record = removedRecord || rovers.get(roverId);
+    if (!record) return [];
+    const driverIds = Array.from(record.drivers || []);
+
+    driverIds.forEach((socketId) => {
+      const joined = socketToRovers.get(socketId);
+      if (joined) {
+        joined.delete(roverId);
+        if (joined.size === 0) socketToRovers.delete(socketId);
+      }
+
+      const socket = io.sockets.sockets.get(socketId);
+      socket?.leave(record.room);
+      record.drivers.delete(socketId);
+      turnService.driverRemoved(roverId, socketId);
+      managerEvents.emit('driver', { socketId, roverId, action: 'remove' });
+    });
+
+    return driverIds;
   }
 
   function isDriver(roverId, socket) {
@@ -175,6 +210,7 @@ function createRoverLifecycle(deps) {
     removeSocket,
     requestControl,
     releaseControl,
+    removeRoverDrivers,
     isDriver,
     canDrive,
     getRoversForSocket,

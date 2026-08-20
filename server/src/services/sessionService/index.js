@@ -135,6 +135,20 @@ function buildUserEntry(socket) {
   const role = getRole(socket);
   const assignment = assignmentService.describeAssignment(socket.id);
   const primaryRover = roverManager.getPrimaryRoverForSocket(socket.id);
+  /*
+    assignmentService owns automatic placement policy, while roverManager owns
+    actual control membership. Validate both candidate indexes before exposing
+    presence because neither cached direction is authoritative without the
+    physical rover record agreeing that this socket is one of its drivers.
+  */
+  const verifiedPrimaryRover = primaryRover
+    && roverManager.isDriver(primaryRover, socket)
+    ? primaryRover
+    : null;
+  const verifiedAssignmentRover = assignment?.roverId
+    && roverManager.isDriver(assignment.roverId, socket)
+    ? assignment.roverId
+    : null;
   const ptzChatTarget = getPtzChatTargetForSocket(socket.id);
   return {
     socketId: socket.id,
@@ -147,7 +161,7 @@ function buildUserEntry(socket) {
       the PTZ chat target while the socket is queued or operating so presence,
       queue lookup, and chat identity all agree.
     */
-    roverId: ptzChatTarget?.roverId || primaryRover || assignment?.roverId || null,
+    roverId: ptzChatTarget?.roverId || verifiedPrimaryRover || verifiedAssignmentRover || null,
   };
 }
 
@@ -172,7 +186,17 @@ function buildSession(socket) {
   }));
   const roster = roverManager.getRosterForSocket(socket);
   const assignment = assignmentService.describeAssignment(socket?.id || '');
-  const assignmentRoverId = filterVisibleRoverId(socket, assignment?.roverId);
+  /*
+    Visibility alone is insufficient here: a reconnected rover can be visible
+    before a stale assignment map has recreated actual driver membership. The
+    session contract consumed by every UI surface must require both visibility
+    and roverManager's authoritative membership check.
+  */
+  const verifiedAssignmentRover = assignment?.roverId
+    && roverManager.isDriver(assignment.roverId, socket)
+    ? assignment.roverId
+    : null;
+  const assignmentRoverId = filterVisibleRoverId(socket, verifiedAssignmentRover);
   const activeDrivers = filterActiveDriversForSocket(getActiveDrivers(), socket);
   const turnQueues = filterTurnQueuesForSocket(getTurnQueues(), socket);
   const socials = features.socials && configuredSocials?.length ? configuredSocials : [];

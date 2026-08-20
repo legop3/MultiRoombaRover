@@ -72,6 +72,7 @@ const {
 } = privateAccess;
 
 const roverLifecycle = createRoverLifecycle({
+  io,
   rovers,
   socketToRovers,
   managerEvents,
@@ -86,6 +87,7 @@ const roverLifecycle = createRoverLifecycle({
 const {
   requestControl,
   releaseControl,
+  removeRoverDrivers,
   isDriver,
   canDrive,
   getRoversForSocket,
@@ -119,6 +121,7 @@ const rosterLifecycle = createRosterLifecycle({
   normalizePrivateSafety,
   stopDockGuard: (...args) => stopDockGuard(...args),
   getControlDenialReason,
+  removeRoverDrivers,
 });
 
 const {
