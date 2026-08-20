@@ -16,6 +16,7 @@ import { LinkButtonsPanel } from '../../../components/UserListPanel/index.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../../../components/Tabs/index.jsx';
 import ActivitiesTab from '../tabs/shared/ActivitiesTab/index.jsx';
 import VipTab from '../tabs/shared/VipTab/index.jsx';
+import VipTabButton from '../tabs/shared/VipTabButton/index.jsx';
 import HelpTab from '../tabs/shared/HelpTab/index.jsx';
 import SettingsTab from '../tabs/shared/SettingsTab/index.jsx';
 import { themeGapClass } from '../../../themes/index.js';
@@ -26,7 +27,7 @@ function LeftColumnTabs() {
       <TabList className="sticky top-0 z-30 shrink-0 bg-neutral-950">
         <Tab id="room">Room</Tab>
         <Tab id="activities">Activities</Tab>
-        <Tab id="vip">Vip</Tab>
+        <VipTabButton />
       </TabList>
       <TabPanels>
         <TabPanel id="room">

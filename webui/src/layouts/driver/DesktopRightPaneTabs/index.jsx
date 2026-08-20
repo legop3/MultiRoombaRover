@@ -19,7 +19,6 @@ import GPIOToggleControl from '../../../components/GPIOToggleControl/index.jsx';
 import HornControl from '../../../components/HornControl/index.jsx';
 import CameraTiltControl from '../../../components/CameraTiltControl/index.jsx';
 import { useSessionSelector } from '../../../context/SessionContext.jsx';
-import { useSettingsNamespace } from '../../../settings/index.js';
 import OverseerPreferencePanel from '../../../components/OverseerPreferencePanel/index.jsx';
 import CardFrame from '../../../components/CardFrame/index.jsx';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -27,6 +26,7 @@ import { useManualDockAssist } from '../../../features/manualDockAssist/useManua
 import { themeGapClass, themeStackClass } from '../../../themes/index.js';
 import ActivitiesTab from '../tabs/shared/ActivitiesTab/index.jsx';
 import VipTab from '../tabs/shared/VipTab/index.jsx';
+import VipTabButton from '../tabs/shared/VipTabButton/index.jsx';
 import HelpTab from '../tabs/shared/HelpTab/index.jsx';
 import SettingsTab from '../tabs/shared/SettingsTab/index.jsx';
 
@@ -214,29 +214,6 @@ export default function RightPaneTabs() {
   const [activeTab, setActiveTab] = useState('telemetry');
   const chatDockRef = useRef(null);
   const [chatDockHeight, setChatDockHeight] = useState(CHAT_DOCK_INITIAL_HEIGHT);
-  const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
-  const ownRoverId = useSessionSelector((state) => String(state.session?.assignment?.roverId || '').trim());
-  const ownAudioForward = useSessionSelector((state) => {
-    const roverId = String(state.session?.assignment?.roverId || '').trim();
-    return roverId ? state.session?.audioForward?.[roverId] || null : null;
-  });
-  const pttActive = useControlSelector((control) => Boolean(control.state.mic?.pttActive));
-  const { value: vipAudio } = useSettingsNamespace('vipAudio', { openMicEnabled: false, pttMode: 'live' });
-  const vipDotClass = isVerified ? 'bg-emerald-400' : 'bg-red-600';
-  const openMicEnabled = Boolean(vipAudio?.openMicEnabled);
-  const pttMode = vipAudio?.pttMode === 'clip' ? 'clip' : 'live';
-  const vipMicActive = Boolean(
-    ownRoverId &&
-      isVerified &&
-      (pttMode === 'clip' ? pttActive : (openMicEnabled || pttActive)),
-  );
-  const vipClipPlaying = Boolean(
-    ownRoverId &&
-      isVerified &&
-      pttMode === 'clip' &&
-      ownAudioForward?.source === 'upload' &&
-      ownAudioForward?.state === 'playing',
-  );
   const showOverseerPreferencePanel = useSessionSelector((state) => {
     const vote = state.session?.overseerVote;
 
@@ -345,16 +322,7 @@ export default function RightPaneTabs() {
         <TabList>
           <Tab id="telemetry">Controls</Tab>
           <Tab id="activities">Activities</Tab> 
-          <Tab id="vip" highlight={vipClipPlaying ? 'green' : vipMicActive ? 'pink' : 'none'}>
-            <span className="inline-flex items-center gap-2">
-              <span>VIP</span>
-              <span
-                className={`inline-block h-3 w-3 rounded-full ${vipDotClass}`}
-                aria-hidden="true"
-                title={isVerified ? 'Verified' : 'Not verified'}
-              />
-            </span>
-          </Tab>
+          <VipTabButton />
           <Tab id="help">Help</Tab>
           <Tab id="settings">Settings</Tab>
         </TabList>

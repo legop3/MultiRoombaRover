@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { FaBullhorn, FaCrosshairs, FaLightbulb } from 'react-icons/fa';
 import { useControlActions, useControlSelector } from '../../../../controls/index.js';
 import { formatKeyLabel } from '../../../../controls/keymapUtils.js';
+import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import useCanControlRover from '../../../../hooks/useCanControlRover.js';
 import KeyPill from '../../../vip/VipAudioUploadCard/KeyPill.jsx';
 import HornSettingsExpansion from './HornSettingsExpansion.jsx';
@@ -35,6 +36,9 @@ function RoundControl({ label, icon, keyLabel, active, tone, disabled = false, o
 export default function BottomLeftPod({ roverId }) {
   const [open, setOpen] = usePodVisibility('peripherals', true);
   const [hornSettingsOpen, setHornSettingsOpen] = usePodVisibility('hornSettings', false);
+  const roomLightsLockedOn = useSessionSelector(
+    (state) => Boolean(state.session?.homeAssistant?.lightPolicy?.lockedOn),
+  );
   const headlight = useControlSelector((control) => control.pipeline?.headlight);
   const laser = useControlSelector((control) => control.pipeline?.laser);
   const hornDevice = useControlSelector((control) => control.pipeline?.horn);
@@ -78,7 +82,11 @@ export default function BottomLeftPod({ roverId }) {
               remain interactive because they do not mutate rover hardware. */}
           {hornDevice ? <RoundControl label="Horn" icon={FaBullhorn} keyLabel={formatKeyLabel(keymap?.hornHonk?.[0])} active={hornActive} tone="horn" disabled={!canControl} large onPointerDown={startHornPointer} onPointerUp={stopHornPointer} className="absolute bottom-1 left-1" /> : null}
           {headlight ? <RoundControl label="Headlight" icon={FaLightbulb} keyLabel={formatKeyLabel(keymap?.headlightToggle?.[0])} active={headlightOn} disabled={!canControl} onClick={() => setHeadlight(!headlightOn)} className="absolute left-[1.979rem] top-[0.662rem]" /> : null}
-          {laser ? <RoundControl label="Laser" icon={FaCrosshairs} keyLabel={formatKeyLabel(keymap?.laserToggle?.[0])} active={laserOn} disabled={!canControl} onClick={() => setLaser(!laserOn)} className="absolute left-[5.338rem] top-[4.021rem]" /> : null}
+          {/* The room-light lock deliberately blocks laser activation because
+              the laser is only intended for use while the room is dark. This
+              mirrors the old desktop control's visible disabled state; turn
+              ownership remains the other independent control restriction. */}
+          {laser ? <RoundControl label="Laser" icon={FaCrosshairs} keyLabel={formatKeyLabel(keymap?.laserToggle?.[0])} active={laserOn} disabled={!canControl || roomLightsLockedOn} onClick={() => setLaser(!laserOn)} className="absolute left-[5.338rem] top-[4.021rem]" /> : null}
           <CornerPodToggle corner="bottom-left" expanded label="Hide rover controls" onClick={() => setOpen(false)} />
         </div>
       ) : (

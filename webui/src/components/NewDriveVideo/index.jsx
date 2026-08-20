@@ -12,6 +12,7 @@ import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useControlSelector } from '../../controls/index.js';
 import { useDriverVideoModePolicy } from '../../hooks/useDriverVideoModePolicy.js';
 import { useDriverLayout } from '../../layouts/driver/DriverLayoutContext.jsx';
+import EmptyDriverVideoNotice from '../DriverVideo/EmptyDriverVideoNotice.jsx';
 
 // Mobile keeps the same HUD composition and coordinate system as desktop, but its
 // physically smaller video stage needs the complete interface reduced as one unit.
@@ -28,8 +29,14 @@ export default function NewDriveVideo() {
 
   if (!roverId) {
     return (
-      <div className={`flex min-h-0 w-full items-center justify-center overflow-hidden text-[0.8rem] text-neutral-300 ${mobileHud ? 'aspect-[4/3] shrink-0' : 'h-screen'}`}>
-        No rover assigned
+      <div
+        className={`min-h-0 w-full overflow-hidden bg-black ${mobileHud ? 'aspect-[4/3] shrink-0' : 'h-screen'}`}
+        aria-label="No rover assigned"
+      >
+        {/* Keep the unassigned state inside the same solid video-shaped stage
+            so removing a rover does not expose the page background or leave a
+            visually empty hole where the live picture had been. */}
+        <EmptyDriverVideoNotice />
       </div>
     );
   }
