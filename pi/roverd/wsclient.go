@@ -24,8 +24,12 @@ type WSClient struct {
 	headlight    *GPIOToggle
 	laser        *GPIOToggle
 	log          *log.Logger
+	console      *ConsoleNotifier
 	recoverMu    sync.Mutex
 	recovering   bool
+	watchdogMu   sync.Mutex
+	watchdogOpen bool
+	watchdogOK   bool
 	ttsQueue     chan *ttsPayload
 	chromeTTS    *chromeTTSDaemon
 	lastAux      motorPWMPayload
@@ -41,7 +45,7 @@ type WSClient struct {
 	audioMu      sync.RWMutex
 }
 
-func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, headlight *GPIOToggle, laser *GPIOToggle, logger *log.Logger) *WSClient {
+func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, headlight *GPIOToggle, laser *GPIOToggle, logger *log.Logger, console *ConsoleNotifier) *WSClient {
 	var ttsQueue chan *ttsPayload
 	if cfg.Audio.TTSEnabled {
 		ttsQueue = make(chan *ttsPayload, 2)
@@ -65,6 +69,7 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		headlight:    headlight,
 		laser:        laser,
 		log:          logger,
+		console:      console,
 		ttsQueue:     ttsQueue,
 		chromeTTS:    chromeTTS,
 		audioLevels: AudioLevels{
@@ -305,6 +310,7 @@ func (c *WSClient) handleRebootCommand(payload *rebootPayload) error {
 
 	go func() {
 		time.Sleep(delay)
+		c.console.Notify("Remote reboot requested. Rebooting the rover now.")
 		c.log.Printf("rebooting pi after remote reboot command")
 		cmd := exec.Command("systemctl", "reboot")
 		if err := cmd.Start(); err != nil {
@@ -331,6 +337,7 @@ func (c *WSClient) handleUpdateCommand() error {
 	c.emitEvent("system.updateStarting", map[string]any{
 		"source": "remoteCommand",
 	})
+	c.console.Notify("Remote software update requested. roverd will restart if the update succeeds.")
 
 	// The helper is launched asynchronously because a successful update may
 	// restart roverd before this websocket command could stream progress back to
@@ -495,6 +502,10 @@ func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
 			lastRecovery = now
 			resetTimer()
 		case frame := <-c.sensorFrames:
+			// A real sensor frame is the authoritative end of a watchdog
+			// episode. Successfully sending the OI restart commands alone does
+			// not prove that the Roomba resumed producing sensor data.
+			c.closeSensorWatchdogEpisode()
 			lastFrame = time.Now()
 			resetTimer()
 			msg := sensorMessage{
@@ -641,6 +652,7 @@ func (c *WSClient) keepalive(ctx context.Context, conn *websocket.Conn) error {
 
 func (c *WSClient) markConnected() {
 	c.connMu.Lock()
+	wasConnected := c.connected
 	c.connected = true
 	c.seekIssued = false
 	c.rebootIssued = false
@@ -654,13 +666,19 @@ func (c *WSClient) markConnected() {
 		c.rebootT = nil
 	}
 	c.connMu.Unlock()
+
+	// Only print on a state transition. Run is retried indefinitely, and a
+	// message on every successful internal operation would quickly bury the
+	// useful lifecycle history at the login prompt.
+	if !wasConnected {
+		c.console.Notify("Control server connected.")
+	}
 }
 
 func (c *WSClient) markDisconnected() {
 	c.connMu.Lock()
-	if c.connected {
-		c.connected = false
-	}
+	wasConnected := c.connected
+	c.connected = false
 	if c.disconnectT == nil {
 		c.disconnectT = time.AfterFunc(disconnectSeekDelay, c.handleDisconnectTimeout)
 	}
@@ -668,6 +686,13 @@ func (c *WSClient) markDisconnected() {
 		c.rebootT = time.AfterFunc(disconnectRebootDelay, c.handleRebootTimeout)
 	}
 	c.connMu.Unlock()
+
+	// Initial dial failures are already represented by the startup message and
+	// journal retry logs. The prominent disconnect alert is reserved for losing
+	// a connection that was actually established.
+	if wasConnected {
+		c.console.Notify("Control server connection lost. Automatic dock seek in 1 minute; rover reboot in 6 minutes if the connection is not restored.")
+	}
 }
 
 func (c *WSClient) handleDisconnectTimeout() {
@@ -679,6 +704,7 @@ func (c *WSClient) handleDisconnectTimeout() {
 	c.seekIssued = true
 	c.connMu.Unlock()
 
+	c.console.Notify("Control server has been disconnected for 1 minute. Seeking the dock now.")
 	if err := c.adapter.SeekDock(); err != nil {
 		c.log.Printf("seek dock on disconnect failed: %v", err)
 		return
@@ -695,6 +721,7 @@ func (c *WSClient) handleRebootTimeout() {
 	c.rebootIssued = true
 	c.connMu.Unlock()
 
+	c.console.Notify("Control server has been disconnected for 6 minutes. Rebooting the rover now.")
 	c.log.Printf("rebooting pi after prolonged websocket disconnect")
 	cmd := exec.Command("systemctl", "reboot")
 	if err := cmd.Start(); err != nil {
@@ -720,10 +747,16 @@ func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Dura
 	c.emitEvent("sensorWatchdog.restart", map[string]any{
 		"idleMs": idleFor.Milliseconds(),
 	})
+	if c.openSensorWatchdogEpisode() {
+		c.console.Notify(fmt.Sprintf("Sensor watchdog is restarting the Roomba sensor stream after %.1f seconds without data.", idleFor.Seconds()))
+	}
 
 	if err := c.adapter.StartOI(); err != nil {
 		c.log.Printf("watchdog start OI failed: %v", err)
 		c.emitEvent("sensorWatchdog.error", map[string]any{"error": err.Error()})
+		// Unlike the restart notice, every concrete command failure is useful
+		// diagnostic information and may change between recovery attempts.
+		c.console.Notify(fmt.Sprintf("Sensor watchdog recovery failed while starting the Roomba OI: %v", err))
 		return
 	}
 	if cmdPause > 0 {
@@ -733,12 +766,53 @@ func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Dura
 	if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
 		c.log.Printf("watchdog start stream failed: %v", err)
 		c.emitEvent("sensorWatchdog.error", map[string]any{"error": err.Error()})
+		c.console.Notify(fmt.Sprintf("Sensor watchdog recovery failed while starting the sensor stream: %v", err))
 		return
 	}
 
 	c.emitEvent("sensorWatchdog.ok", map[string]any{
 		"idleMs": idleFor.Milliseconds(),
 	})
+	if c.markSensorWatchdogCommandsOK() {
+		// Match the existing sensorWatchdog.ok contract precisely: this says
+		// the recovery commands succeeded, not that a new frame has arrived.
+		c.console.Notify("Sensor watchdog successfully sent the sensor-stream restart commands.")
+	}
+}
+
+// openSensorWatchdogEpisode reports whether this is the first recovery attempt
+// since sensor frames stopped. The watchdog can retry every few seconds, so
+// tracking the outage as one episode keeps the login console readable.
+func (c *WSClient) openSensorWatchdogEpisode() bool {
+	c.watchdogMu.Lock()
+	defer c.watchdogMu.Unlock()
+
+	if c.watchdogOpen {
+		return false
+	}
+	c.watchdogOpen = true
+	c.watchdogOK = false
+	return true
+}
+
+// markSensorWatchdogCommandsOK suppresses duplicate success notices while the
+// rover is still waiting for a real frame to close the current outage.
+func (c *WSClient) markSensorWatchdogCommandsOK() bool {
+	c.watchdogMu.Lock()
+	defer c.watchdogMu.Unlock()
+
+	if c.watchdogOK {
+		return false
+	}
+	c.watchdogOK = true
+	return true
+}
+
+func (c *WSClient) closeSensorWatchdogEpisode() {
+	c.watchdogMu.Lock()
+	c.watchdogOpen = false
+	c.watchdogOK = false
+	c.watchdogMu.Unlock()
 }
 
 func isModeOpcode(op byte) bool {

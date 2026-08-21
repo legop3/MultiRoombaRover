@@ -6,6 +6,10 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/roverd -config /etc/roverd.yaml
+# roverd cannot report an unexpected exit after its process is already gone.
+# ExecStopPost fills only that gap; ordinary lifecycle messages remain owned by
+# roverd, and SERVICE_RESULT prevents clean stops from being labeled failures.
+ExecStopPost=/bin/sh -c 'if [ "$SERVICE_RESULT" != "success" ]; then /usr/bin/printf "\r\n*** rover alert ***\r\nroverd exited unexpectedly; systemd will restart it.\r\n" > /dev/tty1 || true; fi'
 Restart=on-failure
 RestartSec=5
 AmbientCapabilities=CAP_SYS_TTY_CONFIG CAP_SYS_RAWIO

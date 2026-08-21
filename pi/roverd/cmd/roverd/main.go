@@ -29,6 +29,7 @@ func main() {
 	defer cancel()
 
 	logger := log.New(os.Stdout, "roverd: ", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+	console := roverd.NewConsoleNotifier(logger)
 
 	serialPort, err := roverd.OpenSerial(cfg.Serial)
 	if err != nil {
@@ -90,7 +91,13 @@ func main() {
 	autoCharge := roverd.NewAutoChargeController(adapter, eventStream, logger)
 	go autoCharge.Run(ctx, sensorSamples)
 
-	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, headlight, laser, logger)
+	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, headlight, laser, logger, console)
+
+	// Startup is announced only after every configured hardware dependency has
+	// initialized successfully. A message here therefore means the control loop
+	// is genuinely ready, rather than merely that systemd launched the process.
+	console.Notify("roverd started and hardware initialization completed.")
+	defer console.Notify("roverd stopped.")
 
 	retryDelay := time.Second
 	for ctx.Err() == nil {
