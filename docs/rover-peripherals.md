@@ -77,9 +77,12 @@ Custom functions can do anything the ESP32 program can do, including:
 - Send text to a display.
 - Operate hardware through an ESP32-specific library.
 - Change several outputs as one operation.
-- Update state used by non-blocking work in `loop()`.
+- Update state used by non-blocking work in `updateRoverPeripheral()`.
 
-Application authors use string IDs such as `specialAction` or `animationSpeed`. They do not assign numeric action IDs. Firmata necessarily uses a numeric SysEx feature byte internally, but that is an implementation detail hidden by the peripheral library.
+The visible control name is also its string wire identifier, so authors provide
+one meaningful name instead of maintaining a second hidden ID. They do not
+assign numeric action IDs. Firmata necessarily uses a numeric SysEx feature byte
+internally, but that is an implementation detail hidden by the package.
 
 ## Firmata user feature
 
@@ -126,13 +129,13 @@ The receiver combines each pair:
 source byte = encoded byte 1 | (encoded byte 2 << 7)
 ```
 
-Peripheral authors never perform this encoding themselves. It belongs in the ESP32 `RoverPeripheralFirmata` library and the Go Firmata client used by `roverd`.
+Peripheral authors never perform this encoding themselves. It belongs inside the ESP32 `RoverPeripheral` package and the Go Firmata client used by `roverd`.
 
 ConfigurableFirmata's ESP32 parser accepts 252 bytes inside one incoming SysEx frame, including the feature and operation bytes. `CONTROL` values are not chunked in this deliberately simple design. The Go client checks the fully encoded message before writing it and returns an error if a particular control value cannot fit, rather than sending a frame the ESP32 would discard. Normal numeric, boolean, and short text controls fit comfortably; a text control's configured length should reflect this transport constraint.
 
 ## Peripheral description
 
-The ESP32 library builds this description from the controls registered during `setup()`. The order of the `controls` array is the registration order and is also the UI order.
+The ESP32 library builds this description from the controls registered in `configureRoverPeripheral()`. The order of the `controls` array is the registration order and is also the UI order.
 
 An example description is:
 
@@ -141,7 +144,7 @@ An example description is:
   "name": "Example peripheral",
   "controls": [
     {
-      "id": "servoPosition",
+      "id": "Servo position",
       "type": "slider",
       "name": "Servo position",
       "min": 0,
@@ -152,20 +155,20 @@ An example description is:
       }
     },
     {
-      "id": "lightBrightness",
+      "id": "Light brightness",
       "type": "slider",
       "name": "Light brightness",
       "min": 0,
       "max": 255,
       "output": {
         "type": "pwm",
-        "pin": 18
+        "pin": 17
       }
     },
     {
-      "id": "specialAction",
+      "id": "Special action",
       "type": "button",
-      "name": "Run special action",
+      "name": "Special action",
       "mode": "momentary",
       "output": {
         "type": "custom"
@@ -488,227 +491,44 @@ The Firmata toggle backend converts the logical value using `activeLow` before s
 
 ## ESP32 authoring API
 
-Peripheral authors should not write JSON, construct SysEx messages, or manually dispatch control IDs. The proposed `RoverPeripheralFirmata` Arduino library owns those tasks.
+Peripheral programs include `RoverPeripheral.h` and define
+`configureRoverPeripheral()`. The library provides serial setup, Firmata setup,
+`setup()`, and `loop()`.
 
-A long positional call such as `addRoverCameraServo(14, -15, 30, 0, 2, 900, 2100, false, false)` is deliberately not part of the API. Several adjacent numbers and booleans are too difficult to understand or review without repeatedly consulting the function signature.
+Configurations use structs. Programs assign one named field per line and then
+register the completed configuration. This avoids positional lists for settings
+such as angles, pulse widths, polarity, and ranges.
 
-The public API uses named configuration structs. Field names include units where a bare number would otherwise be ambiguous, and enums replace booleans whose meaning would be unclear at the call site.
+### Complete firmware
 
-### Proposed configuration types
-
-The core public types are:
-
-```cpp
-enum class OutputPolarity {
-  ActiveHigh,
-  ActiveLow
-};
-
-enum class ButtonMode {
-  Toggle,
-  Momentary
-};
-
-struct FirmataServoOutput {
-  uint8_t pin;
-};
-
-struct FirmataPwmOutput {
-  uint8_t pin;
-};
-
-struct FirmataDigitalOutput {
-  uint8_t pin;
-  OutputPolarity polarity = OutputPolarity::ActiveHigh;
-};
-
-struct RoverCameraServoConfig {
-  uint8_t pin;
-
-  float minimumAngleDegrees;
-  float maximumAngleDegrees;
-  float homeAngleDegrees = 0;
-  float nudgeDegrees = 2;
-
-  uint16_t minimumPulseMicroseconds = 900;
-  uint16_t maximumPulseMicroseconds = 2100;
-
-  bool allowRawPulse = false;
-  bool inverted = false;
-};
-
-struct RoverDigitalOutputConfig {
-  uint8_t pin;
-  OutputPolarity polarity = OutputPolarity::ActiveHigh;
-  bool initiallyOn = false;
-};
-
-struct SliderControlConfig {
-  String id;
-  String name;
-  int minimum;
-  int maximum;
-};
-
-struct ButtonControlConfig {
-  String id;
-  String name;
-  ButtonMode mode;
-};
-
-struct NumberControlConfig {
-  String id;
-  String name;
-  int minimum;
-  int maximum;
-};
-
-struct TextControlConfig {
-  String id;
-  String name;
-  size_t maximumLength;
-};
-```
-
-Defaults cover values that are commonly shared, but required hardware and display values remain explicit. The implementation must validate the completed struct when it is registered rather than assuming that every default-constructed object is usable.
-
-The API uses ordinary field assignments instead of C++ designated initializers. This keeps example sketches compatible with ESP32 Arduino toolchains that are not configured for C++20.
-
-### Generic-control registration
-
-A complete sketch for one servo slider, one light-brightness slider, and one custom momentary button is:
+This program defines the standard camera tilt, headlight, and laser roles. It
+also defines slider, button, number, and text accessory controls.
 
 ```cpp
-#include <Arduino.h>
-#include <ConfigurableFirmata.h>
-#include <FirmataExt.h>
-#include <RoverPeripheralFirmata.h>
+#include <RoverPeripheral.h>
 
-/*
- * Controls are advertised in the order they are added to this object. The
- * browser preserves that order when it renders the peripheral's column.
- */
-RoverPeripheralFirmata peripheral("Example peripheral");
-FirmataExt firmataExtension;
+namespace {
+constexpr uint8_t specialActionPin = 21;
 
-/*
- * This is ordinary application code rather than Firmata plumbing. A real
- * peripheral can replace it with any device-specific sequence or library call.
- */
-void runSpecialAction() {
-  // Start or schedule the peripheral's custom behavior here.
+int repeatCount = 1;
+String displayMessage;
+
+void runSpecialAction(bool pressed) {
+  digitalWrite(specialActionPin, pressed ? HIGH : LOW);
 }
 
-void setup() {
-  Serial.begin(115200);
-  Firmata.begin(Serial);
-
-  /*
-   * roverd handles this control with standard Firmata SERVO commands. The
-   * ESP32 application does not need a callback for each slider update.
-   */
-  SliderControlConfig servoPosition;
-  servoPosition.id = "servoPosition";
-  servoPosition.name = "Servo position";
-  servoPosition.minimum = 0;
-  servoPosition.maximum = 180;
-
-  FirmataServoOutput servoOutput;
-  servoOutput.pin = 14;
-
-  peripheral.addServoSlider(servoPosition, servoOutput);
-
-  /*
-   * roverd handles this control with standard Firmata PWM commands. The range
-   * is included in the generated description and displayed by the web UI.
-   */
-  SliderControlConfig lightBrightness;
-  lightBrightness.id = "lightBrightness";
-  lightBrightness.name = "Light brightness";
-  lightBrightness.minimum = 0;
-  lightBrightness.maximum = 255;
-
-  FirmataPwmOutput lightOutput;
-  lightOutput.pin = 18;
-
-  peripheral.addPwmSlider(lightBrightness, lightOutput);
-
-  /*
-   * Custom controls are delivered through the rover-peripheral Firmata feature.
-   * The library finds this registration by control ID and invokes the callback
-   * with true on press and false on release.
-   */
-  ButtonControlConfig specialAction;
-  specialAction.id = "specialAction";
-  specialAction.name = "Run special action";
-  specialAction.mode = ButtonMode::Momentary;
-
-  peripheral.addButton(
-    specialAction,
-    [](bool pressed) {
-      if (pressed) {
-        runSpecialAction();
-      }
-    }
-  );
-
-  // Register the extension with Firmata and finalize the control description.
-  peripheral.begin(firmataExtension);
+void setRepeatCount(int value) {
+  repeatCount = value;
 }
 
-void loop() {
-  // Standard Firmata messages and rover-peripheral SysEx messages share this parser.
-  while (Firmata.available()) {
-    Firmata.processInput();
-  }
-
-  // Let the peripheral library perform any deferred send or callback work.
-  peripheral.update();
+void setDisplayMessage(const String& value) {
+  displayMessage = value;
 }
-```
+}  // namespace
 
-The intended generic registration methods are:
+void configureRoverPeripheral(RoverPeripheral& peripheral) {
+  peripheral.name("Example rover peripheral");
 
-```cpp
-addServoSlider(const SliderControlConfig&, const FirmataServoOutput&)
-addPwmSlider(const SliderControlConfig&, const FirmataPwmOutput&)
-addDigitalButton(const ButtonControlConfig&, const FirmataDigitalOutput&)
-
-addSlider(const SliderControlConfig&, SliderCallback)
-addButton(const ButtonControlConfig&, ButtonCallback)
-addNumber(const NumberControlConfig&, NumberCallback)
-addText(const TextControlConfig&, TextCallback)
-```
-
-These helpers still produce only the four agreed UI types. The overload or method name distinguishes a standard Firmata output from a custom callback; it does not create an additional UI type.
-
-The standardized built-in replacements use separate methods because they do not create generic UI controls:
-
-```cpp
-addRoverCameraServo(const RoverCameraServoConfig&)
-addRoverHeadlight(const RoverDigitalOutputConfig&)
-addRoverLaser(const RoverDigitalOutputConfig&)
-```
-
-A rover GPIO peripheral can combine built-in replacements and additional controls:
-
-```cpp
-#include <Arduino.h>
-#include <ConfigurableFirmata.h>
-#include <FirmataExt.h>
-#include <RoverPeripheralFirmata.h>
-
-RoverPeripheralFirmata peripheral("Rover GPIO");
-FirmataExt firmataExtension;
-
-void setup() {
-  Serial.begin(115200);
-  Firmata.begin(Serial);
-
-  /*
-   * These declarations satisfy existing rover roles. They retain the normal
-   * camera, headlight, and laser UI instead of entering the generic column.
-   */
   RoverCameraServoConfig cameraServo;
   cameraServo.pin = 14;
   cameraServo.minimumAngleDegrees = -15;
@@ -719,116 +539,264 @@ void setup() {
   cameraServo.maximumPulseMicroseconds = 2100;
   cameraServo.allowRawPulse = false;
   cameraServo.inverted = false;
-
-  peripheral.addRoverCameraServo(cameraServo);
+  peripheral.addCameraServo(cameraServo);
 
   RoverDigitalOutputConfig headlight;
   headlight.pin = 18;
   headlight.polarity = OutputPolarity::ActiveHigh;
   headlight.initiallyOn = false;
-
-  peripheral.addRoverHeadlight(headlight);
+  peripheral.addHeadlight(headlight);
 
   RoverDigitalOutputConfig laser;
-  // GPIO 19 and 20 are reserved for USB on native-USB ESP32-S3 boards.
   laser.pin = 16;
   laser.polarity = OutputPolarity::ActiveHigh;
   laser.initiallyOn = false;
+  peripheral.addLaser(laser);
 
-  peripheral.addRoverLaser(laser);
+  pinMode(specialActionPin, OUTPUT);
+  digitalWrite(specialActionPin, LOW);
 
-  /*
-   * This is an additional feature, so it appears below the peripheral heading
-   * in the ordered generic-control column.
-   */
-  SliderControlConfig underglowBrightness;
-  underglowBrightness.id = "underglowBrightness";
-  underglowBrightness.name = "Underglow brightness";
-  underglowBrightness.minimum = 0;
-  underglowBrightness.maximum = 255;
+  SliderControlConfig brightness;
+  brightness.name = "Light brightness";
+  brightness.minimum = 0;
+  brightness.maximum = 255;
 
-  peripheral.addSlider(
-    underglowBrightness,
-    [](int brightness) {
-      setUnderglowBrightness(brightness);
-    }
-  );
+  PwmOutput brightnessOutput;
+  brightnessOutput.pin = 17;
 
-  peripheral.begin(firmataExtension);
-}
+  peripheral.addSlider(brightness, brightnessOutput);
 
-void loop() {
-  while (Firmata.available()) {
-    Firmata.processInput();
-  }
-  peripheral.update();
+  ButtonControlConfig action;
+  action.name = "Special action";
+  action.mode = ButtonMode::Momentary;
+
+  peripheral.addButton(action, runSpecialAction);
+
+  NumberControlConfig repeats;
+  repeats.name = "Repeat count";
+  repeats.minimum = 1;
+  repeats.maximum = 20;
+
+  peripheral.addNumber(repeats, setRepeatCount);
+
+  TextControlConfig message;
+  message.name = "Display message";
+  message.maximumLength = 64;
+
+  peripheral.addText(message, setDisplayMessage);
 }
 ```
 
-## PlatformIO firmware layout
+Controls appear in registration order. Each accessory control name must be
+non-empty and unique within its peripheral. The name is also its wire
+identifier.
 
-PlatformIO is the only supported firmware workflow. The repository contains one shared library and one complete rover GPIO peripheral project:
+### Built-in rover roles
+
+The standard roles use these configuration types:
+
+```cpp
+RoverCameraServoConfig
+RoverDigitalOutputConfig
+```
+
+They are registered with:
+
+```cpp
+peripheral.addCameraServo(cameraServo);
+peripheral.addHeadlight(headlight);
+peripheral.addLaser(laser);
+```
+
+Camera servo programs set the pin, logical angle range, home angle, nudge size,
+pulse range, raw-pulse policy, and inversion in
+`RoverCameraServoConfig`. Headlight and laser programs set the pin, polarity,
+and initial state in `RoverDigitalOutputConfig`.
+
+These roles keep the existing camera tilt, headlight, and laser HUD controls.
+They do not add entries to the accessory list.
+
+### Standard accessory outputs
+
+A servo slider combines `SliderControlConfig` with `ServoOutput`:
+
+```cpp
+SliderControlConfig position;
+position.name = "Arm position";
+position.minimum = 0;
+position.maximum = 180;
+
+ServoOutput servo;
+servo.pin = 13;
+
+peripheral.addSlider(position, servo);
+```
+
+A PWM slider combines `SliderControlConfig` with `PwmOutput`:
+
+```cpp
+SliderControlConfig brightness;
+brightness.name = "Light brightness";
+brightness.minimum = 0;
+brightness.maximum = 255;
+
+PwmOutput light;
+light.pin = 17;
+
+peripheral.addSlider(brightness, light);
+```
+
+A digital button combines `ButtonControlConfig` with `DigitalOutput`:
+
+```cpp
+ButtonControlConfig workLight;
+workLight.name = "Work light";
+workLight.mode = ButtonMode::Toggle;
+
+DigitalOutput light;
+light.pin = 21;
+light.polarity = OutputPolarity::ActiveHigh;
+
+peripheral.addButton(workLight, light);
+```
+
+### Custom accessory functions
+
+A custom slider passes its value to a callback:
+
+```cpp
+SliderControlConfig speed;
+speed.name = "Motor speed";
+speed.minimum = 0;
+speed.maximum = 100;
+
+peripheral.addSlider(speed, setMotorSpeed);
+```
+
+A custom button passes its logical state to a bool callback:
+
+```cpp
+ButtonControlConfig motor;
+motor.name = "Motor";
+motor.mode = ButtonMode::Momentary;
+
+peripheral.addButton(motor, setMotorRunning);
+```
+
+Momentary bool callbacks receive `true` on press and `false` on release. A
+zero-argument callback may be registered for a momentary action that runs only
+on press.
+
+Number and text inputs use their corresponding configuration structs:
+
+```cpp
+NumberControlConfig repeats;
+repeats.name = "Repeat count";
+repeats.minimum = 1;
+repeats.maximum = 20;
+peripheral.addNumber(repeats, setRepeatCount);
+
+TextControlConfig message;
+message.name = "Display message";
+message.maximumLength = 64;
+peripheral.addText(message, setDisplayMessage);
+```
+
+A program may define `updateRoverPeripheral()` for recurring work:
+
+```cpp
+void updateRoverPeripheral() {
+  // Update application state.
+}
+```
+
+Callbacks and recurring work must not block Firmata processing. Programs must
+not write debug output to `Serial` because Firmata uses that stream.
+
+### Library runtime
+
+The library runtime performs these steps:
+
+1. opens `Serial` at 115200 baud;
+2. calls `configureRoverPeripheral()`;
+3. sets the serial timeout to zero;
+4. initializes Firmata and the rover-peripheral feature;
+5. applies initial output states; and
+6. processes Firmata messages and optional recurring work.
+
+The zero timeout prevents ConfigurableFirmata from waiting for its receive
+buffer to fill before processing a short command.
+
+### PlatformIO package
+
+The package source and reference project are:
 
 ```text
 esp32/
 ├── libraries/
 │   └── RoverPeripheralFirmata/
 │       ├── library.json
+│       ├── LICENSE
+│       ├── README.md
+│       ├── examples/
 │       └── src/
 └── rover-gpio-peripheral/
     ├── platformio.ini
     └── src/main.cpp
 ```
 
-The local library owns control registration, description generation, rover-peripheral SysEx handling, callback dispatch, and the standard digital, PWM, and servo output subset. The sketch only declares hardware and application behavior.
+The published package name is `legop3/RoverPeripheral`. Version `2.0.0`
+contains the struct-based public API.
 
-`platformio.ini` contains two environments:
+A classic ESP32 PlatformIO project declares:
 
-| Environment | Intended hardware | Normal Linux device |
-| --- | --- | --- |
-| `esp32dev` | ESP32-WROOM-32/DevKitC boards using CH340 or CP210x USB-to-UART | `/dev/ttyUSB*` |
-| `esp32-s3-devkitc-1` | ESP32-S3 boards using native USB CDC | `/dev/ttyACM*` |
+```ini
+[env:esp32dev]
+platform = espressif32
+board = esp32dev
+framework = arduino
 
-Both environments compile the same `main.cpp`. The S3 environment only adds the Arduino USB CDC build flags needed to make its native USB serial stream active at boot. The sketch passes Arduino's `Serial` object to `Firmata.begin(Stream&)`, so neither the helper library nor the Firmata messages depend on which USB transport produced the byte stream.
+lib_deps =
+  legop3/RoverPeripheral @ ^2.0.0
+```
 
-Typical commands are:
+A native-USB ESP32-S3 uses `board = esp32-s3-devkitc-1` and:
+
+```ini
+build_flags =
+  -D ARDUINO_USB_MODE=1
+  -D ARDUINO_USB_CDC_ON_BOOT=1
+```
+
+The package manifest installs ConfigurableFirmata, ArduinoJson, and ESP32Servo.
+
+Release validation and publication use:
+
+```bash
+pio pkg pack esp32/libraries/RoverPeripheralFirmata
+pio pkg publish esp32/libraries/RoverPeripheralFirmata --owner legop3
+```
+
+Published versions are immutable. Each release uses a new version in
+`library.json`.
+
+### Building and probing
+
+Build and upload the repository reference firmware with:
 
 ```bash
 cd esp32/rover-gpio-peripheral
-
-# The TG34/CH340 DevKitC-style ESP32 used for initial testing.
 pio run -e esp32dev
 pio run -e esp32dev -t upload --upload-port /dev/ttyUSB0
-pio device monitor --port /dev/ttyUSB0 --baud 115200
-
-# A native-USB ESP32-S3 DevKitC.
-pio run -e esp32-s3-devkitc-1
-pio run -e esp32-s3-devkitc-1 -t upload --upload-port /dev/ttyACM0
-pio device monitor --port /dev/ttyACM0 --baud 115200
 ```
 
-Do not keep PlatformIO's serial monitor open while `roverd` or the probe is using the peripheral. A serial device can have only one process actively consuming the Firmata stream.
-
-After uploading, use the Go probe to perform the real handshake and print the self-description:
+Use `esp32-s3-devkitc-1` and the matching `/dev/ttyACM*` device for a
+native-USB ESP32-S3.
 
 ```bash
 cd pi/roverd
 go run ./cmd/peripheral-probe -port /dev/ttyUSB0
-
-# Exercise the standard servo slider.
-go run ./cmd/peripheral-probe -port /dev/ttyUSB0 -control servoPosition -value 90
-
-# Exercise the custom momentary callback. Run once for press and once for release.
-go run ./cmd/peripheral-probe -port /dev/ttyUSB0 -control specialAction -value true
-go run ./cmd/peripheral-probe -port /dev/ttyUSB0 -control specialAction -value false
 ```
-
-Use `/dev/ttyACM0` instead for a native-USB board. The probe waits two seconds after opening because either style of development board may reset when its serial connection opens. It then performs the standard Firmata firmware and capability queries before sending `DESCRIBE`. `-control` is intentionally a diagnostic option only; production control will enter through the server and `roverd` command path.
-
-ConfigurableFirmata's stock example disables its servo feature on ESP32. `RoverPeripheralFirmata` therefore uses ConfigurableFirmata for standard framing, parsing, capability dispatch, and firmware queries, but supplies the ESP32 servo implementation with `ESP32Servo`. Servo writes still use the standard Firmata `SERVO_CONFIG`, `SET_PIN_MODE`, and `EXTENDED_ANALOG` messages; this is an implementation substitution inside the firmware, not a custom servo protocol.
-
-The project pins ConfigurableFirmata `3.2.0` because PlatformIO's stable Espressif32 platform currently ships Arduino-ESP32 2.x. ConfigurableFirmata `3.4.0` compiles its bundled PWM source with Arduino-ESP32 3.x LEDC function names even when the sketch does not instantiate that feature. The pinned release uses the matching 2.x LEDC API and compiles for both configured boards. This pin is a build compatibility choice and does not change the Firmata messages used by the rover.
-
 ## Connection lifecycle
 
 ### Startup discovery
@@ -973,7 +941,7 @@ Payload:
   "data": {
     "peripheral": {
       "id": "firmata-0",
-      "control": "servoPosition",
+      "control": "Servo position",
       "value": 90
     }
   }
@@ -993,7 +961,7 @@ If the socket cannot drive that rover, the event acknowledgement returns an erro
   "type": "peripheral",
   "peripheral": {
     "id": "firmata-0",
-    "control": "servoPosition",
+    "control": "Servo position",
     "value": 90
   }
 }
@@ -1053,10 +1021,10 @@ A toggle sends one of the last two writes per activation. A momentary button sen
 
 ## Custom callback communication
 
-Suppose `specialAction` is pressed. `roverd` creates the JSON payload:
+Suppose `Special action` is pressed. `roverd` creates the JSON payload:
 
 ```json
-{"control":"specialAction","value":true}
+{"control":"Special action","value":true}
 ```
 
 After 8-to-7-bit encoding, it is placed in:
@@ -1074,19 +1042,18 @@ The ESP32 library:
 1. Receives the SysEx feature message through Firmata.
 2. Decodes the JSON bytes.
 3. Reads `control` and `value`.
-4. Finds the control registered as `specialAction`.
+4. Finds the control registered as `Special action`.
 5. Converts the JSON boolean to the registered button callback's `bool` argument.
 6. Calls the callback with `true`.
 
 On release the same path carries `false`.
 
-For the example sketch, only the press runs the one-shot function:
+For the reference sketch, the callback drives its output high on press and low
+again on release:
 
 ```cpp
-[](bool pressed) {
-  if (pressed) {
-    runSpecialAction();
-  }
+void runSpecialAction(bool pressed) {
+  digitalWrite(specialActionPin, pressed ? HIGH : LOW);
 }
 ```
 
@@ -1155,7 +1122,7 @@ Implementation should remain concentrated in a few clear areas.
 
 ### ESP32 library
 
-The Arduino-compatible `RoverPeripheralFirmata` library now contains:
+The Arduino-compatible `RoverPeripheral` package now contains:
 
 - Ordered control registration.
 - Standardized `cameraServo`, `headlight`, and `laser` role registration.
@@ -1164,11 +1131,18 @@ The Arduino-compatible `RoverPeripheralFirmata` library now contains:
 - `DESCRIBE` response handling.
 - `CONTROL` decoding and callback dispatch.
 - 8-to-7-bit payload encoding and decoding.
-- The standard-output and custom-control helper methods listed above.
+- The public configuration structs and registration methods listed above.
+- Arduino `setup()` and `loop()` ownership, including the zero-timeout Firmata
+  parser configuration required for immediate short-command handling.
 
-Example ESP32 sketches should use this library rather than hand-writing SysEx parsing.
+Example ESP32 sketches import only `RoverPeripheral.h` rather than exposing or
+hand-writing any Firmata setup or SysEx parsing.
 
-The first implementation lives in `esp32/libraries/RoverPeripheralFirmata`, with the complete `esp32/rover-gpio-peripheral` PlatformIO project serving as both the reference firmware and an example usable by either rover host type.
+The package source lives in `esp32/libraries/RoverPeripheralFirmata`, with the
+complete `esp32/rover-gpio-peripheral` PlatformIO project serving as the
+repository reference firmware. The package manifest, README, and examples are
+self-contained so the same directory can be published directly to the
+PlatformIO Registry as `legop3/RoverPeripheral`.
 
 ### `pi/roverd`
 
@@ -1220,19 +1194,16 @@ Add one generic peripheral control renderer that:
 
 ## Implementation sequence
 
-The smallest useful vertical implementation is:
+The implemented vertical path is:
 
-1. Build the ESP32 Firmata feature and the three-control example sketch.
-2. Add boot-time one-device USB discovery and Firmata communication to `roverd`.
-3. Include the fixed description in the rover hello and server roster.
-4. Render the ordered generic controls in the driver UI.
-5. Route generic servo and PWM controls through standard Firmata.
-6. Route the generic momentary button through the custom callback operation.
-7. Add the standardized ESP32 camera-servo, headlight, and laser declarations.
-8. Refactor built-in controllers to select native Pi or Firmata backends at startup.
-9. Verify that existing tilt, headlight, laser, keybinding, gamepad, state-event, and server-policy behavior is unchanged with both backends.
-10. Generalize startup discovery from one connection to multiple simultaneous peripherals.
-11. Add the remaining toggle, number, and text registration helpers and UI renderers.
+1. The public ESP32 package declares built-in roles and ordered accessory controls.
+2. Its private Firmata implementation advertises the generated description.
+3. `roverd` discovers all startup peripherals and resolves hardware backends.
+4. Rover hello metadata carries the fixed renderable inventory to the server.
+5. The server preserves that inventory in the roster and applies normal driver authorization.
+6. The shared web renderer presents the four control types on desktop and mobile.
+7. Commands return through the existing pipeline to standard Firmata outputs or custom callbacks.
+8. The package README and examples give external authors the same concise API used by the repository firmware.
 
 The protocol and session shapes are arrays from the beginning, so supporting multiple devices does not require changing the external contracts after the first-device vertical slice.
 
@@ -1251,16 +1222,17 @@ The completed system should be verified with a real ESP32 and rover Linux comput
 
 ### Standard controls
 
-- Move the servo slider and confirm pin 14 receives servo values across the declared range.
-- Move the brightness slider and confirm pin 18 receives PWM values across the declared range.
+- Move the reference brightness slider and confirm pin 17 receives PWM values across the declared range.
+- Register a `SliderControlConfig` with a `ServoOutput` and confirm its selected pin receives servo values across the declared range.
 - Confirm neither standard control invokes the custom callback path.
 
 ### Custom controls
 
 - Press the momentary button and confirm the ESP32 callback receives `true` once.
 - Release it and confirm the callback receives `false` once.
+- Submit number and text values and confirm their typed callbacks receive the advertised values.
 - Cancel a held pointer or leave the control layout and confirm a release is sent.
-- Confirm arbitrary non-blocking ESP32 behavior can continue from `loop()` after the callback changes its state.
+- Confirm arbitrary non-blocking ESP32 behavior can continue from `updateRoverPeripheral()` after the callback changes its state.
 
 ### Permissions
 

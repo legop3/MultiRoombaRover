@@ -28,31 +28,41 @@ RoverPeripheralFirmata* RoverPeripheralFirmata::instance_ = nullptr;
 
 RoverPeripheralFirmata::RoverPeripheralFirmata(const String& name) : name_(name) {}
 
-void RoverPeripheralFirmata::validateControlIdentity(const String& id, const String& name) const {
-  if (id.length() == 0 || name.length() == 0) {
+void RoverPeripheralFirmata::setName(const String& name) {
+  if (name.length() == 0) {
+    // A blank heading makes multiple attached peripherals impossible to
+    // distinguish. Treat it as a firmware-authoring error at startup rather
+    // than advertising ambiguous controls to the rover.
+    abort();
+  }
+  name_ = name;
+}
+
+void RoverPeripheralFirmata::validateControlName(const String& name) const {
+  if (name.length() == 0) {
     // Registration errors are programmer errors discovered during setup. A
     // hard stop is preferable to advertising a partially usable device whose
     // behavior depends on which malformed control the driver touches first.
     abort();
   }
   for (const ControlRegistration& existing : controls_) {
-    if (existing.id == id) {
+    if (existing.id == name) {
       abort();
     }
   }
 }
 
-void RoverPeripheralFirmata::validateRange(const String& id, int minimum, int maximum) const {
-  if (id.length() == 0 || minimum > maximum) {
+void RoverPeripheralFirmata::validateRange(const String& name, int minimum, int maximum) const {
+  if (name.length() == 0 || minimum > maximum) {
     abort();
   }
 }
 
-void RoverPeripheralFirmata::addServoSlider(const SliderControlConfig& config, const FirmataServoOutput& output) {
-  validateControlIdentity(config.id, config.name);
-  validateRange(config.id, config.minimum, config.maximum);
+void RoverPeripheralFirmata::addServoSlider(const SliderControlConfig& config, const ServoOutput& output) {
+  validateControlName(config.name);
+  validateRange(config.name, config.minimum, config.maximum);
   ControlRegistration control;
-  control.id = config.id;
+  control.id = config.name;
   control.name = config.name;
   control.type = ControlType::Slider;
   control.output = OutputType::Servo;
@@ -62,11 +72,11 @@ void RoverPeripheralFirmata::addServoSlider(const SliderControlConfig& config, c
   controls_.push_back(control);
 }
 
-void RoverPeripheralFirmata::addPwmSlider(const SliderControlConfig& config, const FirmataPwmOutput& output) {
-  validateControlIdentity(config.id, config.name);
-  validateRange(config.id, config.minimum, config.maximum);
+void RoverPeripheralFirmata::addPwmSlider(const SliderControlConfig& config, const PwmOutput& output) {
+  validateControlName(config.name);
+  validateRange(config.name, config.minimum, config.maximum);
   ControlRegistration control;
-  control.id = config.id;
+  control.id = config.name;
   control.name = config.name;
   control.type = ControlType::Slider;
   control.output = OutputType::Pwm;
@@ -76,10 +86,10 @@ void RoverPeripheralFirmata::addPwmSlider(const SliderControlConfig& config, con
   controls_.push_back(control);
 }
 
-void RoverPeripheralFirmata::addDigitalButton(const ButtonControlConfig& config, const FirmataDigitalOutput& output) {
-  validateControlIdentity(config.id, config.name);
+void RoverPeripheralFirmata::addDigitalButton(const ButtonControlConfig& config, const DigitalOutput& output) {
+  validateControlName(config.name);
   ControlRegistration control;
-  control.id = config.id;
+  control.id = config.name;
   control.name = config.name;
   control.type = ControlType::Button;
   control.output = OutputType::Digital;
@@ -90,10 +100,10 @@ void RoverPeripheralFirmata::addDigitalButton(const ButtonControlConfig& config,
 }
 
 void RoverPeripheralFirmata::addSlider(const SliderControlConfig& config, SliderCallback callback) {
-  validateControlIdentity(config.id, config.name);
-  validateRange(config.id, config.minimum, config.maximum);
+  validateControlName(config.name);
+  validateRange(config.name, config.minimum, config.maximum);
   ControlRegistration control;
-  control.id = config.id;
+  control.id = config.name;
   control.name = config.name;
   control.type = ControlType::Slider;
   control.output = OutputType::Custom;
@@ -104,9 +114,9 @@ void RoverPeripheralFirmata::addSlider(const SliderControlConfig& config, Slider
 }
 
 void RoverPeripheralFirmata::addButton(const ButtonControlConfig& config, ButtonCallback callback) {
-  validateControlIdentity(config.id, config.name);
+  validateControlName(config.name);
   ControlRegistration control;
-  control.id = config.id;
+  control.id = config.name;
   control.name = config.name;
   control.type = ControlType::Button;
   control.output = OutputType::Custom;
@@ -116,10 +126,10 @@ void RoverPeripheralFirmata::addButton(const ButtonControlConfig& config, Button
 }
 
 void RoverPeripheralFirmata::addNumber(const NumberControlConfig& config, NumberCallback callback) {
-  validateControlIdentity(config.id, config.name);
-  validateRange(config.id, config.minimum, config.maximum);
+  validateControlName(config.name);
+  validateRange(config.name, config.minimum, config.maximum);
   ControlRegistration control;
-  control.id = config.id;
+  control.id = config.name;
   control.name = config.name;
   control.type = ControlType::Number;
   control.output = OutputType::Custom;
@@ -130,12 +140,12 @@ void RoverPeripheralFirmata::addNumber(const NumberControlConfig& config, Number
 }
 
 void RoverPeripheralFirmata::addText(const TextControlConfig& config, TextCallback callback) {
-  validateControlIdentity(config.id, config.name);
+  validateControlName(config.name);
   if (config.maximumLength == 0) {
     abort();
   }
   ControlRegistration control;
-  control.id = config.id;
+  control.id = config.name;
   control.name = config.name;
   control.type = ControlType::Text;
   control.output = OutputType::Custom;

@@ -1,10 +1,25 @@
 {
-  "name": "RoverPeripheralFirmata",
-  "version": "0.1.0",
-  "description": "Self-describing Firmata controls for MultiRoombaRover ESP32 peripherals",
+  "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
+  "name": "RoverPeripheral",
+  "version": "2.0.1",
+  "description": "Create self-describing ESP32 hardware controls for MultiRoombaRover",
+  "keywords": [
+    "esp32",
+    "firmata",
+    "robotics",
+    "rover"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/legop3/MultiRoombaRover.git"
+  },
+  "homepage": "https://github.com/legop3/MultiRoombaRover/tree/main/esp32/libraries/RoverPeripheralFirmata",
+  "license": "MIT",
   "frameworks": "arduino",
   "platforms": "espressif32",
+  "headers": "RoverPeripheral.h",
   "dependencies": {
+    "ConfigurableFirmata": "https://github.com/firmata/ConfigurableFirmata.git#3.2.0",
     "bblanchon/ArduinoJson": "^7.4.2",
     "madhephaestus/ESP32Servo": "^3.0.8"
   }

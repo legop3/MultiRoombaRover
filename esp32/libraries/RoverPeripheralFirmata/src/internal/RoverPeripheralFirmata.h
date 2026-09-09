@@ -5,95 +5,25 @@
 #include <ConfigurableFirmata.h>
 #include <ESP32Servo.h>
 #include <FirmataExt.h>
+#include <RoverPeripheral.h>
 
-#include <functional>
 #include <vector>
 
-enum class OutputPolarity {
-  ActiveHigh,
-  ActiveLow,
-};
-
-enum class ButtonMode {
-  Toggle,
-  Momentary,
-};
-
-struct FirmataServoOutput {
-  uint8_t pin = 0;
-};
-
-struct FirmataPwmOutput {
-  uint8_t pin = 0;
-};
-
-struct FirmataDigitalOutput {
-  uint8_t pin = 0;
-  OutputPolarity polarity = OutputPolarity::ActiveHigh;
-};
-
-struct RoverCameraServoConfig {
-  uint8_t pin = 0;
-  float minimumAngleDegrees = -15;
-  float maximumAngleDegrees = 30;
-  float homeAngleDegrees = 0;
-  float nudgeDegrees = 2;
-  uint16_t minimumPulseMicroseconds = 900;
-  uint16_t maximumPulseMicroseconds = 2100;
-  bool allowRawPulse = false;
-  bool inverted = false;
-};
-
-struct RoverDigitalOutputConfig {
-  uint8_t pin = 0;
-  OutputPolarity polarity = OutputPolarity::ActiveHigh;
-  bool initiallyOn = false;
-};
-
-struct SliderControlConfig {
-  String id;
-  String name;
-  int minimum = 0;
-  int maximum = 100;
-};
-
-struct ButtonControlConfig {
-  String id;
-  String name;
-  ButtonMode mode = ButtonMode::Momentary;
-};
-
-struct NumberControlConfig {
-  String id;
-  String name;
-  int minimum = 0;
-  int maximum = 100;
-};
-
-struct TextControlConfig {
-  String id;
-  String name;
-  size_t maximumLength = 32;
-};
-
-using SliderCallback = std::function<void(int)>;
-using ButtonCallback = std::function<void(bool)>;
-using NumberCallback = std::function<void(int)>;
-using TextCallback = std::function<void(const String&)>;
-
 /*
- * RoverPeripheralFirmata is both the sketch-facing registration API and one
- * ConfigurableFirmata feature. Keeping those responsibilities together gives a
- * peripheral author one object to configure while still allowing ordinary
- * Firmata tooling to use digital, PWM, and servo commands on the same stream.
+ * RoverPeripheralFirmata is the protocol-facing implementation behind the
+ * small RoverPeripheral public facade. Keeping this class private prevents
+ * peripheral sketches from depending on Firmata types while ordinary Firmata
+ * tooling can still use digital, PWM, and servo commands on the same stream.
  */
 class RoverPeripheralFirmata : public FirmataFeature {
  public:
   explicit RoverPeripheralFirmata(const String& name);
 
-  void addServoSlider(const SliderControlConfig& config, const FirmataServoOutput& output);
-  void addPwmSlider(const SliderControlConfig& config, const FirmataPwmOutput& output);
-  void addDigitalButton(const ButtonControlConfig& config, const FirmataDigitalOutput& output);
+  void setName(const String& name);
+
+  void addServoSlider(const SliderControlConfig& config, const ServoOutput& output);
+  void addPwmSlider(const SliderControlConfig& config, const PwmOutput& output);
+  void addDigitalButton(const ButtonControlConfig& config, const DigitalOutput& output);
   void addSlider(const SliderControlConfig& config, SliderCallback callback);
   void addButton(const ButtonControlConfig& config, ButtonCallback callback);
   void addNumber(const NumberControlConfig& config, NumberCallback callback);
@@ -155,8 +85,8 @@ class RoverPeripheralFirmata : public FirmataFeature {
   RoverDigitalOutputConfig laser_;
   Servo* servos_[TOTAL_PINS] = {};
 
-  void validateControlIdentity(const String& id, const String& name) const;
-  void validateRange(const String& id, int minimum, int maximum) const;
+  void validateControlName(const String& name) const;
+  void validateRange(const String& name, int minimum, int maximum) const;
   void buildAndSendDescription();
   void dispatchCustomControl(byte argc, byte* argv);
   void writeDigitalPin(byte pin, bool enabled);
@@ -167,4 +97,3 @@ class RoverPeripheralFirmata : public FirmataFeature {
   static void digitalPinValueCallback(byte pin, int value);
   static void systemResetCallback();
 };
-
