@@ -20,10 +20,11 @@ export default function AccessoriesExpansion({ roverId }) {
         label="Accessories"
         ariaLabel={open ? 'Hide accessory controls' : 'Show accessory controls'}
         onClick={() => setOpen(!open)}
-        className={`pointer-events-auto !h-28 rounded-l-none ${open ? 'rounded-r-none' : ''}`}
+        hud
+        className="pointer-events-auto !h-28"
       />
       {open ? (
-        <div className="pointer-events-auto h-[70%] min-h-48 max-h-[32rem] w-72 overflow-hidden rounded-r-xl border-2 border-l-0 border-cyan-300/70 bg-slate-950/95 shadow-2xl">
+        <div className="pointer-events-auto h-[70%] min-h-48 max-h-[32rem] w-64 overflow-hidden rounded-r-xl bg-black/60 p-0.5">
           {/* This is exactly the renderer mounted by AuxColumn. The desktop
               wrapper changes available dimensions, never control behavior. */}
           <RoverAccessoryControls roverId={roverId} className="h-full" />

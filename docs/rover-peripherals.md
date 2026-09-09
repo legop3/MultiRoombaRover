@@ -1131,13 +1131,13 @@ Generic peripheral controls are rover controls, so they follow the new driver's 
 
 The standardized replacements do not create any new UI. `cameraServo`, `headlight`, and `laser` continue to use their current camera-tilt, headlight, and laser HUD controls. Only entries in the generic `controls` arrays appear in a new surface named `Accessories`.
 
-On desktop, `Accessories` is a vertical button centered on the left wall of the video. It opens a height-limited, vertically scrollable panel toward the right. The panel uses the same large control cards as mobile and is independent of the bottom-left horn, headlight, and laser pod.
+On desktop, `Accessories` is a vertical button centered on the left wall of the video. It uses the existing translucent black HUD treatment and opens a height-limited, vertically scrollable panel toward the right. The panel uses the same compact control renderer as mobile and is independent of the bottom-left horn, headlight, and laser pod.
 
-On mobile, a vertical `Accessories` button sits directly to the right of the vacuum-forward and vacuum-backward buttons. Activating it replaces the complete `AuxColumn` contents with the ordered, vertically scrollable accessory list. A much smaller vertical `Aux` tab returns to the normal vacuum, camera, light, laser, and horn controls without reserving a large empty rail beside the accessory list.
+On mobile, a vertical `Accessories` button sits directly to the right of the vacuum-forward and vacuum-backward buttons. Activating it replaces the complete `AuxColumn` contents with the ordered, vertically scrollable accessory list. A small `Aux` button shares the first compact device heading and returns to the normal vacuum, camera, light, laser, and horn controls without creating a separate rail or overlay border.
 
 Desktop and mobile reuse one placement-independent `RoverAccessoryControls` renderer inside their different containers. Device-specific React components are not created for individual peripherals. The renderer sends actions through `ControlSystemProvider`, `ControlContext`, and the existing command pipeline so assignment gating, input cancellation, and command behavior remain consistent with other rover HUD controls. Both parents and the renderer disappear completely when the assigned rover has no generic controls; no launcher, empty shell, or reserved space remains.
 
-Control values are local UI values in the first implementation. Slider and toggle changes update the displayed value immediately and are then sent to the server. Restarting `roverd` recreates controls from the new hello rather than persisting peripheral values in `roverSettings`.
+Control values are local UI values in the first implementation. Slider and toggle changes update the displayed value immediately and are then sent to the server. Generic sliders use the same custom pointer-capture approach as mobile camera tilt rather than a browser-native range control, which keeps touch behavior and appearance consistent while driving. Restarting `roverd` recreates controls from the new hello rather than persisting peripheral values in `roverSettings`.
 
 ## Permissions
 

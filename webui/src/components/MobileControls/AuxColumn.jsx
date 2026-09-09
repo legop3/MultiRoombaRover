@@ -199,17 +199,19 @@ function RoverAuxColumn({ roverId, layout, className }) {
   return (
     <div className={`mobile-touch-control flex flex-col gap-0.5 ${className}`.trim()} data-mobile-layout={layout}>
       {showAccessories && hasAccessories ? (
-        <div className="mobile-touch-control relative h-full min-h-0 overflow-hidden rounded-xl border-2 border-cyan-300/70 bg-slate-950/95">
-          {/* The compact return tab overlays only the first heading corner. It
-              does not reserve an otherwise empty rail down the full column. */}
-          <AccessoriesToggle
-            label="Aux"
-            ariaLabel="Return to auxiliary controls"
-            compact
-            onClick={() => setShowAccessories(false)}
-            className="absolute right-1 top-1 z-10"
+        <div className="mobile-touch-control h-full min-h-0 overflow-hidden">
+          <RoverAccessoryControls
+            roverId={roverId}
+            className="h-full"
+            headerAction={(
+              <AccessoriesToggle
+                label="Aux"
+                ariaLabel="Return to auxiliary controls"
+                compact
+                onClick={() => setShowAccessories(false)}
+              />
+            )}
           />
-          <RoverAccessoryControls roverId={roverId} className="h-full pr-1" />
         </div>
       ) : (
         <AuxColumnContent
