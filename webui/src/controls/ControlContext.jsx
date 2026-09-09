@@ -66,6 +66,7 @@ const CONTROL_ACTION_NAMES = [
   'sendSong',
   'startHorn',
   'stopHorn',
+  'setPeripheralControl',
   'setMicPttActive',
 ];
 
@@ -724,6 +725,29 @@ export function ControlSystemProvider({ children }) {
     dispatch({ type: 'control/set-mic-ptt', payload: Boolean(active) });
   }, []);
 
+  const setPeripheralControl = useCallback(
+    (peripheralId, controlId, value) => {
+      const sent = pipeline.sendPeripheralControl(peripheralId, controlId, value);
+      if (sent) {
+        // The generic protocol is currently command-only. Recording the value
+        // here lets every renderer instance share the browser's latest intent
+        // without pretending that it is device-reported telemetry.
+        dispatch({
+          type: 'control/set-peripheral-value',
+          payload: {
+            roverId: pipeline.roverId,
+            peripheralId,
+            controlId,
+            value,
+          },
+        });
+        recordControlIntent();
+      }
+      return sent;
+    },
+    [pipeline, recordControlIntent],
+  );
+
   const actionImplementations = useMemo(
     () => ({
       setMode,
@@ -751,6 +775,7 @@ export function ControlSystemProvider({ children }) {
       sendSong,
       startHorn,
       stopHorn,
+      setPeripheralControl,
       setMicPttActive,
     }),
     [
@@ -779,6 +804,7 @@ export function ControlSystemProvider({ children }) {
       sendSong,
       startHorn,
       stopHorn,
+      setPeripheralControl,
       setMicPttActive,
     ],
   );

@@ -16,7 +16,7 @@ The design deliberately stays small:
 - There is no peripheral configuration in the rover configuration file.
 - There is no separate rover-peripheral protocol version.
 
-This document is both the design contract and implementation guide. The PlatformIO firmware library, reference sketch, focused Go Firmata client, hardware probe, boot-time daemon discovery, fixed inventory, generic output dispatch, built-in hardware backend selection, and rover WebSocket message shapes now exist. Server forwarding and HUD rendering remain later implementation stages.
+This document is both the design contract and implementation guide. The PlatformIO firmware library, reference sketch, focused Go Firmata client, hardware probe, boot-time daemon discovery, fixed inventory, generic output dispatch, built-in hardware backend selection, rover WebSocket message shapes, server roster forwarding, and shared HUD renderer now exist.
 
 ## System boundary
 
@@ -956,10 +956,12 @@ No global `session.features` flag is necessary. Peripherals are inherently optio
 
 ## Browser-to-server control path
 
-The browser sends one generic Socket.IO event for every peripheral control:
+The browser sends every peripheral interaction through the existing Socket.IO
+`command` event. Peripheral actuation is a rover command, so it does not need a
+parallel event or authorization path.
 
 ```text
-peripheral:set
+command
 ```
 
 Payload:
@@ -967,9 +969,14 @@ Payload:
 ```json
 {
   "roverId": "rover-name",
-  "peripheralId": "firmata-0",
-  "controlId": "servoPosition",
-  "value": 90
+  "type": "peripheral",
+  "data": {
+    "peripheral": {
+      "id": "firmata-0",
+      "control": "servoPosition",
+      "value": 90
+    }
+  }
 }
 ```
 
@@ -1124,11 +1131,11 @@ Generic peripheral controls are rover controls, so they follow the new driver's 
 
 The standardized replacements do not create any new UI. `cameraServo`, `headlight`, and `laser` continue to use their current camera-tilt, headlight, and laser HUD controls. Only entries in the generic `controls` arrays appear in a new surface named `Accessories`.
 
-On desktop, `Accessories` is a collapsible HUD drawer connected to the bottom-left rover-control pod. This keeps additional actuation beside the existing horn, headlight, and laser controls without permanently covering the video. The drawer is absent when the assigned rover advertises no generic controls.
+On desktop, `Accessories` is a vertical button centered on the left wall of the video. It opens a height-limited, vertically scrollable panel toward the right. The panel uses the same large control cards as mobile and is independent of the bottom-left horn, headlight, and laser pod.
 
-On mobile, the HUD launcher opens an unscaled, vertically scrollable sheet over the video stage. Generic controls must not be placed in the fixed `AuxColumn`: an arbitrary device-defined list cannot fit that column's intentionally fixed set of large driving controls. The mobile sheet closes without changing control values and disappears when there are no generic controls.
+On mobile, a vertical `Accessories` button sits directly to the right of the vacuum-forward and vacuum-backward buttons. Activating it replaces the complete `AuxColumn` contents with the ordered, vertically scrollable accessory list. A much smaller vertical `Aux` tab returns to the normal vacuum, camera, light, laser, and horn controls without reserving a large empty rail beside the accessory list.
 
-Desktop and mobile reuse one generic renderer inside their different HUD containers. Device-specific React components are not created for individual peripherals. The renderer sends actions through `ControlSystemProvider`, `ControlContext`, and the existing command pipeline so assignment gating, input cancellation, and command behavior remain consistent with other rover HUD controls.
+Desktop and mobile reuse one placement-independent `RoverAccessoryControls` renderer inside their different containers. Device-specific React components are not created for individual peripherals. The renderer sends actions through `ControlSystemProvider`, `ControlContext`, and the existing command pipeline so assignment gating, input cancellation, and command behavior remain consistent with other rover HUD controls. Both parents and the renderer disappear completely when the assigned rover has no generic controls; no launcher, empty shell, or reserved space remains.
 
 Control values are local UI values in the first implementation. Slider and toggle changes update the displayed value immediately and are then sent to the server. Restarting `roverd` recreates controls from the new hello rather than persisting peripheral values in `roverSettings`.
 
@@ -1140,7 +1147,7 @@ The server enforces this with the existing `roverManager.canDrive(roverId, socke
 
 No peripheral-specific roles, administrator-only controls, access lists, or permissions in ESP32 configuration are part of this design.
 
-When the driver loses the rover assignment, the UI stops presenting enabled controls and subsequent `peripheral:set` requests fail the same server-side drive check.
+When the driver loses the rover assignment, the UI stops presenting enabled controls and subsequent peripheral commands fail the same server-side drive check.
 
 ## Expected repository changes
 
@@ -1194,7 +1201,7 @@ Extend the existing rover connection and roster path to:
 - Accept `peripherals` in rover hello metadata.
 - Include peripherals in `roverManager.getRoster()`.
 - Continue exposing effective `cameraServo`, `headlight`, and `laser` metadata through their existing roster fields regardless of physical backend.
-- Add the generic `peripheral:set` Socket.IO handler.
+- Route generic controls through the existing Socket.IO `command` handler.
 - Reuse `roverManager.canDrive()` for authorization.
 - Forward the command through `commandService` so rover acknowledgements remain consistent with other controls.
 
@@ -1205,9 +1212,9 @@ Add one generic peripheral control renderer that:
 - Selects the assigned rover and its peripherals from session state.
 - Preserves peripheral and control array order.
 - Renders only the four agreed control types.
-- Sends every interaction through the same `peripheral:set` event.
+- Sends every interaction through the existing `command` event with type `peripheral`.
 - Supports momentary press and release for pointer, touch, and keyboard activation.
-- Mounts in the desktop Accessories HUD drawer and mobile Accessories HUD sheet.
+- Mounts in the desktop left-wall expansion and as a replacement view inside mobile `AuxColumn`.
 - Uses the shared control context and command pipeline rather than emitting directly from layout code.
 - Disappears completely when the assigned rover has no peripherals.
 

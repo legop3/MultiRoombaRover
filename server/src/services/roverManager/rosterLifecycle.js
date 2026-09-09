@@ -239,6 +239,11 @@ function createRosterLifecycle(deps) {
       cameraServo: record.meta?.cameraServo,
       audio: record.meta?.audio,
       horn: record.meta?.horn,
+      // Generic peripheral metadata is already reduced by roverd to the fields
+      // the browser needs: stable process-local IDs, display names, and ordered
+      // controls. Preserve that order here instead of rebuilding the inventory,
+      // because ESP32 registration order is also the driver's display order.
+      peripherals: Array.isArray(record.meta?.peripherals) ? record.meta.peripherals : [],
       headlight: record.meta?.headlight
         ? { ...record.meta.headlight, state: record.headlightState }
         : record.meta?.headlight,

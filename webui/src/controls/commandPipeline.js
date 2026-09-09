@@ -44,6 +44,11 @@ export function useCommandPipeline(options = {}) {
     return rosterEntry.horn;
   }, [rosterEntry]);
 
+  const peripherals = useMemo(
+    () => (Array.isArray(rosterEntry?.peripherals) ? rosterEntry.peripherals : []),
+    [rosterEntry],
+  );
+
   const headlightState = useMemo(() => rosterEntry?.headlight?.state ?? null, [rosterEntry]);
   const laserState = useMemo(() => rosterEntry?.laser?.state ?? null, [rosterEntry]);
   const emitCommand = useCallback(
@@ -208,6 +213,22 @@ export function useCommandPipeline(options = {}) {
     [emitCommand, roverId],
   );
 
+  const sendPeripheralControl = useCallback(
+    (peripheralId, controlId, value) => {
+      if (!roverId || !peripheralId || !controlId) return null;
+      const peripheral = { id: peripheralId, control: controlId, value };
+      // Peripheral commands deliberately use the same command envelope as all
+      // other rover actuation. This keeps turn authorization, acknowledgements,
+      // and rover WebSocket routing in the server's existing command boundary.
+      emitCommand({
+        type: 'peripheral',
+        data: { peripheral },
+      });
+      return peripheral;
+    },
+    [emitCommand, roverId],
+  );
+
   const sendSong = useCallback(
     (notes = [], options = {}) => {
       if (!roverId) return null;
@@ -244,6 +265,7 @@ export function useCommandPipeline(options = {}) {
       laser,
       laserState,
       horn,
+      peripherals,
       emitCommand,
       enableSensorStream,
       sendDriveDirect,
@@ -253,6 +275,7 @@ export function useCommandPipeline(options = {}) {
       sendHeadlight,
       sendLaser,
       sendHorn,
+      sendPeripheralControl,
       sendSong,
       runMacroSteps,
     }),
@@ -265,6 +288,7 @@ export function useCommandPipeline(options = {}) {
       laser,
       laserState,
       horn,
+      peripherals,
       emitCommand,
       enableSensorStream,
       sendDriveDirect,
@@ -274,6 +298,8 @@ export function useCommandPipeline(options = {}) {
       sendHeadlight,
       sendLaser,
       sendHorn,
+      sendPeripheralControl,
+      sendSong,
       runMacroSteps,
     ],
   );
