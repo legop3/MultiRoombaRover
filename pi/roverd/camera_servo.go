@@ -134,6 +134,10 @@ func (s *CameraServo) Configuration() CameraServoConfig {
 	return s.cfg
 }
 
+func (s *CameraServo) BackendDescription() string {
+	return "native GPIO"
+}
+
 func (s *CameraServo) applyPulseLocked(micros int) {
 	micros = clampInt(micros, s.cfg.MinPulseUs, s.cfg.MaxPulseUs)
 	s.pin.DutyCycle(uint32(micros), uint32(s.cfg.CycleLen))

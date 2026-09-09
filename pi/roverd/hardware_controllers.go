@@ -3,6 +3,7 @@ package roverd
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,7 @@ type CameraServoController interface {
 	SetPulseWidth(micros int) error
 	CurrentAngle() float64
 	Configuration() CameraServoConfig
+	BackendDescription() string
 	Close()
 }
 
@@ -33,6 +35,7 @@ type ToggleController interface {
 	HandleAction(action string) error
 	On() bool
 	Configuration() GPIOToggleConfig
+	BackendDescription() string
 	Close()
 }
 
@@ -40,9 +43,37 @@ type ToggleController interface {
 // decision. Its effective configurations are derived from whichever backend
 // won, making the normal rover hello accurate on both Pi and laptop hosts.
 type RoverHardwareControllers struct {
-	CameraServo CameraServoController
-	Headlight   ToggleController
-	Laser       ToggleController
+	CameraServo       CameraServoController
+	Headlight         ToggleController
+	Laser             ToggleController
+	ignoredESP32Roles []string
+}
+
+// StartupBroadcasts returns short operator-facing messages. Detailed pin and
+// protocol information remains in the journal; tty1 only explains which
+// physical backend won and whether an advertised ESP32 role was ignored.
+func (controllers RoverHardwareControllers) StartupBroadcasts() []string {
+	var messages []string
+	if len(controllers.ignoredESP32Roles) > 0 {
+		messages = append(messages, fmt.Sprintf(
+			"Ignored ESP32 %s because native GPIO is enabled.",
+			strings.Join(controllers.ignoredESP32Roles, ", "),
+		))
+	}
+	messages = append(messages, fmt.Sprintf(
+		"Rover hardware ready: camera servo via %s, headlight via %s, laser via %s.",
+		controllerBackend(controllers.CameraServo),
+		controllerBackend(controllers.Headlight),
+		controllerBackend(controllers.Laser),
+	))
+	return messages
+}
+
+func controllerBackend(controller interface{ BackendDescription() string }) string {
+	if controller == nil {
+		return "disabled"
+	}
+	return controller.BackendDescription()
 }
 
 type nativeHardwareControllerFactories struct {
@@ -68,6 +99,17 @@ func ResolveRoverHardwareControllers(cfg *Config, peripherals *PeripheralManager
 func resolveRoverHardwareControllers(cfg *Config, peripherals *PeripheralManager, logger *log.Logger, factories nativeHardwareControllerFactories) (RoverHardwareControllers, error) {
 	var controllers RoverHardwareControllers
 	var err error
+	// Record ignored declarations separately from selecting controllers so the
+	// same native-first decision can be explained on the local rover console.
+	if cfg.CameraServo.Enabled && peripherals.HasRoverRole("cameraServo") {
+		controllers.ignoredESP32Roles = append(controllers.ignoredESP32Roles, "camera servo")
+	}
+	if cfg.Headlight.Enabled && peripherals.HasRoverRole("headlight") {
+		controllers.ignoredESP32Roles = append(controllers.ignoredESP32Roles, "headlight")
+	}
+	if cfg.Laser.Enabled && peripherals.HasRoverRole("laser") {
+		controllers.ignoredESP32Roles = append(controllers.ignoredESP32Roles, "laser")
+	}
 
 	controllers.CameraServo, err = resolveCameraServoController(cfg.CameraServo, peripherals, logger, factories.newCameraServo)
 	if err != nil {

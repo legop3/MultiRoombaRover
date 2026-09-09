@@ -35,6 +35,10 @@ func TestPeripheralManagerDiscoversInventoryAndDispatchesControls(t *testing.T) 
 	if inventory[0].ID != "firmata-0" || inventory[0].Name != "Bench accessory" {
 		t.Fatalf("unexpected peripheral metadata: %#v", inventory[0])
 	}
+	wantBroadcast := `Rover peripheral "Bench accessory" connected as firmata-0 with 3 additional controls.`
+	if broadcasts := manager.StartupBroadcasts(); len(broadcasts) != 1 || broadcasts[0] != wantBroadcast {
+		t.Fatalf("startup broadcasts = %#v, want %q", broadcasts, wantBroadcast)
+	}
 	wantOrder := []string{"servoPosition", "lightBrightness", "specialAction"}
 	for index, controlID := range wantOrder {
 		if inventory[0].Controls[index].ID != controlID {
@@ -76,6 +80,45 @@ func TestPeripheralManagerDiscoversInventoryAndDispatchesControls(t *testing.T) 
 	customWrite := connection.Bytes()[baseline:]
 	if len(customWrite) < 5 || customWrite[1] != firmataPeripheralFeature || customWrite[2] != firmataPeripheralControl {
 		t.Fatalf("custom control did not use rover-peripheral SysEx: %v", customWrite)
+	}
+}
+
+func TestPeripheralManagerBroadcastsNoDevices(t *testing.T) {
+	manager := &PeripheralManager{byID: make(map[string]*managedPeripheral)}
+	want := "No ESP32 rover peripherals detected during startup."
+	if messages := manager.StartupBroadcasts(); len(messages) != 1 || messages[0] != want {
+		t.Fatalf("startup broadcasts = %#v, want %q", messages, want)
+	}
+}
+
+func TestPeripheralManagerReportsUnexpectedDisconnectOnce(t *testing.T) {
+	connection := scriptedPeripheralConnection(t, testPeripheralDescription("Bench accessory", false))
+	manager, err := discoverPeripheralManager(
+		context.Background(),
+		"/dev/roomba",
+		discardLogger(),
+		testPeripheralDiscoveryDependencies([]string{"/dev/accessory"}, map[string]*scriptedConnection{"/dev/accessory": connection}),
+	)
+	if err != nil {
+		t.Fatalf("discover: %v", err)
+	}
+	defer manager.Close()
+
+	// Closing the fake read stream models an unplugged USB serial adapter. The
+	// manager should publish one identified failure and never attempt reconnect.
+	_ = connection.Close()
+	select {
+	case failure := <-manager.Failures():
+		if failure.ID != "firmata-0" || failure.Name != "Bench accessory" || !errors.Is(failure.Err, io.ErrClosedPipe) {
+			t.Fatalf("unexpected failure: %#v", failure)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for peripheral disconnect")
+	}
+	select {
+	case duplicate := <-manager.Failures():
+		t.Fatalf("unexpected duplicate disconnect: %#v", duplicate)
+	case <-time.After(20 * time.Millisecond):
 	}
 }
 
@@ -228,6 +271,14 @@ func TestPeripheralManagerReturnsHardwareWriteFailure(t *testing.T) {
 	err = manager.SetControl("firmata-0", "lightBrightness", json.RawMessage(`128`))
 	if err == nil || !strings.Contains(err.Error(), "USB device removed") {
 		t.Fatalf("expected hardware error, got %v", err)
+	}
+	select {
+	case failure := <-manager.Failures():
+		if failure.ID != "firmata-0" || !strings.Contains(failure.Err.Error(), "USB device removed") {
+			t.Fatalf("unexpected write failure notification: %#v", failure)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for write failure notification")
 	}
 }
 

@@ -34,3 +34,7 @@ func (g *GPIOToggle) On() bool {
 func (g *GPIOToggle) Configuration() GPIOToggleConfig {
 	return GPIOToggleConfig{}
 }
+
+func (g *GPIOToggle) BackendDescription() string {
+	return "native GPIO"
+}

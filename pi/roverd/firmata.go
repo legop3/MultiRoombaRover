@@ -358,6 +358,10 @@ type FirmataClient struct {
 	requestMu   sync.Mutex
 	stateMu     sync.RWMutex
 	terminalErr error
+	// terminalErrorHandler is invoked only for the first non-timeout read
+	// failure while the client context remains active. PeripheralManager uses it
+	// to turn an unexpected USB loss into one operator-facing broadcast.
+	terminalErrorHandler func(error)
 }
 
 func NewFirmataClient(connection io.ReadWriteCloser) *FirmataClient {
@@ -420,16 +424,39 @@ func (client *FirmataClient) readLoop(ctx context.Context) {
 }
 
 func (client *FirmataClient) publishError(ctx context.Context, err error) {
-	client.stateMu.Lock()
-	if client.terminalErr == nil {
-		client.terminalErr = err
+	firstTerminalError, handler := client.recordTerminalError(err)
+	if firstTerminalError && handler != nil && ctx.Err() == nil {
+		handler(err)
 	}
-	client.stateMu.Unlock()
 
 	select {
 	case client.errors <- err:
 	case <-ctx.Done():
 	default:
+	}
+}
+
+func (client *FirmataClient) recordTerminalError(err error) (bool, func(error)) {
+	client.stateMu.Lock()
+	defer client.stateMu.Unlock()
+	firstTerminalError := client.terminalErr == nil
+	if client.terminalErr == nil {
+		client.terminalErr = err
+	}
+	handler := client.terminalErrorHandler
+	return firstTerminalError, handler
+}
+
+// SetTerminalErrorHandler registers the one-shot observer used after a device
+// has completed discovery. If the connection already failed, the observer is
+// called immediately so a narrow handshake-to-registration race is not lost.
+func (client *FirmataClient) SetTerminalErrorHandler(handler func(error)) {
+	client.stateMu.Lock()
+	client.terminalErrorHandler = handler
+	terminalErr := client.terminalErr
+	client.stateMu.Unlock()
+	if terminalErr != nil && handler != nil {
+		handler(terminalErr)
 	}
 }
 
@@ -445,10 +472,19 @@ func (client *FirmataClient) write(message []byte) error {
 
 	written, err := client.connection.Write(message)
 	if err != nil {
+		firstTerminalError, handler := client.recordTerminalError(err)
+		if firstTerminalError && handler != nil {
+			handler(err)
+		}
 		return err
 	}
 	if written != len(message) {
-		return fmt.Errorf("short Firmata write %d/%d", written, len(message))
+		err := fmt.Errorf("short Firmata write %d/%d", written, len(message))
+		firstTerminalError, handler := client.recordTerminalError(err)
+		if firstTerminalError && handler != nil {
+			handler(err)
+		}
+		return err
 	}
 	return nil
 }

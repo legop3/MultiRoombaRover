@@ -16,6 +16,7 @@ type FirmataCameraServo struct {
 	cfg          CameraServoConfig
 	client       *FirmataClient
 	pin          byte
+	peripheralID string
 	mu           sync.Mutex
 	currentAngle float64
 	desiredAngle float64
@@ -41,10 +42,11 @@ func newFirmataCameraServo(peripheral *managedPeripheral, declaration Peripheral
 		Invert:        declaration.Inverted,
 	}
 	servo := &FirmataCameraServo{
-		cfg:    cfg,
-		client: peripheral.client,
-		pin:    byte(declaration.Pin),
-		stopCh: make(chan struct{}),
+		cfg:          cfg,
+		client:       peripheral.client,
+		pin:          byte(declaration.Pin),
+		peripheralID: peripheral.metadata.ID,
+		stopCh:       make(chan struct{}),
 	}
 
 	// SERVO_CONFIG establishes the peripheral-owned pulse calibration before
@@ -114,6 +116,10 @@ func (servo *FirmataCameraServo) CurrentAngle() float64 {
 
 func (servo *FirmataCameraServo) Configuration() CameraServoConfig {
 	return servo.cfg
+}
+
+func (servo *FirmataCameraServo) BackendDescription() string {
+	return "ESP32 " + servo.peripheralID
 }
 
 func (servo *FirmataCameraServo) Close() {
@@ -209,18 +215,26 @@ func (servo *FirmataCameraServo) startMoveLoopLocked() {
 // FirmataToggle owns logical state exactly like GPIOToggle but sends the final
 // electrical level through Firmata's standard digital-pin command.
 type FirmataToggle struct {
-	cfg    GPIOToggleConfig
-	name   string
-	client *FirmataClient
-	pin    byte
-	mu     sync.Mutex
-	on     bool
-	closed bool
+	cfg          GPIOToggleConfig
+	name         string
+	client       *FirmataClient
+	pin          byte
+	peripheralID string
+	mu           sync.Mutex
+	on           bool
+	closed       bool
 }
 
 func newFirmataToggle(name string, peripheral *managedPeripheral, declaration PeripheralDigitalRole, logger *log.Logger) (*FirmataToggle, error) {
 	cfg := GPIOToggleConfig{Enabled: true, GPIOPin: declaration.Pin, InitialOn: declaration.InitiallyOn, ActiveLow: declaration.ActiveLow}
-	toggle := &FirmataToggle{cfg: cfg, name: name, client: peripheral.client, pin: byte(declaration.Pin), on: cfg.InitialOn}
+	toggle := &FirmataToggle{
+		cfg:          cfg,
+		name:         name,
+		client:       peripheral.client,
+		pin:          byte(declaration.Pin),
+		peripheralID: peripheral.metadata.ID,
+		on:           cfg.InitialOn,
+	}
 	if err := toggle.client.SetPinMode(toggle.pin, FirmataPinModeOutput); err != nil {
 		return nil, fmt.Errorf("select Firmata output mode: %w", err)
 	}
@@ -273,6 +287,10 @@ func (toggle *FirmataToggle) On() bool {
 
 func (toggle *FirmataToggle) Configuration() GPIOToggleConfig {
 	return toggle.cfg
+}
+
+func (toggle *FirmataToggle) BackendDescription() string {
+	return "ESP32 " + toggle.peripheralID
 }
 
 func (toggle *FirmataToggle) Close() {

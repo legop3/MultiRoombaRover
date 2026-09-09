@@ -63,6 +63,16 @@ type PeripheralManager struct {
 	cancel      context.CancelFunc
 	closeOnce   sync.Once
 	logger      *log.Logger
+	failures    chan PeripheralFailure
+}
+
+// PeripheralFailure is emitted once when a successfully discovered device's
+// serial reader terminates unexpectedly. Device identity is retained even
+// though reconnection still requires restarting roverd.
+type PeripheralFailure struct {
+	ID   string
+	Name string
+	Err  error
 }
 
 type peripheralDiscoveryDependencies struct {
@@ -76,9 +86,10 @@ type peripheralDiscoveryDependencies struct {
 func discoverPeripheralManager(ctx context.Context, excludedDevice string, logger *log.Logger, dependencies peripheralDiscoveryDependencies) (*PeripheralManager, error) {
 	managerContext, cancel := context.WithCancel(ctx)
 	manager := &PeripheralManager{
-		byID:   make(map[string]*managedPeripheral),
-		cancel: cancel,
-		logger: logger,
+		byID:     make(map[string]*managedPeripheral),
+		cancel:   cancel,
+		logger:   logger,
+		failures: make(chan PeripheralFailure, 16),
 	}
 
 	candidates, err := dependencies.listCandidates(excludedDevice)
@@ -139,10 +150,49 @@ func discoverPeripheralManager(ctx context.Context, excludedDevice string, logge
 		}
 		manager.peripherals = append(manager.peripherals, peripheral)
 		manager.byID[peripheral.metadata.ID] = peripheral
+		client.SetTerminalErrorHandler(func(terminalErr error) {
+			failure := PeripheralFailure{ID: peripheral.metadata.ID, Name: peripheral.metadata.Name, Err: terminalErr}
+			select {
+			case manager.failures <- failure:
+			default:
+				// The channel is intentionally bounded because broadcasts are
+				// diagnostic. Never block a Firmata reader during a fleet-wide
+				// shutdown or an unlikely burst of simultaneous USB failures.
+				logger.Printf("peripheral failure notification queue full for %s: %v", peripheral.metadata.ID, terminalErr)
+			}
+		})
 		logger.Printf("discovered rover peripheral %s on %s with %d generic controls", description.Name, devicePath, len(description.Controls))
 	}
 
 	return manager, nil
+}
+
+// StartupBroadcasts describes the fixed inventory without exposing device
+// paths or wiring details on the rover's local console.
+func (manager *PeripheralManager) StartupBroadcasts() []string {
+	inventory := manager.Inventory()
+	if len(inventory) == 0 {
+		return []string{"No ESP32 rover peripherals detected during startup."}
+	}
+	messages := make([]string, 0, len(inventory))
+	for _, peripheral := range inventory {
+		messages = append(messages, fmt.Sprintf(
+			"Rover peripheral %q connected as %s with %d additional controls.",
+			peripheral.Name,
+			peripheral.ID,
+			len(peripheral.Controls),
+		))
+	}
+	return messages
+}
+
+// Failures exposes unexpected runtime disconnects to the daemon entry point,
+// which owns the ConsoleNotifier and therefore owns user-facing wording.
+func (manager *PeripheralManager) Failures() <-chan PeripheralFailure {
+	if manager == nil {
+		return nil
+	}
+	return manager.failures
 }
 
 func listPeripheralCandidates(excludedDevice string) ([]string, error) {

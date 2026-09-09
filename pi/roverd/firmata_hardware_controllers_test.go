@@ -47,6 +47,10 @@ func TestDisabledNativeRolesResolveToFirmataOnEveryHostBuild(t *testing.T) {
 	if !controllers.CameraServo.Configuration().Enabled || !controllers.Headlight.Configuration().Enabled || !controllers.Laser.Configuration().Enabled {
 		t.Fatal("ESP32-backed roles were not advertised as enabled")
 	}
+	wantHardwareBroadcast := "Rover hardware ready: camera servo via ESP32 firmata-0, headlight via ESP32 firmata-0, laser via ESP32 firmata-0."
+	if messages := controllers.StartupBroadcasts(); len(messages) != 1 || messages[0] != wantHardwareBroadcast {
+		t.Fatalf("hardware broadcasts = %#v, want %q", messages, wantHardwareBroadcast)
+	}
 
 	// Initialization uses only standard Firmata: servo calibration and mode,
 	// followed by the home position and digital initial states. The active-low
@@ -129,6 +133,10 @@ func TestEnabledNativeRolesWinEvenWithSeveralFirmataProviders(t *testing.T) {
 	if controllers.CameraServo != nativeCamera || controllers.Headlight != nativeToggles["headlight"] || controllers.Laser != nativeToggles["laser"] {
 		t.Fatal("resolver did not retain native controllers")
 	}
+	messages := controllers.StartupBroadcasts()
+	if len(messages) != 2 || messages[0] != "Ignored ESP32 camera servo, headlight, laser because native GPIO is enabled." || messages[1] != "Rover hardware ready: camera servo via native GPIO, headlight via native GPIO, laser via native GPIO." {
+		t.Fatalf("native precedence broadcasts = %#v", messages)
+	}
 }
 
 type testCameraServoController struct {
@@ -140,6 +148,7 @@ func (controller *testCameraServoController) Nudge(float64) error              {
 func (controller *testCameraServoController) SetPulseWidth(int) error          { return nil }
 func (controller *testCameraServoController) CurrentAngle() float64            { return 0 }
 func (controller *testCameraServoController) Configuration() CameraServoConfig { return controller.cfg }
+func (controller *testCameraServoController) BackendDescription() string       { return "native GPIO" }
 func (controller *testCameraServoController) Close()                           {}
 
 type testToggleController struct {
@@ -150,4 +159,5 @@ type testToggleController struct {
 func (controller *testToggleController) HandleAction(string) error       { return nil }
 func (controller *testToggleController) On() bool                        { return controller.on }
 func (controller *testToggleController) Configuration() GPIOToggleConfig { return controller.cfg }
+func (controller *testToggleController) BackendDescription() string      { return "native GPIO" }
 func (controller *testToggleController) Close()                          {}

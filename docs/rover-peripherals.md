@@ -879,6 +879,18 @@ If an ESP32 is unplugged or its serial connection fails while `roverd` is runnin
 3. The failed command is logged by the existing rover WebSocket command path.
 4. The advertised inventory does not change during that process lifetime.
 
+The first terminal read or write error also produces one concise `tty1`
+broadcast through the existing `ConsoleNotifier`:
+
+```text
+Rover peripheral "Rover GPIO" (firmata-0) disconnected: <error>. Reconnect it and restart roverd.
+```
+
+Normal startup uses the same local-console mechanism to announce every fixed
+peripheral, the selected native or ESP32 backend for camera servo, headlight,
+and laser, any ignored ESP32 roles, or that no ESP32 was found. Detailed Linux
+paths and Firmata handshake diagnostics remain in the systemd journal.
+
 The disconnected device is never replaced automatically by another serial device. This ensures that a command cannot be redirected merely because Linux reused a `/dev/ttyACM*` path.
 
 ### Server WebSocket reconnect

@@ -34,3 +34,7 @@ func (c *CameraServo) CurrentAngle() float64 {
 func (c *CameraServo) Configuration() CameraServoConfig {
 	return CameraServoConfig{}
 }
+
+func (c *CameraServo) BackendDescription() string {
+	return "native GPIO"
+}

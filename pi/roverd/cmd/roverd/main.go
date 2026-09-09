@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -42,9 +43,13 @@ func main() {
 	// rebuilt only when the roverd process itself restarts.
 	peripherals, err := roverd.DiscoverPeripheralManager(ctx, cfg.Serial.Device, logger)
 	if err != nil {
+		console.Notify(fmt.Sprintf("Rover peripheral startup failed: %v", err))
 		logger.Fatalf("discover rover peripherals: %v", err)
 	}
 	defer peripherals.Close()
+	for _, message := range peripherals.StartupBroadcasts() {
+		console.Notify(message)
+	}
 
 	var pulser *roverd.BRCPulser
 	if cfg.BRC.Enabled() {
@@ -74,9 +79,32 @@ func main() {
 	// GPIO wins, otherwise a discovered ESP32 may provide the built-in role.
 	hardwareControllers, err := roverd.ResolveRoverHardwareControllers(cfg, peripherals, logger)
 	if err != nil {
+		console.Notify(fmt.Sprintf("Rover peripheral startup failed while selecting hardware: %v", err))
 		logger.Fatalf("resolve rover hardware controllers: %v", err)
 	}
 	defer hardwareControllers.Close()
+	for _, message := range hardwareControllers.StartupBroadcasts() {
+		console.Notify(message)
+	}
+
+	// A peripheral is never hot-reconnected. Report the first terminal serial
+	// failure for each discovered board and tell the local operator exactly what
+	// recovery action the fixed boot-time lifecycle requires.
+	go func() {
+		for {
+			select {
+			case failure := <-peripherals.Failures():
+				console.Notify(fmt.Sprintf(
+					"Rover peripheral %q (%s) disconnected: %v. Reconnect it and restart roverd.",
+					failure.Name,
+					failure.ID,
+					failure.Err,
+				))
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	autoCharge := roverd.NewAutoChargeController(adapter, eventStream, logger)
 	go autoCharge.Run(ctx, sensorSamples)

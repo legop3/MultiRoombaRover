@@ -389,6 +389,7 @@ type scriptedConnection struct {
 	reads              chan []byte
 	timeoutsBeforeRead int
 	pendingRead        []byte
+	closeOnce          sync.Once
 }
 
 func newScriptedConnection(responses ...[]byte) *scriptedConnection {
@@ -432,7 +433,9 @@ func (connection *scriptedConnection) Write(data []byte) (int, error) {
 }
 
 func (connection *scriptedConnection) Close() error {
-	_ = connection.recordingConnection.Close()
-	close(connection.reads)
+	connection.closeOnce.Do(func() {
+		_ = connection.recordingConnection.Close()
+		close(connection.reads)
+	})
 	return nil
 }
