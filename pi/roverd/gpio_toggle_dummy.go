@@ -24,3 +24,7 @@ func (g *GPIOToggle) HandleAction(action string) error {
 func (g *GPIOToggle) On() bool {
 	return false
 }
+
+func (g *GPIOToggle) Configuration() GPIOToggleConfig {
+	return GPIOToggleConfig{}
+}

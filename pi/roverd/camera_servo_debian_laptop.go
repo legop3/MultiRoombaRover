@@ -11,10 +11,9 @@ type CameraServo struct{}
 
 func NewCameraServo(_ CameraServoConfig, _ *log.Logger) (*CameraServo, error) {
 	/*
-		The Debian laptop profile starts with the laptop's built-in webcam and no
-		Pi PWM servo. If a laptop rover eventually grows an external servo board,
-		it should get its own implementation instead of reusing Raspberry Pi GPIO
-		assumptions.
+		This constructor represents only native host GPIO. The shared startup
+		resolver selects the normal Firmata implementation when an ESP32 provides
+		the role, so external hardware is not laptop-specific code.
 	*/
 	return nil, fmt.Errorf("camera servo not supported in the debian-laptop build")
 }
@@ -35,4 +34,8 @@ func (c *CameraServo) SetPulseWidth(micros int) error {
 
 func (c *CameraServo) CurrentAngle() float64 {
 	return 0
+}
+
+func (c *CameraServo) Configuration() CameraServoConfig {
+	return CameraServoConfig{}
 }

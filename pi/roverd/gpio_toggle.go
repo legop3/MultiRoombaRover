@@ -87,6 +87,11 @@ func (g *GPIOToggle) On() bool {
 	return g.on
 }
 
+// Configuration returns the native toggle behavior used in the rover hello.
+func (g *GPIOToggle) Configuration() GPIOToggleConfig {
+	return g.cfg
+}
+
 func (g *GPIOToggle) setLocked(on bool) error {
 	// This is the only place a logical device state becomes an electrical GPIO
 	// value. Hardware that turns on when pulled low sets activeLow in roverd

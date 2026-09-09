@@ -25,10 +25,6 @@ type CameraServo struct {
 	closed       bool
 }
 
-const maxServoDegPerSec = 60.0
-const servoStepInterval = 20 * time.Millisecond
-const servoAngleEpsilon = 0.01
-
 func NewCameraServo(cfg CameraServoConfig, logger *log.Logger) (*CameraServo, error) {
 	if !cfg.Enabled {
 		return nil, fmt.Errorf("camera servo disabled")
@@ -130,6 +126,12 @@ func (s *CameraServo) CurrentAngle() float64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.currentAngle
+}
+
+// Configuration reports the effective public behavior advertised to the
+// server. The native implementation simply returns its validated YAML config.
+func (s *CameraServo) Configuration() CameraServoConfig {
+	return s.cfg
 }
 
 func (s *CameraServo) applyPulseLocked(micros int) {

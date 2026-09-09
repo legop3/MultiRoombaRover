@@ -1,0 +1,11 @@
+{
+  "name": "RoverPeripheralFirmata",
+  "version": "0.1.0",
+  "description": "Self-describing Firmata controls for MultiRoombaRover ESP32 peripherals",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "dependencies": {
+    "bblanchon/ArduinoJson": "^7.4.2",
+    "madhephaestus/ESP32Servo": "^3.0.8"
+  }
+}

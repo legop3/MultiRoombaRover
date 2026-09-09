@@ -37,6 +37,15 @@ func main() {
 	}
 	defer serialPort.Close()
 
+	// Peripheral discovery is intentionally a boot-time operation. The manager
+	// keeps successful USB ports open across server WebSocket reconnects and is
+	// rebuilt only when the roverd process itself restarts.
+	peripherals, err := roverd.DiscoverPeripheralManager(ctx, cfg.Serial.Device, logger)
+	if err != nil {
+		logger.Fatalf("discover rover peripherals: %v", err)
+	}
+	defer peripherals.Close()
+
 	var pulser *roverd.BRCPulser
 	if cfg.BRC.Enabled() {
 		pulser, err = roverd.NewBRCPulser(cfg.BRC, logger)
@@ -61,37 +70,18 @@ func main() {
 		mediaSupervisor.Start(ctx)
 	}
 
-	var cameraServo *roverd.CameraServo
-	if cfg.CameraServo.Enabled {
-		cameraServo, err = roverd.NewCameraServo(cfg.CameraServo, logger)
-		if err != nil {
-			logger.Fatalf("init camera servo: %v", err)
-		}
-		defer cameraServo.Close()
+	// Backend selection is identical on Pi and laptop hosts: enabled native
+	// GPIO wins, otherwise a discovered ESP32 may provide the built-in role.
+	hardwareControllers, err := roverd.ResolveRoverHardwareControllers(cfg, peripherals, logger)
+	if err != nil {
+		logger.Fatalf("resolve rover hardware controllers: %v", err)
 	}
-
-	var headlight *roverd.GPIOToggle
-	if cfg.Headlight.Enabled {
-		headlight, err = roverd.NewGPIOToggle("headlight", cfg.Headlight, logger)
-		if err != nil {
-			logger.Fatalf("init headlight: %v", err)
-		}
-		defer headlight.Close()
-	}
-
-	var laser *roverd.GPIOToggle
-	if cfg.Laser.Enabled {
-		laser, err = roverd.NewGPIOToggle("laser", cfg.Laser, logger)
-		if err != nil {
-			logger.Fatalf("init laser: %v", err)
-		}
-		defer laser.Close()
-	}
+	defer hardwareControllers.Close()
 
 	autoCharge := roverd.NewAutoChargeController(adapter, eventStream, logger)
 	go autoCharge.Run(ctx, sensorSamples)
 
-	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, headlight, laser, logger, console)
+	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, hardwareControllers.CameraServo, hardwareControllers.Headlight, hardwareControllers.Laser, peripherals, logger, console)
 
 	// Startup is announced only after every configured hardware dependency has
 	// initialized successfully. A message here therefore means the control loop
