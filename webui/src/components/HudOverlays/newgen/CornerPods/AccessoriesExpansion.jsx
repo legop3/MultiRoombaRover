@@ -24,10 +24,12 @@ export default function AccessoriesExpansion({ roverId }) {
         className="pointer-events-auto !h-28"
       />
       {open ? (
-        <div className="pointer-events-auto h-[70%] min-h-48 max-h-[32rem] w-64 overflow-hidden rounded-r-xl bg-black/60 p-0.5">
+        <div className="pointer-events-auto w-64 overflow-hidden rounded-r-xl bg-black/60 p-0.5">
           {/* This is exactly the renderer mounted by AuxColumn. The desktop
-              wrapper changes available dimensions, never control behavior. */}
-          <RoverAccessoryControls roverId={roverId} className="h-full" />
+              wrapper changes available dimensions, never control behavior.
+              Content determines the normal panel height; max-height becomes a
+              scrolling boundary only for genuinely long accessory lists. */}
+          <RoverAccessoryControls roverId={roverId} className="max-h-[70vh]" />
         </div>
       ) : null}
     </div>
