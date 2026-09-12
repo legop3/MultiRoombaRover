@@ -97,3 +97,41 @@ test('clearing one reason retains help while another reason remains', () => {
   assert.equal(harness.changes.at(-1).needsHelp, true);
   assert.deepEqual(harness.changes.at(-1).reasons, ['cliff']);
 });
+
+test('docked sensor conditions never accumulate help time', () => {
+  const harness = createHarness();
+  const dockedFaults = {
+    chargingSources: { homeBase: true },
+    bumpsAndWheelDrops: { wheelDropLeft: true },
+    cliffLeft: true,
+  };
+  harness.monitor.handleSensor('purple', dockedFaults);
+  harness.advance(WHEEL_DROP_HELP_MS + CLIFF_HELP_MS);
+  harness.monitor.handleSensor('purple', dockedFaults);
+  assert.equal(harness.changes.length, 0);
+
+  // Leaving the dock begins fresh timers instead of inheriting the long period
+  // during which those same physical bits were harmlessly held at home base.
+  harness.monitor.handleSensor('purple', {
+    chargingSources: {},
+    bumpsAndWheelDrops: { wheelDropLeft: true },
+    cliffLeft: true,
+  });
+  assert.equal(harness.changes.length, 0);
+});
+
+test('docking clears every active help reason', () => {
+  const harness = createHarness();
+  const faults = { bumpsAndWheelDrops: { wheelDropRight: true }, cliffRight: true };
+  harness.monitor.handleSensor('silver', faults);
+  harness.advance(WHEEL_DROP_HELP_MS);
+  harness.monitor.handleSensor('silver', faults);
+  assert.equal(harness.changes.at(-1).needsHelp, true);
+
+  harness.monitor.handleSensor('silver', {
+    ...faults,
+    chargingSources: { homeBase: true },
+  });
+  assert.equal(harness.changes.at(-1).needsHelp, false);
+  assert.deepEqual(harness.changes.at(-1).reasons, []);
+});

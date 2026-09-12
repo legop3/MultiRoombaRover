@@ -62,6 +62,25 @@ function createRoverHelpMonitor({ now = () => Date.now(), onChange = () => {} } 
     if (!roverId || !sensors) return;
     const state = ensureState(roverId);
     const timestamp = now();
+    const docked = Boolean(sensors?.chargingSources?.homeBase);
+
+    if (docked) {
+      // A 600-series Roomba can legitimately rest on the dock with wheel-drop
+      // or cliff bits held by its physical position and the nearby surface.
+      // Home-base contact is therefore a stronger signal than every monitored
+      // fault here: reset all persistence history and do not let time spent
+      // docked contribute toward a later HELP after it leaves the base.
+      state.wheelDropSince = null;
+      state.cliffPattern = 0;
+      state.cliffPatternSince = null;
+      state.dockGuardSince = null;
+      state.dockGuardSawPassive = false;
+      updateReason(roverId, state, 'wheelDrop', false);
+      updateReason(roverId, state, 'cliff', false);
+      updateReason(roverId, state, 'docking', false);
+      return;
+    }
+
     const wheelDrop = Boolean(
       sensors?.bumpsAndWheelDrops?.wheelDropLeft || sensors?.bumpsAndWheelDrops?.wheelDropRight,
     );
@@ -97,10 +116,9 @@ function createRoverHelpMonitor({ now = () => Date.now(), onChange = () => {} } 
     );
 
     if (state.dockGuardSince != null) {
-      const docked = Boolean(sensors?.chargingSources?.homeBase);
       const oiMode = sensors?.oiMode?.label || null;
       if (oiMode === 'passive') state.dockGuardSawPassive = true;
-      if (docked || (state.dockGuardSawPassive && oiMode && oiMode !== 'passive')) {
+      if (state.dockGuardSawPassive && oiMode && oiMode !== 'passive') {
         // Dock guard itself stops as soon as the 600-series wheels begin their
         // autonomous seek motion. Continue timing that seek after the guard
         // interval ends, and clear only on docking or a confirmed exit from the
