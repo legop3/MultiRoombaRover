@@ -4,6 +4,9 @@
 const HELP_HORN_FREQUENCY_HZ = 2000;
 const HELP_HORN_DURATION_MS = 250;
 const HELP_HORN_INTERVAL_MS = 5 * 1000;
+const HELP_ROOMBA_NOTE = 95;
+const HELP_ROOMBA_NOTE_DURATION = 16;
+const HELP_ROOMBA_SONG_SLOT = 4;
 
 function createHelpHornNotifier({
   getRover,
@@ -23,6 +26,10 @@ function createHelpHornNotifier({
     if (stopTimer != null) clearTimeoutFn(stopTimer);
     stopTimers.delete(id);
 
+    // The Roomba song is self-terminating. With no pending external-horn stop,
+    // there is no persistent sound owned by this notifier that needs cleanup.
+    if (stopTimer == null) return;
+
     // Always send a final stop during cleanup. This ensures HELP clearing in
     // the middle of a 250 ms chirp silences it immediately instead of waiting
     // for a timeout that was just cancelled.
@@ -38,48 +45,71 @@ function createHelpHornNotifier({
   function chirp(roverId) {
     const id = String(roverId);
     const record = getRover?.(id);
-    if (!record?.ws || !record?.meta?.horn?.enabled) return false;
+    if (!record?.ws) return false;
 
-    try {
-      issueCommand(id, {
-        type: 'horn',
-        horn: {
-          action: 'start',
-          waveform: 'saw',
-          freqs: [HELP_HORN_FREQUENCY_HZ],
-        },
-      });
-    } catch (err) {
-      logger?.warn?.('Failed to start rover help horn', { roverId: id, error: err.message });
-      return false;
+    let sounded = false;
+    let externalHornStarted = false;
+    if (record.meta?.horn?.enabled) {
+      try {
+        issueCommand(id, {
+          type: 'horn',
+          horn: {
+            action: 'start',
+            waveform: 'saw',
+            freqs: [HELP_HORN_FREQUENCY_HZ],
+          },
+        });
+        sounded = true;
+        externalHornStarted = true;
+      } catch (err) {
+        logger?.warn?.('Failed to start rover help horn', { roverId: id, error: err.message });
+      }
     }
 
-    // There can be only one pending automatic stop for a rover. Replacing an
-    // unexpected stale timer keeps the pulse duration bounded even if chirp is
-    // called manually in addition to its normal five-second interval.
-    const previousStop = stopTimers.get(id);
-    if (previousStop != null) clearTimeoutFn(previousStop);
-    stopTimers.set(
-      id,
-      setTimeoutFn(() => {
-        stopTimers.delete(id);
-        const current = getRover?.(id);
-        if (!current?.ws) return;
-        try {
-          issueCommand(id, { type: 'horn', horn: { action: 'stop' } });
-        } catch (err) {
-          logger?.warn?.('Failed to finish rover help chirp', { roverId: id, error: err.message });
-        }
-      }, HELP_HORN_DURATION_MS),
-    );
-    return true;
+    try {
+      // Roomba 600-series songs use MIDI notes and 1/64-second durations.
+      // Note 95 is approximately 1975.5 Hz, the closest supported pitch to the
+      // external 2000 Hz horn, and duration 16 matches its 250 ms pulse.
+      issueCommand(id, {
+        type: 'song',
+        song: {
+          slot: HELP_ROOMBA_SONG_SLOT,
+          notes: [{ note: HELP_ROOMBA_NOTE, duration: HELP_ROOMBA_NOTE_DURATION }],
+        },
+      });
+      sounded = true;
+    } catch (err) {
+      logger?.warn?.('Failed to play rover help song', { roverId: id, error: err.message });
+    }
+
+    if (externalHornStarted) {
+      // There can be only one pending automatic stop for a rover. Replacing an
+      // unexpected stale timer keeps the external pulse duration bounded; the
+      // independently issued Roomba song always ends itself.
+      const previousStop = stopTimers.get(id);
+      if (previousStop != null) clearTimeoutFn(previousStop);
+      stopTimers.set(
+        id,
+        setTimeoutFn(() => {
+          stopTimers.delete(id);
+          const current = getRover?.(id);
+          if (!current?.ws) return;
+          try {
+            issueCommand(id, { type: 'horn', horn: { action: 'stop' } });
+          } catch (err) {
+            logger?.warn?.('Failed to finish rover help chirp', { roverId: id, error: err.message });
+          }
+        }, HELP_HORN_DURATION_MS),
+      );
+    }
+    return sounded;
   }
 
   function start(roverId) {
     const id = String(roverId);
     if (intervals.has(id)) return;
     const record = getRover?.(id);
-    if (!record?.ws || !record?.meta?.horn?.enabled) return;
+    if (!record?.ws) return;
 
     // Sound immediately so a newly detected rover can be located without
     // waiting through the first five-second interval.
@@ -106,5 +136,8 @@ module.exports = {
   HELP_HORN_DURATION_MS,
   HELP_HORN_FREQUENCY_HZ,
   HELP_HORN_INTERVAL_MS,
+  HELP_ROOMBA_NOTE,
+  HELP_ROOMBA_NOTE_DURATION,
+  HELP_ROOMBA_SONG_SLOT,
   createHelpHornNotifier,
 };
