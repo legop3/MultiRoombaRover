@@ -4,7 +4,7 @@
 const HELP_HORN_FREQUENCY_HZ = 2000;
 const HELP_HORN_DURATION_MS = 250;
 const HELP_HORN_INTERVAL_MS = 5 * 1000;
-const HELP_ROOMBA_NOTE = 95;
+const HELP_ROOMBA_NOTE = 83;
 const HELP_ROOMBA_NOTE_DURATION = 16;
 
 function createHelpHornNotifier({
@@ -67,8 +67,8 @@ function createHelpHornNotifier({
 
     try {
       // Roomba 600-series songs use MIDI notes and 1/64-second durations.
-      // Note 95 is approximately 1975.5 Hz, the closest supported pitch to the
-      // external 2000 Hz horn, and duration 16 matches its 250 ms pulse.
+      // Note 83 is approximately 987.8 Hz: one octave below the closest MIDI
+      // pitch to the external 2000 Hz horn. Duration 16 matches its 250 ms pulse.
       issueCommand(id, {
         type: 'song',
         song: {
