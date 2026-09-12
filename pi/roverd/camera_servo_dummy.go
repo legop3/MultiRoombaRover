@@ -30,3 +30,11 @@ func (c *CameraServo) SetPulseWidth(micros int) error {
 func (c *CameraServo) CurrentAngle() float64 {
 	return 0
 }
+
+func (c *CameraServo) Configuration() CameraServoConfig {
+	return CameraServoConfig{}
+}
+
+func (c *CameraServo) BackendDescription() string {
+	return "native GPIO"
+}

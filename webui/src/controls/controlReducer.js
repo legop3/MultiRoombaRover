@@ -69,6 +69,10 @@ export const initialControlState = {
   macros: DEFAULT_MACROS,
   keymap: DEFAULT_KEYMAP,
   inputs: {},
+  // Generic accessory controls do not currently report state back from roverd.
+  // Keep the last browser-issued value per rover/device/control so closing a
+  // drawer or changing responsive layouts does not make the UI lie about it.
+  peripheralValues: {},
 };
 
 export function controlReducer(state, action) {
@@ -226,6 +230,27 @@ export function controlReducer(state, action) {
           active: Boolean(action.payload),
         },
       };
+    case 'control/set-peripheral-value': {
+      const roverId = String(action.payload?.roverId || '');
+      const peripheralId = String(action.payload?.peripheralId || '');
+      const controlId = String(action.payload?.controlId || '');
+      if (!roverId || !peripheralId || !controlId) return state;
+      const roverValues = state.peripheralValues?.[roverId] || {};
+      const peripheralValues = roverValues[peripheralId] || {};
+      return {
+        ...state,
+        peripheralValues: {
+          ...(state.peripheralValues || {}),
+          [roverId]: {
+            ...roverValues,
+            [peripheralId]: {
+              ...peripheralValues,
+              [controlId]: action.payload.value,
+            },
+          },
+        },
+      };
+    }
     default:
       return state;
   }

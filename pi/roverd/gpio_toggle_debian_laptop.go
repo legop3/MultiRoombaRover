@@ -13,10 +13,10 @@ type GPIOToggle struct {
 
 func NewGPIOToggle(name string, _ GPIOToggleConfig, _ *log.Logger) (*GPIOToggle, error) {
 	/*
-		A Debian laptop has no Raspberry Pi GPIO character-device contract for
-		headlights or lasers. Returning an error when enabled makes bad laptop
-		configs fail during startup instead of advertising controls that cannot
-		change any hardware.
+		A Debian laptop has no native Raspberry Pi GPIO contract. Returning an
+		error here catches an invalid native configuration; the shared resolver
+		selects an ESP32 Firmata toggle before this constructor when native GPIO
+		is disabled.
 	*/
 	return nil, fmt.Errorf("%s not supported in the debian-laptop build", name)
 }
@@ -29,4 +29,12 @@ func (g *GPIOToggle) HandleAction(action string) error {
 
 func (g *GPIOToggle) On() bool {
 	return false
+}
+
+func (g *GPIOToggle) Configuration() GPIOToggleConfig {
+	return GPIOToggleConfig{}
+}
+
+func (g *GPIOToggle) BackendDescription() string {
+	return "native GPIO"
 }

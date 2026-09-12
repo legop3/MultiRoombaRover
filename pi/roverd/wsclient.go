@@ -19,10 +19,11 @@ type WSClient struct {
 	sensorFrames <-chan []byte
 	events       chan RoverEvent
 	media        *MediaSupervisor
-	servo        *CameraServo
+	servo        CameraServoController
 	horn         *HornSynth
-	headlight    *GPIOToggle
-	laser        *GPIOToggle
+	headlight    ToggleController
+	laser        ToggleController
+	peripherals  *PeripheralManager
 	log          *log.Logger
 	console      *ConsoleNotifier
 	recoverMu    sync.Mutex
@@ -45,7 +46,7 @@ type WSClient struct {
 	audioMu      sync.RWMutex
 }
 
-func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo *CameraServo, headlight *GPIOToggle, laser *GPIOToggle, logger *log.Logger, console *ConsoleNotifier) *WSClient {
+func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo CameraServoController, headlight ToggleController, laser ToggleController, peripherals *PeripheralManager, logger *log.Logger, console *ConsoleNotifier) *WSClient {
 	var ttsQueue chan *ttsPayload
 	if cfg.Audio.TTSEnabled {
 		ttsQueue = make(chan *ttsPayload, 2)
@@ -68,6 +69,7 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		horn:         horn,
 		headlight:    headlight,
 		laser:        laser,
+		peripherals:  peripherals,
 		log:          logger,
 		console:      console,
 		ttsQueue:     ttsQueue,
@@ -129,6 +131,20 @@ func (c *WSClient) Run(ctx context.Context) error {
 }
 
 func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
+	// Built-in metadata comes from the selected controller, not necessarily
+	// YAML. An ESP32 can enable a role whose native GPIO entry is disabled.
+	cameraServoConfig := CameraServoConfig{}
+	if c.servo != nil {
+		cameraServoConfig = c.servo.Configuration()
+	}
+	headlightConfig := GPIOToggleConfig{}
+	if c.headlight != nil {
+		headlightConfig = c.headlight.Configuration()
+	}
+	laserConfig := GPIOToggleConfig{}
+	if c.laser != nil {
+		laserConfig = c.laser.Configuration()
+	}
 	msg := helloMessage{
 		Type:          "hello",
 		Name:          c.cfg.Name,
@@ -137,11 +153,12 @@ func (c *WSClient) sendHello(ctx context.Context, conn *websocket.Conn) error {
 		Battery:       c.cfg.Battery,
 		MaxWheelSpeed: c.cfg.MaxWheelMMs,
 		Media:         c.cfg.Media,
-		CameraServo:   c.cfg.CameraServo,
+		CameraServo:   cameraServoConfig,
 		Audio:         c.cfg.Audio,
 		Horn:          c.cfg.Horn,
-		Headlight:     c.cfg.Headlight,
-		Laser:         c.cfg.Laser,
+		Headlight:     headlightConfig,
+		Laser:         laserConfig,
+		Peripherals:   c.peripherals.Inventory(),
 		Private:       c.cfg.Private,
 	}
 	c.log.Printf("sending hello (camera servo enabled=%v pin=%d)", msg.CameraServo.Enabled, msg.CameraServo.Pin)
@@ -238,6 +255,8 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		return c.handleToggleCommand("headlight", c.headlight, msg.Headlight)
 	case msg.Laser != nil:
 		return c.handleToggleCommand("laser", c.laser, msg.Laser)
+	case msg.Peripheral != nil:
+		return c.peripherals.SetControl(msg.Peripheral.ID, msg.Peripheral.Control, msg.Peripheral.Value)
 	case msg.Song != nil:
 		slot := 0
 		if msg.Song.Slot != nil {
@@ -253,7 +272,7 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	}
 }
 
-func (c *WSClient) handleToggleCommand(name string, toggle *GPIOToggle, payload *togglePayload) error {
+func (c *WSClient) handleToggleCommand(name string, toggle ToggleController, payload *togglePayload) error {
 	if toggle == nil {
 		return fmt.Errorf("%s disabled", name)
 	}

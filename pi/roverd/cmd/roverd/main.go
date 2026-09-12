@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -37,6 +38,19 @@ func main() {
 	}
 	defer serialPort.Close()
 
+	// Peripheral discovery is intentionally a boot-time operation. The manager
+	// keeps successful USB ports open across server WebSocket reconnects and is
+	// rebuilt only when the roverd process itself restarts.
+	peripherals, err := roverd.DiscoverPeripheralManager(ctx, cfg.Serial.Device, logger)
+	if err != nil {
+		console.Notify(fmt.Sprintf("Rover peripheral startup failed: %v", err))
+		logger.Fatalf("discover rover peripherals: %v", err)
+	}
+	defer peripherals.Close()
+	for _, message := range peripherals.StartupBroadcasts() {
+		console.Notify(message)
+	}
+
 	var pulser *roverd.BRCPulser
 	if cfg.BRC.Enabled() {
 		pulser, err = roverd.NewBRCPulser(cfg.BRC, logger)
@@ -61,37 +75,41 @@ func main() {
 		mediaSupervisor.Start(ctx)
 	}
 
-	var cameraServo *roverd.CameraServo
-	if cfg.CameraServo.Enabled {
-		cameraServo, err = roverd.NewCameraServo(cfg.CameraServo, logger)
-		if err != nil {
-			logger.Fatalf("init camera servo: %v", err)
-		}
-		defer cameraServo.Close()
+	// Backend selection is identical on Pi and laptop hosts: enabled native
+	// GPIO wins, otherwise a discovered ESP32 may provide the built-in role.
+	hardwareControllers, err := roverd.ResolveRoverHardwareControllers(cfg, peripherals, logger)
+	if err != nil {
+		console.Notify(fmt.Sprintf("Rover peripheral startup failed while selecting hardware: %v", err))
+		logger.Fatalf("resolve rover hardware controllers: %v", err)
+	}
+	defer hardwareControllers.Close()
+	for _, message := range hardwareControllers.StartupBroadcasts() {
+		console.Notify(message)
 	}
 
-	var headlight *roverd.GPIOToggle
-	if cfg.Headlight.Enabled {
-		headlight, err = roverd.NewGPIOToggle("headlight", cfg.Headlight, logger)
-		if err != nil {
-			logger.Fatalf("init headlight: %v", err)
+	// A peripheral is never hot-reconnected. Report the first terminal serial
+	// failure for each discovered board and tell the local operator exactly what
+	// recovery action the fixed boot-time lifecycle requires.
+	go func() {
+		for {
+			select {
+			case failure := <-peripherals.Failures():
+				console.Notify(fmt.Sprintf(
+					"Rover peripheral %q (%s) disconnected: %v. Reconnect it and restart roverd.",
+					failure.Name,
+					failure.ID,
+					failure.Err,
+				))
+			case <-ctx.Done():
+				return
+			}
 		}
-		defer headlight.Close()
-	}
-
-	var laser *roverd.GPIOToggle
-	if cfg.Laser.Enabled {
-		laser, err = roverd.NewGPIOToggle("laser", cfg.Laser, logger)
-		if err != nil {
-			logger.Fatalf("init laser: %v", err)
-		}
-		defer laser.Close()
-	}
+	}()
 
 	autoCharge := roverd.NewAutoChargeController(adapter, eventStream, logger)
 	go autoCharge.Run(ctx, sensorSamples)
 
-	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, cameraServo, headlight, laser, logger, console)
+	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, hardwareControllers.CameraServo, hardwareControllers.Headlight, hardwareControllers.Laser, peripherals, logger, console)
 
 	// Startup is announced only after every configured hardware dependency has
 	// initialized successfully. A message here therefore means the control loop

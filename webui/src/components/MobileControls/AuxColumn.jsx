@@ -1,7 +1,7 @@
 // Aux Column
 // Purpose: Assembles the mobile auxiliary controls column, which is the left column by default.
 // Scope: Owns mobile aux/camera/headlight/laser/horn wiring while reusing desktop variation components where intended.
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FaBullhorn, FaCrosshairs, FaLightbulb } from 'react-icons/fa';
 import './mobileControls.css';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
@@ -15,11 +15,14 @@ import { AUX_ZERO } from './constants.js';
 import VacuumControls from './VacuumControls.jsx';
 import VerticalCameraTilt from './VerticalCameraTilt.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
+import RoverAccessoryControls from '../RoverAccessoryControls/index.jsx';
+import AccessoriesToggle from '../RoverAccessoryControls/AccessoriesToggle.jsx';
+import useRoverAccessories from '../RoverAccessoryControls/useRoverAccessories.js';
 
 const CAMERA_TILT_STEP_DEGREES = 0.5;
 const CAMERA_TILT_PRECISION_STEP_DEGREES = 0.1;
 
-function AuxColumnContent() {
+function AuxColumnContent({ accessoriesAvailable, onShowAccessories }) {
   const roverId = useControlSelector((control) => control.state.roverId);
   const roomLightsLockedOn = useSessionSelector((state) => Boolean(state.session?.homeAssistant?.lightPolicy?.lockedOn));
   const camera = useControlSelector((control) => control.state.camera);
@@ -119,11 +122,20 @@ function AuxColumnContent() {
 
   return (
     <div className="mobile-touch-control grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0.5 text-slate-100">
-      <VacuumControls
-        disabled={vacuumDisabled}
-        onPress={handleAuxPress}
-        onRelease={handleAuxRelease}
-      />
+      <div className={`mobile-touch-control grid min-h-0 gap-0.5 ${accessoriesAvailable ? 'grid-cols-[minmax(0,1fr)_2rem]' : 'grid-cols-1'}`}>
+        <VacuumControls
+          disabled={vacuumDisabled}
+          onPress={handleAuxPress}
+          onRelease={handleAuxRelease}
+        />
+        {accessoriesAvailable ? (
+          <AccessoriesToggle
+            label="Accessories"
+            ariaLabel="Show accessory controls"
+            onClick={onShowAccessories}
+          />
+        ) : null}
+      </div>
       <div className="mobile-touch-control flex min-h-0 items-stretch gap-0.5">
         {cameraEnabled ? (
           <VerticalCameraTilt
@@ -180,10 +192,49 @@ function AuxColumnContent() {
   );
 }
 
-export default function AuxColumn({ layout, className = '' }) {
+function RoverAuxColumn({ roverId, layout, className }) {
+  const [showAccessories, setShowAccessories] = useState(false);
+  const { hasAccessories } = useRoverAccessories(roverId);
+
   return (
     <div className={`mobile-touch-control flex flex-col gap-0.5 ${className}`.trim()} data-mobile-layout={layout}>
-      <AuxColumnContent />
+      {showAccessories && hasAccessories ? (
+        <div className="mobile-touch-control h-full min-h-0 overflow-hidden">
+          <RoverAccessoryControls
+            roverId={roverId}
+            className="h-full"
+            headerAction={(
+              <AccessoriesToggle
+                label="Back"
+                ariaLabel="Return to auxiliary controls"
+                compact
+                onClick={() => setShowAccessories(false)}
+              />
+            )}
+          />
+        </div>
+      ) : (
+        <AuxColumnContent
+          accessoriesAvailable={hasAccessories}
+          onShowAccessories={() => setShowAccessories(true)}
+        />
+      )}
     </div>
+  );
+}
+
+export default function AuxColumn({ layout, className = '' }) {
+  const roverId = useControlSelector((control) => control.state.roverId);
+
+  // Keying the stateful view by assignment makes every newly selected rover
+  // start in the familiar Aux view. It also guarantees that an Accessories
+  // view cannot remain open after changing to a rover without accessories.
+  return (
+    <RoverAuxColumn
+      key={roverId || 'no-rover'}
+      roverId={roverId}
+      layout={layout}
+      className={className}
+    />
   );
 }

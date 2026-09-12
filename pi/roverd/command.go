@@ -1,19 +1,22 @@
 package roverd
 
+import "encoding/json"
+
 type helloMessage struct {
-	Type          string            `json:"type"`
-	Name          string            `json:"name"`
-	Description   string            `json:"description,omitempty"`
-	Color         string            `json:"color,omitempty"`
-	Battery       BatteryConfig     `json:"battery"`
-	MaxWheelSpeed int               `json:"maxWheelSpeed"`
-	Media         MediaConfig       `json:"media"`
-	CameraServo   CameraServoConfig `json:"cameraServo"`
-	Audio         AudioConfig       `json:"audio"`
-	Horn          HornConfig        `json:"horn"`
-	Headlight     GPIOToggleConfig  `json:"headlight"`
-	Laser         GPIOToggleConfig  `json:"laser"`
-	Private       PrivateConfig     `json:"private"`
+	Type          string                    `json:"type"`
+	Name          string                    `json:"name"`
+	Description   string                    `json:"description,omitempty"`
+	Color         string                    `json:"color,omitempty"`
+	Battery       BatteryConfig             `json:"battery"`
+	MaxWheelSpeed int                       `json:"maxWheelSpeed"`
+	Media         MediaConfig               `json:"media"`
+	CameraServo   CameraServoConfig         `json:"cameraServo"`
+	Audio         AudioConfig               `json:"audio"`
+	Horn          HornConfig                `json:"horn"`
+	Headlight     GPIOToggleConfig          `json:"headlight"`
+	Laser         GPIOToggleConfig          `json:"laser"`
+	Peripherals   []RoverPeripheralMetadata `json:"peripherals,omitempty"`
+	Private       PrivateConfig             `json:"private"`
 }
 
 type sensorMessage struct {
@@ -45,6 +48,7 @@ type inboundMessage struct {
 	AudioLevels  *audioLevelsPayload  `json:"audioLevels,omitempty"`
 	Headlight    *togglePayload       `json:"headlight,omitempty"`
 	Laser        *togglePayload       `json:"laser,omitempty"`
+	Peripheral   *peripheralPayload   `json:"peripheral,omitempty"`
 	Song         *songPayload         `json:"song,omitempty"`
 	Reboot       *rebootPayload       `json:"reboot,omitempty"`
 	// Update is intentionally just a marker payload. The server can request the
@@ -101,6 +105,12 @@ type audioLevelsPayload struct {
 
 type togglePayload struct {
 	Action string `json:"action"`
+}
+
+type peripheralPayload struct {
+	ID      string          `json:"id"`
+	Control string          `json:"control"`
+	Value   json.RawMessage `json:"value"`
 }
 
 type songPayload struct {
