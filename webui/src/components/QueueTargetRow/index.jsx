@@ -3,6 +3,7 @@
 // Scope: Owns row chrome, queue chips, timer labels, and row/button event plumbing;
 // callers still own target-specific permission checks and request actions.
 import RoverLabel from '../RoverLabel/index.jsx';
+import RoverHelpOverlay from '../RoverHelpOverlay/index.jsx';
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ');
@@ -105,7 +106,7 @@ export default function QueueTargetRow({
   return (
     <li
       className={classNames(
-        'surface flex flex-wrap items-start justify-between gap-0.5',
+        'surface relative flex flex-wrap items-start justify-between gap-0.5 overflow-hidden',
         canClick && 'cursor-pointer',
         locked
           ? 'bg-red-900/40'
@@ -191,6 +192,9 @@ export default function QueueTargetRow({
           {buttonLabel}
         </button>
       ) : null}
+      {/* Queue rows use the exact overlay component as the large video and
+          display surfaces; its measured font automatically adapts to this box. */}
+      <RoverHelpOverlay active={Boolean(target?.needsHelp)} />
     </li>
   );
 }

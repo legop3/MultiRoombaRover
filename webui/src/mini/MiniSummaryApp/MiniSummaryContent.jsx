@@ -11,6 +11,7 @@ import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
 import PtzLiveVideo from '../../components/PtzLiveVideo/index.jsx';
 import RoverMediaPlayer from '../../components/RoverMediaPlayer/index.jsx';
+import RoverHelpOverlay from '../../components/RoverHelpOverlay/index.jsx';
 import FitViewportFrame from './components/FitViewportFrame.jsx';
 import InfoColumn from './components/InfoColumn.jsx';
 import { ROTATE_MS } from './constants.js';
@@ -352,6 +353,7 @@ export default function MiniSummaryContent() {
                       />
                     )}
                   </FitViewportFrame>
+                  <RoverHelpOverlay active={Boolean(rover.needsHelp)} />
                 </div>
               );
             })}

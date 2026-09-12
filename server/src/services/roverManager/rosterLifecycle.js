@@ -46,6 +46,10 @@ function createRosterLifecycle(deps) {
         room: `rover:${id}`,
         lastSeen: Date.now(),
         lastMovementAt: Date.now(),
+        // Help state belongs to the live rover record so every roster consumer
+        // sees one server-authoritative answer. The monitoring service owns why
+        // the flag changes; roverManager only owns publishing the roster field.
+        needsHelp: false,
         private: { enabled: false },
         privateOpen: true,
         privateSafety: { ...DEFAULT_PRIVATE_SAFETY },
@@ -252,6 +256,7 @@ function createRosterLifecycle(deps) {
         : record.meta?.laser,
       locked: record.locked || (isPrivateRecord(record) && !isPrivateOpen(record)),
       lockReason: record.lockReason || (isPrivateRecord(record) && !isPrivateOpen(record) ? 'private' : null),
+      needsHelp: Boolean(record.needsHelp),
       lastSeen: record.lastSeen,
       private: isPrivateRecord(record)
         ? { enabled: true, open: isPrivateOpen(record), safety: getPrivateSafety(record) }
@@ -297,6 +302,21 @@ function createRosterLifecycle(deps) {
     };
     broadcastRoster();
     managerEvents.emit('rover', { roverId, action: device, record });
+  }
+
+  function setNeedsHelp(roverId, needsHelp) {
+    const record = rovers.get(String(roverId));
+    if (!record) return false;
+    const next = Boolean(needsHelp);
+    if (record.needsHelp === next) return false;
+
+    // Emit both roster fanout forms used by the application. The lightweight
+    // `rovers` event updates direct roster listeners immediately, while the
+    // manager event asks sessionService to rebuild complete session snapshots.
+    record.needsHelp = next;
+    broadcastRoster();
+    managerEvents.emit('help', { roverId: record.id, needsHelp: next });
+    return true;
   }
 
   function handleHostStats(roverId, msg = {}) {
@@ -345,6 +365,7 @@ function createRosterLifecycle(deps) {
     getRosterForSocket,
     syncSpectatorRooms,
     broadcastRoster,
+    setNeedsHelp,
     setToggleState,
     handleHostStats,
     canSeeRover,

@@ -97,6 +97,12 @@ roverManager.managerEvents.on('private', ({ roverId, open }) => {
   }
 });
 
+roverManager.managerEvents.on('help', ({ needsHelp }) => {
+  // Entering HELP affects only future automatic placement. When HELP clears,
+  // retry people who were waiting because every healthy rover was unavailable.
+  if (!needsHelp) reassignWaiting();
+});
+
 roverManager.managerEvents.on('rover', ({ roverId, action }) => {
   if (action === 'removed') {
     /*
@@ -238,7 +244,10 @@ function pickRover(socket, options = {}) {
     return null;
   }
   const allCandidates = Array.from(roverManager.rovers.values()).filter((rover) => {
-    if (!rover || rover.locked) return false;
+    // HELP removes a rover only from automatic placement. Existing drivers are
+    // not displaced, and explicit requestControl calls retain their normal
+    // access policy so a person can deliberately take control to rescue it.
+    if (!rover || rover.locked || rover.needsHelp) return false;
     const access = roverManager.canRequestControl(rover.id, socket, { allowUser: true });
     if (!access.ok) return false;
     return true;

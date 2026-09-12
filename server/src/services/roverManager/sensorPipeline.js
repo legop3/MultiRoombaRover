@@ -329,6 +329,7 @@ function createSensorPipeline(deps) {
   function stopDockGuard(roverId) {
     const state = dockGuardStates.get(roverId);
     if (!state) return;
+    const wasActive = state.active;
     if (state.timer) clearInterval(state.timer);
     state.active = false;
     state.reason = null;
@@ -336,6 +337,11 @@ function createSensorPipeline(deps) {
     state.timer = null;
     state.idleUndockedSince = null;
     state.passiveUndockedSince = null;
+    // The help monitor must clear its docking timer at the same ownership
+    // boundary that stops dock guard. Inferring this from OI mode would be
+    // incorrect because a 600-series rover can enter passive mode for reasons
+    // other than the server's automatic docking workflow.
+    if (wasActive) managerEvents.emit('dockGuard', { roverId, active: false });
   }
 
   function attemptDockGuard(roverId) {
@@ -360,6 +366,12 @@ function createSensorPipeline(deps) {
     state.active = true;
     state.reason = reason;
     state.startedAt = Date.now();
+    managerEvents.emit('dockGuard', {
+      roverId: record.id,
+      active: true,
+      reason,
+      startedAt: state.startedAt,
+    });
     const reasonText = reason === 'passive' ? 'passive mode' : 'idle and undocked';
     sendAlert({
       color: ALERT_COLOR,
