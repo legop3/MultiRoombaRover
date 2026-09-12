@@ -184,6 +184,11 @@ function createRoverLifecycle(deps) {
     const currentRecord = rovers.get(currentId);
     if (!currentRecord) return { ok: true, currentId };
     if (hasOtherDrivers(currentRecord, socket.id)) return { ok: true, currentId };
+    // HELP means the normal dock-before-leaving requirement has failed to
+    // resolve the rover's situation and a person may need to take a different
+    // rover instead. This exception changes departure only; request eligibility
+    // and automatic assignment ranking remain owned by their existing paths.
+    if (currentRecord.needsHelp) return { ok: true, currentId };
     if (isDockedAndCharging(currentRecord)) return { ok: true, currentId };
     return { ok: false, currentId, message: 'Dock and charge your current rover before switching.' };
   }

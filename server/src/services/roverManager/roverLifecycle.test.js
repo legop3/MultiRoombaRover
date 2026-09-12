@@ -57,3 +57,44 @@ test('removing a rover clears driver sets, reverse membership, rooms, and turns'
     { socketId, roverId, action: 'remove' },
   ]);
 });
+
+test('the last driver may leave an undocked HELP rover but not an ordinary undocked rover', () => {
+  const roverId = 'rover-help';
+  const socketId = 'driver-help';
+  const socket = { id: socketId };
+  const record = {
+    id: roverId,
+    drivers: new Set([socketId]),
+    needsHelp: false,
+    // A present but explicitly non-charging frame exercises the real policy
+    // boundary instead of accidentally passing through missing rover state.
+    lastSensor: {
+      decoded: {
+        chargingSources: { homeBase: false },
+        chargingState: { code: 0 },
+      },
+    },
+  };
+  const lifecycle = createRoverLifecycle({
+    io: { sockets: { sockets: new Map() } },
+    rovers: new Map([[roverId, record]]),
+    socketToRovers: new Map([[socketId, new Set([roverId])]]),
+    managerEvents: new EventEmitter(),
+    turnService: {},
+    isAdmin: () => false,
+    sendAlert: () => {},
+    ALERT_COLOR: '#000000',
+    getMode: () => 'public',
+    getControlDenialReason: () => null,
+  });
+
+  const ordinaryResult = lifecycle.canLeaveCurrentRover(socket);
+  assert.equal(ordinaryResult.ok, false);
+  assert.equal(ordinaryResult.message, 'Dock and charge your current rover before switching.');
+
+  // Mutating only the server-owned HELP flag proves that no docking, driver,
+  // role, or assignment condition is being weakened as part of the exception.
+  record.needsHelp = true;
+  const helpResult = lifecycle.canLeaveCurrentRover(socket);
+  assert.deepEqual(helpResult, { ok: true, currentId: roverId });
+});
