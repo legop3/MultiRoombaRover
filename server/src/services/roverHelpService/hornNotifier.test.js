@@ -8,7 +8,6 @@ const {
   HELP_HORN_INTERVAL_MS,
   HELP_ROOMBA_NOTE,
   HELP_ROOMBA_NOTE_DURATION,
-  HELP_ROOMBA_SONG_SLOT,
   createHelpHornNotifier,
 } = require('./hornNotifier');
 
@@ -55,7 +54,6 @@ test('starts matching external and Roomba chirps and schedules the agreed cadenc
       payload: {
         type: 'song',
         song: {
-          slot: HELP_ROOMBA_SONG_SLOT,
           notes: [{ note: HELP_ROOMBA_NOTE, duration: HELP_ROOMBA_NOTE_DURATION }],
         },
       },
@@ -88,7 +86,6 @@ test('still schedules the Roomba song when the external horn is disabled', () =>
     payload: {
       type: 'song',
       song: {
-        slot: HELP_ROOMBA_SONG_SLOT,
         notes: [{ note: HELP_ROOMBA_NOTE, duration: HELP_ROOMBA_NOTE_DURATION }],
       },
     },

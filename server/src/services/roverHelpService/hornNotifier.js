@@ -6,7 +6,6 @@ const HELP_HORN_DURATION_MS = 250;
 const HELP_HORN_INTERVAL_MS = 5 * 1000;
 const HELP_ROOMBA_NOTE = 95;
 const HELP_ROOMBA_NOTE_DURATION = 16;
-const HELP_ROOMBA_SONG_SLOT = 4;
 
 function createHelpHornNotifier({
   getRover,
@@ -73,7 +72,6 @@ function createHelpHornNotifier({
       issueCommand(id, {
         type: 'song',
         song: {
-          slot: HELP_ROOMBA_SONG_SLOT,
           notes: [{ note: HELP_ROOMBA_NOTE, duration: HELP_ROOMBA_NOTE_DURATION }],
         },
       });
@@ -138,6 +136,5 @@ module.exports = {
   HELP_HORN_INTERVAL_MS,
   HELP_ROOMBA_NOTE,
   HELP_ROOMBA_NOTE_DURATION,
-  HELP_ROOMBA_SONG_SLOT,
   createHelpHornNotifier,
 };
