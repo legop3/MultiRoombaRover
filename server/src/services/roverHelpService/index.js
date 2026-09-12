@@ -5,8 +5,18 @@ const roverManager = require('../roverManager');
 const { sendAlert } = require('../alertService');
 const { publishEvent } = require('../eventBus');
 const { REASON_LABELS, createRoverHelpMonitor } = require('./monitor');
+const { createHelpHornNotifier } = require('./hornNotifier');
 
 const HELP_ALERT_COLOR = '#ef4444';
+
+const hornNotifier = createHelpHornNotifier({
+  getRover: (roverId) => roverManager.rovers.get(String(roverId)),
+  // commandService imports roverManager, so resolving it only when a chirp is
+  // actually issued avoids turning server startup order into a circular module
+  // dependency while retaining the established command transport.
+  issueCommand: (roverId, payload) => require('../commandService').issueCommand(roverId, payload),
+  logger: require('../../globals/logger').child('roverHelpService'),
+});
 
 const monitor = createRoverHelpMonitor({
   onChange({ roverId, needsHelp, addedReason, reasons }) {
@@ -16,6 +26,7 @@ const monitor = createRoverHelpMonitor({
     roverManager.setNeedsHelp(roverId, needsHelp);
 
     if (!wasNeedingHelp && needsHelp) {
+      hornNotifier.start(roverId);
       const reason = REASON_LABELS[addedReason] || 'a sustained rover fault was detected';
       sendAlert({
         color: HELP_ALERT_COLOR,
@@ -30,6 +41,7 @@ const monitor = createRoverHelpMonitor({
         payload: { roverId, roverName: record.meta?.name || roverId, reason, reasons },
       });
     } else if (wasNeedingHelp && !needsHelp) {
+      hornNotifier.stop(roverId);
       publishEvent({
         source: 'roverHelpService',
         type: 'rover.helpCleared',
@@ -50,7 +62,10 @@ roverManager.managerEvents.on('dockGuard', (event) => {
 roverManager.managerEvents.on('rover', ({ roverId, action }) => {
   // A reconnect gets a fresh record and fresh persistence timers; stale sensor
   // history from a disconnected chassis must never immediately restore HELP.
-  if (action === 'removed') monitor.removeRover(roverId);
+  if (action === 'removed') {
+    hornNotifier.stop(roverId);
+    monitor.removeRover(roverId);
+  }
 });
 
-module.exports = { monitor };
+module.exports = { hornNotifier, monitor };
