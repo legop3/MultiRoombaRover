@@ -17,7 +17,7 @@ export default function RoverHelpOverlay({ active = false }) {
         fitHeight
         minSize={8}
         maxSize={1400}
-        className="font-black tracking-tight text-white drop-shadow-[0_0_0.08em_rgba(0,0,0,1)]"
+        className="font-black tracking-tight text-white"
       >
         HELP
       </AutoFitText>
