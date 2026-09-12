@@ -30,7 +30,11 @@ export default function AccessoriesExpansion({ roverId }) {
           className="!h-28"
         />
         {open ? (
-          <RoverAccessoryControls roverId={roverId} className="w-64 max-h-[70vh]" />
+          <RoverAccessoryControls
+            roverId={roverId}
+            plainCenteredHeadings
+            className="w-64 max-h-[70vh]"
+          />
         ) : null}
       </div>
     </div>

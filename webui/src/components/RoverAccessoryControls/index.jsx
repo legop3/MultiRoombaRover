@@ -9,7 +9,12 @@ import useRoverAccessories from './useRoverAccessories.js';
 
 const EMPTY_ACCESSORY_VALUES = Object.freeze({});
 
-export default function RoverAccessoryControls({ roverId, headerAction = null, className = '' }) {
+export default function RoverAccessoryControls({
+  roverId,
+  headerAction = null,
+  plainCenteredHeadings = false,
+  className = '',
+}) {
   const { peripherals } = useRoverAccessories(roverId);
   const canControl = useCanControlRover(roverId);
   const { setPeripheralControl } = useControlActions();
@@ -36,8 +41,16 @@ export default function RoverAccessoryControls({ roverId, headerAction = null, c
                 Every peripheral keeps its heading even when it is the only
                 device, because its firmware-provided name identifies which
                 physical accessory owns the controls below it. */}
-            <div className="flex min-h-8 items-center gap-1 bg-black/60 px-1 text-xs font-semibold text-white">
-              <h3 className="min-w-0 flex-1 truncate">{peripheral.name}</h3>
+            <div
+              className={`flex min-h-8 items-center gap-1 px-1 text-xs font-semibold text-white ${plainCenteredHeadings ? '' : 'bg-black/60'}`.trim()}
+            >
+              {/* Desktop already supplies one continuous HUD background, so
+                  its title needs neither a second tone nor left alignment.
+                  Mobile keeps the ordinary heading because it also carries
+                  the Back action on the opposite side. */}
+              <h3 className={`min-w-0 flex-1 truncate ${plainCenteredHeadings ? 'text-center' : ''}`.trim()}>
+                {peripheral.name}
+              </h3>
               {peripheralIndex === 0 ? headerAction : null}
             </div>
             <div className="flex flex-col gap-0.5">
