@@ -21,6 +21,10 @@ function trimUnicode(value, maximumLength) {
 }
 
 const CARD_CLASS = 'mobile-touch-control rounded-xl border-2 px-2 py-1 text-slate-50';
+// Sliders already contain a label row and a separate track. Giving that
+// two-row control the same vertical padding as a one-row button made it much
+// taller than its neighbors without improving its touch target.
+const SLIDER_CARD_CLASS = 'mobile-touch-control rounded-xl border-2 px-1.5 py-0.5 text-slate-50';
 const DISABLED_CLASS = 'disabled:cursor-not-allowed disabled:opacity-40';
 
 function SliderControl({ peripheralId, control, disabled, send, value: storedValue }) {
@@ -97,7 +101,7 @@ function SliderControl({ peripheralId, control, disabled, send, value: storedVal
   };
 
   return (
-    <div className={`${CARD_CLASS} border-emerald-300/70 bg-emerald-900 ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}>
+    <div className={`${SLIDER_CARD_CLASS} border-emerald-300/70 bg-emerald-900 ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}>
       <div className="flex items-center justify-between gap-1 text-sm font-semibold">
         <span className="min-w-0 truncate">{control.name}</span>
         <span className="shrink-0 font-mono text-emerald-100">{value}</span>
@@ -121,7 +125,7 @@ function SliderControl({ peripheralId, control, disabled, send, value: storedVal
         onKeyDown={handleKeyDown}
         onContextMenu={(event) => event.preventDefault()}
         style={{ touchAction: 'none' }}
-        className="mobile-touch-control mobile-drag-control relative mt-1 h-7 w-full rounded-full border border-emerald-100/80 bg-emerald-950 shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+        className="mobile-touch-control mobile-drag-control relative mt-0.5 h-6 w-full rounded-full border border-emerald-100/80 bg-emerald-950 shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
       >
         {/* An inset track gives the thumb room to remain entirely inside the
             card at both endpoints without browser-specific range styling. */}
@@ -155,7 +159,7 @@ function ToggleControl({ peripheralId, control, disabled, send, value }) {
       aria-pressed={enabled}
       disabled={disabled}
       onClick={toggle}
-      className={`${CARD_CLASS} ${DISABLED_CLASS} flex min-h-12 w-full items-center justify-between gap-1 font-semibold transition active:scale-[0.99] ${enabled ? 'border-emerald-300/70 bg-emerald-800 text-emerald-50' : 'border-amber-300/70 bg-amber-900 text-amber-50'}`}
+      className={`${CARD_CLASS} ${DISABLED_CLASS} flex min-h-12 w-full items-center justify-between gap-1 font-semibold ${enabled ? 'border-emerald-300/70 bg-emerald-800 text-emerald-50' : 'border-amber-300/70 bg-amber-900 text-amber-50'}`}
     >
       <span className="min-w-0 truncate">{control.name}</span>
       <span className="shrink-0 text-xs">{enabled ? 'On' : 'Off'}</span>
@@ -221,7 +225,7 @@ function MomentaryControl({ peripheralId, control, disabled, send, value }) {
         }
       }}
       onContextMenu={(event) => event.preventDefault()}
-      className={`${CARD_CLASS} ${DISABLED_CLASS} flex min-h-12 w-full items-center justify-center text-center font-semibold transition active:scale-[0.99] ${pressed ? 'border-fuchsia-200 bg-fuchsia-600 text-white' : 'border-fuchsia-300/70 bg-fuchsia-900 text-fuchsia-50'}`}
+      className={`${CARD_CLASS} ${DISABLED_CLASS} flex min-h-12 w-full items-center justify-center text-center font-semibold ${pressed ? 'border-fuchsia-200 bg-fuchsia-600 text-white' : 'border-fuchsia-300/70 bg-fuchsia-900 text-fuchsia-50'}`}
     >
       {control.name}
     </button>

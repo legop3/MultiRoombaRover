@@ -29,17 +29,17 @@ export default function RoverAccessoryControls({ roverId, headerAction = null, c
       aria-label="Rover accessories"
     >
       {peripherals.map((peripheral, peripheralIndex) => {
-        const showHeading = peripherals.length > 1 || (peripheralIndex === 0 && headerAction);
         return (
-          <section key={peripheral.id} className="mb-0.5 last:mb-0">
+          <section key={peripheral.id} className="mb-0.5 flex flex-col gap-0.5 last:mb-0">
             {/* The firmware's array order is authoritative. Mapping directly over
-                it keeps physical authoring order intact across every UI host. */}
-            {showHeading ? (
-              <div className="mb-0.5 flex min-h-7 items-center gap-1 bg-black/60 px-1 text-xs font-semibold text-cyan-100">
-                <h3 className="min-w-0 flex-1 truncate">{peripheral.name}</h3>
-                {peripheralIndex === 0 ? headerAction : null}
-              </div>
-            ) : null}
+                it keeps physical authoring order intact across every UI host.
+                Every peripheral keeps its heading even when it is the only
+                device, because its firmware-provided name identifies which
+                physical accessory owns the controls below it. */}
+            <div className="flex min-h-8 items-center gap-1 bg-black/60 px-1 text-xs font-semibold text-white">
+              <h3 className="min-w-0 flex-1 truncate">{peripheral.name}</h3>
+              {peripheralIndex === 0 ? headerAction : null}
+            </div>
             <div className="flex flex-col gap-0.5">
               {peripheral.controls.map((control) => (
                 <AccessoryControlField

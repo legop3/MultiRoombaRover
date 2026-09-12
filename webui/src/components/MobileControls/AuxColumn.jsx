@@ -205,7 +205,7 @@ function RoverAuxColumn({ roverId, layout, className }) {
             className="h-full"
             headerAction={(
               <AccessoriesToggle
-                label="Aux"
+                label="Back"
                 ariaLabel="Return to auxiliary controls"
                 compact
                 onClick={() => setShowAccessories(false)}
