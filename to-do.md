@@ -3,19 +3,12 @@
 research how midis can be played easier with drag and drop, auto selection based on which playback mode would fit, more useful and clear toggles, sample midi files to analyze how they would play on a single tone system, better live playback to see what notes are actually playing from each source and what simply wont play on the speaker
 and make sure each toggle and counter actually has a purpose besides debugging or something more useful to the user, note skipped is just for debugging
 ```
-1. assign rovers based on battery percentage, give people highest one
-2. setting to disable replay popups in spectator settings menu
+1. setting to disable replay popups in spectator settings menu
+2. improve controller support for bignuts700
 3. add admin ui for VIP and private requests instead of only through discord
-4. add flag in roverd for video aspect ratio
-   1. maybe dont? whats the point anyway? why do we exist at all? is there purpose to life?
-      1. just removing the black bars, doesnt do anything practical for the driver page
-      2. would only actually help for keeping spectate page compact
-         1. maybe just make the spectate videos be fixed width and match the height of the media
-   2. either 4:3 or 16:9
-   3. default is 4:3
-   4. all it does is tell the web UI to make the rover video 16:9 or 4:3 shaped
-      1. web UI should default to 4:3 if that rover doesnt yet have that config yet
-5.  fix this:
+4. automated rover needs help system
+5. make roverd self update checkout to main branch
+6.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^
