@@ -5,7 +5,8 @@ import { useVisualTelemetrySelector } from '../../../context/TelemetryContext.js
 import { batteryTelemetryEqual, selectBatteryTelemetry } from '../../../context/telemetryViews.js';
 import BatteryBar from '../../../components/BatteryBar/index.jsx';
 import RoverLabel from '../../../components/RoverLabel/index.jsx';
-import AutoFitText from '../../../mini/MiniSummaryApp/components/AutoFitText.jsx';
+import AutoFitText from '../../../components/AutoFitText/index.jsx';
+import RoverHelpOverlay from '../../../components/RoverHelpOverlay/index.jsx';
 import {
   buildRoverStateText,
   findDriverForRover,
@@ -38,6 +39,7 @@ export default function DisplayRoverCell({ rover, session }) {
         !locked && urgent ? 'ring-4 ring-red-500/90' : !locked && warn ? 'ring-2 ring-amber-300/80' : '',
       )}
     >
+      <RoverHelpOverlay active={Boolean(rover?.needsHelp)} />
       <BatteryBar visual={visual} variant="background" orientation="vertical" />
       <div className="relative z-10 grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-[0.55vh] p-[0.85vw] text-center">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-[0.8vw]">

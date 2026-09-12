@@ -355,6 +355,13 @@ managerEvents.on('privateSafety', ({ roverId }) => {
   syncAll();
 });
 
+managerEvents.on('help', ({ roverId, needsHelp }) => {
+  // HELP is roster state used by several passive UI routes, so every connected
+  // socket must receive the transition rather than only the rover's drivers.
+  logger.info('Rover help state changed', roverId, needsHelp);
+  syncAll();
+});
+
 privateRoverAccessRequestEvents.on('change', (event = {}) => {
   logger.info('Private rover access request state changed', event.reason || 'unknown');
   syncAll();

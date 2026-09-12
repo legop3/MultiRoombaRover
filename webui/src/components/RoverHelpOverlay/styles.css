@@ -1,0 +1,9 @@
+@keyframes rover-help-flash {
+  0%, 49% { opacity: 0.96; }
+  50%, 100% { opacity: 0; }
+}
+
+.rover-help-overlay {
+  container-type: size;
+  animation: rover-help-flash 2s steps(1, end) infinite;
+}

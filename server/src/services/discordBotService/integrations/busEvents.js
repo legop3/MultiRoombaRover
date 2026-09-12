@@ -6,7 +6,7 @@ const { buildBatteryStatusEmbed, buildBatteryCaption } = require('../batteryEmbe
 
 function createBusEventHandler(deps) {
   const { logger, discordConfig, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel } = deps;
-  const ADMIN_ALERT_EVENT_TYPES = new Set(['rover.online', 'rover.offline', 'rover.dockGuard', 'battery.warn', 'battery.urgent', 'battery.docked', 'battery.undocked', 'battery.charging.start', 'battery.charging.stop', 'battery.locked', 'battery.unlocked']);
+  const ADMIN_ALERT_EVENT_TYPES = new Set(['rover.online', 'rover.offline', 'rover.dockGuard', 'rover.helpNeeded', 'rover.helpCleared', 'battery.warn', 'battery.urgent', 'battery.docked', 'battery.undocked', 'battery.charging.start', 'battery.charging.stop', 'battery.locked', 'battery.unlocked']);
   let skippedFirstModeAnnouncement = false;
 
   function buildEmbed({ title, description, color, includeSiteUrl = true }) {
@@ -84,6 +84,23 @@ function createBusEventHandler(deps) {
         break;
       case 'rover.dockGuard':
         announce({ channelId: channels.adminAlerts, color: 0xf0b651, title: 'Dock Guard Triggered', description: `${payload?.roverId} (${payload?.reasonText || 'undocked'}) for ${formatDuration(payload?.idleMs)}.` });
+        break;
+      case 'rover.helpNeeded':
+        announce({
+          channelId: channels.adminAlerts,
+          pingRoleId: roles.adminPing || null,
+          color: 0xef4444,
+          title: 'Rover Needs Help',
+          description: `${payload?.roverName || payload?.roverId || 'Unknown rover'}: ${payload?.reason || 'a sustained rover fault was detected'}.`,
+        });
+        break;
+      case 'rover.helpCleared':
+        announce({
+          channelId: channels.adminAlerts,
+          color: 0x4caf50,
+          title: 'Rover Help Cleared',
+          description: `${payload?.roverName || payload?.roverId || 'Unknown rover'} no longer needs help.`,
+        });
         break;
       case 'battery.warn':
         announce({ channelId: channels.adminAlerts, pingRoleId: roles.adminPing || null, color: 0xf0b651, content: buildBatteryCaption(type, rovers.get(payload?.roverId || 'unknown')), embeds: [buildBatteryStatusEmbed({ color: 0xf0b651, records: Array.from(rovers.values()) })] });

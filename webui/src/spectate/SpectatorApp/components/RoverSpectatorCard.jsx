@@ -10,6 +10,7 @@ export default function RoverSpectatorCard({ rover }) {
         <SpectateVideo
           roverId={rover.id}
           label={rover.name}
+          needsHelp={Boolean(rover.needsHelp)}
         />
       </div>
     </article>

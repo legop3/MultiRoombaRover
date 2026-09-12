@@ -12,6 +12,9 @@ require('./src/services/eventBus');
 require('./src/services/modeManager');
 require('./src/services/lockdownGuard');
 require('./src/services/roverManager');
+// Help monitoring subscribes to roverManager telemetry before assignment and
+// session services begin consuming the resulting roster state.
+require('./src/services/roverHelpService');
 require('./src/services/commandService');
 require('./src/services/roverConnectionService');
 require('./src/services/assignmentService');

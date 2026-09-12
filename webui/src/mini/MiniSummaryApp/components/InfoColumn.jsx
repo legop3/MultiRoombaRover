@@ -4,8 +4,9 @@
 import RoverMediaPlayer from '../../../components/RoverMediaPlayer/index.jsx';
 import BatteryBar from '../../../components/BatteryBar/index.jsx';
 import RoverLabel from '../../../components/RoverLabel/index.jsx';
+import RoverHelpOverlay from '../../../components/RoverHelpOverlay/index.jsx';
+import AutoFitText from '../../../components/AutoFitText/index.jsx';
 import { getBatteryVisual } from '../utils.js';
-import AutoFitText from './AutoFitText.jsx';
 
 export default function InfoColumn({
   rover,
@@ -32,6 +33,10 @@ export default function InfoColumn({
         orientation={isActiveView ? 'vertical' : 'horizontal'}
         variant="background"
       />
+      {/* In the side-by-side roster this column is the rover's complete tile.
+          The active carousel already overlays its video pane, so suppressing a
+          second copy here avoids flashing HELP twice for the same rover. */}
+      <RoverHelpOverlay active={!isActiveView && Boolean(rover?.needsHelp)} />
       {isActiveView ? (
         <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-between text-center">
           <div className="min-w-0 bg-transparent px-0 py-0 leading-none">

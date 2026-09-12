@@ -4,6 +4,7 @@ import RoverDescriptionOverlay from '../HudOverlays/RoverDescriptionOverlay/inde
 import OvercurrentOverlay from '../HudOverlays/OvercurrentOverlay/index.jsx';
 import LowBatteryOverlay from '../HudOverlays/LowBatteryOverlay/index.jsx';
 import VerticalBatteryOverlay from '../HudOverlays/VerticalBatteryOverlay/index.jsx';
+import RoverHelpOverlay from '../RoverHelpOverlay/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 
 export default function SpectateVideo({
@@ -11,6 +12,7 @@ export default function SpectateVideo({
   label,
   fitParent = false,
   layoutFormat = 'desktop',
+  needsHelp = false,
 }) {
   const isExternalSpectatorSnapshotOnly = useSessionSelector((state) =>
     state.session?.role === 'spectator' &&
@@ -46,6 +48,7 @@ export default function SpectateVideo({
         <OvercurrentOverlay roverId={roverId} compact={false} />
         <LowBatteryOverlay roverId={roverId} compact={false} />
         <VerticalBatteryOverlay show roverId={roverId} mobileHud={false} />
+        <RoverHelpOverlay active={needsHelp} />
       </div>
     </div>
   );
