@@ -16,8 +16,8 @@ import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import QueueTargetRow, { QueueUserChips } from '../QueueTargetRow/index.jsx';
 import TurnsOverlay from '../HudOverlays/TurnsOverlay/index.jsx';
 import KeyPill from '../vip/VipAudioUploadCard/KeyPill.jsx';
-import { useControlActions, useControlSelector } from '../../controls/index.js';
-import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import { useControlActions } from '../../controls/index.js';
+import ControlHint from '../ControlHint/index.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
@@ -283,12 +283,7 @@ function PtzMobileControlsPanel({ ptz, disabled = false }) {
   );
 }
 
-function keyLabelFor(keymap, actionId) {
-  return formatKeyLabel(keymap?.[actionId]?.[0]);
-}
-
 function PtzControlReference() {
-  const keymap = useControlSelector((control) => control.state.keymap);
   const rows = [
     ['Tilt up', 'driveForward'],
     ['Tilt down', 'driveBackward'],
@@ -305,7 +300,7 @@ function PtzControlReference() {
       {rows.map(([label, actionId]) => (
         <div key={label} className="surface flex items-center justify-between gap-1">
           <span className="text-slate-400">{label}</span>
-          <KeyPill label={keyLabelFor(keymap, actionId)} />
+          <KeyPill label={<ControlHint actionId={actionId} />} />
         </div>
       ))}
     </CardFrame>

@@ -14,7 +14,7 @@ import { useDriveDockState } from '../../../components/DriveDockAction/driveDock
 import { useControlActions, useControlSelector } from '../../../controls/index.js';
 import RoverQueuesPanel from '../../../components/RoverQueuesPanel/index.jsx';
 import RawUserPilePanel from '../../../components/RawUserPilePanel/index.jsx';
-import { formatKeyLabel } from '../../../controls/keymapUtils.js';
+import ControlHint from '../../../components/ControlHint/index.jsx';
 import GPIOToggleControl from '../../../components/GPIOToggleControl/index.jsx';
 import HornControl from '../../../components/HornControl/index.jsx';
 import CameraTiltControl from '../../../components/CameraTiltControl/index.jsx';
@@ -54,7 +54,6 @@ function TopDownMapPanel() {
 function DriveDockPanel() {
   const roverId = useControlSelector((control) => control.state.roverId);
   const roomLightsLockedOn = useSessionSelector((state) => Boolean(state.session?.homeAssistant?.lightPolicy?.lockedOn));
-  const keymap = useControlSelector((control) => control.state.keymap);
   const camera = useControlSelector((control) => control.state.camera);
   const horn = useControlSelector((control) => control.state.horn);
   const headlight = useControlSelector((control) => control.pipeline?.headlight);
@@ -81,11 +80,11 @@ function DriveDockPanel() {
       : typeof config?.homeAngle === 'number'
         ? config.homeAngle
         : (min + max) / 2;
-  const headlightLabel = formatKeyLabel(keymap?.headlightToggle?.[0]);
-  const laserLabel = formatKeyLabel(keymap?.laserToggle?.[0]);
-  const hornLabel = formatKeyLabel(keymap?.hornHonk?.[0]);
-  const upLabel = formatKeyLabel(keymap?.cameraUp?.[0]);
-  const downLabel = formatKeyLabel(keymap?.cameraDown?.[0]);
+  const headlightLabel = <ControlHint actionId="headlightToggle" />;
+  const laserLabel = <ControlHint actionId="laserToggle" />;
+  const hornLabel = <ControlHint actionId="hornHonk" />;
+  const upLabel = <ControlHint actionId="cameraUp" />;
+  const downLabel = <ControlHint actionId="cameraDown" />;
   const cameraDisabled = Boolean(!roverId || dockAssist.cameraLocked);
   /*
     Precision movement mode also tightens the servo slider step. The command

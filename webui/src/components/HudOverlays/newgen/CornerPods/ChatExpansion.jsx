@@ -4,14 +4,12 @@ import { useCallback, useState } from 'react';
 import { FaComment } from 'react-icons/fa';
 import { useChatActions } from '../../../../context/ChatContext.jsx';
 import { useSessionSelector } from '../../../../context/SessionContext.jsx';
-import { useControlSelector } from '../../../../controls/index.js';
-import { formatKeyLabel } from '../../../../controls/keymapUtils.js';
+import ControlHint from '../../../ControlHint/index.jsx';
 import HudChatInput from '../../HudChatInput/index.jsx';
 import KeyPill from '../../../vip/VipAudioUploadCard/KeyPill.jsx';
 
 export default function ChatExpansion({ podOpen }) {
   const role = useSessionSelector((state) => state.session?.role || null);
-  const chatKeyLabel = useControlSelector((control) => formatKeyLabel(control.state.keymap?.chatFocus?.[0]));
   const { blurChat, focusChat } = useChatActions();
   const [open, setOpen] = useState(false);
 
@@ -50,7 +48,7 @@ export default function ChatExpansion({ podOpen }) {
         <FaComment aria-hidden="true" />
         {/* The pill reflects the live keymap so remapping chat focus updates this
             compact HUD hint without duplicating or hardcoding the default key. */}
-        {chatKeyLabel ? <KeyPill label={chatKeyLabel} /> : null}
+        <KeyPill label={<ControlHint actionId="chatFocus" />} />
       </button>
 
       <HudChatInput variant="newdrive" open={open} onOpenChange={setChatOpen} />

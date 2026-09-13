@@ -6,7 +6,7 @@ import '../MobileControls/mobileControls.css';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
 import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
-import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import ControlHint from '../ControlHint/index.jsx';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import { deriveDriveDockStateFromTelemetry } from './driveDockState.js';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
@@ -90,7 +90,6 @@ export default function DriveDockAction({
 }) {
   const isMobile = layout === 'mobile';
   const roverId = useControlSelector((control) => control.state.roverId);
-  const keymap = useControlSelector((control) => control.state.keymap);
   const actions = useControlActions();
   const dockAssist = useManualDockAssist();
   const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
@@ -104,8 +103,8 @@ export default function DriveDockAction({
   const driveDisabled = !roverId || pending !== null;
   const dockDisabled = !roverId || pending !== null;
 
-  const driveKeyLabel = formatKeyLabel(keymap?.driveMacro?.[0]);
-  const dockKeyLabel = formatKeyLabel(keymap?.dockMacro?.[0]);
+  const driveKeyLabel = <ControlHint actionId="driveMacro" />;
+  const dockKeyLabel = <ControlHint actionId="dockMacro" />;
 
   const dockInstructions = {
     summary: 'Use assist mode to manually line up with the dock.',

@@ -18,7 +18,7 @@ import { useHudMapSetting } from '../../hooks/useHudMapSetting.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { useSocket } from '../../context/SocketContext.jsx';
 import { AUDIO_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
-import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import ControlHint from '../ControlHint/index.jsx';
 import {
   DEFAULT_PAGE_THEME_KEY,
   PAGE_THEME_OPTIONS,
@@ -129,7 +129,6 @@ function reconnectSocketWithTransport(socket, transport) {
 }
 
 export default function SettingsPanel() {
-  const keymap = useControlSelector((control) => control.state.keymap);
   const roverId = useControlSelector((control) => control.state.roverId);
   const { sendOiCommand, setSensorStream } = useControlActions();
   const canControl = Boolean(roverId);
@@ -170,7 +169,7 @@ export default function SettingsPanel() {
     ? Math.max(0, Math.min(1, audioSettings.mainBrushDuckAmount))
     : AUDIO_SETTINGS_DEFAULTS.mainBrushDuckAmount;
   const videoColorFilter = normalizeVideoFilter(videoSettings?.colorFilter);
-  const videoFilterCycleKeyLabel = formatKeyLabel(keymap?.videoFilterCycle?.[0]);
+  const videoFilterCycleKeyLabel = <ControlHint actionId="videoFilterCycle" />;
 
   useEffect(() => {
     // Settings load after the provider mounts and can also be replaced by an incoming inter-instance

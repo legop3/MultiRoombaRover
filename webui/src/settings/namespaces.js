@@ -11,7 +11,9 @@ export const INPUT_SETTINGS_DEFAULTS = {
 };
 
 export const GAMEPAD_PROFILE_DEFAULT = {
+  behaviorVersion: 2,
   label: 'Default',
+  promptStyle: 'auto',
   calibration: {
     driveDeadzone: 0.18,
     cameraDeadzone: 0.08,
@@ -19,9 +21,12 @@ export const GAMEPAD_PROFILE_DEFAULT = {
     driveCurve: 'linear',
     cameraCurve: 'linear',
     auxCurve: 'linear',
-    cameraMode: 'absolute',
+    cameraMode: 'velocity',
     cameraSensitivity: 60,
     auxSideScale: 0.55,
+    baseSpeed: 500,
+    turboSpeed: 500,
+    precisionSpeed: 100,
   },
   bindings: {
     drive: {
@@ -30,24 +35,15 @@ export const GAMEPAD_PROFILE_DEFAULT = {
     },
     cameraTilt: {
       kind: 'axis',
-      sources: [
-        { kind: 'axis', index: 3, invert: true },
-        { kind: 'axis', index: 1, invert: true },
-      ],
+      sources: [{ kind: 'axis', index: 3, invert: true }],
     },
     mainBrush: {
       kind: 'axis',
-      sources: [
-        { kind: 'buttonAxis', index: 6 },
-        { kind: 'axis', index: 2, invert: false },
-      ],
+      sources: [{ kind: 'buttonAxis', index: 6 }],
     },
     sideBrush: {
       kind: 'axis',
-      sources: [
-        { kind: 'buttonAxis', index: 7 },
-        { kind: 'axis', index: 5, invert: false },
-      ],
+      sources: [{ kind: 'buttonAxis', index: 7 }],
     },
     vacuum: {
       kind: 'button',
@@ -81,11 +77,63 @@ export const GAMEPAD_PROFILE_DEFAULT = {
       kind: 'button',
       sources: [],
     },
+    boostModifier: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 10 }],
+    },
+    slowModifier: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 11 }],
+    },
+    hornHonk: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 12 }],
+    },
+    micPtt: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 13 }],
+    },
+    videoFilterCycle: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 14 }],
+    },
+    chatFocus: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 15 }],
+    },
+    songNoteUp: {
+      kind: 'button',
+      sources: [],
+    },
+    songNoteDown: {
+      kind: 'button',
+      sources: [],
+    },
+    homeAssistantOn: {
+      kind: 'button',
+      sources: [],
+    },
+    homeAssistantOff: {
+      kind: 'button',
+      sources: [],
+    },
+    /* These direct digital aux actions mirror the keyboard contract exactly. They start empty
+       because the analog trigger/stick defaults above are friendlier on a controller, but users
+       can bind either style without the shared control system knowing which device produced it. */
+    auxMainForward: { kind: 'button', sources: [] },
+    auxMainReverse: { kind: 'button', sources: [] },
+    auxSideForward: { kind: 'button', sources: [] },
+    auxSideReverse: { kind: 'button', sources: [] },
+    auxVacuumFast: { kind: 'button', sources: [] },
+    auxVacuumSlow: { kind: 'button', sources: [] },
+    auxAllForward: { kind: 'button', sources: [] },
   },
 };
 
 export const GAMEPAD_SETTINGS_DEFAULTS = {
-  activeSignature: null,
+  // Runtime instance selection includes the browser slot so two identical controllers remain
+  // distinguishable, while profiles below stay keyed by reusable hardware signature.
+  activeInstanceKey: null,
   profiles: {},
   defaults: {
     profile: GAMEPAD_PROFILE_DEFAULT,

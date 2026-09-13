@@ -7,9 +7,11 @@
     "dev": "VITE_ROVERD_URL=https://rover.otter.land vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "node --test src/controls/inputs/*.test.js src/components/GamepadMappingSettings/*.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lizardbyte/gamepad-helper": "^2026.816.4539",
     "@thumbmarkjs/thumbmarkjs": "^1.10.0",
     "midi-file": "^1.2.4",
     "papaparse": "^5.5.4",
@@ -36,6 +38,7 @@
     "postcss": "^8.5.6",
     "socket.io-client": "4.8.3",
     "tailwindcss": "^3.4.14",
-    "vite": "^7.2.2"
+    "vite": "^7.2.2",
+    "vitest": "^5.0.0"
   }
 }
