@@ -11,10 +11,13 @@ export const INPUT_SETTINGS_DEFAULTS = {
 };
 
 export const GAMEPAD_PROFILE_DEFAULT = {
-  behaviorVersion: 2,
+  behaviorVersion: 4,
   label: 'Default',
   promptStyle: 'auto',
   calibration: {
+    // Steering mode changes only how controller axes are interpreted. Both modes still emit the
+    // same normalized drive vector consumed by the shared rover control pipeline.
+    driveMode: 'single',
     driveDeadzone: 0.18,
     cameraDeadzone: 0.08,
     auxDeadzone: 0.05,
@@ -33,9 +36,31 @@ export const GAMEPAD_PROFILE_DEFAULT = {
       kind: 'axisPair',
       sources: [{ kind: 'axisPair', x: 0, y: 1, invertX: false, invertY: true }],
     },
+    // Tank steering treats the two vertical stick axes as independent wheel throttles. These
+    // remain separate bindings so controllers with unusual layouts can capture and invert each
+    // track without affecting the conventional single-stick mapping above.
+    tankLeft: {
+      kind: 'axis',
+      sources: [{ kind: 'axis', index: 1, invert: true }],
+    },
+    tankRight: {
+      kind: 'axis',
+      sources: [{ kind: 'axis', index: 3, invert: true }],
+    },
     cameraTilt: {
       kind: 'axis',
       sources: [{ kind: 'axis', index: 3, invert: true }],
+    },
+    // Tank mode consumes both stick Y axes for driving, so its existing camera axis is exposed as
+    // two independently remappable buttons. Runtime combines them into the same signed camera
+    // value used by the analog single-stick binding; no camera-specific command path is added.
+    tankCameraUp: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 12 }],
+    },
+    tankCameraDown: {
+      kind: 'button',
+      sources: [{ kind: 'button', index: 13 }],
     },
     mainBrush: {
       kind: 'axis',
@@ -47,23 +72,23 @@ export const GAMEPAD_PROFILE_DEFAULT = {
     },
     vacuum: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 0 }],
+      sources: [{ kind: 'button', index: 1 }],
     },
     allAux: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 1 }],
+      sources: [{ kind: 'button', index: 0 }],
     },
     mainReverse: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 4 }],
+      sources: [],
     },
     sideReverse: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 5 }],
+      sources: [],
     },
     driveMacro: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 2 }],
+      sources: [{ kind: 'button', index: 9 }],
     },
     dockMacro: {
       kind: 'button',
@@ -71,51 +96,53 @@ export const GAMEPAD_PROFILE_DEFAULT = {
     },
     headlightToggle: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 9 }],
+      sources: [{ kind: 'button', index: 4 }],
     },
     laserToggle: {
       kind: 'button',
-      sources: [],
+      sources: [{ kind: 'button', index: 5 }],
     },
     boostModifier: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 10 }],
+      // Full-stick driving already reaches the rover's 500-unit limit, so a default turbo button
+      // would claim a useful physical control without changing output.
+      sources: [],
     },
     slowModifier: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 11 }],
+      sources: [{ kind: 'button', index: 10 }],
     },
     hornHonk: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 12 }],
+      sources: [{ kind: 'button', index: 2 }],
     },
     micPtt: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 13 }],
+      sources: [],
     },
     videoFilterCycle: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 14 }],
+      sources: [],
     },
     chatFocus: {
       kind: 'button',
-      sources: [{ kind: 'button', index: 15 }],
+      sources: [],
     },
     songNoteUp: {
       kind: 'button',
-      sources: [],
+      sources: [{ kind: 'button', index: 12 }],
     },
     songNoteDown: {
       kind: 'button',
-      sources: [],
+      sources: [{ kind: 'button', index: 13 }],
     },
     homeAssistantOn: {
       kind: 'button',
-      sources: [],
+      sources: [{ kind: 'button', index: 15 }],
     },
     homeAssistantOff: {
       kind: 'button',
-      sources: [],
+      sources: [{ kind: 'button', index: 14 }],
     },
     /* These direct digital aux actions mirror the keyboard contract exactly. They start empty
        because the analog trigger/stick defaults above are friendlier on a controller, but users

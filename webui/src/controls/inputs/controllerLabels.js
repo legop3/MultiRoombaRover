@@ -31,6 +31,13 @@ const DIRECTION_GLYPHS = {
   reverse: '−',
 };
 
+const TANK_DIRECTION_GLYPHS = {
+  driveForward: ['up', 'up'],
+  driveBackward: ['down', 'down'],
+  driveLeft: ['down', 'up'],
+  driveRight: ['up', 'down'],
+};
+
 const COMPACT_BUTTON_NAMES = {
   DUp: 'D↑',
   DDown: 'D↓',
@@ -93,6 +100,12 @@ function compactSourceName(source, type) {
 export function bindingForControllerAction(profile, actionId) {
   const direct = profile?.bindings?.[actionId];
   if (direct?.sources?.length) return { binding: direct, direction: null };
+  if (profile?.calibration?.driveMode === 'tank' && actionId === 'cameraUp') {
+    return { binding: profile?.bindings?.tankCameraUp ?? null, direction: null };
+  }
+  if (profile?.calibration?.driveMode === 'tank' && actionId === 'cameraDown') {
+    return { binding: profile?.bindings?.tankCameraDown ?? null, direction: null };
+  }
   const alias = ACTION_ALIASES[actionId];
   if (!alias) return { binding: direct ?? null, direction: null };
   return {
@@ -102,6 +115,16 @@ export function bindingForControllerAction(profile, actionId) {
 }
 
 export function formatControllerBinding(profile, actionId, controller) {
+  if (profile?.calibration?.driveMode === 'tank' && TANK_DIRECTION_GLYPHS[actionId]) {
+    const leftSource = profile?.bindings?.tankLeft?.sources?.[0];
+    const rightSource = profile?.bindings?.tankRight?.sources?.[0];
+    if (!leftSource || !rightSource) return '—';
+    const type = controllerType(controller, profile?.promptStyle);
+    const [leftDirection, rightDirection] = TANK_DIRECTION_GLYPHS[actionId];
+    /* A tank movement is inherently a two-input gesture. Showing both compact stick directions
+       makes help labels accurate without spelling out controller model names or raw axis numbers. */
+    return `${compactSourceName(leftSource, type)} ${DIRECTION_GLYPHS[leftDirection]} + ${compactSourceName(rightSource, type)} ${DIRECTION_GLYPHS[rightDirection]}`;
+  }
   const { binding, direction } = bindingForControllerAction(profile, actionId);
   const source = binding?.sources?.[0];
   if (!source) return '—';

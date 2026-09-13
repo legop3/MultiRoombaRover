@@ -4,11 +4,9 @@ research how midis can be played easier with drag and drop, auto selection based
 and make sure each toggle and counter actually has a purpose besides debugging or something more useful to the user, note skipped is just for debugging
 ```
 1. setting to disable replay popups in spectator settings menu
-2. improve controller support for bignuts700
-3. add admin ui for VIP and private requests instead of only through discord
-4. automated rover needs help system
-5. make roverd self update checkout to main branch
-6.  fix this:
+2. add admin ui for VIP and private requests instead of only through discord
+3. make roverd self update checkout to main branch
+4.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^

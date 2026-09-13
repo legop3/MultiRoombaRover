@@ -555,11 +555,18 @@ export default function GamepadInputManager() {
         here and continue through their established absolute/velocity mapping.
       */
       const handledAsPtzZoom = latest.setCameraAxisIntent(outputs.cameraAxis);
+      /* Tank mode's camera input is a pair of direction buttons rather than a position-bearing
+         analog axis. Always interpret those buttons as velocity commands; absolute mode would
+         incorrectly jump directly to a servo endpoint on every D-pad press. The saved analog
+         camera preference remains untouched and resumes when single-stick steering is selected. */
+      const cameraCalibration = profile.calibration?.driveMode === 'tank'
+        ? { ...profile.calibration, cameraMode: 'velocity' }
+        : profile.calibration;
       if (
         !handledAsPtzZoom &&
-        (profile.calibration?.cameraMode === 'velocity' || Math.abs(outputs.cameraAxis) > 0.001)
+        (cameraCalibration?.cameraMode === 'velocity' || Math.abs(outputs.cameraAxis) > 0.001)
       ) {
-        handleCameraAxis(outputs.cameraAxis, profile.calibration);
+        handleCameraAxis(outputs.cameraAxis, cameraCalibration);
       }
 
       /* Raw values remain in the dedicated hub used by diagnostics. The shared reducer only

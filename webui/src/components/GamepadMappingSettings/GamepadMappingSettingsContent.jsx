@@ -28,6 +28,24 @@ function SettingsGroupLabel({ children }) {
   return <p className="mx-auto w-full max-w-lg text-sm font-semibold text-white">{children}</p>;
 }
 
+function physicalInputKey(source) {
+  /* Inversion and activation thresholds describe how an input is interpreted, not which physical
+     control it is. Ignoring those fields ensures Axis 3 cannot silently own both a tank track and
+     camera tilt merely because one binding happens to be inverted. */
+  if (source?.kind === 'axis' || source?.kind === 'axisButton') return `axis:${source.index}`;
+  if (source?.kind === 'button' || source?.kind === 'buttonAxis') return `button:${source.index}`;
+  return JSON.stringify(source);
+}
+
+function sourcesUseSamePhysicalInput(left, right) {
+  if (!left || !right) return false;
+  return physicalInputKey(left) === physicalInputKey(right);
+}
+
+function actionDriveMode(actionId) {
+  return ACTIONS.find((action) => action.id === actionId)?.driveMode ?? null;
+}
+
 function CurveField({ label, value, onChange }) {
   return (
     <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
@@ -136,19 +154,15 @@ export default function GamepadMappingSettings() {
   const [actionFilter, setActionFilter] = useState('');
   const baselineRef = useRef(null);
   const captureCandidateRef = useRef(null);
-  const grouped = useMemo(() => {
-    const query = actionFilter.trim().toLowerCase();
-    const visibleActions = query
-      ? ACTIONS.filter((action) => `${action.label} ${action.section}`.toLowerCase().includes(query))
-      : ACTIONS;
-    return groupActions(visibleActions);
-  }, [actionFilter]);
 
   useEffect(() => {
-    /* The Controller tab is a diagnostic surface. Locking for its entire mounted lifetime makes
-       calibration and casual input testing safe, not only the brief moment a binding is captured. */
-    return acquireControllerControlLock('controller-settings');
-  }, []);
+    /* The settings panel remains a live control surface so operators can tune calibration while
+       driving and immediately feel the result. Only capture owns the controller lock: without
+       that narrow guard, pressing the input being assigned could also drive a wheel, start a
+       motor, or toggle rover hardware before the new binding is saved. */
+    if (!captureAction) return undefined;
+    return acquireControllerControlLock('controller-binding-capture');
+  }, [captureAction]);
 
   const activePad = useMemo(
     () => pickActivePad(hubState.pads, gamepadSettings.activeInstanceKey),
@@ -166,6 +180,19 @@ export default function GamepadMappingSettings() {
       );
     return resolveGamepadProfile(storedProfile, GAMEPAD_PROFILE_DEFAULT);
   }, [activeSignature, gamepadSettings?.defaults?.profile, gamepadSettings?.profiles]);
+  const driveMode = activeProfile.calibration?.driveMode === 'tank' ? 'tank' : 'single';
+  const grouped = useMemo(() => {
+    const query = actionFilter.trim().toLowerCase();
+    /* Only the active steering scheme is shown. Keeping inactive track/stick bindings out of the
+       mapping list prevents operators from tuning controls that currently have no runtime effect. */
+    const modeActions = ACTIONS.filter(
+      (action) => !action.driveMode || action.driveMode === driveMode,
+    );
+    const visibleActions = query
+      ? modeActions.filter((action) => `${action.label} ${action.section}`.toLowerCase().includes(query))
+      : modeActions;
+    return groupActions(visibleActions);
+  }, [actionFilter, driveMode]);
 
   useEffect(() => {
     if (!activePad || !activeSignature) return;
@@ -219,12 +246,16 @@ export default function GamepadMappingSettings() {
         current.profiles?.[activeSignature] ?? current?.defaults?.profile,
         GAMEPAD_PROFILE_DEFAULT,
       );
-      const descriptorKey = JSON.stringify(descriptor);
       const bindingsWithoutConflict = Object.fromEntries(
         Object.entries(baseProfile.bindings ?? {}).map(([actionId, binding]) => {
           if (actionId === captureAction.id) return [actionId, binding];
+          const otherMode = actionDriveMode(actionId);
+          const captureMode = actionDriveMode(captureAction.id);
+          /* Opposing mode-only actions may intentionally reuse a physical input because runtime
+             never activates them together. Common actions still conflict with both modes. */
+          if (captureMode && otherMode && captureMode !== otherMode) return [actionId, binding];
           const sources = (binding?.sources ?? []).filter(
-            (source) => JSON.stringify(source) !== descriptorKey,
+            (source) => !sourcesUseSamePhysicalInput(source, descriptor),
           );
           return [actionId, { ...binding, sources }];
         }),
@@ -417,6 +448,11 @@ export default function GamepadMappingSettings() {
     const outputs = diagnostics?.outputs;
     if (!outputs) return false;
     if (actionId === 'drive') return Math.hypot(outputs.driveVector.x, outputs.driveVector.y) > 0.01;
+    if (actionId === 'tankLeft') return Math.abs(outputs.tankTracks?.left ?? 0) > 0.01;
+    if (actionId === 'tankRight') return Math.abs(outputs.tankTracks?.right ?? 0) > 0.01;
+    if (actionId === 'tankCameraUp' || actionId === 'tankCameraDown') {
+      return Boolean(outputs.buttons[actionId]);
+    }
     if (actionId === 'cameraTilt') return Math.abs(outputs.cameraAxis) > 0.01;
     if (actionId === 'mainBrush') return Math.abs(outputs.auxAxis.main) > 0.01;
     if (actionId === 'sideBrush') return Math.abs(outputs.auxAxis.side) > 0.01;
@@ -500,6 +536,25 @@ export default function GamepadMappingSettings() {
             </div>
             <p className="mt-0.5 text-xs leading-snug text-white">Override this only when the browser reports the controller incorrectly.</p>
           </label>
+          <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 text-sm text-white">
+              <span className="min-w-0 font-semibold text-white">Steering mode</span>
+              <select
+                value={driveMode}
+                onChange={(event) => {
+                  updateCalibration({ driveMode: event.target.value });
+                  setCaptureAction(null);
+                }}
+                className="rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
+              >
+                <option value="single">Single stick</option>
+                <option value="tank">Tank sticks</option>
+              </select>
+            </div>
+            <p className="mt-0.5 text-xs leading-snug text-white">
+              Tank mode controls the left and right wheels with separate stick axes.
+            </p>
+          </label>
           <SliderField
             label="Drive deadzone"
             description="Ignore small drive stick drift"
@@ -532,20 +587,27 @@ export default function GamepadMappingSettings() {
             value={activeProfile.calibration?.turboSpeed ?? 500}
             onChange={(value) => updateCalibration({ turboSpeed: value })}
           />
-          <SliderField
-            label="Camera deadzone"
-            description="Ignore small camera tilt drift"
-            min={0}
-            max={0.4}
-            step={0.01}
-            value={activeProfile.calibration?.cameraDeadzone ?? 0.08}
-            onChange={(value) => updateCalibration({ cameraDeadzone: value })}
-          />
-          <CurveField
-            label="Camera response"
-            value={activeProfile.calibration?.cameraCurve ?? 'linear'}
-            onChange={(value) => updateCalibration({ cameraCurve: value })}
-          />
+          {driveMode === 'single' && (
+            <>
+              {/* Analog-only settings are hidden in tank mode because its two D-pad camera
+                  directions are digital velocity inputs. The values remain saved for when the
+                  operator returns to single-stick steering. */}
+              <SliderField
+                label="Velocity camera deadzone"
+                description="Absolute mode always uses a 0.01 deadzone"
+                min={0}
+                max={0.4}
+                step={0.01}
+                value={activeProfile.calibration?.cameraDeadzone ?? 0.08}
+                onChange={(value) => updateCalibration({ cameraDeadzone: value })}
+              />
+              <CurveField
+                label="Camera response"
+                value={activeProfile.calibration?.cameraCurve ?? 'linear'}
+                onChange={(value) => updateCalibration({ cameraCurve: value })}
+              />
+            </>
+          )}
           <SliderField
             label="Aux deadzone"
             description="Ignore small trigger noise"
@@ -578,22 +640,24 @@ export default function GamepadMappingSettings() {
             value={activeProfile.calibration?.precisionSpeed ?? 100}
             onChange={(value) => updateCalibration({ precisionSpeed: value })}
           />
-          <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
-            {/* Camera mode is styled like the sliders so calibration controls read as one group
-                even though this specific setting is a select instead of a range input. */}
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 text-sm text-white">
-              <span className="min-w-0 font-semibold text-white">Camera mode</span>
-              <select
-                value={activeProfile.calibration?.cameraMode ?? 'velocity'}
-                onChange={(event) => updateCalibration({ cameraMode: event.target.value })}
-                className="rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
-              >
-                <option value="absolute">Absolute</option>
-                <option value="velocity">Velocity</option>
-              </select>
-            </div>
-            <p className="mt-0.5 text-xs leading-snug text-white">Absolute maps stick to angle; velocity moves over time.</p>
-          </label>
+          {driveMode === 'single' && (
+            <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+              {/* Camera mode is styled like the sliders so calibration controls read as one group
+                  even though this specific setting is a select instead of a range input. */}
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 text-sm text-white">
+                <span className="min-w-0 font-semibold text-white">Camera mode</span>
+                <select
+                  value={activeProfile.calibration?.cameraMode ?? 'velocity'}
+                  onChange={(event) => updateCalibration({ cameraMode: event.target.value })}
+                  className="rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
+                >
+                  <option value="absolute">Absolute</option>
+                  <option value="velocity">Velocity</option>
+                </select>
+              </div>
+              <p className="mt-0.5 text-xs leading-snug text-white">Absolute maps stick to angle; velocity moves over time.</p>
+            </label>
+          )}
           <SliderField
             label="Camera sensitivity"
             description="Velocity mode degrees per second"
