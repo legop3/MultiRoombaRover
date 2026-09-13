@@ -5,9 +5,10 @@ import { getPadSignature } from './gamepadBindings.js';
 
 const listeners = new Set();
 let rafId = null;
-let lastState = { pads: [], timestamp: 0 };
+let lastState = { pads: [], timestamp: 0, supported: true, error: null };
 let hasDeviceListeners = false;
 let deviceChangeHandler = null;
+let lastReadError = null;
 
 function hasConnectedPads() {
   return readGamepads().some((pad) => pad?.connected !== false);
@@ -15,14 +16,24 @@ function hasConnectedPads() {
 
 function readGamepads() {
   if (typeof navigator === 'undefined' || !navigator.getGamepads) {
+    lastReadError = new Error('This browser does not support the Gamepad API.');
     return [];
   }
-  const pads = navigator.getGamepads();
-  if (!pads) return [];
-  return Array.from(pads).filter(Boolean);
+  try {
+    const pads = navigator.getGamepads();
+    lastReadError = null;
+    if (!pads) return [];
+    return Array.from(pads).filter(Boolean);
+  } catch (error) {
+    /* Permissions Policy can make getGamepads throw instead of returning an empty list. Preserve
+       that distinction so the setup UI can explain why reconnecting hardware will not help. */
+    lastReadError = error instanceof Error ? error : new Error(String(error));
+    return [];
+  }
 }
 
 function buildPadState(pad) {
+  const signature = getPadSignature(pad);
   return {
     index: pad.index,
     id: pad.id,
@@ -34,7 +45,8 @@ function buildPadState(pad) {
       pressed: Boolean(btn?.pressed),
       value: typeof btn?.value === 'number' ? btn.value : btn?.pressed ? 1 : 0,
     })),
-    signature: getPadSignature(pad),
+    signature,
+    instanceKey: `${signature}::slot-${pad.index}`,
   };
 }
 
@@ -43,6 +55,8 @@ function updateState() {
   lastState = {
     pads,
     timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+    supported: typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function',
+    error: lastReadError?.message ?? null,
   };
   listeners.forEach((listener) => listener(lastState));
 }

@@ -2,14 +2,14 @@
 // Purpose: Defines the Help Content View module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
-import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import ControlHint from '../ControlHint/index.jsx';
+import { useControllerRuntime } from '../../controls/inputs/controllerRuntime.js';
 import { getHelpContent } from '../../help/content.js';
 
-function KeyPill({ actionId, keymap }) {
-  const value = keymap?.[actionId]?.[0] ?? '';
+function KeyPill({ actionId }) {
   return (
     <span className="rounded border border-slate-600 bg-slate-900/40 px-1 text-[0.7rem] text-slate-200">
-      {formatKeyLabel(value)}
+      <ControlHint actionId={actionId} />
     </span>
   );
 }
@@ -130,14 +130,20 @@ function KeyboardGroup({ group, keymap }) {
 }
 
 function KeyboardBlock({ block, keymap }) {
+  const runtime = useControllerRuntime();
   if (!block) return null;
+  const usingController = runtime.inputMethod === 'controller';
   return (
     <div className="space-y-0.5">
       {/* Heading and footnote share a row when possible and wrap independently
           when the Help card is mounted in a narrow desktop column. */}
       <div className="flex flex-wrap items-center justify-between gap-0.5 text-xs text-slate-200">
-        <span className="font-semibold">{block.title}</span>
-        {block.footnote && <span className="text-[0.7rem] text-slate-400">{block.footnote}</span>}
+        <span className="font-semibold">{usingController ? 'Controller controls' : block.title}</span>
+        <span className="text-[0.7rem] text-slate-400">
+          {usingController
+            ? 'Per-controller; adjust bindings in Settings → Controller.'
+            : block.footnote}
+        </span>
       </div>
       {/* Two keyboard groups fit comfortably once the Help surface reaches 32rem.
           Using the real content threshold restores the established old-page layout

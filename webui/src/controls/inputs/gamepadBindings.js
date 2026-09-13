@@ -1,6 +1,42 @@
 // Gamepad Bindings
 // Purpose: Defines default gamepad axis/button-to-action mappings and lookup helpers. Scope: Supplies binding metadata for gamepad input manager and settings UI.
 const CURVE_EXPO = 1.6;
+const ABSOLUTE_CAMERA_DEADZONE = 0.01;
+
+/*
+  Binary actions share one resolver so the runtime, settings UI, diagnostics, and adaptive
+  prompts all operate on the same complete action set. Adding an action here is intentionally
+  controller-local and does not add controller concepts to the shared command pipeline.
+*/
+export const GAMEPAD_BUTTON_ACTION_IDS = [
+  'tankCameraUp',
+  'tankCameraDown',
+  'vacuum',
+  'allAux',
+  'mainReverse',
+  'sideReverse',
+  'driveMacro',
+  'dockMacro',
+  'headlightToggle',
+  'laserToggle',
+  'boostModifier',
+  'slowModifier',
+  'hornHonk',
+  'micPtt',
+  'videoFilterCycle',
+  'chatFocus',
+  'songNoteUp',
+  'songNoteDown',
+  'homeAssistantOn',
+  'homeAssistantOff',
+  'auxMainForward',
+  'auxMainReverse',
+  'auxSideForward',
+  'auxSideReverse',
+  'auxVacuumFast',
+  'auxVacuumSlow',
+  'auxAllForward',
+];
 
 export function getPadSignature(pad) {
   if (!pad) return 'unknown::none::0::0';
@@ -24,6 +60,57 @@ export function createProfileForPad(pad, baseProfile) {
     buttons: pad?.buttons?.length ?? 0,
   };
   return profile;
+}
+
+export function resolveGamepadProfile(profile, defaults) {
+  /*
+    Profiles are persisted independently per controller. Merge at the binding and calibration
+    levels so adding a newly supported logical action immediately gives existing controllers a
+    usable default without overwriting any binding the user deliberately customized.
+  */
+  const base = defaults ?? {};
+  const current = profile ?? {};
+  const requiresBehaviorUpgrade = current.behaviorVersion !== base.behaviorVersion;
+  return {
+    ...base,
+    ...current,
+    behaviorVersion: base.behaviorVersion,
+    /* Old detector-specific prompt values are invalid for the replacement library. Returning to
+       automatic detection ensures a previously selected workaround cannot mask the real device. */
+    promptStyle: requiresBehaviorUpgrade ? base.promptStyle : current.promptStyle ?? base.promptStyle,
+    calibration: {
+      ...(base.calibration ?? {}),
+      ...(current.calibration ?? {}),
+      /* Profile upgrades retain personal response tuning except for defaults whose old values
+         caused broken camera behavior or imposed an unintended drive-speed ceiling. */
+      ...(requiresBehaviorUpgrade
+        ? {
+            cameraMode: base.calibration?.cameraMode,
+            baseSpeed: base.calibration?.baseSpeed,
+          }
+        : {}),
+    },
+    bindings: {
+      /* Version four intentionally replaces the old arbitrary default layout as one coherent
+         migration. Bindings are controller-local preferences, and the project does not retain
+         backwards compatibility with obsolete layouts; calibration and hardware metadata remain. */
+      ...(requiresBehaviorUpgrade
+        ? cloneProfile(base.bindings ?? {})
+        : { ...(base.bindings ?? {}), ...(current.bindings ?? {}) }),
+    },
+  };
+}
+
+export function advanceCameraAngle(currentAngle, axisValue, sensitivity, elapsedMs, limits) {
+  /* Velocity camera state must never accumulate beyond the physical servo limits. Otherwise a
+     long hold at an endpoint creates an invisible overshoot that has to unwind before reversing. */
+  const min = Number.isFinite(limits?.min) ? limits.min : -45;
+  const max = Number.isFinite(limits?.max) ? limits.max : 45;
+  const baseline = Number.isFinite(currentAngle) ? currentAngle : (min + max) / 2;
+  const safeElapsedMs = Math.max(0, Math.min(50, Number(elapsedMs) || 0));
+  const degreesPerSecond = Math.max(1, Math.min(180, Number(sensitivity) || 60));
+  const candidate = baseline + axisValue * degreesPerSecond * (safeElapsedMs / 1000);
+  return Math.max(min, Math.min(max, candidate));
 }
 
 function clampUnit(value) {
@@ -104,47 +191,103 @@ function resolveAxisPairSource(padState, sources = []) {
 }
 
 function resolveButtonSource(padState, sources = []) {
+  let firstReadableSource = null;
   for (const source of sources) {
     if (!source) continue;
+    if (source.kind === 'chord') {
+      const inputs = Array.isArray(source.inputs) ? source.inputs : [];
+      if (inputs.length === 0) continue;
+      const pressed = inputs.every((input) => resolveButtonSource(padState, [input]).pressed);
+      if (pressed) return { pressed: true, source };
+      firstReadableSource ??= source;
+      continue;
+    }
     if (source.kind === 'button') {
       const btn = readButton(padState, source.index);
       if (!btn) continue;
-      return { pressed: btn.pressed, source };
+      if (btn.pressed) return { pressed: true, source };
+      firstReadableSource ??= source;
+      continue;
     }
     if (source.kind === 'axisButton') {
       const value = readAxis(padState, source.index);
       if (value === null) continue;
       const direction = source.direction || 1;
       const threshold = typeof source.threshold === 'number' ? source.threshold : 0.6;
-      return { pressed: value * direction > threshold, source };
+      if (value * direction > threshold) return { pressed: true, source };
+      firstReadableSource ??= source;
+      continue;
     }
     if (source.kind === 'buttonAxis') {
       const btn = readButton(padState, source.index);
       if (!btn) continue;
-      return { pressed: btn.value > 0.5, source };
+      if (btn.value > 0.5) return { pressed: true, source };
+      firstReadableSource ??= source;
     }
   }
-  return { pressed: false, source: null };
+  return { pressed: false, source: firstReadableSource };
 }
 
 export function computeGamepadOutputs(padState, profile) {
   const bindings = profile?.bindings ?? {};
   const calibration = profile?.calibration ?? {};
 
-  const driveBinding = bindings.drive ?? {};
-  const driveSource = resolveAxisPairSource(padState, driveBinding.sources);
-  let driveX = clampUnit(driveSource.x);
-  let driveY = clampUnit(driveSource.y);
   const driveDeadzone = Math.min(Math.max(calibration.driveDeadzone ?? 0.18, 0), 0.8);
-  const driveCurved = applyRadialDeadzone(driveX, driveY, driveDeadzone);
-  driveX = applyCurve(driveCurved.x, calibration.driveCurve);
-  driveY = applyCurve(driveCurved.y, calibration.driveCurve);
+  const driveMode = calibration.driveMode === 'tank' ? 'tank' : 'single';
+  let driveX = 0;
+  let driveY = 0;
+  let driveSources;
+  let tankTracks = null;
+
+  if (driveMode === 'tank') {
+    const leftSource = resolveAxisSource(padState, bindings.tankLeft?.sources);
+    const rightSource = resolveAxisSource(padState, bindings.tankRight?.sources);
+    /* Each track gets its own axial deadzone and response curve before mixing. Applying a radial
+       deadzone to two independent throttles would make one track's drift or movement change the
+       activation threshold of the other, which is especially unpleasant during slow pivots. */
+    const leftTrack = applyCurve(
+      applyAxisDeadzone(clampUnit(leftSource.value), driveDeadzone),
+      calibration.driveCurve,
+    );
+    const rightTrack = applyCurve(
+      applyAxisDeadzone(clampUnit(rightSource.value), driveDeadzone),
+      calibration.driveCurve,
+    );
+    /* The shared drive mixer later computes left = forward + turn and right = forward - turn.
+       This inverse transform therefore preserves the requested track values exactly while keeping
+       tank-controller knowledge out of ControlContext and the rover command transport. */
+    driveX = clampUnit((leftTrack - rightTrack) / 2);
+    driveY = clampUnit((leftTrack + rightTrack) / 2);
+    tankTracks = { left: leftTrack, right: rightTrack };
+    driveSources = { tankLeft: leftSource.source, tankRight: rightSource.source };
+  } else {
+    const driveBinding = bindings.drive ?? {};
+    const driveSource = resolveAxisPairSource(padState, driveBinding.sources);
+    const driveCurved = applyRadialDeadzone(
+      clampUnit(driveSource.x),
+      clampUnit(driveSource.y),
+      driveDeadzone,
+    );
+    driveX = applyCurve(driveCurved.x, calibration.driveCurve);
+    driveY = applyCurve(driveCurved.y, calibration.driveCurve);
+    driveSources = { drive: driveSource.source };
+  }
 
   const cameraBinding = bindings.cameraTilt ?? {};
-  const cameraSource = resolveAxisSource(padState, cameraBinding.sources);
-  const cameraDeadzone = Math.min(Math.max(calibration.cameraDeadzone ?? 0.08, 0), 0.8);
+  const cameraSource = driveMode === 'tank'
+    ? { value: 0, source: null }
+    : resolveAxisSource(padState, cameraBinding.sources);
+  /* Absolute mode maps the stick directly across the servo's physical range. Its center needs
+     only a tiny noise guard; applying the velocity deadzone there creates a visibly unresponsive
+     band around the home angle and makes small position corrections feel delayed. */
+  const configuredCameraDeadzone = Math.min(
+    Math.max(calibration.cameraDeadzone ?? 0.08, 0),
+    0.8,
+  );
+  const cameraDeadzone = calibration.cameraMode === 'absolute'
+    ? ABSOLUTE_CAMERA_DEADZONE
+    : configuredCameraDeadzone;
   let cameraAxis = applyAxisDeadzone(clampUnit(cameraSource.value), cameraDeadzone);
-  cameraAxis = applyCurve(cameraAxis, calibration.cameraCurve);
 
   const auxDeadzone = Math.min(Math.max(calibration.auxDeadzone ?? 0.05, 0), 0.6);
   const mainBinding = bindings.mainBrush ?? {};
@@ -157,42 +300,50 @@ export function computeGamepadOutputs(padState, profile) {
   let sideAxis = applyAxisDeadzone(clampUnit(sideSource.value), auxDeadzone);
   sideAxis = applyCurve(sideAxis, calibration.auxCurve);
 
-  const vacuumSource = resolveButtonSource(padState, bindings.vacuum?.sources);
-  const allAuxSource = resolveButtonSource(padState, bindings.allAux?.sources);
-  const mainReverseSource = resolveButtonSource(padState, bindings.mainReverse?.sources);
-  const sideReverseSource = resolveButtonSource(padState, bindings.sideReverse?.sources);
-  const driveMacroSource = resolveButtonSource(padState, bindings.driveMacro?.sources);
-  const dockMacroSource = resolveButtonSource(padState, bindings.dockMacro?.sources);
-  const headlightSource = resolveButtonSource(padState, bindings.headlightToggle?.sources);
-  const laserSource = resolveButtonSource(padState, bindings.laserToggle?.sources);
+  const buttonOutputs = Object.fromEntries(
+    GAMEPAD_BUTTON_ACTION_IDS.map((actionId) => {
+      /* D-pad vertical has two deliberate owners, one per steering mode. Suppressing the inactive
+         owner here lets both recommended layouts coexist in one controller profile without a
+         camera press also playing a song note after switching to tank steering. */
+      const inactiveForMode =
+        (driveMode === 'tank' && (actionId === 'songNoteUp' || actionId === 'songNoteDown')) ||
+        (driveMode === 'single' && (actionId === 'tankCameraUp' || actionId === 'tankCameraDown'));
+      return [
+        actionId,
+        inactiveForMode
+          ? { pressed: false, source: null }
+          : resolveButtonSource(padState, bindings[actionId]?.sources),
+      ];
+    }),
+  );
+
+  if (driveMode === 'tank') {
+    /* Direction buttons form the signed equivalent of the single analog camera axis. Opposing
+       presses cancel to zero, providing an immediate and deterministic stop for velocity mode. */
+    cameraAxis = Number(buttonOutputs.tankCameraUp.pressed) -
+      Number(buttonOutputs.tankCameraDown.pressed);
+  }
+  cameraAxis = applyCurve(cameraAxis, calibration.cameraCurve);
 
   return {
     driveVector: { x: driveX, y: driveY, boost: false },
+    // Track values are diagnostic-only; the runtime continues consuming driveVector exclusively.
+    tankTracks,
     cameraAxis,
     auxAxis: { main: mainAxis, side: sideAxis },
-    buttons: {
-      vacuum: vacuumSource.pressed,
-      allAux: allAuxSource.pressed,
-      mainReverse: mainReverseSource.pressed,
-      sideReverse: sideReverseSource.pressed,
-      driveMacro: driveMacroSource.pressed,
-      dockMacro: dockMacroSource.pressed,
-      headlightToggle: headlightSource.pressed,
-      laserToggle: laserSource.pressed,
-    },
+    buttons: Object.fromEntries(
+      Object.entries(buttonOutputs).map(([actionId, output]) => [actionId, output.pressed]),
+    ),
     sources: {
-      drive: driveSource.source,
-      cameraTilt: cameraSource.source,
+      ...driveSources,
+      cameraTilt: driveMode === 'tank'
+        ? buttonOutputs.tankCameraUp.source ?? buttonOutputs.tankCameraDown.source
+        : cameraSource.source,
       mainBrush: mainSource.source,
       sideBrush: sideSource.source,
-      vacuum: vacuumSource.source,
-      allAux: allAuxSource.source,
-      mainReverse: mainReverseSource.source,
-      sideReverse: sideReverseSource.source,
-      driveMacro: driveMacroSource.source,
-      dockMacro: dockMacroSource.source,
-      headlightToggle: headlightSource.source,
-      laserToggle: laserSource.source,
+      ...Object.fromEntries(
+        Object.entries(buttonOutputs).map(([actionId, output]) => [actionId, output.source]),
+      ),
     },
   };
 }

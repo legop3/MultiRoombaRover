@@ -3,21 +3,38 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useControlActions, useControlSelector } from '../ControlContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
-import { GAMEPAD_SETTINGS_DEFAULTS, GAMEPAD_PROFILE_DEFAULT } from '../../settings/namespaces.js';
 import {
+  GAMEPAD_SETTINGS_DEFAULTS,
+  GAMEPAD_PROFILE_DEFAULT,
+  VIDEO_SETTINGS_DEFAULTS,
+} from '../../settings/namespaces.js';
+import {
+  advanceCameraAngle,
   computeGamepadOutputs,
   createProfileForPad,
   getPadSignature,
+  resolveGamepadProfile,
 } from './gamepadBindings.js';
 import { subscribeGamepadHub } from './gamepadHub.js';
 import { isTextEntryActive } from './inputFocusUtils.js';
 import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
+import {
+  isControllerControlLocked,
+  markControllerDisconnected,
+  markControllerInputActive,
+} from './controllerRuntime.js';
+import { useChatActions, useChatFocus } from '../../context/ChatContext.jsx';
+import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
+import { SONG_DEFAULT_DURATION, SONG_DEFAULT_NOTE, SONG_NOTE_RANGE } from '../constants.js';
 
 const SOURCE = 'gamepad';
 const ZERO_VECTOR = { x: 0, y: 0, boost: false };
 const ZERO_AUX = { main: 0, side: 0, vacuum: 0 };
 const DRIVE_RATE_MS = 100;
 const AUX_RATE_MS = 100;
+const CONTROLLER_ACTIVITY_AXIS_MIN = 0.24;
+const CONTROLLER_ACTIVITY_AXIS_DELTA = 0.08;
+const VIDEO_FILTER_SEQUENCE = ['none', 'grayscale', 'greenscale'];
 
 function areVectorsEqual(a, b) {
   return a && b && a.x === b.x && a.y === b.y && a.boost === b.boost;
@@ -37,13 +54,61 @@ function isAuxIdle(aux) {
   return !aux.main && !aux.side && !aux.vacuum;
 }
 
-function pickActivePad(pads, activeSignature) {
+function pickActivePad(pads, activeInstanceKey) {
   if (!pads || pads.length === 0) return null;
-  if (activeSignature) {
-    const match = pads.find((pad) => pad.signature === activeSignature);
+  if (activeInstanceKey) {
+    const match = pads.find((pad) => pad.instanceKey === activeInstanceKey);
     if (match) return match;
   }
   return pads[0];
+}
+
+function hasMeaningfulControllerChange(pad, previous) {
+  if (!previous) {
+    return pad.buttons.some((button) => button.pressed) ||
+      pad.axes.some((axis) => Math.abs(axis) >= CONTROLLER_ACTIVITY_AXIS_MIN);
+  }
+  const buttonPressed = pad.buttons.some(
+    (button, index) => button.pressed && !previous.buttons?.[index]?.pressed,
+  );
+  if (buttonPressed) return true;
+  return pad.axes.some((axis, index) => {
+    const oldAxis = previous.axes?.[index] ?? 0;
+    return Math.abs(axis) >= CONTROLLER_ACTIVITY_AXIS_MIN &&
+      Math.abs(axis - oldAxis) >= CONTROLLER_ACTIVITY_AXIS_DELTA;
+  });
+}
+
+function isControllerNeutral(pad) {
+  return !pad.buttons.some((button) => button.pressed || button.value > 0.1) &&
+    !pad.axes.some((axis) => Math.abs(axis) > 0.2);
+}
+
+function nextVideoFilter(value) {
+  const index = VIDEO_FILTER_SEQUENCE.indexOf(value);
+  return VIDEO_FILTER_SEQUENCE[(index < 0 ? 0 : index + 1) % VIDEO_FILTER_SEQUENCE.length];
+}
+
+function cycleHomeAssistant(latest, targetState) {
+  const homeAssistant = latest.homeAssistant;
+  if (!homeAssistant?.enabled || !homeAssistant?.connected) return;
+  if (
+    (homeAssistant.lightPolicy?.locked || homeAssistant.lightPolicy?.lockedOn) &&
+    !latest.adminCanControlLockedLights
+  ) {
+    return;
+  }
+  const entities = (homeAssistant.entities ?? []).filter(
+    (entity) =>
+      (entity.type === 'light' || entity.type === 'switch') &&
+      entity.available !== false &&
+      entity.state !== 'unavailable',
+  );
+  const ordered = targetState === 'on' ? entities : [...entities].reverse();
+  const next = ordered.find((entity) =>
+    targetState === 'on' ? entity.state !== 'on' : entity.state === 'on',
+  );
+  if (next) latest.homeAssistantSetState(next.id, targetState).catch(() => {});
 }
 
 export default function GamepadInputManager() {
@@ -57,11 +122,27 @@ export default function GamepadInputManager() {
     toggleHeadlight,
     toggleLaser,
     registerInputState,
+    sendSong,
+    setSongNote,
+    startHorn,
+    stopHorn,
+    setMicPttActive,
   } = useControlActions();
   const cameraAngle = useControlSelector((control) => control.state.camera?.angle);
   const cameraConfig = useControlSelector((control) => control.state.camera?.config);
   const roverId = useControlSelector((control) => control.state.roverId);
   const dockAssist = useManualDockAssist();
+  const { focusChat } = useChatActions();
+  const { isChatFocused } = useChatFocus();
+  const { homeAssistantSetState, pushAlert } = useSessionActions();
+  const homeAssistant = useSessionSelector((state) => state.session?.homeAssistant || null);
+  const role = useSessionSelector((state) => state.session?.role || null);
+  const sessionMode = useSessionSelector((state) => state.session?.mode || null);
+  const songNote = useControlSelector((control) => control.state.song?.note);
+  const { value: videoSettings, save: saveVideoSettings } = useSettingsNamespace(
+    'video',
+    VIDEO_SETTINGS_DEFAULTS,
+  );
   const { value: gamepadSettings, save: saveGamepadSettings } = useSettingsNamespace(
     'gamepad',
     GAMEPAD_SETTINGS_DEFAULTS,
@@ -75,6 +156,12 @@ export default function GamepadInputManager() {
   const lastAuxSentAtRef = useRef(0);
   const lastServoAtRef = useRef(0);
   const lastServoAngleRef = useRef(null);
+  const previousPadRef = useRef(null);
+  const lastConnectedSignatureRef = useRef(null);
+  const lastConnectedInstanceKeyRef = useRef(null);
+  const lastRegisteredSignatureRef = useRef(null);
+  const controllerLockedRef = useRef(false);
+  const waitingForNeutralRef = useRef(false);
   // The hub subscription is intentionally stable, so this ref is the bridge back to the latest
   // React values. Rewriting it after each commit is cheaper than tearing down browser gamepad
   // listeners every time settings, camera state, or control callbacks change.
@@ -91,7 +178,10 @@ export default function GamepadInputManager() {
     latest.saveGamepadSettings((prev) => {
       const current = prev ?? GAMEPAD_SETTINGS_DEFAULTS;
       if (current.profiles?.[signature]) return current;
-      const base = current?.defaults?.profile ?? GAMEPAD_PROFILE_DEFAULT;
+      const base = resolveGamepadProfile(
+        current?.defaults?.profile,
+        GAMEPAD_PROFILE_DEFAULT,
+      );
       const nextProfile = createProfileForPad(padState, base);
       return {
         ...current,
@@ -114,12 +204,19 @@ export default function GamepadInputManager() {
     const config = latest?.cameraConfig;
     if (!latest || !config) return;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const cameraMode = calibration?.cameraMode ?? 'absolute';
-    const sensitivity = Math.max(1, Math.min(180, calibration?.cameraSensitivity ?? 60));
+    const cameraMode = calibration?.cameraMode ?? 'velocity';
+    const sensitivity = calibration?.cameraSensitivity ?? 60;
+    const min = typeof config.minAngle === 'number' ? config.minAngle : -45;
+    const max = typeof config.maxAngle === 'number' ? config.maxAngle : 45;
     if (cameraMode === 'velocity') {
+      if (Math.abs(axisValue) <= 0.001) {
+        /* Neutral is the safe synchronization point: no controller motion is being integrated, so
+           an angle changed by another UI can replace our accumulator without causing jitter. */
+        if (typeof latest.cameraAngle === 'number') lastServoAngleRef.current = latest.cameraAngle;
+        lastServoAtRef.current = now;
+        return;
+      }
       const dt = Math.min(50, now - lastServoAtRef.current || 16);
-      const delta = axisValue * sensitivity * (dt / 1000);
-      if (Math.abs(delta) < 0.01) return;
       const baseline =
         typeof lastServoAngleRef.current === 'number'
           ? lastServoAngleRef.current
@@ -128,14 +225,12 @@ export default function GamepadInputManager() {
           : typeof config.homeAngle === 'number'
           ? config.homeAngle
           : 0;
-      const nextAngle = baseline + delta;
+      const nextAngle = advanceCameraAngle(baseline, axisValue, sensitivity, dt, { min, max });
       latest.setServoAngle(nextAngle);
       lastServoAngleRef.current = nextAngle;
       lastServoAtRef.current = now;
       return;
     }
-    const min = typeof config.minAngle === 'number' ? config.minAngle : -45;
-    const max = typeof config.maxAngle === 'number' ? config.maxAngle : 45;
     const home = typeof config.homeAngle === 'number' ? config.homeAngle : (min + max) / 2;
     const angle =
       axisValue < 0
@@ -153,9 +248,29 @@ export default function GamepadInputManager() {
     latest.setServoAngle(angle);
   }, []);
 
-  const activeSignature = useMemo(
-    () => gamepadSettings?.activeSignature ?? null,
-    [gamepadSettings?.activeSignature],
+  const neutralizeController = useCallback((latest) => {
+    /*
+      Every path that makes controller commands unsafe converges here. In particular, held horn
+      and microphone actions need releases just as much as drive and motor axes need zeroes.
+    */
+    latest.setCameraAxisIntent(0);
+    if (!areVectorsEqual(lastVectorRef.current, ZERO_VECTOR)) {
+      lastVectorRef.current = ZERO_VECTOR;
+      latest.setDriveVector(ZERO_VECTOR, { source: SOURCE });
+    }
+    if (!areAuxEqual(lastAuxRef.current, ZERO_AUX)) {
+      lastAuxRef.current = ZERO_AUX;
+      latest.setAuxMotors(ZERO_AUX);
+    }
+    if (buttonStateRef.current.get('hornHonk')) latest.stopHorn();
+    if (buttonStateRef.current.get('micPtt')) latest.setMicPttActive(false);
+    buttonStateRef.current = new Map();
+    reverseStateRef.current = { main: false, side: false };
+  }, []);
+
+  const activeInstanceKey = useMemo(
+    () => gamepadSettings?.activeInstanceKey ?? null,
+    [gamepadSettings?.activeInstanceKey],
   );
 
   useLayoutEffect(() => {
@@ -163,83 +278,132 @@ export default function GamepadInputManager() {
     // after React commits. Updating this ref before paint keeps the stable hub callback aligned
     // with the newest settings and control actions without resubscribing to the hub.
     latestRef.current = {
-      activeSignature,
+      activeInstanceKey,
+      adminCanControlLockedLights:
+        role === 'lockdown' || (role === 'admin' && sessionMode !== 'lockdown'),
       cameraAngle,
       cameraConfig,
       dockAssist,
+      focusChat,
       gamepadSettings,
+      homeAssistant,
+      homeAssistantSetState,
+      isChatFocused,
+      pushAlert,
       registerInputState,
       roverId,
       runMacro,
       saveGamepadSettings,
+      saveVideoSettings,
+      sendSong,
       setAuxMotors,
       setCameraAxisIntent,
       setDriveVector,
+      setMicPttActive,
       setMode,
+      setSongNote,
       setServoAngle,
+      songNote,
+      startHorn,
+      stopHorn,
       toggleHeadlight,
       toggleLaser,
+      videoColorFilter: videoSettings?.colorFilter ?? VIDEO_SETTINGS_DEFAULTS.colorFilter,
     };
   });
 
   useEffect(() => {
-    return subscribeGamepadHub((hubState) => {
+    const unsubscribe = subscribeGamepadHub((hubState) => {
       const latest = latestRef.current;
       if (!latest) return;
-      const activePad = pickActivePad(hubState.pads, latest.activeSignature);
+      const activePad = pickActivePad(hubState.pads, latest.activeInstanceKey);
       if (!activePad) {
-        // A disconnected controller cannot deliver a final neutral axis sample.
-        // Publish it here so PTZ zoom never depends on the browser doing so.
-        latest.setCameraAxisIntent(0);
-        if (!areVectorsEqual(lastVectorRef.current, ZERO_VECTOR)) {
-          lastVectorRef.current = ZERO_VECTOR;
-          latest.setDriveVector(ZERO_VECTOR, { source: SOURCE });
-        }
-        if (!areAuxEqual(lastAuxRef.current, ZERO_AUX)) {
-          lastAuxRef.current = ZERO_AUX;
-          latest.setAuxMotors(ZERO_AUX);
-        }
-        buttonStateRef.current = new Map();
-        reverseStateRef.current = { main: false, side: false };
+        // A disconnect cannot provide release samples, so synthesize every required release once.
+        neutralizeController(latest);
+        markControllerDisconnected(lastConnectedSignatureRef.current);
+        previousPadRef.current = null;
+        lastConnectedSignatureRef.current = null;
+        lastConnectedInstanceKeyRef.current = null;
+        lastRegisteredSignatureRef.current = null;
+        controllerLockedRef.current = false;
+        waitingForNeutralRef.current = false;
         lastDriveSentAtRef.current = 0;
         lastAuxSentAtRef.current = 0;
         latest.registerInputState(SOURCE, { connected: false });
         return;
       }
 
-      if (isTextEntryActive()) {
-        // Entering text blocks gamepad control immediately, including a held
-        // camera axis that otherwise would keep its last PTZ zoom direction.
-        latest.setCameraAxisIntent(0);
-        if (!areVectorsEqual(lastVectorRef.current, ZERO_VECTOR)) {
-          lastVectorRef.current = ZERO_VECTOR;
-          latest.setDriveVector(ZERO_VECTOR, { source: SOURCE });
+      if (
+        lastConnectedInstanceKeyRef.current &&
+        lastConnectedInstanceKeyRef.current !== activePad.instanceKey
+      ) {
+        /* Browser slots distinguish two identical controllers. Neutralize the old owner before
+           accepting the replacement and require any controls already held on the new pad to be
+           released, preventing a selection change from inheriting drive, horn, or microphone. */
+        neutralizeController(latest);
+        previousPadRef.current = null;
+        lastRegisteredSignatureRef.current = null;
+        waitingForNeutralRef.current = true;
+      }
+
+      if (hasMeaningfulControllerChange(activePad, previousPadRef.current)) {
+        markControllerInputActive(activePad);
+      }
+      previousPadRef.current = activePad;
+      lastConnectedSignatureRef.current = activePad.signature;
+      lastConnectedInstanceKeyRef.current = activePad.instanceKey;
+
+      const controlsBlocked = isTextEntryActive() || isControllerControlLocked();
+      if (controlsBlocked) {
+        /* Configuration and text entry still receive hub snapshots, but they must never leak
+           through to physical rover actions. Only publish/reset on the transition into the lock. */
+        if (!controllerLockedRef.current) {
+          neutralizeController(latest);
+          latest.registerInputState(SOURCE, { connected: true, blocked: true });
         }
-        if (!areAuxEqual(lastAuxRef.current, ZERO_AUX)) {
-          lastAuxRef.current = ZERO_AUX;
-          latest.setAuxMotors(ZERO_AUX);
-        }
-        buttonStateRef.current = new Map();
-        reverseStateRef.current = { main: false, side: false };
-        latest.registerInputState(SOURCE, { connected: true, blocked: true });
+        controllerLockedRef.current = true;
+        waitingForNeutralRef.current = true;
         return;
+      }
+      if (controllerLockedRef.current) {
+        controllerLockedRef.current = false;
+        latest.registerInputState(SOURCE, { connected: true, blocked: false });
+      }
+      /* A control held while a dialog closes must not become a fresh command. Require a neutral
+         sample before rearming the controller, just like releasing an emergency-stop switch. */
+      if (waitingForNeutralRef.current) {
+        if (!isControllerNeutral(activePad)) return;
+        waitingForNeutralRef.current = false;
       }
 
       ensureProfile(activePad);
       const signature = activePad.signature;
-      const profile =
+      const storedProfile =
         latest.gamepadSettings?.profiles?.[signature] ??
         latest.gamepadSettings?.defaults?.profile ??
         GAMEPAD_PROFILE_DEFAULT;
+      const profile = resolveGamepadProfile(storedProfile, GAMEPAD_PROFILE_DEFAULT);
       const outputs = computeGamepadOutputs(activePad, profile);
 
-      if (!areVectorsEqual(outputs.driveVector, lastVectorRef.current)) {
+      const driveVector = {
+        ...outputs.driveVector,
+        boost: Boolean(outputs.buttons.boostModifier),
+      };
+      if (!areVectorsEqual(driveVector, lastVectorRef.current)) {
         const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        const idle = vectorMagnitude(outputs.driveVector) < 0.02;
+        const idle = vectorMagnitude(driveVector) < 0.02;
         if (idle || now - lastDriveSentAtRef.current >= DRIVE_RATE_MS) {
-          lastVectorRef.current = outputs.driveVector;
+          lastVectorRef.current = driveVector;
           lastDriveSentAtRef.current = now;
-          latest.setDriveVector(outputs.driveVector, { source: SOURCE });
+          const precisionSpeed = profile.calibration?.precisionSpeed ?? 100;
+          const baseSpeed = profile.calibration?.baseSpeed ?? 500;
+          const turboSpeed = profile.calibration?.turboSpeed ?? 500;
+          latest.setDriveVector(driveVector, {
+            source: SOURCE,
+            speedOptions: outputs.buttons.slowModifier
+              ? { baseSpeed: precisionSpeed, boostSpeed: precisionSpeed }
+              : { baseSpeed, boostSpeed: turboSpeed },
+          });
         }
       }
 
@@ -250,12 +414,30 @@ export default function GamepadInputManager() {
       const side = reverseStateRef.current.side
         ? -Math.round(sideMagnitude * auxSideScale)
         : Math.round(sideMagnitude * auxSideScale);
+      /* Digital bindings intentionally override proportional axes. This mirrors keyboard aux
+         precedence exactly while preserving the controller-friendly analog defaults. */
       let aux = {
-        main: outputs.auxAxis.main !== 0 ? main : 0,
-        side: outputs.auxAxis.side !== 0 ? side : 0,
-        vacuum: outputs.buttons.vacuum ? 127 : 0,
+        main: outputs.buttons.auxMainForward
+          ? 127
+          : outputs.buttons.auxMainReverse
+          ? -127
+          : outputs.auxAxis.main !== 0
+          ? main
+          : 0,
+        side: outputs.buttons.auxSideForward
+          ? 127
+          : outputs.buttons.auxSideReverse
+          ? -70
+          : outputs.auxAxis.side !== 0
+          ? side
+          : 0,
+        vacuum: (outputs.buttons.vacuum || outputs.buttons.auxVacuumFast)
+          ? 127
+          : outputs.buttons.auxVacuumSlow
+          ? 50
+          : 0,
       };
-      if (outputs.buttons.allAux) {
+      if (outputs.buttons.allAux || outputs.buttons.auxAllForward) {
         aux = { main: 127, side: 127, vacuum: 127 };
       }
       if (!areAuxEqual(aux, lastAuxRef.current)) {
@@ -305,6 +487,67 @@ export default function GamepadInputManager() {
         handleButtonEdge('laserToggle', false);
       }
 
+      const hornWasPressed = buttonStateRef.current.get('hornHonk') || false;
+      if (outputs.buttons.hornHonk && handleButtonEdge('hornHonk', true)) {
+        latest.startHorn();
+      } else if (!outputs.buttons.hornHonk) {
+        handleButtonEdge('hornHonk', false);
+        if (hornWasPressed) latest.stopHorn();
+      }
+
+      const micWasPressed = buttonStateRef.current.get('micPtt') || false;
+      if (outputs.buttons.micPtt && handleButtonEdge('micPtt', true)) {
+        latest.setMicPttActive(true);
+      } else if (!outputs.buttons.micPtt) {
+        handleButtonEdge('micPtt', false);
+        if (micWasPressed) latest.setMicPttActive(false);
+      }
+
+      if (outputs.buttons.videoFilterCycle && handleButtonEdge('videoFilterCycle', true)) {
+        const nextFilter = nextVideoFilter(latest.videoColorFilter);
+        latest.saveVideoSettings((current) => ({ ...(current ?? {}), colorFilter: nextFilter }));
+        latest.pushAlert({
+          id: 'video-filter-active',
+          title: 'Video filter',
+          message: `Rover video filter: ${nextFilter}`,
+          color: '#38bdf8',
+          lifetimeMs: 1600,
+        });
+      } else if (!outputs.buttons.videoFilterCycle) {
+        handleButtonEdge('videoFilterCycle', false);
+      }
+
+      if (outputs.buttons.chatFocus && handleButtonEdge('chatFocus', true)) {
+        if (!latest.isChatFocused) latest.focusChat();
+      } else if (!outputs.buttons.chatFocus) {
+        handleButtonEdge('chatFocus', false);
+      }
+
+      /* Song directions share identical edge and wrap behavior; the table keeps the two actions
+         symmetric and prevents one direction from silently diverging during later changes. */
+      for (const [actionId, direction] of [['songNoteUp', 1], ['songNoteDown', -1]]) {
+        if (outputs.buttons[actionId] && handleButtonEdge(actionId, true)) {
+          const [minNote, maxNote] = SONG_NOTE_RANGE;
+          const currentNote = typeof latest.songNote === 'number' ? latest.songNote : SONG_DEFAULT_NOTE;
+          const candidate = currentNote + direction;
+          const nextNote = candidate > maxNote ? minNote : candidate < minNote ? maxNote : candidate;
+          latest.setSongNote(nextNote);
+          latest.sendSong([{ note: nextNote, duration: SONG_DEFAULT_DURATION }], { slot: 0 });
+        } else if (!outputs.buttons[actionId]) {
+          handleButtonEdge(actionId, false);
+        }
+      }
+
+      /* Room-control cycling differs only by target state, so both bindings use the same policy
+         checks and ordered entity selection. */
+      for (const [actionId, targetState] of [['homeAssistantOn', 'on'], ['homeAssistantOff', 'off']]) {
+        if (outputs.buttons[actionId] && handleButtonEdge(actionId, true)) {
+          cycleHomeAssistant(latest, targetState);
+        } else if (!outputs.buttons[actionId]) {
+          handleButtonEdge(actionId, false);
+        }
+      }
+
       /*
         PTZ zoom consumes the live signed gamepad axis, including its zero
         position, so releasing the stick is an explicit stop instead of merely
@@ -312,24 +555,40 @@ export default function GamepadInputManager() {
         here and continue through their established absolute/velocity mapping.
       */
       const handledAsPtzZoom = latest.setCameraAxisIntent(outputs.cameraAxis);
-      if (!handledAsPtzZoom && Math.abs(outputs.cameraAxis) > 0.001) {
-        handleCameraAxis(outputs.cameraAxis, profile.calibration);
+      /* Tank mode's camera input is a pair of direction buttons rather than a position-bearing
+         analog axis. Always interpret those buttons as velocity commands; absolute mode would
+         incorrectly jump directly to a servo endpoint on every D-pad press. The saved analog
+         camera preference remains untouched and resumes when single-stick steering is selected. */
+      const cameraCalibration = profile.calibration?.driveMode === 'tank'
+        ? { ...profile.calibration, cameraMode: 'velocity' }
+        : profile.calibration;
+      if (
+        !handledAsPtzZoom &&
+        (cameraCalibration?.cameraMode === 'velocity' || Math.abs(outputs.cameraAxis) > 0.001)
+      ) {
+        handleCameraAxis(outputs.cameraAxis, cameraCalibration);
       }
 
-      latest.registerInputState(SOURCE, {
-        connected: true,
-        signature,
-        id: activePad.id,
-        index: activePad.index,
-        axes: activePad.axes,
-        buttons: activePad.buttons,
-        drive: outputs.driveVector,
-        aux,
-        cameraAxis: outputs.cameraAxis,
-        bindings: outputs.sources,
-      });
+      /* Raw values remain in the dedicated hub used by diagnostics. The shared reducer only
+         needs connection identity, which avoids forcing the entire provider through 60 updates/s. */
+      if (lastRegisteredSignatureRef.current !== signature) {
+        lastRegisteredSignatureRef.current = signature;
+        latest.registerInputState(SOURCE, {
+          connected: true,
+          blocked: false,
+          signature,
+          id: activePad.id,
+          index: activePad.index,
+        });
+      }
     });
-  }, [ensureProfile, handleButtonEdge, handleCameraAxis]);
+    return () => {
+      unsubscribe();
+      const latest = latestRef.current;
+      if (latest) neutralizeController(latest);
+      markControllerDisconnected(lastConnectedSignatureRef.current);
+    };
+  }, [ensureProfile, handleButtonEdge, handleCameraAxis, neutralizeController]);
 
   return null;
 }

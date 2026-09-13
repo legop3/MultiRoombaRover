@@ -12,8 +12,8 @@ import PtzLiveVideo from '../PtzLiveVideo/index.jsx';
 import ReplaySourcesPanel from '../ReplaySourcesPanel/index.jsx';
 import KeyPill from './VipAudioUploadCard/KeyPill.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
-import { useControlActions, useControlSelector } from '../../controls/index.js';
-import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import { useControlActions } from '../../controls/index.js';
+import ControlHint from '../ControlHint/index.jsx';
 import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 import { isFeatureEnabled } from '../../lib/features.js';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
@@ -307,12 +307,7 @@ function PtzMobileControlsPanel({ ptz, disabled = false }) {
   );
 }
 
-function keyLabelFor(keymap, actionId) {
-  return formatKeyLabel(keymap?.[actionId]?.[0]);
-}
-
 function PtzControlReference() {
-  const keymap = useControlSelector((control) => control.state.keymap);
   const rows = [
     ['Tilt up', 'driveForward'],
     ['Tilt down', 'driveBackward'],
@@ -331,7 +326,7 @@ function PtzControlReference() {
           <span className="text-slate-400">{label}</span>
           {/* Use the same key display component as the rest of the UI so PTZ
               controls read as normal mapped controls instead of custom labels. */}
-          <KeyPill label={keyLabelFor(keymap, actionId)} />
+          <KeyPill label={<ControlHint actionId={actionId} />} />
         </div>
       ))}
     </CardFrame>

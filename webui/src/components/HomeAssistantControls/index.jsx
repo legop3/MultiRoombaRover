@@ -3,8 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useMemo } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
-import { useControlSelector } from '../../controls/index.js';
-import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import ControlHint from '../ControlHint/index.jsx';
 import CardFrame from '../CardFrame/index.jsx';
 import { isFeatureEnabled } from '../../lib/features.js';
 
@@ -184,7 +183,6 @@ export default function HomeAssistantControls() {
 }
 
 function HomeAssistantControlsContent() {
-  const keymap = useControlSelector((control) => control.state.keymap);
   const ha = useSessionSelector((state) => state.session?.homeAssistant || null);
   const { homeAssistantToggle, homeAssistantSetLightColor, homeAssistantSetLightWhite } =
     useSessionActions();
@@ -196,8 +194,8 @@ function HomeAssistantControlsContent() {
   const lightPolicyLocked = Boolean(lightPolicy?.locked || lightPolicy?.lockedOn);
   const controlsLocked = lightPolicyLocked && !adminCanControlLockedLights;
   const lockState = lightPolicy?.lockState || (lightPolicy?.lockedOn ? 'on' : null);
-  const onKeyLabel = formatKeyLabel(keymap?.homeAssistantOn?.[0]);
-  const offKeyLabel = formatKeyLabel(keymap?.homeAssistantOff?.[0]);
+  const onKeyLabel = <ControlHint actionId="homeAssistantOn" />;
+  const offKeyLabel = <ControlHint actionId="homeAssistantOff" />;
 
   if (!ha?.enabled) {
     return (

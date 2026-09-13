@@ -4,8 +4,8 @@
 // the archived desktop layout retains its previous DriveDockAction behavior.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FaChargingStation } from 'react-icons/fa';
-import { useControlActions, useControlSelector } from '../../../../controls/index.js';
-import { formatKeyLabel } from '../../../../controls/keymapUtils.js';
+import { useControlActions } from '../../../../controls/index.js';
+import ControlHint from '../../../ControlHint/index.jsx';
 import { useTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
 import { dockTelemetryEqual, selectDockTelemetry } from '../../../../context/telemetryViews.js';
 import { useManualDockAssist } from '../../../../features/manualDockAssist/useManualDockAssist.js';
@@ -252,7 +252,6 @@ function UndockTransitionGhost({ onFinish }) {
 export default function DockingHud({ roverId }) {
   const layout = useDriverLayout();
   const actions = useControlActions();
-  const keymap = useControlSelector((control) => control.state.keymap);
   const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
   // This replaces ManualDockAssistOverlay as the current HUD's one lifecycle owner. It preserves the
   // success sounds, camera positioning, speed cap, and automatic exit after charging begins.
@@ -282,12 +281,8 @@ export default function DockingHud({ roverId }) {
   /* Mobile already presents its own touch-oriented driving controls. The docked
      action therefore keeps its plain-language instruction without advertising a
      keyboard shortcut that is irrelevant on that layout. */
-  const driveKeyLabel = layout === 'desktop'
-    ? formatKeyLabel(keymap?.driveMacro?.[0])
-    : '';
-  const dockKeyLabel = layout === 'desktop'
-    ? formatKeyLabel(keymap?.dockMacro?.[0])
-    : '';
+  const driveKeyLabel = layout === 'desktop' ? <ControlHint actionId="driveMacro" /> : '';
+  const dockKeyLabel = layout === 'desktop' ? <ControlHint actionId="dockMacro" /> : '';
   const batteryPodOpen = podSettings?.battery !== false;
   // The camera arc is the shared circular-pod reference size. Keep the dock expansion flush
   // against the battery shell after enlarging that gauge to the same 8.5-rem footprint.

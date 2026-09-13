@@ -33,10 +33,10 @@ export function groupActions(actions) {
   }, {});
 }
 
-export function pickActivePad(pads, activeSignature) {
+export function pickActivePad(pads, activeInstanceKey) {
   if (!pads || pads.length === 0) return null;
-  if (activeSignature) {
-    const match = pads.find((pad) => pad.signature === activeSignature);
+  if (activeInstanceKey) {
+    const match = pads.find((pad) => pad.instanceKey === activeInstanceKey);
     if (match) return match;
   }
   return pads[0];
@@ -62,10 +62,13 @@ function detectAxisCapture(pad, baseline, action) {
   if (action.kind === 'axisPair') {
     const top = deltas.filter((entry) => entry.delta > CAPTURE_AXIS_THRESHOLD).slice(0, 2);
     if (top.length < 2) return null;
+    const orderedIndices = top.map((entry) => entry.index).sort((a, b) => a - b);
     return {
       kind: 'axisPair',
-      x: top[0].index,
-      y: top[1].index,
+      // Browsers expose two-dimensional controls as adjacent X/Y axes. Sorting the captured pair
+      // prevents whichever direction moved first from randomly swapping steering and throttle.
+      x: orderedIndices[0],
+      y: orderedIndices[1],
       ...(action.invertDefaults ?? {}),
     };
   }
@@ -80,16 +83,25 @@ function detectAxisCapture(pad, baseline, action) {
 
 function detectButtonCapture(pad, baseline, action) {
   const buttons = pad.buttons ?? [];
+  const newlyPressed = [];
   for (let i = 0; i < buttons.length; i += 1) {
     const btn = buttons[i];
     const value = typeof btn?.value === 'number' ? btn.value : btn?.pressed ? 1 : 0;
-    if (btn?.pressed || value > CAPTURE_BUTTON_THRESHOLD) {
+    const baselineValue = baseline.buttons?.[i]?.value ?? 0;
+    const baselinePressed = baseline.buttons?.[i]?.pressed ?? false;
+    if (!baselinePressed && (btn?.pressed || value - baselineValue > CAPTURE_BUTTON_THRESHOLD)) {
       if (action.kind === 'axis') {
         return { kind: 'buttonAxis', index: i };
       }
-      return { kind: 'button', index: i };
+      newlyPressed.push({ kind: 'button', index: i });
     }
   }
+  if (newlyPressed.length > 1) {
+    // Capturing all buttons observed in the same frame makes intentional modifier chords possible
+    // without a separate advanced editor, while a normal single press keeps the compact shape.
+    return { kind: 'chord', inputs: newlyPressed };
+  }
+  if (newlyPressed.length === 1) return newlyPressed[0];
   const axes = pad.axes ?? [];
   for (let i = 0; i < axes.length; i += 1) {
     const value = axes[i] ?? 0;

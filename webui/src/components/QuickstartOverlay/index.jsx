@@ -1,34 +1,32 @@
-import { useMemo } from 'react';
-import { useControlSelector } from '../../controls/index.js';
-import { formatKeyLabel } from '../../controls/keymapUtils.js';
+import ControlHint from '../ControlHint/index.jsx';
 import NicknameForm from '../NicknameForm/index.jsx';
 import SocialButton from '../SocialButton/index.jsx';
 import KeyPill from '../vip/VipAudioUploadCard/KeyPill.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { getSocialById } from '../../lib/socials.js';
 
-function ControlRow({ label, keyLabel }) {
+function ControlRow({ label, actionId }) {
   return (
     <div className="surface-muted flex items-center justify-between gap-0.5 px-0.5 py-0.35 text-[0.8rem] text-slate-200">
       <span>{label}</span>
-      <KeyPill label={keyLabel} />
+      <KeyPill label={<ControlHint actionId={actionId} />} />
     </div>
   );
 }
 
-function DesktopQuickstart({ keymap }) {
+function DesktopQuickstart() {
   return (
     <div className="space-y-0.5">
       <p className="text-sm text-slate-200">1. Click "Your rover is docked" to undock.</p>
       <div className="space-y-0.5">
         <p className="text-sm text-slate-200">2. Drive with these keybindings:</p>
         <div className="space-y-0.5">
-          <ControlRow label="Forward" keyLabel={formatKeyLabel(keymap?.driveForward?.[0])} />
-          <ControlRow label="Backward" keyLabel={formatKeyLabel(keymap?.driveBackward?.[0])} />
-          <ControlRow label="Turn Left" keyLabel={formatKeyLabel(keymap?.driveLeft?.[0])} />
-          <ControlRow label="Turn Right" keyLabel={formatKeyLabel(keymap?.driveRight?.[0])} />
-          <ControlRow label="Move faster" keyLabel={formatKeyLabel(keymap?.boostModifier?.[0])} />
-          <ControlRow label="Move slower" keyLabel={formatKeyLabel(keymap?.slowModifier?.[0])} />
+          <ControlRow label="Forward" actionId="driveForward" />
+          <ControlRow label="Backward" actionId="driveBackward" />
+          <ControlRow label="Turn Left" actionId="driveLeft" />
+          <ControlRow label="Turn Right" actionId="driveRight" />
+          <ControlRow label="Move faster" actionId="boostModifier" />
+          <ControlRow label="Move slower" actionId="slowModifier" />
         </div>
       </div>
       <p className="text-sm text-slate-200">3. Use the video HUD for rover controls and information.</p>
@@ -75,9 +73,7 @@ export default function QuickstartOverlay({
   onToggleShowOnLoad,
   onClose,
 }) {
-  const rawKeymap = useControlSelector((control) => control.state.keymap);
   const isDesktop = layout === 'desktop';
-  const keymap = useMemo(() => rawKeymap || {}, [rawKeymap]);
 
   if (!visible) return null;
 
@@ -97,7 +93,7 @@ export default function QuickstartOverlay({
         </div>
         <div className={`grid gap-0.5 p-0.5 ${isDesktop ? 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]' : 'grid-cols-1'}`}>
           <section className="space-y-0.5 border-b border-slate-700">
-            {isDesktop ? <DesktopQuickstart keymap={keymap} /> : <MobileQuickstart />}
+            {isDesktop ? <DesktopQuickstart /> : <MobileQuickstart />}
           </section>
           {/* {!isDesktop? <div className='w-full h-1 bg-blue-500'></div> : null} */}
           <section className="space-y-0.5">

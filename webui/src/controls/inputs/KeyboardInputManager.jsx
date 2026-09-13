@@ -6,6 +6,7 @@ import { useChatActions, useChatFocus } from '../../context/ChatContext.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { normalizeKeymapEntries, tokensForEvent } from '../keymapUtils.js';
 import { isKeyboardCaptureLocked } from './keyboardCaptureLock.js';
+import { markKeyboardInputActive } from './controllerRuntime.js';
 import { isTextInputElement } from './inputFocusUtils.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
@@ -428,6 +429,13 @@ export default function KeyboardInputManager() {
       const tokens = tokensForEvent(event);
       if (tokens.length === 0) return;
       const tokenSet = new Set(tokens);
+      /*
+        Shortcut prompts follow the last meaningful control device, not arbitrary typing. Only a
+        key that participates in the configured control map claims keyboard modality.
+      */
+      if (tokens.some((token) => latest.actionTokens.has(token))) {
+        markKeyboardInputActive();
+      }
       if (bindingActive(latest.keymap.chatFocus, tokenSet)) {
         event.preventDefault();
         resetAll();

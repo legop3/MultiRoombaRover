@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { FaVideo } from 'react-icons/fa';
 import { useControlActions, useControlSelector } from '../../../../controls/index.js';
-import { formatKeyLabel } from '../../../../controls/keymapUtils.js';
+import ControlHint from '../../../ControlHint/index.jsx';
 import useCanControlRover from '../../../../hooks/useCanControlRover.js';
 import { useDriverLayout } from '../../../../layouts/driver/DriverLayoutContext.jsx';
 import KeyPill from '../../../vip/VipAudioUploadCard/KeyPill.jsx';
@@ -32,7 +32,6 @@ export default function BottomRightPod({ roverId }) {
   const [open, setOpen] = usePodVisibility('camera', true);
   const camera = useControlSelector((control) => control.state.camera);
   const dockAssistActive = useControlSelector((control) => Boolean(control.state.manualDockAssist?.active));
-  const keymap = useControlSelector((control) => control.state.keymap);
   const { setServoAngle } = useControlActions();
   const canControl = useCanControlRover(roverId);
   const config = camera?.config;
@@ -86,8 +85,8 @@ export default function BottomRightPod({ roverId }) {
       </button>
       {/* These positions continue around the same circle just beyond the two slider endpoints.
           Together they occupy the open third facing the corner without enlarging the pod. */}
-      <div className="absolute left-[61%] top-[90%] -translate-x-1/2 -translate-y-1/2"><KeyPill label={formatKeyLabel(keymap?.cameraDown?.[0])} /></div>
-      <div className="absolute left-[90%] top-[61%] -translate-x-1/2 -translate-y-1/2"><KeyPill label={formatKeyLabel(keymap?.cameraUp?.[0])} /></div>
+      <div className="absolute left-[61%] top-[90%] -translate-x-1/2 -translate-y-1/2"><KeyPill label={<ControlHint actionId="cameraDown" />} /></div>
+      <div className="absolute left-[90%] top-[61%] -translate-x-1/2 -translate-y-1/2"><KeyPill label={<ControlHint actionId="cameraUp" />} /></div>
       <CornerPodToggle corner="bottom-right" expanded label="Hide camera tilt" onClick={() => setOpen(false)} />
     </div>
     ) : showCameraControls && enabled ? (

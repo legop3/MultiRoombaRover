@@ -68,8 +68,8 @@ export default function CardFrame({
     ? { borderColor: '#008a35' }
     : accentRgb
     ? {
-        backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 0%, ${rgba(accentRgb, 0.1)} 100%)`,
-        // backgroundImage: `linear-gradient(90deg, ${rgba(accentRgb, 0.1)} 100%)`,
+        // backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 0%, ${rgba(accentRgb, 0.1)} 100%)`,
+        backgroundImage: `linear-gradient(90deg, ${rgba(accentRgb, 0.2)} 100%)`,
         // backgroundImage: `background-color: ${rgba(accentRgb, 0.2)}`
       }
     : undefined;
@@ -100,7 +100,7 @@ export default function CardFrame({
         >
           <div className="flex min-w-0 items-center gap-0.5">
             {title ? (
-              <p className={cx('m-0 text-[0.78rem] font-semibold leading-none', greenMode ? 'text-lime-400' : 'text-neutral-50')}>
+              <p className={cx('m-0  font-semibold leading-none', greenMode ? 'text-lime-400' : 'text-neutral-50')}>
                 {title}
               </p>
             ) : null}

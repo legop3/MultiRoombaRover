@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fieldClass } from '../constants.js';
 import { useControlSelector } from '../../../controls/index.js';
-import { formatKeyLabel } from '../../../controls/keymapUtils.js';
+import ControlHint from '../../ControlHint/index.jsx';
 import { useSettingsNamespace } from '../../../settings/index.js';
 import { MAX_UPLOAD_BYTES, TARGET_SAMPLE_RATE, RTC_CONFIG } from './constants.js';
 import { bytesToBase64, buildAuthHeader } from './base64.js';
@@ -28,7 +28,6 @@ export default function VipAudioUploadCard({
   readyMicWhip,
   stopMicWhip,
 }) {
-  const keymap = useControlSelector((control) => control.state.keymap);
   const pttActive = useControlSelector((control) => Boolean(control.state.mic?.pttActive));
   const { value: vipAudio, save: saveVipAudio } = useSettingsNamespace('vipAudio', {
     openMicEnabled: false,
@@ -81,7 +80,7 @@ export default function VipAudioUploadCard({
   const whipLinkActive = !clipMode && (micState === 'live' || micState === 'starting');
   const clipRecording = clipMode && clipState === 'recording';
   const clipSending = clipMode && clipState === 'sending';
-  const pttKeyLabel = formatKeyLabel(keymap?.micPtt?.[0]) || 'M';
+  const pttKeyLabel = <ControlHint actionId="micPtt" />;
 
   const setPttMode = useCallback(
     (nextMode) => {
