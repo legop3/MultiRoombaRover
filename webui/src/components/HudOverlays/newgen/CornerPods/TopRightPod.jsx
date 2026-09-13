@@ -1,7 +1,7 @@
 // Top-right Corner Pod
 // Purpose: Combines the battery/current gauge with a compact attached advanced-power expansion.
 import { createElement, useMemo } from 'react';
-import { FaArrowDown, FaArrowUp, FaBatteryHalf, FaBolt, FaExclamationTriangle, FaMemory, FaThermometerHalf, FaWifi } from 'react-icons/fa';
+import { FaArrowDown, FaArrowUp, FaBatteryHalf, FaBolt, FaExclamationTriangle, FaMemory, FaMicrochip, FaThermometerHalf, FaWifi } from 'react-icons/fa';
 import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import { useVisualTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
 import { hostStatsEqual, selectHostStats, selectSpectatorTelemetry, spectatorTelemetryEqual } from '../../../../context/telemetryViews.js';
@@ -19,6 +19,20 @@ function clampPercent(value) {
   return number == null ? 0 : Math.max(0, Math.min(100, number));
 }
 
+function formatMemoryUsage(totalKb, availableKb, usedPercent) {
+  const total = finite(totalKb);
+  const available = finite(availableKb);
+  const percent = finite(usedPercent);
+  if (total == null || available == null || percent == null) return percent == null ? '--' : `${Math.round(percent)}%`;
+
+  const used = Math.max(0, total - available);
+  const useGigabytes = total >= 1024 * 1024;
+  const divisor = useGigabytes ? 1024 * 1024 : 1024;
+  const decimals = useGigabytes ? 1 : 0;
+  const unit = useGigabytes ? 'GB' : 'MB';
+  return `${Math.round(percent)}% · ${(used / divisor).toFixed(decimals)}/${(total / divisor).toFixed(decimals)} ${unit}`;
+}
+
 function MetricRow({ icon, label, value, percent, iconClass, fillClass }) {
   return (
     <div className="min-w-0" title={label}>
@@ -27,9 +41,6 @@ function MetricRow({ icon, label, value, percent, iconClass, fillClass }) {
         <span className="min-w-0 flex-1 truncate text-[0.62rem] leading-none text-slate-200">{label}</span>
         <strong className="shrink-0 text-[0.62rem] leading-none text-white">{value}</strong>
       </div>
-      {/* Every meter uses an explicit real-world display range defined by its caller. The bar
-          therefore adds information instead of merely decorating the latest numeric value.
-          Keeping it on its own line gives both the title and meter the full panel width. */}
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-700">
         <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${clampPercent(percent)}%` }} />
       </div>
@@ -37,7 +48,7 @@ function MetricRow({ icon, label, value, percent, iconClass, fillClass }) {
   );
 }
 
-function WifiTile({ signal }) {
+function WifiTile({ signal, ssid }) {
   const bars = signal == null ? 0 : signal >= -55 ? 4 : signal >= -65 ? 3 : signal >= -75 ? 2 : 1;
   const tone = signal == null ? 'bg-slate-600' : signal < -80 ? 'bg-red-400' : signal < -70 ? 'bg-amber-400' : 'bg-emerald-400';
   return (
@@ -47,6 +58,7 @@ function WifiTile({ signal }) {
         <span className="min-w-0 flex-1 truncate text-[0.62rem] leading-none text-slate-200">Wi-Fi signal</span>
         <strong className="shrink-0 text-[0.62rem] leading-none text-white">{signal == null ? '--' : `${Math.round(signal)} dBm`}</strong>
       </div>
+      <div className="mt-1 truncate text-[0.68rem] font-semibold leading-none text-white">Wi-Fi: {ssid || '--'}</div>
       <div className="mt-1 flex h-2 items-end gap-0.5" aria-hidden="true">
         {[1, 2, 3, 4].map((bar) => (
           <span key={bar} className={`flex-1 rounded-sm ${bar <= bars ? tone : 'bg-slate-700'}`} style={{ height: `${25 * bar}%` }} />
@@ -98,11 +110,14 @@ export default function TopRightPod({ roverId }) {
   const batteryCharge = finite(electrical?.batteryChargeMah);
   const batteryCapacity = finite(electrical?.batteryCapacityMah);
   const cpuTemp = finite(host?.cpuTempC);
+  const cpuUsed = finite(host?.cpuUsedPct);
   const memoryUsed = finite(host?.memoryUsedPct);
+  const memoryUsage = formatMemoryUsage(host?.memoryTotalKb, host?.memoryAvailableKb, memoryUsed);
   const voltagePercent = voltage == null ? 0 : ((voltage - 12000) / 5000) * 100;
   const batteryMahPercent = batteryCharge != null && batteryCapacity > 0 ? (batteryCharge / batteryCapacity) * 100 : 0;
   const cpuTempPercent = cpuTemp == null ? 0 : ((cpuTemp - 30) / 55) * 100;
   const cpuTempTone = cpuTemp >= 80 ? 'bg-red-400' : cpuTemp >= 70 ? 'bg-amber-400' : 'bg-emerald-400';
+  const cpuTone = cpuUsed >= 90 ? 'bg-red-400' : cpuUsed >= 70 ? 'bg-amber-400' : 'bg-sky-400';
   const memoryTone = memoryUsed >= 90 ? 'bg-red-400' : memoryUsed >= 75 ? 'bg-amber-400' : 'bg-violet-400';
   const download = finite(wifi.downloadMbps);
   const upload = finite(wifi.uploadMbps);
@@ -154,10 +169,11 @@ export default function TopRightPod({ roverId }) {
           <div className="space-y-1.5">
             <MetricRow icon={FaBolt} label="Roomba voltage" value={voltage == null ? '--' : `${(voltage / 1000).toFixed(1)} V`} percent={voltagePercent} iconClass="text-sky-300" fillClass="bg-sky-400" />
             <MetricRow icon={FaBolt} label="Roomba current" value={`${current > 0 ? '+' : ''}${Math.round(current)} mA`} percent={currentPercent * 100} iconClass={current < 0 ? 'text-amber-300' : 'text-emerald-300'} fillClass={current < 0 ? 'bg-amber-400' : 'bg-emerald-400'} />
-            <MetricRow icon={FaBatteryHalf} label="Battery charge" value={batteryCharge == null ? '--' : `${Math.round(batteryCharge)} mAh`} percent={batteryMahPercent} iconClass="text-emerald-300" fillClass="bg-emerald-400" />
+            <MetricRow icon={FaBatteryHalf} label="Battery charge" value={batteryCharge == null || batteryCapacity == null ? '--' : `${Math.round(batteryCharge)} / ${Math.round(batteryCapacity)} mAh`} percent={batteryMahPercent} iconClass="text-emerald-300" fillClass="bg-emerald-400" />
             <MetricRow icon={FaThermometerHalf} label="Computer temperature" value={cpuTemp == null ? '--' : `${cpuTemp.toFixed(1)} C`} percent={cpuTempPercent} iconClass={cpuTemp >= 80 ? 'text-red-300' : cpuTemp >= 70 ? 'text-amber-300' : 'text-emerald-300'} fillClass={cpuTempTone} />
-            <MetricRow icon={FaMemory} label="Memory usage" value={memoryUsed == null ? '--' : `${Math.round(memoryUsed)}%`} percent={memoryUsed} iconClass={memoryUsed >= 90 ? 'text-red-300' : memoryUsed >= 75 ? 'text-amber-300' : 'text-violet-300'} fillClass={memoryTone} />
-            <WifiTile signal={signal} />
+            <MetricRow icon={FaMicrochip} label="CPU usage" value={cpuUsed == null ? '--' : `${Math.round(cpuUsed)}%`} percent={cpuUsed} iconClass={cpuUsed >= 90 ? 'text-red-300' : cpuUsed >= 70 ? 'text-amber-300' : 'text-sky-300'} fillClass={cpuTone} />
+            <MetricRow icon={FaMemory} label="Memory usage" value={memoryUsage} percent={memoryUsed} iconClass={memoryUsed >= 90 ? 'text-red-300' : memoryUsed >= 75 ? 'text-amber-300' : 'text-violet-300'} fillClass={memoryTone} />
+            <WifiTile signal={signal} ssid={wifi.ssidSample} />
             <SpeedTile icon={FaArrowDown} label="Download speed" value={download == null ? '--' : `${download.toFixed(1)} Mb/s`} colorClass="text-sky-300" />
             <SpeedTile icon={FaArrowUp} label="Upload speed" value={upload == null ? '--' : `${upload.toFixed(1)} Mb/s`} colorClass="text-violet-300" />
           </div>
