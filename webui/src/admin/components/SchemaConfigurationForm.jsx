@@ -15,12 +15,14 @@ import CardFrame from '../../components/CardFrame/index.jsx';
   server's schema.
 */
 const CONFIGURATION_LAYER_COLORS = [
-  '#0ea5e9', // sky
-  '#6366f1', // indigo
+  // Alternating warm and cool hues keep adjacent structural levels distinct
+  // even after CardFrame applies its intentionally subtle translucent tint.
+  '#0ea5e9', // blue
+  '#f97316', // orange
+  '#22c55e', // green
   '#a855f7', // purple
-  '#14b8a6', // teal
-  '#f59e0b', // amber
-  '#ec4899', // pink
+  '#ef4444', // red
+  '#eab308', // yellow
 ];
 const ConfigurationLayerDepthContext = createContext(0);
 
