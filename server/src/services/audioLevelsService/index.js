@@ -5,7 +5,7 @@ const fs = require('fs');
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('audioLevelsService');
-const { loadConfig } = require('../../configuration');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { isAdmin, roleEvents } = require('../roleService');
 const roverManager = require('../roverManager');
@@ -343,6 +343,32 @@ io.on('connection', (socket) => {
 });
 
 loadState();
+
+registerConfigurationHandler('audioLevels', async (nextConfig) => {
+  /*
+    Audio levels also have a durable operational store because administrators
+    can adjust them outside the configuration editor. Applying a configuration
+    revision intentionally updates that same live state, rather than changing
+    startup fallbacks that an existing store would immediately override.
+  */
+  const current = loadState();
+  persistState({
+    ...current,
+    hornGain: clampGain(nextConfig.hornGain, current.hornGain),
+    ttsGain: clampGain(nextConfig.ttsGain, current.ttsGain),
+    forwardGain: clampGain(nextConfig.forwardGain, current.forwardGain),
+    maxPersonalAdjustmentPercent: clampMaximumAdjustmentPercent(
+      nextConfig.maxPersonalAdjustmentPercent,
+      current.maxPersonalAdjustmentPercent,
+    ),
+    updatedAt: Date.now(),
+    updatedBy: 'configuration',
+    adjustmentRangeUpdatedAt: Date.now(),
+    adjustmentRangeUpdatedBy: 'configuration',
+  });
+  pushLevelsToAllRovers();
+  emitChange('configuration_applied');
+});
 
 module.exports = {
   ADJUSTMENT_FIELDS,

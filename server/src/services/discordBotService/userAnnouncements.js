@@ -22,9 +22,12 @@ function createUserAnnouncements(deps) {
     schedulePresenceRotation,
   } = deps;
 
-  const announcementChannelId = discordConfig?.channels?.announcements || null;
-  const announcementRoleId = discordConfig?.roles?.announcementPing || null;
-  const siteUrl = discordConfig?.siteUrl ? String(discordConfig.siteUrl) : '';
+  // The parent Discord service preserves this object identity and updates its
+  // contents on live configuration application. Resolve individual values at
+  // send/render time so announcements do not retain stale channel or site data.
+  const getAnnouncementChannelId = () => discordConfig?.channels?.announcements || null;
+  const getAnnouncementRoleId = () => discordConfig?.roles?.announcementPing || null;
+  const getSiteUrl = () => (discordConfig?.siteUrl ? String(discordConfig.siteUrl) : '');
 
   let previousSnapshot = buildSnapshot();
   let skippedFirstModeChange = false;
@@ -124,6 +127,7 @@ function createUserAnnouncements(deps) {
       });
     }
 
+    const siteUrl = getSiteUrl();
     if (siteUrl) {
       embed.addFields({
         name: 'Join',
@@ -136,6 +140,8 @@ function createUserAnnouncements(deps) {
   }
 
   async function sendAnnouncement({ content, embeds, ping = false }) {
+    const announcementChannelId = getAnnouncementChannelId();
+    const announcementRoleId = getAnnouncementRoleId();
     if (!announcementChannelId) return;
     const shouldPing = Boolean(ping && announcementRoleId);
     const body = shouldPing ? `<@&${announcementRoleId}> ${content || ''}`.trim() : content;

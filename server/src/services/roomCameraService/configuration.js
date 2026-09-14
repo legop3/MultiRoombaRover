@@ -28,7 +28,7 @@ module.exports = {
     ],
   },
   schema: strictObject({
-    enabled: boolean({ description: 'Publishes the configured room-camera catalog and enables camera snapshots and streams after restart.' }),
+    enabled: boolean({ description: 'Immediately publishes the configured room-camera catalog and enables camera snapshots and streams.' }),
     cameras: {
       type: 'array',
       description: 'Room cameras available to the web UI and replay system.',

@@ -83,9 +83,9 @@ function buildBandwidthSavingsPolicy(config = loadConfig()) {
 
 function getBandwidthSavingsPolicy() {
   /*
-    loadConfig() is cached by configuration service, so rebuilding this small object per
-    caller is cheap while still letting tests pass explicit config objects into
-    buildBandwidthSavingsPolicy().
+    The configuration service returns an in-memory snapshot, so rebuilding this
+    small normalized object per caller is cheap and immediately follows a newly
+    applied revision. Tests may still supply explicit documents directly.
   */
   return buildBandwidthSavingsPolicy(loadConfig());
 }

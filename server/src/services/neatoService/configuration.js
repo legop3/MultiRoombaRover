@@ -10,7 +10,7 @@ module.exports = {
   // ESPHome naming shape while `enabled: false` prevents accidental control.
   defaultValue: { enabled: false, device: 'neato_vacuum' },
   schema: strictObject({
-    enabled: boolean({ description: 'Exposes Neato status and commands through the configured Home Assistant ESPHome device after restart.' }),
+    enabled: boolean({ description: 'Immediately exposes Neato status and commands through the configured Home Assistant ESPHome device.' }),
     device: string({ description: 'ESPHome device name used to derive the Neato entity IDs in Home Assistant; punctuation is normalized to underscores.', examples: ['neato_vacuum'], maxLength: 255 }),
   }, {
     title: 'Neato',

@@ -149,7 +149,7 @@ export default function AdminApp() {
       <PasswordConfirmationDialog open={confirmationOpen} busy={confirmationBusy} error={confirmationError} onCancel={cancelPasswordConfirmation} onConfirm={submitPasswordConfirmation} />
       <main className="mx-auto min-h-screen w-full max-w-[100rem] p-1">
         <CardFrame title="MultiRover administration" meta={connected ? role : 'offline'} bodyClassName="p-0.5 text-xs text-slate-400">
-          <p>{snapshot ? `Active configuration revision ${snapshot.configuration.revision}.${snapshot.restartRequired ? ' An application restart is required to apply saved changes.' : ' The running application has loaded this revision.'}` : 'Central server administration and configuration.'}</p>
+          <p>{snapshot ? `Active configuration revision ${snapshot.configuration.revision}. The running application has applied revision ${snapshot.appliedRevision}.` : 'Central server administration and configuration.'}</p>
         </CardFrame>
         {isAdmin ? (
           <Tabs currentTab={activeSection} onTabChange={selectSection}>

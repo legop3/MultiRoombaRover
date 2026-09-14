@@ -8,7 +8,7 @@ module.exports = {
   feature: true,
   defaultValue: { enabled: false },
   schema: strictObject({
-    enabled: boolean({ description: 'Registers the physical button-box input route and enables its persistent button rewards and effects after restart.' }),
+    enabled: boolean({ description: 'Immediately enables the physical button-box input route and its persistent button rewards and effects.' }),
   }, {
     title: 'Button box',
     description: 'Optional physical button-box input and reward system.',

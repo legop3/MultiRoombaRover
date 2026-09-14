@@ -39,6 +39,9 @@ function createMediaMtxSupervisor(deps) {
 
   function start() {
     if (child) return child;
+    // `stop()` marks the old lifecycle as intentional. Reset that marker when
+    // the same supervisor is started again so later crashes remain fatal.
+    stopping = false;
 
     const generatedConfig = buildMediaMtxConfig({ config, serverPort, snapshotWriterPath });
     /*

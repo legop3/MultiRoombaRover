@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { defaultConfig, normalizeConfig, assertValidConfig } = require('./validation');
 const { definitions, rootSchema, secretPaths, featureDefinitions } = require('./definition');
 const { getFeatureFlags } = require('./index');
@@ -352,4 +353,64 @@ bandwidthSavings:
     assert.ok(error.validationErrors.some((entry) => entry.path === '/bandwidthSavings/multiTabProtection'));
     return true;
   });
+});
+
+test('committed revisions replace the live snapshot and isolate service reload failures', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'multirover-live-configuration-'));
+  temporaryRoots.push(root);
+  const serverRoot = path.resolve(__dirname, '../..');
+  const script = `
+    const configuration = require('./src/configuration');
+    const applied = [];
+    configuration.registerConfigurationHandler('timezone', (next, previous) => {
+      applied.push({ section: 'timezone', next, previous });
+    });
+    configuration.registerConfigurationHandler('media', () => {
+      throw new Error('simulated media reload failure');
+    });
+    const database = configuration.getConfigurationDatabase();
+    const record = database.getClientConfiguration();
+    const next = structuredClone(record.config);
+    next.timezone = 'America/Chicago';
+    next.media.whepBaseUrl = 'http://localhost:9999/video';
+    database.updateConfiguration({
+      value: next,
+      expectedRevision: record.revision,
+      actor: 'live-configuration-test',
+    });
+    configuration.applyCommittedConfiguration().then((application) => {
+      console.log(JSON.stringify({
+        application,
+        applied,
+        liveTimezone: configuration.loadConfig().timezone,
+        liveRevision: configuration.getRuntimeConfigurationRevision(),
+      }));
+      database.close();
+    });
+  `;
+  const output = execFileSync(process.execPath, ['-e', script], {
+    cwd: serverRoot,
+    env: { ...process.env, SERVER_DATA_DIR: root },
+    encoding: 'utf8',
+  });
+  const result = JSON.parse(output.trim());
+
+  /*
+    A failing integration remains visible in application status but cannot
+    roll back the valid revision or prevent an unrelated service from seeing
+    it. This is the central guarantee that makes live application usable on a
+    server where optional hardware may be offline during an ordinary edit.
+  */
+  assert.equal(result.liveTimezone, 'America/Chicago');
+  assert.equal(result.liveRevision, result.application.revision);
+  assert.deepEqual(result.application.changedSections, ['timezone', 'media']);
+  assert.deepEqual(result.applied, [{
+    section: 'timezone',
+    next: 'America/Chicago',
+    previous: defaultConfig.timezone,
+  }]);
+  assert.deepEqual(result.application.services, [
+    { section: 'timezone', status: 'applied' },
+    { section: 'media', status: 'failed', error: 'simulated media reload failure' },
+  ]);
 });

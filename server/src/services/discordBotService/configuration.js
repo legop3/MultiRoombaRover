@@ -28,7 +28,7 @@ module.exports = {
     },
   },
   schema: strictObject({
-    enabled: boolean({ description: 'Logs the Discord bot in and enables commands, chat bridges, replay delivery, and configured announcements after restart.' }),
+    enabled: boolean({ description: 'Logs the Discord bot in and immediately enables commands, chat bridges, replay delivery, and configured announcements.' }),
     token: string({ title: 'Bot token', description: 'Discord bot token used to log in. The saved value is never returned to the browser.', examples: ['DISCORD_BOT_TOKEN'], writeOnly: true, maxLength: 10000 }),
     guildId: string({ title: 'Guild id', description: 'Reserved Discord server identifier. The current bot runtime does not restrict commands or events using this value.', examples: ['123456789012345678'], maxLength: 100 }),
     siteUrl: string({ title: 'Public site URL', description: 'Public base URL appended to announcement embeds and server-hosted replay links.', examples: ['https://rover.example.com'], maxLength: 2048 }),

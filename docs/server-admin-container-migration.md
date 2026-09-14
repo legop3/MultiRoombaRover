@@ -20,6 +20,7 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 
 ## Decision log
 
+- 2026-09-14: Apply every committed configuration revision immediately. The configuration coordinator atomically replaces the process-wide snapshot, compares top-level service sections, serially reloads only affected service runtimes, and then refreshes all sessions. Long-lived HTTP/socket handlers remain registered once and delegate to the current runtime; integrations may reconnect or replace their own child process, worker, client, timers, and subscriptions without restarting Node.
 - 2026-09-14: Render the schema-driven configuration editor as a YAML-like tree inside one `CardFrame`. Every object or array introduces an ordered header and one indentation guide, every scalar occupies one key/value row, and array operations remain beside their item instead of moving to the far edge. Keep all route-specific RJSF styling in `webui/src/admin/styles.css`, outside the shared global stylesheet.
 - 2026-09-14: Treat container deployment as a fresh installation. Neither startup nor the installer searches for, imports, removes, or otherwise manages an old `config.yaml`; the only old-file path retained is an operator-selected YAML upload on `/setup`. The separate command-line importer and its dry-run mode are removed. Internal SQLite schema migrations remain because they evolve the active database rather than discovering an old installation.
 - 2026-09-14: Keep the one-time first-run setup code in `data/setup-code.txt` with owner-only permissions instead of writing the credential into server logs. Reuse it across restarts and delete it permanently when setup completes.
@@ -132,7 +133,7 @@ Implementation architecture:
 - The database validates and commits that complete document as one coherent immutable revision.
 - The admin UI presents one continuous configuration page in the same top-to-bottom order as the former YAML file.
 - Nested cards make object relationships readable, but do not create separate categories, navigation destinations, persistence boundaries, or registries.
-- Shared editor infrastructure owns loading, dirty state, validation errors, revision conflicts, secret operations, and restart-required status for the whole document.
+- Shared editor infrastructure owns loading, dirty state, validation errors, revision conflicts, secret operations, and live-application status for the whole document.
 - The browser receives this same schema from the protected admin endpoint and renders it with a maintained JSON Schema form library.
 - Standard JSON Schema types drive ordinary fields, nested objects, enums, and arrays. One field-agnostic widget handles every `writeOnly` secret; there are no feature-specific configuration components in React.
 
@@ -186,11 +187,15 @@ Configuration changes use one intentionally simple application rule:
 
 1. Validate the complete proposed document.
 2. Commit it as a new database revision.
-3. Report that an application restart is required.
-4. Let the administrator restart immediately or later.
-5. Load one coherent configuration snapshot at the next process start.
+3. Atomically replace the process-wide configuration snapshot.
+4. Compare the old and new top-level sections.
+5. Reload every service that owns a changed section, replacing its complete internal runtime when necessary.
+6. Report per-service application failures without preventing unrelated services from applying the revision.
+7. Refresh sessions only after all affected service reloads finish.
 
-Operational actions such as changing server mode, locking a rover, or issuing a rover command remain live actions and do not become restart-required configuration edits.
+HTTP routes, Socket.IO connection handlers, and process signal handlers are registered once. They consult live state or delegate to the current service runtime, preventing duplicate listeners after repeated saves. Service reloads may reconnect an integration or restart an application-owned child such as MediaMTX, ffmpeg, Kinect, or the Balance Board worker, but never restart the Node application.
+
+Operational actions such as changing server mode, locking a rover, or issuing a rover command remain direct live actions rather than configuration edits.
 
 After migration is complete:
 
@@ -398,7 +403,7 @@ Phase 1 is complete only when all of the following are true:
 - Configuration, administrator accounts, and secrets survive restart.
 - The final lockdown administrator cannot be removed accidentally.
 - All administrative surfaces are available through `/admin` with server-side authorization.
-- Configuration changes create auditable revisions and apply after restart.
+- Configuration changes create auditable revisions and apply to the running services without an application restart.
 - `/video` works through Node without a special public proxy rule for MediaMTX.
 - Rover sockets, RTSP publishing, WHEP playback, snapshots, replays, PTZ, Discord, Home Assistant, Kinect, Balance Board, and reporting retain their intended behavior when enabled.
 
@@ -439,6 +444,7 @@ Implemented on 2026-09-14:
 - Redacted secrets from browser responses and audit data. The one complete save operation preserves stored secrets unless the administrator explicitly replaces or clears them.
 - Converted every runtime configuration consumer to the synchronous database-backed configuration service and removed the YAML loader, `SERVER_CONFIG`, and the tracked example YAML.
 - Added an explicit one-time YAML upload to `/setup`. Existing bcrypt hashes, lockdown roles, Discord identities, configuration, and secrets can be imported only when the operator selects the file; the installer and startup perform no automatic discovery or migration, and there is no command-line importer.
+- The one-time setup upload now passes its committed configuration through the same live-application coordinator, so a fresh installation does not need an immediate restart after importing YAML.
 - Made setup-file import recursively retain only fields present in the current schema. Stale keys from the permissive YAML era are ignored without aliases or historical translations, while invalid values for real current settings still fail validation; stream-only and snapshot-only room-camera entries remain accepted as they were by the runtime.
 - Added safe empty-data startup, a file-backed one-time setup code, the restricted `/setup` route, and a console administrator-recovery command. The credential persists at `data/setup-code.txt` across restarts with `0600` permissions, never appears in logs, and is deleted when setup completes.
 - Added the centralized `/admin` route with Overview, Fleet operations, Users and administrators, and one schema-generated hierarchical Configuration page in legacy YAML order.
@@ -453,16 +459,19 @@ Implemented on 2026-09-14:
 - Converged feature control into service-owned configuration: each public feature opts in beside its own schema, and the configuration system derives those exact `enabled` switches for sessions and command discovery. The former server feature registry was removed; configuration completeness and hardware availability remain visible as runtime status instead of becoming hidden enablement rules.
 - Lazy-loaded setup and administration so the schema-form dependency is not included in ordinary driver-page downloads.
 - Reused the existing fleet and identity administration surfaces, added password reconfirmation for sensitive operations, and prevented removal or demotion of the final lockdown administrator.
-- Added configuration revision history, rollback, audit history, and restart-required reporting. Graceful restart itself remains step 7.
+- Added configuration revision history, rollback, audit history, and immediate application reporting.
+- Added a serialized live-configuration coordinator and converted configurable service runtimes to apply changed sections without restarting Node. Passive policies read the current immutable snapshot; network, hardware, timer, and child-process services replace or retune their owned runtime while stable HTTP/socket handlers continue delegating to it. The admin editor reports any service-specific reload failure after the revision is safely committed.
 
 Local verification completed:
 
 - All 107 server tests passed, including populated legacy-style default coverage, complete schema-description and input-example coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, explicit setup-file import with recursive removal of nonexistent fields, and the earlier filesystem coverage.
+- All 24 server test files passed after live application was added. The new isolated coordinator test confirms coherent snapshot replacement, top-level change detection, per-service invocation, applied revision reporting, and failure isolation.
 - Focused admin, route, and identity UI lint passed.
 - All 20 existing focused web UI tests passed.
 - The production web UI build completed successfully and regenerated the checked-in server assets.
 - Installer syntax and repository whitespace checks passed.
 - A local startup smoke test reached listener initialization. MediaMTX then exited because `/usr/local/bin/mediamtx` is intentionally absent on this development machine; actual enabled integrations and media remain deployment checks for the real server.
+- A second empty-data startup smoke test loaded every reloadable service and reached the HTTP listener without listener-limit warnings. A deliberately substituted failing MediaMTX executable then ended the process as expected; enabled hardware and external integrations still require verification on the actual server.
 
 # Phase 2: containerization and image delivery
 
@@ -672,6 +681,7 @@ Within the two hard phase boundaries, the safest order is:
 - [x] Converge optional feature control into service-owned `enabled` switches and derive the public feature map from those definitions.
 - [x] Build the centralized admin configuration UI.
 - [x] Add persistent audit history.
+- [x] Apply every configuration revision to running services without restarting the application.
 - [ ] Implement coordinated backup and staged restore.
 - [ ] Standardize graceful application restart.
 - [ ] Add the internal `/video` proxy and remove the special external route.

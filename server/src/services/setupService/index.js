@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('setupService');
-const { getConfigurationDatabase } = require('../../configuration');
+const { getConfigurationDatabase, applyCommittedConfiguration } = require('../../configuration');
 const { importConfigurationFile } = require('../../configuration/configurationFileImporter');
 const { createSetupCodeFile } = require('./setupCodeFile');
 
@@ -83,7 +83,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('setup:importConfigurationFile', (payload = {}, cb = () => {}) => {
-    respond(cb, () => {
+    respond(cb, async () => {
       requireOpenSetup(payload.setupCode);
       const yamlText = String(payload.yaml || '');
       if (!yamlText || Buffer.byteLength(yamlText, 'utf8') > MAX_CONFIGURATION_FILE_BYTES) {
@@ -95,8 +95,12 @@ io.on('connection', (socket) => {
         actor: 'first-run-setup',
         source: String(payload.fileName || 'uploaded-config.yaml').slice(0, 255),
       });
+      // By the time a browser can reach setup, server startup has registered
+      // every service handler. Apply the imported revision now so first-run
+      // setup follows the same no-restart contract as later admin edits.
+      const application = await applyCommittedConfiguration();
       setupCodeFile.remove();
-      return result;
+      return { ...result, application };
     });
   });
 });

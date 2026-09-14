@@ -1,25 +1,44 @@
 // Fleet Report Service
-// Purpose: Composes optional passive collection, storage, analysis, retention, and read-only transport.
-// Scope: This is the sole feature boundary; disabled installations register no collectors, timers, database, or sockets.
-const { loadConfig } = require('../../configuration');
+// Purpose: Owns the replaceable collection/report runtime and its stable browser API.
+// Scope: Applies the complete fleetReports section without restarting the Node process.
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const logger = require('../../globals/logger').child('fleetReportService');
+const { subscribeAll } = require('../eventBus');
+const roverManager = require('../roverManager');
+const { commandEvents } = require('../commandService');
+const { odometerEvents } = require('../odometerService');
+const { createStorage } = require('./storage');
+const { createCollector } = require('./collector');
+const { createReportBuilder } = require('./reportBuilder');
+const { registerSocketGateway } = require('./socketGateway');
 
-const config = loadConfig().fleetReports || {};
+let runtime = null;
+let storage = null;
 
-if (!config.enabled) {
-  module.exports = {
-    enabled: false,
-    getDailyReport: () => null,
-  };
-} else {
-  const { subscribeAll } = require('../eventBus');
-  const roverManager = require('../roverManager');
-  const { commandEvents } = require('../commandService');
-  const { odometerEvents } = require('../odometerService');
-  const { createStorage } = require('./storage');
-  const { createCollector } = require('./collector');
-  const { createReportBuilder } = require('./reportBuilder');
-  const { registerSocketGateway } = require('./socketGateway');
+function retentionDays(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function stopRuntime() {
+  if (!runtime) return;
+  runtime.unsubscribeEvents();
+  if (runtime.batteryEnabled) roverManager.managerEvents.off('sensor', runtime.collector.collectSensor);
+  commandEvents.off('observation', runtime.collector.collectCommand);
+  odometerEvents.off('update', runtime.collector.collectOdometer);
+  runtime.managerEventHandlers.forEach((handler, kind) => roverManager.managerEvents.off(kind, handler));
+  clearInterval(runtime.flushTimer);
+  clearInterval(runtime.retentionTimer);
+  runtime.collector.flushMinutes();
+  runtime = null;
+}
+
+function startRuntime(config = {}) {
+  stopRuntime();
+  if (!config.enabled) {
+    logger.info('Fleet reporting disabled by config');
+    return;
+  }
 
   const batteryConfig = config.battery || {};
   const retentionConfig = config.retention || {};
@@ -31,11 +50,14 @@ if (!config.enabled) {
     10,
     Math.min(100, Number(batteryConfig.minimumCapacityTestDepthPercent) || 60),
   );
-  // Battery collection follows its own explicit nested switch. Defaults are
-  // supplied by the validated configuration document, so a missing value does
-  // not need a compatibility fallback that could accidentally enable it.
   const batteryEnabled = Boolean(batteryConfig.enabled);
-  const storage = createStorage({ logger });
+
+  // Keep one SQLite connection for the process lifetime. Configuration reloads
+  // replace collectors and timers, not the durable database they share.
+  if (!storage) {
+    storage = createStorage({ logger });
+    storage.open();
+  }
   const collector = createCollector({
     storage,
     logger,
@@ -43,8 +65,6 @@ if (!config.enabled) {
     minimumCapacityTestDepthPercent,
   });
   const reportBuilder = createReportBuilder({ storage, collector, roverManager });
-
-  storage.open();
   const unsubscribeEvents = subscribeAll(collector.collectEvent);
   if (batteryEnabled) roverManager.managerEvents.on('sensor', collector.collectSensor);
   commandEvents.on('observation', collector.collectCommand);
@@ -55,18 +75,9 @@ if (!config.enabled) {
     roverManager.managerEvents.on(kind, handler);
     return [kind, handler];
   }));
-  registerSocketGateway({ roverManager, reportBuilder, storage, collector, logger });
 
-  // Periodic upserts bound data-loss on an unclean shutdown while still
-  // avoiding writes at the 20 Hz sensor-frame rate.
   const flushTimer = setInterval(() => collector.flushMinutes(), 30 * 1000);
   flushTimer.unref?.();
-
-  function retentionDays(value, fallback) {
-    const number = Number(value);
-    return Number.isFinite(number) && number >= 0 ? number : fallback;
-  }
-
   function pruneNow() {
     const now = Date.now();
     const detailedDays = retentionDays(retentionConfig.detailedDays, 0);
@@ -80,43 +91,50 @@ if (!config.enabled) {
   const retentionTimer = setInterval(pruneNow, 6 * 60 * 60 * 1000);
   retentionTimer.unref?.();
 
-  function getDailyReport({ since, until, roverIds } = {}) {
-    const end = Number(until) || Date.now();
-    return reportBuilder.build({
-      since: Number(since) || end - 24 * 60 * 60 * 1000,
-      until: end,
-      roverIds: Array.isArray(roverIds) ? roverIds : undefined,
-      // Daily Discord output is intentionally metric-only. Avoiding the event
-      // query here also prevents irrelevant event volume from bloating the
-      // durable daily snapshot that supports delivery idempotency.
-      includeEvents: false,
-    });
-  }
-
+  runtime = {
+    batteryEnabled,
+    storage,
+    collector,
+    reportBuilder,
+    unsubscribeEvents,
+    managerEventHandlers,
+    flushTimer,
+    retentionTimer,
+  };
   logger.info('Fleet reporting enabled', {
     databaseAvailable: storage.getDiagnostics().available,
     maximumIntegrationGapMs,
     minimumCapacityTestDepthPercent,
     batteryEnabled,
   });
-
-  module.exports = {
-    enabled: true,
-    getDailyReport,
-    collector,
-    storage,
-    reportBuilder,
-    // Exposed for controlled tests and graceful future shutdown wiring. Normal
-    // runtime leaves subscriptions active for the lifetime of the server.
-    stop() {
-      unsubscribeEvents();
-      if (batteryEnabled) roverManager.managerEvents.off('sensor', collector.collectSensor);
-      commandEvents.off('observation', collector.collectCommand);
-      odometerEvents.off('update', collector.collectOdometer);
-      managerEventHandlers.forEach((handler, kind) => roverManager.managerEvents.off(kind, handler));
-      clearInterval(flushTimer);
-      clearInterval(retentionTimer);
-      collector.flushMinutes();
-    },
-  };
 }
+
+registerSocketGateway({ roverManager, getRuntime: () => runtime, logger });
+startRuntime(loadConfig().fleetReports || {});
+registerConfigurationHandler('fleetReports', startRuntime);
+
+module.exports = {
+  get enabled() {
+    return Boolean(runtime);
+  },
+  getDailyReport({ since, until, roverIds } = {}) {
+    if (!runtime) return null;
+    const end = Number(until) || Date.now();
+    return runtime.reportBuilder.build({
+      since: Number(since) || end - 24 * 60 * 60 * 1000,
+      until: end,
+      roverIds: Array.isArray(roverIds) ? roverIds : undefined,
+      includeEvents: false,
+    });
+  },
+  get collector() {
+    return runtime?.collector || null;
+  },
+  get storage() {
+    return runtime?.storage || storage;
+  },
+  get reportBuilder() {
+    return runtime?.reportBuilder || null;
+  },
+  stop: stopRuntime,
+};

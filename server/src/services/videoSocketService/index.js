@@ -16,11 +16,8 @@ const {
   shouldUseSnapshotsForExternalSpectatorVideo,
 } = require('../../helpers/bandwidthSavings');
 
-const config = loadConfig();
-const mediaConfig = config.media || {};
-
 function getMediaPrefix() {
-  const base = mediaConfig.whepBaseUrl;
+  const base = loadConfig().media?.whepBaseUrl;
   if (!base) {
     return '';
   }

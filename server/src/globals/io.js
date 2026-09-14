@@ -13,8 +13,13 @@ const io = new SocketIOServer(httpServer, {
   maxHttpBufferSize: 16 * 1024 * 1024,
 });
 
-// Allow more service listeners without warnings.
-io.sockets.setMaxListeners(30);
-io.of('/').setMaxListeners(30);
+/*
+  Optional feature gateways now remain registered while disabled so an admin
+  can enable them live without adding a second listener tree. Forty is a small
+  explicit allowance for those one-time service owners, not an unlimited value
+  that could hide duplicate registrations during repeated configuration saves.
+*/
+io.sockets.setMaxListeners(40);
+io.of('/').setMaxListeners(40);
 
 module.exports = io;

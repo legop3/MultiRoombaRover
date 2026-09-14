@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const { app } = require('../../globals/http');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('interInstanceService');
-const { loadConfig, getFeatureFlags } = require('../../configuration');
+const { loadConfig, getFeatureFlags, registerConfigurationHandler } = require('../../configuration');
 const { getConfiguredSocials } = require('../sessionService/configuration');
 const { getMode, MODES } = require('../modeManager');
 const roverManager = require('../roverManager');
@@ -20,13 +20,13 @@ const DEFAULT_POLL_INTERVAL_MS = 30000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
 const INFO_PATH = '/api/inter-instance/info';
 const INSTANCE_ID = uuidv4();
-const config = loadConfig();
-const interInstanceConfig = config.interInstance || {};
-const profileConfig = interInstanceConfig.profile || {};
+let interInstanceConfig = loadConfig().interInstance || {};
 const interInstanceEvents = new EventEmitter();
 const remoteInstances = new Map();
 
-let polling = false;
+let pollGeneration = 0;
+let pollingGeneration = null;
+let pollTimer = null;
 function asTrimmedString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -59,7 +59,7 @@ function pollIntervalMs() {
 }
 
 function ownPublicUrl() {
-  return normalizeBaseUrl(profileConfig.publicUrl);
+  return normalizeBaseUrl(interInstanceConfig.profile?.publicUrl);
 }
 
 function ownInstanceId() {
@@ -79,6 +79,7 @@ function buildPublicUrl(pathname) {
 
 function publicProfile() {
   const publicUrl = ownPublicUrl();
+  const profileConfig = interInstanceConfig.profile || {};
   return {
     id: ownInstanceId(),
     name: asTrimmedString(profileConfig.name) || publicUrl || 'Rover server',
@@ -429,25 +430,40 @@ async function pollRemoteInstance(entry) {
   }
 }
 
-async function pollNow() {
-  if (!isEnabled() || polling) return;
-  polling = true;
+async function pollNow(expectedGeneration = pollGeneration) {
+  if (!isEnabled() || expectedGeneration !== pollGeneration || pollingGeneration === expectedGeneration) return;
+  pollingGeneration = expectedGeneration;
   try {
     const entries = await fetchDirectoryEntries();
     const nextEntries = await Promise.all(entries.map((entry) => pollRemoteInstance(entry)));
+    // Ignore responses from the previous directory/profile after a live edit;
+    // otherwise a slow retired request could repopulate peers after disable or
+    // overwrite results produced by the newly configured directory.
+    if (!isEnabled() || expectedGeneration !== pollGeneration) return;
     replaceRemoteInstances(nextEntries);
     interInstanceEvents.emit('change');
   } catch (err) {
     logger.warn('Inter-instance poll failed', { error: err.message });
   } finally {
-    polling = false;
+    if (pollingGeneration === expectedGeneration) pollingGeneration = null;
   }
 }
 
 function startPolling() {
-  if (!isEnabled()) return;
-  pollNow();
-  setInterval(pollNow, pollIntervalMs());
+  pollGeneration += 1;
+  const expectedGeneration = pollGeneration;
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (!isEnabled()) {
+    remoteInstances.clear();
+    interInstanceEvents.emit('change');
+    return;
+  }
+  pollNow(expectedGeneration);
+  pollTimer = setInterval(() => pollNow(expectedGeneration), pollIntervalMs());
+  pollTimer.unref?.();
 }
 
 function getState() {
@@ -461,6 +477,14 @@ function getState() {
 }
 
 startPolling();
+
+registerConfigurationHandler('interInstance', (nextConfig = {}) => {
+  // Replacing this single reference updates request timeouts, identity fields,
+  // directory URLs, and peer lists together. Rebuilding the interval applies
+  // the new cadence immediately and clears stale peers when disabled.
+  interInstanceConfig = nextConfig;
+  startPolling();
+});
 
 module.exports = {
   getState,

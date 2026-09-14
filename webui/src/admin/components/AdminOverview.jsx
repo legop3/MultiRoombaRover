@@ -13,7 +13,7 @@ export default function AdminOverview({ snapshot, socket, runSensitive, onSnapsh
   const config = snapshot.configuration;
 
   async function restore(revision) {
-    if (!window.confirm(`Restore configuration revision ${revision}? This creates a new active revision and requires a restart.`)) return;
+    if (!window.confirm(`Restore configuration revision ${revision}? This creates and immediately applies a new active revision.`)) return;
     try {
       const response = await runSensitive(() => restoreConfigurationRevision(socket, {
         revision,

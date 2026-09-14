@@ -7,15 +7,15 @@ const { promisify } = require('util');
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('balanceBoardService');
-const { loadConfig } = require('../../configuration');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { isAdmin } = require('../roleService');
 const { sendAlert } = require('../alertService');
 const { createBalanceBoardHardware } = require('./hardware');
 
 const events = new EventEmitter();
-const rawConfig = loadConfig().balanceBoard || {};
-const enabled = Boolean(rawConfig.enabled);
+let rawConfig = loadConfig().balanceBoard || {};
+let enabled = Boolean(rawConfig.enabled);
 const DATA_DIR = resolveDataDir();
 const STORE_PATH = resolveDataPath('balance-board.json');
 const FRAME_ROOM = 'balance-board-viewers';
@@ -452,12 +452,14 @@ function handleWorkerMessage(message = {}) {
 
 io.on('connection', (socket) => {
   socket.on('balanceBoard:subscribe', (_payload = {}, cb = () => {}) => {
+    if (!enabled) return cb({ error: 'Balance Board is disabled' });
     socket.join(FRAME_ROOM);
     if (latestFrame) socket.emit('balanceBoard:frame', latestFrame);
     cb({ success: true });
   });
   socket.on('balanceBoard:unsubscribe', () => socket.leave(FRAME_ROOM));
   socket.on('balanceBoard:zero', (_payload = {}, cb = () => {}) => {
+    if (!enabled) return cb({ error: 'Balance Board is disabled' });
     if (!isAdmin(socket)) {
       cb({ error: 'Admin access required' });
       return;
@@ -470,6 +472,7 @@ io.on('connection', (socket) => {
     }
   });
   socket.on('balanceBoard:resetRecord', (_payload = {}, cb = () => {}) => {
+    if (!enabled) return cb({ error: 'Balance Board is disabled' });
     if (!isAdmin(socket)) {
       cb({ error: 'Admin access required' });
       return;
@@ -484,6 +487,7 @@ io.on('connection', (socket) => {
     }
   });
   socket.on('balanceBoard:unpair', async (_payload = {}, cb = () => {}) => {
+    if (!enabled) return cb({ error: 'Balance Board is disabled' });
     if (!isAdmin(socket)) {
       cb({ error: 'Admin access required' });
       return;
@@ -546,7 +550,7 @@ io.on('connection', (socket) => {
   });
 });
 
-if (enabled) {
+function startHardware() {
   hardware = createBalanceBoardHardware({
     logger,
     address: store.address,
@@ -554,9 +558,37 @@ if (enabled) {
   });
   hardware.events.on('message', handleWorkerMessage);
   hardware.start();
+}
+
+if (enabled) {
+  startHardware();
 } else {
   logger.info('Balance Board disabled by config');
 }
+
+registerConfigurationHandler('balanceBoard', (nextConfig = {}) => {
+  const wasEnabled = enabled;
+  hardware?.stop();
+  hardware = null;
+  clearZeroTimer();
+  rawConfig = nextConfig;
+  enabled = Boolean(rawConfig.enabled);
+  if (!wasEnabled && enabled) store = loadStore();
+  connected = false;
+  batteryPercent = null;
+  latestFrame = null;
+  latestRawCorners = null;
+  latestRawFrameAt = 0;
+  if (enabled) {
+    status = store.address ? 'waiting' : 'starting';
+    detail = store.address ? 'Press the front power button.' : 'Starting Bluetooth discovery.';
+    startHardware();
+  } else {
+    status = 'disabled';
+    detail = 'Balance Board support is disabled.';
+  }
+  events.emit('change', getState());
+});
 
 function installShutdownHooks() {
   const shutdown = () => {

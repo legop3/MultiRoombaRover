@@ -4,7 +4,7 @@
 const { app } = require('../../globals/http');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('buttonBoxService');
-const { loadConfig } = require('../../configuration');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { publishEvent } = require('../eventBus');
 const { getRewardById, listRewards } = require('../../rewards');
@@ -30,7 +30,7 @@ const DATA_DIR = resolveDataDir();
 const STORE_PATH = resolveDataPath('buttonbox-state.json');
 const BUTTON_COUNT = 4;
 const STORE_VERSION = 1;
-const enabled = Boolean(loadConfig().buttonBox?.enabled);
+let enabled = Boolean(loadConfig().buttonBox?.enabled);
 
 const store = createButtonBoxStore({
   logger,
@@ -73,27 +73,37 @@ const core = createButtonBoxCore({
   store,
 });
 
-if (enabled) {
-  /*
-    The button box is physical local hardware, so disabled public installs
-    should not expose its LAN-only press endpoint or initialize its reward file.
-  */
-  registerButtonBoxRoute({
-    app,
-    logger,
-    buttonCount: BUTTON_COUNT,
-    normalizeIp,
-    isLocalNetwork,
-    applyPress: core.applyPress,
-  });
+registerButtonBoxRoute({
+  app,
+  logger,
+  buttonCount: BUTTON_COUNT,
+  normalizeIp,
+  isLocalNetwork,
+  isEnabled: () => enabled,
+  applyPress: core.applyPress,
+});
 
+function enableButtonBox() {
   store.loadState();
   core.recoverEffects().catch((err) => {
     logger.warn('Button box effect recovery failed', err.message);
   });
+}
+
+if (enabled) {
+  enableButtonBox();
 } else {
   logger.info('Button box disabled by config');
 }
+
+registerConfigurationHandler('buttonBox', (buttonBoxConfig = {}) => {
+  const wasEnabled = enabled;
+  enabled = Boolean(buttonBoxConfig.enabled);
+  // Persistent state is loaded only on the transition to enabled. The core has
+  // no long-running hardware client, so disabling is completely represented by
+  // the route and public-method gates.
+  if (!wasEnabled && enabled) enableButtonBox();
+});
 
 module.exports = {
   getButtonBoxState: () => {

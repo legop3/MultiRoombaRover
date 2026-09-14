@@ -8,7 +8,7 @@ module.exports = {
   feature: true,
   defaultValue: { enabled: false },
   schema: strictObject({
-    enabled: boolean({ description: 'Registers barcode scanning, barcode administration, and scan-triggered server behavior after restart.' }),
+    enabled: boolean({ description: 'Immediately enables barcode scanning, barcode administration, and scan-triggered server behavior.' }),
   }, {
     title: 'Barcode scanner',
     description: 'Optional physical barcode scanning and barcode registry service.',

@@ -3,12 +3,10 @@
 // Scope: Handles WHEP/WHP path-prefix trimming and SRT streamid extraction without performing auth decisions.
 const { loadConfig } = require('../../configuration');
 
-const config = loadConfig();
-const mediaConfig = config.media || {};
 const PTZ_STREAM_PATH = 'ptz-camera';
 
 function getPathPrefix() {
-  const base = mediaConfig.whepBaseUrl;
+  const base = loadConfig().media?.whepBaseUrl;
   if (!base) return '';
   try {
     const parsed = new URL(base);
@@ -18,10 +16,11 @@ function getPathPrefix() {
   }
 }
 
-const whepPathPrefix = getPathPrefix().replace(/\/+$/, '').replace(/^\/+/, '');
-const whepPrefixSegments = whepPathPrefix ? whepPathPrefix.split('/').filter(Boolean) : [];
-
 function extractStreamInfo(path) {
+  // The path prefix is tiny to derive and must follow media changes immediately;
+  // retaining it at module load would make auth disagree with newly issued URLs.
+  const whepPathPrefix = getPathPrefix().replace(/\/+$/, '').replace(/^\/+/, '');
+  const whepPrefixSegments = whepPathPrefix ? whepPathPrefix.split('/').filter(Boolean) : [];
   const segments = (path || '').split('/').filter(Boolean);
   if (!segments.length) return null;
 

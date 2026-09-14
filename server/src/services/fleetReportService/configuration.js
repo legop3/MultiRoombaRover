@@ -14,7 +14,7 @@ module.exports = {
     privacy: { retainChatBodies: true },
   },
   schema: strictObject({
-    enabled: boolean({ description: 'Starts persistent fleet metric collection, reports, retention cleanup, and configured daily delivery after restart.' }),
+    enabled: boolean({ description: 'Immediately starts persistent fleet metric collection, reports, retention cleanup, and configured daily delivery.' }),
     retention: strictObject({
       detailedDays: integer({ description: 'Days to retain detailed events, command observations, sessions, and other non-minute fleet records. Zero retains them indefinitely.', minimum: 0, maximum: 36500 }),
       minuteSamplesDays: integer({ description: 'Days to retain per-minute rover metric aggregates. Zero retains them indefinitely.', minimum: 0, maximum: 36500 }),

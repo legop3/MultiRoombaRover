@@ -21,7 +21,7 @@ module.exports = {
     replayEnabled: false,
   },
   schema: strictObject({
-    enabled: boolean({ description: 'Connects to the configured ONVIF camera and exposes its controls after restart.' }),
+    enabled: boolean({ description: 'Immediately connects to the configured ONVIF camera and exposes its controls.' }),
     name: string({ description: 'Human-readable camera name shown in the control interface.', minLength: 1, maxLength: 120 }),
     color: string({ description: 'Six-digit hexadecimal accent color used to identify this camera in the UI.', pattern: '^#[0-9a-fA-F]{6}$' }),
     host: string({ description: 'Hostname or IP address of the ONVIF camera.', examples: ['192.168.0.8'], maxLength: 255 }),

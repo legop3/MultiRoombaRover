@@ -2,7 +2,7 @@ const fsp = require('fs/promises');
 const { Ollama } = require('ollama');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('overseerControl');
-const { loadConfig } = require('../../configuration');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { getRole, roleEvents } = require('../roleService');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { verificationEvents } = require('../verificationService');
@@ -31,26 +31,24 @@ const { toStateUpdate, buildToolState, buildConversation, buildModelMessages } =
 const { buildOllamaTools, executeToolAction } = require('./tools');
 const { loadMemory, saveMemory, createDefaultMemory, summarizeMemory } = require('./memoryStore');
 
-const config = loadConfig();
-const overseerConfig = config.overseerControl || {};
 const RUN_MODE_AUTONOMOUS = 'autonomous';
 const RUN_MODE_DIRECT_ADDRESS = 'directAddress';
 const RUN_MODES = new Set([RUN_MODE_AUTONOMOUS, RUN_MODE_DIRECT_ADDRESS]);
-const enabled = Boolean(overseerConfig.enabled);
-const observeOnly = overseerConfig.observeOnly !== false;
-const name = String(overseerConfig.name || DEFAULT_NAME).trim() || DEFAULT_NAME;
-const configuredRunMode = String(overseerConfig.mode || RUN_MODE_AUTONOMOUS).trim();
-const runMode = RUN_MODES.has(configuredRunMode) ? configuredRunMode : RUN_MODE_AUTONOMOUS;
-const autonomousMode = runMode === RUN_MODE_AUTONOMOUS;
-const directAddressMode = runMode === RUN_MODE_DIRECT_ADDRESS;
-const model = String(overseerConfig.model || '').trim();
-const ollamaUrl = String(overseerConfig.ollamaServer || '').trim();
-const gateIntervalMs = normalizeMs(Number(overseerConfig.gateIntervalMs), DEFAULT_GATE_INTERVAL_MS);
-const postToolsOnlyMessages = Boolean(overseerConfig.postToolsOnlyMessages);
-const tiebreakerEnable = Boolean(overseerConfig.tiebreakerEnable);
-const runWhileNoPeopleOnline = Boolean(overseerConfig.runWhileNoPeopleOnline);
-const profileImageUrl = String(overseerConfig.profileImageUrl || '').trim() || null;
-const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
+let enabled;
+let observeOnly;
+let name;
+let runMode;
+let autonomousMode;
+let directAddressMode;
+let model;
+let ollamaUrl;
+let gateIntervalMs;
+let postToolsOnlyMessages;
+let tiebreakerEnable;
+let runWhileNoPeopleOnline;
+let profileImageUrl;
+let ollamaClient;
+let normalizedConfiguredName;
 
 function normalizeNameMentionText(value) {
   return String(value || '')
@@ -63,7 +61,26 @@ function normalizeNameMentionText(value) {
     .replace(/\s+/g, ' ');
 }
 
-const normalizedConfiguredName = normalizeNameMentionText(name);
+function applyOverseerConfig(overseerConfig = {}) {
+  enabled = Boolean(overseerConfig.enabled);
+  observeOnly = overseerConfig.observeOnly !== false;
+  name = String(overseerConfig.name || DEFAULT_NAME).trim() || DEFAULT_NAME;
+  const configuredRunMode = String(overseerConfig.mode || RUN_MODE_AUTONOMOUS).trim();
+  runMode = RUN_MODES.has(configuredRunMode) ? configuredRunMode : RUN_MODE_AUTONOMOUS;
+  autonomousMode = runMode === RUN_MODE_AUTONOMOUS;
+  directAddressMode = runMode === RUN_MODE_DIRECT_ADDRESS;
+  model = String(overseerConfig.model || '').trim();
+  ollamaUrl = String(overseerConfig.ollamaServer || '').trim();
+  gateIntervalMs = normalizeMs(Number(overseerConfig.gateIntervalMs), DEFAULT_GATE_INTERVAL_MS);
+  postToolsOnlyMessages = Boolean(overseerConfig.postToolsOnlyMessages);
+  tiebreakerEnable = Boolean(overseerConfig.tiebreakerEnable);
+  runWhileNoPeopleOnline = Boolean(overseerConfig.runWhileNoPeopleOnline);
+  profileImageUrl = String(overseerConfig.profileImageUrl || '').trim() || null;
+  ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
+  normalizedConfiguredName = normalizeNameMentionText(name);
+}
+
+applyOverseerConfig(loadConfig().overseerControl || {});
 
 const runtime = {
   timer: null,
@@ -795,6 +812,27 @@ modeEvents.on('change', (mode) => {
     return;
   }
   evaluateSchedulerGate(observeOnly ? 'observe-only mode' : null);
+});
+
+registerConfigurationHandler('overseerControl', (overseerConfig = {}) => {
+  // All scheduler and model parameters are one runtime unit. Cancel the old
+  // cadence, replace them atomically, and let the normal vote/mode gate decide
+  // whether the newly configured scheduler should run.
+  stopScheduler('configuration changed');
+  applyOverseerConfig(overseerConfig);
+  updateStatus({
+    enabled,
+    runMode,
+    observeOnly,
+    name,
+    model,
+    ollamaUrl,
+    gateIntervalMs,
+    postToolsOnlyMessages,
+    tiebreakerEnable,
+    runWhileNoPeopleOnline,
+  });
+  evaluateSchedulerGate('configuration changed');
 });
 
 if (!enabled) {

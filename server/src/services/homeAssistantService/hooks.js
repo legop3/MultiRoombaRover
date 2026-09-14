@@ -8,7 +8,7 @@ const { isAdmin, isLockdownAdmin } = require('../roleService');
 function registerHomeAssistantHooks(deps) {
   const {
     logger,
-    haConfig,
+    getHaConfig,
     isLightControlLocked,
     setLightsLockedOn,
     toggleEntity,
@@ -110,7 +110,9 @@ function registerHomeAssistantHooks(deps) {
       }
       try {
         if (!entityId) throw new Error('entityId required');
-        await setLightWhite(entityId, haConfig?.whiteKelvin);
+        // Resolve configuration at interaction time because the socket handler
+        // is intentionally registered once and survives service reloads.
+        await setLightWhite(entityId, getHaConfig()?.whiteKelvin);
         cb({ success: true });
       } catch (err) {
         cb({ error: err.message });

@@ -9,7 +9,7 @@ const { Cam } = require('onvif');
 
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('ptzCamera');
-const { loadConfig } = require('../../configuration');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { resolveRoverSnapshotDir } = require('../../helpers/dataPaths');
 const {
   shouldUseSnapshotsForNonTurnVideo,
@@ -51,9 +51,8 @@ const PUBLISHER_STDERR_SYNC_MS = 10000;
 const PUBLISHER_RTSP_TIMEOUT_US = 10000000;
 
 const events = new EventEmitter();
-const config = loadConfig();
-const cameraConfig = config.ptzCamera || {};
-const enabled = Boolean(cameraConfig.enabled);
+let cameraConfig = loadConfig().ptzCamera || {};
+let enabled = Boolean(cameraConfig.enabled);
 
 const state = {
   initialized: false,
@@ -114,7 +113,7 @@ let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
 const socketSnapshotSubscriptions = new Map();
 const snapshotLastSentBySocket = new Map();
-const audioPlayback = createPtzAudioPlayback({
+let audioPlayback = createPtzAudioPlayback({
   logger,
   cameraConfig,
   enabled,
@@ -1830,6 +1829,44 @@ registerSocketHandlers();
 if (enabled) {
   initialize();
 }
+
+function stopCameraRuntime() {
+  // Disable restart-producing callbacks before terminating the publisher. The
+  // old ffmpeg exit event can then observe `enabled === false` and will not
+  // resurrect a process built from the previous camera configuration.
+  enabled = false;
+  revokeOperator('configuration-change');
+  state.queue = [];
+  stopPublisher();
+  audioPlayback.stopActivePlayback('configuration-change');
+  if (snapshotTimer) {
+    clearInterval(snapshotTimer);
+    snapshotTimer = null;
+  }
+  if (spotlightVerifyTimer) {
+    clearTimeout(spotlightVerifyTimer);
+    spotlightVerifyTimer = null;
+  }
+  clearMotionWatchdog();
+  clearPanTiltRenewal();
+  clearZoomRepeat();
+  onvifCam = null;
+  state.initialized = false;
+  state.initializing = false;
+  state.rtspUri = null;
+  state.profileToken = DEFAULT_PROFILE_TOKEN;
+}
+
+registerConfigurationHandler('ptzCamera', (nextCameraConfig = {}) => {
+  stopCameraRuntime();
+  cameraConfig = nextCameraConfig;
+  enabled = Boolean(cameraConfig.enabled);
+  state.profileToken = String(cameraConfig.profileToken || DEFAULT_PROFILE_TOKEN);
+  state.error = null;
+  audioPlayback = createPtzAudioPlayback({ logger, cameraConfig, enabled, getSocketLabel });
+  emitChange('configuration-change');
+  if (enabled) initialize();
+});
 
 module.exports = {
   PTZ_CAMERA_ID,

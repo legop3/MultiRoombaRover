@@ -3,10 +3,8 @@
 // Scope: Owns camera identity/url normalization and read-only accessors for room camera metadata.
 const EventEmitter = require('events');
 const logger = require('../../globals/logger').child('roomCameraService');
-const { loadConfig } = require('../../configuration');
 
 const events = new EventEmitter();
-const config = loadConfig();
 const cameraMap = new Map();
 
 function normalizeCamera(camera) {
@@ -38,11 +36,11 @@ function getRoomCamera(id) {
   return cameraMap.get(String(id)) || null;
 }
 
-function loadFromConfig() {
+function loadFromConfig(roomCameraConfig = {}) {
   cameraMap.clear();
   // Schema validation guarantees the configured list shape. Keeping its
   // fallback local makes the camera catalog independent of feature projection.
-  const list = Array.isArray(config.roomCameras?.cameras) ? config.roomCameras.cameras : [];
+  const list = Array.isArray(roomCameraConfig.cameras) ? roomCameraConfig.cameras : [];
   list.forEach((camera) => {
     const normalized = normalizeCamera(camera);
     if (normalized) cameraMap.set(normalized.id, normalized);

@@ -4,27 +4,28 @@
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('liftService');
-const { loadConfig } = require('../../configuration');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { getMode, MODES } = require('../modeManager');
 const { isAdmin, isLockdownAdmin } = require('../roleService');
-const {
-  homeAssistantEvents,
-  getRawEntitySnapshot,
-  callHomeAssistantService,
-  isConnected: isHomeAssistantConnected,
-  enabled: homeAssistantEnabled,
-} = require('../homeAssistantService');
+const homeAssistantService = require('../homeAssistantService');
+const { homeAssistantEvents, getRawEntitySnapshot, callHomeAssistantService } = homeAssistantService;
 
 const events = new EventEmitter();
-const config = loadConfig();
-const haConfig = config.homeAssistant || {};
-const liftConfig = haConfig.lift || {};
-const featureEnabled = Boolean(liftConfig.enabled);
+let featureEnabled;
+let upSwitchId;
+let downSwitchId;
+let interlockMs;
+let commandCooldownMs;
 
-const upSwitchId = String(liftConfig.upSwitch || '').trim();
-const downSwitchId = String(liftConfig.downSwitch || '').trim();
-const interlockMs = Math.max(250, Number(liftConfig.interlockMs) || 9000);
-const commandCooldownMs = Math.max(interlockMs, Number(liftConfig.commandCooldownMs) || 25000);
+function applyLiftConfig(liftConfig = {}) {
+  featureEnabled = Boolean(liftConfig.enabled);
+  upSwitchId = String(liftConfig.upSwitch || '').trim();
+  downSwitchId = String(liftConfig.downSwitch || '').trim();
+  interlockMs = Math.max(250, Number(liftConfig.interlockMs) || 9000);
+  commandCooldownMs = Math.max(interlockMs, Number(liftConfig.commandCooldownMs) || 25000);
+}
+
+applyLiftConfig(loadConfig().homeAssistant?.lift || {});
 
 const state = {
   busy: false,
@@ -70,7 +71,7 @@ function isConfigured() {
 
 function getState() {
   const configured = isConfigured();
-  const connected = isHomeAssistantConnected();
+  const connected = homeAssistantService.isConnected();
   return {
     enabled: featureEnabled,
     configured,
@@ -105,8 +106,8 @@ function emitUpdate() {
 function assertReady() {
   if (!featureEnabled) throw new Error('Lift is disabled');
   if (!isConfigured()) throw new Error('Lift not configured');
-  if (!homeAssistantEnabled) throw new Error('Home Assistant not configured');
-  if (!isHomeAssistantConnected()) throw new Error('Home Assistant not connected');
+  if (!homeAssistantService.enabled) throw new Error('Home Assistant not configured');
+  if (!homeAssistantService.isConnected()) throw new Error('Home Assistant not connected');
 }
 
 async function applyPosition(target) {
@@ -175,16 +176,10 @@ async function moveDown(actor = 'unknown') {
   return requestPosition('down', actor);
 }
 
-if (featureEnabled) {
-  /*
-    Lift state depends on Home Assistant switch snapshots. Subscribe only when
-    the lift exists so disabled installs do not maintain hardware-specific UI
-    sync paths.
-  */
-  homeAssistantEvents.on('snapshot', emitUpdate);
-  homeAssistantEvents.on('status', emitUpdate);
+homeAssistantEvents.on('snapshot', emitUpdate);
+homeAssistantEvents.on('status', emitUpdate);
 
-  io.on('connection', (socket) => {
+io.on('connection', (socket) => {
     function assertFeatureAccess() {
       const mode = getMode();
       // Lift is a public activity feature in open and turns modes. Restricted
@@ -215,10 +210,18 @@ if (featureEnabled) {
         cb({ error: err.message });
       }
     });
-  });
-} else {
+});
+
+if (!featureEnabled) {
   logger.info('Lift disabled by config');
 }
+
+registerConfigurationHandler('homeAssistant', (haConfig = {}) => {
+  // Lift is nested under the Home Assistant section, so it participates in the
+  // same section reload and immediately sees the replacement HA transport.
+  applyLiftConfig(haConfig.lift || {});
+  emitUpdate();
+});
 
 emitUpdate();
 

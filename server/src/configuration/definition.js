@@ -61,7 +61,7 @@ const properties = Object.fromEntries(
 );
 const rootSchema = strictObject(properties, {
   title: 'Configuration',
-  description: 'Complete server configuration. Changes are validated and saved as one revision, then loaded when the application restarts.',
+  description: 'Complete server configuration. Changes are validated, saved as one revision, and applied live by reloading affected services.',
   required: definitions.map(({ key }) => key),
 });
 

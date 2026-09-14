@@ -16,7 +16,7 @@ module.exports = {
     commandCooldownMs: 3000,
   },
   schema: strictObject({
-    enabled: boolean({ description: 'Enables lift status and commands through the two configured Home Assistant switches after restart.' }),
+    enabled: boolean({ description: 'Immediately enables lift status and commands through the two configured Home Assistant switches.' }),
     upSwitch: string({ description: 'Home Assistant switch entity that powers upward lift movement.', examples: ['switch.lift_up'], maxLength: 255 }),
     downSwitch: string({ description: 'Home Assistant switch entity that powers downward lift movement.', examples: ['switch.lift_down'], maxLength: 255 }),
     interlockMs: integer({ description: 'Milliseconds to wait after turning off the opposing direction before energizing the requested direction. Runtime always enforces at least 250 ms.', minimum: 0, maximum: 600000 }),

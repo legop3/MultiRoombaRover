@@ -33,7 +33,7 @@ function normalizeKinectConfig(config = {}) {
 }
 
 function registerKinectSocketGateway({ config, hardware }) {
-  const settings = normalizeKinectConfig(config);
+  let settings = normalizeKinectConfig(config);
   let captureCooldownUntil = 0;
   let busy = false;
   let lastAction = null;
@@ -206,8 +206,31 @@ function registerKinectSocketGateway({ config, hardware }) {
     }
   }
 
+  function reconfigure(nextConfig) {
+    const previousEnabled = settings.enabled;
+    settings = normalizeKinectConfig(nextConfig);
+    lastError = null;
+
+    // The native worker is the Kinect service's complete hardware runtime.
+    // Restarting only when the enabled state changes avoids interrupting an
+    // unrelated cooldown edit while still making enable/disable immediate.
+    if (previousEnabled && !settings.enabled) {
+      hardware.stopWorker();
+      busy = false;
+    } else if (!previousEnabled && settings.enabled) {
+      try {
+        hardware.startWorker();
+      } catch (err) {
+        lastError = err.message || 'kinect worker failed to start';
+        logger.warn('Kinect worker startup failed after configuration change', { err: lastError });
+      }
+    }
+    emitStatusChange();
+  }
+
   return {
     getState: buildStatus,
+    reconfigure,
   };
 }
 

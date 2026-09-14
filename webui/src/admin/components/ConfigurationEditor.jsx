@@ -65,7 +65,7 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
   return (
     <CardFrame title="Configuration" meta={`revision ${revision}`} clipOverflow={false} bodyClassName="p-0.5">
       <div className="configuration-toolbar sticky top-0 z-20 mb-0.5 space-y-0.5 border border-neutral-500/60 bg-neutral-900/95 p-0.5 backdrop-blur">
-        <p className="text-xs text-slate-400">Saved changes apply after an application restart.</p>
+        <p className="text-xs text-slate-400">Saving applies the complete revision immediately and reloads each affected service.</p>
         {/* All document actions stay together at the start of the toolbar. The
             editor may use a wide canvas, but width is never used to separate a
             control from the content that explains it. */}
@@ -75,9 +75,19 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
             setDraft(clone(serverValue));
             setSecretOperations({});
           }}>Reset</button>
-          <button type="button" className="button-dark" disabled={!dirty || saving} onClick={save}>{saving ? 'Saving…' : 'Save configuration'}</button>
+          <button type="button" className="button-dark" disabled={!dirty || saving} onClick={save}>{saving ? 'Applying…' : 'Save configuration'}</button>
         </div>
       </div>
+      {snapshot.configurationApplication?.services?.some((service) => service.status === 'failed') ? (
+        <div className="mb-0.5 border border-amber-500/60 bg-amber-950/40 p-1 text-xs text-amber-100">
+          <p className="font-semibold">Configuration was saved, but some services could not reload</p>
+          <ul className="mt-0.5 list-disc space-y-0.25 pl-4">
+            {snapshot.configurationApplication.services
+              .filter((service) => service.status === 'failed')
+              .map((service, index) => <li key={`${service.section}-${index}`}>{service.section}: {service.error}</li>)}
+          </ul>
+        </div>
+      ) : null}
       {error ? <p className="border border-red-500/60 bg-red-950/40 p-1 text-xs text-red-100">{error}</p> : null}
       {validationErrors.length ? (
         <div className="border border-red-500/60 bg-red-950/40 p-1 text-xs text-red-100">

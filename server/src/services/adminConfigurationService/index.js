@@ -7,6 +7,8 @@ const logger = require('../../globals/logger').child('adminConfigurationService'
 const {
   getConfigurationDatabase,
   getRuntimeConfigurationRevision,
+  getLastConfigurationApplication,
+  applyCommittedConfiguration,
   rootSchema,
 } = require('../../configuration');
 const { getRole } = require('../roleService');
@@ -69,7 +71,8 @@ function buildAdminSnapshot() {
       a second field definition.
     */
     configuration: { ...configuration, schema: rootSchema },
-    restartRequired: configuration.revision !== getRuntimeConfigurationRevision(),
+    appliedRevision: getRuntimeConfigurationRevision(),
+    configurationApplication: getLastConfigurationApplication(),
     administrators: database.listAdministrators(),
     revisions: database.listConfigurationRevisions(),
     auditEvents: database.listAuditEvents(),
@@ -88,23 +91,25 @@ io.on('connection', (socket) => {
     return { confirmedUntil: socket.data.adminPasswordConfirmedAt + PASSWORD_CONFIRMATION_WINDOW_MS };
   });
 
-  ackHandler(socket, 'adminConfig:updateConfiguration', requireRecentPassword, (payload) => {
+  ackHandler(socket, 'adminConfig:updateConfiguration', requireRecentPassword, async (payload) => {
     const revision = database.updateConfiguration({
       value: payload.value,
       expectedRevision: payload.expectedRevision,
       secretOperations: payload.secretOperations,
       actor: actorFor(socket),
     });
-    return { revision, snapshot: buildAdminSnapshot(), restartRequired: true };
+    const application = await applyCommittedConfiguration();
+    return { revision, application, snapshot: buildAdminSnapshot() };
   });
 
-  ackHandler(socket, 'adminConfig:restoreRevision', requireRecentPassword, (payload) => {
+  ackHandler(socket, 'adminConfig:restoreRevision', requireRecentPassword, async (payload) => {
     const revision = database.restoreConfigurationRevision({
       revision: payload.revision,
       expectedRevision: payload.expectedRevision,
       actor: actorFor(socket),
     });
-    return { revision, snapshot: buildAdminSnapshot(), restartRequired: true };
+    const application = await applyCommittedConfiguration();
+    return { revision, application, snapshot: buildAdminSnapshot() };
   });
 
   ackHandler(socket, 'adminConfig:createAdministrator', requireRecentPassword, async (payload) => {
