@@ -5,7 +5,16 @@
 set -euo pipefail
 
 PATH_NAME="${MTX_PATH:-}"
-SNAP_DIR="${ROVER_SNAPSHOT_DIR:-/var/lib/rover-snapshots}"
+
+# Node resolves and supplies SERVER_DATA_DIR when it starts MediaMTX, and
+# MediaMTX carries that environment into this runOnReady hook. Requiring that
+# single root prevents the writer from silently recreating the former /var/lib
+# snapshot store while the readers are looking inside the mounted data folder.
+if [[ -z "${SERVER_DATA_DIR:-}" ]]; then
+  echo "SERVER_DATA_DIR is required for rover snapshot output" >&2
+  exit 1
+fi
+SNAP_DIR="${SERVER_DATA_DIR}/rover-snapshots"
 
 # Ignore non-rover-video paths.
 case "$PATH_NAME" in

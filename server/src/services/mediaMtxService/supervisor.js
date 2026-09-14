@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const yaml = require('js-yaml');
-const { resolveDataPath } = require('../../helpers/dataPaths');
+const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { buildMediaMtxConfig } = require('./config');
 
 function createMediaMtxSupervisor(deps) {
@@ -52,6 +52,16 @@ function createMediaMtxSupervisor(deps) {
     logger.info(`Starting MediaMTX with generated config ${configPath}`);
     child = spawnProcess(mediaMtxBin, [configPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
+      /*
+        MediaMTX passes its environment to runOnReady hooks. Supplying the
+        resolved value here also covers development starts where
+        SERVER_DATA_DIR was omitted, so the installed snapshot writer and every
+        Node snapshot reader still converge on the same canonical data root.
+      */
+      env: {
+        ...process.env,
+        SERVER_DATA_DIR: resolveDataDir(),
+      },
     });
 
     forwardLines(child.stdout, 'info');

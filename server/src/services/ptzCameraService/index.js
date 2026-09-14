@@ -10,6 +10,7 @@ const { Cam } = require('onvif');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('ptzCamera');
 const { loadConfig } = require('../../helpers/configLoader');
+const { resolveRoverSnapshotDir } = require('../../helpers/dataPaths');
 const { isFeatureEnabled } = require('../../helpers/features');
 const {
   shouldUseSnapshotsForNonTurnVideo,
@@ -43,7 +44,7 @@ const STOP_MOTION = Object.freeze({ pan: 0, tilt: 0, zoom: 0 });
 // explicitly disables replay for the camera.
 const DEFAULT_REPLAY_ENABLED = true;
 const DEFAULT_PTZ_COLOR = '#387bf8';
-const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
+const SNAPSHOT_DIR = resolveRoverSnapshotDir();
 const SNAPSHOT_POLL_MS = 300;
 const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
 const SPOTLIGHT_VERIFY_DELAY_MS = 1200;

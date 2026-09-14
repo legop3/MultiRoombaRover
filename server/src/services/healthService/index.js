@@ -3,12 +3,13 @@
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const fsp = require('fs/promises');
 const path = require('path');
+const { resolveRoverSnapshotDir } = require('../../helpers/dataPaths');
 const roverManager = require('../roverManager');
 const { getRoomCameras } = require('../roomCameraService');
 const { getRoomCameraState } = require('../roomCameraService');
 const { getReplayHealthSnapshot } = require('../replayEngineV2');
 
-const ROVER_SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
+const ROVER_SNAPSHOT_DIR = resolveRoverSnapshotDir();
 const HEALTH_INTERVAL_MS = 5000;
 const ROOM_CAMERA_STALE_MS = 5000;
 const ROVER_SNAPSHOT_STALE_MS = 5000;

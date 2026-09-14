@@ -6,6 +6,7 @@ const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('audioForwardService');
 const { loadConfig } = require('../../helpers/configLoader');
+const { resolveRuntimePath } = require('../../helpers/dataPaths');
 const roverManager = require('../roverManager');
 const turnService = require('../turnService');
 const { isMuted, isVerified, verificationEvents } = require('../verificationService');
@@ -25,7 +26,13 @@ const streamSuffix =
   typeof audioForwardConfig.streamSuffix === 'string' && audioForwardConfig.streamSuffix.trim()
     ? audioForwardConfig.streamSuffix.trim()
     : '-fwd';
-const runtimeDir = path.resolve(audioForwardConfig.runtimeDir || '/tmp/mrr-audio-forward');
+/*
+  FIFOs and uploaded clips are disposable, but they are deliberately created
+  and managed by this application. A fixed path below SERVER_DATA_DIR keeps the
+  Node process from writing to an unrelated host temp directory and prevents a
+  configuration value from escaping the server's filesystem boundary.
+*/
+const runtimeDir = resolveRuntimePath('audio-forward');
 const uploadsDir = path.join(runtimeDir, 'uploads');
 const maxUploadBytes = Number.isFinite(audioForwardConfig.maxUploadBytes)
   ? Math.max(256 * 1024, Math.floor(audioForwardConfig.maxUploadBytes))

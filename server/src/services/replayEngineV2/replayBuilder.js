@@ -1,8 +1,8 @@
 // Replay Builder Pipeline
 // Purpose: Assembles selected buffered segments into final replay output video with optional sidebar.
 // Scope: Owns concat/probe/layout/transcode pipeline and returns replay buffer plus source usage metadata.
-const os = require('os');
 const path = require('path');
+const { resolveRuntimePath } = require('../../helpers/dataPaths');
 const { getActiveDrivers } = require('../turnService');
 const { getNickname } = require('../nicknameService');
 const { getRecentMessages } = require('../chatService');
@@ -124,7 +124,15 @@ function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo
       durationMs: BUILD_DURATION_MS,
     });
     const resolvedTitle = sanitizeReplayTitle(title, resolveDefaultReplayTitle(requester, sources));
-    const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'mrr-replay-v2-'));
+    /*
+      A replay build is disposable, but every intermediate concat list, pinned
+      segment, and ffmpeg output is created on the server's behalf. Create a
+      unique workspace below SERVER_DATA_DIR so the application never spills
+      those writes into the host-wide temporary directory.
+    */
+    const buildRoot = resolveRuntimePath('replay-builds');
+    await ensureDir(buildRoot);
+    const tmpDir = await fsp.mkdtemp(path.join(buildRoot, 'build-'));
 
     try {
       const usedSources = [];
