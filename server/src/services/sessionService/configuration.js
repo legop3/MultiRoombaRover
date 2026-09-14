@@ -20,11 +20,11 @@ const socials = {
       title: 'Links',
       description: 'Ordered social or community links presented to users when this feature is enabled.',
       items: strictObject({
-        id: string({ description: 'Stable identifier used by the UI to distinguish this link from the others.', minLength: 1, maxLength: 60, pattern: '^[a-zA-Z0-9_-]+$' }),
-        label: string({ description: 'User-facing text displayed on the link button.', minLength: 1, maxLength: 80 }),
-        url: string({ description: 'Absolute destination opened when a user selects this link.', format: 'uri', maxLength: 2048 }),
-        icon: string({ description: 'Icon name interpreted by the social-button UI; leave blank to use its fallback presentation.', maxLength: 80 }),
-        color: string({ description: 'Six-digit hexadecimal accent color used for this link button.', pattern: '^#[0-9a-fA-F]{6}$' }),
+        id: string({ description: 'Stable identifier used by the UI to distinguish this link from the others.', examples: ['discord'], minLength: 1, maxLength: 60, pattern: '^[a-zA-Z0-9_-]+$' }),
+        label: string({ description: 'User-facing text displayed on the link button.', examples: ['Discord'], minLength: 1, maxLength: 80 }),
+        url: string({ description: 'Absolute destination opened when a user selects this link.', examples: ['https://discord.gg/your-invite'], format: 'uri', maxLength: 2048 }),
+        icon: string({ description: 'Icon name interpreted by the social-button UI; leave blank to use its fallback presentation.', examples: ['FaDiscord'], maxLength: 80 }),
+        color: string({ description: 'Six-digit hexadecimal accent color used for this link button.', examples: ['#5865F2'], pattern: '^#[0-9a-fA-F]{6}$' }),
       }, { description: 'One social-link button shown to users.', required: ['id', 'label', 'url', 'icon', 'color'] }),
     },
   }, { title: 'Social links', description: 'Controls the optional social and community buttons published to local users and peer instances.', required: ['enabled', 'links'] }),
@@ -34,8 +34,8 @@ const driverAd = {
   key: 'driverAd',
   defaultValue: { title: '', html: '' },
   schema: strictObject({
-    title: string({ description: 'Heading displayed above the operator-provided content on the driver page; leave blank to use the card fallback.', maxLength: 120 }),
-    html: string({ title: 'HTML', description: 'Trusted operator HTML shown to drivers.', maxLength: 100000 }),
+    title: string({ description: 'Heading displayed above the operator-provided content on the driver page; leave blank to use the card fallback.', examples: ['Advertisement'], maxLength: 120 }),
+    html: string({ title: 'HTML', description: 'Trusted operator HTML shown to drivers.', examples: ['<a href="https://example.com" target="_blank" rel="noopener noreferrer"><img src="https://example.com/ad.png" alt="Advertisement"></a>'], maxLength: 100000 }),
   }, { title: 'Driver content', description: 'Operator-managed informational or promotional content displayed in the driver application.', required: ['title', 'html'] }),
 };
 

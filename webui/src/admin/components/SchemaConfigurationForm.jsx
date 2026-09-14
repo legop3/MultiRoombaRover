@@ -13,10 +13,14 @@ function buildUiSchema(schema, path = '') {
     server secret-operation protocol; it contains no service or field names.
   */
   if (!schema || typeof schema !== 'object') return {};
+  const firstExample = Array.isArray(schema.examples) ? schema.examples[0] : undefined;
+  const placeholder = firstExample === undefined ? {} : { 'ui:placeholder': String(firstExample) };
+
   if (schema.writeOnly === true) {
     return {
       'ui:widget': 'SecretWidget',
       'ui:options': { secretPath: path },
+      ...placeholder,
     };
   }
 
@@ -34,14 +38,25 @@ function buildUiSchema(schema, path = '') {
     };
   }
 
-  if (schema.type !== 'object' || !schema.properties) return {};
+  if (schema.type === 'array' && schema.items) {
+    /*
+      Array item schemas need the same generic metadata walk as ordinary object
+      properties. Otherwise fields created by Add item would lose their
+      schema-owned placeholders even though the backend described them.
+    */
+    return {
+      items: buildUiSchema(schema.items, path ? `${path}[]` : '[]'),
+    };
+  }
+
+  if (schema.type !== 'object' || !schema.properties) return placeholder;
   return Object.fromEntries(Object.entries(schema.properties).map(([key, childSchema]) => [
     key,
     buildUiSchema(childSchema, path ? `${path}.${key}` : key),
   ]));
 }
 
-function SecretWidget({ id, disabled, readonly, options, registry }) {
+function SecretWidget({ id, disabled, readonly, options, placeholder, registry }) {
   const secretPath = options.secretPath;
   const context = registry.formContext || {};
   const operation = context.secretOperations?.[secretPath];
@@ -78,7 +93,7 @@ function SecretWidget({ id, disabled, readonly, options, registry }) {
           type="password"
           autoComplete="new-password"
           value={operation.value}
-          placeholder="Enter replacement value"
+          placeholder={placeholder || 'Enter replacement value'}
           disabled={unavailable}
           onChange={(event) => setOperation({ action: 'replace', value: event.target.value })}
         />
@@ -135,6 +150,7 @@ function ConfigurationFieldTemplate({
 function ConfigurationObjectTemplate({ description, fieldPathId, properties, title }) {
   const visibleProperties = properties.filter((property) => !property.hidden);
   const propertyLines = visibleProperties.map((property) => property.content);
+  const topLevel = fieldPathId.path.length === 1;
 
   if (fieldPathId.path.length === 0) {
     // The outer configuration card already names the root document. Rendering
@@ -165,7 +181,8 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
     <CardFrame
       title={title}
       clipOverflow={false}
-      className="configuration-card"
+      className={`configuration-card${topLevel ? ' configuration-top-level-card' : ''}`}
+      headerClassName={topLevel ? '!bg-sky-950' : ''}
       bodyClassName="configuration-card-body"
     >
       {description ? <div className="configuration-branch-description">{description}</div> : null}
@@ -208,13 +225,16 @@ function ConfigurationArrayItemTemplate({ buttonsProps, children, hasToolbar, in
   );
 }
 
-function ConfigurationArrayTemplate({ canAdd, disabled, items, onAddClick, readonly, schema, title }) {
+function ConfigurationArrayTemplate({ canAdd, disabled, fieldPathId, items, onAddClick, readonly, schema, title }) {
+  const topLevel = fieldPathId.path.length === 1;
+
   return (
     <CardFrame
       title={title}
       meta={`${items.length} ${items.length === 1 ? 'item' : 'items'}`}
       clipOverflow={false}
-      className="configuration-card configuration-array"
+      className={`configuration-card configuration-array${topLevel ? ' configuration-top-level-card' : ''}`}
+      headerClassName={topLevel ? '!bg-sky-950' : ''}
       bodyClassName="configuration-card-body"
     >
       {schema.description ? <div className="configuration-branch-description">{schema.description}</div> : null}

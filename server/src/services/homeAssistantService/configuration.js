@@ -23,7 +23,7 @@ module.exports = {
   schema: strictObject({
     enabled: boolean({ description: 'Connects to Home Assistant and enables configured room entities, physical-button triggers, Neato controls, and lift controls after restart.' }),
     url: string({ title: 'Server URL', description: 'Base URL of the Home Assistant server used for its REST and WebSocket APIs.', format: 'uri', maxLength: 2048 }),
-    token: string({ title: 'Long-lived access token', description: 'Home Assistant long-lived access token used to authenticate every API request. The saved value is never returned to the browser.', writeOnly: true, maxLength: 20000 }),
+    token: string({ title: 'Long-lived access token', description: 'Home Assistant long-lived access token used to authenticate every API request. The saved value is never returned to the browser.', examples: ['REPLACE_WITH_LONG_LIVED_TOKEN'], writeOnly: true, maxLength: 20000 }),
     [neato.key]: neato.schema,
     [lift.key]: lift.schema,
     entities: {
@@ -31,8 +31,8 @@ module.exports = {
       title: 'Room entities',
       description: 'Home Assistant lights and switches exposed to the room-light controls and button-box actions.',
       items: strictObject({
-        id: string({ title: 'Entity id', description: 'Exact Home Assistant entity ID, such as light.rover_room or switch.floor_lamp.', minLength: 1, maxLength: 255 }),
-        name: string({ description: 'Human-readable name shown for this entity in the rover UI.', minLength: 1, maxLength: 120 }),
+        id: string({ title: 'Entity id', description: 'Exact Home Assistant entity ID, such as light.rover_room or switch.floor_lamp.', examples: ['light.lab_main'], minLength: 1, maxLength: 255 }),
+        name: string({ description: 'Human-readable name shown for this entity in the rover UI.', examples: ['Lab Lights'], minLength: 1, maxLength: 120 }),
         type: string({ description: 'Control behavior to expose: lights receive brightness-aware commands, while switches receive simple on and off commands.', enum: ['light', 'switch'] }),
       }, {
         description: 'One Home Assistant entity that the rover server can display and control.',
@@ -44,9 +44,9 @@ module.exports = {
       title: 'Physical button mappings',
       description: 'Maps Home Assistant entity state changes to built-in rover-server actions.',
       items: strictObject({
-        entityId: string({ title: 'Entity id', description: 'Home Assistant entity whose state changes are watched as button presses.', minLength: 1, maxLength: 255 }),
-        stateEquals: string({ description: 'Exact Home Assistant state that must be reached before the action fires.', minLength: 1, maxLength: 255 }),
-        cooldownMs: integer({ description: 'Minimum milliseconds between accepted activations of this mapping.', minimum: 0, maximum: 86400000 }),
+        entityId: string({ title: 'Entity id', description: 'Home Assistant entity whose state changes are watched as button presses.', examples: ['sensor.basement_rover_buttons_action'], minLength: 1, maxLength: 255 }),
+        stateEquals: string({ description: 'Exact Home Assistant state that must be reached before the action fires.', examples: ['on'], minLength: 1, maxLength: 255 }),
+        cooldownMs: integer({ description: 'Minimum milliseconds between accepted activations of this mapping.', examples: [15000], minimum: 0, maximum: 86400000 }),
         action: string({ description: 'Built-in action to run: raise a human alert, switch to turns mode, switch to admin mode, or toggle the room-light lock.', enum: ['humanAlert', 'modeTurns', 'modeAdmin', 'lightsLockToggle'] }),
       }, {
         description: 'One watched Home Assistant state transition and the server action it triggers.',

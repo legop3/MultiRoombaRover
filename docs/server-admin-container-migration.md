@@ -445,6 +445,8 @@ Implemented on 2026-09-14:
 - Replaced RJSF's unthemed Bootstrap markup with a generic MultiRover tree renderer. The complete document now follows schema order as indented object, array, item, and key/value rows; array controls remain readable text beside each item, and the route-specific styling lives outside the global stylesheet.
 - Replaced the editor's custom section borders, header backgrounds, and indentation guides with the application's shared `CardFrame` at every object, array, and array-item layer. Scalar settings remain compact key/value rows, descriptions use the wider value column, and collection actions stay beside their content instead of moving to the far edge.
 - Disabled RJSF's internal checkbox label and description generically, leaving the shared field row as the single owner of each boolean setting's name, required marker, and description.
+- Restored the former example YAML's installation-specific values as schema-owned input examples. The generic form shows them as placeholders, including inside newly added array items and secret replacement inputs, without saving example URLs, credentials, IDs, or hardware addresses as real configuration.
+- Strengthened top-level hierarchy with a 1.5-rem sibling gap, distinct dark-blue top-level `CardFrame` headers, and repeated indentation for each nested card's contents.
 - Traced all 156 schema nodes to their runtime consumers and added operator-facing descriptions for every root, section, collection, array item, and scalar option. A recursive configuration test now rejects any future schema node without a description; currently reserved settings explicitly state that they have no runtime effect.
 - Converged feature control into service-owned configuration: each public feature opts in beside its own schema, and the configuration system derives those exact `enabled` switches for sessions and command discovery. The former server feature registry was removed; configuration completeness and hardware availability remain visible as runtime status instead of becoming hidden enablement rules.
 - Lazy-loaded setup and administration so the schema-form dependency is not included in ordinary driver-page downloads.
@@ -453,7 +455,7 @@ Implemented on 2026-09-14:
 
 Local verification completed:
 
-- All 104 server tests passed, including complete schema-description coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, explicit setup-file import, and the earlier filesystem coverage.
+- All 105 server tests passed, including complete schema-description and input-example coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, explicit setup-file import, and the earlier filesystem coverage.
 - Focused admin, route, and identity UI lint passed.
 - All 20 existing focused web UI tests passed.
 - The production web UI build completed successfully and regenerated the checked-in server assets.

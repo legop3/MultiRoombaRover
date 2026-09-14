@@ -9,7 +9,7 @@ module.exports = {
   defaultValue: { enabled: false, device: '' },
   schema: strictObject({
     enabled: boolean({ description: 'Exposes Neato status and commands through the configured Home Assistant ESPHome device after restart.' }),
-    device: string({ description: 'ESPHome device name used to derive the Neato entity IDs in Home Assistant; punctuation is normalized to underscores.', maxLength: 255 }),
+    device: string({ description: 'ESPHome device name used to derive the Neato entity IDs in Home Assistant; punctuation is normalized to underscores.', examples: ['neato_vacuum'], maxLength: 255 }),
   }, {
     title: 'Neato',
     description: 'Optional Neato robot controls backed by entities published from one ESPHome device through Home Assistant.',

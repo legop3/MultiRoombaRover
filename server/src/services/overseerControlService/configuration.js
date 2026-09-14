@@ -28,7 +28,7 @@ module.exports = {
     name: string({ description: 'Chat identity for Overseer messages and the phrase that triggers direct-address mode.', minLength: 1, maxLength: 80 }),
     model: string({ description: 'Ollama model name used for Overseer decisions.', minLength: 1, maxLength: 200 }),
     ollamaServer: string({ title: 'Ollama server', description: 'Base URL of the Ollama API used for Overseer decisions.', format: 'uri', maxLength: 2048 }),
-    profileImageUrl: string({ title: 'Profile image URL', description: 'Optional image URL displayed beside Overseer chat messages; leave blank for no custom image.', maxLength: 2048 }),
+    profileImageUrl: string({ title: 'Profile image URL', description: 'Optional image URL displayed beside Overseer chat messages; leave blank for no custom image.', examples: ['https://example.com/overseer.png'], maxLength: 2048 }),
     gateIntervalMs: integer({ description: 'Milliseconds waited after a completed autonomous decision before evaluating the next one.', minimum: 250, maximum: 3600000 }),
   }, { title: 'Overseer Control', description: 'Controls the AI agent that observes server state, optionally executes approved tools, and can speak in chat.', required: ['enabled', 'mode', 'observeOnly', 'postToolsOnlyMessages', 'tiebreakerEnable', 'runWhileNoPeopleOnline', 'name', 'model', 'ollamaServer', 'profileImageUrl', 'gateIntervalMs'] }),
 };

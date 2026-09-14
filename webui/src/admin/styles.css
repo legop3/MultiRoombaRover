@@ -4,9 +4,10 @@
  */
 
 .configuration-tree {
-  /* CardFrame now provides every structural boundary. This rule only preserves
-     the ordered document flow and a normal gap between sibling root cards. */
-  @apply mt-1 space-y-1;
+  /* The large gap is intentionally limited to root siblings. It makes each
+     top-level configuration section read as a separate YAML block while the
+     fields and cards inside each block remain compact. */
+  @apply mt-1 space-y-6;
 }
 
 .configuration-card {
@@ -21,7 +22,10 @@
 }
 
 .configuration-children {
-  @apply space-y-0.5;
+  /* Each structural card contributes one visible indentation level. Repeating
+     this simple rule through nested cards mirrors YAML depth without restoring
+     the custom guide lines and pseudo-card styling removed earlier. */
+  @apply ml-2 space-y-0.5;
 }
 
 .configuration-line {

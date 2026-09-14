@@ -43,6 +43,36 @@ function collectUndocumentedSchemaPaths(schema, pathLabel = '$') {
   return missing;
 }
 
+function collectSchemaPathsMissingInputExamples(schema, value, pathLabel = '$', insideArray = false) {
+  /*
+    Universal defaults such as timeouts and modes are real saved values. Empty
+    strings and newly-created array items are different: they require an
+    installation-specific value, so the admin form must show an example without
+    persisting a fake hostname, credential, or hardware ID. This walk enforces
+    that distinction across both the current default document and array shapes.
+  */
+  if (!schema || typeof schema !== 'object') return [];
+
+  if (schema.type === 'array') {
+    return collectSchemaPathsMissingInputExamples(schema.items, undefined, `${pathLabel}[]`, true);
+  }
+
+  if (schema.type === 'object') {
+    return Object.entries(schema.properties || {}).flatMap(([key, childSchema]) => (
+      collectSchemaPathsMissingInputExamples(childSchema, value?.[key], `${pathLabel}.${key}`, insideArray)
+    ));
+  }
+
+  // Enumerations and checkboxes already communicate their accepted shape
+  // through their controls, so placeholder examples are only required for
+  // otherwise free-form empty scalar inputs.
+  const needsExample = (value === '' || insideArray)
+    && !Array.isArray(schema.enum)
+    && schema.type !== 'boolean';
+  if (!needsExample) return [];
+  return Array.isArray(schema.examples) && schema.examples.length ? [] : [pathLabel];
+}
+
 test.after(() => {
   temporaryRoots.forEach((root) => fs.rmSync(root, { recursive: true, force: true }));
 });
@@ -76,6 +106,15 @@ test('every configuration section, collection, item, and option has an operator 
     avoids recreating a separately maintained documentation registry.
   */
   assert.deepEqual(collectUndocumentedSchemaPaths(rootSchema), []);
+});
+
+test('empty installation-specific fields and array item inputs provide schema-owned examples', () => {
+  /*
+    The frontend derives placeholders from these examples generically. Keeping
+    this assertion beside schema composition prevents an empty, unexplained box
+    from returning when a service adds configuration in the future.
+  */
+  assert.deepEqual(collectSchemaPathsMissingInputExamples(rootSchema, defaultConfig), []);
 });
 
 test('service definitions generate public feature paths without a separate registry', () => {
