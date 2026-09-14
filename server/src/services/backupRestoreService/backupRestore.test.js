@@ -19,8 +19,16 @@ const startupRestore = require('./startupRestore');
 const VALID_RESTORE_ID = 'a'.repeat(64);
 
 function createSourceDatabase(name) {
-  const filePath = path.join(temporaryRoot, `source-${name}`);
+  /*
+    Real service databases use WAL mode. Keeping fixture sources under the
+    excluded runtime directory both mirrors that behavior and ensures their
+    own live WAL files are not mistaken for ordinary durable backup content.
+  */
+  const sourceDirectory = path.join(temporaryRoot, 'runtime', 'database-sources');
+  fs.mkdirSync(sourceDirectory, { recursive: true });
+  const filePath = path.join(sourceDirectory, name);
   const database = new Database(filePath);
+  database.pragma('journal_mode = WAL');
   database.exec('CREATE TABLE example (value TEXT NOT NULL); INSERT INTO example VALUES (\'preserved\');');
   if (name === 'configuration.sqlite') {
     database.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY); INSERT INTO schema_migrations VALUES (1);');
@@ -58,6 +66,7 @@ test('creates and validates a complete backup while excluding runtime and contro
   assert.ok(result.manifest.files.some((entry) => entry.path === 'replays/complete.mp4'));
   assert.equal(result.manifest.files.some((entry) => entry.path.includes('runtime')), false);
   assert.equal(result.manifest.files.some((entry) => entry.path.includes('backup-restore')), false);
+  assert.equal(result.manifest.files.some((entry) => entry.path.endsWith('-wal') || entry.path.endsWith('-shm')), false);
 
   const restoreJob = path.join(temporaryRoot, 'backup-restore', `restore-${VALID_RESTORE_ID}`);
   await fsp.mkdir(restoreJob, { recursive: true });
@@ -65,6 +74,8 @@ test('creates and validates a complete backup while excluding runtime and contro
   await fsp.copyFile(result.archivePath, uploadedArchive);
   const summary = await prepareRestoreArchive({ archivePath: uploadedArchive, jobDir: restoreJob, actor: 'test' });
   assert.equal(summary.fileCount, result.manifest.files.length);
+  const restoredNames = await fsp.readdir(path.join(restoreJob, 'extracted', 'data'));
+  assert.equal(restoredNames.some((name) => name.endsWith('-wal') || name.endsWith('-shm')), false);
 
   sources.forEach((database) => database.close());
 });

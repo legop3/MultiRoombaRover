@@ -17,6 +17,20 @@ const DATABASE_NAMES = ['configuration.sqlite', 'identity.sqlite', 'fleet-report
 const DATABASE_FILES = new Set(DATABASE_NAMES.flatMap((name) => [name, `${name}-wal`, `${name}-shm`]));
 const FILE_COPY_ATTEMPTS = 3;
 
+async function removeSnapshotSidecars(payloadDir) {
+  /*
+    SQLite online backup produces a complete standalone main database file.
+    Reopening that snapshot to inspect its schema can still create empty WAL
+    and shared-memory coordination files because the database retains WAL as
+    its journal mode. Those files describe no durable backup content and must
+    be removed before the manifest inventory and tar archive are produced.
+  */
+  await Promise.all(DATABASE_NAMES.flatMap((name) => [
+    fsp.rm(path.join(payloadDir, `${name}-wal`), { force: true }),
+    fsp.rm(path.join(payloadDir, `${name}-shm`), { force: true }),
+  ]));
+}
+
 function readDatabaseSchemaVersions(payloadDir) {
   const configuration = new Database(path.join(payloadDir, 'configuration.sqlite'), { readonly: true });
   const identity = new Database(path.join(payloadDir, 'identity.sqlite'), { readonly: true });
@@ -148,13 +162,20 @@ async function createFullBackup({ configurationDatabase, identityService, fleetR
       fleetReportService.backupDatabase(path.join(payloadDir, DATABASE_NAMES[2])),
     ]);
     const skippedUnstableFiles = await copyDurableTree(dataDir, payloadDir);
+    /*
+      Finish every operation that can create a staged file before inventorying
+      the payload. Production databases use WAL mode, so schema inspection must
+      precede both sidecar cleanup and the final immutable file list.
+    */
+    const databaseSchemaVersions = readDatabaseSchemaVersions(payloadDir);
+    await removeSnapshotSidecars(payloadDir);
     const files = await listManifestFiles(payloadDir);
     const manifest = {
       format: 'multirover-full-backup',
       formatVersion: FORMAT_VERSION,
       applicationVersion: packageInfo.version,
       createdAt: Date.now(),
-      databaseSchemaVersions: readDatabaseSchemaVersions(payloadDir),
+      databaseSchemaVersions,
       files,
       skippedUnstableFiles,
     };
@@ -173,5 +194,6 @@ module.exports = {
   FORMAT_VERSION,
   createFullBackup,
   readDatabaseSchemaVersions,
+  removeSnapshotSidecars,
   sha256File,
 };

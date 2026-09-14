@@ -10,6 +10,7 @@ const {
   DATABASE_NAMES,
   FORMAT_VERSION,
   readDatabaseSchemaVersions,
+  removeSnapshotSidecars,
   sha256File,
 } = require('./backup');
 
@@ -128,7 +129,22 @@ async function validateExtractedRestore(extractDir) {
 
   const expected = [...manifest.files].sort((left, right) => String(left.path).localeCompare(String(right.path)));
   const actual = await listExtractedFiles(payloadDir);
-  if (expected.length !== actual.length) throw new Error('Backup file inventory does not match the archive.');
+  if (expected.length !== actual.length) {
+    /*
+      Keep the strict complete-inventory check, but identify a few differences
+      so an operator can distinguish a missing file from an unexpected archive
+      entry without weakening restore validation or exposing file contents.
+    */
+    const expectedPaths = new Set(expected.map((entry) => entry.path));
+    const actualPaths = new Set(actual.map((entry) => entry.path));
+    const missing = expected.filter((entry) => !actualPaths.has(entry.path)).map((entry) => entry.path).slice(0, 5);
+    const unexpected = actual.filter((entry) => !expectedPaths.has(entry.path)).map((entry) => entry.path).slice(0, 5);
+    const details = [
+      missing.length ? `missing: ${missing.join(', ')}` : '',
+      unexpected.length ? `unexpected: ${unexpected.join(', ')}` : '',
+    ].filter(Boolean).join('; ');
+    throw new Error(`Backup file inventory does not match the archive${details ? ` (${details})` : ''}.`);
+  }
   for (let index = 0; index < expected.length; index += 1) {
     const wanted = expected[index];
     const found = actual[index];
@@ -155,6 +171,12 @@ async function validateExtractedRestore(extractDir) {
       throw new Error(`Backup ${databaseName} database is newer than this application supports.`);
     }
   }
+  /*
+    Integrity and schema reads can create fresh WAL coordination files even
+    though the uploaded snapshot initially matched its manifest exactly. Remove
+    those validation-only files so startup applies only inventoried content.
+  */
+  await removeSnapshotSidecars(payloadDir);
   return manifest;
 }
 
