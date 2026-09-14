@@ -457,11 +457,13 @@ Implemented on 2026-09-14:
 - Added configuration revision history, rollback, audit history, and immediate application reporting.
 - Added a serialized live-configuration coordinator and converted configurable service runtimes to apply changed sections without restarting Node. Passive policies read the current immutable snapshot; network, hardware, timer, and child-process services replace or retune their owned runtime while stable HTTP/socket handlers continue delegating to it. The admin editor reports any service-specific reload failure after the revision is safely committed.
 - Replaced the privileged host-reboot action with one lockdown-only, recently confirmed, audited application restart on the admin Overview. Node announces the restart, stops accepting new HTTP connections, and signals itself after acknowledging the browser; the existing service signal hooks clean up owned child processes, and systemd now restarts clean application exits without making `systemctl stop` ineffective.
+- Added one protected backup-and-restore service and admin page. Backups keep the application online, use SQLite's online snapshot API for all three databases, make verified stable copies of the remaining durable files, and produce a checksummed archive through a short-lived one-use download. Restore uploads are size-limited, reject unsafe archive entries, verify the complete manifest, checksums, SQLite integrity, and supported schema versions, then remain staged until explicit recent-password confirmation.
+- Restore now uses the normal application restart rather than stopping services itself. The earliest server startup swaps the validated replacement into the data directory, retains one rollback copy, and removes that copy only after the restored application reaches a stabilization point; an interrupted or failed first startup automatically puts the previous data back on the following start. Backup/restore control files and all staging remain inside `data/backup-restore`.
 
 Local verification completed:
 
-- All 109 server tests passed, including populated legacy-style default coverage, complete schema-description and input-example coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, setup and initialized-server YAML import safety, recursive removal of nonexistent fields, and the earlier filesystem coverage.
-- All 24 server test files passed after live application was added. The isolated coordinator test confirms coherent snapshot replacement, top-level change detection, per-service invocation, applied revision reporting, and failure isolation. Application-restart syntax, authorization wiring, and supervisor configuration were checked without exercising the real process signal on the development machine.
+- All 114 server tests passed, including populated legacy-style default coverage, complete schema-description and input-example coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, setup and initialized-server YAML import safety, recursive removal of nonexistent fields, and the earlier filesystem coverage.
+- All 25 server test files passed after live application and backup/restore were added. The isolated backup/restore tests cover complete archive round trips, excluded runtime/control data, checksum tampering, unsafe symbolic-link entries, earliest-startup replacement, successful cleanup, and automatic rollback. Application-restart syntax, authorization wiring, and supervisor configuration were checked without exercising the real process signal on the development machine.
 - Focused admin, route, and identity UI lint passed.
 - All 20 existing focused web UI tests passed.
 - The production web UI build completed successfully and regenerated the checked-in server assets.
@@ -679,7 +681,7 @@ Within the two hard phase boundaries, the safest order is:
 - [x] Add persistent audit history.
 - [x] Apply every configuration revision to running services without restarting the application.
 - [x] Standardize graceful application restart.
-- [ ] Implement online backup and restart-bound staged restore in one service.
+- [x] Implement online backup and restart-bound staged restore in one service.
 - [ ] Add the internal `/video` proxy and remove the special external route.
 - [ ] Run the full Phase 1 completion gate on the legacy deployment.
 - [ ] Build and verify the production application image.

@@ -118,6 +118,15 @@ function getDb() {
   return db;
 }
 
+function backupDatabase(destinationPath) {
+  /*
+    Keep identity writes live while SQLite copies a transactionally consistent
+    view into backup staging. Exposing the operation instead of the connection
+    preserves this service as the sole owner of identity.sqlite.
+  */
+  return getDb().backup(destinationPath);
+}
+
 function ensureSchema(conn) {
   conn.exec(`
     create table if not exists users (
@@ -1087,6 +1096,7 @@ function createJsonStore({ path: filePath, normalizeStoreShape, cloneStore, logg
 module.exports = {
   identityEvents,
   getDb,
+  backupDatabase,
   sanitizeNickname,
   normalizeCookieUserId,
   isValidCookieUserId,

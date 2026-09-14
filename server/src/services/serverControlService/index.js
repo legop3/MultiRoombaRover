@@ -34,21 +34,30 @@ function scheduleApplicationRestart() {
   }, 250);
 }
 
+function requestApplicationRestart({ actor, reason = 'administrator-requested' }) {
+  if (restartPending) throw new Error('Application restart already pending.');
+  database.recordAuditEvent(actor, 'application.restart-requested', { reason });
+  scheduleApplicationRestart();
+  logger.warn('Application restart requested', { actor, reason });
+  // Restore and ordinary admin restarts share this one browser contract, so
+  // clients can explain the disconnect without knowing which control invoked it.
+  io.emit('server:restarting', { reason });
+}
+
 io.on('connection', (socket) => {
   socket.on('server:restartApplication', (_payload = {}, cb = () => {}) => {
     try {
       requireRecentPassword(socket);
       const actor = actorFor(socket);
-      if (restartPending) throw new Error('Application restart already pending.');
-      database.recordAuditEvent(actor, 'application.restart-requested');
-      scheduleApplicationRestart();
-      logger.warn('Application restart requested', { actor });
+      requestApplicationRestart({ actor });
       cb({ success: true });
-      // Every connected browser receives one explicit reason for the upcoming
-      // disconnect instead of interpreting the brief outage as a network fault.
-      io.emit('server:restarting', { reason: 'administrator-requested' });
     } catch (error) {
       cb({ error: error.message, code: error.code || null });
     }
   });
 });
+
+module.exports = {
+  isApplicationRestartPending: () => restartPending,
+  requestApplicationRestart,
+};

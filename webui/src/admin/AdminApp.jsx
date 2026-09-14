@@ -17,6 +17,7 @@ import { DEFAULT_PAGE_THEME_KEY, usePageThemeClass } from '../themes/index.js';
 import { confirmAdminPassword, getAdminSnapshot } from './api.js';
 import AdministratorAccounts from './components/AdministratorAccounts.jsx';
 import AdminOverview from './components/AdminOverview.jsx';
+import BackupRestorePanel from './components/BackupRestorePanel.jsx';
 import ConfigurationEditor from './components/ConfigurationEditor.jsx';
 import PasswordConfirmationDialog from './components/PasswordConfirmationDialog.jsx';
 import './styles.css';
@@ -26,6 +27,7 @@ const TOP_LEVEL_SECTIONS = [
   { key: 'fleet', label: 'Fleet operations' },
   { key: 'users', label: 'Users and administrators', lockdownOnly: true },
   { key: 'configuration', label: 'Configuration', lockdownOnly: true },
+  { key: 'backup-restore', label: 'Backup and restore', lockdownOnly: true },
 ];
 
 export default function AdminApp() {
@@ -139,6 +141,8 @@ export default function AdminApp() {
     );
   } else if (activeSection === 'configuration') {
     content = <ConfigurationEditor snapshot={snapshot} socket={socket} runSensitive={runSensitive} onSnapshot={setSnapshot} onReload={loadSnapshot} />;
+  } else if (activeSection === 'backup-restore') {
+    content = <BackupRestorePanel socket={socket} runSensitive={runSensitive} />;
   } else {
     content = <AdminOverview snapshot={snapshot} socket={socket} runSensitive={runSensitive} onSnapshot={setSnapshot} />;
   }

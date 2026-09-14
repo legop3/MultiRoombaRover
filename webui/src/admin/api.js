@@ -26,6 +26,10 @@ export const createAdministrator = (socket, payload) => emitAdminRequest(socket,
 export const updateAdministrator = (socket, payload) => emitAdminRequest(socket, 'adminConfig:updateAdministrator', payload);
 export const deleteAdministrator = (socket, id) => emitAdminRequest(socket, 'adminConfig:deleteAdministrator', { id });
 export const restartApplication = (socket) => emitAdminRequest(socket, 'server:restartApplication');
+export const getBackupRestoreStatus = (socket) => emitAdminRequest(socket, 'backupRestore:status');
+export const createFullBackup = (socket) => emitAdminRequest(socket, 'backupRestore:createBackup');
+export const createRestoreUpload = (socket) => emitAdminRequest(socket, 'backupRestore:createRestoreUpload');
+export const confirmFullRestore = (socket, restoreId) => emitAdminRequest(socket, 'backupRestore:confirmRestore', { restoreId });
 
 export const getSetupStatus = (socket) => emitAdminRequest(socket, 'setup:status');
 export const createFirstAdministrator = (socket, payload) => emitAdminRequest(socket, 'setup:createAdministrator', payload);

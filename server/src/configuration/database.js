@@ -372,6 +372,15 @@ function createConfigurationDatabase({ databasePath = DEFAULT_DATABASE_PATH } = 
     return importConfigurationFileTransaction(payload);
   }
 
+  function backupDatabase(destinationPath) {
+    /*
+      SQLite's online backup API produces one coherent database file while the
+      live WAL-backed connection remains open. The backup service receives only
+      this narrow operation, never the private database handle.
+    */
+    return db.backup(destinationPath);
+  }
+
   return {
     databasePath,
     getActiveConfigurationRecord,
@@ -389,6 +398,7 @@ function createConfigurationDatabase({ databasePath = DEFAULT_DATABASE_PATH } = 
     listAuditEvents,
     recordAuditEvent,
     importConfigurationFile,
+    backupDatabase,
     close: () => db.close(),
   };
 }

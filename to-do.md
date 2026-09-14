@@ -3,10 +3,18 @@
 research how midis can be played easier with drag and drop, auto selection based on which playback mode would fit, more useful and clear toggles, sample midi files to analyze how they would play on a single tone system, better live playback to see what notes are actually playing from each source and what simply wont play on the speaker
 and make sure each toggle and counter actually has a purpose besides debugging or something more useful to the user, note skipped is just for debugging
 ```
-1. setting to disable replay popups in spectator settings menu
-2. add admin ui for VIP and private requests instead of only through discord
-3. make roverd self update checkout to main branch
-4.  fix this:
+1. add new discord channel: live status
+   1. one concise message which contains the status of all the rovers
+   2. bot clears the channel, then sends a new message
+   3. has a fancy big embed that shows way more stuff
+   4. also has a small text copy at the top (readable on smartwatch lol)
+      1. ```freaky: docked
+            wall-e: caydu
+            bweeble: docked```
+2. setting to disable replay popups in spectator settings menu
+3. add admin ui for VIP and private requests instead of only through discord
+4. make roverd self update checkout to main branch
+5.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^

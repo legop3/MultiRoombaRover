@@ -136,5 +136,17 @@ module.exports = {
   get reportBuilder() {
     return runtime?.reportBuilder || null;
   },
+  backupDatabase(destinationPath) {
+    /*
+      Backups include reporting history even when collection is currently
+      disabled. Lazily opening the existing store keeps this one operation
+      behind the report service's normal database ownership boundary.
+    */
+    if (!storage) {
+      storage = createStorage({ logger });
+      storage.open();
+    }
+    return storage.backupDatabase(destinationPath);
+  },
   stop: stopRuntime,
 };

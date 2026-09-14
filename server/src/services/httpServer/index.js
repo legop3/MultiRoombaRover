@@ -5,6 +5,7 @@ const { httpServer } = require('../../globals/http');
 const config = require('../../globals/config');
 const logger = require('../../globals/logger').child('httpServer');
 const { startMediaMtx } = require('../mediaMtxService');
+const backupRestoreService = require('../backupRestoreService');
 
 httpServer.listen(config.port, () => {
   logger.info(`Server listening on :${config.port}`);
@@ -14,6 +15,13 @@ httpServer.listen(config.port, () => {
     first publisher attempts to authenticate.
   */
   startMediaMtx();
+  /*
+    Give child processes and startup integrations a short stabilization window
+    after restored databases migrate and HTTP begins listening. If the process
+    exits during that window, earliest startup sees the awaiting-health marker
+    and restores the prior data instead of accepting a broken replacement.
+  */
+  setTimeout(() => backupRestoreService.markStartupSuccessful(), 5000);
 });
 
 function stopAcceptingConnections() {
