@@ -6,7 +6,9 @@ const { strictObject, string, boolean } = require('../../configuration/schemaHel
 module.exports = {
   key: 'neato',
   feature: true,
-  defaultValue: { enabled: false, device: '' },
+  // Keeping the example device in the saved template explains the required
+  // ESPHome naming shape while `enabled: false` prevents accidental control.
+  defaultValue: { enabled: false, device: 'neato_vacuum' },
   schema: strictObject({
     enabled: boolean({ description: 'Exposes Neato status and commands through the configured Home Assistant ESPHome device after restart.' }),
     device: string({ description: 'ESPHome device name used to derive the Neato entity IDs in Home Assistant; punctuation is normalized to underscores.', examples: ['neato_vacuum'], maxLength: 255 }),

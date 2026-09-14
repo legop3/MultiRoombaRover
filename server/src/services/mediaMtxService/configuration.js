@@ -5,7 +5,12 @@ const { strictObject, string, stringArray } = require('../../configuration/schem
 
 module.exports = {
   key: 'media',
-  defaultValue: { whepBaseUrl: 'http://127.0.0.1:8889/video', additionalHosts: [] },
+  defaultValue: {
+    // Signaling remains server-local because the internal `/video` proxy owns
+    // browser access; only ICE transport addresses come from the legacy sample.
+    whepBaseUrl: 'http://127.0.0.1:8889/video',
+    additionalHosts: ['rover.example.com', 'media-server.local'],
+  },
   schema: strictObject({
     whepBaseUrl: string({ title: 'WHEP base URL', description: 'Base HTTP URL used to build browser WHEP playback and WHIP audio-publishing endpoints.', format: 'uri', maxLength: 2048 }),
     additionalHosts: stringArray({

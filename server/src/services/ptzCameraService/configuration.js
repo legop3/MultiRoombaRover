@@ -6,13 +6,15 @@ const { strictObject, string, boolean, integer } = require('../../configuration/
 module.exports = {
   key: 'ptzCamera',
   feature: true,
+  // Non-secret commissioning values mirror the legacy template. The password
+  // remains empty and `enabled: false` prevents an accidental camera login.
   defaultValue: {
     enabled: false,
     name: 'PTZ Camera',
     color: '#38bdf8',
-    host: '',
+    host: '192.168.0.8',
     onvifPort: 8000,
-    username: '',
+    username: 'admin',
     password: '',
     profileToken: '003',
     turnDurationMs: 300000,

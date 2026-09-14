@@ -6,7 +6,9 @@ const { strictObject, string, boolean } = require('../../configuration/schemaHel
 module.exports = {
   key: 'barcodeGames',
   feature: true,
-  defaultValue: { enabled: false, botName: 'Barcode Games', profileImageUrl: '' },
+  // Disabled-by-default feature state is independent from its complete visual
+  // identity, matching how the legacy YAML template represented this service.
+  defaultValue: { enabled: false, botName: 'Barcode Games', profileImageUrl: 'https://example.com/barcode-games.png' },
   schema: strictObject({
     enabled: boolean({ description: 'Enables shared barcode-game voting, participation, scoring, and game-state publication.' }),
     botName: string({ description: 'Nickname used for barcode-game lifecycle messages posted into chat.', minLength: 1, maxLength: 80 }),

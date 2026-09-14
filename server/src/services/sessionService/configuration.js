@@ -12,7 +12,27 @@ const timezone = {
 const socials = {
   key: 'socials',
   feature: true,
-  defaultValue: { enabled: false, links: [] },
+  // A complete starter list matches the former YAML template without exposing
+  // it to users until the service-owned enabled switch is deliberately set.
+  defaultValue: {
+    enabled: false,
+    links: [
+      {
+        id: 'discord',
+        label: 'Discord',
+        url: 'https://discord.gg/your-invite',
+        icon: 'FaDiscord',
+        color: '#5865F2',
+      },
+      {
+        id: 'kofi',
+        label: 'Ko-fi',
+        url: 'https://ko-fi.com/your-handle',
+        icon: 'FaCoffee',
+        color: '#29ABE0',
+      },
+    ],
+  },
   schema: strictObject({
     enabled: boolean({ title: 'Enabled', description: 'Shows the configured social-link buttons in driver and inter-instance views.' }),
     links: {
@@ -32,7 +52,9 @@ const socials = {
 
 const driverAd = {
   key: 'driverAd',
-  defaultValue: { title: '', html: '' },
+  // The title is harmless presentation metadata, while the HTML stays empty so
+  // a new installation never displays active sample content to drivers.
+  defaultValue: { title: 'Advertisement', html: '' },
   schema: strictObject({
     title: string({ description: 'Heading displayed above the operator-provided content on the driver page; leave blank to use the card fallback.', examples: ['Advertisement'], maxLength: 120 }),
     html: string({ title: 'HTML', description: 'Trusted operator HTML shown to drivers.', examples: ['<a href="https://example.com" target="_blank" rel="noopener noreferrer"><img src="https://example.com/ad.png" alt="Advertisement"></a>'], maxLength: 100000 }),

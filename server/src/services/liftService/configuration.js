@@ -6,7 +6,15 @@ const { strictObject, string, boolean, integer } = require('../../configuration/
 module.exports = {
   key: 'lift',
   feature: true,
-  defaultValue: { enabled: false, upSwitch: '', downSwitch: '', interlockMs: 2000, commandCooldownMs: 3000 },
+  // These inert example entity IDs preserve the complete former YAML shape;
+  // the explicit feature switch remains the only activation signal.
+  defaultValue: {
+    enabled: false,
+    upSwitch: 'switch.lift_up',
+    downSwitch: 'switch.lift_down',
+    interlockMs: 2000,
+    commandCooldownMs: 3000,
+  },
   schema: strictObject({
     enabled: boolean({ description: 'Enables lift status and commands through the two configured Home Assistant switches after restart.' }),
     upSwitch: string({ description: 'Home Assistant switch entity that powers upward lift movement.', examples: ['switch.lift_up'], maxLength: 255 }),

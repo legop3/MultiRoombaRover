@@ -11,14 +11,45 @@ module.exports = {
   // Retain the actual child definitions so generic configuration metadata can
   // discover their feature switches without repeating nested paths centrally.
   nestedDefinitions: [neato, lift],
+  // Example entities and triggers are real initial document values, as they
+  // were in the YAML template. Home Assistant stays inert until enabled and a
+  // real secret is deliberately installed by the operator.
   defaultValue: {
     enabled: false,
     url: 'http://127.0.0.1:8123',
     token: '',
     [neato.key]: neato.defaultValue,
     [lift.key]: lift.defaultValue,
-    entities: [],
-    buttons: [],
+    entities: [
+      { id: 'light.lab_main', name: 'Lab Lights' },
+      { id: 'switch.dock_power', name: 'Dock Power' },
+    ],
+    buttons: [
+      {
+        entityId: 'sensor.basement_rover_buttons_action',
+        stateEquals: 'on',
+        cooldownMs: 15000,
+        action: 'humanAlert',
+      },
+      {
+        entityId: 'sensor.basement_rover_buttons_action',
+        stateEquals: 'double',
+        cooldownMs: 2000,
+        action: 'modeTurns',
+      },
+      {
+        entityId: 'sensor.basement_rover_buttons_action',
+        stateEquals: 'hold',
+        cooldownMs: 2000,
+        action: 'modeAdmin',
+      },
+      {
+        entityId: 'sensor.basement_rover_buttons_action',
+        stateEquals: 'toggle',
+        cooldownMs: 1000,
+        action: 'lightsLockToggle',
+      },
+    ],
   },
   schema: strictObject({
     enabled: boolean({ description: 'Connects to Home Assistant and enables configured room entities, physical-button triggers, Neato controls, and lift controls after restart.' }),

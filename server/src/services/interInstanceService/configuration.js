@@ -6,12 +6,19 @@ const { strictObject, string, boolean, integer, stringArray } = require('../../c
 module.exports = {
   key: 'interInstance',
   feature: true,
+  // Optional behavior remains disabled, but a new configuration now starts
+  // with the same complete, editable template that the former YAML supplied.
   defaultValue: {
     enabled: false,
-    directoryUrls: [],
+    directoryUrls: ['https://raw.githubusercontent.com/legop3/multi-roomba-rover-instance-directory/refs/heads/main/directory.json'],
     pollIntervalMs: 30000,
     requestTimeoutMs: 5000,
-    profile: { publicUrl: '', name: 'MultiRover', description: '', color: '#38bdf8' },
+    profile: {
+      publicUrl: 'https://rover.example.com',
+      name: 'Example Rover Server',
+      description: 'A short public description of this rover server.',
+      color: '#38bdf8',
+    },
   },
   schema: strictObject({
     enabled: boolean({ description: 'Publishes this server\'s public instance information and polls the configured directories for peer servers.' }),

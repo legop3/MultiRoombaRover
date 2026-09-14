@@ -5,6 +5,8 @@ const { strictObject, string, boolean, integer } = require('../../configuration/
 
 module.exports = {
   key: 'overseerControl',
+  // The integration is still opt-in; populated presentation values keep its
+  // initial document complete without causing the model loop to start.
   defaultValue: {
     enabled: false,
     mode: 'autonomous',
@@ -15,7 +17,7 @@ module.exports = {
     name: 'The Overseer',
     model: 'qwen2.5:7b-instruct',
     ollamaServer: 'http://127.0.0.1:11434',
-    profileImageUrl: '',
+    profileImageUrl: 'https://example.com/overseer.png',
     gateIntervalMs: 2000,
   },
   schema: strictObject({

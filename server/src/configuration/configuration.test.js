@@ -73,6 +73,24 @@ function collectSchemaPathsMissingInputExamples(schema, value, pathLabel = '$', 
   return Array.isArray(schema.examples) && schema.examples.length ? [] : [pathLabel];
 }
 
+function collectEmptyStringPaths(value, pathLabel = '$') {
+  /*
+    Empty-string policy is intentionally tested by path because these four
+    fields are exceptional for security or visible behavior, not omissions in
+    the legacy-style default document. Walking the complete value also catches
+    an accidentally blank field inside a pre-populated example collection.
+  */
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => collectEmptyStringPaths(item, `${pathLabel}[${index}]`));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).flatMap(([key, childValue]) => (
+      collectEmptyStringPaths(childValue, `${pathLabel}.${key}`)
+    ));
+  }
+  return value === '' ? [pathLabel] : [];
+}
+
 test.after(() => {
   temporaryRoots.forEach((root) => fs.rmSync(root, { recursive: true, force: true }));
 });
@@ -83,6 +101,25 @@ test('safe defaults form a complete valid configuration with integrations disabl
   assert.equal(defaultConfig.homeAssistant.enabled, false);
   assert.equal(defaultConfig.ptzCamera.enabled, false);
   assert.equal(defaultConfig.balanceBoard.enabled, false);
+});
+
+test('legacy-style defaults populate every non-secret and inactive-content value', () => {
+  /*
+    Credentials must not masquerade as configured, and driver HTML would be
+    immediately visible without an enable switch. Every other free-form value
+    should match the populated template behavior operators had with YAML.
+  */
+  assert.deepEqual(collectEmptyStringPaths(defaultConfig), [
+    '$.homeAssistant.token',
+    '$.ptzCamera.password',
+    '$.discord.token',
+    '$.driverAd.html',
+  ]);
+  assert.ok(defaultConfig.interInstance.directoryUrls.length > 0);
+  assert.ok(defaultConfig.homeAssistant.entities.length > 0);
+  assert.ok(defaultConfig.homeAssistant.buttons.length > 0);
+  assert.ok(defaultConfig.roomCameras.cameras.length > 0);
+  assert.ok(defaultConfig.socials.links.length > 0);
 });
 
 test('service definitions determine document order and write-only secret handling', () => {
@@ -174,7 +211,10 @@ test('generated feature flags use only each declared enabled switch', () => {
 
 test('normalization fills missing legacy fields but strict validation rejects unknown fields', () => {
   const normalized = normalizeConfig({ media: { whepBaseUrl: 'http://localhost:8889/video' } });
-  assert.deepEqual(normalized.media.additionalHosts, []);
+  // Missing fields now receive the same populated template defaults as a new
+  // installation; normalization must not silently revert this one collection
+  // to the former empty-safe-default policy.
+  assert.deepEqual(normalized.media.additionalHosts, ['rover.example.com', 'media-server.local']);
   assert.doesNotThrow(() => assertValidConfig(normalized));
 
   const invalid = normalizeConfig({ media: { whepBaseUrl: 'http://localhost:8889/video', misspelledHost: 'x' } });

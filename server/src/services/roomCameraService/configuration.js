@@ -6,7 +6,27 @@ const { strictObject, string, boolean } = require('../../configuration/schemaHel
 module.exports = {
   key: 'roomCameras',
   feature: true,
-  defaultValue: { enabled: false, cameras: [] },
+  // The example catalog documents the complete repeated-item shape as actual
+  // initial configuration while the feature switch prevents network requests.
+  defaultValue: {
+    enabled: false,
+    cameras: [
+      {
+        id: 'lobby',
+        name: 'Lobby Camera',
+        description: 'Wide shot of the staging area.',
+        url: 'http://192.168.0.50/snapshot.jpg',
+        streamUrl: 'http://192.168.0.50/stream.mjpg',
+      },
+      {
+        id: 'workshop',
+        name: 'Workshop Bench',
+        description: 'Shows the workbench and charging docks.',
+        url: 'http://192.168.0.51/snapshot.jpg',
+        streamUrl: 'http://192.168.0.51/stream.mjpg',
+      },
+    ],
+  },
   schema: strictObject({
     enabled: boolean({ description: 'Publishes the configured room-camera catalog and enables camera snapshots and streams after restart.' }),
     cameras: {

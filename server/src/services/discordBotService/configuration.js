@@ -6,13 +6,26 @@ const { strictObject, string, boolean } = require('../../configuration/schemaHel
 module.exports = {
   key: 'discord',
   feature: true,
+  // Channel and role IDs retain the fully populated legacy-template shape, but
+  // the credential remains empty and the bot cannot start until explicitly enabled.
   defaultValue: {
     enabled: false,
     token: '',
-    guildId: '',
-    siteUrl: '',
-    channels: { general: '', announcements: '', adminAlerts: '', replay: '', humanAlerts: '' },
-    roles: { stalkerPing: '', announcementPing: '', adminPing: '', humanAlertPing: '' },
+    guildId: '123456789012345678',
+    siteUrl: 'https://rover.example.com',
+    channels: {
+      general: '123456789012345678',
+      announcements: '123456789012345678',
+      adminAlerts: '123456789012345678',
+      replay: '123456789012345678',
+      humanAlerts: '123456789012345678',
+    },
+    roles: {
+      stalkerPing: '123456789012345678',
+      announcementPing: '123456789012345678',
+      adminPing: '123456789012345678',
+      humanAlertPing: '123456789012345678',
+    },
   },
   schema: strictObject({
     enabled: boolean({ description: 'Logs the Discord bot in and enables commands, chat bridges, replay delivery, and configured announcements after restart.' }),
