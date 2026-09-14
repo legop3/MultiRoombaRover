@@ -3,6 +3,20 @@
 // Scope: Contains configuration metadata only so the database can import it without initializing the session service.
 const { strictObject, string, boolean } = require('../../configuration/schemaHelpers');
 
+const publicUrl = {
+  key: 'publicUrl',
+  defaultValue: 'https://rover.example.com',
+  schema: string({
+    title: 'Public URL',
+    description: 'Canonical public base URL used for links, peer identity, page metadata, and the public WebRTC hostname.',
+    examples: ['https://rover.example.com'],
+    format: 'uri',
+    pattern: '^https?://',
+    minLength: 1,
+    maxLength: 2048,
+  }),
+};
+
 const timezone = {
   key: 'timezone',
   defaultValue: 'America/New_York',
@@ -73,4 +87,4 @@ function getConfiguredSocials(config) {
     : [];
 }
 
-module.exports = { timezone, socials, driverAd, getConfiguredSocials };
+module.exports = { publicUrl, timezone, socials, driverAd, getConfiguredSocials };

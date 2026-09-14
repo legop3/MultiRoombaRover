@@ -11,7 +11,7 @@ function formatTimeInZone(date, timeZone) {
   }
 }
 
-function createWebTransportHandlers({ rovers, roverManager, config, siteUrl = '' }) {
+function createWebTransportHandlers({ rovers, roverManager, config, publicUrl = '' }) {
   return {
     async status(message, roverId) {
       const resolved = roverId ? resolveRoverSelector(roverId, rovers) : null;
@@ -59,7 +59,7 @@ function createWebTransportHandlers({ rovers, roverManager, config, siteUrl = ''
       if (!zones.some(([, zone]) => zone.toLowerCase() === String(serverTimezone).toLowerCase())) {
         lines.push(`Server Local — ${formatTimeInZone(now, serverTimezone)} **(server local timezone)**`);
       }
-      const siteLink = siteUrl ? `\n\n${siteUrl}` : '';
+      const siteLink = publicUrl ? `\n\n${publicUrl}` : '';
       return message.reply(`Time Status\n${lines.join('\n')}${siteLink}\n\nServer local timezone: ${serverTimezone}`);
     },
   };

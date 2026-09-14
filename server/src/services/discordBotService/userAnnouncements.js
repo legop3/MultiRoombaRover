@@ -14,6 +14,7 @@ const WATCHED_EVENT_TYPES = new Set([
 function createUserAnnouncements(deps) {
   const {
     discordConfig,
+    config,
     getMode,
     rovers,
     roverManager,
@@ -27,7 +28,7 @@ function createUserAnnouncements(deps) {
   // send/render time so announcements do not retain stale channel or site data.
   const getAnnouncementChannelId = () => discordConfig?.channels?.announcements || null;
   const getAnnouncementRoleId = () => discordConfig?.roles?.announcementPing || null;
-  const getSiteUrl = () => (discordConfig?.siteUrl ? String(discordConfig.siteUrl) : '');
+  const getPublicUrl = () => (config?.publicUrl ? String(config.publicUrl) : '');
 
   let previousSnapshot = buildSnapshot();
   let skippedFirstModeChange = false;
@@ -127,11 +128,11 @@ function createUserAnnouncements(deps) {
       });
     }
 
-    const siteUrl = getSiteUrl();
-    if (siteUrl) {
+    const publicUrl = getPublicUrl();
+    if (publicUrl) {
       embed.addFields({
         name: 'Join',
-        value: siteUrl,
+        value: publicUrl,
         inline: false,
       });
     }

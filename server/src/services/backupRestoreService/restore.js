@@ -19,7 +19,7 @@ const MAX_EXTRACTED_BYTES = 200 * 1024 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES = 100000;
 const RESERVED_DATA_NAMES = new Set(['backup-restore', 'runtime']);
 const SUPPORTED_DATABASE_SCHEMA_VERSIONS = {
-  configuration: 1,
+  configuration: 2,
   identity: 4,
   fleetReports: 0,
 };

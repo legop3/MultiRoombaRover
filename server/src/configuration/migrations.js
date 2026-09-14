@@ -37,6 +37,41 @@ const migrations = [
       );
     `,
   },
+  {
+    version: 2,
+    run(db) {
+      const rows = db.prepare('SELECT id, config_json FROM configuration_revisions').all();
+      const update = db.prepare('UPDATE configuration_revisions SET config_json = ? WHERE id = ?');
+
+      rows.forEach((row) => {
+        const config = JSON.parse(row.config_json);
+        /*
+          publicUrl was formerly repeated under inter-instance, Discord, and
+          media settings. Preserve the public identity already selected by the
+          operator: enabled consumers win first, then non-example values, with
+          inter-instance winning an otherwise equal conflict. Remove only the
+          three fields replaced by the root setting and fixed /video proxy.
+        */
+        const previousInterInstanceUrl = config.interInstance?.profile?.publicUrl;
+        const previousDiscordUrl = config.discord?.siteUrl;
+        const previousCandidates = [
+          config.interInstance?.enabled ? previousInterInstanceUrl : '',
+          config.discord?.enabled ? previousDiscordUrl : '',
+          previousInterInstanceUrl !== 'https://rover.example.com' ? previousInterInstanceUrl : '',
+          previousDiscordUrl !== 'https://rover.example.com' ? previousDiscordUrl : '',
+          previousInterInstanceUrl,
+          previousDiscordUrl,
+        ];
+        config.publicUrl = config.publicUrl
+          || previousCandidates.find((value) => typeof value === 'string' && value.trim())
+          || 'https://rover.example.com';
+        if (config.interInstance?.profile) delete config.interInstance.profile.publicUrl;
+        if (config.discord) delete config.discord.siteUrl;
+        if (config.media) delete config.media.whepBaseUrl;
+        update.run(JSON.stringify(config), row.id);
+      });
+    },
+  },
 ];
 
 function applySchemaMigrations(db) {
@@ -57,7 +92,8 @@ function applySchemaMigrations(db) {
       changed database whose version incorrectly appears current.
     */
     db.transaction(() => {
-      db.exec(migration.sql);
+      if (migration.sql) db.exec(migration.sql);
+      if (migration.run) migration.run(db);
       record.run(migration.version, Date.now());
     })();
   });

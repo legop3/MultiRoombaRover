@@ -203,7 +203,7 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     isAdminUser: (id) => String(id) === String(socket.id) && isAdmin(socket),
     isLockdownAdminUser: (id) => String(id) === String(socket.id) && isLockdownAdmin(socket),
     discordConfig,
-    siteUrl: String(discordConfig.siteUrl || ''),
+    publicUrl: String(config.publicUrl || ''),
     config,
     createReplayTextCommand: createWebReplayTextCommand(socket, sendSystemMessage, replayApi),
   };

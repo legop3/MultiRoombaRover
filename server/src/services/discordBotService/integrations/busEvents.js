@@ -5,15 +5,15 @@ const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { buildBatteryStatusEmbed, buildBatteryCaption } = require('../batteryEmbeds');
 
 function createBusEventHandler(deps) {
-  const { logger, discordConfig, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel } = deps;
+  const { logger, config, discordConfig, roverManager, rovers, schedulePresenceRotation, formatDuration, sendToChannel } = deps;
   const ADMIN_ALERT_EVENT_TYPES = new Set(['rover.online', 'rover.offline', 'rover.dockGuard', 'rover.helpNeeded', 'rover.helpCleared', 'battery.warn', 'battery.urgent', 'battery.docked', 'battery.undocked', 'battery.charging.start', 'battery.charging.stop', 'battery.locked', 'battery.unlocked']);
   let skippedFirstModeAnnouncement = false;
 
   function buildEmbed({ title, description, color, includeSiteUrl = true }) {
     const embed = new EmbedBuilder().setTitle(title || 'Update').setColor(color || 0x2196f3);
-    const siteUrl = includeSiteUrl && discordConfig.siteUrl ? String(discordConfig.siteUrl) : '';
-    if (description) embed.setDescription(siteUrl ? `${description}\n\n${siteUrl}` : description);
-    else if (siteUrl) embed.setDescription(siteUrl);
+    const publicUrl = includeSiteUrl && config.publicUrl ? String(config.publicUrl) : '';
+    if (description) embed.setDescription(publicUrl ? `${description}\n\n${publicUrl}` : description);
+    else if (publicUrl) embed.setDescription(publicUrl);
     embed.setTimestamp(new Date());
     return embed;
   }

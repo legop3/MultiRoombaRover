@@ -14,7 +14,6 @@ module.exports = {
     pollIntervalMs: 30000,
     requestTimeoutMs: 5000,
     profile: {
-      publicUrl: 'https://rover.example.com',
       name: 'Example Rover Server',
       description: 'A short public description of this rover server.',
       color: '#38bdf8',
@@ -33,10 +32,9 @@ module.exports = {
     pollIntervalMs: integer({ description: 'Milliseconds between peer-directory refreshes.', minimum: 1000, maximum: 86400000 }),
     requestTimeoutMs: integer({ description: 'Maximum milliseconds allowed for each directory or peer information request before it is aborted.', minimum: 250, maximum: 120000 }),
     profile: strictObject({
-      publicUrl: string({ description: 'Public base URL peers and users use to reach this server; it also identifies and filters this instance from directory results.', examples: ['https://rover.example.com'], maxLength: 2048 }),
       name: string({ description: 'Public instance name advertised to peer servers.', minLength: 1, maxLength: 120 }),
       description: string({ description: 'Short public summary advertised with this instance.', examples: ['A short public description of this rover server.'], maxLength: 500 }),
       color: string({ description: 'Six-digit hexadecimal accent color advertised for this instance.', pattern: '^#[0-9a-fA-F]{6}$' }),
-    }, { description: 'Public identity this server publishes through the inter-instance information endpoint.', required: ['publicUrl', 'name', 'description', 'color'] }),
+    }, { description: 'Public identity this server publishes through the inter-instance information endpoint; its address comes from the top-level public URL.', required: ['name', 'description', 'color'] }),
   }, { title: 'Inter-instance directory', description: 'Controls discovery and public information exchange between independent MultiRover servers.', required: ['enabled', 'directoryUrls', 'pollIntervalMs', 'requestTimeoutMs', 'profile'] }),
 };

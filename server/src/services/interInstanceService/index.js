@@ -59,7 +59,7 @@ function pollIntervalMs() {
 }
 
 function ownPublicUrl() {
-  return normalizeBaseUrl(interInstanceConfig.profile?.publicUrl);
+  return normalizeBaseUrl(loadConfig().publicUrl);
 }
 
 function ownInstanceId() {
@@ -483,6 +483,15 @@ registerConfigurationHandler('interInstance', (nextConfig = {}) => {
   // directory URLs, and peer lists together. Rebuilding the interval applies
   // the new cadence immediately and clears stale peers when disabled.
   interInstanceConfig = nextConfig;
+  startPolling();
+});
+
+registerConfigurationHandler('publicUrl', () => {
+  /*
+    The canonical URL participates in self-filtering as well as the published
+    profile. Start a fresh generation immediately so results from an in-flight
+    poll using the former identity cannot be committed afterward.
+  */
   startPolling();
 });
 

@@ -1,22 +1,18 @@
 // Media Transport Configuration
-// Purpose: Defines browser WHEP addressing and additional MediaMTX ICE hosts.
+// Purpose: Defines additional MediaMTX ICE hosts not already derived from the server's public URL.
 // Scope: Contains configuration metadata only and never starts MediaMTX.
-const { strictObject, string, stringArray } = require('../../configuration/schemaHelpers');
+const { strictObject, stringArray } = require('../../configuration/schemaHelpers');
 
 module.exports = {
   key: 'media',
   defaultValue: {
-    // Signaling remains server-local because the internal `/video` proxy owns
-    // browser access; only ICE transport addresses come from the legacy sample.
-    whepBaseUrl: 'http://127.0.0.1:8889/video',
-    additionalHosts: ['rover.example.com', 'media-server.local'],
+    additionalHosts: [],
   },
   schema: strictObject({
-    whepBaseUrl: string({ title: 'WHEP base URL', description: 'Base HTTP URL used to build browser WHEP playback and WHIP audio-publishing endpoints.', format: 'uri', maxLength: 2048 }),
     additionalHosts: stringArray({
       title: 'Additional ICE hosts',
       item: { description: 'Hostname or IP address MediaMTX advertises as a WebRTC ICE candidate.', examples: ['rover.example.com', 'media-server.local'], minLength: 1, maxLength: 255 },
-      array: { description: 'Additional public or LAN hostnames and addresses browsers may use to reach MediaMTX WebRTC transport.', uniqueItems: true },
+      array: { description: 'Extra public or LAN hostnames and addresses browsers may use in addition to the hostname derived from the top-level public URL.', uniqueItems: true },
     }),
-  }, { title: 'Media', description: 'Controls browser signaling addresses and WebRTC network candidates generated for the managed MediaMTX process.', required: ['whepBaseUrl', 'additionalHosts'] }),
+  }, { title: 'Media', description: 'Adds optional WebRTC network candidates to the public hostname and local interfaces generated automatically for MediaMTX.', required: ['additionalHosts'] }),
 };

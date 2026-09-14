@@ -9,31 +9,14 @@ const videoSessions = require('../videoSessions');
 const roverManager = require('../roverManager');
 const ptzCameraService = require('../ptzCameraService');
 const turnService = require('../turnService');
-const { loadConfig } = require('../../configuration');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
+const { PUBLIC_MEDIA_PREFIX } = require('../mediaMtxService/proxy');
 const {
   shouldUseSnapshotsForNonTurnVideo,
   shouldUseSnapshotsForExternalSpectatorVideo,
 } = require('../../helpers/bandwidthSavings');
 
-function getMediaPrefix() {
-  const base = loadConfig().media?.whepBaseUrl;
-  if (!base) {
-    return '';
-  }
-  let prefix = base;
-  try {
-    const parsed = new URL(base);
-    prefix = `${parsed.origin}${parsed.pathname}`;
-  } catch (err) {
-    // leave prefix as-is when URL parsing fails; fall back to string cleanup below
-  }
-  return prefix.replace(/\/+$/, '');
-}
-
 function buildWhepUrlForSource(source) {
-  const cleanBase = getMediaPrefix();
-  if (!cleanBase) return '';
   const segments = [];
   if (source.type === 'room') {
     segments.push('room', encodeURIComponent(source.id));
@@ -49,7 +32,9 @@ function buildWhepUrlForSource(source) {
   } else {
     segments.push(encodeURIComponent(source.id));
   }
-  return `${cleanBase}/${segments.join('/')}/whep`;
+  // A same-origin path works through TLS proxies, LAN access, and future
+  // containers without exposing MediaMTX's internal listener to the browser.
+  return `${PUBLIC_MEDIA_PREFIX}/${segments.join('/')}/whep`;
 }
 
 function passesMode(socket) {
@@ -173,9 +158,6 @@ io.on('connection', (socket) => {
         throw new Error('Unsupported video source');
       }
       const url = buildWhepUrlForSource(target);
-      if (!url) {
-        throw new Error('Server video base URL missing');
-      }
       const sessionId = videoSessions.createSession(socket, target);
       cb({ url, token: sessionId, type: target.type, id: target.id });
     } catch (err) {

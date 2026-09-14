@@ -30,6 +30,7 @@ const fleetReports = require('../services/fleetReportService/configuration');
   those fragments are placed independently at their historical positions.
 */
 const definitions = [
+  sessionConfiguration.publicUrl,
   sessionConfiguration.timezone,
   interInstance,
   llmCommentary,

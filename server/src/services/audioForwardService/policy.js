@@ -1,6 +1,8 @@
 // audio Forward Service policy
 // Purpose: Encapsulates permission checks and media path/url derivation helpers.
 // Scope: Keeps runtime behavior unchanged while isolating validation and path-construction logic.
+const { PUBLIC_MEDIA_PREFIX } = require('../mediaMtxService/proxy');
+
 function createAudioForwardPolicy(deps) {
   const {
     isVerified,
@@ -8,7 +10,6 @@ function createAudioForwardPolicy(deps) {
     roverManager,
     turnService,
     streamSuffix,
-    mediaConfig,
   } = deps;
 
   function ensureVipVerified(socket) {
@@ -43,23 +44,8 @@ function createAudioForwardPolicy(deps) {
     return `${roverId}${streamSuffix}`;
   }
 
-  function getMediaPrefix() {
-    const base = mediaConfig.whepBaseUrl;
-    if (!base) return '';
-    try {
-      const parsed = new URL(base);
-      return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, '');
-    } catch {
-      return String(base).replace(/\/+$/, '');
-    }
-  }
-
   function buildWhipUrl(pathId) {
-    const prefix = getMediaPrefix();
-    if (!prefix) {
-      throw new Error('Server media base URL missing');
-    }
-    return `${prefix}/${encodeURIComponent(pathId)}/whip`;
+    return `${PUBLIC_MEDIA_PREFIX}/${encodeURIComponent(pathId)}/whip`;
   }
 
   return {

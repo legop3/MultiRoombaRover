@@ -37,7 +37,7 @@ test('passes the resolved data root to MediaMTX runOnReady hooks', () => {
 
   try {
     const supervisor = createMediaMtxSupervisor({
-      config: { media: { additionalHosts: ['media.example.test'] } },
+      config: { publicUrl: 'https://public.example.test', media: { additionalHosts: ['media.example.test'] } },
       serverPort: 8080,
       logger,
       mediaMtxBin: '/test/bin/mediamtx',

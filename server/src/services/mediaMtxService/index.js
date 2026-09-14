@@ -26,14 +26,17 @@ function stopSupervisor() {
   return new Promise((resolve) => supervisor.stop(resolve));
 }
 
-registerConfigurationHandler('media', async () => {
+async function reloadMediaMtx() {
   // MediaMTX consumes a generated document rather than the Node configuration
-  // object directly. Replace its child process so every media setting is
-  // regenerated and applied as one coherent revision.
+  // object directly. Replace its child process when either explicit media
+  // hosts or the canonical public hostname changes.
   await stopSupervisor();
   supervisor = createSupervisor();
   if (started) supervisor.start();
-});
+}
+
+registerConfigurationHandler('media', reloadMediaMtx);
+registerConfigurationHandler('publicUrl', reloadMediaMtx);
 
 /*
   Other services already use process signal hooks for their own workers. This hook performs

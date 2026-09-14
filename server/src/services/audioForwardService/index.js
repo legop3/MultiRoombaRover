@@ -61,7 +61,6 @@ let operations;
 function replaceAudioForwardRuntime(fullConfig) {
   operations?.stopAllWorkers('configuration-change');
   const audioForwardConfig = fullConfig.audioForward || {};
-  const mediaConfig = fullConfig.media || {};
   serviceEnabled = Boolean(audioForwardConfig.enabled);
   const streamSuffix = typeof audioForwardConfig.streamSuffix === 'string' && audioForwardConfig.streamSuffix.trim()
     ? audioForwardConfig.streamSuffix.trim()
@@ -72,7 +71,6 @@ function replaceAudioForwardRuntime(fullConfig) {
     roverManager,
     turnService,
     streamSuffix,
-    mediaConfig,
   });
   const maxUploadBytes = Number.isFinite(audioForwardConfig.maxUploadBytes)
     ? Math.max(256 * 1024, Math.floor(audioForwardConfig.maxUploadBytes))
@@ -102,7 +100,7 @@ function replaceAudioForwardRuntime(fullConfig) {
 replaceAudioForwardRuntime(loadConfig());
 
 // Stable delegates keep the one-time socket/event registrations below pointed
-// at the newest policy and worker engine after either audio or media changes.
+// at the newest policy and worker engine after audio-forward changes.
 const delegate = (name) => (...args) => operations[name](...args);
 const ensureWorker = delegate('ensureWorker');
 const stopWorker = delegate('stopWorker');
@@ -164,9 +162,6 @@ registerChargeCompleteSound({
 });
 
 registerConfigurationHandler('audioForward', (_section, _previous, nextConfig) => {
-  replaceAudioForwardRuntime(nextConfig);
-});
-registerConfigurationHandler('media', (_section, _previous, nextConfig) => {
   replaceAudioForwardRuntime(nextConfig);
 });
 

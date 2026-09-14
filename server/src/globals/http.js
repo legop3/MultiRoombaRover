@@ -4,9 +4,17 @@ const http = require('http');
 const express = require('express');
 const morgan = require('morgan');
 const config = require('./config');
+const logger = require('./logger').child('mediaMtxProxy');
+const { PUBLIC_MEDIA_PREFIX, createMediaMtxProxy } = require('../services/mediaMtxService/proxy');
 
 const app = express();
 app.use(morgan('dev'));
+/*
+  Mount signaling before body parsers so SDP offers and trickle-ICE fragments
+  remain untouched streams. Express removes the /video mount prefix while the
+  proxy is active, giving MediaMTX its native /<path>/whep or /<path>/whip URL.
+*/
+app.use(PUBLIC_MEDIA_PREFIX, createMediaMtxProxy({ logger }));
 app.use(express.json());
 app.use(express.static(config.staticDir, { index: false }));
 

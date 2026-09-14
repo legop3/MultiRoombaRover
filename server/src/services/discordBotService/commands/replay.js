@@ -33,7 +33,7 @@ function createReplayCommand({
   getActiveDrivers,
   getNickname,
   rovers,
-  discordConfig,
+  config,
 }) {
   const sourceResolver = createReplaySourceResolver({
     rovers,
@@ -137,8 +137,8 @@ function createReplayCommand({
           if (progressMessage?.edit) {
             await progressMessage.edit({ content: sanitizeMentions(buildStatusMessage(job, 'ready')), allowedMentions: DEFAULT_ALLOWED_MENTIONS });
           }
-          const siteUrl = String(discordConfig?.siteUrl || '').replace(/\/$/, '');
-          const publicUrl = siteUrl ? `${siteUrl}${media.url}` : media.url;
+          const publicBaseUrl = String(config?.publicUrl || '').replace(/\/$/, '');
+          const publicUrl = publicBaseUrl ? `${publicBaseUrl}${media.url}` : media.url;
           await progressMessage.reply({ content: `Replay hosted by the rover server: ${publicUrl}`, allowedMentions: DEFAULT_ALLOWED_MENTIONS });
           return;
         } catch (fallbackError) {

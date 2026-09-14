@@ -206,8 +206,8 @@ registerPreferredDeliveryProvider({
       }
     },
     async completeFallback({ context, media }) {
-      const siteUrl = String(discordConfig.siteUrl || '').replace(/\/$/, '');
-      const publicUrl = siteUrl ? `${siteUrl}${media.url}` : media.url;
+      const publicBaseUrl = String(config.publicUrl || '').replace(/\/$/, '');
+      const publicUrl = publicBaseUrl ? `${publicBaseUrl}${media.url}` : media.url;
       if (context?.progressMessage?.reply) {
         await context.progressMessage.reply({
           content: `Replay hosted by the rover server: ${publicUrl}`,
@@ -434,7 +434,7 @@ function applySharedConfigSection(section, value) {
 }
 
 registerConfigurationHandler('discord', applyDiscordConfig);
-['commands', 'timezone', 'fleetReports'].forEach((section) => {
+['commands', 'publicUrl', 'timezone', 'fleetReports'].forEach((section) => {
   registerConfigurationHandler(section, (value) => applySharedConfigSection(section, value));
 });
 

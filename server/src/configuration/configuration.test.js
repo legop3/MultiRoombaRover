@@ -7,8 +7,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const Database = require('better-sqlite3');
 const { defaultConfig, normalizeConfig, assertValidConfig } = require('./validation');
 const { definitions, rootSchema, secretPaths, featureDefinitions } = require('./definition');
+const { migrations } = require('./migrations');
 const { getFeatureFlags } = require('./index');
 const { createConfigurationDatabase } = require('./database');
 const {
@@ -215,19 +217,51 @@ test('generated feature flags use only each declared enabled switch', () => {
 });
 
 test('normalization fills missing legacy fields but strict validation rejects unknown fields', () => {
-  const normalized = normalizeConfig({ media: { whepBaseUrl: 'http://localhost:8889/video' } });
-  // Missing fields now receive the same populated template defaults as a new
-  // installation; normalization must not silently revert this one collection
-  // to the former empty-safe-default policy.
-  assert.deepEqual(normalized.media.additionalHosts, ['rover.example.com', 'media-server.local']);
+  const normalized = normalizeConfig({ media: { additionalHosts: [] } });
+  assert.equal(normalized.publicUrl, 'https://rover.example.com');
+  assert.deepEqual(normalized.media.additionalHosts, []);
   assert.doesNotThrow(() => assertValidConfig(normalized));
 
-  const invalid = normalizeConfig({ media: { whepBaseUrl: 'http://localhost:8889/video', misspelledHost: 'x' } });
+  const invalid = normalizeConfig({ media: { additionalHosts: [], misspelledHost: 'x' } });
   assert.throws(() => assertValidConfig(invalid), (error) => {
     assert.equal(error.code, 'CONFIG_VALIDATION_FAILED');
     assert.ok(error.validationErrors.some((entry) => entry.path.includes('misspelledHost')));
     return true;
   });
+});
+
+test('database migration consolidates existing public URLs and removes obsolete media addressing', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'multirover-public-url-migration-'));
+  temporaryRoots.push(root);
+  const databasePath = path.join(root, 'configuration.sqlite');
+  const legacyDatabase = new Database(databasePath);
+  legacyDatabase.exec(`
+    CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);
+    ${migrations[0].sql}
+  `);
+  legacyDatabase.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (1, ?)').run(Date.now());
+
+  const legacyConfig = structuredClone(defaultConfig);
+  delete legacyConfig.publicUrl;
+  legacyConfig.interInstance.profile.publicUrl = 'https://rover.example.com';
+  legacyConfig.discord.enabled = true;
+  legacyConfig.discord.siteUrl = 'https://canonical.example.com';
+  legacyConfig.media.whepBaseUrl = 'http://127.0.0.1:8889/video';
+  const inserted = legacyDatabase.prepare(`
+    INSERT INTO configuration_revisions (config_json, created_at, actor, source)
+    VALUES (?, ?, 'test', 'legacy-shape')
+  `).run(JSON.stringify(legacyConfig), Date.now());
+  legacyDatabase.prepare('INSERT INTO configuration_state (singleton, active_revision_id) VALUES (1, ?)')
+    .run(inserted.lastInsertRowid);
+  legacyDatabase.close();
+
+  const migrated = createConfigurationDatabase({ databasePath });
+  const active = migrated.getActiveConfigurationRecord().config;
+  assert.equal(active.publicUrl, 'https://canonical.example.com');
+  assert.equal(Object.hasOwn(active.interInstance.profile, 'publicUrl'), false);
+  assert.equal(Object.hasOwn(active.discord, 'siteUrl'), false);
+  assert.equal(Object.hasOwn(active.media, 'whepBaseUrl'), false);
+  migrated.close();
 });
 
 test('full-document updates preserve secrets and reject a stale browser revision', () => {
@@ -291,6 +325,7 @@ admins:
     password_hash: "$2b$10$preservedHash"
     discord_id: "1234"
     lockdown: true
+publicUrl: https://production.example.com
 timezone: America/Chicago
 media:
   whepBaseUrl: http://localhost:8889/video
@@ -320,6 +355,7 @@ fleetReports:
     immediateCriticalAlerts: true
 `;
   const parsed = parseConfigurationFile(yamlText);
+  assert.equal(parsed.config.publicUrl, 'https://production.example.com');
   assert.equal(parsed.config.timezone, 'America/Chicago');
   assert.equal(parsed.administrators[0].passwordHash, '$2b$10$preservedHash');
   assert.equal(Object.hasOwn(parsed.config.overseerControl, 'heartbeatMs'), false);
@@ -428,7 +464,7 @@ test('committed revisions replace the live snapshot and isolate service reload f
     const record = database.getClientConfiguration();
     const next = structuredClone(record.config);
     next.timezone = 'America/Chicago';
-    next.media.whepBaseUrl = 'http://localhost:9999/video';
+    next.media.additionalHosts = ['media.example.test'];
     database.updateConfiguration({
       value: next,
       expectedRevision: record.revision,

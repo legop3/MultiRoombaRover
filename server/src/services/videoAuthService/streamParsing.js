@@ -1,40 +1,21 @@
 // Video Auth Stream Parsing
 // Purpose: Parses MediaMTX path/body payloads into normalized stream targets for rover and room media checks.
-// Scope: Handles WHEP/WHP path-prefix trimming and SRT streamid extraction without performing auth decisions.
-const { loadConfig } = require('../../configuration');
+// Scope: Handles native MediaMTX WHEP/WHIP paths and SRT streamid extraction without performing auth decisions.
 
 const PTZ_STREAM_PATH = 'ptz-camera';
 
-function getPathPrefix() {
-  const base = loadConfig().media?.whepBaseUrl;
-  if (!base) return '';
-  try {
-    const parsed = new URL(base);
-    return parsed.pathname || '';
-  } catch {
-    return base.replace(/^[^/]*:\/\//, '').replace(/^[^/]+/, '');
-  }
-}
-
 function extractStreamInfo(path) {
-  // The path prefix is tiny to derive and must follow media changes immediately;
-  // retaining it at module load would make auth disagree with newly issued URLs.
-  const whepPathPrefix = getPathPrefix().replace(/\/+$/, '').replace(/^\/+/, '');
-  const whepPrefixSegments = whepPathPrefix ? whepPathPrefix.split('/').filter(Boolean) : [];
+  // Node removes its public /video mount before proxying, so MediaMTX reports
+  // only its native stream path to this authorization callback.
   const segments = (path || '').split('/').filter(Boolean);
   if (!segments.length) return null;
-
-  let start = 0;
-  if (whepPrefixSegments.length && whepPrefixSegments.every((segment, idx) => segments[idx] === segment)) {
-    start = whepPrefixSegments.length;
-  }
 
   let end = segments.length;
   if (segments[end - 1] === 'whep' || segments[end - 1] === 'whip') {
     end -= 1;
   }
 
-  const remaining = segments.slice(start, end);
+  const remaining = segments.slice(0, end);
   if (remaining.length === 1) {
     const rawId = remaining[0] || '';
     /*
