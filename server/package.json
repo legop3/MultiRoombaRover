@@ -6,7 +6,6 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "check:media": "node scripts/checkMedia.js",
-    "config:import": "node scripts/importLegacyConfig.js",
     "admin:recover": "node scripts/adminAccount.js"
   },
   "dependencies": {

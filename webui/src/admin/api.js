@@ -27,4 +27,4 @@ export const deleteAdministrator = (socket, id) => emitAdminRequest(socket, 'adm
 
 export const getSetupStatus = (socket) => emitAdminRequest(socket, 'setup:status');
 export const createFirstAdministrator = (socket, payload) => emitAdminRequest(socket, 'setup:createAdministrator', payload);
-export const importLegacyConfiguration = (socket, payload) => emitAdminRequest(socket, 'setup:importLegacy', payload);
+export const importConfigurationFile = (socket, payload) => emitAdminRequest(socket, 'setup:importConfigurationFile', payload);

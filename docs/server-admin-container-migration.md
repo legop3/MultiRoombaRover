@@ -5,7 +5,7 @@
 This document is the live implementation tracker for the migration.
 
 - [x] Phase 1, step 1: Establish the single data-directory contract
-- [x] Phase 1, steps 2-5: Configuration database, legacy import, setup, and centralized admin UI
+- [x] Phase 1, steps 2-5: Configuration database, manual setup-file import, setup, and centralized admin UI
 - [ ] Phase 1, steps 6-9: Backup/restore, restart, and internal video proxy
 - [ ] Phase 2: Containerization, GHCR publishing, and container lifecycle controls
 
@@ -20,6 +20,8 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 
 ## Decision log
 
+- 2026-09-14: Treat container deployment as a fresh installation. Neither startup nor the installer searches for, imports, removes, or otherwise manages an old `config.yaml`; the only old-file path retained is an operator-selected YAML upload on `/setup`. The separate command-line importer and its dry-run mode are removed. Internal SQLite schema migrations remain because they evolve the active database rather than discovering an old installation.
+- 2026-09-14: Keep the one-time first-run setup code in `data/setup-code.txt` with owner-only permissions instead of writing the credential into server logs. Reuse it across restarts and delete it permanently when setup completes.
 - 2026-09-14: Feature enablement is exactly the service-owned `enabled` boolean. A service-owned configuration definition marks itself with `feature: true` when that switch belongs in the public feature map; the configuration system derives the map for sessions and command availability, including nested service definitions, without a separate feature registry. Missing credentials, hardware, connections, data, or enabled dependencies are runtime health conditions and never silently change that choice.
 - 2026-09-14: Keep configuration as one ordered hierarchical document, matching the former YAML layout. The admin application presents one continuous configuration page and saves the complete document as one revision. There are no artificial Hardware, Integrations, Media, or similar configuration categories and no backend or frontend section registries.
 - 2026-09-13: Use an internal Node `/video` proxy. The public reverse proxy will send every site path to Node, Node will strip `/video` and stream WHEP signaling to MediaMTX on loopback, and MediaMTX port 8889 will not be exposed publicly. MediaMTX cannot independently add a WHEP base-path prefix; making `video` part of every stream name would still leave two HTTP servers competing for the public HTTPS listener.
@@ -32,7 +34,7 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 - All operator-controlled server configuration is stored in a validated database and managed through the web UI.
 - All mutable runtime state, generated files, caches, snapshots, recordings, and databases live under one server data directory.
 - A complete backup can capture that one data directory consistently, and a restore can safely replace it.
-- A one-time legacy importer moves an existing `config.yaml` installation into the new configuration database.
+- `/setup` may initialize the database from a YAML file explicitly selected by the operator; no automatic host migration exists.
 - A dedicated `/admin` application contains all server administration.
 - The public `/video` route is proxied to MediaMTX by the Node server, eliminating the special external MediaMTX proxy rule.
 - The completed server is packaged as a replaceable container whose only persistent mount is the data directory.
@@ -196,30 +198,27 @@ After migration is complete:
 - Remove `config.yaml` and `config.example.yaml` from the repository and installation process.
 - Remove `js-yaml` if MediaMTX generation is changed to avoid it or if it is otherwise no longer needed. Generated MediaMTX YAML is an internal artifact, not operator configuration, so retaining `js-yaml` solely for that generator is acceptable.
 
-## 3. Build the one-time legacy configuration importer
+## 3. Add optional configuration-file upload to setup
 
-Existing installations need an explicit, bounded migration from their old `config.yaml`. This importer is not a compatibility loader and must never become a permanent second source of truth.
+Container deployment starts with a new data directory and never discovers an old installation automatically. As a convenience, the first-run setup page may initialize the empty database from a YAML configuration file deliberately selected by the operator. This is not a startup loader, installer migration, command-line workflow, or permanent second source of truth.
 
-The importer must:
+The setup upload must:
 
-- Accept an explicitly selected legacy YAML file.
-- Parse the complete legacy document.
+- Accept only an explicitly selected YAML file from `/setup`.
+- Require the one-time setup code before processing it.
+- Parse the complete document.
 - Map every recognized field into the new configuration schema.
 - Preserve existing bcrypt administrator password hashes.
 - Preserve lockdown roles and Discord IDs.
 - Preserve secrets without printing them.
-- Apply new defaults for fields absent from an older configuration.
-- Detect unknown fields and show them in the migration report.
+- Apply current defaults for absent fields.
+- Report unknown or invalid fields instead of discarding them.
 - Validate the entire result before writing anything.
-- Refuse to overwrite an already-configured database unless an explicit replacement workflow is used.
-- Support a dry-run that reports changes without writing.
-- Write the imported configuration and migration metadata atomically.
-- Record the source format and migration time without storing secret values in the audit event.
-- Verify that the resulting configuration can be read back before considering the import successful.
+- Refuse to replace an already-configured database.
+- Write the configuration, administrators, and audit event atomically.
+- Record the uploaded filename without storing secret values in the audit event.
 
-The first-run UI should recognize that a legacy configuration is available and offer the import after the operator proves possession of the one-time setup code. A command-line import path should also exist for recovery and unattended migration.
-
-After a successful import, the server must use only the database. The legacy YAML file should not be watched, re-read, or used as fallback. Removal of the old file should be an explicit final migration step after the operator has downloaded a backup or otherwise confirmed the import.
+The browser uploads the selected contents directly. The server never scans the host for a file, and it does not retain, watch, remove, or reuse the uploaded YAML after the database transaction completes.
 
 ## 4. Add first-run setup
 
@@ -229,10 +228,10 @@ Required flow:
 
 1. Initialize the databases and safe default configuration.
 2. Keep all optional external integrations disabled.
-3. Generate a one-time setup code and print it to the server log.
+3. Generate a one-time setup code in `data/setup-code.txt` with owner-only permissions. Logs report the file location but never the credential.
 4. Serve a restricted `/setup` application.
 5. Require the setup code before creating the first lockdown administrator.
-6. Offer legacy configuration import when a legacy source was explicitly provided.
+6. Offer manual YAML configuration-file upload as an alternative to creating the first administrator from scratch.
 7. Otherwise collect only the minimum information needed to establish the instance.
 8. Permanently disable setup after the first lockdown administrator exists.
 
@@ -388,8 +387,9 @@ Phase 1 is complete only when all of the following are true:
 
 - The current systemd installation runs without `config.yaml`.
 - A completely empty data directory can be initialized through `/setup`.
-- An existing YAML installation can be imported exactly once.
-- The importer reports unknown or invalid legacy values instead of discarding them.
+- An explicitly selected YAML file can initialize the empty database exactly once.
+- The setup upload reports unknown or invalid values instead of discarding them.
+- Startup and installation do not search for or modify an old `config.yaml`.
 - All mutable server state is contained by the configured data directory.
 - A complete backup can be downloaded and validated.
 - A restore replaces the server state only after validation and survives restart.
@@ -437,8 +437,8 @@ Implemented on 2026-09-14:
 - Added full-document saves with optimistic revision checking. A stale browser cannot overwrite a newer revision, and invalid or unknown fields cannot become active.
 - Redacted secrets from browser responses and audit data. The one complete save operation preserves stored secrets unless the administrator explicitly replaces or clears them.
 - Converted every runtime configuration consumer to the synchronous database-backed configuration service and removed the YAML loader, `SERVER_CONFIG`, and the tracked example YAML.
-- Added an explicit one-time YAML importer for both the setup UI and command line. Existing bcrypt hashes, lockdown roles, Discord identities, configuration, and secrets are migrated without creating a runtime YAML fallback.
-- Added safe empty-data startup, a logged one-time setup code, the restricted `/setup` route, and a console administrator-recovery command.
+- Added an explicit one-time YAML upload to `/setup`. Existing bcrypt hashes, lockdown roles, Discord identities, configuration, and secrets can be imported only when the operator selects the file; the installer and startup perform no automatic discovery or migration, and there is no command-line importer.
+- Added safe empty-data startup, a file-backed one-time setup code, the restricted `/setup` route, and a console administrator-recovery command. The credential persists at `data/setup-code.txt` across restarts with `0600` permissions, never appears in logs, and is deleted when setup completes.
 - Added the centralized `/admin` route with Overview, Fleet operations, Users and administrators, and one schema-generated hierarchical Configuration page in legacy YAML order.
 - Replaced every feature-specific configuration form with `@rjsf/core`; the protected admin snapshot supplies the server's assembled schema, and one generic widget handles all schema-declared secrets.
 - Converged feature control into service-owned configuration: each public feature opts in beside its own schema, and the configuration system derives those exact `enabled` switches for sessions and command discovery. The former server feature registry was removed; configuration completeness and hardware availability remain visible as runtime status instead of becoming hidden enablement rules.
@@ -448,7 +448,7 @@ Implemented on 2026-09-14:
 
 Local verification completed:
 
-- All 99 server tests passed, including direct enabled-switch feature projection, service-definition composition, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, legacy import, and the earlier filesystem coverage.
+- All 103 server tests passed, including file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, explicit setup-file import, and the earlier filesystem coverage.
 - Focused admin, route, and identity UI lint passed.
 - All 20 existing focused web UI tests passed.
 - The production web UI build completed successfully and regenerated the checked-in server assets.
@@ -658,7 +658,7 @@ Within the two hard phase boundaries, the safest order is:
 
 - [x] Complete the filesystem audit and single data-directory migration.
 - [x] Add the configuration schema/database and administrator storage.
-- [x] Add first-run setup and the legacy YAML importer.
+- [x] Add first-run setup and explicit YAML configuration-file upload.
 - [x] Convert every configuration consumer and remove YAML runtime loading.
 - [x] Converge optional feature control into service-owned `enabled` switches and derive the public feature map from those definitions.
 - [x] Build the centralized admin configuration UI.

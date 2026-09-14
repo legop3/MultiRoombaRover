@@ -1,12 +1,12 @@
 // First-Run Setup Application
-// Purpose: Initializes a fresh server or imports an explicitly selected legacy config.yaml through the restricted setup channel.
+// Purpose: Initializes a fresh server or imports an explicitly selected YAML configuration file through the restricted setup channel.
 // Scope: Exists only while the server reports setup required; ordinary administration belongs to /admin.
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import CardFrame from '../components/CardFrame/index.jsx';
 import SocketConnectionPill from '../components/SocketConnectionPill/index.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
-import { createFirstAdministrator, getSetupStatus, importLegacyConfiguration } from './api.js';
+import { createFirstAdministrator, getSetupStatus, importConfigurationFile } from './api.js';
 
 export default function SetupApp() {
   const socket = useSocket();
@@ -16,7 +16,7 @@ export default function SetupApp() {
   const [discordId, setDiscordId] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [legacyFile, setLegacyFile] = useState(null);
+  const [configurationFile, setConfigurationFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -50,13 +50,13 @@ export default function SetupApp() {
     run(() => createFirstAdministrator(socket, { setupCode, username, discordId, password }));
   }
 
-  function importLegacy(event) {
+  function importSelectedConfiguration(event) {
     event.preventDefault();
-    if (!legacyFile) return;
-    run(async () => importLegacyConfiguration(socket, {
+    if (!configurationFile) return;
+    run(async () => importConfigurationFile(socket, {
       setupCode,
-      fileName: legacyFile.name,
-      yaml: await legacyFile.text(),
+      fileName: configurationFile.name,
+      yaml: await configurationFile.text(),
     }));
   }
 
@@ -65,7 +65,7 @@ export default function SetupApp() {
       <SocketConnectionPill />
       <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center gap-0.5">
         <CardFrame title="MultiRover setup" meta={required === null ? 'checking' : required ? 'required' : 'complete'} bodyClassName="space-y-0.5 p-1 text-sm">
-          {required ? <p>Enter the one-time setup code printed in the server log, then create the first lockdown administrator or import an existing configuration.</p> : null}
+          {required ? <p>Enter the one-time code from setup-code.txt in the server data folder, then create the first lockdown administrator or import an existing configuration.</p> : null}
           {required === false ? <Link className="button-dark inline-block" to="/admin">Open administration</Link> : null}
           {message ? <p className="surface p-1 text-sm text-slate-200">{message}</p> : null}
         </CardFrame>
@@ -85,11 +85,11 @@ export default function SetupApp() {
                 <button className="button-dark md:col-span-2" type="submit" disabled={busy || !setupCode || !username || !password}>Create lockdown administrator</button>
               </form>
             </CardFrame>
-            <CardFrame title="Import legacy configuration" bodyClassName="space-y-0.5 p-1 text-sm">
-              <p className="text-xs text-slate-400">The selected YAML is uploaded directly for one-time validation and import. Its secrets are never displayed back in the browser.</p>
-              <form className="flex flex-col gap-0.5 md:flex-row" onSubmit={importLegacy}>
-                <input className="field-input flex-1" type="file" accept=".yaml,.yml,text/yaml" onChange={(event) => setLegacyFile(event.target.files?.[0] || null)} />
-                <button className="button-dark" type="submit" disabled={busy || !setupCode || !legacyFile}>Import selected YAML</button>
+            <CardFrame title="Import configuration file" bodyClassName="space-y-0.5 p-1 text-sm">
+              <p className="text-xs text-slate-400">Choose an existing YAML configuration explicitly. The server validates and imports it once, and its secrets are never displayed back in the browser.</p>
+              <form className="flex flex-col gap-0.5 md:flex-row" onSubmit={importSelectedConfiguration}>
+                <input className="field-input flex-1" type="file" accept=".yaml,.yml,text/yaml" onChange={(event) => setConfigurationFile(event.target.files?.[0] || null)} />
+                <button className="button-dark" type="submit" disabled={busy || !setupCode || !configurationFile}>Import selected YAML</button>
               </form>
             </CardFrame>
           </>

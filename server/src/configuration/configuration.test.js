@@ -1,5 +1,5 @@
 // Configuration System Tests
-// Purpose: Verifies strict defaults, immutable revisions, secret handling, legacy import, and administrator safety.
+// Purpose: Verifies strict defaults, immutable revisions, secret handling, explicit setup-file import, and administrator safety.
 // Scope: Uses isolated temporary databases and never opens the development server's data store.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,7 +10,7 @@ const { defaultConfig, normalizeConfig, assertValidConfig } = require('./validat
 const { definitions, rootSchema, secretPaths, featureDefinitions } = require('./definition');
 const { getFeatureFlags } = require('./index');
 const { createConfigurationDatabase } = require('./database');
-const { parseLegacyConfiguration, importLegacyConfiguration } = require('./legacyImporter');
+const { parseConfigurationFile, importConfigurationFile } = require('./configurationFileImporter');
 
 const temporaryRoots = [];
 
@@ -168,7 +168,7 @@ test('administrator storage never exposes hashes or removes the final lockdown a
   database.close();
 });
 
-test('legacy YAML imports configuration and bcrypt hashes exactly once', () => {
+test('an explicitly uploaded YAML file imports configuration and bcrypt hashes exactly once', () => {
   const yamlText = `
 admins:
   - username: owner
@@ -179,14 +179,14 @@ timezone: America/Chicago
 media:
   whepBaseUrl: http://localhost:8889/video
 `;
-  const parsed = parseLegacyConfiguration(yamlText);
+  const parsed = parseConfigurationFile(yamlText);
   assert.equal(parsed.config.timezone, 'America/Chicago');
   assert.equal(parsed.administrators[0].passwordHash, '$2b$10$preservedHash');
 
   const database = createTestDatabase();
-  const result = importLegacyConfiguration({ text: yamlText, database, dryRun: false });
+  const result = importConfigurationFile({ text: yamlText, database });
   assert.equal(result.administratorCount, 1);
   assert.equal(database.findAdministratorForAuthentication('OWNER').passwordHash, '$2b$10$preservedHash');
-  assert.throws(() => importLegacyConfiguration({ text: yamlText, database }), /cannot replace an initialized installation/);
+  assert.throws(() => importConfigurationFile({ text: yamlText, database }), /cannot replace an initialized installation/);
   database.close();
 });

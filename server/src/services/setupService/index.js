@@ -1,34 +1,38 @@
 // First-Run Setup Service
-// Purpose: Allows an empty data directory to create its first lockdown administrator or import legacy YAML safely.
+// Purpose: Allows an empty data directory to create its first lockdown administrator or import an explicitly uploaded YAML file.
 // Scope: Exposes setup-only socket operations and permanently closes them once a lockdown administrator exists.
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('setupService');
 const { getConfigurationDatabase } = require('../../configuration');
-const { importLegacyConfiguration } = require('../../configuration/legacyImporter');
+const { importConfigurationFile } = require('../../configuration/configurationFileImporter');
+const { createSetupCodeFile } = require('./setupCodeFile');
 
-const MAX_LEGACY_YAML_BYTES = 1024 * 1024;
+const MAX_CONFIGURATION_FILE_BYTES = 1024 * 1024;
 const database = getConfigurationDatabase();
-let setupCode = null;
+const setupCodeFile = createSetupCodeFile();
+let setupNoticeLogged = false;
 
 function isSetupRequired() {
   return !database.isSetupComplete();
 }
 
 function ensureSetupCode() {
-  if (!isSetupRequired()) return null;
-  if (!setupCode) {
-    setupCode = crypto.randomBytes(6).toString('hex');
-    /*
-      The code is intentionally logged only on a server that has no lockdown
-      administrator. It lives in process memory, changes on restart, and is
-      permanently irrelevant as soon as setup succeeds, so it cannot become a
-      recurring environment-variable authentication bypass.
-    */
-    logger.warn('First-run setup is required', { setupCode });
+  if (!isSetupRequired()) {
+    // Setup authorization permanently closes when the first lockdown account
+    // exists. Remove a stale credential left by an interrupted final response.
+    setupCodeFile.remove();
+    return null;
   }
-  return setupCode;
+  const code = setupCodeFile.ensure();
+  // Logs may be retained or shipped elsewhere, so they identify the local file
+  // containing the credential without ever including the credential itself.
+  if (!setupNoticeLogged) {
+    logger.warn('First-run setup is required', { setupCodePath: setupCodeFile.filePath });
+    setupNoticeLogged = true;
+  }
+  return code;
 }
 
 function requireOpenSetup(candidateCode) {
@@ -73,25 +77,25 @@ io.on('connection', (socket) => {
         discordId: payload.discordId,
         role: 'lockdown',
       }, 'first-run-setup');
-      setupCode = null;
+      setupCodeFile.remove();
       return { administrator };
     });
   });
 
-  socket.on('setup:importLegacy', (payload = {}, cb = () => {}) => {
+  socket.on('setup:importConfigurationFile', (payload = {}, cb = () => {}) => {
     respond(cb, () => {
       requireOpenSetup(payload.setupCode);
       const yamlText = String(payload.yaml || '');
-      if (!yamlText || Buffer.byteLength(yamlText, 'utf8') > MAX_LEGACY_YAML_BYTES) {
-        throw new Error('Legacy YAML must be present and no larger than 1 MiB.');
+      if (!yamlText || Buffer.byteLength(yamlText, 'utf8') > MAX_CONFIGURATION_FILE_BYTES) {
+        throw new Error('The YAML configuration file must be present and no larger than 1 MiB.');
       }
-      const result = importLegacyConfiguration({
+      const result = importConfigurationFile({
         text: yamlText,
         database,
         actor: 'first-run-setup',
         source: String(payload.fileName || 'uploaded-config.yaml').slice(0, 255),
       });
-      setupCode = null;
+      setupCodeFile.remove();
       return result;
     });
   });

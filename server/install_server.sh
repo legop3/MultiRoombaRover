@@ -256,22 +256,6 @@ fi
 echo "      Installing rover snapshot writer -> $ROVER_SNAPSHOT_WRITER_BIN"
 install -m 0755 "$ROVER_SNAPSHOT_WRITER_TEMPLATE" "$ROVER_SNAPSHOT_WRITER_BIN"
 
-# Import an existing legacy file only when this installation does not yet have
-# its configuration database. The importer validates the complete document and
-# preserves administrator password hashes without printing secrets. Fresh
-# installations intentionally skip this branch and complete setup through the
-# one-time code printed by the server.
-if [[ -f "$SERVER_DIR/config.yaml" && ! -f "$DATA_DIR/configuration.sqlite" ]]; then
-  echo "      Importing legacy config.yaml into configuration.sqlite"
-  runuser -u "$TARGET_USER" -- env SERVER_DATA_DIR="$DATA_DIR" \
-    "$NODE_BIN" "$SERVER_DIR/scripts/importLegacyConfig.js" "$SERVER_DIR/config.yaml"
-  # The importer exits successfully only after the complete configuration and
-  # administrator catalog have committed and can be read back. Remove this
-  # exact obsolete source file afterward so secrets do not remain in a second,
-  # unmanaged configuration source on upgraded installations.
-  rm -f "$SERVER_DIR/config.yaml"
-fi
-
 # Validate database-backed MediaMTX inputs before disabling a working legacy
 # service. This performs the same build and serialization as startup without
 # opening listeners or leaving a process behind.
@@ -341,7 +325,8 @@ echo
 echo "Services installed:"
 echo "  multirover.service (Node.js control server with MediaMTX child)"
 echo
-echo "Open /setup for a fresh installation or /admin for an imported installation."
+echo "Open /setup to initialize the installation, then use /admin for administration."
+echo "For fresh setup, read the one-time code from $DATA_DIR/setup-code.txt."
 echo "Kinect/libfreenect packages and udev permissions were installed."
 echo "If a Kinect is already plugged in, unplug/replug its USB/power before testing so the new udev rule applies."
 echo "Wii Balance Board direct Bluetooth bridge and front-button listener were installed."

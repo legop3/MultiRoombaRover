@@ -331,8 +331,10 @@ function createConfigurationDatabase({ databasePath = DEFAULT_DATABASE_PATH } = 
     }));
   }
 
-  const importLegacyTransaction = db.transaction(({ config, administrators, actor, source }) => {
-    if (isSetupComplete()) throw new Error('Legacy configuration cannot replace an initialized installation.');
+  const importConfigurationFileTransaction = db.transaction(({ config, administrators, actor, source }) => {
+    // A setup upload initializes an empty installation; it is deliberately not
+    // a general-purpose replacement path for a running server's configuration.
+    if (isSetupComplete()) throw new Error('A configuration file cannot replace an initialized installation.');
     const normalized = assertValidConfig(normalizeConfig(config));
     const revision = commitRevisionTransaction(normalized, {
       expectedRevision: getActiveConfigurationRecord().revision,
@@ -340,13 +342,13 @@ function createConfigurationDatabase({ databasePath = DEFAULT_DATABASE_PATH } = 
       source,
     });
     administrators.forEach((admin) => createAdministratorTransaction(admin, actor, false));
-    if (!isSetupComplete()) throw new Error('Legacy import must contain at least one lockdown administrator.');
-    writeAudit(actor, 'legacy-import.completed', { revision, administratorCount: administrators.length, source });
+    if (!isSetupComplete()) throw new Error('The configuration file must contain at least one lockdown administrator.');
+    writeAudit(actor, 'setup.configuration-file-imported', { revision, administratorCount: administrators.length, source });
     return revision;
   });
 
-  function importLegacy(payload) {
-    return importLegacyTransaction(payload);
+  function importConfigurationFile(payload) {
+    return importConfigurationFileTransaction(payload);
   }
 
   return {
@@ -364,7 +366,7 @@ function createConfigurationDatabase({ databasePath = DEFAULT_DATABASE_PATH } = 
     countLockdownAdministrators,
     isSetupComplete,
     listAuditEvents,
-    importLegacy,
+    importConfigurationFile,
     close: () => db.close(),
   };
 }
