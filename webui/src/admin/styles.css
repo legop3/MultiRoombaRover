@@ -4,33 +4,24 @@
  */
 
 .configuration-tree {
-  /* A single ordered stack is the visual equivalent of YAML's top-to-bottom
-     document order. A deliberately large root gap makes the beginning and end
-     of every top-level section unmistakable, while nested lines stay compact. */
-  @apply mt-1 space-y-4;
+  /* CardFrame now provides every structural boundary. This rule only preserves
+     the ordered document flow and a normal gap between sibling root cards. */
+  @apply mt-1 space-y-1;
 }
 
-.configuration-branch {
+.configuration-card {
   @apply min-w-0;
 }
 
-.configuration-branch-heading,
-.configuration-item-heading {
-  /* Headings and their controls use normal left-to-right flow. Deliberately
-     omitting space-between prevents wide pages from marooning actions. */
-  @apply flex flex-wrap items-center gap-0.5 rounded-md bg-slate-800 px-0.5 py-0.5;
-}
-
-.configuration-branch-heading h3,
-.configuration-item-title {
-  @apply text-sm font-semibold text-slate-100;
+.configuration-card-body {
+  /* The shared card supplies the border, header, and background. Its body needs
+     only compact padding and vertical rhythm for descriptions, actions, rows,
+     and any nested CardFrames. */
+  @apply space-y-0.5 p-0.5;
 }
 
 .configuration-children {
-  /* Every container contributes exactly one indentation and one guide. Deep
-     descendants therefore explain their ancestry without calculating depth or
-     encoding service paths in frontend code. */
-  @apply ml-1 space-y-0.5 border-l border-sky-700/70 py-0.5 pl-1;
+  @apply space-y-0.5;
 }
 
 .configuration-line {
@@ -59,9 +50,9 @@
 
 .configuration-branch-description,
 .configuration-item-description {
-  /* Container help follows its heading at the same indentation; child keys
-     begin below it, preserving the same parent/child rhythm as YAML comments. */
-  @apply ml-0.5 max-w-[56rem];
+  /* Structural descriptions sit inside the corresponding CardFrame body, so
+     no custom border, header background, or indentation treatment is needed. */
+  @apply max-w-[56rem];
 }
 
 .configuration-value-description {
@@ -98,6 +89,9 @@
   @apply min-w-0;
 }
 
-.configuration-array-item + .configuration-array-item {
-  @apply mt-0.5;
+.configuration-item-actions,
+.configuration-array-actions {
+  /* Actions use ordinary flow intentionally. CardFrame's action slot is useful
+     elsewhere, but would separate these controls from wide configuration data. */
+  @apply flex flex-wrap gap-0.5;
 }

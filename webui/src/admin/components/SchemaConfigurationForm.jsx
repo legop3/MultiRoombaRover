@@ -4,6 +4,7 @@
 import { useMemo } from 'react';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
+import CardFrame from '../../components/CardFrame/index.jsx';
 
 function buildUiSchema(schema, path = '') {
   /*
@@ -16,6 +17,20 @@ function buildUiSchema(schema, path = '') {
     return {
       'ui:widget': 'SecretWidget',
       'ui:options': { secretPath: path },
+    };
+  }
+
+  if (schema.type === 'boolean') {
+    /*
+      RJSF's checkbox is unusual: unless it is explicitly selected, it renders
+      the schema description and field name inside the widget as well as
+      passing them to FieldTemplate. This generic option makes the surrounding
+      YAML-like row the sole owner of that text, eliminating duplicates without
+      maintaining a list of boolean setting names.
+    */
+    return {
+      'ui:widget': 'checkbox',
+      'ui:options': { label: false },
     };
   }
 
@@ -136,8 +151,8 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
 
   if (typeof fieldPathId.path.at(-1) === 'number') {
     // Array items receive their numbered heading and action row from the array
-    // item template. Rendering only their description and ordered property
-    // lines prevents redundant boxes while preserving the item's own guidance.
+    // item CardFrame. Rendering only their description and ordered properties
+    // prevents a redundant anonymous card inside that visible item boundary.
     return (
       <div>
         {description ? <div className="configuration-item-description">{description}</div> : null}
@@ -147,13 +162,15 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
   }
 
   return (
-    <section className="configuration-branch">
-      <header className="configuration-branch-heading">
-        <h3>{title}</h3>
-      </header>
+    <CardFrame
+      title={title}
+      clipOverflow={false}
+      className="configuration-card"
+      bodyClassName="configuration-card-body"
+    >
       {description ? <div className="configuration-branch-description">{description}</div> : null}
       <div className="configuration-children">{propertyLines}</div>
-    </section>
+    </CardFrame>
   );
 }
 
@@ -161,13 +178,17 @@ function ConfigurationArrayItemTemplate({ buttonsProps, children, hasToolbar, in
   const unavailable = buttonsProps.disabled || buttonsProps.readonly;
 
   return (
-    <article className="configuration-branch configuration-array-item">
+    <CardFrame
+      title={`Item ${index + 1}`}
+      clipOverflow={false}
+      className="configuration-card configuration-array-item"
+      bodyClassName="configuration-card-body"
+    >
       {hasToolbar ? (
-        // Text controls are intentionally kept immediately after the item
-        // number. RJSF's default Bootstrap toolbox pushes empty glyphicon
-        // buttons to the far edge, which is both unclear and hard to reach.
-        <header className="configuration-item-heading">
-          <span className="configuration-item-title">Item {index + 1}</span>
+        // Actions remain at the beginning of the card body instead of using
+        // CardFrame's right-aligned action slot. Even on a wide editor, item
+        // controls therefore stay next to the content they affect.
+        <div className="configuration-item-actions">
           {(buttonsProps.hasMoveUp || buttonsProps.hasMoveDown) ? (
             <button type="button" className="button-dark text-xs" disabled={unavailable || !buttonsProps.hasMoveUp} onClick={buttonsProps.onMoveUpItem}>Move up</button>
           ) : null}
@@ -180,28 +201,34 @@ function ConfigurationArrayItemTemplate({ buttonsProps, children, hasToolbar, in
           {buttonsProps.hasRemove ? (
             <button type="button" className="button-danger text-xs" disabled={unavailable} onClick={buttonsProps.onRemoveItem}>Remove</button>
           ) : null}
-        </header>
+        </div>
       ) : null}
       <div className="configuration-children">{children}</div>
-    </article>
+    </CardFrame>
   );
 }
 
 function ConfigurationArrayTemplate({ canAdd, disabled, items, onAddClick, readonly, schema, title }) {
   return (
-    <section className="configuration-branch configuration-array">
-      <header className="configuration-branch-heading configuration-array-heading">
-        <h3>{title}</h3>
-        <span className="text-[0.7rem] text-slate-400">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
-      </header>
+    <CardFrame
+      title={title}
+      meta={`${items.length} ${items.length === 1 ? 'item' : 'items'}`}
+      clipOverflow={false}
+      className="configuration-card configuration-array"
+      bodyClassName="configuration-card-body"
+    >
       {schema.description ? <div className="configuration-branch-description">{schema.description}</div> : null}
+      {canAdd ? (
+        // Adding belongs to the collection as a whole, but stays left-aligned
+        // with that collection's contents rather than at the viewport edge.
+        <div className="configuration-array-actions">
+          <button type="button" className="button-dark text-xs" disabled={disabled || readonly} onClick={onAddClick}>Add item</button>
+        </div>
+      ) : null}
       <div className="configuration-children">
-        {items.length ? <div className="space-y-0.5">{items}</div> : <p className="text-xs text-slate-500">No items configured.</p>}
-        {canAdd ? (
-          <button type="button" className="button-dark mt-0.5 text-xs" disabled={disabled || readonly} onClick={onAddClick}>Add item</button>
-        ) : null}
+        {items.length ? items : <p className="text-xs text-slate-500">No items configured.</p>}
       </div>
-    </section>
+    </CardFrame>
   );
 }
 
