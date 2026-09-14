@@ -6,10 +6,12 @@ const bcrypt = require('bcrypt');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('setupService');
 const { getConfigurationDatabase, applyCommittedConfiguration } = require('../../configuration');
-const { importConfigurationFile } = require('../../configuration/configurationFileImporter');
+const {
+  MAX_CONFIGURATION_FILE_BYTES,
+  importConfigurationFile,
+} = require('../../configuration/configurationFileImporter');
 const { createSetupCodeFile } = require('./setupCodeFile');
 
-const MAX_CONFIGURATION_FILE_BYTES = 1024 * 1024;
 const database = getConfigurationDatabase();
 const setupCodeFile = createSetupCodeFile();
 let setupNoticeLogged = false;

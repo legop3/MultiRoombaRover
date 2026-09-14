@@ -11,6 +11,11 @@ const {
   applyCommittedConfiguration,
   rootSchema,
 } = require('../../configuration');
+const {
+  MAX_CONFIGURATION_FILE_BYTES,
+  parseConfigurationFile,
+  buildSecretOperationsForImport,
+} = require('../../configuration/configurationFileImporter');
 const { getRole } = require('../roleService');
 
 const PASSWORD_CONFIRMATION_WINDOW_MS = 5 * 60 * 1000;
@@ -32,6 +37,18 @@ function requireRecentPassword(socket) {
 
 function actorFor(socket) {
   return socket?.data?.user?.username || socket.id;
+}
+
+function safeUploadedFileName(value) {
+  /*
+    The filename is audit metadata only and is never opened on the server.
+    Removing control characters keeps logs and history readable while
+    retaining the operator-visible name that identifies the imported file.
+  */
+  return String(value || 'uploaded-config.yaml')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .slice(0, 255) || 'uploaded-config.yaml';
 }
 
 function errorPayload(error) {
@@ -100,6 +117,37 @@ io.on('connection', (socket) => {
     });
     const application = await applyCommittedConfiguration();
     return { revision, application, snapshot: buildAdminSnapshot() };
+  });
+
+  ackHandler(socket, 'adminConfig:importConfigurationFile', requireRecentPassword, async (payload) => {
+    const yamlText = String(payload.yaml || '');
+    if (!yamlText || Buffer.byteLength(yamlText, 'utf8') > MAX_CONFIGURATION_FILE_BYTES) {
+      throw new Error('The YAML configuration file must be present and no larger than 1 MiB.');
+    }
+
+    /*
+      Parsing deliberately excludes administrators on an initialized server.
+      Configuration is still filtered to today's schema and strictly
+      validated, then committed through the ordinary optimistic update path so
+      missing secrets survive and explicitly supplied secrets replace or clear
+      their current values.
+    */
+    const parsed = parseConfigurationFile(yamlText, { includeAdministrators: false });
+    const fileName = safeUploadedFileName(payload.fileName);
+    const revision = database.updateConfiguration({
+      value: parsed.config,
+      expectedRevision: payload.expectedRevision,
+      secretOperations: buildSecretOperationsForImport(parsed),
+      actor: actorFor(socket),
+      source: `admin-yaml:${fileName}`,
+    });
+    const application = await applyCommittedConfiguration();
+    return {
+      revision,
+      application,
+      ignoredAdministratorCount: parsed.uploadedAdministratorCount,
+      snapshot: buildAdminSnapshot(),
+    };
   });
 
   ackHandler(socket, 'adminConfig:restoreRevision', requireRecentPassword, async (payload) => {

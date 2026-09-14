@@ -20,6 +20,7 @@ export function emitAdminRequest(socket, eventName, payload = {}) {
 export const getAdminSnapshot = (socket) => emitAdminRequest(socket, 'adminConfig:get');
 export const confirmAdminPassword = (socket, password) => emitAdminRequest(socket, 'adminConfig:confirmPassword', { password });
 export const updateConfiguration = (socket, payload) => emitAdminRequest(socket, 'adminConfig:updateConfiguration', payload);
+export const importAdminConfigurationFile = (socket, payload) => emitAdminRequest(socket, 'adminConfig:importConfigurationFile', payload);
 export const restoreConfigurationRevision = (socket, payload) => emitAdminRequest(socket, 'adminConfig:restoreRevision', payload);
 export const createAdministrator = (socket, payload) => emitAdminRequest(socket, 'adminConfig:createAdministrator', payload);
 export const updateAdministrator = (socket, payload) => emitAdminRequest(socket, 'adminConfig:updateAdministrator', payload);

@@ -161,7 +161,13 @@ function createConfigurationDatabase({ databasePath = DEFAULT_DATABASE_PATH } = 
     return { ...record, ...redacted };
   }
 
-  function updateConfiguration({ value, expectedRevision, secretOperations = {}, actor }) {
+  function updateConfiguration({
+    value,
+    expectedRevision,
+    secretOperations = {},
+    actor,
+    source = 'admin-ui',
+  }) {
     const active = getActiveConfigurationRecord();
     const candidate = clone(value);
 
@@ -187,7 +193,12 @@ function createConfigurationDatabase({ databasePath = DEFAULT_DATABASE_PATH } = 
     return commitRevisionTransaction(candidate, {
       expectedRevision,
       actor,
-      source: 'admin-ui',
+      /*
+        Administrative imports use this same safe update path but identify the
+        selected filename in revision and audit history. The source remains
+        server-controlled metadata and never contains configuration values.
+      */
+      source,
     });
   }
 

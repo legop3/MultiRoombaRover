@@ -36,7 +36,7 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 - All operator-controlled server configuration is stored in a validated database and managed through the web UI.
 - All mutable runtime state, generated files, caches, snapshots, recordings, and databases live under one server data directory.
 - A complete backup can capture that one data directory consistently, and a restore can safely replace it.
-- `/setup` may initialize the database from a YAML file explicitly selected by the operator; no automatic host migration exists.
+- `/setup` may initialize the database from a YAML file explicitly selected by the operator, and the protected Configuration page may explicitly replace configuration from one later; no automatic host migration or persistent YAML source exists.
 - A dedicated `/admin` application contains all server administration.
 - The public `/video` route is proxied to MediaMTX by the Node server, eliminating the special external MediaMTX proxy rule.
 - The completed server is packaged as a replaceable container whose only persistent mount is the data directory.
@@ -204,25 +204,35 @@ After migration is complete:
 - Remove `config.yaml` and `config.example.yaml` from the repository and installation process.
 - Remove `js-yaml` if MediaMTX generation is changed to avoid it or if it is otherwise no longer needed. Generated MediaMTX YAML is an internal artifact, not operator configuration, so retaining `js-yaml` solely for that generator is acceptable.
 
-## 3. Add optional configuration-file upload to setup
+## 3. Add explicit configuration-file upload to setup and administration
 
-Container deployment starts with a new data directory and never discovers an old installation automatically. As a convenience, the first-run setup page may initialize the empty database from a YAML configuration file deliberately selected by the operator. This is not a startup loader, installer migration, command-line workflow, or permanent second source of truth.
+Container deployment starts with a new data directory and never discovers an old installation automatically. As a convenience, the first-run setup page may initialize the empty database from a YAML configuration file deliberately selected by the operator. The protected Configuration page may later replace only the configuration from another explicitly selected legacy file. Neither path is a startup loader, installer migration, command-line workflow, or permanent second source of truth.
 
-The setup upload must:
+Every upload must:
 
-- Accept only an explicitly selected YAML file from `/setup`.
-- Require the one-time setup code before processing it.
+- Accept only an explicitly selected YAML file from `/setup` or the protected Configuration page.
 - Parse the complete document.
 - Map every recognized field into the new configuration schema.
-- Preserve existing bcrypt administrator password hashes.
-- Preserve lockdown roles and Discord IDs.
 - Preserve secrets without printing them.
 - Apply current defaults for absent fields.
 - Ignore fields that do not exist in the current schema, while reporting invalid values supplied for current fields.
 - Validate the entire result before writing anything.
+- Record the uploaded filename without storing secret values in the audit event.
+
+The setup upload additionally must:
+
+- Require the one-time setup code before processing it.
+- Preserve existing bcrypt administrator password hashes, lockdown roles, and Discord IDs.
 - Refuse to replace an already-configured database.
 - Write the configuration, administrators, and audit event atomically.
-- Record the uploaded filename without storing secret values in the audit event.
+
+The initialized-server upload additionally must:
+
+- Require a lockdown administrator with recent password confirmation.
+- Use optimistic revision checking so it cannot overwrite an intervening edit.
+- Ignore the entire legacy `admins` collection and leave all current accounts unchanged.
+- Preserve stored secrets omitted from the file, replace supplied secrets, and clear explicitly empty secrets.
+- Commit through the normal revision path and immediately reload affected services.
 
 The browser uploads the selected contents directly. The server never scans the host for a file, and it does not retain, watch, remove, or reuse the uploaded YAML after the database transaction completes.
 
@@ -444,6 +454,7 @@ Implemented on 2026-09-14:
 - Redacted secrets from browser responses and audit data. The one complete save operation preserves stored secrets unless the administrator explicitly replaces or clears them.
 - Converted every runtime configuration consumer to the synchronous database-backed configuration service and removed the YAML loader, `SERVER_CONFIG`, and the tracked example YAML.
 - Added an explicit one-time YAML upload to `/setup`. Existing bcrypt hashes, lockdown roles, Discord identities, configuration, and secrets can be imported only when the operator selects the file; the installer and startup perform no automatic discovery or migration, and there is no command-line importer.
+- Added the same explicit legacy YAML picker to the protected Configuration page for replacing an initialized server's configuration. It requires recent lockdown-password confirmation, ignores every YAML administrator entry, filters nonexistent settings, validates current fields, preserves omitted secrets, applies explicitly supplied or empty secrets, uses optimistic revision checking, records the selected filename in audit history, and reloads affected services immediately.
 - The one-time setup upload now passes its committed configuration through the same live-application coordinator, so a fresh installation does not need an immediate restart after importing YAML.
 - Made setup-file import recursively retain only fields present in the current schema. Stale keys from the permissive YAML era are ignored without aliases or historical translations, while invalid values for real current settings still fail validation; stream-only and snapshot-only room-camera entries remain accepted as they were by the runtime.
 - Added safe empty-data startup, a file-backed one-time setup code, the restricted `/setup` route, and a console administrator-recovery command. The credential persists at `data/setup-code.txt` across restarts with `0600` permissions, never appears in logs, and is deleted when setup completes.
@@ -464,7 +475,7 @@ Implemented on 2026-09-14:
 
 Local verification completed:
 
-- All 107 server tests passed, including populated legacy-style default coverage, complete schema-description and input-example coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, explicit setup-file import with recursive removal of nonexistent fields, and the earlier filesystem coverage.
+- All 109 server tests passed, including populated legacy-style default coverage, complete schema-description and input-example coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, setup and initialized-server YAML import safety, recursive removal of nonexistent fields, and the earlier filesystem coverage.
 - All 24 server test files passed after live application was added. The new isolated coordinator test confirms coherent snapshot replacement, top-level change detection, per-service invocation, applied revision reporting, and failure isolation.
 - Focused admin, route, and identity UI lint passed.
 - All 20 existing focused web UI tests passed.

@@ -11,7 +11,11 @@ const { defaultConfig, normalizeConfig, assertValidConfig } = require('./validat
 const { definitions, rootSchema, secretPaths, featureDefinitions } = require('./definition');
 const { getFeatureFlags } = require('./index');
 const { createConfigurationDatabase } = require('./database');
-const { parseConfigurationFile, importConfigurationFile } = require('./configurationFileImporter');
+const {
+  parseConfigurationFile,
+  buildSecretOperationsForImport,
+  importConfigurationFile,
+} = require('./configurationFileImporter');
 
 const temporaryRoots = [];
 
@@ -353,6 +357,58 @@ bandwidthSavings:
     assert.ok(error.validationErrors.some((entry) => entry.path === '/bandwidthSavings/multiTabProtection'));
     return true;
   });
+});
+
+test('an administrative YAML replacement ignores accounts and only changes secrets present in the file', () => {
+  const database = createTestDatabase();
+  const initial = database.getClientConfiguration();
+  const seededRevision = database.updateConfiguration({
+    value: initial.config,
+    expectedRevision: initial.revision,
+    actor: 'secret-seed',
+    secretOperations: {
+      'homeAssistant.token': { action: 'replace', value: 'preserve-this-token' },
+      'ptzCamera.password': { action: 'replace', value: 'clear-this-password' },
+      'discord.token': { action: 'replace', value: 'replace-this-token' },
+    },
+  });
+  const yamlText = `
+admins:
+  - this obsolete account entry is deliberately malformed
+timezone: America/Chicago
+ptzCamera:
+  password:
+discord:
+  token: new-discord-token
+`;
+
+  /*
+    An initialized installation treats the YAML as configuration data only.
+    Even malformed account data is ignored, while presence-aware secret
+    operations preserve an omitted credential, clear an explicit empty value,
+    and replace an explicit non-empty value.
+  */
+  const parsed = parseConfigurationFile(yamlText, { includeAdministrators: false });
+  assert.deepEqual(parsed.administrators, []);
+  assert.equal(parsed.uploadedAdministratorCount, 1);
+  assert.deepEqual(parsed.providedSecretPaths, ['ptzCamera.password', 'discord.token']);
+  const revision = database.updateConfiguration({
+    value: parsed.config,
+    expectedRevision: seededRevision,
+    secretOperations: buildSecretOperationsForImport(parsed),
+    actor: 'admin-import-test',
+    source: 'admin-yaml:production.yaml',
+  });
+
+  const active = database.getActiveConfigurationRecord();
+  assert.equal(active.revision, revision);
+  assert.equal(active.source, 'admin-yaml:production.yaml');
+  assert.equal(active.config.homeAssistant.token, 'preserve-this-token');
+  assert.equal(active.config.ptzCamera.password, '');
+  assert.equal(active.config.discord.token, 'new-discord-token');
+  assert.equal(active.config.timezone, 'America/Chicago');
+  assert.equal(database.listAdministrators().length, 0);
+  database.close();
 });
 
 test('committed revisions replace the live snapshot and isolate service reload failures', () => {
