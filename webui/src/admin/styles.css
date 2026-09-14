@@ -14,6 +14,14 @@
   @apply min-w-0;
 }
 
+.configuration-card .configuration-card {
+  /* Indent the next structural boundary itself, not every row owned by the
+     parent. Since nested CardFrames repeat this rule, the offset accumulates
+     naturally at each level just like indentation in a YAML document. */
+  margin-left: 1rem;
+  width: calc(100% - 1rem);
+}
+
 .configuration-card-body {
   /* The shared card supplies the border, header, and background. Its body needs
      only compact padding and vertical rhythm for descriptions, actions, rows,
@@ -22,10 +30,10 @@
 }
 
 .configuration-children {
-  /* Each structural card contributes one visible indentation level. Repeating
-     this simple rule through nested cards mirrors YAML depth without restoring
-     the custom guide lines and pseudo-card styling removed earlier. */
-  @apply ml-2 space-y-0.5;
+  /* Scalar rows belong directly to their current CardFrame and therefore do
+     not receive blanket indentation. Nested CardFrames handle their own offset
+     in the rule above, keeping keys aligned with their owning section. */
+  @apply space-y-0.5;
 }
 
 .configuration-line {
@@ -44,7 +52,9 @@
 .configuration-branch-description,
 .configuration-item-description,
 .configuration-value-description {
-  @apply block text-[0.7rem] leading-tight text-slate-500;
+  /* Configuration guidance must remain comfortably readable; these are often
+     full operational explanations rather than disposable form hints. */
+  @apply block text-sm leading-snug text-slate-300;
   margin-top: 0.125rem;
 }
 

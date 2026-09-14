@@ -1,10 +1,36 @@
 // Schema-Generated Configuration Form
 // Purpose: Renders the server-provided JSON Schema as an ordered, indented tree resembling the configuration's YAML structure.
 // Scope: Defines one generic RJSF presentation; it never names or special-cases an individual service or setting.
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
 import CardFrame from '../../components/CardFrame/index.jsx';
+
+/*
+  Structural colors repeat only after six levels, which is deeper than the
+  current configuration document but remains safe for future service-owned
+  schemas. Depth is carried through React context because RJSF's array-item
+  template does not receive a field path; context keeps objects, arrays, and
+  array items in one generic hierarchy without attaching UI metadata to the
+  server's schema.
+*/
+const CONFIGURATION_LAYER_COLORS = [
+  '#0ea5e9', // sky
+  '#6366f1', // indigo
+  '#a855f7', // purple
+  '#14b8a6', // teal
+  '#f59e0b', // amber
+  '#ec4899', // pink
+];
+const ConfigurationLayerDepthContext = createContext(0);
+
+function useConfigurationLayer() {
+  const depth = useContext(ConfigurationLayerDepthContext);
+  return {
+    color: CONFIGURATION_LAYER_COLORS[depth % CONFIGURATION_LAYER_COLORS.length],
+    depth,
+  };
+}
 
 function buildUiSchema(schema, path = '') {
   /*
@@ -151,6 +177,7 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
   const visibleProperties = properties.filter((property) => !property.hidden);
   const propertyLines = visibleProperties.map((property) => property.content);
   const topLevel = fieldPathId.path.length === 1;
+  const layer = useConfigurationLayer();
 
   if (fieldPathId.path.length === 0) {
     // The outer configuration card already names the root document. Rendering
@@ -160,7 +187,11 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
     return (
       <div>
         {description ? <div className="configuration-root-description">{description}</div> : null}
-        <div className="configuration-tree">{propertyLines}</div>
+        {/* The invisible schema root establishes depth zero. Every visible
+            structural CardFrame below it advances the context by one level. */}
+        <ConfigurationLayerDepthContext.Provider value={0}>
+          <div className="configuration-tree">{propertyLines}</div>
+        </ConfigurationLayerDepthContext.Provider>
       </div>
     );
   }
@@ -180,23 +211,27 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
   return (
     <CardFrame
       title={title}
+      color={layer.color}
       clipOverflow={false}
       className={`configuration-card${topLevel ? ' configuration-top-level-card' : ''}`}
-      headerClassName={topLevel ? '!bg-sky-950' : ''}
       bodyClassName="configuration-card-body"
     >
       {description ? <div className="configuration-branch-description">{description}</div> : null}
-      <div className="configuration-children">{propertyLines}</div>
+      <ConfigurationLayerDepthContext.Provider value={layer.depth + 1}>
+        <div className="configuration-children">{propertyLines}</div>
+      </ConfigurationLayerDepthContext.Provider>
     </CardFrame>
   );
 }
 
 function ConfigurationArrayItemTemplate({ buttonsProps, children, hasToolbar, index }) {
   const unavailable = buttonsProps.disabled || buttonsProps.readonly;
+  const layer = useConfigurationLayer();
 
   return (
     <CardFrame
       title={`Item ${index + 1}`}
+      color={layer.color}
       clipOverflow={false}
       className="configuration-card configuration-array-item"
       bodyClassName="configuration-card-body"
@@ -220,21 +255,24 @@ function ConfigurationArrayItemTemplate({ buttonsProps, children, hasToolbar, in
           ) : null}
         </div>
       ) : null}
-      <div className="configuration-children">{children}</div>
+      <ConfigurationLayerDepthContext.Provider value={layer.depth + 1}>
+        <div className="configuration-children">{children}</div>
+      </ConfigurationLayerDepthContext.Provider>
     </CardFrame>
   );
 }
 
 function ConfigurationArrayTemplate({ canAdd, disabled, fieldPathId, items, onAddClick, readonly, schema, title }) {
   const topLevel = fieldPathId.path.length === 1;
+  const layer = useConfigurationLayer();
 
   return (
     <CardFrame
       title={title}
       meta={`${items.length} ${items.length === 1 ? 'item' : 'items'}`}
+      color={layer.color}
       clipOverflow={false}
       className={`configuration-card configuration-array${topLevel ? ' configuration-top-level-card' : ''}`}
-      headerClassName={topLevel ? '!bg-sky-950' : ''}
       bodyClassName="configuration-card-body"
     >
       {schema.description ? <div className="configuration-branch-description">{schema.description}</div> : null}
@@ -245,9 +283,11 @@ function ConfigurationArrayTemplate({ canAdd, disabled, fieldPathId, items, onAd
           <button type="button" className="button-dark text-xs" disabled={disabled || readonly} onClick={onAddClick}>Add item</button>
         </div>
       ) : null}
-      <div className="configuration-children">
-        {items.length ? items : <p className="text-xs text-slate-500">No items configured.</p>}
-      </div>
+      <ConfigurationLayerDepthContext.Provider value={layer.depth + 1}>
+        <div className="configuration-children">
+          {items.length ? items : <p className="text-xs text-slate-500">No items configured.</p>}
+        </div>
+      </ConfigurationLayerDepthContext.Provider>
     </CardFrame>
   );
 }
