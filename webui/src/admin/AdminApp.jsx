@@ -7,6 +7,7 @@ import AuthPanel from '../components/AuthPanel/index.jsx';
 import AdminPanelContent from '../components/AdminPanel/AdminPanelContent.jsx';
 import CardFrame from '../components/CardFrame/index.jsx';
 import SocketConnectionPill from '../components/SocketConnectionPill/index.jsx';
+import Tabs, { Tab, TabList, TabPanels } from '../components/Tabs/index.jsx';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
 import IdentityDatabasePanel from '../database/IdentityDatabasePanel.jsx';
@@ -25,18 +26,6 @@ const TOP_LEVEL_SECTIONS = [
   { key: 'users', label: 'Users and administrators', lockdownOnly: true },
   { key: 'configuration', label: 'Configuration', lockdownOnly: true },
 ];
-
-function NavigationButton({ active, children, onClick }) {
-  return (
-    <button
-      type="button"
-      className={`w-full px-1 py-0.5 text-left text-xs ${active ? 'bg-sky-800 text-white' : 'surface hover:bg-neutral-700'}`}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
-}
 
 export default function AdminApp() {
   useUserIdentitySync({ identitySurface: 'passive' });
@@ -125,11 +114,12 @@ export default function AdminApp() {
   }
 
   const navigationOptions = TOP_LEVEL_SECTIONS.filter((entry) => !entry.lockdownOnly || isLockdown);
+  const activeSection = navigationOptions.some((entry) => entry.key === selected) ? selected : 'overview';
 
   let content;
   if (!isAdmin) {
     content = <div className="mx-auto w-full max-w-md"><AuthPanel /></div>;
-  } else if (selected === 'fleet') {
+  } else if (activeSection === 'fleet') {
     content = <AdminPanelContent />;
   } else if (!isLockdown) {
     content = (
@@ -139,14 +129,14 @@ export default function AdminApp() {
     );
   } else if (!snapshot) {
     content = <CardFrame title="Loading administration" bodyClassName="p-1 text-sm text-slate-300"><p>{loadingError || 'Loading configuration and audit state…'}</p></CardFrame>;
-  } else if (selected === 'users') {
+  } else if (activeSection === 'users') {
     content = (
       <div className="space-y-0.5">
         <AdministratorAccounts administrators={snapshot.administrators} socket={socket} runSensitive={runSensitive} onSnapshot={setSnapshot} />
         <IdentityDatabasePanel />
       </div>
     );
-  } else if (selected === 'configuration') {
+  } else if (activeSection === 'configuration') {
     content = <ConfigurationEditor snapshot={snapshot} socket={socket} runSensitive={runSensitive} onSnapshot={setSnapshot} onReload={loadSnapshot} />;
   } else {
     content = <AdminOverview snapshot={snapshot} socket={socket} runSensitive={runSensitive} onSnapshot={setSnapshot} />;
@@ -161,20 +151,18 @@ export default function AdminApp() {
           <p>{snapshot ? `Active configuration revision ${snapshot.configuration.revision}.${snapshot.restartRequired ? ' An application restart is required to apply saved changes.' : ' The running application has loaded this revision.'}` : 'Central server administration and configuration.'}</p>
         </CardFrame>
         {isAdmin ? (
-          <select className="field-input my-0.5 w-full lg:hidden" value={navigationOptions.some((entry) => entry.key === selected) ? selected : 'overview'} onChange={(event) => selectSection(event.target.value)}>
-            {navigationOptions.map((entry) => <option key={entry.key} value={entry.key}>{entry.label}</option>)}
-          </select>
-        ) : null}
-        <div className="mt-0.5 grid gap-0.5 lg:grid-cols-[15rem_minmax(0,1fr)]">
-          {isAdmin ? (
-            <nav className="hidden space-y-0.5 lg:block" aria-label="Administration sections">
-              {TOP_LEVEL_SECTIONS.filter((entry) => !entry.lockdownOnly || isLockdown).map((entry) => (
-                <NavigationButton key={entry.key} active={selected === entry.key} onClick={() => selectSection(entry.key)}>{entry.label}</NavigationButton>
-              ))}
+          <Tabs currentTab={activeSection} onTabChange={selectSection}>
+            {/* Reusing the same responsive tab surface as the driver page makes
+                administration feel like another MultiRover workspace instead
+                of a separate desktop-oriented application. */}
+            <nav aria-label="Administration sections">
+              <TabList className="my-0.5">
+                {navigationOptions.map((entry) => <Tab key={entry.key} id={entry.key}>{entry.label}</Tab>)}
+              </TabList>
             </nav>
-          ) : null}
-          <section className="min-w-0">{content}</section>
-        </div>
+            <TabPanels><section className="min-w-0">{content}</section></TabPanels>
+          </Tabs>
+        ) : <section className="mt-0.5 min-w-0">{content}</section>}
       </main>
     </div>
   );
