@@ -19,6 +19,7 @@ import AdministratorAccounts from './components/AdministratorAccounts.jsx';
 import AdminOverview from './components/AdminOverview.jsx';
 import ConfigurationEditor from './components/ConfigurationEditor.jsx';
 import PasswordConfirmationDialog from './components/PasswordConfirmationDialog.jsx';
+import './styles.css';
 
 const TOP_LEVEL_SECTIONS = [
   { key: 'overview', label: 'Overview' },

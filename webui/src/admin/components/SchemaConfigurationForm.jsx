@@ -1,10 +1,9 @@
 // Schema-Generated Configuration Form
-// Purpose: Renders the server-provided JSON Schema in the same cards, surfaces, fields, and buttons as the rest of MultiRover.
+// Purpose: Renders the server-provided JSON Schema as an ordered, indented tree resembling the configuration's YAML structure.
 // Scope: Defines one generic RJSF presentation; it never names or special-cases an individual service or setting.
 import { useMemo } from 'react';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
-import CardFrame from '../../components/CardFrame/index.jsx';
 
 function buildUiSchema(schema, path = '') {
   /*
@@ -41,7 +40,7 @@ function SecretWidget({ id, disabled, readonly, options, registry }) {
   }
 
   return (
-    <div className="surface space-y-0.5 p-0.5">
+    <div className="configuration-secret space-y-0.5">
       {/* Secret actions stay beside their status. A wide configuration card
           must not turn related controls into a trip across the screen. */}
       <div className="flex flex-wrap items-center gap-0.5">
@@ -77,7 +76,6 @@ function ConfigurationFieldTemplate({
   children,
   classNames,
   description,
-  displayLabel,
   errors,
   help,
   hidden,
@@ -98,59 +96,48 @@ function ConfigurationFieldTemplate({
   }
 
   return (
-    <div className={`${classNames || ''} configuration-field surface p-1`} style={style}>
-      {displayLabel ? (
-        <label htmlFor={id} className="block text-xs font-semibold text-slate-100">
+    <div className={`${classNames || ''} configuration-line`} style={style}>
+      <div className="configuration-key">
+        {/* Boolean widgets deliberately hide their internal duplicate label, so
+            every scalar can use this same key column and preserve YAML order. */}
+        <label htmlFor={id} className="text-xs font-semibold text-slate-100">
           {label}{required ? <span className="ml-0.25 text-sky-300">*</span> : null}
         </label>
-      ) : null}
-      {displayLabel && description ? <div className="mt-0.25">{description}</div> : null}
-      <div className={displayLabel ? 'mt-0.5' : ''}>{children}</div>
-      {errors}
-      {help}
+        {description ? <div>{description}</div> : null}
+      </div>
+      <div className="configuration-value">
+        {children}
+        {errors}
+        {help}
+      </div>
     </div>
   );
 }
 
 function ConfigurationObjectTemplate({ description, fieldPathId, properties, title }) {
   const visibleProperties = properties.filter((property) => !property.hidden);
-  const propertyGrid = (
-    <div className="configuration-property-grid grid gap-0.5 md:grid-cols-2 xl:grid-cols-3">
-      {/* RJSF gives each property content its own keyed field wrapper. Rendering
-          it directly preserves field-object and field-array on the grid child,
-          allowing containers to span the row without another frontend schema. */}
-      {visibleProperties.map((property) => property.content)}
-    </div>
-  );
+  const propertyLines = visibleProperties.map((property) => property.content);
 
   if (fieldPathId.path.length === 0) {
-    // The editor toolbar already identifies the root document. The root is a
-    // simple ordered stack so every service-owned top-level object receives
-    // the full page width before arranging its own fields responsively.
-    return <div className="space-y-1">{visibleProperties.map((property) => property.content)}</div>;
+    // The outer configuration card already names the root document. Rendering
+    // its properties directly makes their schema order read like YAML lines.
+    return <div className="configuration-tree">{propertyLines}</div>;
   }
 
   if (typeof fieldPathId.path.at(-1) === 'number') {
     // Array items receive their numbered heading and action row from the array
-    // item template. Rendering only their property grid prevents redundant
+    // item template. Rendering only their ordered property lines prevents redundant
     // nested boxes such as "Item 1" followed by another anonymous object box.
-    return propertyGrid;
-  }
-
-  if (fieldPathId.path.length === 1) {
-    return (
-      <CardFrame title={title} clipOverflow={false} bodyClassName="space-y-0.5 p-0.5">
-        {description ? <div className="px-0.5 text-xs text-slate-400">{description}</div> : null}
-        {propertyGrid}
-      </CardFrame>
-    );
+    return <div>{propertyLines}</div>;
   }
 
   return (
-    <section className="configuration-object surface border border-neutral-500/60 p-0.5">
-      <h3 className="mb-0.5 text-sm font-semibold text-slate-100">{title}</h3>
-      {description ? <div className="mb-0.5 text-xs text-slate-400">{description}</div> : null}
-      {propertyGrid}
+    <section className="configuration-branch">
+      <header className="configuration-branch-heading">
+        <h3>{title}</h3>
+        {description ? <div>{description}</div> : null}
+      </header>
+      <div className="configuration-children">{propertyLines}</div>
     </section>
   );
 }
@@ -159,13 +146,13 @@ function ConfigurationArrayItemTemplate({ buttonsProps, children, hasToolbar, in
   const unavailable = buttonsProps.disabled || buttonsProps.readonly;
 
   return (
-    <article className="surface-muted space-y-0.5 border border-neutral-500/60 p-0.5">
+    <article className="configuration-branch configuration-array-item">
       {hasToolbar ? (
         // Text controls are intentionally kept immediately after the item
         // number. RJSF's default Bootstrap toolbox pushes empty glyphicon
         // buttons to the far edge, which is both unclear and hard to reach.
-        <header className="flex flex-wrap items-center gap-0.5">
-          <span className="mr-0.5 text-xs font-semibold text-slate-100">Item {index + 1}</span>
+        <header className="configuration-item-heading">
+          <span className="configuration-item-title">Item {index + 1}</span>
           {(buttonsProps.hasMoveUp || buttonsProps.hasMoveDown) ? (
             <button type="button" className="button-dark text-xs" disabled={unavailable || !buttonsProps.hasMoveUp} onClick={buttonsProps.onMoveUpItem}>Move up</button>
           ) : null}
@@ -180,23 +167,25 @@ function ConfigurationArrayItemTemplate({ buttonsProps, children, hasToolbar, in
           ) : null}
         </header>
       ) : null}
-      {children}
+      <div className="configuration-children">{children}</div>
     </article>
   );
 }
 
 function ConfigurationArrayTemplate({ canAdd, disabled, items, onAddClick, readonly, schema, title }) {
   return (
-    <section className="configuration-array surface space-y-0.5 border border-neutral-500/60 p-0.5">
-      <header className="flex flex-wrap items-center gap-0.5">
-        <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
+    <section className="configuration-branch configuration-array">
+      <header className="configuration-branch-heading configuration-array-heading">
+        <h3>{title}</h3>
         <span className="text-[0.7rem] text-slate-400">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
       </header>
-      {schema.description ? <div className="text-xs text-slate-400">{schema.description}</div> : null}
-      {items.length ? <div className="space-y-0.5">{items}</div> : <p className="text-xs text-slate-500">No items configured.</p>}
-      {canAdd ? (
-        <button type="button" className="button-dark text-xs" disabled={disabled || readonly} onClick={onAddClick}>Add item</button>
-      ) : null}
+      {schema.description ? <div className="configuration-branch-description">{schema.description}</div> : null}
+      <div className="configuration-children">
+        {items.length ? <div className="space-y-0.5">{items}</div> : <p className="text-xs text-slate-500">No items configured.</p>}
+        {canAdd ? (
+          <button type="button" className="button-dark mt-0.5 text-xs" disabled={disabled || readonly} onClick={onAddClick}>Add item</button>
+        ) : null}
+      </div>
     </section>
   );
 }

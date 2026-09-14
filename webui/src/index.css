@@ -66,36 +66,4 @@ body::-webkit-scrollbar,
     @apply px-0.5 py-0.5 text-sm font-medium text-white transition-colors bg-rose-600 hover:bg-rose-500 rounded-md;
   }
 
-  /* RJSF still owns values, validation, and schema traversal, while the
-     generic React templates own layout. Only native form-control appearance
-     remains here, shared uniformly by every present and future setting. */
-  .configuration-schema-form input:not([type='checkbox']),
-  .configuration-schema-form select,
-  .configuration-schema-form textarea {
-    @apply w-full rounded-md border border-neutral-600 bg-neutral-700 px-0.5 py-0.5 text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500;
-  }
-
-  .configuration-schema-form input[type='checkbox'] {
-    @apply mr-0.5 h-4 w-4 align-middle accent-sky-500;
-  }
-
-  .configuration-schema-form .checkbox label {
-    @apply flex cursor-pointer items-center gap-0.5 text-sm font-semibold text-slate-100;
-  }
-
-  .configuration-schema-form .field-description,
-  .configuration-schema-form .help-block {
-    @apply mt-0.5 block text-[0.7rem] text-slate-500;
-  }
-
-  .configuration-schema-form .error-detail {
-    @apply mt-0.5 text-xs text-red-300;
-  }
-
-  /* Container fields need the complete row in responsive property grids.
-     Primitive fields remain free to share columns where their parent has room. */
-  .configuration-property-grid > .field-object,
-  .configuration-property-grid > .field-array {
-    @apply col-span-full;
-  }
 }

@@ -63,9 +63,9 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
   }
 
   return (
-    <div className="space-y-0.5">
-      <CardFrame className="sticky top-0 z-20 bg-neutral-900/95 backdrop-blur" title="Configuration" meta={`revision ${revision}`} bodyClassName="space-y-0.5 p-0.5">
-        <p className="text-[0.7rem] text-slate-400">Saved changes apply after an application restart.</p>
+    <CardFrame title="Configuration" meta={`revision ${revision}`} clipOverflow={false} bodyClassName="p-0.5">
+      <div className="configuration-toolbar sticky top-0 z-20 mb-0.5 space-y-0.5 border border-neutral-500/60 bg-neutral-900/95 p-0.5 backdrop-blur">
+        <p className="text-xs text-slate-400">Saved changes apply after an application restart.</p>
         {/* All document actions stay together at the start of the toolbar. The
             editor may use a wide canvas, but width is never used to separate a
             control from the content that explains it. */}
@@ -77,7 +77,7 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
           }}>Reset</button>
           <button type="button" className="button-dark" disabled={!dirty || saving} onClick={save}>{saving ? 'Saving…' : 'Save configuration'}</button>
         </div>
-      </CardFrame>
+      </div>
       {error ? <p className="border border-red-500/60 bg-red-950/40 p-1 text-xs text-red-100">{error}</p> : null}
       {validationErrors.length ? (
         <div className="border border-red-500/60 bg-red-950/40 p-1 text-xs text-red-100">
@@ -97,6 +97,6 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
         secretOperations={secretOperations}
         setSecretOperation={setSecretOperation}
       />
-    </div>
+    </CardFrame>
   );
 }
