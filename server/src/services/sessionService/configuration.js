@@ -14,28 +14,29 @@ const socials = {
   feature: true,
   defaultValue: { enabled: false, links: [] },
   schema: strictObject({
-    enabled: boolean({ title: 'Enabled' }),
+    enabled: boolean({ title: 'Enabled', description: 'Shows the configured social-link buttons in driver and inter-instance views.' }),
     links: {
       type: 'array',
       title: 'Links',
+      description: 'Ordered social or community links presented to users when this feature is enabled.',
       items: strictObject({
-        id: string({ minLength: 1, maxLength: 60, pattern: '^[a-zA-Z0-9_-]+$' }),
-        label: string({ minLength: 1, maxLength: 80 }),
-        url: string({ format: 'uri', maxLength: 2048 }),
-        icon: string({ maxLength: 80 }),
-        color: string({ pattern: '^#[0-9a-fA-F]{6}$' }),
-      }, { required: ['id', 'label', 'url', 'icon', 'color'] }),
+        id: string({ description: 'Stable identifier used by the UI to distinguish this link from the others.', minLength: 1, maxLength: 60, pattern: '^[a-zA-Z0-9_-]+$' }),
+        label: string({ description: 'User-facing text displayed on the link button.', minLength: 1, maxLength: 80 }),
+        url: string({ description: 'Absolute destination opened when a user selects this link.', format: 'uri', maxLength: 2048 }),
+        icon: string({ description: 'Icon name interpreted by the social-button UI; leave blank to use its fallback presentation.', maxLength: 80 }),
+        color: string({ description: 'Six-digit hexadecimal accent color used for this link button.', pattern: '^#[0-9a-fA-F]{6}$' }),
+      }, { description: 'One social-link button shown to users.', required: ['id', 'label', 'url', 'icon', 'color'] }),
     },
-  }, { title: 'Social links', required: ['enabled', 'links'] }),
+  }, { title: 'Social links', description: 'Controls the optional social and community buttons published to local users and peer instances.', required: ['enabled', 'links'] }),
 };
 
 const driverAd = {
   key: 'driverAd',
   defaultValue: { title: '', html: '' },
   schema: strictObject({
-    title: string({ maxLength: 120 }),
+    title: string({ description: 'Heading displayed above the operator-provided content on the driver page; leave blank to use the card fallback.', maxLength: 120 }),
     html: string({ title: 'HTML', description: 'Trusted operator HTML shown to drivers.', maxLength: 100000 }),
-  }, { title: 'Driver content', required: ['title', 'html'] }),
+  }, { title: 'Driver content', description: 'Operator-managed informational or promotional content displayed in the driver application.', required: ['title', 'html'] }),
 };
 
 function getConfiguredSocials(config) {

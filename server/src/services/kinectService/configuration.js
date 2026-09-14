@@ -8,7 +8,11 @@ module.exports = {
   feature: true,
   defaultValue: { enabled: false, captureCooldownMs: 10000 },
   schema: strictObject({
-    enabled: boolean(),
-    captureCooldownMs: integer({ minimum: 0, maximum: 3600000 }),
-  }, { title: 'Kinect', required: ['enabled', 'captureCooldownMs'] }),
+    enabled: boolean({ description: 'Starts the Kinect worker and exposes authorized frame capture after restart.' }),
+    captureCooldownMs: integer({ description: 'Minimum milliseconds between accepted Kinect frame-capture requests across all clients.', minimum: 0, maximum: 3600000 }),
+  }, {
+    title: 'Kinect',
+    description: 'Optional Kinect frame capture and its server-wide request cooldown.',
+    required: ['enabled', 'captureCooldownMs'],
+  }),
 };

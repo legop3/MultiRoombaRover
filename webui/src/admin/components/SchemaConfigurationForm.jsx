@@ -103,9 +103,12 @@ function ConfigurationFieldTemplate({
         <label htmlFor={id} className="text-xs font-semibold text-slate-100">
           {label}{required ? <span className="ml-0.25 text-sky-300">*</span> : null}
         </label>
-        {description ? <div>{description}</div> : null}
       </div>
       <div className="configuration-value">
+        {/* Descriptions belong with the editable value rather than inside the
+            narrow key column. This keeps long operational guidance readable
+            without weakening the YAML-like key/value alignment. */}
+        {description ? <div className="configuration-value-description">{description}</div> : null}
         {children}
         {errors}
         {help}
@@ -121,22 +124,34 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
   if (fieldPathId.path.length === 0) {
     // The outer configuration card already names the root document. Rendering
     // its properties directly makes their schema order read like YAML lines.
-    return <div className="configuration-tree">{propertyLines}</div>;
+    // The root description remains outside that stack so its introductory
+    // text does not accidentally become another configuration section.
+    return (
+      <div>
+        {description ? <div className="configuration-root-description">{description}</div> : null}
+        <div className="configuration-tree">{propertyLines}</div>
+      </div>
+    );
   }
 
   if (typeof fieldPathId.path.at(-1) === 'number') {
     // Array items receive their numbered heading and action row from the array
-    // item template. Rendering only their ordered property lines prevents redundant
-    // nested boxes such as "Item 1" followed by another anonymous object box.
-    return <div>{propertyLines}</div>;
+    // item template. Rendering only their description and ordered property
+    // lines prevents redundant boxes while preserving the item's own guidance.
+    return (
+      <div>
+        {description ? <div className="configuration-item-description">{description}</div> : null}
+        {propertyLines}
+      </div>
+    );
   }
 
   return (
     <section className="configuration-branch">
       <header className="configuration-branch-heading">
         <h3>{title}</h3>
-        {description ? <div>{description}</div> : null}
       </header>
+      {description ? <div className="configuration-branch-description">{description}</div> : null}
       <div className="configuration-children">{propertyLines}</div>
     </section>
   );

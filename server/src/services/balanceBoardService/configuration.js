@@ -7,5 +7,12 @@ module.exports = {
   key: 'balanceBoard',
   feature: true,
   defaultValue: { enabled: false, simulate: false },
-  schema: strictObject({ enabled: boolean(), simulate: boolean() }, { title: 'Balance Board', required: ['enabled', 'simulate'] }),
+  schema: strictObject({
+    enabled: boolean({ description: 'Starts the Wii Balance Board service and exposes its readings and controls after restart.' }),
+    simulate: boolean({ description: 'Runs the native worker with generated cyclic sensor data instead of connecting to Bluetooth hardware.' }),
+  }, {
+    title: 'Balance Board',
+    description: 'Optional Wii Balance Board input service with a development simulation mode.',
+    required: ['enabled', 'simulate'],
+  }),
 };

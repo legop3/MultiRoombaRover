@@ -5,8 +5,9 @@
 
 .configuration-tree {
   /* A single ordered stack is the visual equivalent of YAML's top-to-bottom
-     document order. Separation comes from hierarchy, not unrelated tiles. */
-  @apply space-y-0.5;
+     document order. A deliberately large root gap makes the beginning and end
+     of every top-level section unmistakable, while nested lines stay compact. */
+  @apply mt-1 space-y-4;
 }
 
 .configuration-branch {
@@ -23,11 +24,6 @@
 .configuration-branch-heading h3,
 .configuration-item-title {
   @apply text-sm font-semibold text-slate-100;
-}
-
-.configuration-branch-heading > div,
-.configuration-branch-description {
-  @apply text-[0.7rem] text-slate-400;
 }
 
 .configuration-children {
@@ -49,11 +45,29 @@
   @apply min-w-0;
 }
 
-.configuration-key .field-description,
-.configuration-key .help-block,
-.configuration-branch-description {
+.configuration-root-description,
+.configuration-branch-description,
+.configuration-item-description,
+.configuration-value-description {
   @apply block text-[0.7rem] leading-tight text-slate-500;
   margin-top: 0.125rem;
+}
+
+.configuration-root-description {
+  @apply mb-1;
+}
+
+.configuration-branch-description,
+.configuration-item-description {
+  /* Container help follows its heading at the same indentation; child keys
+     begin below it, preserving the same parent/child rhythm as YAML comments. */
+  @apply ml-0.5 max-w-[56rem];
+}
+
+.configuration-value-description {
+  /* A little separation from the widget keeps the help readable without
+     turning each setting back into a large card. */
+  @apply mb-0.5 max-w-[40rem];
 }
 
 .configuration-value input:not([type='checkbox']),

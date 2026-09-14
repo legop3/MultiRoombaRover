@@ -443,6 +443,8 @@ Implemented on 2026-09-14:
 - Added the centralized `/admin` route with Overview, Fleet operations, Users and administrators, and one schema-generated hierarchical Configuration page in legacy YAML order.
 - Replaced every feature-specific configuration form with `@rjsf/core`; the protected admin snapshot supplies the server's assembled schema, and one generic widget handles all schema-declared secrets.
 - Replaced RJSF's unthemed Bootstrap markup with a generic MultiRover tree renderer. The complete document now follows schema order as indented object, array, item, and key/value rows; array controls remain readable text beside each item, and the route-specific styling lives outside the global stylesheet.
+- Increased only the top-level section spacing while keeping nested configuration lines compact, moved option descriptions into the wider value column, and made root and array-item descriptions visible instead of discarding them.
+- Traced all 156 schema nodes to their runtime consumers and added operator-facing descriptions for every root, section, collection, array item, and scalar option. A recursive configuration test now rejects any future schema node without a description; currently reserved settings explicitly state that they have no runtime effect.
 - Converged feature control into service-owned configuration: each public feature opts in beside its own schema, and the configuration system derives those exact `enabled` switches for sessions and command discovery. The former server feature registry was removed; configuration completeness and hardware availability remain visible as runtime status instead of becoming hidden enablement rules.
 - Lazy-loaded setup and administration so the schema-form dependency is not included in ordinary driver-page downloads.
 - Reused the existing fleet and identity administration surfaces, added password reconfirmation for sensitive operations, and prevented removal or demotion of the final lockdown administrator.
@@ -450,7 +452,7 @@ Implemented on 2026-09-14:
 
 Local verification completed:
 
-- All 103 server tests passed, including file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, explicit setup-file import, and the earlier filesystem coverage.
+- All 104 server tests passed, including complete schema-description coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, explicit setup-file import, and the earlier filesystem coverage.
 - Focused admin, route, and identity UI lint passed.
 - All 20 existing focused web UI tests passed.
 - The production web UI build completed successfully and regenerated the checked-in server assets.

@@ -20,6 +20,29 @@ function createTestDatabase() {
   return createConfigurationDatabase({ databasePath: path.join(root, 'configuration.sqlite') });
 }
 
+function collectUndocumentedSchemaPaths(schema, pathLabel = '$') {
+  /*
+    The admin editor is entirely schema-generated, so missing schema prose is
+    missing operator documentation. Walk objects, arrays, array item schemas,
+    and scalar leaves instead of checking only named service definitions; this
+    makes every visible level of the hierarchy uphold the same contract.
+  */
+  if (!schema || typeof schema !== 'object') return [];
+  const missing = typeof schema.description === 'string' && schema.description.trim()
+    ? []
+    : [pathLabel];
+
+  if (schema.properties) {
+    Object.entries(schema.properties).forEach(([key, childSchema]) => {
+      missing.push(...collectUndocumentedSchemaPaths(childSchema, `${pathLabel}.${key}`));
+    });
+  }
+  if (schema.items) {
+    missing.push(...collectUndocumentedSchemaPaths(schema.items, `${pathLabel}[]`));
+  }
+  return missing;
+}
+
 test.after(() => {
   temporaryRoots.forEach((root) => fs.rmSync(root, { recursive: true, force: true }));
 });
@@ -44,6 +67,15 @@ test('service definitions determine document order and write-only secret handlin
   assert.equal(rootSchema.properties.homeAssistant.properties.token.writeOnly, true);
   assert.equal(rootSchema.properties.ptzCamera.properties.password.writeOnly, true);
   assert.equal(rootSchema.properties.discord.properties.token.writeOnly, true);
+});
+
+test('every configuration section, collection, item, and option has an operator description', () => {
+  /*
+    New configuration remains self-documenting by default. Reporting every
+    dotted path in one assertion gives a contributor an exact repair list and
+    avoids recreating a separately maintained documentation registry.
+  */
+  assert.deepEqual(collectUndocumentedSchemaPaths(rootSchema), []);
 });
 
 test('service definitions generate public feature paths without a separate registry', () => {

@@ -8,10 +8,14 @@ module.exports = {
   feature: true,
   defaultValue: { enabled: false, upSwitch: '', downSwitch: '', interlockMs: 2000, commandCooldownMs: 3000 },
   schema: strictObject({
-    enabled: boolean(),
-    upSwitch: string({ maxLength: 255 }),
-    downSwitch: string({ maxLength: 255 }),
-    interlockMs: integer({ minimum: 0, maximum: 600000 }),
-    commandCooldownMs: integer({ minimum: 0, maximum: 600000 }),
-  }, { title: 'Lift', required: ['enabled', 'upSwitch', 'downSwitch', 'interlockMs', 'commandCooldownMs'] }),
+    enabled: boolean({ description: 'Enables lift status and commands through the two configured Home Assistant switches after restart.' }),
+    upSwitch: string({ description: 'Home Assistant switch entity that powers upward lift movement.', maxLength: 255 }),
+    downSwitch: string({ description: 'Home Assistant switch entity that powers downward lift movement.', maxLength: 255 }),
+    interlockMs: integer({ description: 'Milliseconds to wait after turning off the opposing direction before energizing the requested direction. Runtime always enforces at least 250 ms.', minimum: 0, maximum: 600000 }),
+    commandCooldownMs: integer({ description: 'Minimum milliseconds between lift commands. Runtime never allows this to be shorter than the interlock delay.', minimum: 0, maximum: 600000 }),
+  }, {
+    title: 'Lift',
+    description: 'Bidirectional lift control using interlocked Home Assistant switch entities.',
+    required: ['enabled', 'upSwitch', 'downSwitch', 'interlockMs', 'commandCooldownMs'],
+  }),
 };
