@@ -279,7 +279,7 @@ test('administrator storage never exposes hashes or removes the final lockdown a
   database.close();
 });
 
-test('an explicitly uploaded YAML file imports configuration and bcrypt hashes exactly once', () => {
+test('an explicitly uploaded YAML imports current fields, ignores obsolete keys, and preserves bcrypt hashes exactly once', () => {
   const yamlText = `
 admins:
   - username: owner
@@ -289,10 +289,45 @@ admins:
 timezone: America/Chicago
 media:
   whepBaseUrl: http://localhost:8889/video
+overseerControl:
+  enabled: false
+  heartbeatMs: 30000
+  alwaysRunModel: false
+homeAssistant:
+  neato:
+    enabled: false
+    brainslugHost: neato-vacuum.local
+    brainslugKey: retired-secret
+    brainslugLogFile: /tmp/retired.log
+roomCameras:
+  enabled: true
+  cameras:
+    - id: stream-only
+      name: Stream-only camera
+      streamUrl: http://camera.local/stream.mjpg
+discord:
+  channels:
+    chatBridge: "123456789012345678"
+  roles:
+    stalker: "123456789012345678"
+fleetReports:
+  discord:
+    immediateCriticalAlerts: true
 `;
   const parsed = parseConfigurationFile(yamlText);
   assert.equal(parsed.config.timezone, 'America/Chicago');
   assert.equal(parsed.administrators[0].passwordHash, '$2b$10$preservedHash');
+  assert.equal(Object.hasOwn(parsed.config.overseerControl, 'heartbeatMs'), false);
+  assert.equal(Object.hasOwn(parsed.config.overseerControl, 'alwaysRunModel'), false);
+  assert.equal(Object.hasOwn(parsed.config.homeAssistant.neato, 'brainslugHost'), false);
+  assert.equal(Object.hasOwn(parsed.config.discord.channels, 'chatBridge'), false);
+  assert.equal(Object.hasOwn(parsed.config.discord.roles, 'stalker'), false);
+  assert.equal(Object.hasOwn(parsed.config.fleetReports.discord, 'immediateCriticalAlerts'), false);
+  assert.deepEqual(parsed.config.roomCameras.cameras, [{
+    id: 'stream-only',
+    name: 'Stream-only camera',
+    streamUrl: 'http://camera.local/stream.mjpg',
+  }]);
 
   const database = createTestDatabase();
   const result = importConfigurationFile({ text: yamlText, database });
@@ -300,4 +335,21 @@ media:
   assert.equal(database.findAdministratorForAuthentication('OWNER').passwordHash, '$2b$10$preservedHash');
   assert.throws(() => importConfigurationFile({ text: yamlText, database }), /cannot replace an initialized installation/);
   database.close();
+});
+
+test('uploaded YAML still rejects invalid values for fields in the current schema', () => {
+  const yamlText = `
+admins:
+  - username: owner
+    password_hash: "$2b$10$preservedHash"
+    lockdown: true
+bandwidthSavings:
+  multiTabProtection: unsupported-mode
+`;
+
+  assert.throws(() => parseConfigurationFile(yamlText), (error) => {
+    assert.equal(error.code, 'CONFIG_VALIDATION_FAILED');
+    assert.ok(error.validationErrors.some((entry) => entry.path === '/bandwidthSavings/multiTabProtection'));
+    return true;
+  });
 });

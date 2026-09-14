@@ -213,7 +213,7 @@ The setup upload must:
 - Preserve lockdown roles and Discord IDs.
 - Preserve secrets without printing them.
 - Apply current defaults for absent fields.
-- Report unknown or invalid fields instead of discarding them.
+- Ignore fields that do not exist in the current schema, while reporting invalid values supplied for current fields.
 - Validate the entire result before writing anything.
 - Refuse to replace an already-configured database.
 - Write the configuration, administrators, and audit event atomically.
@@ -389,7 +389,7 @@ Phase 1 is complete only when all of the following are true:
 - The current systemd installation runs without `config.yaml`.
 - A completely empty data directory can be initialized through `/setup`.
 - An explicitly selected YAML file can initialize the empty database exactly once.
-- The setup upload reports unknown or invalid values instead of discarding them.
+- The setup upload ignores nonexistent fields and reports invalid values supplied for current fields.
 - Startup and installation do not search for or modify an old `config.yaml`.
 - All mutable server state is contained by the configured data directory.
 - A complete backup can be downloaded and validated.
@@ -439,6 +439,7 @@ Implemented on 2026-09-14:
 - Redacted secrets from browser responses and audit data. The one complete save operation preserves stored secrets unless the administrator explicitly replaces or clears them.
 - Converted every runtime configuration consumer to the synchronous database-backed configuration service and removed the YAML loader, `SERVER_CONFIG`, and the tracked example YAML.
 - Added an explicit one-time YAML upload to `/setup`. Existing bcrypt hashes, lockdown roles, Discord identities, configuration, and secrets can be imported only when the operator selects the file; the installer and startup perform no automatic discovery or migration, and there is no command-line importer.
+- Made setup-file import recursively retain only fields present in the current schema. Stale keys from the permissive YAML era are ignored without aliases or historical translations, while invalid values for real current settings still fail validation; stream-only and snapshot-only room-camera entries remain accepted as they were by the runtime.
 - Added safe empty-data startup, a file-backed one-time setup code, the restricted `/setup` route, and a console administrator-recovery command. The credential persists at `data/setup-code.txt` across restarts with `0600` permissions, never appears in logs, and is deleted when setup completes.
 - Added the centralized `/admin` route with Overview, Fleet operations, Users and administrators, and one schema-generated hierarchical Configuration page in legacy YAML order.
 - Replaced every feature-specific configuration form with `@rjsf/core`; the protected admin snapshot supplies the server's assembled schema, and one generic widget handles all schema-declared secrets.
@@ -456,7 +457,7 @@ Implemented on 2026-09-14:
 
 Local verification completed:
 
-- All 106 server tests passed, including populated legacy-style default coverage, complete schema-description and input-example coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, explicit setup-file import, and the earlier filesystem coverage.
+- All 107 server tests passed, including populated legacy-style default coverage, complete schema-description and input-example coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, explicit setup-file import with recursive removal of nonexistent fields, and the earlier filesystem coverage.
 - Focused admin, route, and identity UI lint passed.
 - All 20 existing focused web UI tests passed.
 - The production web UI build completed successfully and regenerated the checked-in server assets.
