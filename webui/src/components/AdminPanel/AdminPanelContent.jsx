@@ -105,7 +105,6 @@ export default function AdminPanelContent() {
     rebootRover,
     updateRover,
     updateAllRovers,
-    rebootServer,
     setAudioLevels,
     setPersonalAudioAdjustmentRange,
     setPrivateSafety,
@@ -119,7 +118,6 @@ export default function AdminPanelContent() {
   const [lockStates, setLockStates] = useState({});
   const [rebootStates, setRebootStates] = useState({});
   const [updateStates, setUpdateStates] = useState({});
-  const [serverRebooting, setServerRebooting] = useState(false);
   const [clearingLlmHistory, setClearingLlmHistory] = useState(false);
   const [clearingOverseerHistory, setClearingOverseerHistory] = useState(false);
   const health = session?.health || null;
@@ -226,18 +224,6 @@ export default function AdminPanelContent() {
       }
     } catch (err) {
       alert(err.message);
-    }
-  };
-
-  const handleServerReboot = async () => {
-    const ok = window.confirm('Reboot the server host now? This will disconnect all users.');
-    if (!ok) return;
-    setServerRebooting(true);
-    try {
-      await rebootServer();
-    } catch (err) {
-      alert(err.message);
-      setServerRebooting(false);
     }
   };
 
@@ -421,14 +407,6 @@ export default function AdminPanelContent() {
   return (
     <CardFrame title="Admin controls" actions={actions} bodyClassName="space-y-0.5 text-base">
       <div className="flex gap-0.5 text-xs">
-        <button
-          type="button"
-          onClick={handleServerReboot}
-          disabled={serverRebooting}
-          className="button-danger disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {serverRebooting ? 'Server rebooting...' : 'Reboot Server'}
-        </button>
         <button
           type="button"
           onClick={handleTestRewardOverlay}

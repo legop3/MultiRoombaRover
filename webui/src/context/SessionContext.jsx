@@ -392,7 +392,6 @@ export function SessionProvider({ children }) {
       // intent, then the server checks privileges and fans out the same fixed
       // update command to every currently connected rover.
       updateAllRovers: () => emitWithAck('command:updateAllRovers'),
-      rebootServer: () => emitWithAck('server:reboot'),
       playUploadedAudio: ({ roverId, name, mime, dataBase64 }) =>
         emitWithAck('audio:uploadPlay', { roverId, name, mime, dataBase64 }),
       stopUploadedAudio: (roverId) => emitWithAck('audio:uploadStop', { roverId }),

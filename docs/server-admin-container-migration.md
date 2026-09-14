@@ -6,7 +6,7 @@ This document is the live implementation tracker for the migration.
 
 - [x] Phase 1, step 1: Establish the single data-directory contract
 - [x] Phase 1, steps 2-5: Configuration database, manual setup-file import, setup, and centralized admin UI
-- [ ] Phase 1, steps 6-9: Backup/restore, restart, and internal video proxy
+- [ ] Phase 1, steps 6-9: Restart, backup/restore, and internal video proxy
 - [ ] Phase 2: Containerization, GHCR publishing, and container lifecycle controls
 
 The single data-directory implementation and local verification are complete. Real snapshot generation, legacy-directory cleanup, and runtime filesystem tracing remain deployment checks for the actual server; they do not leave the implementation step open.
@@ -22,7 +22,9 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 
 - 2026-09-14: Apply every committed configuration revision immediately. The configuration coordinator atomically replaces the process-wide snapshot, compares top-level service sections, serially reloads only affected service runtimes, and then refreshes all sessions. Long-lived HTTP/socket handlers remain registered once and delegate to the current runtime; integrations may reconnect or replace their own child process, worker, client, timers, and subscriptions without restarting Node.
 - 2026-09-14: Render the schema-driven configuration editor as a YAML-like tree inside one `CardFrame`. Every object or array introduces an ordered header and one indentation guide, every scalar occupies one key/value row, and array operations remain beside their item instead of moving to the far edge. Keep all route-specific RJSF styling in `webui/src/admin/styles.css`, outside the shared global stylesheet.
-- 2026-09-14: Treat container deployment as a fresh installation. Neither startup nor the installer searches for, imports, removes, or otherwise manages an old `config.yaml`; the only old-file path retained is an operator-selected YAML upload on `/setup`. The separate command-line importer and its dry-run mode are removed. Internal SQLite schema migrations remain because they evolve the active database rather than discovering an old installation.
+- 2026-09-14: Restart only the application process, never the host. A lockdown administrator with recent password confirmation requests one audited restart, Node acknowledges and announces it, then sends itself SIGTERM. Existing service signal handlers clean up their owned children, while systemd `Restart=always` and the later container restart policy start the application again.
+- 2026-09-14: Keep backup and restore together in one server service after application restart exists. Neither operation stops running services or writers, and no command-line interface is maintained. Backup uses online SQLite snapshots and stable copies of non-database files; restore validates and stages an uploaded archive, records a marker, and uses the normal application restart to replace the data directory during earliest startup.
+- 2026-09-14: Treat container deployment as a fresh installation. Neither startup nor the installer searches for, imports, removes, or otherwise manages an old `config.yaml`; the only old-file paths retained are operator-selected YAML uploads on `/setup` and the protected Configuration page. The separate command-line importer and its dry-run mode are removed. Internal SQLite schema migrations remain because they evolve the active database rather than discovering an old installation.
 - 2026-09-14: Keep the one-time first-run setup code in `data/setup-code.txt` with owner-only permissions instead of writing the credential into server logs. Reuse it across restarts and delete it permanently when setup completes.
 - 2026-09-14: Feature enablement is exactly the service-owned `enabled` boolean. A service-owned configuration definition marks itself with `feature: true` when that switch belongs in the public feature map; the configuration system derives the map for sessions and command availability, including nested service definitions, without a separate feature registry. Missing credentials, hardware, connections, data, or enabled dependencies are runtime health conditions and never silently change that choice.
 - 2026-09-14: Keep configuration as one ordered hierarchical document, matching the former YAML layout. The admin application presents one continuous configuration page and saves the complete document as one revision. There are no artificial Hardware, Integrations, Media, or similar configuration categories and no backend or frontend section registries.
@@ -277,9 +279,26 @@ Authorization rules:
 
 Configuration uses one schema-generated typed form rather than a raw YAML or JSON text editor. Repeatable values such as cameras, entities, links, and buttons receive the form library's generic add, remove, and reorder workflow.
 
-## 6. Implement complete backup and restore
+## 6. Standardize application restart
 
-Everything durable living under one data directory makes the backup boundary simple, but copying live SQLite files and JSON files without coordination would not guarantee a consistent backup. The implementation must create a consistent snapshot before archiving it.
+Replace the current host reboot operation with one deployment-neutral **Restart application** operation.
+
+The restart operation must:
+
+1. Require a lockdown administrator and recent password confirmation.
+2. Reject a second request while one is already pending.
+3. Persist an audit event, acknowledge the requester, and notify connected browsers.
+4. Stop accepting new HTTP connections and send SIGTERM to the Node process after a short acknowledgement delay.
+5. Reuse the cleanup hooks already owned by MediaMTX, ffmpeg, Kinect, Balance Board, and other child-process services.
+6. Exit normally and rely on the process supervisor to start the application again.
+
+During Phase 1, systemd uses `Restart=always`. During Phase 2, the container uses a restart policy such as `unless-stopped`. An explicit operator `systemctl stop` or container stop remains stopped; only a process exit is restarted. The browser shows the announced reconnect state and reloads the active administration snapshot after Socket.IO reconnects.
+
+Host rebooting is a separate privilege and is not part of this application contract. The server never invokes `systemctl reboot`.
+
+## 7. Implement complete backup and restore
+
+Everything durable living under one data directory makes the backup boundary simple. Backup and restore remain together under one `backupRestoreService`; there is no generic maintenance framework and no command-line workflow.
 
 ### Full backup
 
@@ -294,29 +313,25 @@ The primary admin action is **Download full backup**. A full backup includes the
 - Generated and cached files that are part of the current server state
 - A manifest describing the application and schema versions
 
-The backup service must:
+The backup operation must:
 
 1. Require a lockdown administrator and recent password confirmation.
-2. Enter a short maintenance/snapshot state that prevents new persistent mutations.
-3. Ask services with buffered state to flush it, stop active audio/replay workers, and clear `runtime/` so FIFOs and incomplete scratch files are never archived.
-4. Create consistent SQLite snapshots using SQLite's supported backup/checkpoint facilities rather than copying active WAL files blindly.
-5. Copy non-database durable files into temporary staging.
+2. Leave every service and writer running.
+3. Create consistent SQLite snapshots using SQLite's online backup support rather than copying active WAL files.
+4. Copy non-database durable files and verify their size and modification time before and after each copy, retrying a file that changed during the copy.
+5. Exclude `runtime/`, backup/restore staging, SQLite WAL/SHM files, and incomplete files that never become stable during bounded retries.
 6. Produce a manifest containing creation time, application version, schema versions, included paths, sizes, and checksums.
-7. Create the archive in temporary storage and stream it to the browser.
-8. Remove temporary staging whether the operation succeeds or fails.
-9. Resume normal mutations after the consistent snapshot has been captured; archive compression does not need to hold the server in maintenance mode.
+7. Stream the completed archive to the authorized browser and remove temporary staging afterward.
 
 The downloaded archive contains credentials and integration secrets. The UI must say so clearly. It must not be exposed through a permanent public URL or retained indefinitely inside the data directory.
 
-`runtime/` is inside the filesystem boundary but is not durable backup content. Excluding it is necessary because an audio FIFO is a live process primitive rather than a regular file, and incomplete uploads or replay builds have no restore value. The backup coordinator must quiesce the owning services before clearing it so exclusion cannot disrupt active work.
-
-An optional smaller **Download settings and state backup** may exclude explicitly regenerable, high-volume snapshots, replay segments, completed replays, and caches. This is secondary; the full backup remains the authoritative complete-server backup.
+`runtime/` is inside the filesystem boundary but is not durable backup content. Audio FIFOs, incomplete uploads, and in-progress replay builds have no restore value and are excluded without stopping their owners. The initial implementation provides only the authoritative full backup.
 
 ### Restore
 
 Restore cannot safely overwrite databases underneath running services. It must be a staged, restart-bound operation.
 
-The restore service must:
+The restore operation must:
 
 1. Require a lockdown administrator and recent password confirmation.
 2. Upload the archive into bounded staging controlled by the data directory.
@@ -327,45 +342,14 @@ The restore service must:
 7. Display exactly what will be replaced.
 8. Require a final explicit confirmation.
 9. Record a pending-restore marker.
-10. Gracefully stop the application.
+10. Request the normal application restart.
 11. Apply the restore before ordinary services open their databases on the next start.
 12. Run database migrations against the restored data when necessary.
 13. Start the application and verify its health.
 
 The startup restore path must preserve a local rollback snapshot until the restored server passes validation. If extraction, migration, or startup validation fails, it must put the prior data back and report the failure. Restore coordination files may live under `data/system/restore`, but they must be excluded from the restored payload where necessary to avoid recursively restoring an in-progress operation.
 
-Restoring configuration also restores administrator accounts and secrets. The initiating browser may therefore lose authentication after restart; the reconnect UI must explain this and return to login normally.
-
-### Command-line recovery
-
-Backup and restore must also have command-line entry points that use the same implementation as the admin UI. They are needed when the web server cannot start or authentication data is damaged.
-
-The command-line tools must support:
-
-- Creating a consistent backup while the server is stopped
-- Validating a backup without applying it
-- Restoring while the server is stopped
-- Printing a concise manifest summary
-- Refusing unsafe or malformed archives
-
-The UI and command line must not develop separate archive formats or validation behavior.
-
-## 7. Standardize graceful application restart
-
-Replace the current host reboot operation with a deployment-neutral **Restart application** operation.
-
-The restart coordinator must:
-
-1. Authorize and acknowledge the request.
-2. Stop accepting new persistent mutations.
-3. Flush or close persistent stores.
-4. Stop MediaMTX, ffmpeg, and native workers.
-5. Close HTTP and socket listeners within a bounded timeout.
-6. Exit with the status expected by the current supervisor.
-
-During Phase 1, systemd restarts the process. During Phase 2, the container restart policy or lifecycle service restarts it. The browser should show a reconnect state and confirm the active configuration revision after reconnecting.
-
-Host rebooting is a separate privilege and is not part of this application restart contract.
+Restoring configuration also restores administrator accounts and secrets. The initiating browser may therefore lose authentication after restart; the reconnect UI must explain this and return to login normally. Backup and restore exist only in the protected admin application.
 
 ## 8. Internalize MediaMTX WHEP signaling
 
@@ -472,11 +456,12 @@ Implemented on 2026-09-14:
 - Reused the existing fleet and identity administration surfaces, added password reconfirmation for sensitive operations, and prevented removal or demotion of the final lockdown administrator.
 - Added configuration revision history, rollback, audit history, and immediate application reporting.
 - Added a serialized live-configuration coordinator and converted configurable service runtimes to apply changed sections without restarting Node. Passive policies read the current immutable snapshot; network, hardware, timer, and child-process services replace or retune their owned runtime while stable HTTP/socket handlers continue delegating to it. The admin editor reports any service-specific reload failure after the revision is safely committed.
+- Replaced the privileged host-reboot action with one lockdown-only, recently confirmed, audited application restart on the admin Overview. Node announces the restart, stops accepting new HTTP connections, and signals itself after acknowledging the browser; the existing service signal hooks clean up owned child processes, and systemd now restarts clean application exits without making `systemctl stop` ineffective.
 
 Local verification completed:
 
 - All 109 server tests passed, including populated legacy-style default coverage, complete schema-description and input-example coverage, file-backed setup-code lifecycle and symlink rejection, service-definition-derived feature projection, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, setup and initialized-server YAML import safety, recursive removal of nonexistent fields, and the earlier filesystem coverage.
-- All 24 server test files passed after live application was added. The new isolated coordinator test confirms coherent snapshot replacement, top-level change detection, per-service invocation, applied revision reporting, and failure isolation.
+- All 24 server test files passed after live application was added. The isolated coordinator test confirms coherent snapshot replacement, top-level change detection, per-service invocation, applied revision reporting, and failure isolation. Application-restart syntax, authorization wiring, and supervisor configuration were checked without exercising the real process signal on the development machine.
 - Focused admin, route, and identity UI lint passed.
 - All 20 existing focused web UI tests passed.
 - The production web UI build completed successfully and regenerated the checked-in server assets.
@@ -693,8 +678,8 @@ Within the two hard phase boundaries, the safest order is:
 - [x] Build the centralized admin configuration UI.
 - [x] Add persistent audit history.
 - [x] Apply every configuration revision to running services without restarting the application.
-- [ ] Implement coordinated backup and staged restore.
-- [ ] Standardize graceful application restart.
+- [x] Standardize graceful application restart.
+- [ ] Implement online backup and restart-bound staged restore in one service.
 - [ ] Add the internal `/video` proxy and remove the special external route.
 - [ ] Run the full Phase 1 completion gate on the legacy deployment.
 - [ ] Build and verify the production application image.

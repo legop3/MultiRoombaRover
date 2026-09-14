@@ -342,6 +342,16 @@ function createConfigurationDatabase({ databasePath = DEFAULT_DATABASE_PATH } = 
     }));
   }
 
+  function recordAuditEvent(actor, action, details = {}) {
+    /*
+      Operational admin services need the same persistent audit trail as
+      configuration changes, but they must not gain access to the underlying
+      statement or database handle. This narrow method retains the existing
+      redacted-details contract at the database boundary.
+    */
+    writeAudit(actor, action, details);
+  }
+
   const importConfigurationFileTransaction = db.transaction(({ config, administrators, actor, source }) => {
     // A setup upload initializes an empty installation; it is deliberately not
     // a general-purpose replacement path for a running server's configuration.
@@ -377,6 +387,7 @@ function createConfigurationDatabase({ databasePath = DEFAULT_DATABASE_PATH } = 
     countLockdownAdministrators,
     isSetupComplete,
     listAuditEvents,
+    recordAuditEvent,
     importConfigurationFile,
     close: () => db.close(),
   };

@@ -305,7 +305,10 @@ Environment=NODE_ENV=production
 Environment=SERVER_DATA_DIR=$DATA_DIR
 Environment=ROVER_SNAPSHOT_WRITER_BIN=$ROVER_SNAPSHOT_WRITER_BIN
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
-Restart=on-failure
+# Application-requested restarts use the same clean SIGTERM path as an
+# operator stop. Restart=always lets that process exit come back automatically,
+# while an explicit `systemctl stop` still remains stopped by systemd design.
+Restart=always
 RestartSec=2
 SuccessExitStatus=130 143
 

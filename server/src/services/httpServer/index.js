@@ -15,3 +15,16 @@ httpServer.listen(config.port, () => {
   */
   startMediaMtx();
 });
+
+function stopAcceptingConnections() {
+  /*
+    Child-process services already own their SIGTERM cleanup. The HTTP service
+    only stops accepting new work; MediaMTX's bounded signal handler remains
+    responsible for ending the Node process even if an existing socket keeps
+    the close callback waiting.
+  */
+  if (httpServer.listening) httpServer.close();
+}
+
+process.once('SIGINT', stopAcceptingConnections);
+process.once('SIGTERM', stopAcceptingConnections);

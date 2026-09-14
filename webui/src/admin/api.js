@@ -25,6 +25,7 @@ export const restoreConfigurationRevision = (socket, payload) => emitAdminReques
 export const createAdministrator = (socket, payload) => emitAdminRequest(socket, 'adminConfig:createAdministrator', payload);
 export const updateAdministrator = (socket, payload) => emitAdminRequest(socket, 'adminConfig:updateAdministrator', payload);
 export const deleteAdministrator = (socket, id) => emitAdminRequest(socket, 'adminConfig:deleteAdministrator', { id });
+export const restartApplication = (socket) => emitAdminRequest(socket, 'server:restartApplication');
 
 export const getSetupStatus = (socket) => emitAdminRequest(socket, 'setup:status');
 export const createFirstAdministrator = (socket, payload) => emitAdminRequest(socket, 'setup:createAdministrator', payload);

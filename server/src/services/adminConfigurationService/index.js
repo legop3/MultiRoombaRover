@@ -208,4 +208,5 @@ io.on('connection', (socket) => {
 module.exports = {
   PASSWORD_CONFIRMATION_WINDOW_MS,
   requireLockdownAdministrator,
+  requireRecentPassword,
 };

@@ -1,9 +1,10 @@
 // Administration Overview
 // Purpose: Summarizes configuration state, revision history, audit history, and links to existing health/report surfaces.
 // Scope: Presents persisted administration metadata without duplicating operational service implementations.
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import CardFrame from '../../components/CardFrame/index.jsx';
-import { restoreConfigurationRevision } from '../api.js';
+import { restartApplication, restoreConfigurationRevision } from '../api.js';
 
 function formatDate(value) {
   return Number.isFinite(Number(value)) ? new Date(Number(value)).toLocaleString() : 'unknown';
@@ -11,6 +12,16 @@ function formatDate(value) {
 
 export default function AdminOverview({ snapshot, socket, runSensitive, onSnapshot }) {
   const config = snapshot.configuration;
+  const [restartRequested, setRestartRequested] = useState(false);
+
+  useEffect(() => {
+    if (!restartRequested) return undefined;
+    // The socket reconnect is the simplest authoritative success signal: the
+    // replacement process is accepting browser connections again.
+    const handleReconnect = () => setRestartRequested(false);
+    socket.once('connect', handleReconnect);
+    return () => socket.off('connect', handleReconnect);
+  }, [restartRequested, socket]);
 
   async function restore(revision) {
     if (!window.confirm(`Restore configuration revision ${revision}? This creates and immediately applies a new active revision.`)) return;
@@ -25,6 +36,17 @@ export default function AdminOverview({ snapshot, socket, runSensitive, onSnapsh
     }
   }
 
+  async function restart() {
+    if (!window.confirm('Restart the MultiRover application now? Connected rovers and browsers will disconnect briefly; the server host will not reboot.')) return;
+    setRestartRequested(true);
+    try {
+      await runSensitive(() => restartApplication(socket));
+    } catch (error) {
+      setRestartRequested(false);
+      window.alert(error.message);
+    }
+  }
+
   return (
     <div className="space-y-0.5">
       <CardFrame title="Administration overview" meta={`revision ${config.revision}`} bodyClassName="grid gap-0.5 p-0.5 md:grid-cols-3">
@@ -35,6 +57,12 @@ export default function AdminOverview({ snapshot, socket, runSensitive, onSnapsh
       <CardFrame title="Existing administration surfaces" bodyClassName="flex flex-wrap gap-0.5 p-0.5 text-sm">
         <Link className="button-dark" to="/reports">Open fleet reports</Link>
         <Link className="button-dark" to="/">Open driver application</Link>
+      </CardFrame>
+      <CardFrame title="Application" bodyClassName="space-y-0.5 p-1 text-sm">
+        <p className="text-slate-300">Restart only the MultiRover application. The process supervisor starts it again automatically without rebooting the host.</p>
+        <button type="button" className="button-danger" disabled={restartRequested} onClick={restart}>
+          {restartRequested ? 'Waiting for application…' : 'Restart application'}
+        </button>
       </CardFrame>
       <CardFrame title="Configuration revisions" meta={snapshot.revisions.length} bodyClassName="max-h-64 overflow-y-auto p-0.5 text-xs">
         {snapshot.revisions.map((revision) => (
