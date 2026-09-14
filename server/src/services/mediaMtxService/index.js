@@ -1,7 +1,7 @@
 // MediaMTX Service
 // Purpose: Composes server configuration, runtime paths, and child-process supervision.
 // Scope: Starts MediaMTX only after the HTTP auth endpoint is listening and stops it with the server.
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 const globalConfig = require('../../globals/config');
 const logger = require('../../globals/logger').child('mediamtx');
 const { createMediaMtxSupervisor } = require('./supervisor');

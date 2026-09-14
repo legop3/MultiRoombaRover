@@ -11,7 +11,12 @@ const { renderIndexHtml, renderOgImage, renderWebManifest } = require('../embedS
   in-app navigation. The retired desktop composition is intentionally exposed
   at /old; the removed /newdrive route is intentionally absent.
 */
-app.get(['/', '/old', '/spectate', '/mini', '/display', '/scanner', '/database', '/ptz', '/reports'], async (req, res) => {
+/*
+  Every top-level React application needs the same generated index document on
+  a direct browser load. Keeping the setup and admin routes in this explicit
+  allowlist prevents them from working only after client-side navigation.
+*/
+app.get(['/', '/old', '/spectate', '/mini', '/display', '/scanner', '/database', '/ptz', '/reports', '/setup', '/admin'], async (req, res) => {
   try {
     const html = await renderIndexHtml(req);
     res.type('html').send(html);

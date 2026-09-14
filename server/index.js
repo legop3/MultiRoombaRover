@@ -8,6 +8,10 @@ require('./src/helpers/sensorDecoder');
 
 require('./src/services/alertService');
 require('./src/services/authService');
+// Setup remains available only until the first lockdown administrator exists;
+// the administrative configuration gateway then owns all subsequent changes.
+require('./src/services/setupService');
+require('./src/services/adminConfigurationService');
 require('./src/services/eventBus');
 require('./src/services/modeManager');
 require('./src/services/lockdownGuard');

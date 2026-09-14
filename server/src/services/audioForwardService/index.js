@@ -5,7 +5,7 @@ const path = require('path');
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('audioForwardService');
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 const { resolveRuntimePath } = require('../../helpers/dataPaths');
 const roverManager = require('../roverManager');
 const turnService = require('../turnService');
@@ -20,7 +20,10 @@ const audioForwardEvents = new EventEmitter();
 const config = loadConfig();
 const audioForwardConfig = config.audioForward || {};
 const mediaConfig = config.media || {};
-const serviceEnabled = audioForwardConfig.enabled !== false;
+// Configuration defaults always provide this boolean. Treat only an explicit
+// true as enabled so no credential, path, or historical fallback can opt the
+// service in on the operator's behalf.
+const serviceEnabled = Boolean(audioForwardConfig.enabled);
 const ffmpegBin = audioForwardConfig.ffmpegBin || 'ffmpeg';
 const streamSuffix =
   typeof audioForwardConfig.streamSuffix === 'string' && audioForwardConfig.streamSuffix.trim()

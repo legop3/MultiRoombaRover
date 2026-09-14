@@ -102,7 +102,7 @@ function createCommandHandlers(deps) {
     const mode = getMode();
     const commandDefinition = registry[action];
     if (commandDefinition?.requiredFeature && !deps.isFeatureEnabled(commandDefinition.requiredFeature)) {
-      await request.reply({ content: `${commandDefinition.unavailableLabel || commandDefinition.requiredFeature} feature is not configured.` });
+      await request.reply({ content: `${commandDefinition.unavailableLabel || commandDefinition.requiredFeature} feature is disabled.` });
       return;
     }
     // Actions in this set can change operational safety or access policy, so

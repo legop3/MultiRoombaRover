@@ -73,7 +73,10 @@ function createTransport(deps) {
 
   async function connect() {
     if (!enabled) {
-      logger.info('Home Assistant integration disabled; missing url/token in config');
+      // Disabled and misconfigured are intentionally different states. The
+      // explicit switch prevents connection attempts; missing credentials are
+      // surfaced by buildAuth() as a runtime connection failure when enabled.
+      logger.info('Home Assistant disabled by config');
       return;
     }
     if (runtime.connection) return;

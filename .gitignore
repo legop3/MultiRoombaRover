@@ -38,3 +38,6 @@ server/src/services/balanceBoardService/native/balance_board_worker
 server/data/fleet-reports.sqlite
 server/data/fleet-reports.sqlite-shm
 server/data/fleet-reports.sqlite-wal
+server/data/configuration.sqlite
+server/data/configuration.sqlite-shm
+server/data/configuration.sqlite-wal

@@ -9,7 +9,7 @@ const videoSessions = require('../videoSessions');
 const roverManager = require('../roverManager');
 const ptzCameraService = require('../ptzCameraService');
 const turnService = require('../turnService');
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
 const {
   shouldUseSnapshotsForNonTurnVideo,

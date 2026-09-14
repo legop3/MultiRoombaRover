@@ -5,7 +5,7 @@ const fsp = require('fs/promises');
 const { Ollama } = require('ollama');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('llmCommentary');
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 const { getRole, roleEvents } = require('../roleService');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const roverManager = require('../roverManager');
@@ -37,10 +37,10 @@ const { createRunner } = require('./runner');
 const config = loadConfig();
 const commentaryConfig = config.llmCommentary || {};
 const enabled = Boolean(commentaryConfig.enabled);
-const ollamaUrl = String(commentaryConfig.ollamaUrl || commentaryConfig.ollamaServer || '').trim();
+const ollamaUrl = String(commentaryConfig.ollamaServer || '').trim();
 const model = String(commentaryConfig.model || '').trim();
 const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
-const frequencyMs = normalizeFrequencyMs(Number(commentaryConfig.frequency ?? commentaryConfig.frequencyMs));
+const frequencyMs = normalizeFrequencyMs(Number(commentaryConfig.frequency));
 
 const runtime = {
   timer: null,

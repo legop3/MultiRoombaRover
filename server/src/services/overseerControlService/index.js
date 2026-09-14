@@ -2,7 +2,7 @@ const fsp = require('fs/promises');
 const { Ollama } = require('ollama');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('overseerControl');
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 const { getRole, roleEvents } = require('../roleService');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { verificationEvents } = require('../verificationService');
@@ -44,7 +44,7 @@ const runMode = RUN_MODES.has(configuredRunMode) ? configuredRunMode : RUN_MODE_
 const autonomousMode = runMode === RUN_MODE_AUTONOMOUS;
 const directAddressMode = runMode === RUN_MODE_DIRECT_ADDRESS;
 const model = String(overseerConfig.model || '').trim();
-const ollamaUrl = String(overseerConfig.ollamaUrl || overseerConfig.ollamaServer || '').trim();
+const ollamaUrl = String(overseerConfig.ollamaServer || '').trim();
 const gateIntervalMs = normalizeMs(Number(overseerConfig.gateIntervalMs), DEFAULT_GATE_INTERVAL_MS);
 const postToolsOnlyMessages = Boolean(overseerConfig.postToolsOnlyMessages);
 const tiebreakerEnable = Boolean(overseerConfig.tiebreakerEnable);

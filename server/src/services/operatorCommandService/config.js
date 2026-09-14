@@ -1,7 +1,7 @@
 // Operator Command Configuration
 // Purpose: Owns transport-neutral command names used by site chat and optional integrations.
 // Scope: Prevents Discord configuration from defining whether core server commands can be parsed.
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 
 function getCommandConfig(config = loadConfig()) {
   const commandConfig = config.commands || {};

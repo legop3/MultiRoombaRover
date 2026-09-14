@@ -1,11 +1,11 @@
 // Feature Helpers
-// Purpose: Centralizes client-side reads of server-advertised optional features.
-// Scope: Keeps layout/components from each inventing their own "is this feature configured?" rule.
+// Purpose: Centralizes client-side reads of configuration-generated optional feature switches.
+// Scope: Keeps layout/components from interpreting the server's public enabled map differently.
 export function isFeatureEnabled(state, featureName) {
   /*
-    The server owns feature detection because only it can reliably know whether
-    config-driven hardware integrations exist. React should treat missing flags
-    as disabled so old or partial session payloads fail closed and hide extras.
+    The server configuration definition declares which items are public features.
+    React treats missing flags as disabled so partial session payloads fail
+    closed without deriving availability from credentials or service data.
   */
   return Boolean(state?.session?.features?.[featureName]);
 }

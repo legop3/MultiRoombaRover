@@ -1,5 +1,5 @@
 // Identity Database Panel
-// Purpose: Implements the lockdown admin identity database editor UI for the /database route.
+// Purpose: Implements the lockdown admin identity database editor UI inside the centralized administration application.
 // Scope: Keeps list, detail, signal, status, feature-state, and raw JSON editing local to this feature.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import CardFrame from '../components/CardFrame/index.jsx';
@@ -171,10 +171,6 @@ function SignalsCard({ user, onAddSignal, onRemoveSignal }) {
 function StatusCard({ user, onVerified, onDeterrence, onMuted }) {
   const [reason, setReason] = useState(user?.deterrence?.reason || '');
 
-  useEffect(() => {
-    setReason(user?.deterrence?.reason || '');
-  }, [user?.deterrence?.reason, user?.id]);
-
   return (
     <CardFrame title="Status" bodyClassName="grid gap-0.5 p-0.5 text-sm md:grid-cols-2">
       <div className="surface space-y-0.5 px-1 py-0.75">
@@ -233,17 +229,11 @@ function StatusCard({ user, onVerified, onDeterrence, onMuted }) {
 }
 
 function FeatureStateCard({ user, onSaveFeature, onDeleteFeature }) {
-  const namespaces = useMemo(() => Object.keys(user?.features || {}).sort(), [user?.features]);
-  const [namespace, setNamespace] = useState('');
-  const [text, setText] = useState('{}');
+  const namespaces = Object.keys(user?.features || {}).sort();
+  const initialNamespace = namespaces[0] || '';
+  const [namespace, setNamespace] = useState(initialNamespace);
+  const [text, setText] = useState(stringifyJson(initialNamespace ? user.features[initialNamespace] : {}));
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    const nextNamespace = namespaces.includes(namespace) ? namespace : namespaces[0] || '';
-    setNamespace(nextNamespace);
-    setText(stringifyJson(nextNamespace ? user.features[nextNamespace] : {}));
-    setError('');
-  }, [namespace, namespaces, user]);
 
   const save = async () => {
     const ns = namespace.trim();
@@ -265,6 +255,11 @@ function FeatureStateCard({ user, onSaveFeature, onDeleteFeature }) {
     if (!ns) return;
     if (!window.confirm(`Delete feature state "${ns}" from ${user.id}?`)) return;
     await onDeleteFeature(ns);
+    // The selected namespace no longer exists after deletion. Reset the local
+    // editor directly instead of mirroring new props through an effect.
+    setNamespace('');
+    setText('{}');
+    setError('');
   };
 
   return (
@@ -447,13 +442,15 @@ export default function IdentityDatabasePanel() {
                   <SignalsCard user={selectedUser} onAddSignal={handleAddSignal} onRemoveSignal={handleRemoveSignal} />
                 </TabPanel>
                 <TabPanel id="status">
-                  <StatusCard user={selectedUser} onVerified={handleVerified} onDeterrence={handleDeterrence} onMuted={handleMuted} />
+                  {/* These editors own drafts for one identity. Keys remount them
+                      when selection changes without effect-driven state mirroring. */}
+                  <StatusCard key={`status-${selectedUser.id}`} user={selectedUser} onVerified={handleVerified} onDeterrence={handleDeterrence} onMuted={handleMuted} />
                 </TabPanel>
                 <TabPanel id="permissions">
                   <PermissionsCard user={selectedUser} permissions={permissions} onPermission={handlePermission} />
                 </TabPanel>
                 <TabPanel id="features">
-                  <FeatureStateCard user={selectedUser} onSaveFeature={handleSaveFeature} onDeleteFeature={handleDeleteFeature} />
+                  <FeatureStateCard key={`features-${selectedUser.id}`} user={selectedUser} onSaveFeature={handleSaveFeature} onDeleteFeature={handleDeleteFeature} />
                 </TabPanel>
                 <TabPanel id="raw">
                   <RawRecordCard user={selectedUser} />

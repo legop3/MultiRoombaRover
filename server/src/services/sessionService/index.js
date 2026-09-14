@@ -3,6 +3,7 @@
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('sessionService');
+const { getFeatureFlags } = require('../../configuration');
 const { getRole, isAdmin, roleEvents } = require('../roleService');
 const { getMode, modeEvents } = require('../modeManager');
 const roverManager = require('../roverManager');
@@ -43,7 +44,6 @@ const { getGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason } = require('../adminReasonService');
 const { subscribe } = require('../eventBus');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
-const { getFeatureFlags } = require('../../helpers/features');
 const {
   canUseExternalSpectatorAccess,
   getBandwidthSavingsPolicy,
@@ -58,8 +58,6 @@ const { getAudioLevels, getAudioAdjustmentStateForSocket, audioLevelsEvents } = 
 const { getButtonBoxState } = require('../buttonBoxService');
 const { getState: getInterInstanceState, interInstanceEvents } = require('../interInstanceService');
 const {
-  discordInvite,
-  kofiLink,
   serverTimezone,
   configuredSocials,
   driverAd,
@@ -73,8 +71,6 @@ const {
   filterActiveDriversForSocket,
   filterTurnQueuesForSocket,
 } = require('./filters');
-logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configured');
-logger.info('Ko-fi link loaded:', kofiLink ? 'present' : 'not configured');
 logger.info('Socials config loaded:', configuredSocials?.length ? `${configuredSocials.length} entries` : 'not configured');
 
 const SPECTATOR_ACCESS_NAMESPACE = 'spectatorAccess';
@@ -207,9 +203,9 @@ function buildSession(socket) {
     isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
     bandwidthSavings: buildBandwidthSavingsSessionState(socket, controllableUserCount),
     /*
-      Features is the single UI contract for optional server capabilities. A
-      disabled feature should be absent from navigation/layout decisions even
-      though the service module may still be loaded on the Node side.
+      The configuration system derives this public map from service definitions
+      marked as features. A false enabled switch keeps the corresponding UI out
+      of navigation and layout without maintaining another feature registry.
     */
     features,
     roster,
@@ -245,13 +241,7 @@ function buildSession(socket) {
       truth and avoids a separate endpoint for one small optional card.
     */
     driverAd,
-    discord: {
-      invite: discordInvite,
-    },
     timezone: serverTimezone,
-    kofi: {
-      link: kofiLink,
-    },
     identity: getIdentitySummary(socket),
     verification: getVerificationStateForSocket(socket),
     moderation: getModerationStateForSocket(socket),

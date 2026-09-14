@@ -4,7 +4,7 @@
 const bcrypt = require('bcrypt');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('authService');
-const { loadConfig } = require('../../helpers/configLoader');
+const { getConfigurationDatabase } = require('../../configuration');
 const { clearLockdownTimer } = require('../lockdownGuard');
 const { getMode, MODES } = require('../modeManager');
 const { setRole } = require('../roleService');
@@ -19,12 +19,11 @@ const {
   updateFeatureState,
 } = require('../identityService');
 
-const config = loadConfig();
-const admins = config.admins || [];
+const configurationDatabase = getConfigurationDatabase();
 const SPECTATOR_ACCESS_NAMESPACE = 'spectatorAccess';
 
 function findAdmin(username) {
-  return admins.find((admin) => admin.username === username);
+  return configurationDatabase.findAdministratorForAuthentication(username);
 }
 
 async function authenticate(username, password) {
@@ -32,7 +31,7 @@ async function authenticate(username, password) {
   if (!admin) {
     throw new Error('Invalid credentials');
   }
-  const ok = await bcrypt.compare(password, admin.password_hash);
+  const ok = await bcrypt.compare(password, admin.passwordHash);
   if (!ok) {
     throw new Error('Invalid credentials');
   }
@@ -138,11 +137,14 @@ io.on('connection', (socket) => {
   socket.on('auth:login', async ({ username, password }, cb = () => {}) => {
     try {
       const admin = await authenticate(username, password);
-      if (getMode() === MODES.LOCKDOWN && !admin.lockdown) {
+      if (getMode() === MODES.LOCKDOWN && admin.role !== 'lockdown') {
         throw new Error('Lockdown admins only');
       }
-      const role = admin.lockdown ? 'lockdown' : 'admin';
-      socket.data.user = { username: admin.username, discordId: admin.discord_id };
+      const role = admin.role;
+      socket.data.user = { username: admin.username, discordId: admin.discordId };
+      // A successful login is also recent proof of the account password. The
+      // admin service expires this timestamp before allowing sensitive writes.
+      socket.data.adminPasswordConfirmedAt = Date.now();
       setRole(socket, role);
       /*
         In admin-gated external spectator mode, logging in from /spectate is the

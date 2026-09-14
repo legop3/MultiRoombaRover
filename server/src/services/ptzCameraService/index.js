@@ -9,9 +9,8 @@ const { Cam } = require('onvif');
 
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('ptzCamera');
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 const { resolveRoverSnapshotDir } = require('../../helpers/dataPaths');
-const { isFeatureEnabled } = require('../../helpers/features');
 const {
   shouldUseSnapshotsForNonTurnVideo,
   shouldUseSnapshotsForExternalSpectatorVideo,
@@ -54,7 +53,7 @@ const PUBLISHER_RTSP_TIMEOUT_US = 10000000;
 const events = new EventEmitter();
 const config = loadConfig();
 const cameraConfig = config.ptzCamera || {};
-const enabled = isFeatureEnabled('ptzCamera');
+const enabled = Boolean(cameraConfig.enabled);
 
 const state = {
   initialized: false,
@@ -1058,8 +1057,8 @@ function requireOperator(socket) {
 function requirePtzUser(socket) {
   /*
     Listing presets does not move the camera, but it still reveals operational
-    camera state. Use the same feature gate as queue entry so unverified users
-    cannot query PTZ-only data through raw socket calls.
+    camera state. Check the camera's own enabled switch just like queue entry so
+    unverified users cannot query PTZ-only data through raw socket calls.
   */
   if (!enabled) throw new Error('PTZ camera disabled');
   if (!canUsePtzFeature(socket)) throw new Error('Not authorized for PTZ camera');

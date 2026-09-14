@@ -32,7 +32,6 @@ DATA_DIR="$SERVER_DIR/data"
 SNAPSHOT_DIR="$DATA_DIR/rover-snapshots"
 BALANCE_BOARD_NATIVE_DIR="$SCRIPT_DIR/src/services/balanceBoardService/native"
 BALANCE_BOARD_WORKER="$BALANCE_BOARD_NATIVE_DIR/balance_board_worker"
-CONFIG_PATH="$SERVER_DIR/config.yaml"
 ROVER_SNAPSHOT_WRITER_TEMPLATE="$SERVER_DIR/mediamtx/rover-snapshot-writer.sh"
 CHROMEGTTS_WAV_TEMPLATE="$SERVER_DIR/bin/chromegtts-wav.py"
 
@@ -185,12 +184,6 @@ if [[ -f "$BALANCE_BOARD_NATIVE_DIR/Makefile" ]]; then
   setcap cap_net_admin,cap_net_bind_service+ep "$BALANCE_BOARD_WORKER"
 fi
 
-if [[ ! -f "$CONFIG_PATH" ]]; then
-  cp "$SERVER_DIR/config.example.yaml" "$CONFIG_PATH"
-  chown "$TARGET_USER":"$TARGET_USER" "$CONFIG_PATH"
-  echo "Copied config.example.yaml to config.yaml; edit it before exposing the service."
-fi
-
 # Bluetoothd remains responsible for discovery and the one-time bond, but its
 # generic input plugin otherwise reserves control PSM 0x11 and interrupt PSM
 # 0x13 before the Balance Board worker can listen for the board's front-button
@@ -263,11 +256,27 @@ fi
 echo "      Installing rover snapshot writer -> $ROVER_SNAPSHOT_WRITER_BIN"
 install -m 0755 "$ROVER_SNAPSHOT_WRITER_TEMPLATE" "$ROVER_SNAPSHOT_WRITER_BIN"
 
-# Validate the new source of truth before disabling a working legacy service. The validator
-# performs the same build and YAML serialization as server startup without opening listeners
-# or leaving a process behind.
+# Import an existing legacy file only when this installation does not yet have
+# its configuration database. The importer validates the complete document and
+# preserves administrator password hashes without printing secrets. Fresh
+# installations intentionally skip this branch and complete setup through the
+# one-time code printed by the server.
+if [[ -f "$SERVER_DIR/config.yaml" && ! -f "$DATA_DIR/configuration.sqlite" ]]; then
+  echo "      Importing legacy config.yaml into configuration.sqlite"
+  runuser -u "$TARGET_USER" -- env SERVER_DATA_DIR="$DATA_DIR" \
+    "$NODE_BIN" "$SERVER_DIR/scripts/importLegacyConfig.js" "$SERVER_DIR/config.yaml"
+  # The importer exits successfully only after the complete configuration and
+  # administrator catalog have committed and can be read back. Remove this
+  # exact obsolete source file afterward so secrets do not remain in a second,
+  # unmanaged configuration source on upgraded installations.
+  rm -f "$SERVER_DIR/config.yaml"
+fi
+
+# Validate database-backed MediaMTX inputs before disabling a working legacy
+# service. This performs the same build and serialization as startup without
+# opening listeners or leaving a process behind.
 runuser -u "$TARGET_USER" -- env \
-  SERVER_CONFIG="$CONFIG_PATH" \
+  SERVER_DATA_DIR="$DATA_DIR" \
   ROVER_SNAPSHOT_WRITER_BIN="$ROVER_SNAPSHOT_WRITER_BIN" \
   "$NODE_BIN" "$SERVER_DIR/scripts/validateMediaMtxConfig.js"
 
@@ -309,7 +318,6 @@ User=$TARGET_USER
 Group=$TARGET_USER
 WorkingDirectory=$SERVER_DIR
 Environment=NODE_ENV=production
-Environment=SERVER_CONFIG=$CONFIG_PATH
 Environment=SERVER_DATA_DIR=$DATA_DIR
 Environment=ROVER_SNAPSHOT_WRITER_BIN=$ROVER_SNAPSHOT_WRITER_BIN
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
@@ -333,8 +341,8 @@ echo
 echo "Services installed:"
 echo "  multirover.service (Node.js control server with MediaMTX child)"
 echo
-echo "Update $CONFIG_PATH to set admins, lockdown settings, and media parameters."
+echo "Open /setup for a fresh installation or /admin for an imported installation."
 echo "Kinect/libfreenect packages and udev permissions were installed."
 echo "If a Kinect is already plugged in, unplug/replug its USB/power before testing so the new udev rule applies."
 echo "Wii Balance Board direct Bluetooth bridge and front-button listener were installed."
-echo "Enable balanceBoard in config.yaml, press red Sync once, then use the front button for later wakes."
+echo "Enable Balance Board support in /admin, press red Sync once, then use the front button for later wakes."

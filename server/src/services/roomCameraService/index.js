@@ -5,9 +5,9 @@ const { loadFromConfig, getRoomCameras, getRoomCamera, roomCameraEvents } = requ
 const { createSnapshotEngine } = require('./snapshotEngine');
 const { registerRoomCameraSocketGateway } = require('./socketGateway');
 const replay = require('../replayEngineV2/roomCameraReplayBuilder');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig } = require('../../configuration');
 
-const enabled = isFeatureEnabled('roomCameras');
+const enabled = Boolean(loadConfig().roomCameras?.enabled);
 
 const snapshotEngine = createSnapshotEngine({ getRoomCameras, roomCameraEvents });
 if (enabled) {

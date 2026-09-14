@@ -2,7 +2,14 @@
 
 ## Status
 
-This document records the agreed design and implementation order. None of the work described here is implemented merely by this document.
+This document is the live implementation tracker for the migration.
+
+- [x] Phase 1, step 1: Establish the single data-directory contract
+- [x] Phase 1, steps 2-5: Configuration database, legacy import, setup, and centralized admin UI
+- [ ] Phase 1, steps 6-9: Backup/restore, restart, and internal video proxy
+- [ ] Phase 2: Containerization, GHCR publishing, and container lifecycle controls
+
+The single data-directory implementation and local verification are complete. Real snapshot generation, legacy-directory cleanup, and runtime filesystem tracing remain deployment checks for the actual server; they do not leave the implementation step open.
 
 The work is deliberately split into two phases:
 
@@ -13,6 +20,8 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 
 ## Decision log
 
+- 2026-09-14: Feature enablement is exactly the service-owned `enabled` boolean. A service-owned configuration definition marks itself with `feature: true` when that switch belongs in the public feature map; the configuration system derives the map for sessions and command availability, including nested service definitions, without a separate feature registry. Missing credentials, hardware, connections, data, or enabled dependencies are runtime health conditions and never silently change that choice.
+- 2026-09-14: Keep configuration as one ordered hierarchical document, matching the former YAML layout. The admin application presents one continuous configuration page and saves the complete document as one revision. There are no artificial Hardware, Integrations, Media, or similar configuration categories and no backend or frontend section registries.
 - 2026-09-13: Use an internal Node `/video` proxy. The public reverse proxy will send every site path to Node, Node will strip `/video` and stream WHEP signaling to MediaMTX on loopback, and MediaMTX port 8889 will not be exposed publicly. MediaMTX cannot independently add a WHEP base-path prefix; making `video` part of every stream name would still leave two HTTP servers competing for the public HTTPS listener.
 - 2026-09-13: Preserve the existing flat `server/data` layout instead of moving established stores into decorative `state`, `cache`, or `generated` parents. Packaged application assets remain with the application.
 - 2026-09-13: "The server" in the filesystem rule specifically means the main Node.js application. Every file it intentionally creates or modifies, including disposable scratch work, must be beneath `SERVER_DATA_DIR`. Installers, systemd, Docker, BlueZ, and unavoidable internal behavior of external libraries are outside that application boundary.
@@ -113,6 +122,16 @@ Required work:
 The audit must search direct filesystem calls as well as environment-variable defaults. Existing calls that default to `/var/lib`, the repository directory, or an implicit current working directory must be corrected.
 
 ## 2. Replace YAML with a configuration database
+
+Implementation architecture:
+
+- Each configurable service owns a side-effect-free fragment containing its key, safe default, and strict schema. One short composition list assembles those fragments into the ordered hierarchical document.
+- The database validates and commits that complete document as one coherent immutable revision.
+- The admin UI presents one continuous configuration page in the same top-to-bottom order as the former YAML file.
+- Nested cards make object relationships readable, but do not create separate categories, navigation destinations, persistence boundaries, or registries.
+- Shared editor infrastructure owns loading, dirty state, validation errors, revision conflicts, secret operations, and restart-required status for the whole document.
+- The browser receives this same schema from the protected admin endpoint and renders it with a maintained JSON Schema form library.
+- Standard JSON Schema types drive ordinary fields, nested objects, enums, and arrays. One field-agnostic widget handles every `writeOnly` secret; there are no feature-specific configuration components in React.
 
 Create a synchronous configuration service backed by `better-sqlite3`. Synchronous reads preserve the server's current startup model, in which many services load their configuration while modules are required.
 
@@ -223,26 +242,16 @@ A recovery command must be available for resetting or creating a lockdown admini
 
 Create a dedicated `/admin` route instead of continuing to expand the existing driver-page admin panel.
 
-The application should organize existing and new controls into:
+The application should provide these top-level destinations:
 
 - Overview and service health
 - Fleet and rover operations
 - Users, administrators, verification, and permissions
-- Media and bandwidth
-- Discord and Home Assistant
-- PTZ and room cameras
-- Kinect and Balance Board
-- Button box, barcode scanner, barcode games, and lift
-- LLM commentary and Overseer Control
-- Social links and driver content
-- Fleet reports
-- Application and administrative logs
-- Persistent audit history
-- Configuration revisions
-- Backup and restore
-- System restart, and later container update
+- Configuration, presented as one hierarchical page
 
-Existing components and server operations should be moved or reused rather than duplicated. The identity database page and other isolated administrative pages should become sections of this centralized application where doing so preserves their existing behavior.
+Overview may include application logs, persistent audit history, configuration revisions, backup and restore, and system restart or later container-update state. These operational views do not divide the configuration document into categories.
+
+Existing components and server operations should be moved or reused rather than duplicated. The identity database page and other isolated administrative pages should become destinations within this centralized application where doing so preserves their existing behavior.
 
 Authorization rules:
 
@@ -251,7 +260,7 @@ Authorization rules:
 - Sensitive changes require recent password confirmation.
 - Server-side authorization remains authoritative for every operation; hiding a control in React is not an access check.
 
-Configuration forms should be explicit, typed forms. There should be no raw YAML editor and no generic JSON editor for ordinary configuration. Repeatable definitions such as cameras, entities, links, and buttons need simple add, remove, reorder, and test workflows.
+Configuration uses one schema-generated typed form rather than a raw YAML or JSON text editor. Repeatable values such as cameras, entities, links, and buttons receive the form library's generic add, remove, and reorder workflow.
 
 ## 6. Implement complete backup and restore
 
@@ -418,6 +427,33 @@ Local verification completed:
 - Installer and snapshot-writer shell syntax checks passed.
 - Source inventory found no remaining application runtime use of the operating system temporary directory, the old snapshot/replay environment variables, or `/var/lib` paths; only tests use OS temporary directories and the installer retains a deliberate legacy-directory notice.
 - Real snapshot generation and legacy-directory cleanup still require verification on the actual server during deployment.
+
+### Configuration and administration implementation notes
+
+Implemented on 2026-09-14:
+
+- Added one ordered, strictly validated hierarchical configuration assembled from side-effect-free definitions owned by the services that consume each value.
+- Added immutable SQLite configuration revisions, active-revision tracking, administrator accounts, schema migrations, and persistent administrative audit events under the shared data directory.
+- Added full-document saves with optimistic revision checking. A stale browser cannot overwrite a newer revision, and invalid or unknown fields cannot become active.
+- Redacted secrets from browser responses and audit data. The one complete save operation preserves stored secrets unless the administrator explicitly replaces or clears them.
+- Converted every runtime configuration consumer to the synchronous database-backed configuration service and removed the YAML loader, `SERVER_CONFIG`, and the tracked example YAML.
+- Added an explicit one-time YAML importer for both the setup UI and command line. Existing bcrypt hashes, lockdown roles, Discord identities, configuration, and secrets are migrated without creating a runtime YAML fallback.
+- Added safe empty-data startup, a logged one-time setup code, the restricted `/setup` route, and a console administrator-recovery command.
+- Added the centralized `/admin` route with Overview, Fleet operations, Users and administrators, and one schema-generated hierarchical Configuration page in legacy YAML order.
+- Replaced every feature-specific configuration form with `@rjsf/core`; the protected admin snapshot supplies the server's assembled schema, and one generic widget handles all schema-declared secrets.
+- Converged feature control into service-owned configuration: each public feature opts in beside its own schema, and the configuration system derives those exact `enabled` switches for sessions and command discovery. The former server feature registry was removed; configuration completeness and hardware availability remain visible as runtime status instead of becoming hidden enablement rules.
+- Lazy-loaded setup and administration so the schema-form dependency is not included in ordinary driver-page downloads.
+- Reused the existing fleet and identity administration surfaces, added password reconfirmation for sensitive operations, and prevented removal or demotion of the final lockdown administrator.
+- Added configuration revision history, rollback, audit history, and restart-required reporting. Graceful restart itself remains step 7.
+
+Local verification completed:
+
+- All 99 server tests passed, including direct enabled-switch feature projection, service-definition composition, schema-derived secret paths, configuration defaults and strict validation, full-document revision conflicts, secret preservation, administrator invariants, legacy import, and the earlier filesystem coverage.
+- Focused admin, route, and identity UI lint passed.
+- All 20 existing focused web UI tests passed.
+- The production web UI build completed successfully and regenerated the checked-in server assets.
+- Installer syntax and repository whitespace checks passed.
+- A local startup smoke test reached listener initialization. MediaMTX then exited because `/usr/local/bin/mediamtx` is intentionally absent on this development machine; actual enabled integrations and media remain deployment checks for the real server.
 
 # Phase 2: containerization and image delivery
 
@@ -621,11 +657,12 @@ Containerization is complete when:
 Within the two hard phase boundaries, the safest order is:
 
 - [x] Complete the filesystem audit and single data-directory migration.
-- [ ] Add the configuration schema/database and administrator storage.
-- [ ] Add first-run setup and the legacy YAML importer.
-- [ ] Convert every configuration consumer and remove YAML runtime loading.
-- [ ] Build the centralized admin configuration UI.
-- [ ] Add persistent audit history.
+- [x] Add the configuration schema/database and administrator storage.
+- [x] Add first-run setup and the legacy YAML importer.
+- [x] Convert every configuration consumer and remove YAML runtime loading.
+- [x] Converge optional feature control into service-owned `enabled` switches and derive the public feature map from those definitions.
+- [x] Build the centralized admin configuration UI.
+- [x] Add persistent audit history.
 - [ ] Implement coordinated backup and staged restore.
 - [ ] Standardize graceful application restart.
 - [ ] Add the internal `/video` proxy and remove the special external route.

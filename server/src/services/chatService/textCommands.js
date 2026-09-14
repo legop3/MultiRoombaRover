@@ -13,7 +13,7 @@ const homeAssistantService = require('../homeAssistantService');
 const greenModeService = require('../greenModeService');
 const liftService = require('../liftService');
 const neatoService = require('../neatoService');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { isFeatureEnabled } = require('../../configuration');
 const {
   listVerifiedUsers,
   removeVerifiedUser,
@@ -32,7 +32,7 @@ const {
 } = require('../identityService');
 const { publishEvent } = require('../eventBus');
 const assignmentService = require('../assignmentService');
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 const { createCommandHandlers } = require('../operatorCommandService');
 const { parseCommandText } = require('../operatorCommandService/config');
 const { createWebTransportHandlers } = require('../operatorCommandService/webTransport');

@@ -4,8 +4,8 @@
 const fs = require('fs');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('barcodeScannerService');
+const { loadConfig } = require('../../configuration');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
-const { isFeatureEnabled } = require('../../helpers/features');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { publishEvent } = require('../eventBus');
 const { ensureAudioForText, warmAudioForTexts } = require('./ttsCache');
@@ -15,7 +15,7 @@ const REGISTRY_PATH = resolveDataPath('barcode-registry.json');
 const RECENT_SCAN_LIMIT = 8;
 const VALID_CODE_PATTERN = /^[a-z][0-9]{3}$/;
 const SCANNER_SOCKET_ROOM = 'barcode-scanner';
-const enabled = isFeatureEnabled('barcodeScanner');
+const enabled = Boolean(loadConfig().barcodeScanner?.enabled);
 
 let lastKnownGoodRegistry = null;
 let lastRegistryError = null;

@@ -4,8 +4,7 @@
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('neatoService');
-const { loadConfig } = require('../../helpers/configLoader');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig } = require('../../configuration');
 const { isVerified } = require('../verificationService');
 const { getMode, MODES } = require('../modeManager');
 const { isAdmin, isLockdownAdmin } = require('../roleService');
@@ -22,7 +21,7 @@ const events = new EventEmitter();
 const config = loadConfig();
 const haConfig = config.homeAssistant || {};
 const neatoConfig = haConfig.neato || {};
-const featureEnabled = isFeatureEnabled('neato');
+const featureEnabled = Boolean(neatoConfig.enabled);
 
 function normalizeDeviceName(value) {
   const raw = String(value || '').trim().toLowerCase();
@@ -170,7 +169,7 @@ function buildState() {
   const requiredIds = requiredEntityIds();
   const entitiesAvailable = requiredIds.length > 0 && requiredIds.every((id) => isEntityAvailable(id));
   const connected = Boolean(haConnected && entitiesAvailable);
-  const enabled = Boolean(featureEnabled && homeAssistantEnabled && configured);
+  const enabled = featureEnabled;
 
   const controls = {
     start: {

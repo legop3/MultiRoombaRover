@@ -118,7 +118,7 @@ function createPtzAudioPlayback(deps) {
 
     /*
       Write on every playback instead of trying to detect config drift. The file
-      is small, and this guarantees a camera password/host change in config.yaml
+      is small, and this guarantees a camera password/host configuration change
       is reflected without an extra migration path or manual cleanup.
     */
     await fsp.writeFile(configPath, body, { mode: 0o600 });

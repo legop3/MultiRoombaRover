@@ -1,5 +1,5 @@
 // Identity Database API
-// Purpose: Keeps /database socket event names and acknowledgement handling local to the database admin feature.
+// Purpose: Keeps identity socket event names and acknowledgement handling local to the administration user editor.
 // Scope: Provides small promise helpers over the shared socket without adding app-wide SessionContext actions.
 export function emitIdentityAdmin(socket, eventName, payload = {}) {
   return new Promise((resolve, reject) => {

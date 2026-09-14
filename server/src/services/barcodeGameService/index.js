@@ -5,8 +5,7 @@
 // remain thin IO surfaces that subscribe to state and send votes/scans.
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('barcodeGameService');
-const { loadConfig } = require('../../helpers/configLoader');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig } = require('../../configuration');
 const { subscribe } = require('../eventBus');
 const { sendSystemMessage } = require('../chatService');
 const { getActiveDrivers } = require('../turnService');
@@ -31,8 +30,8 @@ const GAME_DEFINITIONS = [scanQuest, scansPerSecond, mostItems];
 const GAMES_BY_ID = Object.fromEntries(GAME_DEFINITIONS.map((game) => [game.id, game]));
 const config = loadConfig();
 const barcodeGamesConfig = config.barcodeGames || {};
-const enabled = isFeatureEnabled('barcodeGames');
-const botName = String(barcodeGamesConfig.botName || barcodeGamesConfig.name || 'Barcode Games').trim() || 'Barcode Games';
+const enabled = Boolean(barcodeGamesConfig.enabled);
+const botName = String(barcodeGamesConfig.botName || 'Barcode Games').trim() || 'Barcode Games';
 const botProfileImageUrl = String(barcodeGamesConfig.profileImageUrl || '').trim() || null;
 
 function sendBarcodeGameChat(text) {
@@ -1125,8 +1124,9 @@ function broadcastState() {
 if (enabled) {
   /*
     Barcode games are an optional layer on top of the physical scanner station.
-    Keep sockets and scan subscriptions behind the feature gate so disabled
-    installs do not run invisible game state.
+    The game's own switch controls whether its sockets and subscriptions exist.
+    Scanner availability is runtime state and must not silently override the
+    operator's explicit choice to enable the game service.
   */
   io.on('connection', (socket) => {
     socket.on('barcodeGame:subscribe', (_payload = {}, cb = () => {}) => {

@@ -9,8 +9,7 @@ const {
 } = require('discord.js');
 const logger = require('../../globals/logger').child('discordBot');
 const io = require('../../globals/io');
-const { loadConfig } = require('../../helpers/configLoader');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig, getConfigurationDatabase, isFeatureEnabled } = require('../../configuration');
 const { parseCommandText } = require('../operatorCommandService/config');
 const roverManager = require('../roverManager');
 const { getRoster, lockRover, rovers } = roverManager;
@@ -82,15 +81,16 @@ const {
 
 const config = loadConfig();
 const discordConfig = config.discord || {};
-const enabled = isFeatureEnabled('discord');
+const enabled = Boolean(discordConfig.enabled);
 // These normalized command names mirror the command router. Bridge-channel
 // command replies are mirrored into web chat, so this entrypoint needs to know
 // the configured command names before it wraps message.reply.
-const adminIds = new Set((config.admins || []).map((a) => String(a.discord_id || '').trim()).filter(Boolean));
-const lockdownAdminIds = new Set((config.admins || []).filter((admin) => admin.lockdown).map((admin) => String(admin.discord_id || '').trim()).filter(Boolean));
+const configuredAdministrators = getConfigurationDatabase().listAdministrators();
+const adminIds = new Set(configuredAdministrators.map((admin) => String(admin.discordId || '').trim()).filter(Boolean));
+const lockdownAdminIds = new Set(configuredAdministrators.filter((admin) => admin.role === 'lockdown').map((admin) => String(admin.discordId || '').trim()).filter(Boolean));
 
 if (!enabled) {
-  logger.info('Discord feature disabled or missing required token');
+  logger.info('Discord disabled by config');
   return;
 }
 

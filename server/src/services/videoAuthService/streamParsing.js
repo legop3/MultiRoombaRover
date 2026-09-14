@@ -1,7 +1,7 @@
 // Video Auth Stream Parsing
 // Purpose: Parses MediaMTX path/body payloads into normalized stream targets for rover and room media checks.
 // Scope: Handles WHEP/WHP path-prefix trimming and SRT streamid extraction without performing auth decisions.
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 
 const config = loadConfig();
 const mediaConfig = config.media || {};

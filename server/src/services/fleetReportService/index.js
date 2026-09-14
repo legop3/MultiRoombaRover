@@ -1,11 +1,12 @@
 // Fleet Report Service
 // Purpose: Composes optional passive collection, storage, analysis, retention, and read-only transport.
 // Scope: This is the sole feature boundary; disabled installations register no collectors, timers, database, or sockets.
-const { loadConfig } = require('../../helpers/configLoader');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig } = require('../../configuration');
 const logger = require('../../globals/logger').child('fleetReportService');
 
-if (!isFeatureEnabled('fleetReports')) {
+const config = loadConfig().fleetReports || {};
+
+if (!config.enabled) {
   module.exports = {
     enabled: false,
     getDailyReport: () => null,
@@ -20,7 +21,6 @@ if (!isFeatureEnabled('fleetReports')) {
   const { createReportBuilder } = require('./reportBuilder');
   const { registerSocketGateway } = require('./socketGateway');
 
-  const config = loadConfig().fleetReports || {};
   const batteryConfig = config.battery || {};
   const retentionConfig = config.retention || {};
   const maximumIntegrationGapMs = Math.max(
@@ -31,7 +31,10 @@ if (!isFeatureEnabled('fleetReports')) {
     10,
     Math.min(100, Number(batteryConfig.minimumCapacityTestDepthPercent) || 60),
   );
-  const batteryEnabled = batteryConfig.enabled !== false;
+  // Battery collection follows its own explicit nested switch. Defaults are
+  // supplied by the validated configuration document, so a missing value does
+  // not need a compatibility fallback that could accidentally enable it.
+  const batteryEnabled = Boolean(batteryConfig.enabled);
   const storage = createStorage({ logger });
   const collector = createCollector({
     storage,

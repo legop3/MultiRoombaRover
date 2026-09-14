@@ -1,7 +1,7 @@
 // Site Metadata Helper
 // Purpose: Resolves the public name, description, and colors used before the web UI starts.
 // Scope: Keeps document/PWA branding server-rendered and independent of Socket.IO session state.
-const { loadConfig } = require('./configLoader');
+const { loadConfig } = require('../configuration');
 
 const DEFAULT_SITE_METADATA = Object.freeze({
   name: 'Multi Roomba Rover',

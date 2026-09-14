@@ -4,8 +4,7 @@
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('liftService');
-const { loadConfig } = require('../../helpers/configLoader');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig } = require('../../configuration');
 const { getMode, MODES } = require('../modeManager');
 const { isAdmin, isLockdownAdmin } = require('../roleService');
 const {
@@ -20,7 +19,7 @@ const events = new EventEmitter();
 const config = loadConfig();
 const haConfig = config.homeAssistant || {};
 const liftConfig = haConfig.lift || {};
-const featureEnabled = isFeatureEnabled('lift');
+const featureEnabled = Boolean(liftConfig.enabled);
 
 const upSwitchId = String(liftConfig.upSwitch || '').trim();
 const downSwitchId = String(liftConfig.downSwitch || '').trim();
@@ -73,7 +72,7 @@ function getState() {
   const configured = isConfigured();
   const connected = isHomeAssistantConnected();
   return {
-    enabled: Boolean(featureEnabled && homeAssistantEnabled && configured),
+    enabled: featureEnabled,
     configured,
     connected,
     entities: {

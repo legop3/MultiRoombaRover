@@ -4,7 +4,7 @@
 const { app } = require('../../globals/http');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('buttonBoxService');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig } = require('../../configuration');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
 const { publishEvent } = require('../eventBus');
 const { getRewardById, listRewards } = require('../../rewards');
@@ -30,7 +30,7 @@ const DATA_DIR = resolveDataDir();
 const STORE_PATH = resolveDataPath('buttonbox-state.json');
 const BUTTON_COUNT = 4;
 const STORE_VERSION = 1;
-const enabled = isFeatureEnabled('buttonBox');
+const enabled = Boolean(loadConfig().buttonBox?.enabled);
 
 const store = createButtonBoxStore({
   logger,

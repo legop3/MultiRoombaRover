@@ -1,6 +1,6 @@
 // MediaMTX Config Builder
 // Purpose: Converts the rover server's media settings into the complete MediaMTX runtime configuration.
-// Scope: Keeps deployment-specific hosts in config.yaml while keeping protocol policy owned by the application.
+// Scope: Keeps deployment-specific hosts in the configuration database while protocol policy remains application-owned.
 const path = require('path');
 
 function normalizeAdditionalHosts(rawHosts) {

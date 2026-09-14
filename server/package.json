@@ -5,9 +5,13 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "check:media": "node scripts/checkMedia.js"
+    "check:media": "node scripts/checkMedia.js",
+    "config:import": "node scripts/importLegacyConfig.js",
+    "admin:recover": "node scripts/adminAccount.js"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.11.1",
     "discord.js": "^14.25.1",
