@@ -1,12 +1,7 @@
 # MultiRover production deployment
-#
-# The public application and private lifecycle controller reuse one published
-# image. Only the lifecycle service receives Docker control; the application
-# retains the narrower hardware access it needs at runtime.
 name: multirover
 
-# This is the deployment's single image selector. Production leaves it on
-# latest; a development deployment can change this one line to its branch tag.
+# Change this one line to use a development branch image.
 x-multirover-image: &multirover-image ghcr.io/legop3/multiroombarover:latest
 
 services:
@@ -14,84 +9,49 @@ services:
     image: *multirover-image
     container_name: multirover
 
-    # Host networking preserves the server's existing LAN behavior and avoids
-    # maintaining a second list of TCP, UDP, RTSP, and WebRTC port mappings.
     network_mode: host
     restart: unless-stopped
     stop_grace_period: 20s
 
-    # SELinux cannot safely relabel the host's system D-Bus socket, and the
-    # hardware services also need host-owned USB device nodes. Disable Docker's
-    # per-container SELinux label while retaining its namespace, capability,
-    # non-root-user, and seccomp isolation. This is narrower than privileged
-    # mode and avoids changing labels on shared host resources.
     security_opt:
       - label=disable
 
     volumes:
-      # Docker owns the volume and initializes it from the image's non-root
-      # /data directory. This avoids coupling container permissions to a host
-      # account's numeric UID while keeping every persistent file together.
+      # All persistent application data is stored in this volume.
       - data:/data
-
-      # The application can ask the private controller for one of its fixed
-      # lifecycle operations, but it never receives the Docker socket itself.
       - lifecycle-socket:/run/multirover
-
-      # bluetoothctl talks to the host Bluetooth daemon over this socket. The
-      # socket is read-only as a filesystem mount; D-Bus method calls still flow
-      # through it normally without exposing the rest of the host D-Bus tree.
+      # Required for Bluetooth hardware such as the Balance Board.
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro
 
-    # Kinect USB node numbers change when it reconnects, so expose the bus
-    # directory rather than one temporary device path. The existing host udev
-    # rule remains responsible for granting the non-root container user access.
+    # Required for Kinect USB access.
     devices:
       - /dev/bus/usb:/dev/bus/usb
 
-    # Only the Balance Board worker receives this capability through its file
-    # capabilities. The Node process remains non-root and the container is not
-    # privileged.
     cap_add:
       - NET_ADMIN
 
   lifecycle:
-    # Reuse the application image and override only its command. This keeps
-    # GHCR publishing and host deployment limited to one image and one Compose
-    # file while the Docker-authorized process remains isolated from the app.
     image: *multirover-image
     container_name: multirover-lifecycle
     command: ["node", "src/services/serverControlService/controller.js"]
     user: root
     network_mode: none
     restart: unless-stopped
-    # The shared image's health check targets the application HTTP server. This
-    # controller intentionally has no TCP listener, so it must not inherit it.
     healthcheck:
       disable: true
     security_opt:
       - label=disable
     environment:
-      # Requests cannot override this deployment-owned target. Reusing the
-      # anchor guarantees the controller pulls the image used by the server.
       MULTIROVER_TARGET_IMAGE: *multirover-image
     volumes:
-      # Status survives replacement of the application and is kept under its
-      # existing single data boundary. The transient socket has its own volume
-      # so special filesystem entries never enter full-data backups.
       - data:/data
       - lifecycle-socket:/run/multirover
-
-      # This is host-root-equivalent access and therefore exists only here,
-      # never in the public-facing application container.
+      # Do not add this Docker socket mount to the server service.
       - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
-  # Use an explicit name so the same data volume survives Compose project moves
-  # or directory renames. Ordinary `docker compose down` does not remove it.
+  # `docker compose down -v` permanently deletes these volumes.
   data:
     name: multirover-data
-  # This volume carries only the private Unix socket and contains no durable
-  # application state. Docker creates it automatically with the deployment.
   lifecycle-socket:
     name: multirover-lifecycle-socket
