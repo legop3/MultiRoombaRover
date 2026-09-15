@@ -26,9 +26,10 @@ services:
       - label=disable
 
     volumes:
-      # This is the application's only persistent storage. No SELinux relabel
-      # is needed because this hardware-integrated container runs label-free.
-      - ./data:/data
+      # Docker owns the volume and initializes it from the image's non-root
+      # /data directory. This avoids coupling container permissions to a host
+      # account's numeric UID while keeping every persistent file together.
+      - data:/data
 
       # bluetoothctl talks to the host Bluetooth daemon over this socket. The
       # socket is read-only as a filesystem mount; D-Bus method calls still flow
@@ -46,3 +47,9 @@ services:
     # privileged.
     cap_add:
       - NET_ADMIN
+
+volumes:
+  # Use an explicit name so the same data volume survives Compose project moves
+  # or directory renames. Ordinary `docker compose down` does not remove it.
+  data:
+    name: multirover-data

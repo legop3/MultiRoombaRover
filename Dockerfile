@@ -98,8 +98,15 @@ RUN curl --fail --location --retry 3 \
     && find /output/opt/roverd/googletts -type f -exec chmod 0644 {} +
 
 FROM fedora:${FEDORA_VERSION} AS runtime
+ARG FEDORA_VERSION
 ARG TARGETARCH
 RUN test "${TARGETARCH}" = "amd64" || (echo "MultiRover server images support only linux/amd64." >&2; exit 1)
+# Fedora's restricted ffmpeg-free build omits the libx264 encoder used by every
+# replay output path. Enable RPM Fusion Free before installing runtime packages
+# so the image receives the complete FFmpeg build instead of requiring replay
+# code to work around a deployment-only codec omission.
+RUN dnf install -y --setopt=install_weak_deps=False \
+      "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm"
 # This is the complete runtime package set. Build headers and compilers live in
 # earlier stages, while media, TTS, USB, and Bluetooth libraries remain here
 # because enabled services invoke them after startup. Weak dependencies are
@@ -109,7 +116,7 @@ RUN dnf install -y --setopt=install_weak_deps=False \
       bluez \
       bluez-libs \
       espeak \
-      ffmpeg-free \
+      ffmpeg \
       flite \
       gstreamer1 \
       gstreamer1-plugins-bad-free \
@@ -126,6 +133,7 @@ RUN dnf install -y --setopt=install_weak_deps=False \
       shadow-utils \
       tini \
       wiiuse \
+    --allowerasing \
     && dnf clean all \
     && useradd --uid 1000 --create-home --home-dir /home/multirover --shell /sbin/nologin multirover \
     && install -d -o multirover -g multirover -m 0755 /data /opt/multirover/server

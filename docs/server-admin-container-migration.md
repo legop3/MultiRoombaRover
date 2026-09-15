@@ -26,6 +26,7 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 
 - 2026-09-14: Publish `ghcr.io/legop3/multiroombarover:latest` only from the repository's main branch. Every other repository branch publishes one moving development image named for that branch, with invalid tag separators normalized; these are development selectors rather than numbered releases. Pull requests only verify that the image builds. There are no release numbers, semantic-version tags, stable/edge channels, or operator-facing version selection. Docker image digests remain an internal mechanism for detecting an available update and retaining the previously running image for rollback.
 - 2026-09-15: Support only `linux/amd64` for the central server image. Rover computers remain independently ARM-capable, but publishing an untested ARM server image would multiply native-worker, media-binary, TTS-library, and hardware validation without serving the current deployment. ARM server support can be added later when a real ARM server exists to verify it.
+- 2026-09-15: Mount the application data directory from the Docker-managed `multirover-data` named volume instead of a host bind path. Docker initializes the empty volume with the image's non-root ownership, eliminating host UID matching, directory creation, ownership commands, and root application startup. The admin backup/restore system is the supported portable interface to the complete data tree.
 - 2026-09-14: Apply every committed configuration revision immediately. The configuration coordinator atomically replaces the process-wide snapshot, compares top-level service sections, serially reloads only affected service runtimes, and then refreshes all sessions. Long-lived HTTP/socket handlers remain registered once and delegate to the current runtime; integrations may reconnect or replace their own child process, worker, client, timers, and subscriptions without restarting Node.
 - 2026-09-14: Render the schema-driven configuration editor as a YAML-like tree inside one `CardFrame`. Every object or array introduces an ordered header and one indentation guide, every scalar occupies one key/value row, and array operations remain beside their item instead of moving to the far edge. Keep all route-specific RJSF styling in `webui/src/admin/styles.css`, outside the shared global stylesheet.
 - 2026-09-14: Restart only the application process, never the host. A lockdown administrator with recent password confirmation requests one audited restart, Node acknowledges and announces it, then sends itself SIGTERM. Existing service signal handlers clean up their owned children, while systemd `Restart=always` and the later container restart policy start the application again.
@@ -51,7 +52,7 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 - The completed server is packaged as a replaceable container whose only persistent mount is the data directory.
 - The latest successful main-branch image is built automatically and published to GHCR as `ghcr.io/legop3/multiroombarover:latest`.
 - The admin UI can restart, update, health-check, and roll back the application container without giving the main application direct Docker access.
-- The final host installation contains as little project-specific material as possible: a Compose file, a data directory, and unavoidable hardware preparation.
+- The final host installation contains as little project-specific material as possible: a Compose file, one Docker-managed data volume, and unavoidable hardware preparation.
 
 ## Important boundary: application files versus server data
 
@@ -550,6 +551,7 @@ Implemented and locally verified on 2026-09-15:
 - Configured `/data` as `SERVER_DATA_DIR`, ran Node as the dedicated uid 1000 `multirover` user, retained only the Balance Board worker's required capabilities, and used `tini` as the container init process.
 - Successfully built and loaded `multiroombarover:local` for `linux/amd64`. Its registry-style compressed content size is approximately 828 MB; Docker reports approximately 2.87 GB of local unpacked disk usage because the complete GStreamer, ffmpeg, Kinect, Node, and offline TTS runtime is intentionally included.
 - Confirmed at build time that Chrome TTS loads its packaged voice model and produces a nonempty WAV file.
+- Replaced Fedora's restricted `ffmpeg-free` package with RPM Fusion Free's complete `ffmpeg` package after development-container testing exposed that `ffmpeg-free` omits the `libx264` encoder required by rover replay capture, room-camera replay rendering, replay sidebars, and final replay assembly.
 - Started the image with host networking and a temporary SELinux-relabeled `/data` bind mount. The application reached its HTTP listener, generated first-run state only inside the mount, and started the packaged MediaMTX with its generated configuration under `/data`.
 - Confirmed `/`, `/setup`, and `/admin` return the production UI; `/video/` reaches the loopback MediaMTX proxy; MediaMTX and Neolink execute; both native workers link against the runtime image; and the Balance Board worker retains only `cap_net_admin` and `cap_net_bind_service`.
 - Restarted the same container and confirmed the setup credential and configuration database were byte-for-byte unchanged, then confirmed `/admin` returned successfully again.
@@ -557,13 +559,16 @@ Implemented and locally verified on 2026-09-15:
 
 ## 11. Compose deployment
 
-The host-visible installation should be only:
+The host-visible project installation should be only:
 
 ```text
 multirover/
-├── compose.yaml
-└── data/
+└── compose.yaml
 ```
+
+Docker owns the separately persisted `multirover-data` volume. Operators move
+or inspect its complete contents through the administration backup/restore UI
+rather than coordinating host filesystem ownership with the container user.
 
 The Compose project contains:
 
@@ -573,7 +578,7 @@ The Compose project contains:
 The application mounts:
 
 ```text
-./data:/data
+data:/data
 ```
 
 Host networking is the initial preferred design because it most closely preserves current rover RTSP, WebRTC ICE, UDP media, camera, and LAN integration behavior. The exact listeners must be audited before finalizing the Compose file.
@@ -590,9 +595,9 @@ MediaMTX WHEP on 8889, API/metrics listeners, and server-local SRT should stay o
 
 Implemented and locally verified on 2026-09-15:
 
-- Added one root `compose.yaml` containing only the main application. It uses `ghcr.io/legop3/multiroombarover:latest`, host networking, `restart: unless-stopped`, and the single `./data:/data` persistent bind mount. The lifecycle service remains a later, separate step rather than a placeholder in the initial deployment.
-- Added the Compose-mounted root `data` directory to `.dockerignore`, alongside the legacy `server/data`, so credentials, databases, recordings, backups, and generated state cannot enter later image builds.
-- Started the exact Compose definition from an empty root data directory using the locally built image tagged with the final GHCR name. The application created its configuration database, setup credential, and generated MediaMTX configuration only under that mount.
+- Added one root `compose.yaml` containing only the main application. It uses `ghcr.io/legop3/multiroombarover:latest`, host networking, `restart: unless-stopped`, and the single `data:/data` persistent named-volume mount. The lifecycle service remains a later, separate step rather than a placeholder in the initial deployment.
+- Added both possible local data directories to `.dockerignore`, alongside the legacy `server/data`, so credentials, databases, recordings, backups, and generated state cannot enter later image builds even during development or manual inspection.
+- Started the exact Compose definition from an empty Docker-managed volume using the locally built image tagged with the final GHCR name. The application created its configuration database, setup credential, and generated MediaMTX configuration only under that volume.
 - Confirmed the production UI responds on `/`, `/setup`, and `/admin`. A request to `/video/` reached the internal MediaMTX proxy and received MediaMTX's expected not-found response because the empty configuration had no requested stream.
 - Restarted through Compose and confirmed the setup credential and configuration database remained byte-for-byte unchanged. A separate marker created through `/data` also remained present after restart.
 
@@ -702,7 +707,7 @@ The actual deployment migration should:
 1. Download and validate a full Phase 1 backup.
 2. Stop and disable the legacy Multirover systemd service.
 3. Ensure no legacy MediaMTX service remains active.
-4. Place the Compose file beside the existing data directory or move that directory once while the service is stopped.
+4. Place the Compose file on the host; Docker creates the named data volume on first start.
 5. Start the application and lifecycle containers.
 6. Confirm that database migrations complete.
 7. Confirm the active configuration revision and administrator access.
@@ -717,9 +722,9 @@ The old systemd application and the Compose application must never run concurren
 
 Containerization is complete when:
 
-- A new host can start from one Compose file and an empty data directory.
+- A new host can start from one Compose file and an automatically created empty data volume.
 - Existing state can be restored from a Phase 1 full backup.
-- `./data:/data` is the only persistent application mount.
+- `data:/data` is the only persistent application mount.
 - Replacing the application container preserves all state.
 - The special external `/video` MediaMTX route is unnecessary.
 - The main container has no Docker socket access and is not fully privileged.
