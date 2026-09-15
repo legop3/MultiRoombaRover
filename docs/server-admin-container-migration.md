@@ -11,6 +11,7 @@ This document is the live implementation tracker for the migration.
 - [x] Phase 2, step 10: Build and locally verify the production application image
 - [x] Phase 2, steps 11-12: Add the single-container Compose deployment and locally verify its host-access contract
 - [x] Phase 2, step 13: Add application and container health checks
+- [x] Phase 2, step 14: Add the restricted lifecycle container and connect the System UI
 - [x] Phase 2, step 15: Build pull requests and publish the main branch to the single GHCR `latest` channel
 - [ ] Phase 2: Containerization, GHCR publishing, and container lifecycle controls
 
@@ -685,6 +686,17 @@ These operations require a lockdown administrator and recent password confirmati
 
 The Compose contract should remain stable so ordinary main-branch image updates replace only the application image. Updating the lifecycle component or changing host mounts/capabilities is a separate, rarer deployment-format update and must not be disguised as an ordinary application update.
 
+### Lifecycle-controller implementation notes
+
+Implemented on 2026-09-15:
+
+- Reused the single published application image for the lifecycle service with a controller-only command. This avoids a second Dockerfile, image name, GHCR workflow, and release lifecycle while the two containers still run separate processes with separate privileges.
+- Mounted `/var/run/docker.sock` only in the network-disabled lifecycle container. The application communicates through a dedicated Unix-socket volume and cannot submit an image name, container name, command, or Docker option; the controller operates only on the fixed `multirover` container and the deployment-selected MultiRover image.
+- Added fixed status, update-check, restart, and update operations. Update checks pull the configured moving image and compare Docker image IDs. Updates retain the previous image ID, recreate the application with its existing Compose host contract, wait for the image health check, and restore the previous image when replacement health fails.
+- Persisted the current operation and result under `data/runtime/container-lifecycle`. This survives ordinary application replacement and browser reconnection but remains excluded from full backups as disposable controller state.
+- Connected the existing lockdown-administrator password confirmation and audit history to the lifecycle operations. The Administration overview polls persisted progress, reports update and rollback results, and keeps the legacy process-level restart only when no controller socket exists.
+- Defined the deployment image once through a Compose YAML anchor. Both services and the controller target reuse that exact value, so production stays on `ghcr.io/legop3/multiroombarover:latest` and development requires changing only the single visible selector line to a branch tag.
+
 ## 15. GHCR publishing automation
 
 Add repository automation that:
@@ -763,7 +775,7 @@ Within the two hard phase boundaries, the safest order is:
 - [x] Build and verify the production application image.
 - [x] Add Compose, data mounting, networking, and hardware access.
 - [x] Add GHCR build and publication automation.
-- [ ] Add the restricted lifecycle container and connect the System UI.
+- [x] Add the restricted lifecycle container and connect the System UI.
 - [ ] Test update, rollback, backup restore, and hardware on the actual server.
 - [ ] Perform the final systemd-to-Compose cutover.
 

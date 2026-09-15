@@ -4,7 +4,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import CardFrame from '../../components/CardFrame/index.jsx';
-import { restartApplication, restoreConfigurationRevision } from '../api.js';
+import {
+  checkForApplicationUpdate,
+  getApplicationLifecycleStatus,
+  restartApplication,
+  restoreConfigurationRevision,
+  updateApplication,
+} from '../api.js';
 
 function formatDate(value) {
   return Number.isFinite(Number(value)) ? new Date(Number(value)).toLocaleString() : 'unknown';
@@ -13,6 +19,33 @@ function formatDate(value) {
 export default function AdminOverview({ snapshot, socket, runSensitive, onSnapshot }) {
   const config = snapshot.configuration;
   const [restartRequested, setRestartRequested] = useState(false);
+  const [lifecycle, setLifecycle] = useState(null);
+  const [lifecycleError, setLifecycleError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    async function refreshLifecycle() {
+      if (!socket.connected) return;
+      try {
+        const response = await getApplicationLifecycleStatus(socket);
+        if (!mounted) return;
+        setLifecycle(response.lifecycle);
+        setLifecycleError('');
+      } catch (error) {
+        if (mounted) setLifecycleError(error.message);
+      }
+    }
+
+    refreshLifecycle();
+    // Update work continues while this application is being replaced. Polling
+    // the controller gives the page current progress before disconnect and the
+    // persisted final result immediately after Socket.IO reconnects.
+    const timer = window.setInterval(refreshLifecycle, 2500);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (!restartRequested) return undefined;
@@ -47,6 +80,33 @@ export default function AdminOverview({ snapshot, socket, runSensitive, onSnapsh
     }
   }
 
+  async function checkForUpdate() {
+    try {
+      const response = await runSensitive(() => checkForApplicationUpdate(socket));
+      setLifecycle(response.lifecycle);
+    } catch (error) {
+      setLifecycleError(error.message);
+    }
+  }
+
+  async function update() {
+    if (!window.confirm('Pull the configured MultiRover image and replace the application container now? The page will reconnect automatically.')) return;
+    try {
+      const response = await runSensitive(() => updateApplication(socket));
+      setLifecycle(response.lifecycle);
+    } catch (error) {
+      setLifecycleError(error.message);
+    }
+  }
+
+  const lifecycleBusy = lifecycle?.state === 'running';
+  const lifecycleAvailable = Boolean(lifecycle?.available);
+  const updateSummary = lifecycle?.updateAvailable === true
+    ? 'An update is available.'
+    : lifecycle?.updateAvailable === false
+      ? 'The running application matches the latest checked image.'
+      : 'Check for updates to compare the running container with the configured image.';
+
   return (
     <div className="space-y-0.5">
       <CardFrame title="Administration overview" meta={`revision ${config.revision}`} bodyClassName="grid gap-0.5 p-0.5 md:grid-cols-3">
@@ -58,11 +118,24 @@ export default function AdminOverview({ snapshot, socket, runSensitive, onSnapsh
         <Link className="button-dark" to="/reports">Open fleet reports</Link>
         <Link className="button-dark" to="/">Open driver application</Link>
       </CardFrame>
-      <CardFrame title="Application" bodyClassName="space-y-0.5 p-1 text-sm">
-        <p className="text-slate-300">Restart only the MultiRover application. The process supervisor starts it again automatically without rebooting the host.</p>
-        <button type="button" className="button-danger" disabled={restartRequested} onClick={restart}>
-          {restartRequested ? 'Waiting for application…' : 'Restart application'}
-        </button>
+      <CardFrame title="Application container" meta={lifecycleAvailable ? lifecycle?.state : 'controller unavailable'} bodyClassName="space-y-1 p-1 text-sm">
+        <div className="surface max-w-4xl space-y-0.5 p-1 text-slate-300">
+          <p>{lifecycleAvailable ? updateSummary : 'Container updates are unavailable until the lifecycle service is running.'}</p>
+          {lifecycle?.message ? <p className="text-slate-400">{lifecycle.message}</p> : null}
+          {lifecycle?.rollback ? <p>Rollback: {lifecycle.rollback.status}{lifecycle.rollback.error ? ` — ${lifecycle.rollback.error}` : ''}</p> : null}
+          {lifecycleError ? <p className="text-red-300">{lifecycleError}</p> : null}
+        </div>
+        <div className="flex flex-wrap gap-0.5">
+          <button type="button" className="button-dark" disabled={!lifecycleAvailable || lifecycleBusy} onClick={checkForUpdate}>
+            {lifecycle?.operation === 'check' && lifecycleBusy ? 'Checking for update…' : 'Check for update'}
+          </button>
+          <button type="button" className="button-danger" disabled={!lifecycleAvailable || lifecycleBusy} onClick={update}>
+            {lifecycle?.operation === 'update' && lifecycleBusy ? 'Updating application…' : 'Update and restart'}
+          </button>
+          <button type="button" className="button-danger" disabled={restartRequested || lifecycleBusy} onClick={restart}>
+            {restartRequested ? 'Waiting for application…' : 'Restart application'}
+          </button>
+        </div>
       </CardFrame>
       <CardFrame title="Configuration revisions" meta={snapshot.revisions.length} bodyClassName="max-h-64 overflow-y-auto p-0.5 text-xs">
         {snapshot.revisions.map((revision) => (

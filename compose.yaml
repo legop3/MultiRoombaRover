@@ -1,14 +1,17 @@
 # MultiRover production deployment
 #
-# This intentionally contains only the application container. The later update
-# controller will be added as a second service when it exists; keeping it out
-# now means this first deployment pass has no placeholder process or unused
-# privilege.
+# The public application and private lifecycle controller reuse one published
+# image. Only the lifecycle service receives Docker control; the application
+# retains the narrower hardware access it needs at runtime.
 name: multirover
+
+# This is the deployment's single image selector. Production leaves it on
+# latest; a development deployment can change this one line to its branch tag.
+x-multirover-image: &multirover-image ghcr.io/legop3/multiroombarover:latest
 
 services:
   server:
-    image: ghcr.io/legop3/multiroombarover:latest
+    image: *multirover-image
     container_name: multirover
 
     # Host networking preserves the server's existing LAN behavior and avoids
@@ -31,6 +34,10 @@ services:
       # account's numeric UID while keeping every persistent file together.
       - data:/data
 
+      # The application can ask the private controller for one of its fixed
+      # lifecycle operations, but it never receives the Docker socket itself.
+      - lifecycle-socket:/run/multirover
+
       # bluetoothctl talks to the host Bluetooth daemon over this socket. The
       # socket is read-only as a filesystem mount; D-Bus method calls still flow
       # through it normally without exposing the rest of the host D-Bus tree.
@@ -48,8 +55,43 @@ services:
     cap_add:
       - NET_ADMIN
 
+  lifecycle:
+    # Reuse the application image and override only its command. This keeps
+    # GHCR publishing and host deployment limited to one image and one Compose
+    # file while the Docker-authorized process remains isolated from the app.
+    image: *multirover-image
+    container_name: multirover-lifecycle
+    command: ["node", "src/services/serverControlService/controller.js"]
+    user: root
+    network_mode: none
+    restart: unless-stopped
+    # The shared image's health check targets the application HTTP server. This
+    # controller intentionally has no TCP listener, so it must not inherit it.
+    healthcheck:
+      disable: true
+    security_opt:
+      - label=disable
+    environment:
+      # Requests cannot override this deployment-owned target. Reusing the
+      # anchor guarantees the controller pulls the image used by the server.
+      MULTIROVER_TARGET_IMAGE: *multirover-image
+    volumes:
+      # Status survives replacement of the application and is kept under its
+      # existing single data boundary. The transient socket has its own volume
+      # so special filesystem entries never enter full-data backups.
+      - data:/data
+      - lifecycle-socket:/run/multirover
+
+      # This is host-root-equivalent access and therefore exists only here,
+      # never in the public-facing application container.
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   # Use an explicit name so the same data volume survives Compose project moves
   # or directory renames. Ordinary `docker compose down` does not remove it.
   data:
     name: multirover-data
+  # This volume carries only the private Unix socket and contains no durable
+  # application state. Docker creates it automatically with the deployment.
+  lifecycle-socket:
+    name: multirover-lifecycle-socket

@@ -3,8 +3,8 @@
 # MultiRover Production Application Image
 # Purpose: Builds the web application, Node dependencies, native hardware
 # workers, and pinned runtime tools into one amd64 server image.
-# Scope: Packages the main application only. Compose, host hardware access, and
-# lifecycle/update control remain separate deployment concerns.
+# Scope: Packages the application and its private controller command in one
+# image. Compose still isolates their processes, mounts, and privileges.
 
 ARG FEDORA_VERSION=43
 

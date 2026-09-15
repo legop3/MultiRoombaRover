@@ -4,7 +4,8 @@
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('serverControlService');
 const { getConfigurationDatabase } = require('../../configuration');
-const { requireRecentPassword } = require('../adminConfigurationService');
+const { requireLockdownAdministrator, requireRecentPassword } = require('../adminConfigurationService');
+const lifecycleClient = require('./lifecycleClient');
 
 const database = getConfigurationDatabase();
 let restartPending = false;
@@ -45,15 +46,60 @@ function requestApplicationRestart({ actor, reason = 'administrator-requested' }
 }
 
 io.on('connection', (socket) => {
+  socket.on('server:lifecycleStatus', (_payload = {}, cb = () => {}) => {
+    Promise.resolve()
+      .then(() => requireLockdownAdministrator(socket))
+      .then(() => lifecycleClient.getLifecycleStatus())
+      .then((lifecycle) => cb({ success: true, lifecycle }))
+      .catch((error) => cb({ error: error.message, code: error.code || null }));
+  });
+
+  socket.on('server:checkForUpdate', (_payload = {}, cb = () => {}) => {
+    Promise.resolve()
+      .then(() => requireRecentPassword(socket))
+      .then(() => lifecycleClient.checkForUpdate())
+      .then((lifecycle) => {
+        database.recordAuditEvent(actorFor(socket), 'application.update-check-requested', {});
+        cb({ success: true, lifecycle });
+      })
+      .catch((error) => cb({ error: error.message, code: error.code || null }));
+  });
+
+  socket.on('server:updateApplication', (_payload = {}, cb = () => {}) => {
+    Promise.resolve()
+      .then(() => requireRecentPassword(socket))
+      .then(() => lifecycleClient.updateApplication())
+      .then((lifecycle) => {
+        database.recordAuditEvent(actorFor(socket), 'application.update-requested', {});
+        io.emit('server:restarting', { reason: 'application-update' });
+        cb({ success: true, lifecycle });
+      })
+      .catch((error) => cb({ error: error.message, code: error.code || null }));
+  });
+
   socket.on('server:restartApplication', (_payload = {}, cb = () => {}) => {
-    try {
+    Promise.resolve().then(async () => {
       requireRecentPassword(socket);
+      if (restartPending) throw new Error('Application restart already pending.');
       const actor = actorFor(socket);
-      requestApplicationRestart({ actor });
-      cb({ success: true });
-    } catch (error) {
-      cb({ error: error.message, code: error.code || null });
-    }
+      try {
+        const lifecycle = await lifecycleClient.restartApplication();
+        restartPending = true;
+        database.recordAuditEvent(actor, 'application.restart-requested', { reason: 'administrator-requested' });
+        logger.warn('Application container restart requested', { actor });
+        io.emit('server:restarting', { reason: 'administrator-requested' });
+        cb({ success: true, lifecycle });
+      } catch (error) {
+        /*
+          Legacy installations intentionally have no controller socket. Keep
+          their existing process-signal restart during migration, but never
+          bypass a real controller rejection such as an operation conflict.
+        */
+        if (!['ENOENT', 'ECONNREFUSED'].includes(error.code)) throw error;
+        requestApplicationRestart({ actor });
+        cb({ success: true, legacy: true });
+      }
+    }).catch((error) => cb({ error: error.message, code: error.code || null }));
   });
 });
 
