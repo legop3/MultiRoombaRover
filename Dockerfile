@@ -176,6 +176,11 @@ USER multirover
 # `/data` on an anonymous volume rather than the replaceable image layer.
 VOLUME ["/data"]
 EXPOSE 8080/tcp 8554/tcp 8189/tcp 8189/udp
+# Use Node's built-in fetch so container readiness does not require curl or a
+# second probe binary in the runtime image. The endpoint verifies the writable
+# data mount and MediaMTX; reaching it already proves Node is accepting HTTP.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/health').then(response=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "index.js"]
 

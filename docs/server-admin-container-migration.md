@@ -10,6 +10,7 @@ This document is the live implementation tracker for the migration.
 - [x] Phase 1, step 9: Complete the remaining legacy-deployment integration and hardware verification
 - [x] Phase 2, step 10: Build and locally verify the production application image
 - [x] Phase 2, steps 11-12: Add the single-container Compose deployment and locally verify its host-access contract
+- [x] Phase 2, step 13: Add application and container health checks
 - [x] Phase 2, step 15: Build pull requests and publish the main branch to the single GHCR `latest` channel
 - [ ] Phase 2: Containerization, GHCR publishing, and container lifecycle controls
 
@@ -644,6 +645,14 @@ Add an internal health endpoint that verifies:
 Optional remote integrations should report degraded status to administrators without forcing a container restart loop. Home Assistant, Discord, a camera, or an LLM server being offline does not mean the application process itself is unhealthy.
 
 Compose should use the health endpoint and a restart policy suitable for unattended operation.
+
+### Health-check implementation notes
+
+Implemented on 2026-09-15:
+
+- Added an unauthenticated `GET /health` readiness endpoint that exposes only two non-sensitive booleans: whether the application user can read and write the configured data directory and whether MediaMTX answers through its loopback-only metrics listener.
+- Treated successful route execution as proof that Node is accepting HTTP and that configuration initialization completed. This avoids repeatedly querying every SQLite database or turning optional integrations and currently offline media sources into container restart conditions.
+- Added the image-level Docker health check using Node's built-in `fetch`, so Compose receives the readiness state without installing another command-line probe utility.
 
 ## 14. Restricted lifecycle container
 
