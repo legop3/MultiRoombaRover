@@ -52,6 +52,11 @@ test('continues rejecting an unauthenticated remote RTSP reader', () => {
   assert.equal(request({ protocol: 'rtsp', action: 'read', path: 'rover-one' }), 401);
 });
 
+test('allows a rover to read its RTSP speaker-forward stream without a browser session', () => {
+  const { request } = createHarness({ requestIp: '192.0.2.10' });
+  assert.equal(request({ protocol: 'rtsp', action: 'read', path: 'rover-one-fwd' }), 200);
+});
+
 test('continues rejecting an unauthenticated WebRTC read', () => {
   const { request } = createHarness();
   assert.equal(request({ protocol: 'webrtc', action: 'read', path: 'rover-one' }), 401);
