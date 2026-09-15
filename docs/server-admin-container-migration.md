@@ -692,6 +692,7 @@ Implemented on 2026-09-15:
 - Added one `Container image` GitHub Actions workflow. Pull requests build the complete production Dockerfile without logging in or publishing. Main-branch pushes publish `ghcr.io/legop3/multiroombarover:latest`, while every other repository branch publishes one moving image using its sanitized branch name.
 - Used GitHub's repository-scoped token with only contents-read and packages-write permissions. No separate registry secret, release process, version calculation, QEMU setup, or custom tag-generation code is required.
 - Kept one Buildx job for all event types so pull-request verification, development branches, and main-branch publication cannot drift into different image recipes. Docker's maintained metadata action owns branch-name sanitization, and GitHub Actions layer caching avoids repeatedly downloading and rebuilding the image's large pinned media and TTS dependencies.
+- Removed the legacy package-lock ignore rules and added the server lockfile required by `npm ci` to the migration change set. Local Docker builds and clean GitHub checkouts now receive the same locked server and web UI dependency inputs instead of allowing an ignored workstation file to mask a missing build input.
 - The workflow file was parsed locally and its event, permission, architecture, tag-selection, and conditional-publish contract were checked. The first actual GHCR publication necessarily remains a GitHub-hosted verification after these changes are pushed.
 
 ## 16. Container cutover

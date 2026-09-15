@@ -13,8 +13,6 @@ config.h
 robots.json
 roverd-dummy
 server/config.yaml
-server/package-lock.json
-package-lock.json
 server/data/discord-guilds.json
 server/data/global-objective.json
 server/data/admin-reason.json
@@ -22,7 +20,9 @@ server/data/buttonbox-state.json
 server/data/barcode-tts-cache/
 server/data/rover-odometers.json
 server/data/mediamtx.yml
-webui/package-lock.json
+# npm lockfiles are deliberately tracked. The production image uses `npm ci`,
+# so a clean GitHub checkout must contain the exact dependency resolution used
+# by local builds rather than resolving a different dependency tree.
 !server/data/
 !server/data/barcode-registry.json
 webui/src/config/analytics.jsx
