@@ -10,7 +10,11 @@ const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 const TARGET_CONTAINER_NAME = 'multirover';
 const TARGET_IMAGE = process.env.MULTIROVER_TARGET_IMAGE || 'ghcr.io/legop3/multiroombarover:latest';
 const SOCKET_PATH = process.env.MULTIROVER_LIFECYCLE_SOCKET || '/run/multirover/lifecycle.sock';
-const STATUS_PATH = process.env.MULTIROVER_LIFECYCLE_STATUS || '/data/runtime/container-lifecycle/status.json';
+// Status belongs beside the controller's private socket instead of in the
+// application's data volume. The controller runs as root for Docker access;
+// keeping it out of /data prevents it from creating directories that the
+// non-root application cannot later use for replay and audio runtime work.
+const STATUS_PATH = process.env.MULTIROVER_LIFECYCLE_STATUS || '/run/multirover/status.json';
 const HEALTH_TIMEOUT_MS = 2 * 60 * 1000;
 const HEALTH_POLL_MS = 1000;
 

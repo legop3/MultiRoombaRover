@@ -44,7 +44,6 @@ services:
     environment:
       MULTIROVER_TARGET_IMAGE: *multirover-image
     volumes:
-      - data:/data
       - lifecycle-socket:/run/multirover
       # Do not add this Docker socket mount to the server service.
       - /var/run/docker.sock:/var/run/docker.sock
