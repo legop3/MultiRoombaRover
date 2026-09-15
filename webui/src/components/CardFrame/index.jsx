@@ -35,6 +35,7 @@ export default function CardFrame({
   actions = null,
   color = null,
   hideHeader = false,
+  stickyHeader = false,
   className = '',
   headerClassName = '',
   bodyClassName = '',
@@ -93,6 +94,11 @@ export default function CardFrame({
         <header
           className={cx(
             'flex items-center justify-between gap-0.5 border-b border-neutral-500/50 bg-slate-800 px-0.5 py-0.5',
+            // Sticky headings are opt-in because many CardFrames are short or
+            // live inside independently scrolling panes. Keeping the behavior
+            // on the shared component gives long cards a consistent title bar
+            // without changing the layout of existing callers.
+            stickyHeader && 'sticky top-0 z-10',
             // 'flex items-center justify-between gap-0.5 border-b border-neutral-500/50 bg-gradient-to-r from-neutral-800 via-neutral-700 to-neutral-600 px-0.5 py-0.5',
             headerClassName,
           )}

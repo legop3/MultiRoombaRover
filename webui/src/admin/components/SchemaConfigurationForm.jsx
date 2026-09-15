@@ -158,7 +158,7 @@ function ConfigurationFieldTemplate({
       <div className="configuration-key">
         {/* Boolean widgets deliberately hide their internal duplicate label, so
             every scalar can use this same key column and preserve YAML order. */}
-        <label htmlFor={id} className="text-xs font-semibold text-slate-100">
+        <label htmlFor={id} className="configuration-key-label">
           {label}{required ? <span className="ml-0.25 text-sky-300">*</span> : null}
         </label>
       </div>
@@ -215,7 +215,9 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
       title={title}
       color={layer.color}
       clipOverflow={false}
+      stickyHeader
       className={`configuration-card${topLevel ? ' configuration-top-level-card' : ''}`}
+      headerClassName="configuration-card-header"
       bodyClassName="configuration-card-body"
     >
       {description ? <div className="configuration-branch-description">{description}</div> : null}
@@ -235,7 +237,9 @@ function ConfigurationArrayItemTemplate({ buttonsProps, children, hasToolbar, in
       title={`Item ${index + 1}`}
       color={layer.color}
       clipOverflow={false}
+      stickyHeader
       className="configuration-card configuration-array-item"
+      headerClassName="configuration-card-header"
       bodyClassName="configuration-card-body"
     >
       {hasToolbar ? (
@@ -274,7 +278,9 @@ function ConfigurationArrayTemplate({ canAdd, disabled, fieldPathId, items, onAd
       meta={`${items.length} ${items.length === 1 ? 'item' : 'items'}`}
       color={layer.color}
       clipOverflow={false}
+      stickyHeader
       className={`configuration-card configuration-array${topLevel ? ' configuration-top-level-card' : ''}`}
+      headerClassName="configuration-card-header"
       bodyClassName="configuration-card-body"
     >
       {schema.description ? <div className="configuration-branch-description">{schema.description}</div> : null}

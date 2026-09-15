@@ -14,6 +14,13 @@
   @apply min-w-0;
 }
 
+.configuration-card-header {
+  /* The editor toolbar owns the top edge of the viewport. Structural title
+     bars use its measured height so sticky CardFrames remain visible directly
+     beneath the actions instead of covering them at narrow widths. */
+  top: var(--configuration-sticky-top, 0px);
+}
+
 .configuration-card .configuration-card {
   /* Indent the next structural boundary itself, not every row owned by the
      parent. Since nested CardFrames repeat this rule, the offset accumulates
@@ -46,6 +53,12 @@
 .configuration-key,
 .configuration-value {
   @apply min-w-0;
+}
+
+.configuration-key-label {
+  /* Keys are the primary identifiers on YAML-like rows, so they must be more
+     prominent than the explanatory copy in the adjacent value column. */
+  @apply text-base font-semibold leading-snug text-slate-100;
 }
 
 .configuration-root-description,

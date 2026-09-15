@@ -7,7 +7,7 @@ This document is the live implementation tracker for the migration.
 - [x] Phase 1, step 1: Establish the single data-directory contract
 - [x] Phase 1, steps 2-5: Configuration database, manual setup-file import, setup, and centralized admin UI
 - [x] Phase 1, steps 6-8: Restart, backup/restore, and internal video proxy
-- [ ] Phase 1, step 9: Legacy-deployment verification and removal of the external `/video` route
+- [ ] Phase 1, step 9: Complete the remaining legacy-deployment integration and hardware verification
 - [ ] Phase 2: Containerization, GHCR publishing, and container lifecycle controls
 
 The single data-directory implementation and local verification are complete. Real snapshot generation, legacy-directory cleanup, and runtime filesystem tracing remain deployment checks for the actual server; they do not leave the implementation step open.
@@ -452,6 +452,7 @@ Implemented on 2026-09-14:
 - Restored the former example YAML's installation-specific values as both schema-owned input examples and the actual initial values for non-secret settings and collection shapes. The only intentionally empty defaults are the three credentials and active driver HTML; their placeholders still explain the expected input without falsely marking credentials as configured or publishing sample content.
 - Strengthened top-level hierarchy with a 1.5-rem sibling gap while retaining compact spacing within each configuration section.
 - Extended `CardFrame` with an optional explicit accent while preserving its assigned-rover default, then gave every configuration nesting level its own complete header-and-border accent. Nested CardFrames themselves now carry the YAML-like indentation, scalar contents remain aligned with their owning card, and descriptions use a larger, higher-contrast treatment.
+- Added an opt-in sticky-header behavior to the shared `CardFrame`. Configuration hierarchy titles use it beneath the independently sticky action toolbar, and scalar key labels are now visually stronger than their descriptions.
 - Traced all 156 schema nodes to their runtime consumers and added operator-facing descriptions for every root, section, collection, array item, and scalar option. A recursive configuration test now rejects any future schema node without a description; currently reserved settings explicitly state that they have no runtime effect.
 - Converged feature control into service-owned configuration: each public feature opts in beside its own schema, and the configuration system derives those exact `enabled` switches for sessions and command discovery. The former server feature registry was removed; configuration completeness and hardware availability remain visible as runtime status instead of becoming hidden enablement rules.
 - Lazy-loaded setup and administration so the schema-form dependency is not included in ordinary driver-page downloads.
@@ -475,6 +476,11 @@ Local verification completed:
 - Installer syntax and repository whitespace checks passed.
 - A local startup smoke test reached listener initialization. MediaMTX then exited because `/usr/local/bin/mediamtx` is intentionally absent on this development machine; actual enabled integrations and media remain deployment checks for the real server.
 - A second empty-data startup smoke test loaded every reloadable service and reached the HTTP listener without listener-limit warnings. A deliberately substituted failing MediaMTX executable then ended the process as expected; enabled hardware and external integrations still require verification on the actual server.
+
+Testing-server verification completed:
+
+- A full backup created from the running application successfully validated and restored through the admin UI after the WAL-sidecar fix.
+- WHEP video playback works when the testing server is published through an ordinary whole-application reverse proxy. No special `/video` upstream, prefix rewrite, buffering rule, or direct public MediaMTX signaling route is present, confirming that Node now owns the complete public signaling path.
 
 # Phase 2: containerization and image delivery
 

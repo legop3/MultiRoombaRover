@@ -1,7 +1,7 @@
 // Complete Configuration Editor
 // Purpose: Connects the one hierarchical configuration form to revision, secret, validation, and save behavior.
 // Scope: Edits and saves one complete configuration document as one immutable revision.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CardFrame from '../../components/CardFrame/index.jsx';
 import { importAdminConfigurationFile, updateConfiguration } from '../api.js';
 import SchemaConfigurationForm from './SchemaConfigurationForm.jsx';
@@ -22,6 +22,8 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState([]);
+  const editorRef = useRef(null);
+  const toolbarRef = useRef(null);
 
   useEffect(() => {
     setDraft(clone(serverValue));
@@ -30,6 +32,35 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
     setConfigurationFile(null);
     setValidationErrors([]);
   }, [revision, serverValue]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const toolbar = toolbarRef.current;
+    if (!editor || !toolbar) return undefined;
+
+    /*
+      The action toolbar can wrap differently at each viewport width, so a
+      fixed CSS offset would eventually let section headings overlap it. Feed
+      its real rendered height into one local CSS variable instead; every
+      sticky configuration CardFrame can then meet the toolbar exactly.
+    */
+    const updateStickyOffset = () => {
+      editor.style.setProperty('--configuration-sticky-top', `${toolbar.offsetHeight}px`);
+    };
+    updateStickyOffset();
+
+    const observer = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(updateStickyOffset)
+      : null;
+    observer?.observe(toolbar);
+    window.addEventListener('resize', updateStickyOffset);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateStickyOffset);
+      editor.style.removeProperty('--configuration-sticky-top');
+    };
+  }, [serverValue, schema]);
 
   const dirty = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(serverValue) || Object.keys(secretOperations).length > 0,
@@ -104,21 +135,22 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
   }
 
   return (
-    <CardFrame title="Configuration" meta={`revision ${revision}`} clipOverflow={false} bodyClassName="p-0.5">
-      <div className="configuration-toolbar sticky top-0 z-20 mb-0.5 space-y-0.5 border border-neutral-500/60 bg-neutral-900/95 p-0.5 backdrop-blur">
-        <p className="text-xs text-slate-400">Saving applies the complete revision immediately and reloads each affected service.</p>
-        {/* All document actions stay together at the start of the toolbar. The
-            editor may use a wide canvas, but width is never used to separate a
-            control from the content that explains it. */}
-        <div className="flex flex-wrap gap-0.5">
-          <button type="button" className="button-dark" disabled={busy} onClick={onReload}>Reload</button>
-          <button type="button" className="button-dark" disabled={!dirty || busy} onClick={() => {
-            setDraft(clone(serverValue));
-            setSecretOperations({});
-          }}>Reset</button>
-          <button type="button" className="button-dark" disabled={!dirty || busy} onClick={save}>{saving ? 'Applying…' : 'Save configuration'}</button>
+    <div ref={editorRef} className="configuration-editor">
+      <CardFrame title="Configuration" meta={`revision ${revision}`} clipOverflow={false} bodyClassName="p-0.5">
+        <div ref={toolbarRef} className="configuration-toolbar sticky top-0 z-20 mb-0.5 space-y-0.5 border border-neutral-500/60 bg-neutral-900/95 p-0.5 backdrop-blur">
+          <p className="text-xs text-slate-400">Saving applies the complete revision immediately and reloads each affected service.</p>
+          {/* All document actions stay together at the start of the toolbar. The
+              editor may use a wide canvas, but width is never used to separate a
+              control from the content that explains it. */}
+          <div className="flex flex-wrap gap-0.5">
+            <button type="button" className="button-dark" disabled={busy} onClick={onReload}>Reload</button>
+            <button type="button" className="button-dark" disabled={!dirty || busy} onClick={() => {
+              setDraft(clone(serverValue));
+              setSecretOperations({});
+            }}>Reset</button>
+            <button type="button" className="button-dark" disabled={!dirty || busy} onClick={save}>{saving ? 'Applying…' : 'Save configuration'}</button>
+          </div>
         </div>
-      </div>
       <CardFrame title="Import legacy YAML" bodyClassName="space-y-0.5 p-1 text-sm" clipOverflow={false}>
         <p className="text-sm text-slate-300">Replace this configuration from an explicitly selected legacy file. Unknown old settings and administrator accounts are ignored; current settings are validated and applied immediately.</p>
         {/* Keep the picker and its action beside each other at the start of the
@@ -168,6 +200,7 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
         secretOperations={secretOperations}
         setSecretOperation={setSecretOperation}
       />
-    </CardFrame>
+      </CardFrame>
+    </div>
   );
 }
