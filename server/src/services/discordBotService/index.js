@@ -90,12 +90,7 @@ const {
 const config = structuredClone(loadConfig());
 const discordConfig = config.discord || {};
 let enabled = Boolean(discordConfig.enabled);
-// These normalized command names mirror the command router. Bridge-channel
-// command replies are mirrored into web chat, so this entrypoint needs to know
-// the configured command names before it wraps message.reply.
-const configuredAdministrators = getConfigurationDatabase().listAdministrators();
-const adminIds = new Set(configuredAdministrators.map((admin) => String(admin.discordId || '').trim()).filter(Boolean));
-const lockdownAdminIds = new Set(configuredAdministrators.filter((admin) => admin.role === 'lockdown').map((admin) => String(admin.discordId || '').trim()).filter(Boolean));
+const configurationDatabase = getConfigurationDatabase();
 
 if (!enabled) logger.info('Discord disabled by config');
 
@@ -122,12 +117,34 @@ function sanitizeMentions(text) {
     .replace(/@here/gi, '[here]');
 }
 
+function findDiscordAdministrator(discordId) {
+  const normalizedDiscordId = String(discordId || '').trim();
+  if (!normalizedDiscordId) return null;
+
+  // Read the administrator registry at the moment Discord checks permission.
+  // Setup imports and administrator edits happen after this module starts, so
+  // a startup-only Set would remain stale until the whole server restarted.
+  return configurationDatabase.listAdministrators().find(
+    (administrator) => String(administrator.discordId || '').trim() === normalizedDiscordId,
+  ) || null;
+}
+
 function isAdminUser(discordId) {
-  return adminIds.has(String(discordId || '').trim());
+  return Boolean(findDiscordAdministrator(discordId));
 }
 
 function isLockdownAdminUser(discordId) {
-  return lockdownAdminIds.has(String(discordId || '').trim());
+  return findDiscordAdministrator(discordId)?.role === 'lockdown';
+}
+
+function getLockdownAdminIds() {
+  // Moderation requests use the same live registry as command authorization,
+  // ensuring newly imported or edited lockdown accounts receive DMs without a
+  // restart or a second cache-synchronization system.
+  return configurationDatabase.listAdministrators()
+    .filter((administrator) => administrator.role === 'lockdown')
+    .map((administrator) => String(administrator.discordId || '').trim())
+    .filter(Boolean);
 }
 
 function countReady() {
@@ -301,7 +318,7 @@ const commands = createCommandHandlers(commandDependencies);
   getPrivateAccessRequestByMessageId,
   approvePrivateAccessRequest,
   denyPrivateAccessRequest,
-  lockdownAdminIds,
+  getLockdownAdminIds,
   isAdminUser,
   isLockdownAdminUser,
   sendToChannel: channelIO.sendToChannel,
