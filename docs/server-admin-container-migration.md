@@ -475,6 +475,7 @@ Implemented on 2026-09-14:
 - Replaced Discord's `siteUrl`, the inter-instance profile's `publicUrl`, and media `whepBaseUrl` with one top-level `publicUrl`. A numbered internal database migration transforms every saved configuration revision before current validation, and the media section now contains only optional additional ICE hosts. WHEP and microphone WHIP URLs are fixed relative paths, so they work through the current origin without knowing its hostname.
 - Discord command authorization and lockdown moderation recipients now read the live administrator registry, so setup imports and later Discord-ID or role edits take effect without restarting the server.
 - Full-data restore now leaves `runtime/` untouched, matching its existing exclusion from backup archives and preventing the non-root application from trying to remove lifecycle-controller state owned by the root controller container.
+- The Users and administrators tab now requests at most 100 lightweight identity summaries through one bounded SQLite query. Search and moderation filters run on the server, while complete signals, permissions, and feature state load only after selecting a user, preventing large identity databases from blocking Socket.IO heartbeats or freezing the browser.
 - Fixed inter-instance public payload generation to read feature flags and social links from the same live configuration revision. Social links enabled through the new configuration system no longer trigger an undefined legacy-config reference and an HTTP 500 response.
 
 Local verification completed:

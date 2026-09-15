@@ -13,8 +13,8 @@ export function emitIdentityAdmin(socket, eventName, payload = {}) {
   });
 }
 
-export function listUsers(socket) {
-  return emitIdentityAdmin(socket, 'identityAdmin:listUsers');
+export function listUsers(socket, { query = '', filter = 'all' } = {}) {
+  return emitIdentityAdmin(socket, 'identityAdmin:listUsers', { query, filter });
 }
 
 export function getUser(socket, userId) {

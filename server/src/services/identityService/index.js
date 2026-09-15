@@ -19,6 +19,7 @@ const DB_PATH = resolveDataPath('identity.sqlite');
 const LEGACY_VERIFICATION_PATH = resolveDataPath('verified-users.json');
 const LEGACY_BARCODE_PATH = resolveDataPath('barcode-games.json');
 const STORE_VERSION = 4;
+const ADMIN_USER_LIST_LIMIT = 100;
 const identityEvents = new EventEmitter();
 
 let db = null;
@@ -558,6 +559,85 @@ function listUsersForAdmin() {
       ...user,
       featureNamespaces: Object.keys(user.features || {}).sort(),
     }));
+}
+
+function listUserSummariesForAdmin({ query = '', filter = 'all' } = {}) {
+  const conn = getDb();
+  const normalizedQuery = String(query || '').trim().toLowerCase().slice(0, 200);
+  const normalizedFilter = ['all', 'verified', 'deterred', 'muted', 'unverified'].includes(filter)
+    ? filter
+    : 'all';
+  const conditions = [];
+  const parameters = [];
+
+  if (normalizedFilter === 'verified') conditions.push('coalesce(user_status.verified_enabled, 0) = 1');
+  if (normalizedFilter === 'deterred') conditions.push('coalesce(user_status.deterrence_enabled, 0) = 1');
+  if (normalizedFilter === 'muted') conditions.push('coalesce(user_status.muted_enabled, 0) = 1');
+  if (normalizedFilter === 'unverified') conditions.push('coalesce(user_status.verified_enabled, 0) = 0');
+
+  if (normalizedQuery) {
+    const pattern = `%${normalizedQuery}%`;
+    /*
+      Search stays inside one bounded SQLite statement. EXISTS checks preserve
+      lookup by any known identity signal without constructing every user's
+      complete signal and feature-state record in JavaScript first.
+    */
+    conditions.push(`(
+      lower(users.id) like ?
+      or exists (select 1 from user_nicknames where user_id = users.id and lower(nickname) like ?)
+      or exists (select 1 from user_cookie_ids where user_id = users.id and lower(cookie_user_id) like ?)
+      or exists (select 1 from user_fingerprint_ids where user_id = users.id and lower(fingerprint_id) like ?)
+      or exists (select 1 from user_known_ips where user_id = users.id and lower(ip) like ?)
+      or exists (select 1 from user_feature_state where user_id = users.id and lower(namespace) like ?)
+      or exists (select 1 from user_permissions where user_id = users.id and lower(permission_key) like ?)
+    )`);
+    parameters.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern);
+  }
+
+  const where = conditions.length ? `where ${conditions.join(' and ')}` : '';
+  /*
+    The list needs only the newest visible signal and moderation flags. Full
+    signal histories, permissions, and feature JSON remain available through
+    getUserForAdmin after an administrator selects one of these summaries.
+    Reading one extra row tells the UI whether it should ask for a narrower
+    search without running a second full COUNT query.
+  */
+  const rows = conn.prepare(`
+    select
+      users.id,
+      users.created_at,
+      users.updated_at,
+      users.last_seen_at,
+      coalesce(user_status.verified_enabled, 0) as verified_enabled,
+      coalesce(user_status.deterrence_enabled, 0) as deterrence_enabled,
+      coalesce(user_status.muted_enabled, 0) as muted_enabled,
+      (select nickname from user_nicknames where user_id = users.id order by last_seen_at desc limit 1) as nickname,
+      (select cookie_user_id from user_cookie_ids where user_id = users.id order by last_seen_at desc limit 1) as cookie_user_id,
+      (select fingerprint_id from user_fingerprint_ids where user_id = users.id order by last_seen_at desc limit 1) as fingerprint_id
+    from users
+    left join user_status on user_status.user_id = users.id
+    ${where}
+    order by coalesce(users.last_seen_at, users.updated_at, users.created_at) desc
+    limit ?
+  `).all(...parameters, ADMIN_USER_LIST_LIMIT + 1);
+
+  return {
+    truncated: rows.length > ADMIN_USER_LIST_LIMIT,
+    users: rows.slice(0, ADMIN_USER_LIST_LIMIT).map((row) => ({
+      id: row.id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      lastSeenAt: row.last_seen_at,
+      nickname: row.nickname || null,
+      cookieUserIds: row.cookie_user_id ? [row.cookie_user_id] : [],
+      fingerprintIds: row.fingerprint_id ? [row.fingerprint_id] : [],
+      verified: { enabled: Boolean(row.verified_enabled) },
+      deterrence: {
+        enabled: Boolean(row.deterrence_enabled),
+        muted: Boolean(row.muted_enabled),
+      },
+    })),
+  };
 }
 
 function getUserForAdmin(userId) {
@@ -1111,6 +1191,7 @@ module.exports = {
   attachIdentitySignals,
   getUserById,
   listUsersForAdmin,
+  listUserSummariesForAdmin,
   getUserForAdmin,
   addUserSignal,
   removeUserSignal,

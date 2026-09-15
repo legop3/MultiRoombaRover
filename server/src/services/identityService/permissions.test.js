@@ -80,3 +80,36 @@ test('unknown permission keys cannot be persisted', () => {
     /Unknown user permission/,
   );
 });
+
+test('administrator user summaries are bounded and searchable without loading full records', () => {
+  const db = identityService.getDb();
+  const insertUser = db.prepare('insert or ignore into users (id, created_at, updated_at, last_seen_at) values (?, ?, ?, ?)');
+  const insertStatus = db.prepare('insert or ignore into user_status (user_id, deterrence_enabled) values (?, ?)');
+  const insertNickname = db.prepare('insert or ignore into user_nicknames (user_id, nickname, first_seen_at, last_seen_at) values (?, ?, ?, ?)');
+
+  /*
+    Seed more records than one response may contain. Direct inserts keep this
+    focused test independent from browser identity generation while exercising
+    the real normalized tables and the same query used by the admin socket.
+  */
+  db.transaction(() => {
+    for (let index = 0; index < 105; index += 1) {
+      const userId = `usr_${index.toString(16).padStart(32, '0')}`;
+      insertUser.run(userId, index, index, index);
+      insertStatus.run(userId, index === 104 ? 1 : 0);
+      insertNickname.run(userId, index === 104 ? 'Unique Search Target' : `User ${index}`, index, index);
+    }
+  })();
+
+  const recent = identityService.listUserSummariesForAdmin();
+  assert.equal(recent.users.length, 100);
+  assert.equal(recent.truncated, true);
+
+  const searched = identityService.listUserSummariesForAdmin({ query: 'unique search target' });
+  assert.equal(searched.users.length, 1);
+  assert.equal(searched.users[0].nickname, 'Unique Search Target');
+
+  const deterred = identityService.listUserSummariesForAdmin({ filter: 'deterred' });
+  assert.equal(deterred.users.length, 1);
+  assert.equal(deterred.users[0].deterrence.enabled, true);
+});

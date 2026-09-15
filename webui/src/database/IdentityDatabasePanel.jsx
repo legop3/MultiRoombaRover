@@ -1,7 +1,7 @@
 // Identity Database Panel
 // Purpose: Implements the lockdown admin identity database editor UI inside the centralized administration application.
 // Scope: Keeps list, detail, signal, status, feature-state, and raw JSON editing local to this feature.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import CardFrame from '../components/CardFrame/index.jsx';
 import Tabs, { Tab, TabList, TabPanel, TabPanels } from '../components/Tabs/index.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
@@ -24,8 +24,6 @@ import {
   maskValue,
   parseEditableJson,
   stringifyJson,
-  userMatchesFilter,
-  userMatchesQuery,
 } from './identityDatabaseUtils.js';
 
 const FILTERS = [
@@ -44,21 +42,16 @@ function StatusPill({ active, children }) {
   );
 }
 
-function UserListCard({ users, selectedUserId, query, filter, loading, onQuery, onFilter, onRefresh, onSelect }) {
-  const filtered = useMemo(
-    () => users.filter((user) => userMatchesFilter(user, filter) && userMatchesQuery(user, query)),
-    [filter, query, users],
-  );
-
+function UserListCard({ users, truncated, selectedUserId, query, filter, loading, onQuery, onFilter, onRefresh, onSearch, onSelect }) {
   const actions = (
-    <button type="button" className="button-dark text-xs" onClick={onRefresh} disabled={loading}>
+    <button type="button" className="button-dark text-xs" onClick={() => onRefresh()} disabled={loading}>
       {loading ? 'Loading' : 'Refresh'}
     </button>
   );
 
   return (
-    <CardFrame title="Identity database" meta={filtered.length} actions={actions} bodyClassName="flex min-h-0 flex-col gap-0.5 p-0.5 text-sm">
-      <div className="grid gap-0.5 md:grid-cols-[minmax(0,1fr)_10rem]">
+    <CardFrame title="Identity database" meta={truncated ? `${users.length}+` : users.length} actions={actions} bodyClassName="flex min-h-0 flex-col gap-0.5 p-0.5 text-sm">
+      <form className="grid gap-0.5 md:grid-cols-[minmax(0,1fr)_10rem_auto]" onSubmit={onSearch}>
         <input
           className="field-input text-sm"
           type="search"
@@ -71,9 +64,15 @@ function UserListCard({ users, selectedUserId, query, filter, loading, onQuery, 
             <option key={entry.key} value={entry.key}>{entry.label}</option>
           ))}
         </select>
-      </div>
+        <button type="submit" className="button-dark text-xs" disabled={loading}>Search</button>
+      </form>
+      {truncated ? (
+        <p className="surface-muted px-1 py-0.5 text-xs text-slate-400">
+          Showing the first 100 matches. Narrow the search to find older users.
+        </p>
+      ) : null}
       <div className="min-h-[18rem] flex-1 overflow-y-auto">
-        {filtered.length ? filtered.map((user) => (
+        {users.length ? users.map((user) => (
           <button
             key={user.id}
             type="button"
@@ -333,14 +332,16 @@ export default function IdentityDatabasePanel() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
   const refreshUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await listUsers(socket);
+      const resp = await listUsers(socket, { query, filter });
       setUsers(resp.users || []);
+      setTruncated(Boolean(resp.truncated));
       setPermissions(resp.permissions || []);
       if (selectedUser?.id) {
         const updated = await getUser(socket, selectedUser.id);
@@ -352,7 +353,7 @@ export default function IdentityDatabasePanel() {
     } finally {
       setLoading(false);
     }
-  }, [selectedUser?.id, socket]);
+  }, [filter, query, selectedUser?.id, socket]);
 
   const selectUser = useCallback(async (userId) => {
     setLoading(true);
@@ -391,6 +392,11 @@ export default function IdentityDatabasePanel() {
     refreshUsers();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const submitSearch = (event) => {
+    event.preventDefault();
+    refreshUsers();
+  };
+
   const handleAddSignal = (type, value) =>
     runMutation((userId) => addSignal(socket, userId, type, value), 'Signal added.');
   const handleRemoveSignal = (type, value) =>
@@ -415,6 +421,7 @@ export default function IdentityDatabasePanel() {
     <div className="grid min-h-0 flex-1 gap-0.5 lg:grid-cols-[24rem_minmax(0,1fr)]">
       <UserListCard
         users={users}
+        truncated={truncated}
         selectedUserId={selectedUser?.id || null}
         query={query}
         filter={filter}
@@ -422,6 +429,7 @@ export default function IdentityDatabasePanel() {
         onQuery={setQuery}
         onFilter={setFilter}
         onRefresh={refreshUsers}
+        onSearch={submitSearch}
         onSelect={selectUser}
       />
       <div className="min-h-0 space-y-0.5 overflow-y-auto">
