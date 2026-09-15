@@ -35,7 +35,11 @@ function listActiveDataEntries({ includeRuntime = true } = {}) {
 }
 
 function removeActiveData() {
-  for (const name of listActiveDataEntries()) {
+  // Runtime contains disposable work owned by active companion processes as
+  // well as the lifecycle controller's status directory. It is deliberately
+  // absent from backup archives, so restore must leave it untouched instead
+  // of trying to delete root-owned controller state from the non-root server.
+  for (const name of listActiveDataEntries({ includeRuntime: false })) {
     fs.rmSync(path.join(resolveDataDir(), name), { recursive: true, force: true });
   }
 }

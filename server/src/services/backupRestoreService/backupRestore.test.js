@@ -116,7 +116,9 @@ test('applies validated replacement data and removes rollback only after startup
   const applied = startupRestore.applyPendingRestore();
   assert.equal(applied.status, 'awaiting-health');
   assert.equal(fs.existsSync(path.join(temporaryRoot, 'old-state.txt')), false);
-  assert.equal(fs.existsSync(path.join(temporaryRoot, 'runtime')), false);
+  // Runtime is outside the durable backup payload and can contain state owned
+  // by the separate lifecycle controller, so applying a restore preserves it.
+  assert.equal(fs.readFileSync(path.join(temporaryRoot, 'runtime', 'active.tmp'), 'utf8'), 'discard during restore');
   assert.equal(fs.readFileSync(path.join(temporaryRoot, 'state.json'), 'utf8'), '{"preserved":true}\n');
   assert.equal(fs.existsSync(path.join(temporaryRoot, 'backup-restore', 'rollback', 'old-state.txt')), true);
 
