@@ -190,7 +190,15 @@ function filterPublicUsers(users = [], publicIds) {
 function buildLocalInfo() {
   const mode = getMode();
   const lockdown = isLockdownMode();
-  const features = getFeatureFlags();
+  /*
+    Build every configuration-derived part of one public response from the
+    same immutable revision. Besides preventing a revision change from mixing
+    feature flags with newer social links, this supplies the explicit snapshot
+    required by getConfiguredSocials instead of relying on the removed legacy
+    global configuration object.
+  */
+  const config = loadConfig();
+  const features = getFeatureFlags(config);
   const publicRoster = getPublicRoster();
   const publicIds = publicRoverIdSet(publicRoster);
   const roster = publicRoster.map((rover) => (lockdown ? rover : addRoverSnapshotLinks(rover)));
