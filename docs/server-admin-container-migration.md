@@ -7,10 +7,13 @@ This document is the live implementation tracker for the migration.
 - [x] Phase 1, step 1: Establish the single data-directory contract
 - [x] Phase 1, steps 2-5: Configuration database, manual setup-file import, setup, and centralized admin UI
 - [x] Phase 1, steps 6-8: Restart, backup/restore, and internal video proxy
-- [ ] Phase 1, step 9: Complete the remaining legacy-deployment integration and hardware verification
+- [x] Phase 1, step 9: Complete the remaining legacy-deployment integration and hardware verification
+- [x] Phase 2, step 10: Build and locally verify the production application image
+- [x] Phase 2, steps 11-12: Add the single-container Compose deployment and locally verify its host-access contract
+- [x] Phase 2, step 15: Build pull requests and publish the main branch to the single GHCR `latest` channel
 - [ ] Phase 2: Containerization, GHCR publishing, and container lifecycle controls
 
-The single data-directory implementation and local verification are complete. Real snapshot generation, legacy-directory cleanup, and runtime filesystem tracing remain deployment checks for the actual server; they do not leave the implementation step open.
+Phase 1 is complete. The current application has run successfully on the production server with the new configuration, administration, persistence, backup/restore, and internal video-proxy contracts.
 
 The work is deliberately split into two phases:
 
@@ -21,6 +24,8 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 
 ## Decision log
 
+- 2026-09-14: Publish `ghcr.io/legop3/multiroombarover:latest` only from the repository's main branch. Every other repository branch publishes one moving development image named for that branch, with invalid tag separators normalized; these are development selectors rather than numbered releases. Pull requests only verify that the image builds. There are no release numbers, semantic-version tags, stable/edge channels, or operator-facing version selection. Docker image digests remain an internal mechanism for detecting an available update and retaining the previously running image for rollback.
+- 2026-09-15: Support only `linux/amd64` for the central server image. Rover computers remain independently ARM-capable, but publishing an untested ARM server image would multiply native-worker, media-binary, TTS-library, and hardware validation without serving the current deployment. ARM server support can be added later when a real ARM server exists to verify it.
 - 2026-09-14: Apply every committed configuration revision immediately. The configuration coordinator atomically replaces the process-wide snapshot, compares top-level service sections, serially reloads only affected service runtimes, and then refreshes all sessions. Long-lived HTTP/socket handlers remain registered once and delegate to the current runtime; integrations may reconnect or replace their own child process, worker, client, timers, and subscriptions without restarting Node.
 - 2026-09-14: Render the schema-driven configuration editor as a YAML-like tree inside one `CardFrame`. Every object or array introduces an ordered header and one indentation guide, every scalar occupies one key/value row, and array operations remain beside their item instead of moving to the far edge. Keep all route-specific RJSF styling in `webui/src/admin/styles.css`, outside the shared global stylesheet.
 - 2026-09-14: Restart only the application process, never the host. A lockdown administrator with recent password confirmation requests one audited restart, Node acknowledges and announces it, then sends itself SIGTERM. Existing service signal handlers clean up their owned children, while systemd `Restart=always` and the later container restart policy start the application again.
@@ -44,7 +49,7 @@ Phase 1 must be complete and verified before Phase 2 begins. Containerization mu
 - A dedicated `/admin` application contains all server administration.
 - The public `/video` route is proxied to MediaMTX by the Node server, eliminating the special external MediaMTX proxy rule.
 - The completed server is packaged as a replaceable container whose only persistent mount is the data directory.
-- Release images are built automatically and published to GHCR.
+- The latest successful main-branch image is built automatically and published to GHCR as `ghcr.io/legop3/multiroombarover:latest`.
 - The admin UI can restart, update, health-check, and roll back the application container without giving the main application direct Docker access.
 - The final host installation contains as little project-specific material as possible: a Compose file, a data directory, and unavoidable hardware preparation.
 
@@ -507,7 +512,7 @@ Use a Fedora-based multi-stage build to remain close to the dependencies already
 
 - Build the Kinect worker against libfreenect/libusb.
 - Build the Balance Board worker against wiiuse/BlueZ.
-- Build for the target image architecture rather than copying checked-in workstation binaries.
+- Build for `linux/amd64` rather than copying checked-in workstation binaries.
 
 ### Packaged runtime tools
 
@@ -531,8 +536,24 @@ The final image should:
 - Use a minimal init process to reap child processes.
 - Treat `/data` as its only persistent writable location.
 - Use `/tmp` only for disposable work.
-- Include release version and commit metadata.
+- Include ordinary OCI source metadata linking the image to this repository, without introducing an application version number.
 - Handle `SIGTERM` through the Phase 1 graceful shutdown coordinator.
+
+### Production image implementation notes
+
+Implemented and locally verified on 2026-09-15:
+
+- Added one root multi-stage `Dockerfile` that builds the Vite application, locked production Node dependencies, Kinect worker, and Balance Board worker, then copies only their runtime outputs into a Fedora 43 image.
+- Downloaded pinned amd64 MediaMTX 1.15.3, Neolink 0.6.2, and ChromeOS Google TTS 26.5 artifacts during the build and rejected downloads that did not match their recorded SHA-256 checksums.
+- Installed the media, TTS, USB, Bluetooth, and native-worker runtime libraries without Fedora weak dependencies. This avoids pulling unrelated desktop recommendations into the headless image while retaining the libraries explicitly required by the current server installer.
+- Added a root `.dockerignore` so local dependencies, mutable server data, generated public assets, compiled host workers, logs, and Git metadata cannot leak into the image build context.
+- Configured `/data` as `SERVER_DATA_DIR`, ran Node as the dedicated uid 1000 `multirover` user, retained only the Balance Board worker's required capabilities, and used `tini` as the container init process.
+- Successfully built and loaded `multiroombarover:local` for `linux/amd64`. Its registry-style compressed content size is approximately 828 MB; Docker reports approximately 2.87 GB of local unpacked disk usage because the complete GStreamer, ffmpeg, Kinect, Node, and offline TTS runtime is intentionally included.
+- Confirmed at build time that Chrome TTS loads its packaged voice model and produces a nonempty WAV file.
+- Started the image with host networking and a temporary SELinux-relabeled `/data` bind mount. The application reached its HTTP listener, generated first-run state only inside the mount, and started the packaged MediaMTX with its generated configuration under `/data`.
+- Confirmed `/`, `/setup`, and `/admin` return the production UI; `/video/` reaches the loopback MediaMTX proxy; MediaMTX and Neolink execute; both native workers link against the runtime image; and the Balance Board worker retains only `cap_net_admin` and `cap_net_bind_service`.
+- Restarted the same container and confirmed the setup credential and configuration database were byte-for-byte unchanged, then confirmed `/admin` returned successfully again.
+- Stopped and removed the smoke-test container and deleted its temporary data. No test server process was left running on the development machine.
 
 ## 11. Compose deployment
 
@@ -565,6 +586,16 @@ Expected externally relevant listeners are:
 
 MediaMTX WHEP on 8889, API/metrics listeners, and server-local SRT should stay on loopback unless an identified remote consumer requires otherwise.
 
+### Compose implementation notes
+
+Implemented and locally verified on 2026-09-15:
+
+- Added one root `compose.yaml` containing only the main application. It uses `ghcr.io/legop3/multiroombarover:latest`, host networking, `restart: unless-stopped`, and the single `./data:/data` persistent bind mount. The lifecycle service remains a later, separate step rather than a placeholder in the initial deployment.
+- Added the Compose-mounted root `data` directory to `.dockerignore`, alongside the legacy `server/data`, so credentials, databases, recordings, backups, and generated state cannot enter later image builds.
+- Started the exact Compose definition from an empty root data directory using the locally built image tagged with the final GHCR name. The application created its configuration database, setup credential, and generated MediaMTX configuration only under that mount.
+- Confirmed the production UI responds on `/`, `/setup`, and `/admin`. A request to `/video/` reached the internal MediaMTX proxy and received MediaMTX's expected not-found response because the empty configuration had no requested stream.
+- Restarted through Compose and confirmed the setup credential and configuration database remained byte-for-byte unchanged. A separate marker created through `/data` also remained present after restart.
+
 ## 12. Hardware access with minimal host setup
 
 The host must still provide the kernel and system services that containers cannot safely configure for themselves.
@@ -583,6 +614,15 @@ Balance Board requirements:
 - No fully privileged main application container
 
 The exact capabilities and device permissions must be proven on the real server hardware. This development machine is not the actual server and cannot complete that validation.
+
+### Hardware-access implementation notes
+
+Implemented and locally verified as far as this development host permits on 2026-09-15:
+
+- Added the BlueZ command-line package to the runtime image because the Balance Board service commissions devices through `bluetoothctl`; the rebuilt image reports BlueZ 5.87.
+- Exposed `/dev/bus/usb` so reconnecting Kinect devices do not depend on a temporary bus/device number, and granted only `NET_ADMIN` for the Balance Board worker rather than using privileged mode.
+- Mounted only the host system D-Bus socket for BlueZ access. Docker's per-container SELinux label is disabled because Fedora blocks access to the shared host socket and USB device nodes otherwise, while relabeling the system socket would affect the host; the process remains non-root and Docker's namespace, capability, and seccomp isolation remain active.
+- Confirmed the container can open the mounted system D-Bus socket and that its native Balance Board worker retains only its existing file capabilities. The development host's Bluetooth daemon is inactive and no production Kinect or Balance Board is attached, so real discovery, reconnect, and streaming remain part of the actual-server validation.
 
 The host should not need Node, npm, MediaMTX, ffmpeg, neolink, application source, or a Multirover systemd unit after cutover.
 
@@ -611,15 +651,15 @@ A small lifecycle container should be the only component with Docker control. It
 - Operate only on the fixed Multirover application service.
 - Reject arbitrary command lines, service names, image names, and Compose arguments.
 - Persist update job state so it survives replacement of the application container.
-- Report current version and image digest.
-- Pull the configured release image.
+- Compare the running image's internal digest with the current `latest` digest.
+- Pull the fixed `ghcr.io/legop3/multiroombarover:latest` image.
 - Restart or recreate the application container.
 - Wait for the application health check.
 - Retain and restore the previous image when the replacement fails.
 
 The `/admin` System section should expose:
 
-- Current version and image digest
+- Whether the running application is current or an update is available
 - Check for update
 - Update and restart
 - Restart application
@@ -629,21 +669,30 @@ The `/admin` System section should expose:
 
 These operations require a lockdown administrator and recent password confirmation. The browser must expect its socket to disappear, show a reconnect state, and retrieve the persistent job result after the new application becomes healthy.
 
-The Compose contract should remain stable so ordinary application releases replace only the application image. Updating the lifecycle component or changing host mounts/capabilities is a separate, rarer deployment-format update and must not be disguised as an ordinary application update.
+The Compose contract should remain stable so ordinary main-branch image updates replace only the application image. Updating the lifecycle component or changing host mounts/capabilities is a separate, rarer deployment-format update and must not be disguised as an ordinary application update.
 
-## 15. GHCR release automation
+## 15. GHCR publishing automation
 
 Add repository automation that:
 
-- Builds the production image from a clean checkout.
-- Runs server tests, focused web UI tests/lint, and the production web build before publishing.
-- Builds each explicitly supported server architecture.
-- Publishes immutable commit/release tags to GHCR.
-- Publishes one documented stable channel used by the lifecycle updater.
-- Records image digests and source revision metadata.
-- Avoids publishing when required verification fails.
+- On pull requests, runs all required verification and proves that the production image builds without publishing it.
+- On each repository branch push, builds the production image from a clean checkout.
+- Uses the production Dockerfile as the single verification path. Its locked dependency installs, web UI production build, native worker builds, external-artifact checksum checks, and TTS smoke test must all pass before publication.
+- Builds the supported `linux/amd64` image without QEMU or a multi-architecture manifest.
+- Publishes `ghcr.io/legop3/multiroombarover:latest` from main and one sanitized branch-name tag from every other repository branch; there are no numbered, commit, stable, edge, or release tags.
+- Leaves the previously published image for that branch untouched when any required verification or build step fails.
+- Uses registry-generated digests only inside the lifecycle implementation for update comparison and rollback.
 
-The deployed server pulls a prebuilt image. It does not run `git pull`, `npm install`, native compilation, or web UI compilation.
+The deployed server pulls the prebuilt `latest` image. It does not run `git pull`, `npm install`, native compilation, or web UI compilation.
+
+### GHCR automation implementation notes
+
+Implemented on 2026-09-15:
+
+- Added one `Container image` GitHub Actions workflow. Pull requests build the complete production Dockerfile without logging in or publishing. Main-branch pushes publish `ghcr.io/legop3/multiroombarover:latest`, while every other repository branch publishes one moving image using its sanitized branch name.
+- Used GitHub's repository-scoped token with only contents-read and packages-write permissions. No separate registry secret, release process, version calculation, QEMU setup, or custom tag-generation code is required.
+- Kept one Buildx job for all event types so pull-request verification, development branches, and main-branch publication cannot drift into different image recipes. Docker's maintained metadata action owns branch-name sanitization, and GitHub Actions layer caching avoids repeatedly downloading and rebuilding the image's large pinned media and TTS dependencies.
+- The workflow file was parsed locally and its event, permission, architecture, tag-selection, and conditional-publish contract were checked. The first actual GHCR publication necessarily remains a GitHub-hosted verification after these changes are pushed.
 
 ## 16. Container cutover
 
@@ -676,7 +725,7 @@ Containerization is complete when:
 - Admin-triggered restart works.
 - Admin-triggered update works and persists progress across reconnection.
 - A failed image health check rolls back to the prior image.
-- GHCR images are reproducibly built from repository releases.
+- The GHCR `latest` image is reproducibly built from the newest successful main-branch commit.
 - Kinect and Balance Board behavior has been verified on the actual host.
 - Node, npm, application source, and media binaries are no longer installed directly on the host.
 
@@ -695,10 +744,10 @@ Within the two hard phase boundaries, the safest order is:
 - [x] Standardize graceful application restart.
 - [x] Implement online backup and restart-bound staged restore in one service.
 - [x] Add the internal `/video` proxy and make the special external route unnecessary.
-- [ ] Run the full Phase 1 completion gate on the legacy deployment.
-- [ ] Build and verify the production application image.
-- [ ] Add Compose, data mounting, networking, and hardware access.
-- [ ] Add GHCR build and publication automation.
+- [x] Run the full Phase 1 completion gate on the legacy deployment.
+- [x] Build and verify the production application image.
+- [x] Add Compose, data mounting, networking, and hardware access.
+- [x] Add GHCR build and publication automation.
 - [ ] Add the restricted lifecycle container and connect the System UI.
 - [ ] Test update, rollback, backup restore, and hardware on the actual server.
 - [ ] Perform the final systemd-to-Compose cutover.

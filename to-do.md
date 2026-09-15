@@ -8,9 +8,11 @@ and make sure each toggle and counter actually has a purpose besides debugging o
    2. bot clears the channel, then sends a new message
    3. has a fancy big embed that shows way more stuff
    4. also has a small text copy at the top (readable on smartwatch lol)
-      1. ```freaky: docked
-            wall-e: user1 driving
-            bweeble: NEEDS HELP```
+      1. ```
+      freaky: docked
+      wall-e: user1 driving
+      bweeble: NEEDS HELP
+      ```
 2. setting to disable replay popups in spectator settings menu
 3. add admin ui for VIP and private requests instead of only through discord
 4. make roverd self update checkout to main branch

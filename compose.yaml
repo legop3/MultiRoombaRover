@@ -1,0 +1,48 @@
+# MultiRover production deployment
+#
+# This intentionally contains only the application container. The later update
+# controller will be added as a second service when it exists; keeping it out
+# now means this first deployment pass has no placeholder process or unused
+# privilege.
+name: multirover
+
+services:
+  server:
+    image: ghcr.io/legop3/multiroombarover:latest
+    container_name: multirover
+
+    # Host networking preserves the server's existing LAN behavior and avoids
+    # maintaining a second list of TCP, UDP, RTSP, and WebRTC port mappings.
+    network_mode: host
+    restart: unless-stopped
+    stop_grace_period: 20s
+
+    # SELinux cannot safely relabel the host's system D-Bus socket, and the
+    # hardware services also need host-owned USB device nodes. Disable Docker's
+    # per-container SELinux label while retaining its namespace, capability,
+    # non-root-user, and seccomp isolation. This is narrower than privileged
+    # mode and avoids changing labels on shared host resources.
+    security_opt:
+      - label=disable
+
+    volumes:
+      # This is the application's only persistent storage. No SELinux relabel
+      # is needed because this hardware-integrated container runs label-free.
+      - ./data:/data
+
+      # bluetoothctl talks to the host Bluetooth daemon over this socket. The
+      # socket is read-only as a filesystem mount; D-Bus method calls still flow
+      # through it normally without exposing the rest of the host D-Bus tree.
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro
+
+    # Kinect USB node numbers change when it reconnects, so expose the bus
+    # directory rather than one temporary device path. The existing host udev
+    # rule remains responsible for granting the non-root container user access.
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+
+    # Only the Balance Board worker receives this capability through its file
+    # capabilities. The Node process remains non-root and the container is not
+    # privileged.
+    cap_add:
+      - NET_ADMIN
