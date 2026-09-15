@@ -215,9 +215,12 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
       title={title}
       color={layer.color}
       clipOverflow={false}
-      stickyHeader
+      // Only root-level siblings may stick. Nested objects share the same
+      // viewport edge, so making every ancestor sticky would place several
+      // headers on top of one another instead of clarifying the hierarchy.
+      stickyHeader={topLevel}
       className={`configuration-card${topLevel ? ' configuration-top-level-card' : ''}`}
-      headerClassName="configuration-card-header"
+      headerClassName={topLevel ? 'configuration-card-header' : ''}
       bodyClassName="configuration-card-body"
     >
       {description ? <div className="configuration-branch-description">{description}</div> : null}
@@ -237,9 +240,7 @@ function ConfigurationArrayItemTemplate({ buttonsProps, children, hasToolbar, in
       title={`Item ${index + 1}`}
       color={layer.color}
       clipOverflow={false}
-      stickyHeader
       className="configuration-card configuration-array-item"
-      headerClassName="configuration-card-header"
       bodyClassName="configuration-card-body"
     >
       {hasToolbar ? (
@@ -278,9 +279,12 @@ function ConfigurationArrayTemplate({ canAdd, disabled, fieldPathId, items, onAd
       meta={`${items.length} ${items.length === 1 ? 'item' : 'items'}`}
       color={layer.color}
       clipOverflow={false}
-      stickyHeader
+      // Top-level collections participate in the same single sticky-heading
+      // layer as top-level objects; their items and nested structures scroll
+      // normally so they can never obscure the collection title.
+      stickyHeader={topLevel}
       className={`configuration-card configuration-array${topLevel ? ' configuration-top-level-card' : ''}`}
-      headerClassName="configuration-card-header"
+      headerClassName={topLevel ? 'configuration-card-header' : ''}
       bodyClassName="configuration-card-body"
     >
       {schema.description ? <div className="configuration-branch-description">{schema.description}</div> : null}
