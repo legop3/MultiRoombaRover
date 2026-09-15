@@ -20,6 +20,8 @@ test('generates RTSP over TCP without deployment-specific hardcodes', () => {
   assert.equal(generated.rtsp, true);
   assert.equal(generated.rtspAddress, ':8554');
   assert.deepEqual(generated.rtspTransports, ['tcp']);
+  assert.equal(generated.srt, false);
+  assert.equal(Object.hasOwn(generated, 'srtAddress'), false);
   assert.equal(Object.hasOwn(generated, 'rtpAddress'), false);
   assert.equal(Object.hasOwn(generated, 'rtcpAddress'), false);
   assert.deepEqual(generated.webrtcAdditionalHosts, ['public.example.com', '10.20.30.40']);

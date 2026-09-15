@@ -40,7 +40,8 @@ case "$PATH_NAME" in
 esac
 
 exec ffmpeg -hide_banner -loglevel warning -nostdin -y \
-  -i "srt://127.0.0.1:9000?streamid=read:${PATH_NAME}" \
+  -rtsp_transport tcp \
+  -i "rtsp://127.0.0.1:8554/${PATH_NAME}" \
   -an \
   -vf "$FILTER" \
   -q:v "$QUALITY" \

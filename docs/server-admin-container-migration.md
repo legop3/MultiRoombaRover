@@ -476,6 +476,7 @@ Implemented on 2026-09-14:
 - Discord command authorization and lockdown moderation recipients now read the live administrator registry, so setup imports and later Discord-ID or role edits take effect without restarting the server.
 - Full-data restore now leaves `runtime/` untouched, matching its existing exclusion from backup archives and preventing the non-root application from trying to remove lifecycle-controller state owned by the root controller container.
 - The Users and administrators tab now requests at most 100 lightweight identity summaries through one bounded SQLite query. Search and moderation filters run on the server, while complete signals, permissions, and feature state load only after selecting a user, preventing large identity databases from blocking Socket.IO heartbeats or freezing the browser.
+- Removed the remaining server-local SRT hops after Fedora's newer libSRT rejected the zero-payload ACKACK packets emitted by MediaMTX's GoSRT implementation on every acknowledgement cycle. PTZ publishing, replay capture, and snapshot capture now share the existing RTSP/TCP listener, SRT is disabled, and only loopback RTSP readers bypass browser-session authorization.
 - Fixed inter-instance public payload generation to read feature flags and social links from the same live configuration revision. Social links enabled through the new configuration system no longer trigger an undefined legacy-config reference and an HTTP 500 response.
 
 Local verification completed:
@@ -594,7 +595,7 @@ Expected externally relevant listeners are:
 - Rover RTSP publishing on TCP 8554
 - WebRTC media on TCP and UDP 8189
 
-MediaMTX WHEP on 8889, API/metrics listeners, and server-local SRT should stay on loopback unless an identified remote consumer requires otherwise.
+MediaMTX WHEP on 8889 and API/metrics listeners should stay on loopback unless an identified remote consumer requires otherwise. Publishers and server-local replay/snapshot readers use the single RTSP/TCP listener on 8554; SRT is disabled.
 
 ### Compose implementation notes
 

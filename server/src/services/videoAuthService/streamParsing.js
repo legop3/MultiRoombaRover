@@ -1,6 +1,6 @@
 // Video Auth Stream Parsing
 // Purpose: Parses MediaMTX path/body payloads into normalized stream targets for rover and room media checks.
-// Scope: Handles native MediaMTX WHEP/WHIP paths and SRT streamid extraction without performing auth decisions.
+// Scope: Handles native MediaMTX path forms without performing auth decisions.
 
 const PTZ_STREAM_PATH = 'ptz-camera';
 
@@ -44,42 +44,10 @@ function extractStreamInfo(path) {
   return null;
 }
 
-function extractSrtStreamId(rawValue) {
-  const value = decodeURIComponent(String(rawValue || '').trim());
-  if (!value) return '';
-
-  const match = value.match(/(?:^|[?&]|,|#!::)r=([^,&]+)/);
-  if (match?.[1]) {
-    return match[1];
-  }
-
-  if (!/[?&=,:]/.test(value)) {
-    return value;
-  }
-
-  return '';
-}
-
 function extractStreamInfoFromBody(body = {}) {
-  const fromPath = extractStreamInfo((body.path || '').replace(/^\//, ''));
-  if (fromPath) return fromPath;
-
-  const srtId =
-    extractSrtStreamId(body.streamid) ||
-    extractSrtStreamId(body.streamId) ||
-    extractSrtStreamId(body.query);
-  if (!srtId) return null;
-
-  if (srtId === PTZ_STREAM_PATH) {
-    return { type: 'ptz', id: srtId };
-  }
-
-  if (srtId.endsWith('-fwd')) {
-    return { type: 'rover', id: srtId, baseId: srtId.slice(0, -4) };
-  }
-
-  const baseId = srtId.endsWith('-audio') ? srtId.slice(0, -6) : srtId;
-  return { type: 'rover', id: srtId, baseId };
+  // All enabled MediaMTX protocols now report the canonical path directly;
+  // there is no second SRT stream-id syntax to normalize or authorize.
+  return extractStreamInfo((body.path || '').replace(/^\//, ''));
 }
 
 module.exports = {

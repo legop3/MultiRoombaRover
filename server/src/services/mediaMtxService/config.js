@@ -69,13 +69,9 @@ function buildMediaMtxConfig({ config, serverPort, snapshotWriterPath }) {
       { url: 'stun:stun.cloudflare.com:3478' },
     ],
 
-    /*
-      Several server-local paths still use SRT: PTZ publishing, replay capture, and the snapshot
-      writer. Rover media moves to RTSP, but removing this listener would break those independent
-      consumers, so both listeners remain deliberately enabled.
-    */
-    srt: true,
-    srtAddress: ':9000',
+    // Every publisher and server-local reader uses RTSP over TCP. Disable SRT
+    // completely so MediaMTX cannot reintroduce the GoSRT/libSRT ACKACK mismatch.
+    srt: false,
 
     authMethod: 'http',
     authHTTPAddress: `http://127.0.0.1:${authPort}/mediamtx/auth`,

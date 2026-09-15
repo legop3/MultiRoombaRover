@@ -32,13 +32,12 @@ function registerVideoAuthRoute(deps) {
       });
     }
 
-    const isSrtLikeProtocol = protocol === 'srt' || protocol === 'srtconn' || protocol.startsWith('srt');
     const isRtspProtocol = protocol === 'rtsp' || protocol.startsWith('rtsp');
-    const isForwardAudioRead = action === 'read' && streamInfo?.id?.endsWith('-fwd');
-    if ((action === 'read' && isSrtLikeProtocol) || isForwardAudioRead) {
-      return res.status(200).end();
-    }
-    if (action === 'publish' && isSrtLikeProtocol) {
+    const isLoopback = ip === '127.0.0.1' || ip === '::1';
+    // Replay and snapshot workers read MediaMTX through loopback RTSP. They do
+    // not represent a browser session, while non-loopback RTSP readers remain
+    // subject to the normal session authorization below.
+    if (action === 'read' && isRtspProtocol && isLoopback) {
       return res.status(200).end();
     }
     /*

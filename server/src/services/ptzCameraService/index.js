@@ -573,7 +573,7 @@ function schedulePublisherRestart(reason = 'publisher-restart') {
 function startPublisher() {
   if (!enabled || !state.rtspUri || publisherProcess) return;
   const input = addCredentialsToRtsp(state.rtspUri);
-  const output = `srt://127.0.0.1:9000?streamid=publish:${encodeURIComponent(PTZ_STREAM_PATH)}`;
+  const output = `rtsp://127.0.0.1:8554/${encodeURIComponent(PTZ_STREAM_PATH)}`;
   /*
     The full-quality autotrack profile is H265, which is the right camera-side
     feed but has been unreliable through browser WHEP playback. Re-encoding is
@@ -607,10 +607,9 @@ function startPublisher() {
     dead session. The existing exit handler then starts a new process, which is
     the part that creates a fresh RTSP connection after the camera comes back.
 
-    The mpegts muxer can also hold packets briefly before writing them to SRT.
-    flush_packets/muxdelay/muxpreload are output-side latency knobs; they do not
-    ask the camera or demuxer to discard frames, so they are a safer next step
-    than the stale-frame dropping experiments that made the Reolink feed freeze.
+    The MediaMTX output uses RTSP over TCP, matching every rover publisher and
+    server-local reader. Keeping one media transport avoids the incompatible
+    empty SRT ACKACK packets produced between GoSRT and Fedora's newer libSRT.
   */
   const proc = spawn('ffmpeg', [
     '-hide_banner',
@@ -671,12 +670,10 @@ function startPublisher() {
     '-2',
     '-flush_packets',
     '1',
-    '-muxdelay',
-    '0',
-    '-muxpreload',
-    '0',
+    '-rtsp_transport',
+    'tcp',
     '-f',
-    'mpegts',
+    'rtsp',
     output,
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   publisherProcess = proc;
@@ -1890,7 +1887,7 @@ module.exports = {
       audio the same way it already mixes rover audio.
     */
     if (!enabled || !isReplayEnabled()) return [];
-    const inputUrl = `srt://127.0.0.1:9000?streamid=read:${encodeURIComponent(PTZ_STREAM_PATH)}`;
+    const inputUrl = `rtsp://127.0.0.1:8554/${encodeURIComponent(PTZ_STREAM_PATH)}`;
     const label = cameraConfig.name || 'PTZ Camera';
     return [
       {
