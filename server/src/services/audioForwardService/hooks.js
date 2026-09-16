@@ -7,7 +7,7 @@ function registerAudioForwardHooks(deps) {
     roverManager,
     turnService,
     logger,
-    serviceEnabled,
+    isServiceEnabled,
     workers,
     whipOwners,
     ensureWorker,
@@ -57,7 +57,7 @@ function registerAudioForwardHooks(deps) {
       stopWorker(roverId);
       return;
     }
-    if (action === 'upsert' && serviceEnabled && !workers.has(roverId)) {
+    if (action === 'upsert' && isServiceEnabled() && !workers.has(roverId)) {
       // A rover coming online should not create ffmpeg publishers by itself.
       // The audio worker is intentionally lazy because uploads, mic forwarding,
       // and automatic sounds are the moments that actually need a media pipe;

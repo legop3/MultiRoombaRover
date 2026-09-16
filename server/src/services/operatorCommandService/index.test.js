@@ -127,7 +127,7 @@ test('status and help survive lockdown', async () => {
 
 test('a disabled required feature is reported before any permission check', async () => {
   const run = createRouter({ featureEnabled: false });
-  assert.match(await run('rs lights on', nonAdmin), /Home Assistant feature is not configured/);
+  assert.match(await run('rs lights on', nonAdmin), /Home Assistant feature is disabled/);
 });
 
 test('green mode remains available without optional Home Assistant features', async () => {

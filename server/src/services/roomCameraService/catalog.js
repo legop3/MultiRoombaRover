@@ -3,11 +3,8 @@
 // Scope: Owns camera identity/url normalization and read-only accessors for room camera metadata.
 const EventEmitter = require('events');
 const logger = require('../../globals/logger').child('roomCameraService');
-const { loadConfig } = require('../../helpers/configLoader');
-const { getRoomCameraEntries } = require('../../helpers/features');
 
 const events = new EventEmitter();
-const config = loadConfig();
 const cameraMap = new Map();
 
 function normalizeCamera(camera) {
@@ -17,7 +14,7 @@ function normalizeCamera(camera) {
     logger.warn('Room camera missing id', camera);
     return null;
   }
-  if (!camera.url && !camera.streamUrl && !camera.mjpegUrl) {
+  if (!camera.url && !camera.streamUrl) {
     logger.warn('Room camera missing url/streamUrl', { id, camera });
     return null;
   }
@@ -26,7 +23,7 @@ function normalizeCamera(camera) {
     name: camera.name || camera.id || String(id),
     description: camera.description || null,
     url: camera.url || null,
-    streamUrl: camera.streamUrl || camera.mjpegUrl || null,
+    streamUrl: camera.streamUrl || null,
   };
 }
 
@@ -39,9 +36,11 @@ function getRoomCamera(id) {
   return cameraMap.get(String(id)) || null;
 }
 
-function loadFromConfig() {
+function loadFromConfig(roomCameraConfig = {}) {
   cameraMap.clear();
-  const list = getRoomCameraEntries(config);
+  // Schema validation guarantees the configured list shape. Keeping its
+  // fallback local makes the camera catalog independent of feature projection.
+  const list = Array.isArray(roomCameraConfig.cameras) ? roomCameraConfig.cameras : [];
   list.forEach((camera) => {
     const normalized = normalizeCamera(camera);
     if (normalized) cameraMap.set(normalized.id, normalized);

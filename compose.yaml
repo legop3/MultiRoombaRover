@@ -1,0 +1,56 @@
+# MultiRover production deployment
+name: multirover
+
+# Change this one line to use a development branch image.
+x-multirover-image: &multirover-image ghcr.io/legop3/multiroombarover:latest
+
+services:
+  server:
+    image: *multirover-image
+    container_name: multirover
+
+    network_mode: host
+    restart: unless-stopped
+    stop_grace_period: 20s
+
+    security_opt:
+      - label=disable
+
+    volumes:
+      # All persistent application data is stored in this volume.
+      - data:/data
+      - lifecycle-socket:/run/multirover
+      # Required for Bluetooth hardware such as the Balance Board.
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro
+
+    # Required for Kinect USB access.
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+
+    cap_add:
+      - NET_ADMIN
+
+  lifecycle:
+    image: *multirover-image
+    container_name: multirover-lifecycle
+    command: ["node", "src/services/serverControlService/controller.js"]
+    user: root
+    network_mode: none
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+    security_opt:
+      - label=disable
+    environment:
+      MULTIROVER_TARGET_IMAGE: *multirover-image
+    volumes:
+      - lifecycle-socket:/run/multirover
+      # Do not add this Docker socket mount to the server service.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  # `docker compose down -v` permanently deletes these volumes.
+  data:
+    name: multirover-data
+  lifecycle-socket:
+    name: multirover-lifecycle-socket

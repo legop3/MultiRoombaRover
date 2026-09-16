@@ -1,5 +1,5 @@
 // Identity Database Utilities
-// Purpose: Provides local formatting, filtering, and JSON helpers for the /database admin page.
+// Purpose: Provides local formatting, filtering, and JSON helpers for the administration user editor.
 // Scope: Avoids leaking database-editor-specific presentation helpers into shared UI modules.
 export const SIGNAL_LABELS = {
   cookieUserId: 'Cookie keys',

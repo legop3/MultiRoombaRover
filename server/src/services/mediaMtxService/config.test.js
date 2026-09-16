@@ -8,8 +8,8 @@ const { buildMediaMtxConfig, normalizeAdditionalHosts } = require('./config');
 test('generates RTSP over TCP without deployment-specific hardcodes', () => {
   const generated = buildMediaMtxConfig({
     config: {
+      publicUrl: 'https://public.example.com',
       media: {
-        whepBaseUrl: 'http://media.internal:8889/video',
         additionalHosts: ['public.example.com', '10.20.30.40'],
       },
     },
@@ -20,15 +20,18 @@ test('generates RTSP over TCP without deployment-specific hardcodes', () => {
   assert.equal(generated.rtsp, true);
   assert.equal(generated.rtspAddress, ':8554');
   assert.deepEqual(generated.rtspTransports, ['tcp']);
+  assert.equal(generated.srt, false);
+  assert.equal(Object.hasOwn(generated, 'srtAddress'), false);
   assert.equal(Object.hasOwn(generated, 'rtpAddress'), false);
   assert.equal(Object.hasOwn(generated, 'rtcpAddress'), false);
   assert.deepEqual(generated.webrtcAdditionalHosts, ['public.example.com', '10.20.30.40']);
+  assert.equal(generated.webrtcAddress, '127.0.0.1:8889');
   assert.equal(generated.authHTTPAddress, 'http://127.0.0.1:8123/mediamtx/auth');
 });
 
-test('uses the configured WHEP hostname while an older config has no additionalHosts', () => {
+test('derives the primary ICE hostname from the canonical public URL', () => {
   const generated = buildMediaMtxConfig({
-    config: { media: { whepBaseUrl: 'https://second-server.example/video' } },
+    config: { publicUrl: 'https://second-server.example', media: { additionalHosts: [] } },
     serverPort: 8080,
     snapshotWriterPath: '/usr/local/bin/rover-snapshot-writer.sh',
   });

@@ -189,7 +189,7 @@ export function InterInstancePopup({ onClose }) {
       <InterInstanceBrowserFrame
         onClose={onClose}
         scaledOverlay
-        className="inter-instance-overlay-frame"
+        className="inter-instance-overlay-frame w-fit [container-type:normal]"
         bodyClassName="inter-instance-overlay-body overflow-y-auto p-0.5"
       />
     </div>

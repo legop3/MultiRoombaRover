@@ -13,7 +13,7 @@ const homeAssistantService = require('../homeAssistantService');
 const greenModeService = require('../greenModeService');
 const liftService = require('../liftService');
 const neatoService = require('../neatoService');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { isFeatureEnabled } = require('../../configuration');
 const {
   listVerifiedUsers,
   removeVerifiedUser,
@@ -32,7 +32,7 @@ const {
 } = require('../identityService');
 const { publishEvent } = require('../eventBus');
 const assignmentService = require('../assignmentService');
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig } = require('../../configuration');
 const { createCommandHandlers } = require('../operatorCommandService');
 const { parseCommandText } = require('../operatorCommandService/config');
 const { createWebTransportHandlers } = require('../operatorCommandService/webTransport');
@@ -43,11 +43,8 @@ const {
   createReplaySourceResolver,
 } = require('../replayDeliveryService/workflow');
 
-const config = loadConfig();
-const discordConfig = config.discord || {};
-
 function isTextCommand(text) {
-  return parseCommandText(text, config).matched;
+  return parseCommandText(text).matched;
 }
 
 function sanitizeMentions(text) {
@@ -142,6 +139,11 @@ function createChatCommandRequest({ socket, text, sendSystemMessage }) {
 
 async function runChatTextCommand({ text, socket, sendSystemMessage }) {
   if (!isTextCommand(text)) return false;
+  // Commands are assembled per message already, so reading the live snapshot
+  // here applies prefix, URL, and integration settings without retaining a
+  // stale dependency object between configuration revisions.
+  const config = loadConfig();
+  const discordConfig = config.discord || {};
   // ReplayEngineV2 has startup side effects by design. Loading it lazily here
   // keeps ordinary chatService initialization from changing the service boot
   // order, while still letting `rs replay` use the existing replay pipeline.
@@ -201,7 +203,7 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     isAdminUser: (id) => String(id) === String(socket.id) && isAdmin(socket),
     isLockdownAdminUser: (id) => String(id) === String(socket.id) && isLockdownAdmin(socket),
     discordConfig,
-    siteUrl: String(discordConfig.siteUrl || ''),
+    publicUrl: String(config.publicUrl || ''),
     config,
     createReplayTextCommand: createWebReplayTextCommand(socket, sendSystemMessage, replayApi),
   };

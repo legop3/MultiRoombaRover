@@ -1,0 +1,39 @@
+// Admin Socket API
+// Purpose: Gives the setup and administration applications one promise-based boundary around acknowledged socket events.
+// Scope: Preserves server error codes and validation details so shared UI infrastructure can respond consistently.
+export function emitAdminRequest(socket, eventName, payload = {}) {
+  return new Promise((resolve, reject) => {
+    socket.emit(eventName, payload, (response = {}) => {
+      if (response?.error) {
+        const error = new Error(response.error);
+        error.code = response.code || null;
+        error.validationErrors = response.validationErrors || [];
+        error.currentRevision = response.currentRevision || null;
+        reject(error);
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+export const getAdminSnapshot = (socket) => emitAdminRequest(socket, 'adminConfig:get');
+export const confirmAdminPassword = (socket, password) => emitAdminRequest(socket, 'adminConfig:confirmPassword', { password });
+export const updateConfiguration = (socket, payload) => emitAdminRequest(socket, 'adminConfig:updateConfiguration', payload);
+export const importAdminConfigurationFile = (socket, payload) => emitAdminRequest(socket, 'adminConfig:importConfigurationFile', payload);
+export const restoreConfigurationRevision = (socket, payload) => emitAdminRequest(socket, 'adminConfig:restoreRevision', payload);
+export const createAdministrator = (socket, payload) => emitAdminRequest(socket, 'adminConfig:createAdministrator', payload);
+export const updateAdministrator = (socket, payload) => emitAdminRequest(socket, 'adminConfig:updateAdministrator', payload);
+export const deleteAdministrator = (socket, id) => emitAdminRequest(socket, 'adminConfig:deleteAdministrator', { id });
+export const restartApplication = (socket) => emitAdminRequest(socket, 'server:restartApplication');
+export const getApplicationLifecycleStatus = (socket) => emitAdminRequest(socket, 'server:lifecycleStatus');
+export const checkForApplicationUpdate = (socket) => emitAdminRequest(socket, 'server:checkForUpdate');
+export const updateApplication = (socket) => emitAdminRequest(socket, 'server:updateApplication');
+export const getBackupRestoreStatus = (socket) => emitAdminRequest(socket, 'backupRestore:status');
+export const createFullBackup = (socket) => emitAdminRequest(socket, 'backupRestore:createBackup');
+export const createRestoreUpload = (socket) => emitAdminRequest(socket, 'backupRestore:createRestoreUpload');
+export const confirmFullRestore = (socket, restoreId) => emitAdminRequest(socket, 'backupRestore:confirmRestore', { restoreId });
+
+export const getSetupStatus = (socket) => emitAdminRequest(socket, 'setup:status');
+export const createFirstAdministrator = (socket, payload) => emitAdminRequest(socket, 'setup:createAdministrator', payload);
+export const importConfigurationFile = (socket, payload) => emitAdminRequest(socket, 'setup:importConfigurationFile', payload);

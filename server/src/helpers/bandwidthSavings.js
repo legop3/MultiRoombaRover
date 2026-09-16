@@ -1,8 +1,8 @@
 // Bandwidth Savings Helper
 // Purpose: Normalizes bandwidth-saving config and exposes tiny policy helpers.
 // Scope: Keeps cross-service video/tab/spectator decisions consistent without
-// making individual services know raw YAML defaults or legacy config shapes.
-const { loadConfig } = require('./configLoader');
+// making individual services duplicate the validated database configuration contract.
+const { loadConfig } = require('../configuration');
 
 const MULTI_TAB_MODES = new Set(['allowed', 'verifiedOnly', 'notAllowed']);
 const VIDEO_MODES = new Set(['snapshots', 'live']);
@@ -21,9 +21,9 @@ const DEFAULT_BANDWIDTH_SAVINGS = Object.freeze({
 
 function normalizeEnum(value, allowed, fallback) {
   /*
-    Config files are hand-edited on the server, so a typo should not crash the
-    process or silently broaden access. Each option falls back to the current
-    conservative behavior unless it exactly matches a known value.
+    Tests and direct helper callers can still supply incomplete objects even
+    though the database rejects invalid persisted values. Conservative fallback
+    here keeps policy behavior safe at that secondary boundary.
   */
   const normalized = typeof value === 'string' ? value.trim() : '';
   return allowed.has(normalized) ? normalized : fallback;
@@ -31,9 +31,9 @@ function normalizeEnum(value, allowed, fallback) {
 
 function normalizeBoolean(value, fallback) {
   /*
-    YAML booleans must stay real booleans. Treating strings such as "false" as
-    truthy would silently enable a bandwidth policy that the operator intended
-    to disable, so invalid values fall back to the documented server default.
+    Treating strings such as "false" as truthy would silently enable a policy.
+    Persisted values are schema-validated, while this guard protects direct
+    helper calls and focused tests from the same JavaScript coercion trap.
   */
   return typeof value === 'boolean' ? value : fallback;
 }
@@ -83,9 +83,9 @@ function buildBandwidthSavingsPolicy(config = loadConfig()) {
 
 function getBandwidthSavingsPolicy() {
   /*
-    loadConfig() is cached by configLoader, so rebuilding this small object per
-    caller is cheap while still letting tests pass explicit config objects into
-    buildBandwidthSavingsPolicy().
+    The configuration service returns an in-memory snapshot, so rebuilding this
+    small normalized object per caller is cheap and immediately follows a newly
+    applied revision. Tests may still supply explicit documents directly.
   */
   return buildBandwidthSavingsPolicy(loadConfig());
 }

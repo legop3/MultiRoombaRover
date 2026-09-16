@@ -1,6 +1,6 @@
 // MediaMTX Config Builder
 // Purpose: Converts the rover server's media settings into the complete MediaMTX runtime configuration.
-// Scope: Keeps deployment-specific hosts in config.yaml while keeping protocol policy owned by the application.
+// Scope: Keeps deployment-specific hosts in the configuration database while protocol policy remains application-owned.
 const path = require('path');
 
 function normalizeAdditionalHosts(rawHosts) {
@@ -20,19 +20,17 @@ function normalizeAdditionalHosts(rawHosts) {
 
 function buildMediaMtxConfig({ config, serverPort, snapshotWriterPath }) {
   const media = config?.media || {};
-  let additionalHosts = normalizeAdditionalHosts(media.additionalHosts);
-  if (!additionalHosts.length && media.whepBaseUrl) {
-    try {
-      /*
-        Existing installations predate media.additionalHosts. Using the already-configured
-        WHEP hostname as a one-host migration default keeps them reachable on first restart;
-        administrators can still list every public and LAN candidate explicitly afterward.
-      */
-      additionalHosts = [new URL(media.whepBaseUrl).hostname].filter(Boolean);
-    } catch {
-      throw new Error('media.whepBaseUrl must be a valid URL when media.additionalHosts is empty');
-    }
+  const configuredHosts = normalizeAdditionalHosts(media.additionalHosts);
+  let publicHostname = '';
+  try {
+    publicHostname = new URL(config?.publicUrl).hostname;
+  } catch {
+    // The assembled configuration schema normally prevents this. Keeping the
+    // builder tolerant makes its pure tests and startup error path explicit.
   }
+  // The canonical public hostname is always advertised once. Operators only
+  // maintain genuinely additional LAN names, aliases, or fixed IP addresses.
+  const additionalHosts = [...new Set([publicHostname, ...configuredHosts].filter(Boolean))];
   const authPort = Number(serverPort) || 8080;
 
   return {
@@ -56,6 +54,9 @@ function buildMediaMtxConfig({ config, serverPort, snapshotWriterPath }) {
     hls: false,
 
     webrtc: true,
+    // WHEP and WHIP signaling is public only through the Node /video proxy.
+    // ICE transport on 8189 remains directly reachable by browsers.
+    webrtcAddress: '127.0.0.1:8889',
     webrtcLocalUDPAddress: ':8189',
     webrtcLocalTCPAddress: ':8189',
     webrtcAdditionalHosts: additionalHosts,
@@ -68,13 +69,9 @@ function buildMediaMtxConfig({ config, serverPort, snapshotWriterPath }) {
       { url: 'stun:stun.cloudflare.com:3478' },
     ],
 
-    /*
-      Several server-local paths still use SRT: PTZ publishing, replay capture, and the snapshot
-      writer. Rover media moves to RTSP, but removing this listener would break those independent
-      consumers, so both listeners remain deliberately enabled.
-    */
-    srt: true,
-    srtAddress: ':9000',
+    // Every publisher and server-local reader uses RTSP over TCP. Disable SRT
+    // completely so MediaMTX cannot reintroduce the GoSRT/libSRT ACKACK mismatch.
+    srt: false,
 
     authMethod: 'http',
     authHTTPAddress: `http://127.0.0.1:${authPort}/mediamtx/auth`,

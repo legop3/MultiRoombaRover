@@ -1,20 +1,42 @@
 // MediaMTX Service
 // Purpose: Composes server configuration, runtime paths, and child-process supervision.
 // Scope: Starts MediaMTX only after the HTTP auth endpoint is listening and stops it with the server.
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const globalConfig = require('../../globals/config');
 const logger = require('../../globals/logger').child('mediamtx');
 const { createMediaMtxSupervisor } = require('./supervisor');
 
-const supervisor = createMediaMtxSupervisor({
-  config: loadConfig(),
-  serverPort: globalConfig.port,
-  logger,
-});
+let supervisor = createSupervisor();
+let started = false;
+
+function createSupervisor() {
+  return createMediaMtxSupervisor({
+    config: loadConfig(),
+    serverPort: globalConfig.port,
+    logger,
+  });
+}
 
 function startMediaMtx() {
+  started = true;
   return supervisor.start();
 }
+
+function stopSupervisor() {
+  return new Promise((resolve) => supervisor.stop(resolve));
+}
+
+async function reloadMediaMtx() {
+  // MediaMTX consumes a generated document rather than the Node configuration
+  // object directly. Replace its child process when either explicit media
+  // hosts or the canonical public hostname changes.
+  await stopSupervisor();
+  supervisor = createSupervisor();
+  if (started) supervisor.start();
+}
+
+registerConfigurationHandler('media', reloadMediaMtx);
+registerConfigurationHandler('publicUrl', reloadMediaMtx);
 
 /*
   Other services already use process signal hooks for their own workers. This hook performs

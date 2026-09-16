@@ -5,8 +5,7 @@
 // remain thin IO surfaces that subscribe to state and send votes/scans.
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('barcodeGameService');
-const { loadConfig } = require('../../helpers/configLoader');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { subscribe } = require('../eventBus');
 const { sendSystemMessage } = require('../chatService');
 const { getActiveDrivers } = require('../turnService');
@@ -29,11 +28,17 @@ const RESULTS_WINDOW_MS = 45 * 1000;
 
 const GAME_DEFINITIONS = [scanQuest, scansPerSecond, mostItems];
 const GAMES_BY_ID = Object.fromEntries(GAME_DEFINITIONS.map((game) => [game.id, game]));
-const config = loadConfig();
-const barcodeGamesConfig = config.barcodeGames || {};
-const enabled = isFeatureEnabled('barcodeGames');
-const botName = String(barcodeGamesConfig.botName || barcodeGamesConfig.name || 'Barcode Games').trim() || 'Barcode Games';
-const botProfileImageUrl = String(barcodeGamesConfig.profileImageUrl || '').trim() || null;
+let enabled;
+let botName;
+let botProfileImageUrl;
+
+function applyBarcodeGameConfig(barcodeGamesConfig = {}) {
+  enabled = Boolean(barcodeGamesConfig.enabled);
+  botName = String(barcodeGamesConfig.botName || 'Barcode Games').trim() || 'Barcode Games';
+  botProfileImageUrl = String(barcodeGamesConfig.profileImageUrl || '').trim() || null;
+}
+
+applyBarcodeGameConfig(loadConfig().barcodeGames || {});
 
 function sendBarcodeGameChat(text) {
   const message = String(text || '').trim();
@@ -768,6 +773,7 @@ function settleActiveGameIfNeeded() {
 }
 
 function handleScan(scan) {
+  if (!enabled) return;
   const now = Number.isFinite(scan?.scannedAt) ? scan.scannedAt : Date.now();
   withGameStore((draft) => {
     updateGlobalCounters(draft, scan, now);
@@ -1122,14 +1128,9 @@ function broadcastState() {
   });
 }
 
-if (enabled) {
-  /*
-    Barcode games are an optional layer on top of the physical scanner station.
-    Keep sockets and scan subscriptions behind the feature gate so disabled
-    installs do not run invisible game state.
-  */
-  io.on('connection', (socket) => {
+io.on('connection', (socket) => {
     socket.on('barcodeGame:subscribe', (_payload = {}, cb = () => {}) => {
+      if (!enabled) return cb({ error: 'barcode games disabled' });
       socket.join(GAME_SOCKET_ROOM);
       const state = buildStatePayload(socket);
       socket.emit('barcodeGame:state', state);
@@ -1137,6 +1138,7 @@ if (enabled) {
     });
 
     socket.on('barcodeGame:vote', ({ gameId } = {}, cb = () => {}) => {
+      if (!enabled) return cb({ error: 'barcode games disabled' });
       try {
         cb(setVote(socket, gameId));
       } catch (err) {
@@ -1145,9 +1147,9 @@ if (enabled) {
       }
     });
 
-  });
+});
 
-  subscribe('barcode.scanned', (event) => {
+subscribe('barcode.scanned', (event) => {
     try {
       handleScan(event.payload);
     } catch (err) {
@@ -1155,10 +1157,16 @@ if (enabled) {
       // are logged and skipped so the scanner page can keep resolving barcodes.
       logger.warn('Barcode game scan handling failed', { error: err.message });
     }
-  });
-} else {
+});
+
+if (!enabled) {
   logger.info('Barcode games disabled by config');
 }
+
+registerConfigurationHandler('barcodeGames', (barcodeGamesConfig = {}) => {
+  applyBarcodeGameConfig(barcodeGamesConfig);
+  broadcastState();
+});
 
 module.exports = {
   buildStatePayload,
@@ -1166,10 +1174,8 @@ module.exports = {
   setVote,
 };
 
-if (enabled) {
-  setInterval(() => {
-    if (settleActiveGameIfNeeded()) {
-      broadcastState();
-    }
-  }, GAME_TICK_MS).unref?.();
-}
+setInterval(() => {
+  if (enabled && settleActiveGameIfNeeded()) {
+    broadcastState();
+  }
+}, GAME_TICK_MS).unref?.();

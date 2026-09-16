@@ -11,6 +11,9 @@ if (!global.WebSocket) {
 
 function createTransport(deps) {
   const { logger, enabled, haConfig, onSnapshot, onStatus } = deps;
+  let active = true;
+  let connection = null;
+  let unsubscribeEntities = null;
   function getCallerFrame() {
     const stack = new Error().stack || '';
     const lines = stack.split('\n').slice(2).map((line) => line.trim());
@@ -37,33 +40,40 @@ function createTransport(deps) {
   }
 
   function teardownConnection() {
-    if (runtime.unsubscribeEntities) {
+    const ownedUnsubscribe = unsubscribeEntities;
+    unsubscribeEntities = null;
+    if (ownedUnsubscribe) {
       try {
-        runtime.unsubscribeEntities();
+        ownedUnsubscribe();
       } catch (err) {
         logger.warn('Failed to unsubscribe entity stream', err.message);
       }
     }
-    runtime.unsubscribeEntities = null;
-
-    if (runtime.connection) {
+    const ownedConnection = connection;
+    connection = null;
+    if (ownedConnection) {
       try {
-        runtime.connection.close();
+        ownedConnection.close();
       } catch (err) {
         logger.warn('Error closing Home Assistant connection', err.message);
       }
     }
 
-    runtime.connection = null;
-    const wasConnected = runtime.connected;
-    runtime.connected = false;
-    if (wasConnected) {
-      onStatus();
+    // An old transport's delayed disconnected event must not clear the newer
+    // transport stored in shared runtime state after a configuration reload.
+    if (runtime.connection === ownedConnection) {
+      runtime.connection = null;
+      runtime.unsubscribeEntities = null;
+      const wasConnected = runtime.connected;
+      runtime.connected = false;
+      if (wasConnected) onStatus();
     }
   }
 
   function scheduleReconnect(delayMs = 5000) {
-    if (!enabled) return;
+    // A replaced transport must never reconnect after its successor has taken
+    // ownership of the shared Home Assistant connection state.
+    if (!active || !enabled) return;
     if (runtime.reconnectTimer) return;
     runtime.reconnectTimer = setTimeout(() => {
       runtime.reconnectTimer = null;
@@ -72,20 +82,30 @@ function createTransport(deps) {
   }
 
   async function connect() {
-    if (!enabled) {
-      logger.info('Home Assistant integration disabled; missing url/token in config');
+    if (!active || !enabled) {
+      // Disabled and misconfigured are intentionally different states. The
+      // explicit switch prevents connection attempts; missing credentials are
+      // surfaced by buildAuth() as a runtime connection failure when enabled.
+      logger.info('Home Assistant disabled by config');
       return;
     }
-    if (runtime.connection) return;
+    if (connection) return;
 
     try {
       const auth = buildAuth();
-      runtime.connection = await createConnection({ auth, setupRetry: 0 });
+      const nextConnection = await createConnection({ auth, setupRetry: 0 });
+      if (!active) {
+        nextConnection.close();
+        return;
+      }
+      connection = nextConnection;
+      runtime.connection = connection;
       runtime.connected = true;
       onStatus();
       logger.info('Connected to Home Assistant');
-      runtime.unsubscribeEntities = subscribeEntities(runtime.connection, onSnapshot);
-      runtime.connection.addEventListener('disconnected', () => {
+      unsubscribeEntities = subscribeEntities(connection, onSnapshot);
+      runtime.unsubscribeEntities = unsubscribeEntities;
+      connection.addEventListener('disconnected', () => {
         logger.warn('Home Assistant connection lost');
         teardownConnection();
         scheduleReconnect();
@@ -98,12 +118,12 @@ function createTransport(deps) {
   }
 
   function isConnected() {
-    return Boolean(runtime.connection && runtime.connected);
+    return Boolean(connection && runtime.connection === connection && runtime.connected);
   }
 
   async function callHomeAssistantService(domain, service, serviceData = {}) {
-    if (!enabled) throw new Error('Home Assistant not configured');
-    if (!runtime.connection) throw new Error('Home Assistant not connected');
+    if (!active || !enabled) throw new Error('Home Assistant not configured');
+    if (!connection || runtime.connection !== connection) throw new Error('Home Assistant not connected');
     if (!domain || !service) throw new Error('domain and service required');
     logger.info('Home Assistant outbound service call', {
       domain: String(domain),
@@ -111,11 +131,24 @@ function createTransport(deps) {
       serviceData: serviceData && typeof serviceData === 'object' ? { ...serviceData } : serviceData,
       caller: getCallerFrame(),
     });
-    await callService(runtime.connection, String(domain), String(service), serviceData || {});
+    await callService(connection, String(domain), String(service), serviceData || {});
+  }
+
+  function disconnect() {
+    // Configuration reloads deliberately retire the complete transport. Clear
+    // its pending retry before closing so the old credentials cannot race the
+    // newly created transport and reclaim the shared connection.
+    active = false;
+    if (runtime.reconnectTimer) {
+      clearTimeout(runtime.reconnectTimer);
+      runtime.reconnectTimer = null;
+    }
+    teardownConnection();
   }
 
   return {
     connect,
+    disconnect,
     isConnected,
     callHomeAssistantService,
   };

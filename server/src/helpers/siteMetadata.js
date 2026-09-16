@@ -1,7 +1,7 @@
 // Site Metadata Helper
 // Purpose: Resolves the public name, description, and colors used before the web UI starts.
 // Scope: Keeps document/PWA branding server-rendered and independent of Socket.IO session state.
-const { loadConfig } = require('./configLoader');
+const { loadConfig } = require('../configuration');
 
 const DEFAULT_SITE_METADATA = Object.freeze({
   name: 'Multi Roomba Rover',
@@ -87,6 +87,7 @@ function resolveSiteMetadata(config = loadConfig()) {
   const interInstance = config?.interInstance;
   const profile = interInstance?.profile;
   const profileName = asTrimmedString(profile?.name);
+  const publicUrl = normalizePublicUrl(config?.publicUrl);
 
   /*
     A partially filled profile must not unexpectedly rename the site. The
@@ -95,7 +96,11 @@ function resolveSiteMetadata(config = loadConfig()) {
     the coherent default set above.
   */
   if (interInstance?.enabled !== true || !profileName) {
-    return { ...DEFAULT_SITE_METADATA, accentTextColor: getReadableAccentText(DEFAULT_SITE_METADATA.accentColor) };
+    return {
+      ...DEFAULT_SITE_METADATA,
+      publicUrl,
+      accentTextColor: getReadableAccentText(DEFAULT_SITE_METADATA.accentColor),
+    };
   }
 
   const accentColor = normalizeHexColor(profile.color) || DEFAULT_SITE_METADATA.accentColor;
@@ -110,7 +115,7 @@ function resolveSiteMetadata(config = loadConfig()) {
       BACKGROUND_BLEND_AMOUNT,
     ),
     accentTextColor: getReadableAccentText(accentColor),
-    publicUrl: normalizePublicUrl(profile.publicUrl),
+    publicUrl,
   };
 }
 

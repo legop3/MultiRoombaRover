@@ -10,6 +10,7 @@ function registerButtonBoxRoute(deps) {
     buttonCount,
     normalizeIp,
     isLocalNetwork,
+    isEnabled,
     applyPress,
   } = deps;
 
@@ -39,6 +40,13 @@ function registerButtonBoxRoute(deps) {
   }
 
   app.post('/buttonbox/press', express.text({ type: 'text/plain' }), async (req, res) => {
+    // The route stays registered for the life of Express, but the service gate
+    // is evaluated per request so the physical endpoint enables and disables
+    // immediately without accumulating duplicate routes.
+    if (!isEnabled()) {
+      res.status(503).json({ error: 'Button box is disabled' });
+      return;
+    }
     if (denyIfNotLocal(req, res)) return;
     const buttonId = parseButtonId(req.body);
     if (!Number.isFinite(buttonId) || buttonId < 1 || buttonId > buttonCount) {

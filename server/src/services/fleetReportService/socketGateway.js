@@ -17,10 +17,13 @@ function normalizeRange(payload = {}) {
   return { since, until: Math.max(since + 1, until) };
 }
 
-function registerSocketGateway({ roverManager, reportBuilder, storage, collector, logger }) {
+function registerSocketGateway({ roverManager, getRuntime, logger }) {
   io.on('connection', (socket) => {
     socket.on('fleetReports:get', (payload = {}, cb = () => {}) => {
       try {
+        const runtime = getRuntime();
+        if (!runtime) throw new Error('Fleet reports are disabled');
+        const { reportBuilder } = runtime;
         const { since, until } = normalizeRange(payload);
         // getRosterForSocket is the canonical live private-rover visibility
         // resolver. Historical queries use precisely those currently visible
@@ -59,6 +62,9 @@ function registerSocketGateway({ roverManager, reportBuilder, storage, collector
 
     socket.on('fleetReports:replaceBattery', (payload = {}, cb = () => {}) => {
       try {
+        const runtime = getRuntime();
+        if (!runtime) throw new Error('Fleet reports are disabled');
+        const { storage, collector } = runtime;
         if (!isAdmin(socket)) throw new Error('Admin access required');
         const roverId = String(payload.roverId || '').trim();
         if (!roverId || !roverManager.rovers.has(roverId)) throw new Error('Known online rover required');

@@ -9,8 +9,12 @@ const {
 } = require('discord.js');
 const logger = require('../../globals/logger').child('discordBot');
 const io = require('../../globals/io');
-const { loadConfig } = require('../../helpers/configLoader');
-const { isFeatureEnabled } = require('../../helpers/features');
+const {
+  loadConfig,
+  getConfigurationDatabase,
+  isFeatureEnabled,
+  registerConfigurationHandler,
+} = require('../../configuration');
 const { parseCommandText } = require('../operatorCommandService/config');
 const roverManager = require('../roverManager');
 const { getRoster, lockRover, rovers } = roverManager;
@@ -80,19 +84,15 @@ const {
   buildStatusMessage,
 } = require('../replayDeliveryService/workflow');
 
-const config = loadConfig();
+// Discord helper modules retain references to these objects. Mutating those
+// references on configuration application updates command and integration
+// behavior without registering a second tree of Discord/event listeners.
+const config = structuredClone(loadConfig());
 const discordConfig = config.discord || {};
-const enabled = isFeatureEnabled('discord');
-// These normalized command names mirror the command router. Bridge-channel
-// command replies are mirrored into web chat, so this entrypoint needs to know
-// the configured command names before it wraps message.reply.
-const adminIds = new Set((config.admins || []).map((a) => String(a.discord_id || '').trim()).filter(Boolean));
-const lockdownAdminIds = new Set((config.admins || []).filter((admin) => admin.lockdown).map((admin) => String(admin.discord_id || '').trim()).filter(Boolean));
+let enabled = Boolean(discordConfig.enabled);
+const configurationDatabase = getConfigurationDatabase();
 
-if (!enabled) {
-  logger.info('Discord feature disabled or missing required token');
-  return;
-}
+if (!enabled) logger.info('Discord disabled by config');
 
 const intents = [
   GatewayIntentBits.Guilds,
@@ -117,12 +117,34 @@ function sanitizeMentions(text) {
     .replace(/@here/gi, '[here]');
 }
 
+function findDiscordAdministrator(discordId) {
+  const normalizedDiscordId = String(discordId || '').trim();
+  if (!normalizedDiscordId) return null;
+
+  // Read the administrator registry at the moment Discord checks permission.
+  // Setup imports and administrator edits happen after this module starts, so
+  // a startup-only Set would remain stale until the whole server restarted.
+  return configurationDatabase.listAdministrators().find(
+    (administrator) => String(administrator.discordId || '').trim() === normalizedDiscordId,
+  ) || null;
+}
+
 function isAdminUser(discordId) {
-  return adminIds.has(String(discordId || '').trim());
+  return Boolean(findDiscordAdministrator(discordId));
 }
 
 function isLockdownAdminUser(discordId) {
-  return lockdownAdminIds.has(String(discordId || '').trim());
+  return findDiscordAdministrator(discordId)?.role === 'lockdown';
+}
+
+function getLockdownAdminIds() {
+  // Moderation requests use the same live registry as command authorization,
+  // ensuring newly imported or edited lockdown accounts receive DMs without a
+  // restart or a second cache-synchronization system.
+  return configurationDatabase.listAdministrators()
+    .filter((administrator) => administrator.role === 'lockdown')
+    .map((administrator) => String(administrator.discordId || '').trim())
+    .filter(Boolean);
 }
 
 function countReady() {
@@ -157,10 +179,10 @@ const replayCaption = createReplayCaptionBuilder({
 // Discord is the preferred replay host only while this optional feature is
 // active. The core replay delivery service owns generation and automatically
 // falls back to its local media store when any operation below fails.
-if (discordConfig?.channels?.replay) {
-  registerPreferredDeliveryProvider({
+registerPreferredDeliveryProvider({
     async begin(job) {
-      const channelId = discordConfig.channels.replay;
+      const channelId = discordConfig.channels?.replay;
+      if (!enabled || !channelId) throw new Error('Discord replay delivery is disabled');
       const progressMessage = await channelIO.sendToChannel(channelId, buildAcceptedMessage(job), {}, DEFAULT_ALLOWED_MENTIONS);
       if (!progressMessage) throw new Error('Discord replay progress message could not be sent');
       const channel = await channelIO.fetchChannel(channelId);
@@ -201,8 +223,8 @@ if (discordConfig?.channels?.replay) {
       }
     },
     async completeFallback({ context, media }) {
-      const siteUrl = String(discordConfig.siteUrl || '').replace(/\/$/, '');
-      const publicUrl = siteUrl ? `${siteUrl}${media.url}` : media.url;
+      const publicBaseUrl = String(config.publicUrl || '').replace(/\/$/, '');
+      const publicUrl = publicBaseUrl ? `${publicBaseUrl}${media.url}` : media.url;
       if (context?.progressMessage?.reply) {
         await context.progressMessage.reply({
           content: `Replay hosted by the rover server: ${publicUrl}`,
@@ -210,8 +232,7 @@ if (discordConfig?.channels?.replay) {
         });
       }
     },
-  });
-}
+});
 
 const commandDependencies = {
   logger,
@@ -297,7 +318,7 @@ const commands = createCommandHandlers(commandDependencies);
   getPrivateAccessRequestByMessageId,
   approvePrivateAccessRequest,
   denyPrivateAccessRequest,
-  lockdownAdminIds,
+  getLockdownAdminIds,
   isAdminUser,
   isLockdownAdminUser,
   sendToChannel: channelIO.sendToChannel,
@@ -366,24 +387,78 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-client.once('ready', () => {
-  logger.info('Discord bot logged in', { tag: client.user?.tag });
-  presence.schedulePresenceRotation();
-  // Discord is only a delivery consumer. Starting its scheduler after the bot
-  // is ready avoids failed sends during login while the collector continues to
-  // operate independently of Discord availability.
-  createFleetDailyReports({
+let fleetDailyReports = null;
+
+function restartFleetDailyReports() {
+  fleetDailyReports?.stop();
+  fleetDailyReports = createFleetDailyReports({
     logger,
     discordConfig,
     fleetConfig: config.fleetReports || {},
     fleetReportService,
     roverManager,
     sendToChannel: channelIO.sendToChannel,
-  }).start();
+  });
+  fleetDailyReports.start();
+}
+
+client.on('ready', () => {
+  logger.info('Discord bot logged in', { tag: client.user?.tag });
+  presence.schedulePresenceRotation();
+  // Discord is only a delivery consumer. Starting its scheduler after the bot
+  // is ready avoids failed sends during login while the collector continues to
+  // operate independently of Discord availability.
+  restartFleetDailyReports();
 });
 
-client.login(discordConfig.token).catch((err) => {
-  logger.error('Discord login failed', err.message);
+function replaceObject(target, source = {}) {
+  Object.keys(target).forEach((key) => delete target[key]);
+  Object.assign(target, structuredClone(source));
+}
+
+function applyDiscordConfig(nextDiscordConfig = {}) {
+  const wasEnabled = enabled;
+  const previousToken = discordConfig.token;
+  replaceObject(discordConfig, nextDiscordConfig);
+  config.discord = discordConfig;
+  enabled = Boolean(discordConfig.enabled);
+
+  if (!enabled) {
+    fleetDailyReports?.stop();
+    fleetDailyReports = null;
+    if (wasEnabled) client.destroy();
+    return;
+  }
+  if (!wasEnabled || previousToken !== discordConfig.token) {
+    if (wasEnabled) client.destroy();
+    // Login health is reported by Discord itself; do not hold the committed
+    // configuration request open while an external network service connects.
+    client.login(discordConfig.token).catch((err) => {
+      logger.error('Discord login failed after configuration change', err.message);
+    });
+  } else if (client.isReady()) {
+    restartFleetDailyReports();
+  }
+}
+
+function applySharedConfigSection(section, value) {
+  config[section] = structuredClone(value);
+  // Fleet delivery owns a timer derived from both Discord and fleet settings.
+  // Reconnecting is unnecessary; rebuild only that scheduler when ready.
+  if (section === 'fleetReports' && client.isReady()) {
+    restartFleetDailyReports();
+  }
+}
+
+registerConfigurationHandler('discord', applyDiscordConfig);
+['commands', 'publicUrl', 'timezone', 'fleetReports'].forEach((section) => {
+  registerConfigurationHandler(section, (value) => applySharedConfigSection(section, value));
 });
+
+if (enabled) {
+  client.login(discordConfig.token).catch((err) => {
+    logger.error('Discord login failed', err.message);
+  });
+}
 
 module.exports = {};

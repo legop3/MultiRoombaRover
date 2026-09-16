@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@lizardbyte/gamepad-helper": "^2026.816.4539",
+    "@rjsf/core": "^6.10.0",
+    "@rjsf/validator-ajv8": "^6.10.0",
     "@thumbmarkjs/thumbmarkjs": "^1.10.0",
     "midi-file": "^1.2.4",
     "papaparse": "^5.5.4",

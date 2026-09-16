@@ -26,12 +26,14 @@ function createRunner(deps) {
     finalizeRunRecord,
     updateStatus,
   } = deps;
+  let active = false;
 
   function defaultTickDelayMs() {
     return frequencyMs + Math.floor(Math.random() * (jitterMs + 1));
   }
 
   function scheduleNextTick(runTick, delayMs = defaultTickDelayMs()) {
+    if (!active) return;
     const safeDelay = Math.max(0, Number.isFinite(delayMs) ? Math.floor(delayMs) : defaultTickDelayMs());
     const nextRunAt = Date.now() + safeDelay;
     updateStatus({ nextRunAt });
@@ -39,6 +41,7 @@ function createRunner(deps) {
   }
 
   function wakeForDriverActivity(runTick) {
+    if (!active) return;
     if (runtime.inFlight) return;
     if (runtime.timer) {
       clearTimeout(runtime.timer);
@@ -48,6 +51,7 @@ function createRunner(deps) {
   }
 
   function stop(reason = 'stopped') {
+    active = false;
     if (runtime.timer) {
       clearTimeout(runtime.timer);
       runtime.timer = null;
@@ -335,6 +339,8 @@ function createRunner(deps) {
       });
       return;
     }
+    if (active) return;
+    active = true;
     logger.info('LLM commentary enabled', { model, ollamaUrl, frequencyMs });
     updatePhase('idle', {
       running: true,

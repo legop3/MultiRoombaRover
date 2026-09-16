@@ -5,7 +5,8 @@ const path = require('path');
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('audioForwardService');
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
+const { resolveRuntimePath } = require('../../helpers/dataPaths');
 const roverManager = require('../roverManager');
 const turnService = require('../turnService');
 const { isMuted, isVerified, verificationEvents } = require('../verificationService');
@@ -16,20 +17,15 @@ const { registerAudioForwardHooks } = require('./hooks');
 const { registerChargeCompleteSound } = require('./chargeCompleteSound');
 
 const audioForwardEvents = new EventEmitter();
-const config = loadConfig();
-const audioForwardConfig = config.audioForward || {};
-const mediaConfig = config.media || {};
-const serviceEnabled = audioForwardConfig.enabled !== false;
-const ffmpegBin = audioForwardConfig.ffmpegBin || 'ffmpeg';
-const streamSuffix =
-  typeof audioForwardConfig.streamSuffix === 'string' && audioForwardConfig.streamSuffix.trim()
-    ? audioForwardConfig.streamSuffix.trim()
-    : '-fwd';
-const runtimeDir = path.resolve(audioForwardConfig.runtimeDir || '/tmp/mrr-audio-forward');
+let serviceEnabled = false;
+/*
+  FIFOs and uploaded clips are disposable, but they are deliberately created
+  and managed by this application. A fixed path below SERVER_DATA_DIR keeps the
+  Node process from writing to an unrelated host temp directory and prevents a
+  configuration value from escaping the server's filesystem boundary.
+*/
+const runtimeDir = resolveRuntimePath('audio-forward');
 const uploadsDir = path.join(runtimeDir, 'uploads');
-const maxUploadBytes = Number.isFinite(audioForwardConfig.maxUploadBytes)
-  ? Math.max(256 * 1024, Math.floor(audioForwardConfig.maxUploadBytes))
-  : 8 * 1024 * 1024;
 
 const states = new Map(); // roverId -> { state, source, error, startedAt, updatedAt }
 const workers = new Map(); // roverId -> worker
@@ -60,51 +56,65 @@ function getAudioForwardState() {
   return payload;
 }
 
-const audioForwardPolicy = createAudioForwardPolicy({
-  isVerified,
-  isMuted,
-  roverManager,
-  turnService,
-  streamSuffix,
-  mediaConfig,
-});
-const {
-  ensureAudioForwardPermission,
-  resolveForwardUrl,
-  resolveForwardPathId,
-  buildWhipUrl,
-} = audioForwardPolicy;
+let operations;
 
-const workerEngine = createAudioForwardWorkerEngine({
-  logger,
-  io,
-  roverManager,
-  turnService,
-  videoSessions,
-  serviceEnabled,
-  ffmpegBin,
-  runtimeDir,
-  uploadsDir,
-  maxUploadBytes,
-  workers,
-  whipOwners,
-  setState,
-  resolveForwardUrl,
-  resolveForwardPathId,
-});
+function replaceAudioForwardRuntime(fullConfig) {
+  operations?.stopAllWorkers('configuration-change');
+  const audioForwardConfig = fullConfig.audioForward || {};
+  serviceEnabled = Boolean(audioForwardConfig.enabled);
+  const streamSuffix = typeof audioForwardConfig.streamSuffix === 'string' && audioForwardConfig.streamSuffix.trim()
+    ? audioForwardConfig.streamSuffix.trim()
+    : '-fwd';
+  const policy = createAudioForwardPolicy({
+    isVerified,
+    isMuted,
+    roverManager,
+    turnService,
+    streamSuffix,
+  });
+  const maxUploadBytes = Number.isFinite(audioForwardConfig.maxUploadBytes)
+    ? Math.max(256 * 1024, Math.floor(audioForwardConfig.maxUploadBytes))
+    : 8 * 1024 * 1024;
+  operations = {
+    ...policy,
+    ...createAudioForwardWorkerEngine({
+      logger,
+      io,
+      roverManager,
+      turnService,
+      videoSessions,
+      serviceEnabled,
+      ffmpegBin: audioForwardConfig.ffmpegBin || 'ffmpeg',
+      runtimeDir,
+      uploadsDir,
+      maxUploadBytes,
+      workers,
+      whipOwners,
+      setState,
+      resolveForwardUrl: policy.resolveForwardUrl,
+      resolveForwardPathId: policy.resolveForwardPathId,
+    }),
+  };
+}
 
-const {
-  ensureWorker,
-  stopWorker,
-  stopAllWorkers,
-  playUploadedAudio,
-  playServerAudioFile,
-  stopPlayback,
-  revokeWhipSessionForRover,
-  stopWhipForRover,
-  stopOwnedAudioIfUnauthorized,
-  startSilenceWriter,
-} = workerEngine;
+replaceAudioForwardRuntime(loadConfig());
+
+// Stable delegates keep the one-time socket/event registrations below pointed
+// at the newest policy and worker engine after audio-forward changes.
+const delegate = (name) => (...args) => operations[name](...args);
+const ensureWorker = delegate('ensureWorker');
+const stopWorker = delegate('stopWorker');
+const stopAllWorkers = delegate('stopAllWorkers');
+const playUploadedAudio = delegate('playUploadedAudio');
+const playServerAudioFile = delegate('playServerAudioFile');
+const stopPlayback = delegate('stopPlayback');
+const revokeWhipSessionForRover = delegate('revokeWhipSessionForRover');
+const stopWhipForRover = delegate('stopWhipForRover');
+const stopOwnedAudioIfUnauthorized = delegate('stopOwnedAudioIfUnauthorized');
+const startSilenceWriter = delegate('startSilenceWriter');
+const ensureAudioForwardPermission = delegate('ensureAudioForwardPermission');
+const resolveForwardPathId = delegate('resolveForwardPathId');
+const buildWhipUrl = delegate('buildWhipUrl');
 
 function installShutdownHooks() {
   const shutdown = (signal) => {
@@ -126,7 +136,7 @@ registerAudioForwardHooks({
   roverManager,
   turnService,
   logger,
-  serviceEnabled,
+  isServiceEnabled: () => serviceEnabled,
   workers,
   whipOwners,
   ensureWorker,
@@ -149,6 +159,10 @@ registerAudioForwardHooks({
 registerChargeCompleteSound({
   logger,
   playServerAudioFile,
+});
+
+registerConfigurationHandler('audioForward', (_section, _previous, nextConfig) => {
+  replaceAudioForwardRuntime(nextConfig);
 });
 
 module.exports = {

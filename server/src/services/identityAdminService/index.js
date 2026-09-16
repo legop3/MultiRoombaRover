@@ -5,7 +5,7 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('identityAdminService');
 const { getRole } = require('../roleService');
 const {
-  listUsersForAdmin,
+  listUserSummariesForAdmin,
   getUserForAdmin,
   addUserSignal,
   removeUserSignal,
@@ -71,10 +71,13 @@ function ackHandler(socket, eventName, handler) {
 }
 
 io.on('connection', (socket) => {
-  ackHandler(socket, 'identityAdmin:listUsers', () => ({
-    users: listUsersForAdmin(),
-    permissions: listRegisteredPermissions(),
-  }));
+  ackHandler(socket, 'identityAdmin:listUsers', ({ query, filter }) => {
+    const result = listUserSummariesForAdmin({ query, filter });
+    return {
+      ...result,
+      permissions: listRegisteredPermissions(),
+    };
+  });
 
   ackHandler(socket, 'identityAdmin:listPermissions', () => ({
     permissions: listRegisteredPermissions(),

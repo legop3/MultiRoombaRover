@@ -4,25 +4,16 @@
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('neatoService');
-const { loadConfig } = require('../../helpers/configLoader');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { isVerified } = require('../verificationService');
 const { getMode, MODES } = require('../modeManager');
 const { isAdmin, isLockdownAdmin } = require('../roleService');
 const { sendAlert } = require('../alertService');
-const {
-  homeAssistantEvents,
-  getRawEntitySnapshot,
-  callHomeAssistantService,
-  isConnected: isHomeAssistantConnected,
-  enabled: homeAssistantEnabled,
-} = require('../homeAssistantService');
+const homeAssistantService = require('../homeAssistantService');
+const { homeAssistantEvents, getRawEntitySnapshot, callHomeAssistantService } = homeAssistantService;
 
 const events = new EventEmitter();
-const config = loadConfig();
-const haConfig = config.homeAssistant || {};
-const neatoConfig = haConfig.neato || {};
-const featureEnabled = isFeatureEnabled('neato');
+let featureEnabled;
 
 function normalizeDeviceName(value) {
   const raw = String(value || '').trim().toLowerCase();
@@ -30,7 +21,7 @@ function normalizeDeviceName(value) {
   return raw.replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
-const device = normalizeDeviceName(neatoConfig.device);
+let device;
 const RESUME_DELAY_MS = 3000;
 const ALERT_COLOR = '#a855f7';
 // BrainSlug exposes these exact select values for Gen 3 robots. Keeping the
@@ -43,7 +34,11 @@ function entityId(domain, suffix) {
   return `${domain}.${device}_${suffix}`;
 }
 
-const ENTITY_IDS = {
+let ENTITY_IDS;
+let ALERT_ENTITIES;
+
+function buildEntityIds() {
+  return {
   buttons: {
     start: entityId('button', 'house_clean'),
     resume: entityId('button', 'resume_cleaning'),
@@ -70,18 +65,26 @@ const ENTITY_IDS = {
   selects: {
     navigationMode: entityId('select', 'navigation_mode'),
   },
-};
+  };
+}
 
 // Alert Feed coverage is intentionally limited to the raw robot lifecycle and
 // issue fields requested for Neato. Battery and charger telemetry poll often and
 // would create noise without representing a useful robot status transition.
-const ALERT_ENTITIES = Object.freeze([
-  { title: 'Neato UI state', entityId: ENTITY_IDS.textSensors.uiState },
-  { title: 'Neato robot state', entityId: ENTITY_IDS.textSensors.robotState },
-  { title: 'Neato robot alert', entityId: ENTITY_IDS.textSensors.robotAlert },
-  { title: 'Neato robot error', entityId: ENTITY_IDS.textSensors.robotError },
-  { title: 'Neato external power', entityId: ENTITY_IDS.binarySensors.extPowerPresent },
-]);
+function applyNeatoConfig(neatoConfig = {}) {
+  featureEnabled = Boolean(neatoConfig.enabled);
+  device = normalizeDeviceName(neatoConfig.device);
+  ENTITY_IDS = buildEntityIds();
+  ALERT_ENTITIES = [
+    { title: 'Neato UI state', entityId: ENTITY_IDS.textSensors.uiState },
+    { title: 'Neato robot state', entityId: ENTITY_IDS.textSensors.robotState },
+    { title: 'Neato robot alert', entityId: ENTITY_IDS.textSensors.robotAlert },
+    { title: 'Neato robot error', entityId: ENTITY_IDS.textSensors.robotError },
+    { title: 'Neato external power', entityId: ENTITY_IDS.binarySensors.extPowerPresent },
+  ];
+}
+
+applyNeatoConfig(loadConfig().homeAssistant?.neato || {});
 
 // Each entity establishes its own baseline because ESPHome entities can become
 // available on different snapshots. A Map also distinguishes "not observed yet"
@@ -166,11 +169,13 @@ function requiredEntityIds() {
 
 function buildState() {
   const configured = Boolean(device);
-  const haConnected = isHomeAssistantConnected();
+  // Home Assistant may have replaced its transport since this service module
+  // loaded, so readiness must be resolved from the live service object.
+  const haConnected = homeAssistantService.isConnected();
   const requiredIds = requiredEntityIds();
   const entitiesAvailable = requiredIds.length > 0 && requiredIds.every((id) => isEntityAvailable(id));
   const connected = Boolean(haConnected && entitiesAvailable);
-  const enabled = Boolean(featureEnabled && homeAssistantEnabled && configured);
+  const enabled = featureEnabled;
 
   const controls = {
     start: {
@@ -250,21 +255,14 @@ function emitUpdate() {
   }
 }
 
-if (featureEnabled) {
-  /*
-    Neato telemetry is derived from Home Assistant entities. Disabled installs
-    should keep the exported API inert instead of tracking HA snapshots for a
-    robot vacuum feature that does not exist on that server.
-  */
-  homeAssistantEvents.on('snapshot', () => {
+homeAssistantEvents.on('snapshot', () => {
+  if (featureEnabled) {
     emitUpdate();
     emitRawStateAlerts();
-  });
+  }
+});
 
-  homeAssistantEvents.on('status', () => {
-    emitUpdate();
-  });
-}
+homeAssistantEvents.on('status', emitUpdate);
 
 function assertConfiguredAndConnected() {
   if (!featureEnabled) {
@@ -273,10 +271,10 @@ function assertConfiguredAndConnected() {
   if (!device) {
     throw new Error('Neato not configured');
   }
-  if (!homeAssistantEnabled) {
+  if (!homeAssistantService.enabled) {
     throw new Error('Home Assistant not configured');
   }
-  if (!isHomeAssistantConnected()) {
+  if (!homeAssistantService.isConnected()) {
     throw new Error('Home Assistant not connected');
   }
 }
@@ -350,8 +348,7 @@ function hasVerifiedSockets() {
   return false;
 }
 
-if (featureEnabled) {
-  io.on('connection', (socket) => {
+io.on('connection', (socket) => {
   function assertFeatureAccess() {
     const mode = getMode();
     // Neato shares the same public-activity policy as lift: everyone may use
@@ -421,10 +418,17 @@ if (featureEnabled) {
       cb({ error: err.message });
     }
   });
-  });
-} else {
+});
+
+if (!featureEnabled) {
   logger.info('Neato disabled by config');
 }
+
+registerConfigurationHandler('homeAssistant', (haConfig = {}) => {
+  applyNeatoConfig(haConfig.neato || {});
+  alertBaselines.clear();
+  emitUpdate();
+});
 
 emitUpdate();
 

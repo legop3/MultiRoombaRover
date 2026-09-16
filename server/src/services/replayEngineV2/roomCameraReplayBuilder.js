@@ -4,11 +4,11 @@
 const { execFile } = require('child_process');
 const EventEmitter = require('events');
 const fsp = require('fs/promises');
-const os = require('os');
 const path = require('path');
 const { promisify } = require('util');
 
 const logger = require('../../globals/logger').child('roomCameraReplay');
+const { resolveRuntimePath } = require('../../helpers/dataPaths');
 
 const execFileAsync = promisify(execFile);
 
@@ -118,7 +118,15 @@ async function buildRoomCameraReplayVideo({ cameraId = null } = {}, { getRoomCam
   });
   if (!cameraEntries.length) throw new Error('No camera frames available yet');
 
-  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rover-replay-'));
+  /*
+    Hundreds of frame images can be produced for one room-camera replay. They
+    are temporary, but the Node application owns them, so both the workspace
+    and final intermediate video stay under the configured data root until the
+    existing finally block removes them.
+  */
+  const buildRoot = resolveRuntimePath('room-camera-replay-builds');
+  await fsp.mkdir(buildRoot, { recursive: true });
+  const tmpDir = await fsp.mkdtemp(path.join(buildRoot, 'build-'));
   try {
     const firstFramePaths = [];
     for (let i = 0; i < cameraEntries.length; i += 1) {

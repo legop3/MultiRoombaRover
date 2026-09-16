@@ -1,0 +1,59 @@
+// Discord Bot Configuration
+// Purpose: Defines the optional bot connection and its guild channel and role mappings.
+// Scope: Contains configuration metadata only and never logs in to Discord.
+const { strictObject, string, boolean } = require('../../configuration/schemaHelpers');
+
+module.exports = {
+  key: 'discord',
+  feature: true,
+  // Channel and role IDs retain the fully populated legacy-template shape, but
+  // the credential remains empty and the bot cannot start until explicitly enabled.
+  defaultValue: {
+    enabled: false,
+    token: '',
+    guildId: '123456789012345678',
+    channels: {
+      general: '123456789012345678',
+      announcements: '123456789012345678',
+      adminAlerts: '123456789012345678',
+      replay: '123456789012345678',
+      humanAlerts: '123456789012345678',
+    },
+    roles: {
+      stalkerPing: '123456789012345678',
+      announcementPing: '123456789012345678',
+      adminPing: '123456789012345678',
+      humanAlertPing: '123456789012345678',
+    },
+  },
+  schema: strictObject({
+    enabled: boolean({ description: 'Logs the Discord bot in and immediately enables commands, chat bridges, replay delivery, and configured announcements.' }),
+    token: string({ title: 'Bot token', description: 'Discord bot token used to log in. The saved value is never returned to the browser.', examples: ['DISCORD_BOT_TOKEN'], writeOnly: true, maxLength: 10000 }),
+    guildId: string({ title: 'Guild id', description: 'Reserved Discord server identifier. The current bot runtime does not restrict commands or events using this value.', examples: ['123456789012345678'], maxLength: 100 }),
+    channels: strictObject({
+      general: string({ description: 'Channel ID used by the button-box stalker-role and everyone-ping rewards.', examples: ['123456789012345678'], maxLength: 100 }),
+      announcements: string({ description: 'Channel ID used for public-mode openings, objective changes, and all-rovers-unlocked announcements.', examples: ['123456789012345678'], maxLength: 100 }),
+      adminAlerts: string({ description: 'Channel ID used for rover health, battery, dock, help, and daily fleet-report notifications.', examples: ['123456789012345678'], maxLength: 100 }),
+      replay: string({ description: 'Channel ID used to upload generated replay videos when Discord replay delivery is available.', examples: ['123456789012345678'], maxLength: 100 }),
+      humanAlerts: string({ description: 'Channel ID used for physical human-alert button notifications and captured images.', examples: ['123456789012345678'], maxLength: 100 }),
+    }, {
+      title: 'Channels',
+      description: 'Discord channel IDs that route each category of bot output.',
+      required: ['general', 'announcements', 'adminAlerts', 'replay', 'humanAlerts'],
+    }),
+    roles: strictObject({
+      stalkerPing: string({ description: 'Role ID mentioned by the button-box stalker-ping reward in the general channel.', examples: ['123456789012345678'], maxLength: 100 }),
+      announcementPing: string({ description: 'Role ID mentioned by configured user announcements.', examples: ['123456789012345678'], maxLength: 100 }),
+      adminPing: string({ description: 'Role ID mentioned for important administrative rover, battery, and help alerts.', examples: ['123456789012345678'], maxLength: 100 }),
+      humanAlertPing: string({ description: 'Role ID mentioned when the physical human-alert button is pressed.', examples: ['123456789012345678'], maxLength: 100 }),
+    }, {
+      title: 'Roles',
+      description: 'Discord role IDs mentioned for specific notification categories.',
+      required: ['stalkerPing', 'announcementPing', 'adminPing', 'humanAlertPing'],
+    }),
+  }, {
+    title: 'Discord',
+    description: 'Optional Discord bot credentials and notification routing; public links use the top-level public URL.',
+    required: ['enabled', 'token', 'guildId', 'channels', 'roles'],
+  }),
+};

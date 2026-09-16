@@ -7,6 +7,12 @@ const rovers = new Map();
 const socketToRovers = new Map();
 const spectatorSockets = new Set();
 const managerEvents = new EventEmitter();
+/*
+  Service reload support requires optional consumers such as commentary to keep
+  one stable rover listener even while disabled. Preserve a finite ceiling so
+  accidental reload-time duplication still becomes visible.
+*/
+managerEvents.setMaxListeners(20);
 const backoffTimers = new Map();
 const dockGuardStates = new Map();
 const dockProtectionStrikeStates = new Map();

@@ -3,12 +3,12 @@
 // Scope: Builds a concise time embed for common zones and server local zone.
 const { EmbedBuilder } = require('discord.js');
 
-function createTimeStatusCommand({ config, discordConfig }) {
+function createTimeStatusCommand({ config }) {
   function buildEmbed({ title, description, color, includeSiteUrl = true }) {
     const embed = new EmbedBuilder().setTitle(title || 'Update').setColor(color || 0x2196f3);
-    const siteUrl = includeSiteUrl && discordConfig.siteUrl ? String(discordConfig.siteUrl) : '';
-    if (description) embed.setDescription(siteUrl ? `${description}\n\n${siteUrl}` : description);
-    else if (siteUrl) embed.setDescription(siteUrl);
+    const publicUrl = includeSiteUrl && config.publicUrl ? String(config.publicUrl) : '';
+    if (description) embed.setDescription(publicUrl ? `${description}\n\n${publicUrl}` : description);
+    else if (publicUrl) embed.setDescription(publicUrl);
     embed.setTimestamp(new Date());
     return embed;
   }

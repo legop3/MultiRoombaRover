@@ -27,7 +27,14 @@ function formatNumber(value, digits = 1) {
 function createFleetDailyReports({ logger, discordConfig, fleetConfig, fleetReportService, roverManager, sendToChannel }) {
   let timer = null;
   const reportConfig = fleetConfig?.discord || {};
-  const enabled = fleetReportService?.enabled && reportConfig.enabled !== false;
+  const enabled = Boolean(reportConfig.enabled);
+  /*
+    Keep the configured choice separate from runtime availability. An operator
+    can enable Discord delivery while the parent fleet collector is unhealthy
+    or disabled; that dependency prevents work but does not rewrite the meaning
+    of this switch.
+  */
+  const fleetReportsAvailable = Boolean(fleetReportService?.enabled);
   const channelId = discordConfig?.channels?.adminAlerts;
   const zone = String(reportConfig.timezone || 'America/New_York');
   const { hour, minute } = parseSendTime(reportConfig.sendAt);
@@ -85,7 +92,7 @@ function createFleetDailyReports({ logger, discordConfig, fleetConfig, fleetRepo
   }
 
   async function deliverPreviousDay() {
-    if (!enabled || !channelId) return;
+    if (!enabled || !fleetReportsAvailable || !channelId) return;
     const range = completedDayRange();
     const existing = fleetReportService.storage.getDailyReport(range.reportDate);
     if (existing?.discordDeliveredAt) return;
@@ -116,7 +123,7 @@ function createFleetDailyReports({ logger, discordConfig, fleetConfig, fleetRepo
   }
 
   function scheduleNext() {
-    if (!enabled || !channelId) return;
+    if (!enabled || !fleetReportsAvailable || !channelId) return;
     const next = nextRunAt({ zone, hour, minute });
     const delay = Math.max(1000, next.toMillis() - Date.now());
     timer = setTimeout(async () => {

@@ -1,0 +1,124 @@
+/* Administration Application Styles
+ * Purpose: Styles the schema-generated configuration tree used only by /admin.
+ * Scope: Keeps route-specific hierarchy and RJSF integration out of the shared global stylesheet.
+ */
+
+.configuration-tree {
+  /* The large gap is intentionally limited to root siblings. It makes each
+     top-level configuration section read as a separate YAML block while the
+     fields and cards inside each block remain compact. */
+  @apply mt-1 space-y-6;
+}
+
+.configuration-card {
+  @apply min-w-0;
+}
+
+.configuration-card-header {
+  /* The editor toolbar owns the top edge of the viewport. Structural title
+     bars use its measured height so sticky CardFrames remain visible directly
+     beneath the actions instead of covering them at narrow widths. */
+  top: var(--configuration-sticky-top, 0px);
+}
+
+.configuration-card .configuration-card {
+  /* Indent the next structural boundary itself, not every row owned by the
+     parent. Since nested CardFrames repeat this rule, the offset accumulates
+     naturally at each level just like indentation in a YAML document. */
+  margin-left: 1rem;
+  width: calc(100% - 1rem);
+}
+
+.configuration-card-body {
+  /* The shared card supplies the border, header, and background. Its body needs
+     only compact padding and vertical rhythm for descriptions, actions, rows,
+     and any nested CardFrames. */
+  @apply space-y-0.5 p-0.5;
+}
+
+.configuration-children {
+  /* Scalar rows belong directly to their current CardFrame and therefore do
+     not receive blanket indentation. Nested CardFrames handle their own offset
+     in the rule above, keeping keys aligned with their owning section. */
+  @apply space-y-0.5;
+}
+
+.configuration-line {
+  /* Each scalar is one logical YAML-like line. The bounded value column starts
+     immediately after its key instead of stretching to the viewport edge. */
+  @apply grid min-w-0 grid-cols-1 items-start gap-0.5 rounded-md bg-neutral-800 px-0.5 py-0.5 sm:grid-cols-[minmax(9rem,16rem)_minmax(12rem,40rem)];
+  justify-content: start;
+}
+
+.configuration-key,
+.configuration-value {
+  @apply min-w-0;
+}
+
+.configuration-key-label {
+  /* Keys are the primary identifiers on YAML-like rows, so they must be more
+     prominent than the explanatory copy in the adjacent value column. */
+  @apply text-base font-semibold leading-snug text-slate-100;
+}
+
+.configuration-root-description,
+.configuration-branch-description,
+.configuration-item-description,
+.configuration-value-description {
+  /* Configuration guidance must remain comfortably readable; these are often
+     full operational explanations rather than disposable form hints. */
+  @apply block text-sm leading-snug text-slate-300;
+  margin-top: 0.125rem;
+}
+
+.configuration-root-description {
+  @apply mb-1;
+}
+
+.configuration-branch-description,
+.configuration-item-description {
+  /* Structural descriptions sit inside the corresponding CardFrame body, so
+     no custom border, header background, or indentation treatment is needed. */
+  @apply max-w-[56rem];
+}
+
+.configuration-value-description {
+  /* A little separation from the widget keeps the help readable without
+     turning each setting back into a large card. */
+  @apply mb-0.5 max-w-[40rem];
+}
+
+.configuration-value input:not([type='checkbox']),
+.configuration-value select,
+.configuration-value textarea {
+  @apply w-full rounded-md border border-neutral-600 bg-neutral-700 px-0.5 py-0.5 text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500;
+}
+
+.configuration-value input[type='checkbox'] {
+  @apply h-4 w-4 align-middle accent-sky-500;
+}
+
+.configuration-value .checkbox label {
+  /* RJSF hides its duplicate boolean label because the key column already
+     names the setting; this rule keeps the remaining checkbox compact. */
+  @apply flex min-h-7 items-center text-slate-100;
+}
+
+.configuration-value .error-detail {
+  @apply mt-0.5 text-xs text-red-300;
+}
+
+.configuration-value .help-block {
+  @apply mt-0.5 block text-[0.7rem] text-slate-500;
+}
+
+.configuration-secret {
+  @apply min-w-0;
+}
+
+.configuration-item-actions,
+.configuration-array-actions {
+  /* Actions use ordinary flow intentionally. CardFrame's action slot is useful
+     elsewhere, but would separate these controls from wide configuration data. */
+  @apply flex flex-wrap gap-0.5;
+}

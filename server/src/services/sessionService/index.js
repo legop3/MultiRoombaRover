@@ -3,6 +3,7 @@
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('sessionService');
+const { getFeatureFlags, configurationEvents } = require('../../configuration');
 const { getRole, isAdmin, roleEvents } = require('../roleService');
 const { getMode, modeEvents } = require('../modeManager');
 const roverManager = require('../roverManager');
@@ -43,7 +44,6 @@ const { getGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason } = require('../adminReasonService');
 const { subscribe } = require('../eventBus');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
-const { getFeatureFlags } = require('../../helpers/features');
 const {
   canUseExternalSpectatorAccess,
   getBandwidthSavingsPolicy,
@@ -58,11 +58,9 @@ const { getAudioLevels, getAudioAdjustmentStateForSocket, audioLevelsEvents } = 
 const { getButtonBoxState } = require('../buttonBoxService');
 const { getState: getInterInstanceState, interInstanceEvents } = require('../interInstanceService');
 const {
-  discordInvite,
-  kofiLink,
-  serverTimezone,
-  configuredSocials,
-  driverAd,
+  getServerTimezone,
+  getConfiguredSessionSocials,
+  getDriverAd,
   ACTIVITY_SYNC_COOLDOWN_MS,
   GPIO_TOGGLE_SYNC_COOLDOWN_MS,
   PERIODIC_SYNC_MS,
@@ -73,9 +71,6 @@ const {
   filterActiveDriversForSocket,
   filterTurnQueuesForSocket,
 } = require('./filters');
-logger.info('Discord invite loaded:', discordInvite ? 'present' : 'not configured');
-logger.info('Ko-fi link loaded:', kofiLink ? 'present' : 'not configured');
-logger.info('Socials config loaded:', configuredSocials?.length ? `${configuredSocials.length} entries` : 'not configured');
 
 const SPECTATOR_ACCESS_NAMESPACE = 'spectatorAccess';
 
@@ -199,7 +194,8 @@ function buildSession(socket) {
   const assignmentRoverId = filterVisibleRoverId(socket, verifiedAssignmentRover);
   const activeDrivers = filterActiveDriversForSocket(getActiveDrivers(), socket);
   const turnQueues = filterTurnQueuesForSocket(getTurnQueues(), socket);
-  const socials = features.socials && configuredSocials?.length ? configuredSocials : [];
+  const configuredSocials = getConfiguredSessionSocials();
+  const socials = features.socials && configuredSocials.length ? configuredSocials : [];
   return {
     socketId: socket?.id || null,
     role: getRole(socket),
@@ -207,9 +203,9 @@ function buildSession(socket) {
     isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
     bandwidthSavings: buildBandwidthSavingsSessionState(socket, controllableUserCount),
     /*
-      Features is the single UI contract for optional server capabilities. A
-      disabled feature should be absent from navigation/layout decisions even
-      though the service module may still be loaded on the Node side.
+      The configuration system derives this public map from service definitions
+      marked as features. A false enabled switch keeps the corresponding UI out
+      of navigation and layout without maintaining another feature registry.
     */
     features,
     roster,
@@ -244,14 +240,8 @@ function buildSession(socket) {
       session payload makes the server configuration the single source of
       truth and avoids a separate endpoint for one small optional card.
     */
-    driverAd,
-    discord: {
-      invite: discordInvite,
-    },
-    timezone: serverTimezone,
-    kofi: {
-      link: kofiLink,
-    },
+    driverAd: getDriverAd(),
+    timezone: getServerTimezone(),
     identity: getIdentitySummary(socket),
     verification: getVerificationStateForSocket(socket),
     moderation: getModerationStateForSocket(socket),
@@ -517,6 +507,13 @@ audioLevelsEvents.on('change', ({ scope, socketId } = {}) => {
 });
 
 interInstanceEvents.on('change', () => {
+  syncAll();
+});
+
+configurationEvents.on('applied', () => {
+  // Feature switches and passive presentation values share the session payload.
+  // Broadcast only after all affected service reloads finish so clients never
+  // see a new feature map paired with an old service runtime.
   syncAll();
 });
 

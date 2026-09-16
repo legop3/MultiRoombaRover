@@ -1,3 +1,10 @@
+const backupRestoreService = require('./src/services/backupRestoreService');
+
+// A staged restore must replace data before configuration, identity, or report
+// services open SQLite. Requiring the service here is safe because its runtime
+// HTTP/socket dependencies remain lazy until register() is called below.
+backupRestoreService.applyPendingRestore();
+
 require('./src/globals/logger');
 require('./src/globals/config');
 require('./src/globals/http');
@@ -8,6 +15,10 @@ require('./src/helpers/sensorDecoder');
 
 require('./src/services/alertService');
 require('./src/services/authService');
+// Setup remains available only until the first lockdown administrator exists;
+// the administrative configuration gateway then owns all subsequent changes.
+require('./src/services/setupService');
+require('./src/services/adminConfigurationService');
 require('./src/services/eventBus');
 require('./src/services/modeManager');
 require('./src/services/lockdownGuard');
@@ -62,4 +73,5 @@ require('./src/services/replayEngineV2');
 // Discord feature so web requests always have a local delivery path.
 require('./src/services/replayDeliveryService');
 require('./src/services/discordBotService');
+backupRestoreService.register();
 require('./src/services/httpServer');

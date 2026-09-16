@@ -9,8 +9,8 @@ const { Cam } = require('onvif');
 
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('ptzCamera');
-const { loadConfig } = require('../../helpers/configLoader');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
+const { resolveRoverSnapshotDir } = require('../../helpers/dataPaths');
 const {
   shouldUseSnapshotsForNonTurnVideo,
   shouldUseSnapshotsForExternalSpectatorVideo,
@@ -43,7 +43,7 @@ const STOP_MOTION = Object.freeze({ pan: 0, tilt: 0, zoom: 0 });
 // explicitly disables replay for the camera.
 const DEFAULT_REPLAY_ENABLED = true;
 const DEFAULT_PTZ_COLOR = '#387bf8';
-const SNAPSHOT_DIR = process.env.ROVER_SNAPSHOT_DIR || '/var/lib/rover-snapshots';
+const SNAPSHOT_DIR = resolveRoverSnapshotDir();
 const SNAPSHOT_POLL_MS = 300;
 const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
 const SPOTLIGHT_VERIFY_DELAY_MS = 1200;
@@ -51,9 +51,8 @@ const PUBLISHER_STDERR_SYNC_MS = 10000;
 const PUBLISHER_RTSP_TIMEOUT_US = 10000000;
 
 const events = new EventEmitter();
-const config = loadConfig();
-const cameraConfig = config.ptzCamera || {};
-const enabled = isFeatureEnabled('ptzCamera');
+let cameraConfig = loadConfig().ptzCamera || {};
+let enabled = Boolean(cameraConfig.enabled);
 
 const state = {
   initialized: false,
@@ -114,7 +113,7 @@ let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
 const socketSnapshotSubscriptions = new Map();
 const snapshotLastSentBySocket = new Map();
-const audioPlayback = createPtzAudioPlayback({
+let audioPlayback = createPtzAudioPlayback({
   logger,
   cameraConfig,
   enabled,
@@ -574,7 +573,7 @@ function schedulePublisherRestart(reason = 'publisher-restart') {
 function startPublisher() {
   if (!enabled || !state.rtspUri || publisherProcess) return;
   const input = addCredentialsToRtsp(state.rtspUri);
-  const output = `srt://127.0.0.1:9000?streamid=publish:${encodeURIComponent(PTZ_STREAM_PATH)}`;
+  const output = `rtsp://127.0.0.1:8554/${encodeURIComponent(PTZ_STREAM_PATH)}`;
   /*
     The full-quality autotrack profile is H265, which is the right camera-side
     feed but has been unreliable through browser WHEP playback. Re-encoding is
@@ -608,10 +607,9 @@ function startPublisher() {
     dead session. The existing exit handler then starts a new process, which is
     the part that creates a fresh RTSP connection after the camera comes back.
 
-    The mpegts muxer can also hold packets briefly before writing them to SRT.
-    flush_packets/muxdelay/muxpreload are output-side latency knobs; they do not
-    ask the camera or demuxer to discard frames, so they are a safer next step
-    than the stale-frame dropping experiments that made the Reolink feed freeze.
+    The MediaMTX output uses RTSP over TCP, matching every rover publisher and
+    server-local reader. Keeping one media transport avoids the incompatible
+    empty SRT ACKACK packets produced between GoSRT and Fedora's newer libSRT.
   */
   const proc = spawn('ffmpeg', [
     '-hide_banner',
@@ -672,12 +670,10 @@ function startPublisher() {
     '-2',
     '-flush_packets',
     '1',
-    '-muxdelay',
-    '0',
-    '-muxpreload',
-    '0',
+    '-rtsp_transport',
+    'tcp',
     '-f',
-    'mpegts',
+    'rtsp',
     output,
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   publisherProcess = proc;
@@ -1057,8 +1053,8 @@ function requireOperator(socket) {
 function requirePtzUser(socket) {
   /*
     Listing presets does not move the camera, but it still reveals operational
-    camera state. Use the same feature gate as queue entry so unverified users
-    cannot query PTZ-only data through raw socket calls.
+    camera state. Check the camera's own enabled switch just like queue entry so
+    unverified users cannot query PTZ-only data through raw socket calls.
   */
   if (!enabled) throw new Error('PTZ camera disabled');
   if (!canUsePtzFeature(socket)) throw new Error('Not authorized for PTZ camera');
@@ -1831,6 +1827,44 @@ if (enabled) {
   initialize();
 }
 
+function stopCameraRuntime() {
+  // Disable restart-producing callbacks before terminating the publisher. The
+  // old ffmpeg exit event can then observe `enabled === false` and will not
+  // resurrect a process built from the previous camera configuration.
+  enabled = false;
+  revokeOperator('configuration-change');
+  state.queue = [];
+  stopPublisher();
+  audioPlayback.stopActivePlayback('configuration-change');
+  if (snapshotTimer) {
+    clearInterval(snapshotTimer);
+    snapshotTimer = null;
+  }
+  if (spotlightVerifyTimer) {
+    clearTimeout(spotlightVerifyTimer);
+    spotlightVerifyTimer = null;
+  }
+  clearMotionWatchdog();
+  clearPanTiltRenewal();
+  clearZoomRepeat();
+  onvifCam = null;
+  state.initialized = false;
+  state.initializing = false;
+  state.rtspUri = null;
+  state.profileToken = DEFAULT_PROFILE_TOKEN;
+}
+
+registerConfigurationHandler('ptzCamera', (nextCameraConfig = {}) => {
+  stopCameraRuntime();
+  cameraConfig = nextCameraConfig;
+  enabled = Boolean(cameraConfig.enabled);
+  state.profileToken = String(cameraConfig.profileToken || DEFAULT_PROFILE_TOKEN);
+  state.error = null;
+  audioPlayback = createPtzAudioPlayback({ logger, cameraConfig, enabled, getSocketLabel });
+  emitChange('configuration-change');
+  if (enabled) initialize();
+});
+
 module.exports = {
   PTZ_CAMERA_ID,
   PTZ_STREAM_PATH,
@@ -1853,7 +1887,7 @@ module.exports = {
       audio the same way it already mixes rover audio.
     */
     if (!enabled || !isReplayEnabled()) return [];
-    const inputUrl = `srt://127.0.0.1:9000?streamid=read:${encodeURIComponent(PTZ_STREAM_PATH)}`;
+    const inputUrl = `rtsp://127.0.0.1:8554/${encodeURIComponent(PTZ_STREAM_PATH)}`;
     const label = cameraConfig.name || 'PTZ Camera';
     return [
       {

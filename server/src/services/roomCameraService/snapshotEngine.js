@@ -74,7 +74,17 @@ function handleStreamError(camera, err) {
 }
 
 function createSnapshotEngine({ getRoomCameras, roomCameraEvents }) {
+  function isCurrentCamera(camera) {
+    return getRoomCameras().some((current) => (
+      current.id === camera.id && current.url === camera.url && current.streamUrl === camera.streamUrl
+    ));
+  }
+
   function startStream(camera) {
+    // Stream close/error events can arrive after a configuration reload. Verify
+    // identity and URL against the current catalog before allowing an old
+    // reconnect timer to recreate a retired camera connection.
+    if (!isCurrentCamera(camera)) return;
     const streamUrl = getStreamUrl(camera);
     if (!streamUrl || streamState.get(camera.id)?.req) return;
     const url = new URL(streamUrl);

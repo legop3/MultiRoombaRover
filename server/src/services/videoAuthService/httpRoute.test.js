@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { registerVideoAuthRoute } = require('./httpRoute');
 
-function createHarness() {
+function createHarness({ requestIp = '127.0.0.1' } = {}) {
   let handler;
   const app = { post: (_path, fn) => { handler = fn; } };
   registerVideoAuthRoute({
@@ -13,7 +13,7 @@ function createHarness() {
     io: { sockets: { sockets: new Map() } },
     logger: { info() {}, warn() {} },
     videoSessions: { getSession: () => null, revokeSession() {} },
-    getRequestIp: () => '127.0.0.1',
+    getRequestIp: () => requestIp,
     logAdminEvent() {},
     extractStreamInfoFromBody: (body) => ({ type: 'rover', id: body.path, baseId: body.path }),
     canAccessStream: () => false,
@@ -40,6 +40,21 @@ function createHarness() {
 test('allows an RTSP rover publisher without a browser session', () => {
   const { request } = createHarness();
   assert.equal(request({ protocol: 'rtsp', action: 'publish', path: 'rover-one' }), 200);
+});
+
+test('allows server-local RTSP replay and snapshot readers without a browser session', () => {
+  const { request } = createHarness();
+  assert.equal(request({ protocol: 'rtsp', action: 'read', path: 'rover-one' }), 200);
+});
+
+test('continues rejecting an unauthenticated remote RTSP reader', () => {
+  const { request } = createHarness({ requestIp: '192.0.2.10' });
+  assert.equal(request({ protocol: 'rtsp', action: 'read', path: 'rover-one' }), 401);
+});
+
+test('allows a rover to read its RTSP speaker-forward stream without a browser session', () => {
+  const { request } = createHarness({ requestIp: '192.0.2.10' });
+  assert.equal(request({ protocol: 'rtsp', action: 'read', path: 'rover-one-fwd' }), 200);
 });
 
 test('continues rejecting an unauthenticated WebRTC read', () => {

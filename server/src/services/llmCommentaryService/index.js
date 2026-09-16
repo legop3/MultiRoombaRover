@@ -5,7 +5,7 @@ const fsp = require('fs/promises');
 const { Ollama } = require('ollama');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('llmCommentary');
-const { loadConfig } = require('../../helpers/configLoader');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { getRole, roleEvents } = require('../roleService');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const roverManager = require('../roverManager');
@@ -34,13 +34,12 @@ const { createSnapshotEngine } = require('./snapshotEngine');
 const { registerHooks } = require('./hooks');
 const { createRunner } = require('./runner');
 
-const config = loadConfig();
-const commentaryConfig = config.llmCommentary || {};
-const enabled = Boolean(commentaryConfig.enabled);
-const ollamaUrl = String(commentaryConfig.ollamaUrl || commentaryConfig.ollamaServer || '').trim();
-const model = String(commentaryConfig.model || '').trim();
-const ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
-const frequencyMs = normalizeFrequencyMs(Number(commentaryConfig.frequency ?? commentaryConfig.frequencyMs));
+let enabled;
+let ollamaUrl;
+let model;
+let ollamaClient;
+let frequencyMs;
+let runner;
 
 const runtime = {
   timer: null,
@@ -234,73 +233,67 @@ const snapshotEngine = createSnapshotEngine({
   getSkipStreak: () => runtime.skipStreak,
 });
 
-const runner = createRunner({
-  logger,
-  enabled,
-  model,
-  ollamaUrl,
-  frequencyMs,
-  jitterMs: JITTER_MS,
-  postCooldownMs: POST_COOLDOWN_MS,
-  maxBotMessages: MAX_BOT_MESSAGES,
-  runtime,
-  snapshotEngine,
-  readSystemPrompt,
-  buildModelMessages,
-  generateCommentary,
-  normalizeDuplicateKey,
-  getRecentMessages,
-  sendSystemMessage,
-  buildFailureInfo,
-  updatePhase,
-  startRunRecord,
-  patchCurrentRun,
-  finalizeRunRecord,
-  updateStatus,
-});
-
-const canRunFromConfig = enabled && model && ollamaUrl;
-
-if (canRunFromConfig) {
-  registerHooks({
-    io,
-    roleEvents,
-    roverManager,
-    emitStatusToSocket,
-    isAdminSocket,
-    clearRuntimeHistory: runner.clearRuntimeHistory,
-    getAdminState: () => buildAdminState(status, runtime.runHistory),
-    onDriverActivity: runner.wakeForDriverActivity,
-    onSensorEvent: snapshotEngine.onSensorEvent,
-    onRoverRemoved: snapshotEngine.removeRover,
+function applyCommentaryConfig(commentaryConfig = {}) {
+  runner?.stop('configuration changed');
+  enabled = Boolean(commentaryConfig.enabled);
+  ollamaUrl = String(commentaryConfig.ollamaServer || '').trim();
+  model = String(commentaryConfig.model || '').trim();
+  ollamaClient = ollamaUrl ? new Ollama({ host: ollamaUrl }) : null;
+  frequencyMs = normalizeFrequencyMs(Number(commentaryConfig.frequency));
+  status = { ...status, enabled, model, ollamaUrl, frequencyMs };
+  runner = createRunner({
+    logger,
+    enabled,
+    model,
+    ollamaUrl,
+    frequencyMs,
+    jitterMs: JITTER_MS,
+    postCooldownMs: POST_COOLDOWN_MS,
+    maxBotMessages: MAX_BOT_MESSAGES,
+    runtime,
+    snapshotEngine,
+    readSystemPrompt,
+    buildModelMessages,
+    generateCommentary,
+    normalizeDuplicateKey,
+    getRecentMessages,
+    sendSystemMessage,
+    buildFailureInfo,
+    updatePhase,
+    startRunRecord,
+    patchCurrentRun,
+    finalizeRunRecord,
+    updateStatus,
   });
-
-  const mode = getMode();
-  if (mode === MODES.LOCKDOWN) {
+  if (getMode() === MODES.LOCKDOWN) {
     runner.stop('paused during lockdown');
-    logger.info('LLM commentary paused due to lockdown mode');
   } else {
     runner.start();
   }
-
-  modeEvents.on('change', (nextMode) => {
-    if (nextMode === MODES.LOCKDOWN) {
-      runner.stop('paused during lockdown');
-      logger.info('LLM commentary paused due to lockdown mode');
-      return;
-    }
-    runner.start();
-  });
-} else {
-  const disabledReason = !enabled
-    ? 'llmCommentary.enabled is false'
-    : 'model or ollama server missing';
-  updatePhase('disabled', {
-    running: false,
-    inFlight: false,
-    currentRunId: null,
-    lastOutcome: 'disabled',
-    lastReason: disabledReason,
-  });
-  logger.info('LLM commentary service not started', { reason: disabledReason });
 }
+
+applyCommentaryConfig(loadConfig().llmCommentary || {});
+
+// Runtime hooks stay attached once and route actions through the newest runner.
+registerHooks({
+  io,
+  roleEvents,
+  roverManager,
+  emitStatusToSocket,
+  isAdminSocket,
+  clearRuntimeHistory: (...args) => runner.clearRuntimeHistory(...args),
+  getAdminState: () => buildAdminState(status, runtime.runHistory),
+  onDriverActivity: (...args) => runner.wakeForDriverActivity(...args),
+  onSensorEvent: snapshotEngine.onSensorEvent,
+  onRoverRemoved: snapshotEngine.removeRover,
+});
+
+modeEvents.on('change', (nextMode) => {
+  if (nextMode === MODES.LOCKDOWN) {
+    runner.stop('paused during lockdown');
+    return;
+  }
+  runner.start();
+});
+
+registerConfigurationHandler('llmCommentary', applyCommentaryConfig);

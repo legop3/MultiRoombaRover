@@ -3,7 +3,7 @@
 // Purpose: Lets the installer validate server-owned MediaMTX inputs before disabling the legacy service.
 // Scope: Builds and serializes the runtime YAML without starting MediaMTX or changing external state.
 const yaml = require('js-yaml');
-const { loadConfig } = require('../src/helpers/configLoader');
+const { loadConfig } = require('../src/configuration');
 const { buildMediaMtxConfig } = require('../src/services/mediaMtxService/config');
 
 const config = loadConfig();

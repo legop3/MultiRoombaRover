@@ -11,8 +11,6 @@ CHROMEGTTS_WAV_BIN="/usr/local/bin/chromegtts-wav"
 ROVER_SNAPSHOT_WRITER_BIN="/usr/local/bin/rover-snapshot-writer.sh"
 MEDIAMTX_SERVICE="/etc/systemd/system/mediamtx.service"
 MULTIROVER_SERVICE="/etc/systemd/system/multirover.service"
-SNAPSHOT_DIR="/var/lib/rover-snapshots"
-REPLAY_SEGMENT_DIR="/var/lib/replay-segments"
 KINECT_UDEV_RULE="/etc/udev/rules.d/99-kinect-world.rules"
 BLUETOOTH_OVERRIDE_DIR="/etc/systemd/system/bluetooth.service.d"
 BLUETOOTH_OVERRIDE="$BLUETOOTH_OVERRIDE_DIR/20-multirover-balance-board.conf"
@@ -30,9 +28,10 @@ fi
 TARGET_USER="$SUDO_USER"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 SERVER_DIR="$SCRIPT_DIR"
+DATA_DIR="$SERVER_DIR/data"
+SNAPSHOT_DIR="$DATA_DIR/rover-snapshots"
 BALANCE_BOARD_NATIVE_DIR="$SCRIPT_DIR/src/services/balanceBoardService/native"
 BALANCE_BOARD_WORKER="$BALANCE_BOARD_NATIVE_DIR/balance_board_worker"
-CONFIG_PATH="$SERVER_DIR/config.yaml"
 ROVER_SNAPSHOT_WRITER_TEMPLATE="$SERVER_DIR/mediamtx/rover-snapshot-writer.sh"
 CHROMEGTTS_WAV_TEMPLATE="$SERVER_DIR/bin/chromegtts-wav.py"
 
@@ -185,12 +184,6 @@ if [[ -f "$BALANCE_BOARD_NATIVE_DIR/Makefile" ]]; then
   setcap cap_net_admin,cap_net_bind_service+ep "$BALANCE_BOARD_WORKER"
 fi
 
-if [[ ! -f "$CONFIG_PATH" ]]; then
-  cp "$SERVER_DIR/config.example.yaml" "$CONFIG_PATH"
-  chown "$TARGET_USER":"$TARGET_USER" "$CONFIG_PATH"
-  echo "Copied config.example.yaml to config.yaml; edit it before exposing the service."
-fi
-
 # Bluetoothd remains responsible for discovery and the one-time bond, but its
 # generic input plugin otherwise reserves control PSM 0x11 and interrupt PSM
 # 0x13 before the Balance Board worker can listen for the board's front-button
@@ -263,11 +256,11 @@ fi
 echo "      Installing rover snapshot writer -> $ROVER_SNAPSHOT_WRITER_BIN"
 install -m 0755 "$ROVER_SNAPSHOT_WRITER_TEMPLATE" "$ROVER_SNAPSHOT_WRITER_BIN"
 
-# Validate the new source of truth before disabling a working legacy service. The validator
-# performs the same build and YAML serialization as server startup without opening listeners
-# or leaving a process behind.
+# Validate database-backed MediaMTX inputs before disabling a working legacy
+# service. This performs the same build and serialization as startup without
+# opening listeners or leaving a process behind.
 runuser -u "$TARGET_USER" -- env \
-  SERVER_CONFIG="$CONFIG_PATH" \
+  SERVER_DATA_DIR="$DATA_DIR" \
   ROVER_SNAPSHOT_WRITER_BIN="$ROVER_SNAPSHOT_WRITER_BIN" \
   "$NODE_BIN" "$SERVER_DIR/scripts/validateMediaMtxConfig.js"
 
@@ -281,10 +274,23 @@ rm -f "$MEDIAMTX_SERVICE"
 rm -f /etc/mediamtx/mediamtx.yml
 
 echo "[4/6] Writing systemd units..."
-mkdir -p "$SNAPSHOT_DIR"
-chown "$TARGET_USER":"$TARGET_USER" "$SNAPSHOT_DIR"
-mkdir -p "$REPLAY_SEGMENT_DIR"
-chown "$TARGET_USER":"$TARGET_USER" "$REPLAY_SEGMENT_DIR"
+# The repository data directory is the legacy deployment's single persistence
+# root and becomes the one bind-mounted /data directory during containerization.
+# Create only the snapshot child eagerly because MediaMTX's hook writes there;
+# the other services already create their own children when those features run.
+mkdir -p "$DATA_DIR" "$SNAPSHOT_DIR"
+chown "$TARGET_USER":"$TARGET_USER" "$DATA_DIR" "$SNAPSHOT_DIR"
+
+# Previous installers used these two /var/lib directories. Replay code already
+# stopped reading its old location, and snapshots regenerate immediately, so do
+# not merge possibly stale runtime media over the new canonical data tree. Keep
+# an existing directory untouched and report it for deliberate cleanup after the
+# operator verifies the upgraded server.
+for legacy_dir in /var/lib/rover-snapshots /var/lib/replay-segments; do
+  if [[ -d "$legacy_dir" ]]; then
+    echo "      Legacy runtime directory is no longer used: $legacy_dir"
+  fi
+done
 cat > "$MULTIROVER_SERVICE" <<EOF
 [Unit]
 Description=Multi-Roomba Rover control server
@@ -296,12 +302,13 @@ User=$TARGET_USER
 Group=$TARGET_USER
 WorkingDirectory=$SERVER_DIR
 Environment=NODE_ENV=production
-Environment=SERVER_CONFIG=$CONFIG_PATH
-Environment=ROVER_SNAPSHOT_DIR=$SNAPSHOT_DIR
-Environment=REPLAY_SEGMENT_DIR=$REPLAY_SEGMENT_DIR
+Environment=SERVER_DATA_DIR=$DATA_DIR
 Environment=ROVER_SNAPSHOT_WRITER_BIN=$ROVER_SNAPSHOT_WRITER_BIN
 ExecStart=$NODE_BIN $SERVER_DIR/index.js
-Restart=on-failure
+# Application-requested restarts use the same clean SIGTERM path as an
+# operator stop. Restart=always lets that process exit come back automatically,
+# while an explicit `systemctl stop` still remains stopped by systemd design.
+Restart=always
 RestartSec=2
 SuccessExitStatus=130 143
 
@@ -321,8 +328,9 @@ echo
 echo "Services installed:"
 echo "  multirover.service (Node.js control server with MediaMTX child)"
 echo
-echo "Update $CONFIG_PATH to set admins, lockdown settings, and media parameters."
+echo "Open /setup to initialize the installation, then use /admin for administration."
+echo "For fresh setup, read the one-time code from $DATA_DIR/setup-code.txt."
 echo "Kinect/libfreenect packages and udev permissions were installed."
 echo "If a Kinect is already plugged in, unplug/replug its USB/power before testing so the new udev rule applies."
 echo "Wii Balance Board direct Bluetooth bridge and front-button listener were installed."
-echo "Enable balanceBoard in config.yaml, press red Sync once, then use the front button for later wakes."
+echo "Enable Balance Board support in /admin, press red Sync once, then use the front button for later wakes."

@@ -5,34 +5,28 @@ const { loadFromConfig, getRoomCameras, getRoomCamera, roomCameraEvents } = requ
 const { createSnapshotEngine } = require('./snapshotEngine');
 const { registerRoomCameraSocketGateway } = require('./socketGateway');
 const replay = require('../replayEngineV2/roomCameraReplayBuilder');
-const { isFeatureEnabled } = require('../../helpers/features');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 
-const enabled = isFeatureEnabled('roomCameras');
+let enabled = false;
 
 const snapshotEngine = createSnapshotEngine({ getRoomCameras, roomCameraEvents });
-if (enabled) {
-  /*
-    Room cameras are optional local hardware/network devices. The service module
-    can still be imported by replay, health, and session code, but disabled
-    installs must not start polling LAN cameras in the background.
-  */
-  loadFromConfig();
-  snapshotEngine.startAll();
+function applyRoomCameraConfig(roomCameraConfig = {}) {
+  enabled = Boolean(roomCameraConfig.enabled);
+  // Loading an empty catalog on disable causes the snapshot engine's existing
+  // update listener to close every stream and timer without unregistering the
+  // stable browser gateway.
+  loadFromConfig(enabled ? roomCameraConfig : { cameras: [] });
 }
 
-if (enabled) {
-  /*
-    Camera frame sockets are part of the room-camera feature surface. Keeping
-    them behind the same gate prevents disabled features from being callable by
-    hand even though server/index.js still imports this module.
-  */
-  registerRoomCameraSocketGateway({
-    getRoomCamera,
-    getRoomCameras,
-    getRoomCameraState: snapshotEngine.getRoomCameraState,
-    roomCameraStreamEvents: snapshotEngine.roomCameraStreamEvents,
-  });
-}
+registerRoomCameraSocketGateway({
+  getRoomCamera,
+  getRoomCameras,
+  getRoomCameraState: snapshotEngine.getRoomCameraState,
+  roomCameraStreamEvents: snapshotEngine.roomCameraStreamEvents,
+});
+
+applyRoomCameraConfig(loadConfig().roomCameras || {});
+registerConfigurationHandler('roomCameras', applyRoomCameraConfig);
 
 function buildRoomCameraReplayVideo(options = {}) {
   return replay.buildRoomCameraReplayVideo(options, { getRoomCamera, getRoomCameras });

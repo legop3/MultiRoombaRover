@@ -508,6 +508,16 @@ function createStorage({ logger }) {
     }), { available: false, path: DB_PATH });
   }
 
+  function backupDatabase(destinationPath) {
+    /*
+      Fleet collection may continue during an online SQLite backup. Each
+      resulting database file represents a valid point-in-time snapshot even
+      when new telemetry commits before the copy completes.
+    */
+    if (!open()) throw new Error('Fleet report database is unavailable.');
+    return db.backup(destinationPath);
+  }
+
   return {
     open,
     insertEvent,
@@ -525,6 +535,7 @@ function createStorage({ logger }) {
     getActiveBattery,
     replaceBattery,
     getDiagnostics,
+    backupDatabase,
   };
 }
 

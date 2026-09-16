@@ -1,0 +1,16 @@
+# Docker Build Context
+# Purpose: Keeps local state, cached dependencies, and host-built artifacts out
+# of the production image build context. Every required artifact is recreated
+# by the Dockerfile from tracked source and lockfiles.
+.git
+.gitignore
+**/node_modules
+# Neither the legacy state directory nor the Compose-mounted replacement may
+# enter an image build. This prevents credentials and backups from becoming
+# image layers after an operator has started using either deployment layout.
+/server/data
+/data
+server/public
+server/src/services/kinectService/native/kinect_worker
+server/src/services/balanceBoardService/native/balance_board_worker
+**/*.log

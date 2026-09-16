@@ -5,7 +5,7 @@ function createDmModerationHandlers(deps) {
   const {
     logger,
     client,
-    lockdownAdminIds,
+    getLockdownAdminIds,
     attachDmMessage,
     getRequestByMessageId,
     approveRequest,
@@ -36,7 +36,9 @@ function createDmModerationHandlers(deps) {
       '',
       `React with ${APPROVE} to approve or ${DENY} to deny.`,
     ].join('\n');
-    await Promise.all(Array.from(lockdownAdminIds).map(async (adminId) => {
+    // Resolve recipients when the request occurs so setup imports and account
+    // edits take effect immediately instead of waiting for a server restart.
+    await Promise.all(getLockdownAdminIds().map(async (adminId) => {
       try {
         const user = await client.users.fetch(String(adminId));
         if (!user) return;
@@ -69,7 +71,9 @@ function createDmModerationHandlers(deps) {
       '',
       `React with ${APPROVE} to approve or ${DENY} to deny.`,
     ].join('\n');
-    await Promise.all(Array.from(lockdownAdminIds).map(async (adminId) => {
+    // Keep private-access moderation on the same live administrator registry
+    // used by command authorization and verification requests.
+    await Promise.all(getLockdownAdminIds().map(async (adminId) => {
       try {
         const user = await client.users.fetch(String(adminId));
         if (!user) return;

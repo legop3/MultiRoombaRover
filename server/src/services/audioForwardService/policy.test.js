@@ -12,7 +12,6 @@ function createPolicy({ verified = true, muted = false, driver = true, canDrive 
     roverManager: { isDriver: () => driver },
     turnService: { canDrive: () => canDrive },
     streamSuffix: '-fwd',
-    mediaConfig: {},
   });
 }
 
@@ -29,4 +28,9 @@ test('preserves normal audio forwarding for an unmuted verified driver', () => {
 test('publishes forwarded audio to the local MediaMTX RTSP path', () => {
   const policy = createPolicy();
   assert.equal(policy.resolveForwardUrl('rover one'), 'rtsp://127.0.0.1:8554/rover%20one-fwd');
+});
+
+test('publishes browser microphone signaling through the same-origin proxy', () => {
+  const policy = createPolicy();
+  assert.equal(policy.buildWhipUrl('rover one-fwd'), '/video/rover%20one-fwd/whip');
 });

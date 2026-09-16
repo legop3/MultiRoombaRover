@@ -15,8 +15,8 @@ function sourceDirForKey(activeSegmentRoot, key) {
   return path.join(activeSegmentRoot, key);
 }
 
-function toSrtReadPath(streamId) {
-  return `srt://127.0.0.1:9000?streamid=read:${encodeURIComponent(streamId)}`;
+function toRtspReadPath(streamId) {
+  return `rtsp://127.0.0.1:8554/${encodeURIComponent(streamId)}`;
 }
 
 function getRoomCameraStream(camera) {
@@ -37,9 +37,9 @@ function listDesiredSources() {
   const sources = [];
   for (const rover of roverManager.getRoster()) {
     const roverId = String(rover.id);
-    sources.push({ id: roverId, sourceType: 'rover', kind: 'video', label: rover.name || roverId, inputUrl: toSrtReadPath(roverId) });
+    sources.push({ id: roverId, sourceType: 'rover', kind: 'video', label: rover.name || roverId, inputUrl: toRtspReadPath(roverId) });
     if (hasRoverAudioCapture(rover)) {
-      sources.push({ id: `${roverId}-audio`, sourceType: 'rover', roverId, kind: 'audio', label: `${rover.name || roverId} audio`, inputUrl: toSrtReadPath(`${roverId}-audio`) });
+      sources.push({ id: `${roverId}-audio`, sourceType: 'rover', roverId, kind: 'audio', label: `${rover.name || roverId} audio`, inputUrl: toRtspReadPath(`${roverId}-audio`) });
     }
   }
   for (const camera of getRoomCameras()) {
@@ -57,7 +57,12 @@ function listDesiredSources() {
 function buildWorkerArgs(activeSegmentRoot, source) {
   const dir = sourceDirForKey(activeSegmentRoot, sourceKey(source));
   const pattern = path.join(dir, 'seg-%06d.mp4');
-  const common = ['-hide_banner', '-loglevel', 'warning', '-y', '-fflags', '+genpts', '-use_wallclock_as_timestamps', '1', '-i', source.inputUrl];
+  // MediaMTX and RTSP cameras use TCP so replay capture has one reliable
+  // transport and never falls back to separate RTP/RTCP UDP listeners.
+  const inputTransport = /^rtsps?:\/\//i.test(source.inputUrl)
+    ? ['-rtsp_transport', 'tcp']
+    : [];
+  const common = ['-hide_banner', '-loglevel', 'warning', '-y', '-fflags', '+genpts', '-use_wallclock_as_timestamps', '1', ...inputTransport, '-i', source.inputUrl];
 
   if (source.kind === 'audio') {
     return [

@@ -2,7 +2,7 @@
 // Purpose: Boots the React application and mounts global providers/router roots. Scope: Defines top-level route wiring and root render lifecycle for the browser app.
 import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import './index.css'
 // Theme artwork is a separate style concern from global component utilities. Loading its dedicated
 // entrypoint here keeps every route consistent without returning theme definitions to index.css.
@@ -16,17 +16,27 @@ import SpectatorApp from './spectate/SpectatorApp/SpectatorAppRoot.jsx'
 import MiniSummaryApp from './mini/MiniSummaryApp/MiniSummaryAppRoot.jsx'
 import ServerDisplayApp from './display/ServerDisplayApp/ServerDisplayAppRoot.jsx'
 import ScannerApp from './scanner/ScannerApp/ScannerAppRoot.jsx'
-import DatabaseAdminApp from './database/DatabaseAdminApp.jsx'
 import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
 import PtzAppRoot from './ptz/PtzAppRoot.jsx'
 import InitialSessionOverlay from './components/InitialSessionOverlay/index.jsx'
 
-// The reporting route includes the charting and CSV libraries. Loading that
-// bundle only when `/reports` is visited keeps ordinary rover-control sessions
-// from paying the cost of the in-depth diagnostics interface.
+// Reporting and administration carry substantial route-specific libraries.
+// Loading each only on its own route keeps charting and JSON Schema tooling out
+// of ordinary rover-control sessions without changing either application's
+// internal ownership.
 const FleetReportsApp = lazy(() => import('./reports/FleetReportsApp.jsx'))
+const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
+const SetupApp = lazy(() => import('./admin/SetupApp.jsx'))
+
+function lazyRoute(element, label) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-neutral-950 p-1 text-sm text-slate-300">Loading {label}…</div>}>
+      {element}
+    </Suspense>
+  )
+}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -52,7 +62,9 @@ createRoot(document.getElementById('root')).render(
                   <Route path="/mini" element={<MiniSummaryApp />} />
                   <Route path="/display" element={<ServerDisplayApp />} />
                   <Route path="/scanner" element={<ScannerApp />} />
-                  <Route path="/database" element={<DatabaseAdminApp />} />
+                  <Route path="/database" element={<Navigate to="/admin?section=users" replace />} />
+                  <Route path="/setup" element={lazyRoute(<SetupApp />, 'setup')} />
+                  <Route path="/admin" element={lazyRoute(<AdminApp />, 'administration')} />
                   {/*
                     PTZ is a separate route so the driver layout and its replay
                     panel are not mounted behind the camera controller. This
@@ -62,11 +74,7 @@ createRoot(document.getElementById('root')).render(
                   <Route path="/ptz" element={<PtzAppRoot />} />
                   <Route
                     path="/reports"
-                    element={(
-                      <Suspense fallback={<div className="min-h-screen bg-neutral-950 p-1 text-sm text-slate-300">Loading fleet reports…</div>}>
-                        <FleetReportsApp />
-                      </Suspense>
-                    )}
+                    element={lazyRoute(<FleetReportsApp />, 'fleet reports')}
                   />
                 </Routes>
               </BrowserRouter>

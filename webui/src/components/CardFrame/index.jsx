@@ -33,7 +33,9 @@ export default function CardFrame({
   title = '',
   meta = null,
   actions = null,
+  color = null,
   hideHeader = false,
+  stickyHeader = false,
   className = '',
   headerClassName = '',
   bodyClassName = '',
@@ -50,27 +52,26 @@ export default function CardFrame({
     const rover = roster.find((entry) => String(entry?.id) === roverId);
     return rover?.color || null;
   });
-  const accentRgb = hexToRgb(ownRoverColor);
-  
-  // swap these to toggle rover card border colors stuff 
-  // Green mode is global server chrome, so it wins over the assigned rover's
-  // personal accent while active. Keeping this override in CardFrame makes all
-  // present and future cards participate without sprinkling mode checks around.
+
+  // Callers can supply a structural accent, while ordinary cards continue to
+  // inherit the assigned rover's color without needing to know session state.
+  const accentRgb = hexToRgb(color || ownRoverColor);
+
   const cardStyle = greenMode
     ? { borderColor: '#008a35' }
     : accentRgb
       ? { borderColor: rgba(accentRgb, 0.3) }
       : undefined;
-  // const cardStyle = undefined;
-
 
   const headerStyle = greenMode
     ? { borderColor: '#008a35' }
     : accentRgb
     ? {
-        // backgroundImage: `linear-gradient(90deg, rgba(23,23,23,0.96) 0%, rgba(38,38,38,0.94) 0%, ${rgba(accentRgb, 0.1)} 100%)`,
+        // The header divider uses the same accent as the outside border. This
+        // makes the color describe the complete CardFrame rather than looking
+        // like an unrelated tint applied only behind its title.
+        borderColor: rgba(accentRgb, 0.3),
         backgroundImage: `linear-gradient(90deg, ${rgba(accentRgb, 0.2)} 100%)`,
-        // backgroundImage: `background-color: ${rgba(accentRgb, 0.2)}`
       }
     : undefined;
 
@@ -93,6 +94,11 @@ export default function CardFrame({
         <header
           className={cx(
             'flex items-center justify-between gap-0.5 border-b border-neutral-500/50 bg-slate-800 px-0.5 py-0.5',
+            // Sticky headings are opt-in because many CardFrames are short or
+            // live inside independently scrolling panes. Keeping the behavior
+            // on the shared component gives long cards a consistent title bar
+            // without changing the layout of existing callers.
+            stickyHeader && 'sticky top-0 z-10',
             // 'flex items-center justify-between gap-0.5 border-b border-neutral-500/50 bg-gradient-to-r from-neutral-800 via-neutral-700 to-neutral-600 px-0.5 py-0.5',
             headerClassName,
           )}

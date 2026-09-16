@@ -4,8 +4,8 @@
 const fs = require('fs');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('barcodeScannerService');
+const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 const { resolveDataDir, resolveDataPath } = require('../../helpers/dataPaths');
-const { isFeatureEnabled } = require('../../helpers/features');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { publishEvent } = require('../eventBus');
 const { ensureAudioForText, warmAudioForTexts } = require('./ttsCache');
@@ -15,7 +15,7 @@ const REGISTRY_PATH = resolveDataPath('barcode-registry.json');
 const RECENT_SCAN_LIMIT = 8;
 const VALID_CODE_PATTERN = /^[a-z][0-9]{3}$/;
 const SCANNER_SOCKET_ROOM = 'barcode-scanner';
-const enabled = isFeatureEnabled('barcodeScanner');
+let enabled = Boolean(loadConfig().barcodeScanner?.enabled);
 
 let lastKnownGoodRegistry = null;
 let lastRegistryError = null;
@@ -312,19 +312,16 @@ async function applyScan(rawCode) {
   return { result };
 }
 
-if (enabled) {
-  /*
-    Barcode scanning is tied to a physical scanner station. Disabled installs
-    should not create the registry file or expose scanner socket commands.
-  */
-  io.on('connection', (socket) => {
+io.on('connection', (socket) => {
     socket.on('barcode:subscribe', (_payload = {}, cb = () => {}) => {
+      if (!enabled) return cb({ error: 'barcode scanner disabled' });
       socket.join(SCANNER_SOCKET_ROOM);
       socket.emit('barcode:state', buildStatePayload());
       cb({ success: true, state: buildStatePayload() });
     });
 
     socket.on('barcode:scan', async ({ code } = {}, cb = () => {}) => {
+      if (!enabled) return cb({ error: 'barcode scanner disabled' });
       try {
         const { result } = await applyScan(code);
         cb({ success: true, result, state: buildStatePayload() });
@@ -336,19 +333,27 @@ if (enabled) {
         cb({ error: err.message || 'barcode scan failed' });
       }
     });
-  });
+});
 
-  modeEvents.on('change', () => {
+modeEvents.on('change', () => {
     // Access-mode changes affect whether the scanner page should beep when it
     // submits a code, so scanner clients need a fresh state packet even without a
     // new scan.
     broadcastState();
-  });
+});
 
+if (enabled) {
   loadRegistryForScan();
 } else {
   logger.info('Barcode scanner disabled by config');
 }
+
+registerConfigurationHandler('barcodeScanner', (scannerConfig = {}) => {
+  const wasEnabled = enabled;
+  enabled = Boolean(scannerConfig.enabled);
+  if (!wasEnabled && enabled) loadRegistryForScan();
+  broadcastState();
+});
 
 module.exports = {
   REGISTRY_PATH,
