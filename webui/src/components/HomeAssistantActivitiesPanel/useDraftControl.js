@@ -5,6 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export default function useDraftControl(onChange, disabled) {
   const [draft, setDraft] = useState(null);
   const timer = useRef(null);
+  const change = useRef(onChange);
+  // A compound action may receive newer companion values while this field is
+  // being typed. Use the current handler when the pause ends, not a snapshot
+  // captured when the timer started.
+  useEffect(() => { change.current = onChange; }, [onChange]);
   const cancel = useCallback(() => {
     clearTimeout(timer.current);
     timer.current = null;
@@ -19,9 +24,9 @@ export default function useDraftControl(onChange, disabled) {
     if (disabled) return;
     // Sending ends the local edit, not a request/response transaction. The
     // next HA broadcast updates this input just like any external change.
-    onChange(value);
+    change.current(value);
     setDraft(null);
-  }, [onChange, disabled, cancel]);
+  }, [disabled, cancel]);
 
   const edit = (value, debounce = true) => {
     cancel();

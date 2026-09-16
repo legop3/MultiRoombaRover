@@ -354,8 +354,8 @@ export function SessionProvider({ children }) {
       // Activity controls are driven by HA broadcasts, not acknowledgements.
       // Skip disconnected edits instead of buffering and replaying stale
       // values when the browser reconnects.
-      homeAssistantActivityAct: (id, value) => {
-        if (socket.connected) socket.emit('homeAssistantActivities:act', { id, value });
+      homeAssistantActivityAct: (id, action, values = {}) => {
+        if (socket.connected) socket.emit('homeAssistantActivities:act', { id, action, values });
       },
       homeAssistantToggle: (entityId) => emitWithAck('homeAssistant:toggle', { entityId }),
       homeAssistantSetState: (entityId, state) =>

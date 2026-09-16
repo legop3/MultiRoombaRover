@@ -9,7 +9,7 @@ function assertAccess(actor = {}) {
 }
 
 function createActions({ getConfig, ha, locks }) {
-  async function execute(id, value, actor, idle = false) {
+  async function execute(id, actionId, values, actor, idle = false) {
     if (!idle) assertAccess(actor);
     const config = getConfig();
     if (!config.enabled) throw new Error('Home Assistant activities are disabled');
@@ -17,12 +17,12 @@ function createActions({ getConfig, ha, locks }) {
     if (!item) throw new Error('Unknown activity item');
     if (!idle && locks.isLocked(id) && !['admin', 'lockdown'].includes(actor.role)) throw new Error('This item is locked');
     if (!ha.enabled || !ha.isConnected()) throw new Error('Home Assistant is offline');
-    const entity = buildEntity(item, ha.getRawEntitySnapshot(id));
+    const entity = buildEntity(item, ha.getRawEntitySnapshot(id), ha.getServiceDescriptions());
     if (!entity.available) throw new Error('This item is unavailable');
-    const command = buildCommand(entity, value);
+    const command = buildCommand(entity, actionId, values);
     // Let HA process independent commands normally; an outstanding service
     // response must not block later user changes or configured idle cleanup.
-    await ha.callHomeAssistantService(entity.domain, command.service, command.data);
+    await ha.callHomeAssistantService(command.domain, command.service, command.data);
   }
 
   async function runIdleActions() {
@@ -34,13 +34,25 @@ function createActions({ getConfig, ha, locks }) {
     for (const item of config.items) {
       if (!item.idleAction || item.idleAction === 'unchanged' || item.readOnly) continue;
       try {
-        const entity = buildEntity(item, ha.getRawEntitySnapshot(item.id));
-        if (entity.type === 'readOnly') continue;
-        if ((item.idleAction === 'press') !== (entity.type === 'button')) throw new Error('Idle action does not match the control type');
-        // The admin form omits an empty optional string. Treat that as empty
-        // text so clearing a message works; other types still reject it through
-        // their normal value validation rather than silently receiving zero.
-        await execute(item.id, item.idleAction === 'press' ? 'press' : (item.idleValue ?? ''), null, true);
+        const entity = buildEntity(item, ha.getRawEntitySnapshot(item.id), ha.getServiceDescriptions());
+        const actionId = item.idleAction.includes('.') ? item.idleAction : `${item.id.split('.')[0]}.${item.idleAction}`;
+        const action = entity.actions.find((candidate) => candidate.id === actionId);
+        if (!action) throw new Error('Configured idle action is not available');
+        let values = {};
+        // A single-input action accepts its plain value. Compound actions use
+        // a JSON object so admins can specify exactly which properties idle
+        // should change, without inventing a separate per-domain idle policy.
+        if (action.fields.length === 1) {
+          const field = action.fields[0];
+          const value = item.idleValue ?? '';
+          values[field.key] = ['toggle', 'color', 'button'].includes(field.type) ? JSON.parse(value) : value;
+          if (field.type === 'select') {
+            values[field.key] = field.options.find((option) => String(option.value) === value)?.value ?? value;
+          }
+        } else if (item.idleValue?.trim()) {
+          values = JSON.parse(item.idleValue);
+        }
+        await execute(item.id, actionId, values, null, true);
         results.push({ id: item.id, ok: true });
       } catch (error) {
         results.push({ id: item.id, ok: false, error: error.message });
@@ -48,7 +60,7 @@ function createActions({ getConfig, ha, locks }) {
     }
     return { action: 'homeAssistantActivitiesIdle', results };
   }
-  return { act: (id, value, actor) => execute(id, value, actor), runIdleActions };
+  return { act: (id, actionId, values, actor) => execute(id, actionId, values, actor), runIdleActions };
 }
 
 module.exports = { createActions, assertAccess };

@@ -26,6 +26,8 @@ function createHomeAssistantRuntime(haConfig = {}) {
     enabled,
     haConfig,
     onSnapshot: runtimeEngine.handleEntitySnapshot,
+    // Activity controls consume service metadata without entering the room catalog.
+    onServices: () => events.emit('services'),
     onStatus: () => runtimeEngine.emitStatus(runtimeEngine.getState),
   });
   callHomeAssistantServiceImpl = transport.callHomeAssistantService;
@@ -74,6 +76,7 @@ module.exports = {
   },
   getLightPolicyState: (...args) => current.runtimeEngine.getLightPolicyState(...args),
   isLightControlLocked: (...args) => current.runtimeEngine.isLightControlLocked(...args),
+  getServiceDescriptions: () => current.transport.getServiceDescriptions(),
   getRawEntitySnapshot: (...args) => current.runtimeEngine.getRawEntitySnapshot(...args),
   getControllableEntityIds: (...args) => current.runtimeEngine.getControllableEntityIds(...args),
   callHomeAssistantService: (...args) => current.transport.callHomeAssistantService(...args),

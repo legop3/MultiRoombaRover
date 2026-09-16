@@ -2,7 +2,7 @@
 // Purpose: Manages websocket auth connection lifecycle, entity subscription, and reconnect behavior.
 // Scope: Handles Home Assistant network transport and service-call plumbing without business policy logic.
 const WebSocket = require('ws');
-const { createConnection, subscribeEntities, callService, Auth } = require('home-assistant-js-websocket');
+const { createConnection, subscribeEntities, getServices, callService, Auth } = require('home-assistant-js-websocket');
 const { runtime } = require('./state');
 
 if (!global.WebSocket) {
@@ -10,10 +10,45 @@ if (!global.WebSocket) {
 }
 
 function createTransport(deps) {
-  const { logger, enabled, haConfig, onSnapshot, onStatus } = deps;
+  const { logger, enabled, haConfig, onSnapshot, onStatus, onServices } = deps;
   let active = true;
   let connection = null;
   let unsubscribeEntities = null;
+  let serviceDescriptions = null;
+  let serviceUnsubscribers = [];
+  let serviceRequest = 0;
+
+  async function refreshServices(owner) {
+    if (!active || owner !== connection) return;
+    const request = ++serviceRequest;
+    try {
+      const descriptions = await getServices(owner);
+      // A reload or reconnect can finish an old request after the replacement
+      // connection starts. Only publish metadata from the current connection.
+      if (!active || owner !== connection || request !== serviceRequest) return;
+      serviceDescriptions = descriptions;
+      onServices?.();
+    } catch (error) {
+      if (active && owner === connection) logger.warn('Failed to fetch Home Assistant actions', error.message);
+    }
+  }
+
+  async function watchServices(owner) {
+    // The library's subscribeServices inserts empty descriptions for newly
+    // registered actions. Fetch full selector metadata instead, on the same
+    // registration/removal events, so integration reloads retain their inputs.
+    for (const event of ['service_registered', 'service_removed']) {
+      if (!active || owner !== connection) return;
+      try {
+        const unsubscribe = await owner.subscribeEvents(() => refreshServices(owner), event);
+        if (!active || owner !== connection) unsubscribe();
+        else serviceUnsubscribers.push(unsubscribe);
+      } catch (error) {
+        if (active && owner === connection) logger.warn('Failed to watch Home Assistant actions', error.message);
+      }
+    }
+    if (active && owner === connection) await refreshServices(owner);
+  }
   function getCallerFrame() {
     const stack = new Error().stack || '';
     const lines = stack.split('\n').slice(2).map((line) => line.trim());
@@ -40,6 +75,14 @@ function createTransport(deps) {
   }
 
   function teardownConnection() {
+    // Retire metadata together with its connection; no old service definitions
+    // may authorize writes against a different Home Assistant installation.
+    serviceRequest += 1;
+    serviceDescriptions = null;
+    serviceUnsubscribers.forEach((unsubscribe) => {
+      try { unsubscribe(); } catch (error) { logger.warn('Failed to unsubscribe Home Assistant actions', error.message); }
+    });
+    serviceUnsubscribers = [];
     const ownedUnsubscribe = unsubscribeEntities;
     unsubscribeEntities = null;
     if (ownedUnsubscribe) {
@@ -105,6 +148,7 @@ function createTransport(deps) {
       logger.info('Connected to Home Assistant');
       unsubscribeEntities = subscribeEntities(connection, onSnapshot);
       runtime.unsubscribeEntities = unsubscribeEntities;
+      void watchServices(connection);
       connection.addEventListener('disconnected', () => {
         logger.warn('Home Assistant connection lost');
         teardownConnection();
@@ -151,6 +195,7 @@ function createTransport(deps) {
     disconnect,
     isConnected,
     callHomeAssistantService,
+    getServiceDescriptions: () => serviceDescriptions,
   };
 }
 
