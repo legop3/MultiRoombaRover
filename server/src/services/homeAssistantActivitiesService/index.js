@@ -21,7 +21,6 @@ const actions = createActions({ getConfig: () => config, ha: {
   get enabled() { return ha.enabled; },
   isConnected: () => snapshotReady && ha.isConnected(),
   getRawEntitySnapshot: ha.getRawEntitySnapshot,
-  getServiceDescriptions: ha.getServiceDescriptions,
   callHomeAssistantService: ha.callHomeAssistantService,
 }, locks });
 
@@ -29,8 +28,7 @@ function getState() {
   return {
     enabled: config.enabled,
     connected: ha.enabled && snapshotReady && ha.isConnected(),
-    controlsReady: Boolean(ha.getServiceDescriptions()),
-    items: config.enabled ? config.items.map((item) => buildEntity(item, ha.getRawEntitySnapshot(item.id), ha.getServiceDescriptions(), locks.isLocked(item.id))) : [],
+    items: config.enabled ? config.items.map((item) => buildEntity(item, ha.getRawEntitySnapshot(item.id), locks.isLocked(item.id))) : [],
   };
 }
 
@@ -52,8 +50,6 @@ function setLocked(query, locked) {
   return item;
 }
 
-// Newly loaded/reloaded integrations can change controls without state changes.
-ha.homeAssistantEvents.on('services', emitUpdate);
 ha.homeAssistantEvents.on('snapshot', () => {
   snapshotReady = true;
   emitUpdate();
@@ -70,7 +66,7 @@ registerConfigurationHandler('homeAssistantActivities', (next) => {
 io.on('connection', (socket) => {
   socket.on('homeAssistantActivities:act', async (payload) => {
     try {
-      await actions.act(payload?.id, payload?.action, payload?.values, { role: getRole(socket), mode: getMode() });
+      await actions.act(payload?.id, payload?.value, { role: getRole(socket), mode: getMode() });
     } catch (error) {
       // No acknowledgement state is sent to the browser: actual entity
       // changes arrive through the shared snapshot stream. Keep failures in

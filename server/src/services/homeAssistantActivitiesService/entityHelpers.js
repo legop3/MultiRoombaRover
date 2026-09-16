@@ -1,89 +1,69 @@
-// Public activity state consists of an entity plus its discovered actions. The
-// same descriptors drive rendering and server validation so clients cannot add
-// writable attributes or arbitrary HA targets of their own.
-const { describeActions, humanize } = require('./capabilities');
+// Only these domains have a known write contract. All other entities retain
+// their actual state as read-only text instead of being coerced to on/off.
+const TYPES = {
+  light: 'toggle', switch: 'toggle', input_boolean: 'toggle',
+  number: 'number', input_number: 'number', text: 'text', input_text: 'text',
+  select: 'select', input_select: 'select', button: 'button', input_button: 'button',
+};
 
-function buildEntity(item, raw, services, locked = false) {
+function buildEntity(item, raw, locked = false) {
   const attributes = raw?.attributes || {};
-  const { actions, unsupported } = item.readOnly ? { actions: [], unsupported: [] } : describeActions(item.id, raw, services);
+  const domain = item.id.split('.')[0];
+  const type = item.readOnly ? 'readOnly' : TYPES[domain] || 'readOnly';
+  // A never-pressed button legitimately reports unknown. Its state is a last
+  // press timestamp, not availability or a boolean toggle state.
+  const available = Boolean(raw && raw.state !== 'unavailable' && (raw.state !== 'unknown' || type === 'button'));
+  const numeric = (value) => typeof value === 'number' && Number.isFinite(value) ? value : null;
   return {
     id: item.id, name: item.name?.trim() || attributes.friendly_name || item.id,
-    icon: item.icon || '', color: item.color || '', locked, readOnly: Boolean(item.readOnly),
-    // Unknown is a legitimate initial state for press-only and stateless
-    // entities. Missing entities and explicit unavailable states disable input.
-    available: Boolean(raw && raw.state !== 'unavailable'),
+    // Include presentation settings in session state so all clients share the configured color.
+    icon: item.icon || '', color: item.color || '', domain, type, locked, available,
     state: raw?.state ?? 'unknown', unit: attributes.unit_of_measurement || '',
-    password: attributes.mode === 'password', actions, unsupported,
-    // Scalar attributes remain inspectable without interpreting them as writable
-    // properties. Lists/objects used for capability metadata are not dumped into
-    // the compact tile, and sensitive text values are not echoed as details.
-    details: Object.entries(attributes).filter(([key, value]) => (
-      !['friendly_name', 'icon', 'supported_features', 'unit_of_measurement', 'mode'].includes(key)
-      && !key.startsWith('min_') && !key.startsWith('max_')
-      && ['string', 'number', 'boolean'].includes(typeof value) && attributes.mode !== 'password'
-    )).map(([key, value]) => ({ name: humanize(key), value: String(value) })),
+    min: numeric(attributes.min), max: numeric(attributes.max), step: numeric(attributes.step),
+    options: Array.isArray(attributes.options) ? attributes.options.filter((option) => typeof option === 'string') : [],
+    password: attributes.mode === 'password',
   };
 }
 
-function normalizeValue(field, value) {
-  switch (field.type) {
+function buildCommand(entity, value) {
+  const data = { entity_id: entity.id };
+  // Explicit state writes avoid racing a server-side toggle against another
+  // user's click. Each branch validates the current HA metadata, not the UI.
+  switch (entity.type) {
     case 'toggle':
-      if (typeof value !== 'boolean') throw new Error(`${field.name}: expected a boolean`);
-      return value;
+      if (value !== 'on' && value !== 'off') throw new Error('Expected on or off');
+      return { service: value === 'on' ? 'turn_on' : 'turn_off', data };
+    case 'button':
+      if (value !== 'press') throw new Error('Expected press');
+      return { service: 'press', data };
     case 'number': {
-      if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') throw new Error(`${field.name}: enter a number`);
+      if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') throw new Error('Enter a number');
       const number = Number(value);
-      if (!Number.isFinite(number)) throw new Error(`${field.name}: enter a finite number`);
-      if ((field.min !== null && number < field.min) || (field.max !== null && number > field.max)) throw new Error(`${field.name}: value is outside the allowed range`);
-      // Step controls slider granularity, not a universal service constraint.
-      // HA owns quantization (for example a three-speed fan reports rounded
-      // percentages while advertising a fractional percentage_step).
-      return number;
+      if (!Number.isFinite(number)) throw new Error('Enter a finite number');
+      if (entity.min === null || entity.max === null) throw new Error('Number limits are unavailable');
+      if (number < entity.min || number > entity.max) throw new Error(`Value must be between ${entity.min} and ${entity.max}`);
+      // Use a tolerance for decimal steps because binary floating point cannot
+      // exactly represent values such as 0.1. The range is still checked above.
+      if (entity.step > 0) {
+        const steps = (number - entity.min) / entity.step;
+        if (Math.abs(steps - Math.round(steps)) > 1e-7) throw new Error(`Value must use steps of ${entity.step}`);
+      }
+      return { service: 'set_value', data: { ...data, value: number } };
+    }
+    case 'text': {
+      if (typeof value !== 'string') throw new Error('Expected text');
+      const length = Array.from(value).length;
+      if (length < (entity.min ?? 0) || length > (entity.max ?? 255)) throw new Error('Text is outside the allowed length');
+      // Keep type/length checks here; HA owns integration-specific text rules
+      // so its patterns are not reinterpreted by a different regex engine.
+      return { service: 'set_value', data: { ...data, value } };
     }
     case 'select':
-      if (!field.options.some((option) => option.value === value)) throw new Error(`${field.name}: choose an available option`);
-      return value;
-    case 'text': {
-      if (typeof value !== 'string') throw new Error(`${field.name}: expected text`);
-      const length = Array.from(value).length;
-      if (length < (field.min ?? 0) || (field.max !== null && length > field.max)) throw new Error(`${field.name}: text is outside the allowed length`);
-      return value;
-    }
-    case 'color':
-      if (!Array.isArray(value) || value.length !== 3 || value.some((channel) => !Number.isInteger(channel) || channel < 0 || channel > 255)) throw new Error(`${field.name}: expected RGB color`);
-      return value;
-    case 'button':
-      if (value !== field.constant) throw new Error(`${field.name}: invalid constant`);
-      return value;
-    case 'date':
-    case 'time':
-    case 'datetime':
-      // Native browser pickers send strings. HA owns calendar/time validation
-      // and timezone interpretation instead of a second date parser here.
-      if (typeof value !== 'string' || !value.trim()) throw new Error(`${field.name}: enter a ${field.type}`);
-      return value;
+      if (!entity.options.includes(value)) throw new Error('Choose an available option');
+      return { service: 'select_option', data: { ...data, option: value } };
     default:
-      throw new Error('Unsupported input');
+      throw new Error('This item is read-only');
   }
-}
-
-function buildCommand(entity, actionId, values = {}) {
-  if (entity.readOnly) throw new Error('This item is read-only');
-  const action = entity.actions.find((candidate) => candidate.id === actionId);
-  if (!action) throw new Error('This action is not available for the entity');
-  if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error('Expected action fields');
-  const data = {};
-  // Never forward arbitrary data, especially entity_id/device_id/area_id: only
-  // the selected action's currently supported fields can reach the HA service.
-  for (const [key, value] of Object.entries(values)) {
-    const field = action.fields.find((candidate) => candidate.key === key);
-    if (!field) throw new Error(`Unknown action field: ${key}`);
-    data[key] = normalizeValue(field, value);
-  }
-  for (const field of action.fields) {
-    if (field.required && !Object.hasOwn(data, field.key)) throw new Error(`${field.name} is required`);
-  }
-  return { domain: action.domain, service: action.service, data: { ...data, entity_id: entity.id } };
 }
 
 module.exports = { buildEntity, buildCommand };

@@ -8,8 +8,8 @@ export default function TextControl({ entity, disabled, onChange }) {
   // sending starts. Enter remains an immediate action for ordinary typing.
   return <>
     <input type={entity.password ? 'password' : 'text'} aria-label={entity.name}
-      value={control.draft ?? entity.state ?? ''} disabled={disabled}
-      minLength={entity.min ?? undefined} maxLength={entity.max ?? undefined}
+      value={control.draft ?? (entity.available ? entity.state : '')} disabled={disabled}
+      minLength={entity.min ?? undefined} maxLength={entity.max ?? 255}
       onChange={(event) => control.edit(event.target.value, !composing.current)}
       onCompositionStart={() => { composing.current = true; control.cancel(); }}
       onCompositionEnd={(event) => { composing.current = false; control.edit(event.currentTarget.value); }}
