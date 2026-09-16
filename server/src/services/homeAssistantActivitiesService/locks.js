@@ -19,7 +19,7 @@ function resolveItem(items, query) {
   if (idMatch) return idMatch;
   const matches = items.filter((item) => item.name.toLowerCase() === normalized);
   if (matches.length > 1) throw new Error(`Name is ambiguous. Use an entity ID: ${matches.map((item) => item.id).join(', ')}`);
-  if (!matches.length) throw new Error('No activity item matches that name or entity ID');
+  if (!matches.length) throw new Error('No activity control item matches that name or entity ID');
   return matches[0];
 }
 

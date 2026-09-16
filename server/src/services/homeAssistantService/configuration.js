@@ -52,14 +52,14 @@ module.exports = {
     ],
   },
   schema: strictObject({
-    enabled: boolean({ description: 'Immediately connects to Home Assistant and enables configured room entities, physical-button triggers, Neato controls, and lift controls.' }),
+    enabled: boolean({ description: 'Immediately connects to Home Assistant and enables configured room lights, physical-button triggers, Neato controls, and lift controls.' }),
     url: string({ title: 'Server URL', description: 'Base URL of the Home Assistant server used for its REST and WebSocket APIs.', format: 'uri', maxLength: 2048 }),
     token: string({ title: 'Long-lived access token', description: 'Home Assistant long-lived access token used to authenticate every API request. The saved value is never returned to the browser.', examples: ['REPLACE_WITH_LONG_LIVED_TOKEN'], writeOnly: true, maxLength: 20000 }),
     [neato.key]: neato.schema,
     [lift.key]: lift.schema,
     entities: {
       type: 'array',
-      title: 'Room entities',
+      title: 'Room Lights',
       description: 'Home Assistant lights and switches exposed to the room-light controls and button-box actions.',
       items: strictObject({
         id: string({ title: 'Entity id', description: 'Exact Home Assistant entity ID, such as light.rover_room or switch.floor_lamp.', examples: ['light.lab_main'], minLength: 1, maxLength: 255 }),

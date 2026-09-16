@@ -44,7 +44,7 @@ module.exports = {
   goal: 400,
   async run(ctx) {
     startStrobe(ctx, { endsAt: Date.now() + STROBE_MS, on: false });
-    ctx.sendAlert({ color: '#ffc107', title: 'Light Strobe', message: 'All room controls strobing for 60 seconds.' });
+    ctx.sendAlert({ color: '#ffc107', title: 'Light Strobe', message: 'All room lights strobing for 60 seconds.' });
   },
   async recover(ctx, effect) {
     if (!effect || Number(effect.endsAt || 0) <= Date.now()) {

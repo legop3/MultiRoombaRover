@@ -129,7 +129,8 @@ test('locks are process-local and names resolve without guessing', () => {
   assert.equal(resolveItem(items.slice(0, 1), 'FAN SPEED').id, 'number.fan');
   assert.equal(resolveItem(items, 'NUMBER.FAN').id, 'number.fan');
   assert.throws(() => resolveItem(items, 'Fan speed'), /number.fan, number.other/);
-  assert.throws(() => resolveItem(items, 'Fan'), /No activity/);
+  // Keep the lookup error aligned with the panel name users see when choosing an item.
+  assert.throws(() => resolveItem(items, 'Fan'), /No activity control/);
 });
 
 test('command preserves multiword names and exposes lock status', async () => {

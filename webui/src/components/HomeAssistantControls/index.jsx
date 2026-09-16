@@ -174,7 +174,7 @@ export default function HomeAssistantControls() {
 
   /*
     Feature existence is owned here, not by each layout that happens to mount
-    room controls. Disabled integrations render nothing; enabled integrations
+    room lights. Disabled integrations render nothing; enabled integrations
     can still show offline/configuration states inside the panel.
   */
   if (!enabled) return null;
@@ -199,7 +199,7 @@ function HomeAssistantControlsContent() {
 
   if (!ha?.enabled) {
     return (
-      <CardFrame title="Room Controls" bodyClassName="space-y-0.5 text-sm text-slate-400">
+      <CardFrame title="Room Lights" bodyClassName="space-y-0.5 text-sm text-slate-400">
         <p className="text-slate-500">Not configured on the server.</p>
       </CardFrame>
     );
@@ -207,7 +207,7 @@ function HomeAssistantControlsContent() {
 
   if (entities.length === 0) {
     return (
-      <CardFrame title="Room Controls" bodyClassName="space-y-0.5 text-sm text-slate-400">
+      <CardFrame title="Room Lights" bodyClassName="space-y-0.5 text-sm text-slate-400">
         <p className="text-slate-500">No lights or switches configured.</p>
       </CardFrame>
     );
@@ -233,16 +233,16 @@ function HomeAssistantControlsContent() {
   );
 
   return (
-    <CardFrame title="Room Controls" actions={actions} bodyClassName="space-y-0.5 text-base">
+    <CardFrame title="Room Lights" actions={actions} bodyClassName="space-y-0.5 text-base">
       {lightPolicyLocked ? (
         <p className="rounded border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
           {adminCanControlLockedLights
             ? lockState === 'off'
-              ? 'Lights are locked off. Admin room controls remain available.'
-              : 'Lights are locked on. Admin room controls remain available.'
+              ? 'Lights are locked off. Admin room lights remain available.'
+              : 'Lights are locked on. Admin room lights remain available.'
             : lockState === 'off'
-              ? 'Lights are locked off. Room controls are disabled.'
-              : 'Lights are locked on. Room controls are disabled.'}
+              ? 'Lights are locked off. Room lights are disabled.'
+              : 'Lights are locked on. Room lights are disabled.'}
         </p>
       ) : null}
       {/* Each lamp declares only the smallest width at which its title, status,

@@ -51,7 +51,7 @@ export default function HomeAssistantActivitiesPanel() {
   const connected = state.connected && socketConnected;
   // Reuse the room-control auto-fit grid and compact tile rhythm, while keeping
   // all data and commands in the Activities namespace on both device layouts.
-  return <CardFrame title="Home Assistant" bodyClassName="space-y-0.5 text-sm"
+  return <CardFrame title="Activity Controls" bodyClassName="space-y-0.5 text-sm"
     actions={<span className={`rounded px-1 py-0.5 text-xs font-semibold leading-none ${connected ? 'bg-emerald-900 text-emerald-100' : 'bg-amber-900 text-amber-100'}`}>{connected ? 'Connected' : 'Offline'}</span>}>
     {!connected ? <p className="px-0.5 text-xs text-amber-200">{socketConnected ? 'Home Assistant is offline.' : 'Server disconnected.'} Values may be out of date.</p> : null}
     {!allowed ? <p className="px-0.5 text-xs text-slate-400">Controls are read-only with your current access.</p> : null}

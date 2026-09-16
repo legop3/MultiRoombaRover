@@ -328,7 +328,7 @@ export default function KeyboardInputManager() {
       shortcuts are part of the public room-control surface. Admin sessions are
       allowed through when the current site mode would also allow their socket
       command, so keyboard behavior matches the server-side authorization and
-      the clickable Room Controls panel.
+      the clickable Room Lights panel.
     */
     if ((ha?.lightPolicy?.locked || ha?.lightPolicy?.lockedOn) && !latest?.adminCanControlLockedLights) return;
     const entities = ha.entities || [];

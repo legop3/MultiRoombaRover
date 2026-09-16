@@ -12,7 +12,7 @@ function createActions({ getConfig, ha, locks }) {
   async function execute(id, value, actor, idle = false) {
     if (!idle) assertAccess(actor);
     const config = getConfig();
-    if (!config.enabled) throw new Error('Home Assistant activities are disabled');
+    if (!config.enabled) throw new Error('Activity Controls are disabled');
     const item = config.items.find((entry) => entry.id === id);
     if (!item) throw new Error('Unknown activity item');
     if (!idle && locks.isLocked(id) && !['admin', 'lockdown'].includes(actor.role)) throw new Error('This item is locked');

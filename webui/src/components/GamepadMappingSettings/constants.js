@@ -68,8 +68,8 @@ export const ACTIONS = [
   { id: 'videoFilterCycle', label: 'Cycle video filter', kind: 'button', section: 'Camera' },
   { id: 'songNoteUp', label: 'Play higher note', kind: 'button', section: 'Audio and chat', driveMode: 'single' },
   { id: 'songNoteDown', label: 'Play lower note', kind: 'button', section: 'Audio and chat', driveMode: 'single' },
-  { id: 'homeAssistantOn', label: 'Turn next room control on', kind: 'button', section: 'Room controls' },
-  { id: 'homeAssistantOff', label: 'Turn next room control off', kind: 'button', section: 'Room controls' },
+  { id: 'homeAssistantOn', label: 'Turn next room light on', kind: 'button', section: 'Room lights' },
+  { id: 'homeAssistantOff', label: 'Turn next room light off', kind: 'button', section: 'Room lights' },
   /* Digital aux actions provide exact parity with the keyboard help surface. They coexist with
      analog brush controls so each operator can choose proportional triggers or discrete buttons. */
   { id: 'auxMainForward', label: 'Main brush forward', kind: 'button', section: 'Aux buttons' },

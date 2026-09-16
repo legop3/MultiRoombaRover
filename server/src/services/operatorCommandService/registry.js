@@ -24,7 +24,7 @@ function buildCommandRegistry(prefix, timeCommand) {
     // integration is absent.
     green: { category: 'admin', summary: 'Toggle green room and page mode.', usage: [`${prefix} green <on|off>`], access: 'Admin', permission: 'admin' },
     // Locks are moderation only; entity actions remain in the Activities card.
-    ha: { category: 'features', summary: 'List activity locks or lock/unlock an item by name or entity ID.', usage: [`${prefix} ha status`, `${prefix} ha <lock|unlock> <name or entity ID>`], access: 'Admin', permission: 'admin', requiredFeature: 'homeAssistantActivities', unavailableLabel: 'Home Assistant activities' },
+    ha: { category: 'features', summary: 'List activity control locks or lock/unlock an item by name or entity ID.', usage: [`${prefix} ha status`, `${prefix} ha <lock|unlock> <name or entity ID>`], access: 'Admin', permission: 'admin', requiredFeature: 'homeAssistantActivities', unavailableLabel: 'Activity Controls' },
     lights: {
       category: 'features',
       summary: 'Control room lights or manage the admin light lock.',

@@ -19,7 +19,7 @@ async function turnOffRoomControls() {
   const lightPolicy = homeAssistantService.getLightPolicyState?.() || null;
   const lockState = lightPolicy?.lockState || null;
   if (lockState === 'on') {
-    logger.info('Idle room-controls off skipped because room controls are locked on', {
+    logger.info('Idle room-controls off skipped because room lights are locked on', {
       lockState,
       source: 'idleService:turnOffRoomControls',
     });

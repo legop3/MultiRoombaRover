@@ -5,12 +5,12 @@ const { getCommandConfig } = require('../config');
 function createHaCommand({ homeAssistantActivitiesService: service, config }) {
   return async function handleHaCommand(message, tokens = []) {
     const reply = (content) => message.reply({ content, allowedMentions: { parse: [], repliedUser: false } });
-    if (!service) return reply('Home Assistant activities are unavailable.');
+    if (!service) return reply('Activity Controls are unavailable.');
     const action = String(tokens[0] || 'status').toLowerCase();
     try {
       if (action === 'status') {
         const items = service.getState().items;
-        return reply(items.length ? items.map((item) => `${item.name} (${item.id}): ${item.locked ? 'locked' : 'unlocked'}`).join('\n') : 'No activity items configured.');
+        return reply(items.length ? items.map((item) => `${item.name} (${item.id}): ${item.locked ? 'locked' : 'unlocked'}`).join('\n') : 'No activity control items configured.');
       }
       if (!['lock', 'unlock'].includes(action) || tokens.length < 2) {
         return reply(`Use ${getCommandConfig(config).prefix} ha status, or ha <lock|unlock> <name or entity ID>.`);
