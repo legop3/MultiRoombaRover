@@ -6,12 +6,34 @@ const logger = require('../../globals/logger').child('serverControlService');
 const { getConfigurationDatabase } = require('../../configuration');
 const { requireLockdownAdministrator, requireRecentPassword } = require('../adminConfigurationService');
 const lifecycleClient = require('./lifecycleClient');
+const { setAdminReason } = require('../adminReasonService');
+const roverManager = require('../roverManager');
+const assignmentService = require('../assignmentService');
 
 const database = getConfigurationDatabase();
 let restartPending = false;
 
 function actorFor(socket) {
   return socket?.data?.user?.username || socket.id;
+}
+
+function notifyDriversOfRestart(actor) {
+  // All requested restart paths share this persistent explanation. Updating
+  // the reason does not change server mode or arrange to clear it at startup.
+  const message = 'Server is restarting...';
+  setAdminReason(message, { by: actor });
+  for (const [roverId, rover] of roverManager.rovers) {
+    // Releasing control mutates the set, so snapshot the current drivers and
+    // send each the existing removal notice before their assignment changes.
+    for (const socketId of [...rover.drivers]) {
+      assignmentService.forceReleaseWithNotice(roverId, socketId, {
+        title: message,
+        message,
+        reasonCode: 'application-restart',
+        actor,
+      });
+    }
+  }
 }
 
 function scheduleApplicationRestart() {
@@ -38,6 +60,7 @@ function scheduleApplicationRestart() {
 function requestApplicationRestart({ actor, reason = 'administrator-requested' }) {
   if (restartPending) throw new Error('Application restart already pending.');
   database.recordAuditEvent(actor, 'application.restart-requested', { reason });
+  notifyDriversOfRestart(actor);
   scheduleApplicationRestart();
   logger.warn('Application restart requested', { actor, reason });
   // Restore and ordinary admin restarts share this one browser contract, so
@@ -70,6 +93,8 @@ io.on('connection', (socket) => {
       .then(() => requireRecentPassword(socket))
       .then(() => lifecycleClient.updateApplication())
       .then((lifecycle) => {
+        // Wait for controller acceptance so rejected updates do not kick users.
+        notifyDriversOfRestart(actorFor(socket));
         database.recordAuditEvent(actorFor(socket), 'application.update-requested', {});
         io.emit('server:restarting', { reason: 'application-update' });
         cb({ success: true, lifecycle });
@@ -85,6 +110,9 @@ io.on('connection', (socket) => {
       try {
         const lifecycle = await lifecycleClient.restartApplication();
         restartPending = true;
+        // Container restarts bypass the process-signal path, but need the same
+        // persistent reason and removal notices once the controller accepts.
+        notifyDriversOfRestart(actor);
         database.recordAuditEvent(actor, 'application.restart-requested', { reason: 'administrator-requested' });
         logger.warn('Application container restart requested', { actor });
         io.emit('server:restarting', { reason: 'administrator-requested' });
