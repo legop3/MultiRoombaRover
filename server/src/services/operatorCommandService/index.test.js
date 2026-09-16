@@ -75,9 +75,15 @@ const admin = { id: 's1', userId: 'u-alice', label: 'alice', isAdmin: true, isLo
 
 test('admin-only commands stay admin-only for a non-admin', async () => {
   const run = createRouter();
-  for (const command of ['rs lock rover-1', 'rs unlock rover-1', 'rs mode open', 'rs green on', 'rs kick alice', 'rs permissions list']) {
+  for (const command of ['rs lock rover-1', 'rs unlock rover-1', 'rs mode open', 'rs green on', 'rs kick alice', 'rs permissions list', 'rs ha lock Fan speed']) {
     assert.match(await run(command, nonAdmin), ADMIN_DENIAL, `${command} must stay admin-only`);
   }
+});
+
+// Activity locks obey the same stronger restriction as other moderation actions.
+test('activity lock commands require lockdown admin during lockdown', async () => {
+  const run = createRouter({ mode: MODES.LOCKDOWN });
+  assert.match(await run('rs ha unlock Fan speed', admin), LOCKDOWN_DENIAL);
 });
 
 test('commands that police themselves still reach their handler as a non-admin', async () => {

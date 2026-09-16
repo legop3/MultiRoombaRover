@@ -12,6 +12,7 @@ const bandwidthSavings = require('../helpers/bandwidthSavings.configuration');
 const audioForward = require('../services/audioForwardService/configuration');
 const audioLevels = require('../services/audioLevelsService/configuration');
 const homeAssistant = require('../services/homeAssistantService/configuration');
+const homeAssistantActivities = require('../services/homeAssistantActivitiesService/configuration');
 const roomCameras = require('../services/roomCameraService/configuration');
 const ptzCamera = require('../services/ptzCameraService/configuration');
 const kinect = require('../services/kinectService/configuration');
@@ -41,6 +42,8 @@ const definitions = [
   audioForward,
   audioLevels,
   homeAssistant,
+  // Activities own a separate catalog even though the HA connection is shared.
+  homeAssistantActivities,
   roomCameras,
   ptzCamera,
   kinect,

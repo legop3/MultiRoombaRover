@@ -5,6 +5,7 @@ const logger = require('../../globals/logger').child('idleService');
 const roverManager = require('../roverManager');
 const { issueCommand } = require('../commandService');
 const homeAssistantService = require('../homeAssistantService');
+const homeAssistantActivities = require('../homeAssistantActivitiesService');
 const neatoService = require('../neatoService');
 const liftService = require('../liftService');
 const ptzCameraService = require('../ptzCameraService');
@@ -135,6 +136,8 @@ async function raiseLift() {
 
 const idleActions = [
   turnOffRoomControls,
+  // Generic activities use their own configured idle values and user locks.
+  homeAssistantActivities.runIdleActions,
   // dockAllRovers,
   disableAllRoverHeadlights,
   disableAllRoverLasers,
