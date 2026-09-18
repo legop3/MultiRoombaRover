@@ -173,6 +173,8 @@ test('service definitions generate public feature paths without a separate regis
     { key: 'homeAssistant', path: ['homeAssistant', 'enabled'] },
     { key: 'neato', path: ['homeAssistant', 'neato', 'enabled'] },
     { key: 'lift', path: ['homeAssistant', 'lift', 'enabled'] },
+    // Activities remain independently configurable from the shared connection.
+    { key: 'homeAssistantActivities', path: ['homeAssistantActivities', 'enabled'] },
     { key: 'roomCameras', path: ['roomCameras', 'enabled'] },
     { key: 'ptzCamera', path: ['ptzCamera', 'enabled'] },
     { key: 'kinect', path: ['kinect', 'enabled'] },

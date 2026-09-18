@@ -21,7 +21,7 @@ export default function MobileTabs() {
           <Tab id="chat">Chat</Tab>
           <Tab id="activities">Activities</Tab>
           <VipTabButton compact />
-          <Tab id="roomcontrols">Room Controls</Tab>
+          <Tab id="roomcontrols">Room Lights</Tab>
           <Tab id="help">Help</Tab>
           <Tab id="settings">Settings</Tab>
         </TabList>

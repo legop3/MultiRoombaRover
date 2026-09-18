@@ -27,6 +27,8 @@ const { getNickname } = require('../nicknameService');
 const { getGlobalObjective, setGlobalObjective, clearGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
 const homeAssistantService = require('../homeAssistantService');
+// Both command transports use the same activity lock owner.
+const homeAssistantActivitiesService = require('../homeAssistantActivitiesService');
 const liftService = require('../liftService');
 const neatoService = require('../neatoService');
 const {
@@ -262,6 +264,7 @@ const commandDependencies = {
   // service into the shared command router keeps Discord and mirrored web-chat
   // command behavior aligned without duplicating Home Assistant calls here.
   homeAssistantService,
+  homeAssistantActivitiesService,
   greenModeService,
   liftService,
   neatoService,

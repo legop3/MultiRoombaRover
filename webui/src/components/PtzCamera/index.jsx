@@ -556,7 +556,7 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
           <PtzControlReference />
           <ReplaySourcesPanel panelId="ptz-controller-replay" defaultSelectedKey={`ptz:${PTZ_CAMERA_ID}`} />
           {/*
-            Desktop keeps room controls as the final sidebar tool so camera
+            Desktop keeps room lights as the final sidebar tool so camera
             turn controls and replay remain above the less-frequent room-wide
             actions. HomeAssistantControls owns its own feature and policy gate.
           */}
@@ -604,7 +604,7 @@ function PtzMobileLandscape({ ptz, onClose, releasePending = false }) {
           </main>
           {/*
             The right control column is naturally taller than the viewport.
-            Placing room controls after the fixed-height video uses that left-
+            Placing room lights after the fixed-height video uses that left-
             column space while the whole landscape page continues scrolling as
             one surface.
           */}
@@ -678,7 +678,7 @@ function PtzMobilePortrait({ ptz, onClose, releasePending = false }) {
         </div>
         <PtzQueueSummary ptz={ptz} />
         <ChatPanel title="Chat" allowSpectatorInput inputTarget="overlay" />
-        {/* Portrait keeps room controls immediately after chat as requested. */}
+        {/* Portrait keeps room lights immediately after chat as requested. */}
         <HomeAssistantControls />
       </section>
     </div>

@@ -18,6 +18,8 @@ const {
   ptzCameraEvents,
 } = require('../ptzCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
+// Publish activities separately so room-control consumers cannot operate them.
+const { getState: getActivityState, activityEvents } = require('../homeAssistantActivitiesService');
 const { isEnabled: isGreenModeEnabled, greenModeEvents } = require('../greenModeService');
 const { getState: getNeatoState, neatoEvents } = require('../neatoService');
 const { getState: getLiftState, liftEvents } = require('../liftService');
@@ -220,6 +222,7 @@ function buildSession(socket) {
     roomCameras: getRoomCameras(),
     ptzCamera: getPtzCameraState(socket),
     homeAssistant: getHomeAssistantState(),
+    homeAssistantActivities: getActivityState(),
     // Green mode is a server-wide visual feature. It stays separate from Home
     // Assistant state because HA only supplies the generic light operations.
     greenMode: isGreenModeEnabled(),
@@ -410,6 +413,9 @@ ptzCameraEvents.on('change', () => {
   logger.info('PTZ camera state change; syncing all clients');
   syncAll();
 });
+
+// The activity service filters unrelated HA snapshots before requesting a sync.
+activityEvents.on('update', () => syncAll());
 
 homeAssistantEvents.on('update', () => {
   logger.info('Home Assistant state change; syncing all clients');

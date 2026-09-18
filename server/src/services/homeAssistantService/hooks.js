@@ -55,7 +55,7 @@ function registerHomeAssistantHooks(deps) {
         return cb({ error: 'Insufficient permissions to control Home Assistant' });
       }
       if (isBlockedByRoomControlLock()) {
-        return cb({ error: 'Room controls are locked' });
+        return cb({ error: 'Room lights are locked' });
       }
       try {
         if (!entityId) throw new Error('entityId required');
@@ -71,7 +71,7 @@ function registerHomeAssistantHooks(deps) {
         return cb({ error: 'Insufficient permissions to control Home Assistant' });
       }
       if (isBlockedByRoomControlLock()) {
-        return cb({ error: 'Room controls are locked' });
+        return cb({ error: 'Room lights are locked' });
       }
       try {
         if (!entityId) throw new Error('entityId required');
@@ -87,7 +87,7 @@ function registerHomeAssistantHooks(deps) {
         return cb({ error: 'Insufficient permissions to control Home Assistant' });
       }
       if (isBlockedByRoomControlLock()) {
-        return cb({ error: 'Room controls are locked' });
+        return cb({ error: 'Room lights are locked' });
       }
       try {
         if (!entityId) throw new Error('entityId required');
@@ -106,7 +106,7 @@ function registerHomeAssistantHooks(deps) {
         return cb({ error: 'Insufficient permissions to control Home Assistant' });
       }
       if (isBlockedByRoomControlLock()) {
-        return cb({ error: 'Room controls are locked' });
+        return cb({ error: 'Room lights are locked' });
       }
       try {
         if (!entityId) throw new Error('entityId required');

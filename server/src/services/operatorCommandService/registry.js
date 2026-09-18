@@ -4,7 +4,7 @@
 const CATEGORIES = {
   system: { title: 'System', names: ['help', 'status', 'replay', 'time-status'] },
   admin: { title: 'Admin', names: ['lock', 'unlock', 'mode', 'reason', 'goal', 'green', 'kick', 'verify', 'deter', 'permissions'] },
-  features: { title: 'Features', names: ['lights', 'lift', 'neato'] },
+  features: { title: 'Features', names: ['lights', 'ha', 'lift', 'neato'] },
   discord: { title: 'Discord', names: ['bridge'] },
 };
 
@@ -23,6 +23,8 @@ function buildCommandRegistry(prefix, timeCommand) {
     // an optional enhancement, so the command must remain available when that
     // integration is absent.
     green: { category: 'admin', summary: 'Toggle green room and page mode.', usage: [`${prefix} green <on|off>`], access: 'Admin', permission: 'admin' },
+    // Locks are moderation only; entity actions remain in the Activities card.
+    ha: { category: 'features', summary: 'List activity control locks or lock/unlock an item by name or entity ID.', usage: [`${prefix} ha status`, `${prefix} ha <lock|unlock> <name or entity ID>`], access: 'Admin', permission: 'admin', requiredFeature: 'homeAssistantActivities', unavailableLabel: 'Activity Controls' },
     lights: {
       category: 'features',
       summary: 'Control room lights or manage the admin light lock.',

@@ -351,6 +351,12 @@ export function SessionProvider({ children }) {
       subscribeAll: () => emitWithAck('session:subscribeAll'),
       lockRover: (roverId, locked) => emitWithAck('session:lockRover', { roverId, locked }),
       setMode: (mode) => emitWithAck('setMode', { mode }),
+      // Activity controls are driven by HA broadcasts, not acknowledgements.
+      // Skip disconnected edits instead of buffering and replaying stale
+      // values when the browser reconnects.
+      homeAssistantActivityAct: (id, value) => {
+        if (socket.connected) socket.emit('homeAssistantActivities:act', { id, value });
+      },
       homeAssistantToggle: (entityId) => emitWithAck('homeAssistant:toggle', { entityId }),
       homeAssistantSetState: (entityId, state) =>
         emitWithAck('homeAssistant:setState', { entityId, state }),
@@ -428,7 +434,7 @@ export function SessionProvider({ children }) {
       clearLatestReplay: () =>
         setState((prev) => (prev.latestReplay ? { ...prev, latestReplay: null } : prev)),
     }),
-    [emitWithAck, setState],
+    [emitWithAck, setState, socket],
   );
 
   const store = useMemo(

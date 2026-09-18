@@ -189,7 +189,7 @@ export function ControlSystemProvider({ children }) {
       Automatic drive-mode lighting is convenience behavior for the open room.
       A room-light lock is an explicit policy decision, including locked-off,
       so this helper must not issue any Home Assistant commands while that
-      policy is active. Admins can still use the dedicated room controls when
+      policy is active. Admins can still use the dedicated room lights when
       they need to override individual lamps.
     */
     if (roomLightsLocked) {

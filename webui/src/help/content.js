@@ -112,10 +112,10 @@ export const HELP_CONTENT = {
           },
           {
             id: 'room-controls',
-            title: 'Room Controls',
+            title: 'Room Lights',
             items: [
-              { action: 'homeAssistantOn', label: 'Next room control on' },
-              { action: 'homeAssistantOff', label: 'Next room control off (reverse)' },
+              { action: 'homeAssistantOn', label: 'Next room light on' },
+              { action: 'homeAssistantOff', label: 'Next room light off (reverse)' },
             ],
           },
         ],
@@ -163,7 +163,7 @@ export const HELP_CONTENT = {
         type: 'list',
         title: 'More controls',
         items: [
-          'Chat, Activities, VIP, Room Controls, Help, and Settings are below the rover controls.',
+          'Chat, Activities, VIP, Room Lights, Help, and Settings are below the rover controls.',
         ],
       },
     ],
@@ -200,7 +200,7 @@ export const HELP_CONTENT = {
         type: 'list',
         title: 'More controls',
         items: [
-          'Chat, Activities, VIP, Room Controls, Help, and Settings are below the rover controls.',
+          'Chat, Activities, VIP, Room Lights, Help, and Settings are below the rover controls.',
         ],
       },
     ],

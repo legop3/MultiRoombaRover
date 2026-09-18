@@ -9,6 +9,7 @@ const { createGoalCommand } = require('./commands/goal');
 const { createVerifyCommand } = require('./commands/verify');
 const { createDeterCommand } = require('./commands/deter');
 const { createPermissionsCommand } = require('./commands/permissions');
+const { createHaCommand } = require('./commands/ha');
 const { createLightsCommand } = require('./commands/lights');
 const { createGreenCommand } = require('./commands/green');
 const { createKickCommand } = require('./commands/kick');
@@ -61,6 +62,8 @@ function createCommandHandlers(deps) {
   const handlePermissionsCommand = createPermissionsCommand(deps);
   const handleBridgeCommand = transportHandlers.bridge;
   const handleTimeStatusCommand = transportHandlers.timeStatus;
+  // HA activities have their own namespace; lights remains room-only.
+  const handleHaCommand = createHaCommand(deps);
   const handleLightsCommand = createLightsCommand(deps);
   const handleGreenCommand = createGreenCommand(deps);
   const handleKickCommand = createKickCommand(deps);
@@ -110,7 +113,7 @@ function createCommandHandlers(deps) {
     // is included because its lock/unlock subcommands change room policy. Its
     // ordinary on/off/color actions are also intentionally restricted to a
     // lockdown admin while the entire server is in lockdown.
-    const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'permissions', 'lights', 'green', 'kick', 'lift', 'neato']);
+    const moderationActions = new Set(['lock', 'unlock', 'mode', 'goal', 'reason', 'verify', 'deter', 'permissions', 'lights', 'ha', 'green', 'kick', 'lift', 'neato']);
     const isAccessModeCommand = commandDefinition?.permission === 'access-mode';
 
     // Feature commands are public activities while access is open or managed
@@ -144,6 +147,8 @@ function createCommandHandlers(deps) {
       case 'bridge':
         if (!handleBridgeCommand) return request.reply(formatHelp({ commandPrefix, timeStatusCommand, includeDiscord: false, isFeatureEnabled: deps.isFeatureEnabled }));
         return handleBridgeCommand(request, tokens);
+      case 'ha':
+        return handleHaCommand(request, tokens);
       case 'lights':
         return handleLightsCommand(request, tokens);
       case 'green':

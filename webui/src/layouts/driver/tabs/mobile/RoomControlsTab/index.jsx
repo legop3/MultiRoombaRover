@@ -1,4 +1,4 @@
-// Mobile Room Controls Tab
+// Mobile Room Lights Tab
 // Purpose: Owns the concrete mobile room-controls card order.
 import { TabPanel } from '../../../../../components/Tabs/index.jsx';
 import HomeAssistantControls from '../../../../../components/HomeAssistantControls/index.jsx';

@@ -1,6 +1,7 @@
 // Driver Activities Tab
 // Purpose: Owns the shared desktop/mobile ordering of activity cards.
 import { TabPanel } from '../../../../../components/Tabs/index.jsx';
+import HomeAssistantActivitiesPanel from '../../../../../components/HomeAssistantActivitiesPanel/index.jsx';
 import NeatoCard from '../../../../../components/NeatoCard/index.jsx';
 import LiftCard from '../../../../../components/LiftCard/index.jsx';
 import BalanceBoardPanel from '../../../../../components/BalanceBoardPanel/index.jsx';
@@ -17,12 +18,12 @@ export default function ActivitiesTab() {
       <div className={`flex flex-col ${themeGapClass}`}>
         <NeatoCard />
         <LiftCard />
+        <HomeAssistantActivitiesPanel />
         <BalanceBoardPanel />
         <BarcodeGamesPanel />
         <OdometerPanel />
         <ButtonBoxPanel />
         <KinectPanel />
-        {/* Fleet reports retains its existing terminal position and self-gate. */}
         <FleetReportsCard />
       </div>
     </TabPanel>

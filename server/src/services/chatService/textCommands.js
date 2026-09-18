@@ -10,6 +10,8 @@ const { getNickname } = require('../nicknameService');
 const { getGlobalObjective, setGlobalObjective, clearGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
 const homeAssistantService = require('../homeAssistantService');
+// Both command transports use the same activity lock owner.
+const homeAssistantActivitiesService = require('../homeAssistantActivitiesService');
 const greenModeService = require('../greenModeService');
 const liftService = require('../liftService');
 const neatoService = require('../neatoService');
@@ -177,6 +179,7 @@ async function runChatTextCommand({ text, socket, sendSystemMessage }) {
     // lights lock/unlock` from becoming transport-specific, and it preserves
     // the existing session update path for all connected browsers.
     homeAssistantService,
+    homeAssistantActivitiesService,
     greenModeService,
     liftService,
     neatoService,

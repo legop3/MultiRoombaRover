@@ -52,7 +52,7 @@ async function setEnabled(nextValue, options = {}) {
       .map(({ result, entityId }) => ({ entityId, error: result.reason?.message || 'unknown error' }));
 
     if (failures.length) {
-      logger.warn('Some room controls failed to enter green mode', { failures });
+      logger.warn('Some room lights failed to enter green mode', { failures });
     }
   } else if (!next && homeAssistantService.enabled) {
     // Disabling the visual mode simply releases the lock it created. Bulb
@@ -67,7 +67,7 @@ async function setEnabled(nextValue, options = {}) {
     skipping the physical-room operations still allows the session theme,
     CardFrame styling, alerts, commands, and timed reward to work normally.
     The integration's generic lock state is also left untouched because there
-    are no server-managed room controls to lock.
+    are no server-managed room lights to lock.
   */
 
   enabled = next;
