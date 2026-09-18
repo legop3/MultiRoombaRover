@@ -338,8 +338,8 @@ function createDiscordRuntime() {
   const integrationHandlers = integrations.register();
   const liveStatus = createLiveStatus({
     client, logger, discordConfig, roverManager, getActiveDrivers, getNickname,
-    io, getMode, getGlobalObjective, fetchChannel: channelIO.fetchChannel, sanitizeMentions,
-    turnEvents, nicknameEvents, subscribe,
+    io, fetchChannel: channelIO.fetchChannel, sanitizeMentions,
+    turnEvents, nicknameEvents,
   });
 
   function isTextCommand(content) {
