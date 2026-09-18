@@ -5,7 +5,7 @@ const { buildRoverStatusSnapshot } = require('./batteryEmbeds');
 function createLiveStatus({ client, logger, discordConfig, roverManager, getActiveDrivers,
   getNickname, io, fetchChannel, sanitizeMentions,
   turnEvents, nicknameEvents }) {
-  const COOLDOWN_MS = 3000;
+  const COOLDOWN_MS = 2000;
   let timer = null;
   let sweepTimer = null;
   let pending = false;
