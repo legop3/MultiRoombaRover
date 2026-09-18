@@ -18,6 +18,7 @@ module.exports = {
       adminAlerts: '123456789012345678',
       replay: '123456789012345678',
       humanAlerts: '123456789012345678',
+      liveStatus: '',
     },
     roles: {
       stalkerPing: '123456789012345678',
@@ -31,6 +32,7 @@ module.exports = {
     token: string({ title: 'Bot token', description: 'Discord bot token used to log in. The saved value is never returned to the browser.', examples: ['DISCORD_BOT_TOKEN'], writeOnly: true, maxLength: 10000 }),
     guildId: string({ title: 'Guild id', description: 'Reserved Discord server identifier. The current bot runtime does not restrict commands or events using this value.', examples: ['123456789012345678'], maxLength: 100 }),
     channels: strictObject({
+      liveStatus: string({ title: 'Live status', description: 'Dedicated live fleet report channel ID. The bot deletes ALL other messages here. Requires View Channel, Read Message History, Send Messages, Embed Links, and Manage Messages. Leave empty to disable.', examples: ['123456789012345678'], maxLength: 100 }),
       general: string({ description: 'Channel ID used by the button-box stalker-role and everyone-ping rewards.', examples: ['123456789012345678'], maxLength: 100 }),
       announcements: string({ description: 'Channel ID used for public-mode openings, objective changes, and all-rovers-unlocked announcements.', examples: ['123456789012345678'], maxLength: 100 }),
       adminAlerts: string({ description: 'Channel ID used for rover health, battery, dock, help, and daily fleet-report notifications.', examples: ['123456789012345678'], maxLength: 100 }),

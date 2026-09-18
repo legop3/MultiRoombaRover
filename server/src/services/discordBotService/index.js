@@ -22,8 +22,8 @@ const { MODES, getMode, setMode } = require('../modeManager');
 const { sendExternalMessage, sendExternalTyping } = require('../chatService');
 const { commandReplyToText } = require('../chatService/commandResultFormatter');
 const { buildReplayVideo, getReplaySources, getDefaultDiscordSources, validateSources, tryTriggerReplay } = require('../replayEngineV2');
-const { getActiveDrivers } = require('../turnService');
-const { getNickname } = require('../nicknameService');
+const { getActiveDrivers, turnEvents } = require('../turnService');
+const { getNickname, nicknameEvents } = require('../nicknameService');
 const { getGlobalObjective, setGlobalObjective, clearGlobalObjective } = require('../globalObjectiveService');
 const { getAdminReason, setAdminReason, clearAdminReason } = require('../adminReasonService');
 const homeAssistantService = require('../homeAssistantService');
@@ -74,6 +74,7 @@ const greenModeService = require('../greenModeService');
 const { createDiscordTransportHandlers, createDiscordCommandRequest } = require('./commandAdapter');
 const { createIntegrations } = require('./integrations');
 const { createFleetDailyReports } = require('./fleetDailyReports');
+const { createLiveStatus } = require('./liveStatus');
 const fleetReportService = require('../fleetReportService');
 const { registerPreferredDeliveryProvider } = require('../replayDeliveryService');
 const {
@@ -335,6 +336,11 @@ function createDiscordRuntime() {
   });
 
   const integrationHandlers = integrations.register();
+  const liveStatus = createLiveStatus({
+    client, logger, discordConfig, roverManager, getActiveDrivers, getNickname,
+    io, getMode, getGlobalObjective, fetchChannel: channelIO.fetchChannel, sanitizeMentions,
+    turnEvents, nicknameEvents, subscribe,
+  });
 
   function isTextCommand(content) {
     // Both transports share this parser so command detection cannot drift from
@@ -383,6 +389,10 @@ function createDiscordRuntime() {
 
   client.on('messageCreate', async (message) => {
     try {
+      if (message.channelId === discordConfig.channels?.liveStatus?.trim()) {
+        liveStatus.update(true);
+        return;
+      }
       await integrationHandlers.handleBridgeInbound(message);
       const commandMessage = createBridgeMirroredCommandMessage(message);
       await commands.handleCommand(createDiscordCommandRequest(commandMessage, { isAdminUser, isLockdownAdminUser }));
@@ -413,12 +423,14 @@ function createDiscordRuntime() {
     // is ready avoids failed sends during login while the collector continues to
     // operate independently of Discord availability.
     restartFleetDailyReports();
+    liveStatus.start();
   });
 
   return {
     client,
     refresh() {
       if (client.isReady()) restartFleetDailyReports();
+      if (client.isReady()) liveStatus.start();
     },
     stop() {
       for (const event of ['clientReady', 'messageCreate', 'typingStart', 'messageReactionAdd']) {
@@ -427,6 +439,7 @@ function createDiscordRuntime() {
       integrationHandlers.stop();
       unregisterReplayProvider();
       presence.stop();
+      liveStatus.stop();
       channelIO.stop();
       fleetDailyReports?.stop();
     },
