@@ -6,12 +6,14 @@ const { MessageFlags } = require('discord.js');
 function createChannelIO({ client, logger, sanitizeMentions }) {
   const channelCache = new Map();
   const typingMessageCache = new Map();
+  let stopped = false;
 
   async function fetchChannel(id) {
-    if (!id) return null;
+    if (stopped || !client.isReady() || !id) return null;
     if (channelCache.has(id)) return channelCache.get(id);
     try {
       const channel = await client.channels.fetch(id);
+      if (stopped) return null;
       if (channel) {
         channelCache.set(id, channel);
         return channel;
@@ -68,6 +70,7 @@ function createChannelIO({ client, logger, sanitizeMentions }) {
     const content = `-# *${username} is typing...*`;
     try {
       const message = await channel.send({ content, allowedMentions: { parse: [] }, flags: [MessageFlags.SuppressNotifications]});
+      if (stopped) return;
       const timeoutId = setTimeout(() => {
         clearTypingMessage(entry.guildId, typingId);
       }, 20000);
@@ -78,6 +81,12 @@ function createChannelIO({ client, logger, sanitizeMentions }) {
   }
 
   return {
+    stop() {
+      stopped = true;
+      for (const record of typingMessageCache.values()) clearTimeout(record.timeoutId);
+      typingMessageCache.clear();
+      channelCache.clear();
+    },
     fetchChannel,
     sendToChannel,
     clearTypingMessage,

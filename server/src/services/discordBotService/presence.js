@@ -7,6 +7,7 @@ function createPresenceManager({ client, logger, getMode, getGlobalObjective, co
   const PRESENCE_ROTATE_MS = 20000;
   let presenceInterval = null;
   let presenceShowObjective = false;
+  let stopped = false;
 
   function truncatePresenceText(text, maxLength) {
     if (!text) return '';
@@ -40,6 +41,7 @@ function createPresenceManager({ client, logger, getMode, getGlobalObjective, co
   }
 
   function schedulePresenceRotation() {
+    if (stopped) return;
     if (presenceInterval) {
       clearInterval(presenceInterval);
       presenceInterval = null;
@@ -59,6 +61,11 @@ function createPresenceManager({ client, logger, getMode, getGlobalObjective, co
   }
 
   return {
+    stop() {
+      stopped = true;
+      clearInterval(presenceInterval);
+      presenceInterval = null;
+    },
     schedulePresenceRotation,
   };
 }

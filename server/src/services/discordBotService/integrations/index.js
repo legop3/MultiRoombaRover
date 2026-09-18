@@ -24,6 +24,7 @@ function createIntegrations(deps) {
   const userAnnouncements = createUserAnnouncements({ ...deps, sendToChannel, schedulePresenceRotation });
 
   function register() {
+    let stopped = false;
     client.on('typingStart', (typing) => {
       chat.handleDiscordTypingStart(typing).catch((err) => logger.warn('Error handling Discord typing', err.message));
     });
@@ -33,14 +34,31 @@ function createIntegrations(deps) {
       dm.handlePrivateAccessReaction(reaction, user).catch((err) => logger.warn('Error handling private access reaction', err.message));
     });
 
-    subscribe('*', handleBusEvent);
-    subscribe('*', userAnnouncements.handleBusEvent);
-    subscribe('verification.requested', dm.sendVerificationRequestDms);
-    subscribe('privateRoverAccess.requested', dm.sendPrivateRoverAccessRequestDms);
-    subscribe('chat:message', chat.handleChatBridgeOutbound);
-    subscribe('chat:typing', chat.handleChatTypingOutbound);
+    // Only the active, ready connection consumes server events. Retain each
+    // unsubscribe function so replacement clients never duplicate deliveries.
+    const unsubscribe = [];
+    function subscribeWhileReady(type, handler) {
+      unsubscribe.push(subscribe(type, (event) => {
+        Promise.resolve().then(() => {
+          if (!stopped && client.isReady()) return handler(event);
+        }).catch((err) => {
+          logger.warn('Error handling Discord integration event', { type, error: err.message });
+        });
+      }));
+    }
+
+    subscribeWhileReady('*', handleBusEvent);
+    subscribeWhileReady('*', userAnnouncements.handleBusEvent);
+    subscribeWhileReady('verification.requested', dm.sendVerificationRequestDms);
+    subscribeWhileReady('privateRoverAccess.requested', dm.sendPrivateRoverAccessRequestDms);
+    subscribeWhileReady('chat:message', chat.handleChatBridgeOutbound);
+    subscribeWhileReady('chat:typing', chat.handleChatTypingOutbound);
 
     return {
+      stop() {
+        stopped = true;
+        unsubscribe.forEach((remove) => remove());
+      },
       handleBridgeInbound: chat.handleBridgeInbound,
       handleBusEvent,
     };
