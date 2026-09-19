@@ -26,10 +26,13 @@ export default function DisplayRoverCell({ rover, session }) {
   const stateText = buildRoverStateText(rover, visual);
   const batteryText = formatBatteryText(visual);
   const batteryVoltage = frame?.sensors.batteryVoltage;
+  const batteryCurrent = frame?.sensors.batteryCurrent;
   const active = Boolean(driver);
   const urgent = Boolean(visual?.urgentActive);
   const warn = Boolean(visual?.warnActive);
   const locked = Boolean(rover?.locked);
+  // console.log(batteryTelemetry)
+  // console.log(batteryVoltage)
 
   return (
     <article
@@ -81,17 +84,19 @@ export default function DisplayRoverCell({ rover, session }) {
               {driver?.label || 'Idle'}
             </AutoFitText>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 bg-black/50 rounded">
             <AutoFitText
               className={classNames(
                 'font-black leading-none',
                 urgent ? 'text-red-100' : warn ? 'text-amber-100' : 'text-slate-100',
               )}
-              maxSize={136}
+              maxSize={70}
               minSize={32}
             >
-              <div>{batteryText}</div>
+              <div className='border-b'>{batteryText}</div>
               <div>{batteryVoltage}v</div>
+              {/* <div className=''>{batteryCurrent}mA</div> */}
+              {(Math.abs(batteryCurrent) > 10) ? (<div className='border-t'> {batteryCurrent + 'mA'}</div>) : null}
             </AutoFitText>
           </div>
         </div>
@@ -100,9 +105,6 @@ export default function DisplayRoverCell({ rover, session }) {
             {stateText}
           </div>
         ) : (
-          // This empty line keeps cells with and without exceptional states the
-          // same height. The grid should not jump just because one rover becomes
-          // locked or low battery while people are reading the board.
           <div aria-hidden="true" />
         )}
       </div>

@@ -91,6 +91,7 @@ export function selectBatteryTelemetry(frame) {
     batteryChargeMah: sensors.batteryChargeMah ?? null,
     batteryCapacityMah: sensors.batteryCapacityMah ?? null,
     batteryVoltage: (sensors.voltageMv/1000).toPrecision(4) ?? null,
+    batteryCurrent: (sensors.currentMa) ?? null,
   };
 }
 
