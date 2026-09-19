@@ -30,8 +30,6 @@ export default function DisplayRoverCell({ rover, session }) {
   const urgent = Boolean(visual?.urgentActive);
   const warn = Boolean(visual?.warnActive);
   const locked = Boolean(rover?.locked);
-  // console.log(batteryTelemetry)
-  // console.log(batteryVoltage)
 
   return (
     <article
