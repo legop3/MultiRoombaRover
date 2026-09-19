@@ -25,10 +25,13 @@ export default function DisplayRoverCell({ rover, session }) {
   const driver = findDriverForRover({ roverId: rover?.id, session });
   const stateText = buildRoverStateText(rover, visual);
   const batteryText = formatBatteryText(visual);
+  const batteryVoltage = frame?.sensors.batteryVoltage;
   const active = Boolean(driver);
   const urgent = Boolean(visual?.urgentActive);
   const warn = Boolean(visual?.warnActive);
   const locked = Boolean(rover?.locked);
+  // console.log(batteryTelemetry)
+  // console.log(batteryVoltage)
 
   return (
     <article
@@ -89,7 +92,8 @@ export default function DisplayRoverCell({ rover, session }) {
               maxSize={136}
               minSize={32}
             >
-              {batteryText}
+              <div>{batteryText}</div>
+              <div>{batteryVoltage}v</div>
             </AutoFitText>
           </div>
         </div>

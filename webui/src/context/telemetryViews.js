@@ -7,6 +7,7 @@ import { shallowArrayEqual, shallowObjectEqual } from './TelemetryContext.jsx';
 const EMPTY_BATTERY_TELEMETRY = Object.freeze({
   batteryChargeMah: null,
   batteryCapacityMah: null,
+  batteryVoltage: null,
 });
 
 const EMPTY_DOCK_TELEMETRY = Object.freeze({
@@ -89,6 +90,7 @@ export function selectBatteryTelemetry(frame) {
   return {
     batteryChargeMah: sensors.batteryChargeMah ?? null,
     batteryCapacityMah: sensors.batteryCapacityMah ?? null,
+    batteryVoltage: (sensors.voltageMv/1000).toPrecision(4) ?? null,
   };
 }
 
