@@ -50,7 +50,7 @@ export default function ServerDisplayContent() {
       <DisplayNoticeOverlay />
       <RewardRunOverlay />
       <ReplayReadyPopup replay={latestReplay} onClose={clearLatestReplay} />  
-      <AlertFeed scale={5} />
+      <AlertFeed scale={2} opacity={1}/>
     </div>
   );
 }

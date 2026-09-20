@@ -20,7 +20,7 @@ export default function MiniSummaryAppRoot() {
   return (
     <>
       <MiniSummaryContent />
-      <AlertFeed scale={3} />
+      <AlertFeed scale={3} opacity={1}/>
     </>
   );
 }
