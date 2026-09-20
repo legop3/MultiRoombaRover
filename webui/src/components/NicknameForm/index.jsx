@@ -62,7 +62,7 @@ export default function NicknameForm({ compact = false }) {
         disabled={saving}
         className="button-dark h-full shrink-0 whitespace-nowrap px-0.5 py-0 disabled:opacity-50"
       >
-        {saving ? 'Saving…' : compact ? 'Set' : 'Save'}
+        {saving ? 'Saving…' : compact ? 'Set Nickname' : 'Save'}
       </button>
     </div>
   );

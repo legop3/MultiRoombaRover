@@ -19,7 +19,7 @@ export default function NumberControl({ entity, disabled, onChange }) {
       <input type="number" aria-label={entity.name} min={entity.min ?? undefined} max={entity.max ?? undefined} step={entity.step || 'any'}
         value={value} disabled={blocked} onChange={(event) => control.edit(event.target.value)}
         onKeyDown={(event) => { if (event.key === 'Enter') control.commit(event.currentTarget.value); }}
-        className="w-16 min-w-0 rounded border border-neutral-700 bg-neutral-950 px-1 py-0.5 text-xs text-slate-200 disabled:opacity-50" />
+        className="w-16 min-w-0 rounded-sm border border-neutral-700 bg-neutral-950 px-1 py-0.5 text-xs text-slate-200 disabled:opacity-50" />
       {entity.unit ? <span className="text-[0.65rem] text-slate-400">{entity.unit}</span> : null}
     </div>
     {!limitsKnown ? <span className="text-xs text-amber-200">Waiting for number limits</span> : null}

@@ -63,7 +63,7 @@ export default function VipPrivateRoverAccessCard({
                     <p className="truncate text-[0.7rem] text-slate-500">{roverId}</p>
                   </div>
                   {pending ? (
-                    <span className="rounded bg-amber-700/30 px-1 py-0.5 text-[0.7rem] text-amber-200">
+                    <span className="rounded-sm bg-amber-700/30 px-1 py-0.5 text-[0.7rem] text-amber-200">
                       Pending
                     </span>
                   ) : (

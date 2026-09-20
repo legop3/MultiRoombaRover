@@ -99,10 +99,10 @@ function HudChatInput({ compact = false, variant = 'legacy', open = true, onOpen
   ]);
   const newDrivePresentation = variant === 'newdrive';
   const containerClass = newDrivePresentation
-    ? `absolute left-1/2 top-1/2 z-[70] flex w-[min(36rem,82%)] -translate-x-1/2 -translate-y-1/2 items-stretch gap-1 rounded-md border border-neutral-700 bg-neutral-900 p-1 transition-opacity duration-100 ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`
+    ? `absolute left-1/2 top-1/2 z-70 flex w-[min(36rem,82%)] -translate-x-1/2 -translate-y-1/2 items-stretch gap-1 rounded-md border border-neutral-700 bg-neutral-900 p-1 transition-opacity duration-100 ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`
     : compact
-      ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-[9rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.4 py-0.2'
-      : 'pointer-events-auto absolute bottom-1 right-1 flex w-[12rem] max-w-[70vw] items-center gap-0.5 rounded bg-black/70 px-0.5 py-0.25';
+      ? 'pointer-events-auto absolute bottom-0.5 right-0.5 flex w-36 max-w-[70vw] items-center gap-0.5 rounded-sm bg-black/70 px-0.4 py-0.2'
+      : 'pointer-events-auto absolute bottom-1 right-1 flex w-48 max-w-[70vw] items-center gap-0.5 rounded-sm bg-black/70 px-0.5 py-0.25';
   const isSafari = useMemo(() => detectSafari(), []);
   /*
     Safari zooms focused inputs below 16px. Keep that workaround Safari-only so
@@ -118,16 +118,16 @@ function HudChatInput({ compact = false, variant = 'legacy', open = true, onOpen
   // The current HUD composer is a physically larger instance of the normal
   // chat-panel entry field, not a separately styled translucent overlay.
   const inputClass = newDrivePresentation
-    ? `field-input h-12 min-w-0 flex-1 px-2 ${inputTextClass} text-slate-100 placeholder:text-slate-400 focus:outline-none`
-    : `min-w-0 flex-1 bg-transparent ${inputTextClass} text-slate-100 placeholder:text-slate-400 focus:outline-none`;
+    ? `field-input h-12 min-w-0 flex-1 px-2 ${inputTextClass} text-slate-100 placeholder:text-slate-400 focus:outline-hidden`
+    : `min-w-0 flex-1 bg-transparent ${inputTextClass} text-slate-100 placeholder:text-slate-400 focus:outline-hidden`;
   // The submit button is still a touch target even though the adjacent input must
   // remain editable, so it gets press suppression without inheriting input text
   // selection behavior.
   const buttonClass = newDrivePresentation
     ? 'button-dark min-h-12 shrink-0 px-4 text-base font-semibold disabled:opacity-50'
     : compact
-      ? 'mobile-touch-control rounded bg-cyan-500/80 px-0.35 py-0.2 text-[0.55rem] font-semibold text-black disabled:opacity-50'
-      : 'mobile-touch-control rounded bg-cyan-500/80 px-0.5 py-0.25 text-[0.7rem] font-semibold text-black disabled:opacity-50';
+      ? 'mobile-touch-control rounded-sm bg-cyan-500/80 px-0.35 py-0.2 text-[0.55rem] font-semibold text-black disabled:opacity-50'
+      : 'mobile-touch-control rounded-sm bg-cyan-500/80 px-0.5 py-0.25 text-[0.7rem] font-semibold text-black disabled:opacity-50';
 
   async function handleSend(event) {
     event.preventDefault();
@@ -227,7 +227,7 @@ function HudChatInput({ compact = false, variant = 'legacy', open = true, onOpen
             blurChat();
             setTypingActive(false);
           }}
-          className="flex min-h-12 w-10 shrink-0 items-center justify-center rounded border border-neutral-600 bg-neutral-800 text-xl leading-none text-slate-200 hover:bg-neutral-700 hover:text-white"
+          className="flex min-h-12 w-10 shrink-0 items-center justify-center rounded-sm border border-neutral-600 bg-neutral-800 text-xl leading-none text-slate-200 hover:bg-neutral-700 hover:text-white"
         >
           ×
         </button>

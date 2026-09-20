@@ -38,7 +38,7 @@ function LightBumpBars({ roverId = null, sensors }) {
         const fill = `${t * 100}%`;
         const color = hueFor(v);
         return (
-          <div key={idx} className="relative flex-1 min-w-[0]" style={{ height: `${barHeight}px` }}>
+          <div key={idx} className="relative flex-1 min-w-0" style={{ height: `${barHeight}px` }}>
             <div className="h-full w-full overflow-hidden bg-slate-800" style={{ borderRadius: 0 }}>
               <div
                 className="h-full"

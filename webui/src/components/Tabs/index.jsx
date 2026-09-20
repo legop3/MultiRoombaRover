@@ -26,7 +26,7 @@ export function useTabIsActive(id) {
 
 const TAB_VARIANTS = {
   primary: {
-    base: 'flex-1 px-0.5 py-0.5 text-sm font-medium focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-slate-500 rounded-md border border-slate-800',
+    base: 'flex-1 px-0.5 py-0.5 text-sm font-medium focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-slate-500 rounded-md border border-slate-800',
     active: 'bg-sky-600 text-white border-white',
     inactive: 'bg-zinc-900 text-slate-300 hover:bg-sky-500 hover:text-white',
   },
@@ -36,7 +36,7 @@ const TAB_HIGHLIGHTS = {
   none: '',
   pink: 'bg-pink-500 text-white border-pink-200 hover:bg-pink-400',
   green: 'bg-emerald-500 text-white border-emerald-200 hover:bg-emerald-400',
-  pinkblue: 'bg-gradient-to-r from-lime-800 to-teal-800'
+  pinkblue: 'bg-linear-to-r from-lime-800 to-teal-800'
 };
 
 const DEFAULT_VARIANT = 'primary';

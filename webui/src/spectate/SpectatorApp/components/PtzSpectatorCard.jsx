@@ -57,7 +57,7 @@ function PtzSnapshotFallback({ label, source }) {
   const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: true });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded bg-black">
+    <div className="relative aspect-video w-full overflow-hidden rounded-sm bg-black">
       {snapshot?.objectUrl ? (
         <img src={snapshot.objectUrl} alt={label} className="h-full w-full object-cover" />
       ) : (
@@ -98,7 +98,7 @@ function PtzLiveOrSnapshot({ label }) {
     <PtzLiveVideo
       enabled
       startMuted
-      className="relative aspect-video w-full overflow-hidden rounded bg-black"
+      className="relative aspect-video w-full overflow-hidden rounded-sm bg-black"
       fallback={({ source }) => <PtzSnapshotFallback label={label} source={source} />}
     />
   );
@@ -119,7 +119,7 @@ export default function PtzSpectatorCard() {
   const label = ptz?.name || 'PTZ Camera';
 
   return (
-    <article className="flex min-h-[16rem] flex-col rounded bg-zinc-900 p-0 sm:min-h-[18rem]">
+    <article className="flex min-h-64 flex-col rounded-sm bg-zinc-900 p-0 sm:min-h-72">
       <PtzLiveOrSnapshot label={label} />
       <div className="min-h-0 flex-1 space-y-0.5 overflow-hidden p-1 text-xs">
         <InfoRow label="Operator" value={ptz?.operatorLabel || 'none'} />
@@ -130,7 +130,7 @@ export default function PtzSpectatorCard() {
         <InfoRow label="Transcoder" value={publisherStatus} tone={publisher.running ? 'text-emerald-300' : 'text-amber-300'} />
         {publisherProgress ? <InfoRow label="Progress" value={publisherProgress} /> : null}
         {publisher.lastStderr ? (
-          <div className="line-clamp-2 break-words font-mono text-[0.65rem] leading-tight text-slate-400">
+          <div className="line-clamp-2 wrap-break-word font-mono text-[0.65rem] leading-tight text-slate-400">
             {publisher.lastStderr}
           </div>
         ) : null}

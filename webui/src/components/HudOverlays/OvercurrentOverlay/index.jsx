@@ -51,10 +51,10 @@ function OvercurrentOverlay({ roverId = null, overcurrentLimiter = null, compact
         ? `${labels.join(', ')} · output ${Math.round(driveCap * 100)}%`
         : labels.join(', ');
   const containerClass = bypassed
-    ? 'h-[3.5rem] w-[14rem]'
+    ? 'h-14 w-56'
     : compact
-      ? 'h-[3.5rem] w-[14rem]'
-      : 'h-[7rem] w-[22rem]';
+      ? 'h-14 w-56'
+      : 'h-28 w-88';
   const titleClass = compact || bypassed ? 'text-base' : 'text-3xl';
   const detailClass = compact || bypassed ? 'text-xs' : 'text-base';
   const backgroundClass = bypassed ? 'bg-amber-950/75' : 'bg-red-950/70';

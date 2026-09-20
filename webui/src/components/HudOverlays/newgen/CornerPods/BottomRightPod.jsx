@@ -69,15 +69,15 @@ export default function BottomRightPod({ roverId }) {
   return (
     <>
     {cameraPodOpen ? (
-    <div className="pointer-events-auto absolute bottom-0 right-0 z-20 flex h-[8.5rem] w-[8.5rem] items-center justify-center rounded-tl-[4.25rem] bg-black/60">
+    <div className="pointer-events-auto absolute bottom-0 right-0 z-20 flex h-34 w-34 items-center justify-center rounded-tl-[4.25rem] bg-black/60">
       {/* The pod shell and its visibility toggle stay usable while waiting, but
           every camera mutation is blocked and visibly muted until control returns. */}
-      <svg viewBox="0 0 144 144" aria-disabled={!canControl} className={`h-[8.5rem] w-[8.5rem] touch-none ${canControl ? '' : 'pointer-events-none opacity-40'}`} onPointerDown={updateFromPointer} onPointerMove={(event) => { if (event.buttons) updateFromPointer(event); }}>
+      <svg viewBox="0 0 144 144" aria-disabled={!canControl} className={`h-34 w-34 touch-none ${canControl ? '' : 'pointer-events-none opacity-40'}`} onPointerDown={updateFromPointer} onPointerMove={(event) => { if (event.buttons) updateFromPointer(event); }}>
         <path d="M 56.47 129.96 A 60 60 0 1 1 129.96 56.47" pathLength="1" fill="none" stroke="#064e3b" strokeWidth="12" strokeLinecap="round" />
         <path d="M 56.47 129.96 A 60 60 0 1 1 129.96 56.47" pathLength="1" fill="none" stroke="#34d399" strokeWidth="12" strokeLinecap="round" strokeDasharray={`${fraction} 1`} />
         <circle cx={knob.x} cy={knob.y} r="7" fill="#ecfdf5" stroke="#059669" strokeWidth="3" />
       </svg>
-      <button type="button" aria-label="Reset camera tilt" disabled={!canControl} onClick={() => setServoAngle(0)} className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded bg-black/55 px-1.5 py-1 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
+      <button type="button" aria-label="Reset camera tilt" disabled={!canControl} onClick={() => setServoAngle(0)} className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-sm bg-black/55 px-1.5 py-1 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
         {/* The icon/value stack mirrors the battery pod and clarifies that this
             circular gauge changes the live rover camera's tilt angle. */}
         <FaVideo className="text-base" aria-hidden="true" />

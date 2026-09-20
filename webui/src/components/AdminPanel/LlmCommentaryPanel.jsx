@@ -74,28 +74,28 @@ export default function LlmCommentaryPanel({ state, onClearHistory, clearingHist
         {statPills.map((pill) => (
           <span
             key={pill.label}
-            className="rounded border border-slate-600/60 bg-slate-800/70 px-0.5 py-0.25 text-[0.72rem] leading-tight text-slate-200"
+            className="rounded-sm border border-slate-600/60 bg-slate-800/70 px-0.5 py-0.25 text-[0.72rem] leading-tight text-slate-200"
           >
             {pill.label}: {pill.value}
           </span>
         ))}
       </div>
       {errors.message ? (
-        <div className="surface text-xs text-red-300 break-words">Error: {errors.message}</div>
+        <div className="surface text-xs text-red-300 wrap-break-word">Error: {errors.message}</div>
       ) : null}
       {errors.details ? (
         <details className="surface text-xs text-red-200">
           <summary className="cursor-pointer select-none text-red-300">Failure details</summary>
-          <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-red-200">
+          <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-red-200">
             {JSON.stringify(errors.details, null, 2)}
           </pre>
         </details>
       ) : null}
       {output.generated ? (
-        <div className="surface text-xs text-slate-200 break-words">Generated: {output.generated}</div>
+        <div className="surface text-xs text-slate-200 wrap-break-word">Generated: {output.generated}</div>
       ) : null}
       {output.posted ? (
-        <div className="surface text-xs text-emerald-200 break-words">Posted: {output.posted}</div>
+        <div className="surface text-xs text-emerald-200 wrap-break-word">Posted: {output.posted}</div>
       ) : null}
       <div className="grid gap-0.5 md:grid-cols-2">
         <div className="space-y-0.5">
@@ -120,7 +120,7 @@ export default function LlmCommentaryPanel({ state, onClearHistory, clearingHist
       </div>
       <details className="surface text-xs text-slate-200">
         <summary className="cursor-pointer select-none text-slate-300">Full Monitor Payload</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+        <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
           {JSON.stringify(state, null, 2)}
         </pre>
       </details>
@@ -154,7 +154,7 @@ export default function LlmCommentaryPanel({ state, onClearHistory, clearingHist
       {selectedRun ? (
         <details className="surface text-xs text-slate-200" open>
           <summary className="cursor-pointer select-none text-slate-300">Run #{selectedRun.runId} details</summary>
-          <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+          <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
             {JSON.stringify(selectedRun, null, 2)}
           </pre>
         </details>

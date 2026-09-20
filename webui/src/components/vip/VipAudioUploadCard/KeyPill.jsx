@@ -3,5 +3,5 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 export default function KeyPill({ label }) {
   if (!label) return null;
-  return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
+  return <span className="rounded-sm border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
 }

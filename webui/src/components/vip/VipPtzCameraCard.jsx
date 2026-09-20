@@ -152,12 +152,12 @@ function PtzStatePanel({ ptz, onClose, onRelease, releaseDisabled = false }) {
       <StatusRow label="Transcoder" value={publisherStatus} tone={publisher.running ? 'text-emerald-300' : 'text-amber-300'} />
       {publisherProgress ? <StatusRow label="Progress" value={publisherProgress} /> : null}
       {publisher.lastStderr ? (
-        <div className="surface max-h-24 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[0.68rem] leading-tight text-slate-200">
+        <div className="surface max-h-24 overflow-y-auto whitespace-pre-wrap wrap-break-word font-mono text-[0.68rem] leading-tight text-slate-200">
           {publisher.lastStderr}
         </div>
       ) : null}
       {ptz?.blocked?.message ? (
-        <div className="rounded border border-amber-500/50 bg-amber-950/40 p-1 text-xs text-amber-100">
+        <div className="rounded-sm border border-amber-500/50 bg-amber-950/40 p-1 text-xs text-amber-100">
           {ptz.blocked.message}
         </div>
       ) : null}
@@ -213,7 +213,7 @@ function PtzLightingControls({ ptz, disabled = false }) {
         onClick={cycleIr}
       >
         <span className="text-sm font-semibold">Infrared</span>
-        <span className="rounded bg-cyan-300 px-1 py-0.5 text-[0.7rem] font-semibold text-cyan-950">{irMode}</span>
+        <span className="rounded-sm bg-cyan-300 px-1 py-0.5 text-[0.7rem] font-semibold text-cyan-950">{irMode}</span>
       </button>
     </div>
   );
@@ -383,7 +383,7 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
       <div className="shrink-0">
         <PtzControlReference />
       </div>
-      <div className="min-h-[12rem] flex-1">
+      <div className="min-h-48 flex-1">
         {/*
           The global chat key focuses the input registered by ChatPanel through
           ChatContext. Keeping a real ChatPanel mounted inside the PTZ fullscreen
@@ -412,7 +412,7 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
       <div className="shrink-0">
         <PtzMobileControlsPanel ptz={ptz} disabled={!isOperator} />
       </div>
-      <div className="min-h-[10rem] flex-1">
+      <div className="min-h-40 flex-1">
         {/*
           Mobile uses the same ChatPanel registration as desktop so the mapped
           chat key and the on-screen input stay on one shared chat implementation.
@@ -444,12 +444,12 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
     : 'grid-cols-[minmax(0,1fr)_20rem]';
 
   const controller = (
-    <div className="fixed inset-0 z-[110] h-[100dvh] w-[100vw] overflow-hidden bg-black text-slate-100">
+    <div className="fixed inset-0 z-110 h-dvh w-screen overflow-hidden bg-black text-slate-100">
       <CardFrame
         hideHeader
         fillHeight
         clipOverflow={false}
-        className="h-[100dvh] w-[100vw] rounded-none border-0 !bg-black"
+        className="h-dvh w-screen rounded-none border-0 bg-black!"
         bodyClassName={`grid h-full min-h-0 overflow-hidden ${sidebarWidthClass}`}
       >
         <main className="relative min-h-0 min-w-0 bg-black">
@@ -562,7 +562,7 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false, layout 
             </div>
             <PtzQueueList queue={ptz?.queue} operatorLabel={ptz?.operatorLabel} />
             {ptz?.blocked?.message ? (
-              <p className="w-full rounded border border-amber-500/50 bg-amber-950/40 p-1 text-xs text-amber-100">
+              <p className="w-full rounded-sm border border-amber-500/50 bg-amber-950/40 p-1 text-xs text-amber-100">
                 {ptz.blocked.message}
               </p>
             ) : null}

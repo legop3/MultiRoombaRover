@@ -87,9 +87,9 @@ function FloatingPadOverlay({ center, size, activeCellId }) {
   const halfPad = size / 2;
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[1000]" aria-hidden="true">
+    <div className="pointer-events-none fixed inset-0 z-1000" aria-hidden="true">
       <div
-        className="absolute grid grid-cols-3 grid-rows-3 overflow-hidden rounded-lg border-2 border-cyan-300/80 bg-slate-950/90 shadow-2xl shadow-cyan-950/50 backdrop-blur-sm"
+        className="absolute grid grid-cols-3 grid-rows-3 overflow-hidden rounded-lg border-2 border-cyan-300/80 bg-slate-950/90 shadow-2xl shadow-cyan-950/50 backdrop-blur-xs"
         style={{
           height: size,
           left: center.x - halfPad,
@@ -221,7 +221,7 @@ export default function FloatingJoystick({
       <div
         ref={containerRef}
         role="presentation"
-        className={`mobile-touch-control mobile-drag-control relative flex h-full w-full select-none items-center justify-center overflow-hidden text-slate-100 ${compact ? 'min-h-[7rem]' : 'min-h-[10rem]'}`}
+        className={`mobile-touch-control mobile-drag-control relative flex h-full w-full select-none items-center justify-center overflow-hidden text-slate-100 ${compact ? 'min-h-28' : 'min-h-40'}`}
         // Pointer drags are the whole control model here, so this inline value
         // reinforces the utility class even if future class churn changes it.
         style={{ touchAction: 'none' }}

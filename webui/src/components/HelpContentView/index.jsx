@@ -8,7 +8,7 @@ import { getHelpContent } from '../../help/content.js';
 
 function KeyPill({ actionId }) {
   return (
-    <span className="rounded border border-slate-600 bg-slate-900/40 px-1 text-[0.7rem] text-slate-200">
+    <span className="rounded-sm border border-slate-600 bg-slate-900/40 px-1 text-[0.7rem] text-slate-200">
       <ControlHint actionId={actionId} />
     </span>
   );
@@ -52,7 +52,7 @@ function Hero({ hero, keymap }) {
         {hero.chips && (
           <div className="flex flex-wrap gap-0.5 text-[0.7rem] text-slate-200">
             {hero.chips.map((chip) => (
-              <span key={chip} className="rounded border border-slate-700 px-1 py-[2px]">
+              <span key={chip} className="rounded-sm border border-slate-700 px-1 py-[2px]">
                 {chip}
               </span>
             ))}

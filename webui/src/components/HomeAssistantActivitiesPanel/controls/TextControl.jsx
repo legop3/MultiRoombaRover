@@ -14,6 +14,6 @@ export default function TextControl({ entity, disabled, onChange }) {
       onCompositionStart={() => { composing.current = true; control.cancel(); }}
       onCompositionEnd={(event) => { composing.current = false; control.edit(event.currentTarget.value); }}
       onKeyDown={(event) => { if (event.key === 'Enter' && !composing.current) control.commit(event.currentTarget.value); }}
-      className="w-full min-w-0 rounded border border-neutral-700 bg-neutral-950 px-1 py-0.5 text-xs text-slate-200 disabled:opacity-50" />
+      className="w-full min-w-0 rounded-sm border border-neutral-700 bg-neutral-950 px-1 py-0.5 text-xs text-slate-200 disabled:opacity-50" />
   </>;
 }

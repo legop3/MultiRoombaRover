@@ -296,14 +296,14 @@ export default function ScannerContent() {
       />
       <section className="flex min-h-screen w-full items-center justify-center">
         <div className="flex max-w-full flex-col items-center gap-[3vh]">
-          <h1 className="max-w-full break-words text-[17vw] font-black leading-none tracking-normal">
+          <h1 className="max-w-full wrap-break-word text-[17vw] font-black leading-none tracking-normal">
             {title}
           </h1>
-          <p className="max-w-full break-words text-[6vw] font-bold leading-tight tracking-normal">
+          <p className="max-w-full wrap-break-word text-[6vw] font-bold leading-tight tracking-normal">
             {label}
           </p>
           {secondary ? (
-            <p className="max-w-full break-words text-[4vw] font-bold leading-tight tracking-normal">
+            <p className="max-w-full wrap-break-word text-[4vw] font-bold leading-tight tracking-normal">
               {secondary}
             </p>
           ) : null}
@@ -320,7 +320,7 @@ export default function ScannerContent() {
                     {section.items.slice(0, 8).map((item, itemIndex) => (
                       <p
                         key={`${item.text}-${itemIndex}`}
-                        className={`max-w-full break-words text-[3.1vw] leading-tight tracking-normal ${
+                        className={`max-w-full wrap-break-word text-[3.1vw] leading-tight tracking-normal ${
                           item.status === 'active'
                             ? 'font-black'
                             : item.status === 'complete'

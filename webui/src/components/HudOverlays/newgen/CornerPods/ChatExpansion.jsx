@@ -43,7 +43,7 @@ export default function ChatExpansion({ podOpen }) {
         aria-label={open ? 'Close chat' : 'Open chat'}
         aria-pressed={open}
         onClick={toggleChat}
-        className={`pointer-events-auto absolute z-20 flex h-8 items-center justify-center gap-1 bg-black/60 px-1.5 text-sm text-white transition hover:bg-black/80 ${podOpen ? 'bottom-[8.5rem] right-0 rounded-tl-lg' : 'bottom-0 right-10 rounded-t-lg'}`}
+        className={`pointer-events-auto absolute z-20 flex h-8 items-center justify-center gap-1 bg-black/60 px-1.5 text-sm text-white transition hover:bg-black/80 ${podOpen ? 'bottom-34 right-0 rounded-tl-lg' : 'bottom-0 right-10 rounded-t-lg'}`}
       >
         <FaComment aria-hidden="true" />
         {/* The pill reflects the live keymap so remapping chat focus updates this

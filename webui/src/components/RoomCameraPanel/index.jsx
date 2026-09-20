@@ -160,7 +160,7 @@ function RoomCameraPanelContent({
   const [orientation, setOrientation] = useState(() =>
     normalizeOrientation(
       panelId ? orientationSettings?.[panelId] : defaultOrientation,
-      'horizontal',
+      normalizeOrientation(defaultOrientation, 'horizontal'),
     ),
   );
   const storedOrientation = panelId ? orientationSettings?.[panelId] : null;
@@ -197,7 +197,7 @@ function RoomCameraPanelContent({
   const actions = showLayoutToggle ? (
     <div className="flex items-center gap-0.5 text-[0.68rem] text-slate-400">
       <span>Layout</span>
-      <div className="inline-flex overflow-hidden rounded border border-slate-700">
+      <div className="inline-flex overflow-hidden rounded-sm border border-slate-700">
         {ORIENTATIONS.map((option) => (
           <button
             key={option}

@@ -137,7 +137,7 @@ export default function ConfigurationEditor({ snapshot, socket, runSensitive, on
   return (
     <div ref={editorRef} className="configuration-editor">
       <CardFrame title="Configuration" meta={`revision ${revision}`} clipOverflow={false} bodyClassName="p-0.5">
-        <div ref={toolbarRef} className="configuration-toolbar sticky top-0 z-20 mb-0.5 space-y-0.5 border border-neutral-500/60 bg-neutral-900/95 p-0.5 backdrop-blur">
+        <div ref={toolbarRef} className="configuration-toolbar sticky top-0 z-20 mb-0.5 space-y-0.5 border border-neutral-500/60 bg-neutral-900/95 p-0.5 backdrop-blur-sm">
           <p className="text-xs text-slate-400">Saving applies the complete revision immediately and reloads each affected service.</p>
           {/* All document actions stay together at the start of the toolbar. The
               editor may use a wide canvas, but width is never used to separate a

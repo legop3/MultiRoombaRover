@@ -99,7 +99,7 @@ export default function InfoColumn({
             <div className="flex w-full min-w-0 flex-1 flex-col items-center gap-4">
               {showPreview ? (
                 <div className="mt-auto w-full">
-                  <div className="w-full aspect-[4/3]">
+                  <div className="w-full aspect-4/3">
                     <RoverMediaPlayer
                       sessionInfo={sessionInfo}
                       videoMode={videoMode}

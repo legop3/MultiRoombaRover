@@ -13,7 +13,7 @@ export default function InitialSessionOverlay() {
 
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black text-slate-200"
+      className="fixed inset-0 z-1000 flex items-center justify-center bg-black text-slate-200"
       role="status"
       aria-live="polite"
       aria-label={connected ? 'Loading session' : 'Connecting'}

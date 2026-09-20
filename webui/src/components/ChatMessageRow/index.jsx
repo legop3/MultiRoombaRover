@@ -3,8 +3,16 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useState } from 'react';
 import { FaDiscord } from 'react-icons/fa';
+import Linkify from 'linkify-react';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import RoverLabel from '../RoverLabel/index.jsx';
+import ChatEmbeds from './ChatEmbeds.jsx';
+
+const LINK_OPTIONS = {
+  target: '_blank',
+  rel: 'noopener noreferrer',
+  className: 'text-sky-300 underline break-all',
+};
 
 function roleColors(role) {
   switch (role) {
@@ -37,7 +45,7 @@ function displayName(message) {
 // height, while the matching calc() size keeps the avatar square after adding that
 // top/bottom coverage.
 const CHAT_ROW_FULL_HEIGHT_AVATAR_CLASS =
-  'my-[-0.125rem] flex h-[calc(1rem+0.25rem)] w-[calc(1rem+0.25rem)] shrink-0 overflow-hidden rounded-none';
+  '-my-0.5 flex h-5 w-5 shrink-0 overflow-hidden rounded-none';
 
 function DiscordAvatar({ guildIconUrl, userAvatarUrl, label }) {
   if (!guildIconUrl && !userAvatarUrl) return null;
@@ -120,7 +128,7 @@ export function ChatIdentity({ message, toolsToggle = null }) {
         />
       ) : null}
       {isBot ? (
-        <span className="shrink-0 rounded bg-emerald-900/60 px-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white">
+        <span className="shrink-0 rounded-sm bg-emerald-900/60 px-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white">
           bot
         </span>
       ) : null}
@@ -185,7 +193,7 @@ export default function ChatMessageRow({ message, variant = 'message' }) {
     hasToolCalls ? (
       <button
         type="button"
-        className="shrink-0 rounded border border-slate-600/70 bg-slate-800/60 px-1 py-[1px] text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
+        className="shrink-0 rounded-sm border border-slate-600/70 bg-slate-800/60 px-1 py-px text-[0.65rem] text-slate-200 hover:bg-slate-700/70"
         onClick={() => {
           if (isSpectator) return;
           setOpen((v) => !v);
@@ -198,10 +206,12 @@ export default function ChatMessageRow({ message, variant = 'message' }) {
     <div className={chatRowClass(message, variant)}>
       <div className="flex w-full items-start gap-0.5">
         <span
-          className={`min-w-0 flex-1 break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
+          className={`min-w-0 flex-1 wrap-break-word leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}
         >
           <ChatIdentity message={message} toolsToggle={toolsToggle} />
-          {!isOpen && (hasText || isTyping) ? ` ${rowText}` : ''}
+          {!isOpen && (hasText || isTyping) ? (
+            <Linkify options={LINK_OPTIONS}>{` ${rowText}`}</Linkify>
+          ) : null}
         </span>
         {!isTyping ? (
           <span className="shrink-0 text-[0.65rem] text-slate-400/60">
@@ -210,7 +220,7 @@ export default function ChatMessageRow({ message, variant = 'message' }) {
         ) : null}
       </div>
       {isOpen && hasToolCalls ? (
-        <div className="w-full rounded border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
+        <div className="w-full rounded-sm border border-slate-700/70 bg-slate-900/70 p-0.5 text-[0.68rem] text-slate-200">
           {toolCalls.map((entry, idx) => {
             const status = String(entry?.status || 'unknown');
             const statusLabel = status === 'ok' ? 'ok' : status === 'blocked' ? 'blocked' : status === 'error' ? 'error' : 'unknown';
@@ -225,10 +235,11 @@ export default function ChatMessageRow({ message, variant = 'message' }) {
         </div>
       ) : null}
       {isOpen && hasText ? (
-        <div className={`w-full break-words leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
-          {message.text}
+        <div className={`w-full wrap-break-word leading-tight whitespace-pre-wrap ${isBot ? 'text-emerald-100' : 'text-slate-100'}`}>
+          <Linkify options={LINK_OPTIONS}>{message.text}</Linkify>
         </div>
       ) : null}
+      {!isTyping && hasText ? <ChatEmbeds text={message.text} /> : null}
     </div>
   );
 }

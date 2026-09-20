@@ -38,14 +38,14 @@ function DockedAction({ driveKeyLabel, pending, controlsDisabled, error, onUndoc
       {/* The docked shield is owned by the dismissible action so hiding the
           prompt also reveals the video and ordinary HUD instead of leaving an
           unexplained dark, input-blocking layer behind. */}
-      <div className="pointer-events-auto absolute inset-0 z-[25] bg-black/75" aria-hidden="true" />
+      <div className="pointer-events-auto absolute inset-0 z-25 bg-black/75" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-6">
         <div className="relative w-[min(32rem,80%)]">
           <button
             type="button"
             disabled={pending || controlsDisabled}
             onClick={onUndock}
-            className={`pointer-events-auto flex w-full flex-col items-center gap-2 px-8 py-7 text-center text-white shadow-2xl ring-2 transition focus-visible:outline-none focus-visible:ring-4 ${mainToneClass}`}
+            className={`pointer-events-auto flex w-full flex-col items-center gap-2 px-8 py-7 text-center text-white shadow-2xl ring-2 transition focus-visible:outline-hidden focus-visible:ring-4 ${mainToneClass}`}
           >
             <strong className="text-3xl leading-tight">{pending ? 'Undocking…' : 'Your rover is docked'}</strong>
             {pending ? (
@@ -73,7 +73,7 @@ function DockedAction({ driveKeyLabel, pending, controlsDisabled, error, onUndoc
             <button
               type="button"
               onClick={() => setHidden(true)}
-              className={`pointer-events-auto absolute left-1/2 top-full -translate-x-1/2 rounded-b-lg px-6 py-1.5 text-sm font-bold text-white shadow-xl ring-2 transition focus-visible:outline-none focus-visible:ring-4 ${hideToneClass}`}
+              className={`pointer-events-auto absolute left-1/2 top-full -translate-x-1/2 rounded-b-lg px-6 py-1.5 text-sm font-bold text-white shadow-xl ring-2 transition focus-visible:outline-hidden focus-visible:ring-4 ${hideToneClass}`}
             >
               Hide
             </button>
@@ -93,7 +93,7 @@ function AutoDockingAction({ driveKeyLabel, pending, controlsDisabled, error, on
         type="button"
         disabled={pending || controlsDisabled}
         onClick={onResumeDriving}
-        className={`pointer-events-auto flex w-[min(30rem,80%)] flex-col items-center gap-2 px-7 py-6 text-center text-white shadow-2xl ring-2 transition focus-visible:outline-none focus-visible:ring-4 ${
+        className={`pointer-events-auto flex w-[min(30rem,80%)] flex-col items-center gap-2 px-7 py-6 text-center text-white shadow-2xl ring-2 transition focus-visible:outline-hidden focus-visible:ring-4 ${
           waitingForTurn
             ? 'cursor-not-allowed bg-slate-950/95 ring-slate-400/70'
             : 'bg-amber-950/90 ring-amber-300/80 hover:bg-amber-900/95 focus-visible:ring-amber-200 disabled:cursor-wait disabled:opacity-75'
@@ -134,17 +134,17 @@ function DockAssistAction({ active, pending, controlsDisabled, error, dockKeyLab
   const dockPositionClass = cornerOffsetClass === 'right-0' ? 'right-10' : cornerOffsetClass;
   if (active) {
     return (
-      <div className="pointer-events-none absolute inset-0 z-[60] flex items-center justify-center">
+      <div className="pointer-events-none absolute inset-0 z-60 flex items-center justify-center">
         {/* Once assist is active, the camera image is the user's task context. Centering this
             one-line instruction connects it to that view instead of leaving guidance beside the
             corner button that already completed its action. */}
-        <div className="pointer-events-auto flex items-center gap-2 rounded bg-cyan-950/60 p-1.5 text-cyan-50 shadow-xl ring-2 ring-cyan-200/90">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-sm bg-cyan-950/60 p-1.5 text-cyan-50 shadow-xl ring-2 ring-cyan-200/90">
           <strong className="whitespace-nowrap text-sm">Dock assist is active, drive forward onto the dock.</strong>
           <button
             type="button"
             onClick={onCancel}
             disabled={controlsDisabled}
-            className="bg-slate-800 px-2 py-1 text-xs font-bold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-slate-800 px-2 py-1 text-xs font-bold text-white transition hover:bg-slate-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Cancel
           </button>
@@ -172,7 +172,7 @@ function DockAssistAction({ active, pending, controlsDisabled, error, dockKeyLab
           aria-label="Start rover docking assist"
           disabled={pending || controlsDisabled}
           onClick={onDock}
-          className={`flex items-center gap-1.5 rounded-bl-xl px-4 pb-2 pt-4 text-base font-bold shadow-xl ring-1 transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-75 ${
+          className={`flex items-center gap-1.5 rounded-bl-xl px-4 pb-2 pt-4 text-base font-bold shadow-xl ring-1 transition focus-visible:outline-hidden focus-visible:ring-2 disabled:cursor-wait disabled:opacity-75 ${
             batteryUrgent
               ? 'bg-red-950 text-red-50 ring-red-300/80 hover:bg-red-900 focus-visible:ring-red-200'
               : batteryLow
@@ -286,7 +286,7 @@ export default function DockingHud({ roverId }) {
   const batteryPodOpen = podSettings?.battery !== false;
   // The camera arc is the shared circular-pod reference size. Keep the dock expansion flush
   // against the battery shell after enlarging that gauge to the same 8.5-rem footprint.
-  const cornerOffsetClass = batteryPodOpen ? 'right-[8.5rem]' : 'right-0';
+  const cornerOffsetClass = batteryPodOpen ? 'right-34' : 'right-0';
   const previousDockedRef = useRef(docked);
   const finishUndockTransition = useCallback(() => setShowUndockTransition(false), []);
 
@@ -344,7 +344,7 @@ export default function DockingHud({ roverId }) {
           docked shield lives inside DockedAction because the new Hide control
           must dismiss the prompt and its dimming as one coherent surface. */}
       <div
-        className={`absolute inset-0 z-[25] transition-all duration-300 ${
+        className={`absolute inset-0 z-25 transition-all duration-300 ${
           autoDocking || pendingAction === 'resuming'
               ? 'pointer-events-auto bg-black/55 opacity-100'
               : 'pointer-events-none opacity-0'

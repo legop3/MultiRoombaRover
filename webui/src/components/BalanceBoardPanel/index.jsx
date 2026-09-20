@@ -57,7 +57,7 @@ function centerOfPressure(corners) {
 
 function CornerReading({ className, label, value }) {
   return (
-    <div className={`surface absolute min-w-[5.5rem] text-center ${className}`}>
+    <div className={`surface absolute min-w-22 text-center ${className}`}>
       <div className="text-[0.62rem] text-slate-400">{label}</div>
       <div className="text-sm font-semibold text-slate-100">{formatWeight(value)}</div>
     </div>

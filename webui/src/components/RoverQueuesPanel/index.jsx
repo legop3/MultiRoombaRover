@@ -304,7 +304,7 @@ export default function RoverQueuesPanel({
               </ul>
             )}
             {externalBlocked ? (
-              <div className="absolute inset-0 z-10 flex items-center justify-center rounded bg-black/70 px-2 text-center text-sm font-semibold text-slate-100">
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-black/70 px-2 text-center text-sm font-semibold text-slate-100">
                 {disabledOverlay}
               </div>
             ) : null}

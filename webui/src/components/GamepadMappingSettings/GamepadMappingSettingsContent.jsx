@@ -48,13 +48,13 @@ function actionDriveMode(actionId) {
 
 function CurveField({ label, value, onChange }) {
   return (
-    <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+    <label className="mx-auto block w-full max-w-lg rounded-sm bg-neutral-800/80 px-1.5 py-1">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 text-sm text-white">
         <span className="font-semibold">{label}</span>
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
+          className="rounded-sm border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
         >
           <option value="linear">Linear</option>
           <option value="expo">Fine center control</option>
@@ -78,7 +78,7 @@ function MappingRow({
   // Mapping rows are constrained to a readable width so the source text and buttons remain
   // visually connected. Buttons wrap on very narrow panes instead of forcing tiny text.
   return (
-    <div className="mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm max-[520px]:grid-cols-1">
+    <div className="mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-sm bg-neutral-800/80 px-1.5 py-1 text-sm max-[520px]:grid-cols-1">
       <div className="min-w-0">
         <div className="flex items-center gap-1">
           <p className="font-semibold leading-snug text-white">{action.label}</p>
@@ -471,7 +471,7 @@ export default function GamepadMappingSettings() {
       bodyClassName="space-y-2 p-1 text-sm"
     >
       {captureAction && (
-        <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-1 rounded bg-emerald-950/50 px-1.5 py-1 text-sm text-white">
+        <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-1 rounded-sm bg-emerald-950/50 px-1.5 py-1 text-sm text-white">
           <span>Release controls, then move or press the input for {captureAction.label}.</span>
           <button type="button" onClick={() => setCaptureAction(null)} className="button-dark px-1 py-0.5 text-xs">
             Cancel
@@ -482,7 +482,7 @@ export default function GamepadMappingSettings() {
       <div className="space-y-1">
         <SettingsGroupLabel>Connected controller</SettingsGroupLabel>
         {hubState.error ? (
-          <p className="mx-auto w-full max-w-lg rounded border border-red-500/60 bg-red-950/40 px-1.5 py-1 text-sm text-white">
+          <p className="mx-auto w-full max-w-lg rounded-sm border border-red-500/60 bg-red-950/40 px-1.5 py-1 text-sm text-white">
             Controller access failed: {hubState.error}
           </p>
         ) : hubState.pads.length === 0 ? (
@@ -492,11 +492,11 @@ export default function GamepadMappingSettings() {
               : 'No controller detected. Connect it, focus this page, then press a button.'}
           </p>
         ) : (
-          <div className="mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm max-[420px]:grid-cols-1">
+          <div className="mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-sm bg-neutral-800/80 px-1.5 py-1 text-sm max-[420px]:grid-cols-1">
             <select
               value={activePad?.instanceKey ?? ''}
               onChange={(event) => setActiveInstanceKey(event.target.value)}
-              className="min-w-0 rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
+              className="min-w-0 rounded-sm border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
             >
               {hubState.pads.map((pad) => (
                 <option key={pad.instanceKey} value={pad.instanceKey}>
@@ -504,7 +504,7 @@ export default function GamepadMappingSettings() {
                 </option>
               ))}
             </select>
-            <span className="rounded bg-neutral-900 px-1 py-0.5 text-xs text-white">
+            <span className="rounded-sm bg-neutral-900 px-1 py-0.5 text-xs text-white">
               {activePad?.mapping ?? 'unknown'}
             </span>
             <p className="col-span-full truncate text-xs text-slate-300" title={activePad?.id}>
@@ -519,13 +519,13 @@ export default function GamepadMappingSettings() {
         {/* Calibration controls stay in one stacked column because range inputs become harder to
             tune when squeezed into multiple narrow columns. */}
         <div className="grid gap-1">
-          <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+          <label className="mx-auto block w-full max-w-lg rounded-sm bg-neutral-800/80 px-1.5 py-1">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 text-sm text-white">
               <span className="font-semibold">Button prompts</span>
               <select
                 value={activeProfile.promptStyle ?? 'auto'}
                 onChange={(event) => updateProfile({ promptStyle: event.target.value })}
-                className="rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
+                className="rounded-sm border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
               >
                 <option value="auto">Automatic</option>
                 <option value="xbox">Xbox</option>
@@ -536,7 +536,7 @@ export default function GamepadMappingSettings() {
             </div>
             <p className="mt-0.5 text-xs leading-snug text-white">Override this only when the browser reports the controller incorrectly.</p>
           </label>
-          <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+          <label className="mx-auto block w-full max-w-lg rounded-sm bg-neutral-800/80 px-1.5 py-1">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 text-sm text-white">
               <span className="min-w-0 font-semibold text-white">Steering mode</span>
               <select
@@ -545,7 +545,7 @@ export default function GamepadMappingSettings() {
                   updateCalibration({ driveMode: event.target.value });
                   setCaptureAction(null);
                 }}
-                className="rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
+                className="rounded-sm border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
               >
                 <option value="single">Single stick</option>
                 <option value="tank">Tank sticks</option>
@@ -641,7 +641,7 @@ export default function GamepadMappingSettings() {
             onChange={(value) => updateCalibration({ precisionSpeed: value })}
           />
           {driveMode === 'single' && (
-            <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+            <label className="mx-auto block w-full max-w-lg rounded-sm bg-neutral-800/80 px-1.5 py-1">
               {/* Camera mode is styled like the sliders so calibration controls read as one group
                   even though this specific setting is a select instead of a range input. */}
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 text-sm text-white">
@@ -649,7 +649,7 @@ export default function GamepadMappingSettings() {
                 <select
                   value={activeProfile.calibration?.cameraMode ?? 'velocity'}
                   onChange={(event) => updateCalibration({ cameraMode: event.target.value })}
-                  className="rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
+                  className="rounded-sm border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-sm text-white"
                 >
                   <option value="absolute">Absolute</option>
                   <option value="velocity">Velocity</option>
@@ -714,7 +714,7 @@ export default function GamepadMappingSettings() {
         {!activePad ? (
           null
         ) : (
-          <details className="mx-auto w-full max-w-lg rounded bg-neutral-900/70 px-1.5 py-1 text-xs text-white">
+          <details className="mx-auto w-full max-w-lg rounded-sm bg-neutral-900/70 px-1.5 py-1 text-xs text-white">
             <summary className="cursor-pointer text-sm font-semibold text-white">Advanced diagnostics</summary>
             <div className="mt-1 space-y-1">
             <p className="text-white">Raw axes</p>

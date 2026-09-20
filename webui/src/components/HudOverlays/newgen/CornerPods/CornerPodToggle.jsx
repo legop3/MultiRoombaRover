@@ -7,24 +7,24 @@ const CORNERS = {
     button: 'left-0 top-0 [clip-path:polygon(0_0,100%_0,0_100%)]',
     icon: 'left-1 top-1',
     collapseRotation: '-rotate-45',
-    expandRotation: 'rotate-[135deg]',
+    expandRotation: 'rotate-135',
   },
   'top-right': {
     button: 'right-0 top-0 [clip-path:polygon(0_0,100%_0,100%_100%)]',
     icon: 'right-1 top-1',
     collapseRotation: 'rotate-45',
-    expandRotation: '-rotate-[135deg]',
+    expandRotation: 'rotate-[-135deg]',
   },
   'bottom-left': {
     button: 'bottom-0 left-0 [clip-path:polygon(0_0,0_100%,100%_100%)]',
     icon: 'bottom-1 left-1',
-    collapseRotation: '-rotate-[135deg]',
+    collapseRotation: 'rotate-[-135deg]',
     expandRotation: 'rotate-45',
   },
   'bottom-right': {
     button: 'bottom-0 right-0 [clip-path:polygon(100%_0,0_100%,100%_100%)]',
     icon: 'bottom-1 right-1',
-    collapseRotation: 'rotate-[135deg]',
+    collapseRotation: 'rotate-135',
     expandRotation: '-rotate-45',
   },
 };

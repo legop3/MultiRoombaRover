@@ -27,7 +27,7 @@ export default function SpectateVideo({
   const videoMode = isExternalSpectatorSnapshotOnly ? 'snapshot' : null;
   return (
     <div className={`flex flex-col gap-0.5 ${fitParent ? 'h-full' : ''}`}>
-      <div className={`relative w-full overflow-hidden bg-black ${fitParent ? 'h-full flex-1' : 'aspect-[4/3]'}`}>
+      <div className={`relative w-full overflow-hidden bg-black ${fitParent ? 'h-full flex-1' : 'aspect-4/3'}`}>
         <RoverMediaPlayer
           roverId={roverId}
           label={label}

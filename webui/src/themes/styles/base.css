@@ -3,8 +3,8 @@
  * Scope: Canvas positioning and the explicit no-artwork fallback; individual artwork lives elsewhere.
  */
 
-/* These selectors intentionally remain ordinary CSS. This stylesheet is processed separately from
- * index.css, so placing them in a Tailwind layer would require duplicating Tailwind's directives. */
+/* Keep theme artwork outside Tailwind's layers so it takes precedence over
+ * utility backgrounds on the page canvas and settings previews. */
   .page-theme {
     /* A fixed canvas makes separated card gaps look like windows onto one continuous design.
        Individual theme classes below supply only their artwork and fallback color. */

@@ -52,7 +52,7 @@ export default function SocialButton({ id = null, label, url, icon, color, layou
       {isInline ? (
         <span className="inline-flex max-w-full items-center justify-center gap-1 text-center leading-tight">
           <Icon className="shrink-0" style={{ fontSize: '1.1em' }} />
-          <span className="break-words">{text}</span>
+          <span className="wrap-break-word">{text}</span>
         </span>
       ) : (
         <span className="flex h-full w-full max-w-full flex-col items-center justify-between text-center leading-tight">
@@ -60,7 +60,7 @@ export default function SocialButton({ id = null, label, url, icon, color, layou
             <Icon className="shrink-0" style={{ fontSize: 'clamp(1rem, 2.2vh + 1.2vw, 2rem)' }} />
             {/* <Icon className="shrink-0" style={{ fontSize: '2vh' }} /> */}
           </span>
-          <span className="w-full break-words leading-tight">{text}</span>
+          <span className="w-full wrap-break-word leading-tight">{text}</span>
         </span>
       )}
     </a>

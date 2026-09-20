@@ -125,7 +125,7 @@ function SliderControl({ peripheralId, control, disabled, send, value: storedVal
         onKeyDown={handleKeyDown}
         onContextMenu={(event) => event.preventDefault()}
         style={{ touchAction: 'none' }}
-        className="mobile-touch-control mobile-drag-control relative mt-0.5 h-6 w-full rounded-full border border-emerald-100/80 bg-emerald-950 shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+        className="mobile-touch-control mobile-drag-control relative mt-0.5 h-6 w-full rounded-full border border-emerald-100/80 bg-emerald-950 shadow-inner focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-200"
       >
         {/* An inset track gives the thumb room to remain entirely inside the
             card at both endpoints without browser-specific range styling. */}
@@ -136,7 +136,7 @@ function SliderControl({ peripheralId, control, disabled, send, value: storedVal
           />
         </div>
         <div
-          className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-950 bg-emerald-200 shadow"
+          className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-950 bg-emerald-200 shadow-sm"
           style={{ left: `clamp(0.4375rem, ${valuePercent}%, calc(100% - 0.4375rem))` }}
         />
       </div>
@@ -271,7 +271,7 @@ function NumberControl({ peripheralId, control, disabled, send, value: storedVal
             event.currentTarget.blur();
           }
         }}
-        className={`mobile-touch-control h-9 w-[45%] min-w-16 rounded-lg border border-indigo-200/70 bg-indigo-950 px-1.5 text-right text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-indigo-200 ${DISABLED_CLASS}`}
+        className={`mobile-touch-control h-9 w-[45%] min-w-16 rounded-lg border border-indigo-200/70 bg-indigo-950 px-1.5 text-right text-base text-white outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-200 ${DISABLED_CLASS}`}
       />
     </label>
   );
@@ -311,7 +311,7 @@ function TextControl({ peripheralId, control, disabled, send, value: storedValue
             event.currentTarget.blur();
           }
         }}
-        className={`mobile-touch-control h-9 w-[55%] min-w-20 rounded-lg border border-sky-200/70 bg-sky-950 px-1.5 text-base text-white outline-none focus-visible:ring-2 focus-visible:ring-sky-200 ${DISABLED_CLASS}`}
+        className={`mobile-touch-control h-9 w-[55%] min-w-20 rounded-lg border border-sky-200/70 bg-sky-950 px-1.5 text-base text-white outline-hidden focus-visible:ring-2 focus-visible:ring-sky-200 ${DISABLED_CLASS}`}
       />
     </label>
   );

@@ -66,7 +66,7 @@ export function QueueUserChips({
         return (
           <span
             key={`${targetId}-${socketId}-${idx}`}
-            className={`flex items-center gap-0.5 rounded px-1 text-[0.7rem] ${highlightClass}`}
+            className={`flex items-center gap-0.5 rounded-sm px-1 text-[0.7rem] ${highlightClass}`}
           >
             <span className={`${roleColors(user.role)} font-semibold`}>
               {formatQueueUserLabel(user, selfId)}
@@ -129,7 +129,7 @@ export default function QueueTargetRow({
         <img
           src={thumbnailUrl}
           alt=""
-          className="h-8 w-10 shrink-0 rounded border border-slate-700 bg-black object-cover"
+          className="h-8 w-10 shrink-0 rounded-sm border border-slate-700 bg-black object-cover"
           loading="lazy"
         />
       ) : null}
@@ -151,7 +151,7 @@ export default function QueueTargetRow({
               ) : null}
             </p>
             {timerLabel ? (
-              <span className="rounded bg-slate-800 px-1 text-[0.7rem] text-slate-200">
+              <span className="rounded-sm bg-slate-800 px-1 text-[0.7rem] text-slate-200">
                 {timerLabel}
               </span>
             ) : null}

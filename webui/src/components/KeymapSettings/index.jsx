@@ -127,7 +127,7 @@ function SettingsGroupLabel({ children }) {
 
 function SpeedField({ label, description, value, onChange, min = 0, max = 500, step = 5 }) {
   return (
-    <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+    <label className="mx-auto block w-full max-w-lg rounded-sm bg-neutral-800/80 px-1.5 py-1">
       {/* The value field sits beside the label because users tune these settings by comparing
           the name and the numeric value together. Keeping them in one row prevents the number
           input from drifting across a wide settings panel. */}
@@ -139,7 +139,7 @@ function SpeedField({ label, description, value, onChange, min = 0, max = 500, s
           max={max}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full rounded border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-right text-xs font-mono text-white"
+          className="w-full rounded-sm border border-neutral-600 bg-neutral-900 px-1 py-0.5 text-right text-xs font-mono text-white"
         />
       </div>
       {description && <p className="mt-0.5 text-xs leading-snug text-white">{description}</p>}
@@ -164,7 +164,7 @@ function BindingRow({ action, value, isActive, onCaptureStart, onCancel, onCaptu
   // change button are one interaction unit, so proximity matters more than stretching to fill
   // every available pixel in the surrounding sidebar.
   return (
-    <div className="mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm max-[420px]:grid-cols-1">
+    <div className="mx-auto grid w-full max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-sm bg-neutral-800/80 px-1.5 py-1 text-sm max-[420px]:grid-cols-1">
       <div className="min-w-0">
         <p className="font-semibold leading-snug text-white">{action.label}</p>
         <p className="mt-0.5 text-xs leading-snug text-white">{formatKeyLabel(value)}</p>

@@ -186,7 +186,7 @@ function QueueReplayLinksRow() {
   */
   return (
     <div className={`flex items-stretch ${themeGapClass}`}>
-      <div className="relative min-w-0 basis-0 grow-[1]">
+      <div className="relative min-w-0 basis-0 grow">
         {/*
           The absolutely positioned queue card is removed from flex cross-size
           calculation. Replay and the links/PTZ stack therefore define the row

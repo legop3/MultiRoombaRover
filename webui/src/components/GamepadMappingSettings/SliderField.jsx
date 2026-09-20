@@ -5,12 +5,12 @@ import { NUMBER_FORMAT } from './constants.js';
 
 export default function SliderField({ label, description, min, max, step, value, onChange }) {
   return (
-    <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1">
+    <label className="mx-auto block w-full max-w-lg rounded-sm bg-neutral-800/80 px-1.5 py-1">
       {/* The formatted value is kept close to the setting name because calibration usually
           happens by nudging a slider and watching the number, not by reading the full panel row. */}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5 text-sm text-white">
         <span className="min-w-0 font-semibold text-white">{label}</span>
-        <span className="rounded bg-neutral-900 px-1 py-0.5 font-mono text-xs text-white">
+        <span className="rounded-sm bg-neutral-900 px-1 py-0.5 font-mono text-xs text-white">
           {NUMBER_FORMAT.format(value)}
         </span>
       </div>

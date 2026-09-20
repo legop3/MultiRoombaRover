@@ -113,7 +113,7 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
         clipOverflow={false}
         bodyClassName="p-0.5"
       >
-        <div className="overflow-hidden rounded bg-black">
+        <div className="overflow-hidden rounded-sm bg-black">
           <video
             key={videoUrl}
             src={videoUrl}
@@ -126,7 +126,7 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
             // The floating panel is intentionally compact because it appears for users who
             // did not ask for the replay. It still loads the video immediately, but its
             // bounded height prevents the floating card from covering too much of the UI.
-            className="aspect-video max-h-[14rem] w-full bg-black"
+            className="aspect-video max-h-56 w-full bg-black"
           />
         </div>
       </CardFrame>
@@ -143,7 +143,7 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
       className={isModal ? 'h-full w-full' : ''}
       bodyClassName={`${isPanel || isModal ? 'flex min-h-0 flex-1 flex-col' : ''} space-y-0.5 p-0.5 text-sm text-slate-200`}
     >
-      <div className={`${isPanel || isModal ? 'min-h-0 flex-1' : ''} overflow-hidden rounded bg-black`}>
+      <div className={`${isPanel || isModal ? 'min-h-0 flex-1' : ''} overflow-hidden rounded-sm bg-black`}>
         <video
           key={videoUrl}
           src={videoUrl}
@@ -156,18 +156,18 @@ export default function ReplayReadyPopup({ replay, onClose, variant = 'modal' })
           // that video should fill the available viewport instead of behaving like
           // a centered dialog preview. object-contain preserves the replay frame
           // without cropping if the browser viewport is not the same aspect ratio.
-          className={`${isPanel ? 'h-full min-h-[10rem]' : isModal ? 'h-full object-contain' : 'aspect-video max-h-[72vh]'} w-full bg-black`}
+          className={`${isPanel ? 'h-full min-h-40' : isModal ? 'h-full object-contain' : 'aspect-video max-h-[72vh]'} w-full bg-black`}
         />
       </div>
     </CardFrame>
   );
 
   if (isPanel) {
-    return <div className="flex h-full min-h-[14rem] flex-col">{card}</div>;
+    return <div className="flex h-full min-h-56 flex-col">{card}</div>;
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-stretch justify-stretch bg-black" onClick={onClose} role="presentation">
+    <div className="fixed inset-0 z-110 flex items-stretch justify-stretch bg-black" onClick={onClose} role="presentation">
       <div
         className="pointer-events-auto h-full w-full"
         onClick={(event) => {

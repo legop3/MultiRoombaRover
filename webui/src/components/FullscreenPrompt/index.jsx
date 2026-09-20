@@ -24,13 +24,13 @@ export default function FullscreenPrompt({ visible, mode, onEnterFullscreen, onD
           <p className="text-xs border-t border-b border-slate-700 p-0.5 text-blue-300 text-center">This will only show once just to let you know. There is a fullscreen button in the bottom right for later use.</p>
 
           <div className="flex justify-end gap-0.5 pt-1 text-sm">
-            <button type="button" className="rounded border border-slate-600 px-3 py-1 text-slate-200" onClick={onDismiss}>
+            <button type="button" className="rounded-sm border border-slate-600 px-3 py-1 text-slate-200" onClick={onDismiss}>
               {isIOSMode ? 'Got it' : 'Not now'}
             </button>
             {!isIOSMode && (
               <button
                 type="button"
-                className="rounded bg-cyan-500 px-3 py-1 font-semibold text-black hover:bg-cyan-400"
+                className="rounded-sm bg-cyan-500 px-3 py-1 font-semibold text-black hover:bg-cyan-400"
                 onClick={onEnterFullscreen}
               >
                 Enter fullscreen

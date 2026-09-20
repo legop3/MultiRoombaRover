@@ -56,7 +56,7 @@ export default function HornSettingsExpansion({ open, onOpenChange }) {
         <select
           value={waveform}
           onChange={(event) => save((current) => ({ ...(current || {}), waveform: event.target.value === 'sine' ? 'sine' : 'saw' }))}
-          className="rounded bg-slate-900 px-2 py-1 text-white ring-1 ring-slate-600"
+          className="rounded-sm bg-slate-900 px-2 py-1 text-white ring-1 ring-slate-600"
         >
           <option value="saw">Saw</option>
           <option value="sine">Sine</option>
@@ -72,7 +72,7 @@ export default function HornSettingsExpansion({ open, onOpenChange }) {
               max={HORN_MAX_FREQUENCY}
               value={frequency}
               onChange={(event) => updateFrequency(index, event.target.value)}
-              className="min-w-0 flex-1 rounded bg-slate-900 px-1.5 py-1 text-right font-mono text-white ring-1 ring-slate-600"
+              className="min-w-0 flex-1 rounded-sm bg-slate-900 px-1.5 py-1 text-right font-mono text-white ring-1 ring-slate-600"
             />
           </label>
         ))}

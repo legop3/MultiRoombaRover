@@ -3,6 +3,9 @@
  * Scope: Keeps route-specific hierarchy and RJSF integration out of the shared global stylesheet.
  */
 
+/* Reuse the shared theme without emitting a second copy of Tailwind. */
+@reference '../index.css';
+
 .configuration-tree {
   /* The large gap is intentionally limited to root siblings. It makes each
      top-level configuration section read as a separate YAML block while the
@@ -91,7 +94,7 @@
 .configuration-value input:not([type='checkbox']),
 .configuration-value select,
 .configuration-value textarea {
-  @apply w-full rounded-md border border-neutral-600 bg-neutral-700 px-0.5 py-0.5 text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500;
+  @apply w-full rounded-md border border-neutral-600 bg-neutral-700 px-0.5 py-0.5 text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-sky-500;
 }
 
 .configuration-value input[type='checkbox'] {

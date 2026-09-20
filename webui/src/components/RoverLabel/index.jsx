@@ -50,7 +50,7 @@ export default function RoverLabel({
   return (
     <Component
       className={classNames(
-        'inline-block rounded border border-transparent px-1 py-[1px] font-semibold text-white',
+        'inline-block rounded-sm border border-transparent px-1 py-px font-semibold text-white',
         className,
       )}
       style={{ ...(style || {}), ...(roverNameChromeStyle(resolvedColor, 0.5) || {}) }}

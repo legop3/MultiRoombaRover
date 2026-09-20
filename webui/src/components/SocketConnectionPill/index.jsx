@@ -95,13 +95,13 @@ export default function SocketConnectionPill() {
   return (
     <div
       className={cls(
-        'fixed bottom-2 left-2 z-[120] transition-opacity duration-500',
+        'fixed bottom-2 left-2 z-120 transition-opacity duration-500',
         !visible && 'hidden',
         faded ? 'opacity-0 pointer-events-none' : 'opacity-100',
       )}
       aria-live="polite"
     >
-      <div className={cls('rounded-sm px-2 py-1 text-xs', toneClass)}>
+      <div className={cls('rounded-xs px-2 py-1 text-xs', toneClass)}>
         <span className="font-semibold">{statusLabel}</span>
         {detail ? <span className="ml-1 opacity-85">({detail})</span> : null}
       </div>

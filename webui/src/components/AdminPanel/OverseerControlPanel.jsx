@@ -58,49 +58,49 @@ export default function OverseerControlPanel({ state, onClearHistory, clearingHi
 
       <details className="surface text-xs text-slate-200" open>
         <summary className="cursor-pointer select-none text-slate-300">Latest Context</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+        <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
           {input.stateUpdate || '<none>'}
         </pre>
       </details>
 
       <details className="surface text-xs text-slate-200" open>
         <summary className="cursor-pointer select-none text-slate-300">Exact Model Input (messages[])</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+        <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
           {renderModelMessages()}
         </pre>
       </details>
 
       <details className="surface text-xs text-slate-200">
         <summary className="cursor-pointer select-none text-slate-300">Exact System Prompt</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+        <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
           {input.systemPrompt || '<none>'}
         </pre>
       </details>
 
       <details className="surface text-xs text-slate-200">
         <summary className="cursor-pointer select-none text-slate-300">Exact Transcript Rows</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+        <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
           {JSON.stringify(input.transcript || [], null, 2)}
         </pre>
       </details>
 
       <details className="surface text-xs text-slate-200">
         <summary className="cursor-pointer select-none text-slate-300">Tool Availability</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+        <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
           {JSON.stringify({ available: input.availableTools, blocked: input.blockedTools }, null, 2)}
         </pre>
       </details>
 
       <details className="surface text-xs text-slate-200" open>
         <summary className="cursor-pointer select-none text-slate-300">Exact Model Output</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+        <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
           {output.raw || '<none>'}
         </pre>
       </details>
 
       <details className="surface text-xs text-slate-200" open>
         <summary className="cursor-pointer select-none text-slate-300">Live Tool Calls</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+        <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
           {JSON.stringify(output.liveToolCalls || [], null, 2)}
         </pre>
       </details>
@@ -115,7 +115,7 @@ export default function OverseerControlPanel({ state, onClearHistory, clearingHi
 
       <details className="surface text-xs text-slate-200">
         <summary className="cursor-pointer select-none text-slate-300">Recent Runs</summary>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">
+        <pre className="mt-0.5 whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">
           {JSON.stringify(state.history || [], null, 2)}
         </pre>
       </details>
@@ -124,7 +124,7 @@ export default function OverseerControlPanel({ state, onClearHistory, clearingHi
         {showPayload ? 'Hide Full Payload' : 'Show Full Payload'}
       </button>
       {showPayload ? (
-        <pre className="surface whitespace-pre-wrap break-words text-[0.72rem] text-slate-200">{JSON.stringify(state, null, 2)}</pre>
+        <pre className="surface whitespace-pre-wrap wrap-break-word text-[0.72rem] text-slate-200">{JSON.stringify(state, null, 2)}</pre>
       ) : null}
     </div>
   );

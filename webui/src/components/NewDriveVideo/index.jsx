@@ -30,7 +30,7 @@ export default function NewDriveVideo() {
   if (!roverId) {
     return (
       <div
-        className={`min-h-0 w-full overflow-hidden bg-black ${mobileHud ? 'aspect-[4/3] shrink-0' : 'h-screen'}`}
+        className={`min-h-0 w-full overflow-hidden bg-black ${mobileHud ? 'aspect-4/3 shrink-0' : 'h-screen'}`}
         aria-label="No rover assigned"
       >
         {/* Keep the unassigned state inside the same solid video-shaped stage
@@ -49,7 +49,7 @@ export default function NewDriveVideo() {
       {/* Media and overlays must share this exact 4:3 containing block. When narrow columns
           reduce the video width, the stage height shrinks with it and no HUD element can remain
           positioned in the letterboxed space above or below the actual picture. */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-black [&_img]:object-contain [&_video]:object-contain">
+      <div className="relative aspect-4/3 w-full overflow-hidden bg-black [&_img]:object-contain [&_video]:object-contain">
         <RoverMediaPlayer roverId={roverId} videoMode={videoMode} />
 
         <div

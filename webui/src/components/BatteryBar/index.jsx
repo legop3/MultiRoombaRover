@@ -96,7 +96,7 @@ function BatteryBar({
   }
 
   const barShellClass = classNames(
-    'relative overflow-hidden rounded-sm border border-slate-800',
+    'relative overflow-hidden rounded-xs border border-slate-800',
     isUrgent || isWarn ? baseToneStrong : 'bg-zinc-900/90',
     isUrgent && 'battery-urgent-flash',
     isVertical
@@ -132,7 +132,7 @@ function BatteryBar({
     isVertical ? (compact ? 'text-[0.55rem]' : 'text-[0.65rem]') : 'text-xs',
   );
   const labelPillClass = classNames(
-    'rounded px-1.5 py-0.5',
+    'rounded-sm px-1.5 py-0.5',
     isBackground ? 'bg-black/30 text-slate-100' : 'bg-black/50 text-slate-100',
   );
 

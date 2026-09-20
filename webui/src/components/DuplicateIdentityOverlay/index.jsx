@@ -16,7 +16,7 @@ export default function DuplicateIdentityOverlay() {
       : 'This driver session is already active in another tab.';
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[2000] flex items-center justify-center bg-black px-0.5 py-0.5 text-slate-100">
+    <div className="pointer-events-auto fixed inset-0 z-2000 flex items-center justify-center bg-black px-0.5 py-0.5 text-slate-100">
       <section className="surface w-full max-w-md space-y-0.5 text-center shadow-2xl">
         <div className="space-y-0.5">
           <h1 className="text-lg font-semibold text-white">Another driver tab is already open</h1>

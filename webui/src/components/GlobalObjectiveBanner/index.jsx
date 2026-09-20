@@ -110,7 +110,7 @@ export default function GlobalObjectiveBanner({ layout = 'desktop', className = 
       [
         'panel-section flex w-full items-center justify-center border border-neutral-500/60 shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_10px_24px_rgba(0,0,0,0.28)]',
         !isMobile ? '@container' : '',
-        isMobile ? 'rounded-none' : 'rounded',
+        isMobile ? 'rounded-none' : 'rounded-sm',
         'px-1 py-1 text-center font-semibold tracking-tight',
         className,
       ]
@@ -163,7 +163,7 @@ export default function GlobalObjectiveBanner({ layout = 'desktop', className = 
           className={
             isMobile
               ? 'flex-1 overflow-hidden text-slate-100'
-              : 'flex-1 whitespace-normal break-words text-slate-100 @sm:overflow-hidden @sm:whitespace-nowrap'
+              : 'flex-1 whitespace-normal wrap-break-word text-slate-100 @sm:overflow-hidden @sm:whitespace-nowrap'
           }
         >
           <span ref={textRef} className="block">

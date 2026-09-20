@@ -1,6 +1,31 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss' source('./');
+@source '../index.html';
+
+@layer base {
+  /* Retain the existing form and border defaults across the v4 Preflight change. */
+  *,
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+    opacity: 1;
+  }
+
+  button,
+  [role='button'] {
+    cursor: pointer;
+  }
+
+  :disabled {
+    cursor: default;
+  }
+}
 
 :root {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
@@ -55,7 +80,7 @@ body::-webkit-scrollbar,
   }
 
   .field-input {
-    @apply bg-neutral-700 border border-neutral-600 text-white placeholder:text-slate-400 px-0.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-sky-500 rounded-md;
+    @apply bg-neutral-700 border border-neutral-600 text-white placeholder:text-slate-400 px-0.5 py-0.5 focus:outline-hidden focus:ring-1 focus:ring-sky-500 rounded-md;
   }
 
   .button-dark {

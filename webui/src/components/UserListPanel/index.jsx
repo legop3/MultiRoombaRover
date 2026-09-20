@@ -152,7 +152,7 @@ export default function UserListPanel({
               <span className="text-[0.7rem] text-slate-500">no rover</span>
             )}
             {isAdmin && (
-              <span className="rounded bg-amber-500/30 px-1 text-[0.7rem] text-amber-200">
+              <span className="rounded-sm bg-amber-500/30 px-1 text-[0.7rem] text-amber-200">
                 Admin
               </span>
             )}
@@ -188,7 +188,7 @@ export default function UserListPanel({
       <div className={`space-y-0.5 ${fillHeight ? 'flex flex-1 min-h-0 flex-col' : ''}`}>
         {!hideHeader && showToggle ? (
           <div className="flex justify-end">
-              <div className="inline-flex overflow-hidden rounded border border-slate-700 text-[0.7rem]">
+              <div className="inline-flex overflow-hidden rounded-sm border border-slate-700 text-[0.7rem]">
                 <button
                   type="button"
                   className={`px-1 py-0.5 ${turnView === 'queues' ? 'bg-slate-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`}
@@ -230,7 +230,7 @@ export default function UserListPanel({
                         <RoverLabel roverId={roverId} fallback={roverId} />
                       </p>
                       {remaining != null && (
-                        <span className="rounded bg-slate-800 px-1 text-[0.7rem]">
+                        <span className="rounded-sm bg-slate-800 px-1 text-[0.7rem]">
                           {remaining}s left
                         </span>
                       )}
@@ -254,7 +254,7 @@ export default function UserListPanel({
                           return (
                             <span
                               key={`${roverId}-${socketId}-${idx}`}
-                              className={`flex items-center gap-0.5 rounded px-1 ${compact ? 'text-[0.7rem]' : 'text-[0.8rem]'} ${highlightClass}`}
+                              className={`flex items-center gap-0.5 rounded-sm px-1 ${compact ? 'text-[0.7rem]' : 'text-[0.8rem]'} ${highlightClass}`}
                             >
                               <span className={`${roleColors(user.role)} font-semibold`}>
                                 {formatLabel(user, selfId)}

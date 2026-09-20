@@ -27,7 +27,7 @@ export default function AccessoriesExpansion({ roverId }) {
           ariaLabel={open ? 'Hide accessory controls' : 'Show accessory controls'}
           onClick={() => setOpen(!open)}
           hud
-          className="!h-28"
+          className="h-28!"
         />
         {open ? (
           <RoverAccessoryControls

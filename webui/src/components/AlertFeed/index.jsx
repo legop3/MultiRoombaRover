@@ -384,7 +384,7 @@ function AlertToastShell({ toast, onDismiss, onPause, onResume }) {
   const genericBackgroundColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)` : 'rgba(33, 150, 243, 0.18)';
   const genericBorderColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 1)` : 'rgba(33, 150, 243, 0.45)';
   const shellClass = [
-    'pointer-events-auto w-fit max-w-[80vw] overflow-hidden rounded-md shadow-sm shadow-black/40',
+    'pointer-events-auto w-fit max-w-[80vw] overflow-hidden rounded-md shadow-xs shadow-black/40',
     generic ? '' : 'border border-white/10 bg-black/75',
   ].join(' ');
 
@@ -429,7 +429,7 @@ function AlertToastShell({ toast, onDismiss, onPause, onResume }) {
         >
           <button
             type="button"
-            className="flex h-4 w-4 items-center justify-center rounded-sm text-xs leading-none text-slate-300 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-none focus:ring-1"
+            className="flex h-4 w-4 items-center justify-center rounded-xs text-xs leading-none text-slate-300 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white focus:outline-hidden focus:ring-1"
             style={{ '--tw-ring-color': accent }}
             onClick={() => onDismiss(toast.key)}
             title="Dismiss alert"
@@ -507,7 +507,7 @@ function AlertToast({ alert }) {
   if (alert.kind === 'buttonbox-active' && alert.payload) {
     const payload = alert.payload;
     return (
-      <div className="pointer-events-none w-[12.5rem]">
+      <div className="pointer-events-none w-50">
         <ButtonBoxTile
           buttonId={payload.buttonId}
           count={payload.count}
@@ -549,7 +549,7 @@ function AlertToast({ alert }) {
         continuous surface while this renderer stays responsible for one line of
         compact title/message text.
       */
-      className="pointer-events-auto min-w-0 max-w-[24rem] px-1.5 py-0.5 text-left text-[0.72rem] leading-tight text-slate-100"
+      className="pointer-events-auto min-w-0 max-w-96 px-1.5 py-0.5 text-left text-[0.72rem] leading-tight text-slate-100"
     >
       <p className="truncate text-slate-100">
         <span className="font-semibold text-slate-300">{alert.title || 'Alert'}</span>

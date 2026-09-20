@@ -82,7 +82,7 @@ export default function CardFrame({
         // sidebars. Making the card itself a query container lets its contents
         // respond to the space they actually receive instead of the viewport,
         // which may be wide while a sidebar card is only a few hundred pixels.
-        'panel-section @container border border-neutral-500/60 bg-neutral-900/100',
+        'panel-section @container border border-neutral-500/60 bg-neutral-900',
         clipOverflow ? 'overflow-hidden' : 'overflow-visible',
         fillHeight && 'flex h-full min-h-0 flex-col',
         className,
@@ -99,7 +99,7 @@ export default function CardFrame({
             // on the shared component gives long cards a consistent title bar
             // without changing the layout of existing callers.
             stickyHeader && 'sticky top-0 z-10',
-            // 'flex items-center justify-between gap-0.5 border-b border-neutral-500/50 bg-gradient-to-r from-neutral-800 via-neutral-700 to-neutral-600 px-0.5 py-0.5',
+            // 'flex items-center justify-between gap-0.5 border-b border-neutral-500/50 bg-linear-to-r from-neutral-800 via-neutral-700 to-neutral-600 px-0.5 py-0.5',
             headerClassName,
           )}
           style={headerStyle}

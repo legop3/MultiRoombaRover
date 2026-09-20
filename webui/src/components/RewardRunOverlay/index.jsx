@@ -74,7 +74,7 @@ export default function RewardRunOverlay() {
   if (!overlay) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-black/75 px-1 py-1">
+    <div className="pointer-events-none fixed inset-0 z-120 flex items-center justify-center bg-black/75 px-1 py-1">
       <div className="pointer-events-auto w-full max-w-2xl">
         <div className="surface rounded-none border-2 border-cyan-300 bg-amber-100/95 px-1 py-1 text-center text-black shadow-2xl">
           <div className="flex items-center justify-center gap-1 border-2 border-blue-600 bg-yellow-100 px-0.5 py-1">

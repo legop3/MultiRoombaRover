@@ -105,7 +105,7 @@ export default function TopLeftPod({ roverId }) {
       : `${seconds}s`;
 
   return (
-    <div className={`pointer-events-auto absolute left-0 top-0 flex items-start ${showLargeTimer ? 'z-[100]' : 'z-20'}`}>
+    <div className={`pointer-events-auto absolute left-0 top-0 flex items-start ${showLargeTimer ? 'z-100' : 'z-20'}`}>
       {showTimer ? (
         <div
           className={`relative flex items-center justify-center transition-[width,height,border-radius,background-color] duration-500 ease-out motion-reduce:transition-none ${
@@ -113,8 +113,8 @@ export default function TopLeftPod({ roverId }) {
               // The waiting/handoff state replaces the old full-screen turn cue.
               // It must be opaque and above every other in-video HUD surface so
               // sensor graphics, chat, and docking controls cannot muddy the text.
-              ? 'h-[25.5rem] w-[25.5rem] rounded-br-[12.75rem] bg-black'
-              : 'h-[8.5rem] w-[8.5rem] rounded-br-[4.25rem] bg-black/60'
+              ? 'h-102 w-102 rounded-br-[12.75rem] bg-black'
+              : 'h-34 w-34 rounded-br-[4.25rem] bg-black/60'
           }`}
         >
           {/* The SVG fills the shell. Its circle geometry supplies the same slim visible inset

@@ -5,8 +5,8 @@ import SpectateVideo from '../../../components/SpectateVideo/index.jsx';
 
 export default function RoverSpectatorCard({ rover }) {
   return (
-    <article className="min-h-[16rem] rounded bg-zinc-900 p-0 sm:min-h-[18rem]">
-      <div className="min-h-0 overflow-hidden rounded bg-black/20">
+    <article className="min-h-64 rounded-sm bg-zinc-900 p-0 sm:min-h-72">
+      <div className="min-h-0 overflow-hidden rounded-sm bg-black/20">
         <SpectateVideo
           roverId={rover.id}
           label={rover.name}

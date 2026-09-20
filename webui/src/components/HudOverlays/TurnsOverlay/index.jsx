@@ -224,7 +224,7 @@ function TurnsOverlay({
       {showTurnCue ? (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/55">
           <div
-            className={`flex flex-col items-center gap-0.5 rounded border border-amber-300/80 bg-black/70 ${cuePadClass}`}
+            className={`flex flex-col items-center gap-0.5 rounded-sm border border-amber-300/80 bg-black/70 ${cuePadClass}`}
           >
             <div className={`font-semibold text-amber-200 ${titleClass}`}>IT IS YOUR TURN!</div>
             <div className={`text-amber-200/80 ${subClass}`}>Start driving!</div>

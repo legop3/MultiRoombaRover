@@ -27,7 +27,7 @@ function VerticalBatteryOverlay({ show = false, roverId = null, sensors, battery
   if (!show || !batteryVisual?.available) return null;
 
   return (
-    <div className="pointer-events-none absolute right-1 top-1/2 flex h-[70%] -translate-y-1/2 flex-col items-center justify-center rounded bg-black/60 px-0.5 pb-1 pt-1">
+    <div className="pointer-events-none absolute right-1 top-1/2 flex h-[70%] -translate-y-1/2 flex-col items-center justify-center rounded-sm bg-black/60 px-0.5 pb-1 pt-1">
       <BatteryBar
         visual={batteryVisual}
         orientation="vertical"

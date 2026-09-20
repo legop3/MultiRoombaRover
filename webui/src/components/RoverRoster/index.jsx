@@ -54,7 +54,7 @@ export default function RoverRoster({
                 </p>
                 <p className="text-xs text-slate-500 flex flex-wrap items-center gap-0.5">
                   <span>{rover.locked ? 'locked' : 'free'}</span>
-                  {rover.lockReason && <span className="rounded bg-black/30 px-1">{rover.lockReason}</span>}
+                  {rover.lockReason && <span className="rounded-sm bg-black/30 px-1">{rover.lockReason}</span>}
                   <span className={classNames('font-semibold', batteryClass(rover))}>
                     Battery {formatBattery(rover)}
                   </span>

@@ -80,7 +80,7 @@ export default function FleetTimeSeriesChart({ minutes = [], roverIds = [], metr
   return (
     <div>
       <p className="mb-0.5 text-[0.68rem] text-slate-400">Drag horizontally to zoom. Double-click to restore the full range. Hover for exact values.</p>
-      <div ref={elementRef} className="min-h-[24rem] w-full overflow-hidden text-slate-200" role="img" aria-label={`Fleet time series for ${metric}`} />
+      <div ref={elementRef} className="min-h-96 w-full overflow-hidden text-slate-200" role="img" aria-label={`Fleet time series for ${metric}`} />
     </div>
   );
 }

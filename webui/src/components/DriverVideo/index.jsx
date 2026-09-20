@@ -23,7 +23,7 @@ export default function DriverVideo({ layoutFormat = 'desktop' }) {
       <CardFrame hideHeader className="shrink-0">
         {/* The legacy page keeps its existing muted 4:3 frame while sharing
             the removal-message behavior with the current video surface. */}
-        <div className="panel-muted aspect-[4/3]">
+        <div className="panel-muted aspect-4/3">
           <EmptyDriverVideoNotice />
         </div>
       </CardFrame>
@@ -34,7 +34,7 @@ export default function DriverVideo({ layoutFormat = 'desktop' }) {
   return (
     <CardFrame hideHeader className="shrink-0">
       <div className="flex flex-col gap-0.5">
-        <div className="relative w-full overflow-hidden bg-black aspect-[4/3]">
+        <div className="relative w-full overflow-hidden bg-black aspect-4/3">
           <RoverMediaPlayer roverId={roverId} videoMode={videoMode} />
           <TurnsOverlay mobileHud={mobileHud} />
           <RoverDescriptionOverlay

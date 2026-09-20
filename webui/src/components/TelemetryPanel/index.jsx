@@ -37,7 +37,7 @@ export default function TelemetryPanel() {
         </>
       )}
       {rawSnippet && (
-        <pre className="surface whitespace-pre-wrap break-words text-xs text-lime-300">{rawSnippet}</pre>
+        <pre className="surface whitespace-pre-wrap wrap-break-word text-xs text-lime-300">{rawSnippet}</pre>
       )}
     </CardFrame>
   );
@@ -163,7 +163,7 @@ function ValueRow({ label, value }) {
 }
 
 function Pill({ active, tone = 'green', label }) {
-  const base = 'rounded px-1.5 py-0.5 text-[0.7rem] font-semibold';
+  const base = 'rounded-sm px-1.5 py-0.5 text-[0.7rem] font-semibold';
   const colors =
     tone === 'red'
       ? active

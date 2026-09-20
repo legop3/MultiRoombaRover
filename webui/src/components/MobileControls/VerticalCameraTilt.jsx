@@ -142,14 +142,14 @@ export default function VerticalCameraTilt({
           camera gesture.
         */
         style={{ touchAction: 'none' }}
-        className="mobile-touch-control mobile-drag-control relative h-full w-6 rounded-full border border-emerald-100/80 bg-emerald-950 shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+        className="mobile-touch-control mobile-drag-control relative h-full w-6 rounded-full border border-emerald-100/80 bg-emerald-950 shadow-inner focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-200"
       >
         <div
           className="pointer-events-none absolute inset-x-1 bottom-1 rounded-full bg-emerald-400"
           style={{ height: `${valuePercent}%` }}
         />
         <div
-          className="pointer-events-none absolute left-1/2 h-3.5 w-3.5 -translate-x-1/2 rounded-full border border-emerald-950 bg-emerald-200 shadow"
+          className="pointer-events-none absolute left-1/2 h-3.5 w-3.5 -translate-x-1/2 rounded-full border border-emerald-950 bg-emerald-200 shadow-sm"
           style={{ bottom: `clamp(0.25rem, calc(${valuePercent}% - 0.4375rem), calc(100% - 1.125rem))` }}
         />
       </div>

@@ -33,7 +33,7 @@ function OverseerMemoryPopup({ memory, onClose }) {
         >
           {/* The memory is rendered as the server's existing plain-text summary so
               this popup stays consistent with the overseer/admin debug display. */}
-          <pre className="surface max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words font-mono text-[0.72rem] text-slate-200">{summary}</pre>
+          <pre className="surface max-h-[70vh] overflow-y-auto whitespace-pre-wrap wrap-break-word font-mono text-[0.72rem] text-slate-200">{summary}</pre>
         </CardFrame>
       </div>
     </div>

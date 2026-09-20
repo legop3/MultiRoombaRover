@@ -31,7 +31,7 @@ function LeftColumnTabs() {
       </TabList>
       <TabPanels>
         <TabPanel id="room">
-          <div className={`flex flex-col ${themeGapClass}`}>
+          <div className="flex flex-col gap-y-2">
             {/* The objective belongs below the selector so the tab bar remains the first visible,
                 sticky control at the top of the independently scrolling left column. */}
             <GlobalObjectiveBanner layout="desktop" />
@@ -49,10 +49,10 @@ function LeftColumnTabs() {
 
 function CommunityColumn() {
   return (
-    <div className={`flex flex-col ${themeGapClass}`}>
+    <div className="flex flex-col gap-y-2">
       {/* A fixed initial chat height keeps the composer usable in a narrow column. The sidebar
           itself scrolls, so every rover/site panel below remains reachable on a 720p display. */}
-      <div className="h-80 min-h-56">
+      <div className="h-96 min-h-56">
         <ChatPanel fillHeight />
       </div>
       <OverseerPreferencePanel />
@@ -93,7 +93,7 @@ export default function DesktopLayout() {
       className={`grid h-screen min-w-0 w-full grid-cols-[minmax(17rem,1fr)_minmax(0,133.333vh)_minmax(17rem,1fr)] overflow-hidden ${themeGapClass}`}
     >
       <aside
-        className={`flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto ${themeGapClass}`}
+        className="flex min-h-0 min-w-0 flex-col gap-y-2 overflow-x-hidden overflow-y-auto"
         aria-label="Room, activities, and site information"
       >
         <LeftColumnTabs />
@@ -103,7 +103,7 @@ export default function DesktopLayout() {
       <NewDriveVideo />
 
       <aside
-        className={`flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto ${themeGapClass}`}
+        className="flex min-h-0 min-w-0 flex-col gap-y-2 overflow-x-hidden overflow-y-auto"
         aria-label="Chat, rovers, help, and settings"
       >
         <RightColumnTabs />

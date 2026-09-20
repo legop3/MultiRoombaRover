@@ -504,7 +504,7 @@ export default function AdminPanelContent() {
           value={reasonDraft}
           onChange={(event) => setReasonDraft(event.target.value)}
           placeholder="Set an admin mode reason"
-          className="field-input text-sm min-h-[3.5rem]"
+          className="field-input text-sm min-h-14"
         />
         <div className="flex gap-0.5 text-xs">
           <button type="button" onClick={handleReasonSave} className="button-dark">
@@ -558,7 +558,7 @@ export default function AdminPanelContent() {
               {updateStates[rover.id] ? 'Updating...' : 'Update'}
             </button>
             {rover?.private?.enabled ? (
-              <div className="w-full rounded border border-slate-700/70 p-0.5 space-y-0.5 text-[0.7rem]">
+              <div className="w-full rounded-sm border border-slate-700/70 p-0.5 space-y-0.5 text-[0.7rem]">
                 <div className="text-slate-300">Private safety</div>
                 <label className="flex items-center gap-0.5">
                   <input

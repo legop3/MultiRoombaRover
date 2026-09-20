@@ -60,7 +60,7 @@ function SettingRow({ children, inline = false, className = '' }) {
   // the full settings pane.
   return (
     <label
-      className={`mx-auto flex w-full max-w-lg items-center gap-1.5 rounded bg-neutral-800/80 px-1.5 py-1 text-sm text-white ${inline ? 'flex-row' : 'flex-col items-stretch @lg:flex-row @lg:items-center'} ${className}`}
+      className={`mx-auto flex w-full max-w-lg items-center gap-1.5 rounded-sm bg-neutral-800/80 px-1.5 py-1 text-sm text-white ${inline ? 'flex-row' : 'flex-col items-stretch @lg:flex-row @lg:items-center'} ${className}`}
     >
       {children}
     </label>
@@ -95,10 +95,10 @@ function RangeSetting({ label, value, disabled = false, onChange }) {
   // Range settings need enough horizontal room for accurate pointer input, so the slider spans
   // the row while the percentage value stays beside the label for quick feedback.
   return (
-    <label className="mx-auto block w-full max-w-lg rounded bg-neutral-800/80 px-1.5 py-1 text-sm text-white">
+    <label className="mx-auto block w-full max-w-lg rounded-sm bg-neutral-800/80 px-1.5 py-1 text-sm text-white">
       <div className="flex items-center justify-between gap-1.5">
         <span className="min-w-0 font-semibold text-white">{label}</span>
-        <span className="rounded bg-neutral-900 px-1 py-0.5 text-xs text-white">
+        <span className="rounded-sm bg-neutral-900 px-1 py-0.5 text-xs text-white">
           {Math.round(value * 100)}%
         </span>
       </div>
@@ -270,10 +270,10 @@ export default function SettingsPanel() {
         {/* Four long labels cannot remain readable in one narrow sidebar row.
             Each tab claims half the row until this Settings container is wide,
             where the minimum is removed and the original single row returns. */}
-        <Tab id="keybindings" className="min-w-[calc(50%_-_0.125rem)] @[28rem]:min-w-0">Keybindings</Tab>
-        <Tab id="controller" className="min-w-[calc(50%_-_0.125rem)] @[28rem]:min-w-0">Controller</Tab>
-        <Tab id="page" className="min-w-[calc(50%_-_0.125rem)] @[28rem]:min-w-0">Page settings</Tab>
-        <Tab id="admin" className="min-w-[calc(50%_-_0.125rem)] @[28rem]:min-w-0">Admin</Tab>
+        <Tab id="keybindings" className="min-w-[calc(50%-0.125rem)] @[28rem]:min-w-0">Keybindings</Tab>
+        <Tab id="controller" className="min-w-[calc(50%-0.125rem)] @[28rem]:min-w-0">Controller</Tab>
+        <Tab id="page" className="min-w-[calc(50%-0.125rem)] @[28rem]:min-w-0">Page settings</Tab>
+        <Tab id="admin" className="min-w-[calc(50%-0.125rem)] @[28rem]:min-w-0">Admin</Tab>
       </TabList>
       <TabPanels>
         <TabPanel id="keybindings">
@@ -333,7 +333,7 @@ export default function SettingsPanel() {
                   seams between stacked cards. It exercises the exact gap directions the artwork
                   must serve on the driver and PTZ pages. */}
               <div
-                className={`page-theme-preview flex h-48 flex-col gap-0.5 overflow-hidden rounded border border-neutral-500/70 p-0.5 @[28rem]:grid @[28rem]:h-32 @[28rem]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(0,0.85fr)] @[28rem]:grid-rows-2 ${getPageThemeClass(previewPageThemeKey)}`}
+                className={`page-theme-preview flex h-48 flex-col gap-0.5 overflow-hidden rounded-sm border border-neutral-500/70 p-0.5 @[28rem]:grid @[28rem]:h-32 @[28rem]:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(0,0.85fr)] @[28rem]:grid-rows-2 ${getPageThemeClass(previewPageThemeKey)}`}
               >
                 <ThemePreviewCard title="Video" className="row-span-2" />
                 <ThemePreviewCard title="Controls" />

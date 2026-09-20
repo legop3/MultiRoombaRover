@@ -62,7 +62,7 @@ function MovementColumnContent({ layout }) {
         type="button"
         disabled={dockActionDisabled}
         onClick={handleDockAction}
-        className={`mobile-touch-control flex min-h-[4.5rem] shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 px-2 text-base font-semibold shadow-md transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`mobile-touch-control flex min-h-18 shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 px-2 text-base font-semibold shadow-md transition disabled:cursor-not-allowed disabled:opacity-50 ${
           dockAssist.active
             ? 'border-cyan-300/70 bg-cyan-900 text-cyan-50'
             : batteryUrgent

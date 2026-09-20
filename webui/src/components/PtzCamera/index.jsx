@@ -182,7 +182,7 @@ function PtzLightingControls({ ptz, disabled = false }) {
         onClick={cycleIr}
       >
         <span className="text-sm font-semibold">Infrared</span>
-        <span className="rounded bg-cyan-300 px-1 py-0.5 text-[0.7rem] font-semibold text-cyan-950">{irMode}</span>
+        <span className="rounded-sm bg-cyan-300 px-1 py-0.5 text-[0.7rem] font-semibold text-cyan-950">{irMode}</span>
       </button>
     </div>
   );
@@ -406,7 +406,7 @@ function PtzPresetPanel({ ptz }) {
       bodyClassName="flex min-h-0 flex-col gap-1 p-1 text-xs"
     >
       {ptz?.presetsError ? (
-        <div className="rounded border border-amber-500/50 bg-amber-950/40 p-1 text-amber-100">
+        <div className="rounded-sm border border-amber-500/50 bg-amber-950/40 p-1 text-amber-100">
           {ptz.presetsError}
         </div>
       ) : null}
@@ -443,7 +443,7 @@ function PtzPresetPanel({ ptz }) {
             </div>
           );
         }) : (
-          <div className="rounded border border-slate-700 bg-black/30 p-2 text-center text-slate-400">
+          <div className="rounded-sm border border-slate-700 bg-black/30 p-2 text-center text-slate-400">
             No presets saved.
           </div>
         )}
@@ -568,7 +568,7 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
         <PtzPresetPanel ptz={ptz} />
       </div>
       {releasePending ? (
-        <div className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/80 px-2 py-1 text-xs text-slate-200">
+        <div className="pointer-events-none absolute bottom-1 right-1 rounded-sm bg-black/80 px-2 py-1 text-xs text-slate-200">
           Closing...
         </div>
       ) : null}
@@ -594,7 +594,7 @@ function PtzMobileLandscape({ ptz, onClose, releasePending = false }) {
           <main className="relative h-[calc(100dvh-0.25rem)] min-h-0 overflow-hidden bg-black">
             <button
               type="button"
-              className="absolute left-1 top-1 z-50 rounded border border-white/40 bg-black/80 px-2 py-1 text-xs font-semibold text-white shadow disabled:opacity-50"
+              className="absolute left-1 top-1 z-50 rounded-sm border border-white/40 bg-black/80 px-2 py-1 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
               disabled={releasePending}
               onClick={onClose}
             >
@@ -645,7 +645,7 @@ function PtzMobilePortrait({ ptz, onClose, releasePending = false }) {
       <main className="relative aspect-video min-h-0 shrink-0 overflow-hidden bg-black">
         <button
           type="button"
-          className="absolute left-1 top-1 z-50 rounded border border-white/40 bg-black/80 px-2 py-1 text-xs font-semibold text-white shadow disabled:opacity-50"
+          className="absolute left-1 top-1 z-50 rounded-sm border border-white/40 bg-black/80 px-2 py-1 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
           disabled={releasePending}
           onClick={onClose}
         >
@@ -814,7 +814,7 @@ export function PtzControllerPage({ layout = 'desktop' }) {
 
   if (!featureEnabled) {
     return (
-      <main className={`flex min-h-[100dvh] items-center justify-center p-2 text-slate-100 ${pageBackgroundClass}`}>
+      <main className={`flex min-h-dvh items-center justify-center p-2 text-slate-100 ${pageBackgroundClass}`}>
         <CardFrame title="PTZ camera" bodyClassName="space-y-1 p-2 text-sm">
           <p>The PTZ camera is not available.</p>
           <button type="button" className="button-dark w-full" onClick={() => navigate('/')}>Return to driver page</button>
@@ -824,7 +824,7 @@ export function PtzControllerPage({ layout = 'desktop' }) {
   }
 
   return (
-    <main className={`h-[100dvh] w-full overflow-hidden text-slate-100 ${pageBackgroundClass}`}>
+    <main className={`h-dvh w-full overflow-hidden text-slate-100 ${pageBackgroundClass}`}>
       {/* The fullscreen CardFrame remains the structural shell. Painting its otherwise
           transparent body is what lets every desktop and mobile PTZ composition share one
           continuous pattern without threading theme props into each individual child panel. */}
@@ -838,7 +838,7 @@ export function PtzControllerPage({ layout = 'desktop' }) {
         hideHeader={isMobile}
         fillHeight
         clipOverflow={false}
-        className="h-[100dvh] w-[100vw] rounded-none border-0 !bg-black"
+        className="h-dvh w-screen rounded-none border-0 bg-black!"
         bodyClassName={`relative min-h-0 flex-1 ${pageBackgroundClass}`}
       >
         {isMobile ? (
@@ -952,7 +952,7 @@ export default function PtzQueueCard() {
           </button>
         ) : null}
         {!canUse ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded bg-black/75 px-2 text-center text-sm font-semibold text-slate-100">
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-black/75 px-2 text-center text-sm font-semibold text-slate-100">
             Verify your account to use the PTZ camera.
           </div>
         ) : null}

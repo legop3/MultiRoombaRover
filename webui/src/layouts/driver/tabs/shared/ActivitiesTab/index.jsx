@@ -11,11 +11,13 @@ import ButtonBoxPanel from '../../../../../components/ButtonBoxPanel/index.jsx';
 import KinectPanel from '../../../../../components/KinectPanel/index.jsx';
 import FleetReportsCard from '../../../../../components/FleetReportsCard/index.jsx';
 import { themeGapClass } from '../../../../../themes/index.js';
+import { useDriverLayout } from '../../../DriverLayoutContext.jsx';
 
 export default function ActivitiesTab() {
+  const layout = useDriverLayout();
   return (
     <TabPanel id="activities">
-      <div className={`flex flex-col ${themeGapClass}`}>
+      <div className={`flex flex-col ${layout === 'desktop' ? 'gap-y-2' : themeGapClass}`}>
         <NeatoCard />
         <LiftCard />
         <HomeAssistantActivitiesPanel />

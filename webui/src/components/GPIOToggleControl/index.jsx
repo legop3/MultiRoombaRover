@@ -131,12 +131,12 @@ export default function GPIOToggleControl({
         {Icon ? <Icon className="shrink-0 text-base" aria-hidden="true" /> : null}
         <span className="text-sm font-semibold">{label}</span>
         {keyLabel ? (
-          <span className="rounded bg-slate-800 px-1 py-0.5 text-[0.6rem] font-semibold text-slate-200">
+          <span className="rounded-sm bg-slate-800 px-1 py-0.5 text-[0.6rem] font-semibold text-slate-200">
             {keyLabel}
           </span>
         ) : null}
       </span>
-      <span className={`rounded px-1 py-0.5 text-[0.7rem] font-semibold ${statusClasses}`}>
+      <span className={`rounded-sm px-1 py-0.5 text-[0.7rem] font-semibold ${statusClasses}`}>
         {statusLabel}
       </span>
     </button>

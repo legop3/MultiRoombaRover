@@ -61,7 +61,7 @@ function WifiTile({ signal, ssid }) {
       <div className="mt-1 truncate text-[0.68rem] font-semibold leading-none text-white">Wi-Fi: {ssid || '--'}</div>
       <div className="mt-1 flex h-2 items-end gap-0.5" aria-hidden="true">
         {[1, 2, 3, 4].map((bar) => (
-          <span key={bar} className={`flex-1 rounded-sm ${bar <= bars ? tone : 'bg-slate-700'}`} style={{ height: `${25 * bar}%` }} />
+          <span key={bar} className={`flex-1 rounded-xs ${bar <= bars ? tone : 'bg-slate-700'}`} style={{ height: `${25 * bar}%` }} />
         ))}
       </div>
     </div>
@@ -128,10 +128,10 @@ export default function TopRightPod({ roverId }) {
     <>
       <div className="pointer-events-auto absolute right-0 top-0 z-20 flex flex-col items-end">
       {batteryOpen ? (
-        <div className="relative flex h-[8.5rem] w-[8.5rem] items-center justify-center rounded-bl-[4.25rem] bg-black/60">
+        <div className="relative flex h-34 w-34 items-center justify-center rounded-bl-[4.25rem] bg-black/60">
           {/* Let the gauge geometry define the visible inset so this pod does not carry an
               extra layer of shell padding that the camera pod does not have. */}
-          <svg className="h-[8.5rem] w-[8.5rem] -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+          <svg className="h-34 w-34 -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
             <circle cx="50" cy="50" r="42" fill="none" stroke="#334155" strokeWidth="9" />
             <circle cx="50" cy="50" r="42" fill="none" stroke={batteryTone} strokeWidth="9" strokeLinecap="round" strokeDasharray={batteryDash} />
             <circle cx="50" cy="50" r="32" fill="none" stroke="#334155" strokeWidth="5" />
@@ -158,7 +158,7 @@ export default function TopRightPod({ roverId }) {
       <ExpansionPanel
         open={powerOpen}
         onOpenChange={setPowerOpen}
-        anchorClassName={`absolute right-0 ${batteryOpen ? 'top-[8.5rem]' : 'top-10'}`}
+        anchorClassName={`absolute right-0 ${batteryOpen ? 'top-34' : 'top-10'}`}
         panelAlign="right"
         panelClassName="w-56 rounded-bl-xl bg-black/60 p-1.5 pt-4 text-white"
         openDirection="left"
@@ -185,7 +185,7 @@ export default function TopRightPod({ roverId }) {
           animation; severity comes from its size and solid color rather than visual noise. */}
       {lowBattery && !docked ? (
         <div
-          className={`pointer-events-none absolute left-1/2 top-[58%] z-[55] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap px-4 py-2 font-bold text-white shadow-xl ${
+          className={`pointer-events-none absolute left-1/2 top-[58%] z-55 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap px-4 py-2 font-bold text-white shadow-xl ${
             urgentBattery ? 'bg-red-950 text-xl' : 'bg-amber-950 text-base'
           }`}
           role="alert"

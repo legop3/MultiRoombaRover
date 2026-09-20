@@ -164,7 +164,7 @@ export default function HornControl({
       }}
       // The settings toggle is a nested press target, so it gets the same touch
       // suppression as the larger horn surface instead of relying on inheritance.
-      className="mobile-touch-control rounded bg-black/40 px-1 py-0.5 text-[0.6rem] font-semibold text-white/90 hover:text-white"
+      className="mobile-touch-control rounded-sm bg-black/40 px-1 py-0.5 text-[0.6rem] font-semibold text-white/90 hover:text-white"
     >
       {showSettings ? 'Hide' : 'Settings'}
     </button>
@@ -212,7 +212,7 @@ export default function HornControl({
           {Icon ? <Icon className="shrink-0 text-base" aria-hidden="true" /> : null}
           <span>Horn</span>
           {keyLabel ? (
-            <span className="rounded bg-black/40 px-1 py-0.5 text-[0.6rem] font-semibold text-white">
+            <span className="rounded-sm bg-black/40 px-1 py-0.5 text-[0.6rem] font-semibold text-white">
               {keyLabel}
             </span>
           ) : null}
@@ -234,7 +234,7 @@ export default function HornControl({
               <select
                 value={formattedWaveform}
                 onChange={updateWaveform}
-                className="rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-[0.65rem] text-slate-100"
+                className="rounded-sm border border-slate-700 bg-slate-900 px-1 py-[2px] text-[0.65rem] text-slate-100"
               >
                 <option value="saw">Saw</option>
                 <option value="sine">Sine</option>
@@ -252,7 +252,7 @@ export default function HornControl({
                     value={freq}
                     data-horn-freq-index={idx}
                     onChange={(event) => updateFreq(idx, event.target.value)}
-                    className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
+                    className="w-full rounded-sm border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
                   />
                 </label>
               ))}
@@ -268,7 +268,7 @@ export default function HornControl({
               <select
                 value={formattedWaveform}
                 onChange={updateWaveform}
-                className="rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-[0.65rem] text-slate-100"
+                className="rounded-sm border border-slate-700 bg-slate-900 px-1 py-[2px] text-[0.65rem] text-slate-100"
               >
                 <option value="saw">Saw</option>
                 <option value="sine">Sine</option>
@@ -285,7 +285,7 @@ export default function HornControl({
                   value={freq}
                   data-horn-freq-index={idx}
                   onChange={(event) => updateFreq(idx, event.target.value)}
-                  className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
+                  className="w-full rounded-sm border border-slate-700 bg-slate-900 px-1 py-[2px] text-right text-[0.65rem] font-mono text-slate-100"
                 />
               </label>
             ))}

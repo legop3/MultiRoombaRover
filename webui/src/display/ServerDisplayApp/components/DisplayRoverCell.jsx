@@ -84,7 +84,7 @@ export default function DisplayRoverCell({ rover, session }) {
               {driver?.label || 'Idle'}
             </AutoFitText>
           </div>
-          <div className="min-w-0 bg-black/50 rounded">
+          <div className="min-w-0 bg-black/50 rounded-sm">
             <AutoFitText
               className={classNames(
                 'font-black leading-none',

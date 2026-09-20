@@ -119,7 +119,7 @@ export default function ModeGateOverlay() {
                 hideWhenEmpty
                 scaledOverlay
                 singleColumn
-                className="inter-instance-overlay-frame w-[20.5rem] min-w-0 max-w-full"
+                className="inter-instance-overlay-frame w-82 min-w-0 max-w-full"
                 bodyClassName="inter-instance-overlay-body min-w-0 overflow-x-hidden overflow-y-auto p-0.5"
               />
             ) : null}

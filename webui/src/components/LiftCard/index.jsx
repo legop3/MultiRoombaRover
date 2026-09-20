@@ -95,7 +95,7 @@ function LiftCardContent() {
       className="relative w-full"
       bodyClassName="text-sm text-slate-200"
       actions={
-        <span className={`inline-flex w-auto rounded px-1 py-0.25 text-xs font-semibold ${badgeClass(statusTone)}`}>
+        <span className={`inline-flex w-auto rounded-sm px-1 py-0.25 text-xs font-semibold ${badgeClass(statusTone)}`}>
           {status}
         </span>
       }

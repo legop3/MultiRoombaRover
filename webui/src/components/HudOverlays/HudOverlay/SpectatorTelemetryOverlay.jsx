@@ -37,11 +37,11 @@ export default function SpectatorTelemetryOverlay({ sensors, telemetry = null, m
     >
       <div className="space-y-0.5 leading-tight">
         <div className="flex flex-col gap-0.5 text-[0.75rem] font-semibold uppercase tracking-wide">
-          <span className={`rounded px-1.5 py-0.5 ${dockTone}`}>{docked ? 'Docked' : 'Undocked'}</span>
-          <span className={`rounded px-1.5 py-0.5 ${chargingTone}`}>
+          <span className={`rounded-sm px-1.5 py-0.5 ${dockTone}`}>{docked ? 'Docked' : 'Undocked'}</span>
+          <span className={`rounded-sm px-1.5 py-0.5 ${chargingTone}`}>
             {charging ? 'Charging' : docked ? 'Not charging' : 'Not charging'}
           </span>
-          <span className={`rounded px-1.5 py-0.5 ${oiTone}`}>OI: {oiLabel}</span>
+          <span className={`rounded-sm px-1.5 py-0.5 ${oiTone}`}>OI: {oiLabel}</span>
         </div>
         {telemetryEntries.map(([labelText, value]) => (
           <span key={labelText} className="flex items-center justify-between gap-0.5">

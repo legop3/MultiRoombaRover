@@ -159,7 +159,7 @@ function TtsControls({
                 : voice;
           saveTtsSettings((current) => ({ ...(current || {}), engine: next, voice: nextVoice }));
         }}
-        className={`${compactSelectClass} w-[5.5rem] shrink`}
+        className={`${compactSelectClass} w-22 shrink`}
       >
         <option value="flite">flite</option>
         <option value="espeak">espeak</option>
@@ -173,7 +173,7 @@ function TtsControls({
               const next = event.target.value;
               saveTtsSettings((current) => ({ ...(current || {}), voice: next }));
             }}
-            className={`${compactSelectClass} w-[3.25rem] shrink`}
+            className={`${compactSelectClass} w-13 shrink`}
           >
             {(engine === 'chromegtts' ? CHROME_TTS_VOICES : FLITE_VOICES).map((v) => (
               <option key={v} value={v}>
@@ -189,7 +189,7 @@ function TtsControls({
                   const next = Number(event.target.value);
                   saveTtsSettings((current) => ({ ...(current || {}), googlePitch: next }));
                 }}
-                className={`${compactSelectClass} w-[5rem] shrink`}
+                className={`${compactSelectClass} w-20 shrink`}
               >
                 {GOOGLE_TTS_VALUES.map((value) => (
                   <option key={`pitch-${value}`} value={value}>
@@ -203,7 +203,7 @@ function TtsControls({
                   const next = Number(event.target.value);
                   saveTtsSettings((current) => ({ ...(current || {}), googleSpeed: next }));
                 }}
-                className={`${compactSelectClass} w-[5rem] shrink`}
+                className={`${compactSelectClass} w-20 shrink`}
               >
                 {GOOGLE_TTS_VALUES.map((value) => (
                   <option key={`speed-${value}`} value={value}>
@@ -221,7 +221,7 @@ function TtsControls({
             const next = Number(event.target.value);
             saveTtsSettings((current) => ({ ...(current || {}), pitch: next }));
           }}
-          className={`${compactSelectClass} w-[4.5rem] shrink`}
+          className={`${compactSelectClass} w-18 shrink`}
         >
           {ESPEAK_PITCHES.map((p) => (
             <option key={p} value={p}>

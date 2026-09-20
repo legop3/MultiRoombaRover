@@ -36,7 +36,7 @@ const FILTERS = [
 
 function StatusPill({ active, children }) {
   return (
-    <span className={`rounded px-1 py-0.25 text-[0.68rem] font-semibold ${active ? 'bg-emerald-700 text-emerald-50' : 'bg-neutral-800 text-neutral-300'}`}>
+    <span className={`rounded-sm px-1 py-0.25 text-[0.68rem] font-semibold ${active ? 'bg-emerald-700 text-emerald-50' : 'bg-neutral-800 text-neutral-300'}`}>
       {children}
     </span>
   );
@@ -71,7 +71,7 @@ function UserListCard({ users, truncated, selectedUserId, query, filter, loading
           Showing the first 100 matches. Narrow the search to find older users.
         </p>
       ) : null}
-      <div className="min-h-[18rem] flex-1 overflow-y-auto">
+      <div className="min-h-72 flex-1 overflow-y-auto">
         {users.length ? users.map((user) => (
           <button
             key={user.id}
@@ -197,7 +197,7 @@ function StatusCard({ user, onVerified, onDeterrence, onMuted }) {
           <span>Deterred</span>
         </label>
         <textarea
-          className="field-input min-h-[4rem] w-full text-xs"
+          className="field-input min-h-16 w-full text-xs"
           value={reason}
           placeholder="Deterrence reason"
           onChange={(event) => setReason(event.target.value)}
@@ -282,7 +282,7 @@ function FeatureStateCard({ user, onSaveFeature, onDeleteFeature }) {
         <button type="button" className="button-dark text-xs" onClick={remove} disabled={!namespace.trim()}>Delete</button>
       </div>
       <textarea
-        className="field-input min-h-[18rem] w-full font-mono text-xs"
+        className="field-input min-h-72 w-full font-mono text-xs"
         value={text}
         spellCheck={false}
         onChange={(event) => setText(event.target.value)}
@@ -295,7 +295,7 @@ function FeatureStateCard({ user, onSaveFeature, onDeleteFeature }) {
 function RawRecordCard({ user }) {
   return (
     <CardFrame title="Raw record" bodyClassName="p-0.5 text-xs">
-      <pre className="surface max-h-[36rem] overflow-auto whitespace-pre-wrap break-words font-mono text-[0.7rem] text-lime-300">
+      <pre className="surface max-h-144 overflow-auto whitespace-pre-wrap wrap-break-word font-mono text-[0.7rem] text-lime-300">
         {stringifyJson(user)}
       </pre>
     </CardFrame>

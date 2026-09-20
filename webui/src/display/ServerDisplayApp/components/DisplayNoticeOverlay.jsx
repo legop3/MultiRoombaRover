@@ -56,7 +56,7 @@ export default function DisplayNoticeOverlay() {
   if (!notice) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[130] flex items-center justify-center bg-black px-[4vw] py-[4vh]">
+    <div className="pointer-events-none fixed inset-0 z-130 flex items-center justify-center bg-black px-[4vw] py-[4vh]">
       <div className="max-w-[92vw] border-4 border-cyan-200 bg-slate-950 px-[3vw] py-[2.5vh] text-center">
         <div className="whitespace-pre-wrap text-[clamp(3.2rem,11vh,11rem)] font-black leading-[0.95] text-white">
           {notice.text}

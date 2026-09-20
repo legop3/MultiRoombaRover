@@ -88,7 +88,7 @@ export default function RawUserPilePanel({
             sorted.map((user) => (
               <span
                 key={user.socketId}
-                className={`rounded px-1 py-0.25 text-[0.7rem] ${roleColors(user.role)}`}
+                className={`rounded-sm px-1 py-0.25 text-[0.7rem] ${roleColors(user.role)}`}
               >
                 {formatLabel(user, selfId)}
               </span>

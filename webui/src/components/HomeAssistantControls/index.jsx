@@ -24,7 +24,7 @@ function StatusBadge({ label, tone = 'muted' }) {
       ? 'bg-amber-900 text-amber-100'
       : 'bg-slate-800 text-slate-200';
   return (
-    <span className={`rounded px-1 py-0.5 text-xs font-semibold leading-none ${styles}`}>
+    <span className={`rounded-sm px-1 py-0.5 text-xs font-semibold leading-none ${styles}`}>
       {label}
     </span>
   );
@@ -82,7 +82,7 @@ function LampSwatch({ entity, swatch, disabled, onSetColor, onSetWhite }) {
       className={cx(
         // The tile background already shows the Home Assistant-reported color,
         // so swatches are plain presets rather than a selected-state indicator.
-        'h-5 w-6 shrink-0 rounded-sm border border-white/80 transition-transform disabled:cursor-not-allowed disabled:opacity-40',
+        'h-5 w-6 shrink-0 rounded-xs border border-white/80 transition-transform disabled:cursor-not-allowed disabled:opacity-40',
         !disabled && 'hover:scale-110 hover:border-white',
       )}
       style={{ backgroundColor: swatch.hex }}
@@ -135,7 +135,7 @@ function LampTile({ entity, connected, controlsLocked, onToggle, onSetColor, onS
         // never sprawls wider than three lamps per row. The tile only keeps a
         // zero minimum lets a pair of tiles share a narrow desktop card. The
         // internal title truncation and wrapping swatches preserve readability.
-        'flex min-w-0 flex-col gap-0.5 rounded border px-0.5 py-0.5 transition-colors',
+        'flex min-w-0 flex-col gap-0.5 rounded-sm border px-0.5 py-0.5 transition-colors',
         disableToggle ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-white/60',
         tileTone,
       )}
@@ -235,7 +235,7 @@ function HomeAssistantControlsContent() {
   return (
     <CardFrame title="Room Lights" actions={actions} bodyClassName="space-y-0.5 text-base">
       {lightPolicyLocked ? (
-        <p className="rounded border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
+        <p className="rounded-sm border border-amber-600/60 bg-amber-900/40 px-1 py-0.5 text-xs text-amber-100">
           {adminCanControlLockedLights
             ? lockState === 'off'
               ? 'Lights are locked off. Admin room lights remain available.'
@@ -267,5 +267,5 @@ function HomeAssistantControlsContent() {
 
 function KeyPill({ label }) {
   if (!label) return null;
-  return <span className="rounded border border-slate-600 px-1 text-[0.65rem] text-slate-300">{label}</span>;
+  return <span className="rounded-sm border border-slate-600 px-1 text-[0.65rem] text-slate-300">{label}</span>;
 }

@@ -111,10 +111,10 @@ function KinectPanelContent() {
 
   const actions = (
     <div className="flex flex-wrap items-center justify-end gap-0.5 text-[0.68rem] text-slate-400">
-      <span className={`inline-flex min-w-[3.7rem] justify-center rounded border px-1 py-0.5 text-xs font-semibold ${statusPill.className}`}>
+      <span className={`inline-flex min-w-[3.7rem] justify-center rounded-sm border px-1 py-0.5 text-xs font-semibold ${statusPill.className}`}>
         {statusPill.label}
       </span>
-      <div className="inline-flex overflow-hidden rounded border border-slate-700">
+      <div className="inline-flex overflow-hidden rounded-sm border border-slate-700">
         {['3d', 'image'].map((option) => (
           <button
             key={option}
@@ -147,7 +147,7 @@ function KinectPanelContent() {
 
   return (
     <CardFrame title="Kinect Viewer" actions={actions} bodyClassName="space-y-0.5 p-0.5 text-sm">
-      <div className="aspect-[4/3] w-full overflow-hidden rounded bg-black">
+      <div className="aspect-4/3 w-full overflow-hidden rounded-sm bg-black">
         {activeView === '3d' && pointCloudFrame?.buffer ? (
           <PointCloudViewer frame={pointCloudFrame} />
         ) : activeView === '3d' ? (
@@ -163,7 +163,7 @@ function KinectPanelContent() {
         )}
       </div>
       {visibleError ? (
-        <p className="m-0 break-words text-[0.7rem] text-red-300">{String(visibleError).toLowerCase()}</p>
+        <p className="m-0 wrap-break-word text-[0.7rem] text-red-300">{String(visibleError).toLowerCase()}</p>
       ) : null}
     </CardFrame>
   );

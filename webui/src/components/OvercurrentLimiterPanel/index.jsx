@@ -32,7 +32,7 @@ function formatClassification(value) {
 function ProgressBar({ value, color = 'bg-emerald-500' }) {
   const width = `${Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100)}%`;
   return (
-    <div className="h-2 w-full overflow-hidden rounded bg-slate-800">
+    <div className="h-2 w-full overflow-hidden rounded-sm bg-slate-800">
       <div className={`h-full ${color}`} style={{ width }} />
     </div>
   );

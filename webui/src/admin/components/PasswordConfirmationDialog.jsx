@@ -21,7 +21,7 @@ export default function PasswordConfirmationDialog({ open, busy, error, onCancel
   }
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/75 p-2">
+    <div className="fixed inset-0 z-1000 flex items-center justify-center bg-black/75 p-2">
       <form className="w-full max-w-sm border border-neutral-500/70 bg-neutral-900 p-1 text-slate-100 shadow-2xl" onSubmit={submit}>
         <h2 className="text-base font-semibold">Confirm password</h2>
         <p className="mt-0.5 text-xs text-slate-400">This sensitive action requires recent confirmation of your administrator password.</p>

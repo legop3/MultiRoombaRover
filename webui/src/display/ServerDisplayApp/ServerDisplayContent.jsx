@@ -37,7 +37,7 @@ export default function ServerDisplayContent() {
 
   return (
     <div className="display-page flex h-screen w-screen flex-col overflow-hidden bg-black text-slate-100">
-      <div className="flex h-[8vh] min-h-[4rem] shrink-0 overflow-hidden">
+      <div className="flex h-[8vh] min-h-16 shrink-0 overflow-hidden">
         <OnlinePeopleStrip users={session?.users || []} />
         <DisplayPtzOperatorBadge />
       </div>

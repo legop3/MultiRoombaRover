@@ -83,7 +83,7 @@ function GameChoice({ game, disabled, onVote }) {
       type="button"
       disabled={disabled || game.active}
       onClick={() => onVote(game.id)}
-      className="surface flex min-h-[3.5rem] flex-col items-start justify-between border-l-4 border-l-neutral-600 px-1 py-0.75 text-left transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-70"
+      className="surface flex min-h-14 flex-col items-start justify-between border-l-4 border-l-neutral-600 px-1 py-0.75 text-left transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-70"
       style={style}
     >
       <span className="flex w-full items-start justify-between gap-1">
@@ -154,7 +154,7 @@ function DisplaySections({ sections }) {
             {section.items.slice(0, 8).map((item, itemIndex) => (
               <p
                 key={`${item.text}-${itemIndex}`}
-                className={`break-words text-xs leading-snug ${
+                className={`wrap-break-word text-xs leading-snug ${
                   item.status === 'active'
                     ? 'font-semibold text-neutral-50'
                     : item.status === 'complete'
@@ -302,14 +302,14 @@ function BarcodeGamesPanelContent() {
             fit its fixed timer and participant blocks without crushing the title. */}
         <div className="grid items-stretch gap-0.5 @[28rem]:grid-cols-[minmax(0,1fr)_9rem_10rem]">
           <div className="surface min-w-0 border-l-4 border-neutral-700 px-1 py-0.75" style={activeTheme.titleBoxStyle}>
-            <p className="break-words text-xl font-bold leading-tight text-neutral-50" style={activeTheme.textStyle}>
+            <p className="wrap-break-word text-xl font-bold leading-tight text-neutral-50" style={activeTheme.textStyle}>
               {display.title || activeGame?.title || 'No game active'}
             </p>
-            <p className="mt-0.5 break-words text-sm font-semibold leading-tight text-neutral-200">
+            <p className="mt-0.5 wrap-break-word text-sm font-semibold leading-tight text-neutral-200">
               {display.primary || 'Vote for a game to start'}
             </p>
             {display.secondary ? (
-              <p className="mt-0.5 break-words text-xs leading-snug text-neutral-300">{display.secondary}</p>
+              <p className="mt-0.5 wrap-break-word text-xs leading-snug text-neutral-300">{display.secondary}</p>
             ) : null}
             <DisplaySections sections={display.sections} />
           </div>

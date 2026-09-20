@@ -57,7 +57,7 @@ function InstanceStatus({ remote }) {
   const availability = getRemoteAvailability(remote);
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-0.5 text-[0.7rem]">
-      <span className={classNames('rounded px-1.5 py-0.5 text-xs font-semibold', statusClass(availability.tone))}>
+      <span className={classNames('rounded-sm px-1.5 py-0.5 text-xs font-semibold', statusClass(availability.tone))}>
         {availability.label}
       </span>
     </div>
@@ -108,7 +108,7 @@ function InstancePanel({ remote, children = null }) {
         {online && features.length ? (
           <div className="flex flex-wrap justify-center gap-0.5">
             {features.map((feature) => (
-              <span key={feature} className="rounded bg-slate-800 px-1 text-[0.7rem] text-slate-200">
+              <span key={feature} className="rounded-sm bg-slate-800 px-1 text-[0.7rem] text-slate-200">
                 {feature}
               </span>
             ))}
@@ -185,11 +185,11 @@ export function ExternalInstancesCompact({ onBrowse = null }) {
 
 export function InterInstancePopup({ onClose }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-0.5">
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/80 p-0.5">
       <InterInstanceBrowserFrame
         onClose={onClose}
         scaledOverlay
-        className="inter-instance-overlay-frame w-fit [container-type:normal]"
+        className="inter-instance-overlay-frame w-fit @container-normal"
         bodyClassName="inter-instance-overlay-body overflow-y-auto p-0.5"
       />
     </div>

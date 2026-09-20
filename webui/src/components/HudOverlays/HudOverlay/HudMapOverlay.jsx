@@ -32,7 +32,7 @@ export default function HudMapOverlay({
   };
 
   return (
-    <div className="pointer-events-none absolute rounded" style={mapStyle}>
+    <div className="pointer-events-none absolute rounded-sm" style={mapStyle}>
       <TopDownMap roverId={roverId} sensors={sensors} size={240} overlay />
     </div>
   );

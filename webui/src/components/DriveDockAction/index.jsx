@@ -31,7 +31,7 @@ function StatusRow({ value, tone = 'neutral' }) {
 
 function KeyPill({ label }) {
   if (!label) return null;
-  return <span className="rounded border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
+  return <span className="rounded-sm border border-white/40 px-1 text-[0.7rem] text-white">{label}</span>;
 }
 
 function ActionPill({ label, tone }) {
@@ -186,7 +186,7 @@ export default function DriveDockAction({
   // tapped repeatedly; attach mobile touch suppression directly to the card so
   // Safari does not select labels or open callouts during those interactions.
   const baseCardClasses =
-    'mobile-touch-control flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-0.75 py-0.75 text-slate-100 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 select-none no-touch-select';
+    'mobile-touch-control flex w-full flex-col gap-0.5 overflow-hidden rounded-xl border-2 px-0.75 py-0.75 text-slate-100 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-hidden focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 select-none no-touch-select';
   const ctaText = 'text-center';
   const ctaLayout = 'items-center justify-between';
   const compactLayout = 'items-center justify-center';
@@ -352,9 +352,9 @@ function StepList({ steps, tone = 'emerald' }) {
         ? 'text-amber-200'
         : 'text-indigo-200';
   return (
-    <div className={`space-y-0.5 rounded border px-0.5 py-0.35 text-left ${container}`}>
+    <div className={`space-y-0.5 rounded-sm border px-0.5 py-0.35 text-left ${container}`}>
       {steps.map((step, idx) => (
-        <div key={step} className="text-[0.85rem] leading-snug break-words">
+        <div key={step} className="text-[0.85rem] leading-snug wrap-break-word">
           <div className="flex items-start">
             <span className={`mr-0 align-top text-[0.75rem] font-semibold ${numberColor}`}>{idx + 1}.</span>
             <span className="align-top">{step}</span>
