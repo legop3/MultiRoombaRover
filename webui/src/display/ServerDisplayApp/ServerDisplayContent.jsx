@@ -12,6 +12,7 @@ import DisplayRoverGrid from './components/DisplayRoverGrid.jsx';
 import DisplayChatFeed from './components/DisplayChatFeed.jsx';
 import DisplayNoticeOverlay from './components/DisplayNoticeOverlay.jsx';
 import DisplayPtzOperatorBadge from './components/DisplayPtzOperatorBadge.jsx';
+import AlertFeed from '../../components/AlertFeed/index.jsx';
 
 export default function ServerDisplayContent() {
   const { session } = useSession();
@@ -38,11 +39,6 @@ export default function ServerDisplayContent() {
     <div className="display-page flex h-screen w-screen flex-col overflow-hidden bg-black text-slate-100">
       <div className="flex h-[8vh] min-h-[4rem] shrink-0 overflow-hidden">
         <OnlinePeopleStrip users={session?.users || []} />
-        {/* The PTZ operator belongs in the same information band as the people
-            strip because it is another "who is active right now" signal. Making
-            it a flex sibling lets the badge reserve real layout space when it
-            appears, which pushes the scrolling strip left instead of covering
-            the rover or chat areas. */}
         <DisplayPtzOperatorBadge />
       </div>
       <div className="min-h-0 flex-[0.72]">
@@ -53,9 +49,8 @@ export default function ServerDisplayContent() {
       </div>
       <DisplayNoticeOverlay />
       <RewardRunOverlay />
-      {/* Display is spectator-like: every Discord-hosted replay should take over
-          this physical-room board, not only replays requested by this browser. */}
-      <ReplayReadyPopup replay={latestReplay} onClose={clearLatestReplay} />
+      <ReplayReadyPopup replay={latestReplay} onClose={clearLatestReplay} />  
+      <AlertFeed scale={5} />
     </div>
   );
 }

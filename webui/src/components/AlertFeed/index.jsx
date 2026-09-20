@@ -381,8 +381,8 @@ function AlertToastShell({ toast, onDismiss, onPause, onResume }) {
   const accent = getToastAccent(toast.alert);
   const generic = isGenericAlert(toast.alert);
   const rgb = getToastRgb(toast.alert);
-  const genericBackgroundColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)` : 'rgba(33, 150, 243, 0.18)';
-  const genericBorderColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.45)` : 'rgba(33, 150, 243, 0.45)';
+  const genericBackgroundColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)` : 'rgba(33, 150, 243, 0.18)';
+  const genericBorderColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 1)` : 'rgba(33, 150, 243, 0.45)';
   const shellClass = [
     'pointer-events-auto w-fit max-w-[80vw] overflow-hidden rounded-md shadow-sm shadow-black/40',
     generic ? '' : 'border border-white/10 bg-black/75',
