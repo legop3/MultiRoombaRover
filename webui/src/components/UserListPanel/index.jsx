@@ -141,10 +141,11 @@ export default function UserListPanel({
             className={`flex items-center gap-0.5 ${compact ? 'py-0.25 text-[0.8rem]' : 'text-sm'}`}
           >
             <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
-            {user.roverId ? (
+            {user.roverId || user.operatingModeDisplay ? (
               <RoverLabel
                 roverId={user.roverId}
-                color={rosterEntry(user.roverId)?.color}
+                name={user.operatingModeDisplay?.name}
+                color={user.operatingModeDisplay?.color || rosterEntry(user.roverId)?.color}
                 fallback={user.roverId}
                 className="text-[0.7rem]"
               />

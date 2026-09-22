@@ -121,6 +121,21 @@ function PtzSnapshotPreview({ feed, label = 'PTZ Camera', className = 'h-full w-
 }
 
 function PtzQueueSummary({ ptz, title = 'PTZ queue' }) {
+  const { ptzClaim, ptzRelease, pushAlert } = useSessionActions();
+  const [pending, setPending] = useState(false);
+  const participating = Boolean(ptz?.isOperator || ptz?.queuedPosition);
+  const changeTurn = async () => {
+    if (pending) return;
+    setPending(true);
+    try {
+      if (participating) await ptzRelease();
+      else await ptzClaim();
+    } catch (err) {
+      pushAlert({ title: 'PTZ camera', message: err.message, color: '#f59e0b' });
+    } finally {
+      setPending(false);
+    }
+  };
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const lookupUser = usePtzQueueLookup(ptz);
   const { queue, currentId, nextId } = normalizePtzQueue(ptz);
@@ -135,6 +150,9 @@ function PtzQueueSummary({ ptz, title = 'PTZ queue' }) {
         selfId={selfId}
         lookupUser={lookupUser}
       />
+      <button type="button" className="button-dark w-full text-xs" disabled={pending || !ptz?.canUse} onClick={changeTurn}>
+        {pending ? 'Please wait…' : ptz?.isOperator ? 'Release turn' : ptz?.queuedPosition ? 'Leave queue' : 'Request turn'}
+      </button>
     </CardFrame>
   );
 }
@@ -691,59 +709,25 @@ export function PtzControllerPage({ layout = 'desktop' }) {
   const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
   const role = useSessionSelector((state) => state.session?.role || null);
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
-  const { ptzClaim, ptzRelease, pushAlert } = useSessionActions();
+  const { ptzClaim, setOperatingMode, pushAlert } = useSessionActions();
   const { stopAllMotion } = useControlActions();
   const navigate = useNavigate();
   const [releasePending, setReleasePending] = useState(false);
   const autoClaimSocketRef = useRef(null);
-  const routeExitReleaseTimerRef = useRef(null);
-  const participantRef = useRef(false);
-  const closingThroughButtonRef = useRef(false);
   const { value: pageSettings } = useSettingsNamespace('page', {
     backgroundTheme: DEFAULT_PAGE_THEME_KEY,
   });
   const isMobile = layout !== 'desktop';
   const canUse = Boolean(ptz?.canUse || isVerified || role === 'admin' || role === 'lockdown');
-  const isParticipant = Boolean(ptz?.isOperator || ptz?.queuedPosition);
   // PTZ is a separate route but shares the browser's page settings. Applying the catalog class to
   // its body surface exposes the theme only through layout padding and card gaps; camera pixels,
   // controls, and card interiors retain their purpose-built dark backgrounds.
   const pageBackgroundClass = usePageThemeClass(pageSettings?.backgroundTheme);
 
   useEffect(() => {
-    // Route-exit cleanup runs after the last render, so retain the latest
-    // server-confirmed membership without making the lifecycle effect resubscribe.
-    participantRef.current = isParticipant;
-  }, [isParticipant]);
-
-  useEffect(() => {
-    if (routeExitReleaseTimerRef.current) {
-      clearTimeout(routeExitReleaseTimerRef.current);
-      routeExitReleaseTimerRef.current = null;
-    }
-
-    return () => {
-      if (!participantRef.current || closingThroughButtonRef.current) return;
-      /*
-        Browser Back and route navigation unmount the PTZ page without invoking
-        its Close button. Defer release by one task so React Strict Mode's
-        development-only cleanup/remount cycle can cancel it in the next setup;
-        a real route exit has no replacement setup, so membership is released.
-
-        This is intentionally membership-gated. An admin release command can
-        revoke the current operator even when the admin is not that operator,
-        so an admin merely visiting/leaving a disabled or unjoined page must not
-        emit a release command.
-      */
-      routeExitReleaseTimerRef.current = setTimeout(() => {
-        routeExitReleaseTimerRef.current = null;
-        ptzRelease().catch(() => {});
-      }, 0);
-    };
-  }, [ptzRelease]);
-
-  useEffect(() => {
     if (!featureEnabled || !ptz || !socketId || !canUse) return undefined;
+    // Wait for startup to publish readiness before consuming the one entry attempt.
+    if (!ptz.initialized && !ptz.error) return undefined;
 
     if (ptz.isOperator || ptz.queuedPosition) {
       /*
@@ -759,17 +743,8 @@ export function PtzControllerPage({ layout = 'desktop' }) {
     autoClaimSocketRef.current = socketId;
     let active = true;
 
-    /*
-      A direct /ptz load still receives the ordinary user role first, which can
-      briefly assign a rover. Claiming through the existing server action is
-      deliberate: ptzCameraService releases that rover ownership before it
-      activates or queues this socket, keeping one authoritative transition.
-
-      The socket-keyed ref suppresses repeats caused by session updates and
-      React's development effect replay. The server claim is also idempotent for
-      an existing operator/queue member, which covers an acknowledgement racing
-      with a fresh public-state sync.
-    */
+    // Handshake mode prevents rover assignment on direct loads/reconnects;
+    // this request checks eligibility and joins the camera's turn queue.
     ptzClaim().catch((err) => {
       if (!active) return;
       pushAlert({
@@ -791,26 +766,20 @@ export function PtzControllerPage({ layout = 'desktop' }) {
   const releaseAndClose = useCallback(async () => {
     if (releasePending) return;
     setReleasePending(true);
-    closingThroughButtonRef.current = true;
     try {
       /*
         Stop first so a held key/pointer cannot leave ONVIF continuous movement
         running while the server removes this socket from the PTZ queue.
       */
       stopAllMotion?.();
-      if (ptz?.isOperator || ptz?.queuedPosition) {
-        await ptzRelease();
-      }
+      await setOperatingMode('rover');
       navigate('/');
     } catch (err) {
-      // A rejected manual release leaves the route mounted, so route-exit
-      // cleanup must remain armed for a later Back/navigation attempt.
-      closingThroughButtonRef.current = false;
-      throw err;
+      pushAlert({ title: 'PTZ camera', message: err.message, color: '#f59e0b' });
     } finally {
       setReleasePending(false);
     }
-  }, [navigate, ptz?.isOperator, ptz?.queuedPosition, ptzRelease, releasePending, stopAllMotion]);
+  }, [navigate, pushAlert, setOperatingMode, releasePending, stopAllMotion]);
 
   if (!featureEnabled) {
     return (
@@ -861,7 +830,7 @@ export default function PtzQueueCard() {
   const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
   const role = useSessionSelector((state) => state.session?.role || null);
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
-  const { ptzClaim, ptzRelease } = useSessionActions();
+  const { ptzClaim, setOperatingMode } = useSessionActions();
   const navigate = useNavigate();
   const lookupUser = usePtzQueueLookup(ptz);
   const { queue, currentId, nextId } = normalizePtzQueue(ptz);
@@ -901,7 +870,7 @@ export default function PtzQueueCard() {
     if (pending) return;
     setPending(true);
     try {
-      await ptzRelease();
+      await setOperatingMode('rover');
     } catch (err) {
       alert(err.message || 'Failed to leave PTZ camera.');
     } finally {

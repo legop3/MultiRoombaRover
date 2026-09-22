@@ -27,9 +27,8 @@ function detectSafari() {
 
 function HudChatInput({ compact = false, variant = 'legacy', open = true, onOpenChange = null }) {
   const role = useSessionSelector((state) => state.session?.role || null);
-  const socketId = useSessionSelector((state) => state.session?.socketId || null);
+  const operatingMode = useSessionSelector((state) => state.session?.operatingMode || 'rover');
   const currentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
-  const users = useSessionSelector((state) => state.session?.users || []);
   const roverRoster = useSessionSelector((state) => state.session?.roster || []);
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const { sendMessage, onInputFocus, onInputBlur, blurChat, registerInputRef, setTypingActive } = useChatActions();
@@ -49,24 +48,12 @@ function HudChatInput({ compact = false, variant = 'legacy', open = true, onOpen
   const { navigateHistory, resetHistoryNavigation } = useChatMessageHistoryNavigation();
   const canChat = role !== 'spectator';
   const hideHudChat = role === 'spectator';
-  const chatTargetId = useMemo(() => {
-    /*
-      HUD chat does not render the full composer controls, but it still sends
-      TTS payloads when the active target supports speech. PTZ appears only in
-      the session user target, not the physical rover roster, so use the same
-      self-target resolution as the full chat panel.
-    */
-    const self = users.find((entry) => entry?.socketId === socketId);
-    if (!self?.roverId && ptz?.id && (ptz?.isOperator || ptz?.queuedPosition)) return ptz.id;
-    return self?.roverId || currentRoverId || null;
-  }, [currentRoverId, ptz?.id, ptz?.isOperator, ptz?.queuedPosition, socketId, users]);
   const rover = useMemo(
-    () => roverRoster.find((entry) => String(entry.id) === String(chatTargetId)) || null,
-    [chatTargetId, roverRoster],
+    () => roverRoster.find((entry) => String(entry.id) === String(currentRoverId)) || null,
+    [currentRoverId, roverRoster],
   );
   const ptzTtsSupported = Boolean(
-    ptz?.id &&
-      String(chatTargetId) === String(ptz.id) &&
+    operatingMode === 'ptz' &&
       ptz?.audio?.enabled &&
       (ptz?.isOperator || ptz?.queuedPosition),
   );

@@ -24,14 +24,8 @@ function formatWebhookUsername(payload) {
     const origin = payload.discordGuildName ? ` (From: ${payload.discordGuildName})` : '';
     return `${name}${origin}${botTag}${spectatorTag}${adminTag}`;
   }
-  /*
-    The chat payload already carries the resolved display name for rover-like
-    targets. Prefer that name so PTZ, which is intentionally pretending to be a
-    rover in chat, shows up as "PTZ Camera" instead of the internal id
-    "ptz-camera"; fall back to the id for older payloads or missing metadata.
-  */
-  const roverTagLabel = payload.roverName || payload.roverId;
-  const roverTag = payload.roverId ? ` [${roverTagLabel}]` : '';
+  const tagLabel = payload.operatingModeDisplay?.name || payload.roverName || payload.roverId;
+  const roverTag = tagLabel ? ` [${tagLabel}]` : '';
   return `${name}${botTag}${spectatorTag}${adminTag}${roverTag}`;
 }
 

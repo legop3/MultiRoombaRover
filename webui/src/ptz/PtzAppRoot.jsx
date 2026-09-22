@@ -19,15 +19,9 @@ import useUserIdentitySync from '../hooks/useUserIdentitySync.js';
 function PtzRouteContent() {
   const layout = useLayoutMode();
 
-  /*
-    Navigating away from the driver route unmounts its identity hooks. The PTZ
-    route is still an active control surface, so it must keep the same driver
-    identity heartbeat alive instead of allowing the session to become passive
-    while someone operates or waits for the camera.
-  */
   useDefaultNickname();
   useIncomingInterInstanceTransfer();
-  useUserIdentitySync({ identitySurface: 'driver' });
+  useUserIdentitySync({ identitySurface: 'ptz' });
 
   return (
     <ControlSystemProvider>

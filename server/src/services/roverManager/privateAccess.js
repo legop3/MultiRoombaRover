@@ -1,3 +1,4 @@
+const { getOperatingMode } = require('../operatingModeService');
 // rover Manager private access
 // Purpose: Encapsulates private-rover visibility and control-authorization policy checks.
 // Scope: Keeps runtime behavior unchanged while isolating policy decisions from orchestration wiring.
@@ -80,6 +81,7 @@ function createPrivateAccessPolicy(deps) {
       allowClosedPrivateGrantInLockdown = false,
       allowClosedPrivateCurrentDriver = false,
     } = options;
+    if (getOperatingMode(socket) !== 'rover') return 'Leave PTZ before requesting rover control';
     if (!record) return 'Unknown rover';
     if (!allowUser && !isAdmin(socket)) return 'Only admins can request control';
     if (record.locked && !isAdmin(socket)) return 'Rover locked';

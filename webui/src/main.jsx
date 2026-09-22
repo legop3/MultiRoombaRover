@@ -20,6 +20,7 @@ import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
 import PtzAppRoot from './ptz/PtzAppRoot.jsx'
+import OperatingModeRouteSync from './components/OperatingModeRouteSync/index.jsx'
 import InitialSessionOverlay from './components/InitialSessionOverlay/index.jsx'
 
 // Reporting and administration carry substantial route-specific libraries.
@@ -53,6 +54,7 @@ createRoot(document.getElementById('root')).render(
               <DeterrenceChaos />
               <BrowserRouter>
                 <AnalyticsReporter />
+                <OperatingModeRouteSync />
                 <Routes>
                   <Route path="/" element={<DriverPageRoot />} />
                   {/* The retired desktop composition remains available for direct comparison

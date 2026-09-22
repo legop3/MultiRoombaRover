@@ -2,20 +2,14 @@
 // Purpose: Builds normalized chat message/typing payloads and rover context snapshots.
 // Scope: Encapsulates chat DTO construction and rover/driver metadata extraction.
 const { v4: uuidv4 } = require('uuid');
-const io = require('../../globals/io');
 const roverManager = require('../roverManager');
 const { getRole } = require('../roleService');
+const { getOperatingMode } = require('../operatingModeService');
 const { describeAssignment } = require('../assignmentService');
 const { getNickname } = require('../nicknameService');
 const ptzCameraService = require('../ptzCameraService');
 
-function resolvePtzChatTarget(socketId) {
-  return ptzCameraService.getChatTargetForSocket(socketId) || null;
-}
-
 function resolveRoverId(socketId) {
-  const ptzTarget = resolvePtzChatTarget(socketId);
-  if (ptzTarget?.roverId) return ptzTarget.roverId;
   const primary = roverManager.getPrimaryRoverForSocket(socketId);
   if (primary) return primary;
   const assignment = describeAssignment(socketId);
@@ -24,54 +18,22 @@ function resolveRoverId(socketId) {
 
 function resolveRoverColor(roverId) {
   if (!roverId) return null;
-  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) {
-    return ptzCameraService.getPublicState()?.color || null;
-  }
   const record = roverManager.rovers.get(String(roverId));
   return record?.meta?.color || null;
 }
 
 function resolveRoverName(roverId) {
   if (!roverId) return null;
-  if (String(roverId) === ptzCameraService.PTZ_CAMERA_ID) {
-    return ptzCameraService.getPublicState()?.name || null;
-  }
   const record = roverManager.rovers.get(String(roverId));
   return record?.meta?.name || null;
 }
 
-function isPtzChatTargetId(roverId) {
-  /*
-    PTZ is intentionally treated as a virtual rover for chat identity only. It
-    does not live in roverManager.rovers because movement, video authorization,
-    and queue ownership are PTZ-service concerns, but chat needs one stable
-    "rover-like" id so the existing web UI, Discord bridge, and AI transcript
-    code can all render the same badge without learning PTZ internals.
-  */
-  return Boolean(roverId) && String(roverId) === ptzCameraService.PTZ_CAMERA_ID;
-}
-
 function isPublicChatTargetId(roverId, socket = null) {
-  if (!roverId) return false;
-  /*
-    Normal rovers remain governed by the existing replay visibility rule, which
-    is also the rule chat historically used to avoid exposing closed private
-    rover activity. PTZ gets an explicit allow-list entry here because it is a
-    public chat target that deliberately pretends to be a rover, even though it
-    is not a roverManager record.
-  */
-  if (isPtzChatTargetId(roverId)) return true;
-  return roverManager.canReplayRoverId(roverId, socket) === true;
+  return Boolean(roverId) && roverManager.canReplayRoverId(roverId, socket) === true;
 }
 
 function isPrivateClosedRoverId(roverId) {
-  if (!roverId) return false;
-  /*
-    PTZ uses the existing rover badge fields so chat rows can reuse RoverLabel,
-    but it is not a private rover. Let PTZ-badged messages broadcast normally
-    instead of falling into the closed-private rover path for unknown ids.
-  */
-  return !isPublicChatTargetId(roverId);
+  return Boolean(roverId) && !isPublicChatTargetId(roverId);
 }
 
 function normalizeProfileImageUrl(value) {
@@ -170,6 +132,8 @@ function buildMessage(socket, text, meta = {}) {
     socketId: socket?.id || null,
     nickname: meta.nickname || getNickname(socket) || null,
     role: meta.role || getRole(socket),
+    operatingMode: socket ? getOperatingMode(socket) : null,
+    operatingModeDisplay: socket ? ptzCameraService.getOperatingModeDisplay(socket.id) : null,
     roverId,
     roverName,
     roverColor,
@@ -215,6 +179,8 @@ function buildTypingPayload(socket, meta = {}) {
     socketId,
     nickname: meta.nickname || getNickname(socket) || null,
     role: meta.role || getRole(socket),
+    operatingMode: socket ? getOperatingMode(socket) : null,
+    operatingModeDisplay: socket ? ptzCameraService.getOperatingModeDisplay(socket.id) : null,
     roverId,
     roverName,
     roverColor,
@@ -231,7 +197,6 @@ function buildTypingPayload(socket, meta = {}) {
 
 module.exports = {
   resolveRoverId,
-  isPtzChatTargetId,
   isPublicChatTargetId,
   isPrivateClosedRoverId,
   buildRoverCtxSnapshot,

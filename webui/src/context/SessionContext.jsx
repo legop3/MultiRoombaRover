@@ -411,8 +411,10 @@ export function SessionProvider({ children }) {
         emitWithAck('audioLevels:setPersonalAdjustmentRange', { maxAdjustmentPercent }),
       setPrivateSafety: (roverId, safety = {}) =>
         emitWithAck('session:privateSafety:set', { roverId, safety }),
-      ptzClaim: () => emitWithAck('ptzCamera:claim'),
+      setOperatingMode: (operatingMode) => emitWithAck('session:setOperatingMode', { operatingMode }),
+      ptzClaim: () => emitWithAck('session:setOperatingMode', { operatingMode: 'ptz' }),
       ptzRelease: () => emitWithAck('ptzCamera:release'),
+      ptzRevokeOperator: () => emitWithAck('ptzCamera:revokeOperator'),
       ptzSpotlight: (payload = {}) => emitWithAck('ptzCamera:spotlight', payload),
       ptzIr: (payload = {}) => emitWithAck('ptzCamera:ir', payload),
       ptzListPresets: () => emitWithAck('ptzCamera:presets:list'),

@@ -5,6 +5,7 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('sessionService');
 const { getFeatureFlags, configurationEvents } = require('../../configuration');
 const { getRole, isAdmin, roleEvents } = require('../roleService');
+const { getOperatingMode, setOperatingMode, operatingModeEvents } = require('../operatingModeService');
 const { getMode, modeEvents } = require('../modeManager');
 const roverManager = require('../roverManager');
 const { managerEvents } = roverManager;
@@ -13,8 +14,8 @@ const { getActiveDrivers, getTurnQueues, turnEvents } = require('../turnService'
 const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 const {
   getPublicState: getPtzCameraState,
-  getChatTargetForSocket: getPtzChatTargetForSocket,
-  PTZ_CAMERA_ID,
+  getOperatingModeDisplay,
+  getParticipantSocketIds,
   ptzCameraEvents,
 } = require('../ptzCameraService');
 const { getState: getHomeAssistantState, homeAssistantEvents } = require('../homeAssistantService');
@@ -111,18 +112,13 @@ function buildBandwidthSavingsSessionState(socket, controllableUserCount = 0) {
 
 function countControllableUsers(userEntries = []) {
   const ids = new Set();
+  const ptzParticipants = new Set(getParticipantSocketIds());
   userEntries.forEach((entry) => {
     const role = String(entry?.role || '');
     if (role === 'spectator') return;
     const socketId = String(entry?.socketId || '').trim();
     const roverId = String(entry?.roverId || '').trim();
-    /*
-      buildUserEntry already maps PTZ queued/operators to the PTZ pseudo-rover
-      id and normal drivers to their physical rover. Counting entries after that
-      normalization gives the browser the same conceptual "controllable users"
-      count it shows in the user/queue panels without duplicating PTZ UI logic.
-    */
-    if (socketId && roverId) ids.add(socketId);
+    if (socketId && (roverId || ptzParticipants.has(socketId))) ids.add(socketId);
   });
   return ids.size;
 }
@@ -146,19 +142,14 @@ function buildUserEntry(socket) {
     && roverManager.isDriver(assignment.roverId, socket)
     ? assignment.roverId
     : null;
-  const ptzChatTarget = getPtzChatTargetForSocket(socket.id);
   return {
     socketId: socket.id,
     userId: socket?.data?.userId || null,
     nickname: getNickname(socket) || null,
     role,
-    /*
-      PTZ is not inserted into the physical rover roster, but for chat and user
-      presence it should read like the user moved to a rover-like target. Prefer
-      the PTZ chat target while the socket is queued or operating so presence,
-      queue lookup, and chat identity all agree.
-    */
-    roverId: ptzChatTarget?.roverId || verifiedPrimaryRover || verifiedAssignmentRover || null,
+    operatingMode: getOperatingMode(socket),
+    operatingModeDisplay: getOperatingModeDisplay(socket.id),
+    roverId: verifiedPrimaryRover || verifiedAssignmentRover || null,
   };
 }
 
@@ -171,15 +162,7 @@ function buildSession(socket) {
   const controllableUserCount = countControllableUsers(userEntries);
   const users = userEntries.map((entry) => ({
     ...entry,
-    /*
-      PTZ is intentionally not a roverManager record, so the normal physical
-      rover visibility filter would erase the user's PTZ chat target. Preserve
-      it here because getPtzChatTargetForSocket already applied the PTZ access
-      and queue/operator rules before buildUserEntry returned it.
-    */
-    roverId: entry.roverId === PTZ_CAMERA_ID
-      ? entry.roverId
-      : filterVisibleRoverId(socket, entry.roverId),
+    roverId: filterVisibleRoverId(socket, entry.roverId),
   }));
   const roster = roverManager.getRosterForSocket(socket);
   const assignment = assignmentService.describeAssignment(socket?.id || '');
@@ -201,6 +184,7 @@ function buildSession(socket) {
   return {
     socketId: socket?.id || null,
     role: getRole(socket),
+    operatingMode: getOperatingMode(socket),
     mode: getMode(),
     isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
     bandwidthSavings: buildBandwidthSavingsSessionState(socket, controllableUserCount),
@@ -280,9 +264,18 @@ function syncAll() {
 }
 
 io.on('connection', (socket) => {
+  socket.on('session:setOperatingMode', async ({ operatingMode } = {}, cb = () => {}) => {
+    try {
+      cb({ ok: true, ...await setOperatingMode(socket, operatingMode) });
+    } catch (err) {
+      cb({ error: err.message });
+    }
+  });
   logger.info('New socket connected', socket.id);
   syncSocket(socket);
 });
+
+operatingModeEvents.on('change', () => syncAll());
 
 roleEvents.on('change', ({ socket }) => {
   if (!socket) return;

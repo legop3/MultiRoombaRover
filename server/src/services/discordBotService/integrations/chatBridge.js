@@ -59,12 +59,6 @@ function createChatBridgeHandlers(deps) {
   function handleChatBridgeOutbound(event) {
     const payload = event?.payload;
     if (!payload) return;
-    /*
-      Outbound bridge filtering must use chat visibility, not rover replay
-      visibility. PTZ deliberately uses roverId: "ptz-camera" so the existing
-      chat badge path can be reused, but that id is not a roverManager rover and
-      would be dropped by canReplayRoverId().
-    */
     if (payload?.roverId && !isPublicChatTargetId(payload.roverId)) return;
     const guildConfigs = listGuildConfigs();
     if (!guildConfigs.length) return;

@@ -20,7 +20,7 @@ const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
 const { isVerified } = require('../verificationService');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
 const roverManager = require('../roverManager');
-const assignmentService = require('../assignmentService');
+const { getOperatingMode, releasePtzTurn } = require('../operatingModeService');
 const videoSessions = require('../videoSessions');
 const { createPtzAudioPlayback } = require('./audioPlayback');
 
@@ -337,36 +337,20 @@ function getPublicState(socket = null) {
   };
 }
 
-function getChatTargetForSocket(socketId) {
-  /*
-    Chat badges are rendered through the same rover badge component on the
-    browser, so PTZ presents itself as a rover-like chat target while a user is
-    actively operating or waiting for the camera. Keeping this mapping in the
-    PTZ service avoids making chat infer camera queue details from public state.
-  */
-  if (!enabled || !socketId) return null;
-  const normalized = String(socketId);
-  const waiting = state.queue.includes(normalized);
-  const operating = state.operatorSocketId === normalized;
-  if (!waiting && !operating) return null;
+function getOperatingModeDisplay(socketId) {
+  const socket = io.sockets.sockets.get(socketId);
+  if (!socket || getOperatingMode(socket) !== 'ptz') return null;
   return {
-    roverId: PTZ_CAMERA_ID,
-    roverName: cameraConfig.name || 'PTZ Camera',
-    roverColor: cameraConfig.color || DEFAULT_PTZ_COLOR,
+    name: cameraConfig.name || 'PTZ Camera',
+    color: cameraConfig.color || DEFAULT_PTZ_COLOR,
   };
 }
 
 function getParticipantSocketIds() {
-  /*
-    PTZ has no roverManager record, so services that need a global "how many
-    controllable users are online" count need a tiny PTZ-owned participant list.
-    The operator and queue are the only users attached to this controllable
-    camera target; spectators merely viewing snapshots/live video are excluded.
-  */
-  return Array.from(new Set([
-    state.operatorSocketId,
-    ...state.queue,
-  ].filter(Boolean)));
+  // A released/expired camera turn does not end participation in PTZ mode.
+  return Array.from(io.sockets.sockets.values())
+    .filter((socket) => getOperatingMode(socket) === 'ptz' && canUsePtzFeature(socket))
+    .map((socket) => socket.id);
 }
 
 function countControllableUsers() {
@@ -386,13 +370,13 @@ function countControllableUsers() {
 
 function canSpeakThroughPtz(socket) {
   /*
-    PTZ chat uses roverId for identity, but the camera has its own queue rather
+    PTZ chat carries its own operating-mode identity and camera queue rather
     than a roverManager driver record. Match the rover TTS rule closely: the
     current operator may speak, and queued users may prepare/use TTS while they
     are in the camera queue. canUsePtzFeature keeps the normal VIP/admin/mode
     access gates in front of both cases.
   */
-  if (!canUsePtzFeature(socket)) return false;
+  if (getOperatingMode(socket) !== 'ptz' || !canUsePtzFeature(socket)) return false;
   const socketId = socket?.id ? String(socket.id) : '';
   if (!socketId) return false;
   return state.operatorSocketId === socketId || state.queue.includes(socketId);
@@ -898,39 +882,6 @@ function removeFromQueue(socketId) {
   state.queue = state.queue.filter((id) => id !== socketId);
 }
 
-function buildDockRequiredPayload(socket, leave) {
-  /*
-    PTZ must not become an escape hatch for abandoning the last undocked rover.
-    Keep the payload shape shared between immediate claim rejection and stale
-    queue cleanup so the browser gets one consistent dock-required event.
-  */
-  return {
-    socketId: socket.id,
-    label: getSocketLabel(socket.id),
-    roverId: leave.currentId || null,
-    message: leave.message,
-    until: null,
-  };
-}
-
-function releaseRoverOwnershipForPtz(socket) {
-  /*
-    PTZ operation must remove the browser from every rover-control state, not
-    only the roverManager driver set. The normal assignment UI is backed by
-    assignmentService, while low-level control membership is tracked inside
-    roverManager. In healthy flows those two agree, but reconnects, admin paths,
-    or earlier cleanup can leave only one side populated. Releasing the union
-    keeps PTZ from looking like a second simultaneous rover assignment.
-  */
-  if (!socket?.id) return;
-  const roverIds = new Set(roverManager.getRoversForSocket(socket.id));
-  const assignedRoverId = assignmentService.getAssignedRover?.(socket.id);
-  if (assignedRoverId) roverIds.add(assignedRoverId);
-  roverIds.forEach((roverId) => {
-    assignmentService.forceRelease(roverId, socket.id);
-  });
-}
-
 function revokeOperator(reason = 'release') {
   if (!state.operatorSocketId) return;
   const previous = state.operatorSocketId;
@@ -981,64 +932,38 @@ function advanceQueue(reason = 'advance') {
   }
   const nextId = state.queue[0];
   const socket = io.sockets.sockets.get(nextId);
-  if (!socket || !canUsePtzFeature(socket)) {
+  if (!socket || getOperatingMode(socket) !== 'ptz' || !canUsePtzFeature(socket)) {
     removeFromQueue(nextId);
     advanceQueue('drop-invalid');
-    return;
-  }
-  const leave = roverManager.canLeaveCurrentRover(socket);
-  if (!leave.ok) {
-    /*
-      claim() blocks this before queue entry, but this defensive check handles
-      stale state: a user can dock, join the queue, then undock again before
-      their PTZ turn arrives. In that case they are removed instead of holding a
-      PTZ queue slot while still responsible for an undocked rover.
-    */
-    removeFromQueue(socket.id);
-    socket.emit('ptzCamera:dockRequired', buildDockRequiredPayload(socket, leave));
-    emitChange('drop-dock-required');
-    advanceQueue('drop-dock-required');
     return;
   }
   activateOperator(socket);
 }
 
-async function claim(socket) {
+function checkParticipationAccess(socket) {
   if (!canUsePtzFeature(socket)) throw new Error('Not authorized for PTZ camera');
-  await initialize();
   if (!state.initialized) throw new Error(state.error || 'PTZ camera is not ready');
-  if (state.operatorSocketId === socket.id) return getPublicState(socket);
-  const leave = roverManager.canLeaveCurrentRover(socket);
-  if (!leave.ok) {
-    const payload = buildDockRequiredPayload(socket, leave);
-    socket.emit('ptzCamera:dockRequired', payload);
-    throw new Error(leave.message);
-  }
-  /*
-    Joining PTZ is the point where rover ownership must end, even when another
-    user is currently operating the camera and this socket only enters the
-    waiting queue. PTZ queue membership is still a camera session: the user is
-    waiting for a camera turn, not continuing as a rover driver until their turn
-    arrives. Releasing here also keeps chat badges, assignment UI, and command
-    routing from presenting a "rover plus camera queue" hybrid state.
-  */
-  releaseRoverOwnershipForPtz(socket);
-  if (state.operatorSocketId) {
-    if (!state.queue.includes(socket.id)) state.queue.push(socket.id);
-    emitChange('queue-join');
-    return getPublicState(socket);
-  }
-  if (!state.queue.includes(socket.id)) state.queue.unshift(socket.id);
-  advanceQueue('claim');
-  return getPublicState(socket);
 }
 
-async function release(socket) {
-  if (state.operatorSocketId === socket.id || isAdmin(socket)) {
+async function prepareParticipation(socket) {
+  if (!canUsePtzFeature(socket)) throw new Error('Not authorized for PTZ camera');
+  await initialize();
+}
+
+function claimTurn(socket) {
+  checkParticipationAccess(socket);
+  if (getOperatingMode(socket) !== 'ptz') throw new Error('PTZ operating mode required');
+  if (state.operatorSocketId === socket.id || state.queue.includes(socket.id)) return;
+  state.queue.push(socket.id);
+  advanceQueue('claim');
+}
+
+function releaseTurn(socket) {
+  removeFromQueue(socket.id);
+  if (state.operatorSocketId === socket.id) {
     revokeOperator('manual-release');
     advanceQueue('manual-release');
   } else {
-    removeFromQueue(socket.id);
     emitChange('queue-leave');
   }
   return getPublicState(socket);
@@ -1047,7 +972,7 @@ async function release(socket) {
 function requireOperator(socket) {
   if (!enabled) throw new Error('PTZ camera disabled');
   if (!passesMode(socket)) throw new Error('Not authorized for PTZ camera');
-  if (!socket || state.operatorSocketId !== socket.id) throw new Error('Not the PTZ operator');
+  if (!socket || getOperatingMode(socket) !== 'ptz' || state.operatorSocketId !== socket.id) throw new Error('Not the PTZ operator');
 }
 
 function requirePtzUser(socket) {
@@ -1686,18 +1611,17 @@ events.on('snapshot:status', ({ error }) => {
 
 function registerSocketHandlers() {
   io.on('connection', (socket) => {
-    socket.on('ptzCamera:claim', async (firstArg, secondArg) => {
+    socket.on('ptzCamera:revokeOperator', (firstArg, secondArg) => {
       const { cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb({ ok: true, state: await claim(socket) });
-      } catch (err) {
-        cb({ error: err.message });
-      }
+      if (!isAdmin(socket)) return cb({ error: 'Admin required' });
+      revokeOperator('admin-revoke');
+      advanceQueue('admin-revoke');
+      cb({ ok: true });
     });
     socket.on('ptzCamera:release', async (firstArg, secondArg) => {
       const { cb } = normalizeSocketArgs(firstArg, secondArg);
       try {
-        cb({ ok: true, state: await release(socket) });
+        cb({ ok: true, state: await releasePtzTurn(socket) });
       } catch (err) {
         cb({ error: err.message });
       }
@@ -1870,7 +1794,11 @@ module.exports = {
   PTZ_STREAM_PATH,
   ptzCameraEvents: events,
   getPublicState,
-  getChatTargetForSocket,
+  getOperatingModeDisplay,
+  prepareParticipation,
+  checkParticipationAccess,
+  claimTurn,
+  releaseTurn,
   getParticipantSocketIds,
   canSpeakThroughPtz,
   speakText,

@@ -33,7 +33,7 @@ export default function useUserIdentitySync({ identitySurface = 'passive' } = {}
   const cookieUserId = (identity?.cookieUserId || '').trim();
   const nickname = (profile?.nickname || '').trim();
   const overseerEnabled = Boolean(overseerPreference?.enabled);
-  const normalizedIdentitySurface = identitySurface === 'driver' ? 'driver' : 'passive';
+  const normalizedIdentitySurface = ['driver', 'ptz'].includes(identitySurface) ? identitySurface : 'passive';
 
   const sendIdentify = useCallback(async () => {
     if (!ready || !connected || !socket?.id) return;

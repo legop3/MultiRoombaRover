@@ -340,7 +340,7 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
     (state) => Boolean(state.session?.bandwidthSavings?.nonTurnVideo?.snapshotsActive),
   );
   const isMobile = layout === 'mobile-portrait' || layout === 'mobile-landscape';
-  const { ptzRelease } = useSessionActions();
+  const { setOperatingMode } = useSessionActions();
   /*
     The VIP fullscreen surface is available to queued PTZ users too. Let queued
     users see live video only when the central non-turn video policy allows it;
@@ -356,7 +356,7 @@ function PtzController({ open, onClose, layout = 'desktop' }) {
   const releaseAndClose = async () => {
     setReleasePending(true);
     try {
-      await ptzRelease();
+      await setOperatingMode('rover');
       onClose();
     } finally {
       setReleasePending(false);
@@ -481,7 +481,7 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false, layout 
   const featureEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'ptzCamera'));
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isVerified = useSessionSelector((state) => Boolean(state.session?.isVerified));
-  const { ptzClaim, ptzRelease } = useSessionActions();
+  const { ptzClaim, setOperatingMode } = useSessionActions();
   const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: Boolean(featureEnabled) });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
   const [controllerOpen, setControllerOpen] = useState(false);
@@ -527,7 +527,7 @@ export default function VipPtzCameraCard({ onMessage, fullWidth = false, layout 
   const handleRelease = async () => {
     setPending(true);
     try {
-      await ptzRelease();
+      await setOperatingMode('rover');
       onMessage?.('Left PTZ camera.');
     } catch (err) {
       onMessage?.(err.message || 'Failed to leave PTZ camera.');
