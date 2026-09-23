@@ -1,7 +1,7 @@
 // Spectator Content
 // Purpose: Defines the Spectator Content module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useSession, useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
+import { useSession } from '../../context/SessionContext.jsx';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
@@ -13,14 +13,23 @@ import RoverQueuesPanel from '../../components/RoverQueuesPanel/index.jsx';
 import RawUserPilePanel from '../../components/RawUserPilePanel/index.jsx';
 import ButtonBoxPanel from '../../components/ButtonBoxPanel/index.jsx';
 import RewardRunOverlay from '../../components/RewardRunOverlay/index.jsx';
-import ReplayReadyPopup from '../../components/ReplaySourcesPanel/ReplayReadyPopup.jsx';
+import SpectatorReplayPopup from '../../components/SpectatorSettings/ReplayPopup.jsx';
 import usePortraitLayout from './hooks/usePortraitLayout.js';
 import RoverRow from './components/RoverRow.jsx';
 import SecondaryRow from './components/SecondaryRow.jsx';
 import LogsRow from './components/LogsRow.jsx';
-import SpectatorViewControls from './components/SpectatorViewControls.jsx';
+import SpectatorSettings from '../../components/SpectatorSettings/index.jsx';
+
+const VIEW_OPTIONS = [
+  { key: 'showSidebar', label: 'Sidebar' },
+  { key: 'showRovers', label: 'Rovers' },
+  { key: 'showPtz', label: 'PTZ camera' },
+  { key: 'showRoomCameras', label: 'Room cameras' },
+  { key: 'showReplayPopups', label: 'Replay popups' },
+];
 
 const SPECTATOR_VIEW_DEFAULTS = {
+  showReplayPopups: true,
   showSidebar: true,
   showRovers: true,
   showPtz: true,
@@ -29,9 +38,7 @@ const SPECTATOR_VIEW_DEFAULTS = {
 
 export default function SpectatorContent() {
   const { session } = useSession();
-  const latestReplay = useSessionSelector((state) => state.latestReplay);
-  const { clearLatestReplay } = useSessionActions();
-  const { value: viewPreferences, save: saveViewPreferences } = useSettingsNamespace(
+  const { value: viewPreferences, save: saveViewPreferences, status: settingsStatus } = useSettingsNamespace(
     'spectatorPage',
     SPECTATOR_VIEW_DEFAULTS,
   );
@@ -151,14 +158,10 @@ export default function SpectatorContent() {
           {showRoomCameras ? <SecondaryRow /> : null}
         </section>
       </main>
-      <SpectatorViewControls preferences={viewPreferences} onToggle={updateViewPreference} />
+      <SpectatorSettings options={VIEW_OPTIONS} preferences={viewPreferences} onToggle={updateViewPreference} />
       <AlertFeed />
       <RewardRunOverlay />
-      {/* Spectators do not have the replay request panel that normal web users see, so
-          the spectator route presents the shared latestReplay value directly. Every
-          spectator should receive the fullscreen replay when completed media becomes
-          available, regardless of which browser or transport requested its creation. */}
-      <ReplayReadyPopup replay={latestReplay} onClose={clearLatestReplay} />
+      <SpectatorReplayPopup enabled={viewPreferences?.showReplayPopups !== false} ready={settingsStatus !== 'loading'} />
     </div>
   );
 }

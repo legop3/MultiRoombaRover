@@ -24,7 +24,7 @@ export default function DisplayPtzOperatorBadge() {
         like it enters from the right edge of the top bar while avoiding the
         previous problem where it covered content in the bottom-right corner.
       */}
-      <div className="flex h-full min-w-0 items-center justify-center gap-[1vw] px-[1.2vw] text-[clamp(2.1rem,5.1vh,5.6rem)] font-black leading-none tracking-normal text-white">
+      <div className="flex h-full min-w-0 items-center justify-center gap-[1vw] px-[1.2vw] text-[clamp(1.25rem,3.2vmin,2.75rem)] font-black leading-none tracking-normal text-white">
         {/*
           The user explicitly requested uppercase "PTZ" here because the room
           display needs a terse, instantly recognizable camera marker. The name

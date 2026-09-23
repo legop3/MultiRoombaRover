@@ -45,7 +45,7 @@ export default function DisplayRoverCell({ rover, session }) {
     >
       <RoverHelpOverlay active={Boolean(rover?.needsHelp)} />
       <BatteryBar visual={visual} variant="background" orientation="vertical" />
-      <div className="relative z-10 grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-[0.55vh] p-[0.85vw] text-center">
+      <div className="relative z-10 grid min-w-0 gap-[0.55vh] p-[0.85vw] text-center">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-[0.8vw]">
           <div className="min-w-0">
             <RoverLabel
@@ -71,8 +71,8 @@ export default function DisplayRoverCell({ rover, session }) {
             </div>
           ) : null}
         </div>
-        <div className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1.45fr)_minmax(0,0.85fr)] items-center gap-[1vw]">
-          <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center justify-center gap-[1vw]">
+          <div className="min-w-0 flex-[1.45_1_12rem]">
             <AutoFitText
               className={classNames(
                 'font-black leading-none',
@@ -84,7 +84,7 @@ export default function DisplayRoverCell({ rover, session }) {
               {driver?.label || 'Idle'}
             </AutoFitText>
           </div>
-          <div className="min-w-0 bg-black/50 rounded-sm">
+          <div className="min-w-0 max-w-[18rem] flex-[0.85_1_9rem] bg-black/50 rounded-sm text-center">
             <AutoFitText
               className={classNames(
                 'font-black leading-none',

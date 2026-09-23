@@ -1,6 +1,9 @@
 // Mini Summary Content
 // Purpose: Defines the Mini Summary Content module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
+import { useSettingsNamespace } from '../../settings/index.js';
+import SpectatorSettings from '../../components/SpectatorSettings/index.jsx';
+import SpectatorReplayPopup from '../../components/SpectatorSettings/ReplayPopup.jsx';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
 import { useVisualTelemetryFrames } from '../../context/TelemetryContext.jsx';
@@ -150,8 +153,15 @@ function MiniPtzUserColumn({ label }) {
   );
 }
 
+const VIEW_OPTIONS = [{ key: 'showReplayPopups', label: 'Replay popups' }];
+
 export default function MiniSummaryContent() {
   const { session } = useSession();
+  const { value: viewPreferences, save: saveViewPreferences, status: settingsStatus } = useSettingsNamespace(
+    'miniPage',
+    { showReplayPopups: true },
+  );
+  const updateViewPreference = (key, enabled) => saveViewPreferences({ [key]: enabled });
   const spectatorReady = useSpectatorMode();
   useDefaultNickname();
   // Mini renders outside App.jsx, so it must run the same persisted identity
@@ -405,6 +415,8 @@ export default function MiniSummaryContent() {
           </div>
         )}
       </aside>
+      <SpectatorSettings options={VIEW_OPTIONS} preferences={viewPreferences} onToggle={updateViewPreference} />
+      <SpectatorReplayPopup enabled={viewPreferences?.showReplayPopups !== false} ready={settingsStatus !== 'loading'} />
     </div>
   );
 }

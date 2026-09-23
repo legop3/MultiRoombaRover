@@ -1,11 +1,13 @@
 // Server Display Content
 // Purpose: Composes the passive room display route used as a third spectator-style page.
 // Scope: Shows online names, rover driver/battery status, chat, replay overlays, reward overlays, and hidden audio.
-import { useSession, useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
+import { useSettingsNamespace } from '../../settings/index.js';
+import SpectatorSettings from '../../components/SpectatorSettings/index.jsx';
+import SpectatorReplayPopup from '../../components/SpectatorSettings/ReplayPopup.jsx';
+import { useSession } from '../../context/SessionContext.jsx';
 import { useSpectatorMode } from '../../hooks/useSpectatorMode.js';
 import useDefaultNickname from '../../hooks/useDefaultNickname.js';
 import useUserIdentitySync from '../../hooks/useUserIdentitySync.js';
-import ReplayReadyPopup from '../../components/ReplaySourcesPanel/ReplayReadyPopup.jsx';
 import RewardRunOverlay from '../../components/RewardRunOverlay/index.jsx';
 import OnlinePeopleStrip from './components/OnlinePeopleStrip.jsx';
 import DisplayRoverGrid from './components/DisplayRoverGrid.jsx';
@@ -14,10 +16,15 @@ import DisplayNoticeOverlay from './components/DisplayNoticeOverlay.jsx';
 import DisplayPtzOperatorBadge from './components/DisplayPtzOperatorBadge.jsx';
 import AlertFeed from '../../components/AlertFeed/index.jsx';
 
+const VIEW_OPTIONS = [{ key: 'showReplayPopups', label: 'Replay popups' }];
+
 export default function ServerDisplayContent() {
   const { session } = useSession();
-  const latestReplay = useSessionSelector((state) => state.latestReplay);
-  const { clearLatestReplay } = useSessionActions();
+  const { value: viewPreferences, save: saveViewPreferences, status: settingsStatus } = useSettingsNamespace(
+    'displayPage',
+    { showReplayPopups: true },
+  );
+  const updateViewPreference = (key, enabled) => saveViewPreferences({ [key]: enabled });
   const inLockdown = session?.mode === 'lockdown';
 
   useDefaultNickname();
@@ -37,20 +44,21 @@ export default function ServerDisplayContent() {
 
   return (
     <div className="display-page flex h-screen w-screen flex-col overflow-hidden bg-black text-slate-100">
-      <div className="flex h-[8vh] min-h-16 shrink-0 overflow-hidden">
+      <div className="flex h-[clamp(4rem,7.5vmin,6.5rem)] shrink-0 overflow-hidden pr-10">
         <OnlinePeopleStrip users={session?.users || []} />
         <DisplayPtzOperatorBadge />
       </div>
-      <div className="min-h-0 flex-[0.72]">
+      <div className="max-h-[65%] shrink-0 overflow-y-auto">
         <DisplayRoverGrid roster={session?.roster || []} session={session} />
       </div>
-      <div className="min-h-0 flex-[1.28]">
+      <div className="min-h-0 flex-1">
         <DisplayChatFeed />
       </div>
       <DisplayNoticeOverlay />
       <RewardRunOverlay />
-      <ReplayReadyPopup replay={latestReplay} onClose={clearLatestReplay} />  
       <AlertFeed scale={2} opacity={1}/>
+      <SpectatorSettings options={VIEW_OPTIONS} preferences={viewPreferences} onToggle={updateViewPreference} />
+      <SpectatorReplayPopup enabled={viewPreferences?.showReplayPopups !== false} ready={settingsStatus !== 'loading'} />
     </div>
   );
 }
