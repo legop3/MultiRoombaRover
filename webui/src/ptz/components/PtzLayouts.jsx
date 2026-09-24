@@ -37,7 +37,7 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
         </aside>
       </div>
       <div className="grid min-h-0 grid-cols-[minmax(0,1.6fr)_minmax(16rem,0.7fr)] gap-0.5 overflow-hidden">
-        <ChatPanel fillHeight title="Chat" allowSpectatorInput inputTarget="overlay" />
+        <ChatPanel fillHeight title="Chat" allowSpectatorInput />
         <PtzPresetPanel ptz={ptz} />
       </div>
       {releasePending ? (
@@ -105,7 +105,7 @@ function PtzMobileLandscape({ ptz, onClose, releasePending = false }) {
         </aside>
       </section>
       <section className="grid gap-0.5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)]">
-        <ChatPanel title="Chat" allowSpectatorInput inputTarget="overlay" />
+        <ChatPanel title="Chat" allowSpectatorInput />
         <PtzPresetPanel ptz={ptz} />
       </section>
     </div>
@@ -150,7 +150,7 @@ function PtzMobilePortrait({ ptz, onClose, releasePending = false }) {
           <PtzPresetPanel ptz={ptz} />
         </div>
         <PtzQueueSummary ptz={ptz} />
-        <ChatPanel title="Chat" allowSpectatorInput inputTarget="overlay" />
+        <ChatPanel title="Chat" allowSpectatorInput />
         {/* Portrait keeps room lights immediately after chat as requested. */}
         <HomeAssistantControls />
       </section>

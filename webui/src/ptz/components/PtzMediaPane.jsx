@@ -1,4 +1,5 @@
 import PtzLiveVideo, { PTZ_CAMERA_ID } from '../../components/PtzLiveVideo/index.jsx';
+import ChatExpansion from '../../components/HudOverlays/newgen/CornerPods/ChatExpansion.jsx';
 import TopLeftPod from '../../components/HudOverlays/newgen/CornerPods/TopLeftPod.jsx';
 import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
 function PtzSnapshotPreview({ feed, label = 'PTZ Camera', className = 'h-full w-full' }) {
@@ -35,6 +36,7 @@ function PtzMediaPane({ ptz, open, framed = true, compact = false }) {
         <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
       )}
       {ptz?.turn ? <TopLeftPod compact={compact} turns={ptz.turn} /> : null}
+      <ChatExpansion podOpen={false} />
     </>
   );
 

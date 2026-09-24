@@ -22,19 +22,27 @@ function createParticipation({ io, events, emitChange, getTurnDurationMs, canPar
   }
 
   function scheduleTurn() {
-    clearTimeout(timer);
+    // Uncontested control has no deadline. Starting a new wait gets a full turn,
+    // while later queue changes must not reset an already running countdown.
+    if (!state.operatorSocketId || !state.queue.length) {
+      clearTimeout(timer);
+      timer = null;
+      state.deadline = null;
+      return;
+    }
+    if (timer) return;
     const duration = getTurnDurationMs();
     state.deadline = Date.now() + duration;
     timer = setTimeout(() => {
-      // An expired operator stays when alone, but is not automatically requeued
-      // when another participant takes over. Preserve the existing PTZ rule.
-      state.queue = state.queue.filter((id) => eligible(id));
+      timer = null;
+      state.queue = state.queue.filter(eligible);
       if (state.queue.length) {
+        // Preserve PTZ's explicit request-to-rejoin rule after a handoff.
         stopOperator('turn-expired');
         advance('turn-expired');
       } else {
         scheduleTurn();
-        emitChange('turn-extended-empty-queue');
+        emitChange('turn-uncontested');
       }
     }, duration);
   }
@@ -45,14 +53,15 @@ function createParticipation({ io, events, emitChange, getTurnDurationMs, canPar
   }
 
   function advance(reason) {
+    state.queue = state.queue.filter(eligible);
     while (!state.operatorSocketId && state.queue.length) {
       const next = state.queue.shift();
       if (!eligible(next)) continue;
       state.operatorSocketId = next;
       state.generation += 1;
-      scheduleTurn();
       events.emit('operator', { socketId: next, action: 'active' });
     }
+    scheduleTurn();
     emitChange(reason);
   }
 

@@ -121,7 +121,7 @@ function describeParticipation(socket) {
         color: cameraConfig.color || DEFAULT_PTZ_COLOR,
         fallback: null,
       },
-      enabled: entered && (isOperator || position > 0),
+      enabled: entered && (isOperator || position > 0) && participation.state.queue.length > 0,
       isActive: isOperator,
       turnsAhead: isOperator ? 0 : position || null,
       queueLength: participation.state.queue.length + (participation.state.operatorSocketId ? 1 : 0),
