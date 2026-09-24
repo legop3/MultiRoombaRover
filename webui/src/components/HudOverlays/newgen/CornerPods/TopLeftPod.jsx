@@ -1,40 +1,28 @@
 // Top-left Corner Pod
-// Purpose: Shows the user's current-turn or queue-wait countdown and the rover identity expansion.
+// Purpose: Renders the caller's turn-display object without knowing its operating mode.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useControlSelector } from '../../../../controls/index.js';
-import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import { useSharedClock } from '../../../../hooks/useSharedClock.js';
 import RoverLabel from '../../../RoverLabel/index.jsx';
 import CornerPodToggle from './CornerPodToggle.jsx';
 import ExpansionPanel from './ExpansionPanel.jsx';
 import usePodVisibility from './usePodVisibility.js';
 
-export default function TopLeftPod({ roverId }) {
+export default function TopLeftPod({ turns, compact = false }) {
   const [timerOpen, setTimerOpen] = usePodVisibility('turnTimer', true);
   const [nameOpen, setNameOpen] = usePodVisibility('roverName', true);
-  const mode = useSessionSelector((state) => state.session?.mode || null);
-  const socketId = useSessionSelector((state) => state.session?.socketId || null);
-  const turnInfo = useSessionSelector((state) => state.session?.turnQueues?.[roverId] || null);
-  const activeDriverId = useSessionSelector((state) => state.session?.activeDrivers?.[roverId] || null);
   const lastControlIntentAt = useControlSelector((control) => control.state.lastControlIntentAt);
-  const deadline = turnInfo?.deadline || null;
-  const idleDeadline = turnInfo?.idleDeadline || null;
-  const queue = turnInfo?.queue || [];
-  // Direct ownership is published independently from the detailed queue and is
-  // therefore the reliable initial-load/reconnect source for the current turn.
-  const currentDriverId = activeDriverId || turnInfo?.current || null;
-  const currentIndex = currentDriverId ? queue.indexOf(currentDriverId) : -1;
-  const userIndex = socketId ? queue.indexOf(socketId) : -1;
-  const turnActive = mode === 'turns' && queue.length > 1 && currentIndex >= 0 && userIndex >= 0;
+  const { target, labels, enabled: turnActive, queueLength, turnsAhead, isActive: isCurrentTurn } = turns;
+  const deadline = turns.deadline;
+  const idleDeadline = turns.idleDeadline;
+  const durationSeconds = turns.durationMs / 1000;
   const hasTurnDeadline = Boolean(turnActive && deadline);
   const now = useSharedClock(1000, hasTurnDeadline);
   const currentTurnSeconds = hasTurnDeadline ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
   const idleSkipSeconds = idleDeadline ? Math.max(0, Math.ceil((idleDeadline - now) / 1000)) : null;
-  const turnsAhead = turnActive ? (userIndex - currentIndex + queue.length) % queue.length : null;
   const seconds = currentTurnSeconds == null || turnsAhead == null
     ? null
-    : currentTurnSeconds + Math.max(0, turnsAhead - 1) * 60;
-  const isCurrentTurn = turnsAhead === 0;
+    : currentTurnSeconds + Math.max(0, turnsAhead - 1) * durationSeconds;
   const isWaitingForTurn = turnActive && !isCurrentTurn;
   const [showTurnCue, setShowTurnCue] = useState(false);
   const [turnCueStartedAt, setTurnCueStartedAt] = useState(null);
@@ -81,25 +69,20 @@ export default function TopLeftPod({ roverId }) {
   }, [lastControlIntentAt, showTurnCue, turnCueStartedAt]);
   const gaugePercent = useMemo(() => {
     if (seconds == null) return 0;
-    /*
-      The server's rover turns are sixty seconds long. Waiting users need one complete
-      turn added for each driver between the current driver and themselves. A complete
-      queue rotation is a stable scale across handoffs, so the ring drains continuously
-      instead of jumping back to full when the current driver changes.
-    */
-    const rotationSeconds = Math.max(60, queue.length * 60);
+    // Scale waiting time by this target's actual turn duration. PTZ and rover
+    // turns have different lengths, but use the same presentation.
+    const rotationSeconds = Math.max(durationSeconds, queueLength * durationSeconds);
     return Math.max(0, Math.min(1, seconds / rotationSeconds));
-  }, [queue.length, seconds]);
+  }, [durationSeconds, queueLength, seconds]);
   const visibleGaugePercent = showTurnCue && idleSkipSeconds != null
-    // The server's initial inactivity grace is seven seconds. Mirroring that known lifecycle
-    // makes the enlarged ring itself reinforce the prominent skip countdown in the center.
-    ? Math.max(0, Math.min(1, idleSkipSeconds / 7))
+    // The caller supplies its inactivity grace alongside the idle deadline.
+    ? Math.max(0, Math.min(1, idleSkipSeconds / (turns.idleGraceMs / 1000)))
     : gaugePercent;
   const showTimer = Boolean(turnActive && timerOpen);
   const showLargeTimer = isWaitingForTurn || showTurnCue;
   const timerLabel = seconds == null
     // Ownership should remain visible while the detailed deadline is in flight.
-    ? isCurrentTurn ? 'Your turn' : 'Waiting'
+    ? isCurrentTurn ? labels.activeTimer : labels.waitingTimer
     : seconds >= 60
       ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
       : `${seconds}s`;
@@ -113,8 +96,8 @@ export default function TopLeftPod({ roverId }) {
               // The waiting/handoff state replaces the old full-screen turn cue.
               // It must be opaque and above every other in-video HUD surface so
               // sensor graphics, chat, and docking controls cannot muddy the text.
-              ? 'h-102 w-102 rounded-br-[12.75rem] bg-black'
-              : 'h-34 w-34 rounded-br-[4.25rem] bg-black/60'
+              ? compact ? 'h-[min(12rem,45vw)] w-[min(12rem,45vw)] rounded-br-[6rem] bg-black' : 'h-102 w-102 rounded-br-[12.75rem] bg-black'
+              : compact ? 'h-24 w-24 rounded-br-[3rem] bg-black/60' : 'h-34 w-34 rounded-br-[4.25rem] bg-black/60'
           }`}
         >
           {/* The SVG fills the shell. Its circle geometry supplies the same slim visible inset
@@ -129,31 +112,31 @@ export default function TopLeftPod({ roverId }) {
                 fixed-size so it never becomes a giant obstruction over the video. */}
             {showLargeTimer ? (
               <>
-                <span className={`mb-2 text-[1.75rem] font-bold leading-tight transition-colors duration-300 ${showTurnCue ? 'text-amber-200' : 'text-sky-100'}`}>
-                  {showTurnCue ? 'It’s your turn!' : 'Someone else is driving'}
+                <span className={`${compact ? 'mb-1 text-sm' : 'mb-2 text-[1.75rem]'} font-bold leading-tight transition-colors duration-300 ${showTurnCue ? 'text-amber-200' : 'text-sky-100'}`}>
+                  {showTurnCue ? labels.handoff : labels.waiting}
                 </span>
-                <strong className="text-[3.375rem] leading-none">
+                <strong className={`${compact ? "text-2xl" : "text-[3.375rem]"} leading-none`}>
                   {showTurnCue && idleSkipSeconds != null ? `${idleSkipSeconds}s` : timerLabel}
                 </strong>
-                <span className={`mt-2 text-[1rem] font-semibold leading-tight ${showTurnCue ? 'text-amber-200' : 'text-sky-200'}`}>
+                <span className={`${compact ? 'mt-1 text-xs' : 'mt-2 text-[1rem]'} font-semibold leading-tight ${showTurnCue ? 'text-amber-200' : 'text-sky-200'}`}>
                   {showTurnCue
                     ? idleSkipSeconds != null
-                      ? 'Start driving or your turn will be skipped'
-                      : 'You’re driving'
-                    : 'until your turn'}
+                      ? labels.idleWarning
+                      : labels.active
+                    : labels.untilTurn}
                 </span>
               </>
             ) : (
               <>
                 <strong className="text-lg leading-none">{timerLabel}</strong>
-                {seconds != null ? <span className="mt-1 text-[0.6rem] font-semibold text-sky-200">left</span> : null}
+                {seconds != null ? <span className="mt-1 text-[0.6rem] font-semibold text-sky-200">{labels.timeRemaining}</span> : null}
               </>
             )}
           </span>
-          <CornerPodToggle corner="top-left" expanded label="Hide turn timer" onClick={() => setTimerOpen(false)} />
+          <CornerPodToggle corner="top-left" expanded label={labels.hideTimer} onClick={() => setTimerOpen(false)} />
         </div>
       ) : turnActive ? (
-        <CornerPodToggle corner="top-left" expanded={false} label="Show turn timer" onClick={() => setTimerOpen(true)} />
+        <CornerPodToggle corner="top-left" expanded={false} label={labels.showTimer} onClick={() => setTimerOpen(true)} />
       ) : null}
 
       {/* The rover name is an independent edge expansion. Its visibility control lives in
@@ -166,10 +149,10 @@ export default function TopLeftPod({ roverId }) {
         panelClassName={`flex h-11 min-w-max items-center gap-2 bg-black/60 px-2 pt-3 ${showTimer ? '' : 'rounded-br-xl'}`}
         openDirection="down"
         closeDirection="up"
-        openLabel="Show rover name"
-        closeLabel="Hide rover name"
+        openLabel={labels.showName}
+        closeLabel={labels.hideName}
       >
-          <RoverLabel roverId={roverId} fallback={roverId} className="px-2 py-1 text-base" />
+          <RoverLabel name={target.name} color={target.color} fallback={target.fallback} className="px-2 py-1 text-base" />
       </ExpansionPanel>
     </div>
   );

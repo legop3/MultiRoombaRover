@@ -11,6 +11,7 @@ const roverManager = require('../roverManager');
 const { managerEvents } = roverManager;
 const assignmentService = require('../assignmentService');
 const { getActiveDrivers, getTurnQueues, turnEvents } = require('../turnService');
+const { buildRoverTurn } = require('../turnService/display');
 const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 const {
   getPublicState: getPtzCameraState,
@@ -194,7 +195,16 @@ function buildSession(socket) {
       of navigation and layout without maintaining another feature registry.
     */
     features,
-    roster,
+    roster: roster.map((rover) => ({
+      ...rover,
+      turn: buildRoverTurn({
+        rover,
+        mode: getMode(),
+        socketId: socket?.id,
+        turnInfo: turnQueues[rover.id],
+        activeDriverId: activeDrivers[rover.id],
+      }),
+    })),
     odometers: roverManager.getOdometersForSocket(socket),
     assignment: {
       ...assignment,

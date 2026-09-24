@@ -1,220 +1,47 @@
-// PTZ Camera Service
-// Purpose: Owns the single Reolink TrackMix PTZ camera integration, including queueing, ONVIF control, Reolink-only light controls, stream publishing, snapshots, and session state.
-// Scope: This is intentionally a one-camera feature, not a generic ONVIF camera framework.
+// PTZ policy and session facade. Camera IO and participation each own their lifecycle.
 const EventEmitter = require('events');
-const fs = require('fs/promises');
-const path = require('path');
-const { spawn } = require('child_process');
-const { Cam } = require('onvif');
 
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('ptzCamera');
 const { loadConfig, registerConfigurationHandler } = require('../../configuration');
-const { resolveRoverSnapshotDir } = require('../../helpers/dataPaths');
 const {
   shouldUseSnapshotsForNonTurnVideo,
   shouldUseSnapshotsForExternalSpectatorVideo,
 } = require('../../helpers/bandwidthSavings');
 const { getMode, MODES, modeEvents } = require('../modeManager');
-const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
-const { isVerified } = require('../verificationService');
+const { isAdmin, isLockdownAdmin, getRole, roleEvents } = require('../roleService');
+const { isVerified, verificationEvents } = require('../verificationService');
 const { getSocketIp, isLocalNetwork } = require('../../helpers/ipResolver');
 const roverManager = require('../roverManager');
-const { getOperatingMode, releasePtzTurn } = require('../operatingModeService');
+const { getOperatingMode, runPtzTurnAction } = require('../operatingModeService');
 const videoSessions = require('../videoSessions');
-const { createPtzAudioPlayback } = require('./audioPlayback');
 
+const { createCameraRuntime } = require('./cameraRuntime');
+const { createParticipation } = require('./participation');
+const { registerSocketGateway } = require('./socketGateway');
+const turnLabels = require('./turnLabels');
 const PTZ_CAMERA_ID = 'ptz-camera';
 const PTZ_STREAM_PATH = 'ptz-camera';
-const DEFAULT_ONVIF_PORT = 8000;
-const DEFAULT_PROFILE_TOKEN = '003';
 const DEFAULT_TURN_DURATION_MS = 5 * 60 * 1000;
-// The TrackMix exposes pan/tilt and zoom through the same ONVIF method but does
-// not behave as if they were the same kind of motor. Pan/tilt runs smoothly from
-// one long ContinuousMove; zoom advances in command-sized increments. Keep the
-// timings separate so zoom can repeat quickly without restarting pan/tilt.
-const MOTION_WATCHDOG_MS = 650;
-const PAN_TILT_TIMEOUT_MS = 10000;
-const PAN_TILT_RENEW_MS = 8000;
-const ZOOM_PULSE_TIMEOUT_MS = 1000;
-const ZOOM_REPEAT_MS = 120;
-const STOP_MOTION = Object.freeze({ pan: 0, tilt: 0, zoom: 0 });
-// PTZ is a normal replay source now, so capture should be on unless the feature
-// explicitly disables replay for the camera.
 const DEFAULT_REPLAY_ENABLED = true;
 const DEFAULT_PTZ_COLOR = '#387bf8';
-const SNAPSHOT_DIR = resolveRoverSnapshotDir();
-const SNAPSHOT_POLL_MS = 300;
 const SNAPSHOT_STREAM_INTERVAL_MS = 2000;
-const SPOTLIGHT_VERIFY_DELAY_MS = 1200;
-const PUBLISHER_STDERR_SYNC_MS = 10000;
-const PUBLISHER_RTSP_TIMEOUT_US = 10000000;
-
 const events = new EventEmitter();
 let cameraConfig = loadConfig().ptzCamera || {};
 let enabled = Boolean(cameraConfig.enabled);
-
-const state = {
-  initialized: false,
-  initializing: false,
-  error: null,
-  profileToken: String(cameraConfig.profileToken || DEFAULT_PROFILE_TOKEN),
-  rtspUri: null,
-  streamPath: PTZ_STREAM_PATH,
-  operatorSocketId: null,
-  queue: [],
-  deadline: null,
-  blocked: null,
-  status: null,
-  light: null,
-  ir: null,
-  presets: [],
-  presetsError: null,
-  publisher: {
-    running: false,
-    pid: null,
-    startedAt: null,
-    restartAt: null,
-    restartCount: 0,
-    exitCode: null,
-    exitSignal: null,
-    exitedAt: null,
-    lastStderr: '',
-    progress: null,
-    lastEvent: 'idle',
-  },
-  reolinkApi: {
-    connected: false,
-    connecting: false,
-    lastError: null,
-    lastConnectedAt: null,
-    lastEvent: 'idle',
-  },
-};
-
-let onvifCam = null;
-let reolinkModulePromise = null;
-let turnTimer = null;
-let publisherProcess = null;
-let publisherRestartTimer = null;
-let publisherStderrSyncTimer = null;
-let snapshotTimer = null;
-let spotlightVerifyTimer = null;
-let vendorStatePromise = Promise.resolve();
-let motionWatchdogTimer = null;
-let panTiltRenewTimer = null;
-let zoomRepeatTimer = null;
-let desiredMotion = STOP_MOTION;
-let pendingFullStopCommand = false;
-let pendingPanTiltCommand = false;
-let pendingZoomCommand = false;
-let motionCommandPromise = null;
-let lastSnapshotState = null;
 const snapshotSubscribers = new Map();
 const socketSnapshotSubscriptions = new Map();
 const snapshotLastSentBySocket = new Map();
-let audioPlayback = createPtzAudioPlayback({
-  logger,
-  cameraConfig,
-  enabled,
-  getSocketLabel,
+let runtime = createCameraRuntime({ cameraConfig, logger, events, onChange: emitChange, getSocketLabel });
+const participation = createParticipation({
+  io, events, emitChange, getTurnDurationMs,
+  canParticipate: (socket) => getOperatingMode(socket) === 'ptz' && Boolean(socket.data?.ptzEntered) && canUsePtzFeature(socket),
+  stopMotion: (reason) => runtime.forceMotionStop(reason),
+  revokeVideo: (socketId) => videoSessions.revokeWhere((info) => info.socketId === socketId && info.sourceType === 'ptz'),
 });
 
 function emitChange(reason = 'change') {
   events.emit('change', { reason, state: getPublicState() });
-}
-
-function schedulePublisherStateSync(reason = 'publisher') {
-  /*
-    ffmpeg can print many warning/progress lines in bursts. Keep the latest text
-    in state immediately, but debounce session sync so one noisy transcoder does
-    not force every connected client to resync for each stderr chunk.
-  */
-  if (publisherStderrSyncTimer) return;
-  publisherStderrSyncTimer = setTimeout(() => {
-    publisherStderrSyncTimer = null;
-    emitChange(reason);
-  }, PUBLISHER_STDERR_SYNC_MS);
-}
-
-function updatePublisherState(patch = {}, reason = 'publisher') {
-  state.publisher = {
-    ...(state.publisher || {}),
-    ...patch,
-  };
-  emitChange(reason);
-}
-
-function updateReolinkApiState(patch = {}, reason = 'reolink-api') {
-  state.reolinkApi = {
-    ...(state.reolinkApi || {}),
-    ...patch,
-  };
-  emitChange(reason);
-}
-
-function parsePublisherProgressLine(line) {
-  /*
-    ffmpeg's "-progress pipe:2" emits simple key=value telemetry on stderr.
-    Warning lines also arrive on stderr, so keep parsing narrow: only accept the
-    known progress keys and let everything else remain user-visible stderr.
-    This gives the UI enough signal to tell whether the transcoder is actually
-    falling behind without flooding normal server logs.
-  */
-  const match = String(line || '').match(/^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$/);
-  if (!match) return false;
-  const [, key, rawValue] = match;
-  const allowed = new Set([
-    'frame',
-    'fps',
-    'stream_0_0_q',
-    'bitrate',
-    'total_size',
-    'out_time_us',
-    'out_time_ms',
-    'out_time',
-    'dup_frames',
-    'drop_frames',
-    'speed',
-    'progress',
-  ]);
-  if (!allowed.has(key)) return false;
-  state.publisher = {
-    ...(state.publisher || {}),
-    progress: {
-      ...(state.publisher?.progress || {}),
-      [key]: rawValue,
-      updatedAt: Date.now(),
-    },
-    lastEvent: 'progress',
-  };
-  return true;
-}
-
-function handlePublisherStderr(chunk) {
-  const text = String(chunk || '').trim();
-  if (!text) return;
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const warningLines = [];
-
-  lines.forEach((line) => {
-    if (!parsePublisherProgressLine(line)) warningLines.push(line);
-  });
-
-  if (warningLines.length) {
-    state.publisher = {
-      ...(state.publisher || {}),
-      lastStderr: warningLines.join('\n').slice(-1000),
-      lastEvent: 'stderr',
-    };
-  }
-
-  schedulePublisherStateSync(warningLines.length ? 'publisher-stderr' : 'publisher-progress');
-}
-
-function clampUnit(value) {
-  const number = Number(value) || 0;
-  return Math.max(-1, Math.min(1, number));
 }
 
 function getTurnDurationMs() {
@@ -229,53 +56,6 @@ function isReplayEnabled() {
     advertise a source that no worker is recording.
   */
   return cameraConfig.replayEnabled === undefined ? DEFAULT_REPLAY_ENABLED : Boolean(cameraConfig.replayEnabled);
-}
-
-function spotlightCameraStateForLogicalOn(logicalOn) {
-  return Boolean(logicalOn) ? 1 : 0;
-}
-
-function isSpotlightOn(light = {}) {
-  const raw = light?.state;
-  let rawOn = false;
-  if (typeof raw === 'string') {
-    const normalized = raw.trim().toLowerCase();
-    rawOn = !['', '0', 'off', 'false'].includes(normalized);
-  } else {
-    rawOn = Boolean(Number(raw));
-  }
-  return rawOn;
-}
-
-function normalizeSpotlightState(light) {
-  if (!light || typeof light !== 'object') return light || null;
-  return { ...light, on: isSpotlightOn(light) };
-}
-
-function normalizeSpotlightPayloadState(rawState) {
-  /*
-    Socket payloads can arrive as booleans, numbers, or strings depending on
-    which control path produced them. Boolean("0") is true in JavaScript, so do
-    an explicit conversion here before building the Reolink payload.
-  */
-  if (typeof rawState === 'string') {
-    const normalized = rawState.trim().toLowerCase();
-    if (['1', 'on', 'true', 'yes'].includes(normalized)) return true;
-    if (['0', 'off', 'false', 'no'].includes(normalized)) return false;
-  }
-  return Boolean(Number(rawState));
-}
-
-function normalizeIrState(rawState) {
-  /*
-    Reolink accepts exactly Auto, On, and Off for this camera's IR LED control.
-    Normalize UI payloads at the server boundary so keyboard, mobile, and any
-    future direct socket callers all hit the same camera API contract.
-  */
-  const normalized = String(rawState || '').trim().toLowerCase();
-  if (normalized === 'on' || normalized === '1' || normalized === 'true') return 'On';
-  if (normalized === 'off' || normalized === '0' || normalized === 'false') return 'Off';
-  return 'Auto';
 }
 
 function passesMode(socket) {
@@ -304,9 +84,59 @@ function getSocketLabel(socketId) {
   return socket?.data?.nickname || socket?.data?.user?.username || socketId || null;
 }
 
+function accessDenial(socket) {
+  if (!enabled) return 'PTZ camera is disabled';
+  if (!socket || !passesMode(socket)) return 'PTZ is unavailable in the current server mode';
+  if (!canUsePtzFeature(socket)) return 'PTZ requires verification or admin access';
+  return null;
+}
+
+function describeParticipation(socket) {
+  const denialReason = accessDenial(socket);
+  const entered = getOperatingMode(socket) === 'ptz' && Boolean(socket?.data?.ptzEntered);
+  const isOperator = Boolean(socket && participation.state.operatorSocketId === socket.id);
+  const position = socket ? participation.state.queue.indexOf(socket.id) + 1 : 0;
+  const ready = enabled && runtime.state.initialized;
+  const canControl = !denialReason && entered && isOperator && ready;
+  return {
+    participation: {
+      status: denialReason ? 'unavailable' : !entered ? 'outside' : isOperator ? 'operating' : position ? 'queued' : 'idle',
+      entered,
+      denialReason,
+    },
+    permissions: {
+      canEnter: !denialReason,
+      canRequestTurn: !denialReason && entered && ready && !isOperator && !position,
+      canReleaseTurn: isOperator || position > 0,
+      canControl,
+      canListPresets: !denialReason && ready,
+      canCreatePreset: !denialReason && ready,
+      canRemovePreset: !denialReason && ready && isAdmin(socket),
+    },
+    viewMode: socket && canRequestLiveVideo(socket) ? 'live' : 'snapshot',
+    turn: {
+      target: {
+        id: PTZ_CAMERA_ID,
+        name: cameraConfig.name || 'PTZ Camera',
+        color: cameraConfig.color || DEFAULT_PTZ_COLOR,
+        fallback: null,
+      },
+      enabled: entered && (isOperator || position > 0),
+      isActive: isOperator,
+      turnsAhead: isOperator ? 0 : position || null,
+      queueLength: participation.state.queue.length + (participation.state.operatorSocketId ? 1 : 0),
+      deadline: participation.state.deadline,
+      durationMs: getTurnDurationMs(),
+      idleDeadline: null,
+      idleGraceMs: 7000,
+      labels: turnLabels,
+    },
+  };
+}
+
 function getPublicState(socket = null) {
   const socketId = socket?.id || null;
-  const queue = state.queue.map((id) => ({
+  const queue = participation.state.queue.map((id) => ({
     socketId: id,
     label: getSocketLabel(id),
   }));
@@ -315,31 +145,33 @@ function getPublicState(socket = null) {
     id: PTZ_CAMERA_ID,
     name: cameraConfig.name || 'PTZ Camera',
     color: cameraConfig.color || DEFAULT_PTZ_COLOR,
-    initialized: state.initialized,
-    error: state.error,
-    streamPath: state.streamPath,
-    operatorSocketId: state.operatorSocketId,
-    operatorLabel: getSocketLabel(state.operatorSocketId),
+    initialized: runtime.state.initialized,
+    initializing: runtime.state.initializing,
+    error: runtime.state.error,
+    streamPath: runtime.state.streamPath,
+    operatorSocketId: participation.state.operatorSocketId,
+    operatorLabel: getSocketLabel(participation.state.operatorSocketId),
     queue,
-    deadline: state.deadline,
-    blocked: state.blocked,
-    status: state.status,
-    light: state.light,
-    ir: state.ir,
-    presets: state.presets,
-    presetsError: state.presetsError,
-    publisher: state.publisher,
-    reolinkApi: state.reolinkApi,
-    audio: audioPlayback.getState(),
-    isOperator: Boolean(socketId && state.operatorSocketId === socketId),
-    queuedPosition: socketId ? state.queue.indexOf(socketId) + 1 || null : null,
+    deadline: participation.state.deadline,
+    blocked: null,
+    status: runtime.state.status,
+    light: runtime.state.light,
+    ir: runtime.state.ir,
+    presets: runtime.state.presets,
+    presetsError: runtime.state.presetsError,
+    publisher: runtime.state.publisher,
+    reolinkApi: runtime.state.reolinkApi,
+    audio: runtime.getAudioState(),
+    isOperator: Boolean(socketId && participation.state.operatorSocketId === socketId),
+    queuedPosition: socketId ? participation.state.queue.indexOf(socketId) + 1 || null : null,
     canUse: socket ? canUsePtzFeature(socket) : false,
+    ...describeParticipation(socket),
   };
 }
 
 function getOperatingModeDisplay(socketId) {
   const socket = io.sockets.sockets.get(socketId);
-  if (!socket || getOperatingMode(socket) !== 'ptz') return null;
+  if (!socket || !socket.data?.ptzEntered || getOperatingMode(socket) !== 'ptz') return null;
   return {
     name: cameraConfig.name || 'PTZ Camera',
     color: cameraConfig.color || DEFAULT_PTZ_COLOR,
@@ -349,7 +181,7 @@ function getOperatingModeDisplay(socketId) {
 function getParticipantSocketIds() {
   // A released/expired camera turn does not end participation in PTZ mode.
   return Array.from(io.sockets.sockets.values())
-    .filter((socket) => getOperatingMode(socket) === 'ptz' && canUsePtzFeature(socket))
+    .filter((socket) => getOperatingMode(socket) === 'ptz' && Boolean(socket.data?.ptzEntered) && canUsePtzFeature(socket))
     .map((socket) => socket.id);
 }
 
@@ -379,600 +211,32 @@ function canSpeakThroughPtz(socket) {
   if (getOperatingMode(socket) !== 'ptz' || !canUsePtzFeature(socket)) return false;
   const socketId = socket?.id ? String(socket.id) : '';
   if (!socketId) return false;
-  return state.operatorSocketId === socketId || state.queue.includes(socketId);
+  return participation.state.operatorSocketId === socketId || participation.state.queue.includes(socketId);
 }
 
 async function speakText(text, ttsOptions = {}, socket = null) {
   if (!canSpeakThroughPtz(socket)) {
     throw new Error('Only the PTZ operator or queue can use PTZ TTS');
   }
-  return audioPlayback.speakText(text, ttsOptions, { socketId: socket?.id || null });
-}
-
-function callOnvif(method, options = {}) {
-  return new Promise((resolve, reject) => {
-    if (!onvifCam || typeof onvifCam[method] !== 'function') {
-      reject(new Error('ONVIF camera is not ready'));
-      return;
-    }
-    onvifCam[method](options, (err, data) => {
-      if (err) reject(err);
-      else resolve(data);
-    });
+  return runtime.speakText(text, ttsOptions, { socketId: socket?.id || null }, () => {
+    if (!canSpeakThroughPtz(socket)) throw new Error('PTZ speech access changed');
   });
-}
-
-function normalizePresetName(rawName, token) {
-  /*
-    ONVIF cameras are inconsistent about preset names. Some return a readable
-    Name field, some return name, and some only return the token. The browser
-    needs a stable label for every button, so fall back to the token only after
-    exhausting the human-facing fields the camera may provide.
-  */
-  const name = String(rawName || '').trim();
-  if (name) return name;
-  const tokenLabel = String(token || '').trim();
-  return tokenLabel ? `Preset ${tokenLabel}` : 'Unnamed preset';
-}
-
-function normalizeOnvifPreset(entry, fallbackToken = '') {
-  /*
-    The onvif package returns camera XML converted to plain objects, but exact
-    key casing can vary by device and service response. Normalize once at the
-    service boundary so UI and socket callers never depend on vendor-specific
-    field names.
-  */
-  if (!entry || typeof entry !== 'object') return null;
-  const token = String(entry.token || entry.$?.token || entry.presetToken || entry.PresetToken || fallbackToken || '').trim();
-  if (!token) return null;
-  return {
-    token,
-    name: normalizePresetName(entry.name || entry.Name, token),
-  };
-}
-
-function normalizeOnvifPresets(raw) {
-  /*
-    getPresets can come back as an array directly, as { presets }, or as nested
-    ONVIF response data depending on the library/device pairing. Keep this
-    intentionally permissive because a missing preset list should degrade to an
-    empty panel, not a broken PTZ session.
-  */
-  const candidates = Array.isArray(raw)
-    ? raw.map((entry) => [null, entry])
-    : Array.isArray(raw?.presets)
-    ? raw.presets.map((entry) => [null, entry])
-    : Array.isArray(raw?.Presets)
-    ? raw.Presets.map((entry) => [null, entry])
-    : Array.isArray(raw?.GetPresetsResponse?.Preset)
-    ? raw.GetPresetsResponse.Preset.map((entry) => [null, entry])
-    : Array.isArray(raw?.Preset)
-    ? raw.Preset.map((entry) => [null, entry])
-    : raw && typeof raw === 'object'
-    ? Object.entries(raw)
-    : [];
-  return candidates
-    .map(([fallbackToken, entry]) => normalizeOnvifPreset(entry, fallbackToken))
-    .filter(Boolean)
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-}
-
-async function refreshPresets(reason = 'presets') {
-  /*
-    The camera owns preset storage. Reading it back after every create/delete
-    keeps this server stateless and avoids a local JSON store drifting away from
-    what ONVIF will actually accept for gotoPreset.
-  */
-  await initialize();
-  try {
-    const raw = await callOnvif('getPresets', { profileToken: state.profileToken });
-    state.presets = normalizeOnvifPresets(raw);
-    state.presetsError = null;
-  } catch (err) {
-    state.presets = [];
-    state.presetsError = err.message || String(err);
-    logger.warn('Failed to refresh PTZ presets', { error: state.presetsError });
-  }
-  emitChange(reason);
-  return state.presets;
-}
-
-function connectOnvif() {
-  return new Promise((resolve, reject) => {
-    const cam = new Cam({
-      hostname: cameraConfig.host,
-      username: cameraConfig.username,
-      password: cameraConfig.password,
-      port: Number(cameraConfig.onvifPort) || DEFAULT_ONVIF_PORT,
-      timeout: 10000,
-    }, function handleConnect(err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
-    return cam;
-  });
-}
-
-async function getStreamUriForProfile(cam) {
-  const profileToken = String(cameraConfig.profileToken || DEFAULT_PROFILE_TOKEN);
-  return new Promise((resolve, reject) => {
-    cam.getStreamUri({ profileToken, protocol: 'RTSP' }, (err, data) => {
-      if (err) reject(err);
-      else resolve(data?.uri || data?.Uri || '');
-    });
-  });
-}
-
-function addCredentialsToRtsp(rawUri) {
-  const parsed = new URL(rawUri);
-  if (!parsed.username) parsed.username = cameraConfig.username;
-  if (!parsed.password) parsed.password = cameraConfig.password;
-  return parsed.toString();
-}
-
-function stopPublisher() {
-  if (publisherRestartTimer) {
-    clearTimeout(publisherRestartTimer);
-    publisherRestartTimer = null;
-  }
-  if (publisherProcess) {
-    try {
-      publisherProcess.kill('SIGTERM');
-    } catch {}
-    publisherProcess = null;
-  }
-  updatePublisherState({
-    running: false,
-    pid: null,
-    restartAt: null,
-    lastEvent: 'stopped',
-  }, 'publisher-stop');
-}
-
-function schedulePublisherRestart(reason = 'publisher-restart') {
-  /*
-    The publisher's recovery rule is intentionally simple: ffmpeg owns the RTSP
-    connection, and this service starts a fresh process whenever that connection
-    causes ffmpeg to exit. Clearing any existing timer first prevents a burst of
-    quick exits from scheduling multiple competing replacement publishers.
-  */
-  if (!enabled || !state.rtspUri) return null;
-  if (publisherRestartTimer) {
-    clearTimeout(publisherRestartTimer);
-    publisherRestartTimer = null;
-  }
-  const restartAt = Date.now() + 1500;
-  publisherRestartTimer = setTimeout(() => {
-    publisherRestartTimer = null;
-    startPublisher();
-  }, 1500);
-  updatePublisherState({
-    restartAt,
-    restartCount: Number(state.publisher?.restartCount || 0) + 1,
-    lastEvent: reason,
-  }, 'publisher-restart-scheduled');
-  return restartAt;
-}
-
-function startPublisher() {
-  if (!enabled || !state.rtspUri || publisherProcess) return;
-  const input = addCredentialsToRtsp(state.rtspUri);
-  const output = `rtsp://127.0.0.1:8554/${encodeURIComponent(PTZ_STREAM_PATH)}`;
-  /*
-    The full-quality autotrack profile is H265, which is the right camera-side
-    feed but has been unreliable through browser WHEP playback. Re-encoding is
-    intentionally kept here, at the single camera publisher boundary, so the
-    rest of the video auth/session/UI code still sees one normal MediaMTX path.
-
-    The camera audio is AAC LC at 16 kHz mono. Keep it inline with the video so
-    the PTZ camera remains one MediaMTX/WHEP source, but transcode it to Opus
-    because that is the WebRTC-friendly audio codec browsers should negotiate
-    through MediaMTX. This avoids creating a rover-style separate audio stream
-    for a camera that already provides synchronized audio in the RTSP feed.
-
-    These encoder settings trade compression efficiency for control latency:
-    ultrafast avoids deep analysis, zerolatency disables x264 buffering, bf=0
-    removes B-frames, and the 20-frame GOP matches the camera's observed 20fps
-    autotrack stream so the browser gets frequent keyframes without forcing a
-    huge bitrate spike. The explicit x264 params turn off lookahead buffering
-    that is useful for compression quality but harmful when the camera is being
-    driven live. Sliced threads allow x264 to keep some parallelism without
-    waiting on future frames the way normal frame-threading can.
-
-    Keep RTSP demuxing conservative here. More aggressive "drop stale frames"
-    flags caused this camera stream to freeze after running for a while, so the
-    safer latency knob is to keep the encoder light and avoid building delay
-    inside x264 itself.
-
-    The camera can restart while ffmpeg keeps its old TCP/RTSP session open and
-    continues publishing a useless black output stream. The timeout options are
-    input-side failure detectors: when the RTSP socket stops producing usable
-    reads for long enough, ffmpeg should exit instead of staying attached to the
-    dead session. The existing exit handler then starts a new process, which is
-    the part that creates a fresh RTSP connection after the camera comes back.
-
-    The MediaMTX output uses RTSP over TCP, matching every rover publisher and
-    server-local reader. Keeping one media transport avoids the incompatible
-    empty SRT ACKACK packets produced between GoSRT and Fedora's newer libSRT.
-  */
-  const proc = spawn('ffmpeg', [
-    '-hide_banner',
-    '-loglevel',
-    'warning',
-    '-nostdin',
-    '-progress',
-    'pipe:2',
-    '-stats_period',
-    '2',
-    '-fflags',
-    'nobuffer',
-    '-flags',
-    'low_delay',
-    '-rtsp_transport',
-    'tcp',
-    '-timeout',
-    String(PUBLISHER_RTSP_TIMEOUT_US),
-    '-i',
-    input,
-    '-map',
-    '0:v:0',
-    '-map',
-    '0:a:0',
-    '-c:v',
-    'libx264',
-    '-preset',
-    'ultrafast',
-    '-tune',
-    'zerolatency',
-    '-threads',
-    '8',
-    '-x264-params',
-    'sliced-threads=1:sync-lookahead=0:rc-lookahead=0:keyint=20:min-keyint=20:scenecut=0',
-    '-bf',
-    '0',
-    '-g',
-    '20',
-    '-keyint_min',
-    '20',
-    '-sc_threshold',
-    '0',
-    '-pix_fmt',
-    'yuv420p',
-    '-c:a',
-    'libopus',
-    '-application',
-    'lowdelay',
-    '-frame_duration',
-    '10',
-    '-b:a',
-    '32k',
-    '-ac',
-    '1',
-    '-ar',
-    '48000',
-    '-strict',
-    '-2',
-    '-flush_packets',
-    '1',
-    '-rtsp_transport',
-    'tcp',
-    '-f',
-    'rtsp',
-    output,
-  ], { stdio: ['ignore', 'ignore', 'pipe'] });
-  publisherProcess = proc;
-  updatePublisherState({
-    running: true,
-    pid: proc.pid || null,
-    startedAt: Date.now(),
-    restartAt: null,
-    exitCode: null,
-    exitSignal: null,
-    exitedAt: null,
-    lastEvent: 'started',
-  }, 'publisher-start');
-  proc.stderr.on('data', handlePublisherStderr);
-  proc.on('exit', (code, signal) => {
-    if (publisherProcess === proc) publisherProcess = null;
-    logger.warn('publisher exited', { code, signal, lastStderr: state.publisher?.lastStderr || null });
-    const restartAt = enabled && state.rtspUri ? Date.now() + 1500 : null;
-    updatePublisherState({
-      running: false,
-      pid: null,
-      restartAt,
-      exitCode: code,
-      exitSignal: signal,
-      exitedAt: Date.now(),
-      lastEvent: restartAt ? 'restarting' : 'exited',
-    }, 'publisher-exit');
-    if (restartAt) schedulePublisherRestart('restarting');
-  });
-  logger.info('Started PTZ stream publisher', { streamPath: PTZ_STREAM_PATH, encoder: 'libx264' });
-}
-
-function getErrorMessage(err) {
-  return err?.message || String(err || 'unknown error');
-}
-
-async function closeReolinkClient(client, reason = 'reset') {
-  /*
-    Each Reolink operation owns a short-lived long-mode session. close() logs
-    out and frees any SDK resources; cleanup failures are logged at debug level
-    because the command result has already been determined by the time finally
-    cleanup runs.
-  */
-  if (!client || typeof client.close !== 'function') return;
-  try {
-    await client.close();
-  } catch (err) {
-    logger.debug?.('Reolink client close failed', { reason, error: getErrorMessage(err) });
-  }
-}
-
-async function createReolinkClientSession() {
-  /*
-    reolink-nvr-api is published as an ESM-only package. This server is still
-    CommonJS, so a top-level require() fails before the service can even start.
-    Dynamic import keeps the server bootable while still creating a fresh camera
-    API client for every command. Avoiding a cached long-lived client keeps one
-    wedged Reolink session from poisoning later light/IR commands.
-  */
-  if (!reolinkModulePromise) {
-    reolinkModulePromise = import('reolink-nvr-api');
-  }
-  const { ReolinkClient } = await reolinkModulePromise;
-  const client = new ReolinkClient({
-    host: cameraConfig.host,
-    username: cameraConfig.username,
-    password: cameraConfig.password,
-    mode: 'long',
-    insecure: true,
-    timeout: 10000,
-  });
-  await client.login();
-  updateReolinkApiState({
-    connected: true,
-    connecting: false,
-    lastError: null,
-    lastConnectedAt: Date.now(),
-    lastEvent: 'connected',
-  }, 'reolink-api-connected');
-  return client;
-}
-
-async function callReolinkApi(command, payload = {}) {
-  /*
-    Commands should not depend on the previous command's session or observed
-    state. Open a fresh Reolink session, send exactly the requested API command,
-    and close it. If the camera rejects or ignores the command, the failure is
-    allowed to surface to the caller instead of being hidden behind retries that
-    can make the UI look successful while the physical emitter never changed.
-  */
-  if (!enabled) throw new Error('PTZ camera disabled');
-  updateReolinkApiState({
-    connected: false,
-    connecting: true,
-    lastEvent: 'connecting',
-  }, 'reolink-api-connecting');
-  let client = null;
-  try {
-    client = await createReolinkClientSession();
-    const result = await client.api(command, payload);
-    updateReolinkApiState({
-      connected: false,
-      connecting: false,
-      lastError: null,
-      lastConnectedAt: Date.now(),
-      lastEvent: 'api-ok-closed',
-    }, 'reolink-api-ok');
-    return result;
-  } catch (err) {
-    const message = getErrorMessage(err);
-    updateReolinkApiState({
-      connected: false,
-      connecting: false,
-      lastError: message,
-      lastEvent: 'api-error',
-    }, 'reolink-api-error');
-    logger.warn('Reolink API command failed', { command, error: message });
-    throw err;
-  } finally {
-    await closeReolinkClient(client, `api:${command}`);
-  }
-}
-
-async function refreshVendorState() {
-  if (!enabled) return;
-  /*
-    Read these sequentially so the camera sees one fresh-session API request at
-    a time. Parallel reads are not useful here, and avoiding overlap keeps the
-    vendor API behavior easier to reason about when it is already acting flaky.
-  */
-  const white = await callReolinkApi('GetWhiteLed', { channel: 0 });
-  const ir = await callReolinkApi('GetIrLights', { channel: 0 });
-  state.light = normalizeSpotlightState(white?.WhiteLed || white || null);
-  state.ir = ir?.IrLights || ir || null;
-}
-
-async function refreshSpotlightState() {
-  const white = await callReolinkApi('GetWhiteLed', { channel: 0 });
-  state.light = normalizeSpotlightState(white?.WhiteLed || white || null);
-  emitChange('light');
-  return state.light;
-}
-
-function scheduleSpotlightVerification() {
-  /*
-    This camera acknowledges SetWhiteLed before GetWhiteLed catches up. A read
-    immediately after a successful write returns the old value for roughly one
-    second, which made the UI appear inverted or flaky. Replace any pending
-    verification with one delayed read so rapid toggles settle on the newest
-    requested state instead of racing stale camera state back into the session.
-  */
-  if (spotlightVerifyTimer) {
-    clearTimeout(spotlightVerifyTimer);
-    spotlightVerifyTimer = null;
-  }
-  spotlightVerifyTimer = setTimeout(() => {
-    spotlightVerifyTimer = null;
-    serializeVendorState(() => refreshSpotlightState()).catch((err) => {
-      logger.warn('spotlight verification failed', { error: err.message });
-    });
-  }, SPOTLIGHT_VERIFY_DELAY_MS);
-}
-
-function serializeVendorState(operation) {
-  /*
-    The Reolink HTTP API can return stale light state when reads and writes are
-    overlapped. Keep spotlight/IR changes in one narrow queue so a button mash
-    becomes ordered camera operations instead of competing Get/Set requests.
-  */
-  vendorStatePromise = vendorStatePromise
-    .catch(() => {})
-    .then(operation);
-  return vendorStatePromise;
-}
-
-async function initialize() {
-  if (!enabled || state.initialized || state.initializing) return;
-  state.initializing = true;
-  try {
-    onvifCam = await connectOnvif();
-    state.rtspUri = await getStreamUriForProfile(onvifCam);
-    /*
-      Reolink light/IR state is useful, but it must not block PTZ startup. The
-      vendor API can be unavailable while ONVIF and RTSP are already healthy;
-      awaiting this refresh here would keep the publisher and queue disabled
-      until the HTTP API responds. Queue it instead so video startup continues.
-    */
-    serializeVendorState(() => refreshVendorState()).catch((err) => {
-      logger.warn('initial Reolink state refresh failed', { error: getErrorMessage(err) });
-    });
-    /*
-      Presets are not required for the camera to be usable. Refresh them during
-      startup so connected clients have the list immediately, but keep failures
-      isolated inside refreshPresets() so a camera with broken preset support
-      can still pan, tilt, zoom, and stream normally.
-    */
-    await refreshPresets('initialize-presets');
-    state.initialized = true;
-    state.error = null;
-    startPublisher();
-    startSnapshotPolling();
-    logger.info('PTZ camera initialized', {
-      host: cameraConfig.host,
-      profileToken: state.profileToken,
-      streamPath: PTZ_STREAM_PATH,
-    });
-  } catch (err) {
-    state.error = err.message || String(err);
-    logger.warn('PTZ camera initialization failed', { error: state.error });
-  } finally {
-    state.initializing = false;
-    emitChange('initialize');
-  }
-}
-
-function clearTurnTimer() {
-  if (turnTimer) clearTimeout(turnTimer);
-  turnTimer = null;
-}
-
-function removeFromQueue(socketId) {
-  state.queue = state.queue.filter((id) => id !== socketId);
-}
-
-function revokeOperator(reason = 'release') {
-  if (!state.operatorSocketId) return;
-  const previous = state.operatorSocketId;
-  state.operatorSocketId = null;
-  state.deadline = null;
-  clearTurnTimer();
-  videoSessions.revokeWhere((info) => info.socketId === previous && info.sourceType === 'ptz');
-  // Operator handoff/disconnect must enter the same serialized stream as
-  // movement. A raw concurrent Stop could otherwise finish before an older
-  // ContinuousMove and allow that stale move to restart the camera afterward.
-  forceMotionStop(`operator-${reason}`);
-  events.emit('operator', { socketId: previous, action: 'release', reason });
-}
-
-function activateOperator(socket) {
-  revokeOperator('handoff');
-  removeFromQueue(socket.id);
-  state.operatorSocketId = socket.id;
-  state.deadline = Date.now() + getTurnDurationMs();
-  turnTimer = setTimeout(handleTurnDeadline, getTurnDurationMs());
-  socket.emit('ptzCamera:turn', { status: 'active', deadline: state.deadline });
-  events.emit('operator', { socketId: socket.id, action: 'active' });
-  emitChange('operator-active');
-}
-
-function handleTurnDeadline() {
-  turnTimer = null;
-  if (!state.operatorSocketId) return;
-  if (state.queue.length > 0) {
-    revokeOperator('turn-expired');
-    advanceQueue('turn-expired');
-    return;
-  }
-  /*
-    A turn timer only matters when somebody else is waiting. If the operator is
-    alone, keep them on the PTZ camera and roll the deadline forward so the UI
-    stays coherent without kicking out the only active viewer.
-  */
-  state.deadline = Date.now() + getTurnDurationMs();
-  turnTimer = setTimeout(handleTurnDeadline, getTurnDurationMs());
-  emitChange('turn-extended-empty-queue');
-}
-
-function advanceQueue(reason = 'advance') {
-  if (state.operatorSocketId || !state.queue.length) {
-    emitChange(reason);
-    return;
-  }
-  const nextId = state.queue[0];
-  const socket = io.sockets.sockets.get(nextId);
-  if (!socket || getOperatingMode(socket) !== 'ptz' || !canUsePtzFeature(socket)) {
-    removeFromQueue(nextId);
-    advanceQueue('drop-invalid');
-    return;
-  }
-  activateOperator(socket);
 }
 
 function checkParticipationAccess(socket) {
   if (!canUsePtzFeature(socket)) throw new Error('Not authorized for PTZ camera');
-  if (!state.initialized) throw new Error(state.error || 'PTZ camera is not ready');
+  if (!runtime.state.initialized) throw new Error(runtime.state.error || 'PTZ camera is not ready');
 }
 
 async function prepareParticipation(socket) {
   if (!canUsePtzFeature(socket)) throw new Error('Not authorized for PTZ camera');
-  await initialize();
-}
-
-function claimTurn(socket) {
-  checkParticipationAccess(socket);
-  if (getOperatingMode(socket) !== 'ptz') throw new Error('PTZ operating mode required');
-  if (state.operatorSocketId === socket.id || state.queue.includes(socket.id)) return;
-  state.queue.push(socket.id);
-  advanceQueue('claim');
-}
-
-function releaseTurn(socket) {
-  removeFromQueue(socket.id);
-  if (state.operatorSocketId === socket.id) {
-    revokeOperator('manual-release');
-    advanceQueue('manual-release');
-  } else {
-    emitChange('queue-leave');
-  }
-  return getPublicState(socket);
+  await runtime.initialize();
 }
 
 function requireOperator(socket) {
   if (!enabled) throw new Error('PTZ camera disabled');
-  if (!passesMode(socket)) throw new Error('Not authorized for PTZ camera');
-  if (!socket || getOperatingMode(socket) !== 'ptz' || state.operatorSocketId !== socket.id) throw new Error('Not the PTZ operator');
+  if (!canUsePtzFeature(socket)) throw new Error('Not authorized for PTZ camera');
+  if (!socket || !socket.data?.ptzEntered || getOperatingMode(socket) !== 'ptz' || participation.state.operatorSocketId !== socket.id) throw new Error('Not the PTZ operator');
 }
 
 function requirePtzUser(socket) {
@@ -993,487 +257,13 @@ function requirePresetAdmin(socket) {
     a useful current position without also being allowed to remove presets.
   */
   if (!enabled) throw new Error('PTZ camera disabled');
-  if (!passesMode(socket)) throw new Error('Not authorized for PTZ camera');
+  if (!canUsePtzFeature(socket)) throw new Error('Not authorized for PTZ camera');
   if (!isAdmin(socket) && !isLockdownAdmin(socket)) throw new Error('PTZ preset admin required');
-}
-
-function normalizePresetToken(rawToken) {
-  const token = String(rawToken || '').trim();
-  if (!token) throw new Error('Preset token is required');
-  if (/[<>&'"]/.test(token)) throw new Error('Preset token contains invalid characters');
-  return token;
-}
-
-function escapeOnvifXmlText(value) {
-  /*
-    The installed onvif package writes option values directly into SOAP XML.
-    Escape admin-entered preset names before handing them to the package so a
-    normal label like "Door & window" remains valid XML instead of corrupting
-    the SetPreset request body.
-  */
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function normalizePresetCreateName(rawName) {
-  /*
-    The ONVIF API stores the preset at the camera's current position. A clear
-    name is the only context future users get in the UI, so require a small
-    non-empty label instead of silently creating "undefined" camera presets.
-  */
-  const name = String(rawName || '').trim().replace(/\s+/g, ' ');
-  if (!name) throw new Error('Preset name is required');
-  if (name.length > 60) throw new Error('Preset name must be 60 characters or less');
-  return name;
-}
-
-function normalizeMotionIntent(payload = {}) {
-  return {
-    pan: clampUnit(payload.pan ?? payload.x),
-    tilt: clampUnit(payload.tilt ?? payload.y),
-    zoom: clampUnit(payload.zoom),
-  };
-}
-
-function isMotionIdle(motion = STOP_MOTION) {
-  return !motion.pan && !motion.tilt && !motion.zoom;
-}
-
-function clearMotionWatchdog() {
-  if (!motionWatchdogTimer) return;
-  clearTimeout(motionWatchdogTimer);
-  motionWatchdogTimer = null;
-}
-
-function clearPanTiltRenewal() {
-  if (!panTiltRenewTimer) return;
-  clearTimeout(panTiltRenewTimer);
-  panTiltRenewTimer = null;
-}
-
-function clearZoomRepeat() {
-  if (!zoomRepeatTimer) return;
-  clearInterval(zoomRepeatTimer);
-  zoomRepeatTimer = null;
-}
-
-function panTiltMatches(left = STOP_MOTION, right = STOP_MOTION) {
-  return left.pan === right.pan && left.tilt === right.tilt;
-}
-
-function requestMotionCommands({ fullStop = false, panTilt = false, zoom = false } = {}) {
-  pendingFullStopCommand = pendingFullStopCommand || fullStop;
-  pendingPanTiltCommand = pendingPanTiltCommand || panTilt;
-  pendingZoomCommand = pendingZoomCommand || zoom;
-  if (
-    motionCommandPromise ||
-    (!pendingFullStopCommand && !pendingPanTiltCommand && !pendingZoomCommand)
-  ) {
-    return motionCommandPromise || Promise.resolve();
-  }
-
-  /*
-    Keep one ONVIF request in flight at a time, but coalesce independently by
-    axis. A zoom timer can tick several times while the camera answers one SOAP
-    request; one pending boolean preserves the newest required pulse without
-    building a delayed command backlog that would continue after release.
-  */
-  motionCommandPromise = (async () => {
-    while (pendingFullStopCommand || pendingPanTiltCommand || pendingZoomCommand) {
-      const sendFullStop = pendingFullStopCommand;
-      pendingFullStopCommand = false;
-      if (sendFullStop) {
-        try {
-          await initialize();
-          /*
-            Reserve ONVIF Stop for real all-axis safety events. The TrackMix
-            appears to treat even an axis-filtered Stop as global, so ordinary
-            user releases below use zero velocity instead.
-          */
-          await callOnvif('stop', {
-            profileToken: state.profileToken,
-            panTilt: true,
-            zoom: true,
-          });
-        } catch (err) {
-          logger.warn('PTZ full stop command failed', { error: getErrorMessage(err) });
-        }
-      }
-
-      const sendPanTilt = pendingPanTiltCommand;
-      pendingPanTiltCommand = false;
-      if (sendPanTilt) {
-        const pan = desiredMotion.pan;
-        const tilt = desiredMotion.tilt;
-        try {
-          await initialize();
-          if (!pan && !tilt) {
-            /*
-              Zero pan/tilt velocity stops only that axis under ContinuousMove.
-              Do not use ONVIF Stop here: this TrackMix ignores the requested
-              axis filter and can also stop zoom that is still being held.
-            */
-            await callOnvif('continuousMove', {
-              profileToken: state.profileToken,
-              x: 0,
-              y: 0,
-              onlySendPanTilt: true,
-              timeout: PAN_TILT_TIMEOUT_MS,
-            });
-          } else {
-            await callOnvif('continuousMove', {
-              profileToken: state.profileToken,
-              x: pan,
-              y: tilt,
-              onlySendPanTilt: true,
-              timeout: PAN_TILT_TIMEOUT_MS,
-            });
-          }
-        } catch (err) {
-          logger.warn('PTZ pan/tilt command failed', { error: getErrorMessage(err), pan, tilt });
-        }
-      }
-
-      const sendZoom = pendingZoomCommand;
-      pendingZoomCommand = false;
-      if (sendZoom) {
-        const zoom = desiredMotion.zoom;
-        try {
-          await initialize();
-          if (zoom) {
-            /*
-              The TrackMix does not advertise continuous zoom, but physical
-              testing showed each accepted zoom-only ContinuousMove advances one
-              step. Repeating this axis-only request restores responsive zoom
-              without resending or restarting the pan/tilt motor.
-            */
-            await callOnvif('continuousMove', {
-              profileToken: state.profileToken,
-              zoom,
-              onlySendZoom: true,
-              timeout: ZOOM_PULSE_TIMEOUT_MS,
-            });
-          }
-        } catch (err) {
-          logger.warn('PTZ zoom command failed', { error: getErrorMessage(err), zoom });
-        }
-      }
-    }
-  })().finally(() => {
-    motionCommandPromise = null;
-    // Cover an intent arriving between the loop check and promise cleanup.
-    if (pendingFullStopCommand || pendingPanTiltCommand || pendingZoomCommand) {
-      requestMotionCommands();
-    }
-  });
-
-  return motionCommandPromise;
-}
-
-function armPanTiltRenewal() {
-  clearPanTiltRenewal();
-  if (!desiredMotion.pan && !desiredMotion.tilt) return;
-  /*
-    The camera requires a finite timeout. Renew close to the ten-second limit,
-    not on every browser heartbeat, so an unusually long hold stays continuous
-    without bringing back the quarter-second motor restarts.
-  */
-  panTiltRenewTimer = setTimeout(() => {
-    panTiltRenewTimer = null;
-    requestMotionCommands({ panTilt: true });
-    armPanTiltRenewal();
-  }, PAN_TILT_RENEW_MS);
-}
-
-function syncZoomRepeater() {
-  clearZoomRepeat();
-  if (!desiredMotion.zoom) return;
-  // queueMotionIntent sends the first step once after configuring this timer;
-  // subsequent ticks retain the old fast hold cadence without a double pulse.
-  zoomRepeatTimer = setInterval(() => {
-    requestMotionCommands({ zoom: true });
-  }, ZOOM_REPEAT_MS);
-}
-
-function queueMotionIntent(motion, reason = 'input') {
-  const nextMotion = normalizeMotionIntent(motion);
-  const panTiltChanged = !panTiltMatches(nextMotion, desiredMotion);
-  const zoomChanged = nextMotion.zoom !== desiredMotion.zoom;
-  desiredMotion = nextMotion;
-  clearMotionWatchdog();
-
-  if (!isMotionIdle(nextMotion)) {
-    /*
-      Socket disconnect normally arrives quickly, but it is not a suitable motor
-      safety boundary. Every non-zero browser heartbeat replaces this timer; if
-      releases or subsequent heartbeats disappear, the server injects a zero
-      intent into the same serialized stream as ordinary control changes.
-    */
-    motionWatchdogTimer = setTimeout(() => {
-      motionWatchdogTimer = null;
-      queueMotionIntent(STOP_MOTION, 'watchdog');
-    }, MOTION_WATCHDOG_MS);
-  }
-
-  /*
-    Identical browser heartbeats refresh only the watchdog. They must not touch
-    either motor scheduler: pan/tilt already has a long continuous command, and
-    zoom has its own 120 ms axis-only repeater.
-  */
-  const sendPanTilt = panTiltChanged;
-  /*
-    A live-camera recording proved that both Stop(Zoom=true) and a zero-velocity
-    zoom ContinuousMove halt pan/tilt on this firmware. Zoom itself is step-based:
-    each non-zero pulse advances once and then settles. Releasing zoom therefore
-    means clearing its timer and any coalesced-but-unsent pulse, with no camera
-    command at all. The last transmitted pulse retains its finite one-second
-    timeout as a backstop.
-  */
-  if (zoomChanged && !nextMotion.zoom) pendingZoomCommand = false;
-  const sendZoom = Boolean(nextMotion.zoom) && zoomChanged;
-  if (sendPanTilt) armPanTiltRenewal();
-  if (sendZoom) syncZoomRepeater();
-  if (zoomChanged && !nextMotion.zoom) clearZoomRepeat();
-  const pending = requestMotionCommands({ panTilt: sendPanTilt, zoom: sendZoom });
-  pending.catch(() => {});
-  return { ok: true, motion: desiredMotion, reason };
-}
-
-function acceptMotionIntent(socket, payload = {}) {
-  requireOperator(socket);
-  return queueMotionIntent(payload, 'operator-input');
-}
-
-function forceMotionStop(reason = 'safety-stop') {
-  /*
-    Lifecycle stops force a real all-axis ONVIF Stop even when local state is
-    already zero. The browser may have lost its final packet, or the camera may
-    have accepted a command whose response has not returned, so deduplicating a
-    safety stop would trust precisely the state we are trying to recover from.
-  */
-  clearPanTiltRenewal();
-  clearZoomRepeat();
-  queueMotionIntent(STOP_MOTION, reason);
-  requestMotionCommands({ fullStop: true });
-  return motionCommandPromise || Promise.resolve();
-}
-
-async function getStatus(socket) {
-  if (!passesMode(socket)) throw new Error('Not authorized for PTZ camera');
-  await initialize();
-  const status = await callOnvif('getStatus', { profileToken: state.profileToken });
-  state.status = status || null;
-  emitChange('status');
-  return state.status;
-}
-
-async function listPresets(socket) {
-  requirePtzUser(socket);
-  return refreshPresets('presets-list');
-}
-
-async function gotoPreset(socket, payload = {}) {
-  requireOperator(socket);
-  await initialize();
-  const presetToken = normalizePresetToken(payload.token || payload.presetToken);
-  /*
-    Stop any continuous move before jumping to a preset. Without this, a held
-    key or touch control can keep sending pan/tilt velocity while the camera is
-    trying to execute the absolute preset move, which makes the final position
-    feel inconsistent. Await the serialized safety stop instead of issuing a
-    raw concurrent ONVIF request that could itself race an older movement.
-  */
-  await forceMotionStop('preset').catch(() => {});
-  await callOnvif('gotoPreset', {
-    profileToken: state.profileToken,
-    /*
-      This onvif package names the goto option "preset" even though it writes
-      that value into the ONVIF PresetToken XML element. Keep the local variable
-      named presetToken because that is what the camera and UI are actually
-      handling, but send the package's expected option name here.
-    */
-    preset: presetToken,
-  });
-  return { ok: true, presetToken };
-}
-
-async function createPreset(socket, payload = {}) {
-  requirePtzUser(socket);
-  await initialize();
-  const presetName = normalizePresetCreateName(payload.name || payload.presetName);
-  const options = {
-    profileToken: state.profileToken,
-    presetName: escapeOnvifXmlText(presetName),
-  };
-  /*
-    ONVIF setPreset updates an existing token when one is supplied and creates a
-    new preset when it is omitted. Support both so the UI can start simple with
-    "create current position" and later reuse the same server action for rename
-    or overwrite workflows if needed.
-  */
-  const rawPresetToken = String(payload.token || payload.presetToken || '').trim();
-  const presetToken = rawPresetToken ? normalizePresetToken(rawPresetToken) : '';
-  if (presetToken) options.presetToken = presetToken;
-  const result = await callOnvif('setPreset', options);
-  const presets = await refreshPresets('preset-create');
-  return {
-    ok: true,
-    presetToken: result?.presetToken || result?.PresetToken || presetToken || null,
-    presets,
-  };
-}
-
-async function removePreset(socket, payload = {}) {
-  requirePresetAdmin(socket);
-  await initialize();
-  const presetToken = normalizePresetToken(payload.token || payload.presetToken);
-  await callOnvif('removePreset', {
-    profileToken: state.profileToken,
-    presetToken,
-  });
-  return {
-    ok: true,
-    presetToken,
-    presets: await refreshPresets('preset-remove'),
-  };
-}
-
-async function setSpotlight(socket, payload = {}) {
-  requireOperator(socket);
-  return serializeVendorState(async () => {
-    let current = state.light ? normalizeSpotlightState(state.light) : null;
-    if (payload.state === undefined && !current) {
-      /*
-        Toggle requests need a base state. Normal button paths send an explicit
-        state, so this read only happens for rare generic toggle callers or
-        startup races before the initial vendor state has arrived.
-      */
-      current = await refreshSpotlightState();
-    }
-    const logicalOn = payload.state === undefined
-      ? !isSpotlightOn(current || {})
-      : normalizeSpotlightPayloadState(payload.state);
-    const cameraState = spotlightCameraStateForLogicalOn(logicalOn);
-    const cameraPayload = {
-      channel: 0,
-      state: cameraState,
-    };
-    const next = {
-      ...(current || {}),
-      ...cameraPayload,
-      on: logicalOn,
-    };
-    if (Number.isFinite(Number(payload.bright))) {
-      const bright = Math.max(0, Math.min(100, Number(payload.bright)));
-      cameraPayload.bright = bright;
-      next.bright = bright;
-    }
-    /*
-      Send the explicit requested state through a fresh API session before
-      changing public state. If the camera/API rejects the command, the UI should
-      not be left showing an optimistic state that never reached the device.
-    */
-    await callReolinkApi('SetWhiteLed', { WhiteLed: cameraPayload });
-    state.light = next;
-    emitChange('light');
-    scheduleSpotlightVerification();
-    return state.light;
-  });
-}
-
-async function setIr(socket, payload = {}) {
-  requireOperator(socket);
-  return serializeVendorState(async () => {
-    const nextState = normalizeIrState(payload.state);
-    /*
-      The camera requires channel inside IrLights. Without it, SetIrLights
-      returns param error (-4), while the optimistic local state makes the UI
-      look like the command worked. Keep the optimistic state, but send the
-      minimal payload the camera actually accepts.
-    */
-    const next = { ...(state.ir || {}), channel: 0, state: nextState };
-    /*
-      As with spotlight, update session state after the fresh-session command
-      succeeds so a rejected Reolink request does not make the UI claim the IR
-      mode changed when the camera never accepted it.
-    */
-    await callReolinkApi('SetIrLights', { IrLights: { channel: 0, state: nextState } });
-    state.ir = next;
-    emitChange('ir');
-    await refreshVendorState();
-    return state.ir;
-  });
-}
-
-async function disableEmittersForIdle() {
-  /*
-    Idle cleanup is a server-owned safety action, not a user control action, so
-    it intentionally does not go through requireOperator(). If nobody is using
-    the camera, the system still needs a way to leave every camera-side emitter
-    in a known off state.
-  */
-  if (!enabled) {
-    return { action: 'disablePtzEmitters', skipped: true, reason: 'ptzDisabled' };
-  }
-
-  await initialize();
-  if (!state.initialized) {
-    return {
-      action: 'disablePtzEmitters',
-      success: false,
-      error: state.error || 'PTZ camera is not ready',
-    };
-  }
-
-  return serializeVendorState(async () => {
-    const lightPayload = { channel: 0, state: spotlightCameraStateForLogicalOn(false) };
-    const irPayload = { channel: 0, state: normalizeIrState('off') };
-
-    /*
-      Set the public state before the API calls finish so the UI immediately
-      reflects the idle policy. These API calls intentionally use the same
-      fixed-interval reconnect loop as user controls, because idle cleanup is
-      only useful if it survives a camera API session reset instead of giving up
-      and leaving emitters in an unknown physical state.
-    */
-    state.light = normalizeSpotlightState({
-      ...(state.light || {}),
-      ...lightPayload,
-      on: false,
-    });
-    state.ir = {
-      ...(state.ir || {}),
-      ...irPayload,
-    };
-    emitChange('idle-emitters-off-pending');
-
-    await callReolinkApi('SetWhiteLed', { WhiteLed: lightPayload });
-    await callReolinkApi('SetIrLights', { IrLights: irPayload });
-
-    /*
-      Read back once after the writes so stale optimistic state does not linger
-      forever. The existing spotlight button path delays verification because it
-      is user-facing and frequently toggled; idle fires rarely, so one ordered
-      refresh keeps the final state simple.
-    */
-    await refreshVendorState();
-
-    emitChange('idle-emitters-off');
-    return {
-      action: 'disablePtzEmitters',
-      success: true,
-      failures: [],
-    };
-  });
 }
 
 function canRequestLiveVideo(socket) {
   if (!enabled || !passesMode(socket)) return false;
-  if (state.operatorSocketId === socket?.id) return true;
+  if (participation.state.operatorSocketId === socket?.id) return canUsePtzFeature(socket);
   if (isAdmin(socket) || isLockdownAdmin(socket)) return true;
   const role = getRole(socket);
   const local = isLocalNetwork(getSocketIp(socket));
@@ -1498,34 +288,6 @@ function canRequestLiveVideo(socket) {
     return true;
   }
   return false;
-}
-
-function getSnapshotPath() {
-  return path.join(SNAPSHOT_DIR, `${PTZ_STREAM_PATH}.jpg`);
-}
-
-async function pollSnapshot() {
-  try {
-    const filePath = getSnapshotPath();
-    const stats = await fs.stat(filePath);
-    if (lastSnapshotState?.mtimeMs && stats.mtimeMs <= lastSnapshotState.mtimeMs) return;
-    const buffer = await fs.readFile(filePath);
-    lastSnapshotState = { frame: buffer, ts: stats.mtimeMs || Date.now(), error: null, mtimeMs: stats.mtimeMs };
-    events.emit('snapshot:frame', { id: PTZ_CAMERA_ID, buffer, ts: lastSnapshotState.ts });
-  } catch (err) {
-    lastSnapshotState = {
-      ...(lastSnapshotState || {}),
-      error: err.code === 'ENOENT' ? 'Snapshot missing' : err.message,
-    };
-    events.emit('snapshot:status', { id: PTZ_CAMERA_ID, error: lastSnapshotState.error });
-  }
-}
-
-function startSnapshotPolling() {
-  if (snapshotTimer) return;
-  snapshotTimer = setInterval(() => {
-    pollSnapshot().catch((err) => logger.warn('snapshot poll failed', { error: err.message }));
-  }, SNAPSHOT_POLL_MS);
 }
 
 function normalizeSnapshotIds(payload = {}) {
@@ -1586,6 +348,33 @@ function normalizeSocketArgs(firstArg, secondArg) {
   };
 }
 
+function claimTurn(socket) {
+  checkParticipationAccess(socket);
+  participation.claim(socket);
+  return getPublicState(socket);
+}
+function releaseTurn(socket) {
+  participation.release(socket.id);
+  return getPublicState(socket);
+}
+function acceptMotionIntent(socket, payload) {
+  requireOperator(socket);
+  return runtime.queueMotionIntent(payload, 'operator-input');
+}
+function operatorAction(method, socket, payload) {
+  requireOperator(socket);
+  const turn = participation.state.generation;
+  return runtime[method](payload, () => {
+    requireOperator(socket);
+    if (participation.state.generation !== turn) throw new Error('PTZ turn changed');
+  });
+}
+function presetAction(method, socket, payload) {
+  const authorize = () => method === 'removePreset' ? requirePresetAdmin(socket) : requirePtzUser(socket);
+  authorize();
+  return runtime[method](payload, authorize);
+}
+
 events.on('snapshot:frame', ({ buffer, ts }) => {
   const subscribers = snapshotSubscribers.get(PTZ_CAMERA_ID);
   if (!subscribers || !buffer) return;
@@ -1609,185 +398,45 @@ events.on('snapshot:status', ({ error }) => {
   });
 });
 
-function registerSocketHandlers() {
-  io.on('connection', (socket) => {
-    socket.on('ptzCamera:revokeOperator', (firstArg, secondArg) => {
-      const { cb } = normalizeSocketArgs(firstArg, secondArg);
-      if (!isAdmin(socket)) return cb({ error: 'Admin required' });
-      revokeOperator('admin-revoke');
-      advanceQueue('admin-revoke');
-      cb({ ok: true });
-    });
-    socket.on('ptzCamera:release', async (firstArg, secondArg) => {
-      const { cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb({ ok: true, state: await releasePtzTurn(socket) });
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:motion', (firstArg, secondArg) => {
-      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        /*
-          Acknowledge acceptance of the newest desired state immediately. The
-          serialized ONVIF pump deliberately runs independently of Socket.IO
-          request latency so browser heartbeats cannot accumulate while waiting
-          for a camera SOAP response.
-        */
-        cb(acceptMotionIntent(socket, payload));
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:status', async (firstArg, secondArg) => {
-      const { cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb({ ok: true, status: await getStatus(socket) });
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:spotlight', async (firstArg, secondArg) => {
-      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb({ ok: true, light: await setSpotlight(socket, payload) });
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:ir', async (firstArg, secondArg) => {
-      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb({ ok: true, ir: await setIr(socket, payload) });
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:presets:list', async (firstArg, secondArg) => {
-      const { cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb({ ok: true, presets: await listPresets(socket) });
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:preset:goto', async (firstArg, secondArg) => {
-      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb(await gotoPreset(socket, payload));
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:preset:create', async (firstArg, secondArg) => {
-      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb(await createPreset(socket, payload));
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:preset:remove', async (firstArg, secondArg) => {
-      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        cb(await removePreset(socket, payload));
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:snapshotSubscribe', (firstArg, secondArg) => {
-      const { payload, cb } = normalizeSocketArgs(firstArg, secondArg);
-      try {
-        if (!passesMode(socket)) throw new Error('Not authorized for PTZ snapshots');
-        const ids = normalizeSnapshotIds(payload);
-        addSnapshotSubscription(socket, ids);
-        if (lastSnapshotState?.frame) sendSnapshotFrame(socket, lastSnapshotState.frame, lastSnapshotState.ts);
-        cb({ ok: true, subscribed: ids });
-      } catch (err) {
-        cb({ error: err.message });
-      }
-    });
-    socket.on('ptzCamera:snapshotUnsubscribe', (firstArg, secondArg) => {
-      const { payload } = normalizeSocketArgs(firstArg, secondArg);
-      removeSnapshotSubscriptions(socket.id, normalizeSnapshotIds(payload));
-    });
-    socket.on('disconnect', () => {
-      if (state.operatorSocketId === socket.id) {
-        revokeOperator('disconnect');
-        advanceQueue('disconnect');
-      }
-      removeFromQueue(socket.id);
-      removeSnapshotSubscriptions(socket.id);
-      emitChange('disconnect');
-    });
-  });
-}
 
-modeEvents.on('change', (mode) => {
-  if (mode !== MODES.LOCKDOWN) return;
-  if (state.operatorSocketId) {
-    const socket = io.sockets.sockets.get(state.operatorSocketId);
-    if (!socket || !isLockdownAdmin(socket)) revokeOperator('lockdown');
+function reconcileAccess() {
+  participation.reconcile();
+  videoSessions.revokeWhere((info) => info.sourceType === 'ptz'
+    && !canRequestLiveVideo(io.sockets.sockets.get(info.socketId)));
+  for (const socketId of socketSnapshotSubscriptions.keys()) {
+    const socket = io.sockets.sockets.get(socketId);
+    if (!socket || !passesMode(socket)) removeSnapshotSubscriptions(socketId);
   }
-  state.queue = state.queue.filter((socketId) => {
-    const socket = io.sockets.sockets.get(socketId);
-    return socket && isLockdownAdmin(socket);
-  });
-  videoSessions.revokeWhere((info) => {
-    if (info.sourceType !== 'ptz') return false;
-    const socket = io.sockets.sockets.get(info.socketId);
-    return !socket || !isLockdownAdmin(socket);
-  });
-  Array.from(socketSnapshotSubscriptions.keys()).forEach((socketId) => {
-    const socket = io.sockets.sockets.get(socketId);
-    if (!socket || !isLockdownAdmin(socket)) removeSnapshotSubscriptions(socketId);
-  });
-  emitChange('lockdown');
+}
+modeEvents.on('change', reconcileAccess);
+roleEvents.on('change', reconcileAccess);
+verificationEvents.on('change', reconcileAccess);
+
+registerSocketGateway({
+  io, isAdmin, participation, emitChange, normalizeSocketArgs, runPtzTurnAction,
+  acceptMotionIntent, passesMode, normalizeSnapshotIds, addSnapshotSubscription,
+  sendSnapshotFrame, removeSnapshotSubscriptions, getSnapshot: () => runtime.getSnapshot(),
+  getStatus: (socket) => { requirePtzUser(socket); return runtime.getStatus(); },
+  listPresets: (socket) => { requirePtzUser(socket); return runtime.listPresets(); },
+  gotoPreset: (socket, payload) => operatorAction('gotoPreset', socket, payload),
+  setSpotlight: (socket, payload) => operatorAction('setSpotlight', socket, payload),
+  setIr: (socket, payload) => operatorAction('setIr', socket, payload),
+  createPreset: (socket, payload) => presetAction('createPreset', socket, payload),
+  removePreset: (socket, payload) => presetAction('removePreset', socket, payload),
 });
-
-registerSocketHandlers();
-if (enabled) {
-  initialize();
+function startRuntime() {
+  if (enabled) runtime.initialize().catch((err) => logger.warn('PTZ initialization failed', { error: err.message }));
 }
-
-function stopCameraRuntime() {
-  // Disable restart-producing callbacks before terminating the publisher. The
-  // old ffmpeg exit event can then observe `enabled === false` and will not
-  // resurrect a process built from the previous camera configuration.
-  enabled = false;
-  revokeOperator('configuration-change');
-  state.queue = [];
-  stopPublisher();
-  audioPlayback.stopActivePlayback('configuration-change');
-  if (snapshotTimer) {
-    clearInterval(snapshotTimer);
-    snapshotTimer = null;
-  }
-  if (spotlightVerifyTimer) {
-    clearTimeout(spotlightVerifyTimer);
-    spotlightVerifyTimer = null;
-  }
-  clearMotionWatchdog();
-  clearPanTiltRenewal();
-  clearZoomRepeat();
-  onvifCam = null;
-  state.initialized = false;
-  state.initializing = false;
-  state.rtspUri = null;
-  state.profileToken = DEFAULT_PROFILE_TOKEN;
-}
-
 registerConfigurationHandler('ptzCamera', (nextCameraConfig = {}) => {
-  stopCameraRuntime();
+  participation.clear('configuration-change');
+  const startAfter = runtime.stop();
   cameraConfig = nextCameraConfig;
   enabled = Boolean(cameraConfig.enabled);
-  state.profileToken = String(cameraConfig.profileToken || DEFAULT_PROFILE_TOKEN);
-  state.error = null;
-  audioPlayback = createPtzAudioPlayback({ logger, cameraConfig, enabled, getSocketLabel });
-  emitChange('configuration-change');
-  if (enabled) initialize();
+  runtime = createCameraRuntime({ cameraConfig, logger, events, onChange: emitChange, getSocketLabel, startAfter });
+  reconcileAccess();
+  startRuntime();
 });
+startRuntime();
 
 module.exports = {
   PTZ_CAMERA_ID,
@@ -1803,7 +452,7 @@ module.exports = {
   canSpeakThroughPtz,
   speakText,
   canRequestLiveVideo,
-  disableEmittersForIdle,
+  disableEmittersForIdle: () => runtime.disableEmittersForIdle(),
   getReplaySource: () => enabled && isReplayEnabled()
     ? { type: 'ptz', id: PTZ_CAMERA_ID, label: cameraConfig.name || 'PTZ Camera' }
     : null,

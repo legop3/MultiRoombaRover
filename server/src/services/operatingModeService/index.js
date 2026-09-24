@@ -29,9 +29,10 @@ async function transition(socket, operatingMode) {
     // Block new rover ownership before release events notify other services.
     socket.data.operatingMode = 'ptz';
     assignment.releaseForOperatingMode(socket);
-    ptz.claimTurn(socket);
+    socket.data.ptzEntered = true;
   } else {
     ptz.releaseTurn(socket);
+    socket.data.ptzEntered = false;
     socket.data.operatingMode = 'rover';
     assignment.resumeAssignment(socket);
   }
@@ -58,8 +59,16 @@ function setOperatingMode(socket, operatingMode) {
   return enqueueTransition(socket, () => transition(socket, operatingMode));
 }
 
-function releasePtzTurn(socket) {
-  return enqueueTransition(socket, () => require('../ptzCameraService').releaseTurn(socket));
+function runPtzTurnAction(socket, action) {
+  return enqueueTransition(socket, () => {
+    const ptz = require('../ptzCameraService');
+    if (action === 'release') return ptz.releaseTurn(socket);
+    if (action !== 'request') throw new Error('Invalid PTZ turn action');
+    if (getOperatingMode(socket) !== 'ptz' || !socket.data.ptzEntered) {
+      throw new Error('Enter PTZ before requesting a turn');
+    }
+    return ptz.claimTurn(socket);
+  });
 }
 
-module.exports = { getOperatingMode, setOperatingMode, releasePtzTurn, operatingModeEvents };
+module.exports = { getOperatingMode, setOperatingMode, runPtzTurnAction, operatingModeEvents };

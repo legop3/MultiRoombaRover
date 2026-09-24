@@ -104,7 +104,7 @@ export function usePtzControlAdapter() {
   const socket = useSocket();
   const { ptzSpotlight, ptzIr } = useSessionActions();
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
-  const isActive = Boolean(ptz?.isOperator);
+  const isActive = Boolean(ptz?.permissions?.canControl);
   const lastMotionSignatureRef = useRef(payloadSignature(PTZ_STOP));
   const desiredMotionRef = useRef(PTZ_STOP);
   const panTiltIntentRef = useRef({ pan: 0, tilt: 0 });

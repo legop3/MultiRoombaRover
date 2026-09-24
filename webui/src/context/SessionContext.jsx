@@ -412,7 +412,7 @@ export function SessionProvider({ children }) {
       setPrivateSafety: (roverId, safety = {}) =>
         emitWithAck('session:privateSafety:set', { roverId, safety }),
       setOperatingMode: (operatingMode) => emitWithAck('session:setOperatingMode', { operatingMode }),
-      ptzClaim: () => emitWithAck('session:setOperatingMode', { operatingMode: 'ptz' }),
+      ptzRequestTurn: () => emitWithAck('ptzCamera:requestTurn'),
       ptzRelease: () => emitWithAck('ptzCamera:release'),
       ptzRevokeOperator: () => emitWithAck('ptzCamera:revokeOperator'),
       ptzSpotlight: (payload = {}) => emitWithAck('ptzCamera:spotlight', payload),

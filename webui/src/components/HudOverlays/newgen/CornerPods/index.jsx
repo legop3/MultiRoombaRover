@@ -1,6 +1,7 @@
 // New Drive Corner Pods
 // Purpose: Composes the four independently owned corner controls around the shared video stage.
 import TopLeftPod from './TopLeftPod.jsx';
+import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import TopRightPod from './TopRightPod.jsx';
 import BottomLeftPod from './BottomLeftPod.jsx';
 import BottomRightPod from './BottomRightPod.jsx';
@@ -9,11 +10,13 @@ import { useDriverLayout } from '../../../../layouts/driver/DriverLayoutContext.
 
 export default function CornerPods({ roverId }) {
   const layout = useDriverLayout();
+  const turns = useSessionSelector((state) => state.session?.roster
+    ?.find((rover) => String(rover.id) === String(roverId))?.turn);
   const showPhysicalControlPods = layout === 'desktop';
 
   return (
     <>
-      <TopLeftPod roverId={roverId} />
+      {turns ? <TopLeftPod turns={turns} /> : null}
       <TopRightPod roverId={roverId} />
       {/* The mobile layouts already provide large touch controls around the video.
           Omitting this pod avoids presenting duplicate horn, light, and laser actions. */}
