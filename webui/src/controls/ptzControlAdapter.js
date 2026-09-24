@@ -2,7 +2,7 @@
 // Purpose: Hooks the single PTZ camera into the internal control action layer.
 // Scope: Owns PTZ-specific control mixing and socket commands so keyboard,
 // mobile, desktop, and gamepad inputs do not each learn camera-specific rules.
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSessionActions, useSessionSelector } from '../context/SessionContext.jsx';
 
@@ -102,9 +102,27 @@ function nextIrMode(currentMode) {
 
 export function usePtzControlAdapter() {
   const socket = useSocket();
-  const { ptzSpotlight, ptzIr } = useSessionActions();
+  const { ptzSpotlight, ptzIr, pushAlert } = useSessionActions();
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const isActive = Boolean(ptz?.permissions?.canControl);
+  const [lightingPending, setLightingPending] = useState({});
+  const lightingPendingRef = useRef({});
+  const spotlightOn = isSpotlightOn(ptz?.light);
+  const irMode = normalizeIrMode(ptz?.ir?.state);
+
+  const sendLighting = useCallback((key, send) => {
+    // Keyboard repeats and simultaneous touch/key input share one in-flight
+    // command per light, so neither can race a pending state change.
+    if (lightingPendingRef.current[key]) return;
+    lightingPendingRef.current[key] = true;
+    setLightingPending((current) => ({ ...current, [key]: true }));
+    send().catch((err) => {
+      pushAlert({ title: 'PTZ camera', message: err.message, color: '#f59e0b' });
+    }).finally(() => {
+      lightingPendingRef.current[key] = false;
+      setLightingPending((current) => ({ ...current, [key]: false }));
+    });
+  }, [pushAlert]);
   const lastMotionSignatureRef = useRef(payloadSignature(PTZ_STOP));
   const desiredMotionRef = useRef(PTZ_STOP);
   const panTiltIntentRef = useRef({ pan: 0, tilt: 0 });
@@ -227,7 +245,7 @@ export function usePtzControlAdapter() {
   const setSpotlight = useCallback(
     (nextOn) => {
       if (!isActive) return false;
-      const desiredOn = typeof nextOn === 'boolean' ? nextOn : !isSpotlightOn(ptz?.light);
+      const desiredOn = typeof nextOn === 'boolean' ? nextOn : !spotlightOn;
       /*
         Lighting keybinds should use the exact acknowledged command action as
         the visible PTZ buttons. Movement remains fire-and-forget because it is
@@ -235,10 +253,10 @@ export function usePtzControlAdapter() {
         from the existing authorization/error contract and must not maintain a
         second socket-only behavior merely because its source is a keybind.
       */
-      ptzSpotlight({ state: desiredOn ? 1 : 0 }).catch(() => {});
+      sendLighting('spotlight', () => ptzSpotlight({ state: desiredOn ? 1 : 0 }));
       return true;
     },
-    [isActive, ptz?.light, ptzSpotlight],
+    [isActive, spotlightOn, ptzSpotlight, sendLighting],
   );
 
   const setIr = useCallback(
@@ -246,13 +264,13 @@ export function usePtzControlAdapter() {
       if (!isActive) return false;
       const desiredState = typeof nextOn === 'boolean'
         ? (nextOn ? 'On' : 'Off')
-        : nextIrMode(ptz?.ir?.state);
+        : nextIrMode(irMode);
       // Match the button path for the same reason as spotlight above. The
       // shared laser key continues to select IR; only its transport is unified.
-      ptzIr({ state: desiredState }).catch(() => {});
+      sendLighting('ir', () => ptzIr({ state: desiredState }));
       return true;
     },
-    [isActive, ptz?.ir?.state, ptzIr],
+    [isActive, irMode, ptzIr, sendLighting],
   );
 
   useEffect(() => {
@@ -300,12 +318,13 @@ export function usePtzControlAdapter() {
     () => ({
       isActive,
       state: ptz,
+      lighting: { spotlightOn, irMode, pending: lightingPending },
       applyDriveVector,
       setZoomIntent,
       setSpotlight,
       setIr,
       stopMotion,
     }),
-    [applyDriveVector, isActive, ptz, setIr, setSpotlight, setZoomIntent, stopMotion],
+    [applyDriveVector, isActive, ptz, spotlightOn, irMode, lightingPending, setIr, setSpotlight, setZoomIntent, stopMotion],
   );
 }

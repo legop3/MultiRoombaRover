@@ -163,7 +163,7 @@ export default function MiniSummaryContent() {
   const frames = useVisualTelemetryFrames();
   const roster = session?.roster ?? [];
   const ptz = session?.ptzCamera || null;
-  const ptzOperatorLabel = String(ptz?.operatorLabel || '').trim();
+  const ptzOperatorLabel = String(ptz?.turn?.userLabels?.[ptz?.turn?.currentId] || '').trim();
   const hasActivePtzOperator = Boolean(ptz?.enabled && ptzOperatorLabel);
   const [index, setIndex] = useState(0);
   const activeDrivers = session?.activeDrivers || {};

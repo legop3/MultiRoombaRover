@@ -64,7 +64,6 @@ createRoot(document.getElementById('root')).render(
                   <Route path="/mini" element={<MiniSummaryApp />} />
                   <Route path="/display" element={<ServerDisplayApp />} />
                   <Route path="/scanner" element={<ScannerApp />} />
-                  <Route path="/database" element={<Navigate to="/admin?section=users" replace />} />
                   <Route path="/setup" element={lazyRoute(<SetupApp />, 'setup')} />
                   <Route path="/admin" element={lazyRoute(<AdminApp />, 'administration')} />
                   {/*

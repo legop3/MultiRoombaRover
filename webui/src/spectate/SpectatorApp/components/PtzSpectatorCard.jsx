@@ -115,15 +115,15 @@ export default function PtzSpectatorCard() {
       ? 'restarting'
       : publisher.lastEvent || 'stopped';
   const publisherProgress = formatPublisherProgress(publisher.progress);
-  const queueCount = Array.isArray(ptz?.queue) ? ptz.queue.length : 0;
+  const queueCount = Math.max(0, (ptz?.turn?.queueLength || 0) - (ptz?.turn?.currentId ? 1 : 0));
   const label = ptz?.name || 'PTZ Camera';
 
   return (
     <article className="flex min-h-64 flex-col rounded-sm bg-zinc-900 p-0 sm:min-h-72">
       <PtzLiveOrSnapshot label={label} />
       <div className="min-h-0 flex-1 space-y-0.5 overflow-hidden p-1 text-xs">
-        <InfoRow label="Operator" value={ptz?.operatorLabel || 'none'} />
-        <InfoRow label="Remaining" value={formatRemaining(ptz?.deadline)} />
+        <InfoRow label="Operator" value={ptz?.turn?.userLabels?.[ptz?.turn?.currentId] || 'none'} />
+        <InfoRow label="Remaining" value={formatRemaining(ptz?.turn?.deadline)} />
         <InfoRow label="Queue" value={queueCount ? `${queueCount} waiting` : 'empty'} />
         <InfoRow label="Spotlight" value={isSpotlightOn(ptz?.light) ? 'On' : 'Off'} />
         <InfoRow label="Infrared" value={normalizeInfraredMode(ptz?.ir?.state)} />

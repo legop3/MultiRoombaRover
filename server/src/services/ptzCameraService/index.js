@@ -1,4 +1,5 @@
 // PTZ policy and session facade. Camera IO and participation each own their lifecycle.
+const { describeQueue } = require('../turnService/queueDisplay');
 const EventEmitter = require('events');
 
 const io = require('../../globals/io');
@@ -96,6 +97,8 @@ function describeParticipation(socket) {
   const entered = getOperatingMode(socket) === 'ptz' && Boolean(socket?.data?.ptzEntered);
   const isOperator = Boolean(socket && participation.state.operatorSocketId === socket.id);
   const position = socket ? participation.state.queue.indexOf(socket.id) + 1 : 0;
+  const currentId = participation.state.operatorSocketId;
+  const queue = currentId ? [currentId, ...participation.state.queue] : [...participation.state.queue];
   const ready = enabled && runtime.state.initialized;
   const canControl = !denialReason && entered && isOperator && ready;
   return {
@@ -115,6 +118,8 @@ function describeParticipation(socket) {
     },
     viewMode: socket && canRequestLiveVideo(socket) ? 'live' : 'snapshot',
     turn: {
+      ...describeQueue(queue, currentId),
+      userLabels: Object.fromEntries(queue.map((id) => [id, getSocketLabel(id)])),
       target: {
         id: PTZ_CAMERA_ID,
         name: cameraConfig.name || 'PTZ Camera',
@@ -135,11 +140,6 @@ function describeParticipation(socket) {
 }
 
 function getPublicState(socket = null) {
-  const socketId = socket?.id || null;
-  const queue = participation.state.queue.map((id) => ({
-    socketId: id,
-    label: getSocketLabel(id),
-  }));
   return {
     enabled,
     id: PTZ_CAMERA_ID,
@@ -149,11 +149,6 @@ function getPublicState(socket = null) {
     initializing: runtime.state.initializing,
     error: runtime.state.error,
     streamPath: runtime.state.streamPath,
-    operatorSocketId: participation.state.operatorSocketId,
-    operatorLabel: getSocketLabel(participation.state.operatorSocketId),
-    queue,
-    deadline: participation.state.deadline,
-    blocked: null,
     status: runtime.state.status,
     light: runtime.state.light,
     ir: runtime.state.ir,
@@ -162,9 +157,6 @@ function getPublicState(socket = null) {
     publisher: runtime.state.publisher,
     reolinkApi: runtime.state.reolinkApi,
     audio: runtime.getAudioState(),
-    isOperator: Boolean(socketId && participation.state.operatorSocketId === socketId),
-    queuedPosition: socketId ? participation.state.queue.indexOf(socketId) + 1 || null : null,
-    canUse: socket ? canUsePtzFeature(socket) : false,
     ...describeParticipation(socket),
   };
 }

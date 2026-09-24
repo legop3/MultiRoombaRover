@@ -58,9 +58,9 @@ function CommunityColumn() {
       <OverseerPreferencePanel />
       <ReplaySourcesPanel panelId="newdrive-replay-sources" />
       <RoverQueuesPanel title="Rovers" />
-      <RawUserPilePanel compact hideNicknameForm />
       <LinkButtonsPanel fillHeight={false} />
       <PtzQueueCard layout="desktop" />
+      <RawUserPilePanel compact hideNicknameForm />
     </div>
   );
 }

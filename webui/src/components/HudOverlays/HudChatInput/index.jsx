@@ -55,7 +55,7 @@ function HudChatInput({ compact = false, variant = 'legacy', open = true, onOpen
   const ptzTtsSupported = Boolean(
     operatingMode === 'ptz' &&
       ptz?.audio?.enabled &&
-      (ptz?.isOperator || ptz?.queuedPosition),
+      (ptz?.turn?.isActive || ptz?.turn?.turnsAhead > 0),
   );
   const ttsSupported = Boolean(rover?.audio?.ttsEnabled || ptzTtsSupported);
   const ttsPayload = useMemo(() => {

@@ -1,8 +1,9 @@
+import PtzLightingPod from './PtzLightingPod.jsx';
 import PtzLiveVideo, { PTZ_CAMERA_ID } from '../../components/PtzLiveVideo/index.jsx';
 import ChatExpansion from '../../components/HudOverlays/newgen/CornerPods/ChatExpansion.jsx';
 import TopLeftPod from '../../components/HudOverlays/newgen/CornerPods/TopLeftPod.jsx';
 import { usePtzCameraSnapshots } from '../../hooks/usePtzCameraSnapshot.js';
-function PtzSnapshotPreview({ feed, label = 'PTZ Camera', className = 'h-full w-full' }) {
+function PtzSnapshotPreview({ feed, label = 'PTZ Camera', className = 'h-full w-full', statusClassName = 'pointer-events-none absolute left-1 bottom-1 z-20 font-medium text-slate-100 text-[0.65rem]' }) {
   return (
     <div className={`relative overflow-hidden bg-black ${className}`}>
       {feed?.objectUrl ? (
@@ -15,7 +16,7 @@ function PtzSnapshotPreview({ feed, label = 'PTZ Camera', className = 'h-full w-
         camera name belongs to the surrounding card/menu, while the media pane
         only exposes stream health in the small bottom-left diagnostic overlay.
       */}
-      <div className="pointer-events-none absolute left-1 bottom-1 z-20 font-medium text-slate-100 text-[0.65rem]">
+      <div className={statusClassName}>
         <div className="flex flex-col gap-0.5 leading-none">
           <span>Status: {feed?.error ? `Error: ${feed.error}` : feed?.status || 'connecting'}</span>
         </div>
@@ -28,14 +29,17 @@ function PtzMediaPane({ ptz, open, framed = true, compact = false }) {
   const shouldUseLiveVideo = ptz?.viewMode === 'live';
   const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !shouldUseLiveVideo });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
+  const statusClassName = `pointer-events-none absolute left-1 ${compact ? 'bottom-1' : 'bottom-24'} z-20 text-[0.65rem] font-medium text-slate-100`;
   const media = (
     <>
       {shouldUseLiveVideo ? (
-        <PtzLiveVideo enabled={open} startMuted={false} statusClassName="pointer-events-none absolute left-1 bottom-1 z-20 text-[0.65rem] font-medium text-slate-100" />
+        <PtzLiveVideo enabled={open} startMuted={false} statusClassName={statusClassName} />
       ) : (
-        <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} />
+        <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} statusClassName={statusClassName} />
       )}
       {ptz?.turn ? <TopLeftPod compact={compact} turns={ptz.turn} /> : null}
+      {/* Mobile already has lighting controls beside/below the video. */}
+      {!compact ? <PtzLightingPod /> : null}
       <ChatExpansion podOpen={false} />
     </>
   );

@@ -1,10 +1,9 @@
-import CardFrame from '../../components/CardFrame/index.jsx';
 import ChatPanel from '../../components/ChatPanel/index.jsx';
 import HomeAssistantControls from '../../components/HomeAssistantControls/index.jsx';
 import ReplaySourcesPanel from '../../components/ReplaySourcesPanel/index.jsx';
 import { PTZ_CAMERA_ID } from '../../components/PtzLiveVideo/index.jsx';
 import { PtzQueueSummary } from './PtzQueuePanel.jsx';
-import { PtzLightingControls, PtzMobileControlsPanel, PtzControlReference } from './PtzControls.jsx';
+import { PtzMobileControlsPanel, PtzControlReference } from './PtzControls.jsx';
 import { PtzPresetPanel } from './PtzPresetPanel.jsx';
 import { PtzMediaPane } from './PtzMediaPane.jsx';
 function PtzDesktopFullscreen({ ptz, releasePending }) {
@@ -19,13 +18,6 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
             layout instead of being covered by one solid sidebar rectangle. */}
         <aside className="flex min-h-0 min-w-56 flex-1 flex-col gap-0.5 overflow-y-auto text-sm">
           <PtzQueueSummary ptz={ptz} />
-          {ptz?.permissions?.canControl ? (
-            <PtzLightingControls ptz={ptz} />
-          ) : (
-            <CardFrame title="Controls" bodyClassName="p-1 text-xs text-slate-400">
-              Live PTZ controls unlock when your camera turn is active.
-            </CardFrame>
-          )}
           <PtzControlReference />
           <ReplaySourcesPanel panelId="ptz-controller-replay" defaultSelectedKey={`ptz:${PTZ_CAMERA_ID}`} />
           {/*
@@ -97,7 +89,7 @@ function PtzMobileLandscape({ ptz, onClose, releasePending = false }) {
             the same scroll column.
           */}
           <PtzQueueSummary ptz={ptz} />
-          <PtzMobileControlsPanel ptz={ptz} disabled={!ptz?.permissions?.canControl} />
+          <PtzMobileControlsPanel disabled={!ptz?.permissions?.canControl} />
           <ReplaySourcesPanel
             panelId="ptz-controller-replay-mobile-landscape"
             defaultSelectedKey={`ptz:${PTZ_CAMERA_ID}`}
@@ -133,7 +125,7 @@ function PtzMobilePortrait({ ptz, onClose, releasePending = false }) {
         same shared PTZ controls used in landscape.
       */}
       <section className="mobile-touch-control">
-        <PtzMobileControlsPanel ptz={ptz} disabled={!ptz?.permissions?.canControl} />
+        <PtzMobileControlsPanel disabled={!ptz?.permissions?.canControl} />
       </section>
       <section className="space-y-0.5">
         {/*

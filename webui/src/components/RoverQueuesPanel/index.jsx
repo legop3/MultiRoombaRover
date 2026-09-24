@@ -3,6 +3,7 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
+import useQueueUserLookup from '../../hooks/useQueueUserLookup.js';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import CardFrame from '../CardFrame/index.jsx';
 import QueueTargetRow from '../QueueTargetRow/index.jsx';
@@ -181,8 +182,7 @@ export default function RoverQueuesPanel({
     }
   }
 
-  const lookupUser = (socketId) =>
-    users.find((u) => u.socketId === socketId) || { socketId, nickname: null, role: null };
+  const lookupUser = useQueueUserLookup(null, users);
 
   async function handleRebootOwnRover() {
     if (rebootPending) return;
@@ -246,14 +246,8 @@ export default function RoverQueuesPanel({
                   const idleRemainingSeconds = idleDeadline
                     ? Math.max(0, Math.ceil((idleDeadline - now) / 1000))
                     : null;
-                  const currentId = info?.current || null;
-                  const currentIdx = currentId ? queue.findIndex((id) => id === currentId) : -1;
-                  const nextId =
-                    queue.length > 1
-                      ? currentIdx >= 0
-                        ? queue[(currentIdx + 1) % queue.length]
-                        : queue[0]
-                      : null;
+                  const currentId = info?.currentId || null;
+                  const nextId = info?.nextId || null;
                   const isSelfCurrent = Boolean(selfId && currentId && currentId === selfId);
                   const isSelfNext = Boolean(selfId && nextId && nextId === selfId);
                   const timerLabel = isSelfCurrent

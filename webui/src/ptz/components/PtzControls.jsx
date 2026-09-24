@@ -1,61 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useControlActions } from '../../controls/index.js';
-import { useSessionActions } from '../../context/SessionContext.jsx';
+import { useCallback, useEffect } from 'react';
+import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 import CardFrame from '../../components/CardFrame/index.jsx';
 import ControlPadPanel from '../../components/MobileControls/ControlPadPanel.jsx';
 import GPIOToggleControl from '../../components/GPIOToggleControl/index.jsx';
 import KeyPill from '../../components/vip/VipAudioUploadCard/KeyPill.jsx';
 import ControlHint from '../../components/ControlHint/index.jsx';
-function isSpotlightOn(light = {}) {
-  if (typeof light?.on === 'boolean') return light.on;
-  const raw = light?.state;
-  if (typeof raw === 'string') {
-    const normalized = raw.trim().toLowerCase();
-    return !['', '0', 'off', 'false'].includes(normalized);
-  }
-  return Boolean(Number(raw));
-}
-
-function normalizeIrMode(mode) {
-  const normalized = String(mode || '').trim().toLowerCase();
-  if (normalized === 'on') return 'On';
-  if (normalized === 'off') return 'Off';
-  return 'Auto';
-}
-
-function nextIrMode(currentMode) {
-  const current = normalizeIrMode(currentMode);
-  if (current === 'Auto') return 'On';
-  if (current === 'On') return 'Off';
-  return 'Auto';
-}
-
-function PtzLightingControls({ ptz, disabled = false }) {
-  const { ptzSpotlight, ptzIr } = useSessionActions();
-  const [busy, setBusy] = useState('');
-  const spotlightOn = isSpotlightOn(ptz?.light);
-  const irMode = normalizeIrMode(ptz?.ir?.state);
-
-  const toggleSpotlight = async (nextOn) => {
-    if (disabled) return;
-    setBusy('spotlight');
-    try {
-      await ptzSpotlight({ state: nextOn ? 1 : 0 });
-    } finally {
-      setBusy('');
-    }
-  };
-
-  const cycleIr = async () => {
-    if (disabled) return;
+function PtzLightingControls({ disabled = false }) {
+  const { setHeadlight, setLaser } = useControlActions();
+  const { spotlightOn, irMode, pending } = useControlSelector((control) => control.ptzControls.lighting);
+  const canControl = useControlSelector((control) => control.ptzControls.isActive);
+  const blocked = disabled || !canControl;
+  const cycleIr = () => {
     triggerTouchHaptic('button');
-    setBusy('ir');
-    try {
-      await ptzIr({ state: nextIrMode(irMode) });
-    } finally {
-      setBusy('');
-    }
+    setLaser();
   };
 
   return (
@@ -63,14 +21,14 @@ function PtzLightingControls({ ptz, disabled = false }) {
       <GPIOToggleControl
         label="Spotlight"
         on={spotlightOn}
-        disabled={disabled || busy === 'spotlight'}
-        onToggle={toggleSpotlight}
+        disabled={blocked || pending.spotlight}
+        onToggle={setHeadlight}
         heightClass="min-h-14"
       />
       <button
         type="button"
         className="mobile-touch-control flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl border-2 border-cyan-300/70 bg-cyan-900 px-1 py-0.75 text-center text-cyan-50 disabled:opacity-50"
-        disabled={disabled || busy === 'ir'}
+        disabled={blocked || pending.ir}
         onClick={cycleIr}
       >
         <span className="text-sm font-semibold">Infrared</span>
@@ -158,7 +116,7 @@ function PtzMobileZoomButtons({ disabled = false }) {
   );
 }
 
-function PtzMobileControlsPanel({ ptz, disabled = false }) {
+function PtzMobileControlsPanel({ disabled = false }) {
   return (
     <div className="mobile-touch-control space-y-0.5">
       <PtzMobileZoomButtons disabled={disabled} />
@@ -170,7 +128,7 @@ function PtzMobileControlsPanel({ ptz, disabled = false }) {
         */}
         <ControlPadPanel compact disabled={disabled} />
       </div>
-      <PtzLightingControls ptz={ptz} disabled={disabled} />
+      <PtzLightingControls disabled={disabled} />
     </div>
   );
 }

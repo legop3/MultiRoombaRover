@@ -7,7 +7,7 @@ import { PTZ_CAMERA_ID } from '../PtzLiveVideo/index.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import { isFeatureEnabled } from '../../lib/features.js';
-import { normalizePtzQueue, usePtzQueueLookup } from '../../ptz/queue.js';
+import useQueueUserLookup from '../../hooks/useQueueUserLookup.js';
 const PTZ_DEFAULT_COLOR = '#387bf8';
 
 function formatRemaining(deadline, now) {
@@ -24,13 +24,13 @@ export default function PtzQueueCard() {
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const { setOperatingMode } = useSessionActions();
   const navigate = useNavigate();
-  const lookupUser = usePtzQueueLookup(ptz);
-  const { queue, currentId, nextId } = normalizePtzQueue(ptz);
-  const now = useSharedClock(1000, Boolean(ptz?.deadline));
+  const lookupUser = useQueueUserLookup(ptz?.turn);
+  const { queue, currentId, nextId } = ptz?.turn || {};
+  const now = useSharedClock(1000, Boolean(ptz?.turn?.deadline));
   const [pending, setPending] = useState(false);
   const canUse = Boolean(ptz?.permissions?.canEnter);
-  const isParticipant = Boolean(ptz?.isOperator || ptz?.queuedPosition);
-  const timerLabel = ptz?.isOperator && ptz?.deadline ? `${formatRemaining(ptz.deadline, now)} left` : '';
+  const isParticipant = Boolean(ptz?.turn?.isActive || ptz?.turn?.turnsAhead);
+  const timerLabel = ptz?.turn?.isActive && ptz?.turn?.deadline ? `${formatRemaining(ptz.turn.deadline, now)} left` : '';
 
   if (!featureEnabled) return null;
 
@@ -66,13 +66,7 @@ export default function PtzQueueCard() {
     }
   };
 
-  const actionLabel = pending
-    ? '...'
-    : ptz?.isOperator
-    ? 'Open'
-    : ptz?.queuedPosition
-    ? 'Open'
-    : 'request';
+  const actionLabel = pending ? '...' : isParticipant ? 'Open' : 'request';
 
   return (
     <CardFrame title={ptz?.name || 'PTZ camera'} bodyClassName="relative space-y-0.5 text-sm">
@@ -82,11 +76,6 @@ export default function PtzQueueCard() {
               id: ptz?.id || PTZ_CAMERA_ID,
               name: ptz?.name || 'PTZ Camera',
               color: ptz?.color || PTZ_DEFAULT_COLOR,
-              // description: ptz?.isOperator
-              //   ? 'Live camera turn active'
-              //   : ptz?.queuedPosition
-              //   ? `Queue position ${ptz.queuedPosition}`
-              //   : 'Pan, tilt, and zoom camera',
             }}
             queue={queue}
             currentId={currentId}
@@ -96,8 +85,8 @@ export default function PtzQueueCard() {
             canClick={canUse && !pending}
             pending={pending}
             buttonLabel={actionLabel}
-            batteryLabel={ptz?.isOperator ? 'LIVE' : ptz?.queuedPosition ? `#${ptz.queuedPosition}` : '--'}
-            batteryClassName={ptz?.isOperator ? 'text-emerald-300' : ptz?.queuedPosition ? 'text-sky-300' : 'text-slate-400'}
+            batteryLabel={ptz?.turn?.isActive ? 'LIVE' : ptz?.turn?.turnsAhead ? `#${ptz.turn.turnsAhead}` : '--'}
+            batteryClassName={ptz?.turn?.isActive ? 'text-emerald-300' : ptz?.turn?.turnsAhead ? 'text-sky-300' : 'text-slate-400'}
             timerLabel={timerLabel}
             onRequest={handleRequest}
             showAction={canUse}

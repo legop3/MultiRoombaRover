@@ -1,3 +1,4 @@
+const { describeQueue } = require('./queueDisplay');
 const { TURN_DURATION_MS, IDLE_TIMEOUT_MS } = require('./constants');
 
 const labels = {
@@ -16,7 +17,7 @@ const labels = {
 };
 
 // Build this from visibility-filtered session data so private rover state stays private.
-function buildRoverTurn({ rover, mode, socketId, turnInfo, activeDriverId }) {
+function buildRoverTurn({ rover, mode, socketId, turnInfo, activeDriverId, users }) {
   const queue = turnInfo?.queue || [];
   // Direct ownership can arrive before queue details on load/reconnect.
   const currentDriverId = activeDriverId || turnInfo?.current || null;
@@ -26,6 +27,10 @@ function buildRoverTurn({ rover, mode, socketId, turnInfo, activeDriverId }) {
   const turnsAhead = enabled ? (userIndex - currentIndex + queue.length) % queue.length : null;
   return {
     target: { id: rover.id, name: rover.name, color: rover.color, fallback: rover.id },
+    ...describeQueue(queue, currentDriverId),
+    userLabels: Object.fromEntries(queue.map((id) => [id,
+      users.find((user) => user.socketId === id)?.nickname || id,
+    ])),
     enabled,
     isActive: turnsAhead === 0,
     turnsAhead,

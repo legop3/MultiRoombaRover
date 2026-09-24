@@ -68,13 +68,13 @@ function getDefaultWebSources(assignment = {}, socket = null) {
     replay`, follows the camera currently controlled by that socket just as it
     follows an assigned rover below.
 
-    isOperator is deliberately stricter than PTZ access or queue membership:
+    turn.isActive is deliberately stricter than PTZ access or queue membership:
     spectators and users waiting for a camera turn must not silently replay a
     camera they are not currently operating. Keeping this rule here also makes
     every web replay entry point share the same default instead of teaching the
     chat-command adapter about PTZ-specific state.
   */
-  if (ptzCameraService.getPublicState(socket).isOperator) {
+  if (ptzCameraService.getPublicState(socket).turn.isActive) {
     const source = ptzCameraService.getReplaySource();
     if (!source) return [];
     return [{ type: source.type, id: String(source.id), label: source.label || source.id }];

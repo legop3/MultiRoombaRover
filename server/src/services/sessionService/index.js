@@ -203,6 +203,7 @@ function buildSession(socket) {
         socketId: socket?.id,
         turnInfo: turnQueues[rover.id],
         activeDriverId: activeDrivers[rover.id],
+        users,
       }),
     })),
     odometers: roverManager.getOdometersForSocket(socket),

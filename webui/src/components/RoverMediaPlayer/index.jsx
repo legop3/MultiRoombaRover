@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { WhepPlayer } from '../../lib/whepPlayer.js';
+import { startWhepPlayback } from '../../lib/whepPlayback.js';
+import useWhepRestart from '../../hooks/useWhepRestart.js';
 import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
 import {
   mainBrushAudioTelemetryEqual,
@@ -11,7 +12,6 @@ import { useRoverSnapshots } from '../../hooks/useRoverSnapshots.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import {
-  RESTART_DELAY_MS,
   UNMUTE_RETRY_MS,
   AUDIO_RETRY_MS,
   BRUSH_CURRENT_THRESHOLD_MA,
@@ -212,10 +212,10 @@ export default function RoverMediaPlayer({
         mainBrushOvercurrent: Boolean(sensors?.wheelOvercurrents?.mainBrush),
       }
     : mainBrushTelemetry;
+  const { restartToken, scheduleRestart } = useWhepRestart();
+  const { restartToken: audioRestartToken, scheduleRestart: scheduleAudioRestart } = useWhepRestart();
   const videoRef = useRef(null);
   const audioRef = useRef(null);
-  const restartTimer = useRef(null);
-  const audioRestartTimer = useRef(null);
   const audioPlayInterval = useRef(null);
   const unmuteTimer = useRef(null);
   const volumeFadeFrameRef = useRef(null);
@@ -224,8 +224,6 @@ export default function RoverMediaPlayer({
   const [detail, setDetail] = useState(null);
   const [audioStatus, setAudioStatus] = useState('idle');
   const [audioDetail, setAudioDetail] = useState(null);
-  const [restartToken, setRestartToken] = useState(0);
-  const [audioRestartToken, setAudioRestartToken] = useState(0);
   const [muted, setMuted] = useState(true);
   const hasDedicatedAudio = Boolean(resolvedAudioSessionInfo?.url);
   const usingSnapshot = videoMode === 'snapshot' || (!videoMode && !resolvedSessionInfo?.url);
@@ -341,15 +339,6 @@ export default function RoverMediaPlayer({
     logAudio('settings/update');
   }, [logAudio]);
 
-  const scheduleRestart = useCallback(() => {
-    clearTimeout(restartTimer.current);
-    restartTimer.current = setTimeout(() => setRestartToken(Date.now()), RESTART_DELAY_MS);
-  }, []);
-  const scheduleAudioRestart = useCallback(() => {
-    clearTimeout(audioRestartTimer.current);
-    audioRestartTimer.current = setTimeout(() => setAudioRestartToken(Date.now()), RESTART_DELAY_MS);
-  }, []);
-
   const ensurePlayback = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -397,8 +386,6 @@ export default function RoverMediaPlayer({
 
   useEffect(
     () => () => {
-      clearTimeout(restartTimer.current);
-      clearTimeout(audioRestartTimer.current);
       clearTimeout(unmuteTimer.current);
       clearInterval(audioPlayInterval.current);
       if (volumeFadeFrameRef.current) {
@@ -426,41 +413,27 @@ export default function RoverMediaPlayer({
     if (!isVideoVisible || usingSnapshot || !resolvedSessionInfo?.url || !videoRef.current) {
       return undefined;
     }
-    let active = true;
-    let player;
     const resetMuteId = setTimeout(() => setMuted(true), 0);
-    const handleStatus = (nextStatus, info) => {
-      if (!active) return;
-      logAudio('video/status', { nextStatus, info: info || null });
-      setStatus(nextStatus);
-      setDetail(info || null);
-      if (nextStatus === 'playing') {
-        ensurePlayback();
-      }
-      if (['error', 'failed', 'disconnected', 'closed'].includes(nextStatus)) {
-        scheduleRestart();
-      }
-    };
-
-    player = new WhepPlayer({
+    const stop = startWhepPlayback({
       url: resolvedSessionInfo.url,
       token: resolvedSessionInfo.token,
       video: videoRef.current,
       receiveAudio: !hasDedicatedAudio,
-      onStatus: handleStatus,
+      scheduleRestart,
+      onStatus: (nextStatus, info) => {
+        logAudio('video/status', { nextStatus, info: info || null });
+        setStatus(nextStatus);
+        setDetail(info || null);
+        if (nextStatus === 'playing') ensurePlayback();
+      },
+      onError: (err) => {
+        setStatus('error');
+        setDetail(err.message);
+      },
     });
-
-    player.start().catch((err) => {
-      if (!active) return;
-      setStatus('error');
-      setDetail(err.message);
-      scheduleRestart();
-    });
-
     return () => {
-      active = false;
       clearTimeout(resetMuteId);
-      player?.stop();
+      stop();
     };
   }, [
     usingSnapshot,
@@ -536,37 +509,24 @@ export default function RoverMediaPlayer({
     if (!resolvedAudioSessionInfo?.url || !audioRef.current) {
       return undefined;
     }
-    let active = true;
-    let player;
-    const handleStatus = (nextStatus, info) => {
-      if (!active) return;
-      logAudio('audio/status', { nextStatus, info: info || null });
-      setAudioStatus(nextStatus);
-      setAudioDetail(info || null);
-      if (['error', 'failed'].includes(nextStatus)) {
-        scheduleAudioRestart();
-      }
-    };
-
-    player = new WhepPlayer({
+    return startWhepPlayback({
       url: resolvedAudioSessionInfo.url,
       token: resolvedAudioSessionInfo.token,
       video: audioRef.current,
       audioOnly: true,
-      onStatus: handleStatus,
+      // Dedicated rover audio historically retries only errors and failures.
+      terminalStates: ['error', 'failed'],
+      scheduleRestart: scheduleAudioRestart,
+      onStatus: (nextStatus, info) => {
+        logAudio('audio/status', { nextStatus, info: info || null });
+        setAudioStatus(nextStatus);
+        setAudioDetail(info || null);
+      },
+      onError: (err) => {
+        setAudioStatus('error');
+        setAudioDetail(err.message);
+      },
     });
-
-    player.start().catch((err) => {
-      if (!active) return;
-      setAudioStatus('error');
-      setAudioDetail(err.message);
-      scheduleAudioRestart();
-    });
-
-    return () => {
-      active = false;
-      player?.stop();
-    };
   }, [
     resolvedAudioSessionInfo?.url,
     resolvedAudioSessionInfo?.token,

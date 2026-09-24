@@ -1,6 +1,7 @@
 // turn Service
 // Purpose: Defines the turn Service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
+const { describeQueue } = require('./queueDisplay');
 const io = require('../../globals/io');
 const { sendAlert } = require('../alertService');
 const { MODES, getMode, modeEvents } = require('../modeManager');
@@ -431,7 +432,7 @@ function getTurnQueues() {
   driverQueues.forEach((queue, roverId) => {
     payload[roverId] = {
       mode,
-      queue: Array.from(queue.queue),
+      ...describeQueue(Array.from(queue.queue), queue.current),
       current: queue.current,
       deadline: turnDeadlines.get(roverId) || null,
       idleDeadline: idleDeadlines.get(roverId) || null,
