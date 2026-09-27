@@ -25,7 +25,6 @@ function useAudio(src, volume = 1) {
 
 export default function TurnAlertListener() {
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
-  const assignments = useSessionSelector((state) => state.session?.turnQueues || {});
   const roster = useSessionSelector((state) => state.session?.roster || []);
   const { pushAlert } = useSessionActions();
   const { value: audioSettings } = useSettingsNamespace('audio', AUDIO_SETTINGS_DEFAULTS);
@@ -38,18 +37,19 @@ export default function TurnAlertListener() {
   useEffect(() => {
     if (!socketId) return;
     const newlyMine = [];
-    Object.entries(assignments).forEach(([roverId, info]) => {
-      if (!info || !info.current || info.current !== socketId) return;
+    roster.forEach((rover) => {
+      const roverId = String(rover.id);
+      if (!rover.turn?.ownsControl) return;
       if (!seenRoversRef.current.has(roverId)) {
         newlyMine.push(roverId);
         seenRoversRef.current.add(roverId);
       }
     });
-    Object.keys(assignments).forEach((roverId) => {
-      if (!assignments[roverId] || assignments[roverId].current !== socketId) {
+    for (const roverId of seenRoversRef.current) {
+      if (!roster.some((rover) => String(rover.id) === roverId && rover.turn?.ownsControl)) {
         seenRoversRef.current.delete(roverId);
       }
-    });
+    }
     if (newlyMine.length === 0) return;
     newlyMine.forEach((roverId) => {
       const roverName = roster.find((r) => String(r.id) === String(roverId))?.name || roverId;
@@ -60,7 +60,7 @@ export default function TurnAlertListener() {
       });
     });
     playSound();
-  }, [assignments, playSound, pushAlert, roster, socketId]);
+  }, [playSound, pushAlert, roster, socketId]);
 
   return null;
 }

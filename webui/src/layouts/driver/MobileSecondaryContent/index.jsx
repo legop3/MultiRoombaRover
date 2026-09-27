@@ -5,11 +5,11 @@ import PtzQueueCard from '../../../components/PtzCamera/index.jsx';
 import ReplaySourcesPanel from '../../../components/ReplaySourcesPanel/index.jsx';
 import RoverQueuesPanel from '../../../components/RoverQueuesPanel/index.jsx';
 import { themeGapClass } from '../../../themes/index.js';
-import { useDriverLayout } from '../DriverLayoutContext.jsx';
+import { useLayout } from '../../LayoutContext.jsx';
 import MobileTabs from '../MobileTabs/index.jsx';
 
 export default function MobileSecondaryContent() {
-  const layout = useDriverLayout();
+  const layout = useLayout();
   const portrait = layout === 'mobile-portrait';
   const replayPanelId = portrait
     ? 'replay-sources-mobile-portrait'

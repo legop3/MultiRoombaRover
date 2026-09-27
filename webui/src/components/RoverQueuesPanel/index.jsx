@@ -96,16 +96,12 @@ function ScrollableQueueContent({ enabled = false, children }) {
 export default function RoverQueuesPanel({
   title = 'Rovers',
   roster: rosterOverride = null,
-  turnQueues: turnQueuesOverride = null,
-  users: usersOverride = null,
   externalInstance = null,
   disabledOverlay = '',
   fillHeight = false,
 }) {
   const role = useSessionSelector((state) => state.session?.role || null);
   const localRoster = useSessionSelector((state) => state.session?.roster ?? []);
-  const localTurnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
-  const localUsers = useSessionSelector((state) => state.session?.users ?? []);
   const interInstanceEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'interInstance'));
   const { value: pageSettings } = useSettingsNamespace('page', { interInstanceTransferSettings: true });
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
@@ -124,8 +120,6 @@ export default function RoverQueuesPanel({
   const externalBlocked = Boolean(externalMode && disabledOverlay);
   const includeInterInstanceSettings = pageSettings?.interInstanceTransferSettings !== false;
   const roster = Array.isArray(rosterOverride) ? rosterOverride : localRoster;
-  const turnQueues = turnQueuesOverride && typeof turnQueuesOverride === 'object' ? turnQueuesOverride : localTurnQueues;
-  const users = Array.isArray(usersOverride) ? usersOverride : localUsers;
 
   const canRequest = useMemo(
     () => (externalMode ? !externalBlocked : role && role !== 'spectator'),
@@ -136,8 +130,8 @@ export default function RoverQueuesPanel({
     [role],
   );
   const hasDeadlines = useMemo(
-    () => Object.values(turnQueues || {}).some((info) => info?.deadline || info?.idleDeadline),
-    [turnQueues],
+    () => roster.some((rover) => rover.turn?.deadline || rover.turn?.idleDeadline),
+    [roster],
   );
   /*
     Queue timers are shown in whole seconds, and several queue panels can be
@@ -145,14 +139,6 @@ export default function RoverQueuesPanel({
     clock keeps those labels in sync while using a single interval globally.
   */
   const now = useSharedClock(1000, hasDeadlines);
-
-  const rosterItems = useMemo(() => {
-    const known = new Set(roster.map((rover) => String(rover.id)));
-    const extra = Object.keys(turnQueues || {})
-      .filter((id) => !known.has(String(id)))
-      .map((id) => ({ id, name: id, locked: false, batteryState: null }));
-    return [...roster, ...extra];
-  }, [roster, turnQueues]);
 
   async function handleRequest(targetRoverId) {
     if (!targetRoverId) return;
@@ -181,8 +167,6 @@ export default function RoverQueuesPanel({
     }
   }
 
-  const lookupUser = (socketId) =>
-    users.find((u) => u.socketId === socketId) || { socketId, nickname: null, role: null };
 
   async function handleRebootOwnRover() {
     if (rebootPending) return;
@@ -224,14 +208,13 @@ export default function RoverQueuesPanel({
       >
         <ScrollableQueueContent enabled={fillHeight}>
           <div className="relative space-y-0.5">
-            {rosterItems.length === 0 ? (
+            {roster.length === 0 ? (
               <p className="text-sm text-slate-500">No rovers registered.</p>
             ) : (
               <ul className="space-y-0.5 text-sm">
-                {rosterItems.map((rover) => {
+                {roster.map((rover) => {
                   const roverId = String(rover.id);
-                  const info = turnQueues?.[roverId] || null;
-                  const queue = info?.queue || [];
+                  const info = rover.turn;
                   /*
                     A turn handoff and an inactivity skip are separate server
                     deadlines. Keep them separate through formatting so an idle
@@ -246,14 +229,8 @@ export default function RoverQueuesPanel({
                   const idleRemainingSeconds = idleDeadline
                     ? Math.max(0, Math.ceil((idleDeadline - now) / 1000))
                     : null;
-                  const currentId = info?.current || null;
-                  const currentIdx = currentId ? queue.findIndex((id) => id === currentId) : -1;
-                  const nextId =
-                    queue.length > 1
-                      ? currentIdx >= 0
-                        ? queue[(currentIdx + 1) % queue.length]
-                        : queue[0]
-                      : null;
+                  const currentId = info?.currentId || null;
+                  const nextId = info?.nextId || null;
                   const isSelfCurrent = Boolean(selfId && currentId && currentId === selfId);
                   const isSelfNext = Boolean(selfId && nextId && nextId === selfId);
                   const timerLabel = isSelfCurrent
@@ -281,11 +258,8 @@ export default function RoverQueuesPanel({
                     <QueueTargetRow
                       key={rover.id}
                       target={{ ...rover, rover, roverId, id: roverId }}
-                      queue={queue}
-                      currentId={currentId}
-                      nextId={nextId}
+                      turn={info}
                       selfId={selfId}
-                      lookupUser={lookupUser}
                       canClick={canClickRow}
                       pending={Boolean(pending[roverId])}
                       locked={locked}

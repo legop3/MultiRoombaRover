@@ -11,7 +11,7 @@ import { dockTelemetryEqual, selectDockTelemetry } from '../../../../context/tel
 import { useManualDockAssist } from '../../../../features/manualDockAssist/useManualDockAssist.js';
 import { useSettingsNamespace } from '../../../../settings/index.js';
 import useCanControlRover from '../../../../hooks/useCanControlRover.js';
-import { useDriverLayout } from '../../../../layouts/driver/DriverLayoutContext.jsx';
+import { useLayout } from '../../../../layouts/LayoutContext.jsx';
 import { useSessionSelector } from '../../../../context/SessionContext.jsx';
 import KeyPill from '../../../vip/VipAudioUploadCard/KeyPill.jsx';
 import ExpansionPanel from '../CornerPods/ExpansionPanel.jsx';
@@ -250,7 +250,7 @@ function UndockTransitionGhost({ onFinish }) {
 }
 
 export default function DockingHud({ roverId }) {
-  const layout = useDriverLayout();
+  const layout = useLayout();
   const actions = useControlActions();
   const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
   // This replaces ManualDockAssistOverlay as the current HUD's one lifecycle owner. It preserves the

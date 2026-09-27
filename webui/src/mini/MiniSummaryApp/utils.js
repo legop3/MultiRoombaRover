@@ -4,12 +4,10 @@
 import { buildBatteryVisual } from '../../lib/battery.js';
 
 export function formatDriverLabel({ roverId, session }) {
-  const activeDriverId = session?.activeDrivers?.[roverId] || null;
-  const user = (session?.users || []).find((entry) => entry.socketId === activeDriverId);
-  const label = user?.nickname || (activeDriverId ? activeDriverId.slice(0, 6) : 'No driver');
-  const mode = session?.mode;
-  const turnInfo = session?.turnQueues?.[roverId];
-  return mode === 'turns' && turnInfo?.current ? `${label}` : label;
+  const turn = session?.roster?.find((rover) => String(rover.id) === String(roverId))?.turn;
+  const driver = turn?.queue?.find((entry) => entry.socketId === turn.currentId);
+  const label = driver?.name || 'No driver';
+  return label;
 }
 
 export function getBatteryVisual({ rover, frame }) {

@@ -1,12 +1,9 @@
-import { useMemo } from 'react';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 import { useSharedClock } from './useSharedClock.js';
 
 export function useDriverVideoModePolicy(roverId) {
   const mode = useSessionSelector((state) => state.session?.mode || null);
-  const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
-  const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
   const nonTurnSnapshotsActive = useSessionSelector(
     (state) => Boolean(state.session?.bandwidthSavings?.nonTurnVideo?.snapshotsActive),
   );
@@ -18,16 +15,9 @@ export function useDriverVideoModePolicy(roverId) {
   */
   const now = useSharedClock(1000, isTurnsMode);
 
-  const turnInfo = roverId ? turnQueues?.[roverId] || null : null;
-  const activeDriverId = roverId ? activeDrivers?.[roverId] || null : null;
-  const isActiveDriver = Boolean(socketId && activeDriverId === socketId);
-  const nextDriverId = useMemo(() => {
-    const queue = turnInfo?.queue || [];
-    if (!queue.length || !turnInfo?.current || queue.length <= 1) return null;
-    const idx = queue.findIndex((id) => id === turnInfo.current);
-    if (idx === -1) return queue[0] || null;
-    return queue[(idx + 1) % queue.length] || null;
-  }, [turnInfo]);
+  const turnInfo = useSessionSelector((state) => state.session?.roster?.find((rover) => String(rover.id) === String(roverId))?.turn);
+  const isActiveDriver = Boolean(turnInfo?.ownsControl);
+  const nextDriverId = turnInfo?.currentId ? turnInfo.nextId : null;
   const isNextDriver = Boolean(socketId && nextDriverId === socketId);
   const deadline = turnInfo?.deadline || null;
   const msUntilTurn = deadline ? deadline - now : null;

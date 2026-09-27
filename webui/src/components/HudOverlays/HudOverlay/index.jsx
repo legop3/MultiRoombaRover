@@ -40,10 +40,8 @@ function HudOverlay({
   });
   const derivedDriverLabel = useSessionSelector((state) => {
     if (!effectiveRoverId || variant !== 'spectator') return null;
-    const activeId = state.session?.activeDrivers?.[effectiveRoverId] || null;
-    const users = state.session?.users || [];
-    const match = users.find((u) => String(u.socketId || '') === String(activeId || ''));
-    return match?.nickname || match?.name || null;
+    const turn = state.session?.roster?.find((rover) => String(rover.id) === String(effectiveRoverId))?.turn;
+    return turn?.queue?.find((entry) => entry.socketId === turn.currentId)?.name || null;
   });
   const resolvedSensors = sensors ?? null;
   const resolvedLabel = label ?? rosterInfo.label ?? null;

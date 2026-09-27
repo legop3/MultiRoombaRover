@@ -157,11 +157,11 @@ function identifySocket(socket, payload = {}) {
   }
 
   /*
-    Spectator-style pages carry identity too, but only the driver surface
-    participates in duplicate-driver enforcement. This flag remains on the
+    Spectator-style pages carry identity too, but only the driver and PTZ surfaces
+    participate in duplicate-driver enforcement. This flag remains on the
     socket because it is connection-specific, not person-specific.
   */
-  socket.data.identitySurface = payload.identitySurface === 'driver' ? 'driver' : 'passive';
+  socket.data.identitySurface = ['driver', 'ptz'].includes(payload.identitySurface) ? payload.identitySurface : 'passive';
 
   const result = identifyCanonicalSocket(socket, {
     ...payload,
@@ -207,7 +207,7 @@ function enforceSingleDriverSocketPerIdentity(currentSocket) {
   if (
     !currentSocket?.id ||
     !currentUserId ||
-    currentSocket.data?.identitySurface !== 'driver' ||
+    !['driver', 'ptz'].includes(currentSocket.data?.identitySurface) ||
     !enforceForCurrentSocket
   ) {
     return;
@@ -215,7 +215,7 @@ function enforceSingleDriverSocketPerIdentity(currentSocket) {
 
   const duplicates = Array.from(io.sockets.sockets.values()).filter((candidate) => {
     if (!candidate?.id || candidate.id === currentSocket.id || candidate.disconnected) return false;
-    if (candidate?.data?.identitySurface !== 'driver') return false;
+    if (!['driver', 'ptz'].includes(candidate?.data?.identitySurface)) return false;
     return getUserIdForSocket(candidate) === currentUserId;
   });
 

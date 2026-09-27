@@ -3,10 +3,10 @@
 import { TabPanel } from '../../../../../components/Tabs/index.jsx';
 import SettingsPanel from '../../../../../components/SettingsPanel/index.jsx';
 import { themeStackClass } from '../../../../../themes/index.js';
-import { useDriverLayout } from '../../../DriverLayoutContext.jsx';
+import { useLayout } from '../../../../LayoutContext.jsx';
 
 export default function SettingsTab() {
-  const layout = useDriverLayout();
+  const layout = useLayout();
   const wrapped = layout !== 'desktop';
   return (
     <TabPanel id="settings">

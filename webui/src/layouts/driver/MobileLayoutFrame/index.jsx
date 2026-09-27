@@ -9,11 +9,11 @@ import { useTelemetryVisualPolicy } from '../../../context/TelemetryContext.jsx'
 import { useFullscreenPrompt } from '../../../hooks/useFullscreenPrompt.js';
 import { useSettingsNamespace } from '../../../settings/index.js';
 import { themeGapClass } from '../../../themes/index.js';
-import { useDriverLayout } from '../DriverLayoutContext.jsx';
+import { useLayout } from '../../LayoutContext.jsx';
 import './styles.css';
 
 export default function MobileLayoutFrame({ children }) {
-  const layout = useDriverLayout();
+  const layout = useLayout();
   useTelemetryVisualPolicy({ mobile: true });
   const fullscreen = useFullscreenPrompt(layout);
   const { value: pageSettings } = useSettingsNamespace('page', { swapMobileControlColumns: false });

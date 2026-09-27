@@ -10,7 +10,8 @@ const { loadConfig, getFeatureFlags, registerConfigurationHandler } = require('.
 const { getConfiguredSocials } = require('../sessionService/configuration');
 const { getMode, MODES } = require('../modeManager');
 const roverManager = require('../roverManager');
-const { getTurnQueues } = require('../turnService');
+const { getTurnQueues, getActiveDrivers } = require('../turnService');
+const { buildRoverTurn } = require('../turnService/display');
 const { getRoomCameras, getRoomCameraState } = require('../roomCameraService');
 const { getRoverSnapshotState } = require('../roverSnapshotService');
 const { getRole } = require('../roleService');
@@ -157,22 +158,6 @@ function publicRoverIdSet(roster = []) {
   return new Set(roster.map((rover) => String(rover?.id || '')).filter(Boolean));
 }
 
-function filterPublicTurnQueues(turnQueues = {}, publicIds) {
-  const visible = publicIds instanceof Set ? publicIds : new Set();
-  const next = {};
-  /*
-    RoverQueuesPanel creates fallback rows for queue ids that are not present in
-    the roster, so the public payload must filter queues with the exact same
-    privacy boundary as the roster. Otherwise a closed-private rover can leak as
-    an orphan queue row after a private access grant assigns someone to it.
-  */
-  Object.entries(turnQueues || {}).forEach(([roverId, info]) => {
-    if (!visible.has(String(roverId))) return;
-    next[roverId] = info;
-  });
-  return next;
-}
-
 function filterPublicUsers(users = [], publicIds) {
   const visible = publicIds instanceof Set ? publicIds : new Set();
   /*
@@ -203,6 +188,8 @@ function buildLocalInfo() {
   const publicIds = publicRoverIdSet(publicRoster);
   const roster = publicRoster.map((rover) => (lockdown ? rover : addRoverSnapshotLinks(rover)));
   const users = filterPublicUsers(Array.from(io.sockets.sockets.values()).map(buildUserEntry), publicIds);
+  const turnQueues = getTurnQueues();
+  const activeDrivers = getActiveDrivers();
   const roomCameras = lockdown || !features.roomCameras ? [] : getRoomCameras().map(buildRoomCameraInfo);
   return {
     instance: {
@@ -212,8 +199,12 @@ function buildLocalInfo() {
       features,
       updatedAt: Date.now(),
     },
-    roster,
-    turnQueues: filterPublicTurnQueues(getTurnQueues(), publicIds),
+    // Only public roster entries reach the builder; queue metadata follows the
+    // same visibility boundary instead of creating separate orphan queue rows.
+    roster: roster.map((rover) => ({
+      ...rover,
+      turn: buildRoverTurn({ rover, mode, socketId: null, turnInfo: turnQueues[rover.id], activeDriverId: activeDrivers[rover.id], users }),
+    })),
     users,
     roomCameras,
     socials: features.socials ? getConfiguredSocials(config) : [],
@@ -349,7 +340,6 @@ function normalizeRemotePayload(entry, payload) {
       features: instance.features && typeof instance.features === 'object' ? instance.features : {},
     },
     roster: Array.isArray(payload?.roster) ? payload.roster : [],
-    turnQueues: payload?.turnQueues && typeof payload.turnQueues === 'object' ? payload.turnQueues : {},
     users: Array.isArray(payload?.users) ? payload.users : [],
     roomCameras: Array.isArray(payload?.roomCameras) ? payload.roomCameras : [],
     socials: Array.isArray(payload?.socials) ? payload.socials : [],
@@ -419,7 +409,6 @@ function markOffline(entry, error) {
       publicUrl: previous.instance?.publicUrl || entry.url,
     },
     roster: previous.roster || [],
-    turnQueues: previous.turnQueues || {},
     users: previous.users || [],
     roomCameras: previous.roomCameras || [],
     socials: previous.socials || [],

@@ -370,11 +370,6 @@ function createSnapshotEngine(deps) {
       .filter((entry) => {
         const roverId = entry?.roverId ? String(entry.roverId) : null;
         if (!roverId) return true;
-        /*
-          This is a chat transcript filter, not a physical-rover filter. PTZ
-          chat intentionally carries a rover-like id so transcript consumers can
-          render it consistently, even though roverManager cannot replay that id.
-        */
         return isPublicChatTargetId(roverId);
       });
     const chatRecent = allRecentMessages
@@ -430,6 +425,8 @@ function createSnapshotEngine(deps) {
         type: 'chat',
         nickname: entry.nickname || entry.socketId?.slice(0, 6) || 'unknown',
         text: entry.text || '',
+        operating_mode: entry.operatingMode || null,
+        operating_mode_name: entry.operatingModeDisplay?.name || null,
         rover_id: roverId,
         rover_ctx: { ...baseCtx, ...storedCtx },
       };

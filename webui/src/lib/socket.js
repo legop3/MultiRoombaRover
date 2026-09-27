@@ -20,9 +20,8 @@ function getIdentitySurface() {
   */
   return window.location.pathname === '/'
     || window.location.pathname === '/old'
-    || window.location.pathname === '/ptz'
     ? 'driver'
-    : 'passive';
+    : window.location.pathname === '/ptz' ? 'ptz' : 'passive';
 }
 
 async function buildSocketIdentity() {
@@ -43,6 +42,7 @@ async function buildSocketIdentity() {
     audioAdjustments: currentSettings?.audioAdjustments || {},
     overseerEnabled: Boolean(currentSettings?.overseerPreference?.enabled),
     identitySurface: getIdentitySurface(),
+    operatingMode: window.location.pathname === '/ptz' ? 'ptz' : 'rover',
   };
 }
 

@@ -73,8 +73,8 @@ export default function UserListPanel({
   const users = useSessionSelector((state) => state.session?.users ?? []);
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const mode = useSessionSelector((state) => state.session?.mode || null);
-  const turnQueues = useSessionSelector((state) => state.session?.turnQueues || {});
   const roster = useSessionSelector((state) => state.session?.roster || []);
+  const queuedRovers = roster.filter((rover) => rover.turn?.queue != null);
   const isTurnsMode = mode === 'turns';
   const [turnView, setTurnView] = useState('queues');
 
@@ -96,11 +96,6 @@ export default function UserListPanel({
   const rosterEntry = useCallback(
     (roverId) => roster.find((r) => String(r.id) === String(roverId)) || null,
     [roster],
-  );
-
-  const lookupUser = useCallback(
-    (socketId) => users.find((u) => u.socketId === socketId) || { socketId, nickname: null, role: null },
-    [users],
   );
 
   const secondsRemaining = useCallback((deadline) => {
@@ -141,10 +136,11 @@ export default function UserListPanel({
             className={`flex items-center gap-0.5 ${compact ? 'py-0.25 text-[0.8rem]' : 'text-sm'}`}
           >
             <p className={`font-semibold ${roleColors(user.role)}`}>{formatLabel(user, selfId)}</p>
-            {user.roverId ? (
+            {user.roverId || user.operatingModeDisplay ? (
               <RoverLabel
                 roverId={user.roverId}
-                color={rosterEntry(user.roverId)?.color}
+                name={user.operatingModeDisplay?.name}
+                color={user.operatingModeDisplay?.color || rosterEntry(user.roverId)?.color}
                 fallback={user.roverId}
                 className="text-[0.7rem]"
               />
@@ -164,7 +160,7 @@ export default function UserListPanel({
   return (
     <CardFrame
       title={!hideHeader ? (isTurnsMode ? (showQueuesSection ? 'Turn queues' : 'Users') : 'Users') : ''}
-      meta={!hideHeader ? (showQueuesSection && isTurnsMode ? Object.keys(turnQueues || {}).length : sorted.length) : null}
+      meta={!hideHeader ? (showQueuesSection && isTurnsMode ? queuedRovers.length : sorted.length) : null}
       hideHeader={hideHeader}
       fillHeight={fillHeight}
       className={className}
@@ -208,21 +204,14 @@ export default function UserListPanel({
         ) : null}
         {showQueuesSection ? (
           <div className={`space-y-0.5 px-0 pb-0 ${turnsListClass} ${compact ? 'text-[0.8rem]' : ''}`}>
-            {Object.keys(turnQueues || {}).length === 0 ? (
+            {queuedRovers.length === 0 ? (
               <p className="text-sm text-slate-500">No turn queues yet.</p>
             ) : (
-              Object.entries(turnQueues).map(([roverId, info]) => {
+              queuedRovers.map(({ id: roverId, turn: info }) => {
                 const queue = info?.queue || [];
                 const deadline = info?.idleDeadline || info?.deadline || null;
                 const remaining = secondsRemaining(deadline);
-                const currentId = info?.current || null;
-                const currentIdx = currentId ? queue.findIndex((id) => id === currentId) : -1;
-                const nextId =
-                  queue.length > 1
-                    ? currentIdx >= 0
-                      ? queue[(currentIdx + 1) % queue.length]
-                      : queue[0]
-                    : null;
+                const { currentId, nextId } = info;
                 return (
                   <div key={roverId} className={`flex flex-col gap-0.5 ${compact ? 'text-[0.8rem] py-0.25' : 'text-sm'}`}>
                     <div className="flex items-center gap-0.5">
@@ -239,11 +228,10 @@ export default function UserListPanel({
                       <p className="text-[0.75rem] text-slate-500">No drivers queued.</p>
                     ) : (
                       <div className="flex flex-wrap items-center gap-0.5">
-                        {queue.map((socketId, idx) => {
-                          const user = lookupUser(socketId);
+                        {queue.map((user, idx) => {
+                          const { socketId } = user;
                           const isCurrent = socketId === currentId;
                           const isNext = Boolean(nextId && socketId === nextId && !isCurrent);
-                          const isSelf = Boolean(selfId && socketId === selfId);
                           const isAdmin =
                             user.role === 'admin' || user.role === 'lockdown';
                           const highlightClass = isCurrent
@@ -257,10 +245,9 @@ export default function UserListPanel({
                               className={`flex items-center gap-0.5 rounded-sm px-1 ${compact ? 'text-[0.7rem]' : 'text-[0.8rem]'} ${highlightClass}`}
                             >
                               <span className={`${roleColors(user.role)} font-semibold`}>
-                                {formatLabel(user, selfId)}
+                                {user.name}{socketId === selfId ? ' (you)' : ''}
                               </span>
                               {isAdmin && <span className="text-[0.7rem] text-amber-200">★</span>}
-                              {/* {isSelf && <span className="text-[0.7rem] text-white">YOU</span>} */}
                               {isCurrent && <span className="text-[0.7rem] text-slate-200">now</span>}
                               {isNext && <span className="text-[0.7rem] text-emerald-100">next</span>}
                             </span>

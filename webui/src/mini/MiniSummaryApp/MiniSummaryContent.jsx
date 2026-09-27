@@ -173,13 +173,12 @@ export default function MiniSummaryContent() {
   const frames = useVisualTelemetryFrames();
   const roster = session?.roster ?? [];
   const ptz = session?.ptzCamera || null;
-  const ptzOperatorLabel = String(ptz?.operatorLabel || '').trim();
+  const ptzOperatorLabel = String(ptz?.turn?.queue?.find((entry) => entry.socketId === ptz.turn.currentId)?.name || '').trim();
   const hasActivePtzOperator = Boolean(ptz?.enabled && ptzOperatorLabel);
   const [index, setIndex] = useState(0);
-  const activeDrivers = session?.activeDrivers || {};
   const driverRoster = useMemo(
-    () => roster.filter((rover) => activeDrivers[rover.id]),
-    [roster, activeDrivers],
+    () => roster.filter((rover) => rover.turn?.currentId),
+    [roster],
   );
   const mediaRovers = useMemo(
     () => roster.filter((rover) => rover?.id),

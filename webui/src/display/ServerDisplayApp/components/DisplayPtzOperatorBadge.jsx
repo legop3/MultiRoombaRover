@@ -7,7 +7,7 @@ import { useSessionSelector } from '../../../context/SessionContext.jsx';
 
 export default function DisplayPtzOperatorBadge() {
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
-  const operatorLabel = String(ptz?.operatorLabel || '').trim();
+  const operatorLabel = String(ptz?.turn?.queue?.find((entry) => entry.socketId === ptz.turn.currentId)?.name || '').trim();
   const visible = Boolean(ptz?.enabled && operatorLabel);
 
   return (

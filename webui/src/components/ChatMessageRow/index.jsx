@@ -132,11 +132,11 @@ export function ChatIdentity({ message, toolsToggle = null }) {
           bot
         </span>
       ) : null}
-      {message.roverId && (
+      {(message.roverId || message.operatingModeDisplay) && (
         <RoverLabel
           roverId={message.roverId}
-          name={message.roverName}
-          color={message.roverColor}
+          name={message.operatingModeDisplay?.name || message.roverName}
+          color={message.operatingModeDisplay?.color || message.roverColor}
           fallback={message.roverId}
           className="shrink-0 text-[0.7rem]"
         />

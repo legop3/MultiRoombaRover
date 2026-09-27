@@ -21,36 +21,20 @@ function roleColors(role) {
   }
 }
 
-function formatQueueUserLabel(user, selfId) {
-  /*
-    Queue chips need to be readable even when a socket has no nickname yet.
-    Keeping the socket-prefix fallback here means rover queues and PTZ queues
-    degrade identically instead of each target inventing its own anonymous label.
-  */
-  if (!user) return '';
-  const base = user.nickname || user.label || user.socketId?.slice(0, 6) || 'unknown';
-  if (user.socketId && user.socketId === selfId) {
-    return `${base} (you)`;
-  }
-  return base;
-}
-
 export function QueueUserChips({
   targetId,
-  queue = [],
-  currentId = null,
-  nextId = null,
+  turn,
   selfId = null,
-  lookupUser,
 }) {
-  if (!queue.length) {
+  const { queue = [], currentId, nextId } = turn || {};
+  if (!queue?.length) {
     return <p className="text-[0.7rem] text-slate-500">No queue.</p>;
   }
 
   return (
     <div className="flex flex-wrap items-center gap-0.5">
-      {queue.map((socketId, idx) => {
-        const user = lookupUser?.(socketId) || { socketId, nickname: null, role: null };
+      {queue.map((user, idx) => {
+        const { socketId } = user;
         const isCurrent = socketId === currentId;
         const isNext = Boolean(nextId && socketId === nextId && !isCurrent);
         /*
@@ -69,7 +53,7 @@ export function QueueUserChips({
             className={`flex items-center gap-0.5 rounded-sm px-1 text-[0.7rem] ${highlightClass}`}
           >
             <span className={`${roleColors(user.role)} font-semibold`}>
-              {formatQueueUserLabel(user, selfId)}
+              {user.name}{socketId === selfId ? ' (you)' : ''}
             </span>
             {isCurrent && <span className="text-[0.65rem] text-slate-200">now</span>}
             {isNext && <span className="text-[0.65rem] text-emerald-100">next</span>}
@@ -82,11 +66,8 @@ export function QueueUserChips({
 
 export default function QueueTargetRow({
   target,
-  queue = [],
-  currentId = null,
-  nextId = null,
+  turn,
   selfId = null,
-  lookupUser,
   canClick = false,
   pending = false,
   locked = false,
@@ -164,11 +145,8 @@ export default function QueueTargetRow({
         </div>
         <QueueUserChips
           targetId={targetId}
-          queue={queue}
-          currentId={currentId}
-          nextId={nextId}
+          turn={turn}
           selfId={selfId}
-          lookupUser={lookupUser}
         />
       </div>
       {showAction ? (

@@ -7,6 +7,7 @@ const logger = require('../../globals/logger').child('assignment');
 const { MODES, getMode, modeEvents } = require('../modeManager');
 const { roleEvents, getRole, isAdmin, isLockdownAdmin } = require('../roleService');
 const roverManager = require('../roverManager');
+const { getOperatingMode } = require('../operatingModeService');
 const { compareRoversForAssignment } = require('./roverRanking');
 
 const socketRefs = new Map(); // socketId -> socket
@@ -131,7 +132,7 @@ roverManager.managerEvents.on('switch', ({ socketId, roverId }) => {
 });
 
 function assignSocket(socket, options = {}) {
-  if (!socket || isAdmin(socket) || getRole(socket) !== 'user') {
+  if (!socket || getOperatingMode(socket) !== 'rover' || isAdmin(socket) || getRole(socket) !== 'user') {
     return;
   }
   // avoid double assignment
@@ -311,13 +312,22 @@ function describeAssignment(socketId) {
 
 module.exports = {
   assignmentEvents,
+  resumeAssignment: assignSocket,
+  releaseForOperatingMode: (socket) => {
+    // Include direct admin control as well as automatic assignment ownership.
+    const roverIds = new Set(roverManager.getRoversForSocket(socket.id));
+    const assigned = assignments.get(socket.id);
+    if (assigned) roverIds.add(assigned);
+    waiting.delete(socket.id);
+    roverIds.forEach((roverId) => forceRelease(roverId, socket.id));
+  },
   describeAssignment,
   forceRelease,
   forceReleaseWithNotice,
   rerollAssignments,
   getAssignedRover: (socketId) => assignments.get(socketId) || null,
   moveAssignment: (socket, roverId, { releasePrevious = true } = {}) => {
-    if (!socket || !roverId) return;
+    if (!socket || !roverId || getOperatingMode(socket) !== 'rover') return;
     const previous = assignments.get(socket.id);
     if (previous && previous !== roverId && releasePrevious) {
       roverManager.releaseControl(previous, socket);

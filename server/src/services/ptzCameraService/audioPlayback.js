@@ -2,7 +2,6 @@
 // Purpose: Generates server-side TTS files and sends them to the Reolink TrackMix speaker through neolink.
 // Scope: Owns file/cache/process details for PTZ speech only; PTZ ownership, chat identity, and camera motion stay in index.js.
 const crypto = require('crypto');
-const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -78,6 +77,7 @@ function createPtzAudioPlayback(deps) {
   const volume = clampNumber(audioConfig.volume, DEFAULT_VOLUME, 0, 4);
   const fliteDefaultVoice = String(audioConfig.fliteDefaultVoice || 'kal').trim();
 
+  let disposed = false;
   let playbackProc = null;
   let playbackSeq = 0;
 
@@ -244,12 +244,16 @@ function createPtzAudioPlayback(deps) {
     }, 1200);
   }
 
-  async function playFile(filePath, context = {}) {
-    if (!audioEnabled) throw new Error('PTZ audio disabled');
+  async function playFile(filePath, context = {}, authorize = () => {}) {
+    if (disposed || !audioEnabled) throw new Error('PTZ audio unavailable');
+    authorize();
     const neolinkConfigPath = await ensureNeolinkConfig();
     const stat = await fsp.stat(filePath);
     if (!stat.isFile()) throw new Error(`PTZ TTS file is not a regular file: ${filePath}`);
 
+    // Rendering and config IO may outlive a turn or camera configuration.
+    if (disposed) throw new Error('PTZ audio configuration changed');
+    authorize();
     stopActivePlayback('new-playback');
     const seq = ++playbackSeq;
     const args = [
@@ -302,13 +306,13 @@ function createPtzAudioPlayback(deps) {
     return { pid: proc.pid || null, seq };
   }
 
-  async function speakText(text, ttsOptions = {}, context = {}) {
+  async function speakText(text, ttsOptions = {}, context = {}, authorize = () => {}) {
     const rendered = await ensureTtsFile(text, ttsOptions);
     await playFile(rendered.filePath, {
       ...context,
       engine: rendered.engine,
       cached: rendered.cached,
-    });
+    }, authorize);
     return rendered;
   }
 
@@ -316,6 +320,10 @@ function createPtzAudioPlayback(deps) {
     getState,
     speakText,
     stopActivePlayback,
+    dispose: () => {
+      disposed = true;
+      stopActivePlayback('configuration-change');
+    },
   };
 }
 

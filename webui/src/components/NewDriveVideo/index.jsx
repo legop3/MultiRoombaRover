@@ -11,7 +11,7 @@ import BottomSensorHud from '../HudOverlays/newgen/BottomSensorHud/index.jsx';
 import { useSessionSelector } from '../../context/SessionContext.jsx';
 import { useControlSelector } from '../../controls/index.js';
 import { useDriverVideoModePolicy } from '../../hooks/useDriverVideoModePolicy.js';
-import { useDriverLayout } from '../../layouts/driver/DriverLayoutContext.jsx';
+import { useLayout } from '../../layouts/LayoutContext.jsx';
 import EmptyDriverVideoNotice from '../DriverVideo/EmptyDriverVideoNotice.jsx';
 
 // Mobile keeps the same HUD composition and coordinate system as desktop, but its
@@ -21,7 +21,7 @@ import EmptyDriverVideoNotice from '../DriverVideo/EmptyDriverVideoNotice.jsx';
 const MOBILE_HUD_SCALE = 0.68;
 
 export default function NewDriveVideo() {
-  const layout = useDriverLayout();
+  const layout = useLayout();
   const mobileHud = layout !== 'desktop';
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const videoMode = useDriverVideoModePolicy(roverId);
