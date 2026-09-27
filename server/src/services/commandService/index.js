@@ -11,6 +11,7 @@ const logger = require('../../globals/logger').child('commandService');
 const { isHeadlightBlocked } = require('../../rewards/definitions/darkness');
 const homeAssistantService = require('../homeAssistantService');
 const overcurrentProtectionService = require('../overcurrentProtectionService');
+const { subscribeCommandRecording, observeCommand, recordCommandRequest } = require('./recording');
 
 // Command observations are intentionally separate from the global event bus.
 // Drive and motor commands can run at control-loop frequency, and publishing
@@ -96,6 +97,7 @@ function issueCommand(roverId, payload) {
   const normalizedPayload = normalizeOutboundCommandPayload(payload);
   const message = { ...normalizedPayload, id };
   record.ws.send(JSON.stringify(message));
+  observeCommand({ phase: 'dispatched', roverId, commandId: id, command: normalizedPayload });
   pendingCommands.set(id, { roverId, ts: Date.now(), type: normalizedPayload.type });
   logger.info('Issued command', roverId, normalizedPayload.type, id);
   return id;
@@ -130,6 +132,7 @@ function handleAck(msg) {
   const pending = pendingCommands.get(msg.id);
   if (!pending) return;
   pendingCommands.delete(msg.id);
+  observeCommand({ phase: 'acknowledged', roverId: pending.roverId, commandId: msg.id, acknowledgement: msg });
   logger.info('Command acknowledged', pending.roverId, pending.type, msg.status);
   io.emit('commandAck', {
     roverId: pending.roverId,
@@ -255,6 +258,7 @@ module.exports = {
   getRecentDriveActivity,
   setDriveCooldown,
   commandEvents,
+  subscribeCommandRecording,
 };
 
 io.on('connection', (socket) => {
@@ -392,8 +396,9 @@ io.on('connection', (socket) => {
     }
   }
 
-  socket.on('command', handleCommand);
-  socket.on('command:issue', handleCommand);
+  const recordedCommand = (request, reply) => recordCommandRequest(socket, request, reply, handleCommand);
+  socket.on('command', recordedCommand);
+  socket.on('command:issue', recordedCommand);
 
   socket.on('command:updateAllRovers', (_payload = {}, cb) => {
     const reply = typeof cb === 'function' ? cb : () => {};
