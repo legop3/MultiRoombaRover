@@ -7,16 +7,13 @@ import SocialButton from '../../SocialButton/index.jsx';
 function TurnsOverlay({
   roverId = null,
   mobileHud = false,
-  turnModel = null,
 }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
-  const effectiveRoverId = turnModel?.targetId ?? roverId ?? assignedRoverId;
+  const effectiveRoverId = roverId ?? assignedRoverId;
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const users = useSessionSelector((state) => state.session?.users ?? []);
-  const turnQueues = useSessionSelector((state) => state.session?.turnQueues ?? {});
   const socketId = useSessionSelector((state) => state.session?.socketId || null);
-  const activeDrivers = useSessionSelector((state) => state.session?.activeDrivers ?? {});
   const lastControlIntentAt = useControlSelector((control) => control.state.lastControlIntentAt);
   const [showTurnCue, setShowTurnCue] = useState(false);
   const [turnCueStartAt, setTurnCueStartAt] = useState(null);
@@ -30,30 +27,15 @@ function TurnsOverlay({
   const subClass = mobileHud ? 'text-xs' : 'text-sm';
   const cueTimerClass = mobileHud ? 'text-[0.55rem]' : 'text-[0.75rem]';
   const cuePadClass = mobileHud ? 'px-4 py-3' : 'px-6 py-4';
-  const turnInfo = turnModel ? null : effectiveRoverId ? turnQueues?.[effectiveRoverId] : null;
-  const activeDriverId = turnModel
-    ? turnModel.activeId || null
-    : effectiveRoverId
-    ? activeDrivers?.[effectiveRoverId] || null
-    : null;
-  const isActiveDriver = turnModel
-    ? Boolean(turnModel.isActive)
-    : Boolean(socketId && activeDriverId === socketId);
-  const isTurnsMode = turnModel ? Boolean(turnModel.enabled) : mode === 'turns';
+  const turnInfo = roster.find((rover) => String(rover.id) === String(effectiveRoverId))?.turn;
+  const activeDriverId = turnInfo?.currentId || null;
+  const isActiveDriver = Boolean(turnInfo?.ownsControl);
+  const isTurnsMode = mode === 'turns';
   const now = useSharedClock(1000, isTurnsMode);
-  const nextDriverId = useMemo(() => {
-    if (turnModel) return turnModel.nextId || null;
-    const queue = turnInfo?.queue || [];
-    if (!queue.length || !turnInfo?.current || queue.length <= 1) return null;
-    const idx = queue.findIndex((id) => id === turnInfo.current);
-    if (idx === -1) return queue[0] || null;
-    return queue[(idx + 1) % queue.length] || null;
-  }, [turnInfo, turnModel]);
-  const isNextDriver = turnModel
-    ? Boolean(turnModel.isNext)
-    : Boolean(socketId && nextDriverId === socketId);
-  const deadline = turnModel ? turnModel.deadline || null : turnInfo?.deadline || null;
-  const idleDeadline = turnModel ? turnModel.idleDeadline || null : turnInfo?.idleDeadline || null;
+  const nextDriverId = turnInfo?.currentId ? turnInfo.nextId : null;
+  const isNextDriver = Boolean(socketId && nextDriverId === socketId);
+  const deadline = turnInfo?.deadline || null;
+  const idleDeadline = turnInfo?.idleDeadline || null;
   const msUntilTurn = deadline ? deadline - now : null;
   const msUntilIdleSkip = idleDeadline ? idleDeadline - now : null;
   const totalRovers = roster.length;
@@ -69,14 +51,10 @@ function TurnsOverlay({
     });
     return unique.size;
   }, [users]);
-  const shouldUsePreviewByLoad = turnModel
-    ? Boolean(turnModel.showPreviewReason)
-    : isTurnsMode && totalDrivers > totalRovers;
+  const shouldUsePreviewByLoad = isTurnsMode && totalDrivers > totalRovers;
   const isPreSwitchWindow =
     isTurnsMode && isNextDriver && msUntilTurn != null && msUntilTurn <= 5000 && msUntilTurn > 0;
-  const showNotTurnNotice = turnModel
-    ? Boolean(turnModel.showNotTurnNotice ?? (isTurnsMode && !isActiveDriver))
-    : isTurnsMode && !isActiveDriver;
+  const showNotTurnNotice = isTurnsMode && !isActiveDriver;
   const showPreviewReason = showNotTurnNotice && !isPreSwitchWindow && shouldUsePreviewByLoad;
   const turnSeconds =
     msUntilTurn != null && Number.isFinite(msUntilTurn) ? Math.max(0, Math.ceil(msUntilTurn / 1000)) : null;
@@ -105,12 +83,9 @@ function TurnsOverlay({
   const turnTimerFlashActive = noticeFlashActive;
 
   useEffect(() => {
-    /*
-      Rover turns and PTZ turns now arrive through the same render path. Use the
-      normalized isTurnsMode flag here instead of checking the server's rover
-      mode directly, otherwise PTZ can render the notice but never trigger the
-      "your turn" cue when camera ownership changes.
-    */
+    // The legacy overlay still follows the server's turns mode; ownership
+    // and deadlines now come from the same turn object as the new HUD.
+
     if (!isTurnsMode) {
       lastTurnRef.current = { initialized: false, roverId: null, activeDriverId: null };
       /*

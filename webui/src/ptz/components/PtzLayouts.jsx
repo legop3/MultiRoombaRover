@@ -11,7 +11,7 @@ function PtzDesktopFullscreen({ ptz, releasePending }) {
     <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(7rem,0.22fr)] gap-0.5 overflow-hidden p-0.5">
       <div className="flex min-h-0 min-w-0 gap-0.5 overflow-hidden">
         <main className="min-h-0 shrink-0 overflow-hidden bg-black" style={{ aspectRatio: '16 / 9' }}>
-          <PtzMediaPane ptz={ptz} open framed />
+          <PtzMediaPane ptz={ptz} open />
         </main>
         {/* Keep the sidebar itself transparent. Its child cards still own their dark surfaces,
             while the shared PTZ page theme can show through the same compact gaps as the driver
@@ -65,7 +65,7 @@ function PtzMobileLandscape({ ptz, onClose, releasePending = false }) {
             >
               Close
             </button>
-            <PtzMediaPane ptz={ptz} open compact framed={false} />
+            <PtzMediaPane ptz={ptz} open />
           </main>
           {/*
             The right control column is naturally taller than the viewport.
@@ -116,7 +116,7 @@ function PtzMobilePortrait({ ptz, onClose, releasePending = false }) {
         >
           Close
         </button>
-        <PtzMediaPane ptz={ptz} open compact framed={false} />
+        <PtzMediaPane ptz={ptz} open />
       </main>
       {/*
         Portrait gives the video its full available width and places controls

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RESTART_DELAY_MS } from '../components/RoverMediaPlayer/constants.js';
+import { RESTART_DELAY_MS } from '../lib/whepPlayback.js';
 
 export default function useWhepRestart(enabled = true) {
   const timer = useRef(null);

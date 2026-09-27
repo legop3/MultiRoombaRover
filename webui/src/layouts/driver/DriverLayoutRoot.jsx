@@ -5,10 +5,10 @@ import DesktopLayout from './DesktopLayout/index.jsx';
 import OldDesktopLayout from './OldDesktopLayout/index.jsx';
 import MobilePortraitLayout from './MobilePortraitLayout/index.jsx';
 import MobileLandscapeLayout from './MobileLandscapeLayout/index.jsx';
-import { useDriverLayout } from './DriverLayoutContext.jsx';
+import { useLayout } from '../LayoutContext.jsx';
 
 export default function DriverLayoutRoot({ oldDesktop = false }) {
-  const layout = useDriverLayout();
+  const layout = useLayout();
 
   if (layout === 'desktop') {
     // /old changes only the desktop composition. Mobile keeps one canonical

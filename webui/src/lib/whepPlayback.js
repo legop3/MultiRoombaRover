@@ -1,5 +1,7 @@
 import { WhepPlayer } from './whepPlayer.js';
 
+export const RESTART_DELAY_MS = 2000;
+
 const TERMINAL_STATES = ['error', 'failed', 'disconnected', 'closed'];
 
 // A mounted effect owns exactly one connection. Invalidate its callbacks before

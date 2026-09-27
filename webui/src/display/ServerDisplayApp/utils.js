@@ -13,13 +13,9 @@ export function formatUserName(user) {
 }
 
 export function findDriverForRover({ roverId, session }) {
-  const activeDriverId = session?.activeDrivers?.[roverId] || null;
-  if (!activeDriverId) return null;
-  const user = (session?.users || []).find((entry) => entry.socketId === activeDriverId);
-  return {
-    socketId: activeDriverId,
-    label: formatUserName(user || { socketId: activeDriverId }),
-  };
+  const turn = session?.roster?.find((rover) => String(rover.id) === String(roverId))?.turn;
+  const driver = turn?.queue?.find((entry) => entry.socketId === turn.currentId);
+  return driver ? { socketId: driver.socketId, label: driver.name } : null;
 }
 
 export function getDisplayBatteryVisual({ rover, frame }) {

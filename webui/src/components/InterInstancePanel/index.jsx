@@ -170,8 +170,6 @@ export function ExternalInstancesCompact({ onBrowse = null }) {
             key={remote.url}
             title={remote.instance?.name || remote.url}
             roster={remote.roster}
-            turnQueues={remote.turnQueues}
-            users={remote.users}
             externalInstance={remote}
             disabledOverlay={getRemoteAvailability(remote).blocked ? getRemoteAvailability(remote).overlay : ''}
           />
@@ -221,8 +219,6 @@ function InterInstanceCards({ instances, centered = false, singleColumn = false 
               <RemoteMediaStrip remote={remote} />
               <RoverQueuesPanel
                 roster={remote.roster}
-                turnQueues={remote.turnQueues}
-                users={remote.users}
                 externalInstance={remote}
                 disabledOverlay={getRemoteAvailability(remote).blocked ? getRemoteAvailability(remote).overlay : ''}
               />

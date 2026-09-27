@@ -63,7 +63,7 @@ function useChatComposerSessionState(allowSpectatorInput) {
   const ptzTtsSupported = Boolean(
     operatingMode === 'ptz' &&
       ptz?.audio?.enabled &&
-      (ptz?.turn?.isActive || ptz?.turn?.turnsAhead > 0),
+      (ptz?.turn?.ownsControl || ptz?.turn?.turnsAhead > 0),
   );
 
   return {

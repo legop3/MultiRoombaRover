@@ -7,7 +7,6 @@ import { PTZ_CAMERA_ID } from '../PtzLiveVideo/index.jsx';
 import { useSessionActions, useSessionSelector } from '../../context/SessionContext.jsx';
 import { useSharedClock } from '../../hooks/useSharedClock.js';
 import { isFeatureEnabled } from '../../lib/features.js';
-import useQueueUserLookup from '../../hooks/useQueueUserLookup.js';
 const PTZ_DEFAULT_COLOR = '#387bf8';
 
 function formatRemaining(deadline, now) {
@@ -24,13 +23,11 @@ export default function PtzQueueCard() {
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
   const { setOperatingMode } = useSessionActions();
   const navigate = useNavigate();
-  const lookupUser = useQueueUserLookup(ptz?.turn);
-  const { queue, currentId, nextId } = ptz?.turn || {};
   const now = useSharedClock(1000, Boolean(ptz?.turn?.deadline));
   const [pending, setPending] = useState(false);
   const canUse = Boolean(ptz?.permissions?.canEnter);
-  const isParticipant = Boolean(ptz?.turn?.isActive || ptz?.turn?.turnsAhead);
-  const timerLabel = ptz?.turn?.isActive && ptz?.turn?.deadline ? `${formatRemaining(ptz.turn.deadline, now)} left` : '';
+  const isParticipant = Boolean(ptz?.turn?.ownsControl || ptz?.turn?.turnsAhead);
+  const timerLabel = ptz?.turn?.ownsControl && ptz?.turn?.deadline ? `${formatRemaining(ptz.turn.deadline, now)} left` : '';
 
   if (!featureEnabled) return null;
 
@@ -77,16 +74,13 @@ export default function PtzQueueCard() {
               name: ptz?.name || 'PTZ Camera',
               color: ptz?.color || PTZ_DEFAULT_COLOR,
             }}
-            queue={queue}
-            currentId={currentId}
-            nextId={nextId}
+            turn={ptz?.turn}
             selfId={selfId}
-            lookupUser={lookupUser}
             canClick={canUse && !pending}
             pending={pending}
             buttonLabel={actionLabel}
-            batteryLabel={ptz?.turn?.isActive ? 'LIVE' : ptz?.turn?.turnsAhead ? `#${ptz.turn.turnsAhead}` : '--'}
-            batteryClassName={ptz?.turn?.isActive ? 'text-emerald-300' : ptz?.turn?.turnsAhead ? 'text-sky-300' : 'text-slate-400'}
+            batteryLabel={ptz?.turn?.ownsControl ? 'LIVE' : ptz?.turn?.turnsAhead ? `#${ptz.turn.turnsAhead}` : '--'}
+            batteryClassName={ptz?.turn?.ownsControl ? 'text-emerald-300' : ptz?.turn?.turnsAhead ? 'text-sky-300' : 'text-slate-400'}
             timerLabel={timerLabel}
             onRequest={handleRequest}
             showAction={canUse}

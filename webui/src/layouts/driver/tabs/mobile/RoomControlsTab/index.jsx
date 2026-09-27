@@ -4,10 +4,10 @@ import { TabPanel } from '../../../../../components/Tabs/index.jsx';
 import HomeAssistantControls from '../../../../../components/HomeAssistantControls/index.jsx';
 import RoomCameraPanel from '../../../../../components/RoomCameraPanel/index.jsx';
 import { themeStackClass } from '../../../../../themes/index.js';
-import { useDriverLayout } from '../../../DriverLayoutContext.jsx';
+import { useLayout } from '../../../../LayoutContext.jsx';
 
 export default function RoomControlsTab() {
-  const layout = useDriverLayout();
+  const layout = useLayout();
   const panelId = layout === 'mobile-landscape' ? 'mobile-landscape-room' : 'mobile-portrait-room';
   return (
     <TabPanel id="roomcontrols">

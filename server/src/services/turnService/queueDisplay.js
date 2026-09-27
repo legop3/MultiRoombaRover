@@ -1,10 +1,20 @@
-// Shared display ordering only; each service still owns its queue policy.
-function describeQueue(queue, currentId) {
-  const currentIndex = currentId ? queue.indexOf(currentId) : -1;
-  const nextId = queue.length > 1
-    ? queue[(currentIndex + 1) % queue.length]
-    : null;
-  return { queue, currentId, nextId };
+// Queue entries are complete display records. No browser-side user lookup or
+// naming fallback is needed, including when the queue comes from another server.
+function describeQueue(socketIds, currentId, users) {
+  const byId = new Map(users.map((user) => [user.socketId, user]));
+  const currentIndex = currentId ? socketIds.indexOf(currentId) : -1;
+  return {
+    queue: socketIds.map((socketId) => {
+      const user = byId.get(socketId);
+      return {
+        socketId,
+        name: user?.nickname || user?.name || socketId.slice(0, 6) || 'unknown',
+        role: user?.role || null,
+      };
+    }),
+    currentId,
+    nextId: socketIds.length > 1 ? socketIds[(currentIndex + 1) % socketIds.length] : null,
+  };
 }
 
 module.exports = { describeQueue };

@@ -6,10 +6,10 @@ import TopRightPod from './TopRightPod.jsx';
 import BottomLeftPod from './BottomLeftPod.jsx';
 import BottomRightPod from './BottomRightPod.jsx';
 import AccessoriesExpansion from './AccessoriesExpansion.jsx';
-import { useDriverLayout } from '../../../../layouts/driver/DriverLayoutContext.jsx';
+import { useLayout } from '../../../../layouts/LayoutContext.jsx';
 
 export default function CornerPods({ roverId }) {
-  const layout = useDriverLayout();
+  const layout = useLayout();
   const turns = useSessionSelector((state) => state.session?.roster
     ?.find((rover) => String(rover.id) === String(roverId))?.turn);
   const showPhysicalControlPods = layout === 'desktop';

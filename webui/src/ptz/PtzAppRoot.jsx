@@ -4,6 +4,7 @@
 // Scope: Mounts input/identity providers; the page owns session entry and layouts.
 import AlertFeed from '../components/AlertFeed/index.jsx';
 import SocketConnectionPill from '../components/SocketConnectionPill/index.jsx';
+import { LayoutProvider } from '../layouts/LayoutContext.jsx';
 import PtzControllerPage from './PtzControllerPage.jsx';
 import {
   ControlSystemProvider,
@@ -26,7 +27,9 @@ function PtzRouteContent() {
     <ControlSystemProvider>
       <KeyboardInputManager />
       <GamepadInputManager />
-      <PtzControllerPage layout={layout} />
+      <LayoutProvider layout={layout}>
+        <PtzControllerPage />
+      </LayoutProvider>
       <AlertFeed />
       <SocketConnectionPill />
     </ControlSystemProvider>

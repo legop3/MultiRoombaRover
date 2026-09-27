@@ -10,7 +10,7 @@ const { getMode, modeEvents } = require('../modeManager');
 const roverManager = require('../roverManager');
 const { managerEvents } = roverManager;
 const assignmentService = require('../assignmentService');
-const { getActiveDrivers, getTurnQueues, turnEvents } = require('../turnService');
+const { getActiveDrivers, getTurnQueues, canDrive, turnEvents } = require('../turnService');
 const { buildRoverTurn } = require('../turnService/display');
 const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 const {
@@ -197,6 +197,7 @@ function buildSession(socket) {
     features,
     roster: roster.map((rover) => ({
       ...rover,
+      permissions: { canControl: getRole(socket) !== 'spectator' && canDrive(rover.id, socket) },
       turn: buildRoverTurn({
         rover,
         mode: getMode(),
@@ -212,8 +213,6 @@ function buildSession(socket) {
       roverId: assignmentRoverId,
       status: assignmentRoverId ? assignment.status : assignment.status === 'waiting' ? 'waiting' : null,
     },
-    activeDrivers,
-    turnQueues,
     roomCameras: getRoomCameras(),
     ptzCamera: getPtzCameraState(socket),
     homeAssistant: getHomeAssistantState(),

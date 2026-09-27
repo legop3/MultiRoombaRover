@@ -2,16 +2,9 @@ const { describeQueue } = require('./queueDisplay');
 const { TURN_DURATION_MS, IDLE_TIMEOUT_MS } = require('./constants');
 
 const labels = {
+  ...require('./labels'),
   waiting: 'Someone else is driving',
-  handoff: 'It’s your turn!',
   active: 'You’re driving',
-  idleWarning: 'Start driving or your turn will be skipped',
-  activeTimer: 'Your turn',
-  waitingTimer: 'Waiting',
-  untilTurn: 'until your turn',
-  timeRemaining: 'left',
-  showTimer: 'Show turn timer',
-  hideTimer: 'Hide turn timer',
   showName: 'Show rover name',
   hideName: 'Hide rover name',
 };
@@ -25,14 +18,14 @@ function buildRoverTurn({ rover, mode, socketId, turnInfo, activeDriverId, users
   const userIndex = socketId ? queue.indexOf(socketId) : -1;
   const enabled = mode === 'turns' && queue.length > 1 && currentIndex >= 0 && userIndex >= 0;
   const turnsAhead = enabled ? (userIndex - currentIndex + queue.length) % queue.length : null;
+  const display = describeQueue(queue, currentDriverId, users);
   return {
     target: { id: rover.id, name: rover.name, color: rover.color, fallback: rover.id },
-    ...describeQueue(queue, currentDriverId),
-    userLabels: Object.fromEntries(queue.map((id) => [id,
-      users.find((user) => user.socketId === id)?.nickname || id,
-    ])),
+    ...display,
+    // Null distinguishes a rover that has never had a queue from an empty queue.
+    queue: turnInfo ? display.queue : null,
     enabled,
-    isActive: turnsAhead === 0,
+    ownsControl: Boolean(socketId && currentDriverId === socketId),
     turnsAhead,
     queueLength: queue.length,
     deadline: turnInfo?.deadline || null,

@@ -5,7 +5,7 @@ import { FaVideo } from 'react-icons/fa';
 import { useControlActions, useControlSelector } from '../../../../controls/index.js';
 import ControlHint from '../../../ControlHint/index.jsx';
 import useCanControlRover from '../../../../hooks/useCanControlRover.js';
-import { useDriverLayout } from '../../../../layouts/driver/DriverLayoutContext.jsx';
+import { useLayout } from '../../../../layouts/LayoutContext.jsx';
 import KeyPill from '../../../vip/VipAudioUploadCard/KeyPill.jsx';
 import ChatExpansion from './ChatExpansion.jsx';
 import CornerPodToggle from './CornerPodToggle.jsx';
@@ -28,7 +28,7 @@ function pointOnArc(fraction) {
 }
 
 export default function BottomRightPod({ roverId }) {
-  const layout = useDriverLayout();
+  const layout = useLayout();
   const [open, setOpen] = usePodVisibility('camera', true);
   const camera = useControlSelector((control) => control.state.camera);
   const dockAssistActive = useControlSelector((control) => Boolean(control.state.manualDockAssist?.active));

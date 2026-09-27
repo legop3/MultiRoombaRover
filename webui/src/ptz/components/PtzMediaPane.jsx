@@ -1,3 +1,5 @@
+import { useLayout } from '../../layouts/LayoutContext.jsx';
+import usePodVisibility from '../../components/HudOverlays/newgen/CornerPods/usePodVisibility.js';
 import PtzLightingPod from './PtzLightingPod.jsx';
 import PtzLiveVideo, { PTZ_CAMERA_ID } from '../../components/PtzLiveVideo/index.jsx';
 import ChatExpansion from '../../components/HudOverlays/newgen/CornerPods/ChatExpansion.jsx';
@@ -25,11 +27,14 @@ function PtzSnapshotPreview({ feed, label = 'PTZ Camera', className = 'h-full w-
   );
 }
 
-function PtzMediaPane({ ptz, open, framed = true, compact = false }) {
+function PtzMediaPane({ ptz, open }) {
+  const layout = useLayout();
+  const isDesktop = layout === 'desktop';
+  const [lightingOpen, setLightingOpen] = usePodVisibility('ptzLighting', true);
   const shouldUseLiveVideo = ptz?.viewMode === 'live';
   const snapshotFeeds = usePtzCameraSnapshots([PTZ_CAMERA_ID], { enabled: open && !shouldUseLiveVideo });
   const snapshot = snapshotFeeds[PTZ_CAMERA_ID] || null;
-  const statusClassName = `pointer-events-none absolute left-1 ${compact ? 'bottom-1' : 'bottom-24'} z-20 text-[0.65rem] font-medium text-slate-100`;
+  const statusClassName = `pointer-events-none absolute left-1 ${isDesktop && lightingOpen ? 'bottom-24' : isDesktop ? 'bottom-10' : 'bottom-1'} z-20 text-[0.65rem] font-medium text-slate-100`;
   const media = (
     <>
       {shouldUseLiveVideo ? (
@@ -37,14 +42,14 @@ function PtzMediaPane({ ptz, open, framed = true, compact = false }) {
       ) : (
         <PtzSnapshotPreview feed={snapshot} label={ptz?.name || 'PTZ Camera'} statusClassName={statusClassName} />
       )}
-      {ptz?.turn ? <TopLeftPod compact={compact} turns={ptz.turn} /> : null}
+      {ptz?.turn ? <TopLeftPod compact={!isDesktop} turns={ptz.turn} /> : null}
       {/* Mobile already has lighting controls beside/below the video. */}
-      {!compact ? <PtzLightingPod /> : null}
+      {isDesktop ? <PtzLightingPod open={lightingOpen} onOpenChange={setLightingOpen} /> : null}
       <ChatExpansion podOpen={false} />
     </>
   );
 
-  if (!framed) {
+  if (!isDesktop) {
     return <div className="relative h-full min-h-0 w-full overflow-hidden bg-black">{media}</div>;
   }
 

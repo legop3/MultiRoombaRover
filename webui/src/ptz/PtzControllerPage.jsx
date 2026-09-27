@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useLayout } from '../layouts/LayoutContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import CardFrame from '../components/CardFrame/index.jsx';
 import { useControlActions } from '../controls/index.js';
@@ -9,7 +10,8 @@ import { DEFAULT_PAGE_THEME_KEY, usePageThemeClass } from '../themes/index.js';
 import usePtzSession from './usePtzSession.js';
 import { PtzDesktopFullscreen, PtzMobileLandscape, PtzMobilePortrait } from './components/PtzLayouts.jsx';
 
-export default function PtzControllerPage({ layout = 'desktop' }) {
+export default function PtzControllerPage() {
+  const layout = useLayout();
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const featureEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'ptzCamera'));
   const { setOperatingMode, pushAlert } = useSessionActions();

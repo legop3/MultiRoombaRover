@@ -1,4 +1,5 @@
 // PTZ policy and session facade. Camera IO and participation each own their lifecycle.
+const { getNickname: getNicknameForQueue } = require('../nicknameService');
 const { describeQueue } = require('../turnService/queueDisplay');
 const EventEmitter = require('events');
 
@@ -118,8 +119,10 @@ function describeParticipation(socket) {
     },
     viewMode: socket && canRequestLiveVideo(socket) ? 'live' : 'snapshot',
     turn: {
-      ...describeQueue(queue, currentId),
-      userLabels: Object.fromEntries(queue.map((id) => [id, getSocketLabel(id)])),
+      ...describeQueue(queue, currentId, queue.map((id) => {
+        const participant = io.sockets.sockets.get(id);
+        return { socketId: id, nickname: getNicknameForQueue(participant), role: getRole(participant) };
+      })),
       target: {
         id: PTZ_CAMERA_ID,
         name: cameraConfig.name || 'PTZ Camera',
@@ -127,7 +130,7 @@ function describeParticipation(socket) {
         fallback: null,
       },
       enabled: entered && (isOperator || position > 0) && participation.state.queue.length > 0,
-      isActive: isOperator,
+      ownsControl: isOperator,
       turnsAhead: isOperator ? 0 : position || null,
       queueLength: participation.state.queue.length + (participation.state.operatorSocketId ? 1 : 0),
       deadline: participation.state.deadline,

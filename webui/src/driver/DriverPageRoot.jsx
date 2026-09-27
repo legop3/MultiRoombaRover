@@ -24,7 +24,8 @@ import {
   usePageThemeClass,
 } from '../themes/index.js';
 import useLayoutMode from '../hooks/useLayoutMode.js';
-import { DriverLayoutProvider } from '../layouts/driver/DriverLayoutContext.jsx';
+import { DriverHelpProvider } from '../layouts/driver/DriverHelpContext.jsx';
+import { LayoutProvider } from '../layouts/LayoutContext.jsx';
 import DriverLayoutRoot from '../layouts/driver/DriverLayoutRoot.jsx';
 import UndockedPageExitGuard from '../components/UndockedPageExitGuard/index.jsx';
 
@@ -98,11 +99,13 @@ function DriverPageContent({ layout, oldDesktop }) {
       <KeyboardInputManager />
       <GamepadInputManager />
       <main className={`relative flex w-full flex-col ${themeGapClass} text-base`}>
-        <DriverLayoutProvider layout={layout} openHelp={openHelp}>
-          {/* Route selection affects only which desktop composition is mounted;
-              all providers, overlays, inputs, and mobile layouts remain shared. */}
-          <DriverLayoutRoot oldDesktop={oldDesktop} />
-        </DriverLayoutProvider>
+        <LayoutProvider layout={layout}>
+          <DriverHelpProvider openHelp={openHelp}>
+            {/* Route selection affects only which desktop composition is mounted;
+                all providers, overlays, inputs, and mobile layouts remain shared. */}
+            <DriverLayoutRoot oldDesktop={oldDesktop} />
+          </DriverHelpProvider>
+        </LayoutProvider>
       </main>
       <AlertFeed />
       <DuplicateIdentityOverlay />

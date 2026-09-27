@@ -12,7 +12,7 @@ export default function TopLeftPod({ turns, compact = false }) {
   const [timerOpen, setTimerOpen] = usePodVisibility('turnTimer', true);
   const [nameOpen, setNameOpen] = usePodVisibility('roverName', true);
   const lastControlIntentAt = useControlSelector((control) => control.state.lastControlIntentAt);
-  const { target, labels, enabled: turnActive, queueLength, turnsAhead, isActive: isCurrentTurn } = turns;
+  const { target, labels, enabled: turnActive, queueLength, turnsAhead, ownsControl: isCurrentTurn } = turns;
   const deadline = turns.deadline;
   const idleDeadline = turns.idleDeadline;
   const durationSeconds = turns.durationMs / 1000;

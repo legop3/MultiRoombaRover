@@ -11,10 +11,10 @@ import ButtonBoxPanel from '../../../../../components/ButtonBoxPanel/index.jsx';
 import KinectPanel from '../../../../../components/KinectPanel/index.jsx';
 import FleetReportsCard from '../../../../../components/FleetReportsCard/index.jsx';
 import { themeGapClass } from '../../../../../themes/index.js';
-import { useDriverLayout } from '../../../DriverLayoutContext.jsx';
+import { useLayout } from '../../../../LayoutContext.jsx';
 
 export default function ActivitiesTab() {
-  const layout = useDriverLayout();
+  const layout = useLayout();
   return (
     <TabPanel id="activities">
       <div className={`flex flex-col ${layout === 'desktop' ? 'gap-y-2' : themeGapClass}`}>

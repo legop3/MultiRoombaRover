@@ -122,7 +122,7 @@ export default function PtzSpectatorCard() {
     <article className="flex min-h-64 flex-col rounded-sm bg-zinc-900 p-0 sm:min-h-72">
       <PtzLiveOrSnapshot label={label} />
       <div className="min-h-0 flex-1 space-y-0.5 overflow-hidden p-1 text-xs">
-        <InfoRow label="Operator" value={ptz?.turn?.userLabels?.[ptz?.turn?.currentId] || 'none'} />
+        <InfoRow label="Operator" value={ptz?.turn?.queue?.find((entry) => entry.socketId === ptz.turn.currentId)?.name || 'none'} />
         <InfoRow label="Remaining" value={formatRemaining(ptz?.turn?.deadline)} />
         <InfoRow label="Queue" value={queueCount ? `${queueCount} waiting` : 'empty'} />
         <InfoRow label="Spotlight" value={isSpotlightOn(ptz?.light) ? 'On' : 'Off'} />
