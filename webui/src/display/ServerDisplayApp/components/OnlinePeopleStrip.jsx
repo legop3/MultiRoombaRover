@@ -75,7 +75,7 @@ export default function OnlinePeopleStrip({ users = [] }) {
       <div
         ref={trackRef}
         className={classNames(
-          'flex h-full w-max items-center whitespace-nowrap text-[clamp(2.5rem,5.3vh,5.8rem)] leading-none',
+          'flex h-full w-max items-center whitespace-nowrap text-[clamp(2.25rem,5.5vmin,4.5rem)] leading-none',
         )}
       >
         <div ref={contentRef} className="flex h-full items-center">

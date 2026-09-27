@@ -1,18 +1,11 @@
-// Spectator View Controls
-// Purpose: Lets each spectator choose which major page regions consume space and media bandwidth.
-// Scope: Owns only the fixed gear menu UI; cookie persistence and layout decisions remain in SpectatorContent.
+// Spectator Settings
+// Purpose: Provides a shared gear menu for page-defined spectator options.
+// Scope: Pages supply their options and own preference persistence.
 import { useEffect, useRef, useState } from 'react';
 import { FaCog } from 'react-icons/fa';
-import CardFrame from '../../../components/CardFrame/index.jsx';
+import CardFrame from '../CardFrame/index.jsx';
 
-const VIEW_OPTIONS = [
-  { key: 'showSidebar', label: 'Sidebar' },
-  { key: 'showRovers', label: 'Rovers' },
-  { key: 'showPtz', label: 'PTZ camera' },
-  { key: 'showRoomCameras', label: 'Room cameras' },
-];
-
-export default function SpectatorViewControls({ preferences, onToggle }) {
+export default function SpectatorSettings({ options, preferences, onToggle }) {
   const [open, setOpen] = useState(false);
   const controlsRef = useRef(null);
 
@@ -45,7 +38,7 @@ export default function SpectatorViewControls({ preferences, onToggle }) {
       <button
         type="button"
         className="button-dark flex h-8 w-8 items-center justify-center p-0 text-slate-100 shadow-lg"
-        aria-label="Spectator view settings"
+        aria-label="Spectator settings"
         aria-expanded={open}
         aria-controls="spectator-view-controls"
         onClick={() => setOpen((current) => !current)}
@@ -54,13 +47,13 @@ export default function SpectatorViewControls({ preferences, onToggle }) {
       </button>
       {open ? (
         <CardFrame
-          title="Spectator view"
+          title="Settings"
           className="w-48 shadow-xl"
           bodyClassName="space-y-0.5 p-0.5 text-sm"
           clipOverflow={false}
         >
           <div id="spectator-view-controls" className="space-y-0.5">
-            {VIEW_OPTIONS.map((option) => (
+            {options.map((option) => (
               <label
                 key={option.key}
                 className="surface-muted flex cursor-pointer items-center gap-0.5 px-1 py-0.75 text-slate-100"
