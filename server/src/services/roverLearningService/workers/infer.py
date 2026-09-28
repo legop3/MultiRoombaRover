@@ -74,7 +74,9 @@ def main():
             with mutex:
                 while observations and observations[0]['ts'] < stamp:
                     event = observations.popleft()
-                    if event['kind'] == 'sensor':
+                    if event['kind'] == 'settings':
+                        args.threshold = max(.05, min(.99, float(event['threshold'])))
+                    elif event['kind'] == 'sensor':
                         sensors, sensor_time = event['data'], event['ts']
                     elif event['kind'] == 'command':
                         try:
@@ -102,16 +104,19 @@ def main():
                 continue
             before = time.perf_counter()
             with torch.inference_mode():
-                logits, numeric = model(torch.from_numpy(np.stack([row[1] for row in selected])).unsqueeze(0).float() / 255,
+                logits, numeric, wheel_output = model(torch.from_numpy(np.stack([row[1] for row in selected])).unsqueeze(0).float() / 255,
                                         torch.from_numpy(np.stack([row[2] for row in selected])).unsqueeze(0))
                 probabilities = logits[0].sigmoid().tolist()
                 predictions = numeric[0].tolist()
+                wheel_speeds = [round(value * 500) for value in wheel_output[0].tolist()]
             if not all(math.isfinite(value) for value in probabilities):
                 raise ValueError('Nonfinite model output')
             families = {}
             active = set()
             proposals = []
             for slot, descriptor in enumerate(schema):
+                if descriptor['template']['type'] == 'drive':
+                    continue
                 command = json.loads(json.dumps(descriptor['template']))
                 family = command['type']
                 if family == 'peripheral':
@@ -147,8 +152,10 @@ def main():
             for _, _, slot, discrete in families.values():
                 if discrete:
                     latched.add(slot)
+            commands.insert(0, {'type': 'drive', 'driveDirect': dict(zip(('left', 'right'), wheel_speeds))})
             print(json.dumps({'kind': 'prediction', 'frameAt': stamp, 'sensorAt': sensor_time,
                               'latencyMs': (time.perf_counter() - before) * 1000,
+                              'wheelSpeeds': wheel_speeds, 'sensorPresent': sensor_vector(sensors)[32:].tolist(),
                               'commands': commands, 'proposals': proposals, 'threshold': args.threshold}, allow_nan=False), flush=True)
 
 

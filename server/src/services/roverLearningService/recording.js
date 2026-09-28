@@ -21,7 +21,7 @@ async function createRecording({ root, roverId, snapshot, logger, docked = false
   await fsp.mkdir(directory);
   const metadata = {
     version: 1, id, roverId, startedAt: Date.now(), endedAt: null,
-    controlProfile: controlProfile(snapshot.meta),
+    controlProfile: controlProfile(snapshot.meta), wheelSpeedLimit: snapshot.meta?.maxWheelSpeed ?? 500,
     timing: 'Video PTS uses server receiver Unix seconds. Events use Unix milliseconds and process monotonic nanoseconds. Browser display delay is not measured.',
     video: { file: 'video.mkv', codec: 'source-copy', timestampUnit: 'seconds', origin: 'unix' },
     events: 'events.ndjson', droppedEvents: 0, bufferOnly: docked,

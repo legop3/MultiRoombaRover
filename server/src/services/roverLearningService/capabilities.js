@@ -7,7 +7,7 @@ function controlProfile(meta = {}) {
 }
 
 function compatible(model, record) {
-  if (model?.specification?.version !== 1 || !record) return false;
+  if (model?.specification?.version !== 2 || !record) return false;
   const profile = controlProfile(record.meta);
   return Array.isArray(model.controlProfiles) && model.controlProfiles.some((saved) => isDeepStrictEqual(saved, profile));
 }

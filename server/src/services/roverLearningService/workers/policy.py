@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from torch import nn
 
-VERSION = 1
+VERSION = 2
 SLOTS = 64
 VALUES = 8
 FRAMES = 4
@@ -109,6 +109,7 @@ class Policy(nn.Module):
             nn.Linear(128 * 3 * 4, 128), nn.ReLU(),
         )
         self.history = nn.GRU(128 + STATE_SIZE, 128, batch_first=True)
+        self.wheels = nn.Linear(128, 2)
         self.actions = nn.Linear(128, SLOTS)
         self.values = nn.Linear(128, SLOTS * VALUES)
 
@@ -117,15 +118,17 @@ class Policy(nn.Module):
         encoded = self.vision(images.reshape(-1, 3, HEIGHT, WIDTH)).reshape(batch, frames, -1)
         history, _ = self.history(torch.cat((encoded, state), dim=-1))
         last = history[:, -1]
-        return self.actions(last), self.values(last).reshape(batch, SLOTS, VALUES).tanh()
+        return self.actions(last), self.values(last).reshape(batch, SLOTS, VALUES).tanh(), self.wheels(last).tanh()
 
 
 def specification(schema):
-    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-v1',
+    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-wheels-v2',
             'frames': FRAMES, 'height': HEIGHT, 'width': WIDTH,
             'historyStrideMs': 300, 'decisionIntervalMs': 100,
             'stateSize': STATE_SIZE, 'sensorFields': SENSORS,
             'normalization': '2/pi * atan(value/scale); missing sensors have mask=0',
             'maxCommandShapes': SLOTS, 'numericFieldsPerShape': VALUES,
-            'commands': schema, 'actionSemantics': 'Events in the next 100 ms; zero means no new command',
+            'commands': schema, 'actionSemantics': 'Continuous wheels at +100ms; accessories are events in the next 100ms',
+            'wheelScaleMmPerSecond': 500, 'wheelOrder': ['left', 'right'],
+            'wheelCommandExpiryMs': None, 'unknownWheelIntent': 'Excluded until next accepted human drive',
             'timing': 'Server-receipt alignment; browser display latency unmeasured'}

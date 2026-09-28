@@ -47,7 +47,7 @@ def load_events(directory):
     return metadata, sorted(events, key=lambda e: e['ts'])
 
 
-def prepare(directory, schema):
+def prepare(directory, schema, stats):
     metadata, events = load_events(directory)
     requests = {}
     accepted = set()
@@ -72,9 +72,28 @@ def prepare(directory, schema):
     if not sensors:
         raise ValueError('No sensor observations')
     candidate = copy.deepcopy(schema)
-    history, targets = [], []
+    history, targets, wheels = [], [], [(stamp, None) for stamp in boundaries]
+    stats.update({'sensorFrames': len(sensors), 'dispatches': len(dispatches),
+                  'failedCommands': len(failed), 'sensorPresentFraction': np.mean([row[1][32:] for row in sensors], axis=0).tolist()})
     for data in dispatches:
-        encoded = encode_command(data.get('command') or {}, candidate, extend=True)
+        command = data.get('command') or {}
+        request = requests.get(data.get('requestId'))
+        human = (data.get('source') == 'client' and request and data.get('commandId') in accepted
+                 and data.get('commandId') not in failed)
+        stamp = data['ts']
+        if command.get('type') == 'drive':
+            direct = command.get('driveDirect') or {}
+            pair = [direct.get('left'), direct.get('right')]
+            if human and all(isinstance(v, (int, float)) and math.isfinite(v) for v in pair):
+                wheels.append((stamp, np.clip(np.array(pair, dtype=np.float32), -metadata.get('wheelSpeedLimit', 500), metadata.get('wheelSpeedLimit', 500)) / 500))
+            else:
+                wheels.append((stamp, None))
+        elif command.get('type') in ('raw', 'reset', 'reboot', 'update', 'sensorStream'):
+            # Raw OI can change mode or motion; do not assume the last wheel
+            # command survives it. A later explicit human drive resolves intent.
+            wheels.append((stamp, None))
+            boundaries.append(stamp)
+        encoded = encode_command(command, candidate, extend=True)
         if encoded is None:
             continue
         stamp = data['ts']
@@ -93,17 +112,22 @@ def prepare(directory, schema):
     if not targets:
         raise ValueError('No accepted client operating commands')
     schema[:] = candidate
-    return metadata, sensors, sorted(history, key=lambda x: x[0]), sorted(targets, key=lambda x: x[0]), sorted(boundaries)
+    return metadata, sensors, sorted(wheels, key=lambda x: x[0]), sorted(history, key=lambda x: x[0]), sorted(targets, key=lambda x: x[0]), sorted(boundaries)
 
 
-def windows(directory, schema, cancelled=lambda: False):
+def windows(directory, schema, cancelled=lambda: False, stats=None):
     directory = Path(directory)
-    metadata, sensors, history, targets, boundaries = prepare(directory, schema)
+    stats = stats if stats is not None else {}
+    metadata, sensors, wheels, history, targets, boundaries = prepare(directory, schema, stats)
+    wheel_times = [row[0] for row in wheels]
+    stats.update({'usableWindows': 0, 'movingWindows': 0, 'stoppedWindows': 0,
+                  'unknownWheelWindows': 0, 'staleSensorWindows': 0, 'boundaryWindows': 0,
+                  'ambiguousWindows': 0, 'videoFrames': 0, 'maxVideoGapMs': 0})
     sensor_times = [row[0] for row in sensors]
     target_times = [row[0] for row in targets]
     available = np.zeros(SLOTS, dtype=np.float32)
     for _, slot, _ in history:
-        available[slot] = 1
+        available[slot] = float(schema[slot]['template']['type'] != 'drive')
     command_values = np.zeros((SLOTS, VALUES), dtype=np.float32)
     command_times = np.full(SLOTS, -np.inf)
     cursor = 0
@@ -127,6 +151,9 @@ def windows(directory, schema, cancelled=lambda: False):
         stamp = float(frame.pts * frame.time_base) * 1000
         if not math.isfinite(stamp) or stamp < last_pts:
             raise ValueError('Invalid/nonmonotonic video timestamps')
+        stats['videoFrames'] += 1
+        if math.isfinite(last_pts):
+            stats['maxVideoGapMs'] = max(stats['maxVideoGapMs'], stamp - last_pts)
         last_pts = stamp
         if not metadata['startedAt'] - 2000 <= stamp <= metadata['endedAt'] + 2000:
             raise ValueError('Video PTS is not aligned to session Unix time')
@@ -142,6 +169,7 @@ def windows(directory, schema, cancelled=lambda: False):
             cursor += 1
         sensor_index = bisect.bisect_right(sensor_times, stamp) - 1
         if sensor_index < 0 or stamp - sensor_times[sensor_index] > 1000:
+            stats['staleSensorWindows'] += 1
             recent.clear()
             continue
         seen = np.isfinite(command_times).astype(np.float32)
@@ -158,7 +186,14 @@ def windows(directory, schema, cancelled=lambda: False):
         if len(chosen) != 4 or stamp + 100 > metadata['endedAt']:
             continue
         if bisect.bisect_right(boundaries, stamp + 100) > bisect.bisect_left(boundaries, chosen[0][0]):
+            stats['boundaryWindows'] += 1
             continue
+        before = bisect.bisect_left(wheel_times, stamp) - 1
+        after = bisect.bisect_right(wheel_times, stamp + 100) - 1
+        if before < 0 or after < 0 or wheels[before][1] is None or wheels[after][1] is None:
+            stats['unknownWheelWindows'] += 1
+            continue
+        wheel_target, previous_wheels = wheels[after][1], wheels[before][1]
         start = bisect.bisect_left(target_times, stamp)
         end = bisect.bisect_left(target_times, stamp + 100)
         actions = np.zeros(SLOTS, dtype=np.float32)
@@ -168,6 +203,8 @@ def windows(directory, schema, cancelled=lambda: False):
         for _, slot, vector in targets[start:end]:
             template = schema[slot]['template']
             family = template['type']
+            if family == 'drive':
+                continue
             if family == 'peripheral':
                 peripheral = template.get('peripheral') or {}
                 family += ':' + str(peripheral.get('id')) + ':' + str(peripheral.get('control'))
@@ -178,5 +215,8 @@ def windows(directory, schema, cancelled=lambda: False):
             families.add(family)
             actions[slot], values[slot] = 1, vector
         if ambiguous:
+            stats['ambiguousWindows'] += 1
             continue
-        yield np.stack([row[1] for row in chosen]), np.stack([row[2] for row in chosen]), actions, values, available
+        stats['usableWindows'] += 1
+        stats['movingWindows' if np.max(np.abs(wheel_target)) > .02 else 'stoppedWindows'] += 1
+        yield np.stack([row[1] for row in chosen]), np.stack([row[2] for row in chosen]), actions, values, available, wheel_target, previous_wheels

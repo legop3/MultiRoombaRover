@@ -19,6 +19,7 @@ function canControl(socket, roverId) {
 
 function createDriving({ root, config, onChange, activity }) {
   const sessions = new Map();
+  const recent = new Map();
   let stopping = false;
   let watchdog;
   let unsubscribe;
@@ -35,7 +36,8 @@ function createDriving({ root, config, onChange, activity }) {
     if (!OPERATING.has(command?.type)) throw new Error('Unsupported model command');
     const record = roverManager.rovers.get(session.roverId);
     if (command.type === 'drive') {
-      command.driveDirect = { left: clamp(command.driveDirect?.left, -500, 500), right: clamp(command.driveDirect?.right, -500, 500) };
+      const limit = Math.min(500, Number(record.meta?.maxWheelSpeed) || 500);
+      command.driveDirect = { left: Math.round(clamp(command.driveDirect?.left, -limit, limit)), right: Math.round(clamp(command.driveDirect?.right, -limit, limit)) };
     }
     if (command.type === 'motors') {
       command.motorPwm = { main: clamp(command.motorPwm?.main, -127, 127), side: clamp(command.motorPwm?.side, -127, 127), vacuum: clamp(command.motorPwm?.vacuum, 0, 127) };
@@ -69,6 +71,9 @@ function createDriving({ root, config, onChange, activity }) {
     const timer = setTimeout(() => session.worker.kill('SIGKILL'), 2000);
     session.done = session.closed.then(() => {
       clearTimeout(timer);
+      recent.delete(roverId);
+      recent.set(roverId, { modelId: session.modelId, stopReason: reason, history: session.history });
+      if (recent.size > 20) recent.delete(recent.keys().next().value);
       sessions.delete(roverId);
       activity('Controller stopped', { roverId, reason });
       onChange();
@@ -90,9 +95,10 @@ function createDriving({ root, config, onChange, activity }) {
     const worker = spawn(config.training.python, [path.join(__dirname, 'workers/infer.py'), '--model', directory,
       '--url', `rtsp://127.0.0.1:8554/${encodeURIComponent(roverId)}`, '--threads', String(config.driving.threads),
       '--threshold', String(config.driving.actionThreshold)], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } });
-    const session = { worker, socket, roverId, modelId, modelName: metadata.name, status: 'starting', startedAt: Date.now(), lastPredictionAt: null };
+    const session = { worker, socket, roverId, modelId, modelName: metadata.name, status: 'starting', startedAt: Date.now(), lastPredictionAt: null, threshold: config.driving.actionThreshold, history: [] };
     session.closed = new Promise((resolve) => worker.once('close', resolve));
     sessions.set(roverId, session);
+    recent.delete(roverId);
     let output = '';
     let stderr = '';
     worker.stdin.on('error', () => { stop(roverId, 'Worker input closed'); });
@@ -120,12 +126,24 @@ function createDriving({ root, config, onChange, activity }) {
           session.sensorAt = message.sensorAt;
           session.latencyMs = message.latencyMs;
           session.proposals = Array.isArray(message.proposals) ? message.proposals.slice(0, 64) : [];
-          session.threshold = message.threshold;
+          session.appliedThreshold = message.threshold;
+          session.wheelSpeeds = message.wheelSpeeds;
+          session.sensorPresent = message.sensorPresent;
           session.submissions = [];
-          if (!Array.isArray(message.commands) || message.commands.length > 64) throw new Error('Invalid action batch');
-          session.predictionStatus = message.commands.length ? 'Proposing actions' : 'Predicting no new action';
+          if (!Array.isArray(message.commands) || message.commands.length > 65) throw new Error('Invalid action batch');
+          session.predictionStatus = message.wheelSpeeds?.some((value) => value !== 0) ? 'Sending wheel controls' : 'Predicting stopped wheels';
           // Manual commands intentionally do not stop or pause this controller.
           for (const command of message.commands) transmit(session, command);
+          // Bound report history independently of camera and UI frame rates.
+          if (!session.history.length || Date.now() - session.history.at(-1).at >= 500) {
+            session.history.push({ at: Date.now(), wheelSpeeds: session.wheelSpeeds,
+              latencyMs: session.latencyMs, frameAgeMs: Date.now() - session.frameAt,
+              sensorAgeMs: Date.now() - session.sensorAt, threshold: session.appliedThreshold,
+              proposals: [...session.proposals].sort((a, b) => b.score - a.score).slice(0, 8).map(({ slot, score, reason }) => ({ slot, score, reason })),
+              submissions: session.submissions.slice(0, 16).map(({ command, result }) => ({ type: command.type, result,
+                wheels: command.type === 'drive' ? command.driveDirect : undefined })) });
+            if (session.history.length > 60) session.history.shift();
+          }
         } catch (error) { stop(roverId, error.message); break; }
       }
     });
@@ -158,11 +176,22 @@ function createDriving({ root, config, onChange, activity }) {
 
   return {
     attach, start, stop, canControl,
+    setThreshold(socket, roverId, value) {
+      const session = sessions.get(roverId);
+      if (!session || session.status === 'stopping' || !canControl(socket, roverId)) throw new Error('You cannot adjust this controller');
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < .05 || value > .99) throw new Error('Threshold must be between 0.05 and 0.99');
+      session.threshold = value;
+      sendState(session, { kind: 'settings', ts: Date.now(), threshold: value });
+    },
+    getDiagnostics(id) {
+      const session = sessions.get(id);
+      return session ? { modelId: session.modelId, sensorPresent: session.sensorPresent, history: session.history } : recent.get(id) || null;
+    },
     isActive: (id) => sessions.has(id),
     getState: (id) => {
       const session = sessions.get(id);
       if (!session) return null;
-      const { worker, socket, closed, done, ...state } = session;
+      const { worker, socket, closed, done, history, ...state } = session;
       return { ...state, startedBy: socket.data?.nickname || socket.id, socketId: socket.id };
     },
     shutdown: async () => {

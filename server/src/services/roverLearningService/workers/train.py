@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import random
+import resource
 import signal
 import time
 import uuid
@@ -70,7 +71,7 @@ def main():
     model = Policy().cpu()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
     # A fresh training lineage prevents previously trained footage leaking into validation.
-    resume_path = root / 'training' / 'resume-v2.pt'
+    resume_path = root / 'training' / 'resume-v3.pt'
     schema, steps, examples, last_published = [], 0, 0, 0
     trained_rovers = set()
     control_profiles = []
@@ -89,6 +90,9 @@ def main():
         control_profiles = saved.get('controlProfiles', [])
         distinct_windows = saved.get('distinctWindows', {})
         published_windows = saved.get('publishedWindows', 0)
+    cpu_started = time.process_time()
+    decode_started = time.monotonic()
+    dataset_stats = []
     initial_steps = steps
     pool, validation, accepted, rejected = [], [], [], {}
     observed_windows = {}
@@ -102,18 +106,34 @@ def main():
             break
         candidate_schema = copy.deepcopy(schema)
         samples, seen = [], 0
+        stats = {}
+        buckets = {key: [] for key in ('stopped', 'forward', 'reverse', 'turn')}
+        counts = dict.fromkeys(buckets, 0)
+        held_out = is_held_out(session_id)
         try:
             directory = root / 'recordings' / session_id
-            for sample in windows(directory, candidate_schema, cancelled):
+            for sample in windows(directory, candidate_schema, cancelled, stats):
                 seen += 1
-                # Uniform reservoir across the whole recording, not just the
-                # opening seconds. Frames remain uint8 until a batch is used.
-                if len(samples) < per_session:
-                    samples.append(sample)
+                # Keep evaluation naturally distributed. Training reserves space
+                # for ordinary turns/reversing so idle or straight motion cannot
+                # consume the entire sample budget. No scripted driving required.
+                if held_out:
+                    reservoir, count, capacity = samples, seen, per_session
                 else:
-                    index = random.randrange(seen)
-                    if index < per_session:
-                        samples[index] = sample
+                    left, right = sample[5]
+                    category = ('stopped' if max(abs(left), abs(right)) <= .02 else
+                                'turn' if abs(left - right) > .1 else
+                                'reverse' if left + right < 0 else 'forward')
+                    counts[category] += 1
+                    reservoir, count, capacity = buckets[category], counts[category], max(1, per_session // 4)
+                if len(reservoir) < capacity:
+                    reservoir.append(sample)
+                else:
+                    index = random.randrange(count)
+                    if index < capacity:
+                        reservoir[index] = sample
+            if not held_out:
+                samples = [sample for bucket in buckets.values() for sample in bucket]
             if cancelled():
                 break  # Do not call a partially decoded recording validated.
             if not samples:
@@ -123,6 +143,8 @@ def main():
             held_out = is_held_out(session_id)
             if held_out:
                 if candidate_schema != schema:
+                    dataset_stats.append({**stats, 'partition': 'heldOut', 'sampledWindows': len(samples),
+                                          'skipReason': 'Vocabulary absent from training data'})
                     continue  # Retry after training data introduces these command shapes.
                 validation.extend(samples)
             else:
@@ -136,15 +158,20 @@ def main():
             profile = metadata.get('controlProfile')
             if not held_out and profile is not None and profile not in control_profiles:
                 control_profiles.append(profile)
-            emit('dataset', sessionId=session_id, windows=seen, sampled=len(samples))
+            stats.update({'partition': 'heldOut' if held_out else 'training', 'sampledWindows': len(samples)})
+            dataset_stats.append(stats)
+            emit('dataset', sessionId=session_id, windows=seen, sampled=len(samples), diagnostics=stats)
         except (ValueError, KeyError, TypeError, OSError, EOFError, IndexError, OverflowError, av.error.FFmpegError) as error:
             rejected[session_id] = str(error)[:500]
             emit('skipped', sessionId=session_id, reason=rejected[session_id])
-    if len(pool) < config['minimumSamples'] or not any(sample[2].any() for sample in pool) or cancelled():
+    if len(pool) < config['minimumSamples'] or not any(np.max(np.abs(sample[5])) > .02 for sample in pool) or cancelled():
         emit('complete', trained=False, accepted=[], rejected=rejected, samples=len(pool),
+             diagnostics={'dataset': dataset_stats, 'decodeSeconds': time.monotonic() - decode_started},
              reason='Stopped/time limit' if cancelled() else 'Waiting for enough training-partition samples with human actions')
         return
 
+    decode_seconds = time.monotonic() - decode_started
+    train_started = time.monotonic()
     numeric_mask = torch.zeros(SLOTS, VALUES)
     for slot, descriptor in enumerate(schema):
         numeric_mask[slot, :len(descriptor['fields'])] = 1
@@ -161,16 +188,17 @@ def main():
             if cancelled() or steps - initial_steps >= config['maxStepsPerJob']:
                 break
             batch = pool[offset:offset + config['batchSize']]
-            images, states, targets, values, available = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
+            images, states, targets, values, available, wheel_targets, previous_wheels = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
             images = images.float().div_(255)
             optimizer.zero_grad(set_to_none=True)
-            action_logits, predictions = model(images, states)
+            action_logits, predictions, wheel_predictions = model(images, states)
             event_loss = functional.binary_cross_entropy_with_logits(action_logits, targets,
                                                                        pos_weight=positive_weight, reduction='none')
             event_loss = (event_loss * available).sum() / available.sum().clamp_min(1)
             mask = numeric_mask.unsqueeze(0) * targets.unsqueeze(-1)
             value_loss = ((predictions - values).square() * mask).sum() / mask.sum().clamp_min(1)
-            loss = event_loss + value_loss
+            wheel_loss = functional.smooth_l1_loss(wheel_predictions, wheel_targets)
+            loss = wheel_loss + event_loss + value_loss
             if not torch.isfinite(loss):
                 raise ValueError('Nonfinite training loss; checkpoint not saved')
             loss.backward()
@@ -180,13 +208,16 @@ def main():
             examples += len(batch)
             losses.append(loss.item())
             if steps % 10 == 0:
-                emit('progress', steps=steps, examples=examples, loss=loss.item())
+                emit('progress', steps=steps, examples=examples, loss=loss.item(),
+                     losses={'wheels': wheel_loss.item(), 'events': event_loss.item(), 'accessoryValues': value_loss.item()})
         if cancelled() or steps - initial_steps >= config['maxStepsPerJob']:
             break
     if steps == initial_steps:
         emit('complete', trained=False, accepted=[], rejected=rejected, reason='No training steps completed')
         return
 
+    training_seconds = time.monotonic() - train_started
+    evaluation_started = time.monotonic()
     distinct_windows.update(observed_windows)
     unique_count = sum(distinct_windows.values())
     evaluation = {'status': 'waiting for held-out sessions', 'windows': len(validation)}
@@ -195,13 +226,15 @@ def main():
         true_positive = predicted_positive = actual_positive = 0
         value_error = value_count = 0
         evaluated = 0
+        wheel_error = stopped_error = persistence_error = 0
+        changed_error = changed_persistence = changed_count = moving_count = 0
         with torch.inference_mode():
             for offset in range(0, len(validation), config['batchSize']):
                 if cancelled():
                     break
                 batch = validation[offset:offset + config['batchSize']]
-                images, states, targets, values, available = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
-                logits, predictions = model(images.float() / 255, states)
+                images, states, targets, values, available, wheel_targets, previous_wheels = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
+                logits, predictions, wheel_predictions = model(images.float() / 255, states)
                 predicted = (logits.sigmoid() >= job['actionThreshold']) & available.bool()
                 actual = targets.bool() & available.bool()
                 true_positive += (predicted & actual).sum().item()
@@ -210,16 +243,42 @@ def main():
                 mask = numeric_mask.unsqueeze(0) * targets.unsqueeze(-1)
                 value_error += ((predictions - values).square() * mask).sum().item()
                 value_count += mask.sum().item()
+                errors = (wheel_predictions - wheel_targets).abs().mean(dim=1) * 500
+                persistence = (previous_wheels - wheel_targets).abs().mean(dim=1) * 500
+                changed = (previous_wheels - wheel_targets).abs().amax(dim=1) > .02
+                changed_error += errors[changed].sum().item()
+                changed_persistence += persistence[changed].sum().item()
+                changed_count += changed.sum().item()
+                moving_count += (wheel_targets.abs().amax(dim=1) > .02).sum().item()
+                wheel_error += errors.sum().item()
+                stopped_error += wheel_targets.abs().mean(dim=1).sum().item() * 500
+                persistence_error += persistence.sum().item()
                 evaluated += len(batch)
         precision = true_positive / max(1, predicted_positive)
         recall = true_positive / max(1, actual_positive)
         mse = value_error / max(1, value_count)
-        # A basic imitation gate, not an autonomous-driving certification.
-        passed = (evaluated == len(validation) and evaluated >= 128 and actual_positive >= 32
-                  and precision >= .5 and recall >= .5 and value_count > 0 and mse <= .1)
+        wheel_mae = wheel_error / max(1, evaluated)
+        stopped_mae = stopped_error / max(1, evaluated)
+        persistence_mae = persistence_error / max(1, evaluated)
+        changed_mae = changed_error / max(1, changed_count)
+        changed_baseline = changed_persistence / max(1, changed_count)
+        # Check control changes separately: copying the previous speed can look
+        # excellent on long straight runs without learning to steer or stop.
+        wheels_pass = (evaluated == len(validation) and evaluated >= 128 and moving_count >= 32
+                       and changed_count >= 32 and wheel_mae < stopped_mae
+                       and wheel_mae <= persistence_mae and changed_mae < changed_baseline)
+        accessories_pass = (predicted_positive == 0 if actual_positive == 0 else
+                            actual_positive >= 32 and precision >= .5 and recall >= .5)
+        passed = wheels_pass and accessories_pass and (value_count == 0 or mse <= .1)
         evaluation = {'status': 'passed imitation gate' if passed else 'imitation gate not met',
                       'windows': evaluated, 'precision': precision, 'recall': recall,
-                      'numericMse': mse, 'positiveActions': actual_positive}
+                      'numericMse': mse, 'positiveActions': actual_positive,
+                      'wheelMaeMmPerSecond': wheel_mae, 'stoppedBaselineMaeMmPerSecond': stopped_mae,
+                      'previousSpeedBaselineMaeMmPerSecond': persistence_mae,
+                      'changedWheelMaeMmPerSecond': changed_mae, 'changedBaselineMaeMmPerSecond': changed_baseline,
+                      'changedWindows': changed_count, 'movingWindows': moving_count,
+                      'wheelsPassed': wheels_pass, 'accessoriesPassed': accessories_pass}
+    evaluation_seconds = time.monotonic() - evaluation_started
     publication = {'distinctMinutes': unique_count / 600,
                    'newMinutes': (unique_count - published_windows) / 600,
                    'minimumMinutes': config['minimumDrivingMinutes'],
@@ -236,6 +295,7 @@ def main():
     if cancelled():
         reasons.append('Job time budget reached')
     publication['reason'] = '; '.join(reasons) or 'Published'
+    save_started = time.monotonic()
     published = None
     if not reasons:
         adjectives = ['amber', 'curious', 'gentle', 'quiet', 'silver', 'bright', 'merry', 'sleepy']
@@ -270,9 +330,15 @@ def main():
         'controlProfiles': control_profiles, 'distinctWindows': distinct_windows,
         'publishedWindows': published_windows,
     }, resume_path)
+    diagnostics = {'dataset': dataset_stats, 'decodeSeconds': decode_seconds,
+                   'trainingSeconds': training_seconds, 'evaluationSeconds': evaluation_seconds, 'checkpointSeconds': time.monotonic() - save_started,
+                   'cpuSeconds': time.process_time() - cpu_started,
+                   'peakRssMiB': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
+                   'dependencies': {'torch': str(torch.__version__), 'numpy': str(np.__version__), 'av': str(av.__version__)},
+                   'policy': specification(schema), 'browserVideoLatencyMs': None}
     emit('complete', trained=True, accepted=accepted, rejected=rejected,
          steps=steps, examples=examples, loss=sum(losses) / len(losses),
-         published=published, publication=publication, evaluation=evaluation, elapsedSeconds=time.monotonic() - started)
+         published=published, publication=publication, evaluation=evaluation, diagnostics=diagnostics, elapsedSeconds=time.monotonic() - started)
 
 
 if __name__ == '__main__':

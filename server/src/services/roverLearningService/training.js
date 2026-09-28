@@ -10,6 +10,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
   const leases = new Set();
   const trainingRoot = path.join(root, 'training');
   let ledger = {};
+  const history = [];
   let child = null;
   let completion = Promise.resolve();
   let stopped = false;
@@ -30,7 +31,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
         }
       }
       try {
-        const saved = JSON.parse(await fs.readFile(path.join(trainingRoot, 'schedule.json'), 'utf8'));
+        const saved = JSON.parse(await fs.readFile(path.join(trainingRoot, 'schedule-v3.json'), 'utf8'));
         ledger = saved.sessions;
         state = { ...saved.progress, status: 'waiting' };
         if (!ledger || typeof ledger !== 'object') throw new Error('Invalid training schedule');
@@ -43,7 +44,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
   }
 
   async function saveLedger() {
-    const filename = path.join(trainingRoot, 'schedule.json');
+    const filename = path.join(trainingRoot, 'schedule-v3.json');
     await fs.writeFile(`${filename}.tmp`, JSON.stringify({ sessions: ledger, progress: state }));
     await fs.rename(`${filename}.tmp`, filename);
   }
@@ -117,8 +118,8 @@ function createTrainer({ root, config, actionThreshold, logger }) {
           if (message.kind === 'complete') result = message;
           if (message.kind === 'error') errorMessage = message.message;
           if (message.kind === 'skipped') logger.warn('Training skipped recording', message);
-          if (message.kind === 'dataset') state = { ...state, lastSampledWindows: message.sampled, lastAvailableWindows: message.windows };
-          if (message.kind === 'progress') state = { ...state, steps: message.steps, examples: message.examples, loss: message.loss };
+          if (message.kind === 'dataset') state = { ...state, lastSampledWindows: message.sampled, lastAvailableWindows: message.windows, dataset: message.diagnostics };
+          if (message.kind === 'progress') state = { ...state, steps: message.steps, examples: message.examples, loss: message.loss, losses: message.losses };
         } catch { errorMessage = 'Invalid training worker message'; }
       }
     });
@@ -138,7 +139,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
             state = { ...state, status: stopped ? 'stopped' : 'waiting', steps: result.steps ?? state.steps,
               completedAt: Date.now(), elapsedSeconds: result.elapsedSeconds ?? null, error: null,
               examples: result.examples ?? state.examples, loss: result.loss ?? null,
-              publication: result.publication ?? state.publication, evaluation: result.evaluation ?? state.evaluation,
+              diagnostics: result.diagnostics ?? state.diagnostics, publication: result.publication ?? state.publication, evaluation: result.evaluation ?? state.evaluation,
               reason: result.reason ?? 'Waiting for the next scheduled training job' };
             await saveLedger();
             logger.info('Training job completed', { ...state, model: result.published?.name || null });
@@ -147,6 +148,10 @@ function createTrainer({ root, config, actionThreshold, logger }) {
           state = { ...state, status: 'error', error: error.message };
           logger.error('Training result persistence failed', { error: error.message });
         } finally {
+          history.push({ at: Date.now(), status: state.status, steps: state.steps, loss: state.loss,
+            losses: state.losses || null, evaluation: state.evaluation || null,
+            elapsedSeconds: state.elapsedSeconds || null });
+          if (history.length > 20) history.shift();
           leases.clear();
           child = null;
           nextRun = Date.now() + config.intervalSeconds * 1000;
@@ -166,7 +171,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
 
   return {
     leases, start, tick, cancel,
-    getState: () => ({ ...state, nextAttemptAt: nextRun || null, leasedSessions: leases.size,
+    getState: () => ({ ...state, history, nextAttemptAt: nextRun || null, leasedSessions: leases.size,
       visitedSessions: Object.values(ledger).filter((entry) => entry.rounds).length,
       skippedSessions: Object.values(ledger).filter((entry) => entry.rejected).length,
       rejectionReasons: [...new Set(Object.values(ledger).filter((entry) => entry.rejected).map((entry) => entry.rejected))].slice(0, 10) }),

@@ -2,7 +2,10 @@
 
 ## Resume here
 
-Status: recording, bounded dataset/training, permanent named models, live inference,
+Status: policy format 2 now predicts continuous wheel speeds plus accessory events.
+Copyable diagnostics and main-card wheel/action displays with a session threshold
+slider are implemented. Older model files remain stored but cannot run in this format.
+Recording, bounded dataset/training, permanent named models, live inference,
 checked autonomous command submission, and the verified VIP card are coded.
 Human commands do not stop or pause autonomy (explicit latest user requirement).
 Focused local checks passed; actual recording/training, live autonomous behavior,
@@ -109,7 +112,7 @@ the default development path. Intended layout:
 rover-learning/
   recordings/       Rolling video/events/session metadata (implemented)
   models/           Permanent UUID directories: weights.pt and model.json
-  training/         resume-v2.pt, schedule.json, and current job.json
+  training/         resume-v3.pt, schedule-v3.json, and current job.json
 ```
 
 Training/model directories are created only when service and training are enabled.
@@ -684,3 +687,71 @@ migration 3 to remove only that obsolete key from all saved revisions before
 startup validation. Other settings remain intact; normal default filling adds
 new fields. No manual database/config edits are required. Existing focused
 migration and normalization tests passed (2/2); production restart is unverified.
+
+
+### Continuous wheel policy and copyable diagnostics (latest IPI)
+
+Requirements: learn solely from ordinary use. Never require prescribed routes,
+exercises, or demonstrations. Keep eight training threads until actual timings
+justify changes. No artificial model-size increase. Manual controls still do not
+stop or pause the controller. Keep card layout in the existing feature-card stack.
+
+Implemented:
+- Policy format 2 adds an independent two-value tanh wheel head (805,234 total
+  parameters), scaled to +/-500 mm/s. Accessory event/value heads remain separate;
+  drive command shapes remain causal history inputs but are masked as event targets.
+- Dataset reconstructs accepted human wheel intent at frame time +100ms, using
+  dispatched wheel values, explicit zero stops, and the recorded hardware limit
+  when available. Inspection of roverd dispatch found persistent wheel commands,
+  not a short wheel-command expiry timer. Permission boundaries, server overrides,
+  failed/ambiguous drive commands and raw/mode/system changes invalidate wheel
+  intent until another accepted human drive. Uncertain windows are excluded.
+  Raw OI controls are consequently not reliable trainable events in this revision;
+  their effects require dedicated decoding before relaxing that exclusion.
+- Four bounded training reservoirs preserve stopped, forward, reverse and turn
+  examples without requiring humans to behave differently. Held-out reservoirs
+  remain uniformly sampled and entire sessions retain deterministic partitioning.
+- Loss reports separate wheel, accessory-event and accessory-value components.
+  Held-out wheel MAE is compared with stopped-wheel and previous-command baselines,
+  with separate error on actual wheel changes. Publication needs >=128 evaluation
+  windows, >=32 moving and >=32 changed windows, improvement over stopped and
+  changed-window persistence baselines, and overall error no worse than persistence.
+  Accessory precision/recall gates remain when events exist; absent accessory
+  events must not produce false positives. These remain experimental imitation
+  criteria, not proof of autonomous competence.
+- Existing footage can be reused. New learning state is resume-v3.pt and
+  schedule-v3.json, preventing old-shape weights or stale rejection ledgers from
+  being reused. Existing published files remain untouched and visibly marked as
+  older format/incompatible. New compatible models are required to start driving.
+- Live inference emits a wheel command every decision, independent of the accessory
+  threshold. Server clamps wheel values to hardware limits through the unchanged
+  shared authorization path. Start/Stop and manual-input behavior are preserved.
+- Main card shows centered signed wheel bars, accessory score/status bars and a
+  session-local threshold slider (0.05..0.99). Only users with current rover control
+  can adjust it. Worker receives settings over its existing stdin channel; desired
+  and applied thresholds are separately observable. Active controllers get 10Hz
+  snapshots even when details are collapsed.
+- Copy diagnostics exports compact reportVersion=1 JSON from the same complete
+  card object. It includes application version, service-source SHA256 fingerprint,
+  policy version, settings, host load/memory, dataset timing/availability counters,
+  separate losses, baseline evaluation, decode/train/evaluation/checkpoint timing,
+  CPU seconds and peak RSS, publication blockers, 20 job summaries and up to 30s
+  of controller history sampled at 2Hz (top eight action scores per entry).
+- Reports use an explicit allowlist: no socket IDs, nicknames, rover IDs, filesystem
+  paths, raw video, credential-bearing URLs or raw command templates. Errors are
+  categorized rather than copying potentially sensitive arbitrary exception text.
+  Browser video latency and actual physical command execution are explicitly
+  unavailable. Diagnostics payloads are sent only while details are expanded;
+  active action visualization remains live in the main card.
+- Clipboard failure exposes a selectable compact report instead of silently failing.
+- No recorded dataset exists under this checkout's server/data/rover-learning.
+  Production worker dependency/entry-point checks succeeded; policy construction
+  reports 805,234 parameters. Targeted card ESLint and Node syntax checks passed.
+  Actual optimizer execution, held-out results, RTSP inference, clipboard/slider
+  behavior and browser appearance remain unverified here. No new tests, fake data,
+  or background development processes were created.
+
+Next: use real diagnostic reports to assess timing, sample rejection, target
+coverage and baseline performance. Do not infer competence from lower training
+loss or increase architecture size without that evidence. If training was disabled
+through the configuration UI, the operator must re-enable it to train this policy.

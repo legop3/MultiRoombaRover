@@ -3,6 +3,7 @@ const io = require('../../globals/io');
 const roverManager = require('../roverManager');
 const { isVerified } = require('../verificationService');
 const { listModels } = require('./models');
+const { report } = require('./diagnostics');
 const { compatible } = require('./capabilities');
 
 function createGateway({ root, driving, getSystemState, activity }) {
@@ -22,16 +23,16 @@ function createGateway({ root, driving, getSystemState, activity }) {
     const session = id ? driving.getState(id) : null;
     const canControl = Boolean(id && driving.canControl(socket, id));
     const system = getSystemState();
-    return {
+    const state = {
       available: true, roverId: id, updatedAt: Date.now(),
-      control: { canStart: canControl && !session, canStop: Boolean(session && (canControl || session.socketId === socket.id)),
+      control: { canStart: canControl && !session, canAdjust: canControl && Boolean(session), canStop: Boolean(session && (canControl || session.socketId === socket.id)),
         reason: !id ? 'Select a rover first' : !canControl ? 'You do not currently have control of this rover' : null },
       session,
       models: models.filter((model) => model.trainedRovers?.some((rover) => roverManager.canSeeRover(rover, socket)))
         .map((model) => ({ id: model.id, name: model.name, createdAt: model.createdAt,
           trainingSteps: model.trainingSteps, examplesProcessed: model.examplesProcessed,
           weightBytes: model.weightBytes, parameters: model.parameters, trainingLoss: model.trainingLoss,
-          evaluation: model.evaluation, validation: model.validation, distinctMinutes: model.distinctMinutes, controls: model.specification?.commands?.length || 0,
+          formatVersion: model.specification?.version, evaluation: model.evaluation, validation: model.validation, distinctMinutes: model.distinctMinutes, controls: model.specification?.commands?.length || 0,
           compatible: Boolean(id && compatible(model, roverManager.rovers.get(id))) })),
       catalogError: modelError,
       recording: { ...system.recording, sessions: system.recording.sessions.filter((s) => roverManager.canSeeRover(s.roverId, socket)) },
@@ -39,6 +40,8 @@ function createGateway({ root, driving, getSystemState, activity }) {
       limits: system.limits,
       activity: system.activity.filter((entry) => !entry.roverId || roverManager.canSeeRover(entry.roverId, socket)),
     };
+    state.diagnostics = viewers.get(socket)?.live ? report(state, id ? driving.getDiagnostics(id) : null) : null;
+    return state;
   }
 
   async function refresh() {
@@ -54,7 +57,7 @@ function createGateway({ root, driving, getSystemState, activity }) {
       const ordinary = Date.now() - lastOrdinary >= 1000;
       if (ordinary) lastOrdinary = Date.now();
       for (const [socket, view] of viewers) {
-        if (ordinary || view.live) socket.volatile.emit('roverLearning:state', stateFor(socket, view.roverId));
+        if (ordinary || view.live || driving.isActive(view.roverId)) socket.volatile.emit('roverLearning:state', stateFor(socket, view.roverId));
       }
     } finally { refreshing = false; }
   }
@@ -74,6 +77,7 @@ function createGateway({ root, driving, getSystemState, activity }) {
         if (!isVerified(socket)) throw new Error('Verification required');
         const roverId = String(payload.roverId || '');
         if (payload.action === 'start') await driving.start(socket, roverId, String(payload.modelId || ''));
+        else if (payload.action === 'threshold') driving.setThreshold(socket, roverId, payload.value);
         else if (payload.action === 'stop') {
           const session = driving.getState(roverId);
           if (!session || !(driving.canControl(socket, roverId) || session.socketId === socket.id)) throw new Error('You cannot stop this controller');

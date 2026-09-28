@@ -25,6 +25,24 @@ function Group({ title, children }) {
   </section>;
 }
 
+const actionNames = { motors: 'Brushes / vacuum', servo: 'Camera tilt', headlight: 'Headlight',
+  laser: 'Laser', horn: 'Horn', peripheral: 'Accessory', song: 'Beeper', raw: 'Recorded control' };
+
+function WheelMeter({ label, speed }) {
+  const known = Number.isFinite(speed);
+  const value = known ? Math.max(-500, Math.min(500, speed)) : 0;
+  return <div className="surface-muted min-w-0 space-y-1">
+    <div className="flex justify-between gap-2 text-xs"><span>{label}</span><span>{known ? `${value} mm/s` : 'Waiting'}</span></div>
+    <div role="meter" aria-label={label} aria-valuemin={-500} aria-valuemax={500} aria-valuenow={value}
+      aria-valuetext={known ? `${value} millimeters per second` : 'Unavailable'} className="relative h-3 overflow-hidden rounded bg-slate-800">
+      <div className={`absolute inset-y-0 rounded ${value < 0 ? 'bg-amber-400' : 'bg-sky-400'}`}
+        style={{ left: `${value < 0 ? 50 + value / 10 : 50}%`, width: `${Math.abs(value) / 10}%` }} />
+      <div className="absolute inset-y-0 left-1/2 w-px bg-slate-400" />
+    </div>
+    <div className="flex justify-between text-xs text-slate-500"><span>Reverse</span><span>Forward</span></div>
+  </div>;
+}
+
 export default function VipRoverLearningCard() {
   const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'roverLearning') && Boolean(state.session?.isVerified));
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
@@ -37,6 +55,8 @@ function LearningCard({ roverId }) {
   const [snapshot, setSnapshot] = useState(null);
   const [selectedId, setSelectedId] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [thresholdDraft, setThresholdDraft] = useState(null);
+  const [copyStatus, setCopyStatus] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const { value: settings, save } = useSettingsNamespace('roverLearning', { favorites: [] });
@@ -78,14 +98,26 @@ function LearningCard({ roverId }) {
   const limits = state?.limits;
   const now = state?.updatedAt || 0;
 
-  const act = (action) => {
+  const act = (action, value) => {
     setWorking(true);
     setError('');
-    socket.timeout(10000).emit('roverLearning:action', { action, roverId, modelId: chosen?.id }, (failure, response) => {
+    socket.timeout(10000).emit('roverLearning:action', { action, value, roverId, modelId: chosen?.id }, (failure, response) => {
       setWorking(false);
+      if (action === 'threshold') setThresholdDraft(null);
       if (failure || response?.error) setError(response?.error || 'The server did not respond. Check the controller status before trying again.');
       else if (response?.state) setSnapshot(response.state);
     });
+  };
+  const commitThreshold = (event) => {
+    const value = Number(event.currentTarget.value);
+    if (!working && state?.control?.canAdjust && value !== session?.threshold) act('threshold', value);
+  };
+  const copyDiagnostics = async () => {
+    try {
+      if (!state?.diagnostics) return;
+      await navigator.clipboard.writeText(JSON.stringify(state.diagnostics));
+      setCopyStatus('Diagnostics copied');
+    } catch { setCopyStatus('Clipboard unavailable. Select and copy the report below.'); }
   };
   const favorite = () => {
     if (!chosen) return;
@@ -103,7 +135,7 @@ function LearningCard({ roverId }) {
       <div className="flex flex-wrap items-center justify-center gap-1">
         <select aria-label="Rover model" className={fieldClass} value={chosen?.id || ''} onChange={(event) => setSelectedId(event.target.value)} disabled={working || !models.length}>
           {!models.length && <option value="">No published models yet</option>}
-          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.compatible ? '' : ' (incompatible)'}</option>)}
+          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.compatible ? '' : model.formatVersion !== 2 ? ' (older model format)' : ' (incompatible)'}</option>)}
         </select>
         <button type="button" className="button-dark text-sm disabled:opacity-50" aria-pressed={Boolean(chosen && favorites.includes(chosen.id))} disabled={!chosen} onClick={favorite}>
           {chosen && favorites.includes(chosen.id) ? '★ Favorite' : '☆ Favorite'}
@@ -113,12 +145,45 @@ function LearningCard({ roverId }) {
         <button type="button" className="button-dark text-sm disabled:opacity-50" disabled={working || !state?.control?.canStart || !chosen?.compatible} onClick={() => act('start')}>Start</button>
         <button type="button" className="button-dark text-sm disabled:opacity-50" disabled={working || !state?.control?.canStop} onClick={() => act('stop')}>Stop</button>
       </div>
+      {session && <section className="space-y-2" aria-label="Live model actions">
+        <p className="text-center text-xs text-sky-300">{session.predictionStatus || 'Waiting for fresh video and sensors'}</p>
+        <div className="grid grid-cols-2 gap-2">
+          <WheelMeter label="Predicted left wheel" speed={session.wheelSpeeds?.[0]} />
+          <WheelMeter label="Predicted right wheel" speed={session.wheelSpeeds?.[1]} />
+        </div>
+        <label className="surface-muted block space-y-1 text-xs">
+          <span className="flex justify-between gap-2"><span>Accessory action threshold</span><span>{(thresholdDraft ?? session.threshold ?? .7).toFixed(2)}</span></span>
+          <input type="range" min="0.05" max="0.99" step="0.01" className="w-full accent-sky-400"
+            value={thresholdDraft ?? session.threshold ?? .7} disabled={working || !state?.control?.canAdjust}
+            onChange={(event) => setThresholdDraft(Number(event.target.value))}
+            onPointerUp={commitThreshold} onKeyUp={commitThreshold} onBlur={commitThreshold} />
+          <span className="block text-slate-400">Lower allows more accessory actions. Wheel speeds are independent.</span>
+        </label>
+        <div className="grid max-h-52 grid-cols-1 gap-1 overflow-y-auto @[28rem]:grid-cols-2">
+          {session.proposals?.map((proposal) => {
+            const submission = session.submissions?.find((item) => item.command.type === proposal.command.type
+              && (proposal.command.type !== 'peripheral' || (item.command.peripheral?.id === proposal.command.peripheral?.id
+                && item.command.peripheral?.control === proposal.command.peripheral?.control)));
+            const status = proposal.reason === 'Proposed' && submission ? submission.result : proposal.reason;
+            return <div key={proposal.slot} className="surface-muted space-y-1 text-xs">
+              <div className="flex justify-between gap-2"><span>{actionNames[proposal.command.type] || proposal.command.type}{proposal.command.type === 'peripheral' ? ` · ${proposal.command.peripheral?.id} / ${proposal.command.peripheral?.control}` : ''}</span><span>{proposal.score.toFixed(2)}</span></div>
+              <div className="h-1.5 overflow-hidden rounded bg-slate-800"><div className={status === 'issued' ? 'h-full bg-emerald-400' : 'h-full bg-slate-500'} style={{ width: `${proposal.score * 100}%` }} /></div>
+              <p className={status === 'issued' ? 'text-emerald-300' : 'text-slate-400'}>{status === 'issued' ? 'Submitted' : status}</p>
+            </div>;
+          })}
+        </div>
+      </section>}
       {state?.control?.reason && <p className="text-center text-xs text-slate-400">{state.control.reason}</p>}
       {/* <p className="text-center text-xs text-slate-500">Manual controls stay available and do not stop the model.</p> */}
       <p className="text-center text-xs text-slate-400">Recording: {recording ? recording.paused ? 'paused for disk space' : `${recording.sessions.filter((item) => item.video === 'Recording human driving').length} driving · ${recording.sessions.filter((item) => item.video === 'Dock lead-in buffer').length} dock buffer(s)` : 'unavailable'} · Training: {training?.status || 'unavailable'}</p>
       {(error || state?.catalogError) && <p role="alert" className="break-words text-xs text-amber-300">{error || state.catalogError}</p>}
       <details className="surface-muted text-xs" onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
         <summary className="cursor-pointer py-1 font-semibold text-slate-200">System details</summary>
+        <div className="my-2 flex flex-wrap items-center gap-2">
+          <button type="button" className="button-dark disabled:opacity-50" disabled={!state?.diagnostics} onClick={copyDiagnostics}>Copy diagnostics</button>
+          <span role="status">{copyStatus}</span>
+        </div>
+        {copyStatus.startsWith('Clipboard unavailable') && <textarea readOnly aria-label="Diagnostics report" className="w-full" rows={4} value={JSON.stringify(state?.diagnostics || {})} onFocus={(event) => event.target.select()} />}
         <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 @[36rem]:grid-cols-2">
           <Group title="Recording and storage"><dl>
             <Row label="Recording size">{bytes(recording?.bytes)}</Row>
@@ -136,6 +201,8 @@ function LearningCard({ roverId }) {
             <Row label="Status">{training?.status || 'Unavailable'}</Row>
             <Row label="Steps">{display(training?.steps)}</Row>
             <Row label="Examples processed">{display(training?.examples)}</Row>
+            <Row label="Wheel / event / accessory losses">{training?.losses ? `${training.losses.wheels.toFixed(4)} / ${training.losses.events.toFixed(4)} / ${training.losses.accessoryValues.toFixed(4)}` : 'Unavailable'}</Row>
+            <Row label="Wheel error / stopped baseline / previous speed baseline">{training?.evaluation?.wheelMaeMmPerSecond == null ? 'Unavailable' : `${training.evaluation.wheelMaeMmPerSecond.toFixed(1)} / ${training.evaluation.stoppedBaselineMaeMmPerSecond.toFixed(1)} / ${training.evaluation.previousSpeedBaselineMaeMmPerSecond.toFixed(1)} mm/s`}</Row>
             <Row label="Training loss">{training?.loss == null ? 'Unavailable' : training.loss.toFixed(4)}</Row>
             <Row label="Current job age">{training?.status === 'training' ? age(now, training.startedAt) : 'Not running'}</Row>
             <Row label="Next attempt">{time(training?.nextAttemptAt)}</Row>
