@@ -9,10 +9,10 @@ module.exports = {
     recording: { maxGiB: 20, minimumFreeGiB: 2, sessionSeconds: 300 },
     driving: { threads: 4, actionThreshold: 0.7, staleMs: 2000 },
     training: {
-      enabled: true, python: '/opt/rover-learning/bin/python', threads: 4,
-      batchSize: 16, maxSamples: 512, minimumSamples: 128, passesPerJob: 2,
+      enabled: true, python: '/opt/rover-learning/bin/python', threads: 8,
+      batchSize: 16, maxSamples: 1024, minimumSamples: 128, passesPerJob: 2,
       roundsPerSession: 3, maxStepsPerJob: 200, checkpointEverySteps: 100,
-      intervalSeconds: 300, maxJobSeconds: 600,
+      intervalSeconds: 60, maxJobSeconds: 600,
     },
   },
   schema: strictObject({

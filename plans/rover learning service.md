@@ -529,15 +529,22 @@ Training defaults beneath `roverLearning.training`:
 | Setting | Default |
 |---|---:|
 | enabled (still gated by outer service enabled=false) | true |
-| threads | 4 |
+| threads | 8 |
 | batchSize | 16 |
-| maxSamples / minimumSamples | 512 / 128 |
+| maxSamples / minimumSamples | 1024 / 128 |
 | passesPerJob | 2 |
 | roundsPerSession | 3 |
 | maxStepsPerJob | 200 |
 | checkpointEverySteps | 100 |
-| intervalSeconds | 300 |
+| intervalSeconds | 60 |
 | maxJobSeconds | 600 |
+
+Defaults tuned to the user's dual E5-2620 v4 server benchmark: eight training
+threads improved throughput substantially over four, while sixteen gave little
+additional benefit. The larger sample pool and shorter interval are starting
+choices for its available resources, not measured learning-quality improvements.
+Inference remains four threads per rover. Existing explicit configuration values
+override these defaults; this change does not rewrite deployed configuration.
 
 At most four completed retained sessions are selected per job. Samples are spread
 over each full video via reservoir sampling, not always taken from its beginning.
