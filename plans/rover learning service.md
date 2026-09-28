@@ -821,3 +821,17 @@ evaluation/cache changes remain proposals, not part of this repair.
   stream is available here; the race is fixed by inspection but cannot yet be
   confirmed as the cause of the earlier production events. Previously discarded
   error details cannot be reconstructed. No new tests or processes were created.
+
+### Deliberate held-out selection
+
+Latest IPI authorizes the scheduler correction only. Randomly shuffled eligible
+sessions are now partitioned with exactly the worker's SHA256 first-eight-hex
+modulo-five rule. Jobs select up to three training sessions and one held-out
+session when both partitions exist; otherwise up to four training sessions.
+No worker starts with held-out sessions alone. Existing split assignments, model
+weights, and training progress are unchanged. Diagnostics expose timestamped
+available/selected partition counts and the reason when evaluation cannot be
+scheduled. Selection guarantees a held-out recording, not usable evaluation
+windows: decoding/vocabulary/sample checks still apply in the worker.
+Node syntax checks and diff whitespace checks passed; actual job selection on
+production recordings remains unverified. No new tests or background processes.

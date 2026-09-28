@@ -40,6 +40,7 @@ function report(state, controller) {
       sessions: state.recording.sessions.map((item) => ({ startedAtUnixMs: item.startedAt,
         status: item.video, droppedEvents: item.droppedEvents, error: redact(item.error), failureDetails: item.failureDetails || null, stderr: redact(item.stderr), errorCategory: errorCategory(item.error) })) },
     training: { status: training.status, steps: training.steps, examples: training.examples,
+      selection: training.selection || null,
       loss: training.loss, losses: training.losses || null, publication: training.publication || null,
       evaluation: training.evaluation || null, dataset: metrics.dataset || training.dataset || null,
       resources: { decodeSeconds: metrics.decodeSeconds ?? null, trainingSeconds: metrics.trainingSeconds ?? null,

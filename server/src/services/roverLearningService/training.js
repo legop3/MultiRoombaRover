@@ -4,7 +4,7 @@ const { errorDetails } = require('./errors');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { randomInt } = require('node:crypto');
+const { randomInt, createHash } = require('node:crypto');
 const { adoptCheckpoint } = require('./models');
 const { listRecordings } = require('./storage');
 
@@ -75,10 +75,27 @@ function createTrainer({ root, config, actionThreshold, logger }) {
       const other = randomInt(index + 1);
       [eligible[index], eligible[other]] = [eligible[other], eligible[index]];
     }
-    const selected = eligible.slice(0, 4);
+    // Match workers/train.py exactly. Never move a previously trained session
+    // into evaluation just to fill a slot: that would contaminate the holdout.
+    const partitions = { training: [], heldOut: [] };
+    for (const id of eligible) {
+      const heldOut = parseInt(createHash('sha256').update(id).digest('hex').slice(0, 8), 16) % 5 === 0;
+      partitions[heldOut ? 'heldOut' : 'training'].push(id);
+    }
+    const trainingSessions = partitions.training.slice(0, partitions.heldOut.length ? 3 : 4);
+    const heldOutSessions = trainingSessions.length ? partitions.heldOut.slice(0, 1) : [];
+    const selected = [...trainingSessions, ...heldOutSessions];
+    const selection = {
+      atUnixMs: Date.now(),
+      availableTraining: partitions.training.length, availableHeldOut: partitions.heldOut.length,
+      selectedTraining: trainingSessions.length, selectedHeldOut: heldOutSessions.length,
+      reason: !trainingSessions.length ? 'Waiting for completed usable training-partition recordings'
+        : !heldOutSessions.length ? 'Training without evaluation: no eligible held-out recordings' : null,
+    };
+    state = { ...state, selection };
     nextRun = Date.now() + config.intervalSeconds * 1000;
     if (!selected.length) {
-      state = { ...state, status: 'waiting', reason: 'Waiting for completed usable human recordings' };
+      state = { ...state, status: 'waiting', reason: selection.reason };
       await saveLedger();
       return;
     }
@@ -86,7 +103,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
     await fs.writeFile(jobPath, JSON.stringify({ root, config, actionThreshold, sessions: selected }));
     if (stopped) return;
     selected.forEach((id) => leases.add(id));
-    state = { ...state, status: 'training', reason: null, sessions: selected };
+    state = { ...state, status: 'training', reason: selection.reason, sessions: selected };
     state.startedAt = Date.now();
     child = spawn(config.python, [path.join(__dirname, 'workers/train.py'), '--job', jobPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
