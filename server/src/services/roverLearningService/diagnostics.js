@@ -6,7 +6,7 @@ const { createHash } = require('node:crypto');
 const applicationVersion = require('../../../package.json').version;
 const hash = createHash('sha256');
 for (const file of ['workers/policy.py', 'workers/dataset.py', 'workers/train.py', 'workers/infer.py',
-  'driving.js', 'recording.js', 'training.js', 'socketGateway.js', 'diagnostics.js']) {
+  'models.js', 'driving.js', 'recording.js', 'training.js', 'socketGateway.js', 'diagnostics.js']) {
   hash.update(fs.readFileSync(path.join(__dirname, file)));
 }
 const implementationSha256 = hash.digest('hex');
@@ -46,7 +46,7 @@ function report(state, controller) {
         peakRssMiB: metrics.peakRssMiB ?? null },
       history: training.history || [], rejectionCategories: (training.rejectionReasons || []).map(errorCategory),
       errorCategory: errorCategory(training.error), nextAttemptAtUnixMs: training.nextAttemptAt },
-    model: session ? { id: session.modelId, threshold: session.threshold, appliedThreshold: session.appliedThreshold } : null,
+    model: session ? { id: session.modelId, checkpointId: session.checkpointId, threshold: session.threshold, appliedThreshold: session.appliedThreshold } : null,
     controller: controller ? { modelId: controller.modelId, sensorPresent: controller.sensorPresent || null,
       stopCategory: errorCategory(controller.stopReason), history: (controller.history || []).map((item) => ({
         ...item, submissions: item.submissions.map((submission) => ({ type: submission.type,

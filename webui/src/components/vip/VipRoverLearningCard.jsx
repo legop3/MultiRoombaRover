@@ -90,7 +90,7 @@ function LearningCard({ roverId }) {
   }, [socket, roverId, detailsOpen]);
 
   const state = snapshot?.roverId === roverId ? snapshot : null;
-  const models = [...(state?.models || [])].sort((a, b) => Number(favorites.includes(b.id)) - Number(favorites.includes(a.id)) || b.createdAt - a.createdAt);
+  const models = [...(state?.models || [])].sort((a, b) => Number(favorites.includes(b.id)) - Number(favorites.includes(a.id)) || Number(b.id === 'latest') - Number(a.id === 'latest') || b.createdAt - a.createdAt);
   const chosen = models.find((model) => model.id === selectedId) || models.find((model) => model.compatible) || models[0];
   const session = state?.session;
   const training = state?.training;
@@ -135,7 +135,7 @@ function LearningCard({ roverId }) {
       <div className="flex flex-wrap items-center justify-center gap-1">
         <select aria-label="Rover model" className={fieldClass} value={chosen?.id || ''} onChange={(event) => setSelectedId(event.target.value)} disabled={working || !models.length}>
           {!models.length && <option value="">No published models yet</option>}
-          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.compatible ? '' : model.formatVersion !== 2 ? ' (older model format)' : ' (incompatible)'}</option>)}
+          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.experimental ? ' (experimental)' : ''}{model.compatible ? '' : model.formatVersion !== 2 ? ' (older model format)' : ' (incompatible)'}</option>)}
         </select>
         <button type="button" className="button-dark text-sm disabled:opacity-50" aria-pressed={Boolean(chosen && favorites.includes(chosen.id))} disabled={!chosen} onClick={favorite}>
           {chosen && favorites.includes(chosen.id) ? '★ Favorite' : '☆ Favorite'}
@@ -145,6 +145,10 @@ function LearningCard({ roverId }) {
         <button type="button" className="button-dark text-sm disabled:opacity-50" disabled={working || !state?.control?.canStart || !chosen?.compatible} onClick={() => act('start')}>Start</button>
         <button type="button" className="button-dark text-sm disabled:opacity-50" disabled={working || !state?.control?.canStop} onClick={() => act('stop')}>Stop</button>
       </div>
+      {state?.control?.canSnapshot && <div className="text-center">
+        <button type="button" className="button-dark text-sm disabled:opacity-50" disabled={working} onClick={() => act('snapshot')}>Save learner snapshot</button>
+        <p className="mt-1 text-xs text-slate-400">Preserves the latest completed training checkpoint, including experimental results.</p>
+      </div>}
       {session && <section className="space-y-2" aria-label="Live model actions">
         <p className="text-center text-xs text-sky-300">{session.predictionStatus || 'Waiting for fresh video and sensors'}</p>
         <div className="grid grid-cols-2 gap-2">
@@ -212,11 +216,11 @@ function LearningCard({ roverId }) {
             <Row label="CPU threads / batch size">{limits ? `${limits.training.threads} / ${limits.training.batchSize}` : 'Unavailable'}</Row>
             <Row label="Samples / passes per job">{limits ? `${limits.training.maxSamples} / ${limits.training.passesPerJob}` : 'Unavailable'}</Row>
             <Row label="Distinct training minutes">{training?.publication?.distinctMinutes?.toFixed(1) ?? 'Unavailable'}</Row>
-            <Row label="Publication minimum / new minutes">{limits ? `${limits.training.minimumDrivingMinutes} / ${limits.training.newDrivingMinutesPerModel}` : 'Unavailable'}</Row>
-            <Row label="Publication status">{training?.publication?.reason || 'Collecting data'}</Row>
+            <Row label="Latest minimum / new minutes">{limits ? `${limits.training.minimumDrivingMinutes} / ${limits.training.newDrivingMinutesPerModel}` : 'Unavailable'}</Row>
+            <Row label="Latest update status">{training?.publication?.reason || 'Collecting data'}</Row>
             <Row label="Held-out evaluation">{training?.evaluation?.status || 'Waiting for held-out data'}</Row>
             <Row label="Held-out precision / recall">{training?.evaluation?.precision == null ? 'Unavailable' : `${training.evaluation.precision.toFixed(3)} / ${training.evaluation.recall.toFixed(3)}`}</Row>
-            <Row label="Steps between publications">{display(limits?.training.checkpointEverySteps)}</Row>
+            <Row label="Steps between Latest updates">{display(limits?.training.checkpointEverySteps)}</Row>
           </dl>{training?.error && <p className="break-words text-amber-300">{training.error}</p>}
             {training?.reason && <p>{training.reason}</p>}
             {training?.rejectionReasons?.map((reason) => <p className="break-words text-amber-300" key={reason}>{reason}</p>)}
@@ -231,7 +235,7 @@ function LearningCard({ roverId }) {
             <Row label="Evaluation">{chosen?.evaluation || 'Unavailable'}</Row>
             <Row label="Distinct training minutes">{chosen?.distinctMinutes?.toFixed(1) ?? 'Unavailable'}</Row>
             <Row label="Held-out precision / recall">{chosen?.validation?.precision == null ? 'Unavailable' : `${chosen.validation.precision.toFixed(3)} / ${chosen.validation.recall.toFixed(3)}`}</Row>
-            <Row label="Published models">{models.length}</Row>
+            <Row label="Available models">{models.length}</Row>
           </dl></Group>
           <Group title="Live controller"><dl>
             <Row label="Latest prediction">{session?.predictionStatus || 'Unavailable'}</Row>

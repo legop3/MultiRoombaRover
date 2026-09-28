@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { randomInt } = require('node:crypto');
+const { adoptCheckpoint } = require('./models');
 const { listRecordings } = require('./storage');
 
 function createTrainer({ root, config, actionThreshold, logger }) {
@@ -133,6 +134,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
             if (!stopped) logger.error('Training job failed', { error: state.error, stderr });
           } else {
             for (const [id, reason] of Object.entries(result.rejected || {})) ledger[id] = { rejected: reason };
+            if (result.published) await adoptCheckpoint(root, result.published, result.promote);
             if (result.trained) {
               for (const id of result.accepted) ledger[id] = { rounds: (ledger[id]?.rounds || 0) + 1 };
             }

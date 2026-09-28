@@ -294,33 +294,36 @@ def main():
         reasons.append(evaluation['status'])
     if cancelled():
         reasons.append('Job time budget reached')
-    publication['reason'] = '; '.join(reasons) or 'Published'
+    publication['reason'] = '; '.join(reasons) or 'Latest updated'
     save_started = time.monotonic()
     published = None
+    # Every completed job exports an immutable candidate; Node owns promotion and retention.
+    adjectives = ['amber', 'curious', 'gentle', 'quiet', 'silver', 'bright', 'merry', 'sleepy']
+    animals = ['otter', 'finch', 'badger', 'robin', 'fox', 'heron', 'marten', 'wren']
+    model_id = str(uuid.uuid4())
+    name = f'{random.choice(adjectives)}-{random.choice(animals)}-{model_id[:8]}'
+    checkpoint_root = root / 'training' / 'checkpoints'
+    checkpoint_root.mkdir(exist_ok=True)
+    staging = checkpoint_root / f'.{model_id}.pending'
+    staging.mkdir()
+    weights_path = staging / 'weights.pt'
+    atomic_torch_save(torch, model.state_dict(), weights_path)
+    published = {
+        'id': model_id, 'name': name, 'createdAt': int(time.time() * 1000),
+        'trainingSteps': steps, 'examplesProcessed': examples,
+        'parameters': sum(p.numel() for p in model.parameters()),
+        'weightBytes': weights_path.stat().st_size,
+        'sha256': hashlib.sha256(weights_path.read_bytes()).hexdigest(),
+        'specification': specification(schema), 'trainedRovers': sorted(trained_rovers),
+        'controlProfiles': control_profiles,
+        'sourceSessions': accepted, 'trainingLoss': sum(losses) / len(losses),
+        'evaluation': evaluation['status'], 'validation': evaluation, 'distinctMinutes': publication['distinctMinutes'], 'dtype': 'float32', 'torchVersion': str(torch.__version__),
+    }
+    (staging / 'model.json').write_text(json.dumps(published, indent=2, allow_nan=False))
+    # A catalog reader sees both weights and metadata, or neither. Existing
+    # versions are never overwritten or deleted by the trainer.
+    staging.rename(checkpoint_root / model_id)
     if not reasons:
-        adjectives = ['amber', 'curious', 'gentle', 'quiet', 'silver', 'bright', 'merry', 'sleepy']
-        animals = ['otter', 'finch', 'badger', 'robin', 'fox', 'heron', 'marten', 'wren']
-        model_id = str(uuid.uuid4())
-        name = f'{random.choice(adjectives)}-{random.choice(animals)}-{model_id[:8]}'
-        staging = root / 'models' / f'.{model_id}.pending'
-        staging.mkdir()
-        weights_path = staging / 'weights.pt'
-        atomic_torch_save(torch, model.state_dict(), weights_path)
-        published = {
-            'id': model_id, 'name': name, 'createdAt': int(time.time() * 1000),
-            'trainingSteps': steps, 'examplesProcessed': examples,
-            'parameters': sum(p.numel() for p in model.parameters()),
-            'weightBytes': weights_path.stat().st_size,
-            'sha256': hashlib.sha256(weights_path.read_bytes()).hexdigest(),
-            'specification': specification(schema), 'trainedRovers': sorted(trained_rovers),
-            'controlProfiles': control_profiles,
-            'sourceSessions': accepted, 'trainingLoss': sum(losses) / len(losses),
-            'evaluation': evaluation['status'], 'validation': evaluation, 'distinctMinutes': publication['distinctMinutes'], 'dtype': 'float32', 'torchVersion': str(torch.__version__),
-        }
-        (staging / 'model.json').write_text(json.dumps(published, indent=2, allow_nan=False))
-        # A catalog reader sees both weights and metadata, or neither. Existing
-        # versions are never overwritten or deleted by the trainer.
-        staging.rename(root / 'models' / model_id)
         last_published = steps
         published_windows = unique_count
     atomic_torch_save(torch, {
@@ -338,7 +341,7 @@ def main():
                    'policy': specification(schema), 'browserVideoLatencyMs': None}
     emit('complete', trained=True, accepted=accepted, rejected=rejected,
          steps=steps, examples=examples, loss=sum(losses) / len(losses),
-         published=published, publication=publication, evaluation=evaluation, diagnostics=diagnostics, elapsedSeconds=time.monotonic() - started)
+         published=published, promote=not reasons, publication=publication, evaluation=evaluation, diagnostics=diagnostics, elapsedSeconds=time.monotonic() - started)
 
 
 if __name__ == '__main__':

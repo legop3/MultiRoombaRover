@@ -2,6 +2,9 @@
 
 ## Resume here
 
+Latest change: one ongoing learner, gated Latest/Previous checkpoints, and
+admin-created permanent snapshots replace automatic permanent publications.
+
 Status: policy format 2 now predicts continuous wheel speeds plus accessory events.
 Copyable diagnostics and main-card wheel/action displays with a session threshold
 slider are implemented. Older model files remain stored but cannot run in this format.
@@ -755,3 +758,31 @@ Next: use real diagnostic reports to assess timing, sample rejection, target
 coverage and baseline performance. Do not infer competence from lower training
 loss or increase architecture size without that evidence. If training was disabled
 through the configuration UI, the operator must re-enable it to train this policy.
+
+
+### Ongoing learner and administrator snapshots
+
+Authorized by the latest IPI. Training continues from the same resume-v3.pt;
+no new training reset or configuration migration is required.
+
+- Each completed training job exports immutable weights/metadata beneath
+  training/checkpoints/<uuid>. A serialized Node catalog atomically updates
+  index.json with candidate, latest, and previous pointers after worker exit.
+- Existing data/step/evaluation gates govern Latest promotion. Previous retains
+  the former Latest. Candidate tracks the latest completed learner even when
+  those gates fail. No automatic permanent named-model creation remains.
+- The model picker exposes Latest and Previous alongside existing permanent
+  snapshots. Running sessions acquire a checkpoint lease and keep their original
+  weights; promotion does not reload them. Retention removes superseded automatic
+  checkpoints, with leased ones removed after their running session closes.
+- Admin-only Save learner snapshot copies the candidate atomically to a new
+  permanent two-word/UUID model directory, carrying its evaluation and source
+  checkpoint ID. Candidates without a passing evaluation are labeled experimental.
+  Non-admin requests are rejected server-side. Normal rover-control permissions
+  still apply when starting any model. Existing models/favorites remain intact.
+- Source fingerprints and controller diagnostics include the pinned checkpoint ID.
+  Configuration field names are unchanged; descriptions now refer to Latest
+  promotion rather than permanent publication. Permanent snapshots are never pruned.
+- Focused Node syntax and Python worker entry-point checks passed. Targeted card
+  lint is run for the UI change. End-to-end training/promotion, snapshot copying,
+  active-session pinning and browser behavior remain unverified without live data.

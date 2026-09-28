@@ -2,7 +2,8 @@
 const io = require('../../globals/io');
 const roverManager = require('../roverManager');
 const { isVerified } = require('../verificationService');
-const { listModels } = require('./models');
+const { isAdmin } = require('../roleService');
+const { listModels, saveSnapshot } = require('./models');
 const { report } = require('./diagnostics');
 const { compatible } = require('./capabilities');
 
@@ -25,11 +26,11 @@ function createGateway({ root, driving, getSystemState, activity }) {
     const system = getSystemState();
     const state = {
       available: true, roverId: id, updatedAt: Date.now(),
-      control: { canStart: canControl && !session, canAdjust: canControl && Boolean(session), canStop: Boolean(session && (canControl || session.socketId === socket.id)),
+      control: { canSnapshot: isAdmin(socket), canStart: canControl && !session, canAdjust: canControl && Boolean(session), canStop: Boolean(session && (canControl || session.socketId === socket.id)),
         reason: !id ? 'Select a rover first' : !canControl ? 'You do not currently have control of this rover' : null },
       session,
       models: models.filter((model) => model.trainedRovers?.some((rover) => roverManager.canSeeRover(rover, socket)))
-        .map((model) => ({ id: model.id, name: model.name, createdAt: model.createdAt,
+        .map((model) => ({ id: model.id, checkpointId: model.checkpointId || model.id, automatic: Boolean(model.automatic), experimental: Boolean(model.experimental), name: model.name, createdAt: model.createdAt,
           trainingSteps: model.trainingSteps, examplesProcessed: model.examplesProcessed,
           weightBytes: model.weightBytes, parameters: model.parameters, trainingLoss: model.trainingLoss,
           formatVersion: model.specification?.version, evaluation: model.evaluation, validation: model.validation, distinctMinutes: model.distinctMinutes, controls: model.specification?.commands?.length || 0,
@@ -76,7 +77,13 @@ function createGateway({ root, driving, getSystemState, activity }) {
       try {
         if (!isVerified(socket)) throw new Error('Verification required');
         const roverId = String(payload.roverId || '');
-        if (payload.action === 'start') await driving.start(socket, roverId, String(payload.modelId || ''));
+        if (payload.action === 'snapshot') {
+          if (!isAdmin(socket)) throw new Error('Administrator access required');
+          const model = await saveSnapshot(root);
+          models = await listModels(root);
+          lastCatalog = Date.now();
+          activity('Learner snapshot saved', { model: model.name });
+        } else if (payload.action === 'start') await driving.start(socket, roverId, String(payload.modelId || ''));
         else if (payload.action === 'threshold') driving.setThreshold(socket, roverId, payload.value);
         else if (payload.action === 'stop') {
           const session = driving.getState(roverId);

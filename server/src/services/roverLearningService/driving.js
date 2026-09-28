@@ -1,5 +1,4 @@
 // Autonomy owns a live user's control context, never an administrative identity.
-const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const roverManager = require('../roverManager');
@@ -7,6 +6,7 @@ const { isVerified, isDeterred } = require('../verificationService');
 const { isAdmin } = require('../roleService');
 const { submitCommand, issueCommand, subscribeCommandRecording } = require('../commandService');
 const { recordCommandRequest } = require('../commandService/recording');
+const { acquireModel } = require('./models');
 const { compatible } = require('./capabilities');
 
 const OPERATING = new Set(['drive', 'motors', 'servo', 'headlight', 'laser', 'horn', 'peripheral', 'song', 'raw']);
@@ -84,19 +84,19 @@ function createDriving({ root, config, onChange, activity }) {
 
   async function start(socket, roverId, modelId) {
     if (stopping || !canControl(socket, roverId)) throw new Error('You cannot control this rover');
-    if (!/^[0-9a-f-]{36}$/.test(modelId)) throw new Error('Invalid model');
-    const directory = path.join(root, 'models', modelId);
-    const metadata = JSON.parse(await fs.readFile(path.join(directory, 'model.json'), 'utf8'));
-    if (metadata.id !== modelId || !compatible(metadata, roverManager.rovers.get(roverId))) {
-      throw new Error('Model is not compatible with this rover');
-    }
-    if (stopping || !canControl(socket, roverId)) throw new Error('Control permission changed');
-    if (sessions.has(roverId)) throw new Error('Stop the current controller before starting another model');
+    const acquired = await acquireModel(root, modelId);
+    const { directory, metadata } = acquired;
+    try {
+      if (!compatible(metadata, roverManager.rovers.get(roverId))) throw new Error('Model is not compatible with this rover');
+      if (stopping || !canControl(socket, roverId)) throw new Error('Control permission changed');
+      if (sessions.has(roverId)) throw new Error('Stop the current controller before starting another model');
+    } catch (error) { await acquired.release(); throw error; }
     const worker = spawn(config.training.python, [path.join(__dirname, 'workers/infer.py'), '--model', directory,
       '--url', `rtsp://127.0.0.1:8554/${encodeURIComponent(roverId)}`, '--threads', String(config.driving.threads),
       '--threshold', String(config.driving.actionThreshold)], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } });
-    const session = { worker, socket, roverId, modelId, modelName: metadata.name, status: 'starting', startedAt: Date.now(), lastPredictionAt: null, threshold: config.driving.actionThreshold, history: [] };
+    const session = { worker, socket, roverId, modelId, checkpointId: metadata.id, modelName: modelId === 'latest' ? 'Latest' : modelId === 'previous' ? 'Previous' : metadata.name, status: 'starting', startedAt: Date.now(), lastPredictionAt: null, threshold: config.driving.actionThreshold, history: [] };
     session.closed = new Promise((resolve) => worker.once('close', resolve));
+    session.closed.then(() => acquired.release()).catch((error) => activity('Checkpoint release failed', { error: error.message }));
     sessions.set(roverId, session);
     recent.delete(roverId);
     let output = '';
