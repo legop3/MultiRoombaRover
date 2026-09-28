@@ -663,8 +663,8 @@ models, silent controllers, and training stopping after a few jobs.
 - Fresh `training/resume-v2.pt` prevents old training exposure contaminating the
   new validation split. Existing published models and old resume.pt are preserved.
   New checkpoints retain optimizer progress even when publication is blocked.
-- Deployment config: remove the old `training.roundsPerSession` key because the
-  schema is strict. Set `checkpointEverySteps: 1000`, `minimumDrivingMinutes: 30`,
+- Deployment config: migration 3 automatically removes the obsolete
+  `training.roundsPerSession` key from saved revisions before startup validation. Set `checkpointEverySteps: 1000`, `minimumDrivingMinutes: 30`,
   and `newDrivingMinutesPerModel: 10`; saved values override changed defaults.
 - Verification: four focused configuration tests passed, modified Node entry
   points passed syntax checks, targeted VIP ESLint passed, and the production
@@ -674,3 +674,13 @@ models, silent controllers, and training stopping after a few jobs.
   dock transitions, actual optimizer/evaluation/publication runs on recordings,
   browser appearance/live updates, and real autonomous behavior. Do not claim
   these checks passed or that the existing event-based policy now drives well.
+
+
+### Startup regression repair
+
+The actual server crash reported CONFIG_VALIDATION_FAILED for the removed
+roverLearning.training.roundsPerSession field. Added configuration database
+migration 3 to remove only that obsolete key from all saved revisions before
+startup validation. Other settings remain intact; normal default filling adds
+new fields. No manual database/config edits are required. Existing focused
+migration and normalization tests passed (2/2); production restart is unverified.
