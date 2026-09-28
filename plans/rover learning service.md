@@ -24,6 +24,10 @@ The user declined the manual server checklist and explicitly asked to continue.
 Do not block further work or repeatedly ask them to do it. Preserve the unverified
 status and have the reader reject unusable recordings automatically.
 
+Latest increment: internal card gating, dock lead-in/tail capture, live prediction
+diagnostics, ongoing retained-data sampling, and gated model publication are coded.
+See the final handoff section for settings and the new training lineage.
+
 Next work: verify the integrated feature against actual recordings and the real
 camera/rover pipeline when that environment is available; inspect the VIP card in
 the running browser. Do not invent successful driving results or block further
@@ -105,7 +109,7 @@ the default development path. Intended layout:
 rover-learning/
   recordings/       Rolling video/events/session metadata (implemented)
   models/           Permanent UUID directories: weights.pt and model.json
-  training/         resume.pt, schedule.json, and current job.json
+  training/         resume-v2.pt, schedule.json, and current job.json
 ```
 
 Training/model directories are created only when service and training are enabled.
@@ -533,9 +537,9 @@ Training defaults beneath `roverLearning.training`:
 | batchSize | 16 |
 | maxSamples / minimumSamples | 1024 / 128 |
 | passesPerJob | 2 |
-| roundsPerSession | 3 |
+| minimumDrivingMinutes / newDrivingMinutesPerModel | 30 / 10 |
 | maxStepsPerJob | 200 |
-| checkpointEverySteps | 100 |
+| checkpointEverySteps | 1000 |
 | intervalSeconds | 60 |
 | maxJobSeconds | 600 |
 
@@ -548,9 +552,9 @@ override these defaults; this change does not rewrite deployed configuration.
 
 At most four completed retained sessions are selected per job. Samples are spread
 over each full video via reservoir sampling, not always taken from its beginning.
-The rounds limit is sampled training visits, not full passes over all recorded
-frames. Once retained data reaches that limit, training waits for new sessions.
-Candidate publication happens at job boundaries after enough accumulated steps;
+The prior three-visit limit is removed. Retained usable training sessions remain
+eligible for repeated sampling; finite jobs still yield between runs.
+Candidate publication happens at job boundaries after data, step, and held-out gates;
 it does not automatically deploy a model. No all-no-action sample pool is trained.
 
 Container rebuild is needed to include Python packages. For a non-container
@@ -616,3 +620,57 @@ record verification limits and outstanding server/hardware work explicitly.
   end-to-end inference/training and browser rendering remain unverified. No new
   tests or background processes were added for verification, and no full build
   or full test suite was run.
+
+
+### Dock capture, live diagnostics, and publication correction
+
+Authorized by IPI after the user reported idle dock recording, many premature
+models, silent controllers, and training stopping after a few jobs.
+
+- VipPanel now renders only `<VipRoverLearningCard />`; the card owns feature and
+  verification gating, rover selection context, and grid wrapper. The user's
+  pre-existing card edit was preserved.
+- Human docked sessions maintain disposable packet-copy video segments and a
+  bounded five-second event buffer. Segments are keyframe-aligned (target two
+  seconds); old closed segments are pruned, with an extra edge segment retained
+  for decoding. Undocking promotes the buffer and sets trainingStartedAt to five
+  seconds earlier. After docking, recording closes after five seconds (250ms
+  polling granularity) and returns to buffering. Never-undocked buffers are
+  deleted on close/recovery and never offered to training. Disk retention still
+  applies. The reader handles chronological segments and filters the lead-in
+  boundary; no RTSP restart is needed to promote a dock buffer.
+- The service still excludes autonomous sessions and still requires an eligible
+  human. Human input does not stop or pause autonomy.
+- Expanded card diagnostics opt into complete volatile snapshots at 10Hz;
+  collapsed cards receive 1Hz. Predictions include all known command shapes,
+  scores, decoded controls, below-threshold/competing/latched reasons, and actual
+  submission results. "Predicting no new action" is separate from worker running.
+- Removed roundsPerSession from configuration and scheduling. Completed usable
+  recordings remain eligible indefinitely within rolling retention. Jobs remain
+  finite, lower-priority, and separated by the configured interval. Waiting and
+  publication reasons are visible in the card.
+- Default publication gates: 1000 optimizer steps, 30 distinct usable training
+  minutes, and 10 additional distinct minutes since the previous publication.
+  Usable minutes count enumerated aligned 100ms windows once per training session,
+  not repeated optimizer exposures; only a reservoir is used in each job.
+- Entire sessions are deterministically partitioned 80/20 by session-ID hash.
+  Held-out sessions never supply gradient updates or new command vocabulary.
+  Evaluation requires at least 128 windows and 32 positive events, precision and
+  recall >=0.5 at the configured action threshold, and normalized numeric MSE
+  <=0.1 with numeric targets present. These are initial imitation gates, not proof
+  of autonomous competence. Evaluation uses the current job's held-out reservoir;
+  jobs with no usable held-out cohort cannot publish.
+- Fresh `training/resume-v2.pt` prevents old training exposure contaminating the
+  new validation split. Existing published models and old resume.pt are preserved.
+  New checkpoints retain optimizer progress even when publication is blocked.
+- Deployment config: remove the old `training.roundsPerSession` key because the
+  schema is strict. Set `checkpointEverySteps: 1000`, `minimumDrivingMinutes: 30`,
+  and `newDrivingMinutesPerModel: 10`; saved values override changed defaults.
+- Verification: four focused configuration tests passed, modified Node entry
+  points passed syntax checks, targeted VIP ESLint passed, and the production
+  training dependency entry point loaded the policy and segmented dataset reader.
+  No fixtures/test files, full builds, or background servers were created.
+- Still unverified on this development machine: live RTSP segment timestamps and
+  dock transitions, actual optimizer/evaluation/publication runs on recordings,
+  browser appearance/live updates, and real autonomous behavior. Do not claim
+  these checks passed or that the existing event-based policy now drives well.

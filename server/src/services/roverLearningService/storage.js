@@ -30,6 +30,10 @@ async function recoverRecordings(root) {
       // until ordinary retention removes it, rather than blocking all startup.
       metadata = { version: 1, id: recording.id, startedAt: recording.startedAt };
     }
+    if (metadata.bufferOnly) {
+      await fs.rm(recording.directory, { recursive: true, force: true });
+      continue;
+    }
     if (metadata.endedAt != null) continue;
     await saveMetadata(recording.directory, {
       ...metadata, endedAt: Date.now(), reason: 'interrupted',

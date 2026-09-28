@@ -1,5 +1,7 @@
 // One service snapshot supplies this entire card. Favorites never leave settings.
 import { useEffect, useState } from 'react';
+import { useSessionSelector } from '../../context/SessionContext.jsx';
+import { isFeatureEnabled } from '../../lib/features.js';
 import { useSocket } from '../../context/SocketContext.jsx';
 import { useSettingsNamespace } from '../../settings/index.js';
 import CardFrame from '../CardFrame/index.jsx';
@@ -23,10 +25,18 @@ function Group({ title, children }) {
   </section>;
 }
 
-export default function VipRoverLearningCard({ roverId }) {
+export default function VipRoverLearningCard() {
+  const enabled = useSessionSelector((state) => isFeatureEnabled(state, 'roverLearning') && Boolean(state.session?.isVerified));
+  const roverId = useSessionSelector((state) => state.session?.assignment?.roverId || null);
+  if (!enabled) return null;
+  return <LearningCard roverId={roverId} />;
+}
+
+function LearningCard({ roverId }) {
   const socket = useSocket();
   const [snapshot, setSnapshot] = useState(null);
   const [selectedId, setSelectedId] = useState('');
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const { value: settings, save } = useSettingsNamespace('roverLearning', { favorites: [] });
@@ -37,7 +47,7 @@ export default function VipRoverLearningCard({ roverId }) {
     const receive = (state) => { if (active) setSnapshot(state); };
     const subscribe = () => {
       if (!socket.connected) return;
-      socket.timeout(5000).emit('roverLearning:subscribe', { roverId }, (failure, response) => {
+      socket.timeout(5000).emit('roverLearning:subscribe', { roverId, live: detailsOpen }, (failure, response) => {
         if (!failure && response?.state) receive(response.state);
       });
     };
@@ -57,7 +67,7 @@ export default function VipRoverLearningCard({ roverId }) {
       socket.off('disconnect', disconnected);
       socket.emit('roverLearning:unsubscribe');
     };
-  }, [socket, roverId]);
+  }, [socket, roverId, detailsOpen]);
 
   const state = snapshot?.roverId === roverId ? snapshot : null;
   const models = [...(state?.models || [])].sort((a, b) => Number(favorites.includes(b.id)) - Number(favorites.includes(a.id)) || b.createdAt - a.createdAt);
@@ -104,10 +114,10 @@ export default function VipRoverLearningCard({ roverId }) {
         <button type="button" className="button-dark text-sm disabled:opacity-50" disabled={working || !state?.control?.canStop} onClick={() => act('stop')}>Stop</button>
       </div>
       {state?.control?.reason && <p className="text-center text-xs text-slate-400">{state.control.reason}</p>}
-      <p className="text-center text-xs text-slate-500">Manual controls stay available and do not stop the model.</p>
-      <p className="text-center text-xs text-slate-400">Recording: {recording ? recording.paused ? 'paused for disk space' : `${recording.sessions.length} human session(s)` : 'unavailable'} · Training: {training?.status || 'unavailable'}</p>
+      {/* <p className="text-center text-xs text-slate-500">Manual controls stay available and do not stop the model.</p> */}
+      <p className="text-center text-xs text-slate-400">Recording: {recording ? recording.paused ? 'paused for disk space' : `${recording.sessions.filter((item) => item.video === 'Recording human driving').length} driving · ${recording.sessions.filter((item) => item.video === 'Dock lead-in buffer').length} dock buffer(s)` : 'unavailable'} · Training: {training?.status || 'unavailable'}</p>
       {(error || state?.catalogError) && <p role="alert" className="break-words text-xs text-amber-300">{error || state.catalogError}</p>}
-      <details className="surface-muted text-xs">
+      <details className="surface-muted text-xs" onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
         <summary className="cursor-pointer py-1 font-semibold text-slate-200">System details</summary>
         <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 @[36rem]:grid-cols-2">
           <Group title="Recording and storage"><dl>
@@ -134,6 +144,11 @@ export default function VipRoverLearningCard({ roverId }) {
             <Row label="Last windows available / sampled">{training?.lastAvailableWindows == null ? 'Unavailable' : `${training.lastAvailableWindows} / ${training.lastSampledWindows}`}</Row>
             <Row label="CPU threads / batch size">{limits ? `${limits.training.threads} / ${limits.training.batchSize}` : 'Unavailable'}</Row>
             <Row label="Samples / passes per job">{limits ? `${limits.training.maxSamples} / ${limits.training.passesPerJob}` : 'Unavailable'}</Row>
+            <Row label="Distinct training minutes">{training?.publication?.distinctMinutes?.toFixed(1) ?? 'Unavailable'}</Row>
+            <Row label="Publication minimum / new minutes">{limits ? `${limits.training.minimumDrivingMinutes} / ${limits.training.newDrivingMinutesPerModel}` : 'Unavailable'}</Row>
+            <Row label="Publication status">{training?.publication?.reason || 'Collecting data'}</Row>
+            <Row label="Held-out evaluation">{training?.evaluation?.status || 'Waiting for held-out data'}</Row>
+            <Row label="Held-out precision / recall">{training?.evaluation?.precision == null ? 'Unavailable' : `${training.evaluation.precision.toFixed(3)} / ${training.evaluation.recall.toFixed(3)}`}</Row>
             <Row label="Steps between publications">{display(limits?.training.checkpointEverySteps)}</Row>
           </dl>{training?.error && <p className="break-words text-amber-300">{training.error}</p>}
             {training?.reason && <p>{training.reason}</p>}
@@ -147,9 +162,13 @@ export default function VipRoverLearningCard({ roverId }) {
             <Row label="Steps / examples">{chosen ? `${chosen.trainingSteps} / ${chosen.examplesProcessed}` : 'Unavailable'}</Row>
             <Row label="Control shapes">{display(chosen?.controls)}</Row>
             <Row label="Evaluation">{chosen?.evaluation || 'Unavailable'}</Row>
+            <Row label="Distinct training minutes">{chosen?.distinctMinutes?.toFixed(1) ?? 'Unavailable'}</Row>
+            <Row label="Held-out precision / recall">{chosen?.validation?.precision == null ? 'Unavailable' : `${chosen.validation.precision.toFixed(3)} / ${chosen.validation.recall.toFixed(3)}`}</Row>
             <Row label="Published models">{models.length}</Row>
-          </dl><p className="mt-1 text-slate-500">Models are kept permanently. Favorites are saved in this browser.</p></Group>
+          </dl></Group>
           <Group title="Live controller"><dl>
+            <Row label="Latest prediction">{session?.predictionStatus || 'Unavailable'}</Row>
+            <Row label="Action threshold">{display(session?.threshold)}</Row>
             <Row label="State">{session?.status || 'Stopped'}</Row>
             <Row label="Started by">{session?.startedBy || 'Unavailable'}</Row>
             <Row label="Duration">{age(now, session?.startedAt)}</Row>
@@ -159,6 +178,13 @@ export default function VipRoverLearningCard({ roverId }) {
             <Row label="Last command result">{session?.lastResult || 'Unavailable'}</Row>
             <Row label="CPU threads">{display(limits?.driving.threads)}</Row>
           </dl>{session?.lastAction && <pre className="mt-1 whitespace-pre-wrap break-all text-slate-400">{JSON.stringify(session.lastAction.command, null, 2)}</pre>}
+            {session?.proposals?.length > 0 && <div className="mt-2 max-h-72 space-y-1 overflow-auto">
+              {session.proposals.map((proposal) => <div key={proposal.slot} className="border-t border-slate-700 py-1">
+                <p>{proposal.command.type} · score {proposal.score.toFixed(3)} · {proposal.reason}</p>
+                <pre className="whitespace-pre-wrap break-all text-slate-400">{JSON.stringify(proposal.command)}</pre>
+              </div>)}
+            </div>}
+            {session?.submissions?.map((item, index) => <p key={index}>Submitted {item.command.type}: {item.result}</p>)}
             {session?.stopReason && <p>{session.stopReason}</p>}
           </Group>
           <div className="@[36rem]:col-span-2"><Group title="Recent activity">

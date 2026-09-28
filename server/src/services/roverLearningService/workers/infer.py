@@ -110,10 +110,8 @@ def main():
                 raise ValueError('Nonfinite model output')
             families = {}
             active = set()
+            proposals = []
             for slot, descriptor in enumerate(schema):
-                if probabilities[slot] < args.threshold:
-                    continue
-                active.add(slot)
                 command = json.loads(json.dumps(descriptor['template']))
                 family = command['type']
                 if family == 'peripheral':
@@ -127,6 +125,11 @@ def main():
                     for key in field['path'][:-1]:
                         target = target[key]
                     target[field['path'][-1]] = round(number) if field['integer'] else number
+                proposals.append({'slot': slot, 'score': probabilities[slot], 'command': command,
+                                  'reason': 'Below threshold'})
+                if probabilities[slot] < args.threshold:
+                    continue
+                active.add(slot)
                 discrete = command['type'] in ('headlight', 'laser', 'horn', 'song', 'raw')
                 if family not in families or probabilities[slot] > families[family][0]:
                     families[family] = (probabilities[slot], command, slot, discrete)
@@ -135,12 +138,18 @@ def main():
             # expose a competing lower-confidence toggle on the following tick.
             commands = [command for _, command, slot, discrete in families.values()
                         if not discrete or slot not in latched]
+            winners = {row[2]: row for row in families.values()}
+            for proposal in proposals:
+                slot = proposal['slot']
+                if slot in active:
+                    proposal['reason'] = ('Competing action' if slot not in winners else
+                                          'Held discrete action' if winners[slot][3] and slot in latched else 'Proposed')
             for _, _, slot, discrete in families.values():
                 if discrete:
                     latched.add(slot)
             print(json.dumps({'kind': 'prediction', 'frameAt': stamp, 'sensorAt': sensor_time,
                               'latencyMs': (time.perf_counter() - before) * 1000,
-                              'commands': commands}, allow_nan=False), flush=True)
+                              'commands': commands, 'proposals': proposals, 'threshold': args.threshold}, allow_nan=False), flush=True)
 
 
 if __name__ == '__main__':

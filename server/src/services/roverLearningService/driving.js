@@ -42,12 +42,13 @@ function createDriving({ root, config, onChange, activity }) {
     }
     if (command.type === 'servo') {
       const servo = record.meta?.cameraServo;
-      if (!servo?.enabled) return;
+      if (!servo?.enabled) { session.submissions.push({ command, result: 'Servo unavailable' }); return; }
       command.servo.angle = clamp(command.servo?.angle, servo.minAngle ?? 0, servo.maxAngle ?? 180);
     }
     const { type, ...data } = command;
     recordCommandRequest(session.socket, { roverId: session.roverId, type, data }, (result) => {
       session.lastResult = result.error || result.reason || 'issued';
+      session.submissions.push({ command, result: session.lastResult });
       if (result.id) session.lastAction = { at: Date.now(), command };
     }, (request, reply) => submitCommand(session.socket, request, reply), 'model');
   }
@@ -118,7 +119,11 @@ function createDriving({ root, config, onChange, activity }) {
           session.frameAt = message.frameAt;
           session.sensorAt = message.sensorAt;
           session.latencyMs = message.latencyMs;
+          session.proposals = Array.isArray(message.proposals) ? message.proposals.slice(0, 64) : [];
+          session.threshold = message.threshold;
+          session.submissions = [];
           if (!Array.isArray(message.commands) || message.commands.length > 64) throw new Error('Invalid action batch');
+          session.predictionStatus = message.commands.length ? 'Proposing actions' : 'Predicting no new action';
           // Manual commands intentionally do not stop or pause this controller.
           for (const command of message.commands) transmit(session, command);
         } catch (error) { stop(roverId, error.message); break; }

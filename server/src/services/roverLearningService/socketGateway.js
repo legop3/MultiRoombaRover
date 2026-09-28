@@ -1,4 +1,4 @@
-// One complete card snapshot per subscriber; no telemetry-frequency UI events.
+// Complete card snapshots; live diagnostics opt into 10 Hz, ordinary cards use 1 Hz.
 const io = require('../../globals/io');
 const roverManager = require('../roverManager');
 const { isVerified } = require('../verificationService');
@@ -13,6 +13,7 @@ function createGateway({ root, driving, getSystemState, activity }) {
   let lastCatalog = 0;
   let closed = false;
   let refreshing = false;
+  let lastOrdinary = 0;
 
   function stateFor(socket, roverId) {
     if (!isVerified(socket)) return { available: false };
@@ -30,7 +31,7 @@ function createGateway({ root, driving, getSystemState, activity }) {
         .map((model) => ({ id: model.id, name: model.name, createdAt: model.createdAt,
           trainingSteps: model.trainingSteps, examplesProcessed: model.examplesProcessed,
           weightBytes: model.weightBytes, parameters: model.parameters, trainingLoss: model.trainingLoss,
-          evaluation: model.evaluation, controls: model.specification?.commands?.length || 0,
+          evaluation: model.evaluation, validation: model.validation, distinctMinutes: model.distinctMinutes, controls: model.specification?.commands?.length || 0,
           compatible: Boolean(id && compatible(model, roverManager.rovers.get(id))) })),
       catalogError: modelError,
       recording: { ...system.recording, sessions: system.recording.sessions.filter((s) => roverManager.canSeeRover(s.roverId, socket)) },
@@ -50,7 +51,11 @@ function createGateway({ root, driving, getSystemState, activity }) {
         catch (error) { modelError = error.message; }
       }
       if (closed) return;
-      for (const [socket, roverId] of viewers) socket.emit('roverLearning:state', stateFor(socket, roverId));
+      const ordinary = Date.now() - lastOrdinary >= 1000;
+      if (ordinary) lastOrdinary = Date.now();
+      for (const [socket, view] of viewers) {
+        if (ordinary || view.live) socket.volatile.emit('roverLearning:state', stateFor(socket, view.roverId));
+      }
     } finally { refreshing = false; }
   }
 
@@ -59,7 +64,7 @@ function createGateway({ root, driving, getSystemState, activity }) {
       const respond = typeof reply === 'function' ? reply : () => {};
       if (!isVerified(socket)) { respond({ error: 'Verification required' }); return; }
       const roverId = typeof payload?.roverId === 'string' ? payload.roverId : null;
-      viewers.set(socket, roverId);
+      viewers.set(socket, { roverId, live: payload.live === true });
       respond({ state: stateFor(socket, roverId) });
       refresh().catch((error) => activity('Card update failed', { error: error.message }));
     };
@@ -74,7 +79,7 @@ function createGateway({ root, driving, getSystemState, activity }) {
           if (!session || !(driving.canControl(socket, roverId) || session.socketId === socket.id)) throw new Error('You cannot stop this controller');
           await driving.stop(roverId);
         } else throw new Error('Unknown action');
-        viewers.set(socket, roverId);
+        viewers.set(socket, { roverId, live: viewers.get(socket)?.live || false });
         respond({ state: stateFor(socket, roverId) });
       } catch (error) { respond({ error: error.message }); }
       refresh().catch((error) => activity('Card update failed', { error: error.message }));
@@ -94,7 +99,7 @@ function createGateway({ root, driving, getSystemState, activity }) {
 
   io.on('connection', connect);
   for (const socket of io.sockets.sockets.values()) connect(socket);
-  const timer = setInterval(() => { refresh().catch((error) => activity('Card update failed', { error: error.message })); }, 1000);
+  const timer = setInterval(() => { refresh().catch((error) => activity('Card update failed', { error: error.message })); }, 100);
   refresh().catch((error) => activity('Catalog unavailable', { error: error.message }));
   return {
     close() {

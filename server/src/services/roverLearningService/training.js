@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process');
 const { randomInt } = require('node:crypto');
 const { listRecordings } = require('./storage');
 
-function createTrainer({ root, config, logger }) {
+function createTrainer({ root, config, actionThreshold, logger }) {
   const leases = new Set();
   const trainingRoot = path.join(root, 'training');
   let ledger = {};
@@ -57,11 +57,10 @@ function createTrainer({ root, config, logger }) {
     for (const id of Object.keys(ledger)) if (!present.has(id)) delete ledger[id];
     const eligible = [];
     for (const recording of recordings) {
-      if (activeIds.has(recording.id) || ledger[recording.id]?.rejected
-          || (ledger[recording.id]?.rounds || 0) >= config.roundsPerSession) continue;
+      if (activeIds.has(recording.id) || ledger[recording.id]?.rejected) continue;
       try {
         const metadata = JSON.parse(await fs.readFile(path.join(recording.directory, 'session.json'), 'utf8'));
-        if (!metadata.endedAt || metadata.error || metadata.droppedEvents || metadata.reason === 'interrupted') continue;
+        if (metadata.bufferOnly || !metadata.endedAt || metadata.error || metadata.droppedEvents || metadata.reason === 'interrupted') continue;
         eligible.push(recording.id);
       } catch (error) {
         ledger[recording.id] = { rejected: `Unreadable session metadata: ${error.message}` };
@@ -76,15 +75,15 @@ function createTrainer({ root, config, logger }) {
     const selected = eligible.slice(0, 4);
     nextRun = Date.now() + config.intervalSeconds * 1000;
     if (!selected.length) {
-      state = { ...state, status: 'waiting' };
+      state = { ...state, status: 'waiting', reason: 'Waiting for completed usable human recordings' };
       await saveLedger();
       return;
     }
     const jobPath = path.join(trainingRoot, 'job.json');
-    await fs.writeFile(jobPath, JSON.stringify({ root, config, sessions: selected }));
+    await fs.writeFile(jobPath, JSON.stringify({ root, config, actionThreshold, sessions: selected }));
     if (stopped) return;
     selected.forEach((id) => leases.add(id));
-    state = { ...state, status: 'training', sessions: selected };
+    state = { ...state, status: 'training', reason: null, sessions: selected };
     state.startedAt = Date.now();
     child = spawn(config.python, [path.join(__dirname, 'workers/train.py'), '--job', jobPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -138,7 +137,9 @@ function createTrainer({ root, config, logger }) {
             }
             state = { ...state, status: stopped ? 'stopped' : 'waiting', steps: result.steps ?? state.steps,
               completedAt: Date.now(), elapsedSeconds: result.elapsedSeconds ?? null, error: null,
-              examples: result.examples ?? state.examples, loss: result.loss ?? null, reason: result.reason ?? null };
+              examples: result.examples ?? state.examples, loss: result.loss ?? null,
+              publication: result.publication ?? state.publication, evaluation: result.evaluation ?? state.evaluation,
+              reason: result.reason ?? 'Waiting for the next scheduled training job' };
             await saveLedger();
             logger.info('Training job completed', { ...state, model: result.published?.name || null });
           }

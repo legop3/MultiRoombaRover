@@ -109,65 +109,74 @@ def windows(directory, schema, cancelled=lambda: False):
     cursor = 0
     recent = collections.deque(maxlen=32)
     last_sample, last_pts = -math.inf, -math.inf
-    with av.open(str(directory / 'video.mkv')) as container:
-        stream = container.streams.video[0]
-        stream.codec_context.thread_count = 1
-        for frame in container.decode(stream):
-            if cancelled():
-                return
-            if frame.pts is None:
-                raise ValueError('Video frame has no timestamp')
-            stamp = float(frame.pts * frame.time_base) * 1000
-            if not math.isfinite(stamp) or stamp < last_pts:
-                raise ValueError('Invalid/nonmonotonic video timestamps')
-            last_pts = stamp
-            if not metadata['startedAt'] - 2000 <= stamp <= metadata['endedAt'] + 2000:
-                raise ValueError('Video PTS is not aligned to session Unix time')
-            if stamp - last_sample < 99:
-                continue
-            last_sample = stamp
-            while cursor < len(history) and history[cursor][0] < stamp:
-                when, slot, values = history[cursor]
-                command_values[slot] = values
-                command_times[slot] = when
-                cursor += 1
-            sensor_index = bisect.bisect_right(sensor_times, stamp) - 1
-            if sensor_index < 0 or stamp - sensor_times[sensor_index] > 1000:
-                recent.clear()
-                continue
-            seen = np.isfinite(command_times).astype(np.float32)
-            ages = np.minimum((stamp - command_times) / 10000, 1).astype(np.float32)
-            state = np.concatenate((sensors[sensor_index][1], command_values.flatten(), ages, seen))
-            pixels = frame.to_ndarray(width=WIDTH, height=HEIGHT, format='rgb24').transpose(2, 0, 1).copy()
-            recent.append((stamp, pixels, state))
-            chosen = []
-            for offset in (900, 600, 300, 0):
-                options = [row for row in recent if row[0] <= stamp - offset + 0.01]
-                if not options or stamp - offset - options[-1][0] > 200:
-                    break
-                chosen.append(options[-1])
-            if len(chosen) != 4 or stamp + 100 > metadata['endedAt']:
-                continue
-            if bisect.bisect_right(boundaries, stamp + 100) > bisect.bisect_left(boundaries, chosen[0][0]):
-                continue
-            start = bisect.bisect_left(target_times, stamp)
-            end = bisect.bisect_left(target_times, stamp + 100)
-            actions = np.zeros(SLOTS, dtype=np.float32)
-            values = np.zeros((SLOTS, VALUES), dtype=np.float32)
-            ambiguous = False
-            families = set()
-            for _, slot, vector in targets[start:end]:
-                template = schema[slot]['template']
-                family = template['type']
-                if family == 'peripheral':
-                    peripheral = template.get('peripheral') or {}
-                    family += ':' + str(peripheral.get('id')) + ':' + str(peripheral.get('control'))
-                if ((actions[slot] and (not schema[slot]['fields'] or not np.array_equal(values[slot], vector)))
-                        or (not actions[slot] and family in families)):
-                    ambiguous = True
-                    break
-                families.add(family)
-                actions[slot], values[slot] = 1, vector
-            if ambiguous:
-                continue
-            yield np.stack([row[1] for row in chosen]), np.stack([row[2] for row in chosen]), actions, values, available
+    def frames():
+        files = metadata['video'].get('files', ['video.mkv'])
+        for name in files:
+            if Path(name).name != name:
+                raise ValueError('Invalid video segment path')
+            with av.open(str(directory / name)) as container:
+                stream = container.streams.video[0]
+                stream.codec_context.thread_count = 1
+                yield from container.decode(stream)
+
+    for frame in frames():
+        if cancelled():
+            return
+        if frame.pts is None:
+            raise ValueError('Video frame has no timestamp')
+        stamp = float(frame.pts * frame.time_base) * 1000
+        if not math.isfinite(stamp) or stamp < last_pts:
+            raise ValueError('Invalid/nonmonotonic video timestamps')
+        last_pts = stamp
+        if not metadata['startedAt'] - 2000 <= stamp <= metadata['endedAt'] + 2000:
+            raise ValueError('Video PTS is not aligned to session Unix time')
+        if stamp < metadata.get('trainingStartedAt', metadata['startedAt']):
+            continue
+        if stamp - last_sample < 99:
+            continue
+        last_sample = stamp
+        while cursor < len(history) and history[cursor][0] < stamp:
+            when, slot, values = history[cursor]
+            command_values[slot] = values
+            command_times[slot] = when
+            cursor += 1
+        sensor_index = bisect.bisect_right(sensor_times, stamp) - 1
+        if sensor_index < 0 or stamp - sensor_times[sensor_index] > 1000:
+            recent.clear()
+            continue
+        seen = np.isfinite(command_times).astype(np.float32)
+        ages = np.minimum((stamp - command_times) / 10000, 1).astype(np.float32)
+        state = np.concatenate((sensors[sensor_index][1], command_values.flatten(), ages, seen))
+        pixels = frame.to_ndarray(width=WIDTH, height=HEIGHT, format='rgb24').transpose(2, 0, 1).copy()
+        recent.append((stamp, pixels, state))
+        chosen = []
+        for offset in (900, 600, 300, 0):
+            options = [row for row in recent if row[0] <= stamp - offset + 0.01]
+            if not options or stamp - offset - options[-1][0] > 200:
+                break
+            chosen.append(options[-1])
+        if len(chosen) != 4 or stamp + 100 > metadata['endedAt']:
+            continue
+        if bisect.bisect_right(boundaries, stamp + 100) > bisect.bisect_left(boundaries, chosen[0][0]):
+            continue
+        start = bisect.bisect_left(target_times, stamp)
+        end = bisect.bisect_left(target_times, stamp + 100)
+        actions = np.zeros(SLOTS, dtype=np.float32)
+        values = np.zeros((SLOTS, VALUES), dtype=np.float32)
+        ambiguous = False
+        families = set()
+        for _, slot, vector in targets[start:end]:
+            template = schema[slot]['template']
+            family = template['type']
+            if family == 'peripheral':
+                peripheral = template.get('peripheral') or {}
+                family += ':' + str(peripheral.get('id')) + ':' + str(peripheral.get('control'))
+            if ((actions[slot] and (not schema[slot]['fields'] or not np.array_equal(values[slot], vector)))
+                    or (not actions[slot] and family in families)):
+                ambiguous = True
+                break
+            families.add(family)
+            actions[slot], values[slot] = 1, vector
+        if ambiguous:
+            continue
+        yield np.stack([row[1] for row in chosen]), np.stack([row[2] for row in chosen]), actions, values, available

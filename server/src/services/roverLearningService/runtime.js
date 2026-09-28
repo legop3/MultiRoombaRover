@@ -28,9 +28,10 @@ function createRuntime({ config, logger }) {
   logger = Object.fromEntries(['info', 'warn', 'error'].map((level) => [level, (message, details) => {
     baseLogger[level](message, details); activity(message, details);
   }]));
-  const trainer = createTrainer({ root, config: config.training, logger });
+  const trainer = createTrainer({ root, config: config.training, actionThreshold: config.driving.actionThreshold, logger });
   const driving = createDriving({ root, config, onChange: refreshEligibility, activity });
   let gateway;
+  let dockTimer;
   let diskState = { bytes: null, free: null };
   const sessions = new Map();
   const unsubscribers = [];
@@ -134,8 +135,8 @@ function createRuntime({ config, logger }) {
     pendingBytes = pending.reduce((sum, event) => sum + event.bytes, 0);
     for (const [roverId, session] of sessions) {
       const record = roverManager.rovers.get(roverId);
-      if (!hasHumanController(roverId) || session.stopping || session.failed || Date.now() - session.startedAt >= config.recording.sessionSeconds * 1000) {
-        await closeSession(roverId, !record?.ws ? 'offline' : !hasHumanController(roverId) ? 'no-human-controller' : session.failed ? 'recorder-failed' : 'rotation');
+      if (!hasHumanController(roverId) || session.stopping || session.failed || session.dockTailComplete || (!session.buffered && Date.now() - session.trainingStartedAt >= config.recording.sessionSeconds * 1000)) {
+        await closeSession(roverId, !record?.ws ? 'offline' : !hasHumanController(roverId) ? 'no-human-controller' : session.failed ? 'recorder-failed' : session.dockTailComplete ? 'docked' : 'rotation');
       }
     }
     if (!running) return;
@@ -160,7 +161,7 @@ function createRuntime({ config, logger }) {
       if (!running) break;
       const roverId = String(key);
       if (!hasHumanController(roverId) || sessions.has(roverId)) continue;
-      const session = await createRecording({ root: recordingsRoot, roverId, snapshot: snapshot(record), logger });
+      const session = await createRecording({ root: recordingsRoot, roverId, snapshot: snapshot(record), logger, docked: Boolean(record.lastSensor?.decoded?.chargingSources?.homeBase) });
       sessions.set(roverId, session);
       // Filesystem awaits can span a disconnect or turn change.
       if (!running || !hasHumanController(roverId)) {
@@ -223,6 +224,13 @@ function createRuntime({ config, logger }) {
     await trainer.start();
     running = true;
     driving.attach();
+    dockTimer = setInterval(() => {
+      for (const [id, session] of sessions) {
+        session.updateDock(Boolean(roverManager.rovers.get(id)?.lastSensor?.decoded?.chargingSources?.homeBase));
+        session.pruneBuffer();
+        if (session.dockTailComplete) schedule();
+      }
+    }, 250);
     gateway = createGateway({ root, driving, activity, getSystemState: () => ({
       recording: { paused: diskPaused, bytes: diskState.bytes, freeBytes: diskState.free,
         pendingBytes, droppedPending, sessions: [...sessions.values()].map((session) => session.getStatus()) },
@@ -277,6 +285,7 @@ function createRuntime({ config, logger }) {
     running = false;
     gateway?.close();
     clearTimeout(timer);
+    clearInterval(dockTimer);
     for (const unsubscribe of unsubscribers.splice(0)) unsubscribe();
     stopPromise = (async () => {
       const trainingStop = trainer.stop();

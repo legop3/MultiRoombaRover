@@ -69,10 +69,13 @@ def main():
     cancelled = lambda: stopped or time.monotonic() - started >= config['maxJobSeconds']
     model = Policy().cpu()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
-    resume_path = root / 'training' / 'resume.pt'
+    # A fresh training lineage prevents previously trained footage leaking into validation.
+    resume_path = root / 'training' / 'resume-v2.pt'
     schema, steps, examples, last_published = [], 0, 0, 0
     trained_rovers = set()
     control_profiles = []
+    distinct_windows = {}
+    published_windows = 0
     if resume_path.exists():
         saved = torch.load(resume_path, map_location='cpu', weights_only=True)
         if saved['version'] != VERSION:
@@ -84,10 +87,15 @@ def main():
         last_published = saved['lastPublished']
         trained_rovers = set(saved['trainedRovers'])
         control_profiles = saved.get('controlProfiles', [])
+        distinct_windows = saved.get('distinctWindows', {})
+        published_windows = saved.get('publishedWindows', 0)
     initial_steps = steps
-    pool, accepted, rejected = [], [], {}
+    pool, validation, accepted, rejected = [], [], [], {}
+    observed_windows = {}
     sessions = list(job['sessions'])
     random.shuffle(sessions)
+    is_held_out = lambda session_id: int(hashlib.sha256(session_id.encode()).hexdigest()[:8], 16) % 5 == 0
+    sessions.sort(key=is_held_out)
     per_session = max(1, config['maxSamples'] // max(1, len(sessions)))
     for session_id in sessions:
         if cancelled():
@@ -110,13 +118,23 @@ def main():
                 break  # Do not call a partially decoded recording validated.
             if not samples:
                 raise ValueError('No complete, aligned observation/action windows')
-            schema = candidate_schema
-            pool.extend(samples)
+            # Entire sessions stay in one partition across all jobs. Neighboring
+            # video windows must never straddle training and validation.
+            held_out = is_held_out(session_id)
+            if held_out:
+                if candidate_schema != schema:
+                    continue  # Retry after training data introduces these command shapes.
+                validation.extend(samples)
+            else:
+                schema = candidate_schema
+                pool.extend(samples)
+                observed_windows[session_id] = seen
             accepted.append(session_id)
             metadata = json.loads((directory / 'session.json').read_text())
-            trained_rovers.add(str(metadata['roverId']))
+            if not held_out:
+                trained_rovers.add(str(metadata['roverId']))
             profile = metadata.get('controlProfile')
-            if profile is not None and profile not in control_profiles:
+            if not held_out and profile is not None and profile not in control_profiles:
                 control_profiles.append(profile)
             emit('dataset', sessionId=session_id, windows=seen, sampled=len(samples))
         except (ValueError, KeyError, TypeError, OSError, EOFError, IndexError, OverflowError, av.error.FFmpegError) as error:
@@ -124,7 +142,7 @@ def main():
             emit('skipped', sessionId=session_id, reason=rejected[session_id])
     if len(pool) < config['minimumSamples'] or not any(sample[2].any() for sample in pool) or cancelled():
         emit('complete', trained=False, accepted=[], rejected=rejected, samples=len(pool),
-             reason='Stopped/time limit' if cancelled() else 'Waiting for more usable samples')
+             reason='Stopped/time limit' if cancelled() else 'Waiting for enough training-partition samples with human actions')
         return
 
     numeric_mask = torch.zeros(SLOTS, VALUES)
@@ -169,8 +187,57 @@ def main():
         emit('complete', trained=False, accepted=[], rejected=rejected, reason='No training steps completed')
         return
 
+    distinct_windows.update(observed_windows)
+    unique_count = sum(distinct_windows.values())
+    evaluation = {'status': 'waiting for held-out sessions', 'windows': len(validation)}
+    if validation and not cancelled():
+        model.eval()
+        true_positive = predicted_positive = actual_positive = 0
+        value_error = value_count = 0
+        evaluated = 0
+        with torch.inference_mode():
+            for offset in range(0, len(validation), config['batchSize']):
+                if cancelled():
+                    break
+                batch = validation[offset:offset + config['batchSize']]
+                images, states, targets, values, available = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
+                logits, predictions = model(images.float() / 255, states)
+                predicted = (logits.sigmoid() >= job['actionThreshold']) & available.bool()
+                actual = targets.bool() & available.bool()
+                true_positive += (predicted & actual).sum().item()
+                predicted_positive += predicted.sum().item()
+                actual_positive += actual.sum().item()
+                mask = numeric_mask.unsqueeze(0) * targets.unsqueeze(-1)
+                value_error += ((predictions - values).square() * mask).sum().item()
+                value_count += mask.sum().item()
+                evaluated += len(batch)
+        precision = true_positive / max(1, predicted_positive)
+        recall = true_positive / max(1, actual_positive)
+        mse = value_error / max(1, value_count)
+        # A basic imitation gate, not an autonomous-driving certification.
+        passed = (evaluated == len(validation) and evaluated >= 128 and actual_positive >= 32
+                  and precision >= .5 and recall >= .5 and value_count > 0 and mse <= .1)
+        evaluation = {'status': 'passed imitation gate' if passed else 'imitation gate not met',
+                      'windows': evaluated, 'precision': precision, 'recall': recall,
+                      'numericMse': mse, 'positiveActions': actual_positive}
+    publication = {'distinctMinutes': unique_count / 600,
+                   'newMinutes': (unique_count - published_windows) / 600,
+                   'minimumMinutes': config['minimumDrivingMinutes'],
+                   'requiredNewMinutes': config['newDrivingMinutesPerModel']}
+    reasons = []
+    if publication['distinctMinutes'] < config['minimumDrivingMinutes']:
+        reasons.append('Collecting distinct driving footage')
+    if publication['newMinutes'] < config['newDrivingMinutesPerModel']:
+        reasons.append('Waiting for new driving footage since last publication')
+    if steps - last_published < config['checkpointEverySteps']:
+        reasons.append('Training steps below publication interval')
+    if evaluation['status'] != 'passed imitation gate':
+        reasons.append(evaluation['status'])
+    if cancelled():
+        reasons.append('Job time budget reached')
+    publication['reason'] = '; '.join(reasons) or 'Published'
     published = None
-    if steps - last_published >= config['checkpointEverySteps']:
+    if not reasons:
         adjectives = ['amber', 'curious', 'gentle', 'quiet', 'silver', 'bright', 'merry', 'sleepy']
         animals = ['otter', 'finch', 'badger', 'robin', 'fox', 'heron', 'marten', 'wren']
         model_id = str(uuid.uuid4())
@@ -188,22 +255,24 @@ def main():
             'specification': specification(schema), 'trainedRovers': sorted(trained_rovers),
             'controlProfiles': control_profiles,
             'sourceSessions': accepted, 'trainingLoss': sum(losses) / len(losses),
-            'evaluation': 'unevaluated', 'dtype': 'float32', 'torchVersion': str(torch.__version__),
+            'evaluation': evaluation['status'], 'validation': evaluation, 'distinctMinutes': publication['distinctMinutes'], 'dtype': 'float32', 'torchVersion': str(torch.__version__),
         }
         (staging / 'model.json').write_text(json.dumps(published, indent=2, allow_nan=False))
         # A catalog reader sees both weights and metadata, or neither. Existing
         # versions are never overwritten or deleted by the trainer.
         staging.rename(root / 'models' / model_id)
         last_published = steps
+        published_windows = unique_count
     atomic_torch_save(torch, {
         'version': VERSION, 'weights': model.state_dict(), 'optimizer': optimizer.state_dict(),
         'schema': schema, 'steps': steps, 'examples': examples,
         'lastPublished': last_published, 'trainedRovers': sorted(trained_rovers),
-        'controlProfiles': control_profiles,
+        'controlProfiles': control_profiles, 'distinctWindows': distinct_windows,
+        'publishedWindows': published_windows,
     }, resume_path)
     emit('complete', trained=True, accepted=accepted, rejected=rejected,
          steps=steps, examples=examples, loss=sum(losses) / len(losses),
-         published=published, elapsedSeconds=time.monotonic() - started)
+         published=published, publication=publication, evaluation=evaluation, elapsedSeconds=time.monotonic() - started)
 
 
 if __name__ == '__main__':
