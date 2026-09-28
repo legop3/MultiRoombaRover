@@ -1,4 +1,5 @@
 // Export an explicit allowlist, never the raw socket/session/configuration object.
+const { redact } = require('./errors');
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -6,7 +7,7 @@ const { createHash } = require('node:crypto');
 const applicationVersion = require('../../../package.json').version;
 const hash = createHash('sha256');
 for (const file of ['workers/policy.py', 'workers/dataset.py', 'workers/train.py', 'workers/infer.py',
-  'models.js', 'driving.js', 'recording.js', 'training.js', 'socketGateway.js', 'diagnostics.js']) {
+  'errors.js', 'storage.js', 'runtime.js', 'models.js', 'driving.js', 'recording.js', 'training.js', 'socketGateway.js', 'diagnostics.js']) {
   hash.update(fs.readFileSync(path.join(__dirname, file)));
 }
 const implementationSha256 = hash.digest('hex');
@@ -28,7 +29,7 @@ function report(state, controller) {
   const metrics = training.diagnostics || {};
   const session = state.session;
   return {
-    reportVersion: 1, generatedAtUnixMs: state.updatedAt,
+    reportVersion: 2, generatedAtUnixMs: state.updatedAt,
     software: { applicationVersion, implementationSha256, policyVersion: 2, node: process.version,
       dependencies: metrics.dependencies || null },
     host: { logicalCpus: os.cpus().length, totalMemoryBytes: os.totalmem(), freeMemoryBytes: os.freemem(), loadAverage: os.loadavg() },
@@ -37,23 +38,23 @@ function report(state, controller) {
       freeBytes: state.recording.freeBytes, pendingBytes: state.recording.pendingBytes,
       droppedPending: state.recording.droppedPending,
       sessions: state.recording.sessions.map((item) => ({ startedAtUnixMs: item.startedAt,
-        status: item.video, droppedEvents: item.droppedEvents, errorCategory: errorCategory(item.error) })) },
+        status: item.video, droppedEvents: item.droppedEvents, error: redact(item.error), failureDetails: item.failureDetails || null, stderr: redact(item.stderr), errorCategory: errorCategory(item.error) })) },
     training: { status: training.status, steps: training.steps, examples: training.examples,
       loss: training.loss, losses: training.losses || null, publication: training.publication || null,
       evaluation: training.evaluation || null, dataset: metrics.dataset || training.dataset || null,
       resources: { decodeSeconds: metrics.decodeSeconds ?? null, trainingSeconds: metrics.trainingSeconds ?? null,
         evaluationSeconds: metrics.evaluationSeconds ?? null, checkpointSeconds: metrics.checkpointSeconds ?? null, cpuSeconds: metrics.cpuSeconds ?? null,
         peakRssMiB: metrics.peakRssMiB ?? null },
-      history: training.history || [], rejectionCategories: (training.rejectionReasons || []).map(errorCategory),
-      errorCategory: errorCategory(training.error), nextAttemptAtUnixMs: training.nextAttemptAt },
+      history: training.history || [], rejectionReasons: (training.rejectionReasons || []).map(redact), rejectionCategories: (training.rejectionReasons || []).map(errorCategory),
+      error: redact(training.error), errorCategory: errorCategory(training.error), nextAttemptAtUnixMs: training.nextAttemptAt },
     model: session ? { id: session.modelId, checkpointId: session.checkpointId, threshold: session.threshold, appliedThreshold: session.appliedThreshold } : null,
     controller: controller ? { modelId: controller.modelId, sensorPresent: controller.sensorPresent || null,
-      stopCategory: errorCategory(controller.stopReason), history: (controller.history || []).map((item) => ({
+      stopReason: redact(controller.stopReason), stopCategory: errorCategory(controller.stopReason), history: (controller.history || []).map((item) => ({
         ...item, submissions: item.submissions.map((submission) => ({ type: submission.type,
-          wheels: submission.wheels, result: submission.result === 'issued' ? 'issued' : errorCategory(submission.result) })) })) } : null,
+          wheels: submission.wheels, result: redact(submission.result) })) })) } : null,
     sensorFields: metrics.policy?.sensorFields || null,
     timing: { alignment: 'server_receipt', browserVideoLatencyMs: null, wheelCommandExpiryMs: null },
-    events: state.activity.map(({ at, message }) => ({ atUnixMs: at, message })),
+    events: state.activity.map(({ at, message, detail, error, stderr }) => ({ atUnixMs: at, message: redact(message), detail: redact(detail), error: error || null, stderr: redact(stderr) })),
     unavailable: ['browser_video_latency', 'actual_physical_command_execution', 'live_training_cpu_utilization'],
   };
 }

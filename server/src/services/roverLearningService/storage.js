@@ -10,9 +10,17 @@ async function listRecordings(root) {
     if (!entry.isDirectory() || !/^\d+-[0-9a-f-]{36}$/.test(entry.name)) continue;
     const directory = path.join(root, entry.name);
     let bytes = 0;
-    for (const file of await fs.readdir(directory, { withFileTypes: true })) {
+    let files;
+    try { files = await fs.readdir(directory, { withFileTypes: true }); }
+    catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+    for (const file of files) {
       if (!file.isFile()) continue;
-      bytes += (await fs.stat(path.join(directory, file.name))).size;
+      try { bytes += (await fs.stat(path.join(directory, file.name))).size; }
+      catch (error) {
+        // Dock-buffer pruning and atomic metadata replacement can remove a
+        // listed file before stat. Absence is normal; other I/O failures are not.
+        if (error.code !== 'ENOENT') throw error;
+      }
     }
     recordings.push({ id: entry.name, directory, bytes, startedAt: Number(entry.name.split('-')[0]) });
   }

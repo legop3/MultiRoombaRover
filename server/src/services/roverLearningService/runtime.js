@@ -1,4 +1,5 @@
 // Enabled-only recording, training, controller, and card lifecycle.
+const { redact, errorDetails } = require('./errors');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { resolveDataPath } = require('../../helpers/dataPaths');
@@ -22,7 +23,9 @@ function createRuntime({ config, logger }) {
   const recentActivity = [];
   function activity(message, details = {}) {
     recentActivity.push({ at: Date.now(), message, roverId: details.roverId || null,
-      detail: details.reason || details.error || details.model || null });
+      detail: redact(details.reason || details.error || details.model),
+      error: details.failure || (details.error ? errorDetails(details.error, message) : null),
+      stderr: redact(details.stderr) });
     if (recentActivity.length > 40) recentActivity.shift();
   }
   const baseLogger = logger;
@@ -77,7 +80,7 @@ function createRuntime({ config, logger }) {
     // The serialized maintenance pass still owns closing/removing the session.
     for (const [id, session] of sessions) {
       if (!next.has(id)) session.stop('no-human-controller').catch((error) => {
-        logger.warn('Unable to finalize unattended recording', { roverId: id, error: error.message });
+        logger.warn('Unable to finalize unattended recording', { roverId: id, error: error.message, failure: errorDetails(error, 'rover learning runtime') });
       });
     }
     schedule();
@@ -185,7 +188,7 @@ function createRuntime({ config, logger }) {
         await trainer.tick(new Set([...sessions.values()].map((session) => session.id)));
       } catch (error) {
         // Training availability must not tear down otherwise healthy capture.
-        logger.error('Unable to schedule training', { error: error.message });
+        logger.error('Unable to schedule training', { error: error.message, failure: errorDetails(error, 'rover learning runtime') });
       }
     }
   }
@@ -198,7 +201,7 @@ function createRuntime({ config, logger }) {
     // The next tick is scheduled after completion: disk slowness cannot build
     // an unbounded backlog of retention tasks or overlapping recorder starts.
     maintenance = maintain().catch(async (error) => {
-      logger.error('Recording maintenance failed; closing recorders', { error: error.message });
+      logger.error('Recording maintenance failed; closing recorders', { error: error.message, failure: errorDetails(error, 'recording maintenance') });
       await Promise.allSettled([...sessions.keys()].map((id) => closeSession(id, 'storage-error')));
     }).finally(() => {
       busy = false;
@@ -216,7 +219,7 @@ function createRuntime({ config, logger }) {
     // Other server services can exit the process before asynchronous cleanup
     // finishes. Signal children immediately, and keep an exit fallback too.
     for (const session of sessions.values()) session.stop('server-shutdown').catch(() => undefined);
-    stop().catch((error) => logger.warn('Recording shutdown failed', { error: error.message }));
+    stop().catch((error) => logger.warn('Recording shutdown failed', { error: error.message, failure: errorDetails(error, 'rover learning runtime') }));
   }
 
   async function start() {

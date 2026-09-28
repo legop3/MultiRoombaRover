@@ -799,3 +799,25 @@ Format 2 snapshots, Latest/Previous, recordings and current training state remai
 This supersedes earlier promises to preserve incompatible format 1 model files.
 Deletion occurs on the actual server when the updated service starts; no production
 files were accessed from this development machine.
+
+
+### Recording maintenance race and diagnostic error details
+
+Authorized by "fix it and fix that IPI" after a production report showed two
+maintenance failures but omitted their error details. Scoped to those two defects;
+evaluation/cache changes remain proposals, not part of this repair.
+
+- listRecordings now tolerates ENOENT for directories/files removed between listing
+  and stat (dock-buffer pruning or atomic metadata rename). Other filesystem
+  errors still propagate; no broad error suppression or retries were added.
+- Diagnostics reportVersion 2 includes actual redacted error messages, rejection
+  reasons, controller results, event detail, and worker stderr. Runtime catches
+  retain error name/code/syscall/path/stack, timestamp and operation. Recording
+  failures retain the same structured details through session finalization.
+- A shared redactor removes URLs, credentials, user keys, email addresses and home
+  usernames while retaining filesystem operation context and stack frames. Error
+  categories remain supplementary, not replacements for actual failures.
+- Node syntax checks passed for affected modules. No actual production recording
+  stream is available here; the race is fixed by inspection but cannot yet be
+  confirmed as the cause of the earlier production events. Previously discarded
+  error details cannot be reconstructed. No new tests or processes were created.

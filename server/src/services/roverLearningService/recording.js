@@ -1,5 +1,6 @@
 // One bounded recording session. Video packets retain receiver wall-clock PTS;
 // telemetry uses the same server clock, not an assumed browser playback clock.
+const { errorDetails, redact } = require('./errors');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
@@ -34,6 +35,7 @@ async function createRecording({ root, roverId, snapshot, logger, docked = false
   let dockedAt = null;
   let pruning = Promise.resolve();
   let failure = null;
+  let failureDetails = null;
   let stopping = false;
   let stopPromise;
   let child;
@@ -43,7 +45,7 @@ async function createRecording({ root, roverId, snapshot, logger, docked = false
   let resolveVideo;
   const videoClosed = new Promise((resolve) => { resolveVideo = resolve; });
   output.on('error', (error) => {
-    failure = error.message;
+    failure = error.message; failureDetails = errorDetails(error, 'recording session');
     // Stop file growth immediately when telemetry is no longer writable.
     child?.kill('SIGTERM');
   });
@@ -76,7 +78,7 @@ async function createRecording({ root, roverId, snapshot, logger, docked = false
       output.write(line);
     } catch (error) {
       metadata.droppedEvents += 1;
-      failure = error.message;
+      failure = error.message; failureDetails = errorDetails(error, 'recording session');
       child?.kill('SIGTERM');
     }
     return true;
@@ -97,7 +99,7 @@ async function createRecording({ root, roverId, snapshot, logger, docked = false
     '-reset_timestamps', '0', path.join(directory, 'video-%09d.mkv'),
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   child.stderr.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-4096); });
-  child.on('error', (error) => { failure = error.message; });
+  child.on('error', (error) => { failure = error.message; failureDetails = errorDetails(error, 'recording session'); });
   child.once('close', (code, signal) => {
     childClosed = true;
     videoResult = { code, signal, stderr };
@@ -131,7 +133,7 @@ async function createRecording({ root, roverId, snapshot, logger, docked = false
         if (!metadata.bufferOnly || stopping) return;
         if (stat.mtimeMs < Date.now() - 5000) await fsp.unlink(filename);
       }
-    }).catch((error) => { failure = error.message; child.kill('SIGTERM'); });
+    }).catch((error) => { failure = error.message; failureDetails = errorDetails(error, 'recording session'); child.kill('SIGTERM'); });
   }
 
   async function stop(reason) {
@@ -158,9 +160,10 @@ async function createRecording({ root, roverId, snapshot, logger, docked = false
       metadata.endedAt = Date.now();
       metadata.reason = reason;
       metadata.error = failure;
+      metadata.failureDetails = failureDetails;
       metadata.video.result = videoResult;
       await saveMetadata(directory, metadata);
-      if (failure) logger.warn('Recording session incomplete', { roverId, id, error: failure, stderr });
+      if (failure) logger.warn('Recording session incomplete', { roverId, id, error: failure, failure: failureDetails, stderr });
     })();
     return stopPromise;
   }
@@ -173,7 +176,7 @@ async function createRecording({ root, roverId, snapshot, logger, docked = false
     get failed() { return Boolean(failure); },
     get stopping() { return stopping; },
     getStatus: () => ({ id, roverId, startedAt: metadata.startedAt, droppedEvents: metadata.droppedEvents,
-      video: childClosed ? 'stopped' : metadata.bufferOnly ? 'Dock lead-in buffer' : 'Recording human driving', error: failure, stopping }),
+      video: childClosed ? 'stopped' : metadata.bufferOnly ? 'Dock lead-in buffer' : 'Recording human driving', error: redact(failure), failureDetails, stderr: redact(stderr), stopping }),
     // Process exit is synchronous; normal disable uses stop() and awaits close.
     kill: () => { if (!childClosed) child.kill('SIGKILL'); },
   };

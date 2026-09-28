@@ -1,5 +1,6 @@
 // One owned finite worker at a time. Leases are acquired in the runtime's
 // serialized maintenance pass, before retention can next inspect recordings.
+const { errorDetails } = require('./errors');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
@@ -40,7 +41,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
     } catch (error) {
       startupError = true;
       state = { ...state, status: 'error', error: error.message };
-      logger.error('Training initialization failed; recording remains available', { error: error.message });
+      logger.error('Training initialization failed; recording remains available', { error: error.message, failure: errorDetails(error, 'training initialization') });
     }
   }
 
@@ -148,7 +149,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
           }
         } catch (error) {
           state = { ...state, status: 'error', error: error.message };
-          logger.error('Training result persistence failed', { error: error.message });
+          logger.error('Training result persistence failed', { error: error.message, failure: errorDetails(error, 'training result persistence') });
         } finally {
           history.push({ at: Date.now(), status: state.status, steps: state.steps, loss: state.loss,
             losses: state.losses || null, evaluation: state.evaluation || null,
