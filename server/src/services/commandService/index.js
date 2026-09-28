@@ -259,144 +259,146 @@ module.exports = {
   setDriveCooldown,
   commandEvents,
   subscribeCommandRecording,
+  submitCommand,
 };
 
-io.on('connection', (socket) => {
-  function handleCommand({ roverId, type, data } = {}, cb) {
-    const reply = typeof cb === 'function' ? cb : () => {};
-    try {
-      if (!roverId) {
-        throw new Error('roverId required');
-      }
-      if (!type) {
-        throw new Error('type required');
-      }
-      if (type === 'audioLevels') {
-        throw new Error('audioLevels command is service-managed');
-      }
-      let payload = data ? { ...data } : {};
-      if (type === 'headlight' && isHeadlightBlocked()) {
-        logger.info('Ignoring headlight command while darkness lock is active', { socketId: socket.id, roverId });
-        reply({ ignored: true, reason: 'darknessActive' });
-        return;
-      }
-      if (type === 'laser' && isLaserCommandBlockedByRoomLightLock(payload)) {
-        logger.info('Ignoring laser command while room lights are locked on', {
-          socketId: socket.id,
-          roverId,
-          action: getLaserAction(payload),
-        });
-        reply({ ignored: true, reason: 'roomLightsLockedOn' });
-        return;
-      }
-      const isRebootCommand = type === 'reboot';
-      const isUpdateCommand = type === 'update';
-      const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));
-      const isAdminSocket = isAdmin(socket);
-      if (!isAdminSocket && isDeterred(socket)) {
-        throw new Error('Not authorized');
-      }
-      /*
-        Both structured song commands and raw Open Interface song payloads
-        reach this shared flag. Enforcing mute here covers the VIP MIDI beeper
-        and any future browser beeper without affecting unrelated driving.
-      */
-      if (!isAdminSocket && isSongCommand && isMuted(socket)) {
-        throw new Error('Muted');
-      }
-      // Rover updates run a privileged, root-owned helper on the Pi. Keep this
-      // in the same explicit admin-only branch as reboot instead of relying on
-      // drive ownership checks, because having a turn should not grant system
-      // maintenance privileges.
-      if ((isRebootCommand || isUpdateCommand) && !isAdminSocket) {
-        throw new Error('Not authorized');
-      }
-      if (!isSongCommand && !isRebootCommand && !isUpdateCommand && !roverManager.canDrive(roverId, socket)) {
-        throw new Error('Not your turn or no control');
-      }
-      const driveDirect = payload?.driveDirect;
-      if (type === 'drive' && driveDirect) {
-        if (!isAdminSocket) {
-          const safeDrive = roverManager.applyPrivateDriveSafety(roverId, socket, driveDirect);
-          if (safeDrive) {
-            payload.driveDirect = safeDrive;
-          }
-        }
-        const left = Number(payload?.driveDirect?.left);
-        const right = Number(payload?.driveDirect?.right);
-        const speed = Math.max(Math.abs(left), Math.abs(right));
-        if (!isAdminSocket) {
-          const blockedUntil = driveCooldowns.get(roverId);
-          if (blockedUntil && Date.now() < blockedUntil && speed > 0) {
-            const reason = isLockdownAdmin(socket)
-              ? 'Drive blocked: cooldown'
-              : 'Drive blocked: safety cooldown';
-            throw new Error(reason);
-          }
-        }
-        if (speed > 0) {
-          let direction = 'turn';
-          if (left > 0 && right > 0) direction = 'forward';
-          if (left < 0 && right < 0) direction = 'backward';
-          lastDriveActivity.set(roverId, {
-            ts: Date.now(),
-            socketId: socket.id,
-            direction,
-            speed,
-            isAdmin: isAdminSocket,
-          });
-        }
-      }
-
-      if (type === 'drive' || type === 'motors') {
-        /*
-          Role is supplied at the command boundary because telemetry does not
-          identify the operator who produced the active motor intent. Admin and
-          lockdown commands therefore enter the service explicitly bypassed;
-          they are recorded for status visibility but are never scaled, blocked,
-          or countermanded by a later sensor frame.
-        */
-        payload = overcurrentProtectionService.protectCommand(roverId, type, payload, {
-          bypassed: isAdminSocket,
-        });
-      }
-      const id = issueCommand(roverId, { type, ...payload });
-      commandEvents.emit('observation', {
-        ts: Date.now(),
-        roverId: String(roverId),
-        type,
-        commandId: id,
-        outcome: 'issued',
-        socketId: socket.id,
-        // Payloads are omitted deliberately: raw OI, TTS, and maintenance
-        // commands can carry arbitrary content. Their structured type/outcome
-        // supplies analytics without accidentally persisting secret material.
-      });
-      logger.info('Queued command', socket.id, roverId, type);
-      if (shouldRecordTurnActivity(type, payload)) {
-        try {
-          const { recordActivity } = require('../turnService');
-          recordActivity(roverId, socket.id);
-        } catch (err) {
-          // Activity recording is best-effort because command delivery should not fail if turn bookkeeping has a transient issue.
-        }
-      }
-      reply({ id });
-    } catch (err) {
-      logger.warn('Command rejected', socket.id, err.message);
-      commandEvents.emit('observation', {
-        ts: Date.now(),
-        roverId: roverId ? String(roverId) : null,
-        type: type || 'unknown',
-        outcome: 'rejected',
-        socketId: socket.id,
-        error: err.message,
-      });
-      reply({ error: err.message });
+// Shared authorization/safety boundary for browser and service-owned control.
+function submitCommand(socket, { roverId, type, data } = {}, cb) {
+  const reply = typeof cb === 'function' ? cb : () => {};
+  try {
+    if (!roverId) {
+      throw new Error('roverId required');
     }
-  }
+    if (!type) {
+      throw new Error('type required');
+    }
+    if (type === 'audioLevels') {
+      throw new Error('audioLevels command is service-managed');
+    }
+    let payload = data ? { ...data } : {};
+    if (type === 'headlight' && isHeadlightBlocked()) {
+      logger.info('Ignoring headlight command while darkness lock is active', { socketId: socket.id, roverId });
+      reply({ ignored: true, reason: 'darknessActive' });
+      return;
+    }
+    if (type === 'laser' && isLaserCommandBlockedByRoomLightLock(payload)) {
+      logger.info('Ignoring laser command while room lights are locked on', {
+        socketId: socket.id,
+        roverId,
+        action: getLaserAction(payload),
+      });
+      reply({ ignored: true, reason: 'roomLightsLockedOn' });
+      return;
+    }
+    const isRebootCommand = type === 'reboot';
+    const isUpdateCommand = type === 'update';
+    const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));
+    const isAdminSocket = isAdmin(socket);
+    if (!isAdminSocket && isDeterred(socket)) {
+      throw new Error('Not authorized');
+    }
+    /*
+      Both structured song commands and raw Open Interface song payloads
+      reach this shared flag. Enforcing mute here covers the VIP MIDI beeper
+      and any future browser beeper without affecting unrelated driving.
+    */
+    if (!isAdminSocket && isSongCommand && isMuted(socket)) {
+      throw new Error('Muted');
+    }
+    // Rover updates run a privileged, root-owned helper on the Pi. Keep this
+    // in the same explicit admin-only branch as reboot instead of relying on
+    // drive ownership checks, because having a turn should not grant system
+    // maintenance privileges.
+    if ((isRebootCommand || isUpdateCommand) && !isAdminSocket) {
+      throw new Error('Not authorized');
+    }
+    if (!isSongCommand && !isRebootCommand && !isUpdateCommand && !roverManager.canDrive(roverId, socket)) {
+      throw new Error('Not your turn or no control');
+    }
+    const driveDirect = payload?.driveDirect;
+    if (type === 'drive' && driveDirect) {
+      if (!isAdminSocket) {
+        const safeDrive = roverManager.applyPrivateDriveSafety(roverId, socket, driveDirect);
+        if (safeDrive) {
+          payload.driveDirect = safeDrive;
+        }
+      }
+      const left = Number(payload?.driveDirect?.left);
+      const right = Number(payload?.driveDirect?.right);
+      const speed = Math.max(Math.abs(left), Math.abs(right));
+      if (!isAdminSocket) {
+        const blockedUntil = driveCooldowns.get(roverId);
+        if (blockedUntil && Date.now() < blockedUntil && speed > 0) {
+          const reason = isLockdownAdmin(socket)
+            ? 'Drive blocked: cooldown'
+            : 'Drive blocked: safety cooldown';
+          throw new Error(reason);
+        }
+      }
+      if (speed > 0) {
+        let direction = 'turn';
+        if (left > 0 && right > 0) direction = 'forward';
+        if (left < 0 && right < 0) direction = 'backward';
+        lastDriveActivity.set(roverId, {
+          ts: Date.now(),
+          socketId: socket.id,
+          direction,
+          speed,
+          isAdmin: isAdminSocket,
+        });
+      }
+    }
 
-  const recordedCommand = (request, reply) => recordCommandRequest(socket, request, reply, handleCommand);
+    if (type === 'drive' || type === 'motors') {
+      /*
+        Role is supplied at the command boundary because telemetry does not
+        identify the operator who produced the active motor intent. Admin and
+        lockdown commands therefore enter the service explicitly bypassed;
+        they are recorded for status visibility but are never scaled, blocked,
+        or countermanded by a later sensor frame.
+      */
+      payload = overcurrentProtectionService.protectCommand(roverId, type, payload, {
+        bypassed: isAdminSocket,
+      });
+    }
+    const id = issueCommand(roverId, { type, ...payload });
+    commandEvents.emit('observation', {
+      ts: Date.now(),
+      roverId: String(roverId),
+      type,
+      commandId: id,
+      outcome: 'issued',
+      socketId: socket.id,
+      // Payloads are omitted deliberately: raw OI, TTS, and maintenance
+      // commands can carry arbitrary content. Their structured type/outcome
+      // supplies analytics without accidentally persisting secret material.
+    });
+    logger.info('Queued command', socket.id, roverId, type);
+    if (shouldRecordTurnActivity(type, payload)) {
+      try {
+        const { recordActivity } = require('../turnService');
+        recordActivity(roverId, socket.id);
+      } catch (err) {
+        // Activity recording is best-effort because command delivery should not fail if turn bookkeeping has a transient issue.
+      }
+    }
+    reply({ id });
+  } catch (err) {
+    logger.warn('Command rejected', socket.id, err.message);
+    commandEvents.emit('observation', {
+      ts: Date.now(),
+      roverId: roverId ? String(roverId) : null,
+      type: type || 'unknown',
+      outcome: 'rejected',
+      socketId: socket.id,
+      error: err.message,
+    });
+    reply({ error: err.message });
+  }
+}
+
+io.on('connection', (socket) => {
+  const recordedCommand = (request, reply) => recordCommandRequest(socket, request, reply, (message, cb) => submitCommand(socket, message, cb));
   socket.on('command', recordedCommand);
   socket.on('command:issue', recordedCommand);
 

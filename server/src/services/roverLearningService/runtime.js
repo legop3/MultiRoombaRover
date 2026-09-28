@@ -1,4 +1,4 @@
-// Enabled-only recording runtime. No training or driving worker is started here.
+// Enabled-only recording, training, controller, and card lifecycle.
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { resolveDataPath } = require('../../helpers/dataPaths');
@@ -11,10 +11,27 @@ const { isDeterred, verificationEvents } = require('../verificationService');
 const { subscribeCommandRecording, commandEvents } = require('../commandService');
 const { createRecording } = require('./recording');
 const { recoverRecordings, enforceRetention } = require('./storage');
+const { createTrainer } = require('./training');
+const { createDriving } = require('./driving');
+const { createGateway } = require('./socketGateway');
 
 function createRuntime({ config, logger }) {
   const root = resolveDataPath('rover-learning');
   const recordingsRoot = path.join(root, 'recordings');
+  const recentActivity = [];
+  function activity(message, details = {}) {
+    recentActivity.push({ at: Date.now(), message, roverId: details.roverId || null,
+      detail: details.reason || details.error || details.model || null });
+    if (recentActivity.length > 40) recentActivity.shift();
+  }
+  const baseLogger = logger;
+  logger = Object.fromEntries(['info', 'warn', 'error'].map((level) => [level, (message, details) => {
+    baseLogger[level](message, details); activity(message, details);
+  }]));
+  const trainer = createTrainer({ root, config: config.training, logger });
+  const driving = createDriving({ root, config, onChange: refreshEligibility, activity });
+  let gateway;
+  let diskState = { bytes: null, free: null };
   const sessions = new Map();
   const unsubscribers = [];
   let running = false;
@@ -30,6 +47,9 @@ function createRuntime({ config, logger }) {
   let eligibleRovers = new Set();
 
   function hasHumanController(roverId) {
+    // Even manual inputs during autonomy remain excluded: model-influenced
+    // video must not silently become human demonstration training data.
+    if (driving.isActive(roverId)) return false;
     const record = roverManager.rovers.get(roverId);
     if (!record?.ws) return false;
     // Admin permission alone must not record the whole fleet. Require actual
@@ -120,14 +140,16 @@ function createRuntime({ config, logger }) {
     }
     if (!running) return;
     const retention = await enforceRetention(
-      recordingsRoot, new Set([...sessions.values()].map((session) => session.id)),
+      recordingsRoot, new Set([...sessions.values()].map((session) => session.id).concat([...trainer.leases])),
       config.recording.maxGiB * 1024 ** 3, config.recording.minimumFreeGiB * 1024 ** 3,
     );
+    diskState = retention;
     if (retention.paused) {
       if (!diskPaused) logger.warn('Recording paused for disk budget', retention);
       diskPaused = true;
       pending = [];
       pendingBytes = 0;
+      await trainer.cancel();
       // Close active files to make them eligible for pruning on the next tick.
       await Promise.all([...sessions.keys()].map((id) => closeSession(id, 'disk-budget')));
       return;
@@ -156,6 +178,14 @@ function createRuntime({ config, logger }) {
         return false;
       });
     }
+    if (running) {
+      try {
+        await trainer.tick(new Set([...sessions.values()].map((session) => session.id)));
+      } catch (error) {
+        // Training availability must not tear down otherwise healthy capture.
+        logger.error('Unable to schedule training', { error: error.message });
+      }
+    }
   }
 
   function schedule() {
@@ -175,7 +205,11 @@ function createRuntime({ config, logger }) {
     });
   }
 
-  function killChildren() { for (const session of sessions.values()) session.kill(); }
+  function killChildren() {
+    driving.kill();
+    trainer.kill();
+    for (const session of sessions.values()) session.kill();
+  }
   function onSignal() {
     // Other server services can exit the process before asynchronous cleanup
     // finishes. Signal children immediately, and keep an exit fallback too.
@@ -186,7 +220,16 @@ function createRuntime({ config, logger }) {
   async function start() {
     await fs.mkdir(recordingsRoot, { recursive: true });
     await recoverRecordings(recordingsRoot);
+    await trainer.start();
     running = true;
+    driving.attach();
+    gateway = createGateway({ root, driving, activity, getSystemState: () => ({
+      recording: { paused: diskPaused, bytes: diskState.bytes, freeBytes: diskState.free,
+        pendingBytes, droppedPending, sessions: [...sessions.values()].map((session) => session.getStatus()) },
+      training: trainer.getState(),
+      limits: { recording: config.recording, training: { ...config.training, python: undefined }, driving: config.driving },
+      activity: [...recentActivity].reverse(),
+    }) });
     eligibleRovers = currentEligibleRovers();
     unsubscribers.push(subscribeCommandRecording((event) => append('command', event)));
     // ACK analytics also provide latency/type context; detailed acknowledgements
@@ -226,17 +269,22 @@ function createRuntime({ config, logger }) {
     }
     if (running) timer = setTimeout(schedule, wakeRequested ? 0 : 15000);
     wakeRequested = false;
-    logger.info('Rover learning recording enabled', { root });
+    logger.info('Rover learning enabled', { root, training: config.training.enabled });
   }
 
   async function stop() {
     if (stopPromise) return stopPromise;
     running = false;
+    gateway?.close();
     clearTimeout(timer);
     for (const unsubscribe of unsubscribers.splice(0)) unsubscribe();
     stopPromise = (async () => {
+      const trainingStop = trainer.stop();
+      const drivingStop = driving.shutdown();
       await maintenance.catch(() => undefined);
       const results = await Promise.allSettled([...sessions.keys()].map((id) => closeSession(id, 'disabled')));
+      await trainingStop;
+      await drivingStop;
       process.off('SIGTERM', onSignal);
       process.off('SIGINT', onSignal);
       process.off('exit', killChildren);
@@ -248,7 +296,7 @@ function createRuntime({ config, logger }) {
     return stopPromise;
   }
 
-  return { start, stop };
+  return { start, stop, getTrainingState: trainer.getState };
 }
 
 module.exports = { createRuntime };

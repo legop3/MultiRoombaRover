@@ -33,9 +33,9 @@ function observeCommand(event) {
   }
 }
 
-function recordCommandRequest(socket, request, reply, execute) {
+function recordCommandRequest(socket, request, reply, execute, source = 'client') {
   if (!observers.size) return execute(request, reply);
-  const context = { requestId: randomUUID(), socketId: socket.id, userId: socket.data?.userId || null };
+  const context = { requestId: randomUUID(), socketId: socket.id, userId: socket.data?.userId || null, source };
   const scope = { active: true, context };
   return requests.run(scope, () => {
     try {

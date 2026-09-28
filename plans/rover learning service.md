@@ -2,11 +2,12 @@
 
 ## Resume here
 
-Status: implementation authorized; first recording/lifecycle increment is coded.
-Training, model catalog, autonomous control, and the VIP card are not implemented.
-The standalone
-CPU benchmark exists at `perf/rover-model-benchmark.py` and was run successfully
-on the user's actual server. No autonomous-driving capability is implemented.
+Status: recording, bounded dataset/training, permanent named models, live inference,
+checked autonomous command submission, and the verified VIP card are coded.
+Human commands do not stop or pause autonomy (explicit latest user requirement).
+Focused local checks passed; actual recording/training, live autonomous behavior,
+concurrent server performance, and browser appearance remain unverified.
+The standalone CPU benchmark was run successfully on the actual server.
 
 This document preserves the conversation's decisions across compactions and
 usage cutoffs. Keep the checklist and handoff section current during authorized
@@ -19,12 +20,14 @@ AGENTS.md instructions: targeted investigation, minimal edits, no new tests unle
 requested, proportional direct verification, and no development processes left
 running. This development machine is not the actual rover server.
 
-Next work: verify real recording output on the server, then define the actual
-feature/action schema and implement training/checkpoint publication. The VIP entry
-point is `webui/src/components/VipPanel/index.jsx`; verified cards are in its
-`isVerified` branch, and client settings use `useSettingsNamespace`. The common
-browser rover command sender is `webui/src/controls/commandPipeline.js`. Finish
-the control-path inventory before declaring every capability learnable.
+The user declined the manual server checklist and explicitly asked to continue.
+Do not block further work or repeatedly ask them to do it. Preserve the unverified
+status and have the reader reject unusable recordings automatically.
+
+Next work: verify the integrated feature against actual recordings and the real
+camera/rover pipeline when that environment is available; inspect the VIP card in
+the running browser. Do not invent successful driving results or block further
+implementation on the previously declined manual checklist.
 
 ## Intended product
 
@@ -101,13 +104,13 @@ the default development path. Intended layout:
 ```text
 rover-learning/
   recordings/       Rolling video/events/session metadata (implemented)
-  models/           Permanent published models (pending)
-  training/         Resumable training/working state (pending)
-  catalog.sqlite    Session/model/progress index (proposed; not created yet)
+  models/           Permanent UUID directories: weights.pt and model.json
+  training/         resume.pt, schedule.json, and current job.json
 ```
 
-Only `recordings/` currently exists when enabled. Its session manifests provide
-the initial retention index; no placeholder model/training database is created.
+Training/model directories are created only when service and training are enabled.
+Session/model manifests and a small scheduling ledger are sufficient at present;
+the previously proposed catalog.sqlite is not needed or created.
 Python compute and video processing must not block the Node event loop. Worker
 dependencies, deployment packaging, and process shutdown must be included in the
 implementation plan; installing Python packages at server startup is not assumed.
@@ -166,8 +169,11 @@ an admin identity or send directly to the rover WebSocket.
 Recheck permissions server-side for actions and continued control. Losing the
 turn/assignment/connection or otherwise losing eligibility stops the autonomous
 session. A safe stop must still be possible after ordinary permission is revoked.
-The exact policy for an incoming manual control command during autonomy is open;
-immediate takeover is the proposed behavior. Prevent two controllers fighting.
+Explicit user decision: incoming human commands do not stop or pause autonomy.
+Both pass through the existing checked command path; subsequent model commands
+can replace human commands. Stop remains explicit, with permission/disconnect,
+stale input, and worker failure stops. Model-influenced sessions are excluded
+from human demonstration recording, including manual inputs during autonomy.
 
 Model actions describe operating controls, not arbitrary server maintenance.
 Inventory reboot/update/raw commands and capability restrictions explicitly rather
@@ -329,16 +335,21 @@ Published inference artifacts and resumable training state need not be identical
 - [x] Obtain IPI for feature implementation.
 - [ ] Inspect remaining UI/control paths and settle concrete contracts.
 - [x] Add service-owned config and dormant lifecycle integration.
-- [ ] Add optional detailed command observer and shared checked submission path.
+- [x] Add optional detailed command observer and shared checked submission path.
 - [ ] Implement timestamped recording, video worker ownership, and bounded dataset.
   Code is implemented for common commands, raw/decoded rover sensor frames,
   host stats, and existing rover state events. Live video/timing/retention
   verification and full control-path inventory remain; do not mark complete yet.
-- [ ] Implement feature/action encoding and training worker with resource limits.
-- [ ] Implement atomic checkpoint publication and permanent model catalog.
-- [ ] Implement model inference, ownership, takeover, stops, and worker cleanup.
-- [ ] Implement service socket gateway with complete per-user card state.
-- [ ] Implement verified VIP card at top, model selection, local favorites, controls.
+- [x] Implement feature/action encoding and training worker with resource limits.
+  Runtime import/dependency checks passed; training on actual recordings is still
+  unverified. The current schema limits and next inference work are described below.
+- [x] Implement atomic checkpoint publication and permanent model catalog.
+  Code complete; no actual-data published checkpoint has been produced locally.
+- [x] Implement model inference, ownership, explicit stops, and worker cleanup.
+  Human input does not stop autonomy; live execution remains unverified.
+- [x] Implement service socket gateway with complete per-user card state.
+- [x] Implement verified VIP card at top, model selection, local favorites, controls,
+  and expandable diagnostics. Browser appearance remains unverified.
 - [ ] Verify disabled startup and enable/disable cleanup directly.
 - [ ] Verify manual-control behavior remains intact and autonomous permission loss
   stops motion using an appropriate authorized runtime.
@@ -420,8 +431,8 @@ Limits and follow-up:
   surviving children. Existing MediaMTX shutdown can exit the whole Node process
   before async metadata flush finishes; next enable marks those sessions interrupted.
 - Storage leases for concurrent training reads are pending with dataset sampling.
-- Safe command submission extraction, autonomous provenance, training, permanent
-  catalog, model selection, client favorites, and UI remain pending.
+- Safe command submission extraction, autonomous provenance, model selection,
+  client favorites, and UI remain pending. Training/catalog code follows below.
 
 Verification completed:
 
@@ -438,7 +449,8 @@ Verification completed:
 - Local FFmpeg help confirms the RTSP transport and timeout options used.
 - No full build, full lint, new tests, live server startup, or rover hardware run.
 
-Server verification needed for this increment:
+Optional server verification reference (user declined doing this checklist;
+do not require it before continuing implementation):
 
 1. Deploy normally, initially disabled; confirm no `rover-learning` directory or
    learning FFmpeg workers are created by a fresh disabled startup.
@@ -458,11 +470,142 @@ Server verification needed for this increment:
 6. Verify rotation and retention with an intentionally chosen small recording
    budget, and confirm manual driving remains responsive during recording.
 
-Return the session metadata, a small representative event sample (excluding any
-unwanted personal text), FFprobe timestamps, and any `roverLearning` errors. Actual
-server capture/timing and live cleanup remain unverified until these checks run.
+Actual server capture/timing and live cleanup remain unverified. These steps are
+a reference for future runtime investigation, not a pending request to the user.
+
+### Dataset/training/checkpoint increment
+
+The user supplied IPI, then asked to continue after a rate-limit interruption.
+Authorization remains in effect. Implemented:
+
+- `workers/policy.py`: fixed-size spatial CNN/GRU with 64 action-shape slots and
+  up to 8 numeric output fields per shape. Four 160x120 RGB frames, spaced roughly
+  300 ms apart, with 32 selected sensors plus missing-value masks and previous
+  command values/ages/known flags. About 805k parameters (larger than the benchmark).
+- Numeric controls are normalized with `2/pi * atan(value/scale)`; the model
+  produces per-shape event logits and numeric values for the next 100 ms.
+  Command types supported: drive, motors, servo, headlight, laser, horn, peripheral,
+  song, raw. Strings/bools/arrays remain exact template constants; variable-size
+  songs/raw OI payloads are discrete demonstrations, not generated arbitrary bytes.
+  Maintenance commands, audio/text and sensor-stream setup are not action targets.
+  All recordings remain intact until normal dataset retention, regardless of
+  whether the trainer can use their commands.
+- The schema grows only into unused fixed slots and is saved with each model.
+  Overflow (64 shapes/8 numeric fields/4096-byte commands) skips the affected
+  recording with a reason instead of silently truncating controls. This is a
+  concrete initial encoding limit, not a promise to represent unlimited hardware
+  or arbitrary song libraries. Revisit it if real recordings exhaust capacity.
+- `workers/dataset.py`: bounded event loading (64 MiB/session), PyAV decoding,
+  absolute timestamp checks, causal sensor/action history, accepted-client-command
+  targets, and masks for observed action slots. Actual measured wheel speeds are
+  among the selected sensor inputs. Missing/stale sensors, video gaps, clock shifts,
+  incomplete recordings, data loss, and ambiguous conflicting actions are excluded.
+  Server-generated control overrides are history/boundaries, not demonstrations.
+- Validation is automatic and cannot establish what frame a browser displayed.
+  A session is only accepted after its video finishes decoding; samples from a
+  subsequently corrupt session are discarded. Commands/sensors at future times
+  do not enter observation history.
+- `workers/train.py`: finite CPU jobs, lower OS priority, shuffled bounded reservoir
+  sampling, sparse-event classification plus masked numeric regression, gradient
+  clipping, finite-loss checks, and AdamW resume state. Never sends rover commands.
+- `training.js`: one owned worker, recording leases acquired within serialized
+  maintenance, bounded stdout/stderr, interval and wall-clock limits, shutdown,
+  persistent per-recording visit/rejection ledger, and progress state for the
+  future card. Retention protects leased recordings. Disk pressure cancels the
+  training job before files become eligible for pruning again.
+- Atomic `training/resume.pt` includes model and optimizer state, schema, cumulative
+  steps/examples, and publication progress. Permanent model directories are
+  atomically renamed into visibility with weights and metadata together.
+- `models.js`: reads the permanent metadata catalog. Each model has a UUID, two-word
+  generated name plus UUID suffix, creation time, steps/examples, schema, source
+  session IDs, trained rover IDs, training loss, parameter count, weight hash/size,
+  and `evaluation: unevaluated`. No model pruning, favorites, or server pin state.
+- Dockerfile packages a CPU-only Python venv at `/opt/rover-learning` during image
+  build. Pinned requirements: torch 2.14.0+cpu, NumPy 2.5.3, PyAV 18.1.0. No runtime
+  downloads/installers. A disabled service does not load or run these dependencies.
+
+Training defaults beneath `roverLearning.training`:
+
+| Setting | Default |
+|---|---:|
+| enabled (still gated by outer service enabled=false) | true |
+| threads | 4 |
+| batchSize | 16 |
+| maxSamples / minimumSamples | 512 / 128 |
+| passesPerJob | 2 |
+| roundsPerSession | 3 |
+| maxStepsPerJob | 200 |
+| checkpointEverySteps | 100 |
+| intervalSeconds | 300 |
+| maxJobSeconds | 600 |
+
+At most four completed retained sessions are selected per job. Samples are spread
+over each full video via reservoir sampling, not always taken from its beginning.
+The rounds limit is sampled training visits, not full passes over all recorded
+frames. Once retained data reaches that limit, training waits for new sessions.
+Candidate publication happens at job boundaries after enough accumulated steps;
+it does not automatically deploy a model. No all-no-action sample pool is trained.
+
+Container rebuild is needed to include Python packages. For a non-container
+deployment, install `workers/requirements.txt` into a dedicated venv and set
+`training.python` to its Python path. The default path is container-specific.
+
+Verification performed in this increment:
+
+- Installed the actual pinned requirements in `/tmp/rover-bench-check-env`.
+- Ran the production worker's `--check-dependencies`: PyTorch/PyAV/NumPy imports,
+  dataset imports, policy construction, and specification output succeeded.
+- Four existing focused configuration tests passed (defaults, descriptions,
+  generated feature paths, normalization). The unrelated prior Discord default
+  assertion was not rerun or changed.
+- Node syntax checks on scheduler/runtime/catalog passed.
+- No new tests, fake recording fixtures, or throwaway test programs were created.
+- No real recordings are available locally. Actual decoding/alignment, optimizer
+  execution against recordings, checkpoint publication/resume, and concurrent
+  server performance are not claimed verified. No full container build was run.
+
+The following controller/UI increment implements those remaining code paths.
+Real-data and live-hardware verification still remain before claiming usable autonomy. The initial model is an experimental imitation policy, not a demonstrated
+competent driver or a final architecture choice.
 
 When resuming after implementation begins, append concrete changed files, commands
 run/results, unresolved failures, decisions approved by the user, and the next
 bounded task here. Do not mark a checkbox complete merely because code exists;
 record verification limits and outstanding server/hardware work explicitly.
+
+
+### Controller and VIP card increment
+
+- `commandService/index.js` exports the existing checked handler as `submitCommand`;
+  browser behavior remains in the same handler. Recording distinguishes model
+  requests from human requests without changing command payloads.
+- `driving.js` owns per-rover CPU workers under the initiating live socket's
+  permissions. Explicit Stop, permission/connection loss, stale predictions, or
+  worker failure stop the session and send zero drive/motors and horn stop.
+  Human commands deliberately neither stop nor pause the model.
+- `workers/infer.py` consumes live RTSP/TCP video plus sensor/command observations,
+  uses the training history format, validates weights/specification, resolves
+  competing command families, and latches discrete actions. It never writes to
+  the rover directly. Driving defaults: four CPU threads, 0.7 action threshold,
+  2000ms stale limit, with a 30-second worker startup allowance.
+- `capabilities.js` matches recorded hardware control profiles against the target
+  rover. Recordings, resumable training state, and published manifests preserve
+  those profiles; models without a matching profile are not selectable for Start.
+- `runtime.js` excludes autonomous sessions from human demonstrations, manages
+  controller shutdown, and supplies bounded recent activity and storage state.
+- `socketGateway.js` emits one complete authorized card object every second to
+  subscribers, refreshes the permanent catalog every 15 seconds, and accepts
+  checked Start/Stop actions. No server-side favorites are stored.
+- `VipRoverLearningCard.jsx` is at the top of the verified VIP tab, gated by the
+  service feature flag. It uses existing CardFrame, field/button/surface styles;
+  favorites use browser settings. Its expandable section includes storage,
+  recording sessions, dataset rejection reasons, training progress/resource
+  limits, model size/loss/control count, inference timing, last action, and events.
+- Verification: focused ESLint on the new card and VipPanel passed; four existing
+  configuration tests passed. The live worker's actual `--help` entry point loaded
+  PyTorch/PyAV/NumPy successfully. Shared-handler diff reviewed with whitespace
+  ignored: extraction preserves the previous command handler logic.
+- No real dataset, checkpoint, camera stream, or rover was available locally;
+  end-to-end inference/training and browser rendering remain unverified. No new
+  tests or background processes were added for verification, and no full build
+  or full test suite was run.

@@ -5,6 +5,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
+const { controlProfile } = require('./capabilities');
 
 const MAX_BUFFER_BYTES = 2 * 1024 * 1024;
 
@@ -20,6 +21,7 @@ async function createRecording({ root, roverId, snapshot, logger }) {
   await fsp.mkdir(directory);
   const metadata = {
     version: 1, id, roverId, startedAt: Date.now(), endedAt: null,
+    controlProfile: controlProfile(snapshot.meta),
     timing: 'Video PTS uses server receiver Unix seconds. Events use Unix milliseconds and process monotonic nanoseconds. Browser display delay is not measured.',
     video: { file: 'video.mkv', codec: 'source-copy', timestampUnit: 'seconds', origin: 'unix' },
     events: 'events.ndjson', droppedEvents: 0,
@@ -111,6 +113,8 @@ async function createRecording({ root, roverId, snapshot, logger }) {
     id, directory, startedAt: metadata.startedAt, append, stop,
     get failed() { return Boolean(failure); },
     get stopping() { return stopping; },
+    getStatus: () => ({ id, roverId, startedAt: metadata.startedAt, droppedEvents: metadata.droppedEvents,
+      video: childClosed ? 'stopped' : 'recorder running', error: failure, stopping }),
     // Process exit is synchronous; normal disable uses stop() and awaits close.
     kill: () => { if (!childClosed) child.kill('SIGKILL'); },
   };

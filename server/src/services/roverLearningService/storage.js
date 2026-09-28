@@ -56,4 +56,4 @@ async function enforceRetention(root, activeIds, maxBytes, minimumFreeBytes) {
   return { bytes, free, paused: bytes >= maxBytes || free < minimumFreeBytes };
 }
 
-module.exports = { recoverRecordings, enforceRetention };
+module.exports = { recoverRecordings, enforceRetention, listRecordings };

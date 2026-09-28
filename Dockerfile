@@ -97,6 +97,15 @@ RUN curl --fail --location --retry 3 \
     && find /output/opt/roverd/googletts -type d -exec chmod 0755 {} + \
     && find /output/opt/roverd/googletts -type f -exec chmod 0644 {} +
 
+FROM architecture-check AS learning-dependencies
+# CPU-only learning dependencies are built once. Disabled installations never
+# launch Python or install packages as a side effect of starting Node.
+RUN dnf install -y --setopt=install_weak_deps=False python3 python3-pip \
+    && dnf clean all
+COPY server/src/services/roverLearningService/workers/requirements.txt /tmp/learning-requirements.txt
+RUN python3 -m venv /opt/rover-learning \
+    && /opt/rover-learning/bin/pip install --no-cache-dir -r /tmp/learning-requirements.txt
+
 FROM fedora:${FEDORA_VERSION} AS runtime
 ARG FEDORA_VERSION
 ARG TARGETARCH
@@ -148,6 +157,7 @@ COPY --from=webui-build /build/server/public ./public
 COPY --from=native-workers /build/kinect/kinect_worker ./src/services/kinectService/native/kinect_worker
 COPY --from=native-workers /build/balance-board/balance_board_worker ./src/services/balanceBoardService/native/balance_board_worker
 COPY --from=packaged-tools /output/ /
+COPY --from=learning-dependencies /opt/rover-learning /opt/rover-learning
 COPY --chmod=0755 server/bin/chromegtts-wav.py /usr/local/bin/chromegtts-wav
 COPY --chmod=0755 server/mediamtx/rover-snapshot-writer.sh /usr/local/bin/rover-snapshot-writer.sh
 

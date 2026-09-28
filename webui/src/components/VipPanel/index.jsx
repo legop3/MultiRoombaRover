@@ -11,6 +11,7 @@ import VipVerificationCard from '../vip/VipVerificationCard.jsx';
 import VipIdentityCard from '../vip/VipIdentityCard.jsx';
 import VipPrivateRoverAccessCard from '../vip/VipPrivateRoverAccessCard.jsx';
 import VipProfileImageCard from '../vip/VipProfileImageCard.jsx';
+import VipRoverLearningCard from '../vip/VipRoverLearningCard.jsx';
 
 export default function VipPanel() {
   const session = useSessionSelector((state) => state.session);
@@ -54,6 +55,9 @@ export default function VipPanel() {
   return (
     <section className="@container space-y-2 text-base">
       <div className="grid grid-cols-1 gap-2 @[32rem]:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)]">
+        {isVerified && session?.features?.roverLearning ? (
+          <div className="@[32rem]:col-span-2"><VipRoverLearningCard roverId={ownRoverId || null} /></div>
+        ) : null}
         {!isVerified ? (
           <div className="@[32rem]:col-span-2">
             <VipVerificationCard
