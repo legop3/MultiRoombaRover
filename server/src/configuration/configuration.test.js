@@ -184,6 +184,7 @@ test('service definitions generate public feature paths without a separate regis
     { key: 'discord', path: ['discord', 'enabled'] },
     { key: 'socials', path: ['socials', 'enabled'] },
     { key: 'fleetReports', path: ['fleetReports', 'enabled'] },
+    { key: 'roverLearning', path: ['roverLearning', 'enabled'] },
   ]);
 });
 

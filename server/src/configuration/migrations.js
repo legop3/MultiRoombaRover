@@ -72,6 +72,18 @@ const migrations = [
       });
     },
   },
+  {
+    version: 3,
+    run(db) {
+      // Migrate historical revisions too, so rolling back settings cannot
+      // restore the removed training-visit limit and break startup again.
+      db.prepare(`
+        UPDATE configuration_revisions
+        SET config_json = json_remove(config_json, '$.roverLearning.training.roundsPerSession')
+        WHERE json_type(config_json, '$.roverLearning.training.roundsPerSession') IS NOT NULL
+      `).run();
+    },
+  },
 ];
 
 function applySchemaMigrations(db) {

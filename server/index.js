@@ -68,6 +68,7 @@ require('./src/services/batteryManager');
 // subscriptions see fully decoded state without becoming an initialization
 // dependency of either control path.
 require('./src/services/fleetReportService');
+require('./src/services/roverLearningService');
 require('./src/services/replayEngineV2');
 // Replay delivery is a core service. It must subscribe before the optional
 // Discord feature so web requests always have a local delivery path.

@@ -11,6 +11,7 @@ import VipVerificationCard from '../vip/VipVerificationCard.jsx';
 import VipIdentityCard from '../vip/VipIdentityCard.jsx';
 import VipPrivateRoverAccessCard from '../vip/VipPrivateRoverAccessCard.jsx';
 import VipProfileImageCard from '../vip/VipProfileImageCard.jsx';
+import VipRoverLearningCard from '../vip/VipRoverLearningCard.jsx';
 
 export default function VipPanel() {
   const session = useSessionSelector((state) => state.session);
@@ -71,6 +72,7 @@ export default function VipPanel() {
         <div className="@[32rem]:col-span-2">
           {isVerified ? (
             <div className="space-y-2">
+              <VipRoverLearningCard />
               <VipMidiBeeperCard />
               <VipAudioUploadCard
                 ownRoverId={ownRoverId}

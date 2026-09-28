@@ -22,6 +22,7 @@ const barcodeScanner = require('../services/barcodeScannerService/configuration'
 const commands = require('../services/operatorCommandService/configuration');
 const discord = require('../services/discordBotService/configuration');
 const fleetReports = require('../services/fleetReportService/configuration');
+const roverLearning = require('../services/roverLearningService/configuration');
 
 /*
   Object property order is preserved by JSON serialization and JSON Schema
@@ -55,6 +56,7 @@ const definitions = [
   sessionConfiguration.socials,
   sessionConfiguration.driverAd,
   fleetReports,
+  roverLearning,
 ];
 
 const defaultConfig = Object.fromEntries(
