@@ -98,6 +98,27 @@ function saveSnapshot(root) {
     return model;
   });
 }
+// Explicitly retire format 1 models after the wheel-policy replacement. Only
+// recognized old-format manifests qualify; malformed or future models are kept.
+function removeObsoleteModels(root) {
+  return serial(async () => {
+    const directory = path.join(root, 'models');
+    let entries;
+    try { entries = await fs.readdir(directory, { withFileTypes: true }); }
+    catch (error) { if (error.code === 'ENOENT') return; throw error; }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !UUID.test(entry.name)) continue;
+      const target = path.join(directory, entry.name);
+      let model;
+      try { model = await metadata(target); }
+      catch { continue; }
+      if (model.specification?.version === 1 && !leases.has(target)) {
+        await fs.rm(target, { recursive: true });
+      }
+    }
+  });
+}
+
 function listModels(root) {
   return serial(async () => {
     let entries;
@@ -116,4 +137,4 @@ function listModels(root) {
     return models;
   });
 }
-module.exports = { listModels, acquireModel, adoptCheckpoint, saveSnapshot };
+module.exports = { removeObsoleteModels, listModels, acquireModel, adoptCheckpoint, saveSnapshot };

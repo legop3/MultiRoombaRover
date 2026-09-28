@@ -786,3 +786,16 @@ no new training reset or configuration migration is required.
 - Focused Node syntax and Python worker entry-point checks passed. Targeted card
   lint is run for the UI change. End-to-end training/promotion, snapshot copying,
   active-session pinning and browser behavior remain unverified without live data.
+
+
+### UI cleanup and obsolete models
+
+User explicitly requested removal of UI narration and deletion of obsolete models.
+Removed snapshot/threshold explanatory prose and the old commented manual-control
+note; idle status now says Stopped. Kept operational status/errors and diagnostics.
+Enabled-service startup now deletes permanent model directories whose validated
+manifest explicitly identifies policy format 1, even when training is disabled.
+Format 2 snapshots, Latest/Previous, recordings and current training state remain.
+This supersedes earlier promises to preserve incompatible format 1 model files.
+Deletion occurs on the actual server when the updated service starts; no production
+files were accessed from this development machine.

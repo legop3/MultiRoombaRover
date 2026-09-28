@@ -397,6 +397,8 @@ function advanceTurn(roverId) {
     return;
   }
   if (queue.queue.length === 0) {
+    // Empty queues must not expose the departed driver through turn.currentId.
+    queue.current = null;
     stopRover(roverId);
     clearTurnTimer(roverId, queue);
     setActiveDriver(roverId, null);

@@ -13,6 +13,7 @@ const { createRecording } = require('./recording');
 const { recoverRecordings, enforceRetention } = require('./storage');
 const { createTrainer } = require('./training');
 const { createDriving } = require('./driving');
+const { removeObsoleteModels } = require('./models');
 const { createGateway } = require('./socketGateway');
 
 function createRuntime({ config, logger }) {
@@ -221,6 +222,7 @@ function createRuntime({ config, logger }) {
   async function start() {
     await fs.mkdir(recordingsRoot, { recursive: true });
     await recoverRecordings(recordingsRoot);
+    await removeObsoleteModels(root);
     await trainer.start();
     running = true;
     driving.attach();

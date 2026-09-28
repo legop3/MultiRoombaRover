@@ -130,7 +130,7 @@ function LearningCard({ roverId }) {
   return <CardFrame title="Rover learning" className="w-full" bodyClassName="text-sm text-slate-300">
     <div className="space-y-2">
       <p className="text-center text-xs text-slate-400">
-        {session ? `${session.modelName} · ${session.status}` : state ? 'Choose a model to control your rover.' : 'Waiting for rover learning status…'}
+        {session ? `${session.modelName} · ${session.status}` : state ? 'Stopped' : 'Waiting for rover learning status…'}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1">
         <select aria-label="Rover model" className={fieldClass} value={chosen?.id || ''} onChange={(event) => setSelectedId(event.target.value)} disabled={working || !models.length}>
@@ -147,7 +147,6 @@ function LearningCard({ roverId }) {
       </div>
       {state?.control?.canSnapshot && <div className="text-center">
         <button type="button" className="button-dark text-sm disabled:opacity-50" disabled={working} onClick={() => act('snapshot')}>Save learner snapshot</button>
-        <p className="mt-1 text-xs text-slate-400">Preserves the latest completed training checkpoint, including experimental results.</p>
       </div>}
       {session && <section className="space-y-2" aria-label="Live model actions">
         <p className="text-center text-xs text-sky-300">{session.predictionStatus || 'Waiting for fresh video and sensors'}</p>
@@ -161,7 +160,6 @@ function LearningCard({ roverId }) {
             value={thresholdDraft ?? session.threshold ?? .7} disabled={working || !state?.control?.canAdjust}
             onChange={(event) => setThresholdDraft(Number(event.target.value))}
             onPointerUp={commitThreshold} onKeyUp={commitThreshold} onBlur={commitThreshold} />
-          <span className="block text-slate-400">Lower allows more accessory actions. Wheel speeds are independent.</span>
         </label>
         <div className="grid max-h-52 grid-cols-1 gap-1 overflow-y-auto @[28rem]:grid-cols-2">
           {session.proposals?.map((proposal) => {
@@ -178,7 +176,6 @@ function LearningCard({ roverId }) {
         </div>
       </section>}
       {state?.control?.reason && <p className="text-center text-xs text-slate-400">{state.control.reason}</p>}
-      {/* <p className="text-center text-xs text-slate-500">Manual controls stay available and do not stop the model.</p> */}
       <p className="text-center text-xs text-slate-400">Recording: {recording ? recording.paused ? 'paused for disk space' : `${recording.sessions.filter((item) => item.video === 'Recording human driving').length} driving · ${recording.sessions.filter((item) => item.video === 'Dock lead-in buffer').length} dock buffer(s)` : 'unavailable'} · Training: {training?.status || 'unavailable'}</p>
       {(error || state?.catalogError) && <p role="alert" className="break-words text-xs text-amber-300">{error || state.catalogError}</p>}
       <details className="surface-muted text-xs" onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
