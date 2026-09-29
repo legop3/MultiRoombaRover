@@ -1,5 +1,6 @@
 // Export an explicit allowlist, never the raw socket/session/configuration object.
 const { redact } = require('./errors');
+const { POLICY_VERSION } = require('./capabilities');
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -7,7 +8,7 @@ const { createHash } = require('node:crypto');
 const applicationVersion = require('../../../package.json').version;
 const hash = createHash('sha256');
 for (const file of ['workers/policy.py', 'workers/dataset.py', 'workers/train.py', 'workers/infer.py',
-  'errors.js', 'storage.js', 'runtime.js', 'models.js', 'driving.js', 'recording.js', 'training.js', 'socketGateway.js', 'diagnostics.js']) {
+  'capabilities.js', 'errors.js', 'storage.js', 'runtime.js', 'models.js', 'driving.js', 'recording.js', 'training.js', 'socketGateway.js', 'diagnostics.js']) {
   hash.update(fs.readFileSync(path.join(__dirname, file)));
 }
 const implementationSha256 = hash.digest('hex');
@@ -29,8 +30,8 @@ function report(state, controller) {
   const metrics = training.diagnostics || {};
   const session = state.session;
   return {
-    reportVersion: 2, generatedAtUnixMs: state.updatedAt,
-    software: { applicationVersion, implementationSha256, policyVersion: 2, node: process.version,
+    reportVersion: 3, generatedAtUnixMs: state.updatedAt,
+    software: { applicationVersion, implementationSha256, policyVersion: POLICY_VERSION, node: process.version,
       dependencies: metrics.dependencies || null },
     host: { logicalCpus: os.cpus().length, totalMemoryBytes: os.totalmem(), freeMemoryBytes: os.freemem(), loadAverage: os.loadavg() },
     settings: state.limits,
@@ -52,7 +53,7 @@ function report(state, controller) {
     controller: controller ? { modelId: controller.modelId, sensorPresent: controller.sensorPresent || null,
       stopReason: redact(controller.stopReason), stopCategory: errorCategory(controller.stopReason), history: (controller.history || []).map((item) => ({
         ...item, submissions: item.submissions.map((submission) => ({ type: submission.type,
-          wheels: submission.wheels, result: redact(submission.result) })) })) } : null,
+          command: submission.command, result: redact(submission.result) })) })) } : null,
     sensorFields: metrics.policy?.sensorFields || null,
     timing: { alignment: 'server_receipt', browserVideoLatencyMs: null, wheelCommandExpiryMs: null },
     events: state.activity.map(({ at, message, detail, error, stderr }) => ({ atUnixMs: at, message: redact(message), detail: redact(detail), error: error || null, stderr: redact(stderr) })),

@@ -25,22 +25,20 @@ function Group({ title, children }) {
   </section>;
 }
 
-const actionNames = { motors: 'Brushes / vacuum', servo: 'Camera tilt', headlight: 'Headlight',
+const actionNames = { drive: 'Drive', motors: 'Brushes / vacuum', servo: 'Camera tilt', headlight: 'Headlight',
   laser: 'Laser', horn: 'Horn', peripheral: 'Accessory', song: 'Beeper', raw: 'Recorded control' };
 
-function WheelMeter({ label, speed }) {
-  const known = Number.isFinite(speed);
-  const value = known ? Math.max(-500, Math.min(500, speed)) : 0;
-  return <div className="surface-muted min-w-0 space-y-1">
-    <div className="flex justify-between gap-2 text-xs"><span>{label}</span><span>{known ? `${value} mm/s` : 'Waiting'}</span></div>
-    <div role="meter" aria-label={label} aria-valuemin={-500} aria-valuemax={500} aria-valuenow={value}
-      aria-valuetext={known ? `${value} millimeters per second` : 'Unavailable'} className="relative h-3 overflow-hidden rounded bg-slate-800">
-      <div className={`absolute inset-y-0 rounded ${value < 0 ? 'bg-amber-400' : 'bg-sky-400'}`}
-        style={{ left: `${value < 0 ? 50 + value / 10 : 50}%`, width: `${Math.abs(value) / 10}%` }} />
-      <div className="absolute inset-y-0 left-1/2 w-px bg-slate-400" />
-    </div>
-    <div className="flex justify-between text-xs text-slate-500"><span>Reverse</span><span>Forward</span></div>
-  </div>;
+function commandParameters(command) {
+  const fields = [];
+  const visit = (value, path) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const [key, item] of Object.entries(value)) visit(item, path ? `${path}.${key}` : key);
+    } else {
+      fields.push(`${path}: ${typeof value === 'number' ? Number(value.toFixed(2)) : JSON.stringify(value)}`);
+    }
+  };
+  for (const [key, value] of Object.entries(command || {})) if (key !== 'type') visit(value, key);
+  return fields.join(' · ');
 }
 
 export default function VipRoverLearningCard() {
@@ -135,7 +133,7 @@ function LearningCard({ roverId }) {
       <div className="flex flex-wrap items-center justify-center gap-1">
         <select aria-label="Rover model" className={fieldClass} value={chosen?.id || ''} onChange={(event) => setSelectedId(event.target.value)} disabled={working || !models.length}>
           {!models.length && <option value="">No published models yet</option>}
-          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.experimental ? ' (experimental)' : ''}{model.compatible ? '' : model.formatVersion !== 2 ? ' (older model format)' : ' (incompatible)'}</option>)}
+          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.experimental ? ' (experimental)' : ''}{model.compatible ? '' : model.formatVersion !== 3 ? ' (older model format)' : ' (incompatible)'}</option>)}
         </select>
         <button type="button" className="button-dark text-sm disabled:opacity-50" aria-pressed={Boolean(chosen && favorites.includes(chosen.id))} disabled={!chosen} onClick={favorite}>
           {chosen && favorites.includes(chosen.id) ? '★ Favorite' : '☆ Favorite'}
@@ -150,12 +148,8 @@ function LearningCard({ roverId }) {
       </div>}
       {session && <section className="space-y-2" aria-label="Live model actions">
         <p className="text-center text-xs text-sky-300">{session.predictionStatus || 'Waiting for fresh video and sensors'}</p>
-        <div className="grid grid-cols-2 gap-2">
-          <WheelMeter label="Predicted left wheel" speed={session.wheelSpeeds?.[0]} />
-          <WheelMeter label="Predicted right wheel" speed={session.wheelSpeeds?.[1]} />
-        </div>
         <label className="surface-muted block space-y-1 text-xs">
-          <span className="flex justify-between gap-2"><span>Accessory action threshold</span><span>{(thresholdDraft ?? session.threshold ?? .7).toFixed(2)}</span></span>
+          <span className="flex justify-between gap-2"><span>Command threshold</span><span>{(thresholdDraft ?? session.threshold ?? .7).toFixed(2)}</span></span>
           <input type="range" min="0.05" max="0.99" step="0.01" className="w-full accent-sky-400"
             value={thresholdDraft ?? session.threshold ?? .7} disabled={working || !state?.control?.canAdjust}
             onChange={(event) => setThresholdDraft(Number(event.target.value))}
@@ -163,14 +157,20 @@ function LearningCard({ roverId }) {
         </label>
         <div className="grid max-h-52 grid-cols-1 gap-1 overflow-y-auto @[28rem]:grid-cols-2">
           {session.proposals?.map((proposal) => {
-            const submission = session.submissions?.find((item) => item.command.type === proposal.command.type
+            const submission = proposal.reason === 'Proposed' && session.submissions?.find((item) => item.command.type === proposal.command.type
               && (proposal.command.type !== 'peripheral' || (item.command.peripheral?.id === proposal.command.peripheral?.id
                 && item.command.peripheral?.control === proposal.command.peripheral?.control)));
             const status = proposal.reason === 'Proposed' && submission ? submission.result : proposal.reason;
             return <div key={proposal.slot} className="surface-muted space-y-1 text-xs">
               <div className="flex justify-between gap-2"><span>{actionNames[proposal.command.type] || proposal.command.type}{proposal.command.type === 'peripheral' ? ` · ${proposal.command.peripheral?.id} / ${proposal.command.peripheral?.control}` : ''}</span><span>{proposal.score.toFixed(2)}</span></div>
-              <div className="h-1.5 overflow-hidden rounded bg-slate-800"><div className={status === 'issued' ? 'h-full bg-emerald-400' : 'h-full bg-slate-500'} style={{ width: `${proposal.score * 100}%` }} /></div>
+              <p className="break-words text-slate-300">{commandParameters(proposal.command)}</p>
+              <div role="meter" aria-label={`${actionNames[proposal.command.type] || proposal.command.type} score`}
+                aria-valuemin={0} aria-valuemax={1} aria-valuenow={proposal.score} className="relative h-2 overflow-hidden rounded bg-slate-800">
+                <div className={status === 'issued' ? 'h-full bg-emerald-400' : 'h-full bg-sky-500'} style={{ width: `${proposal.score * 100}%` }} />
+                <div className="absolute inset-y-0 w-px bg-white" style={{ left: `${(session.appliedThreshold ?? session.threshold ?? .7) * 100}%` }} />
+              </div>
               <p className={status === 'issued' ? 'text-emerald-300' : 'text-slate-400'}>{status === 'issued' ? 'Submitted' : status}</p>
+              {submission && <p className="break-words text-slate-400">Sent: {commandParameters(submission.command)}</p>}
             </div>;
           })}
         </div>
@@ -202,8 +202,11 @@ function LearningCard({ roverId }) {
             <Row label="Status">{training?.status || 'Unavailable'}</Row>
             <Row label="Steps">{display(training?.steps)}</Row>
             <Row label="Examples processed">{display(training?.examples)}</Row>
-            <Row label="Wheel / event / accessory losses">{training?.losses ? `${training.losses.wheels.toFixed(4)} / ${training.losses.events.toFixed(4)} / ${training.losses.accessoryValues.toFixed(4)}` : 'Unavailable'}</Row>
-            <Row label="Wheel error / stopped baseline / previous speed baseline">{training?.evaluation?.wheelMaeMmPerSecond == null ? 'Unavailable' : `${training.evaluation.wheelMaeMmPerSecond.toFixed(1)} / ${training.evaluation.stoppedBaselineMaeMmPerSecond.toFixed(1)} / ${training.evaluation.previousSpeedBaselineMaeMmPerSecond.toFixed(1)} mm/s`}</Row>
+            <Row label="Event / parameter losses">{training?.losses ? `${training.losses.events?.toFixed(4) ?? 'Unavailable'} / ${training.losses.commandValues?.toFixed(4) ?? 'Unavailable'}` : 'Unavailable'}</Row>
+            <Row label="Parameter error">{training?.evaluation?.numericMse?.toFixed(4) ?? 'Unavailable'}</Row>
+            <Row label="Missed / total stop events">{training?.evaluation?.stopEvents == null ? 'Unavailable' : `${training.evaluation.missedStops} / ${training.evaluation.stopEvents}`}</Row>
+            <Row label="Unwanted / no-command windows">{training?.evaluation?.noCommandWindows == null ? 'Unavailable' : `${training.evaluation.unwantedCommandWindows} / ${training.evaluation.noCommandWindows}`}</Row>
+            <Row label="Usable held-out recordings">{display(training?.evaluation?.heldOutSessions)}</Row>
             <Row label="Training loss">{training?.loss == null ? 'Unavailable' : training.loss.toFixed(4)}</Row>
             <Row label="Current job age">{training?.status === 'training' ? age(now, training.startedAt) : 'Not running'}</Row>
             <Row label="Next attempt">{time(training?.nextAttemptAt)}</Row>
@@ -220,6 +223,7 @@ function LearningCard({ roverId }) {
             <Row label="Steps between Latest updates">{display(limits?.training.checkpointEverySteps)}</Row>
           </dl>{training?.error && <p className="break-words text-amber-300">{training.error}</p>}
             {training?.reason && <p>{training.reason}</p>}
+            {training?.evaluation?.gateReasons?.map((reason) => <p key={reason}>{reason}</p>)}
             {training?.rejectionReasons?.map((reason) => <p className="break-words text-amber-300" key={reason}>{reason}</p>)}
           </Group>
           <Group title="Selected model"><dl>

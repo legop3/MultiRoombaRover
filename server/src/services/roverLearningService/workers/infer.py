@@ -14,7 +14,7 @@ import av
 import numpy as np
 import torch
 
-from policy import Policy, VERSION, SLOTS, VALUES, HEIGHT, WIDTH, encode_command, sensor_vector
+from policy import Policy, VERSION, SLOTS, VALUES, HEIGHT, WIDTH, SENSORS, select_slots, decode_command, encode_command, sensor_vector
 
 
 def main():
@@ -78,7 +78,7 @@ def main():
                         args.threshold = max(.05, min(.99, float(event['threshold'])))
                     elif event['kind'] == 'sensor':
                         sensors, sensor_time = event['data'], event['ts']
-                    elif event['kind'] == 'command':
+                    elif event['kind'] == 'command' and event['data'].get('type') != 'drive':
                         try:
                             encoded = encode_command(event['data'], schema)
                             if encoded:
@@ -104,58 +104,30 @@ def main():
                 continue
             before = time.perf_counter()
             with torch.inference_mode():
-                logits, numeric, wheel_output = model(torch.from_numpy(np.stack([row[1] for row in selected])).unsqueeze(0).float() / 255,
+                logits, numeric = model(torch.from_numpy(np.stack([row[1] for row in selected])).unsqueeze(0).float() / 255,
                                         torch.from_numpy(np.stack([row[2] for row in selected])).unsqueeze(0))
                 probabilities = logits[0].sigmoid().tolist()
                 predictions = numeric[0].tolist()
-                wheel_speeds = [round(value * 500) for value in wheel_output[0].tolist()]
             if not all(math.isfinite(value) for value in probabilities):
                 raise ValueError('Nonfinite model output')
-            families = {}
-            active = set()
-            proposals = []
-            for slot, descriptor in enumerate(schema):
-                if descriptor['template']['type'] == 'drive':
-                    continue
-                command = json.loads(json.dumps(descriptor['template']))
-                family = command['type']
-                if family == 'peripheral':
-                    family += ':' + str(command['peripheral']['id']) + ':' + str(command['peripheral']['control'])
-                for index, field in enumerate(descriptor['fields']):
-                    number = predictions[slot][index]
-                    if not math.isfinite(number):
-                        raise ValueError('Nonfinite control value')
-                    number = math.tan(max(-.98, min(.98, number)) * math.pi / 2) * field['scale']
-                    target = command
-                    for key in field['path'][:-1]:
-                        target = target[key]
-                    target[field['path'][-1]] = round(number) if field['integer'] else number
-                proposals.append({'slot': slot, 'score': probabilities[slot], 'command': command,
-                                  'reason': 'Below threshold'})
-                if probabilities[slot] < args.threshold:
-                    continue
-                active.add(slot)
-                discrete = command['type'] in ('headlight', 'laser', 'horn', 'song', 'raw')
-                if family not in families or probabilities[slot] > families[family][0]:
-                    families[family] = (probabilities[slot], command, slot, discrete)
+            winners = select_slots(probabilities, schema, args.threshold)
+            active = {slot for slot in range(len(schema)) if probabilities[slot] >= args.threshold}
             latched.intersection_update(active)
-            # Choose the winning action before latching, so a held toggle cannot
-            # expose a competing lower-confidence toggle on the following tick.
-            commands = [command for _, command, slot, discrete in families.values()
-                        if not discrete or slot not in latched]
-            winners = {row[2]: row for row in families.values()}
-            for proposal in proposals:
-                slot = proposal['slot']
-                if slot in active:
-                    proposal['reason'] = ('Competing action' if slot not in winners else
-                                          'Held discrete action' if winners[slot][3] and slot in latched else 'Proposed')
-            for _, _, slot, discrete in families.values():
-                if discrete:
+            proposals, commands = [], []
+            for slot, descriptor in enumerate(schema):
+                command = decode_command(descriptor, predictions[slot])
+                discrete = command['type'] in ('headlight', 'laser', 'horn', 'song', 'raw')
+                reason = ('Below threshold' if slot not in active else
+                          'Competing action' if slot not in winners else
+                          'Held discrete action' if discrete and slot in latched else 'Proposed')
+                proposals.append({'slot': slot, 'score': probabilities[slot], 'command': command, 'reason': reason})
+                if reason == 'Proposed':
+                    commands.append(command)
+                if slot in winners and discrete:
                     latched.add(slot)
-            commands.insert(0, {'type': 'drive', 'driveDirect': dict(zip(('left', 'right'), wheel_speeds))})
             print(json.dumps({'kind': 'prediction', 'frameAt': stamp, 'sensorAt': sensor_time,
                               'latencyMs': (time.perf_counter() - before) * 1000,
-                              'wheelSpeeds': wheel_speeds, 'sensorPresent': sensor_vector(sensors)[32:].tolist(),
+                              'sensorPresent': sensor_vector(sensors)[len(SENSORS):].tolist(),
                               'commands': commands, 'proposals': proposals, 'threshold': args.threshold}, allow_nan=False), flush=True)
 
 

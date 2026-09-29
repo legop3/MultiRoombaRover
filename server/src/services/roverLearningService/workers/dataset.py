@@ -9,7 +9,7 @@ from pathlib import Path
 import av
 import numpy as np
 
-from policy import SLOTS, VALUES, HEIGHT, WIDTH, encode_command, sensor_vector
+from policy import SLOTS, VALUES, HEIGHT, WIDTH, SENSORS, command_family, is_stop, encode_command, sensor_vector
 
 
 def load_events(directory):
@@ -72,27 +72,13 @@ def prepare(directory, schema, stats):
     if not sensors:
         raise ValueError('No sensor observations')
     candidate = copy.deepcopy(schema)
-    history, targets, wheels = [], [], [(stamp, None) for stamp in boundaries]
+    history, targets = [], []
     stats.update({'sensorFrames': len(sensors), 'dispatches': len(dispatches),
-                  'failedCommands': len(failed), 'sensorPresentFraction': np.mean([row[1][32:] for row in sensors], axis=0).tolist()})
+                  'failedCommands': len(failed), 'sensorPresentFraction': np.mean([row[1][len(SENSORS):] for row in sensors], axis=0).tolist()})
     for data in dispatches:
         command = data.get('command') or {}
-        request = requests.get(data.get('requestId'))
-        human = (data.get('source') == 'client' and request and data.get('commandId') in accepted
-                 and data.get('commandId') not in failed)
-        stamp = data['ts']
-        if command.get('type') == 'drive':
-            direct = command.get('driveDirect') or {}
-            pair = [direct.get('left'), direct.get('right')]
-            if human and all(isinstance(v, (int, float)) and math.isfinite(v) for v in pair):
-                wheels.append((stamp, np.clip(np.array(pair, dtype=np.float32), -metadata.get('wheelSpeedLimit', 500), metadata.get('wheelSpeedLimit', 500)) / 500))
-            else:
-                wheels.append((stamp, None))
-        elif command.get('type') in ('raw', 'reset', 'reboot', 'update', 'sensorStream'):
-            # Raw OI can change mode or motion; do not assume the last wheel
-            # command survives it. A later explicit human drive resolves intent.
-            wheels.append((stamp, None))
-            boundaries.append(stamp)
+        if command.get('type') in ('reset', 'reboot', 'update', 'sensorStream'):
+            boundaries.append(data['ts'])
         encoded = encode_command(command, candidate, extend=True)
         if encoded is None:
             continue
@@ -112,22 +98,21 @@ def prepare(directory, schema, stats):
     if not targets:
         raise ValueError('No accepted client operating commands')
     schema[:] = candidate
-    return metadata, sensors, sorted(wheels, key=lambda x: x[0]), sorted(history, key=lambda x: x[0]), sorted(targets, key=lambda x: x[0]), sorted(boundaries)
+    return metadata, sensors, sorted(history, key=lambda x: x[0]), sorted(targets, key=lambda x: x[0]), sorted(boundaries)
 
 
 def windows(directory, schema, cancelled=lambda: False, stats=None):
     directory = Path(directory)
     stats = stats if stats is not None else {}
-    metadata, sensors, wheels, history, targets, boundaries = prepare(directory, schema, stats)
-    wheel_times = [row[0] for row in wheels]
-    stats.update({'usableWindows': 0, 'movingWindows': 0, 'stoppedWindows': 0,
-                  'unknownWheelWindows': 0, 'staleSensorWindows': 0, 'boundaryWindows': 0,
+    metadata, sensors, history, targets, boundaries = prepare(directory, schema, stats)
+    stats.update({'usableWindows': 0, 'commandWindows': 0, 'stopWindows': 0, 'noCommandWindows': 0,
+                  'staleSensorWindows': 0, 'boundaryWindows': 0,
                   'ambiguousWindows': 0, 'videoFrames': 0, 'maxVideoGapMs': 0})
     sensor_times = [row[0] for row in sensors]
     target_times = [row[0] for row in targets]
     available = np.zeros(SLOTS, dtype=np.float32)
     for _, slot, _ in history:
-        available[slot] = float(schema[slot]['template']['type'] != 'drive')
+        available[slot] = 1
     command_values = np.zeros((SLOTS, VALUES), dtype=np.float32)
     command_times = np.full(SLOTS, -np.inf)
     cursor = 0
@@ -164,8 +149,10 @@ def windows(directory, schema, cancelled=lambda: False, stats=None):
         last_sample = stamp
         while cursor < len(history) and history[cursor][0] < stamp:
             when, slot, values = history[cursor]
-            command_values[slot] = values
-            command_times[slot] = when
+            # Do not let drive predictions simply copy earlier human/model drive commands.
+            if schema[slot]['template']['type'] != 'drive':
+                command_values[slot] = values
+                command_times[slot] = when
             cursor += 1
         sensor_index = bisect.bisect_right(sensor_times, stamp) - 1
         if sensor_index < 0 or stamp - sensor_times[sensor_index] > 1000:
@@ -188,12 +175,6 @@ def windows(directory, schema, cancelled=lambda: False, stats=None):
         if bisect.bisect_right(boundaries, stamp + 100) > bisect.bisect_left(boundaries, chosen[0][0]):
             stats['boundaryWindows'] += 1
             continue
-        before = bisect.bisect_left(wheel_times, stamp) - 1
-        after = bisect.bisect_right(wheel_times, stamp + 100) - 1
-        if before < 0 or after < 0 or wheels[before][1] is None or wheels[after][1] is None:
-            stats['unknownWheelWindows'] += 1
-            continue
-        wheel_target, previous_wheels = wheels[after][1], wheels[before][1]
         start = bisect.bisect_left(target_times, stamp)
         end = bisect.bisect_left(target_times, stamp + 100)
         actions = np.zeros(SLOTS, dtype=np.float32)
@@ -202,13 +183,8 @@ def windows(directory, schema, cancelled=lambda: False, stats=None):
         families = set()
         for _, slot, vector in targets[start:end]:
             template = schema[slot]['template']
-            family = template['type']
-            if family == 'drive':
-                continue
-            if family == 'peripheral':
-                peripheral = template.get('peripheral') or {}
-                family += ':' + str(peripheral.get('id')) + ':' + str(peripheral.get('control'))
-            if ((actions[slot] and (not schema[slot]['fields'] or not np.array_equal(values[slot], vector)))
+            family = command_family(template)
+            if ((actions[slot] and (template['type'] in ('headlight', 'laser', 'horn', 'song', 'raw') or not np.array_equal(values[slot], vector)))
                     or (not actions[slot] and family in families)):
                 ambiguous = True
                 break
@@ -218,5 +194,6 @@ def windows(directory, schema, cancelled=lambda: False, stats=None):
             stats['ambiguousWindows'] += 1
             continue
         stats['usableWindows'] += 1
-        stats['movingWindows' if np.max(np.abs(wheel_target)) > .02 else 'stoppedWindows'] += 1
-        yield np.stack([row[1] for row in chosen]), np.stack([row[2] for row in chosen]), actions, values, available, wheel_target, previous_wheels
+        stats['commandWindows' if actions.any() else 'noCommandWindows'] += 1
+        stats['stopWindows'] += int(any(actions[slot] and is_stop(descriptor) for slot, descriptor in enumerate(schema)))
+        yield np.stack([row[1] for row in chosen]), np.stack([row[2] for row in chosen]), actions, values, available

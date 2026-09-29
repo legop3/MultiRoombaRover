@@ -20,7 +20,7 @@ module.exports = {
     enabled: boolean({ description: 'Enable human-session recording, background learning, and verified-user model control. Disabled starts no workers or storage.' }),
     driving: strictObject({
       threads: integer({ minimum: 1, maximum: 16, description: 'CPU threads per active model controller.' }),
-      actionThreshold: number({ minimum: 0.5, maximum: 0.99, description: 'Minimum predicted action probability for issuing a new control event.' }),
+      actionThreshold: number({ minimum: 0.5, maximum: 0.99, description: 'Minimum model score for issuing a command, including drive and stop commands.' }),
       staleMs: integer({ minimum: 1000, maximum: 5000, description: 'Stop when video, sensors, or model predictions are older than this many milliseconds.' }),
     }, { description: 'Live model execution. Manual inputs do not stop or pause the model.', required: ['threads', 'actionThreshold', 'staleMs'] }),
     recording: strictObject({

@@ -127,21 +127,19 @@ function createDriving({ root, config, onChange, activity }) {
           session.latencyMs = message.latencyMs;
           session.proposals = Array.isArray(message.proposals) ? message.proposals.slice(0, 64) : [];
           session.appliedThreshold = message.threshold;
-          session.wheelSpeeds = message.wheelSpeeds;
           session.sensorPresent = message.sensorPresent;
           session.submissions = [];
           if (!Array.isArray(message.commands) || message.commands.length > 65) throw new Error('Invalid action batch');
-          session.predictionStatus = message.wheelSpeeds?.some((value) => value !== 0) ? 'Sending wheel controls' : 'Predicting stopped wheels';
+          session.predictionStatus = message.commands.length ? `${message.commands.length} command(s) proposed` : 'No command proposed';
           // Manual commands intentionally do not stop or pause this controller.
           for (const command of message.commands) transmit(session, command);
           // Bound report history independently of camera and UI frame rates.
           if (!session.history.length || Date.now() - session.history.at(-1).at >= 500) {
-            session.history.push({ at: Date.now(), wheelSpeeds: session.wheelSpeeds,
+            session.history.push({ at: Date.now(),
               latencyMs: session.latencyMs, frameAgeMs: Date.now() - session.frameAt,
               sensorAgeMs: Date.now() - session.sensorAt, threshold: session.appliedThreshold,
-              proposals: [...session.proposals].sort((a, b) => b.score - a.score).slice(0, 8).map(({ slot, score, reason }) => ({ slot, score, reason })),
-              submissions: session.submissions.slice(0, 16).map(({ command, result }) => ({ type: command.type, result,
-                wheels: command.type === 'drive' ? command.driveDirect : undefined })) });
+              proposals: [...session.proposals].sort((a, b) => b.score - a.score).slice(0, 8).map(({ slot, score, reason, command }) => ({ slot, score, reason, command })),
+              submissions: session.submissions.slice(0, 16).map(({ command, result }) => ({ type: command.type, result, command })) });
             if (session.history.length > 60) session.history.shift();
           }
         } catch (error) { stop(roverId, error.message); break; }

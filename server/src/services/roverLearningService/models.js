@@ -1,3 +1,4 @@
+const { POLICY_VERSION } = require('./capabilities');
 // Mutable aliases reference immutable checkpoints. All readers and retention share
 // a queue so a model cannot disappear between resolving its alias and loading it.
 const fs = require('node:fs/promises');
@@ -82,6 +83,7 @@ function saveSnapshot(root) {
     if (!UUID.test(state.candidate || '')) throw new Error('No completed learner checkpoint yet');
     const source = path.join(checkpointRoot(root), state.candidate);
     const original = await metadata(source);
+    if (original.specification?.version !== POLICY_VERSION) throw new Error('Waiting for a completed command-policy checkpoint');
     const id = randomUUID();
     const words = [['amber', 'silver', 'quiet', 'curious'], ['otter', 'finch', 'fox', 'wren']];
     const name = `${words[0][randomInt(4)]}-${words[1][randomInt(4)]}-${id.slice(0, 8)}`;

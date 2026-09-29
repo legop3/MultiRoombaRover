@@ -33,7 +33,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
         }
       }
       try {
-        const saved = JSON.parse(await fs.readFile(path.join(trainingRoot, 'schedule-v3.json'), 'utf8'));
+        const saved = JSON.parse(await fs.readFile(path.join(trainingRoot, 'schedule-v4.json'), 'utf8'));
         ledger = saved.sessions;
         state = { ...saved.progress, status: 'waiting' };
         if (!ledger || typeof ledger !== 'object') throw new Error('Invalid training schedule');
@@ -46,7 +46,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
   }
 
   async function saveLedger() {
-    const filename = path.join(trainingRoot, 'schedule-v3.json');
+    const filename = path.join(trainingRoot, 'schedule-v4.json');
     await fs.writeFile(`${filename}.tmp`, JSON.stringify({ sessions: ledger, progress: state }));
     await fs.rename(`${filename}.tmp`, filename);
   }
@@ -83,7 +83,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
       partitions[heldOut ? 'heldOut' : 'training'].push(id);
     }
     const trainingSessions = partitions.training.slice(0, partitions.heldOut.length ? 3 : 4);
-    const heldOutSessions = trainingSessions.length ? partitions.heldOut.slice(0, 1) : [];
+    const heldOutSessions = trainingSessions.length ? partitions.heldOut.slice(0, 2) : [];
     const selected = [...trainingSessions, ...heldOutSessions];
     const selection = {
       atUnixMs: Date.now(),

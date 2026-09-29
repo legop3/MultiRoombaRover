@@ -2,18 +2,27 @@
 
 ## Resume here
 
-Latest change: one ongoing learner, gated Latest/Previous checkpoints, and
-admin-created permanent snapshots replace automatic permanent publications.
+Latest change: format 3 command-event policy replaces format 2 continuous wheel
+speeds. All supported controls, including drive and recorded zero-speed stops,
+use scored command templates and the same threshold/checked command pipe. The
+network produces scores and numeric values; it never generates JSON text.
 
-Status: policy format 2 now predicts continuous wheel speeds plus accessory events.
-Copyable diagnostics and main-card wheel/action displays with a session threshold
-slider are implemented. Older model files remain stored but cannot run in this format.
-Recording, bounded dataset/training, permanent named models, live inference,
-checked autonomous command submission, and the verified VIP card are coded.
-Human commands do not stop or pause autonomy (explicit latest user requirement).
-Focused local checks passed; actual recording/training, live autonomous behavior,
-concurrent server performance, and browser appearance remain unverified.
-The standalone CPU benchmark was run successfully on the actual server.
+Implemented: remove wheel-speed telemetry and previous drive-command history
+from inputs (raw recordings unchanged); preserve exact numeric zeros; reuse
+recordings with a fresh resume-v4.pt / schedule-v4.json lineage. Existing format 2
+snapshots remain stored and are visibly incompatible. One ongoing learner, gated
+Latest/Previous, and admin-created permanent snapshots remain.
+
+Main card shows decoded command parameters, score, applied threshold marker, and
+submission results, including below-threshold proposals. Diagnostics reportVersion
+3 includes command predictions/submissions and event evaluation. Manual inputs
+still never stop or pause autonomy. Disabled remains dormant/off by default.
+
+Focused Node syntax, Python production worker entry points, and card ESLint
+passed. New policy: 803,440 parameters, 30 sensor fields, stateSize 700. No live
+recordings/camera/rover pipeline or authenticated browser were available locally.
+Actual training, stop behavior, concurrent performance and visual appearance
+remain unverified. No tests were added and no processes were left running.
 
 This document preserves the conversation's decisions across compactions and
 usage cutoffs. Keep the checklist and handoff section current during authorized
@@ -30,9 +39,8 @@ The user declined the manual server checklist and explicitly asked to continue.
 Do not block further work or repeatedly ask them to do it. Preserve the unverified
 status and have the reader reject unusable recordings automatically.
 
-Latest increment: internal card gating, dock lead-in/tail capture, live prediction
-diagnostics, ongoing retained-data sampling, and gated model publication are coded.
-See the final handoff section for settings and the new training lineage.
+Latest increment: see the command-event policy handoff at the end. Earlier
+format 2 wheel-specific design notes below are historical and superseded.
 
 Next work: verify the integrated feature against actual recordings and the real
 camera/rover pipeline when that environment is available; inspect the VIP card in
@@ -835,3 +843,74 @@ scheduled. Selection guarantees a held-out recording, not usable evaluation
 windows: decoding/vocabulary/sample checks still apply in the worker.
 Node syntax checks and diff whitespace checks passed; actual job selection on
 production recordings remains unverified. No new tests or background processes.
+
+### Active implementation: command-event policy (authorized IPI)
+
+Supersedes format 2 continuous wheel output. The model predicts numeric command
+scores and payload values; ordinary code constructs commands for the existing
+shared command pipe. It does not generate JSON text. Drive, recorded key-release
+stops, and accessories all use the threshold. Remove wheel-speed sensors and
+previous drive-command inputs, but preserve raw recordings. Exact zero values
+remain template constants so a demonstrated stop cannot regress into creeping.
+
+Keep one continuing learner, Latest/Previous, admin snapshots, recording lifecycle,
+permissions, and manual inputs that never cancel autonomy. No prescribed human
+driving. Start a new format 3 lineage, reuse recordings, show older snapshots as
+incompatible. No model-size increase or recording redesign in this change.
+
+Update the upper card to show every command proposal with decoded parameters,
+score, threshold marker and dispatch result, including below-threshold proposals.
+Update copied diagnostics and evaluation for command events, parameter error,
+missed stops and unwanted commands. Evaluate more than one held-out recording;
+event validation is not proof of autonomous driving or physical rollout quality.
+
+Progress: implemented; focused checks passed. User's unrelated webui/package.json
+edit was preserved. No changes to runtime recording, disabled startup, control
+permissions or manual-input override semantics.
+
+Implementation details for resume:
+- workers/policy.py VERSION=3, CNN/GRU unchanged in size; two heads for scores and
+  command parameters. Shared select_slots chooses one winner per command family
+  (peripheral id/control are separate families). No unconditional drive head.
+- Numeric zeros and address fields stay exact template constants. Stop is the
+  normal recorded driveDirect {left:0,right:0} command. Unknown templates still
+  reject explicitly at the 64-shape limit. Arrays remain exact demonstrations.
+- workers/dataset.py yields five arrays: images, state, event labels, parameters,
+  available shapes. It includes accepted human drive events, excludes ambiguous
+  conflicting events in the same 100ms window, and no longer requires an inferred
+  held wheel-speed target. Raw recorded sensors/commands are unchanged.
+- Training reserves separate bounded samples for stop events, other commands and
+  no-command windows. Evaluation remains uniformly sampled. Scheduler selects
+  up to three training and two held-out recordings under the unchanged SHA split.
+- Gate: complete evaluation, >=2 usable held-out sessions, >=128 windows, >=32
+  command events, >=8 stops, >=16 movement events; command precision/recall, stop
+  recall and movement recall each >=0.5; normalized numeric MSE <=0.1 where
+  applicable. Diagnostics expose each failing reason and per-command counts.
+  These are experimental screening thresholds, not a guarantee of useful driving.
+- New optimizer/scheduler filenames prevent silently reusing format 2 weights or
+  old rejected-session bookkeeping. No config values need changing. Existing
+  permanent format 2 snapshots are preserved, but cannot start; attempting to
+  snapshot an old candidate reports that a new command-policy checkpoint is needed.
+- Live inference keeps existing discrete toggle latching and common command limits.
+  The threshold applies to drive and stop just like the other command predictions.
+  No-event means send nothing: it DOES NOT implicitly stop an already moving rover.
+  It must learn explicit stop events; removing the copy shortcut is not proof that
+  learning will succeed. Other motion-related sensors still remain as observations.
+- Upper card replaces separate wheel meters with generic scored proposals and
+  decoded parameters; shows applied threshold and post-clamp submitted parameters.
+  Copied diagnostics retain top eight proposals and up to 16 submissions per
+  sampled controller-history entry, including their command objects.
+
+Verification: actual train.py --check-dependencies loaded Torch/NumPy/PyAV and
+constructed format 3 (803,440 parameters); infer.py --help loaded successfully;
+Node --check passed for six changed service modules; targeted card ESLint passed.
+No new tests or throwaway programs. Live end-to-end training/inference and browser
+visual verification require the actual environment and have not been performed.
+
+Deferred explicitly: chronological commanded-motion replay/closed-loop evaluation,
+prepared frame caching and larger architectures. Current evaluation uses held-out
+100ms event windows with the live threshold/family selection, but cannot assess
+temporal latching or accumulated motion from random reservoir samples. It does
+not claim to verify actual physical command execution. After normal deployment,
+let the new learner process retained recordings; copied reportVersion 3 diagnostics
+provide the next evidence. Do not demand prescribed driving or a manual checklist.

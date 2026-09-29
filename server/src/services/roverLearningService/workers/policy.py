@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from torch import nn
 
-VERSION = 2
+VERSION = 3
 SLOTS = 64
 VALUES = 8
 FRAMES = 4
@@ -26,7 +26,6 @@ SENSORS = [
     ("voltageMv", 16000), ("currentMa", 3000), ("batteryChargeMah", 4000),
     ("batteryCapacityMah", 4000), ("batteryTemperatureC", 50),
     ("chargingState.code", 5), ("chargingSources.homeBase", 1), ("oiMode.code", 4),
-    ("wheelSpeedsMmPerSecond.left", 500), ("wheelSpeedsMmPerSecond.right", 500),
     ("wheelLeftCurrentMa", 2000), ("wheelRightCurrentMa", 2000),
     ("mainBrushCurrentMa", 2000), ("sideBrushCurrentMa", 2000),
     ("lightBumpLeftSignal", 4096), ("lightBumpRightSignal", 4096),
@@ -62,6 +61,10 @@ def describe_command(command):
     def visit(value, path=()):
         if isinstance(value, dict):
             return {key: visit(item, (*path, key)) for key, item in sorted(value.items())}
+        # Exact zeros preserve demonstrated releases/stops. Identity fields must
+        # also stay exact: regression must never invent a peripheral address.
+        if value == 0 or (path and path[-1] in ('id', 'control')):
+            return copy.deepcopy(value)
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             if not math.isfinite(value) or len(values) >= VALUES:
                 raise ValueError('Nonfinite command or too many numeric control fields')
@@ -97,6 +100,44 @@ def encode_command(command, schema, extend=False):
     return slot, vector
 
 
+def command_family(command):
+    if command['type'] == 'peripheral':
+        peripheral = command.get('peripheral') or {}
+        return ('peripheral', str(peripheral.get('id')), str(peripheral.get('control')))
+    return (command['type'],)
+
+
+def select_slots(scores, schema, threshold):
+    winners = {}
+    for slot, descriptor in enumerate(schema):
+        if scores[slot] < threshold:
+            continue
+        family = command_family(descriptor['template'])
+        if family not in winners or scores[slot] > scores[winners[family]]:
+            winners[family] = slot
+    return set(winners.values())
+
+
+def decode_command(descriptor, values):
+    command = copy.deepcopy(descriptor['template'])
+    for index, field in enumerate(descriptor['fields']):
+        number = float(values[index])
+        if not math.isfinite(number):
+            raise ValueError('Nonfinite control value')
+        number = math.tan(max(-.98, min(.98, number)) * math.pi / 2) * field['scale']
+        target = command
+        for key in field['path'][:-1]:
+            target = target[key]
+        target[field['path'][-1]] = round(number) if field['integer'] else number
+    return command
+
+
+def is_stop(descriptor):
+    command = descriptor['template']
+    direct = command.get('driveDirect') or {}
+    return command['type'] == 'drive' and direct.get('left') == 0 and direct.get('right') == 0
+
+
 class Policy(nn.Module):
     def __init__(self):
         super().__init__()
@@ -109,7 +150,6 @@ class Policy(nn.Module):
             nn.Linear(128 * 3 * 4, 128), nn.ReLU(),
         )
         self.history = nn.GRU(128 + STATE_SIZE, 128, batch_first=True)
-        self.wheels = nn.Linear(128, 2)
         self.actions = nn.Linear(128, SLOTS)
         self.values = nn.Linear(128, SLOTS * VALUES)
 
@@ -118,17 +158,16 @@ class Policy(nn.Module):
         encoded = self.vision(images.reshape(-1, 3, HEIGHT, WIDTH)).reshape(batch, frames, -1)
         history, _ = self.history(torch.cat((encoded, state), dim=-1))
         last = history[:, -1]
-        return self.actions(last), self.values(last).reshape(batch, SLOTS, VALUES).tanh(), self.wheels(last).tanh()
+        return self.actions(last), self.values(last).reshape(batch, SLOTS, VALUES).tanh()
 
 
 def specification(schema):
-    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-wheels-v2',
+    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-events-v3',
             'frames': FRAMES, 'height': HEIGHT, 'width': WIDTH,
             'historyStrideMs': 300, 'decisionIntervalMs': 100,
             'stateSize': STATE_SIZE, 'sensorFields': SENSORS,
             'normalization': '2/pi * atan(value/scale); missing sensors have mask=0',
             'maxCommandShapes': SLOTS, 'numericFieldsPerShape': VALUES,
-            'commands': schema, 'actionSemantics': 'Continuous wheels at +100ms; accessories are events in the next 100ms',
-            'wheelScaleMmPerSecond': 500, 'wheelOrder': ['left', 'right'],
-            'wheelCommandExpiryMs': None, 'unknownWheelIntent': 'Excluded until next accepted human drive',
+            'commands': schema, 'actionSemantics': 'All controls are command events in the next 100ms; no event preserves existing rover state',
+            'driveCommandHistoryInput': False, 'zeroNumericValues': 'Exact template constants',
             'timing': 'Server-receipt alignment; browser display latency unmeasured'}

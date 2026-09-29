@@ -41,7 +41,7 @@ def main():
     import torch
     from torch.nn import functional as functional
     from dataset import windows
-    from policy import Policy, VERSION, SLOTS, VALUES, specification
+    from policy import Policy, VERSION, SLOTS, VALUES, specification, is_stop, select_slots
 
     if args.check_dependencies:
         emit('dependencies', torch=str(torch.__version__), numpy=str(np.__version__), av=str(av.__version__),
@@ -70,8 +70,9 @@ def main():
     cancelled = lambda: stopped or time.monotonic() - started >= config['maxJobSeconds']
     model = Policy().cpu()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
-    # A fresh training lineage prevents previously trained footage leaking into validation.
-    resume_path = root / 'training' / 'resume-v3.pt'
+    # The command-event policy has different inputs, targets and weights. Keep its
+    # optimizer lineage separate; reuse recordings with their unchanged partition.
+    resume_path = root / 'training' / 'resume-v4.pt'
     schema, steps, examples, last_published = [], 0, 0, 0
     trained_rovers = set()
     control_profiles = []
@@ -107,7 +108,7 @@ def main():
         candidate_schema = copy.deepcopy(schema)
         samples, seen = [], 0
         stats = {}
-        buckets = {key: [] for key in ('stopped', 'forward', 'reverse', 'turn')}
+        buckets = {key: [] for key in ('stop', 'command', 'none')}
         counts = dict.fromkeys(buckets, 0)
         held_out = is_held_out(session_id)
         try:
@@ -115,17 +116,16 @@ def main():
             for sample in windows(directory, candidate_schema, cancelled, stats):
                 seen += 1
                 # Keep evaluation naturally distributed. Training reserves space
-                # for ordinary turns/reversing so idle or straight motion cannot
-                # consume the entire sample budget. No scripted driving required.
+                # for recorded commands and releases so periods without commands
+                # cannot consume the entire sample budget. No scripted driving required.
                 if held_out:
                     reservoir, count, capacity = samples, seen, per_session
                 else:
-                    left, right = sample[5]
-                    category = ('stopped' if max(abs(left), abs(right)) <= .02 else
-                                'turn' if abs(left - right) > .1 else
-                                'reverse' if left + right < 0 else 'forward')
+                    category = ('stop' if any(sample[2][slot] and is_stop(descriptor)
+                                              for slot, descriptor in enumerate(candidate_schema)) else
+                                'command' if sample[2].any() else 'none')
                     counts[category] += 1
-                    reservoir, count, capacity = buckets[category], counts[category], max(1, per_session // 4)
+                    reservoir, count, capacity = buckets[category], counts[category], max(1, per_session // 3)
                 if len(reservoir) < capacity:
                     reservoir.append(sample)
                 else:
@@ -164,7 +164,7 @@ def main():
         except (ValueError, KeyError, TypeError, OSError, EOFError, IndexError, OverflowError, av.error.FFmpegError) as error:
             rejected[session_id] = str(error)[:500]
             emit('skipped', sessionId=session_id, reason=rejected[session_id])
-    if len(pool) < config['minimumSamples'] or not any(np.max(np.abs(sample[5])) > .02 for sample in pool) or cancelled():
+    if len(pool) < config['minimumSamples'] or not any(sample[2].any() for sample in pool) or cancelled():
         emit('complete', trained=False, accepted=[], rejected=rejected, samples=len(pool),
              diagnostics={'dataset': dataset_stats, 'decodeSeconds': time.monotonic() - decode_started},
              reason='Stopped/time limit' if cancelled() else 'Waiting for enough training-partition samples with human actions')
@@ -188,17 +188,16 @@ def main():
             if cancelled() or steps - initial_steps >= config['maxStepsPerJob']:
                 break
             batch = pool[offset:offset + config['batchSize']]
-            images, states, targets, values, available, wheel_targets, previous_wheels = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
+            images, states, targets, values, available = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
             images = images.float().div_(255)
             optimizer.zero_grad(set_to_none=True)
-            action_logits, predictions, wheel_predictions = model(images, states)
+            action_logits, predictions = model(images, states)
             event_loss = functional.binary_cross_entropy_with_logits(action_logits, targets,
                                                                        pos_weight=positive_weight, reduction='none')
             event_loss = (event_loss * available).sum() / available.sum().clamp_min(1)
             mask = numeric_mask.unsqueeze(0) * targets.unsqueeze(-1)
             value_loss = ((predictions - values).square() * mask).sum() / mask.sum().clamp_min(1)
-            wheel_loss = functional.smooth_l1_loss(wheel_predictions, wheel_targets)
-            loss = wheel_loss + event_loss + value_loss
+            loss = event_loss + value_loss
             if not torch.isfinite(loss):
                 raise ValueError('Nonfinite training loss; checkpoint not saved')
             loss.backward()
@@ -209,7 +208,7 @@ def main():
             losses.append(loss.item())
             if steps % 10 == 0:
                 emit('progress', steps=steps, examples=examples, loss=loss.item(),
-                     losses={'wheels': wheel_loss.item(), 'events': event_loss.item(), 'accessoryValues': value_loss.item()})
+                     losses={'events': event_loss.item(), 'commandValues': value_loss.item()})
         if cancelled() or steps - initial_steps >= config['maxStepsPerJob']:
             break
     if steps == initial_steps:
@@ -224,60 +223,84 @@ def main():
     if validation and not cancelled():
         model.eval()
         true_positive = predicted_positive = actual_positive = 0
-        value_error = value_count = 0
-        evaluated = 0
-        wheel_error = stopped_error = persistence_error = 0
-        changed_error = changed_persistence = changed_count = moving_count = 0
+        value_error = value_count = evaluated = 0
+        stop_actual = stop_detected = false_stops = 0
+        drive_actual = drive_detected = 0
+        empty_windows = unwanted_windows = 0
+        stop_slots = [slot for slot, descriptor in enumerate(schema) if is_stop(descriptor)]
+        drive_slots = [slot for slot, descriptor in enumerate(schema)
+                       if descriptor['template']['type'] == 'drive' and not is_stop(descriptor)]
+        per_command = [{'slot': slot, 'command': descriptor['template'], 'actual': 0,
+                        'predicted': 0, 'matched': 0} for slot, descriptor in enumerate(schema)]
         with torch.inference_mode():
             for offset in range(0, len(validation), config['batchSize']):
                 if cancelled():
                     break
                 batch = validation[offset:offset + config['batchSize']]
-                images, states, targets, values, available, wheel_targets, previous_wheels = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
-                logits, predictions, wheel_predictions = model(images.float() / 255, states)
-                predicted = (logits.sigmoid() >= job['actionThreshold']) & available.bool()
-                actual = targets.bool() & available.bool()
+                images, states, targets, values, available = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
+                logits, predictions = model(images.float() / 255, states)
+                predicted = torch.zeros_like(targets, dtype=torch.bool)
+                # Use the same threshold and competing-command selection as live
+                # inference. Reservoir samples cannot assess temporal latching or
+                # closed-loop motion; report this explicitly rather than implying it.
+                for row, scores in enumerate(logits.sigmoid().tolist()):
+                    for slot in select_slots(scores, schema, job['actionThreshold']):
+                        predicted[row, slot] = True
+                actual = targets.bool()
                 true_positive += (predicted & actual).sum().item()
                 predicted_positive += predicted.sum().item()
                 actual_positive += actual.sum().item()
                 mask = numeric_mask.unsqueeze(0) * targets.unsqueeze(-1)
                 value_error += ((predictions - values).square() * mask).sum().item()
                 value_count += mask.sum().item()
-                errors = (wheel_predictions - wheel_targets).abs().mean(dim=1) * 500
-                persistence = (previous_wheels - wheel_targets).abs().mean(dim=1) * 500
-                changed = (previous_wheels - wheel_targets).abs().amax(dim=1) > .02
-                changed_error += errors[changed].sum().item()
-                changed_persistence += persistence[changed].sum().item()
-                changed_count += changed.sum().item()
-                moving_count += (wheel_targets.abs().amax(dim=1) > .02).sum().item()
-                wheel_error += errors.sum().item()
-                stopped_error += wheel_targets.abs().mean(dim=1).sum().item() * 500
-                persistence_error += persistence.sum().item()
+                empty = ~actual.any(dim=1)
+                empty_windows += empty.sum().item()
+                unwanted_windows += (empty & predicted.any(dim=1)).sum().item()
+                if stop_slots:
+                    stop_actual += actual[:, stop_slots].sum().item()
+                    stop_detected += (actual[:, stop_slots] & predicted[:, stop_slots]).sum().item()
+                    false_stops += (predicted[:, stop_slots] & ~actual[:, stop_slots]).sum().item()
+                if drive_slots:
+                    drive_actual += actual[:, drive_slots].sum().item()
+                    drive_detected += (actual[:, drive_slots] & predicted[:, drive_slots]).sum().item()
+                for item in per_command:
+                    slot = item['slot']
+                    item['actual'] += actual[:, slot].sum().item()
+                    item['predicted'] += predicted[:, slot].sum().item()
+                    item['matched'] += (actual[:, slot] & predicted[:, slot]).sum().item()
                 evaluated += len(batch)
         precision = true_positive / max(1, predicted_positive)
         recall = true_positive / max(1, actual_positive)
         mse = value_error / max(1, value_count)
-        wheel_mae = wheel_error / max(1, evaluated)
-        stopped_mae = stopped_error / max(1, evaluated)
-        persistence_mae = persistence_error / max(1, evaluated)
-        changed_mae = changed_error / max(1, changed_count)
-        changed_baseline = changed_persistence / max(1, changed_count)
-        # Check control changes separately: copying the previous speed can look
-        # excellent on long straight runs without learning to steer or stop.
-        wheels_pass = (evaluated == len(validation) and evaluated >= 128 and moving_count >= 32
-                       and changed_count >= 32 and wheel_mae < stopped_mae
-                       and wheel_mae <= persistence_mae and changed_mae < changed_baseline)
-        accessories_pass = (predicted_positive == 0 if actual_positive == 0 else
-                            actual_positive >= 32 and precision >= .5 and recall >= .5)
-        passed = wheels_pass and accessories_pass and (value_count == 0 or mse <= .1)
-        evaluation = {'status': 'passed imitation gate' if passed else 'imitation gate not met',
+        stop_recall = stop_detected / max(1, stop_actual)
+        held_out_sessions = sum(row.get('partition') == 'heldOut' and not row.get('skipReason') for row in dataset_stats)
+        gate_reasons = []
+        for condition, reason in [
+            (evaluated == len(validation), 'Evaluation interrupted'),
+            (held_out_sessions >= 2, 'Need two usable held-out recordings'),
+            (evaluated >= 128, 'Need 128 held-out windows'),
+            (actual_positive >= 32, 'Need 32 held-out command events'),
+            (stop_actual >= 8, 'Need eight held-out stop events'),
+            (drive_actual >= 16, 'Need 16 held-out movement commands'),
+            (drive_detected / max(1, drive_actual) >= .5, 'Movement command recall below 0.5'),
+            (precision >= .5, 'Command precision below 0.5'),
+            (recall >= .5, 'Command recall below 0.5'),
+            (stop_recall >= .5, 'Stop recall below 0.5'),
+            (value_count == 0 or mse <= .1, 'Command parameter error above 0.1'),
+        ]:
+            if not condition:
+                gate_reasons.append(reason)
+        evaluation = {'status': 'imitation gate not met' if gate_reasons else 'passed imitation gate',
+                      'method': 'Held-out 100ms command events; not a closed-loop rollout',
+                      'threshold': job['actionThreshold'], 'heldOutSessions': held_out_sessions,
                       'windows': evaluated, 'precision': precision, 'recall': recall,
                       'numericMse': mse, 'positiveActions': actual_positive,
-                      'wheelMaeMmPerSecond': wheel_mae, 'stoppedBaselineMaeMmPerSecond': stopped_mae,
-                      'previousSpeedBaselineMaeMmPerSecond': persistence_mae,
-                      'changedWheelMaeMmPerSecond': changed_mae, 'changedBaselineMaeMmPerSecond': changed_baseline,
-                      'changedWindows': changed_count, 'movingWindows': moving_count,
-                      'wheelsPassed': wheels_pass, 'accessoriesPassed': accessories_pass}
+                      'predictedActions': predicted_positive, 'falsePositiveActions': predicted_positive - true_positive,
+                      'stopEvents': stop_actual, 'missedStops': stop_actual - stop_detected,
+                      'stopRecall': stop_recall, 'falseStops': false_stops,
+                      'movementEvents': drive_actual, 'movementRecall': drive_detected / max(1, drive_actual),
+                      'noCommandWindows': empty_windows, 'unwantedCommandWindows': unwanted_windows,
+                      'commands': per_command, 'gateReasons': gate_reasons}
     evaluation_seconds = time.monotonic() - evaluation_started
     publication = {'distinctMinutes': unique_count / 600,
                    'newMinutes': (unique_count - published_windows) / 600,
