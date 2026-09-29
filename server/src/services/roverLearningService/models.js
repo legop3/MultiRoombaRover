@@ -20,7 +20,7 @@ async function index(root) {
 }
 async function metadata(directory) {
   const model = JSON.parse(await fs.readFile(path.join(directory, 'model.json'), 'utf8'));
-  if (model.id !== path.basename(directory)) throw new Error('Model identity mismatch');
+  if (model?.id !== path.basename(directory)) throw new Error('Model identity mismatch');
   return model;
 }
 async function prune(root, state) {
@@ -100,22 +100,53 @@ function saveSnapshot(root) {
     return model;
   });
 }
-// Explicitly retire format 1 models after the wheel-policy replacement. Only
-// recognized old-format manifests qualify; malformed or future models are kept.
+// Retire recognized older policies before workers start. Unknown/malformed or
+// future manifests are not evidence that a directory is disposable.
 function removeObsoleteModels(root) {
   return serial(async () => {
-    const directory = path.join(root, 'models');
-    let entries;
-    try { entries = await fs.readdir(directory, { withFileTypes: true }); }
-    catch (error) { if (error.code === 'ENOENT') return; throw error; }
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !UUID.test(entry.name)) continue;
-      const target = path.join(directory, entry.name);
-      let model;
-      try { model = await metadata(target); }
-      catch { continue; }
-      if (model.specification?.version === 1 && !leases.has(target)) {
-        await fs.rm(target, { recursive: true });
+    const obsolete = [];
+    for (const directory of [path.join(root, 'models'), checkpointRoot(root)]) {
+      let entries;
+      try { entries = await fs.readdir(directory, { withFileTypes: true }); }
+      catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+      for (const entry of entries) {
+        if (!entry.isDirectory() || !UUID.test(entry.name)) continue;
+        const target = path.join(directory, entry.name);
+        let model;
+        try { model = await metadata(target); }
+        catch (error) {
+          if (error.code === 'ENOENT' || error instanceof SyntaxError || error.message === 'Model identity mismatch') continue;
+          throw error;
+        }
+        const version = model.specification?.version;
+        if (Number.isInteger(version) && version >= 1 && version < POLICY_VERSION) {
+          obsolete.push({ target, checkpoint: directory === checkpointRoot(root), id: entry.name });
+        }
+      }
+    }
+    const state = await index(root);
+    const oldCheckpoints = new Set(obsolete.filter((entry) => entry.checkpoint).map((entry) => entry.id));
+    let changed = false;
+    for (const alias of ['candidate', 'latest', 'previous']) {
+      if (oldCheckpoints.has(state[alias])) { delete state[alias]; changed = true; }
+    }
+    // Remove aliases atomically first, so interruption cannot leave the catalog
+    // referring to a checkpoint that cleanup already deleted.
+    if (changed) {
+      const filename = path.join(checkpointRoot(root), 'index.json');
+      await fs.writeFile(`${filename}.tmp`, JSON.stringify(state));
+      await fs.rename(`${filename}.tmp`, filename);
+    }
+    for (const { target } of obsolete) {
+      if (leases.has(target)) retired.add(target);
+      else { await fs.rm(target, { recursive: true, force: true }); retired.delete(target); }
+    }
+    // These filenames belong to superseded optimizer/scheduler lineages, not
+    // policy versions. The current command policy uses lineage v4.
+    for (const suffix of ['', '-v1', '-v2', '-v3']) {
+      for (const filename of [`resume${suffix}.pt`, `resume${suffix}.tmp`,
+        `schedule${suffix}.json`, `schedule${suffix}.json.tmp`]) {
+        await fs.rm(path.join(root, 'training', filename), { force: true });
       }
     }
   });

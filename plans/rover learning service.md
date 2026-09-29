@@ -9,8 +9,8 @@ network produces scores and numeric values; it never generates JSON text.
 
 Implemented: remove wheel-speed telemetry and previous drive-command history
 from inputs (raw recordings unchanged); preserve exact numeric zeros; reuse
-recordings with a fresh resume-v4.pt / schedule-v4.json lineage. Existing format 2
-snapshots remain stored and are visibly incompatible. One ongoing learner, gated
+recordings with a fresh resume-v4.pt / schedule-v4.json lineage. Startup deletes recognized older-format snapshots/checkpoints and old training
+lineages; recordings and current-format models are preserved. One ongoing learner, gated
 Latest/Previous, and admin-created permanent snapshots remain.
 
 Main card shows decoded command parameters, score, applied threshold marker, and
@@ -123,7 +123,7 @@ the default development path. Intended layout:
 rover-learning/
   recordings/       Rolling video/events/session metadata (implemented)
   models/           Permanent UUID directories: weights.pt and model.json
-  training/         resume-v3.pt, schedule-v3.json, and current job.json
+  training/         resume-v4.pt, schedule-v4.json, and current job.json
 ```
 
 Training/model directories are created only when service and training are enabled.
@@ -914,3 +914,19 @@ temporal latching or accumulated motion from random reservoir samples. It does
 not claim to verify actual physical command execution. After normal deployment,
 let the new learner process retained recordings; copied reportVersion 3 diagnostics
 provide the next evidence. Do not demand prescribed driving or a manual checklist.
+
+### Obsolete model cleanup after format 3 transition
+
+Latest user IPI explicitly authorizes deleting obsolete snapshots, checkpoints and
+training state. This supersedes earlier format 2 preservation notes above.
+Enabled-service startup, before trainer/driving/gateway startup, scans both models/
+and training/checkpoints/. Identity-validated manifests with integer policy version
+>=1 and < current POLICY_VERSION are removed. Current/future/unknown-format models
+and recordings are preserved. Candidate/Latest/Previous references to obsolete
+checkpoints are atomically removed before directory deletion; leased directories
+are retired until release. Cleanup also removes legacy resume/schedule files and
+temporary files for the unversioned and v1-v3 lineages. Current v4 state is kept.
+Cleanup runs even when training is disabled, but not when the whole service is off.
+Production deletion occurs on the next enabled-service startup after deployment.
+Verification: focused Node syntax and diff whitespace checks passed. No production
+storage was accessed; actual deletion awaits enabled-service startup on the server.
