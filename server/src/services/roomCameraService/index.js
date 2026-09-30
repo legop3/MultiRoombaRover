@@ -8,10 +8,12 @@ const replay = require('../replayEngineV2/roomCameraReplayBuilder');
 const { loadConfig, registerConfigurationHandler } = require('../../configuration');
 
 let enabled = false;
+let streamIntervalMs = 2000;
 
 const snapshotEngine = createSnapshotEngine({ getRoomCameras, roomCameraEvents });
 function applyRoomCameraConfig(roomCameraConfig = {}) {
   enabled = Boolean(roomCameraConfig.enabled);
+  streamIntervalMs = roomCameraConfig.streamIntervalMs ?? 2000;
   // Loading an empty catalog on disable causes the snapshot engine's existing
   // update listener to close every stream and timer without unregistering the
   // stable browser gateway.
@@ -19,6 +21,7 @@ function applyRoomCameraConfig(roomCameraConfig = {}) {
 }
 
 registerRoomCameraSocketGateway({
+  getStreamIntervalMs: () => streamIntervalMs,
   getRoomCamera,
   getRoomCameras,
   getRoomCameraState: snapshotEngine.getRoomCameraState,

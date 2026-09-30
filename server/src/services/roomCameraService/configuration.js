@@ -1,7 +1,7 @@
 // Room-Camera Configuration
 // Purpose: Defines the optional named snapshot and stream camera catalog.
 // Scope: Contains configuration metadata only and never contacts a camera.
-const { strictObject, string, boolean } = require('../../configuration/schemaHelpers');
+const { strictObject, string, boolean, integer } = require('../../configuration/schemaHelpers');
 
 module.exports = {
   key: 'roomCameras',
@@ -10,6 +10,7 @@ module.exports = {
   // initial configuration while the feature switch prevents network requests.
   defaultValue: {
     enabled: false,
+    streamIntervalMs: 2000,
     cameras: [
       {
         id: 'lobby',
@@ -29,6 +30,7 @@ module.exports = {
   },
   schema: strictObject({
     enabled: boolean({ description: 'Immediately publishes the configured room-camera catalog and enables camera snapshots and streams.' }),
+    streamIntervalMs: integer({ title: 'Stream interval (ms)', description: 'Interval for sending room camera images to clients. Lowering this increases bandwidth usage FAST because it sends a full image each time.', minimum: 1 }),
     cameras: {
       type: 'array',
       description: 'Room cameras available to the web UI and replay system.',

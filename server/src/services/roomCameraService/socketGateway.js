@@ -8,7 +8,6 @@ const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
 
 const SUBSCRIBE_LIMIT = 50;
 const SUBSCRIBE_WINDOW_MS = 10000;
-const STREAM_INTERVAL_MS = 2000;
 
 function passesMode(socket) {
   const mode = getMode();
@@ -20,7 +19,7 @@ function passesMode(socket) {
   return true;
 }
 
-function registerRoomCameraSocketGateway({ getRoomCamera, getRoomCameras, getRoomCameraState, roomCameraStreamEvents }) {
+function registerRoomCameraSocketGateway({ getRoomCamera, getRoomCameras, getRoomCameraState, roomCameraStreamEvents, getStreamIntervalMs }) {
   const cameraSubscribers = new Map();
   const socketSubscriptions = new Map();
   const subscribeBuckets = new Map();
@@ -82,7 +81,7 @@ function registerRoomCameraSocketGateway({ getRoomCamera, getRoomCameras, getRoo
       }
       const lastSent = lastMap.get(id) || 0;
       const now = ts || Date.now();
-      if (now - lastSent < STREAM_INTERVAL_MS) return;
+      if (now - lastSent < getStreamIntervalMs()) return;
       lastMap.set(id, now);
       sendFrame(socket, id, { ts }, buffer);
     });
