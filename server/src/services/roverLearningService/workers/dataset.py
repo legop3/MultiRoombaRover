@@ -47,7 +47,7 @@ def load_events(directory):
     return metadata, sorted(events, key=lambda e: e['ts'])
 
 
-def prepare(directory, schema, stats):
+def prepare(directory, schema, stats, extend):
     metadata, events = load_events(directory)
     requests = {}
     accepted = set()
@@ -72,14 +72,27 @@ def prepare(directory, schema, stats):
     if not sensors:
         raise ValueError('No sensor observations')
     candidate = copy.deepcopy(schema)
-    history, targets = [], []
+    history, targets, unsupported_times = [], [], []
+    unsupported = {}
     stats.update({'sensorFrames': len(sensors), 'dispatches': len(dispatches),
                   'failedCommands': len(failed), 'sensorPresentFraction': np.mean([row[1][len(SENSORS):] for row in sensors], axis=0).tolist()})
     for data in dispatches:
         command = data.get('command') or {}
-        if command.get('type') in ('reset', 'reboot', 'update', 'sensorStream'):
+        if command.get('type') in ('reset', 'reboot', 'update'):
             boundaries.append(data['ts'])
-        encoded = encode_command(command, candidate, extend=True)
+        try:
+            encoded = encode_command(command, candidate, extend=extend)
+        except ValueError as error:
+            # Unrepresentable controls invalidate only nearby observations/targets,
+            # not the rest of a recording. Never turn them into negative labels.
+            request = requests.get(data.get('requestId'))
+            unsupported_times.extend([data['ts'], request['ts'] if request else data['ts']])
+            key = json.dumps(command, sort_keys=True)
+            if key not in unsupported and len(unsupported) < 32:
+                unsupported[key] = {'command': command, 'reason': str(error), 'count': 0}
+            if key in unsupported:
+                unsupported[key]['count'] += 1
+            continue
         if encoded is None:
             continue
         stamp = data['ts']
@@ -95,24 +108,25 @@ def prepare(directory, schema, stats):
             # Server safety overrides belong in history, never demonstration
             # targets. Exclude windows around them rather than teaching inaction.
             boundaries.append(stamp)
-    if not targets:
+    stats['unsupportedCommands'] = list(unsupported.values())
+    stats['unsupportedCommandEvents'] = len(unsupported_times) // 2
+    if not targets and not unsupported_times:
         raise ValueError('No accepted client operating commands')
     schema[:] = candidate
-    return metadata, sensors, sorted(history, key=lambda x: x[0]), sorted(targets, key=lambda x: x[0]), sorted(boundaries)
+    return metadata, sensors, sorted(history, key=lambda x: x[0]), sorted(targets, key=lambda x: x[0]), sorted(boundaries), sorted(unsupported_times)
 
 
-def windows(directory, schema, cancelled=lambda: False, stats=None):
+def windows(directory, schema, cancelled=lambda: False, stats=None, extend=True):
     directory = Path(directory)
     stats = stats if stats is not None else {}
-    metadata, sensors, history, targets, boundaries = prepare(directory, schema, stats)
+    metadata, sensors, history, targets, boundaries, unsupported_times = prepare(directory, schema, stats, extend)
     stats.update({'usableWindows': 0, 'commandWindows': 0, 'stopWindows': 0, 'noCommandWindows': 0,
                   'staleSensorWindows': 0, 'boundaryWindows': 0,
-                  'ambiguousWindows': 0, 'videoFrames': 0, 'maxVideoGapMs': 0})
+                  'unsupportedWindows': 0, 'ambiguousWindows': 0, 'videoFrames': 0, 'maxVideoGapMs': 0})
     sensor_times = [row[0] for row in sensors]
     target_times = [row[0] for row in targets]
     available = np.zeros(SLOTS, dtype=np.float32)
-    for _, slot, _ in history:
-        available[slot] = 1
+    available[:len(schema)] = 1
     command_values = np.zeros((SLOTS, VALUES), dtype=np.float32)
     command_times = np.full(SLOTS, -np.inf)
     cursor = 0
@@ -171,6 +185,9 @@ def windows(directory, schema, cancelled=lambda: False, stats=None):
                 break
             chosen.append(options[-1])
         if len(chosen) != 4 or stamp + 100 > metadata['endedAt']:
+            continue
+        if bisect.bisect_right(unsupported_times, stamp + 100) > bisect.bisect_left(unsupported_times, chosen[0][0]):
+            stats['unsupportedWindows'] += 1
             continue
         if bisect.bisect_right(boundaries, stamp + 100) > bisect.bisect_left(boundaries, chosen[0][0]):
             stats['boundaryWindows'] += 1

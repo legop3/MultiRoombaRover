@@ -133,7 +133,7 @@ function LearningCard({ roverId }) {
       <div className="flex flex-wrap items-center justify-center gap-1">
         <select aria-label="Rover model" className={fieldClass} value={chosen?.id || ''} onChange={(event) => setSelectedId(event.target.value)} disabled={working || !models.length}>
           {!models.length && <option value="">No published models yet</option>}
-          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.experimental ? ' (experimental)' : ''}{model.compatible ? '' : model.formatVersion !== 3 ? ' (older model format)' : ' (incompatible)'}</option>)}
+          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.experimental ? ' (experimental)' : ''}{model.compatible ? '' : model.formatVersion !== 4 ? ' (older model format)' : ' (incompatible)'}</option>)}
         </select>
         <button type="button" className="button-dark text-sm disabled:opacity-50" aria-pressed={Boolean(chosen && favorites.includes(chosen.id))} disabled={!chosen} onClick={favorite}>
           {chosen && favorites.includes(chosen.id) ? '★ Favorite' : '☆ Favorite'}

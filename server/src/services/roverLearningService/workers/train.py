@@ -41,11 +41,11 @@ def main():
     import torch
     from torch.nn import functional as functional
     from dataset import windows
-    from policy import Policy, VERSION, SLOTS, VALUES, specification, is_stop, select_slots
+    from policy import Policy, VERSION, SLOTS, VALUES, specification, is_stop, select_slots, initial_schema
 
     if args.check_dependencies:
         emit('dependencies', torch=str(torch.__version__), numpy=str(np.__version__), av=str(av.__version__),
-             parameters=sum(p.numel() for p in Policy().parameters()), specification=specification([]))
+             parameters=sum(p.numel() for p in Policy().parameters()), specification=specification(initial_schema()))
         return
     if not args.job:
         parser.error('--job is required unless --check-dependencies is used')
@@ -72,8 +72,8 @@ def main():
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
     # The command-event policy has different inputs, targets and weights. Keep its
     # optimizer lineage separate; reuse recordings with their unchanged partition.
-    resume_path = root / 'training' / 'resume-v4.pt'
-    schema, steps, examples, last_published = [], 0, 0, 0
+    resume_path = root / 'training' / 'resume-v5.pt'
+    schema, steps, examples, last_published = initial_schema(), 0, 0, 0
     trained_rovers = set()
     control_profiles = []
     distinct_windows = {}
@@ -113,7 +113,7 @@ def main():
         held_out = is_held_out(session_id)
         try:
             directory = root / 'recordings' / session_id
-            for sample in windows(directory, candidate_schema, cancelled, stats):
+            for sample in windows(directory, candidate_schema, cancelled, stats, extend=not held_out):
                 seen += 1
                 # Keep evaluation naturally distributed. Training reserves space
                 # for recorded commands and releases so periods without commands
@@ -137,15 +137,15 @@ def main():
             if cancelled():
                 break  # Do not call a partially decoded recording validated.
             if not samples:
+                if held_out and stats.get('unsupportedCommandEvents'):
+                    dataset_stats.append({**stats, 'partition': 'heldOut', 'sampledWindows': 0,
+                                          'skipReason': 'No supported aligned windows'})
+                    continue
                 raise ValueError('No complete, aligned observation/action windows')
             # Entire sessions stay in one partition across all jobs. Neighboring
             # video windows must never straddle training and validation.
             held_out = is_held_out(session_id)
             if held_out:
-                if candidate_schema != schema:
-                    dataset_stats.append({**stats, 'partition': 'heldOut', 'sampledWindows': len(samples),
-                                          'skipReason': 'Vocabulary absent from training data'})
-                    continue  # Retry after training data introduces these command shapes.
                 validation.extend(samples)
             else:
                 schema = candidate_schema
@@ -219,7 +219,12 @@ def main():
     evaluation_started = time.monotonic()
     distinct_windows.update(observed_windows)
     unique_count = sum(distinct_windows.values())
-    evaluation = {'status': 'waiting for held-out sessions', 'windows': len(validation)}
+    coverage = [row for row in dataset_stats if row.get('partition') == 'heldOut']
+    unsupported_events = sum(row.get('unsupportedCommandEvents', 0) for row in coverage)
+    unsupported_windows = sum(row.get('unsupportedWindows', 0) for row in coverage)
+    evaluation = {'status': 'No supported held-out windows' if unsupported_events and not validation else 'waiting for held-out sessions',
+                  'windows': len(validation), 'unsupportedCommandEvents': unsupported_events,
+                  'unsupportedWindows': unsupported_windows}
     if validation and not cancelled():
         model.eval()
         true_positive = predicted_positive = actual_positive = 0
@@ -276,6 +281,7 @@ def main():
         held_out_sessions = sum(row.get('partition') == 'heldOut' and not row.get('skipReason') for row in dataset_stats)
         gate_reasons = []
         for condition, reason in [
+            (unsupported_events == 0, 'Held-out controls are not fully represented; see unsupportedCommands'),
             (evaluated == len(validation), 'Evaluation interrupted'),
             (held_out_sessions >= 2, 'Need two usable held-out recordings'),
             (evaluated >= 128, 'Need 128 held-out windows'),
@@ -291,6 +297,7 @@ def main():
             if not condition:
                 gate_reasons.append(reason)
         evaluation = {'status': 'imitation gate not met' if gate_reasons else 'passed imitation gate',
+                      'unsupportedCommandEvents': unsupported_events, 'unsupportedWindows': unsupported_windows,
                       'method': 'Held-out 100ms command events; not a closed-loop rollout',
                       'threshold': job['actionThreshold'], 'heldOutSessions': held_out_sessions,
                       'windows': evaluated, 'precision': precision, 'recall': recall,

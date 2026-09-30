@@ -1,9 +1,9 @@
 // Match actuator configuration, not a rover's display name or changing telemetry.
 const { isDeepStrictEqual } = require('node:util');
-const POLICY_VERSION = 3;
+const POLICY_VERSION = 4;
 
 function controlProfile(meta = {}) {
-  return Object.fromEntries(['cameraServo', 'peripherals', 'headlight', 'laser', 'roomba', 'platform']
+  return Object.fromEntries(['cameraServo', 'headlight', 'laser', 'roomba', 'platform']
     .map((key) => [key, meta?.[key] ?? null]));
 }
 

@@ -4,6 +4,8 @@ Slots describe command shapes, not arbitrary executable instructions. Numeric
 leaves are regressed; string/bool/list values remain exact template constants.
 No command is sent by this module. Execution must use server authorization.
 """
+import base64
+import itertools
 import copy
 import json
 import math
@@ -12,12 +14,12 @@ import numpy as np
 import torch
 from torch import nn
 
-VERSION = 3
+VERSION = 4
 SLOTS = 64
 VALUES = 8
 FRAMES = 4
 HEIGHT, WIDTH = 120, 160
-OPERATING_TYPES = {"drive", "motors", "servo", "headlight", "laser", "horn", "peripheral", "song", "raw"}
+OPERATING_TYPES = {"drive", "motors", "servo", "headlight", "laser", "horn", "song", "raw"}
 SENSORS = [
     ("bumpsAndWheelDrops.bumpLeft", 1), ("bumpsAndWheelDrops.bumpRight", 1),
     ("bumpsAndWheelDrops.wheelDropLeft", 1), ("bumpsAndWheelDrops.wheelDropRight", 1),
@@ -59,18 +61,20 @@ def describe_command(command):
     values, fields = [], []
 
     def visit(value, path=()):
+        if isinstance(value, list) and command['type'] == 'horn' and path == ('horn', 'freqs'):
+            return [visit(item, (*path, index)) for index, item in enumerate(value)]
         if isinstance(value, dict):
             return {key: visit(item, (*path, key)) for key, item in sorted(value.items())}
-        # Exact zeros preserve demonstrated releases/stops. Identity fields must
-        # also stay exact: regression must never invent a peripheral address.
-        if value == 0 or (path and path[-1] in ('id', 'control')):
+        # Exact actuator zeros preserve demonstrated releases. Horn frequency
+        # zeros are parameters so changing a chord does not require a new slot.
+        if value == 0 and command['type'] != 'horn':
             return copy.deepcopy(value)
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             if not math.isfinite(value) or len(values) >= VALUES:
                 raise ValueError('Nonfinite command or too many numeric control fields')
-            scale = {'drive': 500, 'motors': 255, 'servo': 180, 'peripheral': 255,
+            scale = {'drive': 500, 'motors': 255, 'servo': 180,
                      'horn': 1000, 'song': 127}.get(command['type'], 1)
-            fields.append({'path': list(path), 'scale': scale, 'integer': isinstance(value, int)})
+            fields.append({'path': list(path), 'scale': scale, 'integer': command['type'] in ('drive', 'motors', 'servo', 'horn') or isinstance(value, int)})
             values.append(normalize(value, scale))
             return {'$number': len(values) - 1}
         # Arrays (e.g. songs) are discrete exact demonstrations, not variable
@@ -92,7 +96,7 @@ def encode_command(command, schema, extend=False):
         if not extend:
             raise ValueError('Command shape missing from model schema')
         if len(schema) >= SLOTS:
-            raise ValueError('64 command shapes exhausted; recording skipped, not silently truncated')
+            raise ValueError('64 command shapes exhausted; affected windows excluded')
         slot = len(schema)
         schema.append(descriptor)
     vector = np.zeros(VALUES, dtype=np.float32)
@@ -100,10 +104,32 @@ def encode_command(command, schema, extend=False):
     return slot, vector
 
 
+def initial_schema():
+    # Match commandPipeline.js envelopes, OI_COMMANDS and the four-frequency
+    # horn control. Values are examples describing fields, not training labels.
+    commands = []
+    for left, right in itertools.product((0, 1), repeat=2):
+        commands.append({'type': 'drive', 'driveDirect': {'left': left, 'right': right}})
+    for main, side, vacuum in itertools.product((0, 1), repeat=3):
+        commands.append({'type': 'motors', 'motorPwm': {'main': main, 'side': side, 'vacuum': vacuum}})
+    for angle in (0, 1):
+        commands.append({'type': 'servo', 'servo': {'angle': angle}})
+    for kind in ('headlight', 'laser'):
+        for action in ('on', 'off', 'toggle'):
+            commands.append({'type': kind, kind: {'action': action}})
+    for waveform in ('sine', 'saw'):
+        commands.append({'type': 'horn', 'horn': {'action': 'start', 'waveform': waveform, 'freqs': [1, 1, 1, 1]}})
+    commands.append({'type': 'horn', 'horn': {'action': 'stop'}})
+    for opcode in (128, 131, 132, 143):
+        commands.append({'type': 'raw', 'raw': base64.b64encode(bytes([opcode])).decode()})
+    commands.append({'type': 'song', 'song': {'notes': [{'note': 60, 'duration': 8}]}})
+    schema = []
+    for command in commands:
+        encode_command(command, schema, extend=True)
+    return schema
+
+
 def command_family(command):
-    if command['type'] == 'peripheral':
-        peripheral = command.get('peripheral') or {}
-        return ('peripheral', str(peripheral.get('id')), str(peripheral.get('control')))
     return (command['type'],)
 
 
@@ -162,7 +188,7 @@ class Policy(nn.Module):
 
 
 def specification(schema):
-    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-events-v3',
+    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-events-v4',
             'frames': FRAMES, 'height': HEIGHT, 'width': WIDTH,
             'historyStrideMs': 300, 'decisionIntervalMs': 100,
             'stateSize': STATE_SIZE, 'sensorFields': SENSORS,

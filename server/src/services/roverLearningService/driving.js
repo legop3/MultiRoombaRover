@@ -9,7 +9,7 @@ const { recordCommandRequest } = require('../commandService/recording');
 const { acquireModel } = require('./models');
 const { compatible } = require('./capabilities');
 
-const OPERATING = new Set(['drive', 'motors', 'servo', 'headlight', 'laser', 'horn', 'peripheral', 'song', 'raw']);
+const OPERATING = new Set(['drive', 'motors', 'servo', 'headlight', 'laser', 'horn', 'song', 'raw']);
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
 
 function canControl(socket, roverId) {

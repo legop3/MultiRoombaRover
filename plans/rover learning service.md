@@ -2,27 +2,21 @@
 
 ## Resume here
 
-Latest change: format 3 command-event policy replaces format 2 continuous wheel
-speeds. All supported controls, including drive and recorded zero-speed stops,
-use scored command templates and the same threshold/checked command pipe. The
-network produces scores and numeric values; it never generates JSON text.
+Latest change (2026-09-29 IPI): format 4 seeds known user-control command shapes
+before training. Generic peripherals are excluded; sensorStream is ignored without
+invalidating footage. Drive includes zero-speed drive, with no separate stop type.
+Drive, camera, brushes/vacuum, headlight, laser, horn, songs and operating modes
+remain supported. Raw recordings and the existing checked command pipe stay intact.
 
-Implemented: remove wheel-speed telemetry and previous drive-command history
-from inputs (raw recordings unchanged); preserve exact numeric zeros; reuse
-recordings with a fresh resume-v4.pt / schedule-v4.json lineage. Startup deletes recognized older-format snapshots/checkpoints and old training
-lineages; recordings and current-format models are preserved. One ongoing learner, gated
-Latest/Previous, and admin-created permanent snapshots remain.
+Held-out data cannot expand the schema. Unknown control variants exclude nearby
+windows only, with command/count/reason diagnostics and a coverage gate that blocks
+promotion. Supported portions still receive evaluation. Current training lineage
+is resume-v5.pt / schedule-v5.json. Startup removes obsolete format 1-3 models and
+old lineages through v4; recordings and current-format models are preserved.
 
-Main card shows decoded command parameters, score, applied threshold marker, and
-submission results, including below-threshold proposals. Diagnostics reportVersion
-3 includes command predictions/submissions and event evaluation. Manual inputs
-still never stop or pause autonomy. Disabled remains dormant/off by default.
-
-Focused Node syntax, Python production worker entry points, and card ESLint
-passed. New policy: 803,440 parameters, 30 sensor fields, stateSize 700. No live
-recordings/camera/rover pipeline or authenticated browser were available locally.
-Actual training, stop behavior, concurrent performance and visual appearance
-remain unverified. No tests were added and no processes were left running.
+Verification for this increment is recorded at the end. Earlier version-specific
+notes are historical. Manual inputs never pause/cancel autonomy; disabled service
+remains dormant. Actual autonomous performance has not been established.
 
 This document preserves the conversation's decisions across compactions and
 usage cutoffs. Keep the checklist and handoff section current during authorized
@@ -930,3 +924,41 @@ Cleanup runs even when training is disabled, but not when the whole service is o
 Production deletion occurs on the next enabled-service startup after deployment.
 Verification: focused Node syntax and diff whitespace checks passed. No production
 storage was accessed; actual deletion awaits enabled-service startup on the server.
+
+### User-control scope and evaluation coverage (2026-09-29)
+
+Authorized by latest IPI after user clarified that controls include camera, brushes,
+lights, laser, horn and songs but NOT generic peripherals. No new command pipe or
+separate stop command. sensorStream is neither input/target nor a boundary. Actual
+reset/reboot/update remain temporal boundaries because they interrupt observations.
+
+Format 4 seeds drive and motor zero/nonzero field combinations, servo, light/laser
+actions, the two four-frequency horn waveforms and horn release, OI start/safe/full/
+dock bytes and default song. Seed values describe shapes, not artificial training
+examples. Horn frequencies are numeric parameters; integral JSON numbers share
+shapes with equivalent floating representations for drive/motors/servo/horn. Songs
+remain exact demonstrated note arrays; other song/raw variants can extend the
+training schema within its existing 64-slot bound. No promise to pre-enumerate all
+possible tunes. Seeded slots receive negative examples even in sessions where that
+control was not used, avoiding untrained random seeded outputs.
+
+Evaluation freezes the training schema. Unsupported commands are reported with
+payload, reason, occurrence count (up to 32 distinct descriptions), total count and
+affected-window count. The affected observation history/target interval is excluded
+without labeling the unknown command as inaction or skipping the entire recording.
+Any unsupported held-out command blocks promotion; metrics describe only supported
+windows. If none survive, dataset diagnostics still report the coverage problem.
+Existing permission checks, threshold mechanics, recording and manual input behavior
+are unchanged. Generic peripherals are also removed from execution allowlist and
+rover compatibility profile. Previous policy models are automatically cleaned up;
+no configuration edit is required.
+
+Verification completed: train.py --check-dependencies loaded the production
+worker and constructed format 4 with 803,440 parameters and predefined command
+shapes. infer.py --help, Node syntax checks for the four changed service modules,
+focused VipRoverLearningCard ESLint and diff whitespace checks passed.
+No live server data/hardware/browser available locally. Actual training, driving,
+and browser appearance remain unverified. No new tests or background processes.
+Deploying starts a new learner using existing recordings; enabled-service startup
+removes older policy models and optimizer/scheduler lineages through v4. Current
+lineage is v5. No settings changes or prescribed human driving are required.
