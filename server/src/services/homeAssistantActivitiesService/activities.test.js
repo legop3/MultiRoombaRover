@@ -29,7 +29,7 @@ test('sensor states, live constraints, and unknown button states are preserved',
   assert.equal(buildEntity({ id: 'button.bell' }, raw('unknown')).available, true);
   assert.equal(buildEntity({ id: 'button.bell' }, raw('unavailable')).available, false);
   assert.equal(buildEntity({ id: 'button.bell' }, null).available, false);
-  assert.equal(buildEntity({ id: 'switch.fan', readOnly: true }, raw('on')).type, 'readOnly');
+  assert.equal(buildEntity({ id: 'switch.fan', readOnly: true }, raw('on')).type, 'toggle');
 });
 
 test('domain dispatch handles native entities and helpers without room-light payloads', async () => {
@@ -87,22 +87,22 @@ test('permissions, locks, availability and allowlist are authoritative', async (
 test('idle ignores user locks, preserves no-op items, and isolates failures', async () => {
   const h = harness([
     { id: 'switch.keep' },
-    { id: 'number.bad', idleAction: 'set', idleValue: '200' },
-    { id: 'switch.fan', idleAction: 'set', idleValue: 'off' },
+    { id: 'number.bad', automations: { idle: { action: 'set', value: '200' } } },
+    { id: 'switch.fan', automations: { idle: { action: 'set', value: 'off' } } },
     // An empty optional text box is omitted by the schema-driven admin form.
-    { id: 'input_text.message', idleAction: 'set' },
-    { id: 'input_button.stop', idleAction: 'press' },
-    { id: 'sensor.humidity', idleAction: 'set', idleValue: '0' },
-    { id: 'switch.readonly', readOnly: true, idleAction: 'set', idleValue: 'off' },
+    { id: 'input_text.message', automations: { idle: { action: 'set' } } },
+    { id: 'input_button.stop', automations: { idle: { action: 'press' } } },
+    { id: 'sensor.humidity', automations: { idle: { action: 'set', value: '0' } } },
+    { id: 'switch.readonly', readOnly: true, automations: { idle: { action: 'set', value: 'off' } } },
   ], {
-    'number.bad': raw('0', { min: 0, max: 10 }), 'switch.fan': raw('on'),
+    'switch.readonly': raw('on'), 'number.bad': raw('0', { min: 0, max: 10 }), 'switch.fan': raw('on'),
     'input_text.message': raw('Welcome', { min: 0, max: 30 }), 'input_button.stop': raw('unknown'),
   });
   h.locked.add('switch.fan');
   const result = await h.actions.runIdleActions();
   assert.equal(result.results[0].ok, false);
-  assert.equal(result.results.filter((entry) => entry.ok).length, 3);
-  assert.deepEqual(h.calls.map((call) => call[2]), [{ entity_id: 'switch.fan' }, { entity_id: 'input_text.message', value: '' }, { entity_id: 'input_button.stop' }]);
+  assert.equal(result.results.filter((entry) => entry.ok).length, 4);
+  assert.deepEqual(h.calls.map((call) => call[2]), [{ entity_id: 'switch.fan' }, { entity_id: 'input_text.message', value: '' }, { entity_id: 'input_button.stop' }, { entity_id: 'switch.readonly' }]);
 });
 
 test('an outstanding service response does not block later commands', async () => {

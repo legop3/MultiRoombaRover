@@ -24,8 +24,9 @@ function ActivityTile({ entity, connected, allowed, admin }) {
   // Translucent fills preserve text contrast; an amber border still identifies
   // locked tiles regardless of the admin's chosen color.
   const color = /^#[0-9a-f]{6}$/i.test(entity.color) ? entity.color : '#3b82f6';
-  const Control = controls[entity.type] || ReadOnlyControl;
-  const disabled = !connected || !entity.available || !allowed || (entity.locked && !admin);
+  // Ordinary users see only the value; admins retain the entity's actual input.
+  const Control = entity.readOnly && !admin ? ReadOnlyControl : controls[entity.type] || ReadOnlyControl;
+  const disabled = !connected || !entity.available || !allowed || ((entity.locked || entity.readOnly) && !admin);
   return <div className="flex min-w-0 flex-col gap-0.5 rounded-sm border px-0.5 py-0.5"
     style={{ borderColor: entity.locked ? '#b45309' : `${color}aa`, backgroundColor: `${color}33` }}>
     <div className="-mx-0.5 -mt-0.5 flex min-h-5 min-w-0 items-center gap-0.5 rounded-t px-0.5 py-0.5 text-white" style={{ backgroundColor: `${color}66` }}>

@@ -8,7 +8,7 @@ const { buildEntity } = require('./entityHelpers');
 const { createLocks, resolveItem } = require('./locks');
 const { createActions } = require('./actions');
 const { getRole } = require('../roleService');
-const { getMode } = require('../modeManager');
+const { getMode, modeEvents } = require('../modeManager');
 const logger = require('../../globals/logger').child('homeAssistantActivitiesService');
 
 const events = new EventEmitter();
@@ -23,6 +23,35 @@ const actions = createActions({ getConfig: () => config, ha: {
   getRawEntitySnapshot: ha.getRawEntitySnapshot,
   callHomeAssistantService: ha.callHomeAssistantService,
 }, locks });
+
+let operatorsOnline = false;
+let lastAutomationState = null;
+let automationRevision = 0;
+
+function refreshAutomation() {
+  const mode = getMode();
+  const locked = mode === 'admin' || mode === 'lockdown';
+  // Remember transitions, not entity values: HA updates and extra connections
+  // must not repeatedly press buttons or undo a manual admin adjustment.
+  const state = config.enabled && snapshotReady && ha.isConnected()
+    ? (locked ? mode : operatorsOnline ? 'online' : null) : null;
+  if (state === lastAutomationState) return;
+  lastAutomationState = state;
+  const revision = ++automationRevision;
+  if (!state) return;
+  actions.runAutomation(locked ? 'locked' : 'online', () => revision === automationRevision)
+    .then((result) => {
+      const failures = result.results?.filter((item) => !item.ok) || [];
+      if (failures.length) logger.warn('Activity automation failed', { trigger: result.action, failures });
+    }).catch((error) => logger.warn('Activity automation failed', { error: error.message }));
+}
+
+function setOperatorsOnline(online) {
+  operatorsOnline = online;
+  refreshAutomation();
+}
+
+modeEvents.on('change', refreshAutomation);
 
 function getState() {
   return {
@@ -53,14 +82,17 @@ function setLocked(query, locked) {
 ha.homeAssistantEvents.on('snapshot', () => {
   snapshotReady = true;
   emitUpdate();
+  refreshAutomation();
 });
 ha.homeAssistantEvents.on('status', () => {
   snapshotReady = false;
   emitUpdate();
+  refreshAutomation();
 });
 registerConfigurationHandler('homeAssistantActivities', (next) => {
   config = next;
   emitUpdate();
+  refreshAutomation();
 });
 // Resolve access on the server for every command; clients only supply item/value.
 io.on('connection', (socket) => {
@@ -76,4 +108,7 @@ io.on('connection', (socket) => {
   });
 });
 
-module.exports = { ...actions, getState, setLocked, activityEvents: events };
+module.exports = { ...actions, getState, setLocked, setOperatorsOnline, activityEvents: events,
+  // A returning operator ends idle cleanup even if earlier HA calls are still settling.
+  runIdleActions: () => actions.runAutomation('idle', () => !operatorsOnline),
+};

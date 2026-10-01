@@ -9,7 +9,8 @@ const TYPES = {
 function buildEntity(item, raw, locked = false) {
   const attributes = raw?.attributes || {};
   const domain = item.id.split('.')[0];
-  const type = item.readOnly ? 'readOnly' : TYPES[domain] || 'readOnly';
+  // Read-only is a user permission, not an entity capability: admins and automation still need its write type.
+  const type = TYPES[domain] || 'readOnly';
   // A never-pressed button legitimately reports unknown. Its state is a last
   // press timestamp, not availability or a boolean toggle state.
   const available = Boolean(raw && raw.state !== 'unavailable' && (raw.state !== 'unknown' || type === 'button'));
@@ -17,7 +18,7 @@ function buildEntity(item, raw, locked = false) {
   return {
     id: item.id, name: item.name?.trim() || attributes.friendly_name || item.id,
     // Include presentation settings in session state so all clients share the configured color.
-    icon: item.icon || '', color: item.color || '', domain, type, locked, available,
+    icon: item.icon || '', color: item.color || '', domain, type, readOnly: Boolean(item.readOnly), locked, available,
     state: raw?.state ?? 'unknown', unit: attributes.unit_of_measurement || '',
     min: numeric(attributes.min), max: numeric(attributes.max), step: numeric(attributes.step),
     options: Array.isArray(attributes.options) ? attributes.options.filter((option) => typeof option === 'string') : [],

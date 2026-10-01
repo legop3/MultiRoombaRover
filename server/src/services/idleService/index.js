@@ -7,6 +7,7 @@ const { getRole, roleEvents } = require('../roleService');
 const { IDLE_TIMEOUT_MS } = require('./constants');
 const { runtime } = require('./state');
 const { runIdleActions } = require('./actions');
+const activityControls = require('../homeAssistantActivitiesService');
 
 function getActivitySnapshot() {
   let onlineUsers = 0;
@@ -113,6 +114,8 @@ function scheduleIdleTimer() {
 function refreshIdleState() {
   const activity = getActivitySnapshot();
   logger.info('Idle state refresh', activity);
+  // Share the exact idle presence policy; Activity Controls must not count spectators or invent a second role filter.
+  activityControls.setOperatorsOnline(activity.totalActive > 0);
   if (activity.totalActive > 0) {
     clearIdleTimer();
     if (runtime.idleActionsCompleted) {
