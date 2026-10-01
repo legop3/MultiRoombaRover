@@ -1,6 +1,6 @@
 // Configuration Database Migrations
 // Purpose: Applies ordered, transactional schema changes to the configuration and administration database.
-// Scope: Owns database structure only; configuration-document evolution belongs to the ordered definition and validation.
+// Scope: Upgrades database structure and stored configuration documents before current-schema validation.
 const migrations = [
   {
     version: 1,
@@ -82,6 +82,34 @@ const migrations = [
         SET config_json = json_remove(config_json, '$.roverLearning.training.roundsPerSession')
         WHERE json_type(config_json, '$.roverLearning.training.roundsPerSession') IS NOT NULL
       `).run();
+    },
+  },
+  {
+    version: 4,
+    run(db) {
+      const rows = db.prepare('SELECT id, config_json FROM configuration_revisions').all();
+      const update = db.prepare('UPDATE configuration_revisions SET config_json = ? WHERE id = ?');
+      // Upgrade history as well as the active revision so a settings rollback
+      // cannot reintroduce fields rejected by the new Automations schema.
+      for (const row of rows) {
+        const config = JSON.parse(row.config_json);
+        let changed = false;
+        for (const item of config.homeAssistantActivities?.items || []) {
+          const hasAction = Object.hasOwn(item, 'idleAction');
+          const hasValue = Object.hasOwn(item, 'idleValue');
+          if (!hasAction && !hasValue) continue;
+          item.automations ??= {};
+          item.automations.idle ??= {};
+          // Preserve any explicitly saved new-format setting when both formats
+          // exist, including an empty text value used to clear an entity.
+          if (hasAction && !Object.hasOwn(item.automations.idle, 'action')) item.automations.idle.action = item.idleAction;
+          if (hasValue && !Object.hasOwn(item.automations.idle, 'value')) item.automations.idle.value = item.idleValue;
+          delete item.idleAction;
+          delete item.idleValue;
+          changed = true;
+        }
+        if (changed) update.run(JSON.stringify(config), row.id);
+      }
     },
   },
 ];
