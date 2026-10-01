@@ -33,10 +33,17 @@ function createTrainer({ root, config, actionThreshold, logger }) {
         }
       }
       try {
-        const saved = JSON.parse(await fs.readFile(path.join(trainingRoot, 'schedule-v5.json'), 'utf8'));
+        const saved = JSON.parse(await fs.readFile(path.join(trainingRoot, 'schedule-v6.json'), 'utf8'));
         ledger = saved.sessions;
         state = { ...saved.progress, status: 'waiting' };
         if (!ledger || typeof ledger !== 'object') throw new Error('Invalid training schedule');
+        // Retry this reader-specific rejection once after the fixed-grid repair.
+        // Keep optimizer progress and unrelated recording failures intact.
+        if (saved.samplingVersion !== 2) {
+          for (const [id, entry] of Object.entries(ledger)) {
+            if (entry.rejected === 'No complete, aligned observation/action windows') delete ledger[id];
+          }
+        }
       } catch (error) { if (error.code !== 'ENOENT') throw error; }
     } catch (error) {
       startupError = true;
@@ -46,8 +53,8 @@ function createTrainer({ root, config, actionThreshold, logger }) {
   }
 
   async function saveLedger() {
-    const filename = path.join(trainingRoot, 'schedule-v5.json');
-    await fs.writeFile(`${filename}.tmp`, JSON.stringify({ sessions: ledger, progress: state }));
+    const filename = path.join(trainingRoot, 'schedule-v6.json');
+    await fs.writeFile(`${filename}.tmp`, JSON.stringify({ samplingVersion: 2, sessions: ledger, progress: state }));
     await fs.rename(`${filename}.tmp`, filename);
   }
 
@@ -159,6 +166,7 @@ function createTrainer({ root, config, actionThreshold, logger }) {
             state = { ...state, status: stopped ? 'stopped' : 'waiting', steps: result.steps ?? state.steps,
               completedAt: Date.now(), elapsedSeconds: result.elapsedSeconds ?? null, error: null,
               examples: result.examples ?? state.examples, loss: result.loss ?? null,
+              evaluatedSteps: result.trained ? result.steps : state.evaluatedSteps,
               diagnostics: result.diagnostics ?? state.diagnostics, publication: result.publication ?? state.publication, evaluation: result.evaluation ?? state.evaluation,
               reason: result.reason ?? 'Waiting for the next scheduled training job' };
             await saveLedger();
@@ -169,7 +177,9 @@ function createTrainer({ root, config, actionThreshold, logger }) {
           logger.error('Training result persistence failed', { error: error.message, failure: errorDetails(error, 'training result persistence') });
         } finally {
           history.push({ at: Date.now(), status: state.status, steps: state.steps, loss: state.loss,
-            losses: state.losses || null, evaluation: state.evaluation || null,
+            losses: state.losses || null, evaluation: state.evaluation ? Object.fromEntries(
+              ['status', 'windows', 'precision', 'recall', 'f1', 'predictedActions', 'positiveActions', 'numericMse', 'missedStops', 'gateReasons']
+                .map((key) => [key, state.evaluation[key]])) : null,
             elapsedSeconds: state.elapsedSeconds || null });
           if (history.length > 20) history.shift();
           leases.clear();

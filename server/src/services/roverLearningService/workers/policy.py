@@ -14,12 +14,13 @@ import numpy as np
 import torch
 from torch import nn
 
-VERSION = 4
+VERSION = 5
 SLOTS = 64
 VALUES = 8
 FRAMES = 4
 HEIGHT, WIDTH = 120, 160
-OPERATING_TYPES = {"drive", "motors", "servo", "headlight", "laser", "horn", "song", "raw"}
+OPERATING_TYPES = {"drive", "servo", "headlight", "raw"}
+MODE_COMMANDS = tuple(base64.b64encode(bytes([opcode])).decode() for opcode in (128, 131, 132, 143))
 SENSORS = [
     ("bumpsAndWheelDrops.bumpLeft", 1), ("bumpsAndWheelDrops.bumpRight", 1),
     ("bumpsAndWheelDrops.wheelDropLeft", 1), ("bumpsAndWheelDrops.wheelDropRight", 1),
@@ -56,29 +57,28 @@ def sensor_vector(sensors):
 def describe_command(command):
     if command.get('type') not in OPERATING_TYPES:
         return None
+    # Raw is restricted to the existing mode/dock buttons, not arbitrary OI
+    # packets that could reintroduce excluded actuators or songs.
+    if command['type'] == 'raw' and command.get('raw') not in MODE_COMMANDS:
+        return None
     if len(json.dumps(command)) > 4096:
         raise ValueError('Operating command exceeds 4096-byte schema limit')
     values, fields = [], []
 
     def visit(value, path=()):
-        if isinstance(value, list) and command['type'] == 'horn' and path == ('horn', 'freqs'):
-            return [visit(item, (*path, index)) for index, item in enumerate(value)]
         if isinstance(value, dict):
             return {key: visit(item, (*path, key)) for key, item in sorted(value.items())}
-        # Exact actuator zeros preserve demonstrated releases. Horn frequency
-        # zeros are parameters so changing a chord does not require a new slot.
-        if value == 0 and command['type'] != 'horn':
+        # Exact actuator zeros preserve demonstrated releases.
+        if value == 0:
             return copy.deepcopy(value)
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             if not math.isfinite(value) or len(values) >= VALUES:
                 raise ValueError('Nonfinite command or too many numeric control fields')
-            scale = {'drive': 500, 'motors': 255, 'servo': 180,
-                     'horn': 1000, 'song': 127}.get(command['type'], 1)
-            fields.append({'path': list(path), 'scale': scale, 'integer': command['type'] in ('drive', 'motors', 'servo', 'horn') or isinstance(value, int)})
+            scale = {'drive': 500, 'servo': 180}.get(command['type'], 1)
+            fields.append({'path': list(path), 'scale': scale, 'integer': command['type'] in ('drive', 'servo') or isinstance(value, int)})
             values.append(normalize(value, scale))
             return {'$number': len(values) - 1}
-        # Arrays (e.g. songs) are discrete exact demonstrations, not variable
-        # length regression outputs. Never reinterpret raw OI bytes as numbers.
+        # Mode bytes and named actions remain exact constants.
         return copy.deepcopy(value)
 
     template = visit(command)
@@ -105,24 +105,17 @@ def encode_command(command, schema, extend=False):
 
 
 def initial_schema():
-    # Match commandPipeline.js envelopes, OI_COMMANDS and the four-frequency
-    # horn control. Values are examples describing fields, not training labels.
+    # Match the retained commandPipeline.js controls. Values describe fields,
+    # not artificial demonstrations; zero-speed drive remains a drive command.
     commands = []
     for left, right in itertools.product((0, 1), repeat=2):
         commands.append({'type': 'drive', 'driveDirect': {'left': left, 'right': right}})
-    for main, side, vacuum in itertools.product((0, 1), repeat=3):
-        commands.append({'type': 'motors', 'motorPwm': {'main': main, 'side': side, 'vacuum': vacuum}})
     for angle in (0, 1):
         commands.append({'type': 'servo', 'servo': {'angle': angle}})
-    for kind in ('headlight', 'laser'):
-        for action in ('on', 'off', 'toggle'):
-            commands.append({'type': kind, kind: {'action': action}})
-    for waveform in ('sine', 'saw'):
-        commands.append({'type': 'horn', 'horn': {'action': 'start', 'waveform': waveform, 'freqs': [1, 1, 1, 1]}})
-    commands.append({'type': 'horn', 'horn': {'action': 'stop'}})
-    for opcode in (128, 131, 132, 143):
-        commands.append({'type': 'raw', 'raw': base64.b64encode(bytes([opcode])).decode()})
-    commands.append({'type': 'song', 'song': {'notes': [{'note': 60, 'duration': 8}]}})
+    for action in ('on', 'off', 'toggle'):
+        commands.append({'type': 'headlight', 'headlight': {'action': action}})
+    for raw in MODE_COMMANDS:
+        commands.append({'type': 'raw', 'raw': raw})
     schema = []
     for command in commands:
         encode_command(command, schema, extend=True)
@@ -188,7 +181,7 @@ class Policy(nn.Module):
 
 
 def specification(schema):
-    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-events-v4',
+    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-events-v5',
             'frames': FRAMES, 'height': HEIGHT, 'width': WIDTH,
             'historyStrideMs': 300, 'decisionIntervalMs': 100,
             'stateSize': STATE_SIZE, 'sensorFields': SENSORS,

@@ -7,7 +7,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const applicationVersion = require('../../../package.json').version;
 const hash = createHash('sha256');
-for (const file of ['workers/policy.py', 'workers/dataset.py', 'workers/train.py', 'workers/infer.py',
+for (const file of ['workers/policy.py', 'workers/dataset.py', 'workers/train.py', 'workers/infer.py', 'workers/observations.py', 'workers/learning.py',
   'capabilities.js', 'errors.js', 'storage.js', 'runtime.js', 'models.js', 'driving.js', 'recording.js', 'training.js', 'socketGateway.js', 'diagnostics.js']) {
   hash.update(fs.readFileSync(path.join(__dirname, file)));
 }
@@ -41,11 +41,12 @@ function report(state, controller) {
       sessions: state.recording.sessions.map((item) => ({ startedAtUnixMs: item.startedAt,
         status: item.video, droppedEvents: item.droppedEvents, error: redact(item.error), failureDetails: item.failureDetails || null, stderr: redact(item.stderr), errorCategory: errorCategory(item.error) })) },
     training: { status: training.status, steps: training.steps, examples: training.examples,
-      selection: training.selection || null,
+      selection: training.selection || null, evaluatedSteps: training.evaluatedSteps ?? null,
       loss: training.loss, losses: training.losses || null, publication: training.publication || null,
+      trainingAudit: metrics.trainingAudit || null,
       evaluation: training.evaluation || null, dataset: metrics.dataset || training.dataset || null,
       resources: { decodeSeconds: metrics.decodeSeconds ?? null, trainingSeconds: metrics.trainingSeconds ?? null,
-        evaluationSeconds: metrics.evaluationSeconds ?? null, checkpointSeconds: metrics.checkpointSeconds ?? null, cpuSeconds: metrics.cpuSeconds ?? null,
+        evaluationSeconds: metrics.evaluationSeconds ?? null, probeSeconds: metrics.probeSeconds ?? null, beforeAuditSeconds: metrics.beforeAuditSeconds ?? null, checkpointSeconds: metrics.checkpointSeconds ?? null, cpuSeconds: metrics.cpuSeconds ?? null,
         peakRssMiB: metrics.peakRssMiB ?? null },
       history: training.history || [], rejectionReasons: (training.rejectionReasons || []).map(redact), rejectionCategories: (training.rejectionReasons || []).map(errorCategory),
       error: redact(training.error), errorCategory: errorCategory(training.error), nextAttemptAtUnixMs: training.nextAttemptAt },

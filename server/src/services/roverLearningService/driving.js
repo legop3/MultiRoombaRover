@@ -9,7 +9,8 @@ const { recordCommandRequest } = require('../commandService/recording');
 const { acquireModel } = require('./models');
 const { compatible } = require('./capabilities');
 
-const OPERATING = new Set(['drive', 'motors', 'servo', 'headlight', 'laser', 'horn', 'song', 'raw']);
+const OPERATING = new Set(['drive', 'servo', 'headlight', 'raw']);
+const MODE_COMMANDS = new Set([128, 131, 132, 143].map((opcode) => Buffer.from([opcode]).toString('base64')));
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
 
 function canControl(socket, roverId) {
@@ -34,13 +35,11 @@ function createDriving({ root, config, onChange, activity }) {
     if (session.status === 'stopping') return;
     if (!canControl(session.socket, session.roverId)) { stop(session.roverId, 'Control permission lost'); return; }
     if (!OPERATING.has(command?.type)) throw new Error('Unsupported model command');
+    if (command.type === 'raw' && !MODE_COMMANDS.has(command.raw)) throw new Error('Unsupported model operating-mode command');
     const record = roverManager.rovers.get(session.roverId);
     if (command.type === 'drive') {
       const limit = Math.min(500, Number(record.meta?.maxWheelSpeed) || 500);
       command.driveDirect = { left: Math.round(clamp(command.driveDirect?.left, -limit, limit)), right: Math.round(clamp(command.driveDirect?.right, -limit, limit)) };
-    }
-    if (command.type === 'motors') {
-      command.motorPwm = { main: clamp(command.motorPwm?.main, -127, 127), side: clamp(command.motorPwm?.side, -127, 127), vacuum: clamp(command.motorPwm?.vacuum, 0, 127) };
     }
     if (command.type === 'servo') {
       const servo = record.meta?.cameraServo;
@@ -64,8 +63,6 @@ function createDriving({ root, config, onChange, activity }) {
     // A stop must still reach the rover after turn permission is revoked.
     for (const command of [
       { type: 'drive', driveDirect: { left: 0, right: 0 } },
-      { type: 'motors', motorPwm: { main: 0, side: 0, vacuum: 0 } },
-      { type: 'horn', horn: { action: 'stop' } },
     ]) { try { issueCommand(roverId, command); } catch { /* Rover may already be offline. */ } }
     session.worker.kill('SIGTERM');
     const timer = setTimeout(() => session.worker.kill('SIGKILL'), 2000);

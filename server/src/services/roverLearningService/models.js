@@ -142,8 +142,8 @@ function removeObsoleteModels(root) {
       else { await fs.rm(target, { recursive: true, force: true }); retired.delete(target); }
     }
     // These filenames belong to superseded optimizer/scheduler lineages, not
-    // policy versions. The current command policy uses lineage v5.
-    for (const suffix of ['', '-v1', '-v2', '-v3', '-v4']) {
+    // policy versions. The current command policy uses lineage v6.
+    for (const suffix of ['', '-v1', '-v2', '-v3', '-v4', '-v5']) {
       for (const filename of [`resume${suffix}.pt`, `resume${suffix}.tmp`,
         `schedule${suffix}.json`, `schedule${suffix}.json.tmp`]) {
         await fs.rm(path.join(root, 'training', filename), { force: true });

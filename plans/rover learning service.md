@@ -2,6 +2,19 @@
 
 ## Resume here
 
+Latest repair: full learning-path audit. Fixed missing command labels between
+video samples with a shared causal 100ms grid; added real-data score/baseline/
+training-probe diagnostics and normalized saved control profiles for retained
+recordings. Continues policy 5 / lineage v6; this audit does not reset progress.
+See the final audit results section for measured synthetic evidence and limits.
+
+Latest scope (authorized IPI): only drive, camera tilt, headlight and the four
+operating-mode/dock commands (128/131/132/143). Exclude horn, song, laser and all
+brush/vacuum motor commands from both learning and execution, including raw OI
+bypasses. Raw recordings stay intact. Policy format 5, training lineage v6;
+startup removes earlier models and lineages through v5. Earlier scope below is
+historical. No configuration change required.
+
 Latest change (2026-09-29 IPI): format 4 seeds known user-control command shapes
 before training. Generic peripherals are excluded; sensorStream is ignored without
 invalidating footage. Drive includes zero-speed drive, with no separate stop type.
@@ -962,3 +975,103 @@ and browser appearance remain unverified. No new tests or background processes.
 Deploying starts a new learner using existing recordings; enabled-service startup
 removes older policy models and optimizer/scheduler lineages through v4. Current
 lineage is v5. No settings changes or prescribed human driving are required.
+
+### Simplified controls, policy 5
+
+User authorized removal of horn/song/laser/brush motors. Retained 13 seeded shapes:
+four drive zero/nonzero combinations, two camera angle shapes, three headlight
+actions, four raw operating-mode/dock constants. Generic peripherals remain excluded.
+Removed excluded command history/targets via policy allowlist and execution via
+Node allowlist; raw payloads must exactly match one of the four mode commands at
+both boundaries. Controller shutdown now sends only zero-speed drive, leaving
+manual brush/horn state alone. Raw recording and sensor telemetry unchanged.
+Old policies are deleted on enabled startup; resume-v6.pt/schedule-v6.json begin a
+fresh learner using retained recordings. Existing evaluation behavior unchanged.
+Verification passed: production train.py --check-dependencies (policy 5, 13 seeded
+shapes), infer.py --help, changed Node module syntax, focused card ESLint, and diff
+whitespace checks. No live hardware/data available locally; actual learning and
+driving quality remain unverified. No tests added or background processes left.
+
+### Active full learning-path audit (authorized IPI)
+
+User explicitly permits local training/inference with controlled synthetic input;
+there are NO real recordings on this machine. Existing user-control simplification
+edits were present at start and must be preserved. No new schema reset is planned.
+
+Reproduced: production reader with a generated lossless 25 FPS video and 31 valid
+human drive events labeled ZERO commands. Old sampler used 120ms frame intervals
+with only 100ms target coverage. Fixed causal 100ms grid shared by dataset/inference
+uses latest past image; no future pixels. The repaired fixture preserves all 31
+commands. Sensor cutoff is strictly before decision in both paths.
+
+Original objective experiment: 12 easy colored-frame samples, 120 steps, seed 7,
+4 threads: loss 0.8206 -> 0.1996, mean true-command score 0.5106 -> 0.7268, recall
+at 0.7 reached 2/3; at 80 steps recall was still zero. This disproves a wholly
+broken gradient path; it does not diagnose real-data score suppression. Keep
+existing loss/threshold until real-data diagnostics justify changing them.
+
+New learning.py shares the actual objective for ongoing training and disposable
+probe. Per-job before/after evaluation on <=96 unchanged training examples, full
+held-out score distributions, threshold sweep, training-only frequency and no-op
+baselines, decoded pre-server-limit parameter error, gradient norms and sampled
+versus natural frequencies. Bounded <=20s/80-step memorization probe on <=12
+training examples at first job/every 1000 steps; copy only, never published or
+used for generalization gate. Continues current checkpoint/optimizer lineage.
+
+Audit results (synthetic only):
+- Round-tripped eight representative retained command payloads, including signed
+  drive/servo values, zero-speed drive, headlight and all four mode commands.
+- Lossless 25 FPS recording with 31 command events: old sampler labeled 0; new
+  sampler labeled 31/31, including interleaved ignored sensorStream events.
+- Full production train.py decoded five generated recordings, trained/exported
+  checkpoints, evaluated held-out sessions, and resumed optimizer/weights for a
+  second job. 120 -> 240 cumulative steps improved recall at unchanged 0.7 from
+  0 to 0.2553, with precision 1.0 at step 240. Mean true-event score rose 0.5346
+  -> 0.6303. Gate correctly remained failed. A lower 0.5 threshold had precision
+  0.6629/recall 0.8369 and 120 false-positive actions, so threshold was NOT lowered.
+- Disposable diverse probe covered zero-speed drive, moving drive and servo;
+  reached recall 0.75 after 39 steps under its 20s budget. Sampling was corrected
+  to avoid probing only the first event category. Probe uses a copy and higher
+  learning rate for memorization; never adopts weights or changes main optimizer.
+- Exported trained checkpoint reload, forward inference and decoding passed.
+- Retained recordings had extra removed actuator fields, causing false model
+  incompatibility. Normalize saved and current profiles through controlProfile.
+  Direct Node exercise accepts removed laser/peripheral differences and still
+  rejects a changed retained camera configuration.
+
+Diagnostics now report accepted vs represented command counts, request/dispatch
+delay, maximum sensor/image age; sampled vs natural command frequencies; gradient
+norms; same training-subset before/after scores; per-command score distributions;
+threshold sweep and no-op/training-frequency baselines; pre-server-limit decoded
+parameter errors; and bounded diverse memorization probe. Evaluation-step identity
+separates last evaluation from current-job progress. Compact history avoids
+repeating entire command/score tables for every job. Four concise numeric rows
+were added to expanded details; full evidence is in Copy diagnostics.
+
+The original loss and configured 0.7 threshold remain unchanged because experiments
+did not establish that a different objective/threshold fixes real recordings.
+Promotion keeps existing checks and additionally must beat the simple training-
+frequency baseline F1. One-time retry of old reader-specific no-aligned-window
+rejections preserves optimizer state and unrelated errors.
+
+Limits: actual human footage and rover/RTSP transport unavailable. Isolated held-out
+windows cannot measure sequential latch behavior or physical driving; decoded
+parameter errors are explicitly before Node's rover limits/permission/safety
+handling. Main model learned some synthetic cues but has not demonstrated useful
+autonomous driving. Camera command encoding still uses whole-degree predictions.
+The user must not be asked to drive prescribed routes or perform a manual checklist.
+
+Verification: full synthetic worker jobs and checkpoint inference above passed;
+focused Node syntax/card ESLint/diff checks passed before final report additions.
+One experimental seeded run failed because its runpy launcher omitted worker
+import path; corrected launcher succeeded. No production import failure occurred.
+Synthetic inference-worker media exercise passed: eight prediction batches,
+threshold update to 0.3, retained command types and discrete latching exercised.
+This check used a generated checkpoint and a FIFO media adapter preserving
+synthetic PTS (RTSP wall-clock override disabled in the experiment only); it does
+not validate real network capture timing. Trained checkpoint forward/decode was
+verified separately. Temporary media launchers needed fixes for file lifetime
+and command-string escaping; these were experiment issues, not production fixes.
+No repository tests added. Experiments finished and no background worker remains.
+Final focused Node syntax and diff whitespace checks passed. Card lint passed.
+No additional schema/optimizer reset introduced by this audit.

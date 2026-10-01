@@ -39,7 +39,7 @@ def main():
     import numpy as np
     import av
     import torch
-    from torch.nn import functional as functional
+    from learning import loss_setup, tensors, losses as policy_losses, evaluate, probe
     from dataset import windows
     from policy import Policy, VERSION, SLOTS, VALUES, specification, is_stop, select_slots, initial_schema
 
@@ -72,12 +72,13 @@ def main():
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
     # The command-event policy has different inputs, targets and weights. Keep its
     # optimizer lineage separate; reuse recordings with their unchanged partition.
-    resume_path = root / 'training' / 'resume-v5.pt'
+    resume_path = root / 'training' / 'resume-v6.pt'
     schema, steps, examples, last_published = initial_schema(), 0, 0, 0
     trained_rovers = set()
     control_profiles = []
     distinct_windows = {}
     published_windows = 0
+    last_probe_steps, learning_probe = 0, None
     if resume_path.exists():
         saved = torch.load(resume_path, map_location='cpu', weights_only=True)
         if saved['version'] != VERSION:
@@ -91,6 +92,8 @@ def main():
         control_profiles = saved.get('controlProfiles', [])
         distinct_windows = saved.get('distinctWindows', {})
         published_windows = saved.get('publishedWindows', 0)
+        last_probe_steps = saved.get('lastProbeSteps', 0)
+        learning_probe = saved.get('learningProbe')
     cpu_started = time.process_time()
     decode_started = time.monotonic()
     dataset_stats = []
@@ -171,15 +174,16 @@ def main():
         return
 
     decode_seconds = time.monotonic() - decode_started
+    audit_started = time.monotonic()
+    numeric_mask, positive_weight = loss_setup(pool, schema)
+    training_rows = [row for row in dataset_stats if row.get('partition') == 'training']
+    natural_count = sum(row.get('usableWindows', 0) for row in training_rows)
+    frequencies = np.sum([row.get('commandEventCounts', [0] * SLOTS) for row in training_rows], axis=0) / max(1, natural_count)
+    audit_subset = pool[::max(1, len(pool) // 96)][:96]
+    before_training = evaluate(model, audit_subset, schema, job['actionThreshold'], frequencies, config['batchSize'], cancelled)
+    before_audit_seconds = time.monotonic() - audit_started
     train_started = time.monotonic()
-    numeric_mask = torch.zeros(SLOTS, VALUES)
-    for slot, descriptor in enumerate(schema):
-        numeric_mask[slot, :len(descriptor['fields'])] = 1
-    # Balance sparse events without assuming that every time step should fire
-    # every control. This is training loss, not a driving-quality evaluation.
-    positives = np.sum([sample[2] for sample in pool], axis=0)
-    opportunities = np.sum([sample[4] for sample in pool], axis=0)
-    positive_weight = torch.from_numpy(np.clip((opportunities - positives) / np.maximum(positives, 1), 1, 20)).float()
+    gradient_norms = []
     losses = []
     model.train()
     for _ in range(config['passesPerJob']):
@@ -188,20 +192,18 @@ def main():
             if cancelled() or steps - initial_steps >= config['maxStepsPerJob']:
                 break
             batch = pool[offset:offset + config['batchSize']]
-            images, states, targets, values, available = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
-            images = images.float().div_(255)
+            images, states, targets, values, available = tensors(batch)
             optimizer.zero_grad(set_to_none=True)
             action_logits, predictions = model(images, states)
-            event_loss = functional.binary_cross_entropy_with_logits(action_logits, targets,
-                                                                       pos_weight=positive_weight, reduction='none')
-            event_loss = (event_loss * available).sum() / available.sum().clamp_min(1)
-            mask = numeric_mask.unsqueeze(0) * targets.unsqueeze(-1)
-            value_loss = ((predictions - values).square() * mask).sum() / mask.sum().clamp_min(1)
+            event_loss, value_loss = policy_losses(action_logits, predictions, targets, values, available, numeric_mask, positive_weight)
             loss = event_loss + value_loss
             if not torch.isfinite(loss):
                 raise ValueError('Nonfinite training loss; checkpoint not saved')
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+            gradient_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+            if not torch.isfinite(gradient_norm):
+                raise ValueError('Nonfinite training gradient; checkpoint not saved')
+            gradient_norms.append(float(gradient_norm))
             optimizer.step()
             steps += 1
             examples += len(batch)
@@ -226,58 +228,16 @@ def main():
                   'windows': len(validation), 'unsupportedCommandEvents': unsupported_events,
                   'unsupportedWindows': unsupported_windows}
     if validation and not cancelled():
-        model.eval()
-        true_positive = predicted_positive = actual_positive = 0
-        value_error = value_count = evaluated = 0
-        stop_actual = stop_detected = false_stops = 0
-        drive_actual = drive_detected = 0
-        empty_windows = unwanted_windows = 0
-        stop_slots = [slot for slot, descriptor in enumerate(schema) if is_stop(descriptor)]
-        drive_slots = [slot for slot, descriptor in enumerate(schema)
-                       if descriptor['template']['type'] == 'drive' and not is_stop(descriptor)]
-        per_command = [{'slot': slot, 'command': descriptor['template'], 'actual': 0,
-                        'predicted': 0, 'matched': 0} for slot, descriptor in enumerate(schema)]
-        with torch.inference_mode():
-            for offset in range(0, len(validation), config['batchSize']):
-                if cancelled():
-                    break
-                batch = validation[offset:offset + config['batchSize']]
-                images, states, targets, values, available = [torch.from_numpy(np.stack(items)) for items in zip(*batch)]
-                logits, predictions = model(images.float() / 255, states)
-                predicted = torch.zeros_like(targets, dtype=torch.bool)
-                # Use the same threshold and competing-command selection as live
-                # inference. Reservoir samples cannot assess temporal latching or
-                # closed-loop motion; report this explicitly rather than implying it.
-                for row, scores in enumerate(logits.sigmoid().tolist()):
-                    for slot in select_slots(scores, schema, job['actionThreshold']):
-                        predicted[row, slot] = True
-                actual = targets.bool()
-                true_positive += (predicted & actual).sum().item()
-                predicted_positive += predicted.sum().item()
-                actual_positive += actual.sum().item()
-                mask = numeric_mask.unsqueeze(0) * targets.unsqueeze(-1)
-                value_error += ((predictions - values).square() * mask).sum().item()
-                value_count += mask.sum().item()
-                empty = ~actual.any(dim=1)
-                empty_windows += empty.sum().item()
-                unwanted_windows += (empty & predicted.any(dim=1)).sum().item()
-                if stop_slots:
-                    stop_actual += actual[:, stop_slots].sum().item()
-                    stop_detected += (actual[:, stop_slots] & predicted[:, stop_slots]).sum().item()
-                    false_stops += (predicted[:, stop_slots] & ~actual[:, stop_slots]).sum().item()
-                if drive_slots:
-                    drive_actual += actual[:, drive_slots].sum().item()
-                    drive_detected += (actual[:, drive_slots] & predicted[:, drive_slots]).sum().item()
-                for item in per_command:
-                    slot = item['slot']
-                    item['actual'] += actual[:, slot].sum().item()
-                    item['predicted'] += predicted[:, slot].sum().item()
-                    item['matched'] += (actual[:, slot] & predicted[:, slot]).sum().item()
-                evaluated += len(batch)
-        precision = true_positive / max(1, predicted_positive)
-        recall = true_positive / max(1, actual_positive)
-        mse = value_error / max(1, value_count)
-        stop_recall = stop_detected / max(1, stop_actual)
+        measured = evaluate(model, validation, schema, job['actionThreshold'], frequencies, config['batchSize'], cancelled)
+        evaluated = measured['windows']
+        precision, recall = measured.get('precision', 0), measured.get('recall', 0)
+        actual_positive = measured.get('positiveActions', 0)
+        mse = measured.get('numericMse', 0)
+        stop_actual = measured.get('stopEvents', 0)
+        stop_recall = measured.get('stopRecall', 0)
+        drive_actual = measured.get('movementEvents', 0)
+        drive_recall = measured.get('movementRecall', 0)
+        frequency_f1 = max((row['f1'] for row in measured.get('baselines', {}).get('trainingFrequency', [])), default=0)
         held_out_sessions = sum(row.get('partition') == 'heldOut' and not row.get('skipReason') for row in dataset_stats)
         gate_reasons = []
         for condition, reason in [
@@ -288,27 +248,38 @@ def main():
             (actual_positive >= 32, 'Need 32 held-out command events'),
             (stop_actual >= 8, 'Need eight held-out stop events'),
             (drive_actual >= 16, 'Need 16 held-out movement commands'),
-            (drive_detected / max(1, drive_actual) >= .5, 'Movement command recall below 0.5'),
+            (drive_recall >= .5, 'Movement command recall below 0.5'),
             (precision >= .5, 'Command precision below 0.5'),
             (recall >= .5, 'Command recall below 0.5'),
             (stop_recall >= .5, 'Stop recall below 0.5'),
-            (value_count == 0 or mse <= .1, 'Command parameter error above 0.1'),
+            (measured.get('f1', 0) > frequency_f1, 'Command F1 does not beat the training-frequency baseline'),
+            (mse <= .1, 'Command parameter error above 0.1'),
         ]:
             if not condition:
                 gate_reasons.append(reason)
-        evaluation = {'status': 'imitation gate not met' if gate_reasons else 'passed imitation gate',
+        evaluation = {**measured, 'status': 'imitation gate not met' if gate_reasons else 'passed imitation gate',
                       'unsupportedCommandEvents': unsupported_events, 'unsupportedWindows': unsupported_windows,
-                      'method': 'Held-out 100ms command events; not a closed-loop rollout',
+                      'method': 'Isolated held-out 100ms events; live selection, no temporal latch/physical rollout',
                       'threshold': job['actionThreshold'], 'heldOutSessions': held_out_sessions,
-                      'windows': evaluated, 'precision': precision, 'recall': recall,
-                      'numericMse': mse, 'positiveActions': actual_positive,
-                      'predictedActions': predicted_positive, 'falsePositiveActions': predicted_positive - true_positive,
-                      'stopEvents': stop_actual, 'missedStops': stop_actual - stop_detected,
-                      'stopRecall': stop_recall, 'falseStops': false_stops,
-                      'movementEvents': drive_actual, 'movementRecall': drive_detected / max(1, drive_actual),
-                      'noCommandWindows': empty_windows, 'unwantedCommandWindows': unwanted_windows,
-                      'commands': per_command, 'gateReasons': gate_reasons}
-    evaluation_seconds = time.monotonic() - evaluation_started
+                      'gateReasons': gate_reasons}
+    after_training = evaluate(model, audit_subset, schema, job['actionThreshold'], frequencies, config['batchSize'], cancelled)
+    probe_seconds = 0
+    if not cancelled() and (learning_probe is None or steps - last_probe_steps >= 1000):
+        remaining = config['maxJobSeconds'] - (time.monotonic() - started)
+        if remaining > 10:
+            probe_started = time.monotonic()
+            learning_probe = probe(model, audit_subset, schema, job['actionThreshold'], frequencies,
+                                   cancelled, max_seconds=min(20, remaining / 2))
+            learning_probe['atTrainingStep'] = steps
+            last_probe_steps = steps
+            probe_seconds = time.monotonic() - probe_started
+    training_audit = {'before': before_training, 'after': after_training,
+                      'gradientNormBeforeClipping': {'min': min(gradient_norms), 'max': max(gradient_norms)},
+                      'positiveWeights': positive_weight[:len(schema)].tolist(),
+                      'naturalTrainingCommandFrequency': frequencies[:len(schema)].tolist(),
+                      'sampledCommandFrequency': np.mean([row[2] for row in pool], axis=0)[:len(schema)].tolist(),
+                      'learningProbe': learning_probe}
+    evaluation_seconds = time.monotonic() - evaluation_started - probe_seconds
     publication = {'distinctMinutes': unique_count / 600,
                    'newMinutes': (unique_count - published_windows) / 600,
                    'minimumMinutes': config['minimumDrivingMinutes'],
@@ -361,9 +332,9 @@ def main():
         'schema': schema, 'steps': steps, 'examples': examples,
         'lastPublished': last_published, 'trainedRovers': sorted(trained_rovers),
         'controlProfiles': control_profiles, 'distinctWindows': distinct_windows,
-        'publishedWindows': published_windows,
+        'publishedWindows': published_windows, 'lastProbeSteps': last_probe_steps, 'learningProbe': learning_probe,
     }, resume_path)
-    diagnostics = {'dataset': dataset_stats, 'decodeSeconds': decode_seconds,
+    diagnostics = {'dataset': dataset_stats, 'trainingAudit': training_audit, 'probeSeconds': probe_seconds, 'beforeAuditSeconds': before_audit_seconds, 'decodeSeconds': decode_seconds,
                    'trainingSeconds': training_seconds, 'evaluationSeconds': evaluation_seconds, 'checkpointSeconds': time.monotonic() - save_started,
                    'cpuSeconds': time.process_time() - cpu_started,
                    'peakRssMiB': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,

@@ -133,7 +133,7 @@ function LearningCard({ roverId }) {
       <div className="flex flex-wrap items-center justify-center gap-1">
         <select aria-label="Rover model" className={fieldClass} value={chosen?.id || ''} onChange={(event) => setSelectedId(event.target.value)} disabled={working || !models.length}>
           {!models.length && <option value="">No published models yet</option>}
-          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.experimental ? ' (experimental)' : ''}{model.compatible ? '' : model.formatVersion !== 4 ? ' (older model format)' : ' (incompatible)'}</option>)}
+          {models.map((model) => <option key={model.id} value={model.id}>{favorites.includes(model.id) ? '★ ' : ''}{model.name}{model.experimental ? ' (experimental)' : ''}{model.compatible ? '' : model.formatVersion !== 5 ? ' (older model format)' : ' (incompatible)'}</option>)}
         </select>
         <button type="button" className="button-dark text-sm disabled:opacity-50" aria-pressed={Boolean(chosen && favorites.includes(chosen.id))} disabled={!chosen} onClick={favorite}>
           {chosen && favorites.includes(chosen.id) ? '★ Favorite' : '☆ Favorite'}
@@ -220,6 +220,10 @@ function LearningCard({ roverId }) {
             <Row label="Latest update status">{training?.publication?.reason || 'Collecting data'}</Row>
             <Row label="Held-out evaluation">{training?.evaluation?.status || 'Waiting for held-out data'}</Row>
             <Row label="Held-out precision / recall">{training?.evaluation?.precision == null ? 'Unavailable' : `${training.evaluation.precision.toFixed(3)} / ${training.evaluation.recall.toFixed(3)}`}</Row>
+            <Row label="Evaluated training step">{display(training?.evaluatedSteps)}</Row>
+            <Row label="Mean / peak score on human commands">{training?.evaluation?.scoreOnHumanCommands?.mean == null ? 'Unavailable' : `${training.evaluation.scoreOnHumanCommands.mean.toFixed(3)} / ${training.evaluation.scoreOnHumanCommands.max.toFixed(3)}`}</Row>
+            <Row label="Training sample recall before / after">{training?.diagnostics?.trainingAudit?.after?.recall == null ? 'Unavailable' : `${training.diagnostics.trainingAudit.before.recall?.toFixed(3) ?? 'Unavailable'} / ${training.diagnostics.trainingAudit.after.recall.toFixed(3)}`}</Row>
+            <Row label="Memorization probe recall / steps">{training?.diagnostics?.trainingAudit?.learningProbe?.evaluation?.recall == null ? 'Unavailable' : `${training.diagnostics.trainingAudit.learningProbe.evaluation.recall.toFixed(3)} / ${training.diagnostics.trainingAudit.learningProbe.steps}`}</Row>
             <Row label="Steps between Latest updates">{display(limits?.training.checkpointEverySteps)}</Row>
           </dl>{training?.error && <p className="break-words text-amber-300">{training.error}</p>}
             {training?.reason && <p>{training.reason}</p>}

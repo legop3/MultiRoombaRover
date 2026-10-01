@@ -13,6 +13,7 @@ import time
 import av
 import numpy as np
 import torch
+from observations import decision_frames, history_frames
 
 from policy import Policy, VERSION, SLOTS, VALUES, HEIGHT, WIDTH, SENSORS, select_slots, decode_command, encode_command, sensor_vector
 
@@ -54,23 +55,16 @@ def main():
     sensors, sensor_time = {}, 0
     history = collections.deque(maxlen=32)
     latched = set()
-    sampled = 0
     with av.open(args.url, options={'rtsp_transport': 'tcp', 'timeout': '3000000',
                                    'use_wallclock_as_timestamps': '1'}) as video:
         stream = video.streams.video[0]
         stream.codec_context.thread_count = 1
-        for frame in video.decode(stream):
+        for stamp, frame, captured_at in decision_frames(video.decode(stream)):
             if closed.is_set():
                 return
-            if frame.pts is None:
-                continue
-            stamp = float(frame.pts * frame.time_base) * 1000
             now = time.time() * 1000
-            if not math.isfinite(stamp) or abs(now - stamp) > 2000:
+            if abs(now - captured_at) > 2000:
                 raise ValueError('Video time is stale or not aligned to server time')
-            if stamp - sampled < 99:
-                continue
-            sampled = stamp
             with mutex:
                 while observations and observations[0]['ts'] < stamp:
                     event = observations.popleft()
@@ -94,12 +88,7 @@ def main():
                                     np.isfinite(last_commands).astype(np.float32)))
             pixels = frame.to_ndarray(width=WIDTH, height=HEIGHT, format='rgb24').transpose(2, 0, 1).copy()
             history.append((stamp, pixels, state))
-            selected = []
-            for offset in (900, 600, 300, 0):
-                candidates = [entry for entry in history if entry[0] <= stamp - offset + .01]
-                if not candidates or stamp - offset - candidates[-1][0] > 200:
-                    break
-                selected.append(candidates[-1])
+            selected = history_frames(history, stamp)
             if len(selected) != 4:
                 continue
             before = time.perf_counter()
@@ -116,7 +105,7 @@ def main():
             proposals, commands = [], []
             for slot, descriptor in enumerate(schema):
                 command = decode_command(descriptor, predictions[slot])
-                discrete = command['type'] in ('headlight', 'laser', 'horn', 'song', 'raw')
+                discrete = command['type'] in ('headlight', 'raw')
                 reason = ('Below threshold' if slot not in active else
                           'Competing action' if slot not in winners else
                           'Held discrete action' if discrete and slot in latched else 'Proposed')
@@ -125,7 +114,7 @@ def main():
                     commands.append(command)
                 if slot in winners and discrete:
                     latched.add(slot)
-            print(json.dumps({'kind': 'prediction', 'frameAt': stamp, 'sensorAt': sensor_time,
+            print(json.dumps({'kind': 'prediction', 'frameAt': captured_at, 'decisionAt': stamp, 'sensorAt': sensor_time,
                               'latencyMs': (time.perf_counter() - before) * 1000,
                               'sensorPresent': sensor_vector(sensors)[len(SENSORS):].tolist(),
                               'commands': commands, 'proposals': proposals, 'threshold': args.threshold}, allow_nan=False), flush=True)
