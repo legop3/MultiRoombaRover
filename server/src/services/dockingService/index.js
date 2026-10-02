@@ -8,12 +8,15 @@ const ASSIST_SPEED = 60;
 const SENSOR_TIMEOUT_MS = 1500;
 const UNDOCK_TIMEOUT_MS = 4000;
 const REVERSE_TIMEOUT_MS = 1000;
+// Preserve the working OI preparation sequence; only backing away is sensor-driven.
+const MODE_COMMAND_DELAY_MS = 100;
+const FULL_MODE_SETTLE_MS = 300;
 
 function stateFor(record) {
   if (!states.has(record)) {
     states.set(record, {
       contact: null, charging: false, latched: false, assist: false,
-      operation: null, error: null, seenAt: 0, timer: null,
+      operation: null, error: null, seenAt: 0, timer: null, contactDockPending: false,
     });
   }
   return states.get(record);
@@ -63,12 +66,12 @@ function camera(record, angle) {
 function song(record, notes, slot = 0, duration = 10) {
   send(record, { type: 'song', song: { slot, notes: notes.map((note) => ({ note, duration })) } });
 }
-function finishAssist(record) {
+function finishAssist(record, { playExitSong = true } = {}) {
   const state = stateFor(record);
   if (!state.assist) return;
   state.assist = false;
   camera(record, 0);
-  song(record, [83, 76]);
+  if (playExitSong) song(record, [83, 76]);
 }
 function clearOperation(state) {
   clearTimeout(state.timer);
@@ -111,6 +114,7 @@ function handleIntent(record, type, payload, socket) {
     return;
   }
   state.error = null;
+  state.contactDockPending = false;
   require('../roverManager').stopDockGuard(record.id);
   stop(record);
   if (type === 'enterDocking') {
@@ -123,10 +127,11 @@ function handleIntent(record, type, payload, socket) {
   } else {
     finishAssist(record);
     camera(record, 0);
-    state.operation = { startedAt: Date.now(), socket, backoff: payload.backoff !== false, reversing: false };
-    // Full mode works from an initialized OI; start only when OI is off.
-    if (record.lastSensor?.decoded?.oiMode?.code === 0) mode(record, 128);
-    mode(record, 132);
+    state.operation = {
+      startedAt: Date.now(), socket, backoff: payload.backoff !== false, reversing: false,
+      stage: 'start', nextStepAt: Date.now() + MODE_COMMAND_DELAY_MS,
+    };
+    mode(record, 128);
     armDeadline(record);
   }
   publish(record);
@@ -149,6 +154,16 @@ function processTelemetry(record, sensors) {
       } else if (Date.now() - operation.startedAt >= UNDOCK_TIMEOUT_MS
         || (operation.reversingAt && Date.now() - operation.reversingAt >= REVERSE_TIMEOUT_MS)) {
         fail(record, 'undockTimeout', 'Unable to leave the dock.');
+      } else if (Date.now() < operation.nextStepAt) {
+        // Advance only on fresh telemetry, after the previous OI command settles.
+      } else if (operation.stage === 'start') {
+        mode(record, 143);
+        operation.stage = 'dock';
+        operation.nextStepAt = Date.now() + MODE_COMMAND_DELAY_MS;
+      } else if (operation.stage === 'dock') {
+        mode(record, 132);
+        operation.stage = 'full';
+        operation.nextStepAt = Date.now() + FULL_MODE_SETTLE_MS;
       } else if (sensors.oiMode.label === 'full') {
         if (!state.contact || !operation.backoff) {
           stop(record);
@@ -174,12 +189,25 @@ function processTelemetry(record, sensors) {
       state.latched = true;
       if (previousContact !== true) {
         stopAllMotion(record);
-        mode(record, 143);
+        state.contactDockPending = true;
         if (state.assist) song(record, [84], 1, 6);
+      } else if (state.contactDockPending && !state.charging) {
+        const speeds = sensors.wheelSpeedsMmPerSecond;
+        // A stop request does not prove the wheels stopped on the contacts.
+        // Require a subsequent frame with contact and measured stationary wheels.
+        if (speeds?.left === 0 && speeds?.right === 0) {
+          mode(record, 143);
+          state.contactDockPending = false;
+        }
       }
-      if (state.charging) finishAssist(record);
-    } else if (previousContact === true && state.assist) {
-      song(record, [72], 1, 6);
+      if (state.charging) {
+        state.contactDockPending = false;
+        // An immediate exit song would replace the contact beep on the Roomba.
+        finishAssist(record, { playExitSong: false });
+      }
+    } else {
+      state.contactDockPending = false;
+      if (previousContact === true && state.assist) song(record, [72], 1, 6);
     }
   } catch (error) {
     fail(record, 'commandFailed', error.message);
@@ -259,7 +287,8 @@ function issueIntent(record, type, payload, socket) {
     if (Date.now() - state.seenAt >= SENSOR_TIMEOUT_MS || state.contact == null) {
       throw new Error('Waiting for current rover telemetry');
     }
-    if (type === 'enterDocking' && state.contact) throw new Error('Rover is already docked');
+    // Already at the requested destination; acknowledge without restarting assist.
+    if (type === 'enterDocking' && state.contact) return uuidv4();
   }
   const id = uuidv4();
   try {
