@@ -1,3 +1,5 @@
+import { dockTelemetryEqual, selectDockTelemetry } from '../../../context/telemetryViews.js';
+import { useTelemetrySelector } from '../../../context/TelemetryContext.jsx';
 // Right Pane Tabs
 // Purpose: Defines the Right Pane Tabs module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
@@ -22,7 +24,6 @@ import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import OverseerPreferencePanel from '../../../components/OverseerPreferencePanel/index.jsx';
 import CardFrame from '../../../components/CardFrame/index.jsx';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useManualDockAssist } from '../../../features/manualDockAssist/useManualDockAssist.js';
 import { themeGapClass, themeStackClass } from '../../../themes/index.js';
 import ActivitiesTab from '../tabs/shared/ActivitiesTab/index.jsx';
 import VipTab from '../tabs/shared/VipTab/index.jsx';
@@ -62,7 +63,7 @@ function DriveDockPanel() {
   const laserState = useControlSelector((control) => control.pipeline?.laserState);
   const pipelineHorn = useControlSelector((control) => control.pipeline?.horn);
   const { setServoAngle, setHeadlight, setLaser, startHorn, stopHorn } = useControlActions();
-  const dockAssist = useManualDockAssist();
+  const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
   const driveDockState = useDriveDockState(roverId);
   const hideInlineControls = driveDockState.docked && !driveDockState.driving;
 
@@ -85,7 +86,7 @@ function DriveDockPanel() {
   const hornLabel = <ControlHint actionId="hornHonk" />;
   const upLabel = <ControlHint actionId="cameraUp" />;
   const downLabel = <ControlHint actionId="cameraDown" />;
-  const cameraDisabled = Boolean(!roverId || dockAssist.cameraLocked);
+  const cameraDisabled = Boolean(!roverId || dockTelemetry.cameraLocked);
   /*
     Precision movement mode also tightens the servo slider step. The command
     path still sends ordinary angle targets; only the UI increment changes while

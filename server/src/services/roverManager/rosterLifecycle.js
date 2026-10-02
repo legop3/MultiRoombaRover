@@ -117,6 +117,7 @@ function createRosterLifecycle(deps) {
       offline, while removeRoverDrivers still receives the captured record so
       it can clean the reverse membership index and Socket.IO room membership.
     */
+    require('../dockingService').disconnect(record);
     rovers.delete(id);
     removeRoverDrivers(id, record);
     stopDockGuard(id);

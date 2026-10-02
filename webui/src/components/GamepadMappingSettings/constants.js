@@ -56,7 +56,7 @@ export const ACTIONS = [
   { id: 'allAux', label: 'All cleaning motors', kind: 'button', section: 'Aux buttons' },
   { id: 'mainReverse', label: 'Main reverse toggle', kind: 'button', section: 'Brush toggles' },
   { id: 'sideReverse', label: 'Side reverse toggle', kind: 'button', section: 'Brush toggles' },
-  { id: 'driveMacro', label: 'Drive / undock sequence', kind: 'button', section: 'Mode controls' },
+  { id: 'driveMacro', label: 'Drive / undock', kind: 'button', section: 'Mode controls' },
   { id: 'dockMacro', label: 'Manual docking assist', kind: 'button', section: 'Mode controls' },
   { id: 'headlightToggle', label: 'Headlight toggle', kind: 'button', section: 'Camera' },
   { id: 'laserToggle', label: 'Laser toggle', kind: 'button', section: 'Camera' },

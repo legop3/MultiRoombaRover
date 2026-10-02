@@ -85,7 +85,7 @@ function normalizeOutboundCommandPayload(payload = {}) {
   };
 }
 
-function issueCommand(roverId, payload) {
+function issueCommand(roverId, payload, options = {}) {
   const record = roverManager.rovers.get(roverId);
   if (!record || !record.ws) {
     throw new Error('Rover offline');
@@ -93,6 +93,11 @@ function issueCommand(roverId, payload) {
   if (payload?.type === 'laser' && isLaserCommandBlockedByRoomLightLock(payload)) {
     throw new Error('Laser disabled while room lights are locked on');
   }
+  if (options.dockingOwned && payload.driveDirect && getCommandMotionMagnitude('drive', payload) > 0
+    && Date.now() < (driveCooldowns.get(roverId) || 0)) {
+    throw new Error('Drive blocked: safety cooldown');
+  }
+  payload = require('../dockingService').protectCommand(record, payload, options);
   const id = uuidv4();
   const normalizedPayload = normalizeOutboundCommandPayload(payload);
   const message = { ...normalizedPayload, id };
@@ -124,7 +129,14 @@ overcurrentProtectionService.configureCommandIssuer((roverId, payload) => {
     */
     return false;
   }
-  issueCommand(roverId, payload);
+  const record = roverManager.rovers.get(roverId);
+  const reverseAdjustment = payload.driveDirect
+    && (payload.driveDirect.left < 0 || payload.driveDirect.right < 0)
+    && payload.driveDirect.left <= 0 && payload.driveDirect.right <= 0
+    && require('../dockingService').canAdjustReverse(record);
+  // Only protection's adjustments to the active reverse inherit controller
+  // ownership. Zero remains an ordinary stop and cancels the sequence.
+  issueCommand(roverId, payload, { dockingOwned: Boolean(reverseAdjustment) });
   return true;
 });
 
@@ -315,6 +327,22 @@ function submitCommand(socket, { roverId, type, data } = {}, cb) {
     if (!isSongCommand && !isRebootCommand && !isUpdateCommand && !roverManager.canDrive(roverId, socket)) {
       throw new Error('Not your turn or no control');
     }
+    const record = roverManager.rovers.get(roverId);
+    if (!record?.ws) throw new Error('Rover offline');
+    const docking = require('../dockingService');
+    // The controller owns wheel output during undocking. Discard all ordinary
+    // drive input, including neutral, before it can alter protection's intent.
+    if (docking.shouldIgnoreDriveInput(record, payload)) {
+      reply({ ignored: true, reason: 'undocking' });
+      return;
+    }
+    // Reject before recording held motor intent: otherwise a rejected input
+    // could be replayed by protection as soon as the docking lock is released.
+    if (!docking.intents.has(type)) {
+      const guarded = docking.protectCommand(record, { ...payload, type });
+      type = guarded.type;
+      payload = guarded;
+    }
     const driveDirect = payload?.driveDirect;
     if (type === 'drive' && driveDirect) {
       if (!isAdminSocket) {
@@ -361,7 +389,14 @@ function submitCommand(socket, { roverId, type, data } = {}, cb) {
         bypassed: isAdminSocket,
       });
     }
-    const id = issueCommand(roverId, { type, ...payload });
+    const isDockingIntent = docking.intents.has(type);
+    const id = isDockingIntent
+      ? docking.issueIntent(roverManager.rovers.get(roverId), type, payload, socket)
+      : issueCommand(roverId, { ...payload, type });
+    if (isDockingIntent) {
+      // The server acknowledges accepting the intent; telemetry reports its completion.
+      io.emit('commandAck', { roverId, id, status: 'ok' });
+    }
     commandEvents.emit('observation', {
       ts: Date.now(),
       roverId: String(roverId),

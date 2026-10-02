@@ -1,23 +1,24 @@
+import { dockTelemetryEqual, selectDockTelemetry } from '../../../context/telemetryViews.js';
+import { useTelemetrySelector } from '../../../context/TelemetryContext.jsx';
 import React, { useEffect, useRef, useState } from 'react';
-import { useManualDockAssist } from '../../../features/manualDockAssist/useManualDockAssist.js';
 
-function ManualDockAssistOverlay({ mobileHud = false }) {
-  const { visible, statusLabel, statusTone, active, charging } = useManualDockAssist({ manageLifecycle: true });
+function ManualDockAssistOverlay({ roverId, mobileHud = false }) {
+  const telemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
+  const active = telemetry.cameraLocked;
+  const charging = telemetry.dockingPhase === 'charging';
+  const visible = active || telemetry.homeBase;
+  const statusLabel = charging ? 'Docked and charging' : telemetry.homeBase ? 'Docked' : 'Docking assist active';
+  const statusTone = charging ? 'good' : telemetry.homeBase ? 'warn' : 'active';
   const [popupMessage, setPopupMessage] = useState('');
   const timerRef = useRef(null);
-  const prevActiveRef = useRef(active);
+  const [previousActive, setPreviousActive] = useState(active);
 
-  useEffect(() => {
-    const prevActive = prevActiveRef.current;
-    const enabledNow = active && !prevActive;
-    const autoDisabledOnCharge = !active && prevActive && charging;
-    if (enabledNow) {
-      setPopupMessage('Dock assist mode enabled');
-    } else if (autoDisabledOnCharge) {
-      setPopupMessage('Docking successful! Thank you!');
-    }
-    prevActiveRef.current = active;
-  }, [active, charging]);
+  // These messages are presentation only; telemetry owns the operation itself.
+  if (previousActive !== active) {
+    setPreviousActive(active);
+    if (active) setPopupMessage('Dock assist mode enabled');
+    else if (charging) setPopupMessage('Docking successful! Thank you!');
+  }
 
   useEffect(() => {
     if (!popupMessage) return undefined;

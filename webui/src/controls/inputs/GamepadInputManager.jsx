@@ -1,3 +1,5 @@
+import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
+import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
 // Gamepad Input Manager
 // Purpose: Converts polled gamepad state into normalized control actions/commands. Scope: Integrates bindings, deadzone math, and dispatch callbacks for driving.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
@@ -17,7 +19,6 @@ import {
 } from './gamepadBindings.js';
 import { subscribeGamepadHub } from './gamepadHub.js';
 import { isTextEntryActive } from './inputFocusUtils.js';
-import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import {
   isControllerControlLocked,
   markControllerDisconnected,
@@ -113,12 +114,12 @@ function cycleHomeAssistant(latest, targetState) {
 
 export default function GamepadInputManager() {
   const {
-    setMode,
     setDriveVector,
     setAuxMotors,
     setServoAngle,
     setCameraAxisIntent,
-    runMacro,
+    undock,
+    sendCommand,
     toggleHeadlight,
     toggleLaser,
     registerInputState,
@@ -131,7 +132,7 @@ export default function GamepadInputManager() {
   const cameraAngle = useControlSelector((control) => control.state.camera?.angle);
   const cameraConfig = useControlSelector((control) => control.state.camera?.config);
   const roverId = useControlSelector((control) => control.state.roverId);
-  const dockAssist = useManualDockAssist();
+  const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
   const { focusChat } = useChatActions();
   const { isChatFocused } = useChatFocus();
   const { homeAssistantSetState, pushAlert } = useSessionActions();
@@ -283,7 +284,7 @@ export default function GamepadInputManager() {
         role === 'lockdown' || (role === 'admin' && sessionMode !== 'lockdown'),
       cameraAngle,
       cameraConfig,
-      dockAssist,
+      dockTelemetry,
       focusChat,
       gamepadSettings,
       homeAssistant,
@@ -292,7 +293,8 @@ export default function GamepadInputManager() {
       pushAlert,
       registerInputState,
       roverId,
-      runMacro,
+      undock,
+      sendCommand,
       saveGamepadSettings,
       saveVideoSettings,
       sendSong,
@@ -300,8 +302,7 @@ export default function GamepadInputManager() {
       setCameraAxisIntent,
       setDriveVector,
       setMicPttActive,
-      setMode,
-      setSongNote,
+        setSongNote,
       setServoAngle,
       songNote,
       startHorn,
@@ -462,15 +463,13 @@ export default function GamepadInputManager() {
       }
 
       if (outputs.buttons.driveMacro && handleButtonEdge('driveMacro', true)) {
-        latest.dockAssist.exitAssist();
-        latest.setMode('drive');
-        latest.runMacro('drive-sequence');
+        latest.undock();
       } else if (!outputs.buttons.driveMacro) {
         handleButtonEdge('driveMacro', false);
       }
 
       if (outputs.buttons.dockMacro && handleButtonEdge('dockMacro', true)) {
-        latest.dockAssist.toggleAssist();
+        latest.sendCommand(latest.dockTelemetry.cameraLocked ? 'cancelDocking' : 'enterDocking');
       } else if (!outputs.buttons.dockMacro) {
         handleButtonEdge('dockMacro', false);
       }

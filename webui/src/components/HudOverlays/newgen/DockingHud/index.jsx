@@ -8,7 +8,6 @@ import { useControlActions } from '../../../../controls/index.js';
 import ControlHint from '../../../ControlHint/index.jsx';
 import { useTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
 import { dockTelemetryEqual, selectDockTelemetry } from '../../../../context/telemetryViews.js';
-import { useManualDockAssist } from '../../../../features/manualDockAssist/useManualDockAssist.js';
 import { useSettingsNamespace } from '../../../../settings/index.js';
 import useCanControlRover from '../../../../hooks/useCanControlRover.js';
 import { useLayout } from '../../../../layouts/LayoutContext.jsx';
@@ -253,9 +252,6 @@ export default function DockingHud({ roverId }) {
   const layout = useLayout();
   const actions = useControlActions();
   const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
-  // This replaces ManualDockAssistOverlay as the current HUD's one lifecycle owner. It preserves the
-  // success sounds, camera positioning, speed cap, and automatic exit after charging begins.
-  const dockAssist = useManualDockAssist({ manageLifecycle: true });
   const canControl = useCanControlRover(roverId);
   const batteryState = useSessionSelector((state) => {
     const rover = (state.session?.roster || []).find((entry) => String(entry.id) === String(roverId));
@@ -268,15 +264,14 @@ export default function DockingHud({ roverId }) {
   const [dockExpansionOpen, setDockExpansionOpen] = usePodVisibility('dockAssist', true);
   // The action name is presentation state as well as busy state. Keeping the
   // reason prevents a passive, already-undocked rover from ever saying "Undocking".
-  const [pendingAction, setPendingAction] = useState(null);
-  const [error, setError] = useState('');
   const [showUndockTransition, setShowUndockTransition] = useState(false);
 
   const docked = Boolean(dockTelemetry?.homeBase);
   const oiMode = String(dockTelemetry?.oiModeLabel || '').toLowerCase();
   // The established UI contract treats exactly passive + undocked as the Roomba's
   // autonomous docking attempt. Unknown telemetry must not fabricate that state.
-  const autoDocking = !docked && !dockAssist.active && oiMode === 'passive';
+  const autoDocking = !docked && !dockTelemetry.cameraLocked && oiMode === 'passive';
+  const pendingAction = (dockTelemetry.dockingPhase === 'undocking') ? (docked ? 'undocking' : 'resuming') : null;
   const pending = pendingAction !== null;
   /* Mobile already presents its own touch-oriented driving controls. The docked
      action therefore keeps its plain-language instruction without advertising a
@@ -287,55 +282,22 @@ export default function DockingHud({ roverId }) {
   // The camera arc is the shared circular-pod reference size. Keep the dock expansion flush
   // against the battery shell after enlarging that gauge to the same 8.5-rem footprint.
   const cornerOffsetClass = batteryPodOpen ? 'right-34' : 'right-0';
-  const previousDockedRef = useRef(docked);
+  const [previousDocked, setPreviousDocked] = useState(docked);
   const finishUndockTransition = useCallback(() => setShowUndockTransition(false), []);
 
-  useEffect(() => {
-    const wasDocked = previousDockedRef.current;
-    // Only a real live transition plays the cue. An already-undocked rover must not animate
-    // merely because the user opened or refreshed the page.
-    if (wasDocked && !docked) {
-      setShowUndockTransition(true);
-    } else if (docked) {
-      setShowUndockTransition(false);
-    }
-    previousDockedRef.current = docked;
-  }, [docked]);
+  // Presentation-only transition; mounting with an undocked rover does not animate.
+  if (previousDocked !== docked) {
+    setPreviousDocked(docked);
+    setShowUndockTransition(!docked);
+  }
 
-  const startDriving = async (action) => {
+  const startDriving = () => {
     if (!roverId || pending || !canControl) return;
-    setPendingAction(action);
-    setError('');
-    try {
-      // The established drive sequence is the canonical undock path: it restores the camera,
-      // enters full Open Interface mode, and performs the short physical back-away from the dock.
-      dockAssist.exitAssist();
-      actions.setMode('drive');
-      await actions.runMacro('drive-sequence');
-    } catch (caughtError) {
-      setError(caughtError?.message || 'Unable to start driving. Please try again.');
-    } finally {
-      setPendingAction(null);
-    }
+    actions.undock();
   };
-
-  const startUndocking = () => {
-    startDriving('undocking');
-  };
-  const resumeDriving = () => {
-    startDriving('resuming');
-  };
-
   const startDocking = () => {
     if (!roverId || pending || !canControl) return;
-    setError('');
-    try {
-      // Enter on the first click. The explanation appears as the resulting active state instead
-      // of forcing the user through a modal and a second confirmation action.
-      dockAssist.enterAssist();
-    } catch (caughtError) {
-      setError(caughtError?.message || 'Unable to start dock assist. Please try again.');
-    }
+    actions.sendCommand('enterDocking');
   };
 
   return (
@@ -358,20 +320,20 @@ export default function DockingHud({ roverId }) {
           driveKeyLabel={driveKeyLabel}
           pending={pendingAction === 'undocking'}
           controlsDisabled={!canControl}
-          error={error}
-          onUndock={startUndocking}
+          error={dockTelemetry.dockingError}
+          onUndock={startDriving}
         />
       ) : autoDocking || pendingAction === 'resuming' ? (
         <AutoDockingAction
           driveKeyLabel={driveKeyLabel}
           pending={pendingAction === 'resuming'}
           controlsDisabled={!canControl}
-          error={error}
-          onResumeDriving={resumeDriving}
+          error={dockTelemetry.dockingError}
+          onResumeDriving={startDriving}
         />
       ) : (
         <>
-          {dockAssist.active ? (
+          {dockTelemetry.cameraLocked ? (
             /* Dock assist needs the unobscured camera image. A thin cyan frame communicates the
                 temporary mode without adding another instruction surface over the video. */
             <div className="pointer-events-none absolute inset-0 z-50 ring-8 ring-inset ring-cyan-200/90" aria-hidden="true" />
@@ -379,15 +341,15 @@ export default function DockingHud({ roverId }) {
           {/* Desktop keeps the compact corner entry point. Mobile starts assist from
               its dedicated control column, but once active it still mounts this component
               so the centered camera instruction and cancel action remain available. */}
-          {layout === 'desktop' || dockAssist.active ? (
+          {layout === 'desktop' || dockTelemetry.cameraLocked || dockTelemetry.dockingError ? (
             <DockAssistAction
-              active={dockAssist.active}
+              active={dockTelemetry.cameraLocked}
               pending={pending}
               controlsDisabled={!canControl}
-              error={error}
+              error={dockTelemetry.dockingError}
               dockKeyLabel={dockKeyLabel}
               onDock={startDocking}
-              onCancel={dockAssist.exitAssist}
+              onCancel={() => actions.sendCommand('cancelDocking')}
               cornerOffsetClass={cornerOffsetClass}
               open={dockExpansionOpen}
               onOpenChange={setDockExpansionOpen}

@@ -5,13 +5,12 @@ import { useSocket } from '../context/SocketContext.jsx';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 import {
   AUX_LIMITS,
-  COMMAND_DELAY_MS,
   OI_COMMANDS,
   SONG_DEFAULT_DURATION,
   SONG_DEFAULT_NOTE,
   SONG_NOTE_RANGE,
 } from './constants.js';
-import { bytesToBase64, clampRange, sleep } from './controlMath.js';
+import { bytesToBase64, clampRange } from './controlMath.js';
 
 export function useCommandPipeline(options = {}) {
   const { driveTransform, auxTransform } = options;
@@ -53,8 +52,17 @@ export function useCommandPipeline(options = {}) {
   const laserState = useMemo(() => rosterEntry?.laser?.state ?? null, [rosterEntry]);
   const emitCommand = useCallback(
     (payload, cb) => {
-      if (!roverId) return;
-      socket.emit('command', { roverId, ...payload }, cb);
+      if (!roverId || !socket.connected) {
+        cb?.({ error: 'Rover control connection unavailable' });
+        return;
+      }
+      if (cb) {
+        socket.timeout(5000).emit('command', { roverId, ...payload }, (error, result) => {
+          cb(error ? { error: 'Rover command acknowledgement timed out' } : result);
+        });
+      } else {
+        socket.emit('command', { roverId, ...payload });
+      }
     },
     [socket, roverId],
   );
@@ -140,41 +148,6 @@ export function useCommandPipeline(options = {}) {
       return true;
     },
     [emitCommand, enableSensorStream, roverId],
-  );
-
-  const runMacroSteps = useCallback(
-    async (macro) => {
-      if (!macro || !Array.isArray(macro.steps) || !roverId) return;
-      for (const step of macro.steps) {
-        if (!roverId) break;
-        switch (step.type) {
-          case 'oi':
-            sendOiCommand(step.command);
-            break;
-          case 'drive':
-            sendDriveDirect(step.speeds ?? { left: 0, right: 0 });
-            break;
-          case 'motors':
-            sendAuxMotors(step.values ?? {});
-            break;
-          case 'servo':
-            sendServoAngle(step.angle);
-            break;
-          case 'pause':
-            await sleep(step.duration ?? COMMAND_DELAY_MS); // eslint-disable-line no-await-in-loop
-            break;
-          default:
-            break;
-        }
-        if (step.delay || step.delayMs) {
-          const delay = step.delayMs ?? step.delay;
-          if (typeof delay === 'number' && delay > 0) {
-            await sleep(delay); // eslint-disable-line no-await-in-loop
-          }
-        }
-      }
-    },
-    [roverId, sendOiCommand, sendDriveDirect, sendAuxMotors, sendServoAngle],
   );
 
   const sendHeadlight = useCallback(
@@ -277,7 +250,6 @@ export function useCommandPipeline(options = {}) {
       sendHorn,
       sendPeripheralControl,
       sendSong,
-      runMacroSteps,
     }),
     [
       roverId,
@@ -300,7 +272,6 @@ export function useCommandPipeline(options = {}) {
       sendHorn,
       sendPeripheralControl,
       sendSong,
-      runMacroSteps,
     ],
   );
 }
