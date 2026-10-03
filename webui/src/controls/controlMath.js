@@ -55,7 +55,3 @@ export function bytesToBase64(bytes) {
   }
   throw new Error('No base64 encoder available');
 }
-
-export function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

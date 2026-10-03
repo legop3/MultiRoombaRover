@@ -17,13 +17,11 @@ import { computeDifferentialSpeeds, clamp } from './controlMath.js';
 import { useCommandPipeline } from './commandPipeline.js';
 import {
   DEFAULT_KEYMAP,
-  DEFAULT_MACROS,
   HORN_HEAT_COOL_PER_SEC,
   HORN_HEAT_RESUME_THRESHOLD,
   HORN_HEAT_UP_PER_SEC,
   HORN_MAX_FREQUENCY,
   HORN_MAX_MS,
-  MANUAL_DOCK_ASSIST_MAX_SPEED,
   SONG_DEFAULT_NOTE,
 } from './constants.js';
 import { canonicalizeKeyInput } from './keymapUtils.js';
@@ -32,6 +30,8 @@ import { useSessionActions, useSessionSelector } from '../context/SessionContext
 import { HORN_SETTINGS_DEFAULTS } from '../settings/namespaces.js';
 import { useOvercurrentLimiter } from './overcurrentLimiter.js';
 import { usePtzControlAdapter } from './ptzControlAdapter.js';
+import { useTelemetrySelector } from '../context/TelemetryContext.jsx';
+import { selectDockTelemetry, dockTelemetryEqual } from '../context/telemetryViews.js';
 import { trackAnalyticsEvent } from '../analytics/index.js';
 
 const ControlSystemContext = createContext(null);
@@ -49,7 +49,8 @@ const CONTROL_ACTION_NAMES = [
   'setCameraAxisIntent',
   'goServoHome',
   'setCameraPrecisionMode',
-  'runMacro',
+  'undock',
+  'sendCommand',
   'stopAllMotion',
   'sendOiCommand',
   'setSensorStream',
@@ -60,8 +61,6 @@ const CONTROL_ACTION_NAMES = [
   'updateKeyBinding',
   'resetKeyBindings',
   'registerInputState',
-  'setManualDockAssistActive',
-  'toggleManualDockAssist',
   'setSongNote',
   'sendSong',
   'startHorn',
@@ -81,23 +80,6 @@ function clampServoAngle(config, value) {
   const min = typeof config.minAngle === 'number' ? config.minAngle : -45;
   const max = typeof config.maxAngle === 'number' ? config.maxAngle : 45;
   return clamp(value, min, max);
-}
-
-function removeDriveSequenceBackoff(steps = []) {
-  if (!Array.isArray(steps) || steps.length < 3) return steps;
-  const last3 = steps.slice(-3);
-  const [backoffStep, pauseStep, stopStep] = last3;
-  const isBackoffStep =
-    backoffStep?.type === 'drive' &&
-    Number(backoffStep?.speeds?.left) === -300 &&
-    Number(backoffStep?.speeds?.right) === -300;
-  const isPauseStep = pauseStep?.type === 'pause' && Number(pauseStep?.duration) === 600;
-  const isStopStep =
-    stopStep?.type === 'drive' &&
-    Number(stopStep?.speeds?.left) === 0 &&
-    Number(stopStep?.speeds?.right) === 0;
-  if (!isBackoffStep || !isPauseStep || !isStopStep) return steps;
-  return steps.slice(0, -3);
 }
 
 export function ControlSystemProvider({ children }) {
@@ -158,7 +140,7 @@ export function ControlSystemProvider({ children }) {
   const {
     value: controlSettings,
     save: saveControlSettings,
-  } = useSettingsNamespace('controls', { keymap: DEFAULT_KEYMAP, macros: DEFAULT_MACROS });
+  } = useSettingsNamespace('controls', { keymap: DEFAULT_KEYMAP });
   const { value: pageSettings } = useSettingsNamespace('page', { driveMacroBackoffEnabled: true });
   const { value: hornSettings } = useSettingsNamespace('horn', HORN_SETTINGS_DEFAULTS);
   const driveMacroBackoffEnabled =
@@ -166,6 +148,8 @@ export function ControlSystemProvider({ children }) {
       ? pageSettings.driveMacroBackoffEnabled
       : true;
   const roverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
+  const cameraLocked = Boolean(dockTelemetry.cameraLocked);
   const homeAssistantEntities = useSessionSelector((state) => state.session?.homeAssistant?.entities ?? []);
   const roomLightsLocked = useSessionSelector((state) =>
     Boolean(state.session?.homeAssistant?.lightPolicy?.locked || state.session?.homeAssistant?.lightPolicy?.lockedOn),
@@ -238,10 +222,7 @@ export function ControlSystemProvider({ children }) {
   useEffect(() => {
     const mergedKeymap = { ...DEFAULT_KEYMAP, ...(controlSettings?.keymap || {}) };
     dispatch({ type: 'control/set-keymap', payload: mergedKeymap });
-    if (controlSettings?.macros) {
-      dispatch({ type: 'control/set-macros', payload: controlSettings.macros });
-    }
-  }, [controlSettings?.keymap, controlSettings?.macros]);
+  }, [controlSettings?.keymap]);
 
   useEffect(() => {
     const config = pipeline.servoConfig;
@@ -268,11 +249,10 @@ export function ControlSystemProvider({ children }) {
       typeof state.camera.angle === 'number' ? state.camera.angle : servoAngleRef.current;
   }, [state.camera.angle]);
 
+  const { enableSensorStream } = pipeline;
   useEffect(() => {
-    if (pipeline.roverId) {
-      pipeline.enableSensorStream();
-    }
-  }, [pipeline.roverId, pipeline.enableSensorStream]);
+    if (roverId) enableSensorStream();
+  }, [roverId, enableSensorStream]);
 
   const setMode = useCallback(
     (mode) => {
@@ -295,21 +275,6 @@ export function ControlSystemProvider({ children }) {
   const setDriveVector = useCallback(
     (vector, meta = {}) => {
       const speedOptions = { ...(meta.speedOptions || {}) };
-      if (state.manualDockAssist?.active) {
-        const capped = Math.max(1, Math.min(MANUAL_DOCK_ASSIST_MAX_SPEED, 500));
-        speedOptions.maxSpeed = Math.min(
-          typeof speedOptions.maxSpeed === 'number' ? speedOptions.maxSpeed : capped,
-          capped,
-        );
-        speedOptions.baseSpeed = Math.min(
-          typeof speedOptions.baseSpeed === 'number' ? speedOptions.baseSpeed : capped,
-          capped,
-        );
-        speedOptions.boostSpeed = Math.min(
-          typeof speedOptions.boostSpeed === 'number' ? speedOptions.boostSpeed : capped,
-          capped,
-        );
-      }
       const computed = computeDifferentialSpeeds(vector, speedOptions);
       const isMoving = computed.speeds.left !== 0 || computed.speeds.right !== 0;
       if (pipeline.roverId && isMoving && driveEngagementRoverRef.current !== pipeline.roverId) {
@@ -327,7 +292,7 @@ export function ControlSystemProvider({ children }) {
       if (ptzControls.applyDriveVector(vector, meta)) return;
       pipeline.sendDriveDirect(computed.speeds);
     },
-    [pipeline, ptzControls, recordControlIntent, state.manualDockAssist?.active],
+    [pipeline, ptzControls, recordControlIntent],
   );
 
   const setAuxMotors = useCallback(
@@ -369,23 +334,22 @@ export function ControlSystemProvider({ children }) {
   }, [saveControlSettings]);
 
   const setServoAngle = useCallback(
-    (value, options = {}) => {
+    (value) => {
       /*
         Absolute servo positions belong only to rover hardware. PTZ zoom now
         enters through setCameraAxisIntent as a signed held velocity, so this
         function must not infer zoom direction by comparing unrelated absolute
-        angle values from gamepad/manual-dock callers.
+        angle values from camera controls.
       */
       if (!pipeline.servoConfig) return;
-      const force = Boolean(options?.force);
-      if (state.manualDockAssist?.active && !force) return;
+      if (cameraLocked) return;
       const clamped = clampServoAngle(pipeline.servoConfig, value);
       dispatch({ type: 'control/set-camera-angle', payload: clamped });
       pipeline.sendServoAngle(clamped);
       servoAngleRef.current = clamped;
       recordControlIntent();
     },
-    [pipeline, recordControlIntent, state.manualDockAssist?.active],
+    [pipeline, recordControlIntent, cameraLocked],
   );
 
   const nudgeServo = useCallback(
@@ -457,35 +421,19 @@ export function ControlSystemProvider({ children }) {
     dispatch({ type: 'control/set-camera-precision-mode', payload: Boolean(active) });
   }, []);
 
-  const runMacro = useCallback(
-    async (macroId) => {
-      const macro = state.macros.find((item) => item.id === macroId) || null;
-      if (!macro) return;
-      let macroToRun = macro;
-      if (macroId === 'drive-sequence') {
-        turnOnAllLights();
-        if (!homeAssistantEntities?.length) {
-          pendingLightsRef.current = true;
-        }
-        recordControlIntent();
-        if (!driveMacroBackoffEnabled) {
-          macroToRun = {
-            ...macro,
-            steps: removeDriveSequenceBackoff(macro.steps),
-          };
-        }
-      }
-      await pipeline.runMacroSteps(macroToRun);
-    },
-    [
-      driveMacroBackoffEnabled,
-      pipeline,
-      recordControlIntent,
-      homeAssistantEntities,
-      state.macros,
-      turnOnAllLights,
-    ],
-  );
+  const sendCommand = useCallback((type, data = {}) => {
+    recordControlIntent();
+    pipeline.emitCommand({ type, data }, (result) => {
+      if (result?.error) alert(result.error);
+    });
+  }, [pipeline, recordControlIntent]);
+
+  const undock = useCallback(() => {
+    dispatch({ type: 'control/set-mode', payload: 'drive' });
+    turnOnAllLights();
+    if (!homeAssistantEntities?.length) pendingLightsRef.current = true;
+    sendCommand('undock', { backoff: driveMacroBackoffEnabled });
+  }, [driveMacroBackoffEnabled, homeAssistantEntities, turnOnAllLights, sendCommand]);
 
   const stopAllMotion = useCallback(() => {
     dispatch({
@@ -691,32 +639,6 @@ export function ControlSystemProvider({ children }) {
     return () => clearInterval(interval);
   }, [dispatch, hornNeedsTick]);
 
-  const setManualDockAssistActive = useCallback(
-    (active) => {
-      const nextActive = Boolean(active);
-      const prevActive = Boolean(state.manualDockAssist?.active);
-      if (prevActive === nextActive) return;
-      dispatch({ type: 'control/set-manual-dock-assist', payload: nextActive });
-      if (!nextActive) {
-        pipeline.sendSong([{ note: 83, duration: 10 }, { note: 76, duration: 10 }], { slot: 0 });
-        setServoAngle(0, { force: true });
-        return;
-      }
-      const minAngle =
-        typeof pipeline.servoConfig?.minAngle === 'number'
-          ? pipeline.servoConfig.minAngle
-          : -45;
-      setServoAngle(minAngle, { force: true });
-      pipeline.sendSong([{ note: 76, duration: 10 }, { note: 83, duration: 10 }], { slot: 0 });
-      recordControlIntent();
-    },
-    [pipeline, recordControlIntent, setServoAngle, state.manualDockAssist?.active],
-  );
-
-  const toggleManualDockAssist = useCallback(() => {
-    setManualDockAssistActive(!state.manualDockAssist?.active);
-  }, [setManualDockAssistActive, state.manualDockAssist?.active]);
-
   const registerInputState = useCallback((source, data) => {
     dispatch({ type: 'control/register-input-state', payload: { source, state: data } });
   }, []);
@@ -758,7 +680,8 @@ export function ControlSystemProvider({ children }) {
       setCameraAxisIntent,
       goServoHome,
       setCameraPrecisionMode,
-      runMacro,
+      undock,
+      sendCommand,
       stopAllMotion,
       sendOiCommand,
       setSensorStream,
@@ -769,8 +692,6 @@ export function ControlSystemProvider({ children }) {
       updateKeyBinding,
       resetKeyBindings,
       registerInputState,
-      setManualDockAssistActive,
-      toggleManualDockAssist,
       setSongNote,
       sendSong,
       startHorn,
@@ -787,7 +708,8 @@ export function ControlSystemProvider({ children }) {
       setCameraAxisIntent,
       goServoHome,
       setCameraPrecisionMode,
-      runMacro,
+      undock,
+      sendCommand,
       stopAllMotion,
       sendOiCommand,
       setSensorStream,
@@ -798,8 +720,6 @@ export function ControlSystemProvider({ children }) {
       updateKeyBinding,
       resetKeyBindings,
       registerInputState,
-      setManualDockAssistActive,
-      toggleManualDockAssist,
       setSongNote,
       sendSong,
       startHorn,

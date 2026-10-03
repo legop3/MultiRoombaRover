@@ -389,6 +389,10 @@ function createSensorPipeline(deps) {
 
   function evaluateDockGuard(record, sensors) {
     if (!record || !sensors) return;
+    if (sensors.docking?.phase === 'undocking' || sensors.docking?.phase === 'assisting') {
+      stopDockGuard(record.id);
+      return;
+    }
     const state = getDockGuardState(record.id);
     const now = Date.now();
     const docked = Boolean(sensors?.chargingSources?.homeBase);
@@ -564,6 +568,10 @@ function createSensorPipeline(deps) {
       };
       record.lastSensor = { raw: frame, decoded };
     }
+    if (decoded) {
+      decoded = { ...decoded, docking: require('../dockingService').processTelemetry(record, decoded) };
+      record.lastSensor = { raw: frame, decoded };
+    }
     /*
       Rover manager remains responsible only for decoding and routing sensor
       frames. The dedicated service receives the completed sensor object after
@@ -577,6 +585,7 @@ function createSensorPipeline(deps) {
     const overcurrentProtection = decoded && typeof processOvercurrentTelemetry === 'function'
       ? processOvercurrentTelemetry(roverId, decoded)
       : null;
+    record.lastOvercurrentProtection = overcurrentProtection;
     updateMovement(record, decoded);
     const hasDockInfo = decoded?.chargingSources != null;
     if (hasDockInfo) {
@@ -589,6 +598,10 @@ function createSensorPipeline(deps) {
     if (bumps?.bumpLeft || bumps?.bumpRight) record.lastBumpAt = Date.now();
     handlePrivateButtonHold(record, decoded);
     evaluatePrivateSafety(record, decoded);
+    if (decoded) {
+      decoded = { ...decoded, docking: require('../dockingService').snapshot(record) };
+      record.lastSensor = { raw: frame, decoded };
+    }
     io.to(record.room).volatile.emit('sensorFrame', {
       roverId,
       frame,

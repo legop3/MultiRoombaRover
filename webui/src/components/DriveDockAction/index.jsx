@@ -1,13 +1,12 @@
 // Drive Dock Action
 // Purpose: Defines the Drive Dock Action module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import '../MobileControls/mobileControls.css';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
 import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
 import ControlHint from '../ControlHint/index.jsx';
-import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import { deriveDriveDockStateFromTelemetry } from './driveDockState.js';
 import { triggerTouchHaptic } from '../../lib/touchHaptics.js';
 
@@ -91,14 +90,13 @@ export default function DriveDockAction({
   const isMobile = layout === 'mobile';
   const roverId = useControlSelector((control) => control.state.roverId);
   const actions = useControlActions();
-  const dockAssist = useManualDockAssist();
   const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
   const state = driveDockState ?? deriveDriveDockStateFromTelemetry(dockTelemetry);
   const { driving, docked, charging, dockingInProgress } = state;
-  const [pending, setPending] = useState(null);
+  const pending = dockTelemetry.dockingPhase === 'undocking' ? 'drive' : null;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const manualAssistActive = Boolean(dockAssist.active);
+  const manualAssistActive = Boolean(dockTelemetry.cameraLocked);
 
   const driveDisabled = !roverId || pending !== null;
   const dockDisabled = !roverId || pending !== null;
@@ -124,63 +122,36 @@ export default function DriveDockAction({
   const chargeValue = charging ? 'Charging' : docked ? 'Charging soon...' : '—';
   const chargeTone = charging ? 'good' : docked ? 'warn' : 'bad';
 
-  const handleReturnToDrive = async () => {
-    if (!roverId || pending) return;
-    if (isMobile) triggerTouchHaptic('button');
-    setPending('drive');
-    try {
-      dockAssist.exitAssist();
-      actions.setMode('drive');
-      await actions.runMacro('drive-sequence');
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setPending(null);
-    }
-  };
-
-  const handleStartDrive = async () => {
+  const handleStartDrive = () => {
     if (!roverId || pending) return;
     if (isMobile) triggerTouchHaptic('button');
     setConfirmOpen(false);
     setShowModal(false);
-    setPending('drive');
-    try {
-      dockAssist.exitAssist();
-      actions.setMode('drive');
-      await actions.runMacro('drive-sequence');
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setPending(null);
-    }
+    actions.undock();
   };
 
-  const handleConfirmDock = async () => {
+  const handleConfirmDock = () => {
     if (!roverId || pending) return;
     if (isMobile) triggerTouchHaptic('button');
-    setPending('dock');
-    try {
-      dockAssist.enterAssist();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setPending(null);
-      setConfirmOpen(false);
-      setShowModal(false);
-    }
+    actions.sendCommand('enterDocking');
+    setConfirmOpen(false);
+    setShowModal(false);
   };
 
   const handleOpenDock = () => {
     if (dockDisabled) return;
     if (isMobile) triggerTouchHaptic('button');
     if (manualAssistActive) {
-      dockAssist.exitAssist();
+      actions.sendCommand('cancelDocking');
       return;
     }
     setShowModal(true);
     setConfirmOpen(true);
   };
+
+  useEffect(() => {
+    if (dockTelemetry.dockingError) alert(dockTelemetry.dockingError);
+  }, [dockTelemetry.dockingError]);
 
   // The drive/dock card appears inside the mobile controls and can be held or
   // tapped repeatedly; attach mobile touch suppression directly to the card so
@@ -254,7 +225,7 @@ export default function DriveDockAction({
       <button
         type="button"
         disabled={driveDisabled}
-        onClick={handleReturnToDrive}
+        onClick={handleStartDrive}
         onContextMenu={(event) => event.preventDefault()}
         className={`${baseCardClasses} ${filledHeight} ${compactHeight} ${ctaText} ${layoutClass} ${ctaSize} ${amberCta}`}
       >

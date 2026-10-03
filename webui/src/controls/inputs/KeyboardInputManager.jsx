@@ -1,3 +1,5 @@
+import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
+import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
 // Keyboard Input Manager
 // Purpose: Captures and translates keyboard events into normalized control intents. Scope: Owns keydown/keyup listeners and dispatch coordination for drive controls.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
@@ -10,7 +12,6 @@ import { markKeyboardInputActive } from './controllerRuntime.js';
 import { isTextInputElement } from './inputFocusUtils.js';
 import { useSettingsNamespace } from '../../settings/index.js';
 import { INPUT_SETTINGS_DEFAULTS, VIDEO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
-import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import {
   SONG_DEFAULT_DURATION,
   SONG_DEFAULT_NOTE,
@@ -86,12 +87,12 @@ function shouldIgnoreEvent(event) {
 
 export default function KeyboardInputManager() {
   const {
-    setMode,
     setDriveVector,
     setAuxMotors,
     nudgeServo,
     setCameraAxisIntent,
-    runMacro,
+    undock,
+    sendCommand,
     stopAllMotion,
     registerInputState,
     setCameraPrecisionMode,
@@ -107,12 +108,12 @@ export default function KeyboardInputManager() {
   const cameraNudgeDegrees = useControlSelector((control) => control.state.camera?.config?.nudgeDegrees);
   const songNote = useControlSelector((control) => control.state.song?.note);
   const roverId = useControlSelector((control) => control.state.roverId);
+  const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
   const hornActive = useControlSelector((control) => Boolean(control.state.horn?.active));
   const homeAssistant = useSessionSelector((state) => state.session?.homeAssistant || null);
   const role = useSessionSelector((state) => state.session?.role || null);
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const adminCanControlLockedLights = role === 'lockdown' || (role === 'admin' && mode !== 'lockdown');
-  const dockAssist = useManualDockAssist();
   const { homeAssistantSetState, pushAlert } = useSessionActions();
   const { focusChat } = useChatActions();
   const { isChatFocused } = useChatFocus();
@@ -386,7 +387,7 @@ export default function KeyboardInputManager() {
     // before the browser can deliver the next keyboard event after a committed render.
     latestRef.current = {
       actionTokens,
-      dockAssist,
+      dockTelemetry,
       focusChat,
       homeAssistant,
       homeAssistantSetState,
@@ -398,7 +399,8 @@ export default function KeyboardInputManager() {
       pushAlert,
       registerInputState,
       roverId,
-      runMacro,
+      undock,
+      sendCommand,
       saveVideoSettings,
       sendSong,
       servoRepeatMs,
@@ -408,8 +410,7 @@ export default function KeyboardInputManager() {
       setCameraPrecisionMode,
       setDriveVector,
       setMicPttActive,
-      setMode,
-      setSongNote,
+        setSongNote,
       songNote,
       startHorn,
       stopAllMotion,
@@ -452,11 +453,9 @@ export default function KeyboardInputManager() {
 
       if (newlyPressed.length > 0) {
         if (newlyPressed.some((token) => latest.keymap.driveMacro?.has(token))) {
-          latest.dockAssist.exitAssist();
-          latest.setMode('drive');
-          latest.runMacro('drive-sequence');
+          latest.undock();
         } else if (newlyPressed.some((token) => latest.keymap.dockMacro?.has(token))) {
-          latest.dockAssist.toggleAssist();
+          latest.sendCommand(latest.dockTelemetry.cameraLocked ? 'cancelDocking' : 'enterDocking');
         } else if (newlyPressed.some((token) => latest.keymap.headlightToggle?.has(token))) {
           latest.toggleHeadlight();
         } else if (newlyPressed.some((token) => latest.keymap.laserToggle?.has(token))) {

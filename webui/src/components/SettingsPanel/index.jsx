@@ -411,7 +411,7 @@ export default function SettingsPanel() {
                 <span className="font-semibold text-white">Swap control columns (put joystick on the left)</span>
               </SettingRow>
             </CardFrame>
-            <CardFrame title="Macros" bodyClassName="space-y-1 p-1 text-sm">
+            <CardFrame title="Driving" bodyClassName="space-y-1 p-1 text-sm">
               <SettingRow inline>
                 <input
                   type="checkbox"
@@ -419,7 +419,7 @@ export default function SettingsPanel() {
                   checked={driveMacroBackoffEnabled}
                   onChange={handleDriveMacroBackoffEnabled}
                 />
-                <span className="font-semibold text-white">Enable backward bump in drive macro</span>
+                <span className="font-semibold text-white">Back away from the dock when undocking</span>
               </SettingRow>
             </CardFrame>
             <CardFrame title="Audio" className="col-span-full" bodyClassName="space-y-1 p-1 text-sm">

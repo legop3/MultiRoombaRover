@@ -7,7 +7,6 @@ import './mobileControls.css';
 import { useControlActions, useControlSelector } from '../../controls/index.js';
 import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
 import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetryViews.js';
-import { useManualDockAssist } from '../../features/manualDockAssist/useManualDockAssist.js';
 import useCanControlRover from '../../hooks/useCanControlRover.js';
 import HornControl from '../HornControl/index.jsx';
 import GPIOToggleControl from '../GPIOToggleControl/index.jsx';
@@ -33,7 +32,6 @@ function AuxColumnContent({ accessoriesAvailable, onShowAccessories }) {
   const laserState = useControlSelector((control) => control.pipeline?.laserState);
   const pipelineHorn = useControlSelector((control) => control.pipeline?.horn);
   const { setServoAngle, setHeadlight, setLaser, setAuxMotors, startHorn, stopHorn } = useControlActions();
-  const dockAssist = useManualDockAssist();
   const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
   const canControl = useCanControlRover(roverId);
   // Turn ownership is the common mutation boundary for every control in this
@@ -44,7 +42,8 @@ function AuxColumnContent({ accessoriesAvailable, onShowAccessories }) {
   const drivingMode = String(dockTelemetry?.oiModeLabel || '').toLowerCase() === 'full';
   const vacuumDisabled = controlsDisabled
     || docked
-    || (!drivingMode && !dockAssist.active);
+    || dockTelemetry.movementLocked
+    || (!drivingMode && !dockTelemetry.cameraLocked);
   const activeAuxButtonRef = useRef(null);
   const cameraConfig = camera?.config;
   const cameraEnabled = Boolean(roverId && camera?.enabled && cameraConfig);
@@ -60,7 +59,7 @@ function AuxColumnContent({ accessoriesAvailable, onShowAccessories }) {
       : typeof cameraConfig?.homeAngle === 'number'
         ? cameraConfig.homeAngle
         : (cameraMin + cameraMax) / 2;
-  const cameraDisabled = Boolean(controlsDisabled || dockAssist.cameraLocked);
+  const cameraDisabled = Boolean(controlsDisabled || dockTelemetry.cameraLocked);
   /*
     The mobile tilt track shares the same precision flag as desktop tilt. This
     keeps the servo fine-step behavior tied to the selected movement mode rather

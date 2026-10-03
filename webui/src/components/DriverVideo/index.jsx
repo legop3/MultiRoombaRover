@@ -48,7 +48,7 @@ export default function DriverVideo({ layoutFormat = 'desktop' }) {
             mobileHud={mobileHud}
             labelScale={1}
           />
-          <ManualDockAssistOverlay mobileHud={mobileHud} />
+          <ManualDockAssistOverlay roverId={roverId} mobileHud={mobileHud} />
           <HudChatInput compact={mobileHud} />
           <OvercurrentOverlay compact={mobileHud} />
           <LowBatteryOverlay compact={mobileHud} />

@@ -12,10 +12,6 @@ export const DRIVE_LIMITS = {
   boostSpeed: 400,
 };
 
-export const MANUAL_DOCK_ASSIST_MAX_SPEED = 60;
-
-export const COMMAND_DELAY_MS = 100;
-
 export const SONG_NOTE_RANGE = [31, 127];
 export const SONG_DEFAULT_NOTE = 60;
 export const SONG_DEFAULT_DURATION = 8;
@@ -64,23 +60,3 @@ export const DEFAULT_KEYMAP = {
   homeAssistantOn: ['ArrowRight'],
   homeAssistantOff: ['ArrowLeft'],
 };
-
-export const DEFAULT_MACROS = [
-  {
-    id: 'drive-sequence',
-    label: 'Drive',
-    description: 'Start, undock, and full command sequence used by the drive button.',
-    steps: [
-      { type: 'servo', angle: 0 },
-      { type: 'oi', command: 'start' },
-      { type: 'pause', duration: COMMAND_DELAY_MS },
-      { type: 'oi', command: 'dock' },
-      { type: 'pause', duration: COMMAND_DELAY_MS },
-      { type: 'oi', command: 'full' },
-      { type: 'pause', duration: 300 },
-      { type: 'drive', speeds: { left: -300, right: -300 } },
-      { type: 'pause', duration: 600 },
-      { type: 'drive', speeds: { left: 0, right: 0 } },
-    ],
-  },
-];

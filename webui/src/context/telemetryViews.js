@@ -11,6 +11,10 @@ const EMPTY_BATTERY_TELEMETRY = Object.freeze({
 });
 
 const EMPTY_DOCK_TELEMETRY = Object.freeze({
+  dockingPhase: 'idle',
+  movementLocked: true,
+  cameraLocked: false,
+  dockingError: '',
   oiModeLabel: 'Unknown',
   chargingStateLabel: '',
   homeBase: false,
@@ -127,6 +131,10 @@ export function selectDockTelemetry(frame) {
   const sensors = frame?.sensors;
   if (!sensors) return EMPTY_DOCK_TELEMETRY;
   return {
+    dockingPhase: sensors.docking?.phase || 'idle',
+    movementLocked: sensors.docking?.movementLocked ?? true,
+    cameraLocked: Boolean(sensors.docking?.cameraLocked),
+    dockingError: sensors.docking?.error?.message || '',
     oiModeLabel: sensors.oiMode?.label || 'Unknown',
     chargingStateLabel: sensors.chargingState?.label || '',
     // OI packet 34 is the authoritative charging-sources packet. Charging

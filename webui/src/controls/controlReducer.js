@@ -1,6 +1,6 @@
 // Control State Reducer
 // Purpose: Implements reducer transitions for control-system runtime state. Scope: Centralizes deterministic state updates for input, mode, and dispatch events.
-import { DEFAULT_KEYMAP, DEFAULT_MACROS, SONG_DEFAULT_NOTE } from './constants.js';
+import { DEFAULT_KEYMAP, SONG_DEFAULT_NOTE } from './constants.js';
 
 function createDriveState() {
   return {
@@ -49,12 +49,6 @@ function createMicState() {
   };
 }
 
-function createManualDockAssistState() {
-  return {
-    active: false,
-  };
-}
-
 export const initialControlState = {
   roverId: null,
   mode: 'drive',
@@ -64,9 +58,7 @@ export const initialControlState = {
   song: createSongState(),
   horn: createHornState(),
   mic: createMicState(),
-  manualDockAssist: createManualDockAssistState(),
   lastControlIntentAt: 0,
-  macros: DEFAULT_MACROS,
   keymap: DEFAULT_KEYMAP,
   inputs: {},
   // Generic accessory controls do not currently report state back from roverd.
@@ -86,7 +78,6 @@ export function controlReducer(state, action) {
         song: action.payload ? state.song : createSongState(),
         horn: action.payload ? state.horn : createHornState(),
         mic: action.payload ? state.mic : createMicState(),
-        manualDockAssist: action.payload ? state.manualDockAssist : createManualDockAssistState(),
         lastControlIntentAt: action.payload ? state.lastControlIntentAt : 0,
       };
     case 'control/set-mode':
@@ -169,11 +160,6 @@ export function controlReducer(state, action) {
         ...state,
         keymap: { ...state.keymap, ...(action.payload ?? {}) },
       };
-    case 'control/set-macros':
-      return {
-        ...state,
-        macros: Array.isArray(action.payload) ? action.payload : state.macros,
-      };
     case 'control/reset':
       return {
         ...state,
@@ -220,14 +206,6 @@ export function controlReducer(state, action) {
         mic: {
           ...(state.mic || createMicState()),
           pttActive: Boolean(action.payload),
-        },
-      };
-    case 'control/set-manual-dock-assist':
-      return {
-        ...state,
-        manualDockAssist: {
-          ...(state.manualDockAssist || createManualDockAssistState()),
-          active: Boolean(action.payload),
         },
       };
     case 'control/set-peripheral-value': {

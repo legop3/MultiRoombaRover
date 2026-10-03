@@ -11,10 +11,10 @@ export function deriveDriveDockStateFromTelemetry(dockTelemetry) {
   const oiNormalized = oiLabel.toLowerCase();
   const chargingLabel = dockTelemetry?.chargingStateLabel || '';
   const docked = Boolean(dockTelemetry?.homeBase);
-  const charging = docked && chargingLabel.toLowerCase() !== 'not charging' && chargingLabel !== '';
-  const driving = oiNormalized === 'full';
+  const charging = dockTelemetry?.dockingPhase === 'charging';
+  const driving = oiNormalized === 'full' && !dockTelemetry?.movementLocked;
   const dockedNotCharging = docked && !charging;
-  const dockingInProgress = !docked && !charging && oiNormalized === 'passive';
+  const dockingInProgress = !docked && !charging && oiNormalized === 'passive' && dockTelemetry?.dockingPhase !== 'undocking';
   return { driving, docked, charging, dockedNotCharging, dockingInProgress, oiLabel, chargingLabel };
 }
 

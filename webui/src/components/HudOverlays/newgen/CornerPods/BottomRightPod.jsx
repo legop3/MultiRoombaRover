@@ -1,3 +1,5 @@
+import { useTelemetrySelector } from '../../../../context/TelemetryContext.jsx';
+import { selectDockTelemetry, dockTelemetryEqual } from '../../../../context/telemetryViews.js';
 // Bottom-right Corner Pod
 // Purpose: Provides a compact circular camera-tilt control using the existing servo command path.
 import { useCallback } from 'react';
@@ -31,7 +33,7 @@ export default function BottomRightPod({ roverId }) {
   const layout = useLayout();
   const [open, setOpen] = usePodVisibility('camera', true);
   const camera = useControlSelector((control) => control.state.camera);
-  const dockAssistActive = useControlSelector((control) => Boolean(control.state.manualDockAssist?.active));
+  const { cameraLocked } = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
   const { setServoAngle } = useControlActions();
   const canControl = useCanControlRover(roverId);
   const config = camera?.config;
@@ -47,7 +49,7 @@ export default function BottomRightPod({ roverId }) {
   const cameraPodOpen = showCameraControls && enabled && open;
 
   const updateFromPointer = useCallback((event) => {
-    if (!canControl || !enabled || dockAssistActive || !(max > min)) return;
+    if (!canControl || !enabled || cameraLocked || !(max > min)) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - bounds.left) / bounds.width) * 144;
     const y = ((event.clientY - bounds.top) / bounds.height) * 144;
@@ -64,7 +66,7 @@ export default function BottomRightPod({ roverId }) {
     }
     const nextFraction = arcDegrees / ARC_SWEEP_DEGREES;
     setServoAngle(min + nextFraction * (max - min));
-  }, [canControl, dockAssistActive, enabled, max, min, setServoAngle]);
+  }, [canControl, cameraLocked, enabled, max, min, setServoAngle]);
 
   return (
     <>

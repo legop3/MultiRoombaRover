@@ -4,12 +4,15 @@
 const logger = require('../../globals/logger').child('idleService');
 const io = require('../../globals/io');
 const { getRole, roleEvents } = require('../roleService');
+const { getMode, MODES, modeEvents } = require('../modeManager');
+const { isDeterred, verificationEvents } = require('../verificationService');
 const { IDLE_TIMEOUT_MS } = require('./constants');
 const { runtime } = require('./state');
 const { runIdleActions } = require('./actions');
 const activityControls = require('../homeAssistantActivitiesService');
 
 function getActivitySnapshot() {
+  const mode = getMode();
   let onlineUsers = 0;
   let onlineAdmins = 0;
   let onlineSpectators = 0;
@@ -29,12 +32,16 @@ function getActivitySnapshot() {
       return;
     }
 
-    /*
-      Lockdown admins are counted with regular admins because both represent a
-      person with operator-level access who may be supervising the room without
-      actively driving a rover. Plain users also count even before they request
-      control, which is the behavior this service now needs.
-    */
+
+    if (
+      isDeterred(socket)
+      || (mode === MODES.ADMIN && role !== 'admin' && role !== 'lockdown')
+      || (mode === MODES.LOCKDOWN && role !== 'lockdown')
+    ) {
+      onlineIgnored += 1;
+      return;
+    }
+
     if (role === 'admin' || role === 'lockdown') {
       onlineAdmins += 1;
       return;
@@ -90,7 +97,7 @@ function scheduleIdleTimer() {
     runtime.deadlineAt = null;
     const activity = getActivitySnapshot();
     if (activity.totalActive > 0) {
-      logger.info('Idle automation skipped; user or admin online', activity);
+      logger.info('Idle automation skipped; eligible operator online', activity);
       return;
     }
     runtime.lastTriggeredAt = Date.now();
@@ -114,18 +121,12 @@ function scheduleIdleTimer() {
 function refreshIdleState() {
   const activity = getActivitySnapshot();
   logger.info('Idle state refresh', activity);
-  // Share the exact idle presence policy; Activity Controls must not count spectators or invent a second role filter.
   activityControls.setOperatorsOnline(activity.totalActive > 0);
   if (activity.totalActive > 0) {
     clearIdleTimer();
     if (runtime.idleActionsCompleted) {
       logger.info('Idle action one-shot reset; operator is online again', activity);
     }
-    /*
-      A user/admin coming online starts a new activity window. When the room
-      later becomes idle again, the cleanup pipeline should be allowed to run
-      once for that new idle period.
-    */
     runtime.idleActionsCompleted = false;
     return;
   }
@@ -133,17 +134,13 @@ function refreshIdleState() {
 }
 
 io.on('connection', (socket) => {
-  /*
-    A user/admin can be online without ever touching rover controls, so socket
-    presence has to be a first-class idle signal. The disconnect hook is just as
-    important: it is what starts the idle timeout after the last non-spectator
-    leaves, even if no driving event happens around that departure.
-  */
   refreshIdleState();
   socket.on('disconnect', refreshIdleState);
 });
 
 roleEvents.on('change', refreshIdleState);
+modeEvents.on('change', refreshIdleState);
+verificationEvents.on('change', refreshIdleState);
 
 refreshIdleState();
 

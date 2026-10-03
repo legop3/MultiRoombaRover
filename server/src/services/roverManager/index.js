@@ -274,6 +274,7 @@ odometerService.odometerEvents.on('update', ({ roverId, odometer }) => {
 setInterval(tickPrivateAutoClose, PRIVATE_AUTO_CLOSE_TICK_MS);
 
 module.exports = {
+  stopDockGuard,
   upsertRover,
   removeRover,
   lockRover,
