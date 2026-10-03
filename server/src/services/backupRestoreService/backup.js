@@ -109,6 +109,7 @@ async function copyDurableTree(sourceDir, destinationDir, relativeDir = '') {
     const relativePath = path.join(relativeDir, entry.name);
     if (!relativeDir && EXCLUDED_TOP_LEVEL_NAMES.has(entry.name)) continue;
     if (!relativeDir && DATABASE_FILES.has(entry.name)) continue;
+    if (relativePath === path.join('rover-learning', 'recordings')) continue;
     if (entry.isSymbolicLink()) throw new Error(`Backup cannot include symbolic link: ${relativePath}`);
     if (entry.isDirectory()) {
       skipped.push(...await copyDurableTree(sourceDir, destinationDir, relativePath));
