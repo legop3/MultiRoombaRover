@@ -64,6 +64,7 @@ socket.on('connect', async () => {
 // previously stored session with this object instead of merging snapshots.
 socket.on('session:sync', (session) => {
   console.log('Session:', session);
+  console.log('Server mode:', session.mode);
 });
 
 // chat:init contains the recent chat history available when the bot connects.
@@ -104,6 +105,21 @@ Run it with:
 ```bash
 node bot.js
 ```
+
+## Reading server mode
+
+Read `session.mode` from the `session:sync` snapshot to get the current server
+mode. Its possible values are `open`, `turns`, `admin`, and `lockdown`.
+
+The server sends a fresh session snapshot whenever the mode changes, so the
+example's handler receives both the initial mode and subsequent updates. No
+polling or separate mode listener is needed. If your bot stores session data for
+its chat-handling logic, replace the stored session on every `session:sync` and
+read the mode from that latest snapshot.
+
+`session.mode` is the server-wide mode; `session.role` is this connection's role
+(such as `spectator`), and `session.operatingMode` is a separate connection field.
+Use `session.mode` when answering chat questions about the server's current mode.
 
 ## Events used
 

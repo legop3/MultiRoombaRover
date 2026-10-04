@@ -1,6 +1,6 @@
 // Restricted Container Lifecycle Controller
 // Purpose: Pulls and replaces only the fixed MultiRover application container through Docker's local API.
-// Scope: Runs as the private lifecycle Compose service; it exposes no TCP listener and accepts no caller-selected targets.
+// Scope: Runs as the private lifecycle Compose service; it exposes no TCP listener and accepts tags only within the deployment-configured repository.
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -9,6 +9,12 @@ const Docker = require('dockerode');
 const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 const TARGET_CONTAINER_NAME = 'multirover';
 const TARGET_IMAGE = process.env.MULTIROVER_TARGET_IMAGE || 'ghcr.io/legop3/multiroombarover:latest';
+// A registry port is not a tag separator. Strip a digest before splitting the tag.
+const configuredName = TARGET_IMAGE.split('@')[0];
+const tagSeparator = configuredName.lastIndexOf(':');
+const hasConfiguredTag = tagSeparator > configuredName.lastIndexOf('/');
+const IMAGE_REPOSITORY = hasConfiguredTag ? configuredName.slice(0, tagSeparator) : configuredName;
+const DEFAULT_TAG = TARGET_IMAGE.includes('@') ? null : (hasConfiguredTag ? configuredName.slice(tagSeparator + 1) : 'latest');
 const SOCKET_PATH = process.env.MULTIROVER_LIFECYCLE_SOCKET || '/run/multirover/lifecycle.sock';
 // Status belongs beside the controller's private socket instead of in the
 // application's data volume. The controller runs as root for Docker access;
@@ -20,6 +26,32 @@ const HEALTH_POLL_MS = 1000;
 
 let operationRunning = false;
 let status = readStatus();
+// A repository change in Compose invalidates the previous repository's selection.
+if (status.selectedRepository !== IMAGE_REPOSITORY) {
+  status.selectedRepository = IMAGE_REPOSITORY;
+  status.selectedTag = DEFAULT_TAG;
+}
+
+function selectedImage() {
+  return status.selectedTag ? `${IMAGE_REPOSITORY}:${status.selectedTag}` : TARGET_IMAGE;
+}
+
+function publicStatus() {
+  return {
+    ...status,
+    configuredImage: TARGET_IMAGE,
+    repository: IMAGE_REPOSITORY,
+    targetImage: selectedImage(),
+  };
+}
+
+function requestedImage(tag) {
+  if (tag === null) return { imageReference: selectedImage(), tag: status.selectedTag };
+  if (!/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$/.test(tag)) {
+    throw new Error('Enter a valid container tag (1–128 letters, numbers, underscores, periods, or hyphens).');
+  }
+  return { imageReference: `${IMAGE_REPOSITORY}:${tag}`, tag };
+}
 
 function readStatus() {
   try {
@@ -52,11 +84,12 @@ function readStatus() {
 }
 
 function writeStatus(patch) {
-  status = { ...status, ...patch };
+  const nextStatus = { ...status, ...patch };
   fs.mkdirSync(path.dirname(STATUS_PATH), { recursive: true });
   const temporaryPath = `${STATUS_PATH}.tmp`;
-  fs.writeFileSync(temporaryPath, `${JSON.stringify(status, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  fs.writeFileSync(temporaryPath, `${JSON.stringify(nextStatus, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
   fs.renameSync(temporaryPath, STATUS_PATH);
+  status = nextStatus;
   return status;
 }
 
@@ -68,23 +101,23 @@ async function inspectTargetContainer() {
   return docker.getContainer(TARGET_CONTAINER_NAME).inspect();
 }
 
-async function inspectLocalTargetImage() {
+async function inspectLocalTargetImage(imageReference = selectedImage()) {
   try {
-    return await docker.getImage(TARGET_IMAGE).inspect();
+    return await docker.getImage(imageReference).inspect();
   } catch (error) {
     if (error.statusCode === 404) return null;
     throw error;
   }
 }
 
-async function pullTargetImage() {
+async function pullTargetImage(imageReference = selectedImage()) {
   const stream = await new Promise((resolve, reject) => {
-    docker.pull(TARGET_IMAGE, (error, pullStream) => (error ? reject(error) : resolve(pullStream)));
+    docker.pull(imageReference, (error, pullStream) => (error ? reject(error) : resolve(pullStream)));
   });
   await new Promise((resolve, reject) => {
     docker.modem.followProgress(stream, (error) => (error ? reject(error) : resolve()));
   });
-  const image = await inspectLocalTargetImage();
+  const image = await inspectLocalTargetImage(imageReference);
   if (!image) throw new Error('Docker finished pulling but the target image is unavailable.');
   return image;
 }
@@ -193,13 +226,14 @@ async function refreshImageStatus() {
   ]);
   return writeStatus({
     runningImage: container.Image,
+    runningImageReference: container.Config?.Image || null,
     availableImage: image?.Id || null,
     updateAvailable: image ? container.Image !== image.Id : null,
   });
 }
 
 async function runCheck() {
-  writeStatus({ message: `Pulling ${TARGET_IMAGE}…` });
+  writeStatus({ message: `Pulling ${selectedImage()}…` });
   await pullTargetImage();
   const current = await refreshImageStatus();
   return current.updateAvailable ? 'An application update is available.' : 'The application is current.';
@@ -213,9 +247,9 @@ async function runRestart() {
   return 'The application container restarted successfully.';
 }
 
-async function runUpdate() {
-  writeStatus({ message: `Pulling ${TARGET_IMAGE}…`, rollback: null });
-  const targetImage = await pullTargetImage();
+async function runUpdate({ imageReference, tag }) {
+  writeStatus({ message: `Pulling ${imageReference}…`, rollback: null });
+  const targetImage = await pullTargetImage(imageReference);
   const previousContainer = await inspectTargetContainer();
   const previousImage = previousContainer.Image;
   let replacementStarted = false;
@@ -228,11 +262,15 @@ async function runUpdate() {
       updateAvailable: previousImage !== targetImage.Id,
     });
     replacementStarted = true;
-    await replaceContainer({ template: previousContainer, imageReference: TARGET_IMAGE });
+    await replaceContainer({ template: previousContainer, imageReference: targetImage.Id });
     writeStatus({ message: 'Waiting for the updated application to become healthy…' });
     const healthy = await waitForHealthyContainer();
     writeStatus({
+      // Commit the tag only once the replacement passes its health check.
+      selectedRepository: IMAGE_REPOSITORY,
+      selectedTag: tag,
       runningImage: healthy.Image,
+      runningImageReference: healthy.Config?.Image || null,
       availableImage: targetImage.Id,
       updateAvailable: false,
     });
@@ -284,7 +322,7 @@ function queueOperation(operation, runner) {
       operationRunning = false;
     }
   }, 500);
-  return status;
+  return publicStatus();
 }
 
 function sendJson(response, statusCode, value) {
@@ -294,10 +332,11 @@ function sendJson(response, statusCode, value) {
 
 const server = http.createServer((request, response) => {
   try {
+    const url = new URL(request.url, 'http://localhost');
     if (request.method === 'GET' && request.url === '/status') {
       refreshImageStatus()
         .catch(() => status)
-        .then((current) => sendJson(response, 200, { available: true, ...current }));
+        .then(() => sendJson(response, 200, { available: true, ...publicStatus() }));
       return;
     }
     if (request.method === 'POST' && request.url === '/check') {
@@ -308,8 +347,10 @@ const server = http.createServer((request, response) => {
       sendJson(response, 202, { available: true, ...queueOperation('restart', runRestart) });
       return;
     }
-    if (request.method === 'POST' && request.url === '/update') {
-      sendJson(response, 202, { available: true, ...queueOperation('update', runUpdate) });
+    if (request.method === 'POST' && url.pathname === '/update') {
+      const target = requestedImage(url.searchParams.get('tag'));
+      queueOperation('update', () => runUpdate(target));
+      sendJson(response, 202, { available: true, ...publicStatus() });
       return;
     }
     sendJson(response, 404, { error: 'Lifecycle operation not found.' });

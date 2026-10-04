@@ -1,6 +1,6 @@
 // Container Lifecycle Client
 // Purpose: Sends fixed lifecycle requests from the application to the private controller socket.
-// Scope: This client cannot select images, containers, or Docker arguments; the controller owns those constants.
+// Scope: This client can request a tag; the controller owns the repository, container, and Docker arguments.
 const http = require('http');
 
 const LIFECYCLE_SOCKET_PATH = process.env.MULTIROVER_LIFECYCLE_SOCKET || '/run/multirover/lifecycle.sock';
@@ -68,5 +68,11 @@ module.exports = {
   checkForUpdate: () => requestLifecycleController({ method: 'POST', path: '/check' }),
   getLifecycleStatus,
   restartApplication: () => requestLifecycleController({ method: 'POST', path: '/restart' }),
-  updateApplication: () => requestLifecycleController({ method: 'POST', path: '/update' }),
+  updateApplication: (tag) => {
+    if (tag !== undefined && typeof tag !== 'string') throw new Error('Container tag must be a string.');
+    return requestLifecycleController({
+      method: 'POST',
+      path: tag === undefined ? '/update' : `/update?tag=${encodeURIComponent(tag)}`,
+    });
+  },
 };

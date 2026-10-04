@@ -88,14 +88,14 @@ io.on('connection', (socket) => {
       .catch((error) => cb({ error: error.message, code: error.code || null }));
   });
 
-  socket.on('server:updateApplication', (_payload = {}, cb = () => {}) => {
+  socket.on('server:updateApplication', (payload = {}, cb = () => {}) => {
     Promise.resolve()
       .then(() => requireRecentPassword(socket))
-      .then(() => lifecycleClient.updateApplication())
+      .then(() => lifecycleClient.updateApplication(payload?.tag))
       .then((lifecycle) => {
         // Wait for controller acceptance so rejected updates do not kick users.
         notifyDriversOfRestart(actorFor(socket));
-        database.recordAuditEvent(actorFor(socket), 'application.update-requested', {});
+        database.recordAuditEvent(actorFor(socket), 'application.update-requested', { tag: payload?.tag ?? lifecycle.selectedTag });
         io.emit('server:restarting', { reason: 'application-update' });
         cb({ success: true, lifecycle });
       })

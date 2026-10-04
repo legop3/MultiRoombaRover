@@ -21,6 +21,7 @@ export default function AdminOverview({ snapshot, socket, runSensitive, onSnapsh
   const [restartRequested, setRestartRequested] = useState(false);
   const [lifecycle, setLifecycle] = useState(null);
   const [lifecycleError, setLifecycleError] = useState('');
+  const [containerTag, setContainerTag] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -90,10 +91,13 @@ export default function AdminOverview({ snapshot, socket, runSensitive, onSnapsh
   }
 
   async function update() {
-    if (!window.confirm('Pull the configured MultiRover image and replace the application container now? The page will reconnect automatically.')) return;
+    const tag = containerTag === null ? undefined : containerTag.trim();
+    const target = tag === undefined ? lifecycle.targetImage : `${lifecycle.repository}:${tag}`;
+    if (!window.confirm(`Pull ${target} and replace the application container now? The page will reconnect automatically.`)) return;
     try {
-      const response = await runSensitive(() => updateApplication(socket));
+      const response = await runSensitive(() => updateApplication(socket, tag));
       setLifecycle(response.lifecycle);
+      setContainerTag(null);
     } catch (error) {
       setLifecycleError(error.message);
     }
@@ -121,15 +125,36 @@ export default function AdminOverview({ snapshot, socket, runSensitive, onSnapsh
       <CardFrame title="Application container" meta={lifecycleAvailable ? lifecycle?.state : 'controller unavailable'} bodyClassName="space-y-1 p-1 text-sm">
         <div className="surface max-w-4xl space-y-0.5 p-1 text-slate-300">
           <p>{lifecycleAvailable ? updateSummary : 'Container updates are unavailable until the lifecycle service is running.'}</p>
+          {lifecycleAvailable ? (
+            <div className="space-y-0.5 break-all">
+              <p>Repository: {lifecycle.repository}</p>
+              <p>Selected image: {lifecycle.targetImage}</p>
+              <p>Running image: {lifecycle.runningImage}</p>
+              <p>Compose image: {lifecycle.configuredImage}</p>
+              {lifecycle.targetImage !== lifecycle.configuredImage ? <p className="text-amber-300">A manual Compose deployment may restore the Compose image.</p> : null}
+            </div>
+          ) : null}
           {lifecycle?.message ? <p className="text-slate-400">{lifecycle.message}</p> : null}
           {lifecycle?.rollback ? <p>Rollback: {lifecycle.rollback.status}{lifecycle.rollback.error ? ` — ${lifecycle.rollback.error}` : ''}</p> : null}
           {lifecycleError ? <p className="text-red-300">{lifecycleError}</p> : null}
         </div>
+        <label className="flex max-w-md flex-col gap-0.5">
+          <span>Container tag</span>
+          <input
+            className="rounded border border-slate-600 bg-slate-900 px-2 py-1 text-slate-100"
+            value={containerTag ?? lifecycle?.selectedTag ?? ''}
+            placeholder="Enter a tag"
+            maxLength={128}
+            disabled={!lifecycleAvailable || lifecycleBusy}
+            onChange={(event) => setContainerTag(event.target.value)}
+          />
+          <span className="text-xs text-slate-400">Update and restart applies this tag. Update checks use the saved selected image.</span>
+        </label>
         <div className="flex flex-wrap gap-0.5">
           <button type="button" className="button-dark" disabled={!lifecycleAvailable || lifecycleBusy} onClick={checkForUpdate}>
             {lifecycle?.operation === 'check' && lifecycleBusy ? 'Checking for update…' : 'Check for update'}
           </button>
-          <button type="button" className="button-danger" disabled={!lifecycleAvailable || lifecycleBusy} onClick={update}>
+          <button type="button" className="button-danger" disabled={!lifecycleAvailable || lifecycleBusy || (containerTag !== null && !/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$/.test(containerTag.trim()))} onClick={update}>
             {lifecycle?.operation === 'update' && lifecycleBusy ? 'Updating application…' : 'Update and restart'}
           </button>
           <button type="button" className="button-danger" disabled={restartRequested || lifecycleBusy} onClick={restart}>
