@@ -22,6 +22,7 @@ import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
 import PtzAppRoot from './ptz/PtzAppRoot.jsx'
 import OperatingModeRouteSync from './components/OperatingModeRouteSync/index.jsx'
 import InitialSessionOverlay from './components/InitialSessionOverlay/index.jsx'
+import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 
 // Reporting and administration carry substantial route-specific libraries.
 // Loading each only on its own route keeps charting and JSON Schema tooling out
@@ -40,6 +41,7 @@ function lazyRoute(element, label) {
 }
 
 createRoot(document.getElementById('root')).render(
+  <AppErrorBoundary>
   <StrictMode>
     <SocketProvider>
       <SessionProvider>
@@ -84,5 +86,6 @@ createRoot(document.getElementById('root')).render(
         </TelemetryProvider>
       </SessionProvider>
     </SocketProvider>
-  </StrictMode>,
+  </StrictMode>
+  </AppErrorBoundary>,
 )

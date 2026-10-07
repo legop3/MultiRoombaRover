@@ -141,7 +141,7 @@ export default function AdminOverview({ snapshot, socket, runSensitive, onSnapsh
         <label className="flex max-w-md flex-col gap-0.5">
           <span>Container tag</span>
           <input
-            className="rounded border border-slate-600 bg-slate-900 px-2 py-1 text-slate-100"
+            className="field-input w-full"
             value={containerTag ?? lifecycle?.selectedTag ?? ''}
             placeholder="Enter a tag"
             maxLength={128}
