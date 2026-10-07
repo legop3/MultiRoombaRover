@@ -16,7 +16,6 @@ const INITIAL_STATE = {
   overseerMemory: null,
   alerts: [],
   latestReplay: null,
-  replayStatus: null,
   duplicateIdentityBlock: null,
   roverRemovalNotice: null,
 };
@@ -199,23 +198,6 @@ export function SessionProvider({ children }) {
         ],
       }));
     }
-    function handleReplayStatus(payload = {}) {
-      if (!payload?.status) return;
-      setState((prev) => ({
-        ...prev,
-        /*
-          Replay creation is serialized by the server's cooldown and workflow,
-          so the browser needs one current progress value rather than a map of
-          jobs. The server remains authoritative for job identity and execution;
-          this scalar exists only to present accepted/building/uploading/ready/
-          failed progress in the web UI.
-        */
-        replayStatus: {
-          ...payload,
-          receivedAt: Date.now(),
-        },
-      }));
-    }
     function handleReplayReady(payload = {}) {
       if (!payload?.jobId || !payload?.url) return;
       setState((prev) => ({
@@ -316,7 +298,6 @@ export function SessionProvider({ children }) {
     socket.on('overseer:state', handleOverseerState);
     socket.on('overseer:memory', handleOverseerMemory);
     socket.on('alert:new', handleAlertNew);
-    socket.on('replay:status', handleReplayStatus);
     socket.on('replay:ready', handleReplayReady);
     socket.on('replay:failed', handleReplayFailed);
     socket.on('session:duplicateIdentity', handleDuplicateIdentity);
@@ -331,7 +312,6 @@ export function SessionProvider({ children }) {
       socket.off('overseer:state', handleOverseerState);
       socket.off('overseer:memory', handleOverseerMemory);
       socket.off('alert:new', handleAlertNew);
-      socket.off('replay:status', handleReplayStatus);
       socket.off('replay:ready', handleReplayReady);
       socket.off('replay:failed', handleReplayFailed);
       socket.off('session:duplicateIdentity', handleDuplicateIdentity);

@@ -35,9 +35,9 @@ async function deliverReplay(payload = {}) {
     requestedBy: payload.requestedBy,
   });
 
-  jobStatus.emit(job, 'accepted', { message: buildAcceptedMessage(job) });
   let providerContext = null;
   try {
+    jobStatus.emit(job, 'accepted', { message: buildAcceptedMessage(job) });
     let providerError = null;
     if (preferredDeliveryProvider?.begin) {
       try {

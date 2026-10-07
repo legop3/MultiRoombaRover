@@ -46,7 +46,7 @@ export default function ReplaySourcesPanel({
   const assignmentRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
   const roster = useSessionSelector((state) => state.session?.roster ?? []);
   const replayState = useSessionSelector((state) => state.session?.replay || null);
-  const replayStatus = useSessionSelector((state) => state.replayStatus);
+  const replayStatus = replayState?.status;
   const socket = useSocket();
   const { triggerReplay } = useSessionActions();
   const sources = useMemo(() => normalizeSources(replaySources || []), [replaySources]);
@@ -161,48 +161,25 @@ export default function ReplaySourcesPanel({
     };
   }, [sources]);
 
-  const hasReplayCooldown = Boolean(replayState?.lastTriggeredAt && replayState?.cooldownMs);
-  const replayCooldownEndsAt = hasReplayCooldown
-    ? replayState.lastTriggeredAt + replayState.cooldownMs
+  const cooldownNow = useSharedClock(1000, Boolean(replayState?.lastTriggeredAt));
+  const remainingMs = replayState?.lastTriggeredAt
+    ? Math.max(0, replayState.lastTriggeredAt + replayState.cooldownMs - cooldownNow)
     : 0;
-  const cooldownNow = useSharedClock(1000, hasReplayCooldown);
-  const remainingMs = useMemo(() => {
-    if (!hasReplayCooldown) return 0;
-    /*
-      The button only shows whole seconds, so a shared one-second clock gives the
-      same useful information without each mounted replay panel owning a 250ms
-      interval. The exact server cooldown still decides whether the action is
-      accepted; this value is only the local disabled-state/display estimate.
-    */
-    const next = replayCooldownEndsAt - cooldownNow;
-    return Math.max(0, next);
-  }, [cooldownNow, hasReplayCooldown, replayCooldownEndsAt]);
-
-  const replayDisabled = busy || mode === 'lockdown' || remainingMs > 0 || !selected.length;
+  const atJobLimit = replayState?.atJobLimit === true;
+  const replaySourceKeys = replayState?.activeSourceKeys;
+  const activeSourceKeys = useMemo(() => new Set(replaySourceKeys || []), [replaySourceKeys]);
+  const replayDisabled = busy || mode === 'lockdown' || remainingMs > 0 || atJobLimit || !selected.length;
   const selectedSet = useMemo(() => {
     // Checkbox rendering asks the same membership question for every source.
     // A Set avoids repeated linear scans and, more importantly, gives memoized
     // child lists a stable value while the selected keys have not changed.
     return new Set(selected);
   }, [selected]);
-  const replayStatusText = useMemo(() => {
-    if (!replayStatus?.status) return null;
-    const titleText = replayStatus.title ? `: ${replayStatus.title}` : '';
-    switch (replayStatus.status) {
-      case 'accepted':
-        return `Replay accepted${titleText}`;
-      case 'building':
-        return `Replay building${titleText}`;
-      case 'uploading':
-        return `Replay uploading${titleText}`;
-      case 'ready':
-        return `Replay ready${titleText}`;
-      case 'failed':
-        return replayStatus.message || `Replay failed${titleText}`;
-      default:
-        return replayStatus.message || `Replay ${replayStatus.status}${titleText}`;
-    }
-  }, [replayStatus]);
+  const replayStatusText = replayStatus?.status
+    ? replayStatus.status === 'failed' && replayStatus.message
+      ? replayStatus.message
+      : `Replay ${replayStatus.status}${replayStatus.title ? `: ${replayStatus.title}` : ''}`
+    : null;
   const toggleKey = useCallback((key) => {
     setSelected((prev) => {
       return prev.includes(key) ? prev.filter((value) => value !== key) : [...prev, key];
@@ -250,13 +227,13 @@ export default function ReplaySourcesPanel({
             current desktop sidebar. They only collapse when the card becomes
             narrower than the supported new-drive desktop column. */}
         <div className={`grid grid-cols-2 gap-0.5 @max-[15rem]:grid-cols-1 ${listWrapClass}`}>
-          <GroupList title="Rovers" items={grouped.rovers} selectedSet={selectedSet} onToggle={toggleKey} />
-          <GroupList title="Room Cams" items={grouped.rooms} selectedSet={selectedSet} onToggle={toggleKey} />
+          <GroupList title="Rovers" items={grouped.rovers} selectedSet={selectedSet} activeSourceKeys={activeSourceKeys} onToggle={toggleKey} />
+          <GroupList title="Room Cams" items={grouped.rooms} selectedSet={selectedSet} activeSourceKeys={activeSourceKeys} onToggle={toggleKey} />
         </div>
         <div className="space-y-0.5">
           {error ? <div className="text-xs text-amber-400">{error}</div> : null}
           {replayStatusText ? (
-            <div className={`text-xs ${replayStatus?.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
+            <div className={`text-xs ${replayStatus.status === 'failed' ? 'text-amber-400' : 'text-emerald-300'}`}>
               {replayStatusText}
             </div>
           ) : null}
@@ -279,11 +256,6 @@ export default function ReplaySourcesPanel({
                 saveSettings((current) => ({ ...(current || {}), [titleSettingKey]: next }));
               }}
               onKeyDown={(event) => {
-                // Enter is the keyboard equivalent of clicking Replay. Ignore
-                // composition events so confirming an IME candidate cannot
-                // accidentally submit a replay before the title is complete.
-                // handleReplay remains the single authority for cooldown,
-                // lockdown, busy, and empty-source checks.
                 if (event.key !== 'Enter' || event.nativeEvent?.isComposing) return;
                 event.preventDefault();
                 handleReplay();
@@ -314,7 +286,7 @@ export default function ReplaySourcesPanel({
               onClick={handleReplay}
               disabled={replayDisabled}
             >
-              {remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
+              {atJobLimit ? 'Replay (limit reached)' : remainingMs > 0 ? `Replay (${Math.ceil(remainingMs / 1000)}s)` : busy ? 'Replay…' : 'Replay'}
             </button>
           </div>
         </div>
@@ -323,14 +295,14 @@ export default function ReplaySourcesPanel({
   );
 }
 
-const GroupList = React.memo(function GroupList({ title, items, selectedSet, onToggle }) {
+const GroupList = React.memo(function GroupList({ title, items, selectedSet, activeSourceKeys, onToggle }) {
   if (!items.length) return null;
   return (
     <div className="space-y-0.5">
       <div className="panel-muted text-xs">{title}</div>
       <div className="space-y-0.5">
         {items.map((item) => (
-          <label key={item.key} className="surface flex items-center gap-0.5 text-xs">
+          <label key={item.key} className={`surface flex items-center gap-0.5 text-xs ${activeSourceKeys.has(item.key) ? 'animate-pulse' : ''}`}>
             <input
               type="checkbox"
               checked={selectedSet.has(item.key)}

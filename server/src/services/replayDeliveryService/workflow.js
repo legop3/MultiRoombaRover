@@ -2,6 +2,7 @@
 // Purpose: Provides transport-neutral replay jobs, source lookup, status events, and user-facing progress text.
 // Scope: Keeps Discord-command and web-triggered replay delivery on the same core status pipeline.
 const Fuse = require('fuse.js');
+const { updateReplayStatus } = require('../replayEngineV2/cooldown');
 
 const DEFAULT_ALLOWED_MENTIONS = { parse: [], repliedUser: false };
 const FUZZY_THRESHOLD = 0.42;
@@ -180,6 +181,22 @@ function createJobStatusEmitter({ io, logger, sanitizeMentions }) {
 
   function emit(job, status, extra = {}) {
     const payload = buildPayload(job, status, extra);
+    updateReplayStatus(payload);
+    if (status === 'accepted') {
+      // Sound once per participating rover; a disconnected rover must not abort video creation.
+      const { issueCommand } = require('../commandService');
+      const roverIds = new Set(job.sources.filter((entry) => entry.type === 'rover').map((entry) => entry.id));
+      for (const roverId of roverIds) {
+        try {
+          issueCommand(roverId, {
+            type: 'song',
+            song: { notes: [{ note: 72, duration: 8 }, { note: 76, duration: 8 }, { note: 79, duration: 16 }] },
+          });
+        } catch (err) {
+          logger?.warn?.('Unable to play replay tune', { roverId, error: err.message });
+        }
+      }
+    }
     io.emit('replay:status', payload);
     if (status === 'ready' && extra.media) io.emit('replay:ready', extra.media);
     if (status === 'failed') io.emit('replay:failed', payload);

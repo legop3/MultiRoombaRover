@@ -1,6 +1,6 @@
 // Discord Replay Command
 // Purpose: Handles replay capture requests from Discord through the shared replay job/status workflow.
-// Scope: Resolves sources, enforces cooldowns, reports job progress, uploads video, and broadcasts media URLs.
+// Scope: Resolves sources, enforces replay availability, reports job progress, uploads video, and broadcasts media URLs.
 const { AttachmentBuilder } = require('discord.js');
 const io = require('../../../globals/io');
 const { hostReplay } = require('../../replayMediaService');
@@ -60,12 +60,6 @@ function createReplayCommand({
       return;
     }
 
-    const attempt = tryTriggerReplay({ by: message.author?.id || null, source: 'discord' });
-    if (!attempt.ok) {
-      await replyDenied(message, `Replay denied: cooldown active. Try again in ${Math.ceil(attempt.remainingMs / 1000)}s.`);
-      return;
-    }
-
     const requester = message.member?.nickname || message.author?.globalName || message.author?.username || 'Discord';
     const job = createReplayJob({
       id: buildReplayJobId('discord'),
@@ -74,17 +68,23 @@ function createReplayCommand({
       sources: resolved.sources || [],
       includeSidebar: true,
     });
-    jobStatus.emit(job, 'accepted', { message: buildAcceptedMessage(job) });
+    const attempt = tryTriggerReplay({ jobId: job.id, by: { source: 'discord', requester } });
+    if (!attempt.ok) {
+      await replyDenied(message, `Replay denied: ${attempt.error}`);
+      return;
+    }
 
-    const progressMessage = await message.reply({
-      content: sanitizeMentions(buildAcceptedMessage(job)),
-      allowedMentions: DEFAULT_ALLOWED_MENTIONS,
-    });
-    const stopTyping = startDiscordTypingLoop(message.channel, logger, 'discord replay command');
-
+    let progressMessage = null;
+    let stopTyping = () => {};
     let builtReplay = null;
     let deliveredMedia = null;
     try {
+      jobStatus.emit(job, 'accepted', { message: buildAcceptedMessage(job) });
+      progressMessage = await message.reply({
+        content: sanitizeMentions(buildAcceptedMessage(job)),
+        allowedMentions: DEFAULT_ALLOWED_MENTIONS,
+      });
+      stopTyping = startDiscordTypingLoop(message.channel, logger, 'discord replay command');
       jobStatus.emit(job, 'building', { message: buildStatusMessage(job, 'building') });
       if (progressMessage?.edit) {
         await progressMessage.edit({ content: sanitizeMentions(buildStatusMessage(job, 'building')), allowedMentions: DEFAULT_ALLOWED_MENTIONS });

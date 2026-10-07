@@ -459,7 +459,7 @@ balanceBoardEvents.on('change', () => {
 });
 
 replayEvents.on('update', () => {
-  logger.info('Replay cooldown updated; syncing all clients');
+  logger.info('Replay state updated; syncing all clients');
   syncAll();
 });
 

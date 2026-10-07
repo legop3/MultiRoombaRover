@@ -1,6 +1,6 @@
 // Replay Socket Hooks
 // Purpose: Registers web socket replay-trigger handler that publishes replay requests.
-// Scope: Applies replay mode/cooldown/source validation for socket-triggered replay requests.
+// Scope: Applies replay mode/availability/source validation for socket-triggered replay requests.
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('replaySocket');
 const { getMode, MODES } = require('../modeManager');
@@ -45,9 +45,9 @@ function registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefau
       const title = normalizeReplayTitle(payload?.title);
       const includeSidebar = normalizeIncludeSidebar(payload?.includeSidebar);
       const jobId = buildReplayJobId('web');
-      const attempt = tryTriggerReplay({ by: { source: 'web', requester } });
+      const attempt = tryTriggerReplay({ jobId, by: { source: 'web', requester } });
       if (!attempt.ok) {
-        cb({ error: 'Replay cooldown active', remainingMs: attempt.remainingMs, state: attempt.state });
+        cb({ error: attempt.error, remainingMs: attempt.remainingMs, state: attempt.state });
         return;
       }
 
