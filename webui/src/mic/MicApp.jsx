@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSocket } from '../context/SocketContext.jsx';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 import useUserIdentitySync from '../hooks/useUserIdentitySync.js';
 import { RESTART_DELAY_MS } from '../lib/whepPlayback.js';
 import { waitForIceGatheringComplete } from '../components/vip/VipAudioUploadCard/whipTransport.js';
+import useMicPtt from './useMicPtt.js';
 
 export default function MicApp() {
   const socket = useSocket();
@@ -11,6 +12,16 @@ export default function MicApp() {
   const local = useSessionSelector((state) => state.session?.isLocalNetwork);
   const enabled = useSessionSelector((state) => state.session?.features?.roomAudio);
   const [status, setStatus] = useState('Connecting…');
+  const [pttMode, setPttMode] = useState(false);
+  const available = Boolean(connected && local && enabled);
+  const { held, setPointerHeld, setButtonKeyHeld, keyLabel } = useMicPtt(available && pttMode);
+  const transmitting = available && (!pttMode || held);
+  const mediaRef = useRef(null);
+  const transmittingRef = useRef(transmitting);
+  useLayoutEffect(() => {
+    transmittingRef.current = transmitting;
+    mediaRef.current?.getAudioTracks().forEach((track) => { track.enabled = transmitting; });
+  }, [transmitting]);
   useUserIdentitySync();
   useEffect(() => {
     if (!connected || !local || !enabled) return undefined;
@@ -61,6 +72,9 @@ export default function MicApp() {
           const captured = await navigator.mediaDevices.getUserMedia({ audio: true });
           if (!isCurrent(current)) { captured.getTracks().forEach((track) => track.stop()); return; }
           media = captured;
+          mediaRef.current = media;
+          // New capture and reconnect attempts must respect the current PTT state immediately.
+          media.getAudioTracks().forEach((track) => { track.enabled = transmittingRef.current; });
           media.getAudioTracks().forEach((track) => { track.onended = () => retry(attempt, 'Microphone disconnected. Retrying…'); });
         }
         const source = await ack('roomAudio:start');
@@ -103,9 +117,55 @@ export default function MicApp() {
       clearTimeout(retryTimer);
       closeAttempt();
       media?.getTracks().forEach((track) => { track.onended = null; track.stop(); });
+      mediaRef.current = null;
       if (socket.connected) socket.emit('roomAudio:stop', {});
     };
   }, [socket, connected, local, enabled]);
   const message = !connected ? 'Connecting…' : local === false ? 'This page is available to local visitors only.' : !enabled ? 'Room audio is disabled.' : status;
-  return <main className="min-h-screen bg-neutral-950 p-4 text-slate-200"><div className="panel mx-auto max-w-md p-4"><h1 className="text-lg font-semibold">Room microphone</h1><p className="mt-2 text-sm">{message}</p></div></main>;
+  return (
+    <main className="min-h-screen bg-neutral-950 p-4 text-slate-200">
+      <div className="panel mx-auto max-w-md p-4">
+        <h1 className="text-lg font-semibold">Room microphone</h1>
+        <p className="mt-2 text-sm" role="status">{message}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2" role="group" aria-label="Microphone mode">
+          {[false, true].map((ptt) => (
+            <button key={String(ptt)} type="button" aria-pressed={pttMode === ptt}
+              className={`button-dark w-full ${pttMode === ptt ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
+              onClick={() => setPttMode(ptt)}>
+              {ptt ? 'Push to talk' : 'Open mic'}
+            </button>
+          ))}
+        </div>
+        {pttMode && (
+          <>
+            <button type="button" disabled={!available} aria-pressed={held}
+              className={`button-dark mt-4 min-h-40 w-full touch-none select-none text-2xl font-semibold ${held ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
+              onPointerDown={(event) => {
+                if (event.button !== 0 || !event.isPrimary) return;
+                event.currentTarget.setPointerCapture(event.pointerId);
+                setPointerHeld(true);
+              }}
+              onPointerUp={() => setPointerHeld(false)}
+              onPointerCancel={() => setPointerHeld(false)}
+              onLostPointerCapture={() => setPointerHeld(false)}
+              onContextMenu={(event) => event.preventDefault()}
+              onKeyDown={(event) => {
+                if (event.key !== ' ' && event.key !== 'Enter') return;
+                event.preventDefault();
+                setButtonKeyHeld(true);
+              }}
+              onKeyUp={(event) => {
+                if (event.key !== ' ' && event.key !== 'Enter') return;
+                event.preventDefault();
+                setButtonKeyHeld(false);
+              }}
+              onBlur={() => setButtonKeyHeld(false)}>
+              {held ? 'Talking…' : 'Hold to talk'}
+            </button>
+            <p className="mt-2 text-center text-sm text-slate-400">Hold the button, {keyLabel}, or your configured controller PTT control.</p>
+          </>
+        )}
+      </div>
+    </main>
+  );
 }
