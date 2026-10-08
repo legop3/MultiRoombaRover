@@ -4,9 +4,20 @@ import { useSessionSelector } from '../context/SessionContext.jsx';
 import useUserIdentitySync from '../hooks/useUserIdentitySync.js';
 import { RESTART_DELAY_MS } from '../lib/whepPlayback.js';
 import { waitForIceGatheringComplete } from '../components/vip/VipAudioUploadCard/whipTransport.js';
-import useMicPtt from './useMicPtt.js';
+import { ControlSystemProvider, KeyboardInputManager, GamepadInputManager, useControlSelector } from '../controls/index.js';
+import ControlHint from '../components/ControlHint/index.jsx';
 
 export default function MicApp() {
+  return (
+    <ControlSystemProvider>
+      <KeyboardInputManager />
+      <GamepadInputManager />
+      <MicPage />
+    </ControlSystemProvider>
+  );
+}
+
+function MicPage() {
   const socket = useSocket();
   const connected = useSessionSelector((state) => state.connected);
   const local = useSessionSelector((state) => state.session?.isLocalNetwork);
@@ -14,7 +25,10 @@ export default function MicApp() {
   const [status, setStatus] = useState('Connecting…');
   const [pttMode, setPttMode] = useState(false);
   const available = Boolean(connected && local && enabled);
-  const { held, setPointerHeld, setButtonKeyHeld, keyLabel } = useMicPtt(available && pttMode);
+  const pttActive = useControlSelector((control) => Boolean(control.state.mic?.pttActive));
+  const [pointerHeld, setPointerHeld] = useState(false);
+  const [buttonKeyHeld, setButtonKeyHeld] = useState(false);
+  const held = available && pttMode && (pttActive || pointerHeld || buttonKeyHeld);
   const transmitting = available && (!pttMode || held);
   const mediaRef = useRef(null);
   const transmittingRef = useRef(transmitting);
@@ -22,6 +36,22 @@ export default function MicApp() {
     transmittingRef.current = transmitting;
     mediaRef.current?.getAudioTracks().forEach((track) => { track.enabled = transmitting; });
   }, [transmitting]);
+  useEffect(() => {
+    // Pointer capture can outlive focus; release the page button when leaving the page.
+    function releaseButton() {
+      setPointerHeld(false);
+      setButtonKeyHeld(false);
+    }
+    function visibilityChange() {
+      if (document.hidden) releaseButton();
+    }
+    window.addEventListener('blur', releaseButton);
+    document.addEventListener('visibilitychange', visibilityChange);
+    return () => {
+      window.removeEventListener('blur', releaseButton);
+      document.removeEventListener('visibilitychange', visibilityChange);
+    };
+  }, []);
   useUserIdentitySync();
   useEffect(() => {
     if (!connected || !local || !enabled) return undefined;
@@ -131,7 +161,11 @@ export default function MicApp() {
           {[false, true].map((ptt) => (
             <button key={String(ptt)} type="button" aria-pressed={pttMode === ptt}
               className={`button-dark w-full ${pttMode === ptt ? 'bg-emerald-500 text-white hover:bg-emerald-500' : ''}`}
-              onClick={() => setPttMode(ptt)}>
+              onClick={() => {
+                setPointerHeld(false);
+                setButtonKeyHeld(false);
+                setPttMode(ptt);
+              }}>
               {ptt ? 'Push to talk' : 'Open mic'}
             </button>
           ))}
@@ -162,7 +196,7 @@ export default function MicApp() {
               onBlur={() => setButtonKeyHeld(false)}>
               {held ? 'Talking…' : 'Hold to talk'}
             </button>
-            <p className="mt-2 text-center text-sm text-slate-400">Hold the button, {keyLabel}, or your configured controller PTT control.</p>
+            <p className="mt-2 text-center text-sm text-slate-400">Hold the button or <ControlHint actionId="micPtt" /> to talk.</p>
           </>
         )}
       </div>
