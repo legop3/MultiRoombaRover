@@ -3,9 +3,9 @@ import { useSocket } from '../context/SocketContext.jsx';
 import { useSessionSelector } from '../context/SessionContext.jsx';
 import useUserIdentitySync from '../hooks/useUserIdentitySync.js';
 import { RESTART_DELAY_MS } from '../lib/whepPlayback.js';
-import { waitForIceGatheringComplete } from '../components/vip/VipAudioUploadCard/whipTransport.js';
 import { ControlSystemProvider, KeyboardInputManager, GamepadInputManager, useControlSelector } from '../controls/index.js';
 import ControlHint from '../components/ControlHint/index.jsx';
+import MediaMTXWebRTCPublisher from '../lib/vendor/mediamtxPublisher.js';
 
 export default function MicApp() {
   return (
@@ -70,14 +70,12 @@ function MicPage() {
       const current = attempt;
       attempt = null;
       if (!current) return;
-      clearTimeout(current.timer);
-      current.abort.abort();
-      if (current.peer) {
-        current.peer.onconnectionstatechange = null;
-        current.peer.close();
-      }
-      if (current.resource) fetch(current.resource, { method: 'DELETE', headers: current.headers, keepalive: true }).catch(() => {});
+      const publisher = current.publisher;
+      publisher?.close();
+      // Upstream close stops the peer and retry timer but leaves HTTP session cleanup to us.
+      if (publisher?.sessionUrl) fetch(publisher.sessionUrl, { method: 'DELETE', keepalive: true }).catch(() => {});
     }
+
     function retry(current, message) {
       if (!isCurrent(current)) return;
       closeAttempt();
@@ -90,7 +88,7 @@ function MicPage() {
       // Invalidate the previous attempt before closing it. Late async results
       // and peer events must never change the new attempt's state or timers.
       closeAttempt();
-      const current = { abort: new AbortController() };
+      const current = {};
       attempt = current;
       setStatus('Starting microphone…');
       try {
@@ -109,36 +107,23 @@ function MicPage() {
         }
         const source = await ack('roomAudio:start');
         if (!isCurrent(current)) return;
-        current.headers = { Authorization: `Basic ${btoa(`${source.token}:${source.token}`)}` };
-        const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        current.peer = pc;
-        media.getAudioTracks().forEach((track) => pc.addTrack(track, media));
-        pc.onconnectionstatechange = () => {
-          if (!isCurrent(current)) return;
-          if (pc.connectionState === 'connected') {
-            clearTimeout(current.timer);
-            setStatus('Microphone live');
-          }
-          if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) retry(current, 'Connection lost. Retrying…');
-        };
-        await pc.setLocalDescription(await pc.createOffer());
-        if (!isCurrent(current)) return;
-        await waitForIceGatheringComplete(pc);
-        if (!isCurrent(current)) return;
-        const response = await fetch(source.url, { method: 'POST', headers: { ...current.headers, 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp, signal: AbortSignal.any([current.abort.signal, AbortSignal.timeout(10000)]) });
-        if (!response.ok) throw new Error(`Microphone connection failed (${response.status})`);
-        const location = response.headers.get('Location');
-        current.resource = location ? new URL(location, new URL(source.url, window.location.href)).href : null;
-        if (!isCurrent(current)) {
-          if (current.resource) fetch(current.resource, { method: 'DELETE', headers: current.headers, keepalive: true }).catch(() => {});
-          return;
-        }
-        const sdp = await response.text();
-        if (!isCurrent(current)) return;
-        await pc.setRemoteDescription({ type: 'answer', sdp });
-        if (!isCurrent(current)) return;
-        // A negotiation can hang without reaching a terminal peer state.
-        if (pc.connectionState !== 'connected') current.timer = setTimeout(() => retry(current, 'Connection timed out. Retrying…'), 10000);
+        setStatus('Connecting audio…');
+        current.publisher = new MediaMTXWebRTCPublisher({
+          url: new URL(source.url, window.location.href).href,
+          user: source.token,
+          pass: source.token,
+          stream: media,
+          audioCodec: 'opus',
+          audioBitrate: 64,
+          audioVoice: true,
+          onConnected: () => {
+            if (isCurrent(current)) setStatus('Microphone live');
+          },
+          // The publisher owns transport retries; restarting it here would create competing loops.
+          onError: (message) => {
+            if (isCurrent(current)) setStatus(message);
+          },
+        });
       } catch (error) { retry(current, `${error.message}. Retrying…`); }
     }
     start();
