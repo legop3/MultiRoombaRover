@@ -20,6 +20,7 @@ function normalizeAdditionalHosts(rawHosts) {
 
 function buildMediaMtxConfig({ config, serverPort, snapshotWriterPath }) {
   const media = config?.media || {};
+  const webrtcPort = media.webrtcPort ?? 8189;
   const configuredHosts = normalizeAdditionalHosts(media.additionalHosts);
   let publicHostname = '';
   try {
@@ -55,10 +56,10 @@ function buildMediaMtxConfig({ config, serverPort, snapshotWriterPath }) {
 
     webrtc: true,
     // WHEP and WHIP signaling is public only through the Node /video proxy.
-    // ICE transport on 8189 remains directly reachable by browsers.
+    // The configured ICE transport port remains directly reachable by browsers.
     webrtcAddress: '127.0.0.1:8889',
-    webrtcLocalUDPAddress: ':8189',
-    webrtcLocalTCPAddress: ':8189',
+    webrtcLocalUDPAddress: `:${webrtcPort}`,
+    webrtcLocalTCPAddress: `:${webrtcPort}`,
     webrtcAdditionalHosts: additionalHosts,
     webrtcICEServers2: [
       { url: 'stun:stun.l.google.com:19302' },
