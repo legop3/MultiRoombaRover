@@ -91,9 +91,9 @@ function createWebReplayTextCommand(socket, sendSystemMessage, replayApi) {
 
       const requester = buildRequesterLabel(socket);
       const jobId = buildReplayJobId('web-chat');
-      const attempt = replayApi.tryTriggerReplay({ by: { source: 'web-chat', requester } });
+      const attempt = replayApi.tryTriggerReplay({ jobId, by: { source: 'web-chat', requester } });
       if (!attempt.ok) {
-        await message.reply({ content: `Replay denied: cooldown active. Try again in ${Math.ceil(attempt.remainingMs / 1000)}s.` });
+        await message.reply({ content: `Replay denied: ${attempt.error}` });
         return;
       }
 
