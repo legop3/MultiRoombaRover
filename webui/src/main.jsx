@@ -20,6 +20,7 @@ import { SettingsProvider } from './settings/index.js'
 import DeterrenceChaos from './components/DeterrenceChaos/index.jsx'
 import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
 import PtzAppRoot from './ptz/PtzAppRoot.jsx'
+import MicApp from './mic/MicApp.jsx'
 import OperatingModeRouteSync from './components/OperatingModeRouteSync/index.jsx'
 import InitialSessionOverlay from './components/InitialSessionOverlay/index.jsx'
 import AppErrorBoundary from './components/AppErrorBoundary.jsx'
@@ -65,6 +66,7 @@ createRoot(document.getElementById('root')).render(
                   <Route path="/spectate" element={<SpectatorApp />} />
                   <Route path="/mini" element={<MiniSummaryApp />} />
                   <Route path="/display" element={<ServerDisplayApp />} />
+                  <Route path="/mic" element={<MicApp />} />
                   <Route path="/scanner" element={<ScannerApp />} />
                   <Route path="/setup" element={lazyRoute(<SetupApp />, 'setup')} />
                   <Route path="/admin" element={lazyRoute(<AdminApp />, 'administration')} />

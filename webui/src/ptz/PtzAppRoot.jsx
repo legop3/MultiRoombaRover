@@ -2,6 +2,7 @@
 // Purpose: Mounts the PTZ controller as a real page with the same shared input
 // and identity systems used by the driver page.
 // Scope: Mounts input/identity providers; the page owns session entry and layouts.
+import RoomAudioPlayer from '../components/RoomAudioPlayer/index.jsx';
 import AlertFeed from '../components/AlertFeed/index.jsx';
 import SocketConnectionPill from '../components/SocketConnectionPill/index.jsx';
 import { LayoutProvider } from '../layouts/LayoutContext.jsx';
@@ -25,6 +26,7 @@ function PtzRouteContent() {
 
   return (
     <ControlSystemProvider>
+      <RoomAudioPlayer />
       <KeyboardInputManager />
       <GamepadInputManager />
       <LayoutProvider layout={layout}>

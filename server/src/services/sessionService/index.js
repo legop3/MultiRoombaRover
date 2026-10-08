@@ -12,6 +12,7 @@ const { managerEvents } = roverManager;
 const assignmentService = require('../assignmentService');
 const { getActiveDrivers, getTurnQueues, canDrive, turnEvents } = require('../turnService');
 const { buildRoverTurn } = require('../turnService/display');
+const { getRoomAudioStreams, roomAudioEvents } = require('../roomAudioService');
 const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 const {
   getPublicState: getPtzCameraState,
@@ -214,6 +215,7 @@ function buildSession(socket) {
       status: assignmentRoverId ? assignment.status : assignment.status === 'waiting' ? 'waiting' : null,
     },
     roomCameras: getRoomCameras(),
+    roomAudioStreams: getRoomAudioStreams(socket),
     ptzCamera: getPtzCameraState(socket),
     homeAssistant: getHomeAssistantState(),
     homeAssistantActivities: getActivityState(),
@@ -406,6 +408,8 @@ turnEvents.on('queue', (event = {}) => {
   logger.info('Turn queue change; syncing all clients');
   syncAll();
 });
+
+roomAudioEvents.on('update', () => syncAll());
 
 roomCameraEvents.on('update', () => {
   logger.info('Room camera change detected; syncing all clients');

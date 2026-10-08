@@ -159,6 +159,7 @@ export default function SettingsPanel() {
   const masterVolume = Number.isFinite(audioSettings?.masterVolume) ? audioSettings.masterVolume : AUDIO_SETTINGS_DEFAULTS.masterVolume;
   const alertVolume = Number.isFinite(audioSettings?.alertVolume) ? audioSettings.alertVolume : AUDIO_SETTINGS_DEFAULTS.alertVolume;
   const roverVolume = Number.isFinite(audioSettings?.roverVolume) ? audioSettings.roverVolume : AUDIO_SETTINGS_DEFAULTS.roverVolume;
+  const roomVolume = Number.isFinite(audioSettings?.roomVolume) ? audioSettings.roomVolume : AUDIO_SETTINGS_DEFAULTS.roomVolume;
   const mainBrushDuckEnabled =
     typeof audioSettings?.mainBrushDuckEnabled === 'boolean'
       ? audioSettings.mainBrushDuckEnabled
@@ -439,6 +440,11 @@ export default function SettingsPanel() {
                 label="Rover audio"
                 value={roverVolume}
                 onChange={handleAudioRange('roverVolume')}
+              />
+              <RangeSetting
+                label="Room audio"
+                value={roomVolume}
+                onChange={handleAudioRange('roomVolume')}
               />
               <SettingRow>
                 <span className="font-semibold text-white">Main brush ducking</span>

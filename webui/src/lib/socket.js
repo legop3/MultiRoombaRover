@@ -42,6 +42,7 @@ async function buildSocketIdentity() {
     audioAdjustments: currentSettings?.audioAdjustments || {},
     overseerEnabled: Boolean(currentSettings?.overseerPreference?.enabled),
     identitySurface: getIdentitySurface(),
+    role: window.location.pathname === '/mic' ? 'spectator' : 'user',
     operatingMode: window.location.pathname === '/ptz' ? 'ptz' : 'rover',
   };
 }

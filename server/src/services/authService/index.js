@@ -124,7 +124,7 @@ function grantExternalSpectatorAccessAfterAdminLogin(socket) {
 }
 
 io.on('connection', (socket) => {
-  const requestedRole = socket.handshake?.query?.role;
+  const requestedRole = socket.handshake?.auth?.role || socket.handshake?.query?.role;
   /*
     Role is assigned before the browser's full identity heartbeat has completed.
     For admin-gated external spectators, fail closed here; the spectator page can
@@ -188,4 +188,5 @@ module.exports = {
   isAdmin,
   isLockdownAdmin,
   authenticate,
+  canBecomeSpectator,
 };

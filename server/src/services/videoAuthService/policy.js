@@ -17,6 +17,7 @@ function createVideoAuthPolicy(deps) {
     turnService,
     roverManager,
     ptzCameraService,
+    roomAudioService,
     getSocketIp,
     isLocalNetwork,
     io,
@@ -58,6 +59,11 @@ function createVideoAuthPolicy(deps) {
   }
 
   function canAccessStream({ socket, streamInfo, action, sourceType }) {
+    if (streamInfo.type === 'roomAudio') {
+      return action === 'publish'
+        ? sourceType === 'roomMic' && roomAudioService.canPublish(socket, streamInfo.id)
+        : action === 'read' && sourceType === 'roomAudio' && roomAudioService.canListen(socket) && roomAudioService.hasStream(streamInfo.id);
+    }
     if (!canView(socket)) {
       return false;
     }

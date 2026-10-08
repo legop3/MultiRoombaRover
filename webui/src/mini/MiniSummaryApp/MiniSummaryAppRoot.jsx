@@ -1,6 +1,7 @@
 // Mini Summary App Root
 // Purpose: Defines the Mini Summary App Root module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
+import RoomAudioPlayer from '../../components/RoomAudioPlayer/index.jsx';
 import { useEffect } from 'react';
 import AlertFeed from '../../components/AlertFeed/index.jsx';
 import MiniSummaryContent from './MiniSummaryContent.jsx';
@@ -19,6 +20,7 @@ export default function MiniSummaryAppRoot() {
 
   return (
     <>
+      <RoomAudioPlayer />
       <MiniSummaryContent />
       <AlertFeed scale={3} opacity={1}/>
     </>

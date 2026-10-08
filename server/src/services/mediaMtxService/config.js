@@ -81,6 +81,7 @@ function buildMediaMtxConfig({ config, serverPort, snapshotWriterPath }) {
       { action: 'pprof' },
     ],
     paths: {
+      '~^room-audio/': { source: 'publisher' },
       all: {
         source: 'publisher',
         sourceOnDemand: false,

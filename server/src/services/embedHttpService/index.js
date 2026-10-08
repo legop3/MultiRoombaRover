@@ -16,7 +16,7 @@ const { renderIndexHtml, renderOgImage, renderWebManifest } = require('../embedS
   a direct browser load. Keeping the setup and admin routes in this explicit
   allowlist prevents them from working only after client-side navigation.
 */
-app.get(['/', '/old', '/spectate', '/mini', '/display', '/scanner', '/database', '/ptz', '/reports', '/setup', '/admin'], async (req, res) => {
+app.get(['/', '/old', '/spectate', '/mini', '/display', '/scanner', '/database', '/ptz', '/reports', '/setup', '/admin', '/mic'], async (req, res) => {
   try {
     const html = await renderIndexHtml(req);
     res.type('html').send(html);

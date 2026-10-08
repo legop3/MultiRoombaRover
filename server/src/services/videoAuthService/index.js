@@ -4,6 +4,7 @@
 const { app } = require('../../globals/http');
 const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('videoAuth');
+const roomAudioService = require('../roomAudioService');
 const videoSessions = require('../videoSessions');
 const { getMode, MODES } = require('../modeManager');
 const { isAdmin, isLockdownAdmin, getRole } = require('../roleService');
@@ -28,6 +29,7 @@ const { canAccessStream } = createVideoAuthPolicy({
   turnService,
   roverManager,
   ptzCameraService,
+  roomAudioService,
   getSocketIp,
   isLocalNetwork,
   io,
@@ -42,6 +44,7 @@ registerVideoAuthRoute({
   logAdminEvent,
   extractStreamInfoFromBody,
   canAccessStream,
+  trackRoomAudioSession: roomAudioService.trackMediaSession,
 });
 
 module.exports = {};
