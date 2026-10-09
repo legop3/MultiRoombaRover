@@ -28,7 +28,6 @@ import useLayoutMode from '../hooks/useLayoutMode.js';
 import { DriverHelpProvider } from '../layouts/driver/DriverHelpContext.jsx';
 import { LayoutProvider } from '../layouts/LayoutContext.jsx';
 import DriverLayoutRoot from '../layouts/driver/DriverLayoutRoot.jsx';
-import UndockedPageExitGuard from '../components/UndockedPageExitGuard/index.jsx';
 
 /* Driver-page compositions live under layouts/driver. App retains only global providers, overlays, and route-level state. */
 function DriverPageRoot({ oldDesktop = false }) {
@@ -92,7 +91,6 @@ function DriverPageContent({ layout, oldDesktop }) {
   return (
     <ControlSystemProvider>
       <RoomAudioPlayer />
-      <UndockedPageExitGuard />
       <KeyboardInputManager />
       <GamepadInputManager />
       <main className={`relative flex w-full flex-col ${themeGapClass} text-base`}>

@@ -187,6 +187,7 @@ function buildSession(socket) {
     socketId: socket?.id || null,
     role: getRole(socket),
     operatingMode: getOperatingMode(socket),
+    canLeaveRover: roverManager.canLeaveCurrentRover(socket).ok,
     mode: getMode(),
     isLocalNetwork: isLocalNetwork(getSocketIp(socket)),
     bandwidthSavings: buildBandwidthSavingsSessionState(socket, controllableUserCount),
@@ -263,10 +264,14 @@ function buildSession(socket) {
   };
 }
 
+// Cache only the published decision so sensor frames send updates on transitions.
+const leavePermissionBySocket = new WeakMap();
+
 function syncSocket(socket) {
   if (!socket) return;
   const payload = buildSession(socket);
   logger.info('Syncing session', socket.id, payload.role, payload.assignment);
+  leavePermissionBySocket.set(socket, payload.canLeaveRover);
   socket.emit('session:sync', payload);
 }
 
@@ -285,6 +290,15 @@ io.on('connection', (socket) => {
   });
   logger.info('New socket connected', socket.id);
   syncSocket(socket);
+});
+
+managerEvents.on('sensor', ({ roverId }) => {
+  io.sockets.sockets.forEach((socket) => {
+    const decision = roverManager.canLeaveCurrentRover(socket);
+    if (decision.currentId !== roverId) return;
+    if (leavePermissionBySocket.get(socket) === decision.ok) return;
+    syncSocket(socket);
+  });
 });
 
 operatingModeEvents.on('change', () => syncAll());
@@ -365,13 +379,13 @@ privateRoverAccessRequestEvents.on('change', (event = {}) => {
   syncAll();
 });
 
-managerEvents.on('driver', ({ socketId }) => {
-  if (!socketId) return;
-  const socket = io.sockets.sockets.get(socketId);
-  if (socket) {
-    logger.info('Driver assignment change; syncing session', socketId);
-    syncSocket(socket);
-  }
+// Update the changed driver and anyone whose departure permission depends on them.
+managerEvents.on('driver', ({ socketId, roverId }) => {
+  io.sockets.sockets.forEach((socket) => {
+    if (socket.id === socketId || roverManager.isDriver(roverId, socket)) {
+      syncSocket(socket);
+    }
+  });
 });
 
 turnEvents.on('activeDriver', () => {

@@ -59,20 +59,6 @@ function BarcodeScanToast({ payload }) {
   );
 }
 
-function UndockedExitWarningToast() {
-  return (
-    <div
-      className="w-[min(32rem,80vw)] rounded-md bg-amber-950 px-4 py-3 text-left text-amber-50"
-      role="alert"
-    >
-      <p className="text-xl font-bold leading-tight text-amber-100">Please dock your rover</p>
-      <p className="mt-1 text-base font-medium leading-snug text-amber-50/90">
-        Your rover is still undocked. Please dock it before leaving the page.
-      </p>
-    </div>
-  );
-}
-
 export default function AlertContent({ alert }) {
   if (alert.kind === 'buttonbox-active' && alert.payload) {
     const payload = alert.payload;
@@ -111,9 +97,6 @@ export default function AlertContent({ alert }) {
   }
   if (alert.kind === 'barcode-scan' && alert.payload) {
     return <BarcodeScanToast payload={alert.payload} />;
-  }
-  if (alert.kind === 'undocked-exit-warning') {
-    return <UndockedExitWarningToast />;
   }
   const color = typeof alert.color === 'string' ? alert.color.trim() : '';
   const backgroundColor = /^#?[0-9a-f]{6}$/i.test(color) ? `#${color.replace('#', '')}` : '#2196f3';

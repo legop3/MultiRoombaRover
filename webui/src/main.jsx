@@ -2,7 +2,7 @@
 // Purpose: Boots the React application and mounts global providers/router roots. Scope: Defines top-level route wiring and root render lifecycle for the browser app.
 import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { createBrowserRouter, Route, RouterProvider, Routes } from 'react-router-dom'
 import './index.css'
 // Theme artwork is a separate style concern from global component utilities. Loading its dedicated
 // entrypoint here keeps every route consistent without returning theme definitions to index.css.
@@ -22,6 +22,7 @@ import AnalyticsReporter from './analytics/AnalyticsReporter.jsx'
 import PtzAppRoot from './ptz/PtzAppRoot.jsx'
 import MicApp from './mic/MicApp.jsx'
 import OperatingModeRouteSync from './components/OperatingModeRouteSync/index.jsx'
+import PageExitGuard from './components/PageExitGuard/index.jsx'
 import InitialSessionOverlay from './components/InitialSessionOverlay/index.jsx'
 import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 
@@ -41,6 +42,42 @@ function lazyRoute(element, label) {
   )
 }
 
+// A data router provides one blocker for links, programmatic navigation, and history.
+const router = createBrowserRouter([{
+  path: '*',
+  element: (
+    <>
+      <AnalyticsReporter />
+      <OperatingModeRouteSync />
+      <PageExitGuard />
+      <Routes>
+        <Route path="/" element={<DriverPageRoot />} />
+        {/* The retired desktop composition remains available for direct comparison
+            without duplicating the driver shell or changing canonical mobile layouts. */}
+        <Route path="/old" element={<DriverPageRoot oldDesktop />} />
+        <Route path="/spectate" element={<SpectatorApp />} />
+        <Route path="/mini" element={<MiniSummaryApp />} />
+        <Route path="/display" element={<ServerDisplayApp />} />
+        <Route path="/mic" element={<MicApp />} />
+        <Route path="/scanner" element={<ScannerApp />} />
+        <Route path="/setup" element={lazyRoute(<SetupApp />, 'setup')} />
+        <Route path="/admin" element={lazyRoute(<AdminApp />, 'administration')} />
+        {/*
+          PTZ is a separate route so the driver layout and its replay
+          panel are not mounted behind the camera controller. This
+          also makes orientation changes a PTZ layout concern instead
+          of a local overlay-open state owned by the driver page.
+        */}
+        <Route path="/ptz" element={<PtzAppRoot />} />
+        <Route
+          path="/reports"
+          element={lazyRoute(<FleetReportsApp />, 'fleet reports')}
+        />
+      </Routes>
+    </>
+  ),
+}])
+
 createRoot(document.getElementById('root')).render(
   <AppErrorBoundary>
   <StrictMode>
@@ -55,34 +92,7 @@ createRoot(document.getElementById('root')).render(
           <SettingsProvider>
             <ChatProvider>
               <DeterrenceChaos />
-              <BrowserRouter>
-                <AnalyticsReporter />
-                <OperatingModeRouteSync />
-                <Routes>
-                  <Route path="/" element={<DriverPageRoot />} />
-                  {/* The retired desktop composition remains available for direct comparison
-                      without duplicating the driver shell or changing canonical mobile layouts. */}
-                  <Route path="/old" element={<DriverPageRoot oldDesktop />} />
-                  <Route path="/spectate" element={<SpectatorApp />} />
-                  <Route path="/mini" element={<MiniSummaryApp />} />
-                  <Route path="/display" element={<ServerDisplayApp />} />
-                  <Route path="/mic" element={<MicApp />} />
-                  <Route path="/scanner" element={<ScannerApp />} />
-                  <Route path="/setup" element={lazyRoute(<SetupApp />, 'setup')} />
-                  <Route path="/admin" element={lazyRoute(<AdminApp />, 'administration')} />
-                  {/*
-                    PTZ is a separate route so the driver layout and its replay
-                    panel are not mounted behind the camera controller. This
-                    also makes orientation changes a PTZ layout concern instead
-                    of a local overlay-open state owned by the driver page.
-                  */}
-                  <Route path="/ptz" element={<PtzAppRoot />} />
-                  <Route
-                    path="/reports"
-                    element={lazyRoute(<FleetReportsApp />, 'fleet reports')}
-                  />
-                </Routes>
-              </BrowserRouter>
+              <RouterProvider router={router} />
             </ChatProvider>
           </SettingsProvider>
         </TelemetryProvider>
