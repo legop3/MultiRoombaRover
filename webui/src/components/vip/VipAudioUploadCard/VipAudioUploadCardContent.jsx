@@ -9,7 +9,7 @@ import { useSettingsNamespace } from '../../../settings/index.js';
 import { MAX_UPLOAD_BYTES, TARGET_SAMPLE_RATE } from './constants.js';
 import { bytesToBase64 } from './base64.js';
 import { waitForOutboundAudioFlow } from './whipTransport.js';
-import MediaMTXWebRTCPublisher from '../../../lib/vendor/mediamtxPublisher.js';
+import MediaMTXWebRTCPublisher from '../../../../.cache/mediamtx/publisher.js';
 import useServerUrl from '../../../hooks/useServerUrl.js';
 import { mergeFloatChunks, encodeWavMono16 } from './audioCodec.js';
 import StatusIndicator from './StatusIndicator.jsx';

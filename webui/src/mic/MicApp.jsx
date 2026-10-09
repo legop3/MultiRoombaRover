@@ -5,7 +5,7 @@ import useUserIdentitySync from '../hooks/useUserIdentitySync.js';
 import { RESTART_DELAY_MS } from '../lib/whepPlayback.js';
 import { ControlSystemProvider, KeyboardInputManager, GamepadInputManager, useControlSelector } from '../controls/index.js';
 import ControlHint from '../components/ControlHint/index.jsx';
-import MediaMTXWebRTCPublisher from '../lib/vendor/mediamtxPublisher.js';
+import MediaMTXWebRTCPublisher from '../../.cache/mediamtx/publisher.js';
 import useServerUrl from '../hooks/useServerUrl.js';
 
 export default function MicApp() {
