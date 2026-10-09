@@ -5,9 +5,11 @@ import { useSettingsNamespace } from '../../settings/index.js';
 import { AUDIO_SETTINGS_DEFAULTS } from '../../settings/namespaces.js';
 import { RESTART_DELAY_MS, startWhepPlayback } from '../../lib/whepPlayback.js';
 import useWhepRestart from '../../hooks/useWhepRestart.js';
+import useServerUrl from '../../hooks/useServerUrl.js';
 
 function StreamPlayer({ id, volume }) {
   const socket = useSocket();
+  const serverUrl = useServerUrl();
   const audio = useRef(null);
   const { restartToken, scheduleRestart } = useWhepRestart();
   useEffect(() => {
@@ -22,7 +24,7 @@ function StreamPlayer({ id, volume }) {
       token = response.token;
       if (error || response.error || !response.url) { scheduleRestart(); return; }
       stop = startWhepPlayback({
-        ...response, video: audio.current, audioOnly: true,
+        ...response, url: serverUrl(response.url), video: audio.current, audioOnly: true,
         onStatus: () => {}, onError: () => {}, scheduleRestart,
       });
     });
@@ -30,7 +32,7 @@ function StreamPlayer({ id, volume }) {
       active = false; stop?.();
       if (token && socket.connected) socket.emit('roomAudio:release', { token });
     };
-  }, [id, socket, restartToken, scheduleRestart]);
+  }, [id, socket, restartToken, scheduleRestart, serverUrl]);
   useEffect(() => { if (audio.current) audio.current.volume = Math.max(0, Math.min(1, volume)); }, [volume]);
   return <audio ref={audio} autoPlay />;
 }

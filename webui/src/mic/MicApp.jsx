@@ -6,6 +6,7 @@ import { RESTART_DELAY_MS } from '../lib/whepPlayback.js';
 import { ControlSystemProvider, KeyboardInputManager, GamepadInputManager, useControlSelector } from '../controls/index.js';
 import ControlHint from '../components/ControlHint/index.jsx';
 import MediaMTXWebRTCPublisher from '../lib/vendor/mediamtxPublisher.js';
+import useServerUrl from '../hooks/useServerUrl.js';
 
 export default function MicApp() {
   return (
@@ -19,6 +20,7 @@ export default function MicApp() {
 
 function MicPage() {
   const socket = useSocket();
+  const serverUrl = useServerUrl();
   const connected = useSessionSelector((state) => state.connected);
   const local = useSessionSelector((state) => state.session?.isLocalNetwork);
   const enabled = useSessionSelector((state) => state.session?.features?.roomAudio);
@@ -109,7 +111,7 @@ function MicPage() {
         if (!isCurrent(current)) return;
         setStatus('Connecting audio…');
         current.publisher = new MediaMTXWebRTCPublisher({
-          url: new URL(source.url, window.location.href).href,
+          url: serverUrl(source.url),
           user: source.token,
           pass: source.token,
           stream: media,
@@ -135,7 +137,7 @@ function MicPage() {
       mediaRef.current = null;
       if (socket.connected) socket.emit('roomAudio:stop', {});
     };
-  }, [socket, connected, local, enabled]);
+  }, [socket, connected, local, enabled, serverUrl]);
   const message = !connected ? 'Connecting…' : local === false ? 'This page is available to local visitors only.' : !enabled ? 'Room audio is disabled.' : status;
   return (
     <main className="min-h-screen bg-neutral-950 p-4 text-slate-200">

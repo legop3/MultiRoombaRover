@@ -1,19 +1,16 @@
 // Vip Audio Upload Card Content
 // Purpose: Defines the Vip Audio Upload Card Content module and the local helpers/components used in this file.
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { fieldClass } from '../constants.js';
 import { useControlSelector } from '../../../controls/index.js';
 import ControlHint from '../../ControlHint/index.jsx';
 import { useSettingsNamespace } from '../../../settings/index.js';
-import { MAX_UPLOAD_BYTES, TARGET_SAMPLE_RATE, RTC_CONFIG } from './constants.js';
-import { bytesToBase64, buildAuthHeader } from './base64.js';
-import {
-  waitForIceGatheringComplete,
-  waitForPeerConnected,
-  configureSenderForLowLatency,
-  waitForOutboundAudioFlow,
-} from './whipTransport.js';
+import { MAX_UPLOAD_BYTES, TARGET_SAMPLE_RATE } from './constants.js';
+import { bytesToBase64 } from './base64.js';
+import { waitForOutboundAudioFlow } from './whipTransport.js';
+import MediaMTXWebRTCPublisher from '../../../lib/vendor/mediamtxPublisher.js';
+import useServerUrl from '../../../hooks/useServerUrl.js';
 import { mergeFloatChunks, encodeWavMono16 } from './audioCodec.js';
 import StatusIndicator from './StatusIndicator.jsx';
 import KeyPill from './KeyPill.jsx';
@@ -28,6 +25,7 @@ export default function VipAudioUploadCard({
   readyMicWhip,
   stopMicWhip,
 }) {
+  const serverUrl = useServerUrl();
   const pttActive = useControlSelector((control) => Boolean(control.state.mic?.pttActive));
   const { value: vipAudio, save: saveVipAudio } = useSettingsNamespace('vipAudio', {
     openMicEnabled: false,
@@ -47,7 +45,8 @@ export default function VipAudioUploadCard({
 
   const streamRef = useRef(null);
   const audioTrackRef = useRef(null);
-  const whipPcRef = useRef(null);
+  const micAttemptRef = useRef(null);
+  const micEnabledRef = useRef(false);
   const micActiveRef = useRef(false);
   const activeRoverRef = useRef('');
 
@@ -146,19 +145,12 @@ export default function VipAudioUploadCard({
       const target = String(targetRoverId || activeRoverRef.current || '').trim();
       micActiveRef.current = false;
       setMicState('idle');
-      if (whipPcRef.current) {
-        try {
-          whipPcRef.current.getSenders().forEach((sender) => sender.track?.stop());
-        } catch {
-          // noop
-        }
-        try {
-          whipPcRef.current.close();
-        } catch {
-          // noop
-        }
-      }
-      whipPcRef.current = null;
+      const publisher = micAttemptRef.current?.publisher;
+      micAttemptRef.current = null;
+      activeRoverRef.current = '';
+      publisher?.close();
+      // The upstream client stops transport retries; release its HTTP session separately.
+      if (publisher?.sessionUrl) fetch(publisher.sessionUrl, { method: 'DELETE', keepalive: true }).catch(() => {});
       if (streamRef.current) {
         try {
           streamRef.current.getTracks().forEach((track) => track.stop());
@@ -175,14 +167,15 @@ export default function VipAudioUploadCard({
           // noop
         }
       }
-      activeRoverRef.current = '';
     },
     [stopMicWhip],
   );
 
   const startWhipMic = useCallback(
-    async (target) => {
+    async (target, attempt) => {
+      const isCurrent = () => micAttemptRef.current === attempt && activeRoverRef.current === target;
       const startPayload = await startMicWhip?.(target);
+      if (!isCurrent()) return;
       const whipUrl = String(startPayload?.whipUrl || '').trim();
       const token = String(startPayload?.token || '').trim();
       if (!whipUrl || !token) {
@@ -198,12 +191,16 @@ export default function VipAudioUploadCard({
           autoGainControl: false,
         },
       });
+      if (!isCurrent()) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
 
       const track = stream.getAudioTracks()?.[0];
       audioTrackRef.current = track || null;
       if (track) {
-        track.enabled = Boolean(openMicEnabled || pttActive);
+        track.enabled = micEnabledRef.current;
       }
       if (track?.applyConstraints) {
         try {
@@ -219,47 +216,42 @@ export default function VipAudioUploadCard({
         }
       }
 
-      const pc = new RTCPeerConnection(RTC_CONFIG);
-      whipPcRef.current = pc;
-      pc.onconnectionstatechange = () => {
-        if (!micActiveRef.current) return;
-        const state = pc.connectionState;
-        if (state === 'connected') {
-          setMicState('live');
-          return;
-        }
-        if (state === 'failed' || state === 'disconnected' || state === 'closed') {
-          setMicState('error');
-          setMessage(`WHIP transport ${state}.`);
-        }
-      };
-      stream.getAudioTracks().forEach((audioTrack) => {
-        const sender = pc.addTrack(audioTrack, stream);
-        configureSenderForLowLatency(sender);
-      });
-
-      const offer = await pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
-      await pc.setLocalDescription(offer);
-      await waitForIceGatheringComplete(pc, 1800);
-
-      const response = await fetch(whipUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/sdp',
-          ...buildAuthHeader(token),
+      if (!isCurrent()) return;
+      attempt.publisher = new MediaMTXWebRTCPublisher({
+        url: serverUrl(whipUrl),
+        user: token,
+        pass: token,
+        stream,
+        audioCodec: 'opus',
+        audioBitrate: 64,
+        audioVoice: true,
+        onConnected: async () => {
+          if (!isCurrent()) return;
+          const pc = attempt.publisher.pc;
+          try {
+            // Report ready only after audio is flowing, including on transport reconnection.
+            await waitForOutboundAudioFlow(pc);
+            if (!isCurrent() || attempt.publisher.pc !== pc) return;
+            await readyMicWhip?.(target);
+            if (!isCurrent() || attempt.publisher.pc !== pc) return;
+            setMicState('live');
+            setMessage('');
+          } catch (error) {
+            if (!isCurrent() || attempt.publisher.pc !== pc) return;
+            await stopMicCapture(target);
+            if (micAttemptRef.current) return;
+            setMicState('error');
+            setMessage(error.message || 'Failed to start mic forwarding.');
+          }
         },
-        body: pc.localDescription?.sdp || offer.sdp,
+        onError: (message) => {
+          if (!isCurrent()) return;
+          setMicState('starting');
+          setMessage(message);
+        },
       });
-      if (!response.ok) {
-        throw new Error(`WHIP request failed: ${response.status}`);
-      }
-      const answerSdp = await response.text();
-      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-      await waitForPeerConnected(pc, 10000);
-      await waitForOutboundAudioFlow(pc, 6000);
-      await readyMicWhip?.(target);
     },
-    [openMicEnabled, pttActive, readyMicWhip, startMicWhip],
+    [readyMicWhip, startMicWhip, stopMicCapture, serverUrl],
   );
 
   const teardownClipPipeline = useCallback(async () => {
@@ -410,8 +402,6 @@ export default function VipAudioUploadCard({
   }, [ensureClipPipeline, roverId]);
 
   useEffect(() => {
-    let cancelled = false;
-
     async function syncLiveMic() {
       if (clipMode) {
         await stopMicCapture(activeRoverRef.current || roverId);
@@ -425,34 +415,31 @@ export default function VipAudioUploadCard({
       if (micActiveRef.current && activeRoverRef.current === roverId) return;
       if (!openMicEnabled && !pttActive) return;
 
+      const attempt = {};
+      micAttemptRef.current = attempt;
       try {
         setMicState('starting');
         setMessage('');
         micActiveRef.current = true;
         activeRoverRef.current = roverId;
-        await startWhipMic(roverId);
-        if (!cancelled) {
-          setMicState('live');
-        }
+        await startWhipMic(roverId, attempt);
       } catch (err) {
-        if (!cancelled) {
+        if (micAttemptRef.current === attempt) {
+          await stopMicCapture(roverId);
+          if (micAttemptRef.current) return;
           setMicState('error');
           setMessage(err?.message || 'Failed to start mic forwarding.');
         }
-        await stopMicCapture(roverId);
       }
     }
 
     syncLiveMic();
-    return () => {
-      cancelled = true;
-    };
   }, [clipMode, openMicEnabled, pttActive, roverId, startWhipMic, stopMicCapture]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    micEnabledRef.current = Boolean(!clipMode && (openMicEnabled || pttActive));
     const track = audioTrackRef.current;
-    if (!track) return;
-    track.enabled = Boolean(!clipMode && (openMicEnabled || pttActive));
+    if (track) track.enabled = micEnabledRef.current;
   }, [clipMode, openMicEnabled, pttActive]);
 
   useEffect(() => {

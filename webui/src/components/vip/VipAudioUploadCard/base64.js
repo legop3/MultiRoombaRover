@@ -10,14 +10,3 @@ export function bytesToBase64(bytes) {
   }
   return btoa(binary);
 }
-
-function encodeBase64(value) {
-  if (typeof btoa === 'function') return btoa(value);
-  return '';
-}
-
-export function buildAuthHeader(token) {
-  if (!token) return {};
-  const encoded = encodeBase64(`${token}:${token}`);
-  return encoded ? { Authorization: `Basic ${encoded}` } : {};
-}
