@@ -2,8 +2,10 @@
 // Purpose: Resolves replay-capable media sources and ffmpeg worker arguments.
 // Scope: Converts live rover/room state into stable source descriptors and stream worker config.
 const path = require('path');
+const { randomUUID } = require('crypto');
 const roverManager = require('../roverManager');
 const { getRoomCameras } = require('../roomCameraService');
+const { getActiveRoomAudioStreams } = require('../roomAudioService');
 const ptzCameraService = require('../ptzCameraService');
 const { FFMPEG_BIN, SEGMENT_SECONDS, TARGET_FPS } = require('./constants');
 
@@ -51,12 +53,17 @@ function listDesiredSources() {
   // both come from the same live MediaMTX path, unlike rovers where audio is a
   // separate published stream.
   sources.push(...ptzCameraService.getReplayWorkerSources());
+  for (const stream of getActiveRoomAudioStreams()) {
+    sources.push({ id: stream.id, sourceType: 'roomAudio', kind: 'audio', label: stream.name,
+      inputUrl: `rtsp://127.0.0.1:8554/room-audio/${encodeURIComponent(stream.id)}` });
+  }
   return sources;
 }
 
 function buildWorkerArgs(activeSegmentRoot, source) {
   const dir = sourceDirForKey(activeSegmentRoot, sourceKey(source));
-  const pattern = path.join(dir, 'seg-%06d.mp4');
+  // Each capture process owns its filenames so restarts preserve buffered segments.
+  const pattern = path.join(dir, `seg-${randomUUID()}-%06d.mp4`);
   // MediaMTX and RTSP cameras use TCP so replay capture has one reliable
   // transport and never falls back to separate RTP/RTCP UDP listeners.
   const inputTransport = /^rtsps?:\/\//i.test(source.inputUrl)

@@ -6,6 +6,7 @@ const { promisify } = require('util');
 const fsp = require('fs/promises');
 const logger = require('../../globals/logger').child('replayEngineV2');
 const roverManager = require('../roverManager');
+const { roomAudioEvents } = require('../roomAudioService');
 const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 
 const {
@@ -40,8 +41,8 @@ function getActiveSegmentRoot() {
   return runtime.activeSegmentRoot;
 }
 
-const workerManager = createWorkerManager({ getActiveSegmentRoot });
 const segmentStore = createSegmentStore({ getActiveSegmentRoot });
+const workerManager = createWorkerManager({ getActiveSegmentRoot, onWorkerClosed: segmentStore.refreshIndexForWorker });
 const sidebarRenderer = createSidebarRenderer({ execFileAsync, ensureDir });
 const replayBuilder = createReplayBuilder({
   execFileAsync,
@@ -50,6 +51,7 @@ const replayBuilder = createReplayBuilder({
   renderSidebarVideo: sidebarRenderer.renderSidebarVideo,
   getVideoEntriesForSource: segmentStore.getVideoEntriesForSource,
   getAudioEntriesForSource: segmentStore.getAudioEntriesForSource,
+  getRoomAudioEntries: segmentStore.getRoomAudioEntries,
   overlapping: segmentStore.overlapping,
 });
 registerReplaySocketHooks({ tryTriggerReplay, validateSources, getDefaultWebSources });
@@ -87,6 +89,10 @@ async function start() {
     tick().catch((err) => logger.warn('tick failed', err.message));
   }, CLEANUP_INTERVAL_MS);
 }
+
+roomAudioEvents.on('update', () => {
+  tick().catch((err) => logger.warn('room audio update tick failed', err.message));
+});
 
 roomCameraEvents.on('update', () => {
   tick().catch((err) => logger.warn('room camera update tick failed', err.message));

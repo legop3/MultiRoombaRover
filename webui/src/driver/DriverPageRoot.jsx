@@ -1,5 +1,6 @@
 // Main Application Shell
 // Purpose: Composes the primary rover control interface and page-level layout. Scope: Orchestrates high-level panels, overlays, and feature modules for the default route.
+import RoomAudioPlayer from '../components/RoomAudioPlayer/index.jsx';
 import { useCallback, useEffect, useState } from 'react';
 import AlertFeed from '../components/AlertFeed/index.jsx';
 import {
@@ -90,11 +91,7 @@ function DriverPageContent({ layout, oldDesktop }) {
   );
   return (
     <ControlSystemProvider>
-      {/*
-        Keep document-exit protection inside the control provider so it follows
-        the same assigned-rover identity as every driving command. Mounting it
-        only on the driver page leaves spectator and utility routes unchanged.
-      */}
+      <RoomAudioPlayer />
       <UndockedPageExitGuard />
       <KeyboardInputManager />
       <GamepadInputManager />

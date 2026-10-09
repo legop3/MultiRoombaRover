@@ -176,6 +176,7 @@ export const AUDIO_SETTINGS_DEFAULTS = {
   masterVolume: 1,
   alertVolume: 0.5,
   roverVolume: 1,
+  roomVolume: 1,
   mainBrushDuckEnabled: true,
   mainBrushDuckAmount: 0.75,
 };

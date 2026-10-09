@@ -13,6 +13,7 @@ const audioForward = require('../services/audioForwardService/configuration');
 const audioLevels = require('../services/audioLevelsService/configuration');
 const homeAssistant = require('../services/homeAssistantService/configuration');
 const homeAssistantActivities = require('../services/homeAssistantActivitiesService/configuration');
+const roomAudio = require('../services/roomAudioService/configuration');
 const roomCameras = require('../services/roomCameraService/configuration');
 const ptzCamera = require('../services/ptzCameraService/configuration');
 const kinect = require('../services/kinectService/configuration');
@@ -46,6 +47,7 @@ const definitions = [
   // Activities own a separate catalog even though the HA connection is shared.
   homeAssistantActivities,
   roomCameras,
+  roomAudio,
   ptzCamera,
   kinect,
   balanceBoard,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { startWhepPlayback } from '../../lib/whepPlayback.js';
 import useWhepRestart from '../../hooks/useWhepRestart.js';
+import useServerUrl from '../../hooks/useServerUrl.js';
 import { useTelemetrySelector } from '../../context/TelemetryContext.jsx';
 import {
   mainBrushAudioTelemetryEqual,
@@ -130,6 +131,7 @@ export default function RoverMediaPlayer({
   pauseVideoWhenHidden = null,
 }) {
   const assignedRoverId = useSessionSelector((state) => state.session?.assignment?.roverId ?? null);
+  const serverUrl = useServerUrl();
   const effectiveRoverId = roverId ?? assignedRoverId;
   const mode = useSessionSelector((state) => state.session?.mode || null);
   const configuredPauseHiddenRoverVideo = useSessionSelector(
@@ -415,7 +417,7 @@ export default function RoverMediaPlayer({
     }
     const resetMuteId = setTimeout(() => setMuted(true), 0);
     const stop = startWhepPlayback({
-      url: resolvedSessionInfo.url,
+      url: serverUrl(resolvedSessionInfo.url),
       token: resolvedSessionInfo.token,
       video: videoRef.current,
       receiveAudio: !hasDedicatedAudio,
@@ -446,6 +448,7 @@ export default function RoverMediaPlayer({
     hasDedicatedAudio,
     logAudio,
     effectiveRoverId,
+    serverUrl,
   ]);
 
   useEffect(() => {
@@ -510,7 +513,7 @@ export default function RoverMediaPlayer({
       return undefined;
     }
     return startWhepPlayback({
-      url: resolvedAudioSessionInfo.url,
+      url: serverUrl(resolvedAudioSessionInfo.url),
       token: resolvedAudioSessionInfo.token,
       video: audioRef.current,
       audioOnly: true,
@@ -533,6 +536,7 @@ export default function RoverMediaPlayer({
     audioRestartToken,
     scheduleAudioRestart,
     logAudio,
+    serverUrl,
   ]);
 
   useEffect(() => {

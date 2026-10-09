@@ -11,6 +11,7 @@ function registerVideoAuthRoute(deps) {
     logAdminEvent,
     extractStreamInfoFromBody,
     canAccessStream,
+    trackRoomAudioSession,
   } = deps;
 
   app.post('/mediamtx/auth', (req, res) => {
@@ -36,7 +37,8 @@ function registerVideoAuthRoute(deps) {
     const isLoopback = ip === '127.0.0.1' || ip === '::1';
     const isRoverForwardAudioRead = action === 'read'
       && isRtspProtocol
-      && streamInfo?.id?.endsWith('-fwd');
+      && streamInfo?.type === 'rover'
+      && streamInfo.id.endsWith('-fwd');
     // Replay and snapshot workers read MediaMTX through loopback RTSP. They do
     // not represent a browser session. Rovers likewise read their dedicated
     // -fwd speaker feed without browser credentials; every other non-loopback
@@ -50,7 +52,7 @@ function registerVideoAuthRoute(deps) {
       callback for RTSP, so explicitly admit that publish protocol while leaving WHEP reads
       under the existing session and role checks below.
     */
-    if (action === 'publish' && isRtspProtocol) {
+    if (action === 'publish' && isRtspProtocol && (streamInfo?.type !== 'roomAudio' || isLoopback)) {
       return res.status(200).end();
     }
 
@@ -62,7 +64,9 @@ function registerVideoAuthRoute(deps) {
     const info = videoSessions.getSession(sessionId);
     const streamTypeMatches =
       info &&
-      (info.sourceType === streamInfo.type || (info.sourceType === 'roverMic' && streamInfo.type === 'rover'));
+      (info.sourceType === streamInfo.type
+        || (info.sourceType === 'roomMic' && streamInfo.type === 'roomAudio')
+        || (info.sourceType === 'roverMic' && streamInfo.type === 'rover'));
     if (!info || !streamTypeMatches || info.sourceId !== streamInfo.id) {
       logger.warn('invalid session %s for stream %s:%s', sessionId, streamInfo.type, streamInfo.id);
       return res.status(401).end();
@@ -78,6 +82,7 @@ function registerVideoAuthRoute(deps) {
       return res.status(401).end();
     }
 
+    if (streamInfo.type === 'roomAudio' && protocol === 'webrtc') trackRoomAudioSession(body.id, sessionId);
     return res.status(200).end();
   });
 }

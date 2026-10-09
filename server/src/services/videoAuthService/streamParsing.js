@@ -33,6 +33,8 @@ function extractStreamInfo(path) {
     return { type: 'rover', id: rawId, baseId };
   }
 
+  if (remaining.length === 2 && remaining[0] === 'room-audio') return { type: 'roomAudio', id: remaining[1] };
+
   if (remaining.length === 2 && remaining[0] === 'room') {
     return { type: 'room', id: remaining[1] || '' };
   }

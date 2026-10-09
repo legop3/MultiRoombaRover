@@ -18,7 +18,9 @@ const {
 
 function buildWhepUrlForSource(source) {
   const segments = [];
-  if (source.type === 'room') {
+  if (source.type === 'roomAudio') {
+    segments.push('room-audio', encodeURIComponent(source.id));
+  } else if (source.type === 'room') {
     segments.push('room', encodeURIComponent(source.id));
   } else if (source.type === 'ptz') {
     /*
@@ -145,6 +147,9 @@ io.on('connection', (socket) => {
           */
           throw new Error('Live video is limited to this rover queue');
         }
+      } else if (target.type === 'roomAudio') {
+        const roomAudio = require('../roomAudioService');
+        if (!roomAudio.canListen(socket) || !roomAudio.hasStream(target.id)) throw new Error('Room audio unavailable');
       } else if (target.type === 'room') {
         throw new Error('Room cameras now use the snapshot feed');
       } else if (target.type === 'ptz') {

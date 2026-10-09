@@ -23,9 +23,13 @@ services:
       # Required for Bluetooth hardware such as the Balance Board.
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro
 
-    # Required for Kinect USB access.
+    # Kinect USB access.
     devices:
       - /dev/bus/usb:/dev/bus/usb
+      # For a server-local microphone, uncomment this device and group_add below.
+      # - /dev/snd:/dev/snd
+    # group_add:
+    #   - "${AUDIO_GID:?Set AUDIO_GID to the host sound device group ID}"
 
     cap_add:
       - NET_ADMIN

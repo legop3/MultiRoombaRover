@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useVideoRequests } from '../../hooks/useVideoRequests.js';
 import { startWhepPlayback } from '../../lib/whepPlayback.js';
 import useWhepRestart from '../../hooks/useWhepRestart.js';
+import useServerUrl from '../../hooks/useServerUrl.js';
 
 export const PTZ_CAMERA_ID = 'ptz-camera';
 
@@ -23,6 +24,7 @@ export default function PtzLiveVideo({
   statusClassName = 'pointer-events-none absolute left-1 top-1 z-20 font-medium text-slate-100 text-[0.65rem]',
   fallback = null,
 }) {
+  const serverUrl = useServerUrl();
   const videoRef = useRef(null);
   const playTimerRef = useRef(null);
   const [status, setStatus] = useState('idle');
@@ -44,7 +46,7 @@ export default function PtzLiveVideo({
     if (!enabled || shouldUseFallback || !source?.url || !videoRef.current) return undefined;
     const video = videoRef.current;
     const stop = startWhepPlayback({
-      url: source.url,
+      url: serverUrl(source.url),
       token: source.token,
       video: videoRef.current,
       startMuted,
@@ -76,7 +78,7 @@ export default function PtzLiveVideo({
       video.removeEventListener('error', handleError);
       stop();
     };
-  }, [enabled, scheduleRestart, shouldUseFallback, source?.token, source?.url, startMuted]);
+  }, [enabled, scheduleRestart, shouldUseFallback, source?.token, source?.url, startMuted, serverUrl]);
 
   useEffect(() => {
     const video = videoRef.current;

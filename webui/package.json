@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "VITE_ROVERD_URL=https://rover.otter.land vite",
+    "predev": "node scripts/prepareMediaMtx.js",
+    "dev": "VITE_ROVERD_URL=https://rovertest.otter.land vite",
+    "prebuild": "node scripts/prepareMediaMtx.js",
     "build": "vite build",
     "lint": "eslint .",
     "test": "node --test src/controls/inputs/*.test.js src/components/GamepadMappingSettings/*.test.js",

@@ -12,7 +12,7 @@ async function ensureDir(dir) {
   await fsp.mkdir(dir, { recursive: true });
 }
 
-function createWorkerManager({ getActiveSegmentRoot }) {
+function createWorkerManager({ getActiveSegmentRoot, onWorkerClosed }) {
   function startWorker(source) {
     const key = sourceKey(source);
     if (workers.has(key) || pendingWorkerStarts.has(key)) return;
@@ -21,26 +21,36 @@ function createWorkerManager({ getActiveSegmentRoot }) {
     const dir = sourceDirForKey(getActiveSegmentRoot(), key);
     ensureDir(dir)
       .then(() => {
-        if (workers.has(key)) {
+        // Directory creation can finish after a microphone has disconnected.
+        if (workers.has(key) || !listDesiredSources().some((entry) => sourceKey(entry) === key)) {
           pendingWorkerStarts.delete(key);
           return;
         }
         const proc = spawn(FFMPEG_BIN, args, { stdio: ['ignore', 'ignore', 'pipe'] });
-        workers.set(key, { key, source, proc });
+        const worker = { key, source, proc, stopping: false };
+        workers.set(key, worker);
         pendingWorkerStarts.delete(key);
         proc.stderr.on('data', (chunk) => {
           const text = String(chunk || '').trim();
           if (!text) return;
           logger.warn('worker stderr', { key, text: text.slice(0, 500) });
         });
-        proc.on('exit', (code, signal) => {
-          const current = workers.get(key);
-          if (current?.proc === proc) workers.delete(key);
-          logger.warn('worker exited', { key, code, signal });
-          setTimeout(() => {
-            const desired = listDesiredSources().find((entry) => sourceKey(entry) === key);
-            if (desired && !workers.has(key)) startWorker(desired);
-          }, 1500);
+        proc.on('error', (err) => logger.warn('worker process failed', { key, error: err.message }));
+        worker.finished = new Promise((resolve) => {
+          proc.once('close', async (code, signal) => {
+            clearTimeout(worker.killTimer);
+            // FFmpeg writes the final MP4 trailer before close. Index it before
+            // releasing this worker so a disconnect cannot drop its last audio.
+            try { await onWorkerClosed(worker); }
+            catch (err) { logger.warn('final worker indexing failed', { key, error: err.message }); }
+            if (workers.get(key) === worker) workers.delete(key);
+            resolve();
+            logger.warn('worker exited', { key, code, signal });
+            if (!worker.stopping) setTimeout(() => {
+              const desired = listDesiredSources().find((entry) => sourceKey(entry) === key);
+              if (desired && !workers.has(key)) startWorker(desired);
+            }, 1500);
+          });
         });
       })
       .catch((err) => {
@@ -52,8 +62,14 @@ function createWorkerManager({ getActiveSegmentRoot }) {
   function stopWorker(key) {
     const worker = workers.get(key);
     if (!worker) return;
-    try { worker.proc.kill('SIGTERM'); } catch {}
-    workers.delete(key);
+    if (!worker.stopping) {
+      worker.stopping = true;
+      worker.proc.kill('SIGTERM');
+      // Bound shutdown if a capture is blocked waiting on its network input.
+      worker.killTimer = setTimeout(() => worker.proc.kill('SIGKILL'), 3000);
+      worker.killTimer.unref();
+    }
+    return worker.finished;
   }
 
   async function syncWorkers() {
@@ -63,9 +79,11 @@ function createWorkerManager({ getActiveSegmentRoot }) {
       const key = sourceKey(source);
       if (!workers.has(key)) startWorker(source);
     }
+    const stops = [];
     for (const key of Array.from(workers.keys())) {
-      if (!desiredKeys.has(key)) stopWorker(key);
+      if (!desiredKeys.has(key)) stops.push(stopWorker(key));
     }
+    await Promise.all(stops);
   }
 
   return { startWorker, stopWorker, syncWorkers };

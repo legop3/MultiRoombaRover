@@ -51,7 +51,7 @@ function buildChatEventsForWindow(startMs, endMs, limit = 22, preWindowCount = 1
   return [...beforeWindow, ...inWindow].sort((a, b) => a.ts - b.ts);
 }
 
-function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo, getVideoEntriesForSource, getAudioEntriesForSource, overlapping }) {
+function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo, getVideoEntriesForSource, getAudioEntriesForSource, getRoomAudioEntries, overlapping }) {
   function resolveReplayWindow({ sources = [], nowMs, guardMs, durationMs }) {
     const tentativeEnd = nowMs - guardMs;
     const sourceEnds = [];
@@ -185,6 +185,28 @@ function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo
       }
 
       if (!normalizedVideos.length) throw new Error('No replay segments available for selected sources');
+
+      const roomAudioEntries = await pinSegmentFiles(
+        overlapping(getRoomAudioEntries(), tStart, tEnd), tmpDir, 'room-audio-seg',
+      );
+      if (roomAudioEntries.length) {
+        // Place each segment at its recorded time. A mic joining late or
+        // reconnecting must leave silence in the gap, not shift its speech earlier.
+        const audioInputs = roomAudioEntries.flatMap((entry) => ['-i', entry.filePath]);
+        const audioFilters = roomAudioEntries.map((entry, index) => {
+          const start = Math.max(0, (tStart - entry.startMs) / 1000);
+          const duration = (Math.min(tEnd, entry.endMs) - Math.max(tStart, entry.startMs)) / 1000;
+          const delay = Math.max(0, Math.round(entry.startMs - tStart));
+          return `[${index}:a]atrim=start=${start.toFixed(3)}:duration=${duration.toFixed(3)},asetpts=PTS-STARTPTS,adelay=${delay}:all=1[room${index}]`;
+        });
+        const refs = roomAudioEntries.map((_, index) => `[room${index}]`).join('');
+        audioFilters.push(`${refs}amix=inputs=${roomAudioEntries.length}:normalize=0[roomout]`);
+        const roomAudioPath = path.join(tmpDir, 'room-audio.m4a');
+        await execFileAsync(FFMPEG_BIN, ['-y', '-hide_banner', '-loglevel', 'error', ...audioInputs,
+          '-filter_complex', audioFilters.join(';'), '-map', '[roomout]', '-vn', '-ac', '1', '-ar', '48000',
+          '-c:a', 'aac', '-b:a', '96k', roomAudioPath]);
+        normalizedAudios.push(roomAudioPath);
+      }
 
       const layout = buildGridLayout(normalizedVideos.length);
       const { maxWidth, maxHeight } = await probeMaxFrameSize(normalizedVideos.map((v) => v.path));

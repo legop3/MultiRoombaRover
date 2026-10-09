@@ -6,9 +6,10 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../../globals/logger').child('replayEngineV2');
 const { BUFFER_SECONDS, SEGMENT_SECONDS } = require('./constants');
-const { workers, segmentIndex } = require('./state');
+const { workers, pendingWorkerStarts, segmentIndex } = require('./state');
 const { sourceKey, sourceDirForKey } = require('./sources');
 const ptzCameraService = require('../ptzCameraService');
+const SEGMENT_FILENAME_PATTERN = /^seg-[a-f0-9-]+-\d{6}\.mp4$/;
 
 async function ensureDir(dir) {
   await fsp.mkdir(dir, { recursive: true });
@@ -25,7 +26,7 @@ function createSegmentStore({ getActiveSegmentRoot }) {
       return;
     }
 
-    const segmentFiles = files.filter((entry) => entry.isFile() && /^seg-\d{6}\.mp4$/.test(entry.name)).map((entry) => entry.name).sort();
+    const segmentFiles = files.filter((entry) => entry.isFile() && SEGMENT_FILENAME_PATTERN.test(entry.name)).map((entry) => entry.name).sort();
     if (!segmentFiles.length) {
       segmentIndex.set(key, []);
       return;
@@ -64,6 +65,13 @@ function createSegmentStore({ getActiveSegmentRoot }) {
 
   async function cleanupOldFiles() {
     const cutoff = Date.now() - BUFFER_SECONDS * 1000;
+    // Retention applies to stopped workers too; dynamic microphone sessions
+    // must not leave permanent index entries after their audio expires.
+    for (const [key, entries] of segmentIndex) {
+      const retained = entries.filter((entry) => entry.endMs >= cutoff);
+      if (!retained.length && !workers.has(key) && !pendingWorkerStarts.has(key)) segmentIndex.delete(key);
+      else segmentIndex.set(key, retained);
+    }
     const root = getActiveSegmentRoot();
     try {
       await ensureDir(root);
@@ -80,6 +88,10 @@ function createSegmentStore({ getActiveSegmentRoot }) {
             const stat = await fsp.stat(filePath);
             if (stat.mtimeMs < cutoff) await fsp.unlink(filePath);
           } catch {}
+        }
+        if (!workers.has(dirent.name) && !pendingWorkerStarts.has(dirent.name)) {
+          // rmdir only removes empty directories, preserving buffered or newly written files.
+          try { await fsp.rmdir(dirPath); } catch {}
         }
       }
     } catch (err) {
@@ -113,6 +125,14 @@ function createSegmentStore({ getActiveSegmentRoot }) {
       return segmentIndex.get(key) || [];
     }
     return [];
+  }
+
+  function getRoomAudioEntries() {
+    // Include retained buffers from microphones that disconnected during the
+    // replay window, rather than limiting history to currently live streams.
+    return [...segmentIndex.entries()]
+      .filter(([key]) => key.startsWith('roomAudio__audio__'))
+      .flatMap(([, entries]) => entries);
   }
 
   function overlapping(entries, startMs, endMs) {
@@ -153,7 +173,7 @@ function createSegmentStore({ getActiveSegmentRoot }) {
       try {
         const files = fs.readdirSync(dir);
         for (const name of files) {
-          if (!/^seg-\d{6}\.mp4$/.test(name)) continue;
+          if (!SEGMENT_FILENAME_PATTERN.test(name)) continue;
           const full = path.join(dir, name);
           let stat;
           try { stat = fs.statSync(full); } catch { continue; }
@@ -172,10 +192,12 @@ function createSegmentStore({ getActiveSegmentRoot }) {
 
   return {
     refreshSegmentIndex,
+    refreshIndexForWorker,
     cleanupOldFiles,
     getVideoEntriesForSource,
     getAudioEntriesForRover,
     getAudioEntriesForSource,
+    getRoomAudioEntries,
     overlapping,
     bootstrapIndexFromDisk,
     getReplayHealthSnapshot,
