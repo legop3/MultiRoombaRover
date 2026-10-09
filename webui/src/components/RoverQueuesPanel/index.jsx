@@ -253,7 +253,7 @@ export default function RoverQueuesPanel({
                     ? lockLabel
                     : externalMode
                     ? 'Open'
-                    : 'request';
+                    : 'Switch';
                   const canClickRow = canRequest && !lockedBlocked && !pending[roverId];
                   return (
                     <QueueTargetRow
