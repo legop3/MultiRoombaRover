@@ -40,5 +40,8 @@ export function buildExternalRoverUrl(instance, roverId, { includeSettings = fal
 export function openExternalRover(instance, roverId, { includeSettings = true } = {}) {
   const targetUrl = buildExternalRoverUrl(instance, roverId, { includeSettings });
   if (!targetUrl) return;
+  // These queue actions are buttons, so let the page guard veto navigation
+  // before beforeunload would pause painting behind the native browser dialog.
+  if (!window.dispatchEvent(new Event('page:navigate', { cancelable: true }))) return;
   window.location.href = targetUrl;
 }

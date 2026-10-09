@@ -24,8 +24,34 @@ export default function PageExitGuard() {
       event.preventDefault();
       event.returnValue = true;
     }
+    function blockNavigation(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      setWarning({ blocked: true, visible: true });
+    }
+    function handleLinkClick(event) {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+      if (!link || link.hasAttribute('download')) return;
+      const target = (link.getAttribute('target') || document.querySelector('base[target]')?.getAttribute('target') || '_self').toLowerCase();
+      if (target !== '_self') return;
+      const destination = new URL(link.href, window.location.href);
+      if (destination.protocol !== 'http:' && destination.protocol !== 'https:') return;
+      // Hash links stay in this document and do not abandon the rover.
+      if (destination.origin === window.location.origin
+        && destination.pathname === window.location.pathname
+        && destination.search === window.location.search
+        && link.getAttribute('href').includes('#')) return;
+      blockNavigation(event);
+    }
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('click', handleLinkClick, true);
+    window.addEventListener('page:navigate', blockNavigation);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleLinkClick, true);
+      window.removeEventListener('page:navigate', blockNavigation);
+    };
   }, [shouldBlock]);
 
   useEffect(() => {
@@ -46,18 +72,21 @@ export default function PageExitGuard() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="page-exit-warning"
-      className="fixed inset-0 z-[2147483647] flex flex-col items-center justify-center gap-10 bg-neutral-950 p-6 text-center text-white"
+      className="fixed inset-0 z-[2147483647] flex flex-col items-center justify-between gap-4 bg-black p-6 text-center text-white"
       onKeyDown={(event) => {
         event.stopPropagation();
         if (event.key === 'Escape') dismiss();
       }}
     >
       <p id="page-exit-warning" className="text-[clamp(3rem,10vw,10rem)] font-bold leading-tight">
-        Please dock your rover
+        Please dock your rover!
       </p>
       <button type="button" autoFocus className="button-dark px-8 py-4 text-3xl" onClick={dismiss}>
         Okay
       </button>
+      <p aria-hidden="true" className="text-[clamp(3rem,10vw,10rem)] font-bold leading-tight">
+        Please dock your rover!
+      </p>
     </div>,
     document.body,
   );

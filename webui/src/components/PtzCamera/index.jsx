@@ -21,6 +21,7 @@ export default function PtzQueueCard() {
   const featureEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'ptzCamera'));
   const ptz = useSessionSelector((state) => state.session?.ptzCamera || null);
   const selfId = useSessionSelector((state) => state.session?.socketId || null);
+  const canLeaveRover = useSessionSelector((state) => state.session?.canLeaveRover !== false);
   const { setOperatingMode } = useSessionActions();
   const navigate = useNavigate();
   const now = useSharedClock(1000, Boolean(ptz?.turn?.deadline));
@@ -32,7 +33,7 @@ export default function PtzQueueCard() {
   if (!featureEnabled) return null;
 
   const handleRequest = async () => {
-    if (!canUse || pending) return;
+    if (!canUse || !canLeaveRover || pending) return;
     if (isParticipant) {
       navigate('/ptz');
       return;
@@ -76,14 +77,14 @@ export default function PtzQueueCard() {
             }}
             turn={ptz?.turn}
             selfId={selfId}
-            canClick={canUse && !pending}
+            canClick={canUse && canLeaveRover && !pending}
             pending={pending}
             buttonLabel={actionLabel}
             batteryLabel={ptz?.turn?.ownsControl ? 'LIVE' : ptz?.turn?.turnsAhead ? `#${ptz.turn.turnsAhead}` : '--'}
             batteryClassName={ptz?.turn?.ownsControl ? 'text-emerald-300' : ptz?.turn?.turnsAhead ? 'text-sky-300' : 'text-slate-400'}
             timerLabel={timerLabel}
             onRequest={handleRequest}
-            showAction={canUse}
+            showAction={canUse && canLeaveRover}
           />
         </ul>
         {isParticipant ? (

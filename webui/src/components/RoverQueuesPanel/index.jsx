@@ -101,6 +101,7 @@ export default function RoverQueuesPanel({
   fillHeight = false,
 }) {
   const role = useSessionSelector((state) => state.session?.role || null);
+  const canLeaveRover = useSessionSelector((state) => state.session?.canLeaveRover !== false);
   const localRoster = useSessionSelector((state) => state.session?.roster ?? []);
   const interInstanceEnabled = useSessionSelector((state) => isFeatureEnabled(state, 'interInstance'));
   const { value: pageSettings } = useSettingsNamespace('page', { interInstanceTransferSettings: true });
@@ -122,8 +123,8 @@ export default function RoverQueuesPanel({
   const roster = Array.isArray(rosterOverride) ? rosterOverride : localRoster;
 
   const canRequest = useMemo(
-    () => (externalMode ? !externalBlocked : role && role !== 'spectator'),
-    [externalBlocked, externalMode, role],
+    () => canLeaveRover && (externalMode ? !externalBlocked : role && role !== 'spectator'),
+    [canLeaveRover, externalBlocked, externalMode, role],
   );
   const adminCapable = useMemo(
     () => role === 'admin' || role === 'lockdown',
@@ -142,7 +143,7 @@ export default function RoverQueuesPanel({
 
   async function handleRequest(targetRoverId) {
     if (!targetRoverId) return;
-    if (externalBlocked) return;
+    if (!canRequest) return;
     if (externalMode) {
       /*
         External queue cards deliberately reuse the local row layout, but their
