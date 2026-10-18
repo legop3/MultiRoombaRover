@@ -400,6 +400,7 @@ function createOvercurrentProtectionService(options = {}) {
       type: 'drive',
       driveDirect: { left: 0, right: 0 },
     });
+    issueAdjustedCommand(roverId, { type: 'song', song: { notes: [{ note: 76, duration: 8 }, { note: 72, duration: 8 }, { note: 67, duration: 16 }] } });
     logger.warn('Stopped rover after persistent wheel overcurrent', {
       roverId,
       motor: stalledWheel,

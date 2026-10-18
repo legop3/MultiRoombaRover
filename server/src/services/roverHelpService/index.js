@@ -2,20 +2,19 @@
 // Purpose: Publishes sustained 600-series Roomba trouble as roster and alert state.
 // Scope: Integrates the pure monitor with roverManager, browser alerts, and the event bus.
 const roverManager = require('../roverManager');
+const { issueCommand } = require('../commandService');
 const { sendAlert } = require('../alertService');
 const { publishEvent } = require('../eventBus');
 const { REASON_LABELS, createRoverHelpMonitor } = require('./monitor');
 const { createHelpHornNotifier } = require('./hornNotifier');
+const logger = require('../../globals/logger').child('roverHelpService');
 
 const HELP_ALERT_COLOR = '#ef4444';
 
 const hornNotifier = createHelpHornNotifier({
   getRover: (roverId) => roverManager.rovers.get(String(roverId)),
-  // commandService imports roverManager, so resolving it only when a chirp is
-  // actually issued avoids turning server startup order into a circular module
-  // dependency while retaining the established command transport.
-  issueCommand: (roverId, payload) => require('../commandService').issueCommand(roverId, payload),
-  logger: require('../../globals/logger').child('roverHelpService'),
+  issueCommand,
+  logger,
 });
 
 const monitor = createRoverHelpMonitor({
@@ -42,6 +41,11 @@ const monitor = createRoverHelpMonitor({
       });
     } else if (wasNeedingHelp && !needsHelp) {
       hornNotifier.stop(roverId);
+      try {
+        issueCommand(roverId, { type: 'song', song: { notes: [{ note: 72, duration: 8 }, { note: 79, duration: 16 }] } });
+      } catch (err) {
+        logger.warn('Failed to play HELP-cleared confirmation', { roverId, error: err.message });
+      }
       publishEvent({
         source: 'roverHelpService',
         type: 'rover.helpCleared',

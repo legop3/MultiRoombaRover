@@ -4,6 +4,7 @@
 const logger = require('../../globals/logger').child('batteryManager');
 const { publishEvent } = require('../eventBus');
 const { managerEvents, lockRover, rovers } = require('../roverManager');
+const { issueCommand } = require('../commandService');
 
 const STATES = {
   NORMAL: 'normal',
@@ -61,6 +62,11 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
   }
   if (!state.urgent && batteryState?.urgentActive) {
     state.urgent = true;
+    try {
+      issueCommand(roverId, { type: 'song', song: { notes: [{ note: 72, duration: 8 }, { note: 0, duration: 8 }, { note: 72, duration: 16 }] } });
+    } catch (err) {
+      logger.warn('Failed to play urgent battery warning', { roverId, error: err.message });
+    }
     publishEvent({
       source: 'batteryManager',
       type: 'battery.urgent',
