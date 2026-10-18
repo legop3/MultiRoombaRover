@@ -9,15 +9,21 @@
 ARG FEDORA_VERSION=43
 
 FROM fedora:${FEDORA_VERSION} AS architecture-check
+ARG FEDORA_VERSION
 ARG TARGETARCH
 # The central server is currently deployed and verified only on amd64. Failing
 # here avoids publishing an ARM image whose native workers and hardware paths
 # have never been exercised on a real ARM server.
 RUN test "${TARGETARCH}" = "amd64" || (echo "MultiRover server images support only linux/amd64." >&2; exit 1)
 
-FROM architecture-check AS webui-build
-RUN dnf install -y --setopt=install_weak_deps=False nodejs npm \
-    && dnf clean all
+# Both Node builders reuse the same installed toolchain layer.
+# Fedora 43 uses DNF5. Cache metadata and RPMs outside image layers, and keep
+# downloads after installation so invalidated layers can reuse them.
+FROM architecture-check AS node-build-base
+RUN --mount=type=cache,id=dnf-${FEDORA_VERSION}-node-build-base,target=/var/cache/libdnf5,sharing=locked \
+    dnf install -y --setopt=install_weak_deps=False --setopt=keepcache=True nodejs npm
+
+FROM node-build-base AS webui-build
 WORKDIR /build
 # Copy dependency manifests first so ordinary source edits retain the expensive
 # npm cache layer. npm ci makes the checked-in lockfile the exact dependency
@@ -25,14 +31,17 @@ WORKDIR /build
 COPY webui/package.json webui/package-lock.json ./webui/
 RUN --mount=type=cache,target=/root/.npm \
     cd webui && npm ci
+# Keep the pinned browser publisher in a reusable layer across UI source edits.
+COPY webui/scripts/prepareMediaMtx.js ./webui/scripts/prepareMediaMtx.js
+RUN cd webui && node scripts/prepareMediaMtx.js
 COPY webui ./webui
 # Vite deliberately emits into ../server/public. Create that destination in the
 # isolated builder and copy only its finished files into the runtime stage.
 RUN mkdir -p server/public && cd webui && npm run build
 
-FROM architecture-check AS server-dependencies
-RUN dnf install -y --setopt=install_weak_deps=False nodejs npm gcc-c++ make python3 \
-    && dnf clean all
+FROM node-build-base AS server-dependencies
+RUN --mount=type=cache,id=dnf-${FEDORA_VERSION}-server-dependencies,target=/var/cache/libdnf5,sharing=locked \
+    dnf install -y --setopt=install_weak_deps=False --setopt=keepcache=True gcc-c++ make python3
 WORKDIR /build/server
 COPY server/package.json server/package-lock.json ./
 # Native Node modules compile here when a matching prebuild is unavailable;
@@ -41,7 +50,8 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev
 
 FROM architecture-check AS native-workers
-RUN dnf install -y --setopt=install_weak_deps=False \
+RUN --mount=type=cache,id=dnf-${FEDORA_VERSION}-native-workers,target=/var/cache/libdnf5,sharing=locked \
+    dnf install -y --setopt=install_weak_deps=False --setopt=keepcache=True \
       bluez-libs-devel \
       gcc-c++ \
       libcap \
@@ -49,8 +59,7 @@ RUN dnf install -y --setopt=install_weak_deps=False \
       libusb1-devel \
       make \
       pkgconf-pkg-config \
-      wiiuse-devel \
-    && dnf clean all
+      wiiuse-devel
 WORKDIR /build
 COPY server/src/services/kinectService/native ./kinect
 COPY server/src/services/balanceBoardService/native ./balance-board
@@ -66,8 +75,8 @@ ARG NEOLINK_VERSION=0.6.2
 ARG NEOLINK_SHA256=0cb963b44dca7ccc5333154092186e1536c687aef0e1ad119b7f310a7471dbbb
 ARG GOOGLE_TTS_VERSION=26.5
 ARG GOOGLE_TTS_SHA256=6a9eae6726871788da52e767dad964a1c83e7feb7e7dbac508a2574a2345ac24
-RUN dnf install -y --setopt=install_weak_deps=False curl findutils tar unzip xz \
-    && dnf clean all
+RUN --mount=type=cache,id=dnf-${FEDORA_VERSION}-packaged-tools,target=/var/cache/libdnf5,sharing=locked \
+    dnf install -y --setopt=install_weak_deps=False --setopt=keepcache=True curl findutils tar unzip xz
 WORKDIR /build/tools
 # Each external artifact is pinned and checked before extraction. A changed or
 # truncated upstream download therefore fails the image build instead of being
@@ -100,11 +109,12 @@ RUN curl --fail --location --retry 3 \
 FROM architecture-check AS learning-dependencies
 # CPU-only learning dependencies are built once. Disabled installations never
 # launch Python or install packages as a side effect of starting Node.
-RUN dnf install -y --setopt=install_weak_deps=False python3 python3-pip \
-    && dnf clean all
+RUN --mount=type=cache,id=dnf-${FEDORA_VERSION}-learning-dependencies,target=/var/cache/libdnf5,sharing=locked \
+    dnf install -y --setopt=install_weak_deps=False --setopt=keepcache=True python3 python3-pip
 COPY server/src/services/roverLearningService/workers/requirements.txt /tmp/learning-requirements.txt
-RUN python3 -m venv /opt/rover-learning \
-    && /opt/rover-learning/bin/pip install --no-cache-dir -r /tmp/learning-requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python3 -m venv /opt/rover-learning \
+    && /opt/rover-learning/bin/pip install -r /tmp/learning-requirements.txt
 
 FROM fedora:${FEDORA_VERSION} AS runtime
 ARG FEDORA_VERSION
@@ -114,14 +124,16 @@ RUN test "${TARGETARCH}" = "amd64" || (echo "MultiRover server images support on
 # replay output path. Enable RPM Fusion Free before installing runtime packages
 # so the image receives the complete FFmpeg build instead of requiring replay
 # code to work around a deployment-only codec omission.
-RUN dnf install -y --setopt=install_weak_deps=False \
+RUN --mount=type=cache,id=dnf-${FEDORA_VERSION}-runtime,target=/var/cache/libdnf5,sharing=locked \
+    dnf install -y --setopt=install_weak_deps=False --setopt=keepcache=True \
       "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm"
 # This is the complete runtime package set. Build headers and compilers live in
 # earlier stages, while media, TTS, USB, and Bluetooth libraries remain here
 # because enabled services invoke them after startup. Weak dependencies are
 # deliberately disabled: Fedora otherwise installs desktop portals, graphical
 # themes, and GPU drivers that a headless server neither starts nor uses.
-RUN dnf install -y --setopt=install_weak_deps=False \
+RUN --mount=type=cache,id=dnf-${FEDORA_VERSION}-runtime,target=/var/cache/libdnf5,sharing=locked \
+    dnf install -y --setopt=install_weak_deps=False --setopt=keepcache=True \
       bluez \
       bluez-libs \
       espeak \
@@ -143,17 +155,11 @@ RUN dnf install -y --setopt=install_weak_deps=False \
       tini \
       wiiuse \
     --allowerasing \
-    && dnf clean all \
     && useradd --uid 1000 --create-home --home-dir /home/multirover --shell /sbin/nologin multirover \
     && install -d -o multirover -g multirover -m 0755 /data /opt/multirover/server
 
 WORKDIR /opt/multirover/server
-COPY server/index.js server/package.json server/package-lock.json ./
-COPY server/src ./src
-COPY server/assets ./assets
-COPY server/prompts ./prompts
 COPY --from=server-dependencies /build/server/node_modules ./node_modules
-COPY --from=webui-build /build/server/public ./public
 COPY --from=native-workers /build/kinect/kinect_worker ./src/services/kinectService/native/kinect_worker
 COPY --from=native-workers /build/balance-board/balance_board_worker ./src/services/balanceBoardService/native/balance_board_worker
 COPY --from=packaged-tools /output/ /
@@ -175,6 +181,14 @@ RUN setcap cap_net_admin,cap_net_bind_service+ep \
       --output /tmp/chromegtts-smoke.wav \
     && test -s /tmp/chromegtts-smoke.wav \
     && rm /tmp/chromegtts-smoke.wav
+
+# Frequently edited application files come after dependencies and tool checks,
+# so server changes do not invalidate the large runtime dependency layers.
+COPY --from=webui-build /build/server/public ./public
+COPY server/index.js server/package.json server/package-lock.json ./
+COPY server/src ./src
+COPY server/assets ./assets
+COPY server/prompts ./prompts
 
 ENV NODE_ENV=production \
     SERVER_DATA_DIR=/data \
