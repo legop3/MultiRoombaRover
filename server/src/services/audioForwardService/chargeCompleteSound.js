@@ -4,7 +4,7 @@
 const path = require('path');
 const { subscribe } = require('../eventBus');
 
-const DONE_CHARGING_SOUND_PATH = path.resolve(__dirname, '..', '..', '..', 'public', 'donecharging.wav');
+const DONE_CHARGING_SOUND_PATH = path.resolve(__dirname, '..', '..', '..', 'assets', 'donecharging.wav');
 
 function registerChargeCompleteSound(deps) {
   const {
@@ -12,22 +12,18 @@ function registerChargeCompleteSound(deps) {
     playServerAudioFile,
   } = deps;
 
-  subscribe('battery.unlocked', (event = {}) => {
+  subscribe('battery.chargeComplete', (event = {}) => {
     const roverId = String(event?.payload?.roverId || '').trim();
     if (!roverId) return;
 
     try {
-      // battery.unlocked is the existing server-side definition of "done
-      // charging" because it only fires after the battery manager has waited
-      // through its full charge-release policy. Playing from this event avoids
-      // duplicating charging thresholds or raw sensor-state guesses here.
       playServerAudioFile(roverId, DONE_CHARGING_SOUND_PATH, {
         source: 'charge-complete',
       });
-      logger.info('Played charging complete sound', { roverId, filePath: DONE_CHARGING_SOUND_PATH });
+      logger.info('Started charging complete sound', { roverId, filePath: DONE_CHARGING_SOUND_PATH });
     } catch (err) {
       // A missing/offline rover or unavailable ffmpeg should not affect the
-      // battery manager's unlock decision. The sound is an announcement layered
+      // battery manager's processing. The sound is an announcement layered
       // on top of the state transition, so failures are logged and contained.
       logger.warn('Failed to play charging complete sound', {
         roverId,

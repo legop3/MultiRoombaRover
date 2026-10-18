@@ -30,6 +30,7 @@ function getState(roverId) {
       dockedCharging: false,
       charging: false,
       batteryLocked: false,
+      completionAnnounced: false,
       waitingSince: null,
     });
   }
@@ -142,6 +143,18 @@ function handleSensorEvent({ roverId, sensors, batteryState }) {
   const isFull =
     (batteryState?.charge != null && fullThreshold != null && batteryState.charge >= fullThreshold) ||
     (batteryState?.percent != null && batteryState.percent >= 0.99);
+
+  // Announce once per dock visit, independently of the charging lock. Keep the
+  // latch at 100% so small charge fluctuations cannot repeat the sound.
+  if (!onDock) state.completionAnnounced = false;
+  if (onDock && batteryState?.percentDisplay >= 100 && !state.completionAnnounced) {
+    state.completionAnnounced = true;
+    publishEvent({
+      source: 'batteryManager',
+      type: 'battery.chargeComplete',
+      payload: { roverId, batteryState },
+    });
+  }
 
   const needsCharge = state.warned;
 
