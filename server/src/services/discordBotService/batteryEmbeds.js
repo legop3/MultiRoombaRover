@@ -2,6 +2,7 @@
 // Purpose: Centralizes rover battery/status snapshot formatting and embed rendering for Discord surfaces.
 // Scope: Shared presentation logic for status commands and admin alert battery event posts.
 const { EmbedBuilder } = require('discord.js');
+const { getMode } = require('../modeManager');
 
 function formatVoltage(voltageMv) {
   if (voltageMv == null) return 'n/a';
@@ -69,6 +70,7 @@ function buildRoverStatusSnapshot(record) {
 
 function buildBatteryStatusEmbed({ color = 0x2196f3, records = [] }) {
   const embed = new EmbedBuilder().setTitle('Rover Battery Status').setColor(color).setTimestamp(new Date());
+  embed.addFields({ name: 'Server mode', value: getMode(), inline: true });
   const snapshots = records.map((entry) => buildRoverStatusSnapshot(entry)).filter(Boolean);
   if (!snapshots.length) {
     embed.setDescription('No rovers online.');
