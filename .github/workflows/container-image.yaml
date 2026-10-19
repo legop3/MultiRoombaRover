@@ -58,6 +58,8 @@ jobs:
       # replaced on each successful push, just as main replaces `latest`.
       - name: Build and optionally publish
         uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_RETENTION_DAYS: 3
         with:
           context: .
           platforms: linux/amd64
