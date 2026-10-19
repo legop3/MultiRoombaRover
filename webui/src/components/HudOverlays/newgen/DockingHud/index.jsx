@@ -23,14 +23,29 @@ function DockedAction({ driveKeyLabel, pending, controlsDisabled, error, onUndoc
   /* The dismissal belongs to this mounted docked episode. DockingHud unmounts
      this component when the rover leaves the base, and its roverId key remounts
      it for a different assignment, so no persistence or reset effect is needed. */
-  if (hidden && !pending) return null;
-
   const mainToneClass = waitingForTurn
     ? 'cursor-not-allowed bg-slate-950/95 ring-slate-400/70'
     : 'bg-emerald-950/90 ring-emerald-300/80 hover:bg-emerald-900/95 focus-visible:ring-emerald-200 disabled:cursor-wait disabled:opacity-75';
   const hideToneClass = waitingForTurn
     ? 'bg-slate-950/95 ring-slate-400/70 hover:bg-slate-900'
     : 'bg-emerald-950/90 ring-emerald-300/80 hover:bg-emerald-900/95 focus-visible:ring-emerald-200';
+  const toggleClass = `pointer-events-auto absolute left-1/2 -translate-x-1/2 rounded-b-lg px-6 py-1.5 text-sm font-bold text-white shadow-xl ring-2 transition focus-visible:outline-hidden focus-visible:ring-4 ${hideToneClass}`;
+
+  // Keep a small reopen control on the video's top edge; pending undocking
+  // still reveals the prompt so progress remains visible after a keybind action.
+  if (hidden && !pending) {
+    return (
+      <button
+        type="button"
+        aria-label="Show docked rover controls"
+        aria-expanded={false}
+        onClick={() => setHidden(false)}
+        className={`${toggleClass} top-0 z-30`}
+      >
+        Show
+      </button>
+    );
+  }
 
   return (
     <>
@@ -71,8 +86,10 @@ function DockedAction({ driveKeyLabel, pending, controlsDisabled, error, onUndoc
           {!pending ? (
             <button
               type="button"
+              aria-label="Hide docked rover controls"
+              aria-expanded={true}
               onClick={() => setHidden(true)}
-              className={`pointer-events-auto absolute left-1/2 top-full -translate-x-1/2 rounded-b-lg px-6 py-1.5 text-sm font-bold text-white shadow-xl ring-2 transition focus-visible:outline-hidden focus-visible:ring-4 ${hideToneClass}`}
+              className={`${toggleClass} top-full`}
             >
               Hide
             </button>

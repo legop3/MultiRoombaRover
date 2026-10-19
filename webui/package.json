@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "predev": "node scripts/prepareMediaMtx.js",
-    "dev": "VITE_ROVERD_URL=https://rovertest.otter.land vite",
+    "dev": "VITE_ROVERD_URL=https://rover.otter.land vite",
     "prebuild": "node scripts/prepareMediaMtx.js",
     "build": "vite build",
     "lint": "eslint .",
