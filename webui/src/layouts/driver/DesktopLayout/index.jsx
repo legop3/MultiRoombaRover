@@ -55,12 +55,12 @@ function CommunityColumn() {
       <div className="h-96 min-h-56">
         <ChatPanel fillHeight />
       </div>
-      <OverseerPreferencePanel />
       <ReplaySourcesPanel panelId="newdrive-replay-sources" />
       <RoverQueuesPanel title="Rovers" />
       <LinkButtonsPanel fillHeight={false} />
       <PtzQueueCard layout="desktop" />
       <RawUserPilePanel compact hideNicknameForm />
+      <OverseerPreferencePanel />
     </div>
   );
 }
