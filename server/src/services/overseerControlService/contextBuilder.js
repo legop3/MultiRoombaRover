@@ -1,5 +1,11 @@
 const { evaluateTools } = require('./tools');
 
+function formatTimeContext(timestamp, now) {
+  const at = Number(timestamp);
+  if (!Number.isFinite(at) || at <= 0) return 'time=unknown';
+  return `at=${new Date(at).toISOString()} age_seconds=${Math.max(0, Math.floor((now - at) / 1000))}`;
+}
+
 function normalizeNeatoIssue(value) {
   const raw = String(value || '').trim();
   if (!raw) return 'none';
@@ -7,8 +13,12 @@ function normalizeNeatoIssue(value) {
   return raw;
 }
 
-function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason }) {
+function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason, now = Date.now(), previousRunAt }) {
   const lines = [];
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  lines.push(`current_time: ${new Date(now).toISOString()}`);
+  lines.push(`local_time: ${new Date(now).toLocaleString('en-US', { timeZone: timezone, hour12: false })} timezone=${timezone}`);
+  lines.push(`previous_run: ${formatTimeContext(previousRunAt, now)}`);
   lines.push(`trigger: ${triggerReason || 'heartbeat'}`);
   lines.push(`mode: ${mode || 'unknown'}`);
   lines.push(`home_assistant_connected: ${homeAssistantState?.connected ? 'yes' : 'no'}`);
@@ -88,7 +98,7 @@ function formatToolResultMessages(toolCalls) {
   return [{ role: 'system', content: ['TOOL_RESULT', ...lines].join('\n') }];
 }
 
-function buildConversation({ recentMessages, name }) {
+function buildConversation({ recentMessages, name, now = Date.now() }) {
   const messages = [];
   (recentMessages || []).forEach((entry) => {
     const text = String(entry?.text || '').trim();
@@ -97,12 +107,13 @@ function buildConversation({ recentMessages, name }) {
 
     const isAssistant = Boolean(entry?.bot);
     const nickname = String(entry?.nickname || (isAssistant ? name || 'Overseer' : 'user')).trim();
+    const timing = `[${formatTimeContext(entry?.ts, now)}]`;
     if (isAssistant) {
-      if (text) messages.push({ role: 'assistant', content: text });
-      messages.push(...toolResultMessages);
+      if (text) messages.push({ role: 'assistant', content: `${timing} ${text}` });
+      messages.push(...toolResultMessages.map((message) => ({ ...message, content: `${message.content}\nmessage_time: ${timing}` })));
       return;
     }
-    if (text) messages.push({ role: 'user', content: `${nickname}: ${text}` });
+    if (text) messages.push({ role: 'user', content: `${timing} ${nickname}: ${text}` });
   });
   return messages;
 }
@@ -143,6 +154,7 @@ function buildModelMessages({
 }
 
 module.exports = {
+  formatTimeContext,
   toStateUpdate,
   buildToolState,
   buildConversation,

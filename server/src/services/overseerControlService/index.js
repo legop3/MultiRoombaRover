@@ -27,7 +27,7 @@ const {
   normalizeMs,
 } = require('./constants');
 const { isAdminRole, buildAdminState, buildFailureInfo } = require('./runtimeHelpers');
-const { toStateUpdate, buildToolState, buildConversation, buildModelMessages } = require('./contextBuilder');
+const { toStateUpdate, buildToolState, buildConversation, buildModelMessages, formatTimeContext } = require('./contextBuilder');
 const { buildOllamaTools, executeToolAction } = require('./tools');
 const { loadMemory, saveMemory, createDefaultMemory, summarizeMemory } = require('./memoryStore');
 
@@ -91,6 +91,7 @@ const runtime = {
   runHistory: [],
   liveToolCalls: [],
   pendingDirectAddressRun: false,
+  lastDecisionAt: null,
   memoryStore: loadMemory(),
   contextResetAt: Date.now(),
 };
@@ -365,7 +366,7 @@ function buildToolCallFeedEntries(requestedActions = [], actionResults = []) {
   });
 }
 
-function buildRecentEventsSummary() {
+function buildRecentEventsSummary(now) {
   const events = (runtime.liveToolCalls || [])
     .filter((entry) => entry && (entry.phase === 'ok' || entry.phase === 'error' || entry.phase === 'blocked'))
     .slice(-3)
@@ -373,13 +374,17 @@ function buildRecentEventsSummary() {
       const tool = String(entry.tool || 'unknown');
       const phase = String(entry.phase || 'unknown');
       const err = entry.error ? ` error=${String(entry.error).slice(0, 60)}` : '';
-      return `- tool=${tool} phase=${phase}${err}`;
+      return `- ${formatTimeContext(entry.at, now)} tool=${tool} phase=${phase}${err}`;
     });
   if (!events.length) return '- none';
   return events.join('\n');
 }
 
 async function runDecision(triggerReason) {
+  // Use one reference time so all ages in this model request agree.
+  const now = Date.now();
+  const previousRunAt = runtime.lastDecisionAt;
+  runtime.lastDecisionAt = now;
   const runId = runtime.tickCount;
   updateStatus({ phase: 'context_build', currentRunId: runId, lastTriggerReason: triggerReason, lastError: null, lastErrorDetails: null });
 
@@ -389,7 +394,7 @@ async function runDecision(triggerReason) {
   const liftState = getLiftState();
   const roster = buildRosterSummary();
 
-  const stateUpdate = toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason });
+  const stateUpdate = toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason, now, previousRunAt });
   const toolState = buildToolState({ mode, homeAssistantState, neatoState, liftState });
 
   const recentConversation = getRecentMessages(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT + 20, { includeSystem: true })
@@ -399,14 +404,14 @@ async function runDecision(triggerReason) {
       return isPublicChatTargetId(entry.roverId);
     })
     .slice(-(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT));
-  const conversationMessages = buildConversation({ recentMessages: recentConversation, name });
+  const conversationMessages = buildConversation({ recentMessages: recentConversation, name, now });
 
   const systemPrompt = await readPrompt();
   const modelMessages = buildModelMessages({
     systemPrompt,
     stateUpdate,
     memorySummary: summarizeMemory(runtime.memoryStore),
-    recentEvents: buildRecentEventsSummary(),
+    recentEvents: buildRecentEventsSummary(now),
     conversationMessages,
     availableTools: toolState.available,
     blockedTools: toolState.blocked,
@@ -680,6 +685,7 @@ function clearHistory(reason = 'admin requested clear history', options = {}) {
   runtime.contextResetAt = Date.now();
   runtime.runHistory = [];
   runtime.liveToolCalls = [];
+  runtime.lastDecisionAt = null;
   runtime.generationCount = 0;
   runtime.generationTotalMs = 0;
   if (resetPersistentMemory) {
