@@ -7,6 +7,7 @@ const { getRole, roleEvents } = require('../roleService');
 const { getMode, MODES, modeEvents } = require('../modeManager');
 const { verificationEvents } = require('../verificationService');
 const homeAssistantService = require('../homeAssistantService');
+const activityControls = require('../homeAssistantActivitiesService');
 const neatoService = require('../neatoService');
 const liftService = require('../liftService');
 const buttonBoxService = require('../buttonBoxService');
@@ -390,12 +391,13 @@ async function runDecision(triggerReason) {
 
   const mode = getMode();
   const homeAssistantState = getHomeAssistantState();
+  const activityState = activityControls.getState();
   const neatoState = getNeatoState();
   const liftState = getLiftState();
   const roster = buildRosterSummary();
 
-  const stateUpdate = toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason, timezone: loadConfig().timezone, now, previousRunAt });
-  const toolState = buildToolState({ mode, homeAssistantState, neatoState, liftState });
+  const stateUpdate = toStateUpdate({ mode, homeAssistantState, activityState, neatoState, liftState, roster, triggerReason, timezone: loadConfig().timezone, now, previousRunAt });
+  const toolState = buildToolState({ mode, homeAssistantState, activityState, neatoState, liftState });
 
   let chatCount = 0;
   let botCount = 0;

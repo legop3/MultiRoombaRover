@@ -12,6 +12,7 @@ const neatoClearErrors = require('./neatoClearErrors');
 const haSetEntity = require('./haSetEntity');
 const haSetLightColor = require('./haSetLightColor');
 const buttonBoxAddCount = require('./buttonBoxAddCount');
+const activityAct = require('./activityAct');
 
 const TOOL_DEFINITIONS = [
   memoryRead,
@@ -28,6 +29,7 @@ const TOOL_DEFINITIONS = [
   haSetEntity,
   haSetLightColor,
   buttonBoxAddCount,
+  activityAct,
 ];
 const TOOL_BY_ID = new Map(TOOL_DEFINITIONS.map((tool) => [tool.id, tool]));
 

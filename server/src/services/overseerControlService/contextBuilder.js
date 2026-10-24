@@ -13,7 +13,7 @@ function normalizeNeatoIssue(value) {
   return raw;
 }
 
-function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason, timezone, now = Date.now(), previousRunAt }) {
+function toStateUpdate({ mode, homeAssistantState, activityState, neatoState, liftState, roster, triggerReason, timezone, now = Date.now(), previousRunAt }) {
   const lines = [];
   lines.push(`current_time: ${new Date(now).toISOString()}`);
   lines.push(`local_time: ${new Date(now).toLocaleString('en-US', { timeZone: timezone, hour12: false })} timezone=${timezone}`);
@@ -22,6 +22,12 @@ function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster
   lines.push(`mode: ${mode || 'unknown'}`);
   lines.push(`home_assistant_connected: ${homeAssistantState?.connected ? 'yes' : 'no'}`);
   lines.push(`lights_locked_on: ${homeAssistantState?.lightPolicy?.lockedOn ? 'yes' : 'no'}`);
+  lines.push(`activity_controls: enabled=${activityState?.enabled ? 'yes' : 'no'} connected=${activityState?.connected ? 'yes' : 'no'}`);
+  for (const item of activityState?.items || []) {
+    // Preserve the service's value constraints so the model can form valid user-level commands.
+    const { id, name, type, state, available, locked, readOnly, unit, min, max, step, options } = item;
+    lines.push(`activity_item: ${JSON.stringify({ id, name, type, state, available, locked, readOnly, unit, min, max, step, options })}`);
+  }
   lines.push(`lift: ${liftState?.connected ? 'connected' : 'offline'} busy=${liftState?.busy ? 'yes' : 'no'}`);
   const neatoError = normalizeNeatoIssue(neatoState?.telemetry?.robotError);
   const neatoAlert = normalizeNeatoIssue(neatoState?.telemetry?.robotAlert);
@@ -65,8 +71,8 @@ function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster
   return lines.join('\n');
 }
 
-function buildToolState({ mode, homeAssistantState, neatoState, liftState }) {
-  return evaluateTools({ mode, homeAssistantState, neatoState, liftState });
+function buildToolState({ mode, homeAssistantState, activityState, neatoState, liftState }) {
+  return evaluateTools({ mode, homeAssistantState, activityState, neatoState, liftState });
 }
 
 function formatToolResultMessages(toolCalls) {
