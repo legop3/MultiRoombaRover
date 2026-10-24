@@ -394,16 +394,21 @@ async function runDecision(triggerReason) {
   const liftState = getLiftState();
   const roster = buildRosterSummary();
 
-  const stateUpdate = toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason, now, previousRunAt });
+  const stateUpdate = toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason, timezone: loadConfig().timezone, now, previousRunAt });
   const toolState = buildToolState({ mode, homeAssistantState, neatoState, liftState });
 
+  let chatCount = 0;
+  let botCount = 0;
   const recentConversation = getRecentMessages(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT + 20, { includeSystem: true })
     .filter((entry) => Number(entry?.ts || 0) >= runtime.contextResetAt)
     .filter((entry) => {
       if (!entry?.roverId) return true;
       return isPublicChatTargetId(entry.roverId);
     })
-    .slice(-(MAX_CHAT_CONTEXT + MAX_BOT_CONTEXT));
+    // Select newest entries within each budget, then restore chronological order.
+    .reverse()
+    .filter((entry) => entry?.bot ? ++botCount <= MAX_BOT_CONTEXT : ++chatCount <= MAX_CHAT_CONTEXT)
+    .reverse();
   const conversationMessages = buildConversation({ recentMessages: recentConversation, name, now });
 
   const systemPrompt = await readPrompt();

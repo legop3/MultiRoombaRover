@@ -13,9 +13,8 @@ function normalizeNeatoIssue(value) {
   return raw;
 }
 
-function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason, now = Date.now(), previousRunAt }) {
+function toStateUpdate({ mode, homeAssistantState, neatoState, liftState, roster, triggerReason, timezone, now = Date.now(), previousRunAt }) {
   const lines = [];
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   lines.push(`current_time: ${new Date(now).toISOString()}`);
   lines.push(`local_time: ${new Date(now).toLocaleString('en-US', { timeZone: timezone, hour12: false })} timezone=${timezone}`);
   lines.push(`previous_run: ${formatTimeContext(previousRunAt, now)}`);
