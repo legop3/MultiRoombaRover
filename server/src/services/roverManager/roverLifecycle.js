@@ -174,6 +174,8 @@ function createRoverLifecycle(deps) {
 
   function canLeaveCurrentRover(socket, options = {}) {
     const currentId = getPrimaryRoverForSocket(socket.id);
+    // Admins, including lockdown admins, can always leave their current rover.
+    if (isAdmin(socket)) return { ok: true, currentId };
     /*
       Leaving a rover is only risky when this socket is the last person attached
       to an undocked rover. The same rule is used for rover-to-rover switching
