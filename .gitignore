@@ -42,3 +42,4 @@ server/data/fleet-reports.sqlite-wal
 server/data/configuration.sqlite
 server/data/configuration.sqlite-shm
 server/data/configuration.sqlite-wal
+AGENTS.md
