@@ -19,6 +19,8 @@ Jun 18 15:14:18 roombaserver.local node[216731]: Node.js v22.20.0
 Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Main process exited, code=exited, status=1/FAILURE
 Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Failed with result 'exit-code'.
 Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Consumed 55min 11.511s CPU time, 711M memory peak.`
+1. redo new user experience, at the very least make it a fullscreen thing instead of a popup
+2. roverd settings and installer rework (see discord forum post)
 
 # relative pipe dreams:
 1. VPS video forwarding
