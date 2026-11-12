@@ -23,6 +23,7 @@ Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Consumed 55mi
 2. roverd settings and installer rework (see discord forum post)
 
 # relative pipe dreams:
+1. convert MRR into a platform that could work with non-roomba rovers... 
 1. VPS video forwarding
    1. get forwarding working with the VPS for in-queue users and spectators
    2. bandwidth testing
