@@ -110,7 +110,7 @@ function maybeSpeak(socket, message, ttsOptions) {
     issueCommand(message.roverId, {
       type: 'tts',
       tts: {
-        text: message.text,
+        text: message.text.replace(/\b(?:https?:\/\/|www\.)\S{25,}[^\s.,!?;:"'()\[\]{}]/g, ' [link] '),
         engine: ttsOptions.engine,
         voice: ttsOptions.voice,
         pitch: ttsOptions.pitch,
