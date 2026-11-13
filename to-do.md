@@ -21,6 +21,7 @@ Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Failed with r
 Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Consumed 55min 11.511s CPU time, 711M memory peak.`
 1. redo new user experience, at the very least make it a fullscreen thing instead of a popup
 2. roverd settings and installer rework (see discord forum post)
+3. global quiet mode with its fingers in everything. activity controls optional, session status for theater, another global volume set, etc. 
 
 # relative pipe dreams:
 1. convert MRR into a platform that could work with non-roomba rovers... 
