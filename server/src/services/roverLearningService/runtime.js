@@ -116,8 +116,7 @@ function createRuntime({ config, logger }) {
     // Do not serialize the live record: it contains sockets and circular state.
     return {
       meta: record.meta, sensors: record.lastSensor, hostStats: record.lastHostStats,
-      batteryState: record.batteryState, headlightState: record.headlightState,
-      laserState: record.laserState, drivers: [...(record.drivers || [])],
+      batteryState: record.batteryState, roverState: record.roverState, drivers: [...(record.drivers || [])],
       locked: record.locked, privateOpen: record.privateOpen,
     };
   }

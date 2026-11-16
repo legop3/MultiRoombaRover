@@ -18,7 +18,7 @@ Select the appropriate architecture binary on a rover. The default object suppli
 
 ## Connections and state
 
-- `/rover`: existing control commands, acknowledgements, sensors, and operational toggle state. The planned full `roverState` replacement is not implemented yet.
+- `/rover`: control commands, acknowledgements, sensors, and complete `roverState` snapshots.
 - `/rover/management`: configuration hello, management commands/acknowledgements, host statistics, and daemon events.
 - Derive the management address from the configured `ws://host[:port]/rover` or `wss://host[:port]/rover` control URL; there is no second server address to maintain.
 - Management starts independently of hardware initialization and remains available after serial/peripheral startup failure.
@@ -64,7 +64,7 @@ Do this on the intended server/rover, not the development machine:
 2. With an authenticated admin Socket.IO session, call `roverManagement:list` and `roverManagement:get`. Expect configuration and schema even when the rover's serial device cannot open.
 3. Change a harmless setting such as description in the returned full object and call `roverManagement:save`. Expect an acknowledgement, disconnect/reconnect, and a new hello containing that setting. Confirm `/etc/roverd.json` matches and survives a service restart.
 4. Submit an incomplete object. Expect an error, no file replacement, and no restart.
-5. Confirm host statistics and autocharge/watchdog/daemon notices still reach their existing UI/alert consumers through management. Headlight/laser state must remain on control.
+5. Confirm host statistics and autocharge/watchdog/daemon notices still reach their existing UI/alert consumers through management. Headlight/laser state must arrive as a complete `roverState` snapshot on control.
 6. Verify reboot/update requests use management, the normal user reboot restrictions still apply, and non-admin clients cannot read/save configuration or invoke the admin command endpoint.
 7. Confirm new movement commands cannot execute while a save/reboot/update is stopping the rover, and that control disconnect safety still works independently of management.
 
@@ -72,6 +72,8 @@ Record acknowledgement errors, reconnect hello contents, relevant journal/server
 
 ## Pending stages
 
-Browser/live verification of the configuration page, shared `roverState`, YAML media catalogs/child supervision, universal ALSA routing, standalone bootstrap, and replacement update workflow remain pending. The current updater and systemd media supervisor have moved transport but retain their existing implementations until those stages.
+Browser/live verification of configuration and operational state, YAML media catalogs/child supervision, universal ALSA routing, standalone bootstrap, and replacement update workflow remain pending. The current updater and systemd media supervisor have moved transport but retain their existing implementations until those stages.
 
 Apply-field targets the currently management-connected fleet. It clones each rover’s own configuration, replaces an existing field, and sends the complete object for rover-side validation. Inspect individual results for failures. Missing fields and changed connections are reported; offline changes are not queued. Paths traverse object fields, not array elements. Array-valued fields can be replaced as a whole.
+
+Control state messages have the shape `{ "type": "roverState", "state": { "headlightOn": false, "laserOn": null } }`. Null indicates an unavailable role. Each message replaces the server object; disconnect clears it. The roster exposes `roverState` directly, rather than per-device `state` objects.

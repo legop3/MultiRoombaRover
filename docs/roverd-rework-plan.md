@@ -159,15 +159,15 @@ The order below is a working sequence, not a requirement to leave incompatible i
 - [x] Rename `pi/` to `rover/` and update references.
 - [x] Replace machine-specific build targets/tags with architecture-specific artifacts and resolve hardware support split.
 - [x] Group every native GPIO setting under the disabled-by-default Pi GPIO peripheral switch in the current configuration and samples.
-- [ ] Expose the grouped Pi GPIO configuration in the new JSON schema/UI.
+- [x] Expose the grouped Pi GPIO configuration in the new JSON schema/UI.
 - [x] Register Pi GPIO through the common peripheral provider path, including BRC lifecycle ownership and uniform role-conflict handling.
-- [ ] Connect peripheral operational state to the new shared `roverState` object.
+- [x] Connect peripheral operational state to the new shared `roverState` object.
 - [x] Gate GPIO provider registration, initialization, and BRC startup behind the parent switch; retain saved child settings. Hardware validation remains pending.
 - [x] Implement complete JSON configuration serialization, schema, validation, atomic saves, and restart flow (live save/reconnect verification pending).
 - [x] Implement separate management connection and in-memory server management state.
 - [x] Move reboot, update, media management, host statistics, and daemon status messages to management; update consumers. Preserve the separately authorized user reboot path.
 - [x] Separate management lifecycle from hardware startup failures (deployment verification pending).
-- [ ] Implement full-object `roverState` and consolidate server/UI operational-state consumers.
+- [x] Implement full-object `roverState` and consolidate server/UI operational-state consumers (live verification pending).
 - [ ] Add bundled YAML catalogs and one custom YAML profile per media category.
 - [ ] Preserve AIY HAT as an explicit profile and expose ordinary audio-device selection on every architecture, including TTS/horn/mixer paths.
 - [ ] Generate ALSA routing from shared input/output selections; connect microphone, TTS, horn, forwarded audio, and independent volume controls to the resulting logical devices.
@@ -264,3 +264,12 @@ Verification for this stage:
 - Configuration UI/backend implementation is now present; end-to-end deployment verification remains pending. Profile/status/output controls, unified rover state, audio/media supervision, and bootstrap/update rework are still separate outstanding stages.
 
 - Placement correction: rover configuration is embedded in the existing fleet management panel alongside the rover roster. Removed the separate administration tab.
+
+### Unified operational state (2026-11-16)
+
+- Roverd owns a complete `roverState` object with `headlightOn` and `laserOn`; null indicates an unavailable role. Sends on control connection/reconnection and logical changes. Pending notifications coalesce to the latest complete snapshot.
+- Server replaces one current object, exposes it in roster snapshots, and clears it on disconnect. Superseded sockets cannot overwrite state or remove a newer connection. Removed per-toggle event handling and separate server state stores.
+- Desktop/mobile/HUD controls, darkness reward restoration, and learning snapshots read the shared object. Telemetry and daemon management remain separate.
+- All four architecture binaries rebuilt successfully; focused frontend lint and server syntax checks passed. The two existing roster lifecycle tests passed after updating their state fixture. No new tests added.
+- Still verify live initial state, toggles through both GPIO/Firmata, reconnect state, disconnect clearing, and darkness restoration. Production UI assets have not been rebuilt.
+- Next implementation stage: YAML media profiles, command environments and child-process supervision, alongside the planned universal audio routing.

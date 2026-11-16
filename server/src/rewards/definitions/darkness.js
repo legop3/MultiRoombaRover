@@ -120,7 +120,7 @@ module.exports = {
 
     const prevHeadlights = {};
     ctx.listOnlineRovers().forEach((rover) => {
-      const state = rover?.headlight?.state;
+      const state = rover?.roverState;
       const headlightOn = Boolean(state && state.headlightOn === true);
       prevHeadlights[String(rover.id)] = headlightOn;
       try {

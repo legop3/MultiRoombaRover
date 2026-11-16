@@ -15,39 +15,41 @@ import (
 )
 
 type WSClient struct {
-	autoCharge    *AutoChargeController
-	commandMu     sync.Mutex
-	stopping      atomic.Bool
-	controlEvents chan RoverEvent
-	cfg           *Config
-	adapter       *SerialAdapter
-	sensorFrames  <-chan []byte
-	events        chan RoverEvent
-	media         *MediaSupervisor
-	servo         CameraServoController
-	horn          *HornSynth
-	headlight     ToggleController
-	laser         ToggleController
-	peripherals   *PeripheralManager
-	log           *log.Logger
-	console       *ConsoleNotifier
-	recoverMu     sync.Mutex
-	recovering    bool
-	watchdogMu    sync.Mutex
-	watchdogOpen  bool
-	watchdogOK    bool
-	ttsQueue      chan *ttsPayload
-	chromeTTS     *chromeTTSDaemon
-	lastAux       motorPWMPayload
-	autoSideOn    bool
-	connMu        sync.Mutex
-	connected     bool
-	disconnectT   *time.Timer
-	rebootT       *time.Timer
-	seekIssued    bool
-	rebootIssued  bool
-	audioLevels   AudioLevels
-	audioMu       sync.RWMutex
+	autoCharge   *AutoChargeController
+	commandMu    sync.Mutex
+	stopping     atomic.Bool
+	stateChanged chan struct{}
+	stateMu      sync.Mutex
+	roverState   RoverState
+	cfg          *Config
+	adapter      *SerialAdapter
+	sensorFrames <-chan []byte
+	events       chan RoverEvent
+	media        *MediaSupervisor
+	servo        CameraServoController
+	horn         *HornSynth
+	headlight    ToggleController
+	laser        ToggleController
+	peripherals  *PeripheralManager
+	log          *log.Logger
+	console      *ConsoleNotifier
+	recoverMu    sync.Mutex
+	recovering   bool
+	watchdogMu   sync.Mutex
+	watchdogOpen bool
+	watchdogOK   bool
+	ttsQueue     chan *ttsPayload
+	chromeTTS    *chromeTTSDaemon
+	lastAux      motorPWMPayload
+	autoSideOn   bool
+	connMu       sync.Mutex
+	connected    bool
+	disconnectT  *time.Timer
+	rebootT      *time.Timer
+	seekIssued   bool
+	rebootIssued bool
+	audioLevels  AudioLevels
+	audioMu      sync.RWMutex
 }
 
 func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, events chan RoverEvent, media *MediaSupervisor, servo CameraServoController, headlight ToggleController, laser ToggleController, peripherals *PeripheralManager, logger *log.Logger, console *ConsoleNotifier) *WSClient {
@@ -64,21 +66,21 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 		horn = NewHornSynth(cfg.Horn, logger)
 	}
 	client := &WSClient{
-		controlEvents: make(chan RoverEvent, 16),
-		cfg:           cfg,
-		adapter:       adapter,
-		sensorFrames:  frames,
-		events:        events,
-		media:         media,
-		servo:         servo,
-		horn:          horn,
-		headlight:     headlight,
-		laser:         laser,
-		peripherals:   peripherals,
-		log:           logger,
-		console:       console,
-		ttsQueue:      ttsQueue,
-		chromeTTS:     chromeTTS,
+		stateChanged: make(chan struct{}, 1),
+		cfg:          cfg,
+		adapter:      adapter,
+		sensorFrames: frames,
+		events:       events,
+		media:        media,
+		servo:        servo,
+		horn:         horn,
+		headlight:    headlight,
+		laser:        laser,
+		peripherals:  peripherals,
+		log:          logger,
+		console:      console,
+		ttsQueue:     ttsQueue,
+		chromeTTS:    chromeTTS,
 		audioLevels: AudioLevels{
 			HornGain:    1.0,
 			TTSGain:     1.0,
@@ -109,6 +111,7 @@ func (c *WSClient) Run(ctx context.Context) error {
 		defer c.chromeTTS.Shutdown()
 	}
 
+	c.refreshState()
 	if err := c.sendHello(ctx, conn); err != nil {
 		return err
 	}
@@ -128,7 +131,7 @@ func (c *WSClient) Run(ctx context.Context) error {
 		}
 	}()
 	go c.forwardSensors(ctx, conn)
-	go c.forwardEvents(ctx, conn)
+	go c.forwardState(ctx, conn)
 
 	select {
 	case <-ctx.Done():
@@ -284,12 +287,7 @@ func (c *WSClient) handleToggleCommand(name string, toggle ToggleController, pay
 	if err := toggle.HandleAction(payload.Action); err != nil {
 		return err
 	}
-	// Event names and payload keys use logical device names. GPIO polarity has
-	// already been handled inside GPIOToggle, so the server only sees whether
-	// the headlight or laser should be considered on.
-	c.emitEvent(fmt.Sprintf("%s.state", name), map[string]any{
-		fmt.Sprintf("%sOn", name): toggle.On(),
-	})
+	c.refreshState()
 	return nil
 }
 
@@ -472,20 +470,53 @@ func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
 	}
 }
 
-func (c *WSClient) forwardEvents(ctx context.Context, conn *websocket.Conn) {
-	if c.events == nil {
+// RoverState is a complete operational snapshot; nil means the role is absent.
+type RoverState struct {
+	HeadlightOn *bool `json:"headlightOn"`
+	LaserOn     *bool `json:"laserOn"`
+}
+
+func (c *WSClient) refreshState() {
+	next := RoverState{}
+	if c.headlight != nil {
+		value := c.headlight.On()
+		next.HeadlightOn = &value
+	}
+	if c.laser != nil {
+		value := c.laser.On()
+		next.LaserOn = &value
+	}
+	c.stateMu.Lock()
+	old, _ := json.Marshal(c.roverState)
+	updated, _ := json.Marshal(next)
+	c.roverState = next
+	c.stateMu.Unlock()
+	if string(old) != string(updated) {
+		select {
+		case c.stateChanged <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (c *WSClient) forwardState(ctx context.Context, conn *websocket.Conn) {
+	send := func() error {
+		c.stateMu.Lock()
+		state := c.roverState
+		c.stateMu.Unlock()
+		return writeJSON(ctx, conn, map[string]any{"type": "roverState", "state": state})
+	}
+	if err := send(); err != nil {
+		conn.CloseNow()
 		return
 	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case evt := <-c.controlEvents:
-			if evt.Type == "" {
-				evt.Type = "event"
-			}
-			if err := writeJSON(ctx, conn, evt); err != nil {
-				c.log.Printf("event send failed: %v", err)
+		case <-c.stateChanged:
+			if err := send(); err != nil {
+				conn.CloseNow()
 				return
 			}
 		}
@@ -494,9 +525,6 @@ func (c *WSClient) forwardEvents(ctx context.Context, conn *websocket.Conn) {
 
 func (c *WSClient) emitEvent(event string, data map[string]any) {
 	events := c.events
-	if event == "headlight.state" || event == "laser.state" {
-		events = c.controlEvents
-	}
 	if events == nil {
 		return
 	}

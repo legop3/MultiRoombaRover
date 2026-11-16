@@ -8,38 +8,7 @@ const { sendAlert } = require('../alertService');
 const ALERT_COLOR = '#00bcd4';
 const { handleAck } = require('../commandService');
 
-function coerceBool(value) {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value !== 0;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'true') return true;
-    if (normalized === 'false') return false;
-    if (normalized === '1') return true;
-    if (normalized === '0') return false;
-  }
-  return null;
-}
-
 const HEARTBEAT_INTERVAL_MS = 15000;
-
-function handleToggleEvent(roverId, msg) {
-  if (msg.event === 'headlight.state') {
-    const headlightOn = coerceBool(msg.data?.headlightOn);
-    if (headlightOn != null) {
-      roverManager.setToggleState(roverId, 'headlight', headlightOn);
-      return true;
-    }
-  }
-  if (msg.event === 'laser.state') {
-    const laserOn = coerceBool(msg.data?.laserOn);
-    if (laserOn != null) {
-      roverManager.setToggleState(roverId, 'laser', laserOn);
-      return true;
-    }
-  }
-  return false;
-}
 
 roverWSS.on('connection', (ws) => {
   let roverId = null;
@@ -80,19 +49,19 @@ roverWSS.on('connection', (ws) => {
       sendAlert({ color: ALERT_COLOR, title: 'Rover Online', message: roverId });
       return;
     }
-    if (!roverId) return;
+    if (!roverId || roverManager.rovers.get(roverId)?.ws !== ws) return;
     if (msg.type === 'sensor') {
       roverManager.handleSensorFrame(roverId, msg);
     } else if (msg.type === 'ack') {
       handleAck(msg);
-    } else if (msg.type === 'event') {
-      handleToggleEvent(roverId, msg);
+    } else if (msg.type === 'roverState') {
+      roverManager.setRoverState(roverId, msg.state);
     }
   });
 
   ws.on('close', () => {
     clearInterval(heartbeat);
-    if (roverId) {
+    if (roverId && roverManager.rovers.get(roverId)?.ws === ws) {
       roverManager.removeRover(roverId);
       sendAlert({ color: ALERT_COLOR, title: 'Rover Offline', message: roverId });
     }
