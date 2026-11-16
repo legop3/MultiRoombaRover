@@ -41,32 +41,6 @@ function handleToggleEvent(roverId, msg) {
   return false;
 }
 
-function handleMessage(roverId, msg) {
-  switch (msg.type) {
-    case 'hello':
-      roverManager.upsertRover(msg, this);
-      sendAlert({ color: ALERT_COLOR, title: 'Rover Connected', message: roverId });
-      break;
-    case 'sensor':
-      roverManager.handleSensorFrame(roverId, msg);
-      break;
-    case 'hostStats':
-      // Host stats are periodic Pi metadata, not user-facing rover events, so
-      // they are routed directly to roverManager instead of becoming alerts.
-      roverManager.handleHostStats(roverId, msg);
-      break;
-    case 'event': {
-      if (handleToggleEvent(roverId, msg)) {
-        break;
-      }
-      sendAlert({ color: ALERT_COLOR, title: `${roverId} event`, message: msg.event });
-      break;
-    }
-    default:
-      break;
-  }
-}
-
 roverWSS.on('connection', (ws) => {
   let roverId = null;
   ws.isAlive = true;
@@ -109,16 +83,10 @@ roverWSS.on('connection', (ws) => {
     if (!roverId) return;
     if (msg.type === 'sensor') {
       roverManager.handleSensorFrame(roverId, msg);
-    } else if (msg.type === 'hostStats') {
-      // Keep the Pi health stream separate from both Roomba sensorFrame data
-      // and generic rover events, which are surfaced as alerts.
-      roverManager.handleHostStats(roverId, msg);
     } else if (msg.type === 'ack') {
       handleAck(msg);
     } else if (msg.type === 'event') {
-      if (!handleToggleEvent(roverId, msg)) {
-        sendAlert({ color: ALERT_COLOR, title: `${roverId}`, message: msg.event });
-      }
+      handleToggleEvent(roverId, msg);
     }
   });
 

@@ -3,6 +3,8 @@
 // Scope: Keeps behavior unchanged while isolating this concern into a clear, single-responsibility unit.
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '../../context/SessionContext.jsx';
+import { useSocket } from '../../context/SocketContext.jsx';
+import RoverConfigurationEditor from '../../admin/components/RoverConfigurationEditor.jsx';
 import RoverRoster from '../RoverRoster/index.jsx';
 import LlmCommentaryPanel from './LlmCommentaryPanel.jsx';
 import OverseerControlPanel from './OverseerControlPanel.jsx';
@@ -95,6 +97,7 @@ function buildPrivateSafetyDraft(rover) {
 }
 
 export default function AdminPanelContent() {
+  const socket = useSocket();
   const {
     session,
     lockRover,
@@ -635,6 +638,7 @@ export default function AdminPanelContent() {
           </div>
         )}
       />
+      <RoverConfigurationEditor socket={socket} />
       <ReplaySnapshotHealth health={health} roster={roster} />
       <LlmCommentaryPanel
         state={llmCommentaryState}

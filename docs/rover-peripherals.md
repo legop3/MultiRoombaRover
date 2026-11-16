@@ -359,43 +359,33 @@ An ESP32 that supplies all three roles describes:
 }
 ```
 
-The ESP32 description owns the calibration for hardware attached to that ESP32. Rover YAML does not repeat the ESP32 pin numbers or servo calibration.
+The ESP32 description owns the calibration for hardware attached to that ESP32. Rover configuration does not repeat the ESP32 pin numbers or servo calibration.
 
-### Optional backend-selection rule
+### Peripheral role selection
 
-`roverd` resolves each built-in role once during startup:
+Roverd resolves each built-in role once during startup across Firmata peripherals and the optional internal Pi GPIO peripheral. Exactly one provider enables a role; no providers leave it disabled. Multiple providers report a conflict identifying the devices and leave only that role unavailable. Native GPIO has no priority over external peripherals.
 
-1. If that native Pi GPIO feature is enabled in rover YAML, use the native Pi implementation.
-2. Otherwise, if exactly one discovered ESP32 declares the role, use its Firmata implementation.
-3. Otherwise, leave the built-in feature disabled.
+All native settings live under `piGpio`, whose parent switch defaults to disabled:
 
-Native configuration deliberately wins. A Pi rover can attach an ESP32 for unrelated generic controls without unexpectedly moving its existing camera servo, headlight, or laser to the ESP32. To deliberately use the ESP32 for one of those features, disable only that native feature in rover YAML.
-
-Any rover configuration that should use the ESP32 for these roles keeps the corresponding native GPIO features disabled:
-
-```yaml
-cameraServo:
-  enabled: false
-
-headlight:
-  enabled: false
-
-laser:
-  enabled: false
+```json
+{
+  "piGpio": {
+    "enabled": false,
+    "cameraServo": { "enabled": false },
+    "headlight": { "enabled": true, "gpioPin": 22, "activeLow": true },
+    "laser": { "enabled": false },
+    "brc": { "enabled": true, "gpioPin": 4, "pulseEvery": "1m", "pulseWidth": "1s" }
+  }
+}
 ```
 
-An attached ESP32 can then fill any or all of those roles automatically at the next `roverd` start. This works identically on Raspberry Pi and laptop rover hosts; no USB path or backend name is added to YAML.
+This is a layout excerpt, not a complete configuration file. Use the JSON sample or `-print-default-config` for all required fields.
 
-Conflict behavior is fixed and simple:
-
-- Native feature enabled and ESP32 declares the same role: use native and log that the ESP32 role was ignored.
-- Native feature disabled and one ESP32 declares the role: use that ESP32.
-- Native feature disabled and no ESP32 declares the role: disable the feature.
-- Native feature disabled and multiple ESP32s declare the same role: fail startup with a duplicate-role error rather than choosing by USB enumeration order.
+While the parent is disabled, saved child settings cause no GPIO probing or initialization. When enabled, the internal peripheral appears as `pi-gpio` / “Pi GPIO” and offers its enabled roles. BRC runs as its automatic background function, not a user control. Pin, chip, servo calibration, and timing settings all remain inside this section. This applies to every architecture build. See the JSON sample config for complete settings; the WebUI configuration editor is a later rework step.
 
 ### Shared controller interfaces
 
-The current `WSClient` directly owns concrete `*CameraServo` and `*GPIOToggle` values. Supporting either physical backend cleanly requires it to depend on the behavior it uses instead of a platform-specific concrete type.
+`WSClient` uses controller interfaces shared by the internal GPIO and external Firmata providers.
 
 The intended interfaces are:
 
@@ -433,7 +423,7 @@ ToggleController
 
 ### Effective hello metadata
 
-The current hello is built from `c.cfg.CameraServo`, `c.cfg.Headlight`, and `c.cfg.Laser`. That cannot remain the source of truth because an ESP32 role may enable a feature whose native YAML entry is disabled.
+Hello uses the selected controllers’ effective configuration, since external roles are independent of saved native GPIO settings.
 
 After startup resolution, the selected controller supplies the effective public configuration. `sendHello()` advertises that effective configuration:
 
@@ -794,7 +784,7 @@ Use `esp32-s3-devkitc-1` and the matching `/dev/ttyACM*` device for a
 native-USB ESP32-S3.
 
 ```bash
-cd pi/roverd
+cd rover/roverd
 go run ./cmd/peripheral-probe -port /dev/ttyUSB0
 ```
 ## Connection lifecycle
@@ -813,8 +803,8 @@ Peripheral discovery happens exactly once per `roverd` process. The currently im
 8. Validates every advertised standard-output pin against Firmata capabilities.
 9. Configures generic digital, PWM, and servo pin modes once.
 10. Assigns process-local IDs such as `firmata-0` and `firmata-1` in discovery order.
-11. Resolves `cameraServo`, `headlight`, and `laser` against the native configuration.
-12. Rejects duplicate ESP32 providers only when the corresponding native role is disabled and Firmata selection would otherwise be ambiguous.
+11. Registers the internal Pi GPIO peripheral if enabled and resolves camera-servo, headlight, and laser roles across providers.
+12. Reports duplicate role providers and leaves conflicting roles unavailable.
 13. Constructs the selected native or Firmata controllers and fixed generic inventory.
 14. Constructs `WSClient` with those controllers and that inventory.
 15. Connects to the server and includes the effective built-in configuration and renderable inventory in the normal rover hello.
@@ -1144,7 +1134,7 @@ repository reference firmware. The package manifest, README, and examples are
 self-contained so the same directory can be published directly to the
 PlatformIO Registry as `legop3/RoverPeripheral`.
 
-### `pi/roverd`
+### `rover/roverd`
 
 `PeripheralManager` is responsible for:
 
@@ -1164,9 +1154,9 @@ Only renderable control metadata leaves `roverd`. Firmata pin numbers, output ma
 
 The manager should remain independent of the existing Roomba Open Interface serial adapter. A peripheral serial connection is not the Roomba base serial connection and must not be routed through `SerialAdapter`.
 
-The transport foundation is a focused Firmata parser/client in `pi/roverd/firmata.go`. It operates on `io.ReadWriteCloser`, which keeps byte-stream behavior testable without hardware and lets discovery pass either `/dev/ttyUSB*` or `/dev/ttyACM*` ports into the same client. `pi/roverd/cmd/peripheral-probe` remains the direct hardware diagnostic entry point, while `PeripheralManager` now connects the same client to automatic daemon startup discovery.
+The transport foundation is a focused Firmata parser/client in `rover/roverd/firmata.go`. It operates on `io.ReadWriteCloser`, which keeps byte-stream behavior testable without hardware and lets discovery pass either `/dev/ttyUSB*` or `/dev/ttyACM*` ports into the same client. `rover/roverd/cmd/peripheral-probe` remains the direct hardware diagnostic entry point, while `PeripheralManager` now connects the same client to automatic daemon startup discovery.
 
-`WSClient` now depends on shared camera-servo and toggle controller interfaces rather than platform-selected concrete types. The startup resolver uses the same native-first rule in the ARM Pi and amd64 laptop binaries. Firmata camera movement retains the established limits, home position, nudging, inversion, pulse calibration, raw-pulse policy, and movement-rate behavior; Firmata toggles retain logical state and polarity conversion.
+`WSClient` now depends on shared camera-servo and toggle controller interfaces rather than platform-selected concrete types. The startup resolver uses the same unique-provider rule in every architecture binary. Firmata camera movement retains the established limits, home position, nudging, inversion, pulse calibration, raw-pulse policy, and movement-rate behavior; Firmata toggles retain logical state and polarity conversion.
 
 ### Server
 
@@ -1247,8 +1237,8 @@ The completed system should be verified with a real ESP32 and rover Linux comput
 - Confirm camera angle limits, home position, nudge amount, inversion, pulse calibration, and rate limiting match the declared ESP32 configuration.
 - Confirm headlight and laser toggle state events remain identical to the native Pi path.
 - Confirm existing laser restrictions still apply with the Firmata backend.
-- Enable a native role and declare the same ESP32 role; confirm native wins and the ignored role is logged.
-- Disable native and declare the same role from two ESP32s; confirm startup fails with a clear duplicate-role error.
+- Enable Pi GPIO and a native role also declared by an ESP32; confirm the conflict lists both providers and leaves that role unavailable.
+- Declare the same role from two ESP32s; confirm a clear conflict and that unrelated roles remain available.
 - Confirm a Pi rover can use native built-in controls and generic ESP32 controls simultaneously.
 - Repeat ESP32 role selection on both the ARM Pi binary and amd64 laptop binary and confirm their commands and advertised configurations match.
 

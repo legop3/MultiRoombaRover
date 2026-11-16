@@ -124,6 +124,7 @@ export default function AdminApp() {
     content = <div className="mx-auto w-full max-w-md"><AuthPanel /></div>;
   } else if (activeSection === 'fleet') {
     content = <AdminPanelContent />;
+
   } else if (!isLockdown) {
     content = (
       <CardFrame title="Administrator access" bodyClassName="p-1 text-sm text-slate-300">

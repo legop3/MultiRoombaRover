@@ -1,0 +1,132 @@
+package roverd
+
+import "encoding/json"
+
+type helloMessage struct {
+	Type          string                    `json:"type"`
+	Name          string                    `json:"name"`
+	Description   string                    `json:"description,omitempty"`
+	Color         string                    `json:"color,omitempty"`
+	Battery       BatteryConfig             `json:"battery"`
+	MaxWheelSpeed int                       `json:"maxWheelSpeed"`
+	Media         any                       `json:"media"`
+	CameraServo   CameraServoConfig         `json:"cameraServo"`
+	Audio         AudioConfig               `json:"audio"`
+	Horn          HornConfig                `json:"horn"`
+	Headlight     GPIOToggleConfig          `json:"headlight"`
+	Laser         GPIOToggleConfig          `json:"laser"`
+	Peripherals   []RoverPeripheralMetadata `json:"peripherals,omitempty"`
+	Private       PrivateConfig             `json:"private"`
+}
+
+type sensorMessage struct {
+	Type      string `json:"type"`
+	Timestamp int64  `json:"ts"`
+	Data      string `json:"data"`
+}
+
+// hostStatsMessage is intentionally separate from sensorMessage because sensor
+// frames are raw Roomba Open Interface data, while these values describe the
+// Raspberry Pi host that is running roverd.
+type hostStatsMessage struct {
+	Type      string    `json:"type"`
+	Timestamp int64     `json:"ts"`
+	Stats     HostStats `json:"stats"`
+}
+
+type inboundMessage struct {
+	Type         string               `json:"type"`
+	ID           string               `json:"id"`
+	DriveDirect  *driveDirectPayload  `json:"driveDirect,omitempty"`
+	MotorPWM     *motorPWMPayload     `json:"motorPwm,omitempty"`
+	Raw          string               `json:"raw,omitempty"`
+	SensorStream *sensorStreamPayload `json:"sensorStream,omitempty"`
+	Servo        *servoPayload        `json:"servo,omitempty"`
+	TTS          *ttsPayload          `json:"tts,omitempty"`
+	Horn         *hornPayload         `json:"horn,omitempty"`
+	AudioLevels  *audioLevelsPayload  `json:"audioLevels,omitempty"`
+	Headlight    *togglePayload       `json:"headlight,omitempty"`
+	Laser        *togglePayload       `json:"laser,omitempty"`
+	Peripheral   *peripheralPayload   `json:"peripheral,omitempty"`
+	Song         *songPayload         `json:"song,omitempty"`
+}
+
+type driveDirectPayload struct {
+	Left  int `json:"left"`
+	Right int `json:"right"`
+}
+
+type motorPWMPayload struct {
+	Main   int `json:"main"`
+	Side   int `json:"side"`
+	Vacuum int `json:"vacuum"`
+}
+
+type sensorStreamPayload struct {
+	Enable bool `json:"enable"`
+}
+
+type mediaCommand struct {
+	Action string `json:"action"`
+}
+
+type servoPayload struct {
+	Angle   *float64 `json:"angle,omitempty"`
+	Nudge   *float64 `json:"nudge,omitempty"`
+	PulseUs *int     `json:"pulseUs,omitempty"`
+}
+
+type ttsPayload struct {
+	Text   string  `json:"text"`
+	Engine string  `json:"engine,omitempty"`
+	Voice  string  `json:"voice,omitempty"`
+	Pitch  float64 `json:"pitch,omitempty"`
+	Speed  float64 `json:"speed,omitempty"`
+	Speak  bool    `json:"speak,omitempty"`
+}
+
+type hornPayload struct {
+	Action   string    `json:"action"`
+	Waveform string    `json:"waveform,omitempty"`
+	Freqs    []float64 `json:"freqs,omitempty"`
+}
+
+type audioLevelsPayload struct {
+	HornGain    *float64 `json:"hornGain,omitempty"`
+	TTSGain     *float64 `json:"ttsGain,omitempty"`
+	ForwardGain *float64 `json:"forwardGain,omitempty"`
+}
+
+type togglePayload struct {
+	Action string `json:"action"`
+}
+
+type peripheralPayload struct {
+	ID      string          `json:"id"`
+	Control string          `json:"control"`
+	Value   json.RawMessage `json:"value"`
+}
+
+type songPayload struct {
+	Slot  *int       `json:"slot,omitempty"`
+	Notes []songNote `json:"notes"`
+	Loop  bool       `json:"loop,omitempty"`
+}
+
+type songNote struct {
+	Note     int `json:"note"`
+	Duration int `json:"duration"`
+}
+
+type rebootPayload struct {
+	DelayMs int `json:"delayMs,omitempty"`
+}
+
+type updatePayload struct{}
+
+type ackMessage struct {
+	Type   string `json:"type"`
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}

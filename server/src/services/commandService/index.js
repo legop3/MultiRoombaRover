@@ -2,6 +2,7 @@
 // Purpose: Defines the command Service module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const { v4: uuidv4 } = require('uuid');
+const roverManagement = require('../roverManagementService');
 const EventEmitter = require('events');
 const io = require('../../globals/io');
 const roverManager = require('../roverManager');
@@ -86,6 +87,9 @@ function normalizeOutboundCommandPayload(payload = {}) {
 }
 
 function issueCommand(roverId, payload, options = {}) {
+  if (['reboot', 'update', 'media'].includes(payload?.type)) {
+    return roverManagement.issueCommand(roverId, payload);
+  }
   const record = roverManager.rovers.get(roverId);
   if (!record || !record.ws) {
     throw new Error('Rover offline');
@@ -168,10 +172,10 @@ function issueUpdateToAllRovers() {
   const updated = [];
   const failed = [];
 
-  roverManager.rovers.forEach((record) => {
+  roverManagement.rovers.forEach((record) => {
     if (!record?.ws) return;
 
-    const roverId = String(record.id);
+    const roverId = String(record.roverId);
     try {
       // Use the same narrow update payload as the per-rover admin action. The
       // browser only asks for "update all"; the Pi still owns the privileged
@@ -304,6 +308,7 @@ function submitCommand(socket, { roverId, type, data } = {}, cb) {
     }
     const isRebootCommand = type === 'reboot';
     const isUpdateCommand = type === 'update';
+    const isManagementCommand = isRebootCommand || isUpdateCommand || type === 'media';
     const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));
     const isAdminSocket = isAdmin(socket);
     if (!isAdminSocket && isDeterred(socket)) {
@@ -321,10 +326,14 @@ function submitCommand(socket, { roverId, type, data } = {}, cb) {
     // in the same explicit admin-only branch as reboot instead of relying on
     // drive ownership checks, because having a turn should not grant system
     // maintenance privileges.
-    if ((isRebootCommand || isUpdateCommand) && !isAdminSocket) {
+    if (isManagementCommand && !isAdminSocket) {
       throw new Error('Not authorized');
     }
-    if (!isSongCommand && !isRebootCommand && !isUpdateCommand && !roverManager.canDrive(roverId, socket)) {
+    if (isManagementCommand) {
+      reply({ id: issueCommand(roverId, { ...payload, type }) });
+      return;
+    }
+    if (!isSongCommand && !roverManager.canDrive(roverId, socket)) {
       throw new Error('Not your turn or no control');
     }
     const record = roverManager.rovers.get(roverId);

@@ -64,11 +64,24 @@ To install roverd on your pi:
 1. Install `Raspberry Pi OS (Legacy) Lite` (exactly what its called in the imager) on your SD card
 2. Boot the pi up, plug in your good wifi adapter, use `nmtui` to set it up
 3. Install `git`, clone this repo into your home folder
-4. Move into the repo folder, run the roverd installer using `sudo pi/install_roverd.sh`
+4. Move into the repo folder, run the roverd installer using `sudo rover/install_roverd.sh`
 5. Reboot your raspberry pi
-6. Roverd, along with the audio and video publishers should now be running. Roverd should have created it's default config file at `/etc/roverd.yaml`
+6. Roverd, along with the audio and video publishers should now be running. Roverd should have created it's default config file at `/etc/roverd.json`
 
-Edit the `/etc/roverd.yaml` config file to change settings like your rover's name, color, and set the server IP.
+Edit the `/etc/roverd.json` config file to change settings like your rover's name, color, and set the server IP.
+
+Configuration is now a complete JSON object. See [roverd management](docs/roverd-management.md)
+for schema/default export, local validation, the management API, and deployment checks.
+
+The roverd rework is in progress; see the [implementation tracker](docs/roverd-rework-plan.md).
+Native GPIO now lives under `piGpio`, with its parent `enabled` switch disabled by default.
+Enable that switch only on hosts using the internal Pi GPIO peripheral, and configure its camera servo, headlight, laser, and BRC children there.
+See [hardware configuration notes](docs/rover-hardware-config.md) for the existing AIY Voice HAT setup and pin constraints.
+
+Build rover binaries with `make -C rover/roverd all`, or select one architecture with
+`make -C rover/roverd build ARCH=armv6` (also `armv7`, `arm64`, or `amd64`).
+Artifacts are `dist/roverd-linux-<architecture>` and remain in the repository.
+These builds share the same configuration and peripheral support; there is no laptop-specific build.
 
 
 ## Setting up the server

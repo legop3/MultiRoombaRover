@@ -1,0 +1,127 @@
+{
+  "piGpio": {
+    "enabled": false,
+    "brc": {
+      "enabled": true,
+      "gpioPin": 4,
+      "gpioChip": "gpiochip0",
+      "pulseEvery": "1m0s",
+      "pulseWidth": "1s"
+    },
+    "cameraServo": {
+      "enabled": false,
+      "pin": 12,
+      "freqHz": 50,
+      "cycleLen": 20000,
+      "minPulseUs": 900,
+      "maxPulseUs": 2100,
+      "minAngle": -15,
+      "maxAngle": 30,
+      "homeAngle": 0,
+      "nudgeDegrees": 2,
+      "allowRawPulse": false,
+      "invert": false
+    },
+    "headlight": {
+      "enabled": true,
+      "gpioPin": 22,
+      "gpioChip": "gpiochip0",
+      "initialOn": false,
+      "activeLow": true
+    },
+    "laser": {
+      "enabled": false,
+      "gpioPin": 27,
+      "gpioChip": "gpiochip0",
+      "initialOn": false,
+      "activeLow": false
+    }
+  },
+  "name": "dummy2",
+  "description": "",
+  "color": "",
+  "serverUrl": "ws://127.0.0.1:8080/rover",
+  "serial": {
+    "device": "/dev/ttyS0",
+    "baud": 115200
+  },
+  "battery": {
+    "full": 2068,
+    "warn": 1700,
+    "urgent": 1650
+  },
+  "maxWheelSpeed": 350,
+  "media": {
+    "rtspPort": 8554,
+    "manage": false,
+    "healthUrl": "http://127.0.0.1:9997/v3/paths/list",
+    "healthInterval": "30s",
+    "video": {
+      "enabled": true,
+      "service": "video-publisher.service",
+      "publisher": "pi-libcamera",
+      "device": "",
+      "inputFormat": "",
+      "width": 640,
+      "height": 480,
+      "fps": 30,
+      "bitrate": 2000000,
+      "inverted": true,
+      "sensorMode": "1296:972"
+    },
+    "audioCapture": {
+      "enabled": false,
+      "service": "audio-only-publisher.service",
+      "device": "hw:0,0",
+      "sampleRate": 48000,
+      "channels": 2,
+      "bitrate": 510000
+    },
+    "audioPlayback": {
+      "enabled": true,
+      "service": "audio-forward-listener.service",
+      "device": "forward",
+      "normalize": true,
+      "normalizeFilter": "dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled"
+    }
+  },
+  "audio": {
+    "ttsEnabled": false,
+    "defaultEngine": "flite",
+    "defaultVoice": "rms",
+    "defaultPitch": 50
+  },
+  "horn": {
+    "enabled": false,
+    "volume": 0.25,
+    "sampleRate": 48000,
+    "channels": 1,
+    "device": "",
+    "sineGain": 1,
+    "sawGain": 0.7,
+    "maxDuration": "10s"
+  },
+  "autoSideBrush": {
+    "enabled": true,
+    "speed": 20
+  },
+  "private": {
+    "enabled": false,
+    "safety": {
+      "speedLimitEnabled": false,
+      "speedLimitMaxWheelSpeed": 250,
+      "hardOvercurrentEnabled": false,
+      "overcurrentStopMs": 300,
+      "hardBumpEnabled": false,
+      "bumpBackoffSpeed": 250,
+      "bumpBackoffMs": 350,
+      "cliffEnabled": false,
+      "cliffBackoffSpeed": 250,
+      "cliffBackoffMs": 500,
+      "virtualWallEnabled": true,
+      "virtualWallBackoffSpeed": 250,
+      "virtualWallBackoffMs": 500,
+      "triggerCooldownMs": 800
+    }
+  }
+}
