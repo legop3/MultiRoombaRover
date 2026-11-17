@@ -1,6 +1,6 @@
 # Roverd rework plan and implementation tracker
 
-Status: implementation authorized on 2026-11-16; repository/build, internal GPIO, JSON/management, Fleet UI, rover state, media profiles/supervision, and shared audio routing implemented; deployment verification, standalone bootstrap, and update redesign remain pending.
+Status: implementation authorized on 2026-11-16; repository/build, internal GPIO, JSON/management, Fleet UI, rover state, media profiles/supervision, and shared audio routing implemented; standalone bootstrap and shared self-update are also implemented; final cleanup/hardware audit and deployment verification remain pending.
 
 This is the persistent plan and progress record for the roverd rework. Update it as implementation proceeds, recording completed work, decisions, verification evidence, and remaining work. Keep unfinished work unchecked; distinguish implemented behavior from runtime-verified behavior.
 
@@ -177,8 +177,8 @@ The order below is a working sequence, not a requirement to leave incompatible i
 - [x] Implement per-rover schema editor and complete-object saves (browser/live verification pending).
 - [x] Implement apply-one-field-to-all-connected-rovers with individual results (browser/live verification pending).
 - [x] Add profile editing/selection, media output/status, reboot, and update UI. (Live verification pending.)
-- [ ] Implement standalone bootstrap with only name/address input and automatic OS architecture selection.
-- [ ] Implement shared checkout installation and self-update with reconnect-visible results.
+- [x] Implement standalone bootstrap with only name/address input and automatic OS architecture selection. (Host verification pending.)
+- [x] Implement shared checkout installation and self-update with reconnect-visible results. (Host verification pending.)
 - [ ] Remove obsolete services, configuration files, scripts, build distinctions, and documentation.
 - [ ] Update user/contributor documentation, including profile variables, setup expectations, building, installation, and updates.
 - [ ] Perform focused available verification and record results below.
@@ -285,3 +285,14 @@ Verification for this stage:
 - Added real CLI inspection for catalogs and generated ALSA configuration, without setup execution or hardware access.
 - Verification: all four architecture builds passed; six profiles loaded through the actual daemon and all setup/run commands passed Bash syntax checks; current sample config validation and ALSA config rendering passed; installer/TTS shell syntax and server JS syntax passed. Focused frontend lint passed including the final status-display changes. No camera/audio streaming, setup commands, host installation, or browser/server processes were run here.
 - Next: verify the remaining frontend check, then standalone bootstrap and update flow. Actual device formats, concurrent playback/gains, child cleanup and network recovery still require the documented rover-side checks.
+
+
+### Standalone bootstrap and shared updates (2026-11-16)
+
+- Added `rover/bootstrap.sh`: prompts only for name/server WebSocket address, installs prerequisites, clones into `/opt/roverd`, invokes the shared installer, and starts roverd. Existing configuration is preserved on rerun.
+- Installer selects committed architecture binaries from OS architecture (and ARM generation for 32-bit ARM), writes initial identity only on first installation, and preserves custom profiles/data. Running binary and updater replacement use atomic rename.
+- Replaced rebooting updater with an independent systemd job using fast-forward Git pull and the same installer, followed by service restart. No releases, forced reset, migrations, or rollback machinery.
+- Latest update progress/result is persisted atomically, sent over management, cached in server memory, and displayed in Fleet Management including after reconnect. Detailed command output stays in the systemd journal.
+- Added `docs/roverd-installation.md` and updated README instructions.
+- Verification: all four committed architecture binaries rebuilt successfully; shell syntax, server syntax, focused UI lint, and diff whitespace checks passed. No installation, apt operation, host reboot/restart, or live server/browser was run on the development machine.
+- Required rover checks: fresh bootstrap identity/connectivity; successful update and reconnect-visible status; failure reporting and retry; preservation of settings/custom profiles/data. Hardware/audio checks and final universal-hardware audit remain open.

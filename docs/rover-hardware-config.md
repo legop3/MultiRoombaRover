@@ -1,6 +1,6 @@
 # Rover hardware configuration notes
 
-This document records hardware-specific requirements while the roverd rework is in progress. Media profiles and shared audio routing are implemented. The standalone bootstrap remains unfinished; current installation uses a checkout. Configuration selections are recorded below.
+This document records hardware-specific requirements while the roverd rework is in progress. Media profiles and shared audio routing are implemented. The standalone bootstrap creates the managed checkout and invokes the shared installer. Configuration selections are recorded below.
 
 ## Universal configuration requirements
 
@@ -16,7 +16,7 @@ Roverd configuration selects one physical input device and one physical output d
 
 The microphone streamer uses the selected input. TTS, horn, and forwarded audio share the selected output while retaining simultaneous playback and separate volume controls. Profiles use the generated logical devices supplied through their environment; they do not each hardcode or independently select physical audio hardware. Use ALSA conversion where supported instead of requiring all devices to accept the existing HAT playback format.
 
-AIY setup enables its hardware and uses this same routing system. The bootstrap still asks only for rover name and server address. Audio routing is implemented; the standalone bootstrap remains planned.
+AIY setup enables its hardware and uses this same routing system. The bootstrap still asks only for rover name and server address. Audio routing and the standalone bootstrap are implemented; hardware verification remains pending.
 
 ## Historical AIY Voice HAT setup
 

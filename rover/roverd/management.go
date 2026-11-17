@@ -1,11 +1,13 @@
 package roverd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"os/exec"
 	"sync"
 	"time"
@@ -81,7 +83,7 @@ func (m *ManagementClient) connect(parent context.Context) error {
 	conn.SetReadLimit(1024 * 1024)
 	if err := writeJSON(ctx, conn, map[string]any{
 		"type": "hello", "name": m.cfg.Name, "config": m.cfg,
-		"schema": ConfigurationSchema(), "profiles": m.profileCatalog(), "mediaStatus": m.mediaStatus(),
+		"schema": ConfigurationSchema(), "profiles": m.profileCatalog(), "mediaStatus": m.mediaStatus(), "updateStatus": readUpdateStatus(),
 	}); err != nil {
 		return err
 	}
@@ -102,6 +104,7 @@ func (m *ManagementClient) connect(parent context.Context) error {
 		}
 	}()
 	go m.forwardHostStats(ctx, conn)
+	go m.forwardUpdateStatus(ctx, conn)
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -198,7 +201,7 @@ func (m *ManagementClient) execute(ctx context.Context, command managementComman
 		return m.restart, nil
 	}
 	// The updater remains a fixed-purpose helper; browser input cannot select
-	// executable paths or shell arguments. Its implementation is a later stage.
+	// executable paths or shell arguments. The separate systemd job survives restart.
 	path, args := "systemctl", []string{"reboot"}
 	if command.Type == "update" {
 		path, args = "/usr/local/sbin/roverd-self-update", nil
@@ -303,4 +306,34 @@ func (m *ManagementClient) mediaStatus() map[string]string {
 		return nil
 	}
 	return m.media.Status()
+}
+
+// Persist only the latest update result, so reconnects do not depend on an
+// in-memory event surviving the service restart.
+func readUpdateStatus() json.RawMessage {
+	data, err := os.ReadFile("/var/lib/roverd/update-status.json")
+	if err != nil || !json.Valid(data) {
+		return nil
+	}
+	return data
+}
+
+func (m *ManagementClient) forwardUpdateStatus(ctx context.Context, conn *websocket.Conn) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	var previous json.RawMessage
+	for {
+		current := readUpdateStatus()
+		if current != nil && !bytes.Equal(current, previous) {
+			if err := writeJSON(ctx, conn, map[string]any{"type": "updateStatus", "status": current}); err != nil {
+				return
+			}
+			previous = current
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }

@@ -58,12 +58,9 @@ These are the basics of how evertything is connected on my rovers, this is hard 
 ### Software on your rover
 Roverd targets Debian-based systems with ARMv6, ARMv7, ARM64, or AMD64 binaries. For the existing AIY Voice HAT rover, use Raspberry Pi OS Bookworm; that hardware setup has not been verified on Trixie.
 
-The standalone installer is still being implemented. For now:
-1. Set up the OS and networking.
-2. Install `git` and clone this repository.
-3. From the repository, run `sudo rover/install_roverd.sh`.
-4. Configure `/etc/roverd.json`, including the rover name, server address, physical audio devices, and enabled media profiles. Media and native Pi GPIO are disabled by default.
-5. Run `sudo systemctl restart roverd`.
+Download [rover/bootstrap.sh](rover/bootstrap.sh) onto the rover and run `sudo bash bootstrap.sh`. It asks only for the rover name and the full server WebSocket address, creates the managed checkout at `/opt/roverd`, installs the matching binary from the repository, and starts roverd.
+
+Configure audio devices, media profiles, and optional Pi GPIO through Fleet Management. Media and native Pi GPIO are disabled by default. Updates use the same installer and restart the service without rebooting the host. See [installation and updates](docs/roverd-installation.md).
 
 Roverd supervises the selected streamer commands itself. Disable/remove any previously installed streamer services before starting it. The AIY profiles may request a one-time reboot to activate their boot overlay. See [media profiles and audio routing](docs/rover-media-profiles.md) for configuration and deployment checks.
 

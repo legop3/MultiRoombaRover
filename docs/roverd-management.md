@@ -72,7 +72,7 @@ Record acknowledgement errors, reconnect hello contents, relevant journal/server
 
 ## Pending stages
 
-YAML media catalogs, child supervision, shared ALSA routing, and Fleet Management profile controls are implemented. Browser/live verification of configuration, operational state, media, and audio remains pending. Standalone bootstrap and the replacement update workflow are the next implementation stage.
+YAML media catalogs, child supervision, shared ALSA routing, and Fleet Management profile controls are implemented. Browser/live verification of configuration, operational state, media, and audio remains pending. Standalone bootstrap and shared self-update are implemented; host verification remains pending. See [installation and updates](roverd-installation.md). Update status is included as `updateStatus` in hello and sent as `{type: "updateStatus", status: {state, message, timestamp}}` when it changes.
 
 Apply-field targets the currently management-connected fleet. It clones each rover’s own configuration, replaces an existing field, and sends the complete object for rover-side validation. Inspect individual results for failures. Missing fields and changed connections are reported; offline changes are not queued. Paths traverse object fields, not array elements. Array-valued fields can be replaced as a whole.
 

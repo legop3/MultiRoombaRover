@@ -53,6 +53,7 @@ function RoverForm({ socket, record, online }) {
   }
   return <div className="space-y-2">
     <p className="text-sm">{online ? 'Management connected' : 'Management offline — edits are retained locally.'}</p>
+    {record.updateStatus && <p role="status">Update: {record.updateStatus.state} — {record.updateStatus.message}</p>}
     <p role="status">{message}</p>
     {results.length > 0 && <ul>{results.map((result) => <li key={result.roverId}>{result.roverId}: {result.success ? 'Saved' : result.error}</li>)}</ul>}
     <fieldset disabled={busy || !online} className="space-y-2">
@@ -145,6 +146,9 @@ export default function RoverConfigurationEditor({ socket }) {
     socket.on('roverManagement:changed', changed);
     socket.on('roverManagement:offline', offline);
     socket.on('connect', refresh);
+    const updateStatus = ({ roverId, status }) => setRecords((previous) => previous[roverId]
+      ? { ...previous, [roverId]: { ...previous[roverId], updateStatus: status } } : previous);
+    socket.on('roverManagement:updateStatus', updateStatus);
     socket.on('disconnect', disconnected);
     refresh();
     return () => {
@@ -154,6 +158,7 @@ export default function RoverConfigurationEditor({ socket }) {
       socket.off('roverManagement:offline', offline);
       socket.off('connect', refresh);
       socket.off('disconnect', disconnected);
+      socket.off('roverManagement:updateStatus', updateStatus);
     };
   }, [socket]);
   const id = selected || Object.keys(records)[0] || '';

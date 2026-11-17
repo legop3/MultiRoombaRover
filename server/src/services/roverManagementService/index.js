@@ -18,6 +18,7 @@ function snapshot(record) {
     schema: record.schema,
     profiles: record.profiles,
     mediaStatus: record.mediaStatus,
+    updateStatus: record.updateStatus,
     hostStats: record.hostStats || null,
     notices: record.notices,
   };
@@ -83,7 +84,7 @@ managementWSS.on('connection', (ws) => {
         if (typeof msg.name !== 'string' || !msg.name || !msg.config || !msg.schema) throw new Error('Invalid management hello');
         clearTimeout(helloTimeout);
         const previous = rovers.get(msg.name);
-        record = { roverId: msg.name, ws, config: msg.config, schema: msg.schema, profiles: msg.profiles, mediaStatus: msg.mediaStatus || {}, notices: [] };
+        record = { roverId: msg.name, ws, config: msg.config, schema: msg.schema, profiles: msg.profiles, mediaStatus: msg.mediaStatus || {}, updateStatus: msg.updateStatus || null, notices: [] };
         rovers.set(record.roverId, record);
         previous?.ws.close(1000, 'Replaced by new connection');
         notifyAdmins('roverManagement:changed', snapshot(record));
@@ -93,6 +94,9 @@ managementWSS.on('connection', (ws) => {
       if (msg.type === 'ack') {
         if (pending.get(msg.id)?.ws !== ws) return;
         finish(msg.id, msg.status === 'ok' ? null : new Error(msg.error || 'Management action failed'), msg);
+      } else if (msg.type === 'updateStatus') {
+        record.updateStatus = msg.status;
+        notifyAdmins('roverManagement:updateStatus', { roverId: record.roverId, status: msg.status });
       } else if (msg.type === 'hostStats') {
         record.hostStats = msg;
         require('../roverManager').handleHostStats(record.roverId, msg);
