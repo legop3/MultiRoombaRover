@@ -92,3 +92,21 @@ body::-webkit-scrollbar,
   }
 
 }
+
+/* Schema controls share the surrounding fleet UI's input treatment. */
+.rover-config-form input:not([type="checkbox"]),
+.rover-config-form select,
+.rover-config-form textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #475569;
+  border-radius: 0.375rem;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+.rover-config-form input:focus-visible,
+.rover-config-form select:focus-visible,
+.rover-config-form textarea:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+.rover-config-form .text-danger,
+.rover-config-form .error-detail { color: #fca5a5; }

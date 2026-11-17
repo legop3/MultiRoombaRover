@@ -45,6 +45,8 @@ install -D -o root -g root -m 0755 rover/bin/roverd-self-update.sh /usr/local/sb
 # Keep the running updater on its original inode until it exits.
 mv -f /usr/local/sbin/roverd-self-update.new /usr/local/sbin/roverd-self-update
 echo "Registered update checkout at $REPO_ROOT"
+# Refuse to report a successful installation with an unusable saved config.
+/usr/local/bin/roverd -config /etc/roverd.json -check-config
 systemctl daemon-reload
 systemctl enable roverd.service
 echo 'Installation complete; caller can now restart roverd.'

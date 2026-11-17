@@ -11,6 +11,7 @@ if [[ ! -e /opt/roverd ]]; then
   git clone https://github.com/legop3/MultiRoombaRover.git /opt/roverd
 fi
 [[ -d /opt/roverd/.git ]] || { echo '/opt/roverd must be a repository checkout' >&2; exit 1; }
+git -C /opt/roverd pull --ff-only
 export ROVERD_INITIAL_NAME="$rover_name" ROVERD_INITIAL_SERVER="$server_address"
 bash /opt/roverd/rover/install_roverd.sh
 systemctl restart roverd

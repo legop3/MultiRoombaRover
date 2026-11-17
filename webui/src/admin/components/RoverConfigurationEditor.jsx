@@ -12,33 +12,76 @@ function request(socket, event, payload = {}) {
   });
 }
 
-function fields(schema, prefix = []) {
-  return Object.entries(schema?.properties || {}).flatMap(([key, child]) => {
-    const path = [...prefix, key];
-    return child.type === 'object' ? fields(child, path) : [{ path, label: path.join(' / ') }];
-  });
+function label(key) { return key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase()); }
+
+function fieldUI(schema, path = []) {
+  const ui = { 'ui:title': path.length ? label(path.at(-1)) : '', 'ui:options': { path } };
+  if (schema.type === 'string') ui['ui:emptyValue'] = '';
+  for (const [key, child] of Object.entries(schema.properties || {})) ui[key] = fieldUI(child, [...path, key]);
+  return ui;
 }
+
+function FieldLayout({ id, label: title, children, errors, help, description, schema, uiSchema, registry }) {
+  const path = uiSchema?.['ui:options']?.path || [];
+  const object = schema.type === 'object';
+  return <div className={object ? 'min-w-0' : 'space-y-2 py-3 border-b border-slate-700/50'}>
+    {!object && <div className="flex items-center justify-between gap-3">
+      <label htmlFor={id} className="font-medium text-sm">{title}</label>
+      <button type="button" className="text-xs text-sky-300 hover:underline disabled:opacity-40"
+        disabled={registry.formContext.busy || !registry.formContext.online}
+        onClick={() => registry.formContext.applyField(path)}>Apply to all rovers</button>
+    </div>}
+    {description}{children}{errors}{help}
+  </div>;
+}
+
+function ObjectLayout({ title, properties, uiSchema, registry }) {
+  const path = uiSchema?.['ui:options']?.path || [];
+  const content = <div className="space-y-3">{properties.map((property) => <div key={property.name}>{property.content}</div>)}
+    {path.length === 2 && path[0] === 'media' && path[1] !== 'rtspPort'
+      && <MediaProfiles {...registry.formContext} category={path[1]} />}
+  </div>;
+  if (!path.length) return content;
+  return <details className="rounded-lg border border-slate-700 bg-slate-900/40 p-4" open={path[0] === 'media'}>
+    <summary className="cursor-pointer font-semibold mb-3">{title}</summary>{content}
+  </details>;
+}
+
+// Required boolean properties may be false; HTML required checkboxes may not.
+function BooleanInput({ id, value, disabled, readonly, onChange }) {
+  return <input id={id} type="checkbox" checked={Boolean(value)} disabled={disabled || readonly}
+    onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 accent-sky-500" />;
+}
+const widgets = { CheckboxWidget: BooleanInput };
+
+const templates = { FieldTemplate: FieldLayout, ObjectFieldTemplate: ObjectLayout };
 
 function RoverForm({ socket, record, online }) {
   const [draft, setDraft] = useState(() => structuredClone(record.config));
-  const [field, setField] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [results, setResults] = useState([]);
-  const options = fields(record.schema);
   const schema = structuredClone(record.schema);
+  const uiSchema = fieldUI(schema);
   for (const category of ['video', 'audioCapture', 'audioPlayback']) {
     const property = schema.properties?.media?.properties?.[category]?.properties?.profile;
     const profiles = record.profiles?.[category] || [];
-    if (property && profiles.length) property.oneOf = profiles.map((profile) => ({ const: profile.id, title: profile.name }));
+    if (property) {
+      // Explicit enum/select avoids rendering profile identifiers as free text.
+      const choices = profiles.map((profile) => ({ id: profile.id, name: profile.name }));
+      const current = draft.media?.[category]?.profile;
+      if (current && !choices.some((entry) => entry.id === current)) choices.push({ id: current, name: `${current} (unavailable)` });
+      property.enum = choices.map((entry) => entry.id);
+      uiSchema.media[category].profile['ui:widget'] = 'select';
+      uiSchema.media[category].profile['ui:enumNames'] = choices.map((entry) => entry.name);
+    }
   }
-  async function save(all) {
+  async function save(path) {
     setBusy(true);
     setMessage('');
     setResults([]);
     try {
-      if (all) {
-        const path = JSON.parse(field);
+      if (path) {
         const value = path.reduce((object, key) => object?.[key], draft);
         if (value === undefined) throw new Error('Selected field has no value');
         const response = await request(socket, 'roverManagement:applyField', { path, value });
@@ -57,24 +100,19 @@ function RoverForm({ socket, record, online }) {
     <p role="status">{message}</p>
     {results.length > 0 && <ul>{results.map((result) => <li key={result.roverId}>{result.roverId}: {result.success ? 'Saved' : result.error}</li>)}</ul>}
     <fieldset disabled={busy || !online} className="space-y-2">
-      <Form schema={schema} formData={draft} validator={validator}
-        onChange={({ formData }) => setDraft(formData)} onSubmit={() => save(false)}>
-        <button type="submit" className="button-dark">Save to this rover</button>
+      <Form schema={schema} uiSchema={uiSchema} templates={templates} widgets={widgets} noHtml5Validate
+        formContext={{ socket, record, online, busy, configDirty: JSON.stringify(draft) !== JSON.stringify(record.config), applyField: save }}
+        className="rover-config-form" formData={draft} validator={validator}
+        onChange={({ formData }) => setDraft(formData)} onSubmit={() => save()}>
+        <div className="sticky bottom-0 bg-slate-900 border-t border-slate-700 p-3 mt-4">
+          <button type="submit" className="button-dark">Save configuration to this rover</button>
+        </div>
       </Form>
-      <label className="block">Field to apply to all connected rovers
-        <select className="block bg-slate-900 text-slate-100" value={field} onChange={(event) => setField(event.target.value)}>
-          <option value="">Select a field</option>
-          {options.map(({ path, label }) => <option key={JSON.stringify(path)} value={JSON.stringify(path)}>{label}</option>)}
-        </select>
-      </label>
-      <button type="button" className="button-dark" disabled={!field} onClick={() => save(true)}>Apply this field to all rovers</button>
     </fieldset>
-    <MediaProfiles socket={socket} record={record} online={online} />
   </div>;
 }
 
-function MediaProfiles({ socket, record, online }) {
-  const [category, setCategory] = useState('video');
+function MediaProfiles({ socket, record, online, category, configDirty }) {
   const [profile, setProfile] = useState({ id: 'custom', name: '', description: '', setup: '', run: '' });
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -90,15 +128,13 @@ function MediaProfiles({ socket, record, online }) {
     } catch (error) { setMessage(error.message); }
     finally { setBusy(false); }
   }
-  return <details className="space-y-2">
-    <summary>Media profiles and output</summary>
-    <label>Streamer <select className="bg-slate-900" value={category} onChange={(event) => setCategory(event.target.value)}>
-      <option value="video">Video</option><option value="audioCapture">Microphone</option><option value="audioPlayback">Speaker</option>
-    </select></label>
+  return <div className="space-y-3 pt-3">
     {(record.profiles?.[category] || []).map((entry) => <p key={entry.id}>{entry.name}: {entry.description}</p>)}
     <p>Status: {record.mediaStatus?.[category] || (online ? 'Waiting for status' : 'Offline')}</p>
-    <h3>Custom profile</h3>
-    <fieldset disabled={!online || busy}>
+    <details className="rounded border border-slate-600 p-3">
+    <summary className="cursor-pointer">Create or edit custom profile</summary>
+    {configDirty && <p className="text-sm text-amber-300">Save configuration changes before saving a custom profile, which restarts the rover.</p>}
+    <fieldset disabled={!online || busy || configDirty}>
       {['name', 'description', 'setup', 'run'].map((key) => <label key={key} className="block">{key}
         <textarea className="field-input block w-full" rows={['setup', 'run'].includes(key) ? 4 : 1}
           value={profile[key]} onChange={(event) => setProfile((previous) => ({ ...previous, [key]: event.target.value }))} />
@@ -106,15 +142,16 @@ function MediaProfiles({ socket, record, online }) {
       <button type="button" className="button-dark" onClick={save}>Save custom profile</button>
     </fieldset>
     <p role="status">{message}</p>
+    </details>
+    <details><summary className="cursor-pointer">Streamer output</summary>
     <pre className="max-h-80 overflow-auto whitespace-pre-wrap text-xs">{(record.notices || [])
       .filter((event) => event.event?.startsWith('media.') && event.data?.category === category)
-      .map((event) => `${event.event === 'media.status' ? '[status] ' : ''}${event.data?.message || ''}`).join('\n')}</pre>
-  </details>;
+      .map((event) => `${event.event === 'media.status' ? '[status] ' : ''}${event.data?.message || ''}`).join('\n')}</pre></details>
+  </div>;
 }
 
-export default function RoverConfigurationEditor({ socket }) {
+export default function RoverConfigurationEditor({ socket, selected, onSelect }) {
   const [records, setRecords] = useState({});
-  const [selected, setSelected] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
@@ -163,10 +200,10 @@ export default function RoverConfigurationEditor({ socket }) {
   }, [socket]);
   const id = selected || Object.keys(records)[0] || '';
   const record = records[id];
-  return <div className="p-2 space-y-3">
-    <h2 className="text-lg">Rover configuration</h2>
+  return <div id="fleet-configuration" className="space-y-4 scroll-mt-4">
+    <h2 className="text-lg font-semibold">Configure rover</h2>
     {error && <p role="alert">{error}</p>}
-    <label>Rover <select className="bg-slate-900 text-slate-100" value={id} onChange={(event) => setSelected(event.target.value)}>
+    <label>Rover <select className="bg-slate-900 text-slate-100" value={id} onChange={(event) => onSelect(event.target.value)}>
       {!id && <option value="">No management connections</option>}
       {Object.values(records).map((entry) => <option key={entry.roverId} value={entry.roverId}>{entry.roverId}{entry.online ? '' : ' (offline)'}</option>)}
     </select></label>

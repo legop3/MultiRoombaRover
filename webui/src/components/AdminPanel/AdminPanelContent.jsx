@@ -118,6 +118,7 @@ export default function AdminPanelContent() {
     overseerControlState,
   } = useSession();
   const roster = useMemo(() => session?.roster ?? [], [session?.roster]);
+  const [configurationRover, setConfigurationRover] = useState('');
   const [lockStates, setLockStates] = useState({});
   const [rebootStates, setRebootStates] = useState({});
   const [updateStates, setUpdateStates] = useState({});
@@ -408,7 +409,7 @@ export default function AdminPanelContent() {
   );
 
   return (
-    <CardFrame title="Admin controls" actions={actions} bodyClassName="space-y-0.5 text-base">
+    <><CardFrame title="Admin controls" actions={actions} bodyClassName="space-y-0.5 text-base">
       <div className="flex gap-0.5 text-xs">
         <button
           type="button"
@@ -519,6 +520,8 @@ export default function AdminPanelContent() {
         </div>
       </div>
 
+    </CardFrame>
+    <CardFrame title="Fleet management" bodyClassName="space-y-5">
       <div className="flex items-center justify-between gap-0.5 text-xs">
         <span className="text-slate-400">Rovers</span>
         <button
@@ -534,6 +537,7 @@ export default function AdminPanelContent() {
         roster={roster}
         renderActions={(rover) => (
           <div className="flex flex-wrap items-center gap-0.5 text-xs">
+            <a href="#fleet-configuration" className="button-dark" onClick={() => setConfigurationRover(String(rover.id))}>Configure</a>
             <button
               type="button"
               onClick={() => handleLockToggle(rover.id, !lockMap[rover.id])}
@@ -638,7 +642,9 @@ export default function AdminPanelContent() {
           </div>
         )}
       />
-      <RoverConfigurationEditor socket={socket} />
+      <RoverConfigurationEditor socket={socket} selected={configurationRover} onSelect={setConfigurationRover} />
+    </CardFrame>
+    <CardFrame title="Monitoring" bodyClassName="space-y-3">
       <ReplaySnapshotHealth health={health} roster={roster} />
       <LlmCommentaryPanel
         state={llmCommentaryState}
@@ -651,6 +657,6 @@ export default function AdminPanelContent() {
         clearingHistory={clearingOverseerHistory}
       />
       <AdminIpLogPanel entries={adminLogs} />
-    </CardFrame>
+    </CardFrame></>
   );
 }
