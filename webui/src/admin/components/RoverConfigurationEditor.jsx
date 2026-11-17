@@ -51,7 +51,7 @@ function RoverForm({ socket, record, online }) {
     {record.updateStatus && <p role="status">Update: {record.updateStatus.state} — {record.updateStatus.message}</p>}
     <p role="status">{message}</p>
     {results.length > 0 && <ul>{results.map((result) => <li key={result.roverId}>{result.roverId}: {result.success ? 'Saved' : result.error}</li>)}</ul>}
-    <SchemaConfigurationForm schema={schema} value={draft} onChange={setDraft} disabled={busy || !online}
+    <SchemaConfigurationForm liveData={record} schema={schema} value={draft} onChange={setDraft} disabled={busy || !online}
       renderFieldAction={(path) => <button type="button" className="button-dark text-xs" disabled={busy || !online}
         onClick={() => save(path)}>Apply to all</button>}
       renderObjectFooter={(path) => path.length === 2 && path[0] === 'media' && record.profiles?.[path[1]]

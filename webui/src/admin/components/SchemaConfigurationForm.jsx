@@ -311,7 +311,7 @@ function ConfigurationArrayTemplate({ canAdd, disabled, fieldPathId, items, onAd
   );
 }
 
-export default function SchemaConfigurationForm({ schema, value, onChange, configuredSecrets, secretOperations, setSecretOperation, disabled = false, renderFieldAction, renderObjectFooter }) {
+export default function SchemaConfigurationForm({ schema, value, onChange, configuredSecrets, secretOperations, setSecretOperation, disabled = false, renderFieldAction, renderObjectFooter, liveData }) {
   const uiSchema = useMemo(() => buildUiSchema(schema), [schema]);
   const widgets = useMemo(() => ({ SecretWidget }), []);
   const templates = useMemo(() => ({
@@ -326,7 +326,9 @@ export default function SchemaConfigurationForm({ schema, value, onChange, confi
     setSecretOperation,
     renderFieldAction,
     renderObjectFooter,
-  }), [configuredSecrets, secretOperations, setSecretOperation, renderFieldAction, renderObjectFooter]);
+    // RJSF ignores function identity changes; footer data must participate in comparison.
+    liveData,
+  }), [configuredSecrets, secretOperations, setSecretOperation, renderFieldAction, renderObjectFooter, liveData]);
 
   return (
     <div className="configuration-schema-form">
