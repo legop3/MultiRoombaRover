@@ -21,7 +21,9 @@
     changed=0
     for setting in dtparam=i2s=on dtoverlay=googlevoicehat-soundcard; do
       if ! grep -Fxq "$setting" "$boot"; then
-        printf '\n%s\n' "$setting" >> "$boot"
+        # Leave any model-specific section before adding shared HAT settings.
+        if [[ "$changed" == 0 ]]; then printf '\n[all]\n' >> "$boot"; fi
+        printf '%s\n' "$setting" >> "$boot"
         changed=1
       fi
     done

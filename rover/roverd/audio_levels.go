@@ -76,7 +76,7 @@ func (c *WSClient) applyMixerGain(control string, gain float64) {
 		return
 	}
 
-	// Convert linear gain to dB, matching softvol max_dB=12.0 in /etc/asound.conf.
+	// Convert linear gain to dB, matching softvol max_dB=12.0 in the generated ALSA routing.
 	db := 20.0 * math.Log10(normalized)
 	if db > 12.0 {
 		db = 12.0

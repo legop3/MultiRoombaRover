@@ -671,7 +671,7 @@ func (c *WSClient) handleRebootTimeout() {
 	c.connMu.Unlock()
 
 	c.console.Notify("Control server has been disconnected for 6 minutes. Rebooting the rover now.")
-	c.log.Printf("rebooting pi after prolonged websocket disconnect")
+	c.log.Printf("rebooting rover after prolonged websocket disconnect")
 	cmd := exec.Command("systemctl", "reboot")
 	if err := cmd.Start(); err != nil {
 		c.log.Printf("reboot command failed: %v", err)

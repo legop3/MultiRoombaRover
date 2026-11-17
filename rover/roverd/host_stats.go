@@ -20,7 +20,7 @@ const (
 )
 
 // HostStats is the wire format sent from roverd to the server. It avoids
-// Roomba-specific sensor naming so the browser can treat these values as Pi
+// Roomba-specific sensor naming so the browser can treat these values as Linux
 // host health, not robot telemetry.
 type HostStats struct {
 	UptimeSec         *float64          `json:"uptimeSec,omitempty"`
@@ -136,17 +136,21 @@ func CollectHostStats(ctx context.Context) HostStats {
 		}
 	}
 
-	if coreV, err := readCoreVoltage(ctx); err != nil {
-		stats.addError("coreVoltage", err)
-	} else {
-		stats.CoreVoltageV = &coreV
-	}
+	// Firmware voltage/throttle telemetry is optional on non-Pi hosts.
+	if _, err := exec.LookPath("vcgencmd"); err == nil {
+		if coreV, err := readCoreVoltage(ctx); err != nil {
+			stats.addError("coreVoltage", err)
+		} else {
+			stats.CoreVoltageV = &coreV
+		}
 
-	if raw, flags, err := readThrottleFlags(ctx); err != nil {
-		stats.addError("throttled", err)
-	} else {
-		stats.ThrottledRaw = raw
-		stats.applyThrottleFlags(flags)
+		if raw, flags, err := readThrottleFlags(ctx); err != nil {
+			stats.addError("throttled", err)
+		} else {
+			stats.ThrottledRaw = raw
+			stats.applyThrottleFlags(flags)
+		}
+
 	}
 
 	if wifi, err := collectWiFiStats(ctx); err != nil {

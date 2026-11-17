@@ -239,7 +239,7 @@ func (c *ManagementClient) forwardHostStats(ctx context.Context, conn *websocket
 
 	send := func() bool {
 		// Host stats are collected on demand so each outbound message describes
-		// the current Pi state. Collection failures are encoded into the stats
+		// the current host state. Collection failures are encoded into the stats
 		// payload, which keeps this telemetry path from closing the rover socket.
 		stats := CollectHostStats(ctx)
 		// Throughput is derived here because this loop owns the ordered, periodic

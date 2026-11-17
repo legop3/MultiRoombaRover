@@ -8,7 +8,7 @@ https://rover.otter.land
 
 ## This guide is a work in progress, it will cover:
 - Building rovers
-- Installing roverd on a rover's raspberry pi
+- Installing roverd on a Debian-based rover computer
 - Setting up the server
 - Configuration
 
@@ -16,6 +16,8 @@ https://rover.otter.land
 You WILL need some common hobby electronics knowledge to build one of these, I will not be making a super detailed wiring or assembly guide, some of building your rover will be up to you, things such as a protective cage, camera and electronics mounting will not be covered in any great detail.
 
 ### Parts per rover
+
+This parts list describes my Pi/AIY build. Roverd also supports other Linux hosts and configurable camera/audio devices.
 
 | Part | Notes |
 | --- | --- |
@@ -28,7 +30,7 @@ You WILL need some common hobby electronics knowledge to build one of these, I w
 | A good wifi adapter | Has to work with Linux 6.12 (I use ones with the MT7921AU chipset and they work  great), ideally wifi 6 with MU-MIMO if you are running multiple rovers on one AP. The built in wifi on the pi zero 2 W is NOT good enough for this. |
 | A USB hub hat (if using a pi zero) | If you are using a raspberry pi zero, you will want a USB hub hat for your wifi adapter, I would not recommend using an OTG adapter as it may not provide enough power. |
 | ----CAMERA STUFF---- | ----Below here is all camera related things that youll need---- |
-| A pi camera v2 (ov5647) | The video publisher in this project is only designed for the ov5647, though it would be totally possible to make your own publisher for other sensors. |
+| A compatible camera | Select the rpicam profile for a Raspberry Pi CSI camera or V4L2 for a USB camera. Custom profiles can use other capture/encoder commands. |
 | Cheap 5v servo | Unless you have a VERY wide camera lens, you will want to have a servo plugged into the pi to be able to tilt the camera up and down. |
 | LED for toggling the headlight | I use white LEDs attached to one of the "driver" pins on the AIY hat to trick one of those generic pi camera LED floodlights into turning on / off on demand.|
 | Optional laser pointer | A laser pointer can be wired to another high-current-capable GPIO driver, with GPIO 27 used by default in the rover config. |

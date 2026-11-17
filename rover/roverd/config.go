@@ -272,8 +272,8 @@ func DefaultConfig() Config {
 				Height:     480,
 				FPS:        30,
 				Bitrate:    2000000,
-				Inverted:   true,
-				SensorMode: "1296:972",
+				Inverted:   false,
+				SensorMode: "",
 			},
 			AudioCapture: AudioCaptureConfig{
 				Profile: "alsa",
@@ -471,12 +471,7 @@ func validateAudioConfig(cfg *AudioConfig) {
 }
 
 func validateMediaConfig(cfg *MediaConfig, serverURL string, roverName string) error {
-	/*
-		The nested media config is the source of truth for the publisher scripts,
-		so defaults that used to live in shell are normalized here before any env
-		file is written. This keeps the Pi behavior stable while making laptop
-		and future publisher variants explicit configuration choices.
-	*/
+	// Normalize shared settings before they become profile command variables.
 	if cfg.RTSPPort <= 0 {
 		cfg.RTSPPort = 8554
 	}

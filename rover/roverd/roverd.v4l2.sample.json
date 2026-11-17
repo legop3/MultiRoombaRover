@@ -63,7 +63,7 @@
       "fps": 30,
       "bitrate": 2000000,
       "inverted": false,
-      "sensorMode": "1296:972"
+      "sensorMode": ""
     },
     "audioCapture": {
       "profile": "alsa",

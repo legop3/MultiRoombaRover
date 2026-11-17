@@ -1,6 +1,6 @@
 # Roverd rework plan and implementation tracker
 
-Status: implementation authorized on 2026-11-16; repository/build, internal GPIO, JSON/management, Fleet UI, rover state, media profiles/supervision, and shared audio routing implemented; standalone bootstrap and shared self-update are also implemented; final cleanup/hardware audit and deployment verification remain pending.
+Status: implementation authorized on 2026-11-16; repository/build, internal GPIO, JSON/management, Fleet UI, rover state, media profiles/supervision, and shared audio routing implemented; standalone bootstrap and shared self-update are also implemented; source cleanup/hardware audit is complete; deployment and hardware verification remain pending.
 
 This is the persistent plan and progress record for the roverd rework. Update it as implementation proceeds, recording completed work, decisions, verification evidence, and remaining work. Keep unfinished work unchecked; distinguish implemented behavior from runtime-verified behavior.
 
@@ -171,7 +171,7 @@ The order below is a working sequence, not a requirement to leave incompatible i
 - [x] Add bundled YAML catalogs and one custom YAML profile per media category. (Live verification pending.)
 - [x] Preserve AIY HAT as an explicit profile and expose ordinary audio-device selection on every architecture, including TTS/horn/mixer paths. (Live verification pending.)
 - [x] Generate ALSA routing from shared input/output selections; connect microphone, TTS, horn, forwarded audio, and independent volume controls to the resulting logical devices. (Live verification pending.)
-- [ ] Document exact configuration for the existing AIY rover and audit other machine-specific assumptions.
+- [x] Document exact configuration for the existing AIY rover and audit other machine-specific assumptions.
 - [x] Implement command environments, persistent working directories, and setup on each daemon startup. (Live verification pending.)
 - [x] Replace media systemd management with child-process supervision and continuous bounded output forwarding. (Live verification pending.)
 - [x] Implement per-rover schema editor and complete-object saves (browser/live verification pending).
@@ -179,10 +179,12 @@ The order below is a working sequence, not a requirement to leave incompatible i
 - [x] Add profile editing/selection, media output/status, reboot, and update UI. (Live verification pending.)
 - [x] Implement standalone bootstrap with only name/address input and automatic OS architecture selection. (Host verification pending.)
 - [x] Implement shared checkout installation and self-update with reconnect-visible results. (Host verification pending.)
-- [ ] Remove obsolete services, configuration files, scripts, build distinctions, and documentation.
-- [ ] Update user/contributor documentation, including profile variables, setup expectations, building, installation, and updates.
-- [ ] Perform focused available verification and record results below.
-- [ ] Record deployment/hardware checks still required; do not claim those verified locally.
+- [x] Remove obsolete services, configuration files, scripts, build distinctions, and documentation.
+- [x] Update user/contributor documentation, including profile variables, setup expectations, building, installation, and updates.
+- [x] Perform focused available verification and record results below.
+- [x] Record deployment/hardware checks still required; do not claim those verified locally.
+
+- [ ] Complete live rover/server/browser and hardware verification recorded below.
 
 ## Verification record
 
@@ -296,3 +298,14 @@ Verification for this stage:
 - Added `docs/roverd-installation.md` and updated README instructions.
 - Verification: all four committed architecture binaries rebuilt successfully; shell syntax, server syntax, focused UI lint, and diff whitespace checks passed. No installation, apt operation, host reboot/restart, or live server/browser was run on the development machine.
 - Required rover checks: fresh bootstrap identity/connectivity; successful update and reconnect-visible status; failure reporting and retry; preservation of settings/custom profiles/data. Hardware/audio checks and final universal-hardware audit remain open.
+
+
+### Final source cleanup and hardware audit (2026-11-16)
+
+- Audited device paths, ALSA routing and gains, camera defaults, serial discovery, architecture-specific TTS installation, GPIO ownership, host telemetry, installer/build references, and current setup documentation.
+- Removed the inverted camera/fixed CSI mode from new defaults and cleared the CSI mode in the V4L2 sample. Preserved the existing AIY/CSI sample and checked-in rover configuration. Physical audio/serial device identifiers remain editable defaults; no automatic hardware guessing was added.
+- Pi firmware voltage/throttle probes are optional when `vcgencmd` is absent. Native GPIO remains behind its explicit peripheral switch.
+- Inline AIY setup now adds missing settings under `[all]` instead of inheriting the last boot-config section. Existing conditional host settings are documented rather than rewritten.
+- Removed obsolete publisher/env-file wording and stale bootstrap status; updated hardware notes with exact existing camera, AIY, PWM, stable serial path, and TTS constraints. Historical stage notes above remain a record of their stage, not current pending work.
+- Verification: all four committed architecture binaries rebuilt; actual daemon loaded six profiles and all inline commands passed Bash syntax checks; V4L2 sample validation passed; actual default export confirmed non-inverted video and empty sensor mode; diff whitespace check passed.
+- Live installation/update, browser/server saves and permissions, GPIO/serial, camera/audio, independent volume controls, and failure/reconnect behavior remain unverified. Use the deployment checks in the management, installation, media, and hardware documents. No hardware services or background processes were started here.
