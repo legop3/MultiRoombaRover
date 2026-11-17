@@ -30,7 +30,7 @@ with open(path, 'w') as f:
 PYCONFIG
   /usr/local/bin/roverd -config /etc/roverd.json.new -check-config
   mv /etc/roverd.json.new /etc/roverd.json
-  echo 'Set name, serverUrl, devices, and enabled profiles in /etc/roverd.json before starting roverd.'
+  echo 'Initial configuration created. Configure devices and enabled profiles through Fleet Management.'
 fi
 install -m 0644 rover/systemd/roverd.service /etc/systemd/system/roverd.service
 # Use this checkout directly for catalogs and command resources.
@@ -38,9 +38,13 @@ install -d /etc/systemd/system/roverd.service.d
 printf '[Service]\nExecStart=\nExecStart=/usr/local/bin/roverd -config /etc/roverd.json -repo "%s"\n' "$REPO_ROOT" > /etc/systemd/system/roverd.service.d/repository.conf
 install -m 0755 rover/bin/chromegtts-daemon.py /usr/local/bin/chromegtts-daemon
 bash rover/bin/setup-tts.sh
-log() { echo "$*"; }
-source rover/install/self_update.sh
-install_self_update_support
+printf -v quoted_repo_root '%q' "$REPO_ROOT"
+printf 'ROVERD_REPO_DIR=%s\n' "$quoted_repo_root" > /etc/roverd-update.env
+chmod 0600 /etc/roverd-update.env
+install -D -o root -g root -m 0755 rover/bin/roverd-self-update.sh /usr/local/sbin/roverd-self-update.new
+# Keep the running updater on its original inode until it exits.
+mv -f /usr/local/sbin/roverd-self-update.new /usr/local/sbin/roverd-self-update
+echo "Registered update checkout at $REPO_ROOT"
 systemctl daemon-reload
 systemctl enable roverd.service
 echo 'Installation complete; caller can now restart roverd.'

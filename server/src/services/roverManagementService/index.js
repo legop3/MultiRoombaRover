@@ -184,9 +184,9 @@ io.on('connection', (socket) => {
     await result;
     return { id };
   });
-  bind('roverManagement:command', async ({ roverId, type, reboot, media }) => {
-    if (!['reboot', 'update', 'media'].includes(type)) throw new Error('Unsupported management command');
-    const { id, result } = request(roverId, { type, reboot, media });
+  bind('roverManagement:command', async ({ roverId, type, reboot }) => {
+    if (!['reboot', 'update'].includes(type)) throw new Error('Unsupported management command');
+    const { id, result } = request(roverId, { type, reboot });
     await result;
     return { id };
   });

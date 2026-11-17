@@ -5,7 +5,7 @@
     if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
-  run: &run |
+  run: |
     filters=()
     if [ "$ROVER_AUDIO_NORMALIZE" = true ]; then filters=(-af "$ROVER_AUDIO_NORMALIZE_FILTER"); fi
     exec ffmpeg -nostdin -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" -vn "${filters[@]}" -f alsa "$ROVER_AUDIO_OUTPUT_DEVICE"
@@ -35,4 +35,7 @@
     if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
-  run: *run
+  run: |
+    filters=()
+    if [ "$ROVER_AUDIO_NORMALIZE" = true ]; then filters=(-af "$ROVER_AUDIO_NORMALIZE_FILTER"); fi
+    exec ffmpeg -nostdin -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" -vn "${filters[@]}" -f alsa "$ROVER_AUDIO_OUTPUT_DEVICE"

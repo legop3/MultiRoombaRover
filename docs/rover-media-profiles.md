@@ -1,12 +1,19 @@
-# Rover media profiles and audio
+# Writing rover media profiles
 
-Roverd reads three YAML catalogs directly from its checkout: `rover/profiles/video.yaml`, `audioCapture.yaml`, and `audioPlayback.yaml`. Each is a list of profiles with `id`, `name`, `description`, optional `setup`, and `run`.
+Bundled profiles live in `rover/profiles/video.yaml`, `audioCapture.yaml`, and `audioPlayback.yaml`. Each catalog is a YAML list with these fields:
 
-Commands live in the YAML itself. Bundled profiles must not delegate their setup or run implementation to an in-repository shell helper. Multiline shell commands, arrays, and pipelines are supported through Bash with error/pipe failure handling. Profile identifiers use lowercase letters, digits, underscores, and hyphens; `custom` is reserved.
+- `id`: lowercase letters, digits, underscores, or hyphens; `custom` is reserved.
+- `name` and `description`: displayed in Fleet Management.
+- `setup`: optional Bash command, safe to repeat at every roverd startup.
+- `run`: Bash command that stays running to stream media.
 
-Each enabled streamer runs its selected setup on every daemon startup. Setups are serialized to avoid competing package-manager operations; successful setup is not tracked on disk. Each run command then starts independently and retries after two seconds on exit. A failed setup leaves only that streamer stopped. Shutdown kills the complete process group and waits for it. Nothing installs media systemd services.
+Put commands directly in YAML, not in repository shell helpers. Bash arrays and pipelines work. Commands run as root with error and pipeline failure handling, in `/var/lib/roverd/profiles/<category>/<id>`. That directory persists across restarts and updates.
 
-Working directories are `/var/lib/roverd/profiles/<category>/<id>`. Commands receive environment variables, not interpolated shell source. Quote variables normally.
+Enabled profiles run setup serially, then stream independently. Setup failure stops only that streamer. Exited run commands retry after two seconds without repeating setup. Shutdown stops the complete process group. Output and status appear in Fleet Management; output buffering is bounded.
+
+## Command variables
+
+Variables are supplied through the environment. Quote expansions normally, for example `"$ROVER_VIDEO_DEVICE"`.
 
 | Variables | Meaning |
 | --- | --- |
@@ -20,38 +27,23 @@ Working directories are `/var/lib/roverd/profiles/<category>/<id>`. Commands rec
 | `ROVER_AUDIO_SAMPLE_RATE`, `ROVER_AUDIO_CHANNELS`, `ROVER_AUDIO_BITRATE` | Microphone encoding settings |
 | `ROVER_AUDIO_NORMALIZE`, `ROVER_AUDIO_NORMALIZE_FILTER` | Forwarded-audio normalization |
 
-The bundled options are `v4l2` / `rpicam` for video and `alsa` / `aiy` for capture and playback. Hardware encoders or other transports can be supplied as custom commands without adding roverd code.
 
-## Configuration and UI
+Fleet Management supports one custom profile per category, saved at `/etc/roverd/profiles/<category>.yaml`. Saving a custom profile restarts roverd; choose it in the streamer's configuration to use it.
 
-Select `media.video.profile`, `media.audioCapture.profile`, and `media.audioPlayback.profile`, with each category's `enabled` switch. Fleet management renders profile names from the catalogs and has a “Media profiles and output” section for descriptions, current status, output, and custom editing.
+## Audio constraints
 
-There is one custom profile per category, stored under `/etc/roverd/profiles/<category>.yaml`. Saving it restarts roverd; select `custom` in configuration to use it. Bundled files remain in the checkout. The admin API is `roverManagement:saveProfile` with `{ roverId, category, profile }`.
+Use the supplied logical audio routes so microphone, TTS, horn, and forwarded audio follow the configured devices. Physical input/output are selected separately through `audio.inputDevice` and `audio.outputDevice`. Find stable identifiers with `arecord -l` and `aplay -l`.
 
-Output is always forwarded while management is connected, without viewer subscriptions. Rover queues and server/browser history are bounded; a noisy process can lose old output but cannot indefinitely block streaming or grow history. Current streamer status is retained separately and included in management hello.
+The output must support a hardware dmix slave with the configured sample rate/channels. Client format conversion uses ALSA plug devices. Independent volume controls may appear only after their PCM first opens. ARMv6 hosts use flite/espeak rather than Chrome TTS.
 
-## Audio routing
+For the existing AIY Voice HAT, verify card ID `sndrpigooglevoi` before using `hw:CARD=sndrpigooglevoi,DEV=0`; the previous output format was 16000 Hz mono. GPIO18/19 are used by I2S. The existing GPIO12 servo requires `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` in an applicable boot-config section. Reboot after overlay changes.
 
-`audio.inputDevice` and `audio.outputDevice` select physical ALSA devices independently. Use hardware PCM identifiers such as `hw:CARD=Device,DEV=0`; find the actual identifiers with `arecord -l` and `aplay -l`. The output must support ALSA dmix's hardware slave; arbitrary sound-server/plugin PCM names are not interchangeable with a hardware PCM.
+## Verification still required
 
-`audio.mixerCard` selects the output card's mixer identifier. `audio.outputSampleRate` and `audio.outputChannels` configure its hardware mix format. Choose a format supported by that device; `plug` handles client conversion to that format. Input and output may be on separate cards.
+Implementation has passed local build/syntax checks; live deployment remains unverified:
 
-Roverd generates `/var/lib/roverd/asound.conf` and sets `ALSA_CONFIG_PATH` for its children. It does not overwrite the host's ALSA configuration. Its system ALSA include can still load host configuration through ALSA hooks; remove old roverd-specific host ALSA definitions before deployment. Logical devices are `rover_capture`, `rover_tts`, `rover_horn`, and `rover_forward`. TTS, horn, and forwarded audio share a dmix output and have independent soft-volume controls. `amixer` targets the configured mixer card, never a fallback card zero. Some soft-volume controls appear only once their PCM has first been opened; verify volume behavior after playback begins.
+- Bootstrap, configuration saves, fleet field changes, and update results after reconnection.
+- Camera, microphone, simultaneous TTS/horn/forwarded audio, individual gains, and GPIO/serial operation.
+- Streamer retries on a brief connection loss and complete child shutdown on config restart. The separate control watchdog reboots after six minutes offline.
 
-Chrome TTS uses the same generated playback route. Its architecture-specific library/voice files are runtime data under `/var/lib/roverd/googletts`; the installer invokes the independent TTS dependency installer. ARMv6 hosts must use flite/espeak if no matching Chrome library is available. The server no longer substitutes Chrome TTS when a command omits an engine; roverd's configured default applies.
-
-## Inspection without hardware or setup execution
-
-```sh
-./dist/roverd-linux-amd64 -repo "$PWD" -print-media-profiles
-./dist/roverd-linux-amd64 -config rover/roverd/roverd.sample.json -check-config
-./dist/roverd-linux-amd64 -config rover/roverd/roverd.sample.json -print-audio-config
-```
-
-These commands do not install packages, open devices, or start streams. Configuration/schema and architecture binaries have changed together; old JSON objects are not migrated.
-
-## Deployment checks still required
-
-Before deploying over an old installation, explicitly disable/remove its old media units so they cannot compete for devices or publish duplicate streams. This rework does not migrate an installed host. The checkout installer now installs only the roverd service and runtime dependencies; the standalone bootstrap and shared updater use that installer. See [installation and updates](roverd-installation.md).
-
-On the actual rover, confirm all selected profiles complete setup, observe output/status in fleet management, and verify video, microphone, forwarded audio, TTS, horn, simultaneous playback, and each gain control. Restart the server or interrupt Wi-Fi: media commands should retry without restarting roverd. The existing control-disconnection watchdog separately seeks the dock after one minute and reboots the host after six minutes; use a shorter interruption to isolate streamer retries. Save configuration and verify no media child processes remain from the previous daemon. Capture journal output and observed results. AIY overlay changes require a one-time host reboot; ordinary configuration saves only restart roverd.
+Before replacing an old installation, disable its streamer services and remove its roverd-specific host ALSA definitions; system ALSA hooks can still load those definitions.

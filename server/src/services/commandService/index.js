@@ -67,7 +67,7 @@ function enforceLaserRoomLightLock(reason) {
 }
 
 function issueCommand(roverId, payload, options = {}) {
-  if (['reboot', 'update', 'media'].includes(payload?.type)) {
+  if (['reboot', 'update'].includes(payload?.type)) {
     return roverManagement.issueCommand(roverId, payload);
   }
   const record = roverManager.rovers.get(roverId);
@@ -158,9 +158,9 @@ function issueUpdateToAllRovers() {
     const roverId = String(record.roverId);
     try {
       // Use the same narrow update payload as the per-rover admin action. The
-      // browser only asks for "update all"; the Pi still owns the privileged
-      // pull/install/reboot sequence through its fixed self-update helper.
-      issueCommand(roverId, { type: 'update', update: {} });
+      // browser only asks for "update all"; roverd still owns the privileged
+      // pull/install/restart sequence through its fixed self-update helper.
+      issueCommand(roverId, { type: 'update' });
       updated.push(roverId);
     } catch (err) {
       failed.push({ roverId, error: err.message });
@@ -288,7 +288,7 @@ function submitCommand(socket, { roverId, type, data } = {}, cb) {
     }
     const isRebootCommand = type === 'reboot';
     const isUpdateCommand = type === 'update';
-    const isManagementCommand = isRebootCommand || isUpdateCommand || type === 'media';
+    const isManagementCommand = isRebootCommand || isUpdateCommand;
     const isSongCommand = type === 'song' || (type === 'raw' && isSongRawPayload(payload));
     const isAdminSocket = isAdmin(socket);
     if (!isAdminSocket && isDeterred(socket)) {
@@ -302,7 +302,7 @@ function submitCommand(socket, { roverId, type, data } = {}, cb) {
     if (!isAdminSocket && isSongCommand && isMuted(socket)) {
       throw new Error('Muted');
     }
-    // Rover updates run a privileged, root-owned helper on the Pi. Keep this
+    // Rover updates run a privileged, root-owned helper on the rover. Keep this
     // in the same explicit admin-only branch as reboot instead of relying on
     // drive ownership checks, because having a turn should not grant system
     // maintenance privileges.

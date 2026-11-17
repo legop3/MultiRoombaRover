@@ -8,7 +8,7 @@ https://rover.otter.land
 
 ## This guide is a work in progress, it will cover:
 - Building rovers
-- Installing roverd on a Debian-based rover computer
+- Installing roverd on a rover's raspberry pi
 - Setting up the server
 - Configuration
 
@@ -16,8 +16,6 @@ https://rover.otter.land
 You WILL need some common hobby electronics knowledge to build one of these, I will not be making a super detailed wiring or assembly guide, some of building your rover will be up to you, things such as a protective cage, camera and electronics mounting will not be covered in any great detail.
 
 ### Parts per rover
-
-This parts list describes my Pi/AIY build. Roverd also supports other Linux hosts and configurable camera/audio devices.
 
 | Part | Notes |
 | --- | --- |
@@ -30,7 +28,7 @@ This parts list describes my Pi/AIY build. Roverd also supports other Linux host
 | A good wifi adapter | Has to work with Linux 6.12 (I use ones with the MT7921AU chipset and they work  great), ideally wifi 6 with MU-MIMO if you are running multiple rovers on one AP. The built in wifi on the pi zero 2 W is NOT good enough for this. |
 | A USB hub hat (if using a pi zero) | If you are using a raspberry pi zero, you will want a USB hub hat for your wifi adapter, I would not recommend using an OTG adapter as it may not provide enough power. |
 | ----CAMERA STUFF---- | ----Below here is all camera related things that youll need---- |
-| A compatible camera | Select the rpicam profile for a Raspberry Pi CSI camera or V4L2 for a USB camera. Custom profiles can use other capture/encoder commands. |
+| A pi camera v2 (ov5647) | The video publisher in this project is only designed for the ov5647, though it would be totally possible to make your own publisher for other sensors. |
 | Cheap 5v servo | Unless you have a VERY wide camera lens, you will want to have a servo plugged into the pi to be able to tilt the camera up and down. |
 | LED for toggling the headlight | I use white LEDs attached to one of the "driver" pins on the AIY hat to trick one of those generic pi camera LED floodlights into turning on / off on demand.|
 | Optional laser pointer | A laser pointer can be wired to another high-current-capable GPIO driver, with GPIO 27 used by default in the rover config. |
@@ -58,26 +56,19 @@ These are the basics of how evertything is connected on my rovers, this is hard 
    4. optionally, a laser pointer connected to another high current driver output, GPIO 27 by default.
 
 ### Software on your rover
-Roverd targets Debian-based systems with ARMv6, ARMv7, ARM64, or AMD64 binaries. For the existing AIY Voice HAT rover, use Raspberry Pi OS Bookworm; that hardware setup has not been verified on Trixie.
+Raspberry pi OS installation:
 
-Download [rover/bootstrap.sh](rover/bootstrap.sh) onto the rover and run `sudo bash bootstrap.sh`. It asks only for the rover name and the full server WebSocket address, creates the managed checkout at `/opt/roverd`, installs the matching binary from the repository, and starts roverd.
+Everything that runs on the pi is designed for debian Bookworm, because I could not get the AIY voice hat working in Trixie.
 
-Configure audio devices, media profiles, and optional Pi GPIO through Fleet Management. Media and native Pi GPIO are disabled by default. Updates use the same installer and restart the service without rebooting the host. See [installation and updates](docs/roverd-installation.md).
+To install roverd on your pi:
+1. Install `Raspberry Pi OS (Legacy) Lite` (exactly what its called in the imager) on your SD card
+2. Boot the pi up, plug in your good wifi adapter, use `nmtui` to set it up
+3. Install `git`, clone this repo into your home folder
+4. Move into the repo folder, run the roverd installer using `sudo pi/install_roverd.sh`
+5. Reboot your raspberry pi
+6. Roverd, along with the audio and video publishers should now be running. Roverd should have created it's default config file at `/etc/roverd.yaml`
 
-Roverd supervises the selected streamer commands itself. Disable/remove any previously installed streamer services before starting it. The AIY profiles may request a one-time reboot to activate their boot overlay. See [media profiles and audio routing](docs/rover-media-profiles.md) for configuration and deployment checks.
-
-Configuration is now a complete JSON object. See [roverd management](docs/roverd-management.md)
-for schema/default export, local validation, the management API, and deployment checks.
-
-The roverd rework is in progress; see the [implementation tracker](docs/roverd-rework-plan.md).
-Native GPIO now lives under `piGpio`, with its parent `enabled` switch disabled by default.
-Enable that switch only on hosts using the internal Pi GPIO peripheral, and configure its camera servo, headlight, laser, and BRC children there.
-See [hardware configuration notes](docs/rover-hardware-config.md) for the existing AIY Voice HAT setup and pin constraints.
-
-Build rover binaries with `make -C rover/roverd all`, or select one architecture with
-`make -C rover/roverd build ARCH=armv6` (also `armv7`, `arm64`, or `amd64`).
-Artifacts are `dist/roverd-linux-<architecture>` and remain in the repository.
-These builds share the same configuration and peripheral support; there is no laptop-specific build.
+Edit the `/etc/roverd.yaml` config file to change settings like your rover's name, color, and set the server IP.
 
 
 ## Setting up the server

@@ -35,7 +35,6 @@ type managementCommand struct {
 	Reboot   *rebootPayload  `json:"reboot"`
 	Category string          `json:"category"`
 	Profile  *MediaProfile   `json:"profile"`
-	Media    *mediaCommand   `json:"media"`
 }
 
 func NewManagementClient(cfg *Config, path string, events chan RoverEvent, logger *log.Logger, restart func()) *ManagementClient {
@@ -162,12 +161,6 @@ func (m *ManagementClient) execute(ctx context.Context, command managementComman
 			_ = m.runtime.PrepareShutdown()
 		}
 		return m.restart, nil
-	}
-	if command.Type == "media" {
-		if m.media == nil || command.Media == nil {
-			return nil, fmt.Errorf("media supervisor unavailable")
-		}
-		return nil, m.media.HandleAction(ctx, command.Media.Action)
 	}
 	var config *Config
 	var err error

@@ -5,7 +5,7 @@
     if ! command -v ffmpeg >/dev/null || ! command -v arecord >/dev/null; then
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
-  run: &run |
+  run: |
     exec ffmpeg -nostdin -f alsa -ar "$ROVER_AUDIO_SAMPLE_RATE" -ac "$ROVER_AUDIO_CHANNELS" -i "$ROVER_AUDIO_INPUT_DEVICE" -c:a libopus -b:a "$ROVER_AUDIO_BITRATE" -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"
 - id: aiy
   name: Google AIY Voice HAT microphone
@@ -33,4 +33,5 @@
     if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
-  run: *run
+  run: |
+    exec ffmpeg -nostdin -f alsa -ar "$ROVER_AUDIO_SAMPLE_RATE" -ac "$ROVER_AUDIO_CHANNELS" -i "$ROVER_AUDIO_INPUT_DEVICE" -c:a libopus -b:a "$ROVER_AUDIO_BITRATE" -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"

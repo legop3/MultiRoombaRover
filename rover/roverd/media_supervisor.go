@@ -91,13 +91,6 @@ func (m *MediaSupervisor) selection(category string) (bool, string) {
 		return m.cfg.Media.AudioPlayback.Enabled, m.cfg.Media.AudioPlayback.Profile
 	}
 }
-func (m *MediaSupervisor) HandleAction(_ context.Context, action string) error {
-	if action != "stop" {
-		return fmt.Errorf("save configuration to start or restart media")
-	}
-	m.Stop()
-	return nil
-}
 func (m *MediaSupervisor) supervise(ctx context.Context, category, id string) {
 	var profile *MediaProfile
 	for _, p := range m.profiles[category] {

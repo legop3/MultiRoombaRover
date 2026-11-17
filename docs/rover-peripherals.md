@@ -379,9 +379,9 @@ All native settings live under `piGpio`, whose parent switch defaults to disable
 }
 ```
 
-This is a layout excerpt, not a complete configuration file. Use the JSON sample or `-print-default-config` for all required fields.
+This is a layout excerpt, not a complete configuration file. Use Fleet Management to edit the complete configuration, or `-print-default-config` to inspect all initial fields.
 
-While the parent is disabled, saved child settings cause no GPIO probing or initialization. When enabled, the internal peripheral appears as `pi-gpio` / “Pi GPIO” and offers its enabled roles. BRC runs as its automatic background function, not a user control. Pin, chip, servo calibration, and timing settings all remain inside this section. This applies to every architecture build. See the JSON sample config for complete settings; the WebUI configuration editor is a later rework step.
+While the parent is disabled, saved child settings cause no GPIO probing or initialization. When enabled, the internal peripheral appears as `pi-gpio` / “Pi GPIO” and offers its enabled roles. BRC runs as its automatic background function, not a user control. Pin, chip, servo calibration, and timing settings all remain inside this section. This applies to every architecture build. Configure these settings in the Fleet Management configuration editor.
 
 ### Shared controller interfaces
 
