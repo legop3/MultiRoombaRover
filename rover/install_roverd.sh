@@ -9,6 +9,9 @@ case "$(dpkg --print-architecture)" in
   armhf) case "$(uname -m)" in armv6*) arch=armv6 ;; *) arch=armv7 ;; esac ;;
   *) echo 'Unsupported OS architecture' >&2; exit 1 ;;
 esac
+if [[ ${ROVERD_MIGRATE:-} == 1 ]]; then
+  python3 rover/install/migrate.py --binary "dist/roverd-linux-$arch"
+fi
 # Rename avoids overwriting an executable that the running service has mapped.
 install -m 0755 "dist/roverd-linux-$arch" /usr/local/bin/roverd.new
 mv -f /usr/local/bin/roverd.new /usr/local/bin/roverd
