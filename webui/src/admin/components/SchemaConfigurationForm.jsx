@@ -5,6 +5,7 @@ import { createContext, useContext, useMemo } from 'react';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
 import CardFrame from '../../components/CardFrame/index.jsx';
+import '../styles.css';
 
 /*
   Structural colors repeat only after six levels, which is deeper than the
@@ -77,6 +78,8 @@ function buildUiSchema(schema, path = '') {
     };
   }
 
+  if (schema.type === 'string') placeholder['ui:emptyValue'] = '';
+  if (schema.oneOf?.every((option) => Object.hasOwn(option, 'const'))) placeholder['ui:widget'] = 'select';
   if (schema.type !== 'object' || !schema.properties) return placeholder;
   return Object.fromEntries(Object.entries(schema.properties).map(([key, childSchema]) => [
     key,
@@ -142,6 +145,8 @@ function ConfigurationFieldTemplate({
   required,
   schema,
   style,
+  fieldPathId,
+  registry,
 }) {
   if (hidden) return <div className="hidden">{children}</div>;
 
@@ -161,6 +166,7 @@ function ConfigurationFieldTemplate({
         <label htmlFor={id} className="configuration-key-label">
           {label}{required ? <span className="ml-0.25 text-sky-300">*</span> : null}
         </label>
+        {registry.formContext.renderFieldAction?.(fieldPathId.path)}
       </div>
       <div className="configuration-value">
         {/* Descriptions belong with the editable value rather than inside the
@@ -175,7 +181,7 @@ function ConfigurationFieldTemplate({
   );
 }
 
-function ConfigurationObjectTemplate({ description, fieldPathId, properties, title }) {
+function ConfigurationObjectTemplate({ description, fieldPathId, properties, title, registry }) {
   const visibleProperties = properties.filter((property) => !property.hidden);
   const propertyLines = visibleProperties.map((property) => property.content);
   const topLevel = fieldPathId.path.length === 1;
@@ -226,6 +232,7 @@ function ConfigurationObjectTemplate({ description, fieldPathId, properties, tit
       {description ? <div className="configuration-branch-description">{description}</div> : null}
       <ConfigurationLayerDepthContext.Provider value={layer.depth + 1}>
         <div className="configuration-children">{propertyLines}</div>
+        {registry.formContext.renderObjectFooter?.(fieldPathId.path)}
       </ConfigurationLayerDepthContext.Provider>
     </CardFrame>
   );
@@ -304,7 +311,7 @@ function ConfigurationArrayTemplate({ canAdd, disabled, fieldPathId, items, onAd
   );
 }
 
-export default function SchemaConfigurationForm({ schema, value, onChange, configuredSecrets, secretOperations, setSecretOperation }) {
+export default function SchemaConfigurationForm({ schema, value, onChange, configuredSecrets, secretOperations, setSecretOperation, disabled = false, renderFieldAction, renderObjectFooter }) {
   const uiSchema = useMemo(() => buildUiSchema(schema), [schema]);
   const widgets = useMemo(() => ({ SecretWidget }), []);
   const templates = useMemo(() => ({
@@ -317,11 +324,14 @@ export default function SchemaConfigurationForm({ schema, value, onChange, confi
     configuredSecrets,
     secretOperations,
     setSecretOperation,
-  }), [configuredSecrets, secretOperations, setSecretOperation]);
+    renderFieldAction,
+    renderObjectFooter,
+  }), [configuredSecrets, secretOperations, setSecretOperation, renderFieldAction, renderObjectFooter]);
 
   return (
     <div className="configuration-schema-form">
       <Form
+        disabled={disabled}
         schema={schema}
         uiSchema={uiSchema}
         formData={value}
