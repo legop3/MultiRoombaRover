@@ -27,9 +27,8 @@ function AuxColumnContent({ accessoriesAvailable, onShowAccessories }) {
   const camera = useControlSelector((control) => control.state.camera);
   const horn = useControlSelector((control) => control.state.horn);
   const headlight = useControlSelector((control) => control.pipeline?.headlight);
-  const headlightState = useControlSelector((control) => control.pipeline?.headlightState);
+  const roverState = useControlSelector((control) => control.pipeline?.roverState);
   const laser = useControlSelector((control) => control.pipeline?.laser);
-  const laserState = useControlSelector((control) => control.pipeline?.laserState);
   const pipelineHorn = useControlSelector((control) => control.pipeline?.horn);
   const { setServoAngle, setHeadlight, setLaser, setAuxMotors, startHorn, stopHorn } = useControlActions();
   const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
@@ -152,7 +151,7 @@ function AuxColumnContent({ accessoriesAvailable, onShowAccessories }) {
               <GPIOToggleControl
                 label="Headlight"
                 icon={FaLightbulb}
-                on={headlightState?.headlightOn}
+                on={roverState?.headlightOn}
                 disabled={controlsDisabled}
                 onToggle={handleHeadlightToggle}
                 heightClass="h-full"
@@ -162,7 +161,7 @@ function AuxColumnContent({ accessoriesAvailable, onShowAccessories }) {
               <GPIOToggleControl
                 label="Laser"
                 icon={FaCrosshairs}
-                on={laserState?.laserOn}
+                on={roverState?.laserOn}
                 disabled={controlsDisabled || roomLightsLockedOn}
                 onToggle={handleLaserToggle}
                 heightClass="h-full"

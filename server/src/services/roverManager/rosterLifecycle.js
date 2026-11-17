@@ -41,8 +41,7 @@ function createRosterLifecycle(deps) {
         locked: false,
         lockReason: null,
         batteryState: null,
-        headlightState: null,
-        laserState: null,
+        roverState: null,
         room: `rover:${id}`,
         lastSeen: Date.now(),
         lastMovementAt: Date.now(),
@@ -79,22 +78,7 @@ function createRosterLifecycle(deps) {
     } else {
       record.privateOpen = true;
     }
-    if (!meta?.headlight?.enabled) {
-      record.headlightState = null;
-    } else if (record.headlightState == null) {
-      record.headlightState = {
-        headlightOn: Boolean(meta.headlight.initialOn),
-        updatedAt: Date.now(),
-      };
-    }
-    if (!meta?.laser?.enabled) {
-      record.laserState = null;
-    } else if (record.laserState == null) {
-      record.laserState = {
-        laserOn: Boolean(meta.laser.initialOn),
-        updatedAt: Date.now(),
-      };
-    }
+    record.roverState = null;
     rovers.set(id, record);
     spectatorSockets.forEach((socketId) => {
       const sock = io.sockets.sockets.get(socketId);
@@ -118,6 +102,7 @@ function createRosterLifecycle(deps) {
       it can clean the reverse membership index and Socket.IO room membership.
     */
     require('../dockingService').disconnect(record);
+    record.roverState = null;
     rovers.delete(id);
     removeRoverDrivers(id, record);
     stopDockGuard(id);
@@ -249,12 +234,9 @@ function createRosterLifecycle(deps) {
       // controls. Preserve that order here instead of rebuilding the inventory,
       // because ESP32 registration order is also the driver's display order.
       peripherals: Array.isArray(record.meta?.peripherals) ? record.meta.peripherals : [],
-      headlight: record.meta?.headlight
-        ? { ...record.meta.headlight, state: record.headlightState }
-        : record.meta?.headlight,
-      laser: record.meta?.laser
-        ? { ...record.meta.laser, state: record.laserState }
-        : record.meta?.laser,
+      headlight: record.meta?.headlight,
+      laser: record.meta?.laser,
+      roverState: record.roverState,
       locked: record.locked || (isPrivateRecord(record) && !isPrivateOpen(record)),
       lockReason: record.lockReason || (isPrivateRecord(record) && !isPrivateOpen(record) ? 'private' : null),
       needsHelp: Boolean(record.needsHelp),
@@ -290,19 +272,14 @@ function createRosterLifecycle(deps) {
     });
   }
 
-  function setToggleState(roverId, device, on) {
+  function setRoverState(roverId, state) {
     const record = rovers.get(roverId);
-    if (!record) return;
-    if (typeof on !== 'boolean') return;
-    if (device !== 'headlight' && device !== 'laser') return;
-    const stateKey = device === 'headlight' ? 'headlightState' : 'laserState';
-    const onKey = `${device}On`;
-    record[stateKey] = {
-      [onKey]: on,
-      updatedAt: Date.now(),
-    };
+    if (!record || !state || typeof state !== 'object' || Array.isArray(state)) return;
+    if (!['headlightOn', 'laserOn'].every((key) => Object.hasOwn(state, key)
+      && (state[key] === null || typeof state[key] === 'boolean'))) return;
+    record.roverState = state;
     broadcastRoster();
-    managerEvents.emit('rover', { roverId, action: device, record });
+    managerEvents.emit('rover', { roverId, action: 'roverState', record });
   }
 
   function setNeedsHelp(roverId, needsHelp) {
@@ -367,7 +344,7 @@ function createRosterLifecycle(deps) {
     syncSpectatorRooms,
     broadcastRoster,
     setNeedsHelp,
-    setToggleState,
+    setRoverState,
     handleHostStats,
     canSeeRover,
     canRequestControl,

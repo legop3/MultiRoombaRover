@@ -1,0 +1,41 @@
+- id: alsa
+  name: ALSA speaker
+  description: Uses the configured output alongside TTS and horn with independent volume controls.
+  setup: |
+    if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg alsa-utils
+    fi
+  run: |
+    filters=()
+    if [ "$ROVER_AUDIO_NORMALIZE" = true ]; then filters=(-af "$ROVER_AUDIO_NORMALIZE_FILTER"); fi
+    exec ffmpeg -nostdin -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" -vn "${filters[@]}" -f alsa "$ROVER_AUDIO_OUTPUT_DEVICE"
+- id: aiy
+  name: Google AIY Voice HAT speaker
+  description: Enables the HAT hardware; uses the same configured ALSA routing as other devices. Reboot once after initial setup.
+  setup: |
+    set -euo pipefail
+    # Capture/playback setup may run concurrently; serialize edits to boot config.
+    exec 9>/var/lock/roverd-aiy.lock
+    flock 9
+    boot=/boot/firmware/config.txt
+    [[ -f "$boot" ]] || boot=/boot/config.txt
+    [[ -f "$boot" ]] || { echo 'AIY setup needs a Raspberry Pi boot config.txt' >&2; exit 1; }
+    changed=0
+    for setting in dtparam=i2s=on dtoverlay=googlevoicehat-soundcard; do
+      if ! grep -Fxq "$setting" "$boot"; then
+        # Leave any model-specific section before adding shared HAT settings.
+        if [[ "$changed" == 0 ]]; then printf '\n[all]\n' >> "$boot"; fi
+        printf '%s\n' "$setting" >> "$boot"
+        changed=1
+      fi
+    done
+    if [[ "$changed" == 1 ]]; then
+      echo 'AIY hardware enabled. Reboot the host once before using this sound card.'
+    fi
+    if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg alsa-utils
+    fi
+  run: |
+    filters=()
+    if [ "$ROVER_AUDIO_NORMALIZE" = true ]; then filters=(-af "$ROVER_AUDIO_NORMALIZE_FILTER"); fi
+    exec ffmpeg -nostdin -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" -vn "${filters[@]}" -f alsa "$ROVER_AUDIO_OUTPUT_DEVICE"

@@ -58,9 +58,8 @@ function DriveDockPanel() {
   const camera = useControlSelector((control) => control.state.camera);
   const horn = useControlSelector((control) => control.state.horn);
   const headlight = useControlSelector((control) => control.pipeline?.headlight);
-  const headlightState = useControlSelector((control) => control.pipeline?.headlightState);
+  const roverState = useControlSelector((control) => control.pipeline?.roverState);
   const laser = useControlSelector((control) => control.pipeline?.laser);
-  const laserState = useControlSelector((control) => control.pipeline?.laserState);
   const pipelineHorn = useControlSelector((control) => control.pipeline?.horn);
   const { setServoAngle, setHeadlight, setLaser, startHorn, stopHorn } = useControlActions();
   const dockTelemetry = useTelemetrySelector(roverId, selectDockTelemetry, dockTelemetryEqual);
@@ -126,7 +125,7 @@ function DriveDockPanel() {
               {headlightAvailable && (
                 <GPIOToggleControl
                   label="Headlight"
-                  on={headlightState?.headlightOn}
+                  on={roverState?.headlightOn}
                   disabled={!roverId}
                   onToggle={auxControls.setHeadlight}
                   keyLabel={headlightLabel}
@@ -135,7 +134,7 @@ function DriveDockPanel() {
               {laserAvailable && (
                 <GPIOToggleControl
                   label="Laser"
-                  on={laserState?.laserOn}
+                  on={roverState?.laserOn}
                   disabled={!roverId || roomLightsLockedOn}
                   onToggle={auxControls.setLaser}
                   keyLabel={laserLabel}

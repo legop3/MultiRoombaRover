@@ -20,8 +20,8 @@ export default function BottomLeftPod({ roverId }) {
   const headlight = useControlSelector((control) => control.pipeline?.headlight);
   const laser = useControlSelector((control) => control.pipeline?.laser);
   const hornDevice = useControlSelector((control) => control.pipeline?.horn);
-  const headlightOn = useControlSelector((control) => Boolean(control.pipeline?.headlightState?.headlightOn));
-  const laserOn = useControlSelector((control) => Boolean(control.pipeline?.laserState?.laserOn));
+  const headlightOn = useControlSelector((control) => Boolean(control.pipeline?.roverState?.headlightOn));
+  const laserOn = useControlSelector((control) => Boolean(control.pipeline?.roverState?.laserOn));
   const hornActive = useControlSelector((control) => Boolean(control.state.horn?.active));
   const { setHeadlight, setLaser, startHorn, stopHorn } = useControlActions();
   const canControl = useCanControlRover(roverId);

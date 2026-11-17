@@ -48,8 +48,7 @@ export function useCommandPipeline(options = {}) {
     [rosterEntry],
   );
 
-  const headlightState = useMemo(() => rosterEntry?.headlight?.state ?? null, [rosterEntry]);
-  const laserState = useMemo(() => rosterEntry?.laser?.state ?? null, [rosterEntry]);
+  const roverState = rosterEntry?.roverState ?? null;
   const emitCommand = useCallback(
     (payload, cb) => {
       if (!roverId || !socket.connected) {
@@ -234,9 +233,8 @@ export function useCommandPipeline(options = {}) {
       rosterEntry,
       servoConfig,
       headlight,
-      headlightState,
+      roverState,
       laser,
-      laserState,
       horn,
       peripherals,
       emitCommand,
@@ -256,9 +254,8 @@ export function useCommandPipeline(options = {}) {
       rosterEntry,
       servoConfig,
       headlight,
-      headlightState,
+      roverState,
       laser,
-      laserState,
       horn,
       peripherals,
       emitCommand,

@@ -5,11 +5,14 @@ const { httpServer } = require('./http');
 const logger = require('./logger');
 
 const roverWSS = new WebSocketServer({ noServer: true });
+const managementWSS = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
 
 httpServer.on('upgrade', (req, socket, head) => {
-  if (req.url.startsWith('/rover')) {
-    roverWSS.handleUpgrade(req, socket, head, (ws) => {
-      roverWSS.emit('connection', ws, req);
+  const path = new URL(req.url, 'http://localhost').pathname;
+  const target = path === '/rover/management' ? managementWSS : path === '/rover' ? roverWSS : null;
+  if (target) {
+    target.handleUpgrade(req, socket, head, (ws) => {
+      target.emit('connection', ws, req);
     });
   }
 });
@@ -19,3 +22,5 @@ roverWSS.on('connection', () => {
 });
 
 module.exports = roverWSS;
+
+module.exports.managementWSS = managementWSS;

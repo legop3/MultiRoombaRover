@@ -1,6 +1,6 @@
 /* Administration Application Styles
- * Purpose: Styles the schema-generated configuration tree used only by /admin.
- * Scope: Keeps route-specific hierarchy and RJSF integration out of the shared global stylesheet.
+ * Purpose: Styles the schema-generated configuration tree shared by server and rover configuration.
+ * Scope: Keeps configuration hierarchy and RJSF integration out of the shared global stylesheet.
  */
 
 /* Reuse the shared theme without emitting a second copy of Tailwind. */
