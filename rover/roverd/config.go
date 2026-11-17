@@ -265,7 +265,7 @@ func DefaultConfig() Config {
 
 			Video: VideoMediaConfig{
 				Profile: "v4l2",
-				Enabled: false,
+				Enabled: true,
 				Device:  "/dev/video0", InputFormat: "mjpeg",
 
 				Width:      640,
@@ -277,7 +277,7 @@ func DefaultConfig() Config {
 			},
 			AudioCapture: AudioCaptureConfig{
 				Profile: "alsa",
-				Enabled: false,
+				Enabled: true,
 
 				SampleRate: 48000,
 				Channels:   2,
@@ -285,7 +285,7 @@ func DefaultConfig() Config {
 			},
 			AudioPlayback: AudioPlaybackConfig{
 				Profile: "alsa",
-				Enabled: false,
+				Enabled: true,
 
 				Normalize:       true,
 				NormalizeFilter: "dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled",
@@ -293,13 +293,13 @@ func DefaultConfig() Config {
 		},
 		Audio: AudioConfig{
 			InputDevice: "hw:0,0", OutputDevice: "hw:0,0", MixerCard: "0", OutputSampleRate: 48000, OutputChannels: 2,
-			TTSEnabled:    false,
-			DefaultEngine: "flite",
+			TTSEnabled:    true,
+			DefaultEngine: "google",
 			DefaultVoice:  "rms",
 			DefaultPitch:  50,
 		},
 		Horn: HornConfig{
-			Enabled:     false,
+			Enabled:     true,
 			Volume:      0.25,
 			SampleRate:  48000,
 			Channels:    1,
@@ -460,7 +460,7 @@ func clampFloat(value, min, max float64) float64 {
 
 func validateAudioConfig(cfg *AudioConfig) {
 	if cfg.DefaultEngine == "" {
-		cfg.DefaultEngine = "flite"
+		cfg.DefaultEngine = "google"
 	}
 	if cfg.DefaultVoice == "" {
 		cfg.DefaultVoice = "rms"

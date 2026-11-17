@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import SchemaConfigurationForm from './SchemaConfigurationForm.jsx';
 
 function request(socket, event, payload = {}) {
@@ -62,6 +62,12 @@ function RoverForm({ socket, record, online }) {
 }
 
 function MediaProfiles({ socket, record, online, category, configDirty }) {
+  const outputRef = useRef(null);
+  const output = record.mediaOutput?.[category] || '';
+  useEffect(() => {
+    const element = outputRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [output]);
   const [profile, setProfile] = useState({ id: 'custom', name: '', description: '', setup: '', run: '' });
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -93,9 +99,7 @@ function MediaProfiles({ socket, record, online, category, configDirty }) {
     <p role="status">{message}</p>
     </details>
     <details><summary className="cursor-pointer">Streamer output</summary>
-    <pre className="max-h-80 overflow-auto whitespace-pre-wrap text-xs">{(record.notices || [])
-      .filter((event) => event.event?.startsWith('media.') && event.data?.category === category)
-      .map((event) => `${event.event === 'media.status' ? '[status] ' : ''}${event.data?.message || ''}`).join('\n')}</pre></details>
+    <pre ref={outputRef} className="max-h-80 overflow-auto whitespace-pre-wrap text-xs">{output || 'Waiting for command stdout/stderr…'}</pre></details>
   </div>;
 }
 
@@ -124,7 +128,9 @@ export default function RoverConfigurationEditor({ socket, selected, onSelect })
     const mediaEvent = ({ roverId, ...event }) => {
       if (!event.event?.startsWith('media.')) return;
       setRecords((previous) => previous[roverId] ? { ...previous, [roverId]: {
-        ...previous[roverId], mediaStatus: event.event === 'media.status'
+        ...previous[roverId], mediaOutput: event.event === 'media.output'
+          ? { ...previous[roverId].mediaOutput, [event.data.category]: ((previous[roverId].mediaOutput?.[event.data.category] || '') + (event.data.message || '')).slice(-65536) }
+          : previous[roverId].mediaOutput, mediaStatus: event.event === 'media.status'
           ? { ...previous[roverId].mediaStatus, [event.data.category]: event.data.message } : previous[roverId].mediaStatus, notices: [...(previous[roverId].notices || []), event].slice(-100),
       } } : previous);
     };

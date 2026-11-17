@@ -18,6 +18,7 @@ function snapshot(record) {
     schema: record.schema,
     profiles: record.profiles,
     mediaStatus: record.mediaStatus,
+    mediaOutput: record.mediaOutput,
     updateStatus: record.updateStatus,
     hostStats: record.hostStats || null,
     notices: record.notices,
@@ -84,7 +85,7 @@ managementWSS.on('connection', (ws) => {
         if (typeof msg.name !== 'string' || !msg.name || !msg.config || !msg.schema) throw new Error('Invalid management hello');
         clearTimeout(helloTimeout);
         const previous = rovers.get(msg.name);
-        record = { roverId: msg.name, ws, config: msg.config, schema: msg.schema, profiles: msg.profiles, mediaStatus: msg.mediaStatus || {}, updateStatus: msg.updateStatus || null, notices: [] };
+        record = { roverId: msg.name, ws, config: msg.config, schema: msg.schema, profiles: msg.profiles, mediaStatus: msg.mediaStatus || {}, mediaOutput: {}, updateStatus: msg.updateStatus || null, notices: [] };
         rovers.set(record.roverId, record);
         previous?.ws.close(1000, 'Replaced by new connection');
         notifyAdmins('roverManagement:changed', snapshot(record));
@@ -103,8 +104,16 @@ managementWSS.on('connection', (ws) => {
         notifyAdmins('roverManagement:hostStats', { roverId: record.roverId, ...msg });
       } else if (msg.type === 'event') {
         if (msg.event === 'media.status') record.mediaStatus[msg.data.category] = msg.data.message;
-        record.notices.push(msg);
-        if (record.notices.length > 100) record.notices.shift();
+        if (msg.event === 'media.output') {
+          const category = msg.data?.category;
+          if (['video', 'audioCapture', 'audioPlayback'].includes(category)) {
+            // Keep raw chunks per command so other streamers/notices cannot evict them.
+            record.mediaOutput[category] = ((record.mediaOutput[category] || '') + (msg.data.message || '')).slice(-65536);
+          }
+        } else {
+          record.notices.push(msg);
+          if (record.notices.length > 100) record.notices.shift();
+        }
         notifyAdmins('roverManagement:event', { roverId: record.roverId, ...msg });
         if (!msg.event?.startsWith('media.')) sendAlert({ color: '#00bcd4', title: record.roverId, message: msg.data?.message || msg.event });
       }
