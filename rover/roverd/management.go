@@ -15,6 +15,7 @@ import (
 
 type ManagementClient struct {
 	cfg        *Config
+	repo       string
 	configPath string
 	events     chan RoverEvent
 	log        *log.Logger
@@ -26,11 +27,13 @@ type ManagementClient struct {
 }
 
 type managementCommand struct {
-	Type   string          `json:"type"`
-	ID     string          `json:"id"`
-	Config json.RawMessage `json:"config"`
-	Reboot *rebootPayload  `json:"reboot"`
-	Media  *mediaCommand   `json:"media"`
+	Type     string          `json:"type"`
+	ID       string          `json:"id"`
+	Config   json.RawMessage `json:"config"`
+	Reboot   *rebootPayload  `json:"reboot"`
+	Category string          `json:"category"`
+	Profile  *MediaProfile   `json:"profile"`
+	Media    *mediaCommand   `json:"media"`
 }
 
 func NewManagementClient(cfg *Config, path string, events chan RoverEvent, logger *log.Logger, restart func()) *ManagementClient {
@@ -78,7 +81,7 @@ func (m *ManagementClient) connect(parent context.Context) error {
 	conn.SetReadLimit(1024 * 1024)
 	if err := writeJSON(ctx, conn, map[string]any{
 		"type": "hello", "name": m.cfg.Name, "config": m.cfg,
-		"schema": ConfigurationSchema(), "profiles": map[string]any{"video": []any{}, "audioCapture": []any{}, "audioPlayback": []any{}},
+		"schema": ConfigurationSchema(), "profiles": m.profileCatalog(), "mediaStatus": m.mediaStatus(),
 	}); err != nil {
 		return err
 	}
@@ -143,6 +146,19 @@ func (m *ManagementClient) execute(ctx context.Context, command managementComman
 	defer m.mu.Unlock()
 	if m.stopping {
 		return nil, fmt.Errorf("management action already pending")
+	}
+	if command.Type == "profile.set" {
+		if command.Profile == nil {
+			return nil, fmt.Errorf("profile required")
+		}
+		if err := SaveCustomProfile(command.Category, *command.Profile); err != nil {
+			return nil, err
+		}
+		m.stopping = true
+		if m.runtime != nil {
+			_ = m.runtime.PrepareShutdown()
+		}
+		return m.restart, nil
 	}
 	if command.Type == "media" {
 		if m.media == nil || command.Media == nil {
@@ -270,4 +286,21 @@ func (m *ManagementClient) emit(event string, data map[string]any) {
 	case m.events <- RoverEvent{Type: "event", Event: event, Ts: time.Now().UnixMilli(), Data: data}:
 	default:
 	}
+}
+
+func (m *ManagementClient) SetRepository(repo string) { m.repo = repo }
+func (m *ManagementClient) profileCatalog() map[string][]MediaProfile {
+	profiles, err := LoadMediaProfiles(m.repo)
+	if err != nil {
+		m.log.Printf("profile catalog: %v", err)
+		return map[string][]MediaProfile{}
+	}
+	return profiles
+}
+
+func (m *ManagementClient) mediaStatus() map[string]string {
+	if m.media == nil {
+		return nil
+	}
+	return m.media.Status()
 }

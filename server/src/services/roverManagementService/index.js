@@ -17,6 +17,7 @@ function snapshot(record) {
     config: record.config,
     schema: record.schema,
     profiles: record.profiles,
+    mediaStatus: record.mediaStatus,
     hostStats: record.hostStats || null,
     notices: record.notices,
   };
@@ -82,7 +83,7 @@ managementWSS.on('connection', (ws) => {
         if (typeof msg.name !== 'string' || !msg.name || !msg.config || !msg.schema) throw new Error('Invalid management hello');
         clearTimeout(helloTimeout);
         const previous = rovers.get(msg.name);
-        record = { roverId: msg.name, ws, config: msg.config, schema: msg.schema, profiles: msg.profiles, notices: [] };
+        record = { roverId: msg.name, ws, config: msg.config, schema: msg.schema, profiles: msg.profiles, mediaStatus: msg.mediaStatus || {}, notices: [] };
         rovers.set(record.roverId, record);
         previous?.ws.close(1000, 'Replaced by new connection');
         notifyAdmins('roverManagement:changed', snapshot(record));
@@ -97,10 +98,11 @@ managementWSS.on('connection', (ws) => {
         require('../roverManager').handleHostStats(record.roverId, msg);
         notifyAdmins('roverManagement:hostStats', { roverId: record.roverId, ...msg });
       } else if (msg.type === 'event') {
+        if (msg.event === 'media.status') record.mediaStatus[msg.data.category] = msg.data.message;
         record.notices.push(msg);
         if (record.notices.length > 100) record.notices.shift();
         notifyAdmins('roverManagement:event', { roverId: record.roverId, ...msg });
-        sendAlert({ color: '#00bcd4', title: record.roverId, message: msg.data?.message || msg.event });
+        if (!msg.event?.startsWith('media.')) sendAlert({ color: '#00bcd4', title: record.roverId, message: msg.data?.message || msg.event });
       }
     } catch (error) {
       logger.warn('Invalid management message', error.message);
@@ -172,6 +174,11 @@ io.on('connection', (socket) => {
       }
     }));
     return { results };
+  });
+  bind('roverManagement:saveProfile', async ({ roverId, category, profile }) => {
+    const { id, result } = request(roverId, { type: 'profile.set', category, profile });
+    await result;
+    return { id };
   });
   bind('roverManagement:command', async ({ roverId, type, reboot, media }) => {
     if (!['reboot', 'update', 'media'].includes(type)) throw new Error('Unsupported management command');

@@ -124,10 +124,7 @@ func (h *HornSynth) run(waveform string, freqs []float64, stop <-chan struct{}) 
 	h.mu.Unlock()
 	volume *= gain
 
-	device := strings.TrimSpace(h.cfg.Device)
-	if device == "" {
-		device = "horn"
-	}
+	device := "rover_horn"
 	args := []string{"-q", "-D", device, "-f", "S16_LE", "-c", fmt.Sprintf("%d", channels), "-r", fmt.Sprintf("%d", rate), "-t", "raw"}
 	cmd := exec.Command("aplay", args...)
 	stdin, err := cmd.StdinPipe()

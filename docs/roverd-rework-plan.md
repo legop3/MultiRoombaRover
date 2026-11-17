@@ -1,6 +1,6 @@
 # Roverd rework plan and implementation tracker
 
-Status: implementation authorized on 2026-11-16; repository/build, internal GPIO, and JSON/management backend implemented; live management verification and remaining stages pending.
+Status: implementation authorized on 2026-11-16; repository/build, internal GPIO, JSON/management, Fleet UI, rover state, media profiles/supervision, and shared audio routing implemented; deployment verification, standalone bootstrap, and update redesign remain pending.
 
 This is the persistent plan and progress record for the roverd rework. Update it as implementation proceeds, recording completed work, decisions, verification evidence, and remaining work. Keep unfinished work unchecked; distinguish implemented behavior from runtime-verified behavior.
 
@@ -168,15 +168,15 @@ The order below is a working sequence, not a requirement to leave incompatible i
 - [x] Move reboot, update, media management, host statistics, and daemon status messages to management; update consumers. Preserve the separately authorized user reboot path.
 - [x] Separate management lifecycle from hardware startup failures (deployment verification pending).
 - [x] Implement full-object `roverState` and consolidate server/UI operational-state consumers (live verification pending).
-- [ ] Add bundled YAML catalogs and one custom YAML profile per media category.
-- [ ] Preserve AIY HAT as an explicit profile and expose ordinary audio-device selection on every architecture, including TTS/horn/mixer paths.
-- [ ] Generate ALSA routing from shared input/output selections; connect microphone, TTS, horn, forwarded audio, and independent volume controls to the resulting logical devices.
+- [x] Add bundled YAML catalogs and one custom YAML profile per media category. (Live verification pending.)
+- [x] Preserve AIY HAT as an explicit profile and expose ordinary audio-device selection on every architecture, including TTS/horn/mixer paths. (Live verification pending.)
+- [x] Generate ALSA routing from shared input/output selections; connect microphone, TTS, horn, forwarded audio, and independent volume controls to the resulting logical devices. (Live verification pending.)
 - [ ] Document exact configuration for the existing AIY rover and audit other machine-specific assumptions.
-- [ ] Implement command environments, persistent working directories, and setup on each daemon startup.
-- [ ] Replace media systemd management with child-process supervision and continuous bounded output forwarding.
+- [x] Implement command environments, persistent working directories, and setup on each daemon startup. (Live verification pending.)
+- [x] Replace media systemd management with child-process supervision and continuous bounded output forwarding. (Live verification pending.)
 - [x] Implement per-rover schema editor and complete-object saves (browser/live verification pending).
 - [x] Implement apply-one-field-to-all-connected-rovers with individual results (browser/live verification pending).
-- [ ] Add profile editing/selection, media output/status, reboot, and update UI.
+- [x] Add profile editing/selection, media output/status, reboot, and update UI. (Live verification pending.)
 - [ ] Implement standalone bootstrap with only name/address input and automatic OS architecture selection.
 - [ ] Implement shared checkout installation and self-update with reconnect-visible results.
 - [ ] Remove obsolete services, configuration files, scripts, build distinctions, and documentation.
@@ -273,3 +273,15 @@ Verification for this stage:
 - All four architecture binaries rebuilt successfully; focused frontend lint and server syntax checks passed. The two existing roster lifecycle tests passed after updating their state fixture. No new tests added.
 - Still verify live initial state, toggles through both GPIO/Firmata, reconnect state, disconnect clearing, and darkness restoration. Production UI assets have not been rebuilt.
 - Next implementation stage: YAML media profiles, command environments and child-process supervision, alongside the planned universal audio routing.
+
+### Media profiles, supervision, and audio (2026-11-16)
+
+- Added three YAML catalogs with six profiles: V4L2/rpicam video, generic ALSA/AIY microphone and playback. All bundled setup/run commands are inline YAML; the user explicitly rejected delegation to repository shell helpers, and the AIY helper was removed.
+- Each enabled streamer has a persistent working directory, startup setup, independent command restart, complete process-group cleanup, and bounded continuously forwarded output. Setup is serialized for package-manager access with no persistent completion markers.
+- Management hello includes catalogs and current media status. Fleet management exposes profile selection, exactly one editable custom profile per category, status, and output. Output is not emitted as chat alerts.
+- Shared audio input/output settings generate a private ALSA config for microphone, TTS, horn, and forwarded audio, retaining mixing and independent gains. Hardware output PCM, mixer card, rate, and channels are explicit settings. See hardware notes for AIY values and limitations.
+- Removed old media services/launchers, old machine-specific installer modules, static ALSA configs, and duplicate Chrome daemon. The checkout installer now installs only roverd plus runtime dependencies. Standalone bootstrap and self-update redesign remain unfinished.
+- The server now respects roverd's configured default speech engine. TTS assets live under `/var/lib/roverd/googletts`; the generic dependency helper selects architecture-specific libraries.
+- Added real CLI inspection for catalogs and generated ALSA configuration, without setup execution or hardware access.
+- Verification: all four architecture builds passed; six profiles loaded through the actual daemon and all setup/run commands passed Bash syntax checks; current sample config validation and ALSA config rendering passed; installer/TTS shell syntax and server JS syntax passed. Focused frontend lint passed including the final status-display changes. No camera/audio streaming, setup commands, host installation, or browser/server processes were run here.
+- Next: verify the remaining frontend check, then standalone bootstrap and update flow. Actual device formats, concurrent playback/gains, child cleanup and network recovery still require the documented rover-side checks.

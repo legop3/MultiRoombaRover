@@ -17,11 +17,24 @@ import (
 
 func main() {
 	var cfgPath string
+	var repoPath string
+	flag.StringVar(&repoPath, "repo", "/opt/roverd", "managed repository checkout")
 	flag.StringVar(&cfgPath, "config", "/etc/roverd.json", "path to roverd JSON configuration")
 	printDefaults := flag.Bool("print-default-config", false, "print a complete initial JSON configuration and exit")
+	printProfiles := flag.Bool("print-media-profiles", false, "read and print media profiles without running commands")
+	printAudio := flag.Bool("print-audio-config", false, "print generated ALSA configuration without installing it")
 	printSchema := flag.Bool("print-config-schema", false, "print the configuration JSON Schema and exit")
 	checkConfig := flag.Bool("check-config", false, "validate configuration without opening hardware or connecting")
 	flag.Parse()
+	if *printProfiles {
+		profiles, err := roverd.LoadMediaProfiles(repoPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		data, _ := json.MarshalIndent(profiles, "", "  ")
+		fmt.Println(string(data))
+		return
+	}
 	if *printDefaults {
 		data, _ := json.MarshalIndent(roverd.DefaultConfig(), "", "  ")
 		fmt.Println(string(data))
@@ -35,11 +48,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
+	if *printAudio {
+		fmt.Print(roverd.AudioConfiguration(cfg.Audio))
+		return
+	}
 	if *checkConfig {
 		fmt.Println("Configuration valid")
 		return
 	}
-	if run(cfg, cfgPath) {
+	if run(cfg, cfgPath, repoPath) {
 		executable, err := os.Executable()
 		if err != nil {
 			log.Fatal(err)
@@ -50,7 +67,7 @@ func main() {
 	}
 }
 
-func run(cfg *roverd.Config, cfgPath string) bool {
+func run(cfg *roverd.Config, cfgPath, repoPath string) bool {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	logger := log.New(os.Stdout, "roverd: ", log.LstdFlags|log.Lmicroseconds|log.LUTC)
@@ -59,14 +76,20 @@ func run(cfg *roverd.Config, cfgPath string) bool {
 	console.SetEvents(events)
 	var restarting atomic.Bool
 	management := roverd.NewManagementClient(cfg, cfgPath, events, logger, func() { restarting.Store(true); cancel() })
+	if err := roverd.ConfigureAudio(cfg.Audio); err != nil {
+		console.Notify(fmt.Sprintf("Audio routing unavailable: %v", err))
+	}
+	media, err := roverd.NewMediaSupervisor(cfg, repoPath, events, logger)
+	if err != nil {
+		console.Notify(fmt.Sprintf("Media profiles unavailable: %v", err))
+	}
+	management.SetMedia(media)
+	management.SetRepository(repoPath)
 	managementDone := make(chan struct{})
 	go func() { defer close(managementDone); management.Run(ctx) }()
-	// Hardware failures leave management connected until a corrected config
-	// requests restart. runHardware unwinds its own resources on failure.
-	media := roverd.NewMediaSupervisor(cfg.Media, logger)
-	management.SetMedia(media)
 	if media != nil {
 		media.Start(ctx)
+		defer media.Stop()
 	}
 	if err := runHardware(ctx, cfg, events, management, media, logger, console); err != nil {
 		console.Notify(fmt.Sprintf("Hardware unavailable: %v. Management remains connected.", err))

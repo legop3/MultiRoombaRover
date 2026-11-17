@@ -66,26 +66,6 @@ function enforceLaserRoomLightLock(reason) {
   forceAllRoverLasersOff(reason);
 }
 
-function normalizeOutboundCommandPayload(payload = {}) {
-  if (payload?.type !== 'tts') return payload;
-
-  const tts = payload.tts && typeof payload.tts === 'object' ? payload.tts : {};
-  const configuredEngine = typeof tts.engine === 'string' ? tts.engine.trim() : '';
-  if (configuredEngine) return payload;
-
-  // The server owns the default for commands it sends. Roverd still keeps its
-  // own local default for payloads that omit an engine from some other source,
-  // but normal server-issued TTS should prefer Google speech without requiring
-  // every caller to remember that policy.
-  return {
-    ...payload,
-    tts: {
-      ...tts,
-      engine: 'chromegtts',
-    },
-  };
-}
-
 function issueCommand(roverId, payload, options = {}) {
   if (['reboot', 'update', 'media'].includes(payload?.type)) {
     return roverManagement.issueCommand(roverId, payload);
@@ -103,7 +83,7 @@ function issueCommand(roverId, payload, options = {}) {
   }
   payload = require('../dockingService').protectCommand(record, payload, options);
   const id = uuidv4();
-  const normalizedPayload = normalizeOutboundCommandPayload(payload);
+  const normalizedPayload = payload;
   const message = { ...normalizedPayload, id };
   record.ws.send(JSON.stringify(message));
   observeCommand({ phase: 'dispatched', roverId, commandId: id, command: normalizedPayload });

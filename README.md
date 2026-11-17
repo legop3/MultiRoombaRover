@@ -56,19 +56,16 @@ These are the basics of how evertything is connected on my rovers, this is hard 
    4. optionally, a laser pointer connected to another high current driver output, GPIO 27 by default.
 
 ### Software on your rover
-Raspberry pi OS installation:
+Roverd targets Debian-based systems with ARMv6, ARMv7, ARM64, or AMD64 binaries. For the existing AIY Voice HAT rover, use Raspberry Pi OS Bookworm; that hardware setup has not been verified on Trixie.
 
-Everything that runs on the pi is designed for debian Bookworm, because I could not get the AIY voice hat working in Trixie.
+The standalone installer is still being implemented. For now:
+1. Set up the OS and networking.
+2. Install `git` and clone this repository.
+3. From the repository, run `sudo rover/install_roverd.sh`.
+4. Configure `/etc/roverd.json`, including the rover name, server address, physical audio devices, and enabled media profiles. Media and native Pi GPIO are disabled by default.
+5. Run `sudo systemctl restart roverd`.
 
-To install roverd on your pi:
-1. Install `Raspberry Pi OS (Legacy) Lite` (exactly what its called in the imager) on your SD card
-2. Boot the pi up, plug in your good wifi adapter, use `nmtui` to set it up
-3. Install `git`, clone this repo into your home folder
-4. Move into the repo folder, run the roverd installer using `sudo rover/install_roverd.sh`
-5. Reboot your raspberry pi
-6. Roverd, along with the audio and video publishers should now be running. Roverd should have created it's default config file at `/etc/roverd.json`
-
-Edit the `/etc/roverd.json` config file to change settings like your rover's name, color, and set the server IP.
+Roverd supervises the selected streamer commands itself. Disable/remove any previously installed streamer services before starting it. The AIY profiles may request a one-time reboot to activate their boot overlay. See [media profiles and audio routing](docs/rover-media-profiles.md) for configuration and deployment checks.
 
 Configuration is now a complete JSON object. See [roverd management](docs/roverd-management.md)
 for schema/default export, local validation, the management API, and deployment checks.

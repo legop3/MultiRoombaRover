@@ -24,7 +24,7 @@ Select the appropriate architecture binary on a rover. The default object suppli
 - Management starts independently of hardware initialization and remains available after serial/peripheral startup failure.
 - Control disconnect docking/reboot behavior still depends on control connectivity. A live management connection does not count as a working control connection.
 - The server maintains management records independently of the control roster, only in memory. Management disconnect removes the record; hello repopulates it.
-- Profile catalogs in hello are currently empty. YAML media profiles are the next media implementation stage, not installed catalogs hidden elsewhere.
+- Profile catalogs and current media status arrive in hello; see [media profiles](rover-media-profiles.md).
 
 ## Configuration page
 
@@ -72,7 +72,7 @@ Record acknowledgement errors, reconnect hello contents, relevant journal/server
 
 ## Pending stages
 
-Browser/live verification of configuration and operational state, YAML media catalogs/child supervision, universal ALSA routing, standalone bootstrap, and replacement update workflow remain pending. The current updater and systemd media supervisor have moved transport but retain their existing implementations until those stages.
+YAML media catalogs, child supervision, shared ALSA routing, and Fleet Management profile controls are implemented. Browser/live verification of configuration, operational state, media, and audio remains pending. Standalone bootstrap and the replacement update workflow are the next implementation stage.
 
 Apply-field targets the currently management-connected fleet. It clones each rover’s own configuration, replaces an existing field, and sends the complete object for rover-side validation. Inspect individual results for failures. Missing fields and changed connections are reported; offline changes are not queued. Paths traverse object fields, not array elements. Array-valued fields can be replaced as a whole.
 

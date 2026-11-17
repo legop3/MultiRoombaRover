@@ -1,0 +1,34 @@
+- id: alsa
+  name: ALSA microphone
+  description: Uses the configured audio input device through roverd's ALSA conversion route.
+  setup: |
+    if ! command -v ffmpeg >/dev/null || ! command -v arecord >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg alsa-utils
+    fi
+  run: &run |
+    exec ffmpeg -nostdin -f alsa -ar "$ROVER_AUDIO_SAMPLE_RATE" -ac "$ROVER_AUDIO_CHANNELS" -i "$ROVER_AUDIO_INPUT_DEVICE" -c:a libopus -b:a "$ROVER_AUDIO_BITRATE" -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"
+- id: aiy
+  name: Google AIY Voice HAT microphone
+  description: Same configurable ALSA route; setup enables the HAT overlay. Reboot once after first enabling its hardware.
+  setup: |
+    set -euo pipefail
+    # Capture/playback setup may run concurrently; serialize edits to boot config.
+    exec 9>/var/lock/roverd-aiy.lock
+    flock 9
+    boot=/boot/firmware/config.txt
+    [[ -f "$boot" ]] || boot=/boot/config.txt
+    [[ -f "$boot" ]] || { echo 'AIY setup needs a Raspberry Pi boot config.txt' >&2; exit 1; }
+    changed=0
+    for setting in dtparam=i2s=on dtoverlay=googlevoicehat-soundcard; do
+      if ! grep -Fxq "$setting" "$boot"; then
+        printf '\n%s\n' "$setting" >> "$boot"
+        changed=1
+      fi
+    done
+    if [[ "$changed" == 1 ]]; then
+      echo 'AIY hardware enabled. Reboot the host once before using this sound card.'
+    fi
+    if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg alsa-utils
+    fi
+  run: *run

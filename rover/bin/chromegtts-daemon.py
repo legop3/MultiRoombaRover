@@ -7,11 +7,11 @@ import subprocess
 import sys
 
 
-ASSET_ROOT = "/opt/roverd/googletts"
+ASSET_ROOT = "/var/lib/roverd/googletts"
 LIB_PATH = os.path.join(ASSET_ROOT, "libchrometts.so")
 VOICE_DIR = os.path.join(ASSET_ROOT, "en-us-x-multi-r30")
 PIPELINE = "pipeline.pb"
-PLAYBACK_DEVICE = "tts"
+PLAYBACK_DEVICE = "rover_tts"
 SAMPLE_RATE = "24000"
 MAX_TEXT_CHARS = 512
 

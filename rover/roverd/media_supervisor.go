@@ -2,162 +2,210 @@ package roverd
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
+	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
+	"sync"
+	"syscall"
 	"time"
 )
 
 type MediaSupervisor struct {
-	cfg           MediaConfig
-	logger        *log.Logger
-	client        *http.Client
-	checkInterval time.Duration
+	statusMu sync.Mutex
+	statuses map[string]string
+	cfg      *Config
+	repo     string
+	profiles map[string][]MediaProfile
+	events   chan RoverEvent
+	logger   *log.Logger
+	mu       sync.Mutex
+	setupMu  sync.Mutex
+	cancel   context.CancelFunc
+	done     chan struct{}
 }
 
-func NewMediaSupervisor(cfg MediaConfig, logger *log.Logger) *MediaSupervisor {
-	if err := UpdatePublisherEnv(cfg); err != nil {
-		logger.Printf("media supervisor: update env failed: %v", err)
+func NewMediaSupervisor(cfg *Config, repo string, events chan RoverEvent, logger *log.Logger) (*MediaSupervisor, error) {
+	profiles, err := LoadMediaProfiles(repo)
+	if err != nil {
+		return nil, err
 	}
-	if !cfg.Manage {
-		return nil
-	}
-	interval := cfg.HealthInterval.Duration
-	if interval <= 0 {
-		interval = 30 * time.Second
-	}
-	var client *http.Client
-	if cfg.HealthURL != "" {
-		client = &http.Client{Timeout: 5 * time.Second}
-	}
-	return &MediaSupervisor{
-		cfg:           cfg,
-		logger:        logger,
-		client:        client,
-		checkInterval: interval,
-	}
+	return &MediaSupervisor{cfg: cfg, repo: repo, profiles: profiles, events: events, logger: logger, statuses: make(map[string]string)}, nil
 }
-
+func (m *MediaSupervisor) Profiles() map[string][]MediaProfile { return m.profiles }
+func (m *MediaSupervisor) emit(kind, category, message string) {
+	if kind == "media.status" {
+		m.statusMu.Lock()
+		m.statuses[category] = message
+		m.statusMu.Unlock()
+	}
+	event := RoverEvent{Type: "event", Event: kind, Ts: time.Now().UnixMilli(), Data: map[string]any{"category": category, "message": message}}
+	select {
+	case m.events <- event:
+	default:
+	} // Never block a child on a slow/disconnected server.
+}
 func (m *MediaSupervisor) Start(ctx context.Context) {
-	if m == nil {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.cancel != nil {
 		return
 	}
-	if err := UpdatePublisherEnv(m.cfg); err != nil {
-		m.logger.Printf("media supervisor: update env failed: %v", err)
-	}
-	if m.cfg.HealthURL == "" || m.client == nil {
-		return
-	}
+	ctx, m.cancel = context.WithCancel(ctx)
+	m.done = make(chan struct{})
 	go func() {
-		ticker := time.NewTicker(m.checkInterval)
-		defer ticker.Stop()
-
-		if err := m.checkAndRepair(); err != nil {
-			m.logger.Printf("media supervisor: %v", err)
-		}
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if err := m.checkAndRepair(); err != nil {
-					m.logger.Printf("media supervisor: %v", err)
-				}
+		defer close(m.done)
+		var workers sync.WaitGroup
+		for _, category := range mediaCategories {
+			enabled, id := m.selection(category)
+			if !enabled {
+				m.emit("media.status", category, "disabled")
+				continue
 			}
+			workers.Add(1)
+			go func(category, id string) { defer workers.Done(); m.supervise(ctx, category, id) }(category, id)
 		}
+		workers.Wait()
 	}()
 }
-
-func (m *MediaSupervisor) HandleAction(ctx context.Context, action string) error {
-	if m == nil {
-		return errors.New("media supervisor disabled")
+func (m *MediaSupervisor) Stop() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.cancel == nil {
+		return
 	}
-	if err := UpdatePublisherEnv(m.cfg); err != nil {
-		return err
-	}
-	switch action {
-	case "start", "stop", "restart", "reload", "status":
-		return m.runSystemctl(ctx, action)
+	m.cancel()
+	<-m.done
+	m.cancel = nil
+}
+func (m *MediaSupervisor) selection(category string) (bool, string) {
+	switch category {
+	case "video":
+		return m.cfg.Media.Video.Enabled, m.cfg.Media.Video.Profile
+	case "audioCapture":
+		return m.cfg.Media.AudioCapture.Enabled, m.cfg.Media.AudioCapture.Profile
 	default:
-		return fmt.Errorf("unknown media action: %s", action)
+		return m.cfg.Media.AudioPlayback.Enabled, m.cfg.Media.AudioPlayback.Profile
 	}
 }
-
-func (m *MediaSupervisor) checkAndRepair() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
-	defer cancel()
-
-	if m.checkHealth(ctx) {
-		return nil
+func (m *MediaSupervisor) HandleAction(_ context.Context, action string) error {
+	if action != "stop" {
+		return fmt.Errorf("save configuration to start or restart media")
 	}
-	m.logger.Printf("media supervisor: health check failed, restarting configured media services")
-	if err := m.runSystemctl(ctx, "restart"); err != nil {
-		return fmt.Errorf("restart media services: %w", err)
-	}
+	m.Stop()
 	return nil
 }
-
-func (m *MediaSupervisor) checkHealth(ctx context.Context) bool {
-	if m.client == nil || m.cfg.HealthURL == "" {
-		return true
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.cfg.HealthURL, nil)
-	if err != nil {
-		m.logger.Printf("media supervisor: health request: %v", err)
-		return false
-	}
-	resp, err := m.client.Do(req)
-	if err != nil {
-		m.logger.Printf("media supervisor: health request failed: %v", err)
-		return false
-	}
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return true
-	}
-	m.logger.Printf("media supervisor: unexpected health status %d", resp.StatusCode)
-	return false
-}
-
-func (m *MediaSupervisor) runSystemctl(ctx context.Context, action string) error {
-	services := m.managedServices()
-	if len(services) == 0 {
-		return errors.New("no media services configured")
-	}
-	runCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	for _, service := range services {
-		cmd := exec.CommandContext(runCtx, "systemctl", action, service)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("systemctl %s %s: %w (%s)", action, service, err, string(output))
+func (m *MediaSupervisor) supervise(ctx context.Context, category, id string) {
+	var profile *MediaProfile
+	for _, p := range m.profiles[category] {
+		if p.ID == id {
+			copy := p
+			profile = &copy
+			break
 		}
 	}
-	return nil
+	if profile == nil {
+		m.emit("media.status", category, "unknown profile: "+id)
+		return
+	}
+	dir := filepath.Join("/var/lib/roverd/profiles", category, id)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		m.emit("media.status", category, err.Error())
+		return
+	}
+	env := m.environment(dir)
+	if profile.Setup != "" {
+		m.emit("media.status", category, "setup")
+		m.setupMu.Lock()
+		err := m.command(ctx, category, dir, env, profile.Setup)
+		m.setupMu.Unlock()
+		if err != nil {
+			m.emit("media.status", category, "setup failed: "+err.Error())
+			return
+		}
+	}
+	for ctx.Err() == nil {
+		m.emit("media.status", category, "running")
+		err := m.command(ctx, category, dir, env, profile.Run)
+		if ctx.Err() != nil {
+			break
+		}
+		m.emit("media.status", category, fmt.Sprintf("exited (%v); retrying in 2s", err))
+		select {
+		case <-ctx.Done():
+		case <-time.After(2 * time.Second):
+		}
+	}
+	m.emit("media.status", category, "stopped")
 }
 
-func (m *MediaSupervisor) managedServices() []string {
-	/*
-		Only enabled streams are service-managed. This matters for audio capture:
-		the service may be installed everywhere, but a rover with capture disabled
-		should not have remote media commands starting a publisher that the config
-		says should stay off.
-	*/
-	services := []string{}
-	if m.cfg.Video.Enabled && m.cfg.Video.Service != "" {
-		services = append(services, m.cfg.Video.Service)
+type mediaOutput struct {
+	supervisor *MediaSupervisor
+	category   string
+}
+
+func (w mediaOutput) Write(data []byte) (int, error) {
+	// Split even output without newlines into bounded messages.
+	count := len(data)
+	for len(data) > 0 {
+		n := len(data)
+		if n > 4096 {
+			n = 4096
+		}
+		w.supervisor.emit("media.output", w.category, string(data[:n]))
+		data = data[n:]
 	}
-	if m.cfg.AudioCapture.Enabled && m.cfg.AudioCapture.Service != "" {
-		services = append(services, m.cfg.AudioCapture.Service)
+	return count, nil
+}
+func (m *MediaSupervisor) command(ctx context.Context, category, dir string, env []string, command string) error {
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-e", "-o", "pipefail", "-c", command)
+	cmd.Dir = dir
+	cmd.Env = env
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Stdout = mediaOutput{m, category}
+	cmd.Stderr = mediaOutput{m, category}
+	// Kill the entire group: shell pipelines must not survive cancellation or
+	// retain stdout pipes after their parent shell exits.
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = 2 * time.Second
+	if err := cmd.Start(); err != nil {
+		return err
 	}
-	if m.cfg.AudioPlayback.Enabled && m.cfg.AudioPlayback.Service != "" {
-		services = append(services, m.cfg.AudioPlayback.Service)
+	err := cmd.Wait()
+	_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	return err
+}
+func (m *MediaSupervisor) environment(dir string) []string {
+	cfg := m.cfg
+	host, _ := url.Parse(cfg.ServerURL)
+	values := map[string]string{
+		"ROVER_NAME": cfg.Name, "ROVER_SERVER_HOST": host.Hostname(), "ROVER_PROFILE_DIR": dir, "ROVER_REPO_DIR": m.repo,
+		"ROVER_VIDEO_DEVICE": cfg.Media.Video.Device, "ROVER_VIDEO_INPUT_FORMAT": cfg.Media.Video.InputFormat,
+		"ROVER_VIDEO_WIDTH": strconv.Itoa(cfg.Media.Video.Width), "ROVER_VIDEO_HEIGHT": strconv.Itoa(cfg.Media.Video.Height),
+		"ROVER_VIDEO_FPS": strconv.Itoa(cfg.Media.Video.FPS), "ROVER_VIDEO_BITRATE": strconv.Itoa(cfg.Media.Video.Bitrate),
+		"ROVER_VIDEO_INVERTED": strconv.FormatBool(cfg.Media.Video.Inverted), "ROVER_VIDEO_SENSOR_MODE": cfg.Media.Video.SensorMode,
+		"ROVER_VIDEO_PUBLISH_URL": cfg.Media.Video.PublishURL, "ROVER_AUDIO_PUBLISH_URL": cfg.Media.AudioCapture.PublishURL,
+		"ROVER_AUDIO_PLAYBACK_URL": cfg.Media.AudioPlayback.ForwardURL, "ROVER_AUDIO_INPUT_DEVICE": "rover_capture", "ROVER_AUDIO_OUTPUT_DEVICE": "rover_forward",
+		"ROVER_AUDIO_SAMPLE_RATE": strconv.Itoa(cfg.Media.AudioCapture.SampleRate), "ROVER_AUDIO_CHANNELS": strconv.Itoa(cfg.Media.AudioCapture.Channels),
+		"ROVER_AUDIO_BITRATE": strconv.Itoa(cfg.Media.AudioCapture.Bitrate), "ROVER_AUDIO_NORMALIZE": strconv.FormatBool(cfg.Media.AudioPlayback.Normalize),
+		"ROVER_AUDIO_NORMALIZE_FILTER": cfg.Media.AudioPlayback.NormalizeFilter,
 	}
-	return services
+	env := os.Environ()
+	for key, value := range values {
+		env = append(env, key+"="+value)
+	}
+	return env
+}
+
+func (m *MediaSupervisor) Status() map[string]string {
+	m.statusMu.Lock()
+	defer m.statusMu.Unlock()
+	result := make(map[string]string)
+	for key, value := range m.statuses {
+		result[key] = value
+	}
+	return result
 }

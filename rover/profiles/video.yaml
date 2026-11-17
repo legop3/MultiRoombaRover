@@ -1,0 +1,25 @@
+- id: v4l2
+  name: V4L2 camera
+  description: USB or other Linux V4L2 camera, encoded with software H.264.
+  setup: |
+    command -v ffmpeg >/dev/null || { apt-get update && apt-get install -y ffmpeg; }
+  run: |
+    filters=()
+    if [ "$ROVER_VIDEO_INVERTED" = true ]; then filters=(-vf hflip,vflip); fi
+    exec ffmpeg -nostdin -f v4l2 -input_format "$ROVER_VIDEO_INPUT_FORMAT" -video_size "${ROVER_VIDEO_WIDTH}x${ROVER_VIDEO_HEIGHT}" -framerate "$ROVER_VIDEO_FPS" -i "$ROVER_VIDEO_DEVICE" "${filters[@]}" -an -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -b:v "$ROVER_VIDEO_BITRATE" -f rtsp -rtsp_transport tcp "$ROVER_VIDEO_PUBLISH_URL"
+- id: rpicam
+  name: Raspberry Pi CSI camera
+  description: rpicam/libcamera H.264 output, republished through ffmpeg.
+  setup: |
+    command -v ffmpeg >/dev/null || { apt-get update && apt-get install -y ffmpeg; }
+    if ! command -v rpicam-vid >/dev/null && ! command -v libcamera-vid >/dev/null; then
+      apt-get update
+      apt-get install -y rpicam-apps
+    fi
+  run: |
+    camera=$(command -v rpicam-vid || command -v libcamera-vid)
+    options=()
+    if [ "$ROVER_VIDEO_INVERTED" = true ]; then options+=(--hflip --vflip); fi
+    if [ -n "$ROVER_VIDEO_SENSOR_MODE" ]; then options+=(--mode "$ROVER_VIDEO_SENSOR_MODE"); fi
+    "$camera" --timeout 0 --nopreview --inline --codec h264 --width "$ROVER_VIDEO_WIDTH" --height "$ROVER_VIDEO_HEIGHT" --framerate "$ROVER_VIDEO_FPS" --bitrate "$ROVER_VIDEO_BITRATE" "${options[@]}" -o - |
+      ffmpeg -nostdin -fflags +genpts -f h264 -i pipe:0 -c:v copy -an -f rtsp -rtsp_transport tcp "$ROVER_VIDEO_PUBLISH_URL"

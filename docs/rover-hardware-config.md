@@ -1,6 +1,6 @@
 # Rover hardware configuration notes
 
-This document records hardware-specific requirements while the roverd rework is in progress. The existing installer still contains machine-specific setup; the universal bootstrap and media profiles are not implemented yet. Final profile names and JSON examples will be added when those interfaces exist.
+This document records hardware-specific requirements while the roverd rework is in progress. Media profiles and shared audio routing are implemented. The standalone bootstrap remains unfinished; current installation uses a checkout. Configuration selections are recorded below.
 
 ## Universal configuration requirements
 
@@ -16,11 +16,11 @@ Roverd configuration selects one physical input device and one physical output d
 
 The microphone streamer uses the selected input. TTS, horn, and forwarded audio share the selected output while retaining simultaneous playback and separate volume controls. Profiles use the generated logical devices supplied through their environment; they do not each hardcode or independently select physical audio hardware. Use ALSA conversion where supported instead of requiring all devices to accept the existing HAT playback format.
 
-AIY setup enables its hardware and uses this same routing system. The bootstrap still asks only for rover name and server address. This design is agreed but not yet implemented.
+AIY setup enables its hardware and uses this same routing system. The bootstrap still asks only for rover name and server address. Audio routing is implemented; the standalone bootstrap remains planned.
 
-## Existing AIY Voice HAT setup
+## Historical AIY Voice HAT setup
 
-These facts come from the repository's existing installer/configuration, not a live hardware check:
+These facts record the previous installer/configuration, not a live hardware check or the current implementation:
 
 - The Pi installer enables `dtoverlay=googlevoicehat-soundcard` and `dtparam=i2s=on`, and disables onboard audio with `dtparam=audio=off`.
 - The README records that this setup worked on Raspberry Pi OS Bookworm and had problems on Trixie. The rework must not imply that the HAT is verified on every Debian release.
@@ -40,12 +40,28 @@ For the new internal GPIO peripheral, enable `piGpio.enabled` on a rover that us
 
 The parent switch now defaults to disabled. Saved child settings do not enable GPIO on their own. External peripherals must not advertise the same enabled role unless the conflicting internal role is disabled.
 
-## Remaining implementation work
+## Implementation and verification tracking
 
-- [ ] Add AIY capture/playback profiles alongside generic selectable ALSA device profiles.
-- [ ] Make TTS, horn, forwarded audio, and mixer routing use configured devices consistently.
-- [ ] Generate ALSA routing from the shared input/output configuration, including distinct input/output cards, logical profile devices, format conversion, and independent playback volume controls.
+- [x] Add AIY capture/playback profiles alongside generic selectable ALSA device profiles.
+- [x] Make TTS, horn, forwarded audio, and mixer routing use configured devices consistently.
+- [x] Generate ALSA routing from the shared input/output configuration, including distinct input/output cards, logical profile devices, format conversion, and independent playback volume controls.
 - [ ] Audit fixed card numbers, named PCM assumptions, capture formats, camera orientation/sensor defaults, serial device defaults, and architecture-specific TTS assets.
-- [ ] Keep required one-time host boot changes visible; distinguish a hardware-overlay reboot from ordinary roverd update/restart behavior.
-- [ ] Add exact final profile selections and JSON settings for the existing AIY rover.
+- [x] Keep required one-time host boot changes visible; distinguish a hardware-overlay reboot from ordinary roverd update/restart behavior.
+- [x] Add exact final profile selections and JSON settings for the existing AIY rover.
 - [ ] Verify on the actual HAT and at least one non-HAT audio device; record results rather than assuming compatibility.
+
+## Implemented profile/audio selections (2026-11-16)
+
+The new supervisor and generated ALSA routing are implemented, but not hardware-verified. See [media profile documentation](rover-media-profiles.md). Bundled setup/run commands are contained in YAML, not repository shell helpers.
+
+For the existing AIY v1 setup, start with these fields in a complete current config:
+
+- `media.video.profile`: `rpicam`, enabled for the CSI camera; retain the existing resolution/bitrate, inverted mounting, and sensor mode if appropriate.
+- `media.audioCapture.profile` and `media.audioPlayback.profile`: `aiy`, enabling each required streamer. Their inline setup enables I2S and the Google Voice HAT overlay. Reboot once if setup changes boot configuration.
+- `audio.inputDevice` and `audio.outputDevice`: `hw:CARD=sndrpigooglevoi,DEV=0`, **after verifying that identifier on the rover**.
+- `audio.mixerCard`: `sndrpigooglevoi`, matching the verified output card.
+- `audio.outputSampleRate`: `16000`; `audio.outputChannels`: `1`, preserving the old HAT mixing format.
+- `audio.ttsEnabled`: true if desired; choose `audio.defaultEngine` explicitly. Chrome speech assets now live outside the checkout under `/var/lib/roverd/googletts`.
+- Enable the parent `piGpio.enabled` and the desired child roles as described above. The old automatic PWM-overlay installer is gone; the GPIO12/13 PWM overlay remains a documented host wiring requirement, not an audio-profile side effect.
+
+The HAT setup does not disable unrelated onboard audio or force a card index. Use the configured stable device/card names. Existing installed media systemd units must be removed/disabled before running the new supervisor. Remove any old roverd-specific host ALSA configuration before deployment: the generated config includes the system ALSA definitions, whose hooks can still load host configuration. The old media launchers are no longer used.

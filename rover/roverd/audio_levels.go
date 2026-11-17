@@ -100,18 +100,9 @@ func (c *WSClient) applyMixerGain(control string, gain float64) {
 }
 
 func (c *WSClient) trySetMixerControl(control, value string) error {
-	// Prefer the active ALSA default route; fall back to card index for compatibility.
-	candidates := [][]string{
-		{"-q", "-D", "default", "sset", control, value},
-		{"-q", "-c", "0", "sset", control, value},
+	out, err := exec.Command("amixer", "-q", "-c", c.cfg.Audio.MixerCard, "sset", control, value).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w (%s)", err, string(out))
 	}
-	var lastErr error
-	for _, args := range candidates {
-		out, err := exec.Command("amixer", args...).CombinedOutput()
-		if err == nil {
-			return nil
-		}
-		lastErr = fmt.Errorf("%w (%s)", err, string(out))
-	}
-	return lastErr
+	return nil
 }
