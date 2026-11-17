@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 log() { echo "$*"; }
-apt-get update
-apt-get install -y flite espeak python3 curl xz-utils unzip alsa-utils libc++1 libc++abi1
+# Package dependencies are installed by install_roverd.sh before this helper runs.
 install_google_tts_assets() {
 	local asset_dir="/var/lib/roverd/googletts"
 	local voice_dir="${asset_dir}/en-us-x-multi-r30"

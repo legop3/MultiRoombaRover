@@ -13,7 +13,7 @@ esac
 install -m 0755 "dist/roverd-linux-$arch" /usr/local/bin/roverd.new
 mv -f /usr/local/bin/roverd.new /usr/local/bin/roverd
 apt-get update
-apt-get install -y git ca-certificates python3 util-linux
+apt-get install -y git ca-certificates python3 util-linux flite espeak curl xz-utils unzip alsa-utils libc++1 libc++abi1
 install -d /etc/roverd/profiles /var/lib/roverd
 if [[ ! -f /etc/roverd.json ]]; then
   /usr/local/bin/roverd -print-default-config > /etc/roverd.json.new

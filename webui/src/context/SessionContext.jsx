@@ -369,11 +369,11 @@ export function SessionProvider({ children }) {
       setAdminReason: (text) => emitWithAck('adminReason:set', { text }),
       rebootRover: (roverId) =>
         emitWithAck('command', { roverId, type: 'reboot', data: { reboot: {} } }),
-      // Rover updates are intentionally parameter-free from the browser. The Pi
-      // side owns the git pull + installer sequence so the admin UI can request
+      // Rover updates are intentionally parameter-free from the browser. Roverd
+      // owns the git pull + installer sequence so the admin UI can request
       // maintenance without becoming a remote shell.
       updateRover: (roverId) =>
-        emitWithAck('command', { roverId, type: 'update', data: { update: {} } }),
+        emitWithAck('command', { roverId, type: 'update' }),
       // Bulk rover updates stay server-owned so the admin browser sends one
       // intent, then the server checks privileges and fans out the same fixed
       // update command to every currently connected rover.
