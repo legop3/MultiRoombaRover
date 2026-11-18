@@ -2,9 +2,7 @@
   name: ALSA microphone
   description: Uses the configured audio input device through roverd's ALSA conversion route.
   setup: |
-    if ! command -v ffmpeg >/dev/null || ! command -v arecord >/dev/null; then
-      apt-get update && apt-get install -y ffmpeg alsa-utils
-    fi
+    apt-get update && apt-get install -y ffmpeg alsa-utils
   run: |
     sample_rate=48000
     channels=2
@@ -20,9 +18,6 @@
   description: HAT capture with S32_LE input, 20 dB microphone boost, and low-latency Opus settings. Reboot once after first enabling its hardware.
   setup: |
     set -euo pipefail
-    # Capture/playback setup may run concurrently; serialize edits to boot config.
-    exec 9>/var/lock/roverd-aiy.lock
-    flock 9
     boot=/boot/firmware/config.txt
     [[ -f "$boot" ]] || boot=/boot/config.txt
     [[ -f "$boot" ]] || { echo 'AIY setup needs a Raspberry Pi boot config.txt' >&2; exit 1; }
@@ -38,9 +33,7 @@
     if [[ "$changed" == 1 ]]; then
       echo 'AIY hardware enabled. Reboot the host once before using this sound card.'
     fi
-    if ! command -v ffmpeg >/dev/null || ! command -v arecord >/dev/null; then
-      apt-get update && apt-get install -y ffmpeg alsa-utils
-    fi
+    apt-get update && apt-get install -y ffmpeg alsa-utils
   run: |
     sample_rate=48000
     channels=2

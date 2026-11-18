@@ -2,9 +2,7 @@
   name: ALSA speaker
   description: Uses the configured output alongside TTS and horn with independent volume controls.
   setup: |
-    if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
-      apt-get update && apt-get install -y ffmpeg alsa-utils
-    fi
+    apt-get update && apt-get install -y ffmpeg alsa-utils
   run: |
     normalize=true
     normalize_filter='dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled'
@@ -19,9 +17,6 @@
   description: HAT playback with low-latency decoding and 16 kHz mono output through the configured audio route. Reboot once after initial setup.
   setup: |
     set -euo pipefail
-    # Capture/playback setup may run concurrently; serialize edits to boot config.
-    exec 9>/var/lock/roverd-aiy.lock
-    flock 9
     boot=/boot/firmware/config.txt
     [[ -f "$boot" ]] || boot=/boot/config.txt
     [[ -f "$boot" ]] || { echo 'AIY setup needs a Raspberry Pi boot config.txt' >&2; exit 1; }
@@ -37,9 +32,7 @@
     if [[ "$changed" == 1 ]]; then
       echo 'AIY hardware enabled. Reboot the host once before using this sound card.'
     fi
-    if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
-      apt-get update && apt-get install -y ffmpeg alsa-utils
-    fi
+    apt-get update && apt-get install -y ffmpeg alsa-utils
   run: |
     normalize=true
     normalize_filter='dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled'

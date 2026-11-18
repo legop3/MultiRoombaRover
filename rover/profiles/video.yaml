@@ -2,7 +2,7 @@
   name: V4L2 camera
   description: USB or other Linux V4L2 camera, encoded with software H.264.
   setup: |
-    command -v ffmpeg >/dev/null || { apt-get update && apt-get install -y ffmpeg; }
+    apt-get update && apt-get install -y ffmpeg
   run: |
     device=/dev/video0
     input_format=mjpeg
@@ -23,26 +23,16 @@
       -g "$fps" -keyint_min "$fps" -sc_threshold 0 -flush_packets 1 -muxdelay 0 -muxpreload 0 \
       -f rtsp -rtsp_transport tcp "$ROVER_VIDEO_PUBLISH_URL"
 - id: rpicam
-  name: Raspberry Pi CSI camera
-  description: rpicam/libcamera H.264 output, republished through ffmpeg.
+  name: Pi Zero 2 W Camera v2
+  description: Inverted Camera Module v2 on a Pi Zero 2 W, with H.264 republished through ffmpeg.
   setup: |
-    command -v ffmpeg >/dev/null || { apt-get update && apt-get install -y ffmpeg; }
-    if ! command -v rpicam-vid >/dev/null && ! command -v libcamera-vid >/dev/null; then
-      apt-get update
-      apt-get install -y rpicam-apps
-    fi
+    apt-get update && apt-get install -y ffmpeg rpicam-apps
   run: |
     width=640
     height=480
     fps=30
     bitrate=2000000
-    inverted=true
-    sensor_mode=1296:972
-    camera=$(command -v rpicam-vid || command -v libcamera-vid)
-    options=()
-    if [ "$inverted" = true ]; then options+=(--rotation 180); fi
-    if [ -n "$sensor_mode" ]; then options+=(--mode "$sensor_mode"); fi
-    "$camera" --inline --timeout 0 "${options[@]}" \
+    rpicam-vid --inline --timeout 0 --rotation 180 --mode 1296:972 \
       --width "$width" --height "$height" \
       --framerate "$fps" --bitrate "$bitrate" \
       --codec h264 --intra 120 --profile baseline --denoise auto --nopreview \
