@@ -11,7 +11,7 @@
     exec ffmpeg -nostdin -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" -vn "${filters[@]}" -f alsa "$ROVER_AUDIO_OUTPUT_DEVICE"
 - id: aiy
   name: Google AIY Voice HAT speaker
-  description: Enables the HAT hardware; uses the same configured ALSA routing as other devices. Reboot once after initial setup.
+  description: HAT playback with low-latency decoding and 16 kHz mono output through the configured audio route. Reboot once after initial setup.
   setup: |
     set -euo pipefail
     # Capture/playback setup may run concurrently; serialize edits to boot config.
@@ -38,4 +38,9 @@
   run: |
     filters=()
     if [ "$ROVER_AUDIO_NORMALIZE" = true ]; then filters=(-af "$ROVER_AUDIO_NORMALIZE_FILTER"); fi
-    exec ffmpeg -nostdin -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" -vn "${filters[@]}" -f alsa "$ROVER_AUDIO_OUTPUT_DEVICE"
+    # Decode to the same explicit HAT playback format as the previous listener.
+    ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer -flags low_delay \
+      -analyzeduration 200k -probesize 32k -rtsp_transport tcp \
+      -i "$ROVER_AUDIO_PLAYBACK_URL" -vn "${filters[@]}" \
+      -ac 1 -ar 16000 -f s16le pipe:1 |
+      aplay -q -D "$ROVER_AUDIO_OUTPUT_DEVICE" -t raw -f S16_LE -r 16000 -c 1

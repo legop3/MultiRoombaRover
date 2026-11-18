@@ -28,7 +28,13 @@ pcm.rover_mix {
  type dmix
  ipc_key 70601
  ipc_key_add_uid true
- slave { pcm %s format S16_LE rate %d channels %d }
+ # Preserve the previous mixer's explicit ALSA buffer geometry.
+ slave {
+  pcm %s format S16_LE rate %d channels %d
+  period_time 0
+  period_size 1024
+  buffer_size 4096
+ }
 }
 `, strconv.Quote(cfg.InputDevice), strconv.Quote(cfg.OutputDevice), cfg.OutputSampleRate, cfg.OutputChannels)
 	for _, pair := range [][2]string{{"tts", "TTSMaster"}, {"horn", "HornMaster"}, {"forward", "ForwardMaster"}} {

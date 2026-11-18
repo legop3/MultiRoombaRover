@@ -19,7 +19,15 @@
   run: |
     camera=$(command -v rpicam-vid || command -v libcamera-vid)
     options=()
-    if [ "$ROVER_VIDEO_INVERTED" = true ]; then options+=(--hflip --vflip); fi
+    if [ "$ROVER_VIDEO_INVERTED" = true ]; then options+=(--rotation 180); fi
     if [ -n "$ROVER_VIDEO_SENSOR_MODE" ]; then options+=(--mode "$ROVER_VIDEO_SENSOR_MODE"); fi
-    "$camera" --timeout 0 --nopreview --inline --codec h264 --width "$ROVER_VIDEO_WIDTH" --height "$ROVER_VIDEO_HEIGHT" --framerate "$ROVER_VIDEO_FPS" --bitrate "$ROVER_VIDEO_BITRATE" "${options[@]}" -o - |
-      ffmpeg -nostdin -fflags +genpts -f h264 -i pipe:0 -c:v copy -an -f rtsp -rtsp_transport tcp "$ROVER_VIDEO_PUBLISH_URL"
+    # Preserve the previous Pi publisher's camera tuning and packet timing.
+    "$camera" --inline --timeout 0 "${options[@]}" \
+      --width "$ROVER_VIDEO_WIDTH" --height "$ROVER_VIDEO_HEIGHT" \
+      --framerate "$ROVER_VIDEO_FPS" --bitrate "$ROVER_VIDEO_BITRATE" \
+      --codec h264 --intra 120 --profile baseline --denoise auto --nopreview \
+      --metering centre --ev 0.1 --awb auto --saturation 0.6 --brightness 0 --output - |
+      ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer \
+        -use_wallclock_as_timestamps 1 -f h264 -i pipe:0 -c:v copy -an \
+        -flush_packets 1 -muxdelay 0 -muxpreload 0 \
+        -f rtsp -rtsp_transport tcp "$ROVER_VIDEO_PUBLISH_URL"
