@@ -188,8 +188,8 @@ io.on('connection', (socket) => {
     }));
     return { results };
   });
-  bind('roverManagement:saveProfile', async ({ roverId, category, profile }) => {
-    const { id, result } = request(roverId, { type: 'profile.set', category, profile });
+  bind('roverManagement:saveProfile', async ({ roverId, category, profile, config }) => {
+    const { id, result } = request(roverId, { type: 'profile.set', category, profile, config });
     await result;
     return { id };
   });

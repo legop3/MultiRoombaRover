@@ -6,7 +6,15 @@
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
   run: |
-    exec ffmpeg -nostdin -f alsa -ar "$ROVER_AUDIO_SAMPLE_RATE" -ac "$ROVER_AUDIO_CHANNELS" -i "$ROVER_AUDIO_INPUT_DEVICE" -c:a libopus -b:a "$ROVER_AUDIO_BITRATE" -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"
+    sample_rate=48000
+    channels=2
+    bitrate=510000
+    arecord -D "$ROVER_AUDIO_INPUT_DEVICE" -f S32_LE -c "$channels" -r "$sample_rate" -B 16384 -F 1024 -q -t raw |
+      ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer \
+        -rtbufsize 0 -thread_queue_size 4096 -f s32le -ar "$sample_rate" -ac "$channels" -i pipe:0 \
+        -af "volume=20dB" -c:a libopus -b:a "$bitrate" -ar:a "$sample_rate" -ac:a "$channels" \
+        -application audio -frame_duration 20 -compression_level 0 \
+        -flush_packets 1 -muxdelay 0 -muxpreload 0 -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"
 - id: aiy
   name: Google AIY Voice HAT microphone
   description: HAT capture with S32_LE input, 20 dB microphone boost, and low-latency Opus settings. Reboot once after first enabling its hardware.
@@ -34,15 +42,12 @@
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
   run: |
-    # Preserve the HAT capture format, gain, and low-cost Opus settings.
-    arecord -D "$ROVER_AUDIO_INPUT_DEVICE" -f S32_LE \
-      -c "$ROVER_AUDIO_CHANNELS" -r "$ROVER_AUDIO_SAMPLE_RATE" \
-      -B "${AUDIO_ALSA_BUFFER_BYTES:-16384}" -F "${AUDIO_ALSA_PERIOD_BYTES:-1024}" -q -t raw |
+    sample_rate=48000
+    channels=2
+    bitrate=510000
+    arecord -D "$ROVER_AUDIO_INPUT_DEVICE" -f S32_LE -c "$channels" -r "$sample_rate" -B 16384 -F 1024 -q -t raw |
       ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer \
-        -rtbufsize 0 -thread_queue_size 4096 -f s32le \
-        -ar "$ROVER_AUDIO_SAMPLE_RATE" -ac "$ROVER_AUDIO_CHANNELS" -i pipe:0 \
-        -af "volume=20dB" -c:a libopus -b:a "$ROVER_AUDIO_BITRATE" \
-        -ar:a "$ROVER_AUDIO_SAMPLE_RATE" -ac:a "$ROVER_AUDIO_CHANNELS" \
+        -rtbufsize 0 -thread_queue_size 4096 -f s32le -ar "$sample_rate" -ac "$channels" -i pipe:0 \
+        -af "volume=20dB" -c:a libopus -b:a "$bitrate" -ar:a "$sample_rate" -ac:a "$channels" \
         -application audio -frame_duration 20 -compression_level 0 \
-        -flush_packets 1 -muxdelay 0 -muxpreload 0 \
-        -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"
+        -flush_packets 1 -muxdelay 0 -muxpreload 0 -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"

@@ -4,9 +4,24 @@
   setup: |
     command -v ffmpeg >/dev/null || { apt-get update && apt-get install -y ffmpeg; }
   run: |
+    device=/dev/video0
+    input_format=mjpeg
+    width=640
+    height=480
+    fps=30
+    bitrate=2000000
+    inverted=false
+    input_options=()
+    if [ -n "$input_format" ]; then input_options=(-input_format "$input_format"); fi
     filters=()
-    if [ "$ROVER_VIDEO_INVERTED" = true ]; then filters=(-vf hflip,vflip); fi
-    exec ffmpeg -nostdin -f v4l2 -input_format "$ROVER_VIDEO_INPUT_FORMAT" -video_size "${ROVER_VIDEO_WIDTH}x${ROVER_VIDEO_HEIGHT}" -framerate "$ROVER_VIDEO_FPS" -i "$ROVER_VIDEO_DEVICE" "${filters[@]}" -an -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -b:v "$ROVER_VIDEO_BITRATE" -f rtsp -rtsp_transport tcp "$ROVER_VIDEO_PUBLISH_URL"
+    if [ "$inverted" = true ]; then filters=(-vf "transpose=2,transpose=2"); fi
+    exec ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer -flags low_delay \
+      -thread_queue_size 4096 -f v4l2 "${input_options[@]}" -framerate "$fps" \
+      -video_size "${width}x${height}" -i "$device" "${filters[@]}" -an \
+      -c:v libx264 -preset veryfast -tune zerolatency -profile:v baseline -pix_fmt yuv420p \
+      -b:v "$bitrate" -maxrate "$bitrate" -bufsize "$((bitrate / 2))" \
+      -g "$fps" -keyint_min "$fps" -sc_threshold 0 -flush_packets 1 -muxdelay 0 -muxpreload 0 \
+      -f rtsp -rtsp_transport tcp "$ROVER_VIDEO_PUBLISH_URL"
 - id: rpicam
   name: Raspberry Pi CSI camera
   description: rpicam/libcamera H.264 output, republished through ffmpeg.
@@ -17,14 +32,20 @@
       apt-get install -y rpicam-apps
     fi
   run: |
+    width=640
+    height=480
+    fps=30
+    bitrate=2000000
+    inverted=true
+    sensor_mode=1296:972
     camera=$(command -v rpicam-vid || command -v libcamera-vid)
     options=()
-    if [ "$ROVER_VIDEO_INVERTED" = true ]; then options+=(--rotation 180); fi
-    if [ -n "$ROVER_VIDEO_SENSOR_MODE" ]; then options+=(--mode "$ROVER_VIDEO_SENSOR_MODE"); fi
+    if [ "$inverted" = true ]; then options+=(--rotation 180); fi
+    if [ -n "$sensor_mode" ]; then options+=(--mode "$sensor_mode"); fi
     # Preserve the previous Pi publisher's camera tuning and packet timing.
     "$camera" --inline --timeout 0 "${options[@]}" \
-      --width "$ROVER_VIDEO_WIDTH" --height "$ROVER_VIDEO_HEIGHT" \
-      --framerate "$ROVER_VIDEO_FPS" --bitrate "$ROVER_VIDEO_BITRATE" \
+      --width "$width" --height "$height" \
+      --framerate "$fps" --bitrate "$bitrate" \
       --codec h264 --intra 120 --profile baseline --denoise auto --nopreview \
       --metering centre --ev 0.1 --awb auto --saturation 0.6 --brightness 0 --output - |
       ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer \

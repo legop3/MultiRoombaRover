@@ -13,22 +13,17 @@ Enabled profiles run setup serially, then stream independently. Setup failure st
 
 ## Command variables
 
-Variables are supplied through the environment. Quote expansions normally, for example `"$ROVER_VIDEO_DEVICE"`.
+Variables are supplied through the environment. Quote expansions normally, for example `"$ROVER_AUDIO_INPUT_DEVICE"`.
 
 | Variables | Meaning |
 | --- | --- |
 | `ROVER_NAME`, `ROVER_SERVER_HOST` | Identity and server hostname |
 | `ROVER_PROFILE_DIR`, `ROVER_REPO_DIR` | Persistent working directory and checkout |
-| `ROVER_VIDEO_DEVICE`, `ROVER_VIDEO_INPUT_FORMAT` | Camera input |
-| `ROVER_VIDEO_WIDTH`, `ROVER_VIDEO_HEIGHT`, `ROVER_VIDEO_FPS`, `ROVER_VIDEO_BITRATE` | Camera/encoder settings |
-| `ROVER_VIDEO_INVERTED`, `ROVER_VIDEO_SENSOR_MODE` | Orientation and optional rpicam mode |
 | `ROVER_VIDEO_PUBLISH_URL`, `ROVER_AUDIO_PUBLISH_URL`, `ROVER_AUDIO_PLAYBACK_URL` | Complete derived RTSP URLs |
 | `ROVER_AUDIO_INPUT_DEVICE`, `ROVER_AUDIO_OUTPUT_DEVICE` | Generated logical ALSA microphone and forwarded-audio routes |
-| `ROVER_AUDIO_SAMPLE_RATE`, `ROVER_AUDIO_CHANNELS`, `ROVER_AUDIO_BITRATE` | Microphone encoding settings |
-| `ROVER_AUDIO_NORMALIZE`, `ROVER_AUDIO_NORMALIZE_FILTER` | Forwarded-audio normalization |
 
 
-Fleet Management supports one custom profile per category, saved at `/etc/roverd/profiles/<category>.yaml`. Saving a custom profile restarts roverd; choose it in the streamer's configuration to use it.
+Fleet Management supports one custom profile per category, saved at `/etc/roverd/profiles/<category>.yaml`. The selected setup/run commands are visible. Copy to custom lets you edit them; Save and use custom saves the configuration and selects the custom command in one restart. Camera and encoder options belong in these commands, not generic config fields.
 
 ## Audio constraints
 

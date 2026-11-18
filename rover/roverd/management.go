@@ -153,8 +153,21 @@ func (m *ManagementClient) execute(ctx context.Context, command managementComman
 		if command.Profile == nil {
 			return nil, fmt.Errorf("profile required")
 		}
+		var config *Config
+		if len(command.Config) > 0 {
+			var err error
+			config, err = DecodeConfig(command.Config)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if err := SaveCustomProfile(command.Category, *command.Profile); err != nil {
 			return nil, err
+		}
+		if config != nil {
+			if err := SaveConfig(m.configPath, config); err != nil {
+				return nil, err
+			}
 		}
 		m.stopping = true
 		if m.runtime != nil {

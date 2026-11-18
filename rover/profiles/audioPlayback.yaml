@@ -6,9 +6,14 @@
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
   run: |
+    normalize=true
+    normalize_filter='dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled'
     filters=()
-    if [ "$ROVER_AUDIO_NORMALIZE" = true ]; then filters=(-af "$ROVER_AUDIO_NORMALIZE_FILTER"); fi
-    exec ffmpeg -nostdin -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" -vn "${filters[@]}" -f alsa "$ROVER_AUDIO_OUTPUT_DEVICE"
+    if [ "$normalize" = true ]; then filters=(-af "$normalize_filter"); fi
+    ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer -flags low_delay \
+      -analyzeduration 200k -probesize 32k -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" \
+      -vn "${filters[@]}" -ac 1 -ar 16000 -f s16le pipe:1 |
+      aplay -q -D "$ROVER_AUDIO_OUTPUT_DEVICE" -t raw -f S16_LE -r 16000 -c 1
 - id: aiy
   name: Google AIY Voice HAT speaker
   description: HAT playback with low-latency decoding and 16 kHz mono output through the configured audio route. Reboot once after initial setup.
@@ -36,11 +41,11 @@
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
   run: |
+    normalize=true
+    normalize_filter='dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled'
     filters=()
-    if [ "$ROVER_AUDIO_NORMALIZE" = true ]; then filters=(-af "$ROVER_AUDIO_NORMALIZE_FILTER"); fi
-    # Decode to the same explicit HAT playback format as the previous listener.
+    if [ "$normalize" = true ]; then filters=(-af "$normalize_filter"); fi
     ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer -flags low_delay \
-      -analyzeduration 200k -probesize 32k -rtsp_transport tcp \
-      -i "$ROVER_AUDIO_PLAYBACK_URL" -vn "${filters[@]}" \
-      -ac 1 -ar 16000 -f s16le pipe:1 |
+      -analyzeduration 200k -probesize 32k -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" \
+      -vn "${filters[@]}" -ac 1 -ar 16000 -f s16le pipe:1 |
       aplay -q -D "$ROVER_AUDIO_OUTPUT_DEVICE" -t raw -f S16_LE -r 16000 -c 1

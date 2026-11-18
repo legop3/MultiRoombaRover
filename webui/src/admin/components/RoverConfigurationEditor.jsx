@@ -51,23 +51,25 @@ function RoverForm({ socket, record, online }) {
     {record.updateStatus && <p role="status">Update: {record.updateStatus.state} — {record.updateStatus.message}</p>}
     <p role="status">{message}</p>
     {results.length > 0 && <ul>{results.map((result) => <li key={result.roverId}>{result.roverId}: {result.success ? 'Saved' : result.error}</li>)}</ul>}
-    <SchemaConfigurationForm liveData={record} schema={schema} value={draft} onChange={setDraft} disabled={busy || !online}
+    <SchemaConfigurationForm liveData={{ record, draft }} schema={schema} value={draft} onChange={setDraft} disabled={busy || !online}
       renderFieldAction={(path) => <button type="button" className="button-dark text-xs" disabled={busy || !online}
         onClick={() => save(path)}>Apply to all</button>}
       renderObjectFooter={(path) => path.length === 2 && path[0] === 'media' && record.profiles?.[path[1]]
         ? <MediaProfiles socket={socket} record={record} online={online && !busy} category={path[1]}
-            configDirty={JSON.stringify(draft) !== JSON.stringify(record.config)} /> : null} />
+            draft={draft} /> : null} />
     <button type="button" className="button-dark text-xs" disabled={busy || !online} onClick={() => save()}>Save to this rover</button>
   </div>;
 }
 
-function MediaProfiles({ socket, record, online, category, configDirty }) {
+function MediaProfiles({ socket, record, online, category, draft }) {
   const outputRef = useRef(null);
   const output = record.mediaOutput?.[category] || '';
   useEffect(() => {
     const element = outputRef.current;
     if (element) element.scrollTop = element.scrollHeight;
   }, [output]);
+  const selected = record.profiles?.[category]?.find((entry) => entry.id === draft.media[category].profile);
+  const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState({ id: 'custom', name: '', description: '', setup: '', run: '' });
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -78,27 +80,34 @@ function MediaProfiles({ socket, record, online, category, configDirty }) {
   async function save() {
     setBusy(true);
     try {
-      await request(socket, 'roverManagement:saveProfile', { roverId: record.roverId, category, profile });
-      setMessage('Custom profile saved. Rover is restarting. Select custom in the media settings to use it.');
+      await request(socket, 'roverManagement:saveProfile', { roverId: record.roverId, category, profile, config: { ...draft, media: { ...draft.media, [category]: { ...draft.media[category], profile: 'custom' } } } });
+      setMessage('Custom profile saved and selected. Rover is restarting.');
     } catch (error) { setMessage(error.message); }
     finally { setBusy(false); }
   }
   return <div className="space-y-0.5 text-xs">
-    {(record.profiles?.[category] || []).map((entry) => <p key={entry.id}>{entry.name}: {entry.description}</p>)}
+    <p>{selected?.description || 'Selected profile is unavailable.'}</p>
+    {selected && <>
+      <label className="block">Setup command<textarea className="field-input w-full font-mono" readOnly rows={4} value={selected.setup || ''} /></label>
+      <label className="block">Run command<textarea className="field-input w-full font-mono" readOnly rows={8} value={selected.run} /></label>
+      <button type="button" className="button-dark" disabled={!online || busy} onClick={() => {
+        setProfile({ ...selected, id: 'custom', name: selected.id === 'custom' ? selected.name : `${selected.name} (custom)` });
+        setEditing(true);
+      }}>{selected.id === 'custom' ? 'Edit custom' : 'Copy to custom'}</button>
+    </>}
     <p>Status: {record.mediaStatus?.[category] || (online ? 'Waiting for status' : 'Offline')}</p>
-    <details className="space-y-0.5">
-    <summary className="cursor-pointer">Create or edit custom profile</summary>
-    {configDirty && <p className="text-sm text-amber-300">Save configuration changes before saving a custom profile, which restarts the rover.</p>}
-    <fieldset disabled={!online || busy || configDirty}>
+    {editing && <div className="space-y-0.5">
+    <fieldset disabled={!online || busy}>
       {['name', 'description', 'setup', 'run'].map((key) => <label key={key} className="block">{key}
         <textarea className="field-input block w-full" rows={['setup', 'run'].includes(key) ? 4 : 1}
           value={profile[key]} onChange={(event) => setProfile((previous) => ({ ...previous, [key]: event.target.value }))} />
       </label>)}
-      <button type="button" className="button-dark" onClick={save}>Save custom profile</button>
+      <button type="button" className="button-dark" onClick={save}>Save and use custom</button>
+      <button type="button" className="button-dark" onClick={() => setEditing(false)}>Cancel</button>
     </fieldset>
     <p role="status">{message}</p>
-    </details>
-    <details><summary className="cursor-pointer">Streamer output</summary>
+    </div>}
+    <details open><summary className="cursor-pointer">Streamer output</summary>
     <pre ref={outputRef} className="max-h-80 overflow-auto whitespace-pre-wrap text-xs">{output || 'Waiting for command stdout/stderr…'}</pre></details>
   </div>;
 }

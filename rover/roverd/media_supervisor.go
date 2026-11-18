@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -176,15 +175,8 @@ func (m *MediaSupervisor) environment(dir string) []string {
 	host, _ := url.Parse(cfg.ServerURL)
 	values := map[string]string{
 		"ROVER_NAME": cfg.Name, "ROVER_SERVER_HOST": host.Hostname(), "ROVER_PROFILE_DIR": dir, "ROVER_REPO_DIR": m.repo,
-		"ROVER_VIDEO_DEVICE": cfg.Media.Video.Device, "ROVER_VIDEO_INPUT_FORMAT": cfg.Media.Video.InputFormat,
-		"ROVER_VIDEO_WIDTH": strconv.Itoa(cfg.Media.Video.Width), "ROVER_VIDEO_HEIGHT": strconv.Itoa(cfg.Media.Video.Height),
-		"ROVER_VIDEO_FPS": strconv.Itoa(cfg.Media.Video.FPS), "ROVER_VIDEO_BITRATE": strconv.Itoa(cfg.Media.Video.Bitrate),
-		"ROVER_VIDEO_INVERTED": strconv.FormatBool(cfg.Media.Video.Inverted), "ROVER_VIDEO_SENSOR_MODE": cfg.Media.Video.SensorMode,
 		"ROVER_VIDEO_PUBLISH_URL": cfg.Media.Video.PublishURL, "ROVER_AUDIO_PUBLISH_URL": cfg.Media.AudioCapture.PublishURL,
 		"ROVER_AUDIO_PLAYBACK_URL": cfg.Media.AudioPlayback.ForwardURL, "ROVER_AUDIO_INPUT_DEVICE": "rover_capture", "ROVER_AUDIO_OUTPUT_DEVICE": "rover_forward",
-		"ROVER_AUDIO_SAMPLE_RATE": strconv.Itoa(cfg.Media.AudioCapture.SampleRate), "ROVER_AUDIO_CHANNELS": strconv.Itoa(cfg.Media.AudioCapture.Channels),
-		"ROVER_AUDIO_BITRATE": strconv.Itoa(cfg.Media.AudioCapture.Bitrate), "ROVER_AUDIO_NORMALIZE": strconv.FormatBool(cfg.Media.AudioPlayback.Normalize),
-		"ROVER_AUDIO_NORMALIZE_FILTER": cfg.Media.AudioPlayback.NormalizeFilter,
 	}
 	env := os.Environ()
 	for key, value := range values {

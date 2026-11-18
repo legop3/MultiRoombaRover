@@ -91,15 +91,7 @@ type VideoMediaConfig struct {
 	Enabled bool   `json:"enabled"`
 	// PublishURL is derived during validation. It remains in rover metadata for server-side
 	// consumers through MediaMetadata, but is never persisted in configuration.
-	PublishURL  string `json:"-"`
-	Device      string `json:"device"`
-	InputFormat string `json:"inputFormat"`
-	Width       int    `json:"width"`
-	Height      int    `json:"height"`
-	FPS         int    `json:"fps"`
-	Bitrate     int    `json:"bitrate"`
-	Inverted    bool   `json:"inverted"`
-	SensorMode  string `json:"sensorMode"`
+	PublishURL string `json:"-"`
 }
 
 type AudioCaptureConfig struct {
@@ -110,10 +102,6 @@ type AudioCaptureConfig struct {
 	Enabled bool `json:"enabled"`
 	// PublishURL follows the same derived-only contract as the video path.
 	PublishURL string `json:"-"`
-
-	SampleRate int `json:"sampleRate"`
-	Channels   int `json:"channels"`
-	Bitrate    int `json:"bitrate"`
 }
 
 type AudioPlaybackConfig struct {
@@ -125,9 +113,6 @@ type AudioPlaybackConfig struct {
 	Enabled bool `json:"enabled"`
 	// ForwardURL is derived because the server and rover must agree on the exact -fwd path.
 	ForwardURL string `json:"-"`
-
-	Normalize       bool   `json:"normalize"`
-	NormalizeFilter string `json:"normalizeFilter"`
 }
 
 type CameraServoConfig struct {
@@ -261,35 +246,10 @@ func DefaultConfig() Config {
 		},
 		MaxWheelMMs: 500,
 		Media: MediaConfig{
-			RTSPPort: 8554,
-
-			Video: VideoMediaConfig{
-				Profile: "v4l2",
-				Enabled: true,
-				Device:  "/dev/video0", InputFormat: "mjpeg",
-
-				Width:      640,
-				Height:     480,
-				FPS:        30,
-				Bitrate:    2000000,
-				Inverted:   false,
-				SensorMode: "",
-			},
-			AudioCapture: AudioCaptureConfig{
-				Profile: "alsa",
-				Enabled: true,
-
-				SampleRate: 48000,
-				Channels:   2,
-				Bitrate:    510000,
-			},
-			AudioPlayback: AudioPlaybackConfig{
-				Profile: "alsa",
-				Enabled: true,
-
-				Normalize:       true,
-				NormalizeFilter: "dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled",
-			},
+			RTSPPort:      8554,
+			Video:         VideoMediaConfig{Profile: "v4l2", Enabled: true},
+			AudioCapture:  AudioCaptureConfig{Profile: "alsa", Enabled: true},
+			AudioPlayback: AudioPlaybackConfig{Profile: "alsa", Enabled: true},
 		},
 		Audio: AudioConfig{
 			InputDevice: "hw:0,0", OutputDevice: "hw:0,0", MixerCard: "0", OutputSampleRate: 48000, OutputChannels: 2,
@@ -488,26 +448,6 @@ func validateMediaConfig(cfg *MediaConfig, serverURL string, roverName string) e
 }
 
 func validateVideoMediaConfig(cfg *VideoMediaConfig, serverURL string, roverName string, rtspPort int) error {
-	// V4L2 input formats are consumed by ffmpeg as lowercase names such as
-	// mjpeg or yuyv422. Normalizing here keeps the publisher script simple and
-	// makes hand-edited Debian laptop configs less sensitive to capitalization.
-	cfg.InputFormat = strings.ToLower(strings.TrimSpace(cfg.InputFormat))
-	if cfg.Width <= 0 {
-		cfg.Width = 640
-	}
-	if cfg.Height <= 0 {
-		cfg.Height = 480
-	}
-	if cfg.FPS <= 0 {
-		cfg.FPS = 30
-	}
-	if cfg.Bitrate <= 0 {
-		cfg.Bitrate = 2000000
-	}
-	/*
-		Always derive this endpoint. Older rover configs can contain an explicit SRT publishUrl;
-		honoring it after a binary update would silently leave that rover on the old transport.
-	*/
 	derived, err := derivePublishURL(serverURL, roverName, rtspPort)
 	if err != nil {
 		return fmt.Errorf("derive publishUrl: %w", err)
@@ -517,15 +457,6 @@ func validateVideoMediaConfig(cfg *VideoMediaConfig, serverURL string, roverName
 }
 
 func validateAudioCaptureConfig(cfg *AudioCaptureConfig, serverURL string, roverName string, rtspPort int) error {
-	if cfg.SampleRate <= 0 {
-		cfg.SampleRate = 48000
-	}
-	if cfg.Channels <= 0 {
-		cfg.Channels = 2
-	}
-	if cfg.Bitrate <= 0 {
-		cfg.Bitrate = 510000
-	}
 	derived, err := derivePublishURL(serverURL, roverName+"-audio", rtspPort)
 	if err != nil {
 		return fmt.Errorf("derive publishUrl: %w", err)
@@ -535,9 +466,6 @@ func validateAudioCaptureConfig(cfg *AudioCaptureConfig, serverURL string, rover
 }
 
 func validateAudioPlaybackConfig(cfg *AudioPlaybackConfig, serverURL string, roverName string, rtspPort int) error {
-	if cfg.NormalizeFilter == "" {
-		cfg.NormalizeFilter = "dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled"
-	}
 	derived, err := deriveReadURL(serverURL, roverName+"-fwd", rtspPort)
 	if err != nil {
 		return fmt.Errorf("derive forwardUrl: %w", err)
