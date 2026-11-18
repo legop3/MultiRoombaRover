@@ -303,17 +303,26 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 func DecodeConfig(data []byte) (*Config, error) {
-	if err := ValidateConfigurationSchema(data); err != nil {
-		return nil, err
+	if trimmed := bytes.TrimSpace(data); len(trimmed) == 0 || trimmed[0] != '{' {
+		return nil, errors.New("expected one JSON object")
 	}
-	var cfg Config
+	// Defaults fill newly added settings; decoding into Config drops obsolete ones.
+	cfg := DefaultConfig()
 	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&cfg); err != nil {
 		return nil, err
 	}
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		return nil, errors.New("expected one JSON object")
+	}
+	// Validate the current shape after applying saved settings, so schema changes
+	// do not prevent an otherwise valid installed rover from starting.
+	current, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateConfigurationSchema(current); err != nil {
+		return nil, err
 	}
 	if err := validateConfig(&cfg); err != nil {
 		return nil, err

@@ -14,6 +14,10 @@ if [[ ${ROVERD_MIGRATE:-} == 1 ]]; then
 fi
 # Rename avoids overwriting an executable that the running service has mapped.
 install -m 0755 "dist/roverd-linux-$arch" /usr/local/bin/roverd.new
+if [[ -f /etc/roverd.json ]]; then
+  # A rejected config must leave the installed executable untouched.
+  /usr/local/bin/roverd.new -config /etc/roverd.json -check-config
+fi
 mv -f /usr/local/bin/roverd.new /usr/local/bin/roverd
 apt-get update
 apt-get install -y git ca-certificates python3 util-linux flite espeak curl xz-utils unzip alsa-utils libc++1 libc++abi1

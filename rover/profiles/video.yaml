@@ -42,7 +42,6 @@
     options=()
     if [ "$inverted" = true ]; then options+=(--rotation 180); fi
     if [ -n "$sensor_mode" ]; then options+=(--mode "$sensor_mode"); fi
-    # Preserve the previous Pi publisher's camera tuning and packet timing.
     "$camera" --inline --timeout 0 "${options[@]}" \
       --width "$width" --height "$height" \
       --framerate "$fps" --bitrate "$bitrate" \
