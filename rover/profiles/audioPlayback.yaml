@@ -1,8 +1,10 @@
 - id: alsa
-  name: ALSA speaker
+  name: ALSA speaker (generic)
   description: Uses the configured output alongside TTS and horn with independent volume controls.
   setup: |
-    apt-get update && apt-get install -y ffmpeg alsa-utils
+    if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg alsa-utils
+    fi
   run: |
     normalize=true
     normalize_filter='dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled'
@@ -13,7 +15,7 @@
       -vn "${filters[@]}" -ac 1 -ar 16000 -f s16le pipe:1 |
       aplay -q -D "$ROVER_AUDIO_OUTPUT_DEVICE" -t raw -f S16_LE -r 16000 -c 1
 - id: aiy
-  name: Google AIY Voice HAT speaker
+  name: Google AIY Voice HAT speaker (raspberry pi)
   description: HAT playback with low-latency decoding and 16 kHz mono output through the configured audio route. Reboot once after initial setup.
   setup: |
     set -euo pipefail
@@ -32,7 +34,9 @@
     if [[ "$changed" == 1 ]]; then
       echo 'AIY hardware enabled. Reboot the host once before using this sound card.'
     fi
-    apt-get update && apt-get install -y ffmpeg alsa-utils
+    if ! command -v ffmpeg >/dev/null || ! command -v aplay >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg alsa-utils
+    fi
   run: |
     normalize=true
     normalize_filter='dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled'

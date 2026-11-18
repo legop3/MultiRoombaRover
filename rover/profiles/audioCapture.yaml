@@ -1,8 +1,10 @@
 - id: alsa
-  name: ALSA microphone
+  name: ALSA microphone (generic)
   description: Uses the configured audio input device through roverd's ALSA conversion route.
   setup: |
-    apt-get update && apt-get install -y ffmpeg alsa-utils
+    if ! command -v ffmpeg >/dev/null || ! command -v arecord >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg alsa-utils
+    fi
   run: |
     sample_rate=48000
     channels=2
@@ -14,7 +16,7 @@
         -application audio -frame_duration 20 -compression_level 0 \
         -flush_packets 1 -muxdelay 0 -muxpreload 0 -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"
 - id: aiy
-  name: Google AIY Voice HAT microphone
+  name: Google AIY Voice HAT microphone (raspberry pi)
   description: HAT capture with S32_LE input, 20 dB microphone boost, and low-latency Opus settings. Reboot once after first enabling its hardware.
   setup: |
     set -euo pipefail
@@ -33,7 +35,9 @@
     if [[ "$changed" == 1 ]]; then
       echo 'AIY hardware enabled. Reboot the host once before using this sound card.'
     fi
-    apt-get update && apt-get install -y ffmpeg alsa-utils
+    if ! command -v ffmpeg >/dev/null || ! command -v arecord >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg alsa-utils
+    fi
   run: |
     sample_rate=48000
     channels=2

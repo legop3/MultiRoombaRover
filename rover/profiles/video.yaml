@@ -1,8 +1,10 @@
 - id: v4l2
-  name: V4L2 camera
+  name: V4L2 camera (generic, NO hardware encoding, only use for testing...)
   description: USB or other Linux V4L2 camera, encoded with software H.264.
   setup: |
-    apt-get update && apt-get install -y ffmpeg
+    if ! command -v ffmpeg >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg
+    fi
   run: |
     device=/dev/video0
     input_format=mjpeg
@@ -23,10 +25,12 @@
       -g "$fps" -keyint_min "$fps" -sc_threshold 0 -flush_packets 1 -muxdelay 0 -muxpreload 0 \
       -f rtsp -rtsp_transport tcp "$ROVER_VIDEO_PUBLISH_URL"
 - id: rpicam
-  name: Pi Zero 2 W Camera v2
+  name: Pi Zero 2 W Camera v2 (Carpet's Rovers)
   description: Inverted Camera Module v2 on a Pi Zero 2 W, with H.264 republished through ffmpeg.
   setup: |
-    apt-get update && apt-get install -y ffmpeg rpicam-apps
+    if ! command -v ffmpeg >/dev/null || ! command -v rpicam-vid >/dev/null; then
+      apt-get update && apt-get install -y ffmpeg rpicam-apps
+    fi
   run: |
     width=640
     height=480
