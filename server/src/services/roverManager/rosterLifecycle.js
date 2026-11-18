@@ -221,6 +221,7 @@ function createRosterLifecycle(deps) {
       id: record.id,
       name: record.meta?.name || record.id,
       description: record.meta?.description,
+      ipAddress: record.ws?.peerAddress || null,
       color: record.meta?.color || null,
       battery: record.meta?.battery,
       batteryState: record.batteryState,

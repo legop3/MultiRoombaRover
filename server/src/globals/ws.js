@@ -12,6 +12,7 @@ httpServer.on('upgrade', (req, socket, head) => {
   const target = path === '/rover/management' ? managementWSS : path === '/rover' ? roverWSS : null;
   if (target) {
     target.handleUpgrade(req, socket, head, (ws) => {
+      ws.peerAddress = req.socket.remoteAddress?.replace(/^::ffff:/, '') || null;
       target.emit('connection', ws, req);
     });
   }

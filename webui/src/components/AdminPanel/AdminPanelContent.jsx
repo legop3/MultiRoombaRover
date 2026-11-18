@@ -564,6 +564,7 @@ export default function AdminPanelContent() {
             >
               {updateStates[rover.id] ? 'Updating...' : 'Update'}
             </button>
+            <span className="text-slate-400">IP: <code className="text-slate-200 select-all break-all">{rover.ipAddress || 'Unavailable'}</code></span>
             {rover?.private?.enabled ? (
               <div className="w-full rounded-sm border border-slate-700/70 p-0.5 space-y-0.5 text-[0.7rem]">
                 <div className="text-slate-300">Private safety</div>
