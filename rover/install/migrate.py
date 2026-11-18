@@ -170,26 +170,19 @@ def main():
             return
         if os.geteuid() != 0:
             raise ValueError('Host migration requires root')
-        root = Path('/var/backups/roverd')
-        root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        backup = Path(tempfile.mkdtemp(prefix='migration-', dir=root))
-        paths = [source, Path('/usr/local/bin/roverd'), Path('/usr/local/bin/chromegtts-daemon'), Path('/etc/systemd/system/roverd.service'), Path('/etc/systemd/system/roverd.service.d'), Path('/etc/roverd-update.env'), Path('/usr/local/sbin/roverd-self-update'), *legacy]
-        for path in dict.fromkeys(paths):
-            if not path.exists() and not path.is_symlink():
-                continue
-            target = backup / str(path).lstrip('/')
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if path.is_dir():
-                shutil.copytree(path, target, symlinks=True)
-            else:
-                shutil.copy2(path, target, follow_symlinks=False)
-        print(f'Previous installation saved in {backup}', flush=True)
+        if not current:
+            root = Path('/var/backups/roverd')
+            root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            backup = Path(tempfile.mkdtemp(prefix='config-', dir=root)) / source.name
+            shutil.copyfile(source, backup)
+            os.chmod(backup, 0o600)
+            print(f'Old configuration saved in {backup}', flush=True)
         for unit in ['roverd', *units]:
             if run('systemctl', 'show', '-p', 'LoadState', '--value', unit + '.service').strip() != 'not-found':
                 run('systemctl', 'stop', unit + '.service')
                 if unit != 'roverd':
                     run('systemctl', 'disable', unit + '.service')
-        for path in legacy + [Path('/etc/systemd/system/roverd.service.d')]:
+        for path in legacy + [Path('/etc/systemd/system/roverd.service.d'), Path('/opt/roverd/googletts')]:
             if path.is_dir() and not path.is_symlink():
                 shutil.rmtree(path)
             else:

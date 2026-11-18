@@ -13,10 +13,9 @@ apt-get update
 apt-get install -y git ca-certificates python3 python3-yaml
 # The old installer used /opt/roverd for speech assets, not a checkout.
 if [[ -d /opt/roverd && ! -e /opt/roverd/.git ]]; then
-  install -d -m 0700 /var/backups/roverd
-  previous=$(mktemp -d /var/backups/roverd/old-directory.XXXXXXXX)
-  mv /opt/roverd "$previous/roverd"
-  echo "Previous /opt/roverd saved in $previous/roverd"
+  rm -rf -- /opt/roverd/googletts
+  # Refuse to erase unrelated contents in a directory that is not a checkout.
+  rmdir /opt/roverd
 fi
 if [[ ! -e /opt/roverd ]]; then
   git clone https://github.com/legop3/MultiRoombaRover.git /opt/roverd
