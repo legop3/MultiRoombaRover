@@ -63,10 +63,8 @@ Everything that runs on the pi is designed for debian Bookworm, because I could 
 To install roverd on your pi:
 1. Install `Raspberry Pi OS (Legacy) Lite` (exactly what its called in the imager) on your SD card
 2. Boot the pi up, plug in your good wifi adapter, use `nmtui` to set it up
-3. Install `git`, clone this repo into your home folder
-4. Move into the repo folder, run the roverd installer using `sudo pi/install_roverd.sh`
-5. Reboot your raspberry pi
-6. Roverd, along with the audio and video publishers should now be running. Roverd should have created it's default config file at `/etc/roverd.yaml`
+3. run this: `wget -O bootstrap.sh https://raw.githubusercontent.com/legop3/MultiRoombaRover/HEAD/rover/bootstrap.sh
+sudo bash bootstrap.sh`
 
 Edit the `/etc/roverd.yaml` config file to change settings like your rover's name, color, and set the server IP.
 
