@@ -6,23 +6,12 @@
       apt-get update && apt-get install -y ffmpeg
     fi
   run: |
-    device=/dev/video0
-    input_format=mjpeg
-    width=640
-    height=480
-    fps=30
-    bitrate=2000000
-    inverted=false
-    input_options=()
-    if [ -n "$input_format" ]; then input_options=(-input_format "$input_format"); fi
-    filters=()
-    if [ "$inverted" = true ]; then filters=(-vf "transpose=2,transpose=2"); fi
     exec ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer -flags low_delay \
-      -thread_queue_size 4096 -f v4l2 "${input_options[@]}" -framerate "$fps" \
-      -video_size "${width}x${height}" -i "$device" "${filters[@]}" -an \
+      -thread_queue_size 4096 -f v4l2 -input_format mjpeg -framerate 30 \
+      -video_size 640x480 -i /dev/video0 -an \
       -c:v libx264 -preset veryfast -tune zerolatency -profile:v baseline -pix_fmt yuv420p \
-      -b:v "$bitrate" -maxrate "$bitrate" -bufsize "$((bitrate / 2))" \
-      -g "$fps" -keyint_min "$fps" -sc_threshold 0 -flush_packets 1 -muxdelay 0 -muxpreload 0 \
+      -b:v 2000000 -maxrate 2000000 -bufsize 1000000 \
+      -g 30 -keyint_min 30 -sc_threshold 0 -flush_packets 1 -muxdelay 0 -muxpreload 0 \
       -f rtsp -rtsp_transport tcp "$ROVER_VIDEO_PUBLISH_URL"
 - id: rpicam
   name: Pi Zero 2 W Camera v2 (Carpet's Rovers)
@@ -32,13 +21,9 @@
       apt-get update && apt-get install -y ffmpeg rpicam-apps
     fi
   run: |
-    width=640
-    height=480
-    fps=30
-    bitrate=2000000
     rpicam-vid --inline --timeout 0 --rotation 180 --mode 1296:972 \
-      --width "$width" --height "$height" \
-      --framerate "$fps" --bitrate "$bitrate" \
+      --width 640 --height 480 \
+      --framerate 30 --bitrate 2000000 \
       --codec h264 --intra 120 --profile baseline --denoise auto --nopreview \
       --metering centre --ev 0.1 --awb auto --saturation 0.6 --brightness 0 --output - |
       ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer \

@@ -6,13 +6,10 @@
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
   run: |
-    sample_rate=48000
-    channels=2
-    bitrate=510000
-    arecord -D "$ROVER_AUDIO_INPUT_DEVICE" -f S32_LE -c "$channels" -r "$sample_rate" -B 16384 -F 1024 -q -t raw |
+    arecord -D "$ROVER_AUDIO_INPUT_DEVICE" -f S32_LE -c 2 -r 48000 -B 16384 -F 1024 -q -t raw |
       ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer \
-        -rtbufsize 0 -thread_queue_size 4096 -f s32le -ar "$sample_rate" -ac "$channels" -i pipe:0 \
-        -af "volume=20dB" -c:a libopus -b:a "$bitrate" -ar:a "$sample_rate" -ac:a "$channels" \
+        -rtbufsize 0 -thread_queue_size 4096 -f s32le -ar 48000 -ac 2 -i pipe:0 \
+        -af "volume=20dB" -c:a libopus -b:a 510000 -ar:a 48000 -ac:a 2 \
         -application audio -frame_duration 20 -compression_level 0 \
         -flush_packets 1 -muxdelay 0 -muxpreload 0 -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"
 - id: aiy
@@ -39,12 +36,9 @@
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
   run: |
-    sample_rate=48000
-    channels=2
-    bitrate=510000
-    arecord -D "$ROVER_AUDIO_INPUT_DEVICE" -f S32_LE -c "$channels" -r "$sample_rate" -B 16384 -F 1024 -q -t raw |
+    arecord -D "$ROVER_AUDIO_INPUT_DEVICE" -f S32_LE -c 2 -r 48000 -B 16384 -F 1024 -q -t raw |
       ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer \
-        -rtbufsize 0 -thread_queue_size 4096 -f s32le -ar "$sample_rate" -ac "$channels" -i pipe:0 \
-        -af "volume=20dB" -c:a libopus -b:a "$bitrate" -ar:a "$sample_rate" -ac:a "$channels" \
+        -rtbufsize 0 -thread_queue_size 4096 -f s32le -ar 48000 -ac 2 -i pipe:0 \
+        -af "volume=20dB" -c:a libopus -b:a 510000 -ar:a 48000 -ac:a 2 \
         -application audio -frame_duration 20 -compression_level 0 \
         -flush_packets 1 -muxdelay 0 -muxpreload 0 -f rtsp -rtsp_transport tcp "$ROVER_AUDIO_PUBLISH_URL"

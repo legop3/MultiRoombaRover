@@ -6,13 +6,9 @@
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
   run: |
-    normalize=true
-    normalize_filter='dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled'
-    filters=()
-    if [ "$normalize" = true ]; then filters=(-af "$normalize_filter"); fi
     ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer -flags low_delay \
       -analyzeduration 200k -probesize 32k -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" \
-      -vn "${filters[@]}" -ac 1 -ar 16000 -f s16le pipe:1 |
+      -vn -af "dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled" -ac 1 -ar 16000 -f s16le pipe:1 |
       aplay -q -D "$ROVER_AUDIO_OUTPUT_DEVICE" -t raw -f S16_LE -r 16000 -c 1
 - id: aiy
   name: Google AIY Voice HAT speaker (raspberry pi)
@@ -38,11 +34,7 @@
       apt-get update && apt-get install -y ffmpeg alsa-utils
     fi
   run: |
-    normalize=true
-    normalize_filter='dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled'
-    filters=()
-    if [ "$normalize" = true ]; then filters=(-af "$normalize_filter"); fi
     ffmpeg -nostdin -hide_banner -loglevel warning -fflags nobuffer -flags low_delay \
       -analyzeduration 200k -probesize 32k -rtsp_transport tcp -i "$ROVER_AUDIO_PLAYBACK_URL" \
-      -vn "${filters[@]}" -ac 1 -ar 16000 -f s16le pipe:1 |
+      -vn -af "dynaudnorm=f=75:g=15:m=10:p=0.9,alimiter=limit=0.85:level=disabled" -ac 1 -ar 16000 -f s16le pipe:1 |
       aplay -q -D "$ROVER_AUDIO_OUTPUT_DEVICE" -t raw -f S16_LE -r 16000 -c 1
