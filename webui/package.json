@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "predev": "node scripts/prepareMediaMtx.js",
-    "dev": "VITE_ROVERD_URL=https://rover.otter.land vite",
+    "dev": "cross-env VITE_ROVERD_URL=https://rover.otter.land vite",
     "prebuild": "node scripts/prepareMediaMtx.js",
     "build": "vite build",
     "lint": "eslint .",
@@ -38,6 +38,7 @@
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",
     "baseline-browser-mapping": "^2.11.25",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
