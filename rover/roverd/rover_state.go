@@ -114,6 +114,7 @@ func (c *WSClient) publishHardwareState(valid bool) {
 	c.stateMu.Lock()
 	old, _ := json.Marshal(c.roverState)
 	s := &c.roverState
+	s.DockingStatus = c.dockingSnapshot(valid)
 	s.DockAssist = boolValue(c.docking.assist)
 	if !valid {
 		s.DrivingMode, s.Docked, s.Docking = nil, nil, nil

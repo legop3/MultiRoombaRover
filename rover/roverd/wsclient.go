@@ -524,13 +524,14 @@ func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
 
 // RoverState is a complete operational snapshot; nil means the role is absent.
 type RoverState struct {
-	DrivingMode *bool        `json:"drivingMode"`
-	DockAssist  *bool        `json:"dockAssist"`
-	Docking     *bool        `json:"docking"`
-	Docked      *bool        `json:"docked"`
-	Battery     BatteryState `json:"battery"`
-	HeadlightOn *bool        `json:"headlightOn"`
-	LaserOn     *bool        `json:"laserOn"`
+	DockingStatus dockingStatus `json:"dockingStatus"`
+	DrivingMode   *bool         `json:"drivingMode"`
+	DockAssist    *bool         `json:"dockAssist"`
+	Docking       *bool         `json:"docking"`
+	Docked        *bool         `json:"docked"`
+	Battery       BatteryState  `json:"battery"`
+	HeadlightOn   *bool         `json:"headlightOn"`
+	LaserOn       *bool         `json:"laserOn"`
 }
 
 func (c *WSClient) refreshState() {

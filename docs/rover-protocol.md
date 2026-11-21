@@ -578,3 +578,5 @@ Official roverd derives RTSP addresses from the configured server host, RTSP por
 6. Respond to WebSocket pings. On reconnect, resend hello and complete state.
 
 No capability negotiation or alternate supported roverd implementation is implied by this example.
+
+`roverState.dockingStatus` is the rover-owned UI snapshot: `phase` (`unknown`, `idle`, `undocking`, `docked`, `charging`, `assisting`, or `seeking`), boolean `movementLocked` and `cameraLocked`, and `error` (null or `{code,message}`). The server forwards docking commands and displays this snapshot; it does not reconstruct docking locks, phases, or timeouts.

@@ -17,6 +17,7 @@ type undockOperation struct {
 // Docking state is separate from the roverState snapshot sent to the server.
 // All controller entry points run under commandMu, alongside drive commands.
 type dockingController struct {
+	error              *dockingError
 	sample             SensorSample
 	seen               bool
 	dockHold           bool
@@ -110,6 +111,7 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 	if c.docking.operation != nil {
 		return nil
 	}
+	c.docking.error = nil
 	if msg.Type == "cancelDocking" {
 		if err := c.adapter.DriveDirect(0, 0); err != nil {
 			return err
@@ -203,6 +205,10 @@ func (c *WSClient) finishUndock(status, message string) {
 		status = "error"
 		message = err.Error()
 	}
+	if status != "ok" {
+		c.docking.error = &dockingError{Code: status, Message: message}
+	}
+	c.publishHardwareState(time.Since(c.runtime.seen) <= 1500*time.Millisecond)
 	select {
 	case c.results <- ackMessage{Type: "commandResult", ID: op.id, Status: status, Error: message}:
 	default:
@@ -279,4 +285,38 @@ func (c *WSClient) stopAtDock() error {
 		c.dockBeep(1, 6, 84)
 	}
 	return nil
+}
+
+// The UI displays this snapshot without reconstructing physical locks or phases.
+type dockingError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+type dockingStatus struct {
+	Phase          string        `json:"phase"`
+	MovementLocked bool          `json:"movementLocked"`
+	CameraLocked   bool          `json:"cameraLocked"`
+	Error          *dockingError `json:"error"`
+}
+
+func (c *WSClient) dockingSnapshot(valid bool) dockingStatus {
+	d := &c.docking
+	s := c.runtime.sample
+	phase := "idle"
+	switch {
+	case d.operation != nil:
+		phase = "undocking"
+	case !valid:
+		phase = "unknown"
+	case s.ChargeSources&sourceHomeBase != 0:
+		phase = "docked"
+		if isCharging(s.ChargingState) {
+			phase = "charging"
+		}
+	case d.assist:
+		phase = "assisting"
+	case s.Mode == oiModePassive:
+		phase = "seeking"
+	}
+	return dockingStatus{Phase: phase, MovementLocked: !valid || d.operation != nil || d.dockHold || d.error != nil || s.ChargeSources&sourceHomeBase != 0, CameraLocked: d.assist, Error: d.error}
 }
