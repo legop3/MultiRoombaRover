@@ -16,6 +16,8 @@ import (
 
 type WSClient struct {
 	autoCharge   *AutoChargeController
+	runtime      roverRuntime
+	results      chan ackMessage
 	commandMu    sync.Mutex
 	stopping     atomic.Bool
 	stateChanged chan struct{}
@@ -67,6 +69,7 @@ func NewWSClient(cfg *Config, adapter *SerialAdapter, frames <-chan []byte, even
 	}
 	client := &WSClient{
 		stateChanged: make(chan struct{}, 1),
+		results:      make(chan ackMessage, 16),
 		cfg:          cfg,
 		adapter:      adapter,
 		sensorFrames: frames,
@@ -217,7 +220,18 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		return fmt.Errorf("roverd is stopping")
 	}
 	switch {
+	case msg.Type == "undock" || msg.Type == "dockAssist" || msg.Type == "autoDock" || msg.Type == "cancelDocking":
+		return c.dockingCommand(msg)
 	case msg.DriveDirect != nil:
+		if c.runtime.operation != nil {
+			if msg.DriveDirect.Left == 0 && msg.DriveDirect.Right == 0 {
+				c.finishUndock("cancelled", "Stopped by wheel protection")
+				return nil
+			}
+			if c.runtime.operation.reversing.IsZero() {
+				return nil
+			}
+		}
 		left := clamp(msg.DriveDirect.Left, -c.cfg.MaxWheelMMs, c.cfg.MaxWheelMMs)
 		right := clamp(msg.DriveDirect.Right, -c.cfg.MaxWheelMMs, c.cfg.MaxWheelMMs)
 		if err := c.adapter.DriveDirect(left, right); err != nil {
@@ -241,6 +255,9 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		buf, err := base64.StdEncoding.DecodeString(msg.Raw)
 		if err != nil {
 			return fmt.Errorf("raw decode: %w", err)
+		}
+		if len(buf) > 0 && (isModeOpcode(buf[0]) || buf[0] == 143) && c.runtime.operation != nil {
+			c.finishUndock("cancelled", "Interrupted by explicit Roomba command")
 		}
 		if err := c.adapter.SendRaw(buf); err != nil {
 			return err
@@ -472,24 +489,26 @@ func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
 
 // RoverState is a complete operational snapshot; nil means the role is absent.
 type RoverState struct {
-	HeadlightOn *bool `json:"headlightOn"`
-	LaserOn     *bool `json:"laserOn"`
+	DrivingMode *bool        `json:"drivingMode"`
+	Docking     *bool        `json:"docking"`
+	Docked      *bool        `json:"docked"`
+	Battery     BatteryState `json:"battery"`
+	HeadlightOn *bool        `json:"headlightOn"`
+	LaserOn     *bool        `json:"laserOn"`
 }
 
 func (c *WSClient) refreshState() {
-	next := RoverState{}
+	var headlight, laser *bool
 	if c.headlight != nil {
-		value := c.headlight.On()
-		next.HeadlightOn = &value
+		headlight = boolValue(c.headlight.On())
 	}
 	if c.laser != nil {
-		value := c.laser.On()
-		next.LaserOn = &value
+		laser = boolValue(c.laser.On())
 	}
 	c.stateMu.Lock()
 	old, _ := json.Marshal(c.roverState)
-	updated, _ := json.Marshal(next)
-	c.roverState = next
+	c.roverState.HeadlightOn, c.roverState.LaserOn = headlight, laser
+	updated, _ := json.Marshal(c.roverState)
 	c.stateMu.Unlock()
 	if string(old) != string(updated) {
 		select {
@@ -514,6 +533,11 @@ func (c *WSClient) forwardState(ctx context.Context, conn *websocket.Conn) {
 		select {
 		case <-ctx.Done():
 			return
+		case result := <-c.results:
+			if err := writeJSON(ctx, conn, result); err != nil {
+				conn.CloseNow()
+				return
+			}
 		case <-c.stateChanged:
 			if err := send(); err != nil {
 				conn.CloseNow()
@@ -614,6 +638,11 @@ func (c *WSClient) markConnected() {
 }
 
 func (c *WSClient) markDisconnected() {
+	c.commandMu.Lock()
+	if c.runtime.operation != nil {
+		c.finishUndock("cancelled", "Control connection lost")
+	}
+	c.commandMu.Unlock()
 	if c.stopping.Load() {
 		return
 	}
@@ -783,6 +812,9 @@ func (c *WSClient) PrepareShutdown() error {
 	c.commandMu.Lock()
 	defer c.commandMu.Unlock()
 	c.stopping.Store(true)
+	if c.runtime.operation != nil {
+		c.finishUndock("cancelled", "Management action")
+	}
 	if c.autoCharge != nil {
 		c.autoCharge.SetPaused(true)
 	}
@@ -802,11 +834,11 @@ func (c *WSClient) PrepareShutdown() error {
 
 func (c *WSClient) ResumeControl() {
 	c.commandMu.Lock()
-	defer c.commandMu.Unlock()
 	if c.autoCharge != nil {
 		c.autoCharge.SetPaused(false)
 	}
 	c.stopping.Store(false)
+	c.commandMu.Unlock()
 	// A rejected management action must restore disconnect safety timers too.
 	c.connMu.Lock()
 	connected := c.connected

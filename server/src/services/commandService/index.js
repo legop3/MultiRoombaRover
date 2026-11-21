@@ -128,6 +128,7 @@ function handleAck(msg) {
   const pending = pendingCommands.get(msg.id);
   if (!pending) return;
   pendingCommands.delete(msg.id);
+  if (msg.status === 'error') require('../dockingService').handleResult(roverManager.rovers.get(pending.roverId), msg);
   observeCommand({ phase: 'acknowledged', roverId: pending.roverId, commandId: msg.id, acknowledgement: msg });
   logger.info('Command acknowledged', pending.roverId, pending.type, msg.status);
   io.emit('commandAck', {

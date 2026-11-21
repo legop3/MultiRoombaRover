@@ -38,7 +38,7 @@ function AuxColumnContent({ accessoriesAvailable, onShowAccessories }) {
   // command itself depends on the Roomba being able to drive.
   const controlsDisabled = !roverId || !canControl;
   const docked = Boolean(dockTelemetry?.homeBase);
-  const drivingMode = String(dockTelemetry?.oiModeLabel || '').toLowerCase() === 'full';
+  const drivingMode = dockTelemetry?.drivingMode === true;
   const vacuumDisabled = controlsDisabled
     || docked
     || dockTelemetry.movementLocked

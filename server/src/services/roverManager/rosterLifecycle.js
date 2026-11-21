@@ -35,7 +35,6 @@ function createRosterLifecycle(deps) {
         ws: null,
         lastSensor: null,
         lastHostStats: null,
-        docked: null,
         lastBumpAt: null,
         drivers: new Set(),
         locked: false,
@@ -79,6 +78,7 @@ function createRosterLifecycle(deps) {
       record.privateOpen = true;
     }
     record.roverState = null;
+    record.batteryState = null;
     rovers.set(id, record);
     spectatorSockets.forEach((socketId) => {
       const sock = io.sockets.sockets.get(socketId);
@@ -103,6 +103,7 @@ function createRosterLifecycle(deps) {
     */
     require('../dockingService').disconnect(record);
     record.roverState = null;
+    record.batteryState = null;
     rovers.delete(id);
     removeRoverDrivers(id, record);
     stopDockGuard(id);
@@ -238,6 +239,7 @@ function createRosterLifecycle(deps) {
       headlight: record.meta?.headlight,
       laser: record.meta?.laser,
       roverState: record.roverState,
+      docking: require('../dockingService').snapshot(record),
       locked: record.locked || (isPrivateRecord(record) && !isPrivateOpen(record)),
       lockReason: record.lockReason || (isPrivateRecord(record) && !isPrivateOpen(record) ? 'private' : null),
       needsHelp: Boolean(record.needsHelp),
@@ -276,9 +278,13 @@ function createRosterLifecycle(deps) {
   function setRoverState(roverId, state) {
     const record = rovers.get(roverId);
     if (!record || !state || typeof state !== 'object' || Array.isArray(state)) return;
-    if (!['headlightOn', 'laserOn'].every((key) => Object.hasOwn(state, key)
-      && (state[key] === null || typeof state[key] === 'boolean'))) return;
+    if (!require('../../helpers/roverState').validState(state)) return;
+    const previous = record.roverState;
     record.roverState = state;
+    record.batteryState = require('../../helpers/roverState').batteryView(state);
+    require('../dockingService').processState(record);
+    managerEvents.emit('state', { roverId, state, previous, record, batteryState: record.batteryState });
+    io.to(record.room).emit('roverState', { roverId, state });
     broadcastRoster();
     managerEvents.emit('rover', { roverId, action: 'roverState', record });
   }

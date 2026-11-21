@@ -41,11 +41,6 @@ const monitor = createRoverHelpMonitor({
       });
     } else if (wasNeedingHelp && !needsHelp) {
       hornNotifier.stop(roverId);
-      try {
-        issueCommand(roverId, { type: 'song', song: { notes: [{ note: 72, duration: 8 }, { note: 79, duration: 16 }] } });
-      } catch (err) {
-        logger.warn('Failed to play HELP-cleared confirmation', { roverId, error: err.message });
-      }
       publishEvent({
         source: 'roverHelpService',
         type: 'rover.helpCleared',
@@ -55,9 +50,15 @@ const monitor = createRoverHelpMonitor({
   },
 });
 
-roverManager.managerEvents.on('sensor', ({ roverId, sensors }) => {
-  monitor.handleSensor(roverId, sensors);
-});
+// Evaluate elapsed conditions independently of whether state changes. Old
+// sensor samples must not keep asserting a cliff/wheel-drop fault indefinitely.
+const monitorTimer = setInterval(() => {
+  for (const [roverId, record] of roverManager.rovers) {
+    const sensors = Date.now() - (record.sensorReceivedAt || 0) < 1500 ? record.lastSensor?.decoded || {} : {};
+    monitor.handleSensor(roverId, sensors, record.roverState);
+  }
+}, 250);
+monitorTimer.unref?.();
 
 roverManager.managerEvents.on('dockGuard', (event) => {
   monitor.handleDockGuard(event);

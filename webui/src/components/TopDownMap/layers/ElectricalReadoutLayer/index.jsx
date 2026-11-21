@@ -3,19 +3,14 @@ import { shallowObjectEqual } from '../../../../context/TelemetryContext.jsx';
 import { ReadoutBar } from '../../visuals.jsx';
 import { rawNumber, useTopDownTelemetry } from '../layerTelemetry.js';
 
-const EMPTY_ELECTRICAL_TELEMETRY = Object.freeze({
-  voltageMv: null,
-  currentMa: null,
-  chargingStateLabel: '',
-});
+
 
 function selectElectricalTelemetry(frame) {
-  const sensors = frame?.sensors;
-  if (!sensors) return EMPTY_ELECTRICAL_TELEMETRY;
+  const sensors = frame?.sensors || {};
   return {
     voltageMv: rawNumber(sensors.voltageMv),
     currentMa: rawNumber(sensors.currentMa),
-    chargingStateLabel: sensors.chargingState?.label || '',
+    chargingStateLabel: frame?.roverState?.battery?.charging == null ? 'Unknown' : frame.roverState.battery.charging ? 'Charging' : 'Not charging',
   };
 }
 

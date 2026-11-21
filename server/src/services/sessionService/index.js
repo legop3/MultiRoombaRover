@@ -209,7 +209,6 @@ function buildSession(socket) {
         users,
       }),
     })),
-    odometers: roverManager.getOdometersForSocket(socket),
     assignment: {
       ...assignment,
       roverId: assignmentRoverId,

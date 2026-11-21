@@ -35,7 +35,7 @@ module.exports = {
       liveStatus: string({ title: 'Live status', description: 'Dedicated live fleet report channel ID. The bot deletes ALL other messages here. Requires View Channel, Read Message History, Send Messages, and Manage Messages. Leave empty to disable.', examples: ['123456789012345678'], maxLength: 100 }),
       general: string({ description: 'Channel ID used by the button-box stalker-role and everyone-ping rewards.', examples: ['123456789012345678'], maxLength: 100 }),
       announcements: string({ description: 'Channel ID used for public-mode openings, objective changes, and all-rovers-unlocked announcements.', examples: ['123456789012345678'], maxLength: 100 }),
-      adminAlerts: string({ description: 'Channel ID used for rover health, battery, dock, help, and daily fleet-report notifications.', examples: ['123456789012345678'], maxLength: 100 }),
+      adminAlerts: string({ description: 'Channel ID used for rover health, battery, dock, help notifications.', examples: ['123456789012345678'], maxLength: 100 }),
       replay: string({ description: 'Channel ID used to upload generated replay videos when Discord replay delivery is available.', examples: ['123456789012345678'], maxLength: 100 }),
       humanAlerts: string({ description: 'Channel ID used for physical human-alert button notifications and captured images.', examples: ['123456789012345678'], maxLength: 100 }),
     }, {

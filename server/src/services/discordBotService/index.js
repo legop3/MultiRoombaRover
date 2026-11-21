@@ -73,9 +73,7 @@ const { createCommandHandlers } = require('../operatorCommandService');
 const greenModeService = require('../greenModeService');
 const { createDiscordTransportHandlers, createDiscordCommandRequest } = require('./commandAdapter');
 const { createIntegrations } = require('./integrations');
-const { createFleetDailyReports } = require('./fleetDailyReports');
 const { createLiveStatus } = require('./liveStatus');
-const fleetReportService = require('../fleetReportService');
 const { registerPreferredDeliveryProvider } = require('../replayDeliveryService');
 const {
   DEFAULT_ALLOWED_MENTIONS,
@@ -401,35 +399,18 @@ function createDiscordRuntime() {
     }
   });
 
-  let fleetDailyReports = null;
-
-  function restartFleetDailyReports() {
-    fleetDailyReports?.stop();
-    fleetDailyReports = createFleetDailyReports({
-      logger,
-      discordConfig,
-      fleetConfig: config.fleetReports || {},
-      fleetReportService,
-      roverManager,
-      sendToChannel: channelIO.sendToChannel,
-    });
-    fleetDailyReports.start();
-  }
-
   client.on('clientReady', () => {
     logger.info('Discord bot logged in', { tag: client.user?.tag });
     presence.schedulePresenceRotation();
     // Discord is only a delivery consumer. Starting its scheduler after the bot
     // is ready avoids failed sends during login while the collector continues to
     // operate independently of Discord availability.
-    restartFleetDailyReports();
     liveStatus.start();
   });
 
   return {
     client,
     refresh() {
-      if (client.isReady()) restartFleetDailyReports();
       if (client.isReady()) liveStatus.start();
     },
     stop() {
@@ -441,7 +422,6 @@ function createDiscordRuntime() {
       presence.stop();
       liveStatus.stop();
       channelIO.stop();
-      fleetDailyReports?.stop();
     },
   };
 }
@@ -463,15 +443,10 @@ async function applyDiscordConfig(nextDiscordConfig = {}) {
 
 function applySharedConfigSection(section, value) {
   config[section] = structuredClone(value);
-  // Fleet delivery owns a timer derived from both Discord and fleet settings.
-  // Reconnecting is unnecessary; rebuild only that scheduler when ready.
-  if (section === 'fleetReports') {
-    connection.refresh();
-  }
 }
 
 registerConfigurationHandler('discord', applyDiscordConfig);
-['commands', 'publicUrl', 'timezone', 'fleetReports'].forEach((section) => {
+['commands', 'publicUrl', 'timezone'].forEach((section) => {
   registerConfigurationHandler(section, (value) => applySharedConfigSection(section, value));
 });
 

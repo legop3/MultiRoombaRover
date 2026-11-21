@@ -284,10 +284,9 @@ export default function DockingHud({ roverId }) {
   const [showUndockTransition, setShowUndockTransition] = useState(false);
 
   const docked = Boolean(dockTelemetry?.homeBase);
-  const oiMode = String(dockTelemetry?.oiModeLabel || '').toLowerCase();
   // The established UI contract treats exactly passive + undocked as the Roomba's
   // autonomous docking attempt. Unknown telemetry must not fabricate that state.
-  const autoDocking = !docked && !dockTelemetry.cameraLocked && oiMode === 'passive';
+  const autoDocking = dockTelemetry.autoDocking === true;
   const pendingAction = (dockTelemetry.dockingPhase === 'undocking') ? (docked ? 'undocking' : 'resuming') : null;
   const pending = pendingAction !== null;
   /* Mobile already presents its own touch-oriented driving controls. The docked

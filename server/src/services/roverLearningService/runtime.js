@@ -164,7 +164,7 @@ function createRuntime({ config, logger }) {
       if (!running) break;
       const roverId = String(key);
       if (!hasHumanController(roverId) || sessions.has(roverId)) continue;
-      const session = await createRecording({ root: recordingsRoot, roverId, snapshot: snapshot(record), logger, docked: Boolean(record.lastSensor?.decoded?.chargingSources?.homeBase) });
+      const session = await createRecording({ root: recordingsRoot, roverId, snapshot: snapshot(record), logger, docked: record.roverState?.docked === true });
       sessions.set(roverId, session);
       // Filesystem awaits can span a disconnect or turn change.
       if (!running || !hasHumanController(roverId)) {
@@ -230,7 +230,7 @@ function createRuntime({ config, logger }) {
     driving.attach();
     dockTimer = setInterval(() => {
       for (const [id, session] of sessions) {
-        session.updateDock(Boolean(roverManager.rovers.get(id)?.lastSensor?.decoded?.chargingSources?.homeBase));
+        session.updateDock(roverManager.rovers.get(id)?.roverState?.docked === true);
         session.pruneBuffer();
         if (session.dockTailComplete) schedule();
       }

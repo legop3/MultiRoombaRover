@@ -20,4 +20,9 @@ type SensorSample struct {
 	Timestamp     int64
 	ChargingState byte
 	ChargeSources byte
+	Mode          byte
+	Charge        uint16
+	Capacity      uint16
+	LeftEncoder   uint16
+	RightEncoder  uint16
 }

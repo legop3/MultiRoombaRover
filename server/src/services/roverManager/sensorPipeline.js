@@ -14,7 +14,6 @@ function createSensorPipeline(deps) {
     privateSafetyTimers,
     privateSafetyStates,
     parseSensorFrame,
-    computeBatteryState,
     clampInt,
     DEFAULT_PRIVATE_SAFETY,
     SAFETY_BACKOFF_MIN,
@@ -24,13 +23,11 @@ function createSensorPipeline(deps) {
     PASSIVE_UNDOCKED_MS,
     DOCK_GUARD_RETRY_MS,
     DOCK_GUARD_WINDOW_MS,
-    DOCK_COMMAND_BASE64,
     BACKOFF_MS,
     BACKOFF_SPEED,
     ALERT_COLOR,
     sendAlert,
     publishEvent,
-    processOdometerFrame,
     processOvercurrentTelemetry,
     isPrivateRecord,
     isPrivateOpen,
@@ -352,8 +349,7 @@ function createSensorPipeline(deps) {
     }
     const { issueCommand } = require('../commandService');
     try {
-      issueCommand(roverId, { type: 'sensorStream', sensorStream: { enable: true } });
-      issueCommand(roverId, { type: 'raw', raw: DOCK_COMMAND_BASE64 });
+      issueCommand(roverId, { type: 'autoDock' });
     } catch (err) {
       logger.warn('Dock guard command failed', roverId, err.message);
     }
@@ -376,7 +372,7 @@ function createSensorPipeline(deps) {
     sendAlert({
       color: ALERT_COLOR,
       title: 'Dock Guard Triggered',
-      message: `${record.id} ${reasonText}. Seeking dock and restarting sensors until movement.`,
+      message: `${record.id} ${reasonText}. Seeking dock until movement.`,
     });
     publishEvent({
       source: 'roverManager',
@@ -387,24 +383,26 @@ function createSensorPipeline(deps) {
     state.timer = setInterval(() => attemptDockGuard(record.id), DOCK_GUARD_RETRY_MS);
   }
 
-  function evaluateDockGuard(record, sensors) {
-    if (!record || !sensors) return;
-    if (sensors.docking?.phase === 'undocking' || sensors.docking?.phase === 'assisting') {
+  function evaluateDockGuard(record) {
+    if (!record) return;
+    if (record.roverState?.docked == null) { stopDockGuard(record.id); return; }
+    const docking = require('../dockingService').snapshot(record);
+    if (docking.phase === 'undocking' || docking.phase === 'assisting') {
       stopDockGuard(record.id);
       return;
     }
     const state = getDockGuardState(record.id);
     const now = Date.now();
-    const docked = Boolean(sensors?.chargingSources?.homeBase);
-    const oiMode = sensors?.oiMode?.label || null;
+    const docked = record.roverState?.docked;
+    const seeking = record.roverState?.docking === true;
     const idleMs = record.lastMovementAt ? now - record.lastMovementAt : 0;
     const isIdle = idleMs >= 1000;
     if (docked || record.drivers.size > 0 || !isIdle) state.idleUndockedSince = null;
     else if (!state.idleUndockedSince) state.idleUndockedSince = now;
-    if (docked || oiMode !== 'passive' || !isIdle) state.passiveUndockedSince = null;
+    if (docked || !seeking || !isIdle) state.passiveUndockedSince = null;
     else if (!state.passiveUndockedSince) state.passiveUndockedSince = now;
     if (state.active) {
-      const shouldStop = docked || !isIdle || (state.reason === 'idle' && record.drivers.size > 0) || (state.reason === 'passive' && oiMode !== 'passive');
+      const shouldStop = docked || !isIdle || (state.reason === 'idle' && record.drivers.size > 0) || (state.reason === 'passive' && !seeking);
       if (shouldStop) stopDockGuard(record.id);
       return;
     }
@@ -546,26 +544,13 @@ function createSensorPipeline(deps) {
     const record = rovers.get(roverId);
     if (!record) return;
     record.lastSeen = Date.now();
-    let decoded = parseSensorFrame(frame.data);
+    let decoded = frame.sensors ? require('../../helpers/sensorDecoder').parseSensorJSON(frame.sensors) : parseSensorFrame(frame.data);
+    if (!decoded) return;
+    record.sensorReceivedAt = Date.now();
     record.lastSensor = { raw: frame, decoded };
-    record.batteryState = computeBatteryState(record, decoded);
-    let odometer = null;
-    if (typeof processOdometerFrame === 'function') {
-      odometer = processOdometerFrame(roverId, decoded);
-    }
-    if (decoded && odometer?.wheelSpeedsMmPerSecond) {
-      /*
-        Wheel speed is not a native packet in the Roomba sensor stream; it is a
-        synthesized sensor produced from the same encoder deltas that drive the
-        persistent odometer. Merging it into the decoded sensor object keeps the
-        public socket contract simple: clients still read one JSON `sensors`
-        payload per frame, with calculated values clearly grouped under their
-        own wheel-speed key.
-      */
-      decoded = {
-        ...decoded,
-        wheelSpeedsMmPerSecond: odometer.wheelSpeedsMmPerSecond,
-      };
+
+    if (!frame.sensors) {
+      decoded = { ...decoded, wheelSpeedsMmPerSecond: require('../wheelSpeedService').processSensorFrame(roverId, decoded) };
       record.lastSensor = { raw: frame, decoded };
     }
     if (decoded) {
@@ -587,13 +572,6 @@ function createSensorPipeline(deps) {
       : null;
     record.lastOvercurrentProtection = overcurrentProtection;
     updateMovement(record, decoded);
-    const hasDockInfo = decoded?.chargingSources != null;
-    if (hasDockInfo) {
-      const prevDocked = record.docked;
-      const docked = Boolean(decoded?.chargingSources?.homeBase);
-      record.docked = docked;
-      if (prevDocked === true && docked === false) handleIdleUndock(record);
-    }
     const bumps = decoded?.bumpsAndWheelDrops;
     if (bumps?.bumpLeft || bumps?.bumpRight) record.lastBumpAt = Date.now();
     handlePrivateButtonHold(record, decoded);
@@ -610,14 +588,29 @@ function createSensorPipeline(deps) {
     });
     managerEvents.emit('sensor', {
       roverId,
+      roverState: record.roverState,
       sensors: decoded,
       batteryState: record.batteryState,
       overcurrentProtection,
     });
-    evaluateDockGuard(record, decoded);
+    evaluateDockGuard(record);
   }
 
+  function handleState({ record, previous }) {
+    if (previous?.docked === true && record.roverState?.docked === false) handleIdleUndock(record);
+    evaluateDockGuard(record);
+  }
+  // Unchanged rover state does not generate events. Dock-guard deadlines still
+  // advance, but unknown hardware state must not trigger automatic movement.
+  const timer = setInterval(() => {
+    for (const record of rovers.values()) {
+      if (record.roverState?.docked == null) { stopDockGuard(record.id); continue; }
+      evaluateDockGuard(record);
+    }
+  }, 1000);
+  timer.unref?.();
   return {
+    handleState,
     handleSensorFrame,
     applyPrivateDriveSafety,
     stopDockGuard,

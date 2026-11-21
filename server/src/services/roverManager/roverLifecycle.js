@@ -156,12 +156,7 @@ function createRoverLifecycle(deps) {
   }
 
   function isDockedAndCharging(record) {
-    const sensors = record?.lastSensor?.decoded || record?.lastSensor?.sensors || null;
-    if (!sensors) return false;
-    const docked = Boolean(sensors.chargingSources?.homeBase);
-    const code = sensors.chargingState?.code;
-    const charging = code === 2 || code === 3 || code === 4;
-    return docked && charging;
+    return record?.roverState?.docked === true && record?.roverState?.battery?.charging === true;
   }
 
   function hasOtherDrivers(record, socketId) {

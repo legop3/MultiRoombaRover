@@ -21,7 +21,6 @@ const RESERVED_DATA_NAMES = new Set(['backup-restore', 'runtime']);
 const SUPPORTED_DATABASE_SCHEMA_VERSIONS = {
   configuration: 2,
   identity: 4,
-  fleetReports: 0,
 };
 
 function normalizeArchivePath(value) {

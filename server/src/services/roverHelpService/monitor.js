@@ -58,11 +58,11 @@ function createRoverHelpMonitor({ now = () => Date.now(), onChange = () => {} } 
     });
   }
 
-  function handleSensor(roverId, sensors) {
+  function handleSensor(roverId, sensors, roverState) {
     if (!roverId || !sensors) return;
     const state = ensureState(roverId);
     const timestamp = now();
-    const docked = Boolean(sensors?.chargingSources?.homeBase);
+    const docked = roverState?.docked === true;
 
     if (docked) {
       // A 600-series Roomba can legitimately rest on the dock with wheel-drop
@@ -116,13 +116,10 @@ function createRoverHelpMonitor({ now = () => Date.now(), onChange = () => {} } 
     );
 
     if (state.dockGuardSince != null) {
-      const oiMode = sensors?.oiMode?.label || null;
-      if (oiMode === 'passive') state.dockGuardSawPassive = true;
-      if (state.dockGuardSawPassive && oiMode && oiMode !== 'passive') {
-        // Dock guard itself stops as soon as the 600-series wheels begin their
-        // autonomous seek motion. Continue timing that seek after the guard
-        // interval ends, and clear only on docking or a confirmed exit from the
-        // passive OI mode used by opcode 143.
+      if (roverState?.docking === true) state.dockGuardSawPassive = true;
+      if (state.dockGuardSawPassive && roverState?.docking === false) {
+        // Keep timing autonomous seeking after the retry interval stops,
+        // until the rover confirms it has stopped seeking.
         state.dockGuardSince = null;
         state.dockGuardSawPassive = false;
       }

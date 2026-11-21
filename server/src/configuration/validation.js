@@ -50,7 +50,10 @@ function formatValidationErrors(errors = []) {
 }
 
 function normalizeConfig(input = {}) {
-  return mergeDefaults(defaultConfig, input);
+  // Fleet reporting was removed; discard its saved section before validation.
+  const current = { ...input };
+  delete current.fleetReports;
+  return mergeDefaults(defaultConfig, current);
 }
 
 function assertValidConfig(input) {

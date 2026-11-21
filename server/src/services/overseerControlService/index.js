@@ -262,17 +262,8 @@ function buildRosterSummary() {
           return nickname || socketId;
         })
         .filter(Boolean);
-      const sensors = record?.lastSensor?.decoded || {};
-      const docked = Boolean(record?.docked || sensors?.chargingSources?.homeBase);
-      const oiMode = String(sensors?.oiMode?.label || '').toLowerCase();
-      let statusTag = 'docking';
-      if (docked) {
-        statusTag = 'docked';
-      } else if (oiMode === 'safe' || oiMode === 'full') {
-        statusTag = 'driving';
-      } else if (oiMode === 'passive' || oiMode === 'off' || oiMode === 'unknown' || !oiMode) {
-        statusTag = 'docking';
-      }
+      const state = record?.roverState;
+      const statusTag = state?.docked === true ? 'docked' : state?.docking === true ? 'docking' : state?.drivingMode === true ? 'driving' : state?.drivingMode === false ? 'idle' : 'unknown';
       return {
         id: roverId || 'unknown',
         statusTag,

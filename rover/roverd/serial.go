@@ -9,11 +9,13 @@ import (
 	"io"
 	"log"
 	"sync"
+	"sync/atomic"
 
 	"github.com/tarm/serial"
 )
 
 type SerialAdapter struct {
+	seeking atomic.Bool
 	port    io.ReadWriteCloser
 	encoder *base64.Encoding
 	mu      sync.Mutex
@@ -89,15 +91,28 @@ func (s *SerialAdapter) PauseSensorStream(pause bool) error {
 }
 
 func (s *SerialAdapter) SendRaw(raw []byte) error {
+	if len(raw) > 0 {
+		if raw[0] == 143 {
+			return s.SeekDock()
+		}
+		if isModeOpcode(raw[0]) {
+			s.seeking.Store(false)
+		}
+	}
 	return s.write(raw)
 }
 
 func (s *SerialAdapter) StartOI() error {
+	s.seeking.Store(false)
 	return s.write([]byte{128})
 }
 
 func (s *SerialAdapter) SeekDock() error {
-	return s.write([]byte{143})
+	if err := s.write([]byte{143}); err != nil {
+		return err
+	}
+	s.seeking.Store(true)
+	return nil
 }
 
 func (s *SerialAdapter) PlaySong(slot int, notes []songNote) error {

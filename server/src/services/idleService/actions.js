@@ -12,7 +12,6 @@ const ptzCameraService = require('../ptzCameraService');
 const {
   HEADLIGHT_DISABLE_ACTION,
   LASER_DISABLE_ACTION,
-  DOCK_COMMAND_BASE64,
 } = require('./constants');
 
 async function turnOffRoomControls() {
@@ -54,7 +53,7 @@ async function dockAllRovers() {
     if (!record?.ws) return;
     const roverId = String(record.id);
     try {
-      issueCommand(roverId, { type: 'raw', raw: DOCK_COMMAND_BASE64 });
+      issueCommand(roverId, { type: 'autoDock' });
       attempted.push(roverId);
     } catch (err) {
       failed.push({ roverId, error: err.message });

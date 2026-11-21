@@ -55,14 +55,6 @@ function createSnapshotEngine(deps) {
     return roverActivity.get(roverId);
   }
 
-  function isChargingFromSensors(sensors = {}) {
-    const label = String(sensors?.chargingState?.label || '').toLowerCase();
-    if (label === 'waiting' || label === 'full charging' || label === 'trickle charging') {
-      return true;
-    }
-    const code = sensors?.chargingState?.code;
-    return code === 2 || code === 3 || code === 4;
-  }
 
   function resolveDriverNickname(socketId) {
     if (!socketId) return null;
@@ -74,7 +66,7 @@ function createSnapshotEngine(deps) {
     if (!roverId || !sensors) return;
     if (!roverManager.canReplayRoverId(roverId)) return;
     const nowMs = Date.now();
-    const dockedNow = Boolean(sensors?.chargingSources?.homeBase);
+    const dockedNow = roverManager.rovers.get(String(roverId))?.roverState?.docked === true;
     const bucketTs = Math.floor(nowMs / ACTIVITY_BUCKET_MS) * ACTIVITY_BUCKET_MS;
     const state = upsertActivityState(String(roverId));
     pruneActivityBuckets(state, nowMs);
@@ -98,7 +90,7 @@ function createSnapshotEngine(deps) {
     const driverSocketId = activeDrivers[roverKey] || null;
     const driverNickname = driverSocketId ? resolveDriverNickname(driverSocketId) : null;
     const docked = dockedNow;
-    const charging = isChargingFromSensors(sensors);
+    const charging = roverManager.rovers.get(String(roverId))?.roverState?.battery?.charging === true;
     const wheelsOffGround = Boolean(
       sensors?.bumpsAndWheelDrops?.wheelDropLeft && sensors?.bumpsAndWheelDrops?.wheelDropRight,
     );
@@ -287,8 +279,8 @@ function createSnapshotEngine(deps) {
         ACTIVITY_SCORE_WINDOW_MS,
         nowMs,
       );
-      const charging = isChargingFromSensors(sensors);
-      const docked = Boolean(sensors?.chargingSources?.homeBase);
+      const charging = roverManager.rovers.get(String(roverId))?.roverState?.battery?.charging === true;
+      const docked = roverManager.rovers.get(String(roverId))?.roverState?.docked === true;
       const isMoving = activity30s.distance_m > 0.1 || activity30s.turn_deg > 20;
       let statusTag = 'idle';
       if (charging) statusTag = 'charging';

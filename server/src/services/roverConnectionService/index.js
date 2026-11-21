@@ -52,6 +52,8 @@ roverWSS.on('connection', (ws) => {
     if (!roverId || roverManager.rovers.get(roverId)?.ws !== ws) return;
     if (msg.type === 'sensor') {
       roverManager.handleSensorFrame(roverId, msg);
+    } else if (msg.type === 'commandResult') {
+      require('../dockingService').handleResult(roverManager.rovers.get(roverId), msg);
     } else if (msg.type === 'ack') {
       handleAck(msg);
     } else if (msg.type === 'roverState') {

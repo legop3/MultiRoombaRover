@@ -14,7 +14,7 @@ import numpy as np
 import torch
 from torch import nn
 
-VERSION = 5
+VERSION = 6
 SLOTS = 64
 VALUES = 8
 FRAMES = 4
@@ -28,7 +28,7 @@ SENSORS = [
     ("wall", 1), ("virtualWall", 1), ("wallSignal", 4096),
     ("voltageMv", 16000), ("currentMa", 3000), ("batteryChargeMah", 4000),
     ("batteryCapacityMah", 4000), ("batteryTemperatureC", 50),
-    ("chargingState.code", 5), ("chargingSources.homeBase", 1), ("oiMode.code", 4),
+    ("roverState.battery.charging", 1), ("roverState.docked", 1), ("roverState.drivingMode", 1),
     ("wheelLeftCurrentMa", 2000), ("wheelRightCurrentMa", 2000),
     ("mainBrushCurrentMa", 2000), ("sideBrushCurrentMa", 2000),
     ("lightBumpLeftSignal", 4096), ("lightBumpRightSignal", 4096),
@@ -181,7 +181,7 @@ class Policy(nn.Module):
 
 
 def specification(schema):
-    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-events-v5',
+    return {'version': VERSION, 'architecture': 'spatial-cnn-gru-events-v6',
             'frames': FRAMES, 'height': HEIGHT, 'width': WIDTH,
             'historyStrideMs': 300, 'decisionIntervalMs': 100,
             'stateSize': STATE_SIZE, 'sensorFields': SENSORS,

@@ -10,25 +10,9 @@ const EMPTY_BATTERY_TELEMETRY = Object.freeze({
   batteryVoltage: null,
 });
 
-const EMPTY_DOCK_TELEMETRY = Object.freeze({
-  dockingPhase: 'idle',
-  movementLocked: true,
-  cameraLocked: false,
-  dockingError: '',
-  oiModeLabel: 'Unknown',
-  chargingStateLabel: '',
-  homeBase: false,
-});
 
-const EMPTY_SPECTATOR_TELEMETRY = Object.freeze({
-  voltageMv: null,
-  currentMa: null,
-  batteryChargeMah: null,
-  batteryCapacityMah: null,
-  oiModeLabel: 'Unknown',
-  chargingStateLabel: '',
-  homeBase: false,
-});
+
+
 
 const EMPTY_HOST_STATS = Object.freeze({});
 const EMPTY_OVERCURRENT_FLAGS = Object.freeze({
@@ -94,7 +78,7 @@ export function selectBatteryTelemetry(frame) {
   return {
     batteryChargeMah: sensors.batteryChargeMah ?? null,
     batteryCapacityMah: sensors.batteryCapacityMah ?? null,
-    batteryVoltage: (sensors.voltageMv/1000).toPrecision(4) ?? null,
+    batteryVoltage: Number.isFinite(sensors.voltageMv) ? (sensors.voltageMv / 1000).toPrecision(4) : null,
     batteryCurrent: (sensors.currentMa) ?? null,
   };
 }
@@ -128,33 +112,31 @@ export function overcurrentFlagsEqual(left, right) {
 }
 
 export function selectDockTelemetry(frame) {
-  const sensors = frame?.sensors;
-  if (!sensors) return EMPTY_DOCK_TELEMETRY;
+  const state = frame?.roverState;
+  const docking = frame?.docking;
   return {
-    dockingPhase: sensors.docking?.phase || 'idle',
-    movementLocked: sensors.docking?.movementLocked ?? true,
-    cameraLocked: Boolean(sensors.docking?.cameraLocked),
-    dockingError: sensors.docking?.error?.message || '',
-    oiModeLabel: sensors.oiMode?.label || 'Unknown',
-    chargingStateLabel: sensors.chargingState?.label || '',
-    // OI packet 34 is the authoritative charging-sources packet. Charging
-    // state describes the battery charger state and must not stand in for the
-    // physical home-base contact bit.
-    homeBase: Boolean(sensors.chargingSources?.homeBase),
+    drivingMode: state?.drivingMode ?? null,
+    autoDocking: state?.docking ?? null,
+    dockingPhase: docking?.phase || (state?.docked ? state.battery?.charging ? 'charging' : 'docked' : 'idle'),
+    movementLocked: docking?.movementLocked ?? state?.drivingMode !== true,
+    cameraLocked: Boolean(docking?.cameraLocked),
+    dockingError: docking?.error?.message || '',
+    oiModeLabel: state?.drivingMode === true ? 'Driving' : state?.drivingMode === false ? 'Not driving' : 'Unknown',
+    chargingStateLabel: state?.battery?.charging === true ? 'Charging' : state?.battery?.charging === false ? 'Not charging' : 'Unknown',
+    homeBase: state?.docked ?? null,
   };
 }
 
 export function selectSpectatorTelemetry(frame) {
-  const sensors = frame?.sensors;
-  if (!sensors) return EMPTY_SPECTATOR_TELEMETRY;
+  const sensors = frame?.sensors || {};
   return {
     voltageMv: bucketNumber(sensors.voltageMv, 25),
     currentMa: bucketNumber(sensors.currentMa, 25),
     batteryChargeMah: sensors.batteryChargeMah ?? null,
     batteryCapacityMah: sensors.batteryCapacityMah ?? null,
-    oiModeLabel: sensors.oiMode?.label || 'Unknown',
-    chargingStateLabel: sensors.chargingState?.label || '',
-    homeBase: Boolean(sensors.chargingSources?.homeBase),
+    oiModeLabel: frame?.roverState?.drivingMode == null ? 'Unknown' : frame.roverState.drivingMode ? 'Driving' : 'Not driving',
+    chargingStateLabel: frame?.roverState?.battery?.charging === true ? 'Charging' : '',
+    homeBase: frame?.roverState?.docked ?? null,
   };
 }
 

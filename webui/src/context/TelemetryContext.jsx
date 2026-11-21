@@ -284,9 +284,29 @@ export function TelemetryProvider({ children }) {
       notifyVisualAll();
     }
 
+    function handleState({ roverId, state }) {
+      if (!roverId) return;
+      framesRef.current[roverId] = { ...framesRef.current[roverId], roverId, roverState: state };
+      notifyRover(roverId); notifyRawSelectors(roverId); notifyVisualSelectors(roverId); notifyVisualAll();
+    }
+    function handleDocking({ roverId, docking }) {
+      framesRef.current[roverId] = { ...framesRef.current[roverId], docking };
+      notifyRover(roverId); notifyRawSelectors(roverId); notifyVisualSelectors(roverId); notifyVisualAll();
+    }
+    function handleRoster(rovers) {
+      const present = new Set();
+      for (const rover of rovers || []) { present.add(rover.id); handleState({ roverId: rover.id, state: rover.roverState }); handleDocking({ roverId: rover.id, docking: rover.docking }); }
+      for (const id of Object.keys(framesRef.current)) if (!present.has(id)) handleState({ roverId: id, state: null });
+    }
+    socket.on('roverState', handleState);
+    socket.on('dockingState', handleDocking);
+    socket.on('rovers', handleRoster);
     socket.on('sensorFrame', handleSensorFrame);
     socket.on('roverHostStats', handleRoverHostStats);
     return () => {
+      socket.off('roverState', handleState);
+      socket.off('dockingState', handleDocking);
+      socket.off('rovers', handleRoster);
       socket.off('sensorFrame', handleSensorFrame);
       socket.off('roverHostStats', handleRoverHostStats);
       if (visualTimerRef.current) {

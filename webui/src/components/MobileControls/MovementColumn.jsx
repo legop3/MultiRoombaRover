@@ -22,7 +22,7 @@ function MovementColumnContent({ layout }) {
   const batteryUrgent = Boolean(batteryState?.urgentActive);
   const batteryLow = Boolean(batteryState?.warnActive || batteryUrgent);
   const docked = Boolean(dockTelemetry?.homeBase);
-  const drivingMode = String(dockTelemetry?.oiModeLabel || '').toLowerCase() === 'full';
+  const drivingMode = dockTelemetry?.drivingMode === true;
 
   const movementDisabled = !roverId
     || !canControl

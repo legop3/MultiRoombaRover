@@ -23,7 +23,6 @@ let io;
 let logger;
 let getConfigurationDatabase;
 let identityService;
-let fleetReportService;
 let requireLockdownAdministrator;
 let requireRecentPassword;
 let requestApplicationRestart;
@@ -96,7 +95,6 @@ function registerSocketApi() {
           const result = await createFullBackup({
             configurationDatabase: getConfigurationDatabase(),
             identityService,
-            fleetReportService,
             jobId,
           });
           const token = createToken();
@@ -242,7 +240,6 @@ function register() {
   logger = require('../../globals/logger').child('backupRestoreService');
   ({ getConfigurationDatabase } = require('../../configuration'));
   identityService = require('../identityService');
-  fleetReportService = require('../fleetReportService');
   ({ requireLockdownAdministrator, requireRecentPassword } = require('../adminConfigurationService'));
   ({ isApplicationRestartPending, requestApplicationRestart } = require('../serverControlService'));
   fs.mkdirSync(controlDir, { recursive: true });

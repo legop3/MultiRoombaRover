@@ -18,7 +18,7 @@ export default function TelemetryPanel() {
   const rawSnippet = frame?.raw ? frame.raw : null;
 
   return (
-    <CardFrame title='Roomba sensor values' clipOverflow={false} bodyClassName="space-y-0.5 text-base text-slate-100">
+    <CardFrame title='Rover sensor values' clipOverflow={false} bodyClassName="space-y-0.5 text-base text-slate-100">
       {/* <div className="text-sm text-slate-400">
         <span>{connected ? 'online' : 'offline'}</span>
         <span> · role {session?.role || 'unknown'}</span>
@@ -32,7 +32,7 @@ export default function TelemetryPanel() {
         <p className="text-sm text-slate-500">Waiting for sensor frames…</p>
       ) : (
         <>
-          <TelemetrySummary sensors={sensors} voltage={voltage} current={current} batteryTemp={batteryTemp} charge={charge} capacity={capacity} />
+          <TelemetrySummary roverState={frame?.roverState} sensors={sensors} voltage={voltage} current={current} batteryTemp={batteryTemp} charge={charge} capacity={capacity} />
           <SensorDetails sensors={sensors} />
         </>
       )}
@@ -43,11 +43,11 @@ export default function TelemetryPanel() {
   );
 }
 
-function TelemetrySummary({ sensors, voltage, current, batteryTemp, charge, capacity }) {
-  const chargePct = charge != null && capacity ? `${Math.round((charge / capacity) * 100)}` : '--';
+function TelemetrySummary({ roverState, sensors, voltage, current, batteryTemp, charge, capacity }) {
+  const chargePct = roverState?.battery?.percent ?? '--';
   const oiMode = sensors?.oiMode?.label || '--';
-  const docked = sensors?.chargingSources?.homeBase ? 'Yes' : 'No';
-  const charging = sensors?.chargingState?.label || '--';
+  const docked = roverState?.docked == null ? 'Unknown' : roverState.docked ? 'Yes' : 'No';
+  const charging = roverState?.battery?.charging == null ? 'Unknown' : roverState.battery.charging ? 'Charging' : 'Not charging';
 
   return (
     <div className="grid grid-cols-2 gap-0.5 md:grid-cols-3">

@@ -57,7 +57,7 @@ def prepare(directory, schema, stats, extend):
     for event in events:
         data = event['data']
         if event['kind'] == 'sensor':
-            sensors.append((event['ts'], sensor_vector(data.get('sensors') or {})))
+            sensors.append((event['ts'], sensor_vector({**(data.get('sensors') or {}), 'roverState': data.get('roverState') or {}})))
         if event['kind'] in ('driver', 'turn:activeDriver', 'lock', 'private'):
             boundaries.append(event['ts'])
         if event['kind'] != 'command':

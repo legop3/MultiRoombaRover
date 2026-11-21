@@ -143,14 +143,14 @@ function createDriving({ root, config, onChange, activity }) {
       }
     });
     const sensors = roverManager.rovers.get(roverId)?.lastSensor?.decoded;
-    if (sensors) sendState(session, { kind: 'sensor', ts: Date.now(), data: sensors });
+    if (sensors) sendState(session, { kind: 'sensor', ts: Date.now(), data: { ...sensors, roverState: roverManager.rovers.get(roverId)?.roverState } });
     activity('Controller started', { roverId, model: metadata.name, socketId: socket.id });
     onChange();
   }
 
   function sensor(event) {
     const session = sessions.get(String(event.roverId));
-    if (session) sendState(session, { kind: 'sensor', ts: Date.now(), data: event.sensors });
+    if (session) sendState(session, { kind: 'sensor', ts: Date.now(), data: { ...event.sensors, roverState: event.roverState } });
   }
 
   function attach() {

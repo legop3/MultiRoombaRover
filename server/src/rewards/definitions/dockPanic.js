@@ -11,7 +11,7 @@ module.exports = {
     const rovers = ctx.listOnlineRovers();
     rovers.forEach((rover) => {
       try {
-        ctx.issueCommand(String(rover.id), { type: 'raw', raw: DOCK_COMMAND_BASE64 });
+        ctx.issueCommand(String(rover.id), { type: 'autoDock' });
       } catch (err) {
         ctx.logger.warn('dockPanic failed', { roverId: rover.id, error: err.message });
       }

@@ -22,7 +22,6 @@ const buttonBox = require('../services/buttonBoxService/configuration');
 const barcodeScanner = require('../services/barcodeScannerService/configuration');
 const commands = require('../services/operatorCommandService/configuration');
 const discord = require('../services/discordBotService/configuration');
-const fleetReports = require('../services/fleetReportService/configuration');
 const roverLearning = require('../services/roverLearningService/configuration');
 
 /*
@@ -57,7 +56,6 @@ const definitions = [
   discord,
   sessionConfiguration.socials,
   sessionConfiguration.driverAd,
-  fleetReports,
   roverLearning,
 ];
 

@@ -27,9 +27,9 @@ function createWebTransportHandlers({ rovers, roverManager, config, publicUrl = 
         const sensors = record.lastSensor?.decoded || record.lastSensor?.sensors || {};
         const battery = record.batteryState || {};
         const name = record.meta?.name || record.id;
-        const docked = Boolean(sensors?.chargingSources?.homeBase);
-        const chargingLabel = String(sensors?.chargingState?.label || 'unknown');
-        const charging = ['waiting', 'full charging', 'trickle charging'].includes(chargingLabel.toLowerCase()) || [2, 3, 4].includes(sensors?.chargingState?.code);
+        const docked = record?.roverState?.docked === true;
+        const chargingLabel = String((record?.roverState?.battery?.charging == null ? 'unknown' : record.roverState.battery.charging ? 'charging' : 'not charging'));
+        const charging = record?.roverState?.battery?.charging === true;
         const lockLabel = record.locked ? `locked${record.lockReason ? ` (${record.lockReason})` : ''}` : 'unlocked';
         const charge = battery.charge != null && battery.capacity != null ? `${battery.charge}/${battery.capacity}mAh` : 'n/a';
         const percent = battery.percentDisplay != null ? `${battery.percentDisplay}%` : 'n/a';

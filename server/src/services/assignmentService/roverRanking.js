@@ -9,10 +9,7 @@ function readDockedState(rover) {
     the derived top-level field has not yet been synchronized. Unknown docking
     state deliberately remains unknown instead of being treated as undocked.
   */
-  if (rover?.docked === true || rover?.docked === false) return rover.docked;
-  const sensors = rover?.lastSensor?.decoded || rover?.lastSensor?.sensors || null;
-  const homeBase = sensors?.chargingSources?.homeBase;
-  return homeBase === true || homeBase === false ? homeBase : null;
+  return rover?.roverState?.docked ?? null;
 }
 
 function driverCount(rover) {

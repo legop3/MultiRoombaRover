@@ -13,7 +13,7 @@ const packageInfo = require('../../../package.json');
 const FORMAT_VERSION = 1;
 const CONTROL_DIR_NAME = 'backup-restore';
 const EXCLUDED_TOP_LEVEL_NAMES = new Set([CONTROL_DIR_NAME, 'runtime']);
-const DATABASE_NAMES = ['configuration.sqlite', 'identity.sqlite', 'fleet-reports.sqlite'];
+const DATABASE_NAMES = ['configuration.sqlite', 'identity.sqlite'];
 const DATABASE_FILES = new Set(DATABASE_NAMES.flatMap((name) => [name, `${name}-wal`, `${name}-shm`]));
 const FILE_COPY_ATTEMPTS = 3;
 
@@ -34,19 +34,14 @@ async function removeSnapshotSidecars(payloadDir) {
 function readDatabaseSchemaVersions(payloadDir) {
   const configuration = new Database(path.join(payloadDir, 'configuration.sqlite'), { readonly: true });
   const identity = new Database(path.join(payloadDir, 'identity.sqlite'), { readonly: true });
-  const fleetReports = new Database(path.join(payloadDir, 'fleet-reports.sqlite'), { readonly: true });
   try {
     return {
       configuration: Number(configuration.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()?.version) || 0,
       identity: Number(identity.pragma('user_version', { simple: true })) || 0,
-      // Fleet reporting currently evolves with additive startup checks and has
-      // no numbered migration table, so zero accurately identifies that scheme.
-      fleetReports: Number(fleetReports.pragma('user_version', { simple: true })) || 0,
     };
   } finally {
     configuration.close();
     identity.close();
-    fleetReports.close();
   }
 }
 
@@ -146,7 +141,7 @@ async function listManifestFiles(rootDir, relativeDir = '') {
   return files.sort((left, right) => left.path.localeCompare(right.path));
 }
 
-async function createFullBackup({ configurationDatabase, identityService, fleetReportService, jobId }) {
+async function createFullBackup({ configurationDatabase, identityService, jobId }) {
   const dataDir = resolveDataDir();
   const jobDir = resolveDataPath(path.join(CONTROL_DIR_NAME, `backup-${jobId}`));
   const payloadDir = path.join(jobDir, 'data');
@@ -160,7 +155,6 @@ async function createFullBackup({ configurationDatabase, identityService, fleetR
     await Promise.all([
       configurationDatabase.backupDatabase(path.join(payloadDir, DATABASE_NAMES[0])),
       identityService.backupDatabase(path.join(payloadDir, DATABASE_NAMES[1])),
-      fleetReportService.backupDatabase(path.join(payloadDir, DATABASE_NAMES[2])),
     ]);
     const skippedUnstableFiles = await copyDurableTree(dataDir, payloadDir);
     /*

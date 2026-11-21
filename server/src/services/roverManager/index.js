@@ -5,7 +5,7 @@ const io = require('../../globals/io');
 const logger = require('../../globals/logger').child('roverManager');
 const { sendAlert } = require('../alertService');
 const { parseSensorFrame } = require('../../helpers/sensorDecoder');
-const odometerService = require('../odometerService');
+
 const overcurrentProtectionService = require('../overcurrentProtectionService');
 const { MODES, getMode } = require('../modeManager');
 const { isAdmin, isLockdownAdmin, roleEvents } = require('../roleService');
@@ -18,7 +18,6 @@ const {
   IDLE_UNDOCKED_MS,
   PASSIVE_UNDOCKED_MS,
   DOCK_GUARD_RETRY_MS,
-  DOCK_COMMAND_BASE64,
   BACKOFF_MS,
   BACKOFF_SPEED,
   PRIVATE_BUTTON_HOLD_MS,
@@ -41,7 +40,7 @@ const {
   privateSafetyTimers,
   privateSafetyStates,
 } = require('./state');
-const { normalizePrivateSafety, clampInt, computeBatteryState } = require('./mathUtils');
+const { normalizePrivateSafety, clampInt } = require('./mathUtils');
 const { createPrivateAccessPolicy } = require('./privateAccess');
 const { createSensorPipeline } = require('./sensorPipeline');
 const { createRoverLifecycle } = require('./roverLifecycle');
@@ -167,7 +166,6 @@ const sensorPipeline = createSensorPipeline({
   privateSafetyTimers,
   privateSafetyStates,
   parseSensorFrame,
-  computeBatteryState,
   clampInt,
   DEFAULT_PRIVATE_SAFETY,
   SAFETY_BACKOFF_MIN,
@@ -177,13 +175,11 @@ const sensorPipeline = createSensorPipeline({
   PASSIVE_UNDOCKED_MS,
   DOCK_GUARD_RETRY_MS,
   DOCK_GUARD_WINDOW_MS,
-  DOCK_COMMAND_BASE64,
   BACKOFF_MS,
   BACKOFF_SPEED,
   ALERT_COLOR,
   sendAlert,
   publishEvent,
-  processOdometerFrame: odometerService.processSensorFrame,
   processOvercurrentTelemetry: overcurrentProtectionService.processTelemetry,
   isPrivateRecord,
   isPrivateOpen,
@@ -195,6 +191,7 @@ const sensorPipeline = createSensorPipeline({
 
 const { handleSensorFrame, applyPrivateDriveSafety } = sensorPipeline;
 stopDockGuard = sensorPipeline.stopDockGuard;
+managerEvents.on('state', sensorPipeline.handleState);
 
 managerEvents.on('rover', ({ roverId, action }) => {
   /*
@@ -205,6 +202,7 @@ managerEvents.on('rover', ({ roverId, action }) => {
   */
   if (action === 'removed') {
     overcurrentProtectionService.cleanupRover(roverId);
+    require('../wheelSpeedService').clear(roverId);
   }
 });
 
@@ -218,11 +216,6 @@ function canReplayRoverId(roverId, socket = null) {
   if (!isPrivateRecord(record)) return true;
   if (isPrivateOpen(record)) return true;
   return socket ? isRoverVisibleToSocket(record, socket) : false;
-}
-
-function getOdometersForSocket(socket) {
-  const visibleIds = getRosterForSocket(socket).map((entry) => entry.id);
-  return odometerService.getSnapshots(visibleIds);
 }
 
 roleEvents.on('change', ({ socket, role }) => {
@@ -259,16 +252,6 @@ registerSocketHandlers({
   setPrivateOpen,
   lockRover,
   setPrivateSafety,
-  getOdometersForSocket,
-});
-
-odometerService.odometerEvents.on('update', ({ roverId, odometer }) => {
-  io.sockets.sockets.forEach((socket) => {
-    const record = rovers.get(String(roverId));
-    if (isRoverVisibleToSocket(record, socket)) {
-      socket.volatile.emit('odometer:update', { roverId, odometer });
-    }
-  });
 });
 
 setInterval(tickPrivateAutoClose, PRIVATE_AUTO_CLOSE_TICK_MS);
@@ -303,5 +286,4 @@ module.exports = {
   canRequestControl,
   applyPrivateDriveSafety,
   canReplayRoverId,
-  getOdometersForSocket,
 };

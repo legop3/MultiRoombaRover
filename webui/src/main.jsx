@@ -30,7 +30,6 @@ import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 // Loading each only on its own route keeps charting and JSON Schema tooling out
 // of ordinary rover-control sessions without changing either application's
 // internal ownership.
-const FleetReportsApp = lazy(() => import('./reports/FleetReportsApp.jsx'))
 const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
 const SetupApp = lazy(() => import('./admin/SetupApp.jsx'))
 
@@ -71,7 +70,6 @@ const router = createBrowserRouter([{
         <Route path="/ptz" element={<PtzAppRoot />} />
         <Route
           path="/reports"
-          element={lazyRoute(<FleetReportsApp />, 'fleet reports')}
         />
       </Routes>
     </>

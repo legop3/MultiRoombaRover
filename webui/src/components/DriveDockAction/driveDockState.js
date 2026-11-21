@@ -8,13 +8,12 @@ import { dockTelemetryEqual, selectDockTelemetry } from '../../context/telemetry
 
 export function deriveDriveDockStateFromTelemetry(dockTelemetry) {
   const oiLabel = dockTelemetry?.oiModeLabel || 'Unknown';
-  const oiNormalized = oiLabel.toLowerCase();
   const chargingLabel = dockTelemetry?.chargingStateLabel || '';
   const docked = Boolean(dockTelemetry?.homeBase);
   const charging = dockTelemetry?.dockingPhase === 'charging';
-  const driving = oiNormalized === 'full' && !dockTelemetry?.movementLocked;
+  const driving = dockTelemetry?.drivingMode === true && !dockTelemetry?.movementLocked;
   const dockedNotCharging = docked && !charging;
-  const dockingInProgress = !docked && !charging && oiNormalized === 'passive' && dockTelemetry?.dockingPhase !== 'undocking';
+  const dockingInProgress = dockTelemetry?.autoDocking === true;
   return { driving, docked, charging, dockedNotCharging, dockingInProgress, oiLabel, chargingLabel };
 }
 

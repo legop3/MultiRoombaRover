@@ -41,13 +41,6 @@ function formatOiEmoji(oiMode) {
   return '❔';
 }
 
-function isCharging(sensors) {
-  const label = sensors?.chargingState?.label?.toLowerCase();
-  const chargingByLabel = label === 'waiting' || label === 'full charging' || label === 'trickle charging';
-  const code = sensors?.chargingState?.code;
-  const chargingByCode = code === 2 || code === 3 || code === 4;
-  return chargingByLabel || chargingByCode;
-}
 
 function buildRoverStatusSnapshot(record) {
   if (!record) return null;
@@ -58,9 +51,9 @@ function buildRoverStatusSnapshot(record) {
     name: record.meta?.name || record.id,
     locked: record.locked,
     lockReason: record.lockReason,
-    docked: Boolean(sensors?.chargingSources?.homeBase),
-    charging: isCharging(sensors),
-    chargingLabel: sensors?.chargingState?.label || 'unknown',
+    docked: record?.roverState?.docked === true,
+    charging: record?.roverState?.battery?.charging === true,
+    chargingLabel: (record?.roverState?.battery?.charging == null ? 'unknown' : record.roverState.battery.charging ? 'charging' : 'not charging'),
     voltageMv: sensors?.voltageMv ?? null,
     currentMa: sensors?.currentMa ?? null,
     batteryState: record.batteryState,

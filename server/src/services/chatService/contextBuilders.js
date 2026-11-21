@@ -49,12 +49,6 @@ function normalizeProfileImageUrl(value) {
   }
 }
 
-function isChargingFromSensors(sensors = {}) {
-  const label = String(sensors?.chargingState?.label || '').toLowerCase();
-  if (label === 'waiting' || label === 'full charging' || label === 'trickle charging') return true;
-  const code = sensors?.chargingState?.code;
-  return code === 2 || code === 3 || code === 4;
-}
 
 function buildRoverCtxSnapshot(roverId) {
   if (!roverId) return null;
@@ -66,8 +60,8 @@ function buildRoverCtxSnapshot(roverId) {
   const { getActiveDrivers } = require('../turnService');
   const activeDrivers = getActiveDrivers();
   const driverSocketId = activeDrivers[key] || record?.drivers?.values?.().next?.().value || null;
-  const charging = isChargingFromSensors(sensors);
-  const docked = Boolean(sensors?.chargingSources?.homeBase);
+  const charging = record?.roverState?.battery?.charging === true;
+  const docked = record?.roverState?.docked === true;
   const wheelsOffGround = Boolean(sensors?.bumpsAndWheelDrops?.wheelDropLeft && sensors?.bumpsAndWheelDrops?.wheelDropRight);
   const latestDistanceM = Math.round((Math.abs(Number(sensors?.distanceMm) || 0) / 1000) * 10) / 10;
   const latestTurnDeg = Math.round(Math.abs(Number(sensors?.angleDeg) || 0));

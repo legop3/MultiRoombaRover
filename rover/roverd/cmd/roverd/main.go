@@ -168,7 +168,8 @@ func runHardware(ctx context.Context, cfg *roverd.Config, eventStream chan rover
 
 	client := roverd.NewWSClient(cfg, adapter, sensorFrames, eventStream, mediaSupervisor, hardwareControllers.CameraServo, hardwareControllers.Headlight, hardwareControllers.Laser, peripherals, logger, console)
 	client.SetAutoCharge(autoCharge)
-	go autoCharge.Run(ctx, sensorSamples)
+	go client.ObserveHardware(ctx, sensorSamples)
+
 	if !management.SetRuntime(client, mediaSupervisor) {
 		return nil
 	}

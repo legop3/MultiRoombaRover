@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"sync/atomic"
 )
 
 type dummyPort struct{}
@@ -19,7 +20,8 @@ func OpenSerial(cfg SerialConfig) (io.ReadWriteCloser, error) {
 }
 
 type SerialAdapter struct {
-	log *log.Logger
+	seeking atomic.Bool
+	log     *log.Logger
 }
 
 func NewSerialAdapter(_ io.ReadWriteCloser, logger *log.Logger) *SerialAdapter {

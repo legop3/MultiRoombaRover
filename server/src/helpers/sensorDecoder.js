@@ -11,10 +11,10 @@ const CHARGING_STATE = {
 };
 
 const OI_MODES = {
-  1: 'off',
-  2: 'passive',
-  3: 'safe',
-  4: 'full',
+  0: 'off',
+  1: 'passive',
+  2: 'safe',
+  3: 'full',
 };
 
 const GROUP100_LAYOUT = [
@@ -219,7 +219,25 @@ function validateChecksum(frame, checksum) {
   return (sum & 0xff) === 0;
 }
 
+// Direct sensor input uses the same field names and units as decoded packets.
+// Snapshots replace previous readings; omitted readings are unavailable.
+const sensorShapes = Object.fromEntries(GROUP100_LAYOUT.map(({ key, bytes, parser }) => [key, parser(Buffer.alloc(bytes))]));
+sensorShapes.wheelSpeedsMmPerSecond = { left: 0, right: 0, center: 0 };
+function parseSensorJSON(value) {
+  function valid(v, shape) {
+    if (v === null) return true;
+    if (typeof shape === 'number') return typeof v === 'number' && Number.isFinite(v);
+    if (typeof shape === 'boolean') return typeof v === 'boolean';
+    if (typeof shape === 'string') return typeof v === 'string' && v.length <= 128;
+    return v && typeof v === 'object' && !Array.isArray(v)
+      && Object.entries(v).every(([key, entry]) => Object.hasOwn(shape, key) && valid(entry, shape[key]));
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !valid(value, sensorShapes)) return null;
+  return value;
+}
+
 module.exports = {
   parseSensorFrame,
+  parseSensorJSON,
   CHARGING_STATE,
 };

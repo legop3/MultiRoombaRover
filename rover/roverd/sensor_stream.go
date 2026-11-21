@@ -5,6 +5,7 @@ package roverd
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"io"
 	"log"
@@ -122,6 +123,12 @@ func decodeSensorSample(frame []byte) (SensorSample, bool) {
 		}
 		segment := payload[idx : idx+size]
 		switch id {
+		case 100:
+			sample.Mode = segment[40]
+			sample.Charge = binary.BigEndian.Uint16(segment[22:24])
+			sample.Capacity = binary.BigEndian.Uint16(segment[24:26])
+			sample.LeftEncoder = binary.BigEndian.Uint16(segment[52:54])
+			sample.RightEncoder = binary.BigEndian.Uint16(segment[54:56])
 		case 21:
 			sample.ChargingState = segment[0]
 			seen |= 1
