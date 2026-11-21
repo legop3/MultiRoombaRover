@@ -38,6 +38,7 @@ type roverRuntime struct {
 	seen            time.Time
 	waiting         time.Time
 	needsCharge     bool
+	dockHold        bool
 	assistCamera    float64
 	seeking, assist bool
 	operation       *undockOperation
@@ -82,7 +83,10 @@ func (c *WSClient) ObserveHardware(ctx context.Context, samples <-chan SensorSam
 			if c.runtime.operation != nil {
 				c.advanceUndock()
 			} else if docked {
-				if !hadSample || previous.ChargeSources&sourceHomeBase == 0 {
+				if !c.runtime.dockHold {
+					// Contact latches the stop: a bouncing contact must not
+					// unlock held controls or repeatedly interrupt charging.
+					c.runtime.dockHold = true
 					if err := c.stopAtDock(); err != nil {
 						c.log.Printf("dock contact stop: %v", err)
 					}
@@ -92,10 +96,6 @@ func (c *WSClient) ObserveHardware(ctx context.Context, samples <-chan SensorSam
 					c.setDockAssist(false, true)
 				}
 			} else if hadSample && previous.ChargeSources&sourceHomeBase != 0 && c.runtime.assist {
-				// Contact slipped before charging: retain manual assistance.
-				if err := c.setOIMode(132); err != nil {
-					c.log.Printf("dock assist resume: %v", err)
-				}
 				c.dockBeep(1, 6, 72)
 			}
 			if sample.ChargingState == 4 && docked {
@@ -201,7 +201,7 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 		if err := c.setOIMode(128); err != nil {
 			return err
 		}
-		if c.runtime.sample.ChargeSources&sourceHomeBase == 0 && time.Since(c.runtime.seen) < 1500*time.Millisecond {
+		if !c.runtime.dockHold && c.runtime.sample.ChargeSources&sourceHomeBase == 0 && time.Since(c.runtime.seen) < 1500*time.Millisecond {
 			if err := c.setOIMode(132); err != nil {
 				return err
 			}
@@ -220,7 +220,7 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 	switch msg.Type {
 	case "autoDock":
 		c.setDockAssist(false)
-		if c.runtime.seeking || c.runtime.sample.ChargeSources&sourceHomeBase != 0 {
+		if c.runtime.dockHold || c.runtime.seeking || c.runtime.sample.ChargeSources&sourceHomeBase != 0 {
 			return nil
 		}
 		if err := c.adapter.SeekDock(); err != nil {
@@ -229,7 +229,7 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 		c.runtime.seeking = true
 	case "dockAssist":
 		// Assistance cannot improve an already-established dock contact.
-		if c.runtime.sample.ChargeSources&sourceHomeBase != 0 || c.runtime.assist {
+		if c.runtime.dockHold || c.runtime.sample.ChargeSources&sourceHomeBase != 0 || c.runtime.assist {
 			return nil
 		}
 		c.runtime.seeking = false
@@ -254,6 +254,7 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 			speed = clamp(*msg.Speed, 1, c.cfg.MaxWheelMMs)
 		}
 		c.log.Printf("undock starting: backoff=%v speed=%d mode=%d sources=%d", msg.Backoff == nil || *msg.Backoff, speed, c.runtime.sample.Mode, c.runtime.sample.ChargeSources)
+		c.runtime.dockHold = false
 		c.runtime.operation = &undockOperation{speed: speed, id: msg.ID, started: time.Now(), next: time.Now().Add(100 * time.Millisecond), backoff: msg.Backoff == nil || *msg.Backoff}
 	}
 	return nil
@@ -302,6 +303,7 @@ func (c *WSClient) finishUndock(status, message string) {
 	}
 	c.log.Printf("undock %s: %s (stage=%d mode=%d sources=%d)", status, message, op.stage, c.runtime.sample.Mode, c.runtime.sample.ChargeSources)
 	c.runtime.operation = nil
+	c.runtime.dockHold = status != "ok" || c.runtime.sample.ChargeSources&sourceHomeBase != 0
 	c.adapter.seeking.Store(false)
 	if err := c.adapter.DriveDirect(0, 0); err != nil {
 		status = "error"

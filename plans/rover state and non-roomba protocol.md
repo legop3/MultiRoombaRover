@@ -216,3 +216,5 @@ Use focused existing checks and direct runtime verification where practical. Do 
 - Follow-up verification: all four architecture binaries and the production WebUI built successfully; changed server JavaScript syntax and diff whitespace checks passed. Physical dock/undock and assist behavior require deployment testing on a rover.
 
 - Docking follow-up: docking now derives from passive mode and absent dock contact. Restored assist entry/exit/contact/contact-loss sounds; retain assist until charging is confirmed. Both docking paths take control, stop wheel/auxiliary motors on contact, and immediately request charging without a stationary-wheel wait. Local command handling blocks held motor commands while docked; deliberate undocking remains exempt. Hardware verification pending.
+
+- Contact-stop correction: latch motion inhibition on first contact and retain it through contact flicker, charging, and assist cancellation. Only explicit undocking releases it. Removed the erroneous contact-loss Full-mode transition; repeated contact does not rerun the stop/charge sequence.

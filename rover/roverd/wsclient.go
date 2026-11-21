@@ -220,9 +220,10 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	if c.stopping.Load() {
 		return fmt.Errorf("roverd is stopping")
 	}
-	// Queued drive/motor messages must not undo the local contact stop.
+	// The contact stop stays latched through contact flicker and charging.
+	// Queued drive/motor messages must not undo it.
 	// Deliberate undocking owns its reverse output and is exempt.
-	if c.runtime.operation == nil && c.runtime.sample.ChargeSources&sourceHomeBase != 0 {
+	if c.runtime.operation == nil && (c.runtime.dockHold || c.runtime.sample.ChargeSources&sourceHomeBase != 0) {
 		moving := msg.DriveDirect != nil && (msg.DriveDirect.Left != 0 || msg.DriveDirect.Right != 0)
 		motors := msg.MotorPWM != nil && (msg.MotorPWM.Main != 0 || msg.MotorPWM.Side != 0 || msg.MotorPWM.Vacuum != 0)
 		if moving || motors {
