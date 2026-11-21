@@ -16,7 +16,7 @@ function snapshot(record) {
 function publish(record) {
   require('../../globals/io').to(record.room).emit('dockingState', { roverId: record.id, docking: snapshot(record) });
 }
-function send(record, payload) { return require('../commandService').issueCommand(record.id, payload, { dockingOwned: true }); }
+function send(record, payload) { return require('../commandService').issueCommand(record.id, payload); }
 function finish(record, error = null) {
   const state = stateFor(record);
   if (state.operation) clearTimeout(state.operation.timer);
@@ -56,6 +56,16 @@ function handleResult(record, msg) {
   finish(record, msg.status === 'ok' ? null : { code: msg.status, message: msg.error || 'Undocking stopped.' });
 }
 function processState(record) {
+  const local = stateFor(record);
+  const docked = record.roverState?.docked;
+  if (!local.operation && docked === true && local.docked !== true) {
+    // The rover stops locally; forget held intents here too so protection
+    // cannot replay pre-contact drive or brush commands after undocking.
+    const protection = require('../overcurrentProtectionService');
+    protection.protectCommand(record.id, 'drive', { driveDirect: { left: 0, right: 0 } });
+    protection.protectCommand(record.id, 'motors', { motorPwm: { main: 0, side: 0, vacuum: 0 } });
+  }
+  local.docked = docked;
   publish(record);
 }
 function processTelemetry(record) {
@@ -66,29 +76,12 @@ function processTelemetry(record) {
   }
   return snapshot(record);
 }
-function protectCommand(record, payload, { dockingOwned = false } = {}) {
-  if (dockingOwned) return payload;
-  if (payload.raw) {
-    const raw = Buffer.from(payload.raw, 'base64');
-    if ([137,145].includes(raw[0])) {
-      if (raw.length !== 5) throw new Error('Invalid raw drive command');
-      if (raw[0] === 145) return protectCommand(record, {type:'drive', driveDirect:{left:raw.readInt16BE(3),right:raw.readInt16BE(1)}});
-      if (raw.readInt16BE(1) !== 0 && snapshot(record).movementLocked) throw new Error('Drive blocked while docked or undocking');
-    }
-  }
-  if (payload.driveDirect) {
-    const { left, right } = payload.driveDirect;
-    if ((left || right) && snapshot(record).movementLocked) throw new Error('Drive blocked while docked or undocking');
-  }
-  return payload;
-}
 const ownershipTimer = setInterval(() => {
   for (const record of require('../roverManager').rovers.values()) processTelemetry(record);
 }, 250);
 ownershipTimer.unref?.();
 function disconnect(record) { finish(record); }
 module.exports = {
-  intents, issueIntent, snapshot, processState, processTelemetry, protectCommand, disconnect, handleResult,
-  shouldIgnoreDriveInput: (record, payload) => Boolean(stateFor(record).operation && (payload.driveDirect || (payload.raw && [137,145].includes(Buffer.from(payload.raw,'base64')[0])))),
-  canAdjustReverse: record => Boolean(record && stateFor(record).operation),
+  intents, issueIntent, snapshot, processState, processTelemetry, disconnect, handleResult,
+  isUndocking: record => Boolean(record && stateFor(record).operation),
 };
