@@ -1,4 +1,4 @@
-const flags = ['drivingMode', 'docking', 'docked', 'headlightOn', 'laserOn'];
+const flags = ['drivingMode', 'dockAssist', 'docking', 'docked', 'headlightOn', 'laserOn'];
 const batteryFlags = ['charging', 'low', 'critical', 'needsCharge'];
 function validState(state) {
   if (!state || Array.isArray(state) || typeof state !== 'object') return false;

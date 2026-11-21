@@ -3,6 +3,7 @@ package roverd
 import (
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -234,6 +235,7 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		}
 		left := clamp(msg.DriveDirect.Left, -c.cfg.MaxWheelMMs, c.cfg.MaxWheelMMs)
 		right := clamp(msg.DriveDirect.Right, -c.cfg.MaxWheelMMs, c.cfg.MaxWheelMMs)
+		left, right = c.limitAssistDrive(left, right)
 		if err := c.adapter.DriveDirect(left, right); err != nil {
 			return err
 		}
@@ -259,6 +261,20 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		if len(buf) > 0 && (isModeOpcode(buf[0]) || buf[0] == 143) && c.runtime.operation != nil {
 			c.finishUndock("cancelled", "Interrupted by explicit Roomba command")
 		}
+		if len(buf) > 0 && (isModeOpcode(buf[0]) || buf[0] == 143) {
+			c.setDockAssist(false)
+			c.publishHardwareState(time.Since(c.runtime.seen) <= 1500*time.Millisecond)
+		}
+		if c.runtime.assist && len(buf) == 5 {
+			switch buf[0] {
+			case 145:
+				left, right := c.limitAssistDrive(int(int16(binary.BigEndian.Uint16(buf[3:5]))), int(int16(binary.BigEndian.Uint16(buf[1:3]))))
+				return c.adapter.DriveDirect(left, right)
+			case 137:
+				speed := clamp(int(int16(binary.BigEndian.Uint16(buf[1:3]))), -60, 60)
+				binary.BigEndian.PutUint16(buf[1:3], uint16(int16(speed)))
+			}
+		}
 		if err := c.adapter.SendRaw(buf); err != nil {
 			return err
 		}
@@ -267,6 +283,9 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		}
 		return nil
 	case msg.Servo != nil:
+		if c.runtime.assist {
+			return fmt.Errorf("camera controlled by dock assist")
+		}
 		if c.servo == nil {
 			return fmt.Errorf("camera servo disabled")
 		}
@@ -490,6 +509,7 @@ func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
 // RoverState is a complete operational snapshot; nil means the role is absent.
 type RoverState struct {
 	DrivingMode *bool        `json:"drivingMode"`
+	DockAssist  *bool        `json:"dockAssist"`
 	Docking     *bool        `json:"docking"`
 	Docked      *bool        `json:"docked"`
 	Battery     BatteryState `json:"battery"`
@@ -639,6 +659,11 @@ func (c *WSClient) markConnected() {
 
 func (c *WSClient) markDisconnected() {
 	c.commandMu.Lock()
+	if c.runtime.assist {
+		c.setDockAssist(false)
+		_ = c.adapter.DriveDirect(0, 0)
+		c.publishHardwareState(time.Since(c.runtime.seen) <= 1500*time.Millisecond)
+	}
 	if c.runtime.operation != nil {
 		c.finishUndock("cancelled", "Control connection lost")
 	}

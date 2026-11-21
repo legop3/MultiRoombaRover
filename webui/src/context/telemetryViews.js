@@ -119,7 +119,7 @@ export function selectDockTelemetry(frame) {
     autoDocking: state?.docking ?? null,
     dockingPhase: docking?.phase || (state?.docked ? state.battery?.charging ? 'charging' : 'docked' : 'idle'),
     movementLocked: docking?.movementLocked ?? state?.drivingMode !== true,
-    cameraLocked: Boolean(docking?.cameraLocked),
+    cameraLocked: state?.dockAssist === true,
     dockingError: docking?.error?.message || '',
     oiModeLabel: state?.drivingMode === true ? 'Driving' : state?.drivingMode === false ? 'Not driving' : 'Unknown',
     chargingStateLabel: state?.battery?.charging === true ? 'Charging' : state?.battery?.charging === false ? 'Not charging' : 'Unknown',

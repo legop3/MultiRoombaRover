@@ -37,7 +37,7 @@ The server requests one of three actions; the rover performs the hardware-specif
 
 Wire names are `undock`, `dockAssist`, and `autoDock`; `cancelDocking` interrupts an operation. Do not expand this into redesigning driving or a general hardware framework.
 
-The server retains permissions, driver ownership, administrative/battery locks, manual-assist UI, camera handling, speed limits, and sensor-based safety policy. Official roverd owns Roomba opcodes, sequencing, contact handling, and local operation deadlines. The existing `roverState.docking` flag means autonomous seeking, not the server's manual-assist UI mode.
+The server retains permissions, driver ownership, administrative/battery locks, manual-assist UI and sensor-based safety policy. Assist-specific camera handling and speed limits belong to roverd. Official roverd owns Roomba opcodes, sequencing, contact handling, and local operation deadlines. The existing `roverState.docking` flag means autonomous seeking, not manual assistance, which is reported separately as roverState.dockAssist.
 
 Explicit stop/cancel must interrupt the operation and prevent queued movement from restarting. Ordinary neutral drive input must not accidentally cancel undocking. Driver/control loss must cause server cancellation; rover connection loss or unavailable hardware must cancel an active undocking operation locally. Preserve the existing delayed disconnect auto-dock fallback separately.
 
@@ -56,6 +56,7 @@ Acceptance is not completion. The UI needs pending, completion, cancellation, an
 ```json
 {
   "drivingMode": true,
+  "dockAssist": false,
   "docking": false,
   "docked": false,
   "battery": {
@@ -73,6 +74,7 @@ Acceptance is not completion. The UI needs pending, completion, cancellation, an
 | Field | Meaning |
 | --- | --- |
 | `drivingMode` | Hardware is in its drive-enabled operating mode; not wheel movement, driver ownership, or permission to bypass server locks. |
+| `dockAssist` | Rover-owned manual docking assistance is active; null when unavailable. |
 | `docking` | Actively seeking the dock; not merely being outside driving mode. |
 | `docked` | Physically on the dock. |
 | `battery.percent` | Percentage from 0 to 100, with decimals allowed. |
@@ -132,7 +134,7 @@ Server-owned assignments, administrative locks, permissions, and command restric
 - [x] Trigger operational transitions from state messages, even when no sensor messages arrive.
 - [x] Update `batteryManager`, assignment ranking, rover leave rules, idle-undock protection, and help detection.
 - [x] Update `dockingService` state inputs and preserve server-owned command protection/operation progress separately.
-  - Keep manual-assist UI, camera handling, speed limits, and server command restrictions. Relocate physical undocking/contact/charging sequences and their deadlines to roverd; server pending/error presentation follows command outcomes and rover state.
+  - Keep manual-assist UI and server command restrictions. Move assist camera handling and speed limits into roverd. Relocate physical undocking/contact/charging sequences and their deadlines to roverd; server pending/error presentation follows command outcomes and rover state.
 - [x] Replace normal server-generated raw Roomba docking sequences with the three action requests, including automatic dock guard. Keep ordinary drive commands unchanged.
 - [x] Convert idle-service dock-all and the All Dock (`dockPanic`) reward from raw opcode 143 to the standard auto-dock action. Audit other command producers, not just the docking UI.
 - [x] Update command dispatch paths that assume Roomba mode or send Roomba-specific automatic commands, including battery-warning songs.
@@ -208,3 +210,7 @@ Use focused existing checks and direct runtime verification where practical. Do 
 - 2026-11-21: Local validation covers Go compilation for all four committed architectures, WebUI production compilation, changed JavaScript syntax, focused UI lint, and direct state/sensor/config validator calls. Deployment, actual charging recovery, physical docking/protection, and browser rendering remain unverified here. The unchecked verification items above are the deployment checklist, not claims of completed hardware testing.
 
 - 2026-11-21: Replaced the incomplete protocol overview with a detailed implementation reference after user review. Added OI-specification sensor ranges/encodings/enums/bitfields and firmware caveats, JSON validation and UI scales, all peripheral control types and local output/role declarations, full command examples, management payloads/events, and host-stat units. Documented existing reserved-field names, stasis information loss, and ignored command fields rather than implying missing behavior is implemented. Documentation only; runtime code and master README unchanged.
+
+- Follow-up after rover deployment: restored the original reported OI mapping (off=1, passive=2, safe=3, full=4). The shifted mapping mislabeled passive in Discord and prevented the undock reverse stage from recognizing Full. Preserved Start → Seek Dock → Full, settling delays, backoff preference, maximum-speed/protection settings, contact-based stop, and timeouts; restored sensor-stream restart after mode commands.
+- Dock assist is now rover-owned including camera angle and 60 mm/s limit. It ignores requests while docked, restores the previous camera angle when ending, and reports dockAssist in roverState. Server no longer positions the camera or implements assist speed reduction. Requires server and rover update together; physical verification remains pending.
+- Follow-up verification: all four architecture binaries and the production WebUI built successfully; changed server JavaScript syntax and diff whitespace checks passed. Physical dock/undock and assist behavior require deployment testing on a rover.

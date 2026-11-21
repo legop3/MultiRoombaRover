@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+// Preserve the values reported by the supported Roombas and the original
+// server decoder. Shifting these down one leaves real Full (4) unrecognized.
+const (
+	oiModePassive byte = 2
+	oiModeSafe    byte = 3
+	oiModeFull    byte = 4
+)
+
 type BatteryState struct {
 	Percent     *float64 `json:"percent"`
 	Charging    *bool    `json:"charging"`
@@ -30,6 +38,7 @@ type roverRuntime struct {
 	seen            time.Time
 	waiting         time.Time
 	needsCharge     bool
+	assistCamera    float64
 	seeking, assist bool
 	operation       *undockOperation
 }
@@ -61,7 +70,7 @@ func (c *WSClient) ObserveHardware(ctx context.Context, samples <-chan SensorSam
 			hadSample := !c.runtime.seen.IsZero()
 			c.runtime.sample, c.runtime.seen = sample, time.Now()
 			docked := sample.ChargeSources&sourceHomeBase != 0
-			if docked || (hadSample && previous.Mode == 1 && (sample.Mode == 2 || sample.Mode == 3)) {
+			if docked || (hadSample && previous.Mode == oiModePassive && (sample.Mode == oiModeSafe || sample.Mode == oiModeFull)) {
 				c.adapter.seeking.Store(false)
 			}
 			if c.runtime.operation == nil {
@@ -76,8 +85,8 @@ func (c *WSClient) ObserveHardware(ctx context.Context, samples <-chan SensorSam
 				// Contact ends manual motion; charging recovery runs only after stopping.
 				_ = c.adapter.DriveDirect(0, 0)
 				_ = c.adapter.MotorPWM(0, 0, 0)
-				_ = c.adapter.StartOI()
-				c.runtime.assist = false
+				_ = c.setOIMode(128)
+				c.setDockAssist(false)
 			}
 			if sample.ChargingState == 4 && docked {
 				if c.runtime.waiting.IsZero() {
@@ -135,12 +144,13 @@ func (c *WSClient) publishHardwareState(valid bool) {
 	c.stateMu.Lock()
 	old, _ := json.Marshal(c.roverState)
 	s := &c.roverState
+	s.DockAssist = boolValue(c.runtime.assist)
 	if !valid {
 		s.DrivingMode, s.Docked, s.Docking = nil, nil, nil
 		s.Battery = BatteryState{}
 	} else {
 		sample := c.runtime.sample
-		s.DrivingMode = boolValue(sample.Mode == 2 || sample.Mode == 3)
+		s.DrivingMode = boolValue(sample.Mode == oiModeSafe || sample.Mode == oiModeFull)
 		s.Docked = boolValue(sample.ChargeSources&sourceHomeBase != 0)
 		s.Docking = boolValue(c.runtime.seeking)
 		charge, full, warn, urgent := float64(sample.Charge), float64(c.cfg.Battery.Full), float64(c.cfg.Battery.Warn), float64(c.cfg.Battery.Urgent)
@@ -171,16 +181,18 @@ func (c *WSClient) publishHardwareState(valid bool) {
 }
 
 func (c *WSClient) dockingCommand(msg *inboundMessage) error {
+	defer func() { c.publishHardwareState(time.Since(c.runtime.seen) <= 1500*time.Millisecond) }()
 	if msg.Type == "cancelDocking" {
 		if c.runtime.operation != nil {
 			c.finishUndock("cancelled", "Docking cancelled")
 		}
-		c.runtime.seeking, c.runtime.assist = false, false
-		if err := c.adapter.StartOI(); err != nil {
+		c.runtime.seeking = false
+		c.setDockAssist(false)
+		if err := c.setOIMode(128); err != nil {
 			return err
 		}
 		if c.runtime.sample.ChargeSources&sourceHomeBase == 0 && time.Since(c.runtime.seen) < 1500*time.Millisecond {
-			if err := c.adapter.SendRaw([]byte{132}); err != nil {
+			if err := c.setOIMode(132); err != nil {
 				return err
 			}
 		}
@@ -197,6 +209,7 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 	}
 	switch msg.Type {
 	case "autoDock":
+		c.setDockAssist(false)
 		if c.runtime.seeking || c.runtime.sample.ChargeSources&sourceHomeBase != 0 {
 			return nil
 		}
@@ -205,29 +218,34 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 		}
 		c.runtime.seeking = true
 	case "dockAssist":
-		c.runtime.assist = true
+		// Assistance cannot improve an already-established dock contact.
+		if c.runtime.sample.ChargeSources&sourceHomeBase != 0 || c.runtime.assist {
+			return nil
+		}
 		c.runtime.seeking = false
 		if err := c.adapter.DriveDirect(0, 0); err != nil {
 			return err
 		}
-		if err := c.adapter.SendRaw([]byte{132}); err != nil {
+		if err := c.setOIMode(132); err != nil {
 			return err
 		}
+		c.setDockAssist(true)
 	case "undock":
-		c.runtime.assist, c.runtime.seeking = false, false
+		c.setDockAssist(false)
+		c.runtime.seeking = false
 		if err := c.adapter.DriveDirect(0, 0); err != nil {
 			return err
 		}
-		if err := c.adapter.StartOI(); err != nil {
+		if err := c.setOIMode(128); err != nil {
 			return err
 		}
 		speed := c.cfg.MaxWheelMMs
 		if msg.Speed != nil {
 			speed = clamp(*msg.Speed, 1, c.cfg.MaxWheelMMs)
 		}
+		c.log.Printf("undock starting: backoff=%v speed=%d mode=%d sources=%d", msg.Backoff == nil || *msg.Backoff, speed, c.runtime.sample.Mode, c.runtime.sample.ChargeSources)
 		c.runtime.operation = &undockOperation{speed: speed, id: msg.ID, started: time.Now(), next: time.Now().Add(100 * time.Millisecond), backoff: msg.Backoff == nil || *msg.Backoff}
 	}
-	c.publishHardwareState(true)
 	return nil
 }
 
@@ -243,11 +261,11 @@ func (c *WSClient) advanceUndock() {
 		op.stage = 1
 		op.next = time.Now().Add(100 * time.Millisecond)
 	case 1:
-		err = c.adapter.SendRaw([]byte{132})
+		err = c.setOIMode(132)
 		op.stage = 2
 		op.next = time.Now().Add(300 * time.Millisecond)
 	default:
-		if c.runtime.sample.Mode != 3 {
+		if c.runtime.sample.Mode != oiModeFull {
 			if !op.reversing.IsZero() {
 				c.finishUndock("error", "Roomba left driving mode")
 			}
@@ -272,6 +290,7 @@ func (c *WSClient) finishUndock(status, message string) {
 	if op == nil {
 		return
 	}
+	c.log.Printf("undock %s: %s (stage=%d mode=%d sources=%d)", status, message, op.stage, c.runtime.sample.Mode, c.runtime.sample.ChargeSources)
 	c.runtime.operation = nil
 	c.adapter.seeking.Store(false)
 	if err := c.adapter.DriveDirect(0, 0); err != nil {
@@ -282,4 +301,42 @@ func (c *WSClient) finishUndock(status, message string) {
 	case c.results <- ackMessage{Type: "commandResult", ID: op.id, Status: status, Error: message}:
 	default:
 	}
+}
+
+// The old raw mode-command path also restarted streaming. Local docking must
+// preserve that side effect: its next step depends on fresh hardware samples.
+func (c *WSClient) setOIMode(mode byte) error {
+	if err := c.adapter.SendRaw([]byte{mode}); err != nil {
+		return err
+	}
+	return c.ensureSensorStream()
+}
+
+func (c *WSClient) setDockAssist(enabled bool) {
+	if c.runtime.assist == enabled {
+		return
+	}
+	c.runtime.assist = enabled
+	if c.servo == nil {
+		return
+	}
+	angle := c.runtime.assistCamera
+	if enabled {
+		c.runtime.assistCamera = c.servo.CurrentAngle()
+		angle = c.servo.Configuration().MinAngle
+	}
+	if err := c.servo.SetAngle(angle); err != nil {
+		c.log.Printf("dock assist camera: %v", err)
+	}
+}
+
+func (c *WSClient) limitAssistDrive(left, right int) (int, int) {
+	if !c.runtime.assist {
+		return left, right
+	}
+	maximum := math.Max(math.Abs(float64(left)), math.Abs(float64(right)))
+	if maximum <= 60 {
+		return left, right
+	}
+	return int(math.Round(float64(left) * 60 / maximum)), int(math.Round(float64(right) * 60 / maximum))
 }
