@@ -34,14 +34,15 @@ type undockOperation struct {
 }
 
 type roverRuntime struct {
-	sample          SensorSample
-	seen            time.Time
-	waiting         time.Time
-	needsCharge     bool
-	dockHold        bool
-	assistCamera    float64
-	seeking, assist bool
-	operation       *undockOperation
+	sample             SensorSample
+	seen               time.Time
+	waiting            time.Time
+	needsCharge        bool
+	dockHold           bool
+	contactDockPending bool
+	assistCamera       float64
+	seeking, assist    bool
+	operation          *undockOperation
 }
 
 func boolValue(v bool) *bool { return &v }
@@ -83,21 +84,36 @@ func (c *WSClient) ObserveHardware(ctx context.Context, samples <-chan SensorSam
 			if c.runtime.operation != nil {
 				c.advanceUndock()
 			} else if docked {
-				if !c.runtime.dockHold {
+				c.runtime.dockHold = true
+				if !hadSample || previous.ChargeSources&sourceHomeBase == 0 {
 					// Contact latches the stop: a bouncing contact must not
 					// unlock held controls or repeatedly interrupt charging.
-					c.runtime.dockHold = true
 					c.log.Printf("dock contact: stopping (mode=%d sources=%d)", sample.Mode, sample.ChargeSources)
 					if err := c.stopAtDock(); err != nil {
 						c.log.Printf("dock contact stop: %v", err)
+					} else {
+						c.runtime.contactDockPending = true
+					}
+				} else if c.runtime.contactDockPending && !isCharging(sample.ChargingState) {
+					// Keep stopping and requesting charging on separate contact
+					// samples, as the server controller did. Seeking immediately
+					// after stopping can start motion again on a fleeting contact.
+					if err := c.adapter.SeekDock(); err != nil {
+						c.log.Printf("dock charging request: %v", err)
+					} else {
+						c.runtime.contactDockPending = false
 					}
 				}
 				if isCharging(sample.ChargingState) {
+					c.runtime.contactDockPending = false
 					// Preserve the contact beep instead of replacing it with exit notes.
 					c.setDockAssist(false, true)
 				}
-			} else if hadSample && previous.ChargeSources&sourceHomeBase != 0 && c.runtime.assist {
-				c.dockBeep(1, 6, 72)
+			} else {
+				c.runtime.contactDockPending = false
+				if hadSample && previous.ChargeSources&sourceHomeBase != 0 && c.runtime.assist {
+					c.dockBeep(1, 6, 72)
+				}
 			}
 			if sample.ChargingState == 4 && docked {
 				if c.runtime.waiting.IsZero() {
@@ -256,6 +272,7 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 		}
 		c.log.Printf("undock starting: backoff=%v speed=%d mode=%d sources=%d", msg.Backoff == nil || *msg.Backoff, speed, c.runtime.sample.Mode, c.runtime.sample.ChargeSources)
 		c.runtime.dockHold = false
+		c.runtime.contactDockPending = false
 		c.runtime.operation = &undockOperation{speed: speed, id: msg.ID, started: time.Now(), next: time.Now().Add(100 * time.Millisecond), backoff: msg.Backoff == nil || *msg.Backoff}
 	}
 	return nil
@@ -373,9 +390,12 @@ func (c *WSClient) dockBeep(slot, duration int, notes ...int) {
 
 func (c *WSClient) stopAtDock() error {
 	// Autonomous seek runs in Passive, where wheel commands are ignored.
-	// Take control before stopping, then request charging immediately.
-	if err := c.adapter.SendRaw([]byte{132}); err != nil {
-		return err
+	// Assist is already in driving mode; only autonomous docking needs
+	// a mode change to make the stop command effective.
+	if !c.runtime.assist {
+		if err := c.adapter.SendRaw([]byte{132}); err != nil {
+			return err
+		}
 	}
 	if err := c.adapter.DriveDirect(0, 0); err != nil {
 		return err
@@ -388,5 +408,5 @@ func (c *WSClient) stopAtDock() error {
 	if c.runtime.assist {
 		c.dockBeep(1, 6, 84)
 	}
-	return c.adapter.SeekDock()
+	return nil
 }
