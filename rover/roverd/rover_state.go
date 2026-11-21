@@ -81,12 +81,22 @@ func (c *WSClient) ObserveHardware(ctx context.Context, samples <-chan SensorSam
 			}
 			if c.runtime.operation != nil {
 				c.advanceUndock()
-			} else if docked && hadSample && previous.ChargeSources&sourceHomeBase == 0 {
-				// Contact ends manual motion; charging recovery runs only after stopping.
-				_ = c.adapter.DriveDirect(0, 0)
-				_ = c.adapter.MotorPWM(0, 0, 0)
-				_ = c.setOIMode(128)
-				c.setDockAssist(false)
+			} else if docked {
+				if !hadSample || previous.ChargeSources&sourceHomeBase == 0 {
+					if err := c.stopAtDock(); err != nil {
+						c.log.Printf("dock contact stop: %v", err)
+					}
+				}
+				if isCharging(sample.ChargingState) {
+					// Preserve the contact beep instead of replacing it with exit notes.
+					c.setDockAssist(false, true)
+				}
+			} else if hadSample && previous.ChargeSources&sourceHomeBase != 0 && c.runtime.assist {
+				// Contact slipped before charging: retain manual assistance.
+				if err := c.setOIMode(132); err != nil {
+					c.log.Printf("dock assist resume: %v", err)
+				}
+				c.dockBeep(1, 6, 72)
 			}
 			if sample.ChargingState == 4 && docked {
 				if c.runtime.waiting.IsZero() {
@@ -152,7 +162,7 @@ func (c *WSClient) publishHardwareState(valid bool) {
 		sample := c.runtime.sample
 		s.DrivingMode = boolValue(sample.Mode == oiModeSafe || sample.Mode == oiModeFull)
 		s.Docked = boolValue(sample.ChargeSources&sourceHomeBase != 0)
-		s.Docking = boolValue(c.runtime.seeking)
+		s.Docking = boolValue(sample.Mode == oiModePassive && sample.ChargeSources&sourceHomeBase == 0)
 		charge, full, warn, urgent := float64(sample.Charge), float64(c.cfg.Battery.Full), float64(c.cfg.Battery.Warn), float64(c.cfg.Battery.Urgent)
 		var percent *float64
 		value := 0.0
@@ -312,11 +322,18 @@ func (c *WSClient) setOIMode(mode byte) error {
 	return c.ensureSensorStream()
 }
 
-func (c *WSClient) setDockAssist(enabled bool) {
+func (c *WSClient) setDockAssist(enabled bool, quiet ...bool) {
 	if c.runtime.assist == enabled {
 		return
 	}
 	c.runtime.assist = enabled
+	if len(quiet) == 0 || !quiet[0] {
+		if enabled {
+			c.dockBeep(0, 10, 76, 83)
+		} else {
+			c.dockBeep(0, 10, 83, 76)
+		}
+	}
 	if c.servo == nil {
 		return
 	}
@@ -339,4 +356,34 @@ func (c *WSClient) limitAssistDrive(left, right int) (int, int) {
 		return left, right
 	}
 	return int(math.Round(float64(left) * 60 / maximum)), int(math.Round(float64(right) * 60 / maximum))
+}
+
+func (c *WSClient) dockBeep(slot, duration int, notes ...int) {
+	song := make([]songNote, len(notes))
+	for i, note := range notes {
+		song[i] = songNote{Note: note, Duration: duration}
+	}
+	if err := c.adapter.PlaySong(slot, song); err != nil {
+		c.log.Printf("dock beep: %v", err)
+	}
+}
+
+func (c *WSClient) stopAtDock() error {
+	// Autonomous seek runs in Passive, where wheel commands are ignored.
+	// Take control before stopping, then request charging immediately.
+	if err := c.setOIMode(132); err != nil {
+		return err
+	}
+	if err := c.adapter.DriveDirect(0, 0); err != nil {
+		return err
+	}
+	if err := c.adapter.MotorPWM(0, 0, 0); err != nil {
+		return err
+	}
+	c.lastAux = motorPWMPayload{}
+	c.autoSideOn = false
+	if c.runtime.assist {
+		c.dockBeep(1, 6, 84)
+	}
+	return c.adapter.SeekDock()
 }

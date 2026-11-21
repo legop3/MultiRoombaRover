@@ -75,7 +75,7 @@ Acceptance is not completion. The UI needs pending, completion, cancellation, an
 | --- | --- |
 | `drivingMode` | Hardware is in its drive-enabled operating mode; not wheel movement, driver ownership, or permission to bypass server locks. |
 | `dockAssist` | Rover-owned manual docking assistance is active; null when unavailable. |
-| `docking` | Actively seeking the dock; not merely being outside driving mode. |
+| `docking` | Reported passive mode while not on the dock. |
 | `docked` | Physically on the dock. |
 | `battery.percent` | Percentage from 0 to 100, with decimals allowed. |
 | `battery.charging` | In the charging process, including normal waiting pauses; not a claim that current is flowing at every instant. |
@@ -214,3 +214,5 @@ Use focused existing checks and direct runtime verification where practical. Do 
 - Follow-up after rover deployment: restored the original reported OI mapping (off=1, passive=2, safe=3, full=4). The shifted mapping mislabeled passive in Discord and prevented the undock reverse stage from recognizing Full. Preserved Start → Seek Dock → Full, settling delays, backoff preference, maximum-speed/protection settings, contact-based stop, and timeouts; restored sensor-stream restart after mode commands.
 - Dock assist is now rover-owned including camera angle and 60 mm/s limit. It ignores requests while docked, restores the previous camera angle when ending, and reports dockAssist in roverState. Server no longer positions the camera or implements assist speed reduction. Requires server and rover update together; physical verification remains pending.
 - Follow-up verification: all four architecture binaries and the production WebUI built successfully; changed server JavaScript syntax and diff whitespace checks passed. Physical dock/undock and assist behavior require deployment testing on a rover.
+
+- Docking follow-up: docking now derives from passive mode and absent dock contact. Restored assist entry/exit/contact/contact-loss sounds; retain assist until charging is confirmed. Both docking paths take control, stop wheel/auxiliary motors on contact, and immediately request charging without a stationary-wheel wait. Local command handling blocks held motor commands while docked; deliberate undocking remains exempt. Hardware verification pending.

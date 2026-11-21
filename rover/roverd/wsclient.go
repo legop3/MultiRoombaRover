@@ -220,6 +220,24 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	if c.stopping.Load() {
 		return fmt.Errorf("roverd is stopping")
 	}
+	// Queued drive/motor messages must not undo the local contact stop.
+	// Deliberate undocking owns its reverse output and is exempt.
+	if c.runtime.operation == nil && c.runtime.sample.ChargeSources&sourceHomeBase != 0 {
+		moving := msg.DriveDirect != nil && (msg.DriveDirect.Left != 0 || msg.DriveDirect.Right != 0)
+		motors := msg.MotorPWM != nil && (msg.MotorPWM.Main != 0 || msg.MotorPWM.Side != 0 || msg.MotorPWM.Vacuum != 0)
+		if moving || motors {
+			return fmt.Errorf("motion blocked while docked; undock first")
+		}
+		if msg.Raw != "" {
+			raw, err := base64.StdEncoding.DecodeString(msg.Raw)
+			if err != nil {
+				return err
+			}
+			if len(raw) > 0 && (raw[0] == 137 || raw[0] == 145 || raw[0] == 138 || raw[0] == 144 || raw[0] == 146) {
+				return fmt.Errorf("raw motor command blocked while docked")
+			}
+		}
+	}
 	switch {
 	case msg.Type == "undock" || msg.Type == "dockAssist" || msg.Type == "autoDock" || msg.Type == "cancelDocking":
 		return c.dockingCommand(msg)
