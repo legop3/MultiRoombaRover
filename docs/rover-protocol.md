@@ -253,10 +253,10 @@ On rejection: `{"type":"ack","id":"command-id","status":"error","error":"reason"
 | Command | Payload / behavior |
 | --- | --- |
 | `drive` | `driveDirect: {left, right}`; signed mm/s. Zero speeds stop ordinary driving. |
-| `undock` | Optional `backoff` boolean (default true), `speed` mm/s maximum for reverse. Perform local preparation/backoff and stop in driving mode. |
+| `undock` | Optional `backoff` boolean (default true). Perform Start → Seek Dock → Full, then reverse at configured maxWheelSpeed until contact is lost or three seconds of reversing elapse. With backoff false, finish after preparation without reversing. |
 | `dockAssist` | Prepare user-driven docking; stop on contact and arrange charging locally. Rover manages camera positioning and assist speed limiting; server only requests the action and displays reported state. Already docked is a no-op. |
 | `autoDock` | Begin autonomous dock-seeking. Repeated requests must not restart an active seek. |
-| `cancelDocking` | Interrupt docking/undocking and stop; exit assist through the server action. |
+| `cancelDocking` | Stop docking assistance; ignored during an active undock. |
 | `servo` | `servo: {angle}` or `{nudge}` in degrees, or `{pulseUs}` for supported hardware. |
 | `headlight`, `laser` | Matching object with `action`: on/off/toggle. |
 | `tts` | `tts: {text, engine?, voice?, pitch?, speed?, speak?}`. |
@@ -282,12 +282,12 @@ Send one command payload per message. Most ordinary handlers dispatch by the pop
 - **Audio levels:** optional numeric hornGain, ttsGain, forwardGain are linear multipliers clamped to 0…4; 0 mutes and 1 is unity gain. Omitted fields retain their current values.
 - **Song:** 1…16 notes required. roverd accepts slot 0…4 (default 0), clamps note to 31…127 and duration to 1…255 units of 1/64 second. Although loop is present in the payload struct, the current handler does not implement looping. OI note values outside its audible range represent rests.
 - **Sensor stream:** enable true restarts the configured Roomba stream; false is currently a no-op, not a stop-stream operation.
-- **Raw:** base64-encoded bytes sent to Roomba serial. Mode and seek-dock requests interrupt an active local undock. Custom non-Roomba clients should reject unsupported raw/OI commands.
+- **Raw:** base64-encoded bytes sent to Roomba serial. Raw commands are ignored during an active local undock. Custom non-Roomba clients should reject unsupported raw/OI commands.
 
 Examples:
 
 ```json
-{"type":"undock","id":"u1","backoff":true,"speed":100}
+{"type":"undock","id":"u1","backoff":true}
 {"type":"dockAssist","id":"a1"}
 {"type":"autoDock","id":"a2"}
 {"type":"cancelDocking","id":"a3"}
@@ -312,7 +312,7 @@ Undock sends a final result on the control connection:
 {"type":"commandResult","id":"command-id","status":"ok"}
 ```
 
-Failure/cancellation uses `status: "error"` or `"cancelled"` and `error`. The physical state still comes from `roverState`. Official roverd bounds undocking, stops on lost hardware/control connection, and owns wheel output during the operation. A zero-speed command stops undocking; other drive commands cannot turn it into forward motion or exceed its reverse speed. Server wheel protection may reduce/stop the reverse. Auto-dock completion is represented by docked state; official roverd stops wheels and auxiliary motors on contact, then requests charging on a later contact sample only when both encoder-derived wheel speeds are zero and charging has not already started. Manual assistance ends when charging is confirmed. The local docking controller uses the original 50 ms telemetry cadence. There is no generic accessory feedback stream.
+Failure/cancellation uses `status: "error"` or `"cancelled"` and `error`. The physical state still comes from `roverState`. Official roverd ignores incoming control commands while undocking, including joystick release, protection output, raw commands, and cancellation. Control-connection loss does not cancel the sequence. After preparation it reverses at the configured maximum wheel speed, stopping on confirmed loss of dock contact or after three seconds of reversing. The timeout runs locally even without telemetry. Serial write failures still report an error. Management changes are rejected while undocking. Auto-dock completion is represented by docked state; official roverd stops wheels and auxiliary motors on contact, then requests charging on a later contact sample only when both encoder-derived wheel speeds are zero and charging has not already started. Manual assistance ends when charging is confirmed. The local docking controller uses the original 50 ms telemetry cadence. There is no generic accessory feedback stream.
 
 Official roverd limits assisted driving to 60 mm/s, aims the camera at its configured minimum angle, and returns the camera to zero when assistance ends. Cancellation, undocking, auto-docking, explicit OI mode changes, and control-connection loss also end assistance. Assist entry/exit and contact/contact-loss play the original OI beeps. First contact latches a local movement stop until explicit undocking. Contact loss does not restore Full mode, release held controls, or restart auto-docking; manual assistance remains active until charging is confirmed or cancelled. Held drive/motor commands cannot override the contact stop. These behaviors belong to roverd; other rover implementations may provide different assistance. The server does not issue camera-position commands, impose an assist-specific speed limit, or block drive commands based on docking state. Roverd enforces the physical movement lock.
 

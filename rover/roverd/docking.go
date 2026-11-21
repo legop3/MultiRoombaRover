@@ -7,11 +7,11 @@ import (
 )
 
 type undockOperation struct {
-	speed                    int
-	id                       string
-	started, next, reversing time.Time
-	stage                    int
-	backoff                  bool
+	speed           int
+	id              string
+	next, reversing time.Time
+	stage           int
+	backoff         bool
 }
 
 // Docking state is separate from the roverState snapshot sent to the server.
@@ -100,27 +100,22 @@ func (c *WSClient) checkDockingDeadline() {
 	if op == nil {
 		return
 	}
-	if time.Since(c.runtime.seen) > 1500*time.Millisecond {
-		c.finishUndock("error", "Roomba telemetry unavailable")
-	} else if time.Since(op.started) >= 4*time.Second || (!op.reversing.IsZero() && time.Since(op.reversing) >= time.Second) {
-		c.finishUndock("error", "Undocking timed out")
+	if !op.reversing.IsZero() && time.Since(op.reversing) >= 3*time.Second {
+		c.finishUndock("error", "Undocking timed out after 3 seconds of reversing")
 	}
 }
 
 func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 	defer func() { c.publishHardwareState(time.Since(c.runtime.seen) <= 1500*time.Millisecond) }()
+	if c.docking.operation != nil {
+		return nil
+	}
 	if msg.Type == "cancelDocking" {
-		if c.docking.operation != nil {
-			c.finishUndock("cancelled", "Docking cancelled")
-		}
 		if err := c.adapter.DriveDirect(0, 0); err != nil {
 			return err
 		}
 		c.setDockAssist(false)
 		return nil
-	}
-	if c.docking.operation != nil {
-		return fmt.Errorf("undocking is already in progress")
 	}
 	if time.Since(c.runtime.seen) > 1500*time.Millisecond {
 		return fmt.Errorf("waiting for Roomba telemetry")
@@ -157,13 +152,10 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 			return err
 		}
 		speed := c.cfg.MaxWheelMMs
-		if msg.Speed != nil {
-			speed = clamp(*msg.Speed, 1, c.cfg.MaxWheelMMs)
-		}
 		c.log.Printf("undock starting: backoff=%v speed=%d mode=%d sources=%d", msg.Backoff == nil || *msg.Backoff, speed, c.runtime.sample.Mode, c.runtime.sample.ChargeSources)
 		c.docking.dockHold = false
 		c.docking.contactDockPending = false
-		c.docking.operation = &undockOperation{speed: speed, id: msg.ID, started: time.Now(), next: time.Now().Add(100 * time.Millisecond), backoff: msg.Backoff == nil || *msg.Backoff}
+		c.docking.operation = &undockOperation{speed: speed, id: msg.ID, next: time.Now().Add(100 * time.Millisecond), backoff: msg.Backoff == nil || *msg.Backoff}
 	}
 	return nil
 }
@@ -184,13 +176,7 @@ func (c *WSClient) advanceUndock() {
 		op.stage = 2
 		op.next = time.Now().Add(300 * time.Millisecond)
 	default:
-		if c.runtime.sample.Mode != oiModeFull {
-			if !op.reversing.IsZero() {
-				c.finishUndock("error", "Roomba left driving mode")
-			}
-			return
-		}
-		if !op.backoff || c.runtime.sample.ChargeSources&sourceHomeBase == 0 {
+		if !op.backoff || (time.Since(c.runtime.seen) <= 1500*time.Millisecond && c.runtime.sample.ChargeSources&sourceHomeBase == 0) {
 			c.finishUndock("ok", "")
 			return
 		}

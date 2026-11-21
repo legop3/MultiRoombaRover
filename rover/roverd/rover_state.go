@@ -96,6 +96,11 @@ func (c *WSClient) ObserveHardware(ctx context.Context, samples <-chan SensorSam
 				continue
 			}
 			c.checkDockingDeadline()
+			// Preparation and the reverse deadline must progress even if sensor
+			// samples stop. Only fresh samples can confirm leaving the dock.
+			if c.docking.operation != nil {
+				c.advanceUndock()
+			}
 			if time.Since(c.runtime.seen) > 1500*time.Millisecond {
 				c.runtime.waiting = time.Time{}
 				c.publishHardwareState(false)

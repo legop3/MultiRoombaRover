@@ -36,7 +36,6 @@ type hostStatsMessage struct {
 
 type inboundMessage struct {
 	Type         string               `json:"type"`
-	Speed        *int                 `json:"speed,omitempty"`
 	Backoff      *bool                `json:"backoff,omitempty"`
 	ID           string               `json:"id"`
 	DriveDirect  *driveDirectPayload  `json:"driveDirect,omitempty"`

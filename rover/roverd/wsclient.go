@@ -222,25 +222,11 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	if c.stopping.Load() {
 		return fmt.Errorf("roverd is stopping")
 	}
-	if c.docking.operation != nil && msg.Raw != "" {
-		raw, err := base64.StdEncoding.DecodeString(msg.Raw)
-		if err != nil {
-			return err
-		}
-		if len(raw) > 0 && (raw[0] == 137 || raw[0] == 145) {
-			if len(raw) != 5 {
-				return fmt.Errorf("invalid raw drive command")
-			}
-			if raw[0] == 145 {
-				msg.DriveDirect = &driveDirectPayload{Left: int(int16(binary.BigEndian.Uint16(raw[3:5]))), Right: int(int16(binary.BigEndian.Uint16(raw[1:3])))}
-				msg.Raw = ""
-			} else {
-				if raw[1] == 0 && raw[2] == 0 {
-					c.finishUndock("cancelled", "Stopped by drive command")
-				}
-				return nil
-			}
-		}
+	// Once accepted, undocking owns the rover until contact is lost or its
+	// three-second reverse timeout expires. This includes neutral joystick
+	// input, protection output, raw mode commands, and cancellation requests.
+	if c.docking.operation != nil {
+		return nil
 	}
 	// The contact stop stays latched through contact flicker and charging.
 	// Queued drive/motor messages must not undo it.
@@ -265,22 +251,6 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	case msg.Type == "undock" || msg.Type == "dockAssist" || msg.Type == "autoDock" || msg.Type == "cancelDocking":
 		return c.dockingCommand(msg)
 	case msg.DriveDirect != nil:
-		if c.docking.operation != nil {
-			if msg.DriveDirect.Left == 0 && msg.DriveDirect.Right == 0 {
-				c.finishUndock("cancelled", "Stopped by drive command")
-				return nil
-			}
-			if c.docking.operation.reversing.IsZero() {
-				return nil
-			}
-			// Undocking owns direction and maximum speed. Incoming commands
-			// may reduce the reverse or stop it, but cannot steer away from it.
-			if msg.DriveDirect.Left > 0 || msg.DriveDirect.Right > 0 {
-				return nil
-			}
-			msg.DriveDirect.Left = clamp(msg.DriveDirect.Left, -c.docking.operation.speed, 0)
-			msg.DriveDirect.Right = clamp(msg.DriveDirect.Right, -c.docking.operation.speed, 0)
-		}
 		left := clamp(msg.DriveDirect.Left, -c.cfg.MaxWheelMMs, c.cfg.MaxWheelMMs)
 		right := clamp(msg.DriveDirect.Right, -c.cfg.MaxWheelMMs, c.cfg.MaxWheelMMs)
 		left, right = c.limitAssistDrive(left, right)
@@ -306,9 +276,7 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 		if err != nil {
 			return fmt.Errorf("raw decode: %w", err)
 		}
-		if len(buf) > 0 && (isModeOpcode(buf[0]) || buf[0] == 143) && c.docking.operation != nil {
-			c.finishUndock("cancelled", "Interrupted by explicit Roomba command")
-		}
+
 		if len(buf) > 0 && (isModeOpcode(buf[0]) || buf[0] == 143) {
 			c.setDockAssist(false)
 			c.publishHardwareState(time.Since(c.runtime.seen) <= 1500*time.Millisecond)
@@ -712,9 +680,6 @@ func (c *WSClient) markDisconnected() {
 		_ = c.adapter.DriveDirect(0, 0)
 		c.publishHardwareState(time.Since(c.runtime.seen) <= 1500*time.Millisecond)
 	}
-	if c.docking.operation != nil {
-		c.finishUndock("cancelled", "Control connection lost")
-	}
 	c.commandMu.Unlock()
 	if c.stopping.Load() {
 		return
@@ -884,10 +849,10 @@ func isModeOpcode(op byte) bool {
 func (c *WSClient) PrepareShutdown() error {
 	c.commandMu.Lock()
 	defer c.commandMu.Unlock()
-	c.stopping.Store(true)
 	if c.docking.operation != nil {
-		c.finishUndock("cancelled", "Management action")
+		return fmt.Errorf("wait for undocking to finish")
 	}
+	c.stopping.Store(true)
 	if c.autoCharge != nil {
 		c.autoCharge.SetPaused(true)
 	}

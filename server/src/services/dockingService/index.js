@@ -26,22 +26,13 @@ function finish(record, error = null) {
 function issueIntent(record, type, payload, socket) {
   const state = stateFor(record);
   if (type === 'enterDocking') type = 'dockAssist';
-  if (state.operation && type !== 'cancelDocking') throw new Error('Undocking is already in progress');
-  if (type === 'cancelDocking') finish(record);
+  if (state.operation) return send(record, { type, ...(type === 'undock' ? { backoff: payload.backoff !== false } : {}) });
   state.error = null;
   require('../roverManager').stopDockGuard(record.id);
-  let speed;
-  if (type === 'undock') {
-    const maximum = Math.min(500, Number(record.meta?.maxWheelSpeed) || 500);
-    const guarded = require('../overcurrentProtectionService').protectCommand(record.id, 'drive', { driveDirect: { left: -maximum, right: -maximum } }, { bypassed: require('../roleService').isAdmin(socket) });
-    speed = Math.min(Math.abs(guarded.driveDirect.left), Math.abs(guarded.driveDirect.right));
-    if (!speed && payload.backoff !== false) throw new Error('Undocking blocked by wheel protection');
-  }
-  const id = send(record, { type, ...(type === 'undock' ? { backoff: payload.backoff !== false, speed } : {}) });
+  const id = send(record, { type, ...(type === 'undock' ? { backoff: payload.backoff !== false } : {}) });
   state.request = id;
   if (type === 'undock') {
     state.operation = { id, socket, timer: setTimeout(() => {
-      send(record, { type: 'cancelDocking' });
       finish(record, { code: 'timeout', message: 'No undocking result received.' });
     }, 6000) };
   }
@@ -68,18 +59,7 @@ function processState(record) {
   local.docked = docked;
   publish(record);
 }
-function processTelemetry(record) {
-  const state = stateFor(record);
-  if (state.operation && (!state.operation.socket?.connected || !require('../roverManager').canDrive(record.id, state.operation.socket))) {
-    send(record, { type: 'cancelDocking' });
-    finish(record, { code: 'controlLost', message: 'Undocking stopped because control changed.' });
-  }
-  return snapshot(record);
-}
-const ownershipTimer = setInterval(() => {
-  for (const record of require('../roverManager').rovers.values()) processTelemetry(record);
-}, 250);
-ownershipTimer.unref?.();
+function processTelemetry(record) { return snapshot(record); }
 function disconnect(record) { finish(record); }
 module.exports = {
   intents, issueIntent, snapshot, processState, processTelemetry, disconnect, handleResult,
