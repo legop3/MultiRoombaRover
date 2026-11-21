@@ -5,7 +5,7 @@ const fsp = require('fs/promises');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../../globals/logger').child('replayEngineV2');
-const { BUFFER_SECONDS, SEGMENT_SECONDS } = require('./constants');
+const { getBufferSeconds, SEGMENT_SECONDS } = require('./constants');
 const { workers, pendingWorkerStarts, segmentIndex } = require('./state');
 const { sourceKey, sourceDirForKey } = require('./sources');
 const ptzCameraService = require('../ptzCameraService');
@@ -32,7 +32,7 @@ function createSegmentStore({ getActiveSegmentRoot }) {
       return;
     }
 
-    const cutoffMs = Date.now() - BUFFER_SECONDS * 1000 - 5000;
+    const cutoffMs = Date.now() - getBufferSeconds() * 1000 - 5000;
     const entries = [];
     for (const filename of segmentFiles) {
       const filePath = path.join(dir, filename);
@@ -64,7 +64,7 @@ function createSegmentStore({ getActiveSegmentRoot }) {
   }
 
   async function cleanupOldFiles() {
-    const cutoff = Date.now() - BUFFER_SECONDS * 1000;
+    const cutoff = Date.now() - getBufferSeconds() * 1000;
     // Retention applies to stopped workers too; dynamic microphone sessions
     // must not leave permanent index entries after their audio expires.
     for (const [key, entries] of segmentIndex) {
@@ -149,9 +149,10 @@ function createSegmentStore({ getActiveSegmentRoot }) {
     }
   }
 
-  function getReplayHealthSnapshot({ BUILD_DURATION_MS, roverManager, getRoomCameras }) {
+  function getReplayHealthSnapshot({ buildDurationMs, roverManager, getRoomCameras }) {
     const now = Date.now();
-    const neededCount = Math.max(1, Math.ceil(BUILD_DURATION_MS / 1000));
+    const bufferMs = getBufferSeconds() * 1000;
+    const neededCount = Math.max(1, Math.ceil(buildDurationMs / 1000));
     const sources = [];
     let readyCount = 0;
 
@@ -179,7 +180,7 @@ function createSegmentStore({ getActiveSegmentRoot }) {
           try { stat = fs.statSync(full); } catch { continue; }
           if (!stat.isFile() || stat.size < 4096) continue;
           if (stat.mtimeMs > (lastSegmentAt || 0)) lastSegmentAt = stat.mtimeMs;
-          if (now - stat.mtimeMs <= BUFFER_SECONDS * 1000) recentCount += 1;
+          if (now - stat.mtimeMs <= bufferMs) recentCount += 1;
         }
       } catch {}
       const ready = recentCount >= neededCount;

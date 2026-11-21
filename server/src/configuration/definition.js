@@ -16,6 +16,7 @@ const homeAssistantActivities = require('../services/homeAssistantActivitiesServ
 const roomAudio = require('../services/roomAudioService/configuration');
 const roomCameras = require('../services/roomCameraService/configuration');
 const ptzCamera = require('../services/ptzCameraService/configuration');
+const replay = require('../services/replayEngineV2/configuration');
 const kinect = require('../services/kinectService/configuration');
 const balanceBoard = require('../services/balanceBoardService/configuration');
 const buttonBox = require('../services/buttonBoxService/configuration');
@@ -49,6 +50,7 @@ const definitions = [
   roomCameras,
   roomAudio,
   ptzCamera,
+  replay,
   kinect,
   balanceBoard,
   buttonBox,

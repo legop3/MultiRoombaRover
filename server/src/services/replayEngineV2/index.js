@@ -12,9 +12,9 @@ const { getRoomCameras, roomCameraEvents } = require('../roomCameraService');
 const {
   SEGMENT_ROOT,
   SEGMENT_SECONDS,
-  BUFFER_SECONDS,
+  getBufferSeconds,
   CLEANUP_INTERVAL_MS,
-  BUILD_DURATION_MS,
+  getBuildDurationMs,
 } = require('./constants');
 const { events, runtime } = require('./state');
 const { createWorkerManager } = require('./workerManager');
@@ -62,7 +62,7 @@ async function buildReplayVideoFresh(options = {}) {
 }
 
 function getReplayHealthSnapshot() {
-  return segmentStore.getReplayHealthSnapshot({ BUILD_DURATION_MS, roverManager, getRoomCameras });
+  return segmentStore.getReplayHealthSnapshot({ buildDurationMs: getBuildDurationMs(), roverManager, getRoomCameras });
 }
 
 async function tick() {
@@ -121,5 +121,5 @@ module.exports = {
   replayEngineEvents: events,
   replaySegmentRootDir: () => runtime.activeSegmentRoot,
   replaySegmentSeconds: SEGMENT_SECONDS,
-  replayBufferSeconds: BUFFER_SECONDS,
+  get replayBufferSeconds() { return getBufferSeconds(); },
 };

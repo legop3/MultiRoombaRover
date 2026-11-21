@@ -8,7 +8,7 @@ const { getNickname } = require('../nicknameService');
 const { getRecentMessages } = require('../chatService');
 const io = require('../../globals/io');
 const roverManager = require('../roverManager');
-const { FFMPEG_BIN, BUILD_DURATION_MS, BUILD_GUARD_MS, TARGET_FPS, MAX_WIDTH, MAX_HEIGHT, MAX_BYTES } = require('./constants');
+const { FFMPEG_BIN, getBuildDurationMs, BUILD_GUARD_MS, TARGET_FPS, MAX_WIDTH, MAX_HEIGHT, MAX_BYTES } = require('./constants');
 
 function buildGridLayout(count) {
   const cols = Math.ceil(Math.sqrt(count));
@@ -117,11 +117,13 @@ function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo
 
   async function buildReplayVideo({ sources = [], title = '', requester = '', includeSidebar = true } = {}) {
     if (!Array.isArray(sources) || !sources.length) throw new Error('No replay sources selected');
+    // Resolved once per build so a settings change mid-render cannot mismatch the window and encode length.
+    const buildDurationMs = getBuildDurationMs();
     const { tEnd, tStart } = resolveReplayWindow({
       sources,
       nowMs: Date.now(),
       guardMs: BUILD_GUARD_MS,
-      durationMs: BUILD_DURATION_MS,
+      durationMs: buildDurationMs,
     });
     const resolvedTitle = sanitizeReplayTitle(title, resolveDefaultReplayTitle(requester, sources));
     /*
@@ -220,7 +222,7 @@ function createReplayBuilder({ execFileAsync, fsp, ensureDir, renderSidebarVideo
       }
       tileWidth = clampEven(tileWidth);
       tileHeight = clampEven(tileHeight);
-      const durationSec = BUILD_DURATION_MS / 1000;
+      const durationSec = buildDurationMs / 1000;
 
       const inputArgs = [];
       const filterParts = [];
