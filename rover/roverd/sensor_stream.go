@@ -65,24 +65,25 @@ func (s *SensorStreamer) Run(ctx context.Context) {
 			continue
 		}
 
+		// Hardware reactions must see every frame. Only network telemetry
+		// is throttled; a brief dock contact must not disappear between sends.
+		if s.parsed != nil {
+			if sample, ok := decodeSensorSample(frame); ok {
+				select {
+				case s.parsed <- sample:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
 		now := time.Now()
 		if !nextSend.IsZero() && now.Before(nextSend) {
 			continue
 		}
 		nextSend = now.Add(sensorThrottleMinimum)
-
 		select {
 		case s.rawOut <- frame:
 		default:
-		}
-
-		if s.parsed != nil {
-			if sample, ok := decodeSensorSample(frame); ok {
-				select {
-				case s.parsed <- sample:
-				default:
-				}
-			}
 		}
 	}
 }
@@ -104,13 +105,10 @@ func decodeSensorSample(frame []byte) (SensorSample, bool) {
 		return SensorSample{}, false
 	}
 	payload := frame[2 : 2+nBytes]
-	if len(payload) != expectedPayloadLength {
-		return SensorSample{}, false
-	}
 
 	idx := 0
 	var sample SensorSample
-	var seen byte
+	var seenGroup bool
 	for idx < len(payload) {
 		id := payload[idx]
 		idx++
@@ -124,20 +122,19 @@ func decodeSensorSample(frame []byte) (SensorSample, bool) {
 		segment := payload[idx : idx+size]
 		switch id {
 		case 100:
+			// Match the original server decoder: use one coherent group-100
+			// snapshot, not later duplicate reads of charging/contact.
+			seenGroup = true
+			sample.ChargingState = segment[16]
+			sample.ChargeSources = segment[39]
 			sample.Mode = segment[40]
 			sample.Charge = binary.BigEndian.Uint16(segment[22:24])
 			sample.Capacity = binary.BigEndian.Uint16(segment[24:26])
 			sample.LeftEncoder = binary.BigEndian.Uint16(segment[52:54])
 			sample.RightEncoder = binary.BigEndian.Uint16(segment[54:56])
-		case 21:
-			sample.ChargingState = segment[0]
-			seen |= 1
-		case 34:
-			sample.ChargeSources = segment[0]
-			seen |= 2
 		}
 		idx += size
 	}
 	sample.Timestamp = time.Now().UnixMilli()
-	return sample, seen&3 == 3
+	return sample, seenGroup
 }

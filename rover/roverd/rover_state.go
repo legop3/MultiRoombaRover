@@ -87,6 +87,7 @@ func (c *WSClient) ObserveHardware(ctx context.Context, samples <-chan SensorSam
 					// Contact latches the stop: a bouncing contact must not
 					// unlock held controls or repeatedly interrupt charging.
 					c.runtime.dockHold = true
+					c.log.Printf("dock contact: stopping (mode=%d sources=%d)", sample.Mode, sample.ChargeSources)
 					if err := c.stopAtDock(); err != nil {
 						c.log.Printf("dock contact stop: %v", err)
 					}
@@ -373,7 +374,7 @@ func (c *WSClient) dockBeep(slot, duration int, notes ...int) {
 func (c *WSClient) stopAtDock() error {
 	// Autonomous seek runs in Passive, where wheel commands are ignored.
 	// Take control before stopping, then request charging immediately.
-	if err := c.setOIMode(132); err != nil {
+	if err := c.adapter.SendRaw([]byte{132}); err != nil {
 		return err
 	}
 	if err := c.adapter.DriveDirect(0, 0); err != nil {
