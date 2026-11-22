@@ -68,7 +68,7 @@ function HudOverlay({
     return (
       <>
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <SpectatorTelemetryOverlay sensors={resolvedSensors} telemetry={sensors ? null : spectatorTelemetry} mobileHud={isMobile} />
+          <SpectatorTelemetryOverlay sensors={resolvedSensors} telemetry={spectatorTelemetry} mobileHud={isMobile} />
           <RoverLabelOverlay
             variant="spectator"
             label={resolvedLabel}

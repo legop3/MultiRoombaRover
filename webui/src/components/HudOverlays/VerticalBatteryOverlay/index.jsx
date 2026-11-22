@@ -1,29 +1,12 @@
 import React from 'react';
-import { useSessionSelector } from '../../../context/SessionContext.jsx';
 import { useVisualTelemetrySelector } from '../../../context/TelemetryContext.jsx';
-import { batteryTelemetryEqual, selectBatteryTelemetry } from '../../../context/telemetryViews.js';
+import { batteryTelemetryEqual, selectBatteryState } from '../../../context/telemetryViews.js';
 import { buildBatteryVisual } from '../../../lib/battery.js';
 import BatteryBar from '../../BatteryBar/index.jsx';
 
-function VerticalBatteryOverlay({ show = false, roverId = null, sensors, batteryConfig, mobileHud = false }) {
-  const batteryTelemetry = useVisualTelemetrySelector(roverId, selectBatteryTelemetry, batteryTelemetryEqual);
-  const rosterBatteryConfig = useSessionSelector((state) => {
-    if (!roverId) return null;
-    const roster = state.session?.roster || [];
-    const rover = roster.find((entry) => String(entry.id) === String(roverId));
-    return rover?.battery ?? null;
-  });
-  const resolvedBatteryTelemetry = sensors
-    ? {
-        batteryChargeMah: sensors?.batteryChargeMah ?? null,
-        batteryCapacityMah: sensors?.batteryCapacityMah ?? null,
-      }
-    : batteryTelemetry;
-  const resolvedBatteryConfig = batteryConfig ?? rosterBatteryConfig;
-  const batteryVisual = buildBatteryVisual({
-    charge: resolvedBatteryTelemetry?.batteryChargeMah ?? null,
-    config: resolvedBatteryConfig,
-  });
+function VerticalBatteryOverlay({ show = false, roverId = null, mobileHud = false }) {
+  const batteryState = useVisualTelemetrySelector(roverId, selectBatteryState, batteryTelemetryEqual);
+  const batteryVisual = buildBatteryVisual({ batteryState });
   if (!show || !batteryVisual?.available) return null;
 
   return (

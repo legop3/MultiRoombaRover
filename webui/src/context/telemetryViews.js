@@ -72,6 +72,16 @@ export function lightBumpTelemetryEqual(left, right) {
   return shallowArrayEqual(left, right);
 }
 
+// Battery bars and warnings follow rover state even without electrical sensors.
+export function selectBatteryState(frame) {
+  const battery = frame?.roverState?.battery;
+  return {
+    percentDisplay: battery?.percent ?? null,
+    warnActive: battery?.low === true,
+    urgentActive: battery?.critical === true,
+  };
+}
+
 export function selectBatteryTelemetry(frame) {
   const sensors = frame?.sensors;
   if (!sensors) return EMPTY_BATTERY_TELEMETRY;
@@ -134,8 +144,8 @@ export function selectSpectatorTelemetry(frame) {
     currentMa: bucketNumber(sensors.currentMa, 25),
     batteryChargeMah: sensors.batteryChargeMah ?? null,
     batteryCapacityMah: sensors.batteryCapacityMah ?? null,
-    oiModeLabel: frame?.roverState?.drivingMode == null ? 'Unknown' : frame.roverState.drivingMode ? 'Driving' : 'Not driving',
-    chargingStateLabel: frame?.roverState?.battery?.charging === true ? 'Charging' : '',
+    drivingMode: frame?.roverState?.drivingMode ?? null,
+    charging: frame?.roverState?.battery?.charging ?? null,
     homeBase: frame?.roverState?.docked ?? null,
   };
 }

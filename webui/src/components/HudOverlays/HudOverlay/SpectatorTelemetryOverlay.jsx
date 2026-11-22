@@ -2,9 +2,10 @@ export default function SpectatorTelemetryOverlay({ sensors, telemetry = null, m
   const voltageMv = telemetry?.voltageMv ?? sensors?.voltageMv ?? null;
   const currentMa = telemetry?.currentMa ?? sensors?.currentMa ?? null;
   const batteryChargeMah = telemetry?.batteryChargeMah ?? sensors?.batteryChargeMah ?? null;
-  const oiLabel = telemetry?.oiModeLabel ?? 'Unknown';
+  const driving = telemetry?.drivingMode ?? null;
+  const modeLabel = driving == null ? 'Unknown' : driving ? 'Driving' : 'Not driving';
   const docked = telemetry?.homeBase ?? null;
-  const chargingLabel = telemetry?.chargingStateLabel ?? '';
+  const charging = telemetry?.charging ?? null;
   const statusPadClass = mobileHud ? 'px-0.25 py-0.25' : 'px-1 py-0.5';
   const telemetryPosClass = mobileHud ? 'left-0.5 top-1/2' : 'left-1 top-1/2';
   const telemetryTextClass = mobileHud ? 'text-[0.45rem]' : 'text-[0.65rem]';
@@ -12,18 +13,11 @@ export default function SpectatorTelemetryOverlay({ sensors, telemetry = null, m
     ['Voltage', voltageMv != null ? `${(voltageMv / 1000).toFixed(2)} V` : '--'],
     ['Current', currentMa != null ? `${currentMa} mA` : '--'],
     ['Charge', batteryChargeMah != null ? `${batteryChargeMah}` : '--'],
-    ['OI', oiLabel || '--'],
+    ['Mode', modeLabel],
   ];
-  const charging = Boolean(chargingLabel && chargingLabel.toLowerCase() !== 'not charging');
-  const oiNormalized = oiLabel.toLowerCase();
-  const oiTone =
-    oiNormalized === 'full'
-      ? 'bg-emerald-500/80 text-emerald-50'
-      : oiNormalized === 'safe'
-      ? 'bg-amber-400/80 text-amber-950'
-      : oiNormalized === 'passive'
-      ? 'bg-slate-700/80 text-slate-100'
-      : 'bg-slate-700/60 text-slate-200';
+  const modeTone = driving === true
+    ? 'bg-emerald-500/80 text-emerald-50'
+    : 'bg-slate-700/70 text-slate-200';
   const dockTone = docked ? 'bg-emerald-500/80 text-emerald-50' : 'bg-slate-700/70 text-slate-200';
   const chargingTone = charging
     ? 'bg-emerald-500/80 text-emerald-50'
@@ -37,11 +31,11 @@ export default function SpectatorTelemetryOverlay({ sensors, telemetry = null, m
     >
       <div className="space-y-0.5 leading-tight">
         <div className="flex flex-col gap-0.5 text-[0.75rem] font-semibold uppercase tracking-wide">
-          <span className={`rounded-sm px-1.5 py-0.5 ${dockTone}`}>{docked ? 'Docked' : 'Undocked'}</span>
+          <span className={`rounded-sm px-1.5 py-0.5 ${dockTone}`}>{docked == null ? 'Dock unknown' : docked ? 'Docked' : 'Undocked'}</span>
           <span className={`rounded-sm px-1.5 py-0.5 ${chargingTone}`}>
-            {charging ? 'Charging' : docked ? 'Not charging' : 'Not charging'}
+            {charging == null ? 'Charging unknown' : charging ? 'Charging' : 'Not charging'}
           </span>
-          <span className={`rounded-sm px-1.5 py-0.5 ${oiTone}`}>OI: {oiLabel}</span>
+          <span className={`rounded-sm px-1.5 py-0.5 ${modeTone}`}>{modeLabel}</span>
         </div>
         {telemetryEntries.map(([labelText, value]) => (
           <span key={labelText} className="flex items-center justify-between gap-0.5">
