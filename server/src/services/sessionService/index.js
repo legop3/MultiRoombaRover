@@ -322,11 +322,6 @@ modeEvents.on('change', () => {
 });
 
 managerEvents.on('rover', (event = {}) => {
-  // Rover telemetry/state has its own targeted roverState and rovers events.
-  // Rebuilding every connected browser's full session for each state sample
-  // multiplies a single robot's battery readings into thousands of syncs.
-  // Only roster/lifecycle and permissions changes require session snapshots.
-  if (event.action === 'roverState') return;
   const state = getState();
   if (event.action === 'headlight' || event.action === 'laser') {
     const now = Date.now();
