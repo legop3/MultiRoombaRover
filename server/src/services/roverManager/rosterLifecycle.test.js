@@ -62,3 +62,48 @@ test('getRoster supplies an empty peripheral inventory when none was advertised'
 
   assert.deepEqual(entry.peripherals, []);
 });
+
+test('repeated unchanged roverState does not fan out roster or state events', () => {
+  const { EventEmitter } = require('node:events');
+  const managerEvents = new EventEmitter();
+  const roverEvents = [];
+  const socketEvents = [];
+  const socket = { id: 'browser-1', emit: (type, data) => socketEvents.push(type) };
+  const rovers = new Map([['cozmo', {
+    id: 'cozmo', meta: { name: 'cozmo' }, roverState: null,
+    batteryState: null, room: 'rover:cozmo', lastSeen: 0,
+    drivers: new Set(), locked: false, needsHelp: false,
+  }]]);
+  const manager = createRosterLifecycle({
+    rovers, managerEvents,
+    io: {
+      to: () => ({ emit: (type, data) => roverEvents.push(type) }),
+      sockets: { sockets: new Map([['browser-1', socket]]) },
+    },
+    spectatorSockets: new Set(),
+    isRoverVisibleToSocket: () => true,
+    isPrivateRecord: () => false,
+    isPrivateOpen: () => true,
+    getPrivateSafety: () => ({}),
+  });
+  let updates = 0;
+  managerEvents.on('rover', () => updates++);
+  const state = {
+    drivingMode: true, dockAssist: false, docking: false,
+    docked: false, headlightOn: false, laserOn: null,
+    battery: { percent: 56, charging: false, low: false,
+               critical: false, needsCharge: false },
+  };
+  manager.setRoverState('cozmo', state);
+  assert.equal(updates, 1);
+  assert.deepEqual(roverEvents, ['roverState']);
+  assert.deepEqual(socketEvents, ['rovers']);
+  manager.setRoverState('cozmo', { ...state, battery: { ...state.battery } });
+  assert.equal(updates, 1);
+  assert.deepEqual(roverEvents, ['roverState']);
+  assert.deepEqual(socketEvents, ['rovers']);
+  manager.setRoverState('cozmo', { ...state, battery: { ...state.battery, percent: 57 } });
+  assert.equal(updates, 2);
+  assert.deepEqual(roverEvents, ['roverState', 'roverState']);
+  assert.deepEqual(socketEvents, ['rovers', 'rovers']);
+});
