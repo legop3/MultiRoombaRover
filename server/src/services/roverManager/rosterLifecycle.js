@@ -279,9 +279,6 @@ function createRosterLifecycle(deps) {
     const record = rovers.get(roverId);
     if (!record || !state || typeof state !== 'object' || Array.isArray(state)) return;
     if (!require('../../helpers/roverState').validState(state)) return;
-    // The rover may resend identical state periodically as a heartbeat.
-    // This must not generate roster, docking or session work.
-    if (record.roverState && JSON.stringify(record.roverState) === JSON.stringify(state)) return;
     const previous = record.roverState;
     record.roverState = state;
     record.batteryState = require('../../helpers/roverState').batteryView(state);
