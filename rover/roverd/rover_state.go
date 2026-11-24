@@ -123,7 +123,7 @@ func (c *WSClient) publishHardwareState(valid bool) {
 		sample := c.runtime.sample
 		s.DrivingMode = boolValue(sample.Mode == oiModeSafe || sample.Mode == oiModeFull)
 		s.Docked = boolValue(sample.ChargeSources&sourceHomeBase != 0)
-		s.Docking = boolValue(sample.Mode == oiModePassive && sample.ChargeSources&sourceHomeBase == 0)
+		s.Docking = boolValue(c.observedSeeking())
 		charge, full, warn, urgent := float64(sample.Charge), float64(c.cfg.Battery.Full), float64(c.cfg.Battery.Warn), float64(c.cfg.Battery.Urgent)
 		var percent *float64
 		value := 0.0

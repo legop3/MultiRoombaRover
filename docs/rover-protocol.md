@@ -77,7 +77,7 @@ Send the whole object on connection and when any field changes. It replaces the 
 | --- | --- |
 | `drivingMode` | Hardware is drive-enabled; not a guarantee of server permission or actual wheel movement. |
 | `dockAssist` | Rover-controlled manual docking assistance is active. Null means unsupported/unknown. |
-| `docking` | Passive hardware mode while not on the dock. Manual assistance is reported separately. |
+| `docking` | Passive hardware mode, no dock contact, and measured encoder movement. This is an observed seeking indication; manual assistance is reported separately. |
 | `docked` | Physical dock contact. |
 | `battery.percent` | Display percentage, 0–100, decimals allowed. |
 | `battery.charging` | Charging process, including normal waiting pauses. Instantaneous current remains telemetry. |
@@ -89,7 +89,7 @@ The server uses this state for operational displays, battery locking, docking po
 
 Official roverd computes its displayed percentage using configured urgent/warn/full calibration (0/10/100%). It remembers low-battery recovery across daemon restarts. Recovery clears after five continuous minutes of docked waiting and `(charge-warn)/(full-warn) >= 0.01`, not merely when the display reaches 100%. Missing hardware samples reset the waiting interval and produce null hardware state. An unchanged valid state needs no periodic resend.
 
-Official roverd reports drivingMode true for observed OI safe/full (3/4 in the supported rovers' reported mapping); passive/off are false. Docking is true exactly when the reported mode is passive and Home Base contact is absent. Docked comes from the Home Base bit. Charging is true for OI states 1–4. Low is charge ≤ configured warn, critical is charge ≤ urgent. The calibrated percent is rounded and clamped to 0…100; if calibration is unusable but capacity is positive it falls back to charge/capacity. Hardware state becomes null after 1.5 seconds without samples; headlight/laser state remains independent. A custom rover is responsible for reporting null when its own hardware observations become unavailable.
+Official roverd reports drivingMode true for observed OI safe/full (3/4 in the supported rovers' reported mapping); passive/off are false. Docking is true when the reported mode is passive, Home Base contact is absent, and successive encoder samples indicate movement. It is a display indication, never a gate for autoDock. Docked comes from the Home Base bit. Charging is true for OI states 1–4. Low is charge ≤ configured warn, critical is charge ≤ urgent. The calibrated percent is rounded and clamped to 0…100; if calibration is unusable but capacity is positive it falls back to charge/capacity. Hardware state becomes null after 1.5 seconds without samples; headlight/laser state remains independent. A custom rover is responsible for reporting null when its own hardware observations become unavailable.
 
 Malformed roverState is ignored rather than partially merged or acknowledged. All required leaves must exist. The current validator permits extra keys, but extra keys have no defined consumers.
 
@@ -255,7 +255,7 @@ On rejection: `{"type":"ack","id":"command-id","status":"error","error":"reason"
 | `drive` | `driveDirect: {left, right}`; signed mm/s. Zero speeds stop ordinary driving. |
 | `undock` | Optional `backoff` boolean (default true). Perform Start → Seek Dock → Full, then reverse at configured maxWheelSpeed until contact is lost or three seconds of reversing elapse. With backoff false, finish after preparation without reversing. |
 | `dockAssist` | Prepare user-driven docking; stop on contact and arrange charging locally. Rover manages camera positioning and assist speed limiting; server only requests the action and displays reported state. Already docked is a no-op. |
-| `autoDock` | Begin autonomous dock-seeking. Repeated requests must not restart an active seek. |
+| `autoDock` | Send Seek Dock regardless of mode, contact, remembered commands, or telemetry freshness. Ignored only during an active undock. |
 | `cancelDocking` | Stop docking assistance; ignored during an active undock. |
 | `servo` | `servo: {angle}` or `{nudge}` in degrees, or `{pulseUs}` for supported hardware. |
 | `headlight`, `laser` | Matching object with `action`: on/off/toggle. |
@@ -314,7 +314,7 @@ Undock sends a final result on the control connection:
 
 Failure/cancellation uses `status: "error"` or `"cancelled"` and `error`. The physical state still comes from `roverState`. Official roverd ignores incoming control commands while undocking, including joystick release, protection output, raw commands, and cancellation. Control-connection loss does not cancel the sequence. After preparation it reverses at the configured maximum wheel speed, stopping on confirmed loss of dock contact or after three seconds of reversing. The timeout runs locally even without telemetry. Serial write failures still report an error. Management changes are rejected while undocking. Auto-dock completion is represented by docked state; official roverd stops wheels and auxiliary motors on contact, then requests charging on a later contact sample only when both encoder-derived wheel speeds are zero and charging has not already started. Manual assistance ends when charging is confirmed. The local docking controller uses the original 50 ms telemetry cadence. There is no generic accessory feedback stream.
 
-Official roverd limits assisted driving to 60 mm/s, aims the camera at its configured minimum angle, and returns the camera to zero when assistance ends. Cancellation, undocking, auto-docking, explicit OI mode changes, and control-connection loss also end assistance. Assist entry/exit and contact/contact-loss play the original OI beeps. First contact latches a local movement stop until explicit undocking. Contact loss does not restore Full mode, release held controls, or restart auto-docking; manual assistance remains active until charging is confirmed or cancelled. Held drive/motor commands cannot override the contact stop. These behaviors belong to roverd; other rover implementations may provide different assistance. The server does not issue camera-position commands, impose an assist-specific speed limit, or block drive commands based on docking state. Roverd enforces the physical movement lock.
+Official roverd limits assisted driving to 60 mm/s, aims the camera at its configured minimum angle, and returns the camera to zero when assistance ends. Cancellation, undocking, auto-docking, explicit OI mode changes, and control-connection loss also end assistance. Assist entry/exit and contact/contact-loss play the original OI beeps. Motor commands are held while dock contact is reported, without a persistent contact latch. Contact loss releases that contact-based hold and does not issue mode changes or automatically restart docking; manual assistance remains active until charging is confirmed or cancelled. Held drive/motor commands cannot override the contact stop. These behaviors belong to roverd; other rover implementations may provide different assistance. The server does not issue camera-position commands, impose an assist-specific speed limit, or block drive commands based on docking state. Roverd enforces the physical movement lock.
 
 ## Accessories
 
@@ -580,3 +580,5 @@ Official roverd derives RTSP addresses from the configured server host, RTSP por
 No capability negotiation or alternate supported roverd implementation is implied by this example.
 
 `roverState.dockingStatus` is the rover-owned UI snapshot: `phase` (`unknown`, `idle`, `undocking`, `docked`, `charging`, `assisting`, or `seeking`), boolean `movementLocked` and `cameraLocked`, and `error` (null or `{code,message}`). The server forwards docking commands and displays this snapshot; it does not reconstruct docking locks, phases, or timeouts.
+
+Sensor watchdog recovery restarts the sensor stream without sending Start OI or changing hardware mode.

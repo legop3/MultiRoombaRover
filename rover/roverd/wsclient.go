@@ -228,10 +228,9 @@ func (c *WSClient) dispatch(ctx context.Context, msg *inboundMessage) error {
 	if c.docking.operation != nil {
 		return nil
 	}
-	// The contact stop stays latched through contact flicker and charging.
-	// Queued drive/motor messages must not undo it.
-	// Deliberate undocking owns its reverse output and is exempt.
-	if c.docking.operation == nil && (c.docking.dockHold || c.runtime.sample.ChargeSources&sourceHomeBase != 0) {
+	// Hold incoming motor commands while contact is present so they cannot
+	// undo the contact stop before charging starts. Contact loss releases this.
+	if c.runtime.sample.ChargeSources&sourceHomeBase != 0 {
 		moving := msg.DriveDirect != nil && (msg.DriveDirect.Left != 0 || msg.DriveDirect.Right != 0)
 		motors := msg.MotorPWM != nil && (msg.MotorPWM.Main != 0 || msg.MotorPWM.Side != 0 || msg.MotorPWM.Vacuum != 0)
 		if moving || motors {
@@ -464,7 +463,6 @@ func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
 	const (
 		sensorSilenceTimeout   = 5 * time.Second
 		sensorRecoveryCooldown = 3 * time.Second
-		sensorCommandPause     = 50 * time.Millisecond
 	)
 
 	timer := time.NewTimer(sensorSilenceTimeout)
@@ -499,7 +497,7 @@ func (c *WSClient) forwardSensors(ctx context.Context, conn *websocket.Conn) {
 				idleFor = sensorSilenceTimeout
 			}
 
-			c.recoverSensorStream(idleFor, sensorCommandPause)
+			c.recoverSensorStream(idleFor)
 			lastRecovery = now
 			resetTimer()
 		case frame := <-c.sensorFrames:
@@ -746,7 +744,7 @@ func (c *WSClient) handleRebootTimeout() {
 	}
 }
 
-func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Duration) {
+func (c *WSClient) recoverSensorStream(idleFor time.Duration) {
 	c.commandMu.Lock()
 	defer c.commandMu.Unlock()
 	if c.stopping.Load() {
@@ -773,18 +771,7 @@ func (c *WSClient) recoverSensorStream(idleFor time.Duration, cmdPause time.Dura
 		c.console.Notify(fmt.Sprintf("Sensor watchdog is restarting the Roomba sensor stream after %.1f seconds without data.", idleFor.Seconds()))
 	}
 
-	if err := c.adapter.StartOI(); err != nil {
-		c.log.Printf("watchdog start OI failed: %v", err)
-		c.emitEvent("sensorWatchdog.error", map[string]any{"error": err.Error()})
-		// Unlike the restart notice, every concrete command failure is useful
-		// diagnostic information and may change between recovery attempts.
-		c.console.Notify(fmt.Sprintf("Sensor watchdog recovery failed while starting the Roomba OI: %v", err))
-		return
-	}
-	if cmdPause > 0 {
-		time.Sleep(cmdPause)
-	}
-
+	// Restart telemetry without interrupting the Roomba's own docking behavior.
 	if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
 		c.log.Printf("watchdog start stream failed: %v", err)
 		c.emitEvent("sensorWatchdog.error", map[string]any{"error": err.Error()})

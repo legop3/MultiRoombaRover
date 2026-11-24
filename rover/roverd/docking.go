@@ -20,9 +20,9 @@ type dockingController struct {
 	error              *dockingError
 	sample             SensorSample
 	seen               bool
-	dockHold           bool
 	contactDockPending bool
-	seeking, assist    bool
+	assist             bool
+	moving             bool
 	operation          *undockOperation
 }
 
@@ -38,15 +38,8 @@ func (c *WSClient) observeDocking(sample SensorSample) {
 	}
 	d.sample, d.seen = sample, true
 	docked := sample.ChargeSources&sourceHomeBase != 0
-	if docked || (hadSample && previous.Mode == oiModePassive && (sample.Mode == oiModeSafe || sample.Mode == oiModeFull)) {
-		c.adapter.seeking.Store(false)
-	}
-	if d.operation == nil {
-		d.seeking = c.adapter.seeking.Load()
-	}
-	if docked {
-		d.seeking = false
-	}
+	// Movement is measured between telemetry samples, not inferred from commands.
+	d.moving = hadSample && elapsed > 0 && elapsed <= 1500 && !dockingWheelsStopped(previous, sample)
 	if d.operation != nil {
 		c.checkDockingDeadline()
 		if d.operation != nil {
@@ -61,9 +54,7 @@ func (c *WSClient) observeDocking(sample SensorSample) {
 		}
 		return
 	}
-	// Losing contact must not release held controls. Each new contact still
-	// issues a fresh stop, just as the old server's contact-edge handler did.
-	d.dockHold = true
+	// Stop on each new contact before requesting charging.
 	if !hadSample || previous.ChargeSources&sourceHomeBase == 0 {
 		if err := c.stopAtDock(); err != nil {
 			c.log.Printf("dock contact stop: %v", err)
@@ -119,25 +110,20 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 		c.setDockAssist(false)
 		return nil
 	}
+	// An explicit dock request must reach the hardware even with stale telemetry.
+	if msg.Type == "autoDock" {
+		c.setDockAssist(false)
+		return c.adapter.SeekDock()
+	}
 	if time.Since(c.runtime.seen) > 1500*time.Millisecond {
 		return fmt.Errorf("waiting for Roomba telemetry")
 	}
 	switch msg.Type {
-	case "autoDock":
-		c.setDockAssist(false)
-		if c.docking.dockHold || c.docking.seeking || c.runtime.sample.ChargeSources&sourceHomeBase != 0 {
-			return nil
-		}
-		if err := c.adapter.SeekDock(); err != nil {
-			return err
-		}
-		c.docking.seeking = true
 	case "dockAssist":
 		// Assistance cannot improve an already-established dock contact.
-		if c.docking.dockHold || c.runtime.sample.ChargeSources&sourceHomeBase != 0 || c.docking.assist {
+		if c.runtime.sample.ChargeSources&sourceHomeBase != 0 || c.docking.assist {
 			return nil
 		}
-		c.docking.seeking = false
 		c.docking.contactDockPending = false
 		if err := c.adapter.DriveDirect(0, 0); err != nil {
 			return err
@@ -149,13 +135,11 @@ func (c *WSClient) dockingCommand(msg *inboundMessage) error {
 		}
 		c.setDockAssist(false)
 		c.dockCamera(0)
-		c.docking.seeking = false
 		if err := c.setOIMode(128); err != nil {
 			return err
 		}
 		speed := c.cfg.MaxWheelMMs
 		c.log.Printf("undock starting: backoff=%v speed=%d mode=%d sources=%d", msg.Backoff == nil || *msg.Backoff, speed, c.runtime.sample.Mode, c.runtime.sample.ChargeSources)
-		c.docking.dockHold = false
 		c.docking.contactDockPending = false
 		c.docking.operation = &undockOperation{speed: speed, id: msg.ID, next: time.Now().Add(100 * time.Millisecond), backoff: msg.Backoff == nil || *msg.Backoff}
 	}
@@ -199,8 +183,6 @@ func (c *WSClient) finishUndock(status, message string) {
 	}
 	c.log.Printf("undock %s: %s (stage=%d mode=%d sources=%d)", status, message, op.stage, c.runtime.sample.Mode, c.runtime.sample.ChargeSources)
 	c.docking.operation = nil
-	c.docking.dockHold = status != "ok" || c.runtime.sample.ChargeSources&sourceHomeBase != 0
-	c.adapter.seeking.Store(false)
 	if err := c.adapter.DriveDirect(0, 0); err != nil {
 		status = "error"
 		message = err.Error()
@@ -315,8 +297,13 @@ func (c *WSClient) dockingSnapshot(valid bool) dockingStatus {
 		}
 	case d.assist:
 		phase = "assisting"
-	case s.Mode == oiModePassive:
+	case c.observedSeeking():
 		phase = "seeking"
 	}
-	return dockingStatus{Phase: phase, MovementLocked: !valid || d.operation != nil || d.dockHold || d.error != nil || s.ChargeSources&sourceHomeBase != 0, CameraLocked: d.assist, Error: d.error}
+	return dockingStatus{Phase: phase, MovementLocked: !valid || d.operation != nil || (s.ChargeSources&sourceHomeBase != 0 || (s.Mode != oiModeSafe && s.Mode != oiModeFull)), CameraLocked: d.assist, Error: d.error}
+}
+
+func (c *WSClient) observedSeeking() bool {
+	s := c.runtime.sample
+	return s.ChargeSources&sourceHomeBase == 0 && s.Mode == oiModePassive && c.docking.moving
 }
