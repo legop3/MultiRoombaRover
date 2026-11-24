@@ -747,7 +747,7 @@ func (c *WSClient) handleRebootTimeout() {
 func (c *WSClient) recoverSensorStream(idleFor time.Duration) {
 	c.commandMu.Lock()
 	defer c.commandMu.Unlock()
-	if c.stopping.Load() {
+	if c.stopping.Load() || c.docking.operation != nil {
 		return
 	}
 	c.recoverMu.Lock()
@@ -771,7 +771,15 @@ func (c *WSClient) recoverSensorStream(idleFor time.Duration) {
 		c.console.Notify(fmt.Sprintf("Sensor watchdog is restarting the Roomba sensor stream after %.1f seconds without data.", idleFor.Seconds()))
 	}
 
-	// Restart telemetry without interrupting the Roomba's own docking behavior.
+	// Restore the OI before requesting telemetry, as in the original recovery.
+	if err := c.adapter.StartOI(); err != nil {
+		c.log.Printf("watchdog start OI failed: %v", err)
+		c.emitEvent("sensorWatchdog.error", map[string]any{"error": err.Error()})
+		c.console.Notify(fmt.Sprintf("Sensor watchdog recovery failed while starting the Roomba OI: %v", err))
+		return
+	}
+	time.Sleep(50 * time.Millisecond)
+
 	if err := c.adapter.StartSensorStream(defaultStreamPackets); err != nil {
 		c.log.Printf("watchdog start stream failed: %v", err)
 		c.emitEvent("sensorWatchdog.error", map[string]any{"error": err.Error()})

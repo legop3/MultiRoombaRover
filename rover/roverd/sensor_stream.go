@@ -65,14 +65,13 @@ func (s *SensorStreamer) Run(ctx context.Context) {
 			continue
 		}
 
-		// Hardware reactions must see every frame. Only network telemetry
-		// is throttled; a brief dock contact must not disappear between sends.
+		// A slow hardware handler must not stall serial reading or network
+		// telemetry. Offer every sample, dropping it if the queue is full.
 		if s.parsed != nil {
 			if sample, ok := decodeSensorSample(frame); ok {
 				select {
 				case s.parsed <- sample:
-				case <-ctx.Done():
-					return
+				default:
 				}
 			}
 		}

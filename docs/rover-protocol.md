@@ -581,4 +581,4 @@ No capability negotiation or alternate supported roverd implementation is implie
 
 `roverState.dockingStatus` is the rover-owned UI snapshot: `phase` (`unknown`, `idle`, `undocking`, `docked`, `charging`, `assisting`, or `seeking`), boolean `movementLocked` and `cameraLocked`, and `error` (null or `{code,message}`). The server forwards docking commands and displays this snapshot; it does not reconstruct docking locks, phases, or timeouts.
 
-Sensor watchdog recovery restarts the sensor stream without sending Start OI or changing hardware mode.
+Roverd requests group 100 only. After five seconds without frames, sensor watchdog recovery sends Start OI, waits 50 ms, and requests streaming again. Recovery is skipped during active undocking. Local sample delivery is nonblocking so hardware handling cannot stall serial reading.

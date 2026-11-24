@@ -1,11 +1,9 @@
 package roverd
 
 var (
-	defaultStreamPackets = []byte{100, 21, 34}
+	defaultStreamPackets = []byte{100}
 	packetSizes          = map[byte]int{
 		100: 80,
-		21:  1,
-		34:  1,
 	}
 	expectedPayloadLength = func() int {
 		sum := 0

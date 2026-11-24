@@ -52,9 +52,9 @@ func buildDummyFrame() []byte {
 	payload = append(payload, 100)
 	group := make([]byte, packetSizes[100])
 	group[0] = byte(rand.Intn(16)) // bumps
+	group[16] = 3                  // charging state
+	group[39] = 0b10               // Home Base contact
 	payload = append(payload, group...)
-	payload = append(payload, 21, 3)
-	payload = append(payload, 34, 0b10)
 
 	buf := make([]byte, 0, len(payload)+3)
 	buf = append(buf, sensorHeader, byte(len(payload)))
