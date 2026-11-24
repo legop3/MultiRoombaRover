@@ -170,6 +170,7 @@ export default function AdminApp() {
           </Tabs>
         ) : <section className="mt-0.5 min-w-0">{content}</section>}
       </main>
+      <AlertFeed/>
     </div>
   );
 }
