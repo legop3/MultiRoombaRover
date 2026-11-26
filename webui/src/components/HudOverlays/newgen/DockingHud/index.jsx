@@ -100,7 +100,7 @@ function DockedAction({ driveKeyLabel, pending, controlsDisabled, error, onUndoc
   );
 }
 
-function AutoDockingAction({ driveKeyLabel, pending, controlsDisabled, error, onResumeDriving }) {
+function StartDrivingAction({ autoDocking, driveKeyLabel, pending, controlsDisabled, error, onResumeDriving }) {
   const waitingForTurn = controlsDisabled && !pending;
 
   return (
@@ -116,13 +116,12 @@ function AutoDockingAction({ driveKeyLabel, pending, controlsDisabled, error, on
         }`}
       >
         <strong className="text-3xl leading-tight">
-          {pending ? 'Starting driving…' : 'Rover is docking itself'}
+          {pending ? 'Starting driving…' : autoDocking ? 'Rover is docking itself' : 'Start driving'}
         </strong>
         {pending ? null : waitingForTurn ? (
-          /* Automatic docking is still important context when another user owns
-             the turn, but the recovery action must not imply that it is available. */
+          /* Show the hardware state without offering control outside the user's turn. */
           <span className="text-lg font-semibold leading-snug text-slate-300">
-            Wait for your turn to resume driving.
+            Wait for your turn to start driving.
           </span>
         ) : (
           <span className="text-lg font-semibold leading-snug text-amber-50">
@@ -132,7 +131,7 @@ function AutoDockingAction({ driveKeyLabel, pending, controlsDisabled, error, on
                 {' '}or press <KeyPill label={driveKeyLabel} />
               </>
             ) : null}
-            {' '}to stop automatic docking and resume driving
+            {' '}{autoDocking ? 'to stop automatic docking and resume driving' : 'to enter driving mode'}
           </span>
         )}
         {error ? <span className="text-sm font-semibold text-red-200">{error}</span> : null}
@@ -284,9 +283,10 @@ export default function DockingHud({ roverId }) {
   const [showUndockTransition, setShowUndockTransition] = useState(false);
 
   const docked = Boolean(dockTelemetry?.homeBase);
-  // The established UI contract treats exactly passive + undocked as the Roomba's
-  // autonomous docking attempt. Unknown telemetry must not fabricate that state.
   const autoDocking = dockTelemetry.autoDocking === true;
+  // Passive and stationary is a valid post-reboot state, not necessarily seeking.
+  // Offer the drive action independently, but never infer it from missing telemetry.
+  const needsDrivingMode = dockTelemetry.homeBase === false && dockTelemetry.drivingMode === false;
   const pendingAction = (dockTelemetry.dockingPhase === 'undocking') ? (docked ? 'undocking' : 'resuming') : null;
   const pending = pendingAction !== null;
   /* Mobile already presents its own touch-oriented driving controls. The docked
@@ -318,12 +318,12 @@ export default function DockingHud({ roverId }) {
 
   return (
     <>
-      {/* Automatic docking keeps its own lighter blocking shield. The ordinary
+      {/* Entering driving mode uses a lighter blocking shield. The ordinary
           docked shield lives inside DockedAction because the new Hide control
           must dismiss the prompt and its dimming as one coherent surface. */}
       <div
         className={`absolute inset-0 z-25 transition-all duration-300 ${
-          autoDocking || pendingAction === 'resuming'
+          needsDrivingMode || autoDocking || pendingAction === 'resuming'
               ? 'pointer-events-auto bg-black/55 opacity-100'
               : 'pointer-events-none opacity-0'
         }`}
@@ -339,8 +339,9 @@ export default function DockingHud({ roverId }) {
           error={dockTelemetry.dockingError}
           onUndock={startDriving}
         />
-      ) : autoDocking || pendingAction === 'resuming' ? (
-        <AutoDockingAction
+      ) : needsDrivingMode || autoDocking || pendingAction === 'resuming' ? (
+        <StartDrivingAction
+          autoDocking={autoDocking}
           driveKeyLabel={driveKeyLabel}
           pending={pendingAction === 'resuming'}
           controlsDisabled={!canControl}
