@@ -1,7 +1,7 @@
 // Main Application Shell
 // Purpose: Composes the primary rover control interface and page-level layout. Scope: Orchestrates high-level panels, overlays, and feature modules for the default route.
 import RoomAudioPlayer from '../components/RoomAudioPlayer/index.jsx';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AlertFeed from '../components/AlertFeed/index.jsx';
 import {
   ControlSystemProvider,
@@ -63,10 +63,14 @@ function DriverPageContent({ layout, oldDesktop }) {
   const [helpVisible, setHelpVisible] = useState(false);
   const [quickstartVisible, setQuickstartVisible] = useState(false);
 
+  // Decide first-run visibility once, when settings finish loading. Later preference
+  // changes (e.g. toggling "Don't show again") must not re-open or force-close the dialog.
+  const quickstartInitializedRef = useRef(false);
   useEffect(() => {
-    if (quickstartStatus === 'ready') {
-      setQuickstartVisible(quickstartSettings?.showOnLoad !== false);
-    }
+    if (quickstartStatus !== 'ready') return;
+    if (quickstartInitializedRef.current) return;
+    quickstartInitializedRef.current = true;
+    setQuickstartVisible(quickstartSettings?.showOnLoad !== false);
   }, [quickstartStatus, quickstartSettings?.showOnLoad]);
 
   const openHelp = useCallback(() => {
@@ -78,13 +82,11 @@ function DriverPageContent({ layout, oldDesktop }) {
   const closeQuickstart = useCallback(() => {
     setQuickstartVisible(false);
   }, []);
+  // Persisting the preference is independent of dismissing; only closeQuickstart hides the dialog.
   const setQuickstartShowOnLoad = useCallback(
     (enabled) => {
       const next = Boolean(enabled);
       saveQuickstartSettings((current) => ({ ...(current ?? {}), showOnLoad: next }));
-      if (!next) {
-        setQuickstartVisible(false);
-      }
     },
     [saveQuickstartSettings],
   );
