@@ -4,8 +4,7 @@ research how midis can be played easier with drag and drop, auto selection based
 and make sure each toggle and counter actually has a purpose besides debugging or something more useful to the user, note skipped is just for debugging
 ```
 1. add admin ui for VIP and private requests instead of only through discord
-2. make roverd self update checkout to main branch
-3.  fix this:
+2.  fix this:
 `Jun 18 15:14:18 roombaserver.local node[216731]: /home/daniel/MultiRoombaRover/server/src/services/roverManager/socketHandlers.js:92
 Jun 18 15:14:18 roombaserver.local node[216731]:         cb({ error: err.message });
 Jun 18 15:14:18 roombaserver.local node[216731]:         ^
@@ -19,15 +18,11 @@ Jun 18 15:14:18 roombaserver.local node[216731]: Node.js v22.20.0
 Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Main process exited, code=exited, status=1/FAILURE
 Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Failed with result 'exit-code'.
 Jun 18 15:14:18 roombaserver.local systemd[1]: multirover.service: Consumed 55min 11.511s CPU time, 711M memory peak.`
-1. redo new user experience, at the very least make it a fullscreen thing instead of a popup
-2. roverd settings and installer rework (see discord forum post)
-3. global quiet mode with its fingers in everything. activity controls optional, session status for theater, another global volume set, etc. 
+1. global quiet mode with its fingers in everything. activity controls optional, session status for theater, another global volume set, etc. 
 
 # relative pipe dreams:
-1. convert MRR into a platform that could work with non-roomba rovers... 
 1. VPS video forwarding
    1. get forwarding working with the VPS for in-queue users and spectators
    2. bandwidth testing
    3. maybe switch room cams back to real video, with audio?
 2. RF based positional tracking / room map tab
-3. chromecast monitor youtube search and speakers

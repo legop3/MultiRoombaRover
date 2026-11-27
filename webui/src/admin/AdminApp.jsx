@@ -20,6 +20,7 @@ import AdminOverview from './components/AdminOverview.jsx';
 import BackupRestorePanel from './components/BackupRestorePanel.jsx';
 import ConfigurationEditor from './components/ConfigurationEditor.jsx';
 import PasswordConfirmationDialog from './components/PasswordConfirmationDialog.jsx';
+import AlertFeed from '../components/AlertFeed/index.jsx';
 import './styles.css';
 
 const TOP_LEVEL_SECTIONS = [
