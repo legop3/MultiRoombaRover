@@ -9,15 +9,21 @@ const { promisify } = require('util');
 
 const logger = require('../../globals/logger').child('roomCameraReplay');
 const { resolveRuntimePath } = require('../../helpers/dataPaths');
+const { getBuildDurationMs } = require('./constants');
 
 const execFileAsync = promisify(execFile);
 
-const REPLAY_DURATION_MS = 20000;
 const REPLAY_FPS = 15;
-const HISTORY_WINDOW_MS = 60000;
+const MIN_HISTORY_WINDOW_MS = 60000;
+const HISTORY_MARGIN_MS = 15000;
 const MAX_REPLAY_WIDTH = 1280;
 const MAX_REPLAY_HEIGHT = 720;
 const REPLAY_MAX_BYTES = Math.floor(9.5 * 1024 * 1024);
+
+// Frame history must always cover the configured replay length plus a margin.
+function getHistoryWindowMs() {
+  return Math.max(MIN_HISTORY_WINDOW_MS, getBuildDurationMs() + HISTORY_MARGIN_MS);
+}
 
 const frameHistory = new Map();
 const latestFrames = new Map();
@@ -29,7 +35,7 @@ function recordRoomCameraFrame(id, buffer, ts = Date.now()) {
   latestFrames.set(id, entry);
   const history = frameHistory.get(id) || [];
   history.push(entry);
-  const cutoff = ts - HISTORY_WINDOW_MS;
+  const cutoff = ts - getHistoryWindowMs();
   while (history.length && history[0].ts < cutoff) history.shift();
   frameHistory.set(id, history);
   events.emit('frame', { id, ts });
@@ -41,7 +47,7 @@ function clearRoomCameraReplayFrames() {
 }
 
 function getRoomCameraReplayMetadata() {
-  return { durationMs: REPLAY_DURATION_MS, fps: REPLAY_FPS };
+  return { durationMs: getBuildDurationMs(), fps: REPLAY_FPS };
 }
 
 function buildTimelineForCamera(id, startMs, frameCount, frameStepMs) {
@@ -107,9 +113,10 @@ async function buildRoomCameraReplayVideo({ cameraId = null } = {}, { getRoomCam
   const cameras = cameraId ? [getRoomCamera(cameraId)].filter(Boolean) : getRoomCameras();
   if (!cameras.length) throw new Error('No room cameras configured');
 
-  const frameCount = Math.max(1, Math.round((REPLAY_DURATION_MS / 1000) * REPLAY_FPS));
+  const replayDurationMs = getBuildDurationMs();
+  const frameCount = Math.max(1, Math.round((replayDurationMs / 1000) * REPLAY_FPS));
   const frameStepMs = 1000 / REPLAY_FPS;
-  const startMs = Date.now() - REPLAY_DURATION_MS;
+  const startMs = Date.now() - replayDurationMs;
 
   const cameraEntries = [];
   cameras.forEach((camera) => {
