@@ -5,7 +5,7 @@ set -euo pipefail
 # Existing installations keep their identity; only fresh hosts need prompts.
 if [[ ! -f /etc/roverd.json && ! -f /etc/roverd.yaml ]]; then
   read -r -p 'Rover name: ' rover_name </dev/tty
-  read -r -p 'Server address (ws://host:port/rover or wss://host/rover): ' server_address </dev/tty
+  read -r -p 'Server address (ws://private-host:65037/rover): ' server_address </dev/tty
   [[ -n "$rover_name" && -n "$server_address" ]] || { echo 'Name and address are required' >&2; exit 1; }
   export ROVERD_INITIAL_NAME="$rover_name" ROVERD_INITIAL_SERVER="$server_address"
 fi

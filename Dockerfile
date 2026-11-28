@@ -199,7 +199,7 @@ USER multirover
 # when no explicit host path or named volume is supplied, Docker still places
 # `/data` on an anonymous volume rather than the replaceable image layer.
 VOLUME ["/data"]
-EXPOSE 8080/tcp 8554/tcp 8189/tcp 8189/udp
+EXPOSE 65037/tcp 8080/tcp 8554/tcp 8189/tcp 8189/udp
 # Use Node's built-in fetch so container readiness does not require curl or a
 # second probe binary in the runtime image. The endpoint verifies the writable
 # data mount and MediaMTX; reaching it already proves Node is accepting HTTP.

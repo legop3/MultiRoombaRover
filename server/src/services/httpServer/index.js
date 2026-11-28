@@ -2,10 +2,15 @@
 // Purpose: Defines the http Server module and the helpers/state used by this service unit.
 // Scope: Keeps runtime behavior unchanged while isolating responsibilities into a clear module boundary.
 const { httpServer } = require('../../globals/http');
+const { roverHttpServer } = require('../../globals/ws');
 const config = require('../../globals/config');
 const logger = require('../../globals/logger').child('httpServer');
 const { startMediaMtx } = require('../mediaMtxService');
 const backupRestoreService = require('../backupRestoreService');
+
+roverHttpServer.listen(65037, () => {
+  logger.info('Rover WebSocket server listening on :65037');
+});
 
 httpServer.listen(config.port, () => {
   logger.info(`Server listening on :${config.port}`);
@@ -31,6 +36,7 @@ function stopAcceptingConnections() {
     responsible for ending the Node process even if an existing socket keeps
     the close callback waiting.
   */
+  if (roverHttpServer.listening) roverHttpServer.close();
   if (httpServer.listening) httpServer.close();
 }
 

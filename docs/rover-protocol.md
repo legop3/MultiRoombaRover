@@ -465,7 +465,7 @@ Config's root fields are `name`, `description`, `color`, `serverUrl`, `serial`, 
 - `autoSideBrush`: boolean enabled, integer speed.
 - `piGpio`: boolean enabled and nested brc, cameraServo, headlight, laser. Disabling it disables the Pi peripheral.
 - `piGpio.brc`: boolean enabled, integer gpioPin, string gpioChip, and duration strings pulseEvery/pulseWidth.
-- `serverUrl`: rover control WebSocket URL; management uses its host with path /rover/management.
+- `serverUrl`: rover control WebSocket URL; control and management always use TCP port 65037 on this host. Management uses the path `/rover/management`. Restrict this port to the rover network and keep it outside public proxy routes and port forwarding.
 
 For a config update, take the complete object from hello, edit fields according to the supplied schema, and send the complete object back. The schema is part of the wire exchange; this document does not prescribe a second set of installation defaults.
 

@@ -203,7 +203,7 @@ type Config struct {
 // configuration is always a complete object.
 func DefaultConfig() Config {
 	cfg := Config{
-		Name: "rover", ServerURL: "ws://localhost:8080/rover",
+		Name: "rover", ServerURL: "ws://localhost:65037/rover",
 		Serial:  SerialConfig{Device: "/dev/ttyUSB0", Baud: 115200},
 		Battery: BatteryConfig{Full: 2068, Warn: 1700, Urgent: 1650},
 		PiGPIO: PiGPIOConfig{
@@ -343,6 +343,9 @@ func validateConfig(cfg *Config) error {
 	if err != nil || server.Hostname() == "" || (server.Scheme != "ws" && server.Scheme != "wss") || server.Path != "/rover" || server.RawQuery != "" || server.Fragment != "" {
 		return errors.New("serverUrl must be ws://host[:port]/rover or wss://host[:port]/rover")
 	}
+	// Keep existing rover configs pointed at their server when moving off the web port.
+	server.Host = net.JoinHostPort(server.Hostname(), "65037")
+	cfg.ServerURL = server.String()
 	if cfg.Serial.Device == "" || cfg.Serial.Baud == 0 {
 		return errors.New("serial device/baud required")
 	}
