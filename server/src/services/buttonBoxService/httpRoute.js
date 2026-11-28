@@ -31,11 +31,14 @@ function registerButtonBoxRoute(deps) {
 
   function denyIfNotLocal(req, res) {
     const ip = normalizeIp(getSocketIp(req));
-    if (isLocalNetwork(ip)) {
+    const forwarded = ['forwarded', 'x-forwarded-for', 'x-real-ip'].some(
+      (name) => req.headers[name] !== undefined
+    );
+    if (!forwarded && isLocalNetwork(ip)) {
       return false;
     }
-    logger.warn('Rejected non-local button press request', { ip: ip || null });
-    res.status(403).json({ error: 'Button presses must originate from local network' });
+    logger.warn('Rejected button press request', { ip: ip || null, forwarded });
+    res.status(403).json({ error: 'Button presses require a direct local connection' });
     return true;
   }
 
